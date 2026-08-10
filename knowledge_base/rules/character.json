@@ -1,0 +1,94 @@
+[
+  {
+    "id": "character_arc_change",
+    "name": "Character Arc as Value Change",
+    "taxonomy_level": "character",
+    "category": "arc",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "A character arc is a measurable change in some value at stake in the character's life (their capacity to love, their moral courage, their self-knowledge) from the story's beginning to its end — not just a change in circumstances. A character whose external situation changes but whose internal values/behavior end where they started has not arced, regardless of plot events around them.",
+    "detection_signal": "For a given character, compare their established starting traits/beliefs/behavior against their state in the final act. Identify what specific internal value changed, and which scene(s) demonstrate the change was earned (not just asserted in a line of dialogue).",
+    "counter_considerations": "Flat arcs (a character who resists change and instead changes the world/other characters around them) are a deliberate, legitimate structure, especially for certain genre protagonists (e.g. many detective/procedural leads). Distinguish 'no arc because it's not needed for this role' from 'arc was intended but not delivered'.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["true_character_vs_characterization", "opening_closing_bookend"]
+  },
+  {
+    "id": "true_character_vs_characterization",
+    "name": "True Character vs. Characterization",
+    "taxonomy_level": "character",
+    "category": "consistency",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "McKee distinguishes 'characterization' (surface traits: appearance, mannerisms, job, style of speech) from 'true character' (what a person actually values and will do, revealed specifically through choices made under pressure). A character's true character should be consistent; their choices under pressure should follow from established values, even when those choices surprise the audience.",
+    "detection_signal": "Identify moments where a character makes a significant choice under pressure (a dilemma, a sacrifice, a betrayal). Check whether that choice is consistent with what's been established about the character's values elsewhere, or represents an unexplained swing.",
+    "counter_considerations": "A choice that seems to contradict established character can be a legitimate, powerful moment IF the story has laid groundwork for a hidden value or a breaking point — the distinction is whether the deviation is earned by prior setup or arrives without support.",
+    "severity_default": "high",
+    "confidence_tier": "low",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["character_arc_change"]
+  },
+  {
+    "id": "want_vs_need",
+    "name": "Conscious Want vs. Unconscious Need",
+    "taxonomy_level": "character",
+    "category": "motivation",
+    "source": {
+      "type": "framework",
+      "originator": "Common across McKee's Object of Desire and Truby-school character theory",
+      "work": null,
+      "note": "The specific want/need distinction is broadly taught across multiple character-theory schools (McKee's conscious/unconscious desire, and John Truby's want/need distinction in The Anatomy of Story, 2007) rather than a single originating source."
+    },
+    "definition": "Protagonists are often strongest when they pursue a conscious, statable Want (the plot-level goal driving the story's action) that is different from, and sometimes in tension with, an unconscious Need (the deeper psychological or moral truth the character must learn). The most satisfying arcs resolve the Need even when the Want is not achieved, or complicate the achievement of the Want by forcing a confrontation with the Need.",
+    "detection_signal": "Identify the protagonist's stated/plot-level goal (Want) and check whether the story also establishes a distinct psychological/emotional gap (Need). Flag cases where only a Want is present with no discernible Need — this often correlates with a plot-mechanical but emotionally flat character arc.",
+    "counter_considerations": "Not every protagonist requires this duality — some genre structures (procedurals, some ensemble pieces) intentionally keep protagonists want-driven without a deep internal arc. Flag as a discussion point, not a universal requirement.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["scene_summaries"],
+    "related_rules": ["character_arc_change"]
+  },
+  {
+    "id": "cast_polarization",
+    "name": "Cast Polarization",
+    "taxonomy_level": "character",
+    "category": "cast_design",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "McKee's first principle of cast design: characters should hold contrasting or contradictory attitudes toward the same events/values. If two characters consistently share the same attitude and react identically to events, the cast has redundancy — one of them isn't earning their place, or the two should be merged.",
+    "detection_signal": "For each pair of characters with significant scene overlap, compare their reactions/attitudes toward shared story events. Flag pairs whose function and perspective appear interchangeable throughout.",
+    "counter_considerations": "Minor/background characters aren't held to this standard — this applies most to characters with meaningful scene presence and narrative function, not incidental figures.",
+    "severity_default": "low",
+    "confidence_tier": "low",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["character_necessity"]
+  },
+  {
+    "id": "character_necessity",
+    "name": "Character Necessity",
+    "taxonomy_level": "character",
+    "category": "necessity",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard script-consulting heuristic, closely related to McKee's cast polarization principle above but framed at the level of 'does this character need to exist at all', which is the framing requested for this analyzer."
+    },
+    "definition": "Every named, recurring character should serve a distinct function: advancing plot, revealing another character (often the protagonist) through contrast or relationship, or carrying a piece of the theme. A character who does none of these across their scenes is a candidate for removal or merging with another character.",
+    "detection_signal": "For each named character, using the knowledge graph's scene-presence index: summarize what plot/character/theme function they serve across all their scenes. Flag characters whose presence seems removable without loss to the story.",
+    "counter_considerations": "Comic relief, atmosphere, and world-building characters can be legitimate even with a thin plot function — weigh genre and tone before flagging.",
+    "severity_default": "low",
+    "confidence_tier": "low",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["cast_polarization"]
+  }
+]

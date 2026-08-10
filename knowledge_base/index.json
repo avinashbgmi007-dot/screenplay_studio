@@ -1,0 +1,382 @@
+{
+  "rule_count": 34,
+  "rules": [
+    {
+      "id": "character_arc_change",
+      "name": "Character Arc as Value Change",
+      "taxonomy_level": "character",
+      "category": "arc",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/character.json"
+    },
+    {
+      "id": "true_character_vs_characterization",
+      "name": "True Character vs. Characterization",
+      "taxonomy_level": "character",
+      "category": "consistency",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/character.json"
+    },
+    {
+      "id": "want_vs_need",
+      "name": "Conscious Want vs. Unconscious Need",
+      "taxonomy_level": "character",
+      "category": "motivation",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/character.json"
+    },
+    {
+      "id": "cast_polarization",
+      "name": "Cast Polarization",
+      "taxonomy_level": "character",
+      "category": "cast_design",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/character.json"
+    },
+    {
+      "id": "character_necessity",
+      "name": "Character Necessity",
+      "taxonomy_level": "character",
+      "category": "necessity",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/character.json"
+    },
+    {
+      "id": "prop_continuity",
+      "name": "Prop Continuity",
+      "taxonomy_level": "continuity",
+      "category": "physical_continuity",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/continuity.json"
+    },
+    {
+      "id": "timeline_consistency",
+      "name": "Timeline Consistency",
+      "taxonomy_level": "continuity",
+      "category": "temporal_continuity",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/continuity.json"
+    },
+    {
+      "id": "character_trait_continuity",
+      "name": "Character Physical/Biographical Trait Continuity",
+      "taxonomy_level": "continuity",
+      "category": "character_continuity",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/continuity.json"
+    },
+    {
+      "id": "world_rule_consistency_continuity",
+      "name": "World-Rule Consistency (Continuity Angle)",
+      "taxonomy_level": "continuity",
+      "category": "world_building",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/continuity.json"
+    },
+    {
+      "id": "on_the_nose_vs_subtext",
+      "name": "On-the-Nose Dialogue vs. Subtext",
+      "taxonomy_level": "dialogue",
+      "category": "subtext",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "exposition_as_ammunition",
+      "name": "Exposition as Ammunition, Not Data Dump",
+      "taxonomy_level": "dialogue",
+      "category": "exposition",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "distinct_character_voice",
+      "name": "Distinct Character Voice",
+      "taxonomy_level": "dialogue",
+      "category": "voice",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "chekhovs_gun",
+      "name": "Chekhov's Gun",
+      "taxonomy_level": "plot_thread",
+      "category": "setup_payoff",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "setup_payoff_general",
+      "name": "General Setup and Payoff",
+      "taxonomy_level": "plot_thread",
+      "category": "setup_payoff",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "subplot_resonance_or_contradiction",
+      "name": "Subplot Function (Resonance or Contradiction)",
+      "taxonomy_level": "plot_thread",
+      "category": "subplot",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "progressive_complications_no_repetition",
+      "name": "Progressive Complications Without Repetition",
+      "taxonomy_level": "plot_thread",
+      "category": "causality",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "no_coincidental_resolution",
+      "name": "No Coincidental Resolution",
+      "taxonomy_level": "plot_thread",
+      "category": "causality",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "antagonist_force_balance",
+      "name": "Antagonistic Force of Comparable Power",
+      "taxonomy_level": "relationship",
+      "category": "antagonism",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/relationship.json"
+    },
+    {
+      "id": "relationship_dynamic_consistency",
+      "name": "Relationship Dynamic Consistency",
+      "taxonomy_level": "relationship",
+      "category": "consistency",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/relationship.json"
+    },
+    {
+      "id": "scene_must_turn",
+      "name": "Every Scene Must Turn",
+      "taxonomy_level": "scene",
+      "category": "scene_structure",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "goal_conflict_disaster",
+      "name": "Scene Structure: Goal, Conflict, Disaster",
+      "taxonomy_level": "scene",
+      "category": "scene_structure",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "obligatory_scene",
+      "name": "The Obligatory Scene",
+      "taxonomy_level": "scene",
+      "category": "payoff",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "enter_late_leave_early",
+      "name": "Enter Late, Leave Early",
+      "taxonomy_level": "scene",
+      "category": "scene_economy",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_text"
+      ],
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "scene_necessity_test",
+      "name": "Scene Necessity (Plot / Character / Theme Test)",
+      "taxonomy_level": "scene",
+      "category": "scene_economy",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "controlling_idea",
+      "name": "Controlling Idea (Theme as Cause-and-Effect Statement)",
+      "taxonomy_level": "story_macro",
+      "category": "theme",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/story_macro.json"
+    },
+    {
+      "id": "theme_contradiction",
+      "name": "Theme Contradiction Without Earned Justification",
+      "taxonomy_level": "story_macro",
+      "category": "theme",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/story_macro.json"
+    },
+    {
+      "id": "genre_convention_fulfillment",
+      "name": "Genre Convention Fulfillment",
+      "taxonomy_level": "story_macro",
+      "category": "genre",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/story_macro.json"
+    },
+    {
+      "id": "world_rule_consistency",
+      "name": "World-Building Rule Consistency",
+      "taxonomy_level": "story_macro",
+      "category": "world_building",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "file": "rules/story_macro.json"
+    },
+    {
+      "id": "three_act_structure",
+      "name": "Three-Act Structure",
+      "taxonomy_level": "structure_pacing",
+      "category": "act_structure",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries",
+        "page_estimates"
+      ],
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "save_the_cat_15_beats",
+      "name": "Save the Cat 15-Beat Sheet",
+      "taxonomy_level": "structure_pacing",
+      "category": "beat_sheet",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries",
+        "page_estimates"
+      ],
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "heros_journey_12_stages",
+      "name": "Hero's Journey (12 Stages)",
+      "taxonomy_level": "structure_pacing",
+      "category": "beat_sheet",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "mckee_five_part_design",
+      "name": "Five-Part Story Design",
+      "taxonomy_level": "structure_pacing",
+      "category": "act_structure",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "pacing_escalation",
+      "name": "Escalation of Conflict (Law of Conflict)",
+      "taxonomy_level": "structure_pacing",
+      "category": "pacing",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "opening_closing_bookend",
+      "name": "Opening/Closing Image Bookend",
+      "taxonomy_level": "structure_pacing",
+      "category": "act_structure",
+      "confidence_tier": "low",
+      "requires": [
+        "scene_summaries"
+      ],
+      "file": "rules/structure_pacing.json"
+    }
+  ]
+}

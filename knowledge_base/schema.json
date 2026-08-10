@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Screenplay Craft Rule",
+  "type": "object",
+  "required": [
+    "id", "name", "taxonomy_level", "category", "source", "definition",
+    "detection_signal", "counter_considerations", "severity_default",
+    "confidence_tier", "requires", "related_rules"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Unique snake_case identifier, stable across versions (other rules reference it via related_rules)."
+    },
+    "name": {"type": "string"},
+    "taxonomy_level": {
+      "type": "string",
+      "enum": [
+        "story_macro", "structure_pacing", "plot_thread", "character",
+        "relationship", "scene", "dialogue", "continuity", "formatting"
+      ]
+    },
+    "category": {"type": "string"},
+    "source": {
+      "type": "object",
+      "required": ["type", "originator", "work"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["framework", "attributed_principle", "general_craft"],
+          "description": "framework = from a named, published system; attributed_principle = credited to a person but not one treatise; general_craft = widely-taught convention with no single originator."
+        },
+        "originator": {"type": ["string", "null"]},
+        "work": {"type": ["string", "null"]},
+        "note": {"type": "string"}
+      }
+    },
+    "definition": {
+      "type": "string",
+      "description": "Original-wording explanation of the concept -- never verbatim text from the source work."
+    },
+    "detection_signal": {
+      "type": "string",
+      "description": "The operational instruction: what an analyzer check should actually look for."
+    },
+    "counter_considerations": {
+      "type": "string",
+      "description": "Legitimate exceptions -- when NOT flagging is the correct call."
+    },
+    "severity_default": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "confidence_tier": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "How mechanically checkable this rule is, independent of how well-established the underlying theory is. Flows through to report framing (low tier => framed as a discussion prompt, not a verdict)."
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["knowledge_graph", "scene_summaries", "scene_text", "page_estimates"]
+      },
+      "description": "What data this rule's check needs available to run."
+    },
+    "related_rules": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "IDs of other rules in this knowledge base this one relates to or builds on."
+    }
+  }
+}

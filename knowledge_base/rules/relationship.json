@@ -1,0 +1,40 @@
+[
+  {
+    "id": "antagonist_force_balance",
+    "name": "Antagonistic Force of Comparable Power",
+    "taxonomy_level": "relationship",
+    "category": "antagonism",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)",
+      "note": "McKee frames this broadly as 'antagonistic force' rather than requiring a literal villain -- the force can be a person, a system, an environment, or an internal contradiction."
+    },
+    "definition": "The force opposing the protagonist should be credible and powerful enough that the protagonist's struggle feels genuinely uncertain. This antagonistic force need not be a villain — it can be a system, an environment, another well-intentioned character, or an internal contradiction — but it must exert real pressure, or the protagonist's eventual success (or failure) won't feel earned.",
+    "detection_signal": "Identify the primary antagonistic force. Assess whether it presents credible, escalating opposition across the story, or whether the protagonist's path is essentially uncontested (obstacles resolved too easily, antagonist absent from large stretches, or antagonist's actions inconsistent with a credible threat).",
+    "counter_considerations": "Internal/psychological antagonism (a character opposed primarily by their own flaws) is a legitimate structure and may not manifest as a external 'force' at all — check for credible internal stakes in these cases instead.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["relationship_dynamic_consistency"]
+  },
+  {
+    "id": "relationship_dynamic_consistency",
+    "name": "Relationship Dynamic Consistency",
+    "taxonomy_level": "relationship",
+    "category": "consistency",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard script-consulting heuristic extending McKee's true-character consistency principle to the level of a relationship between two characters, rather than one character in isolation."
+    },
+    "definition": "The specific dynamic between two characters (power balance, trust level, affection, resentment) established across their shared scenes should evolve in a traceable way — shifts in the relationship should correspond to specific events between them, not jump unexplained between scenes.",
+    "detection_signal": "Using the knowledge graph's scene-presence index: for a character pair with multiple shared scenes, trace the apparent state of their relationship scene-by-scene. Flag discontinuities where the relationship's tenor changes significantly between consecutive shared scenes without an intervening event to justify it.",
+    "counter_considerations": "Time skips between scenes (explicitly marked, e.g. 'THREE MONTHS LATER') can legitimately account for offscreen relationship development — check for such markers before flagging a jump as unexplained.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["true_character_vs_characterization"]
+  }
+]

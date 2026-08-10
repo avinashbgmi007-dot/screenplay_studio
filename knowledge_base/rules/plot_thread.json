@@ -1,0 +1,95 @@
+[
+  {
+    "id": "chekhovs_gun",
+    "name": "Chekhov's Gun",
+    "taxonomy_level": "plot_thread",
+    "category": "setup_payoff",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Anton Chekhov",
+      "work": null,
+      "note": "Popularized via Chekhov's letters and anecdote (commonly summarized as: 'If in Act One you have a pistol hanging on the wall, then it must fire in the last act'), not from a single treatise. Widely adopted across dramatic writing as a principle of narrative economy."
+    },
+    "definition": "Any object, ability, fact, or detail given deliberate narrative emphasis (visual focus, dialogue callout, repetition, a character reacting strongly to it) implicitly promises the audience it will matter later. If that promise goes unfulfilled, the emphasis was a false signal that misdirects audience attention and expectation.",
+    "detection_signal": "Using the knowledge graph: find objects/facts/abilities mentioned with narrative weight (dwelt on visually, named explicitly in dialogue, or reacted to) early or mid-script, that never recur or get referenced again. Not every mentioned object qualifies — the detection must filter for ones that were given emphasis, not passing set-dressing.",
+    "counter_considerations": "Red herrings in mysteries/thrillers are a deliberate, legitimate exception — an object can be emphasized specifically to mislead, as long as that misdirection itself pays off (the audience realizes they were misled). Also: not everything needs a literal payoff if the emphasis was establishing character or mood rather than plot (use judgment on whether the emphasis read as a plot promise).",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["setup_payoff_general"]
+  },
+  {
+    "id": "setup_payoff_general",
+    "name": "General Setup and Payoff",
+    "taxonomy_level": "plot_thread",
+    "category": "setup_payoff",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)",
+      "note": "McKee frames this via 'the gap' -- the audience is sent back through the story seeking answers, and can only find them if information was planted in advance."
+    },
+    "definition": "Beyond physical objects (Chekhov's Gun), any planted piece of information, a promise made in dialogue ('I'll tell you everything when this is over'), a skill mentioned once, or a relationship detail should be deliberately paid off later. A payoff that arrives without a setup can feel unearned (a deus ex machina); a setup without a payoff feels like an abandoned thread.",
+    "detection_signal": "Using the knowledge graph: identify explicit promises made in dialogue ('I'll show you when...', 'someday you'll understand...') and check whether the promised information/event is later delivered. Cross-reference skills or capabilities mentioned once ('I used to be a locksmith') against whether they're used at a later point of narrative need.",
+    "counter_considerations": "Some unresolved threads are intentional (open endings, sequel setups, thematic ambiguity) — flag as a discussion point rather than an error, especially for anything resolved-but-ambiguous.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["chekhovs_gun"]
+  },
+  {
+    "id": "subplot_resonance_or_contradiction",
+    "name": "Subplot Function (Resonance or Contradiction)",
+    "taxonomy_level": "plot_thread",
+    "category": "subplot",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "A subplot earns its place by relating to the central plot's controlling idea (theme) in one of two ways: resonance (the subplot reinforces the same thematic idea through a different set of circumstances, adding variation) or contradiction (the subplot deliberately argues against the central theme, adding irony and complexity). A subplot that does neither reads as a disconnected distraction.",
+    "detection_signal": "For each identified subplot, compare its apparent thematic throughline against the story's central theme/controlling idea. Flag subplots that seem thematically unrelated to the main plot and don't appear to intentionally contrast it either.",
+    "counter_considerations": "Purely comedic or tonal-relief subplots can be legitimate without deep thematic connection, especially in ensemble comedies — use judgment on genre expectations before flagging.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["scene_summaries"],
+    "related_rules": ["chekhovs_gun"]
+  },
+  {
+    "id": "progressive_complications_no_repetition",
+    "name": "Progressive Complications Without Repetition",
+    "taxonomy_level": "plot_thread",
+    "category": "causality",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "Each complication the protagonist faces should cross a new point of no return and be qualitatively different/harder than the last, not a repetition of a similar obstacle. Repetitiousness ('the enemy of rhythm,' in McKee's framing) causes a story to feel like it's spinning in place rather than advancing.",
+    "detection_signal": "Trace the sequence of major obstacles the protagonist faces. Flag cases where consecutive complications are structurally identical (same type of obstacle, similar stakes, no escalation or new information).",
+    "counter_considerations": "A deliberate escalating repetition (each attempt fails in a worse way, e.g. comedic 'rule of three' structures) is a legitimate device — the key distinction is whether repetition compounds or merely repeats.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["scene_summaries"],
+    "related_rules": ["pacing_escalation"]
+  },
+  {
+    "id": "no_coincidental_resolution",
+    "name": "No Coincidental Resolution",
+    "taxonomy_level": "plot_thread",
+    "category": "causality",
+    "source": {
+      "type": "framework",
+      "originator": "Aristotle, widely echoed in modern craft writing",
+      "work": "Poetics (c. 335 BCE)",
+      "note": "Aristotle argued the resolution of a plot should arise from the internal logic of the story, not from chance or external intervention (later termed 'deus ex machina')."
+    },
+    "definition": "Coincidence is a legitimate tool to *complicate* a story (bad luck creating a new problem is fair), but resolving the central conflict through coincidence, luck, or an external force with no prior setup undercuts the causal logic the audience has been tracking, and reads as unearned.",
+    "detection_signal": "Identify the mechanism that resolves the central conflict. Check whether that mechanism was established/set up earlier (a character's known skill, a previously-planted object or relationship) versus introduced only at the point of resolution.",
+    "counter_considerations": "Genre conventions vary — some comedic or absurdist/farce traditions deliberately use coincidence as a structural device throughout, not just at the ending, and audiences read it as part of the genre's rules.",
+    "severity_default": "high",
+    "confidence_tier": "medium",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["setup_payoff_general"]
+  }
+]

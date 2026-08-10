@@ -1,0 +1,59 @@
+[
+  {
+    "id": "on_the_nose_vs_subtext",
+    "name": "On-the-Nose Dialogue vs. Subtext",
+    "taxonomy_level": "dialogue",
+    "category": "subtext",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard, widely-taught screenwriting principle echoed across nearly every major craft source (McKee, Field, Snyder, and general script-consulting practice) in similar terms; not attributable to one originator."
+    },
+    "definition": "Dialogue is 'on-the-nose' when a character states their feelings, intentions, or the scene's meaning directly and explicitly, rather than the audience inferring it from what's said around the point, from subtext, or from behavior. Real people rarely announce their exact emotional state; effective dialogue usually operates on two levels — what's said, and what's actually meant/felt underneath.",
+    "detection_signal": "For emotionally significant dialogue exchanges, check whether characters state their feelings/intentions directly and explicitly ('I'm furious that you lied to me') versus expressing them indirectly through word choice, deflection, subject-changing, or action ('You know what? Forget it. I'll take the bus.').",
+    "counter_considerations": "Direct emotional statements are appropriate and even necessary at certain high points (a genuine, earned confession scene) or for certain character types (a character established as blunt/socially direct). Flag patterns of on-the-nose dialogue throughout a script, not isolated instances at climactic moments.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": ["scene_text"],
+    "related_rules": ["exposition_as_ammunition"]
+  },
+  {
+    "id": "exposition_as_ammunition",
+    "name": "Exposition as Ammunition, Not Data Dump",
+    "taxonomy_level": "dialogue",
+    "category": "exposition",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)",
+      "note": "McKee's framing: exposition should be given as 'ammunition' -- used by a character to pursue a goal or win a conflict within a scene -- rather than delivered because the audience needs the information."
+    },
+    "definition": "Background/world/plot information a character states should serve that character's immediate scene goal (persuading, threatening, confessing, deflecting) rather than existing purely to inform the audience. Dialogue that exists only because the audience needs to know something, with no in-scene dramatic purpose for the character saying it, reads as an exposition dump.",
+    "detection_signal": "For dialogue passages containing significant background/plot information, check whether the speaking character has an in-scene motivation for saying it at that moment (are they trying to accomplish something by telling this to this specific listener, right now), or whether the information's only function is audience clarity.",
+    "counter_considerations": "Some genres/formats (procedurals with a 'explain the case' convention, certain comedic or meta styles) intentionally lean into direct exposition as a stylistic choice — weigh genre/tone.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": ["scene_text"],
+    "related_rules": ["on_the_nose_vs_subtext"]
+  },
+  {
+    "id": "distinct_character_voice",
+    "name": "Distinct Character Voice",
+    "taxonomy_level": "dialogue",
+    "category": "voice",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Widely-taught principle, closely related to McKee's cast polarization (characters should hold contrasting attitudes) but applied specifically to how characters speak rather than what they believe."
+    },
+    "definition": "Different characters should be identifiable by dialogue alone, without speaker tags — through consistent differences in vocabulary, sentence rhythm, formality, verbal tics, or subject fixation, reflecting differences in background, education, temperament, or worldview.",
+    "detection_signal": "Compare dialogue samples from different major characters for surface-level distinguishability (vocabulary complexity, sentence length, characteristic phrases). This is flagged here as a genuinely lower-confidence check than most others in this knowledge base — true stylometric distinctiveness is hard to assess reliably, especially for a local model, and false positives/negatives are both likely.",
+    "counter_considerations": "Characters from similar backgrounds who are meant to sound similar (e.g. members of a close-knit group with shared slang) may legitimately share vocal qualities — the check should focus on characters expected to contrast, not flag similarity as inherently wrong.",
+    "severity_default": "low",
+    "confidence_tier": "low",
+    "requires": ["scene_text", "knowledge_graph"],
+    "related_rules": ["cast_polarization"]
+  }
+]

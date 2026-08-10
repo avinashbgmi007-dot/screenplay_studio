@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+coverage/
+
+# Python
+.pytest_cache/
+__pycache__/
+
+# Temp
+.tmp/
+*.tmp
+
+# Local tooling
+.remember/
+.serena/
+
+# Graphify
+graphify-out/
+.graphify_*
+graph-chunk*.json
+.tmp_graph.*
+test-output.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
