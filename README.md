@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Script Doctor & Co-Writer Studio
 
 A local, privacy-first screenplay analysis system running entirely on your
@@ -137,3 +138,6 @@ differently.
   `failed` (not `complete`) — there's no partial-category resume within a
   single analyze stage (e.g. 5/6 categories succeeding doesn't let you
   retry just the 6th without re-running all 6).
+=======
+# screenplay_studio
+>>>>>>> 6a9b8f40cd0ea9130a04d2f315febdf36faa601a
