@@ -1030,7 +1030,32 @@ In `main()`, add the argument and assignment:
     memory_path = args.memory_path
 ```
 
-- [ ] **Step 3: Modify `cli.py`** — in the `chat` command, at its engine construction site, apply the same pattern: add a `--memory-path` argument to the chat subparser (default `None`), and when constructing the engine pass `memory=WriterMemory.load(args.memory_path) if args.memory_path else None`.
+- [ ] **Step 3: Modify `cli.py`** (three precise edits):
+
+Edit 1 — change `run_repl` (line 55) to accept and use a `memory` param:
+
+```python
+def run_repl(session: Session, store: SessionStore, client: LlamaServerClient, memory=None):
+    script_ctx, report_ctx = _load_contexts(session)
+    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory)
+```
+
+Edit 2 — in `cmd_chat`, build the memory from the flag just before the `run_repl` call:
+
+```python
+    memory = None
+    if args.memory_path:
+        from .memory import WriterMemory
+        memory = WriterMemory.load(args.memory_path)
+
+    run_repl(session, store, client, memory=memory)
+```
+
+Edit 3 — add the argument to the `chat` subparser (after the existing `--sessions-dir` line):
+
+```python
+    p_chat.add_argument("--memory-path", default=None, help="Optional writer relationship memory file")
+```
 
 - [ ] **Step 4: Verify nothing regressed**
 
