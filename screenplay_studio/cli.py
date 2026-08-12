@@ -56,7 +56,7 @@ def cmd_run(args):
             orch.run_parse()
             print("Parse stage complete.")
         elif args.only == "analyze":
-            orch.run_analyze(categories=categories)
+            orch.run_analyze(categories=categories, report_language=args.lang)
             print("Analyze stage complete.")
         elif args.only == "chat":
             session, engine, store = orch.start_chat()
@@ -64,7 +64,7 @@ def cmd_run(args):
         else:
             orch.run_parse()
             print("Parse stage complete.")
-            orch.run_analyze(categories=categories)
+            orch.run_analyze(categories=categories, report_language=args.lang)
             print("Analyze stage complete.")
             if not args.skip_chat:
                 session, engine, store = orch.start_chat()
@@ -88,7 +88,7 @@ def cmd_resume(args):
     orch = Orchestrator(manifest)
     try:
         orch.run_parse()
-        orch.run_analyze()
+        orch.run_analyze(report_language=args.lang)
         if not args.skip_chat:
             session, engine, store = orch.start_chat()
             _run_chat_repl(session, engine, store)
@@ -127,6 +127,8 @@ def main():
     p_run.add_argument("--categories", help="Comma-separated analyzer categories to run")
     p_run.add_argument("--only", choices=["parse", "analyze", "chat"], help="Run only one stage")
     p_run.add_argument("--skip-chat", action="store_true", help="Don't hand off to interactive chat after analyze")
+    p_run.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
+                      help="Language of the analysis report (eng, tenglish, hindi, tamil)")
     p_run.set_defaults(func=cmd_run)
 
     p_resume = sub.add_parser("resume", help="Resume an existing project — only reruns incomplete stages")
@@ -134,14 +136,42 @@ def main():
     p_resume.add_argument("--server", help="llama-server base URL override")
     p_resume.add_argument("--model", help="Explicit model id override")
     p_resume.add_argument("--skip-chat", action="store_true")
+    p_resume.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
+                      help="Language of the analysis report (eng, tenglish, hindi, tamil)")
     p_resume.set_defaults(func=cmd_resume)
 
     p_status = sub.add_parser("status", help="Show a project's stage status")
     p_status.add_argument("project", help="Project directory")
     p_status.set_defaults(func=cmd_status)
 
+    p_watch = sub.add_parser("watch", help="Auto-analyze screenplays dropped into a folder")
+    p_watch.add_argument("watch_dir", help="Folder to watch for new screenplays")
+    p_watch.add_argument("--projects-dir", default="./watched_projects", help="Where to create projects")
+    p_watch.add_argument("--server", default="http://localhost:8080", help="llama-server base URL")
+    p_watch.add_argument("--model", help="Explicit model id override")
+    p_watch.add_argument("--poll", type=int, default=5, help="Seconds between scans (default 5)")
+    p_watch.add_argument("--once", action="store_true", help="Process whatever's there once and exit (no loop)")
+    p_watch.add_argument("--categories", help="Comma-separated analyzer categories to run")
+    p_watch.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
+                      help="Language of the analysis report (eng, tenglish, hindi, tamil)")
+    p_watch.set_defaults(func=cmd_watch)
+
     args = parser.parse_args()
     args.func(args)
+
+
+def cmd_watch(args):
+    from .watch import process_pending, watch_loop
+    categories = tuple(args.categories.split(",")) if args.categories else None
+    if args.once:
+        results = process_pending(args.watch_dir, args.projects_dir, args.server, model=args.model,
+                                  categories=categories, report_language=args.lang)
+        for r in results:
+            status = "OK" if r["ok"] else "FAILED"
+            print(f"{status}: {r['filename']} → {r['project'] or r['error']}")
+        return
+    watch_loop(args.watch_dir, args.projects_dir, args.server,
+               poll_interval=args.poll, model=args.model, categories=categories, report_language=args.lang)
 
 
 if __name__ == "__main__":

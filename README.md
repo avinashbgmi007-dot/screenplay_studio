@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Script Doctor & Co-Writer Studio
 
 A local, privacy-first screenplay analysis system running entirely on your
@@ -129,6 +128,53 @@ produced despite some errors) is still marked "complete" with the errors
 visible — these are genuinely different situations and now behave
 differently.
 
+## Indian-language scripts (Tenglish / Hindi / Tamil)
+
+The parser natively handles Indian-language screenplays alongside standard
+English ones — the classification rules were made script-aware:
+
+- **Tenglish** — Telugu spoken-lines written in the Roman alphabet with
+  standard `INT.`/`EXT.` headings (the dominant Telugu/Tamil screenwriting
+  convention). Handles `EXT/INT.` headings, all-caps beat markers like
+  `TWO MONTHS EARLIER` (never misread as speakers), and underscore names
+  like `GOON_ONE` (normalized to `GOON ONE`).
+- **Hindi (Devanagari)** — caseless script: `इंट.`/`एक्सट.` scene headings
+  and speaker cues are detected by content context since there's no
+  uppercase. Same for **Tamil** (`உள்.`/`வெளி.` headings).
+
+### PDFs without a text layer (scanned / some Final Draft exports)
+
+Some PDFs — including `tests/fixtures/Pain_FD_4_scenes.pdf` — carry fonts
+without a Unicode mapping, so no text extractor can read them. The parser
+falls back to **built-in OCR**: it renders each page and reads it with
+tesseract (or easyocr), auto-detected — no code changes needed:
+
+```bash
+# install once (recommended lang packs for Indian scripts)
+pip install pytesseract
+# + install tesseract itself with eng, tel, hin, tam language packs
+
+# optional overrides (defaults: auto-detect, eng+tel+hin)
+export SCRIPT_DOCTOR_OCR=tesseract        # or easyocr
+python -m screenplay_studio run my_script.pdf --project ./p
+```
+
+If no OCR engine is installed, the parser returns a clear, actionable
+error (re-export as .fdx/.fountain, or install tesseract) instead of a
+silent empty parse.
+
+### Report language (English / Tenglish / Hindi / Tamil)
+
+The analysis report can be produced in the language the script is in:
+
+```bash
+python -m screenplay_studio run my_script.fountain --project ./p --lang tenglish
+python -m screenplay_studio watch ./inbox --lang hindi
+```
+
+In the web app, pick "Report in" next to **Run Analysis**. Quotes in the
+report stay verbatim from the script so verification still works.
+
 ## Known limitations
 
 - The orchestrator assumes all four component packages sit as siblings
@@ -138,6 +184,6 @@ differently.
   `failed` (not `complete`) — there's no partial-category resume within a
   single analyze stage (e.g. 5/6 categories succeeding doesn't let you
   retry just the 6th without re-running all 6).
-=======
-# screenplay_studio
->>>>>>> 6a9b8f40cd0ea9130a04d2f315febdf36faa601a
+- OCR-read PDFs are best-effort: scene boundaries and speaker attribution
+  come from OCR line breaks, so spot-check them (a warning marks the
+  project's parse as low-confidence).

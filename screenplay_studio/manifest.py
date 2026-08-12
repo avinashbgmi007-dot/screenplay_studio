@@ -56,6 +56,9 @@ class ProjectManifest:
         "parse": StageStatus(), "analyze": StageStatus(), "chat": StageStatus(),
     })
     cowriter_session_id: str = None
+    drafts: list = field(default_factory=list)  # [{name, source_filename, uploaded_at}] — uploaded drafts
+    active_draft: str = None  # None => the original first upload is active
+    report_language: str = "eng"  # language of the analysis report: eng | tenglish | hindi | tamil
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -92,6 +95,11 @@ class ProjectManifest:
     def sessions_dir(self) -> str:
         return os.path.join(self.project_dir, "sessions")
 
+    @property
+    def progress_path(self) -> str:
+        """Live per-stage analysis progress (written by the analyzer's callback)."""
+        return os.path.join(self.project_dir, "progress.json")
+
     def stage(self, name: str) -> StageStatus:
         if name not in self.stages:
             self.stages[name] = StageStatus()
@@ -124,6 +132,9 @@ class ProjectManifest:
             "timeout": self.timeout,
             "stages": {k: v.to_dict() for k, v in self.stages.items()},
             "cowriter_session_id": self.cowriter_session_id,
+            "drafts": self.drafts,
+            "active_draft": self.active_draft,
+            "report_language": self.report_language,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -137,6 +148,9 @@ class ProjectManifest:
             model_id=d.get("model_id"),
             timeout=d.get("timeout", 600),
             cowriter_session_id=d.get("cowriter_session_id"),
+            drafts=d.get("drafts", []),
+            active_draft=d.get("active_draft"),
+            report_language=d.get("report_language", "eng"),
             created_at=d.get("created_at", time.time()),
             updated_at=d.get("updated_at", time.time()),
             stages={},

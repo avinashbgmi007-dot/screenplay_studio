@@ -44,10 +44,11 @@ def _judge_candidate(
     candidate_name: str,
     mention_contexts: list[dict],
     total_scenes: int,
+    language: str = "eng",
 ) -> dict:
     grammar = principle_judgment_grammar()
     system, user = prompts.principle_judgment_prompt(
-        candidate_kind, candidate_name, mention_contexts, rules_fragment, total_scenes
+        candidate_kind, candidate_name, mention_contexts, rules_fragment, total_scenes, language=language
     )
     return client.chat_json(system, user, grammar=grammar, max_tokens=500)
 
@@ -62,6 +63,8 @@ def _finding_from_judgment(
     Diagnosis only — no suggested_resolution field. Piece 2 explains what's
     wrong and why; proposing how to fix it is Piece 3's job, and only when
     the writer actually asks for it."""
+    if not isinstance(judgment, dict):
+        return None  # model returned a non-object (e.g. bare array) — not actionable
     if not judgment.get("significant") or judgment.get("paid_off"):
         return None
 
@@ -84,6 +87,7 @@ def run_principles_engine(
     rules_ctx,
     total_scenes: int,
     max_candidates: int = 15,
+    language: str = "eng",
 ) -> tuple[list[dict], list[str]]:
     """
     Returns (findings, errors). Caps at max_candidates total (props +
@@ -106,7 +110,7 @@ def run_principles_engine(
         try:
             judgment = _judge_candidate(
                 client, rules_fragment, "recurring_object", prop.name,
-                prop.mention_texts, total_scenes,
+                prop.mention_texts, total_scenes, language,
             )
             finding = _finding_from_judgment("recurring_object", prop.name, prop.scenes_mentioned, judgment, "chekhovs_gun")
             if finding:
@@ -119,7 +123,7 @@ def run_principles_engine(
             mention_contexts = [{"scene": promise.scene_number, "text": promise.text}]
             judgment = _judge_candidate(
                 client, rules_fragment, "dialogue_promise", promise.text,
-                mention_contexts, total_scenes,
+                mention_contexts, total_scenes, language,
             )
             finding = _finding_from_judgment(
                 "dialogue_promise", promise.text, [promise.scene_number], judgment, "setup_payoff_general"

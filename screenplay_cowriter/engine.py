@@ -8,6 +8,7 @@ free operations that don't need a model call — this module handles only the
 from .models import Session, Message
 from .llm_client import LlamaServerClient
 from .context import ScriptContext, ReportContext, build_system_prompt, build_scene_context_block, extract_scene_refs
+from .language_meta import strip_language_meta
 
 HISTORY_WINDOW = 16  # most recent messages kept verbatim; older context relies on the standing report summary
 
@@ -36,7 +37,7 @@ class CoWriterEngine:
 
         messages.append({"role": "user", "content": user_text})
 
-        reply = self.client.chat(messages)
+        reply = strip_language_meta(self.client.chat(messages))
 
         branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode))
         branch.messages.append(Message(role="assistant", content=reply, mode=branch.active_mode))

@@ -45,29 +45,41 @@ class Orchestrator:
         return m
 
     # ---- stage: analyze ----
-    def run_analyze(self, categories: tuple = None) -> ProjectManifest:
+    def run_analyze(self, categories: tuple = None, report_language: str = None) -> ProjectManifest:
         m = self.manifest
         if m.stage("parse").status != "complete":
             raise OrchestratorError("Cannot analyze — parse stage hasn't completed successfully yet.")
         if m.stage("analyze").status == "complete":
             return m
 
+        if report_language:
+            m.report_language = report_language
+            m.save()
+        language = m.report_language or "eng"
+
         m.mark_running("analyze")
+        import json as _json
         try:
             from screenplay_parser.models import ScriptDocument
             from screenplay_analyzer.pipeline import analyze
             from screenplay_analyzer.llm_client import LlamaServerClient
             from screenplay_analyzer.report import save_report
 
+            def progress_cb(event):
+                with open(m.progress_path, "w", encoding="utf-8") as f:
+                    _json.dump(event, f)
+
             doc = ScriptDocument.load(m.parsed_path)
             client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout)
 
-            kwargs = {}
+            kwargs = {"report_language": language}
             if categories:
                 kwargs["run_categories"] = categories
 
-            result = analyze(doc, client, **kwargs)
+            result = analyze(doc, client, progress_cb=progress_cb, **kwargs)
             save_report(result, m.report_md_path, m.report_findings_path)
+            with open(m.progress_path, "w", encoding="utf-8") as f:
+                _json.dump({"stage": "done", "status": "complete", "detail": "Analysis complete"}, f)
 
             if result.model_used:
                 m.model_id = result.model_used
@@ -92,6 +104,12 @@ class Orchestrator:
             else:
                 m.mark_complete("analyze", {"report_md": m.report_md_path, "report_findings": m.report_findings_path})
         except Exception as e:
+            import json as _json2
+            try:
+                with open(m.progress_path, "w", encoding="utf-8") as f:
+                    _json2.dump({"stage": "failed", "status": "failed", "detail": str(e)}, f)
+            except Exception:
+                pass
             m.mark_failed("analyze", str(e))
             raise OrchestratorError(f"Analyze stage failed: {e}") from e
         return m

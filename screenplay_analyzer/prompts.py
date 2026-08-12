@@ -54,13 +54,59 @@ CONFIDENCE_TIER_INSTRUCTION = (
     "'worth considering', not verdicts."
 )
 
+# Report language: the analysis report (findings, coverage) can be produced in
+# English (default), Tenglish (Telugu spoken-lines written in the Latin/Roman
+# alphabet — the everyday writing style of Telugu screenwriting), Hindi
+# (Devanagari), or Tamil. The instruction is appended to every category prompt.
+# evidence_quote is exempt: quotes must stay verbatim from the script so the
+# verifier can check them.
+REPORT_LANGUAGES = {
+    "eng": "",
+    "tenglish": (
+        "\n\nIMPORTANT — Write your entire response in Tenglish: Telugu (and Hindi, where "
+        "natural) rendered in the Latin/Roman alphabet exactly as spoken in everyday "
+        "Telugu conversation, e.g. \"ippativarku Siddharth unconscious unnadani cheppaledu\", "
+        "\"noppi ni feel avvaledu\". Keep English for technical craft terms (scene, act, "
+        "arc, pacing, premise). Exception: evidence_quote must remain verbatim from the "
+        "script, never translated."
+    ),
+    "hindi": (
+        "\n\nIMPORTANT — Write your entire response in Hindi, in Devanagari script. "
+        "Keep English for technical craft terms (scene, act, arc, pacing, premise). "
+        "Exception: evidence_quote must remain verbatim from the script, never translated."
+    ),
+    "tamil": (
+        "\n\nIMPORTANT — Write your entire response in Tamil, in Tamil script. "
+        "Keep English for technical craft terms (scene, act, arc, pacing, premise). "
+        "Exception: evidence_quote must remain verbatim from the script, never translated."
+    ),
+}
 
-def scene_summary_prompt(scenes_chunk: list[dict]) -> tuple[str, str]:
+
+def language_instruction(language: str = "eng") -> str:
+    """Suffix appended to category prompts to control the report's language.
+    English (default) adds nothing, so existing behavior is unchanged."""
+    return REPORT_LANGUAGES.get(language or "eng", "")
+
+
+LANGUAGE_META_INSTRUCTION = (
+    "Never comment on the script's LANGUAGE itself. Do not identify, classify, or "
+    "speculate about what language or dialect the script is written in (e.g. \"reads "
+    "as regional\", \"probably Telugu\", \"a South Indian language\", \"mixed "
+    "language\", \"code-switching\"), and never mention subtitles, translation, or "
+    "what non-native speakers will or won't understand. The writer knows what "
+    "language their pages are in. Feedback is about story, character, dialogue, "
+    "structure, and craft — nothing else."
+)
+
+
+def scene_summary_prompt(scenes_chunk: list[dict], language: str = "eng") -> tuple[str, str]:
     system = (
         "You are a script analyst assistant. Summarize each screenplay scene in 1-2 "
         "plain sentences: what happens, who's involved, and its narrative purpose. "
         "Be concise and factual — no evaluation, just what happens. "
         "Respond only with JSON matching the required schema."
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION}"
     )
     parts = []
     for s in scenes_chunk:
@@ -73,7 +119,7 @@ def scene_summary_prompt(scenes_chunk: list[dict]) -> tuple[str, str]:
     return system, user
 
 
-def dialogue_analysis_prompt(scenes_chunk: list[dict], rules_fragment: str = "", chekhov_fragment: str = "") -> tuple[str, str]:
+def dialogue_analysis_prompt(scenes_chunk: list[dict], rules_fragment: str = "", chekhov_fragment: str = "", language: str = "eng") -> tuple[str, str]:
     system = (
         "You are a professional script doctor reviewing dialogue and action lines. "
         "For the scenes below, identify specific issues.\n\n"
@@ -90,6 +136,7 @@ def dialogue_analysis_prompt(scenes_chunk: list[dict], rules_fragment: str = "",
         f"{chekhov_fragment}\n\n"
         "Only flag genuine issues — don't manufacture findings if the writing is fine. "
         f"{CITATION_INSTRUCTION} Use category \"dialogue\" for dialogue/action findings. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
     parts = []
@@ -99,25 +146,27 @@ def dialogue_analysis_prompt(scenes_chunk: list[dict], rules_fragment: str = "",
     return system, user
 
 
-def theme_analysis_prompt(scene_overview: str, title: str, rules_fragment: str = "") -> tuple[str, str]:
+def theme_analysis_prompt(scene_overview: str, title: str, rules_fragment: str = "", language: str = "eng") -> tuple[str, str]:
     system = (
         "You are a professional script doctor analyzing theme and subtext across an "
         "entire screenplay.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"theme\" for all findings. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
     user = f"Screenplay: {title or '(untitled)'}\n\nScene-by-scene overview:\n\n{scene_overview}"
     return system, user
 
 
-def character_analysis_prompt(scene_overview: str, title: str, characters: list[str], rules_fragment: str = "") -> tuple[str, str]:
+def character_analysis_prompt(scene_overview: str, title: str, characters: list[str], rules_fragment: str = "", language: str = "eng") -> tuple[str, str]:
     system = (
         "You are a professional script doctor analyzing character arcs across an "
         "entire screenplay. Focus on the characters with the most scene presence — "
         "don't force findings for minor characters.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"character\" for all findings. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
     user = (
@@ -128,12 +177,13 @@ def character_analysis_prompt(scene_overview: str, title: str, characters: list[
     return system, user
 
 
-def structure_analysis_prompt(scene_overview: str, title: str, total_scenes: int, estimated_pages, rules_fragment: str = "") -> tuple[str, str]:
+def structure_analysis_prompt(scene_overview: str, title: str, total_scenes: int, estimated_pages, rules_fragment: str = "", language: str = "eng") -> tuple[str, str]:
     page_note = f"~{estimated_pages} pages" if estimated_pages else "page count unknown"
     system = (
         "You are a professional script doctor analyzing structure and pacing.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"structure\" for all findings. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
     user = (
@@ -143,13 +193,57 @@ def structure_analysis_prompt(scene_overview: str, title: str, total_scenes: int
     return system, user
 
 
-def scene_function_prompt(scene_overview: str, title: str, rules_fragment: str = "") -> tuple[str, str]:
+def logline_test_prompt(logline: str, scene_overview: str, title: str, language: str = "eng") -> tuple[str, str]:
+    system = (
+        "You are a professional script doctor. A logline's job is to land the whole "
+        "premise in one sentence: a specific protagonist, a concrete want, a real "
+        "obstacle, and stakes the audience can feel. Judge the screenplay's logline "
+        "against that standard and report a signal: strong (it lands), workable "
+        "(it mostly lands but needs tightening), or muddled (a reader can't tell "
+        "what the movie is). Diagnose only — say what works, what muddles it, and "
+        "which element(s) a clean logline needs that are missing. Offer one \"tightened\" "
+        "example that keeps the writer's actual premise intact — never invent plot "
+        "that isn't in the scene overview. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
+        "Respond only with JSON matching the required schema."
+    )
+    user = (
+        f"Screenplay: {title or '(untitled)'}\n\n"
+        f"Current logline: {logline or '(none)'}\n\n"
+        f"Scene-by-scene overview:\n\n{scene_overview}"
+    )
+    return system, user
+
+
+def character_reads_prompt(scene_overview: str, title: str, characters: list[str], language: str = "eng") -> tuple[str, str]:
+    system = (
+        "You are an impartial first-time reader — you have never met these characters "
+        "and don't know what the writer intends. For each main character, report how "
+        "they ACTUALLY come across on the page to a stranger (the impression their "
+        "words and actions create), what the script appears to intend them to be, "
+        "and the gap between the two. Be specific and evidence-anchored. If a "
+        "character reads exactly as intended, say the gap is minimal — don't force "
+        "a divergence. Only include characters with real scene presence. Diagnose "
+        "only, never prescribe fixes. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
+        "Respond only with JSON matching the required schema."
+    )
+    user = (
+        f"Screenplay: {title or '(untitled)'}\n"
+        f"Characters: {', '.join(characters)}\n\n"
+        f"Scene-by-scene overview:\n\n{scene_overview}"
+    )
+    return system, user
+
+
+def scene_function_prompt(scene_overview: str, title: str, rules_fragment: str = "", language: str = "eng") -> tuple[str, str]:
     system = (
         "You are a professional script doctor evaluating whether each scene earns "
         "its place. Be conservative: only flag a scene if you're genuinely confident "
         "it isn't pulling weight.\n\n"
         f"{rules_fragment}\n\n{CONFIDENCE_TIER_INSTRUCTION}\n\n"
         f"{CITATION_INSTRUCTION_SUMMARY} Use category \"scene_function\" for all findings. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
     user = f"Screenplay: {title or '(untitled)'}\n\nScene-by-scene overview:\n\n{scene_overview}"
@@ -162,6 +256,7 @@ def principle_judgment_prompt(
     mention_contexts: list[dict],
     rule_fragment: str,
     total_scenes: int,
+    language: str = "eng",
 ) -> tuple[str, str]:
     """
     candidate_kind: "recurring_object" | "dialogue_promise"
@@ -185,6 +280,7 @@ def principle_judgment_prompt(
         "explain in 'reasoning' what the emphasis was and, if unresolved, why "
         "that matters. Do NOT propose how to fix it; that's a separate "
         "conversation the writer has if and when they want it. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
     contexts_text = "\n".join(f"Scene {c['scene']}: {c['text']}" for c in mention_contexts)
@@ -197,12 +293,35 @@ def principle_judgment_prompt(
     return system, user
 
 
-def coverage_prompt(scene_overview: str, title: str, author: str) -> tuple[str, str]:
+def genre_check_prompt(genre: str, conventions: list[str], scene_overview: str, language: str = "eng") -> tuple[str, str]:
+    conventions_text = "\n".join(f"- {c}" for c in conventions)
+    system = (
+        "You are a genre specialist checking whether this screenplay delivers on its "
+        "genre's audience expectations. The conventions below are expectations to "
+        "test, not rules to obey — a great script can violate any of them on purpose. "
+        "For each one, judge whether the script delivers, misses, or deliberately "
+        "subverts it. Only report findings that are genuinely actionable or genuinely "
+        "notable — don't manufacture findings for conventions the script simply "
+        "doesn't emphasize. When a miss looks like a deliberate choice, say so.\n\n"
+        f"CONVENTIONS TO TEST ({genre or 'unknown genre'}):\n{conventions_text}\n\n"
+        f"{CITATION_INSTRUCTION_SUMMARY} Use category \"genre\" for all findings. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
+        "Respond only with JSON matching the required schema."
+    )
+    user = (
+        "Evaluate this screenplay against the genre conventions above. "
+        f"Scene-by-scene overview:\n\n{scene_overview}"
+    )
+    return system, user
+
+
+def coverage_prompt(scene_overview: str, title: str, author: str, language: str = "eng") -> tuple[str, str]:
     system = (
         "You are writing professional script coverage, the standard industry format "
         "used by studios and agencies to quickly assess a screenplay. Be honest and "
         "specific, not generically positive. recommendation must be exactly one of "
         "\"pass\", \"consider\", or \"recommend\". "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
         "Respond only with JSON matching the required schema."
     )
     user = (

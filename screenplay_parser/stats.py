@@ -11,6 +11,32 @@ lead usually means a name-normalization mismatch upstream).
 from collections import Counter, defaultdict
 
 from .models import ElementType, ScriptDocument
+from .structure import assign_acts, pacing_curve, character_arc
+
+WORDS_PER_SCREEN_MINUTE = 160  # ~1 screenplay page per minute, ~160 words/page
+
+
+def scene_estimates(doc: ScriptDocument) -> dict:
+    """Per-scene word counts and runtime estimate: {scene_number: {words,
+    minutes, dialogue_lines}}. Runtime assumes ~1 page per minute (160
+    words/page), counting dialogue, parentheticals, and action — the parts
+    of a scene that actually play. Output is keyed by scene_number for
+    direct lookup."""
+    out = {}
+    for s in doc.scenes:
+        words = 0
+        dialogue_lines = 0
+        for el in s.elements:
+            if el.type in (ElementType.DIALOGUE, ElementType.PARENTHETICAL, ElementType.ACTION):
+                words += len(el.text.split())
+                if el.type is ElementType.DIALOGUE:
+                    dialogue_lines += 1
+        out[s.scene_number] = {
+            "words": words,
+            "dialogue_lines": dialogue_lines,
+            "minutes": round(max(words / WORDS_PER_SCREEN_MINUTE, 0.1), 1),
+        }
+    return out
 
 
 def character_stats(doc: ScriptDocument) -> dict:
@@ -116,4 +142,9 @@ def full_stats_report(doc: ScriptDocument) -> dict:
         "location_usage": location_usage(doc),
         "scene_length_stats": scene_length_stats(doc),
         "int_ext_and_time_breakdown": int_ext_and_time_breakdown(doc),
+        "acts": assign_acts(doc),
+        "pacing": pacing_curve(doc),
+        "character_arc": character_arc(doc),
+        "scene_estimates": scene_estimates(doc),
+        "runtime_minutes": round(sum(e["minutes"] for e in scene_estimates(doc).values()), 1),
     }

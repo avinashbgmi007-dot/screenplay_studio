@@ -196,6 +196,16 @@ class LlamaServerClient:
         }
         if grammar:
             payload["grammar"] = grammar
+            # Reasoning models split output into a free-form `reasoning_content`
+            # phase followed by `content`. Under a grammar, the constrained
+            # generation gets routed into the reasoning block and `content`
+            # comes back empty or as unconstrained prose — so the schema
+            # constraint never reaches what this client parses. Disabling
+            # thinking for grammar-constrained calls makes the constrained
+            # JSON land in `content` where it belongs. (Harmless no-op on
+            # non-reasoning templates.)
+            payload.setdefault("chat_template_kwargs", {})
+            payload["chat_template_kwargs"]["enable_thinking"] = False
 
         last_error = None
         for attempt in range(retries + 1):

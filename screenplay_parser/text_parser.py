@@ -186,10 +186,26 @@ def _parse_lines(
             add_element(ElementType.SHOT, stripped)
         elif dialogue_open and pending_character and looks_like_parenthetical(stripped):
             add_element(ElementType.PARENTHETICAL, stripped, character=pending_character)
-        elif not dialogue_open and looks_like_character_cue(stripped) and current_scene is not None:
-            pending_character = normalize_character_name(stripped)
-            add_element(ElementType.CHARACTER, stripped, character=pending_character)
-            dialogue_open = True
+        elif not dialogue_open and current_scene is not None:
+            # caseless scripts (Devanagari/Hindi, Tamil) have no uppercase, so
+            # the cue test needs the next non-blank line for context — a short
+            # native-script line is only a speaker if followed by content.
+            nxt = ""
+            nxt2 = ""
+            for j in range(idx + 1, len(lines)):
+                if lines[j].strip():
+                    nxt = lines[j].strip()
+                    for k in range(j + 1, len(lines)):
+                        if lines[k].strip():
+                            nxt2 = lines[k].strip()
+                            break
+                    break
+            if looks_like_character_cue(stripped, nxt, nxt2):
+                pending_character = normalize_character_name(stripped)
+                add_element(ElementType.CHARACTER, stripped, character=pending_character)
+                dialogue_open = True
+            else:
+                add_element(ElementType.ACTION, stripped)
         elif dialogue_open and pending_character:
             add_element(ElementType.DIALOGUE, stripped, character=pending_character)
         else:

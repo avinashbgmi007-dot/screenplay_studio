@@ -22,6 +22,7 @@ CATEGORY_TITLES = {
     "dialogue": "Dialogue & Action",
     "scene_function": "Scene Functionality",
     "plot_thread": "Plot Economy (Setups, Payoffs & Chekhov's Gun)",
+    "genre": "Genre Conventions",
 }
 
 
@@ -103,6 +104,47 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append(f"**Comparable films:** {', '.join(cov['comparable_films'])}")
             lines.append("")
 
+    # --- Logline test ---
+    if result.logline_test:
+        lt = result.logline_test
+        lines.append("## Logline Test")
+        signal = (lt.get("signal") or "").upper()
+        lines.append(f"**Signal: {signal}** — {lt.get('logline', '')}")
+        lines.append("")
+        if lt.get("what_works"):
+            lines.append(f"**What works:** {lt['what_works']}")
+        if lt.get("what_muddles"):
+            lines.append(f"**What muddles it:** {lt['what_muddles']}")
+        if lt.get("missing"):
+            lines.append(f"**What a clean logline needs that's missing:** {lt['missing']}")
+        if lt.get("tightened"):
+            lines.append(f"**Tightened example (your premise intact):** {lt['tightened']}")
+        lines.append("")
+
+    # --- Character-perception read ---
+    if result.character_reads:
+        lines.append("## How the Characters Read")
+        lines.append(
+            "*An impartial first-time reader's impression of each main character "
+            "— what they actually come across as, vs. what the script appears "
+            "to intend.*"
+        )
+        lines.append("")
+        for r in result.character_reads:
+            name = r.get("character", "?")
+            lines.append(f"### {name}")
+            lines.append(f"**Reads as:** {r.get('how_reads', '')}")
+            lines.append(f"**Apparent intent:** {r.get('apparent_intent', '')}")
+            lines.append(f"**The gap:** {r.get('gap', '')}")
+            v = r.get("verification", {})
+            badge = VERIFICATION_BADGE.get(v.get("status"), "")
+            quote = r.get("evidence_quote")
+            if quote and v.get("status") == "verified":
+                lines.append(f"- Evidence: \"{quote}\"")
+            elif quote:
+                lines.append(f"- Evidence (unverified): \"{quote}\"{badge}")
+            lines.append("")
+
     # --- Analysis categories ---
     grouped = _findings_by_category(result.findings)
     lines.append("## Detailed Analysis")
@@ -127,8 +169,38 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append(f"**[{f.get('severity', 'low').upper()}] {scene_str}** — {f.get('message', '')}")
     lines.append("")
 
-    # --- Analytics ---
+    # --- Acts ---
     st = result.stats
+    acts = st.get("acts") or []
+    if acts:
+        lines.append("## Structure at a Glance")
+        lines.append("### Acts")
+        for a in acts:
+            pages = f"pp. {a['page_start']}–{a['page_end']}" if a["page_start"] else ""
+            if not a["scene_numbers"]:
+                lines.append(f"**{a['name']}** (no scenes in this range)")
+                continue
+            lines.append(f"**{a['name']}** ({a['scene_count']} scenes, {pages}): Scenes {a['scene_numbers'][0]}–{a['scene_numbers'][-1]}")
+        lines.append("")
+        pacing = st.get("pacing") or {}
+        segments = pacing.get("segments", [])
+        if segments:
+            lines.append("### Pacing (dialogue vs action words per segment)")
+            lines.append("| Pages | Dialogue | Action | Scenes |")
+            lines.append("|---|---|---|---|")
+            for seg in segments:
+                lines.append(f"| {seg['page_start']}–{seg['page_end']} | {seg['dialogue_words']} | {seg['action_words']} | {seg['scene_count']} |")
+            lines.append("")
+        arcs = st.get("character_arc") or []
+        if arcs:
+            lines.append("### Character Presence")
+            lines.append("| Character | First scene | Last scene | Scenes | Dialogue lines |")
+            lines.append("|---|---|---|---|---|")
+            for c in arcs[:12]:
+                lines.append(f"| {c['character']} | {c['first_scene']} | {c['last_scene']} | {c['scene_count']} | {c['dialogue_lines']} |")
+            lines.append("")
+
+    # --- Analytics ---
     lines.append("## Analytics")
     if st.get("character_stats", {}).get("characters"):
         lines.append("### Character Dialogue Share")
@@ -183,6 +255,8 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "source_filename": result.doc.source_filename,
         "model_used": result.model_used,
         "coverage": result.coverage,
+        "character_reads": result.character_reads,
+        "logline_test": result.logline_test,
         "findings": result.findings,
         "formatting_findings": result.formatting_findings,
         "stats": result.stats,

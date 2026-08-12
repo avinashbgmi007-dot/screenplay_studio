@@ -18,11 +18,13 @@ from .fdx_parser import parse_fdx
 from .text_parser import parse_txt, parse_fountain, parse_md
 from .pdf_parser import parse_pdf
 from .knowledge_graph import build_knowledge_graph, KnowledgeGraph
+from .export import export, export_to_path, to_fountain, to_fdx, to_txt
 
 __all__ = [
     "Element", "ElementType", "ParseWarning", "Scene", "ScriptDocument",
     "parse_screenplay", "parse_fdx", "parse_txt", "parse_fountain", "parse_md", "parse_pdf",
     "build_knowledge_graph", "KnowledgeGraph",
+    "export", "export_to_path", "to_fountain", "to_fdx", "to_txt",
 ]
 
 _EXT_DISPATCH = {

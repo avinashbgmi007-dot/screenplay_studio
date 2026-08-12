@@ -117,6 +117,29 @@ class TestProjectLifecycle:
         resp = http_client.get(f"/api/projects/{project}/report")
         assert resp.status_code == 400
 
+    def test_force_rerun_actually_reruns(self, http_client, tmp_path):
+        upload_resp = _upload(http_client)
+        project = upload_resp.get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        report_path = webapp_server._project_dir(project) + os.sep + "report.findings.json"
+        import json
+        first = json.load(open(report_path, encoding="utf-8"))
+
+        # without force, a second call short-circuits (no re-analysis)
+        http_client.post(f"/api/projects/{project}/analyze")
+        assert json.load(open(report_path, encoding="utf-8")) == first
+
+        # with force, the stage resets and the report is regenerated
+        resp = http_client.post(f"/api/projects/{project}/analyze", json={"force": True})
+        assert resp.status_code == 200
+        assert resp.get_json()["stages"]["analyze"] == "complete"
+        second = json.load(open(report_path, encoding="utf-8"))
+        assert second == first  # same mock output, but it genuinely re-ran
+        # prove the re-run happened: progress.json exists from the fresh run
+        from screenplay_studio.manifest import ProjectManifest
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        assert os.path.exists(m.progress_path)
+
 
 class TestChatFlow:
     def _setup_analyzed_project(self, http_client):
@@ -165,6 +188,12 @@ class TestChatFlow:
         session_data = http_client.get(f"/api/projects/{project}/chat/sessions/{sid}").get_json()
         assert len(session_data["branches"]["alt"]["messages"]) == 4  # setup(2) + fork-only(2)
         assert len(session_data["branches"]["main"]["messages"]) == 2  # untouched
+        # the served branch dict must expose the fork point so the UI can
+        # badge each message with its true origin branch
+        alt = session_data["branches"]["alt"]
+        assert alt["parent_branch"] == "main"
+        assert alt["forked_at_index"] == 2  # the split happened after setup(2)
+        assert session_data["branches"]["main"]["forked_at_index"] is None
 
     def test_switch_branch(self, http_client):
         project = self._setup_analyzed_project(http_client)

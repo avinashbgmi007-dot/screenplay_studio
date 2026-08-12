@@ -28,6 +28,20 @@ SCENE_REF_RE = re.compile(r"[Ss]cene\s+(\d+)")
 
 MAX_SCENES_INJECTED_PER_TURN = 4  # cap context growth if someone mentions ten scene numbers at once
 
+# Standing rule: the writer knows what language their pages are in — the
+# co-writer never comments on the script's language itself (dialect
+# identification, subtitles, non-native-speaker accessibility). Kept in the
+# system prompt every turn, and strip_language_meta() (engine.py) backs it
+# up on the reply side for models that ignore instructions.
+LANGUAGE_META_INSTRUCTION = (
+    "The writer knows what language their pages are in. Never comment on the "
+    "script's LANGUAGE itself: do not identify, classify, or speculate about what "
+    "language or dialect it's written in (e.g. \"reads as regional\", \"probably "
+    "Telugu\", \"mixed language\", \"code-switching\"), and never mention subtitles, "
+    "translation, or what non-native speakers will or won't understand. Keep every "
+    "note about story, character, dialogue, structure, and craft."
+)
+
 
 def load_json(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
@@ -119,7 +133,7 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         f"When specific scene text is relevant to the current question, it will be "
         f"provided below as additional context for this turn. If it isn't provided "
         f"and you need exact wording to answer precisely, say so rather than guessing "
-        f"at exact lines from memory."
+        f"at exact lines from memory.\n\n{LANGUAGE_META_INSTRUCTION}"
     )
 
 
