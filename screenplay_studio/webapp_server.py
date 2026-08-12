@@ -1059,7 +1059,8 @@ def _load_session_and_engine(project: str, session_id: str):
     script_ctx = ScriptContext(load_json(script_path))
     report = _sanitize_report(load_json(report_path)) if report_path else None
     report_ctx = ReportContext(report)
-    client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id, timeout=CONFIG["timeout"])
+    client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id,
+                               timeout=CONFIG["timeout"], fallback_to_loaded=True)
     memory = None
     try:
         mem_mod = _import_cowriter("memory")
@@ -1243,7 +1244,8 @@ def refresh_writer_memory():
         return _error(str(e), 503)
     llm_mod = _import_cowriter("llm_client")
     client = llm_mod.LlamaServerClient(base_url=session.server_url or CONFIG["server_url"],
-                                       model=session.model_id, timeout=CONFIG["timeout"])
+                                       model=session.model_id, timeout=CONFIG["timeout"],
+                                       fallback_to_loaded=True)
     recent = [m.to_dict() for m in session.branch.messages[-16:]]
     mem.refresh(client, recent)
     return jsonify({"profile": mem.to_dict(), "card": mem.card_text()})

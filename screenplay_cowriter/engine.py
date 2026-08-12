@@ -8,7 +8,7 @@ free operations that don't need a model call — this module handles only the
 from .models import Session, Message
 from .llm_client import LlamaServerClient
 from .context import ScriptContext, ReportContext, build_system_prompt, build_scene_context_block, extract_scene_refs
-from .language_meta import strip_language_meta
+from .language_meta import strip_language_meta, strip_json_wrap
 
 HISTORY_WINDOW = 16  # most recent messages kept verbatim; older context relies on the standing report summary
 
@@ -73,7 +73,7 @@ class CoWriterEngine:
                 messages.append({"role": m.role, "content": m.content})
             messages.append({"role": "user", "content": user_text})
             try:
-                reply = strip_language_meta(self.client.chat(messages))
+                reply = strip_language_meta(strip_json_wrap(self.client.chat(messages)))
             except Exception:
                 branch.awaiting_probe = False  # never strand the writer mid-probe
                 raise
@@ -90,7 +90,7 @@ class CoWriterEngine:
             for m in branch.messages[-self.history_window:]:
                 messages.append({"role": m.role, "content": m.content})
             messages.append({"role": "user", "content": user_text})
-            reply = strip_language_meta(self.client.chat(messages))
+            reply = strip_language_meta(strip_json_wrap(self.client.chat(messages)))
             reply = cap_suggestions(reply)
 
         reply = ensure_forward_momentum(reply, turn_kind)

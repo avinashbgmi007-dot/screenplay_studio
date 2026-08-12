@@ -97,7 +97,7 @@ def send_message(session_id):
     except FileNotFoundError:
         return jsonify({"error": "not found"}), 404
 
-    client = LlamaServerClient(base_url=session.server_url, model=session.model_id)
+    client = LlamaServerClient(base_url=session.server_url, model=session.model_id, fallback_to_loaded=True)
     script_ctx, report_ctx = _load_contexts(session)
     memory = None
     if memory_path:

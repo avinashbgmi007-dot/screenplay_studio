@@ -18,6 +18,53 @@ class OrchestratorError(Exception):
     pass
 
 
+def _merge_analysis(m, result):
+    """Merge a retry-failed re-run into the existing report.
+
+    The retry run's AnalysisResult only contains findings for the categories
+    that were re-run (plus the deterministic passes). The previous report
+    holds findings for the categories that succeeded before. This overlays
+    the new findings onto the previous ones (keeping the old findings for
+    categories NOT re-run) and recomputes the verification summary over the
+    combined set, so the merged report reflects the full picture."""
+    import json as _json
+    try:
+        with open(m.report_findings_path, "r", encoding="utf-8") as f:
+            prev = _json.load(f)
+    except (FileNotFoundError, _json.JSONDecodeError):
+        return  # nothing to merge into — fresh report is fine
+
+    rerun = set(result.category_outcomes.keys())
+    # Deterministic passes (voice/subtext) regenerate on EVERY analyze run and
+    # never appear in category_outcomes — dropping the old copies avoids
+    # duplicating them in the merged report.
+    always_regenerated = {"voice", "subtext"}
+    # keep previous findings whose category wasn't part of this re-run
+    prev_findings = [
+        f for f in (prev.get("findings") or [])
+        if f.get("category") not in rerun and f.get("category") not in always_regenerated
+    ]
+    result.findings = prev_findings + list(result.findings)
+
+    # deterministic passes & non-category extras: keep previous values where
+    # this re-run didn't regenerate them
+    if not result.coverage:
+        result.coverage = prev.get("coverage")
+    if not result.character_reads:
+        result.character_reads = prev.get("character_reads") or []
+    if not result.logline_test:
+        result.logline_test = prev.get("logline_test")
+    if not result.formatting_findings:
+        result.formatting_findings = prev.get("formatting_findings") or []
+    if not result.stats:
+        result.stats = prev.get("stats") or {}
+    if not result.model_used:
+        result.model_used = prev.get("model_used")
+
+    from screenplay_analyzer.verifier import verification_summary
+    result.verification = verification_summary(result.findings)
+
+
 class Orchestrator:
     def __init__(self, manifest: ProjectManifest):
         self.manifest = manifest
@@ -45,12 +92,41 @@ class Orchestrator:
         return m
 
     # ---- stage: analyze ----
-    def run_analyze(self, categories: tuple = None, report_language: str = None) -> ProjectManifest:
+    def run_analyze(self, categories: tuple = None, report_language: str = None,
+                    retry_failed: bool = False) -> ProjectManifest:
         m = self.manifest
         if m.stage("parse").status != "complete":
             raise OrchestratorError("Cannot analyze — parse stage hasn't completed successfully yet.")
-        if m.stage("analyze").status == "complete":
-            return m
+
+        stage = m.stage("analyze")
+        prev_outputs = None
+        merging = False
+        if stage.status == "complete" or stage.status == "failed":
+            # A completed stage is normally a no-op (resume never redoes
+            # finished work). The one exception: a *partial* completion — some
+            # categories succeeded, some failed. With retry_failed=True, re-run
+            # only the failed categories and merge their results into the
+            # existing report instead of re-running everything. A "failed"
+            # stage whose partial record was preserved (failed retry) resumes
+            # the same way.
+            failed = (stage.output_paths or {}).get("failed_categories") or []
+            if not retry_failed or not failed:
+                if stage.status == "complete":
+                    return m  # fully complete, nothing to do
+                # else: failed stage with no partial record — fall through and
+                # re-run everything (pre-existing resume behavior)
+            else:
+                # genre / logline_test need coverage's genre+logline fields. If
+                # they failed *independently* of coverage (a transient error on
+                # their own model call), coverage must be re-run alongside them
+                # — otherwise the fresh run's empty coverage gates them out and
+                # step-7 re-marks them failed forever.
+                if any(c in failed for c in ("genre", "logline_test")) and "coverage" not in failed:
+                    failed = list(failed) + ["coverage"]
+                categories = tuple(failed)
+                print(f"Retrying failed analysis categories only: {', '.join(failed)}")
+                merging = True
+                prev_outputs = dict(stage.output_paths)
 
         if report_language:
             m.report_language = report_language
@@ -77,6 +153,25 @@ class Orchestrator:
                 kwargs["run_categories"] = categories
 
             result = analyze(doc, client, progress_cb=progress_cb, **kwargs)
+
+            if merging and not result.category_outcomes:
+                # The retry didn't get through a single category (e.g. server
+                # unreachable at model resolve). Merging an empty re-run would
+                # resurrect every previous finding (empty rerun set) and the
+                # report would be overwritten with stale content — and the
+                # partial record would look "complete" with no failures. Fail
+                # the retry instead (the except handler marks it failed and
+                # restores the previous partial record), preserving the report.
+                error_summary = "; ".join(result.errors) or "Retry produced no category outcomes (no model calls succeeded)."
+                raise OrchestratorError(f"Analyze retry failed before any category ran: {error_summary}")
+
+            failed_categories = [c for c, s in (result.category_outcomes or {}).items() if s == "failed"]
+            if merging:
+                # Merge: keep the previously-successful findings, overlay this
+                # re-run's fresh findings for the retried categories, and
+                # recompute the verification summary over the combined set.
+                _merge_analysis(m, result)
+
             save_report(result, m.report_md_path, m.report_findings_path)
             with open(m.progress_path, "w", encoding="utf-8") as f:
                 _json.dump({"stage": "done", "status": "complete", "detail": "Analysis complete"}, f)
@@ -100,9 +195,16 @@ class Orchestrator:
                     "report_md": m.report_md_path,
                     "report_findings": m.report_findings_path,
                     "partial_errors": result.errors,
+                    "category_outcomes": dict(result.category_outcomes or {}),
+                    "failed_categories": failed_categories,
                 })
             else:
-                m.mark_complete("analyze", {"report_md": m.report_md_path, "report_findings": m.report_findings_path})
+                m.mark_complete("analyze", {
+                    "report_md": m.report_md_path,
+                    "report_findings": m.report_findings_path,
+                    "category_outcomes": dict(result.category_outcomes or {}),
+                    "failed_categories": failed_categories,
+                })
         except Exception as e:
             import json as _json2
             try:
@@ -111,6 +213,13 @@ class Orchestrator:
             except Exception:
                 pass
             m.mark_failed("analyze", str(e))
+            # A retry that itself fails must not destroy the partial-completion
+            # record (failed_categories + report paths). Restore the previous
+            # output_paths so a later retry_failed can resume from exactly
+            # where the last successful run stopped.
+            if merging and prev_outputs is not None:
+                m.stages["analyze"].output_paths = prev_outputs
+                m.save()
             raise OrchestratorError(f"Analyze stage failed: {e}") from e
         return m
 
@@ -140,7 +249,7 @@ class Orchestrator:
                 session = store.create(title=m.title, report_path=report_path, script_path=m.parsed_path)
                 m.cowriter_session_id = session.session_id
 
-            client = LlamaServerClient(base_url=m.server_url, timeout=m.timeout)
+            client = LlamaServerClient(base_url=m.server_url, timeout=m.timeout, fallback_to_loaded=True)
             report_ctx = ReportContext(load_json(report_path) if report_path else None)
             model_id = resolve_model(client, report_ctx, explicit_model=m.model_id)
 
@@ -149,7 +258,7 @@ class Orchestrator:
             store.save(session)
 
             script_ctx = ScriptContext(load_json(m.parsed_path))
-            engine = CoWriterEngine(client, script_ctx, report_ctx)
+            engine = CoWriterEngine(client, script_ctx, report_ctx, store=store)
 
             m.mark_complete("chat", {"session_id": session.session_id})
             return session, engine, store
@@ -158,12 +267,12 @@ class Orchestrator:
             raise OrchestratorError(f"Chat stage failed to start: {e}") from e
 
     # ---- full pipeline ----
-    def run_full(self, categories: tuple = None, skip_chat: bool = True):
+    def run_full(self, categories: tuple = None, skip_chat: bool = True, retry_failed: bool = False):
         """Runs parse -> analyze, and optionally prepares (but doesn't drive)
         chat. skip_chat=True by default since chat is inherently interactive —
         the CLI decides whether to hand off to a REPL after this returns."""
         self.run_parse()
-        self.run_analyze(categories=categories)
+        self.run_analyze(categories=categories, retry_failed=retry_failed)
         if not skip_chat:
             return self.start_chat()
         return None

@@ -156,6 +156,23 @@ class TestChatFlow:
         assert data["session_id"]
         assert data["branch"] == "main"
 
+    def test_chat_falls_back_when_pinned_model_not_loaded(self, http_client):
+        """The project is pinned to a model the server no longer has loaded
+        (user swapped models) — the webapp must fall back to the loaded
+        model instead of failing the chat."""
+        webapp_server.CONFIG["model"] = "ghost-model.gguf"
+        project = self._setup_analyzed_project(http_client)
+        resp = http_client.post(f"/api/projects/{project}/chat/start")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["model_id"] == "mock-e2e-model.gguf"
+
+        sid = data["session_id"]
+        msg = http_client.post(f"/api/projects/{project}/chat/sessions/{sid}/messages",
+                               json={"text": "What about the revolver?"})
+        assert msg.status_code == 200
+        assert msg.get_json()["reply"]
+
     def test_send_message_and_get_reply(self, http_client):
         project = self._setup_analyzed_project(http_client)
         sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]

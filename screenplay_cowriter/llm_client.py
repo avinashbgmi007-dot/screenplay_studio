@@ -19,11 +19,19 @@ class ModelNotFoundError(LlamaServerError):
 
 
 class LlamaServerClient:
-    def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None):
+    def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None,
+                 fallback_to_loaded: bool = False):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.extra_headers = extra_headers or {}
+        # When True, a model id that isn't currently loaded falls back to
+        # whatever the server has loaded instead of raising. Used where the
+        # model id is a *remembered preference* (session/manifest pins in the
+        # webapp) rather than an explicit user choice — swapping the loaded
+        # model must not brick existing conversations. The cowriter CLI keeps
+        # the strict default: an explicit --model must be loaded.
+        self.fallback_to_loaded = fallback_to_loaded
         self._resolved_model: str | None = None
 
     def list_models(self) -> list[str]:
@@ -61,9 +69,12 @@ class LlamaServerClient:
             raise LlamaServerError(f"llama-server at {self.base_url} reports no loaded models.")
         if self.model:
             if self.model not in available:
-                raise ModelNotFoundError(
-                    f"Requested model '{self.model}' is not loaded at {self.base_url}. Available: {available}"
-                )
+                if self.fallback_to_loaded:
+                    self.model = available[0]
+                else:
+                    raise ModelNotFoundError(
+                        f"Requested model '{self.model}' is not loaded at {self.base_url}. Available: {available}"
+                    )
             self._resolved_model = self.model
         else:
             self._resolved_model = available[0]

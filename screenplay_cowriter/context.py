@@ -42,6 +42,17 @@ LANGUAGE_META_INSTRUCTION = (
     "note about story, character, dialogue, structure, and craft."
 )
 
+# Some local models (reasoning / JSON-tuned distills) decide on their own to
+# wrap chat replies in JSON or code fences even when nothing asks for it.
+# State it plainly up front so the reply reads like a colleague's note, not a
+# serialized object.
+PLAIN_TEXT_INSTRUCTION = (
+    "Reply in plain conversational prose — the writer reads your message "
+    "directly. Never emit JSON, code fences, XML, or any structured or wrapped "
+    "format; if an answer would benefit from structure, use short paragraphs "
+    "or simple sentences instead."
+)
+
 
 def load_json(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
@@ -134,7 +145,7 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         f"When specific scene text is relevant to the current question, it will be "
         f"provided below as additional context for this turn. If it isn't provided "
         f"and you need exact wording to answer precisely, say so rather than guessing "
-        f"at exact lines from memory.\n\n{LANGUAGE_META_INSTRUCTION}"
+        f"at exact lines from memory.\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
     )
     if relationship_card:
         prompt += f"\n\n{relationship_card}"

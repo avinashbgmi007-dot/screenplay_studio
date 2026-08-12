@@ -14,6 +14,7 @@ screenplay_analyzer/feedback_filter.py — keep the pattern sets in sync).
 
 from __future__ import annotations
 
+import json
 import re
 
 _LANGUAGE_ID_PATTERNS = [
@@ -76,3 +77,56 @@ def strip_language_meta(text: str) -> str:
     # collapse >1 blank line runs left by dropped lines
     out = re.sub(r"\n{3,}", "\n\n", out)
     return out
+
+
+_FENCED_JSON = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
+_JSON_TEXT_KEYS = ("content", "answer", "reply", "response", "text", "message", "output")
+
+
+def _unwrap_parsed(parsed, original: str) -> str:
+    """Extract the natural-language part of a parsed JSON reply; fall back to
+    the original when there's nothing to unwrap."""
+    if isinstance(parsed, str):
+        return parsed.strip() or original
+    if isinstance(parsed, dict):
+        for key in _JSON_TEXT_KEYS:
+            value = parsed.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        if len(parsed) == 1:
+            only = next(iter(parsed.values()))
+            if isinstance(only, str) and only.strip():
+                return only.strip()
+    return original
+
+
+def strip_json_wrap(text: str) -> str:
+    """Unwrap a chat reply that a model decided to JSON-ify on its own.
+
+    The co-writer never asks for structured output in conversation (the
+    system prompt now says so explicitly), but some local models — reasoning
+    or JSON-tuned distills — wrap their answer anyway. A ```json fence is
+    searched for ANYWHERE in the reply (models sometimes preface it with a
+    sentence); otherwise the reply is treated as JSON only when it's pure
+    JSON (starts with `{` or `[`). The natural-language part — the
+    content/answer/reply/... field, or the sole string value — replaces the
+    wrapper; anything that isn't JSON-shaped, or doesn't parse, passes
+    through untouched.
+    """
+    if not text:
+        return text
+    stripped = text.strip()
+    fenced = _FENCED_JSON.search(stripped)
+    if fenced:
+        try:
+            parsed = json.loads(fenced.group(1).strip())
+        except ValueError:
+            return text
+        return _unwrap_parsed(parsed, text)
+    if not (stripped.startswith("{") or stripped.startswith("[")):
+        return text
+    try:
+        parsed = json.loads(stripped)
+    except ValueError:
+        return text
+    return _unwrap_parsed(parsed, text)
