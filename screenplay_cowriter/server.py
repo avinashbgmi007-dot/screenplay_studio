@@ -21,6 +21,7 @@ from .personas import PERSONAS, MODES
 
 app = Flask(__name__)
 store: SessionStore = None  # set in main()
+memory_path: str = None  # optional writer relationship memory file (set in main())
 
 
 def _load_contexts(session):
@@ -98,7 +99,11 @@ def send_message(session_id):
 
     client = LlamaServerClient(base_url=session.server_url, model=session.model_id)
     script_ctx, report_ctx = _load_contexts(session)
-    engine = CoWriterEngine(client, script_ctx, report_ctx)
+    memory = None
+    if memory_path:
+        from .memory import WriterMemory
+        memory = WriterMemory.load(memory_path)
+    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory)
 
     try:
         reply = engine.send_message(session, text)
@@ -165,12 +170,14 @@ def update_settings(session_id):
 
 
 def main():
-    global store
+    global store, memory_path
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8300)
     parser.add_argument("--sessions-dir", default="./sessions")
+    parser.add_argument("--memory-path", default=None, help="Optional writer relationship memory file")
     args = parser.parse_args()
     store = SessionStore(args.sessions_dir)
+    memory_path = args.memory_path
     app.run(host="127.0.0.1", port=args.port)
 
 

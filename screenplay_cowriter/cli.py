@@ -52,9 +52,9 @@ def _load_contexts(session: Session):
     return ScriptContext(script_data), ReportContext(report_data)
 
 
-def run_repl(session: Session, store: SessionStore, client: LlamaServerClient):
+def run_repl(session: Session, store: SessionStore, client: LlamaServerClient, memory=None):
     script_ctx, report_ctx = _load_contexts(session)
-    engine = CoWriterEngine(client, script_ctx, report_ctx)
+    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory)
 
     print(f"\n[session {session.session_id}] \"{session.title}\" — branch: {session.current_branch}")
     print(f"Model: {session.model_id} @ {session.server_url}")
@@ -194,7 +194,12 @@ def cmd_chat(args):
     session.model_id = model_id
     store.save(session)
 
-    run_repl(session, store, client)
+    memory = None
+    if args.memory_path:
+        from .memory import WriterMemory
+        memory = WriterMemory.load(args.memory_path)
+
+    run_repl(session, store, client, memory=memory)
 
 
 def cmd_list(args):
@@ -219,6 +224,7 @@ def main():
     p_chat.add_argument("--server", help="llama-server base URL (default: http://localhost:8080)")
     p_chat.add_argument("--model", help="Explicit model id override")
     p_chat.add_argument("--sessions-dir", default="./sessions", help="Where session files live")
+    p_chat.add_argument("--memory-path", default=None, help="Optional writer relationship memory file")
     p_chat.set_defaults(func=cmd_chat)
 
     p_list = sub.add_parser("list", help="List saved sessions")
