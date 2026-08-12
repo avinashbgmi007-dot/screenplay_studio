@@ -2699,3 +2699,15 @@ body[data-room="feedback"] {
 .feedback-empty { flex: 1; display: grid; place-items: center; text-align: center; color: var(--text-muted); padding: 40px 20px; }
 
 .icon-btn { min-width: 34px; padding: 5px 8px; }
+
+/* Sam's notes on you (writer relationship memory) */
+.sam-notes-dimensions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.sam-notes-chip {
+  background: var(--paper-dim); border: 1px solid var(--ink-border); border-radius: 999px;
+  padding: 3px 10px; font-size: 12px; color: var(--text-muted);
+}
+.sam-notes-observations { list-style: none; padding: 0; margin: 0; }
+.sam-notes-obs {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--ink-border); font-size: 13px;
+}

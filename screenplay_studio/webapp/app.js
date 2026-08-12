@@ -875,6 +875,51 @@ async function resetToPartner() {
   renderMessages();
 }
 
+// ---- Sam's notes on you (writer relationship memory) ----
+async function loadSamNotes() {
+  const data = await api("/writer-memory");
+  renderSamNotes(data);
+}
+function renderSamNotes(data) {
+  const dims = $("#sam-notes-dimensions"), obsList = $("#sam-notes-observations"), empty = $("#sam-notes-empty");
+  dims.innerHTML = "";
+  obsList.innerHTML = "";
+  const profile = data.profile || {};
+  const gated = Object.entries(profile.dimensions || {}).filter(
+    ([, d]) => d && d.confidence >= 0.6 && d.value !== "balanced" && d.value !== "medium"
+  );
+  gated.forEach(([name, d]) => {
+    const chip = document.createElement("span");
+    chip.className = "sam-notes-chip";
+    chip.textContent = `${name.replace(/_/g, " ")}: ${d.value} (${Math.round(d.confidence * 100)}%)`;
+    dims.appendChild(chip);
+  });
+  const observations = (profile.observations || []).filter((o) => !o.suppressed);
+  observations.forEach((o) => {
+    const li = document.createElement("li");
+    li.className = "sam-notes-obs";
+    const text = document.createElement("span");
+    text.textContent = o.text;
+    const forget = document.createElement("button");
+    forget.className = "btn-secondary btn-small";
+    forget.textContent = "forget this";
+    forget.addEventListener("click", async () => {
+      await api(`/writer-memory/observations/${encodeURIComponent(o.id)}/suppress`, { method: "POST" });
+      loadSamNotes();
+    });
+    li.append(text, forget);
+    obsList.appendChild(li);
+  });
+  empty.style.display = (!gated.length && !observations.length) ? "" : "none";
+}
+async function openSamNotes() {
+  openModal("#sam-notes-modal");
+  await loadSamNotes();
+}
+function closeSamNotes() {
+  closeModal("#sam-notes-modal");
+}
+
 async function _setPersonaMode(persona, mode) {
   if (!state.currentSession) return;
   try {
@@ -2542,6 +2587,16 @@ function init() {
   $("#bb-icon").addEventListener("click", openBeatboardView);
   $("#compare-icon").addEventListener("click", openCompareView);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
+  $("#sam-notes-btn").addEventListener("click", openSamNotes);
+  $("#sam-notes-close").addEventListener("click", closeSamNotes);
+  $("#sam-notes-refresh").addEventListener("click", async () => {
+    if (!state.currentProject || !state.currentSession) return;
+    await api("/writer-memory/refresh", {
+      method: "POST",
+      body: JSON.stringify({ project: state.currentProject, session_id: state.currentSession }),
+    });
+    loadSamNotes();
+  });
   $("#tab-report-btn").addEventListener("click", () => switchFeedbackTab("report"));
   $("#tab-fixqueue-btn").addEventListener("click", () => switchFeedbackTab("fixqueue"));
   $("#print-btn").addEventListener("click", () => {
