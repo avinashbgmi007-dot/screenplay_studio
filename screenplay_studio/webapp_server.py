@@ -33,7 +33,53 @@ app = Flask(__name__, static_folder=None)
 # Set by main() at startup — kept module-level for simplicity, matching
 # the same pattern already used in screenplay_cowriter/server.py.
 PROJECTS_DIR = "./studio_projects"
-CONFIG = {"server_url": "http://localhost:8080", "model": None, "timeout": 600}
+
+
+class ServerConfig:
+    """Process-wide server settings.
+
+    A small holder instead of a bare module-level dict so the mutable state
+    is contained: writes are validated, and `to_dict()` returns a copy so
+    callers (and JSON responses) can't mutate the live config by reference.
+    Kept dict-compatible (CONFIG["key"] / CONFIG["key"] = v) so existing
+    callers and tests keep working unchanged.
+    """
+
+    _DEFAULTS = {"server_url": "http://localhost:8080", "model": None, "timeout": 600}
+
+    def __init__(self):
+        self._data = dict(self._DEFAULTS)
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        if key == "timeout":
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                raise ValueError("timeout must be an integer number of seconds")
+            if value <= 0:
+                raise ValueError("timeout must be positive")
+        if key == "server_url":
+            # None/empty means "not set" — keep the default rather than
+            # storing a truthy "None" string.
+            if value is None or value == "":
+                value = self._DEFAULTS["server_url"]
+            else:
+                value = str(value).rstrip("/")
+        if key == "model" and value == "":
+            value = None
+        self._data[key] = value
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def to_dict(self) -> dict:
+        return dict(self._data)
+
+
+CONFIG = ServerConfig()
 
 
 # ---------- static frontend ----------
@@ -67,9 +113,12 @@ def _load_manifest(name: str) -> ProjectManifest:
 def _manifest_summary(m: ProjectManifest) -> dict:
     sessions = []
     if os.path.isdir(m.sessions_dir):
-        from screenplay_cowriter.store import SessionStore
-        store = SessionStore(m.sessions_dir)
-        sessions = store.list()
+        try:
+            store_mod = _import_cowriter("store")
+            store = store_mod.SessionStore(m.sessions_dir)
+            sessions = store.list()
+        except CowriterUnavailableError:
+            sessions = []  # co-writer not installed — shelf still works
     from .revision import has_edits, edits_log
     return {
         "project": os.path.basename(m.project_dir),
@@ -116,6 +165,25 @@ def _error(message: str, status: int = 400):
     return jsonify({"error": message}), status
 
 
+class CowriterUnavailableError(Exception):
+    """screenplay_cowriter isn't installed — chat features can't work."""
+
+
+def _import_cowriter(name: str):
+    """Lazily import a module from screenplay_cowriter, converting an
+    ImportError into a clean, actionable error instead of a traceback
+    (the co-writer is an optional piece; the rest of the webapp must keep
+    working when it's absent)."""
+    import importlib
+    try:
+        return importlib.import_module(f"screenplay_cowriter.{name}")
+    except ImportError as e:
+        raise CowriterUnavailableError(
+            "The co-writer package (screenplay_cowriter) isn't installed, so chat is unavailable. "
+            f"Install it alongside screenplay_studio to enable chat. ({e})"
+        ) from e
+
+
 # ---------- config ----------
 
 @app.route("/api/test-connection", methods=["POST"])
@@ -139,7 +207,18 @@ def test_connection():
 
 @app.route("/api/config", methods=["GET"])
 def get_config():
-    return jsonify(CONFIG)
+    cfg = CONFIG.to_dict()
+    # Personas/modes come from the co-writer so the frontend dropdown never
+    # drifts from the server's canonical list (falls back to empty when the
+    # co-writer isn't installed; the UI then shows its built-in defaults).
+    try:
+        personas_mod = _import_cowriter("personas")
+        cfg["personas"] = list(personas_mod.PERSONAS.keys())
+        cfg["modes"] = list(personas_mod.MODES.keys())
+    except CowriterUnavailableError:
+        cfg["personas"] = []
+        cfg["modes"] = []
+    return jsonify(cfg)
 
 
 @app.route("/api/config", methods=["POST"])
@@ -151,11 +230,10 @@ def set_config():
         CONFIG["model"] = body["model"] or None
     if "timeout" in body:
         try:
-            t = int(body["timeout"])
-            CONFIG["timeout"] = t if t > 0 else CONFIG["timeout"]
+            CONFIG["timeout"] = int(body["timeout"])
         except (TypeError, ValueError):
-            pass
-    return jsonify(CONFIG)
+            pass  # invalid timeout ignored — keep the current value
+    return jsonify(CONFIG.to_dict())
 
 
 # ---------- projects ----------
@@ -958,10 +1036,16 @@ def start_chat(name):
 
 
 def _load_session_and_engine(project: str, session_id: str):
-    from screenplay_cowriter.store import SessionStore
-    from screenplay_cowriter.context import ScriptContext, ReportContext, load_json
-    from screenplay_cowriter.engine import CoWriterEngine
-    from screenplay_cowriter.llm_client import LlamaServerClient
+    store_mod = _import_cowriter("store")
+    context_mod = _import_cowriter("context")
+    engine_mod = _import_cowriter("engine")
+    llm_mod = _import_cowriter("llm_client")
+    SessionStore = store_mod.SessionStore
+    ScriptContext = context_mod.ScriptContext
+    ReportContext = context_mod.ReportContext
+    load_json = context_mod.load_json
+    CoWriterEngine = engine_mod.CoWriterEngine
+    LlamaServerClient = llm_mod.LlamaServerClient
 
     m = _load_manifest(project)
     store = SessionStore(m.sessions_dir)
@@ -976,7 +1060,13 @@ def _load_session_and_engine(project: str, session_id: str):
     report = _sanitize_report(load_json(report_path)) if report_path else None
     report_ctx = ReportContext(report)
     client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id, timeout=CONFIG["timeout"])
-    engine = CoWriterEngine(client, script_ctx, report_ctx)
+    memory = None
+    try:
+        mem_mod = _import_cowriter("memory")
+        memory = mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
+    except Exception:
+        memory = None  # never let memory wiring break the chat
+    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory)
     return session, engine, store
 
 
@@ -986,10 +1076,13 @@ def get_session(name, sid):
         session, _, _ = _load_session_and_engine(name, sid)
     except FileNotFoundError:
         return _error("Session or project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
     # Retroactive: stored sessions written before the language-meta filter
     # existed may contain dialect/subtitle commentary — strip it at serve
     # time so old history reads the same as new replies.
-    from screenplay_cowriter.language_meta import strip_language_meta
+    lang_meta_mod = _import_cowriter("language_meta")
+    strip_language_meta = lang_meta_mod.strip_language_meta
     return jsonify({
         "session_id": session.session_id,
         "title": session.title,
@@ -1021,6 +1114,8 @@ def send_message(name, sid):
         session, engine, store = _load_session_and_engine(name, sid)
     except FileNotFoundError:
         return _error("Session or project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
 
     try:
         reply = engine.send_message(session, text)
@@ -1049,6 +1144,8 @@ def fork_session(name, sid):
         return _error("Session or project not found.", 404)
     except ValueError as e:
         return _error(str(e))
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
 
     store.save(session)
     return jsonify({"current_branch": session.current_branch, "branches": list(session.branches.keys())})
@@ -1066,6 +1163,8 @@ def switch_branch(name, sid):
         return _error("Session or project not found.", 404)
     except ValueError as e:
         return _error(str(e))
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
 
     store.save(session)
     return jsonify({"current_branch": session.current_branch})
@@ -1073,7 +1172,9 @@ def switch_branch(name, sid):
 
 @app.route("/api/projects/<name>/chat/sessions/<sid>/settings", methods=["POST"])
 def update_settings(name, sid):
-    from screenplay_cowriter.personas import PERSONAS, MODES
+    personas_mod = _import_cowriter("personas")
+    PERSONAS = personas_mod.PERSONAS
+    MODES = personas_mod.MODES
 
     body = request.get_json() or {}
     persona = body.get("persona")
@@ -1087,6 +1188,8 @@ def update_settings(name, sid):
         session, _, store = _load_session_and_engine(name, sid)
     except FileNotFoundError:
         return _error("Session or project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
 
     if persona:
         session.branch.active_persona = persona
@@ -1094,6 +1197,56 @@ def update_settings(name, sid):
         session.branch.active_mode = mode
     store.save(session)
     return jsonify({"active_persona": session.branch.active_persona, "active_mode": session.branch.active_mode})
+
+
+def _load_writer_memory():
+    mem_mod = _import_cowriter("memory")
+    return mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
+
+
+@app.route("/api/writer-memory", methods=["GET"])
+def get_writer_memory():
+    try:
+        mem = _load_writer_memory()
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return jsonify({"profile": mem.to_dict(), "card": mem.card_text()})
+
+
+@app.route("/api/writer-memory/observations/<obs_id>/suppress", methods=["POST"])
+def suppress_writer_observation(obs_id):
+    try:
+        mem = _load_writer_memory()
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    if not mem.suppress(obs_id):
+        return _error("Observation not found.", 404)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/writer-memory/refresh", methods=["POST"])
+def refresh_writer_memory():
+    body = request.get_json() or {}
+    project = body.get("project")
+    session_id = body.get("session_id")
+    if not project or not session_id:
+        return _error("project and session_id are required.", 400)
+    try:
+        session, _, _ = _load_session_and_engine(project, session_id)
+    except FileNotFoundError:
+        return _error("Session or project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    try:
+        mem = _load_writer_memory()
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    llm_mod = _import_cowriter("llm_client")
+    client = llm_mod.LlamaServerClient(base_url=session.server_url or CONFIG["server_url"],
+                                       model=session.model_id, timeout=CONFIG["timeout"])
+    recent = [m.to_dict() for m in session.branch.messages[-16:]]
+    mem.refresh(client, recent)
+    return jsonify({"profile": mem.to_dict(), "card": mem.card_text()})
 
 
 def main():

@@ -260,6 +260,52 @@ class TestChatFlow:
         assert "acts" in fq
 
 
+    def _reset_writer_memory(self):
+        import os
+        from screenplay_studio import webapp_server
+        p = os.path.join(webapp_server.PROJECTS_DIR, "writer_profile.json")
+        if os.path.exists(p):
+            os.remove(p)
+
+    def test_get_writer_memory(self, http_client):
+        self._reset_writer_memory()
+        resp = http_client.get("/api/writer-memory")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "profile" in data and "card" in data
+        assert data["profile"]["meta"]["total_turns_observed"] == 0
+
+    def test_suppress_observation_via_api(self, http_client):
+        self._reset_writer_memory()
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+        for _ in range(3):
+            http_client.post(f"/api/projects/{project}/chat/sessions/{sid}/messages",
+                             json={"text": "just tell me straight, what's wrong with scene 1"})
+        data = http_client.get("/api/writer-memory").get_json()
+        obs = next(o for o in data["profile"]["observations"] if not o["suppressed"])
+        resp = http_client.post(f"/api/writer-memory/observations/{obs['id']}/suppress")
+        assert resp.status_code == 200
+        data2 = http_client.get("/api/writer-memory").get_json()
+        assert next(o for o in data2["profile"]["observations"] if o["id"] == obs["id"])["suppressed"] is True
+
+    def test_suppress_unknown_observation_404(self, http_client):
+        self._reset_writer_memory()
+        resp = http_client.post("/api/writer-memory/observations/obs_nope/suppress")
+        assert resp.status_code == 404
+
+    def test_refresh_endpoint_merges_mock_proposal(self, http_client):
+        self._reset_writer_memory()
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+        http_client.post(f"/api/projects/{project}/chat/sessions/{sid}/messages", json={"text": "hello"})
+        resp = http_client.post("/api/writer-memory/refresh",
+                                json={"project": project, "session_id": sid})
+        assert resp.status_code == 200
+        profile = resp.get_json()["profile"]
+        assert profile["dimensions"]["detail_level"]["value"] == "deep"
+
+
 class TestTimeoutConfig:
     """Proves the configurable timeout (added in response to a real slow-
     local-model bug report) actually reaches the manifest and persists,

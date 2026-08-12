@@ -40,6 +40,17 @@ def chat_completions():
     user = messages[-1]["content"] if messages else ""
     scene_nums = _scene_numbers_in_prompt(user)
 
+    # ---- Writer relationship memory refresh (Piece 3 v2) ----
+    if "RELATIONSHIP MEMORY REFRESH" in user:
+        return _reply(json.dumps({
+            "detail_level": {"value": "deep", "confidence": 0.8},
+            "directness": {"value": "direct", "confidence": 0.7},
+            "probe_appetite": {"value": "no_evidence", "confidence": 0.0},
+            "pushback_appetite": {"value": "no_evidence", "confidence": 0.0},
+            "observations": [{"text": "The writer likes to explore character motives at length.",
+                              "dimension": "topic_gravity"}],
+        }))
+
     # ---- Revision loop (Piece 2.5) request shape ----
     if "script doctor proposing a targeted revision" in system.lower():
         block = user.split("SCENE TEXT:", 1)[1] if "SCENE TEXT:" in user else user
