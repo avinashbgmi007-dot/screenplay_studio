@@ -51,6 +51,7 @@ screenplay-studio_1/
 │   ├── language_meta.py        # Strips wrapper-language markers from replies
 │   ├── personas.py             # 7 personas, 4 modes (default: writing_partner/peer)
 │   ├── peer.py                 # guardrails: two-phase probe, forward-momentum, idea cap
+│   ├── memory.py               # writer relationship memory: signals, confidence gate, card, refresh
 │   ├── discovery.py            # Model selection (explicit > inherited > loaded)
 │   ├── llm_client.py           # Lightweight chat client (free text)
 │   ├── models.py               # Session, Branch, Message dataclasses
@@ -147,6 +148,9 @@ screenplay-studio_1/
 | `/api/projects/<name>/chat/sessions/<sid>/fork` | POST | Fork conversation branch |
 | `/api/projects/<name>/chat/sessions/<sid>/switch` | POST | Switch to different branch |
 | `/api/projects/<name>/chat/sessions/<sid>/settings` | POST | Update chat settings |
+| `/api/writer-memory` | GET | Writer relationship memory (profile + card) |
+| `/api/writer-memory/observations/<id>/suppress` | POST | Forget an inferred observation |
+| `/api/writer-memory/refresh` | POST | Run the LLM refresh now (project + session_id in body) |
 
 ### Data Models
 
@@ -301,6 +305,14 @@ The webapp is now two rooms with a shared script pane (see §2). `screenplay_cow
 - **One idea at a time** — `cap_suggestions` structurally caps bulleted suggestions per turn.
 - **Informed partner** — the `peer` mode locks in "never volunteer the report"; the Feedback→Co-write bridge *prefills the composer* (never auto-sends).
 Tests: `tests/test_peer_guardrails.py` (27) + webapp room tests. Full suite: **328 passed**.
+
+### 0b. Writer relationship memory (added 2026-08-12)
+`screenplay_cowriter/memory.py` gives Sam a writer-level memory (across all projects) at `studio_projects/writer_profile.json`:
+- **Rule signals → evidence** — each turn feeds cheap deterministic signals (tone statements, probe engagement, pushback, topic keywords) into per-dimension pos/neg evidence. A dimension affects behavior only past a **0.6 confidence gate with ≥ 3 signals** (nothing gates on one comment); it flips only when the opposite pole wins, and re-flips only with sustained evidence.
+- **Refresh** — every 10 observed turns, a fire-and-forget daemon thread asks the model to propose profile updates from the recent transcript (lenient JSON parse, merge only on higher confidence / novel observations; `force=True` for the webapp's user-initiated refresh).
+- **Injection** — `CoWriterEngine(memory=None)` observes each turn and injects the relationship card into `build_system_prompt(relationship_card=, cold_start_line=)` on both prompt paths. `memory=None` is byte-identical to before; only the webapp wires memory by default (cowriter CLI/server opt in via `--memory-path`).
+- **Writer stays the editor** — "Sam's notes on you" modal (Co-write partner card): view observations, "forget this" (suppresses permanently), "refresh now". The card text forbids quoting memory at the writer ("you always say…" is forbidden).
+Tests: `tests/test_writer_memory.py` (26) + webapp endpoints. Full suite: **358 passed**.
 
 ### 1. Named category sentinel (resolved)
 `pipeline.py` now exports `ALL_CATEGORIES` and `resolve_categories()`: `None` and `("all",)` both expand to the full ten-category tuple; any other tuple is passed through unchanged. `analyze()` normalizes via `resolve_categories`, and per-category outcomes (`category_outcomes`, `"ok"`/`"failed"`) are recorded so partial analyses can be resumed.

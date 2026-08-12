@@ -4,6 +4,8 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+- **2026-08-12 — Writer relationship memory (v2).** Spec + plan in `docs/superpowers/specs/` + `docs/superpowers/plans/` (`2026-08-12-writer-relationship-memory-*`). New `screenplay_cowriter/memory.py`: per-turn rule micro-signals → pos/neg evidence with a 0.6 confidence gate + MIN_EVIDENCE=3 (nothing gates on one comment; flips only when the opposite pole wins), human-readable observations auto-created the moment a dimension gates, explicit-tone contradictions auto-suppress at 2+, relationship card + cold-start line, every-10-turns LLM refresh (fire-and-forget daemon thread, module-level file lock, lenient JSON parse, strict merge rules: only higher-confidence wins, novel observations only). `CoWriterEngine(memory=None)` + `build_system_prompt(relationship_card=, cold_start_line=)` — byte-identical when absent. Writer-level store at `studio_projects/writer_profile.json` (webapp wires by default; cowriter CLI/server get `--memory-path`, default off). Webapp endpoints: `GET /api/writer-memory`, `POST /api/writer-memory/observations/<id>/suppress`, `POST /api/writer-memory/refresh`. Frontend: "Sam's notes on you" modal in the partner card (reuses `openModal`/`closeModal` + `modal-label`; forget + refresh-now with loading state). Plan super-critique found 4 issues before execution (cold-start-after-observe bug, suppress idempotency, modal helpers, nonexistent CSS class) + review hardening fixed 3 more (refresh double-check under lock, broad exception swallow, pushback regex false positive). Full suite: **358 passed** (+26 memory +4 webapp).
+
 - **2026-08-12 — Two-room webapp + writing-partner guardrails.** Spec + plan in `docs/superpowers/specs/` + `docs/superpowers/plans/`. The webapp is now two rooms with a shared script pane: **Co-write** (the writer's desk — one consistent partner "Sam", warm amber identity) and **Feedback** (the consultant's desk — Report + Fix Queue tabs, cool slate identity), switchable via the top-bar room toggle; Beat Board/Compare moved to script-pane toolbar icons. New `screenplay_cowriter/peer.py` with pure guardrails: two-phase turn (probes unreasoned ideas, abandons on topic change), forward-momentum nudge (light-touch: only short stranded replies, never factual answers), one-idea-at-a-time cap. `writing_partner` persona + `peer` mode are the new defaults; `Branch.awaiting_probe` flag (per-branch, fork-safe); personas are now conversational lenses (no dropdowns). Full suite: **328 passed**. Code review caught + fixed: blank Feedback pane (both panes started hidden — `switchFeedbackTab("report")` now called), dead scene-restore guard (`state.view === "script"` → room values).
 
 - **2026-08-12 — Bug-fix batch (all 6 items) + retry hardening.** Fixed: named `ALL_CATEGORIES` sentinel + per-category `category_outcomes`; partial-category resume via `run_analyze(retry_failed=True)` / CLI `--retry-failed` (merges into existing report); server-driven personas in `/api/config` + `app.js` fallback; graceful `_import_cowriter()`/`CowriterUnavailableError` (503) in webapp; defensive session save inside `CoWriterEngine.send_message` (all 4 call sites pass `store`); `ServerConfig` validated holder replacing bare dict. Added `tests/test_fix_batch.py` (17 tests). Full suite: **298 passed**. Updated ARCHITECTURE.md ("Known Issues" → "Resolved Issues") and DEVELOPMENT.md.
@@ -21,13 +23,17 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 - `requirements.txt` is the source of truth for dependencies (there is no `pyproject.toml`).
 - `docs/CODEBASE_MAP.md` is the designated answer to "where is X" — keep it updated when public APIs change.
 
+## Working Agreements
+
+- **Super-critique gate (user-mandated, standing):** after the planning is finalized (spec written → self-review → user review → implementation plan written), do a **super-critique** of the plan BEFORE executing — be a genuine critic, verify every assumption against the real code (helpers, field names, wiring, tautologies), fix real issues, commit the fixes, and only then proceed. This caught 6 real bugs in the rooms plan (`a751c85`). Same gate applies to the spec before user review.
+
 ## Current State
 
-- Test suite: **328 tests passed** (298 + 27 peer/engine guardrail tests + 3 webapp room tests), runs against in-process mock llama-server (port 8196) — no real model needed.
+- Test suite: **358 tests passed** (328 + 26 writer-memory tests + 4 webapp memory endpoints), runs against in-process mock llama-server (port 8196) — no real model needed.
 - All 6 known code issues fixed (previous batch) + **new rooms feature**: two-room webapp (Co-write/Feedback), shared script pane, writing-partner guardrails (two-phase probe, dead-end nudge, one-idea cap), `writing_partner`/`peer` defaults, conversational persona lenses, prefill-only "→ discuss with my partner" bridge, room theming via `body[data-room]`.
+- **Writer relationship memory (v2) shipped**: `screenplay_cowriter/memory.py`, writer-level `studio_projects/writer_profile.json`, confidence-gated tone calibration, 10-turn LLM refresh, "Sam's notes on you" modal.
 - Git: repo now has commits (spec, plan, backend batch, webapp batch). Remaining untracked: the pre-existing project files (sample data, `.freebuff/`, `studio_projects/`, PDFs) — recommend one initial commit of the baseline so future sessions can use `git diff`.
 - Remaining non-code items: OCR best-effort limitation (by design), no per-category webapp UI for `--retry-failed` (CLI-only so far).
-- Deferred (v2): relationship memory (writer-profile / tone calibration) — the design leaves room for it on top of the guardrails.
 
 ## Open Questions
 
