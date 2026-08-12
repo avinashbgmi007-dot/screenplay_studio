@@ -59,7 +59,7 @@ TONE_RULES = [
     (re.compile(r"\b(?:push back|argue with me|disagree with me|challenge me|fight me on)\b", re.I), "pushback_appetite", "high"),
 ]
 
-PUSHBACK_ARGUE = re.compile(r"\b(?:i disagree|no,? |but |that won'?t work|that doesn'?t work|that loses|keep it anyway|actually no)\b", re.I)
+PUSHBACK_ARGUE = re.compile(r"\b(?:i disagree\b|no,|but |that won'?t work\b|that doesn'?t work\b|that loses\b|keep it anyway\b|actually no\b)", re.I)
 PUSHBACK_AGREE = re.compile(r"\b(?:ok(?:ay)?|sure|fine|good point|makes sense|agree(?:d)?|sounds good|go with it)\b", re.I)
 PROBE_REASON = re.compile(r"\b(?:because|since|the reason|my instinct|i feel|i think|the thing is)\b", re.I)
 
@@ -431,21 +431,26 @@ class WriterMemory:
 
     def _refresh_worker(self, client, recent_messages):
         try:
-            with _FILE_LOCK:
-                if not self.refresh_due():
-                    return
+            if not self.refresh_due():
+                return
             self._refresh_sync(client, recent_messages)
         finally:
             self._refresh_in_flight = False
 
     def refresh(self, client, recent_messages):
-        """Synchronous refresh — used by the webapp's 'refresh now' button."""
-        self._refresh_sync(client, recent_messages)
+        """Synchronous refresh — used by the webapp's 'refresh now' button.
+        force=True so a user-initiated refresh always runs, even when not due."""
+        self._refresh_sync(client, recent_messages, force=True)
 
-    def _refresh_sync(self, client, recent_messages):
+    def _refresh_sync(self, client, recent_messages, force=False):
         reply = client.chat([{"role": "user", "content": refresh_prompt(recent_messages)}])
         proposal = parse_refresh_json(reply)
         with _FILE_LOCK:
+            # Re-check under the lock AFTER the (slow) model call: a concurrent
+            # request may have refreshed while we were talking. Benign either
+            # way, but this closes the double-refresh window for real.
+            if not force and not self.refresh_due():
+                return
             if proposal:
                 merge_refresh(self.profile, proposal)
             self.profile["meta"]["turns_at_last_refresh"] = self.profile["meta"]["total_turns_observed"]

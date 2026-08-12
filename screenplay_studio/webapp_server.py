@@ -1064,8 +1064,8 @@ def _load_session_and_engine(project: str, session_id: str):
     try:
         mem_mod = _import_cowriter("memory")
         memory = mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
-    except Exception:
-        memory = None  # never let memory wiring break the chat
+    except (CowriterUnavailableError, OSError, ValueError):
+        memory = None  # memory unavailable or unreadable — never break the chat
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory)
     return session, engine, store
 

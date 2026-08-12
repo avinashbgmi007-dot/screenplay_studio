@@ -2591,11 +2591,20 @@ function init() {
   $("#sam-notes-close").addEventListener("click", closeSamNotes);
   $("#sam-notes-refresh").addEventListener("click", async () => {
     if (!state.currentProject || !state.currentSession) return;
-    await api("/writer-memory/refresh", {
-      method: "POST",
-      body: JSON.stringify({ project: state.currentProject, session_id: state.currentSession }),
-    });
-    loadSamNotes();
+    const btn = $("#sam-notes-refresh");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Refreshing…";
+    try {
+      await api("/writer-memory/refresh", {
+        method: "POST",
+        body: JSON.stringify({ project: state.currentProject, session_id: state.currentSession }),
+      });
+      await loadSamNotes();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
   });
   $("#tab-report-btn").addEventListener("click", () => switchFeedbackTab("report"));
   $("#tab-fixqueue-btn").addEventListener("click", () => switchFeedbackTab("fixqueue"));
