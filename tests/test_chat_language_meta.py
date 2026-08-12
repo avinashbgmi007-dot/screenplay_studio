@@ -99,6 +99,8 @@ class TestEngineAppliesFilter:
     def test_clean_reply_passthrough(self):
         engine = CoWriterEngine(_ChatClient(CRAFT_PARAGRAPH), ScriptContext(), ReportContext(None))
         session = Session.new("T")
-        reply = engine.send_message(session, "hello")
+        # a question takes the full-turn path (a bare "hello" would be treated as
+        # an unreasoned idea and probed first — see peer.py two-phase logic)
+        reply = engine.send_message(session, "What about scene 3?")
         assert reply == CRAFT_PARAGRAPH
         assert engine.client.calls == 1

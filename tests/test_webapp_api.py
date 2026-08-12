@@ -235,6 +235,23 @@ class TestChatFlow:
         resp = http_client.post(f"/api/projects/{project}/chat/start")
         assert resp.status_code == 200
 
+    def test_new_session_defaults_to_writing_partner(self, http_client):
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+        data = http_client.get(f"/api/projects/{project}/chat/sessions/{sid}").get_json()
+        branch = next(iter(data["branches"].values()))
+        assert branch["active_persona"] == "writing_partner"
+        assert branch["active_mode"] == "peer"
+
+    def test_settings_reset_to_partner(self, http_client):
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+        base = f"/api/projects/{project}/chat/sessions/{sid}/settings"
+        http_client.post(base, json={"persona": "producer"})
+        resp = http_client.post(base, json={"persona": "writing_partner", "mode": "peer"})
+        assert resp.status_code == 200
+        assert resp.get_json() == {"active_persona": "writing_partner", "active_mode": "peer"}
+
 
 class TestTimeoutConfig:
     """Proves the configurable timeout (added in response to a real slow-

@@ -130,6 +130,7 @@ def chat_completions():
         "film producer": "producer", "development executive": "dev_exec",
         "screenwriting teacher": "teacher", "general moviegoer": "audience",
         "genre specialist": "genre_specialist", "script consultant": "script_consultant",
+        "co-writing partner": "writing_partner",
     }
     detected_persona = "unknown"
     for marker, name in persona_markers.items():

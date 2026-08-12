@@ -43,8 +43,9 @@ class Branch:
     messages: list[Message] = field(default_factory=list)
     parent_branch: str | None = None
     forked_at_index: int | None = None  # index into parent's messages at fork time
-    active_persona: str = "script_consultant"
-    active_mode: str = "evidence_discussion"
+    active_persona: str = "writing_partner"
+    active_mode: str = "peer"
+    awaiting_probe: bool = False  # two-phase turn: writer is mid-probe (no suggestions yet)
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict:
@@ -55,6 +56,7 @@ class Branch:
             "forked_at_index": self.forked_at_index,
             "active_persona": self.active_persona,
             "active_mode": self.active_mode,
+            "awaiting_probe": self.awaiting_probe,
             "created_at": self.created_at,
         }
 
@@ -63,8 +65,9 @@ class Branch:
         b = Branch(
             name=d["name"], parent_branch=d.get("parent_branch"),
             forked_at_index=d.get("forked_at_index"),
-            active_persona=d.get("active_persona", "script_consultant"),
-            active_mode=d.get("active_mode", "evidence_discussion"),
+            active_persona=d.get("active_persona", "writing_partner"),
+            active_mode=d.get("active_mode", "peer"),
+            awaiting_probe=d.get("awaiting_probe", False),
             created_at=d.get("created_at", time.time()),
         )
         b.messages = [Message.from_dict(m) for m in d.get("messages", [])]
