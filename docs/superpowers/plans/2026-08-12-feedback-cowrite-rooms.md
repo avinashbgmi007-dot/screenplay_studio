@@ -166,7 +166,7 @@ def test_stranded_reply_gets_nudge_for_idea_turn():
     out = ensure_forward_momentum("That could work.", "idea")
     assert out.startswith("That could work.")
     assert out != "That could work."
-    assert any(out.endswith(n) for n in ["", "? "]) or out.rstrip().endswith("?")
+    assert out.rstrip().endswith("?")  # every nudge template ends with a question
 
 
 def test_no_nudge_for_factual_answer():
@@ -576,9 +576,9 @@ def test_dead_end_nudge_applied_when_needed():
     client = FakeClient(["That could work."])
     engine = _make_engine(client)
     s = _make_session()
-    reply = engine.send_message(s, "I think we cut the monologue")
+    reply = engine.send_message(s, "what do you think about cutting the monologue?")
     assert "one at a time" not in reply  # no bullets, so no cap
-    assert reply.endswith("?") or "want" in reply.lower() or "let's" in reply.lower()
+    assert reply.rstrip().endswith("?")  # nudge appended to the stranded reply
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -598,16 +598,17 @@ Expected: FAIL — old `send_message` has no two-phase logic (assertions on `awa
         user_text = (user_text or "").strip()
         turn_kind = classify_turn(user_text)
 
-        # Abandon a pending probe when the writer has clearly moved on.
-        if branch.awaiting_probe and turn_kind != "idea":
-            branch.awaiting_probe = False
-        # An idea continuing a probe counts as the phase-2 answer.
-        elif branch.awaiting_probe and turn_kind == "idea":
+        # A pending probe is resolved by whatever comes next: an idea is the
+        # answer to it, a question/directive is a topic change. Either way the
+        # flag clears — and we must NOT re-probe the writer who just answered
+        # (capturing was_pending BEFORE clearing prevents that loop).
+        was_pending = branch.awaiting_probe
+        if was_pending:
             branch.awaiting_probe = False
 
         scene_refs = extract_scene_refs(user_text)
 
-        if not branch.awaiting_probe and should_probe(user_text):
+        if not was_pending and should_probe(user_text):
             # Phase 1: reflect + probe, no suggestions.
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode
@@ -683,7 +684,7 @@ git commit -m "feat: integrate two-phase turn + guardrails into co-writer engine
 
 ```python
     def test_new_session_defaults_to_writing_partner(self, http_client):
-        project = self._make_project(http_client)
+        project = self._setup_analyzed_project(http_client)
         sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
         data = http_client.get(f"/api/projects/{project}/chat/sessions/{sid}").get_json()
         branch = next(iter(data["branches"].values()))
@@ -691,7 +692,7 @@ git commit -m "feat: integrate two-phase turn + guardrails into co-writer engine
         assert branch["active_mode"] == "peer"
 
     def test_settings_reset_to_partner(self, http_client):
-        project = self._make_project(http_client)
+        project = self._setup_analyzed_project(http_client)
         sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
         base = f"/api/projects/{project}/chat/sessions/{sid}/settings"
         http_client.post(base, json={"persona": "producer"})
@@ -753,7 +754,9 @@ git commit -m "test: webapp sessions default to writing partner + reset endpoint
 
 - [ ] **Step 1: Restructure the project workspace markup**
 
-Move the existing header controls: keep `#project-title` + `#branch-switcher` in a top bar; replace the four `#view-*` buttons with the two room buttons + `#room-chip`; MOVE `#analyze-btn`, `#report-lang-select`, `#analyze-progress`, `#reader-btn` into the Feedback panel header; MOVE `#persona-select` and `#mode-select` out of the header (they become hidden — lenses are conversational now). The composer form and `#messages` move into `#cowrite-panel`. Add `#partner-card` above `#messages` with: `[▓ Sam] — writing with you` and a `#reset-partner-btn` ("back to Sam"). Add the two `#bb-icon` / `#compare-icon` buttons into `#script-toolbar` next to export buttons. Add `#feedback-tabs`, the three feedback containers, and `#feedback-empty` (text: *"No analysis yet — Run Analysis to get the consultant's report"*).
+Move the existing header controls: keep `#project-title` + `#branch-switcher` in a top bar; replace the four `#view-*` buttons with the two room buttons + `#room-chip`; MOVE `#analyze-btn`, `#report-lang-select`, `#analyze-progress` into the Feedback panel header (they are consultant business now). `#reader-btn` STAYS in the script pane toolbar — it toggles reader mode on the draft, it is not a consultant control. MOVE `#persona-select` and `#mode-select` out of the header (they become hidden — lenses are conversational now). The composer form and `#messages` move into `#cowrite-panel`. Add `#partner-card` above `#messages` with: `[▓ Sam] — writing with you` and a `#reset-partner-btn` ("back to Sam"). Add the two `#bb-icon` / `#compare-icon` buttons into `#script-toolbar` next to export buttons. Add `#feedback-tabs`, the three feedback containers, and `#feedback-empty` (text: *"No analysis yet — Run Analysis to get the consultant's report"*).
+
+Wrap the whole project workspace in `<div class="workspace">` containing exactly three children: `#script-pane` (left, fixed width via CSS), `#cowrite-panel`, and `#feedback-panel` (right, flex: 1). Both room panels are direct children of `.workspace` so the script pane is literally the same DOM node in both rooms.
 
 - [ ] **Step 2: Verify structure by serving**
 
@@ -805,11 +808,11 @@ function openCowriteRoom() {
 function openFeedbackRoom() {
   if (state.view === "feedback") return;
   setRoom("feedback");
-  loadFeedbackPanels();
+  if (typeof loadFeedbackPanels === "function") loadFeedbackPanels();  // defined in Task 10
 }
 ```
 
-Update `hideAllViews()` to hide `#beatboard-view` and `#compare-view` only (the rooms are handled by `setRoom`). Update all references: `state.view === "script"` → treat `"cowrite"` and `"feedback"` as script-visible (e.g. `[state.view === "cowrite" || state.view === "feedback"]` in the keyboard/undo/print guards). Re-point `#analyze-btn`, `#report-lang-select`, `#analyze-progress` handlers — they now live in the Feedback panel but the existing `addEventListener` code already queries by ID, so no handler change is required. Add `$("#bb-icon")`/`$("#compare-icon")` click handlers → `openBeatboardView()`/`openCompareView()`. Add `$("#reset-partner-btn")` → POST settings `{persona:"writing_partner", mode:"peer"}` then `renderMessages()`.
+Update `hideAllViews()` to hide `#beatboard-view` and `#compare-view` only (the rooms are handled by `setRoom`). Update all references: `state.view === "script"` → treat `"cowrite"` and `"feedback"` as script-visible (e.g. `[state.view === "cowrite" || state.view === "feedback"]` in the keyboard/undo/print guards). **Remove the old `#view-chat-btn` / `#view-script-btn` / `#view-beatboard-btn` / `#view-compare-btn` click listeners** (their DOM nodes no longer exist; leaving them throws). Re-point `#analyze-btn`, `#report-lang-select`, `#analyze-progress` handlers — they now live in the Feedback panel but the existing `addEventListener` code already queries by ID, so no handler change is required. Add `$("#bb-icon")`/`$("#compare-icon")` click handlers → `openBeatboardView()`/`openCompareView()`. Add `$("#reset-partner-btn")` → POST settings `{persona:"writing_partner", mode:"peer"}` then `renderMessages()`. **In the saved-view restore switch, map legacy values to rooms:** `"chat"` → `"cowrite"`, `"script"` → `"cowrite"` (the script is now the shared pane; the co-write room is its home), `"beatboard"`/`"compare"` unchanged.
 
 - [ ] **Step 2: Add `maybeShowWelcome()` and the `discussFinding` prefill**
 
@@ -889,7 +892,7 @@ function renderReportPanel() {
     card.appendChild(el("div", "craft-panel-head",
       el("span", "craft-panel-title", `Coverage — ${(cov.recommendation || "").toUpperCase()}`)));
     if (cov.logline) card.appendChild(el("p", "", `Logline: ${cov.logline}`));
-    if (cov.synopsis) card.appendChild(el("p", "", cov.synopsis));
+    if (cov.one_page_synopsis) card.appendChild(el("p", "", cov.one_page_synopsis));  // NOTE: field is one_page_synopsis, not synopsis
     (cov.weaknesses || []).forEach(w => card.appendChild(el("p", "fix-row-why", `• ${w}`)));
     c.appendChild(card);
   }
@@ -1006,8 +1009,7 @@ git commit -m "feat: room theming + partner card + feedback panel styles"
 
 ```python
     def test_report_and_fixqueue_available_after_analysis(self, http_client):
-        project = self._make_project(http_client)
-        http_client.post(f"/api/projects/{project}/analyze")
+        project = self._setup_analyzed_project(http_client)  # helper already analyzes
         assert http_client.get(f"/api/projects/{project}/report").status_code == 200
         fq = http_client.get(f"/api/projects/{project}/fixqueue").get_json()
         assert "items" in fq
