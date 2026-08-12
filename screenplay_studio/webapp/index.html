@@ -104,25 +104,82 @@
       </div>
     </section>
 
-    <section id="chat-view" class="view" style="display:none;">
-      <header id="chat-header">
-        <div class="chat-header-left">
-          <h2 id="project-title">—</h2>
-          <div id="branch-switcher" class="branch-switcher"></div>
+    <header id="project-bar">
+      <div class="project-bar-left">
+        <h2 id="project-title">—</h2>
+        <div id="branch-switcher" class="branch-switcher"></div>
+      </div>
+      <div class="project-bar-right">
+        <div id="room-toggle" class="room-toggle" role="tablist" aria-label="Rooms">
+          <button id="room-cowrite-btn" class="room-toggle-btn active" role="tab" aria-selected="true" type="button">Co-write</button>
+          <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" type="button">Feedback</button>
+          <span id="room-chip" class="room-chip">✍️ Writer's Desk</span>
         </div>
-        <div class="chat-header-right">
-          <div id="view-toggle" class="view-toggle" role="tablist" aria-label="Project views">
-            <button id="view-chat-btn" class="view-toggle-btn active" role="tab" aria-selected="true" type="button">Chat</button>
-            <button id="view-script-btn" class="view-toggle-btn" role="tab" aria-selected="false" type="button">Script &amp; Notes</button>
-            <button id="view-beatboard-btn" class="view-toggle-btn" role="tab" aria-selected="false" type="button">Beat Board</button>
-            <button id="view-compare-btn" class="view-toggle-btn" role="tab" aria-selected="false" type="button">Compare</button>
+        <button id="palette-btn" class="btn-secondary" title="Command palette (Ctrl+K)" type="button">⌘K</button>
+      </div>
+    </header>
+
+    <!-- Hidden: persona/mode are conversational lenses now, but the JS still
+         reads these elements for settings — keep them in the DOM, invisible. -->
+    <div hidden>
+      <select id="persona-select" title="Reader perspective"></select>
+      <select id="mode-select" title="Conversation mode"></select>
+    </div>
+
+    <!-- The workspace: one shared script pane, two switchable room panels -->
+    <div class="workspace">
+
+      <!-- Shared script pane: the pages are always in front of you -->
+      <section id="script-pane" aria-label="The script">
+        <div id="script-toolbar" class="script-toolbar">
+          <input id="script-search" type="search" placeholder="Search the script… (e.g. a character, a prop, a line)" aria-label="Search script text">
+          <div id="finding-summary" class="finding-summary"></div>
+          <div class="script-actions">
+            <button id="reader-btn" class="btn-secondary" title="Reader mode — the draft clean, no margin machinery" type="button">Reader</button>
+            <button id="undo-btn" class="btn-secondary" title="Undo the last applied edit (Ctrl+Z)" disabled>↶ Undo</button>
+            <button id="redo-btn" class="btn-secondary" title="Re-apply the undone edit (Ctrl+Shift+Z)" disabled>↷ Redo</button>
+            <button id="bb-icon" class="btn-secondary icon-btn" title="Beat Board — try a new scene order" type="button">📋</button>
+            <button id="compare-icon" class="btn-secondary icon-btn" title="Compare drafts side by side" type="button">🗂</button>
+            <a id="export-fountain" class="btn-secondary" download>Export .fountain</a>
+            <a id="export-fdx" class="btn-secondary" download>Export .fdx</a>
+            <a id="export-txt" class="btn-secondary" download>Export .txt</a>
+            <button id="print-btn" class="btn-secondary" title="Print the working draft, or save it as PDF (Ctrl+P)">Print / Save PDF</button>
+            <button id="reset-edits-btn" class="btn-secondary danger" style="display:none;">Discard edits</button>
           </div>
-          <label class="control-label">Reading as
-            <select id="persona-select" title="Reader perspective"></select>
-          </label>
-          <label class="control-label">Mode
-            <select id="mode-select" title="Conversation mode"></select>
-          </label>
+        </div>
+        <div id="draft-bar" class="draft-bar" style="display:none;">
+          <label class="draft-label" for="draft-select">Draft</label>
+          <select id="draft-select" title="Switch draft"></select>
+          <button id="upload-draft-btn" class="btn-secondary" type="button">+ Upload new draft</button>
+          <input type="file" id="draft-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
+          <span id="upload-draft-status" class="upload-status"></span>
+        </div>
+        <div id="diff-banner" class="diff-banner" style="display:none;"></div>
+        <div id="script-scenes" class="script-scenes" aria-live="polite"></div>
+      </section>
+
+      <!-- Co-write room: the writer's desk -->
+      <section id="cowrite-panel" class="room-panel" aria-label="Co-write">
+        <div id="partner-card" class="partner-card">
+          <span class="avatar">▓</span>
+          <span class="partner-name">Sam — writing with you</span>
+          <button id="reset-partner-btn" class="btn-secondary btn-small" title="Back to the writing partner default" type="button">back to Sam</button>
+        </div>
+        <div id="messages" class="messages"></div>
+        <form id="composer" class="composer">
+          <div id="history-pop" class="history-pop" role="listbox" aria-label="Previous messages" hidden></div>
+          <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins…" rows="1"></textarea>
+          <button type="submit" id="send-btn" aria-label="Send">➤</button>
+        </form>
+      </section>
+
+      <!-- Feedback room: the consultant's desk -->
+      <section id="feedback-panel" class="room-panel" aria-label="Feedback" style="display:none;">
+        <div class="feedback-header">
+          <div>
+            <div class="feedback-title">Script Consultant Report</div>
+            <div class="feedback-sub">A professional review, delivered.</div>
+          </div>
           <label class="control-label">Report in
             <select id="report-lang-select" title="Language of the analysis report">
               <option value="eng">English</option>
@@ -131,8 +188,6 @@
               <option value="tamil">Tamil</option>
             </select>
           </label>
-          <button id="palette-btn" class="btn-secondary" title="Command palette (Ctrl+K)" type="button">⌘K</button>
-          <button id="reader-btn" class="btn-secondary" title="Reader mode — the draft clean, no margin machinery" type="button">Reader</button>
           <div id="analyze-progress" class="analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — hover or focus for the pipeline">
             <div class="ap-bar"><div class="ap-bar-fill"></div></div>
             <span class="ap-pct">0%</span>
@@ -140,42 +195,16 @@
           </div>
           <button id="analyze-btn" class="btn-secondary">Run Analysis</button>
         </div>
-      </header>
-
-      <div id="messages" class="messages"></div>
-
-      <form id="composer" class="composer">
-        <div id="history-pop" class="history-pop" role="listbox" aria-label="Previous messages" hidden></div>
-        <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins…" rows="1"></textarea>
-        <button type="submit" id="send-btn" aria-label="Send">➤</button>
-      </form>
-    </section>
-
-    <!-- Script & Notes: the working draft as pages with red-pencil findings -->
-    <section id="script-view" class="view">
-      <div id="script-toolbar" class="script-toolbar">
-        <input id="script-search" type="search" placeholder="Search the script… (e.g. a character, a prop, a line)" aria-label="Search script text">
-        <div id="finding-summary" class="finding-summary"></div>
-        <div class="script-actions">
-          <button id="undo-btn" class="btn-secondary" title="Undo the last applied edit (Ctrl+Z)" disabled>↶ Undo</button>
-          <button id="redo-btn" class="btn-secondary" title="Re-apply the undone edit (Ctrl+Shift+Z)" disabled>↷ Redo</button>
-          <a id="export-fountain" class="btn-secondary" download>Export .fountain</a>
-          <a id="export-fdx" class="btn-secondary" download>Export .fdx</a>
-          <a id="export-txt" class="btn-secondary" download>Export .txt</a>
-          <button id="print-btn" class="btn-secondary" title="Print the working draft, or save it as PDF (Ctrl+P)">Print / Save PDF</button>
-          <button id="reset-edits-btn" class="btn-secondary danger" style="display:none;">Discard edits</button>
+        <div id="feedback-tabs" class="feedback-tabs" style="display:none;">
+          <button id="tab-report-btn" class="active" type="button">Report</button>
+          <button id="tab-fixqueue-btn" type="button">Fix Queue</button>
         </div>
-      </div>
-      <div id="draft-bar" class="draft-bar" style="display:none;">
-        <label class="draft-label" for="draft-select">Draft</label>
-        <select id="draft-select" title="Switch draft"></select>
-        <button id="upload-draft-btn" class="btn-secondary" type="button">+ Upload new draft</button>
-        <input type="file" id="draft-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
-        <span id="upload-draft-status" class="upload-status"></span>
-      </div>
-      <div id="diff-banner" class="diff-banner" style="display:none;"></div>
-      <div id="script-scenes" class="script-scenes" aria-live="polite"></div>
-    </section>
+        <div id="feedback-report" class="feedback-pane" style="display:none;"></div>
+        <div id="feedback-fixqueue" class="feedback-pane" style="display:none;"></div>
+        <div id="feedback-empty" class="feedback-empty">No analysis yet — Run Analysis to get the consultant's report.</div>
+      </section>
+
+    </div>
 
     <!-- Beat Board: the corkboard — a proposed scene order, not the draft -->
     <section id="beatboard-view" class="view" style="display:none;">

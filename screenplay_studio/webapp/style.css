@@ -1366,37 +1366,10 @@ body.dawn .branch-badge {
    View toggle (Chat / Script & Notes)
    ============================================================ */
 
-.view-toggle {
-  display: inline-flex;
-  border: 1px solid var(--ink-650);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  margin-right: 6px;
-}
-
-.view-toggle-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  padding: 7px 11px;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.view-toggle-btn:hover { color: var(--text-primary); }
-.view-toggle-btn.active {
-  background: linear-gradient(180deg, var(--brass-bright), var(--brass));
-  color: var(--ink-950);
-  font-weight: 600;
-}
-
 /* ============================================================
-   Script & Notes view — the manuscript as pages on the desk
+   The shared script pane — the manuscript as pages on the desk
+   (rendered inside .workspace, present in both rooms)
    ============================================================ */
-
-#script-view { display: none; }
-#script-view.visible { display: flex; }
 
 .script-toolbar {
   display: flex;
@@ -2499,17 +2472,19 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   /* strip the room: chrome, rail, den, modals, banners */
-  #sidebar, #checkpoint-rail, #error-banner, #welcome-view, #chat-view,
+  #sidebar, #checkpoint-rail, #error-banner, #welcome-view,
   #beatboard-view, #compare-view, #palette-modal, #settings-modal,
   #rewrite-modal, .script-toolbar, #draft-bar, #diff-banner,
-  #composer, .den, .note-add, .finding-note-actions,
-  .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn {
+  #composer, .den, .note-add, .finding-note-actions, #project-bar,
+  #room-toggle, #room-chip, #partner-card, #feedback-tabs,
+  .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
+  #cowrite-panel, #feedback-panel {
     display: none !important;
   }
   body::before, body::after { display: none !important; }
 
   #main { padding: 0 !important; margin: 0 !important; }
-  #script-view { display: block !important; position: static !important; padding: 0 !important; }
+  #script-pane { display: block !important; position: static !important; padding: 0 !important; flex: none !important; }
   #script-scenes { overflow: visible !important; padding: 0 !important; display: block !important; }
 
   .scene-page {
@@ -2543,8 +2518,9 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
 
   /* Beat-board card printing: body.print-cards swaps the paper output for
      index cards to cut out and shuffle. */
-  body.print-cards #script-view, body.print-cards #chat-view,
-  body.print-cards #compare-view, body.print-cards #welcome-view {
+  body.print-cards #script-pane, body.print-cards #cowrite-panel,
+  body.print-cards #feedback-panel, body.print-cards #compare-view,
+  body.print-cards #welcome-view {
     display: none !important;
   }
   body.print-cards #beatboard-view { display: flex !important; }
@@ -2586,3 +2562,140 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   .den { padding: 24px 16px 100px; }
   .welcome-card { padding: 26px 20px 18px; }
 }
+
+/* ================= Two rooms: the writer's desk vs the consultant's desk =================
+   The script pane stays neutral in both rooms; identity lives in the header
+   and the right-hand panel. body[data-room] drives the accent + panel tint. */
+
+:root,
+body[data-room="cowrite"] {
+  --room-accent: var(--brass-bright);
+  --room-accent-soft: rgba(224, 181, 103, 0.14);
+  --room-panel-bg: rgba(224, 181, 103, 0.05);
+  --room-panel-border: rgba(224, 181, 103, 0.22);
+}
+body[data-room="feedback"] {
+  --room-accent: #7ea6d9;
+  --room-accent-soft: rgba(126, 166, 217, 0.14);
+  --room-panel-bg: rgba(126, 166, 217, 0.05);
+  --room-panel-border: rgba(126, 166, 217, 0.25);
+}
+
+#project-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ink-border);
+  background: var(--ink-900);
+}
+.project-bar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.project-bar-right { display: flex; align-items: center; gap: 10px; }
+#project-bar h2 { margin: 0; font-family: var(--font-display); font-size: 16px; letter-spacing: 0.4px; }
+
+/* room switch */
+.room-toggle { display: flex; align-items: center; gap: 6px; }
+.room-toggle-btn {
+  border: 1px solid var(--ink-border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 5px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.room-toggle-btn:hover { color: var(--text-primary); border-color: var(--room-accent); }
+.room-toggle-btn.active {
+  background: var(--room-accent-soft);
+  color: var(--room-accent);
+  border-color: var(--room-accent);
+  font-weight: 600;
+}
+#room-chip {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: var(--room-accent);
+  border: 1px dashed var(--room-accent);
+  border-radius: 10px;
+  padding: 2px 9px;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* the workspace: shared script pane + room panel */
+.workspace { display: none; flex: 1; min-height: 0; }
+#script-pane {
+  flex: 0 0 55%;
+  min-width: 420px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--ink-border);
+  background: var(--ink-850);
+}
+#script-pane .script-toolbar { flex: 0 0 auto; }
+#script-pane .script-scenes { flex: 1; min-height: 0; }
+
+.room-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--room-panel-bg);
+}
+
+/* partner card (co-write) */
+#partner-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--room-panel-border);
+  background: linear-gradient(90deg, var(--room-accent-soft), transparent 65%);
+  flex: 0 0 auto;
+}
+#partner-card .avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--room-accent);
+  color: var(--ink-950);
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 700;
+}
+#partner-card .partner-name {
+  font-family: var(--font-hand);
+  font-size: 17px;
+  color: var(--room-accent);
+}
+.btn-small { padding: 2px 10px; font-size: 12px; border-radius: 6px; }
+#reset-partner-btn { margin-left: auto; }
+
+/* feedback panel header + tabs */
+.feedback-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--room-panel-border);
+  flex: 0 0 auto;
+}
+.feedback-title { font-family: var(--font-display); font-size: 15px; color: var(--room-accent); letter-spacing: 0.5px; }
+.feedback-sub { font-size: 12px; color: var(--text-muted); }
+.feedback-header .control-label { margin-left: auto; }
+
+.feedback-tabs { display: flex; gap: 4px; padding: 6px 14px 0; flex: 0 0 auto; }
+.feedback-tabs button {
+  border: none; background: transparent; color: var(--text-muted);
+  padding: 5px 14px; border-bottom: 2px solid transparent;
+  cursor: pointer; font-family: var(--font-body); font-size: 13px;
+}
+.feedback-tabs button:hover { color: var(--text-primary); }
+.feedback-tabs button.active { border-bottom-color: var(--room-accent); color: var(--room-accent); font-weight: 600; }
+.feedback-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; }
+.feedback-empty { flex: 1; display: grid; place-items: center; text-align: center; color: var(--text-muted); padding: 40px 20px; }
+
+.icon-btn { min-width: 34px; padding: 5px 8px; }

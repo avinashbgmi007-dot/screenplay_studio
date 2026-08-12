@@ -252,6 +252,13 @@ class TestChatFlow:
         assert resp.status_code == 200
         assert resp.get_json() == {"active_persona": "writing_partner", "active_mode": "peer"}
 
+    def test_report_and_fixqueue_available_after_analysis(self, http_client):
+        project = self._setup_analyzed_project(http_client)  # helper already analyzes
+        assert http_client.get(f"/api/projects/{project}/report").status_code == 200
+        fq = http_client.get(f"/api/projects/{project}/fixqueue").get_json()
+        assert "items" in fq
+        assert "acts" in fq
+
 
 class TestTimeoutConfig:
     """Proves the configurable timeout (added in response to a real slow-

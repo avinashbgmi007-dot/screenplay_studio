@@ -115,6 +115,17 @@ function hideError() {
 
 // ---------- config ----------
 
+// Canonical fallbacks for the persona/mode dropdowns. The server exposes the
+// real lists via /api/config; these are used only when the server doesn't
+// (e.g. the co-writer package isn't installed) so the UI never renders empty.
+const FALLBACK_PERSONAS = ["script_consultant", "producer", "dev_exec", "teacher", "audience", "genre_specialist"];
+const FALLBACK_MODES = ["evidence_discussion", "brainstorm", "character_interview"];
+const FALLBACK_PERSONA_LABELS = {
+  script_consultant: "Script Consultant", producer: "Producer", dev_exec: "Dev Exec",
+  teacher: "Teacher", audience: "Audience", genre_specialist: "Genre Specialist",
+};
+const FALLBACK_MODE_LABELS = { evidence_discussion: "Grounded Discussion", brainstorm: "Brainstorm", character_interview: "Character Interview" };
+
 async function loadConfig() {
   try {
     state.config = await api("/config");
@@ -282,7 +293,7 @@ function applyReaderMode(on) {
 function saveSession() {
   try {
     const payload = { project: state.currentProject, view: state.view };
-    if (state.view === "script" && state.script && state.script.scenes && state.script.scenes.length) {
+    if ((state.view === "cowrite" || state.view === "feedback") && state.script && state.script.scenes && state.script.scenes.length) {
       const container = document.getElementById("script-scenes");
       const pages = container ? [...container.querySelectorAll(".scene-page")] : [];
       if (pages.length) {
@@ -307,11 +318,6 @@ function restoreSession() {
 async function openProject(name) {
   try {
     state.currentProject = name;
-    state.view = "chat";
-    $("#view-chat-btn").classList.add("active");
-    $("#view-script-btn").classList.remove("active");
-    $("#script-view").classList.remove("visible");
-    $("#chat-view").style.display = "flex";
     state.script = null;
     state.findings = [];
     state.findingStatus = {};
@@ -321,7 +327,8 @@ async function openProject(name) {
     renderProjectList();
 
     $("#welcome-view").style.display = "none";
-    $("#chat-view").style.display = "flex";
+    const ws = document.querySelector(".workspace");
+    if (ws) ws.style.display = "flex";
     $("#project-title").textContent = project.title;
     $("#project-title").title = project.title;
 
@@ -350,17 +357,58 @@ async function openProject(name) {
       await loadSession(project.sessions[0].session_id);
     } else {
       state.currentSession = null;
-      state.branches = { main: { messages: [], active_persona: "script_consultant", active_mode: "evidence_discussion" } };
+      state.branches = { main: { messages: [], active_persona: "writing_partner", active_mode: "peer" } };
       state.currentBranch = "main";
       renderMessages();
       renderBranches();
       renderCheckpoints();
       populateSelectors();
     }
+
+    // the script pane is always visible in both rooms — render it once
+    try { await loadScriptData(); } catch (_) { /* no parse yet — pane shows its hint */ }
+    renderScriptView();
+    maybeShowWelcome();
+
+    setRoom("cowrite");
     saveSession();
   } catch (e) {
     showError("Couldn't open that project: " + e.message);
   }
+}
+
+// ---------- rooms: Co-write (writer's desk) vs Feedback (consultant's desk) ----------
+// The script pane is shared and always visible; the room toggle swaps the right
+// panel and the room's visual identity (see body[data-room] in style.css).
+
+function setRoom(room) {
+  state.view = room;                       // "cowrite" | "feedback"
+  document.body.dataset.room = room;       // drives CSS theming
+  const chip = $("#room-chip");
+  if (chip) chip.textContent = room === "feedback" ? "📋 Consultant's Desk" : "✍️ Writer's Desk";
+  $("#room-cowrite-btn").classList.toggle("active", room === "cowrite");
+  $("#room-feedback-btn").classList.toggle("active", room === "feedback");
+  $("#cowrite-panel").style.display = room === "cowrite" ? "flex" : "none";
+  $("#feedback-panel").style.display = room === "feedback" ? "flex" : "none";
+  // closing a full-screen tool returns to the active room
+  $("#beatboard-view").style.display = "none";
+  $("#compare-view").style.display = "none";
+  const ws = document.querySelector(".workspace");
+  if (ws) ws.style.display = "flex";
+  saveSession();
+}
+
+function openCowriteRoom() {
+  if (state.view === "cowrite") return;
+  setRoom("cowrite");
+  renderMessages();
+  maybeShowWelcome();
+}
+
+function openFeedbackRoom() {
+  if (state.view === "feedback") return;
+  setRoom("feedback");
+  if (typeof loadFeedbackPanels === "function") loadFeedbackPanels();  // defined in Task 10
 }
 
 // ---------- analysis progress pipeline ----------
@@ -536,10 +584,10 @@ async function runAnalysis() {
     btn.textContent = "Re-run Analysis";
     appendSystemNote("Analysis complete. The report is now grounding this conversation.");
     await loadProjects();
-    if (state.view === "script") {
-      await loadScriptData();
-      renderScriptView();
-    }
+    // script pane is shared — refresh it in either room after analysis
+    await loadScriptData();
+    renderScriptView();
+    if (state.view === "feedback") loadFeedbackPanels();
   } catch (e) {
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
@@ -796,27 +844,39 @@ async function createFork() {
 
 function populateSelectors() {
   const b = currentBranchData();
-  const personas = ["script_consultant", "producer", "dev_exec", "teacher", "audience", "genre_specialist"];
-  const modes = ["evidence_discussion", "brainstorm", "character_interview"];
-  const personaLabels = {
-    script_consultant: "Script Consultant", producer: "Producer", dev_exec: "Dev Exec",
-    teacher: "Teacher", audience: "Audience", genre_specialist: "Genre Specialist",
-  };
-  const modeLabels = { evidence_discussion: "Grounded Discussion", brainstorm: "Brainstorm", character_interview: "Character Interview" };
+  // Prefer the server-provided lists; fall back to the built-ins only if the
+  // server didn't supply them (co-writer missing or an old config response).
+  const personas = (state.config && state.config.personas && state.config.personas.length)
+    ? state.config.personas : FALLBACK_PERSONAS;
+  const modes = (state.config && state.config.modes && state.config.modes.length)
+    ? state.config.modes : FALLBACK_MODES;
+  const personaLabels = { ...FALLBACK_PERSONA_LABELS };
+  const modeLabels = { ...FALLBACK_MODE_LABELS };
 
   const pSel = $("#persona-select");
   pSel.innerHTML = "";
-  personas.forEach((p) => pSel.appendChild(new Option(personaLabels[p], p, false, p === b.active_persona)));
+  personas.forEach((p) => pSel.appendChild(new Option(personaLabels[p] || p, p, false, p === b.active_persona)));
 
   const mSel = $("#mode-select");
   mSel.innerHTML = "";
-  modes.forEach((m) => mSel.appendChild(new Option(modeLabels[m], m, false, m === b.active_mode)));
+  modes.forEach((m) => mSel.appendChild(new Option(modeLabels[m] || m, m, false, m === b.active_mode)));
 }
 
 async function updateSettings() {
   if (!state.currentSession) return;
   const persona = $("#persona-select").value;
   const mode = $("#mode-select").value;
+  await _setPersonaMode(persona, mode);
+}
+
+async function resetToPartner() {
+  // "back to Sam": reset the current branch to the writing-partner default
+  await _setPersonaMode("writing_partner", "peer");
+  renderMessages();
+}
+
+async function _setPersonaMode(persona, mode) {
+  if (!state.currentSession) return;
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/chat/sessions/${state.currentSession}/settings`, {
       method: "POST", body: JSON.stringify({ persona, mode }),
@@ -1645,46 +1705,118 @@ function renderScriptView() {
 }
 
 async function hideAllViews() {
-  $("#view-chat-btn").classList.remove("active");
-  $("#view-script-btn").classList.remove("active");
-  $("#view-beatboard-btn").classList.remove("active");
-  $("#view-compare-btn").classList.remove("active");
-  $("#chat-view").style.display = "none";
-  $("#script-view").classList.remove("visible");
+  // full-screen tools only — the rooms are handled by setRoom()
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
+  const ws = document.querySelector(".workspace");
+  if (ws) ws.style.display = "none";
 }
 
+// The script pane is always visible now; kept as a thin alias so callers
+// (palette commands, session restore) that used to "open the script view"
+// simply ensure the shared pane is loaded and rendered.
 async function openScriptView() {
-  if (state.view === "script") return;
-  state.view = "script";
-  hideAllViews();
-  $("#view-script-btn").classList.add("active");
-  $("#script-view").classList.add("visible");
+  if (state.view === "cowrite" || state.view === "feedback") return;
+  openCowriteRoom();
   try {
     await loadScriptData();
   } catch (e) {
     showError("Couldn't load the script: " + e.message);
   }
   renderScriptView();
-  saveSession();
 }
 
 function openChatView() {
-  if (state.view === "chat") return;
-  state.view = "chat";
-  hideAllViews();
-  $("#view-chat-btn").classList.add("active");
-  $("#chat-view").style.display = "flex";
-  saveSession();
+  openCowriteRoom();
 }
 
 function discussFinding(f, index) {
-  openChatView();
+  openCowriteRoom();
   const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "the whole script";
   $("#input").value = `About the note on ${refs} — "${f.issue}": how should I approach fixing it?`;
   autoResizeTextarea();
   $("#input").focus();
+}
+
+let welcomeShownFor = null;
+function maybeShowWelcome() {
+  if (!state.currentProject) return;
+  if (welcomeShownFor === state.currentProject) return;
+  welcomeShownFor = state.currentProject;
+  const container = $("#messages");
+  if (!container) return;
+  const branch = currentBranchData();
+  if ((branch.messages || []).length > 0) return;
+  if (!container.querySelector(".chat-empty-hint")) {
+    container.appendChild(el("div", "chat-empty-hint", "Sam: Hey — I'm here. What are we working on?"));
+  }
+}
+
+async function loadFeedbackPanels() {
+  const base = `/api/projects/${encodeURIComponent(state.currentProject)}`;
+  try {
+    if (!state.report) state.report = await api(`${base}/report`);
+  } catch (_) { /* no analysis yet */ }
+  try {
+    if (!state.fixQueue) state.fixQueue = await api(`${base}/fixqueue`);
+  } catch (_) { /* no analysis yet */ }
+  const hasReport = !!(state.report && (state.report.findings || state.report.coverage));
+  const empty = $("#feedback-empty");
+  const tabs = $("#feedback-tabs");
+  if (empty) empty.style.display = hasReport ? "none" : "block";
+  if (tabs) tabs.style.display = hasReport ? "flex" : "none";
+  if (hasReport) {
+    renderReportPanel();
+    const fq = $("#feedback-fixqueue");
+    if (fq) {
+      fq.innerHTML = "";
+      renderFixQueuePanel(fq);   // existing function, reused verbatim
+    }
+    switchFeedbackTab("report");  // show the Report pane (both panes start hidden)
+  }
+}
+
+function switchFeedbackTab(tab) {
+  const reportBtn = $("#tab-report-btn");
+  const fqBtn = $("#tab-fixqueue-btn");
+  const report = $("#feedback-report");
+  const fq = $("#feedback-fixqueue");
+  if (reportBtn) reportBtn.classList.toggle("active", tab === "report");
+  if (fqBtn) fqBtn.classList.toggle("active", tab === "fixqueue");
+  if (report) report.style.display = tab === "report" ? "block" : "none";
+  if (fq) fq.style.display = tab === "fixqueue" ? "block" : "none";
+}
+
+function renderReportPanel() {
+  const c = $("#feedback-report");
+  if (!c) return;
+  c.innerHTML = "";
+  const cov = state.report && state.report.coverage;
+  if (cov) {
+    const card = el("div", "craft-panel");
+    const head = el("div", "craft-panel-head");
+    head.appendChild(el("span", "craft-panel-title", `Coverage — ${(cov.recommendation || "").toUpperCase()}`));
+    card.appendChild(head);
+    if (cov.logline) card.appendChild(el("p", "", `Logline: ${cov.logline}`));
+    if (cov.one_page_synopsis) card.appendChild(el("p", "", cov.one_page_synopsis));
+    (cov.weaknesses || []).forEach((w) => card.appendChild(el("p", "fix-row-why", `• ${w}`)));
+    c.appendChild(card);
+  }
+  const byCat = {};
+  (state.report.findings || []).forEach((f) => { (byCat[f.category] = byCat[f.category] || []).push(f); });
+  for (const [cat, list] of Object.entries(byCat)) {
+    const card = el("div", "craft-panel");
+    const head = el("div", "craft-panel-head");
+    head.appendChild(el("span", "craft-panel-title", cat));
+    card.appendChild(head);
+    list.forEach((f) => {
+      const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "General";
+      const issue = el("p", "fix-row-issue", `[${(f.severity || "low").toUpperCase()}] ${refs}: ${f.issue}`);
+      if (f.why_it_matters) issue.appendChild(el("p", "fix-row-why", f.why_it_matters));
+      card.appendChild(issue);
+    });
+    c.appendChild(card);
+  }
 }
 
 // ---- compare (side-by-side drafts) ----
@@ -1695,7 +1827,6 @@ async function openCompareView() {
   if (state.view === "compare") return;
   state.view = "compare";
   hideAllViews();
-  $("#view-compare-btn").classList.add("active");
   $("#compare-view").style.display = "flex";
   try {
     await loadCompare();
@@ -1774,7 +1905,6 @@ async function openBeatboardView() {
   if (state.view === "beatboard") return;
   state.view = "beatboard";
   hideAllViews();
-  $("#view-beatboard-btn").classList.add("active");
   $("#beatboard-view").style.display = "flex";
   try {
     await loadBeatboard();
@@ -2052,8 +2182,9 @@ const SHORTCUTS = [
   ["Ctrl/⌘ K", "Command palette"],
   ["Ctrl/⌘ Z", "Undo last applied edit"],
   ["Ctrl/⌘ Shift Z", "Redo the undone edit"],
-  ["c", "Switch to Chat"],
-  ["s", "Switch to Script & Notes"],
+  ["c", "Switch to Co-write"],
+  ["f", "Switch to Feedback"],
+  ["s", "Focus the script pane"],
   ["b", "Open the Beat Board"],
   ["d", "Compare drafts side by side"],
   ["j / n", "Next scene (script view)"],
@@ -2064,14 +2195,14 @@ const SHORTCUTS = [
 
 function paletteCommands() {
   return [
-    { type: "command", label: "Switch to Chat", keys: "c", run: () => { openChatView(); } },
-    { type: "command", label: "Switch to Script & Notes", keys: "s", run: () => openScriptView() },
+    { type: "command", label: "Switch to Co-write", keys: "c", run: () => { openCowriteRoom(); } },
+    { type: "command", label: "Switch to Feedback", keys: "f", run: () => { openFeedbackRoom(); } },
     { type: "command", label: "Open the Beat Board", keys: "b", run: () => openBeatboardView() },
     { type: "command", label: "Compare drafts side by side", keys: "d", run: () => { if (state.currentProject) openCompareView(); } },
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
     { type: "command", label: "Start a new page", keys: "", run: () => { $("#new-project-btn").click(); } },
-    { type: "command", label: "Focus the conversation", keys: "", run: () => { openChatView(); setTimeout(() => $("#input").focus(), 60); } },
-    { type: "command", label: "Search the script", keys: "/", run: () => { if (state.view !== "script") openScriptView(); setTimeout(() => $("#script-search").focus(), 80); } },
+    { type: "command", label: "Focus the conversation", keys: "", run: () => { openCowriteRoom(); setTimeout(() => $("#input").focus(), 60); } },
+    { type: "command", label: "Search the script", keys: "/", run: () => { if (state.view !== "cowrite" && state.view !== "feedback") openCowriteRoom(); setTimeout(() => $("#script-search").focus(), 80); } },
     { type: "command", label: "Export working draft (.fountain)", keys: "", run: () => $("#export-fountain").click() },
     { type: "command", label: "Study settings", keys: "", run: () => $("#settings-btn").click() },
   ];
@@ -2215,7 +2346,7 @@ function bindGlobalShortcuts() {
 
     // undo/redo — meaningful in the script view (or anywhere with edits)
     if (mod && e.key.toLowerCase() === "z") {
-      if (state.view === "script" && state.editsData && (state.editsData.can_undo || e.shiftKey)) {
+      if ((state.view === "cowrite" || state.view === "feedback") && state.editsData && (state.editsData.can_undo || e.shiftKey)) {
         e.preventDefault();
         if (e.shiftKey) redoEdit(); else undoEdit();
       }
@@ -2227,12 +2358,12 @@ function bindGlobalShortcuts() {
 
     if (e.key === "?") { e.preventDefault(); openPalette(true); }
     else if (e.key === "/") { e.preventDefault(); paletteCommands().find((c) => c.keys === "/").run(); }
-    else if (e.key === "c") { openChatView(); }
-    else if (e.key === "s") { openScriptView(); }
+    else if (e.key === "c") { openCowriteRoom(); }
+    else if (e.key === "f") { openFeedbackRoom(); }
     else if (e.key === "b") { openBeatboardView(); }
     else if (e.key === "d" && state.currentProject) { openCompareView(); }
-    else if (e.key === "j" || e.key === "n") { if (state.view === "script") { e.preventDefault(); stepScene(1); } }
-    else if (e.key === "k" || e.key === "p") { if (state.view === "script") { e.preventDefault(); stepScene(-1); } }
+    else if (e.key === "j" || e.key === "n") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(1); } }
+    else if (e.key === "k" || e.key === "p") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(-1); } }
   });
 }
 
@@ -2282,7 +2413,8 @@ function init() {
 
   $("#new-project-btn").addEventListener("click", () => {
     $("#welcome-view").style.display = "flex";
-    $("#chat-view").style.display = "none";
+    const ws = document.querySelector(".workspace");
+    if (ws) ws.style.display = "none";
     state.currentProject = null;
     renderProjectList();
     saveSession();
@@ -2329,8 +2461,9 @@ function init() {
     const s = restoreSession();
     if (!s || !s.project || !(state.projects || []).some((p) => p.project === s.project)) return;
     openProject(s.project).then(() => {
-      if (s.view === "script") {
-        openScriptView().then(() => {
+      if (s.view === "chat" || s.view === "script") {
+        // legacy saved views map to the Co-write room (the script is the shared pane)
+        openProject(s.project).then(() => {
           if (s.scene) {
             const page = document.getElementById(`scene-page-${s.scene}`);
             if (page) page.scrollIntoView({ behavior: "auto", block: "start" });
@@ -2343,9 +2476,7 @@ function init() {
 
   $("#analyze-btn").addEventListener("click", runAnalysis);
 
-  // script & notes view
-  $("#view-chat-btn").addEventListener("click", openChatView);
-  $("#view-script-btn").addEventListener("click", openScriptView);
+  // script pane
   $("#script-search").addEventListener("input", () => renderScriptView());
   $("#reset-edits-btn").addEventListener("click", resetEdits);
   $("#undo-btn").addEventListener("click", undoEdit);
@@ -2405,10 +2536,17 @@ function init() {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.style.display = "none"; });
   });
 
-  // view toggle
-  $("#view-beatboard-btn").addEventListener("click", openBeatboardView);
-  $("#view-compare-btn").addEventListener("click", openCompareView);
-  $("#print-btn").addEventListener("click", () => { if (state.view === "script") window.print(); });
+  // rooms
+  $("#room-cowrite-btn").addEventListener("click", openCowriteRoom);
+  $("#room-feedback-btn").addEventListener("click", openFeedbackRoom);
+  $("#bb-icon").addEventListener("click", openBeatboardView);
+  $("#compare-icon").addEventListener("click", openCompareView);
+  $("#reset-partner-btn").addEventListener("click", resetToPartner);
+  $("#tab-report-btn").addEventListener("click", () => switchFeedbackTab("report"));
+  $("#tab-fixqueue-btn").addEventListener("click", () => switchFeedbackTab("fixqueue"));
+  $("#print-btn").addEventListener("click", () => {
+    if (state.view === "cowrite" || state.view === "feedback") window.print();
+  });
   $("#compare-from-select").addEventListener("change", (e) => {
     compareFrom = e.target.value;
     loadCompare().catch((err) => showError("Couldn't reload comparison: " + err.message));
