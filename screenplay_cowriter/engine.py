@@ -15,7 +15,7 @@ HISTORY_WINDOW = 16  # most recent messages kept verbatim; older context relies 
 
 class CoWriterEngine:
     def __init__(self, client: LlamaServerClient, script_ctx: ScriptContext, report_ctx: ReportContext,
-                 history_window: int = HISTORY_WINDOW, store=None):
+                 history_window: int = HISTORY_WINDOW, store=None, memory=None):
         self.client = client
         self.script_ctx = script_ctx
         self.report_ctx = report_ctx
@@ -25,6 +25,10 @@ class CoWriterEngine:
         # conversation on some error path. Callers may still save explicitly
         # (idempotent — same content, harmless double-write).
         self.store = store
+        # Optional writer relationship memory. When present, send_message
+        # observes each turn and injects the relationship card into the
+        # system prompt (both probe and full-turn paths).
+        self.memory = memory
 
     def send_message(self, session: Session, user_text: str) -> str:
         from .peer import (
@@ -43,12 +47,23 @@ class CoWriterEngine:
         if was_pending:
             branch.awaiting_probe = False
 
+        if self.memory is not None:
+            # Capture the cold-start line BEFORE observe(): observe bumps
+            # total_turns_observed, which would otherwise kill it on turn 1.
+            cold_start_line = self.memory.cold_start_line() if not branch.messages else None
+            prev_reply = branch.messages[-1].content if (was_pending and branch.messages) else None
+            self.memory.observe(user_text, turn_kind, was_pending, prev_reply)
+        else:
+            cold_start_line = None
+        relationship_card = self.memory.card_text() if self.memory is not None else None
+
         scene_refs = extract_scene_refs(user_text)
 
         if not was_pending and should_probe(user_text):
             # Phase 1: reflect + probe, no suggestions.
             system_prompt = build_system_prompt(
-                self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode
+                self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
+                relationship_card=relationship_card, cold_start_line=cold_start_line,
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = [{"role": "system", "content": system_prompt}]
@@ -65,7 +80,8 @@ class CoWriterEngine:
             branch.awaiting_probe = True
         else:
             system_prompt = build_system_prompt(
-                self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode
+                self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
+                relationship_card=relationship_card, cold_start_line=cold_start_line,
             )
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = [{"role": "system", "content": system_prompt}]
@@ -84,5 +100,9 @@ class CoWriterEngine:
 
         if self.store is not None:
             self.store.save(session)
+
+        if self.memory is not None:
+            recent = [m.to_dict() for m in branch.messages[-self.history_window:]]
+            self.memory.maybe_refresh_async(self.client, recent)
 
         return reply

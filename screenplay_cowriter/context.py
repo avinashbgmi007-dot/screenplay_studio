@@ -123,9 +123,10 @@ class ReportContext:
         return "\n\n".join(parts) if parts else "(No report loaded — discussing the raw script only.)"
 
 
-def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, persona: str, mode: str) -> str:
+def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, persona: str, mode: str,
+                        relationship_card: str | None = None, cold_start_line: str | None = None) -> str:
     title = script_ctx.title or report_ctx.title or "this screenplay"
-    return (
+    prompt = (
         f"{persona_text(persona)}\n\n"
         f"{mode_text(mode)}\n\n"
         f"You're discussing the screenplay \"{title}\" with its writer. Here is the "
@@ -135,6 +136,11 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         f"and you need exact wording to answer precisely, say so rather than guessing "
         f"at exact lines from memory.\n\n{LANGUAGE_META_INSTRUCTION}"
     )
+    if relationship_card:
+        prompt += f"\n\n{relationship_card}"
+    if cold_start_line:
+        prompt += f"\n\n{cold_start_line}"
+    return prompt
 
 
 def extract_scene_refs(text: str) -> list:
