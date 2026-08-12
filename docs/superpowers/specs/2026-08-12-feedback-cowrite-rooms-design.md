@@ -69,6 +69,7 @@ Consequences:
 
 - Right panel: the existing conversation (`#messages`) + composer.
 - Header: a **partner card** (avatar + name "Sam", "writing with you") + branch switcher. **No persona dropdown, no mode dropdown, no report-language dropdown.**
+- **First-turn welcome:** on a fresh session (no messages), Sam opens with a short one-line welcome — makes the "human sitting beside you" real from the first second.
 - Personas become **conversational lenses**: *"what would a producer say about this cold open?"* — Sam adopts the lens in-voice and drops it when the conversation moves on.
 - `peer` is the default mode (see §7).
 
@@ -123,11 +124,14 @@ All four guardrails are pure functions where possible (unit-testable without a m
 
 1. **Two-phase turn (`classify_turn` + phase state).**
    - Classify the writer's message: `idea` (a statement sharing a thought), `question`, or `directive`.
-   - If `idea` and the turn is not already in phase 2 → reply is forced to **phase 1**: reflect the idea back + ask what's driving it ("why do you think so?" / "what feels right about it?"). Suggestions are **structurally withheld** until the writer responds.
+   - **The probe is NOT mechanical.** It fires only when the idea arrives *without* embedded reasoning (no "because / since / my instinct is / the reason I…"). If the writer already gave their reasoning, Sam responds to it directly — a real co-writer doesn't interrogate every thought.
+   - When it does fire, reply is forced to **phase 1**: reflect the idea back + ask what's driving it ("why do you think so?" / "what feels right about it?"). Suggestions are **structurally withheld** until the writer responds.
    - Phase state tracked on the **Branch** (a new optional `awaiting_probe` field, mirroring how persona/mode are already per-branch — forks copy the flag along with the history).
-   - If the writer responds to the probe → full turn (suggestions allowed, subject to the one-idea cap).
+   - **Abandon on topic change:** if `awaiting_probe` is set but the writer's next message changes topic (a new question/directive, no reference back to the idea), the probe is abandoned and the new message is answered fresh — never drag the writer back to an old question.
 2. **Dead-end check (`ensure_forward_momentum`).**
-   - After the model reply, verify the text ends with a question, an explicit choice, or a stated next step. If not, append one from a small natural template pool (never robotic; the template pool is short and phrased in the partner's voice).
+   - After the model reply, verify the text ends with a question, an explicit choice, or a stated next step.
+   - **Light-touch:** append a forward nudge ONLY when the reply is short or clearly stranded AND the turn was an idea/response turn — never to a purely factual answer (e.g. a plot summary doesn't need a follow-up question). Real humans sometimes end on a period; the goal is the writer never feels *stranded*, not that every message interrogates them.
+   - Append from a small varied template pool phrased in the partner's voice (rotated so it never repeats back-to-back).
 3. **One idea at a time (`cap_suggestions`).**
    - Prompt-level rule plus a light structural cap on bulleted suggestions per turn (default: 1; configurable constant). Excess suggestions are condensed by the prompt; the cap is a safety net, not a trimmer.
 4. **Never-volunteer enforcement (prompt lock).**
@@ -150,12 +154,13 @@ All four guardrails are pure functions where possible (unit-testable without a m
 - **Fix Queue tab** → renders the existing `GET /api/projects/<name>/fixqueue` payload (already severity→act sorted): each finding as a card with severity badge, scene + heading, act, evidence quote, and current revision status (addressed / still_present / unknown).
 - Header: `Run Analysis` (existing `POST /analyze`, keeps `force` + `report_language` semantics) + report-language picker (moved from the old chat header).
 - Progress display (existing `GET /progress` + the in-header progress bar) relocates to the Feedback room header.
+- **Empty state:** when the project has no completed analysis, the room shows "No analysis yet — Run Analysis to get the consultant's report". Bridge links appear only when findings exist.
 
 ## 9. The bridge (Feedback → Co-write)
 
 - Each fix-queue finding card has **"→ discuss with my partner"**.
-- Clicking it: switches to the Co-write room and sends a seed message via the existing chat endpoint, e.g. *"The consultant flagged scene 14: '…issue…'. What do you think?"*
-- This honors the **informed-partner** rule: the partner never volunteers; *you* bring the finding over.
+- Clicking it: switches to the Co-write room and **prefills the composer** with an editable seed message that includes the scene number (so Sam's scene-text injection works), e.g. *"The consultant flagged scene 14: '…issue…'. What do you think?"* — the writer edits and sends it.
+- **Prefill, never auto-send** — the app must not make the writer discuss anything; the writer stays the editor. This honors the **informed-partner** rule: the partner never volunteers; *you* bring the finding over.
 
 ---
 
@@ -184,15 +189,18 @@ Feedback room:  Run Analysis → POST /analyze (unchanged)
 
 1. **Unit tests — `peer.py` guardrails** (`tests/test_peer_guardrails.py`, mock server, no real model):
    - `classify_turn`: statement → `idea`; question → `question`; directive → `directive`.
+   - Idea WITH embedded reasoning → no probe (respond to the reasoning directly); idea WITHOUT reasoning → probe fires.
    - Phase-1 reply contains a probe and **no suggestions**; suggestions withheld while `awaiting_probe=True`.
+   - `awaiting_probe=True` + writer changes topic → probe abandoned, new message answered fresh.
    - Phase-2 turn (after writer response) allows suggestions, capped at one.
-   - `ensure_forward_momentum` appends a forward question/choice when the reply dead-ends; leaves already-forward replies untouched.
+   - `ensure_forward_momentum` appends a forward question/choice when the reply dead-ends; leaves already-forward replies untouched; never appends to purely factual answers.
    - `cap_suggestions` caps bulleted suggestions.
    - Informed-partner lock: system prompt for `writing_partner`/`peer` contains the never-volunteer instruction.
    - Branch round-trip: `awaiting_probe` survives save/load; failed turn resets the flag; forks copy the flag.
 2. **Webapp tests** (`tests/test_webapp_api.py` additions or `tests/test_rooms_ui.py`):
    - New session defaults to `writing_partner`/`peer`.
-   - Seed-message bridge: posting the consultant seed through the chat endpoint persists and is retrievable.
+   - Seed-message bridge: prefill payload built correctly (scene number present), send persists and is retrievable.
+   - **Script-pane regression guard:** script interactions (search, undo/redo, draft upload, reader mode, keyboard nav) work identically from within the Feedback room layout, not just the Co-write room.
    - Report/Fix Queue endpoints unchanged (existing tests keep passing).
 3. **Full suite:** all existing tests (298) stay green.
 
