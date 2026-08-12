@@ -160,15 +160,41 @@ def apply_signals(profile, signals):
     return profile
 
 
+def _current_belief_rejected(profile, dim):
+    """Has the writer rejected the dimension's CURRENT belief?
+
+    'Forget this' suppresses the human-readable observation for the belief;
+    that rejection must stop the belief from steering Sam's tone until it is
+    re-learned. Keyed to the template of the *current* value so that
+    contradiction auto-suppression of an OLD pole's observation (the writer
+    argued the old belief away and the dimension flipped) does NOT silence
+    the new belief — the dimension has moved on.
+    """
+    value = profile["dimensions"][dim]["value"]
+    template = OBS_TEMPLATES.get((dim, value))
+    if template is None:
+        return False
+    # Observations are appended in time order: the belief counts as rejected
+    # only if its LATEST observation is suppressed. If the writer re-learns
+    # the belief, a fresh (non-suppressed) observation is appended and the
+    # old forgotten one no longer silences the gate.
+    matching = [o for o in profile.get("observations", [])
+                if o.get("dimension") == dim and o.get("text") == template]
+    return bool(matching) and matching[-1].get("suppressed")
+
+
 def dimension_gate(profile):
     """Dimensions that actually affect behavior: learnable pole, confidence >= gate,
-    and at least MIN_EVIDENCE total signals."""
+    at least MIN_EVIDENCE total signals, and a belief the writer hasn't rejected
+    (a suppressed template observation for the current value)."""
     gated = {}
     for dim, d in profile["dimensions"].items():
         if dim not in DIMENSION_POLES:
             continue
         ev = d["evidence"]
         if d["value"] in DIMENSION_POLES[dim] and d["confidence"] >= BEHAVIOR_GATE and (ev["pos"] + ev["neg"]) >= MIN_EVIDENCE:
+            if _current_belief_rejected(profile, dim):
+                continue
             gated[dim] = {"value": d["value"], "confidence": d["confidence"]}
     return gated
 
@@ -254,8 +280,13 @@ def build_relationship_card(profile):
         top = max(topics, key=topics.get)
         if topics[top] / sum(topics.values()) >= 0.4:
             phrases.append(f"keeps returning to {top}-level concerns")
+    # Only observations for dimensions Sam actually acts on (or free-standing
+    # general notes) reach the card — a refresh note about a dimension whose
+    # belief the writer forgot must not sneak the rejected belief back in.
+    active_dims = set(gated) | {"general", "topic_gravity"}
     obs_lines = [o["text"] for o in profile.get("observations", [])
-                 if not o["suppressed"] and o["confidence"] >= BEHAVIOR_GATE]
+                 if not o["suppressed"] and o["confidence"] >= BEHAVIOR_GATE
+                 and o.get("dimension") in active_dims]
     card = ("ABOUT HOW YOU TWO WORK TOGETHER — what you've noticed about how this writer "
             "likes to work: " + "; ".join(phrases) + ".")
     if obs_lines:
@@ -402,6 +433,12 @@ class WriterMemory:
 
     def card_text(self):
         return build_relationship_card(self.profile)
+
+    def gated_dimensions(self):
+        """The dimensions currently steering behavior (suppression-aware) —
+        what the webapp's notes panel renders as chips, so the UI never
+        shows a chip for a belief the writer has forgotten."""
+        return dimension_gate(self.profile)
 
     def cold_start_line(self):
         return cold_start_line(self.profile)

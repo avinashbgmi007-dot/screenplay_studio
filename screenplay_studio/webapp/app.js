@@ -884,14 +884,13 @@ function renderSamNotes(data) {
   const dims = $("#sam-notes-dimensions"), obsList = $("#sam-notes-observations"), empty = $("#sam-notes-empty");
   dims.innerHTML = "";
   obsList.innerHTML = "";
-  const profile = data.profile || {};
-  const gated = Object.entries(profile.dimensions || {}).filter(
-    ([, d]) => d && d.confidence >= 0.6 && d.value !== "balanced" && d.value !== "medium"
-  );
-  gated.forEach(([name, d]) => {
+  // The chips come from the server's suppression-aware gate (the same set
+  // that steers Sam), so a forgotten belief stops showing here too.
+  const gated = Object.entries(data.gated || {});
+  gated.forEach(([name, entry]) => {
     const chip = document.createElement("span");
     chip.className = "sam-notes-chip";
-    chip.textContent = `${name.replace(/_/g, " ")}: ${d.value} (${Math.round(d.confidence * 100)}%)`;
+    chip.textContent = `${name.replace(/_/g, " ")}: ${entry.value} (${Math.round(entry.confidence * 100)}%)`;
     dims.appendChild(chip);
   });
   const observations = (profile.observations || []).filter((o) => !o.suppressed);

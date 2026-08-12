@@ -288,6 +288,10 @@ class TestChatFlow:
         assert resp.status_code == 200
         data2 = http_client.get("/api/writer-memory").get_json()
         assert next(o for o in data2["profile"]["observations"] if o["id"] == obs["id"])["suppressed"] is True
+        # the suppression-aware gate is exposed for the panel's chips — the
+        # only learned belief was forgotten, so nothing steers Sam any more
+        assert data2["gated"] == {}
+        assert data2["card"] is None
 
     def test_suppress_unknown_observation_404(self, http_client):
         self._reset_writer_memory()

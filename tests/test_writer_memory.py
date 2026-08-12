@@ -100,8 +100,86 @@ def test_card_excludes_suppressed_observation():
         mem.apply_signals(p, _signal({"directness": "direct"}))
     obs = next(o for o in p["observations"] if o["dimension"] == "directness")
     obs["suppressed"] = True
+    # the only learned belief was forgotten — no phrase, no bullet, no card
+    assert mem.build_relationship_card(p) is None
+
+
+def test_suppressed_belief_drops_phrase_and_gate():
+    """Forgetting a belief stops it steering Sam's tone: the dimension drops
+    out of the gate (so its card phrase disappears) until re-learned, while
+    other remembered dimensions keep working."""
+    p = mem.empty_profile()
+    for _ in range(3):
+        mem.apply_signals(p, _signal({"directness": "direct"}))
+    for _ in range(3):
+        mem.apply_signals(p, _signal({"pushback_appetite": "high"}))
+    assert "directness" in mem.dimension_gate(p)
+    assert "pushback_appetite" in mem.dimension_gate(p)
     card = mem.build_relationship_card(p)
-    assert obs["text"] not in card
+    assert "no softening" in card
+    assert "pushing back" in card
+
+    # the writer forgets the directness belief
+    obs = next(o for o in p["observations"] if o["dimension"] == "directness")
+    obs["suppressed"] = True
+
+    assert "directness" not in mem.dimension_gate(p)
+    assert "pushback_appetite" in mem.dimension_gate(p)
+    card2 = mem.build_relationship_card(p)
+    assert "no softening" not in card2
+    assert "pushing back" in card2
+
+
+def test_forgotten_belief_returns_after_learning():
+    """Forgetting is reversible: fresh evidence re-learns the belief and the
+    dimension steers Sam again (the old suppressed observation doesn't block
+    the re-gate)."""
+    p = mem.empty_profile()
+    for _ in range(3):
+        mem.apply_signals(p, _signal({"directness": "direct"}))
+    obs = next(o for o in p["observations"] if o["dimension"] == "directness")
+    obs["suppressed"] = True
+    assert "directness" not in mem.dimension_gate(p)
+
+    mem.apply_signals(p, _signal({"directness": "direct"}))  # writer re-learns it
+    assert "directness" in mem.dimension_gate(p)
+    assert "no softening" in mem.build_relationship_card(p)
+    active = [o for o in p["observations"] if o["dimension"] == "directness" and not o["suppressed"]]
+    assert active  # a fresh observation exists alongside the forgotten one
+
+
+def test_card_omits_refresh_observation_for_rejected_dimension():
+    """A refresh note about a forgotten dimension must not leak the rejected
+    belief back into the card (the phrase is gone AND its observations are)."""
+    p = mem.empty_profile()
+    for _ in range(3):
+        mem.apply_signals(p, _signal({"directness": "direct"}))
+    for _ in range(3):
+        mem.apply_signals(p, _signal({"pushback_appetite": "high"}))
+    p["observations"].append({"dimension": "directness", "text": "Writer often asks for directness.",
+                               "confidence": 0.6, "suppressed": False})
+    obs = next(o for o in p["observations"] if o["dimension"] == "directness" and o["text"] == "You want the note straight — no softening.")
+    obs["suppressed"] = True
+    card = mem.build_relationship_card(p)
+    assert "no softening" not in card
+    assert "Writer often asks for directness" not in card
+    assert "pushing back" in card  # the other dimension still speaks
+
+
+def test_contradiction_auto_suppress_keeps_new_pole_phrase():
+    """The writer arguing an old belief away auto-suppresses that observation
+    (2 contradictions) — but the flipped NEW belief must still steer Sam."""
+    p = mem.empty_profile()
+    for _ in range(4):
+        mem.apply_signals(p, _signal({"detail_level": "short"}))
+    assert "detail_level" in mem.dimension_gate(p)
+    for _ in range(5):
+        mem.apply_signals(p, _signal({"detail_level": "deep"}))  # flips + auto-suppresses old obs
+    for _ in range(2):
+        mem.apply_signals(p, _signal({"detail_level": "deep"}))  # re-gates at deep
+    assert mem.dimension_gate(p)["detail_level"]["value"] == "deep"
+    card = mem.build_relationship_card(p)
+    assert "go deep and wander" in card  # the new belief speaks, not the forgotten old one
 
 
 def test_cold_start_line_only_when_zero_evidence():
@@ -193,6 +271,22 @@ def test_suppress_persists(tmp_path):
     assert m.suppress(obs["id"]) is False  # already suppressed
     m2 = mem.WriterMemory.load(str(tmp_path / "writer_profile.json"))
     assert next(o for o in m2.profile["observations"] if o["id"] == obs["id"])["suppressed"] is True
+
+
+def test_gated_dimensions_method_suppression_aware(tmp_path):
+    """The wrapper exposes the same suppression-aware gate the webapp renders
+    chips from — forgetting a belief removes it from gated_dimensions."""
+    m = mem.WriterMemory.load(str(tmp_path / "writer_profile.json"))
+    for _ in range(3):
+        m.observe("just tell me straight what's wrong", "idea", False, None)
+    assert "directness" in m.gated_dimensions()
+    obs = next(o for o in m.profile["observations"] if o["dimension"] == "directness")
+    m.suppress(obs["id"])
+    assert "directness" not in m.gated_dimensions()
+    # the only learned belief is gone — Sam has no read on the writer until
+    # he learns something new (the panel shows the "still getting to know
+    # you" state, which is the honest thing to show)
+    assert m.card_text() is None
 
 
 def test_refresh_due_and_reset(tmp_path):

@@ -1210,7 +1210,7 @@ def get_writer_memory():
         mem = _load_writer_memory()
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
-    return jsonify({"profile": mem.to_dict(), "card": mem.card_text()})
+    return jsonify({"profile": mem.to_dict(), "card": mem.card_text(), "gated": mem.gated_dimensions()})
 
 
 @app.route("/api/writer-memory/observations/<obs_id>/suppress", methods=["POST"])
