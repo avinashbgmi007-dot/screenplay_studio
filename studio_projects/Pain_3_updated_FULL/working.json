@@ -1,0 +1,6655 @@
+{
+  "title": null,
+  "author": null,
+  "source_format": "pdf",
+  "source_filename": "source.pdf",
+  "parse_confidence": "low",
+  "scene_count": 22,
+  "estimated_page_count": 28,
+  "all_characters": [
+    "DISSOLVE",
+    "DOCTOR",
+    "FATHER",
+    "GOON ONE",
+    "GOON TWO",
+    "MATCH CUT",
+    "MATCH CUT TO",
+    "RAHUL",
+    "RISHI",
+    "SENIOR COLLEAGUE",
+    "SIDDHARTH",
+    "THE END",
+    "X COMPANY"
+  ],
+  "front_matter": [],
+  "scenes": [
+    {
+      "scene_number": 1,
+      "heading_raw": "EXT/INT. HOSPITAL - NIGHT",
+      "int_ext": "INT/EXT",
+      "location": "HOSPITAL",
+      "time_of_day": "NIGHT",
+      "page_start": 1,
+      "page_end": 1,
+      "characters_present": [],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT/INT. HOSPITAL - NIGHT",
+          "character": null,
+          "line_start": 0
+        },
+        {
+          "type": "action",
+          "text": "Ambulance siren, hospital env. Siddhu’s been rushed to a",
+          "character": null,
+          "line_start": 1
+        },
+        {
+          "type": "action",
+          "text": "hospital. Alaa Siddhu kallu moosthadu.",
+          "character": null,
+          "line_start": 2
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 3
+        },
+        {
+          "type": "action",
+          "text": "2 MONTHS LATER",
+          "character": null,
+          "line_start": 5
+        }
+      ]
+    },
+    {
+      "scene_number": 2,
+      "heading_raw": "EXT. OPEN PARK - MAGIC HOUR",
+      "int_ext": "EXT",
+      "location": "OPEN PARK",
+      "time_of_day": "MAGIC HOUR",
+      "page_start": 1,
+      "page_end": 2,
+      "characters_present": [
+        "DOCTOR",
+        "RISHI",
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. OPEN PARK - MAGIC HOUR",
+          "character": null,
+          "line_start": 7
+        },
+        {
+          "type": "action",
+          "text": "Doctor will be looking at Siddhu, walks along with Rishi",
+          "character": null,
+          "line_start": 8
+        },
+        {
+          "type": "character",
+          "text": "DOCTOR",
+          "character": "DOCTOR",
+          "line_start": 9
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi, ippativarku Siddharth",
+          "character": "DOCTOR",
+          "line_start": 10
+        },
+        {
+          "type": "dialogue",
+          "text": "unconscious unnadani cheppaledu",
+          "character": "DOCTOR",
+          "line_start": 11
+        },
+        {
+          "type": "parenthetical",
+          "text": "(points out Siddhu)",
+          "character": "DOCTOR",
+          "line_start": 12
+        },
+        {
+          "type": "dialogue",
+          "text": "head injury valla, lost his sense",
+          "character": "DOCTOR",
+          "line_start": 13
+        },
+        {
+          "type": "dialogue",
+          "text": "of feeling pain, Hypoalgesia",
+          "character": "DOCTOR",
+          "line_start": 14
+        },
+        {
+          "type": "dialogue",
+          "text": "antaaru",
+          "character": "DOCTOR",
+          "line_start": 15
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu alaa nilchoni chusthuntaadu, harsh sun ni hand tho",
+          "character": "DOCTOR",
+          "line_start": 16
+        },
+        {
+          "type": "dialogue",
+          "text": "avoid chesthuntadu. Rishi alaa blank chusthu Doc ni",
+          "character": "DOCTOR",
+          "line_start": 17
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "DOCTOR",
+          "line_start": 18
+        },
+        {
+          "type": "dialogue",
+          "text": "Enti?",
+          "character": "DOCTOR",
+          "line_start": 19
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani Siddhu ni chusthunte, Siddhu mellaga sun light ni",
+          "character": "DOCTOR",
+          "line_start": 20
+        },
+        {
+          "type": "dialogue",
+          "text": "theeskuntu untadu on his face",
+          "character": "DOCTOR",
+          "line_start": 21
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR (O.S.)",
+          "character": "DOCTOR",
+          "line_start": 22
+        },
+        {
+          "type": "dialogue",
+          "text": "Noppi ni process chese Nerves",
+          "character": "DOCTOR",
+          "line_start": 23
+        },
+        {
+          "type": "dialogue",
+          "text": "damage avvadam valla ala avthundi",
+          "character": "DOCTOR",
+          "line_start": 24
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (O.S.)",
+          "character": "DOCTOR",
+          "line_start": 25
+        },
+        {
+          "type": "dialogue",
+          "text": "ante vaadu, noppi ni feel avvaledu",
+          "character": "DOCTOR",
+          "line_start": 26
+        },
+        {
+          "type": "dialogue",
+          "text": "antunnara?",
+          "character": "DOCTOR",
+          "line_start": 27
+        },
+        {
+          "type": "dialogue",
+          "text": "Doc nods",
+          "character": "DOCTOR",
+          "line_start": 28
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR",
+          "character": "DOCTOR",
+          "line_start": 29
+        },
+        {
+          "type": "dialogue",
+          "text": "Both Physically and Emotionally.",
+          "character": "DOCTOR",
+          "line_start": 30
+        },
+        {
+          "type": "dialogue",
+          "text": "Ante shaareerakanga, maanasikanga",
+          "character": "DOCTOR",
+          "line_start": 31
+        },
+        {
+          "type": "dialogue",
+          "text": "kuda--",
+          "character": "DOCTOR",
+          "line_start": 32
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi interrupts by staring at unknown",
+          "character": "DOCTOR",
+          "line_start": 33
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR (CONT’D)",
+          "character": "DOCTOR",
+          "line_start": 34
+        },
+        {
+          "type": "dialogue",
+          "text": "Body ki emaina debhalu thagilina",
+          "character": "DOCTOR",
+          "line_start": 35
+        },
+        {
+          "type": "dialogue",
+          "text": "noppi undadhu, emotional ga manalni",
+          "character": "DOCTOR",
+          "line_start": 36
+        },
+        {
+          "type": "dialogue",
+          "text": "othidi chese vishayala nundi oche",
+          "character": "DOCTOR",
+          "line_start": 37
+        },
+        {
+          "type": "dialogue",
+          "text": "noppi, suffering kuda",
+          "character": "DOCTOR",
+          "line_start": 38
+        },
+        {
+          "type": "parenthetical",
+          "text": "((MMOORREE))",
+          "character": "DOCTOR",
+          "line_start": 39
+        },
+        {
+          "type": "action",
+          "text": "22..",
+          "character": null,
+          "line_start": 41
+        },
+        {
+          "type": "action",
+          "text": "DDOOCCTTOORR ((CCOONNTT’’DD))",
+          "character": null,
+          "line_start": 42
+        },
+        {
+          "type": "action",
+          "text": "(shakes a no)",
+          "character": null,
+          "line_start": 43
+        },
+        {
+          "type": "action",
+          "text": "feel avvaleru",
+          "character": null,
+          "line_start": 44
+        },
+        {
+          "type": "action",
+          "text": "Doc ala chepthunte, Rishi, Siddhu ni chusthuntaadu(walks)",
+          "character": null,
+          "line_start": 45
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 46
+        },
+        {
+          "type": "dialogue",
+          "text": "Ilaa enduk indho telid kaani",
+          "character": "RISHI",
+          "line_start": 47
+        },
+        {
+          "type": "dialogue",
+          "text": "Accident maatram vaadi manchike",
+          "character": "RISHI",
+          "line_start": 48
+        },
+        {
+          "type": "dialogue",
+          "text": "indhi ankunta",
+          "character": "RISHI",
+          "line_start": 49
+        },
+        {
+          "type": "dialogue",
+          "text": "(as he takes a deep",
+          "character": "RISHI",
+          "line_start": 50
+        },
+        {
+          "type": "dialogue",
+          "text": "breath)",
+          "character": "RISHI",
+          "line_start": 51
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will be observing, walking around, as if he feels new",
+          "character": "RISHI",
+          "line_start": 52
+        },
+        {
+          "type": "dialogue",
+          "text": "all these around, kind of feels different. Siddhu chusthu,",
+          "character": "RISHI",
+          "line_start": 53
+        },
+        {
+          "type": "dialogue",
+          "text": "walks towards Rishi-doc as they speak.",
+          "character": "RISHI",
+          "line_start": 54
+        },
+        {
+          "type": "dialogue",
+          "text": "Doc will be smoking, Rishi will be looking at Doc with a",
+          "character": "RISHI",
+          "line_start": 55
+        },
+        {
+          "type": "dialogue",
+          "text": "blank-dull face, as Siddhu approaches, shakes hand with doc",
+          "character": "RISHI",
+          "line_start": 56
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR",
+          "character": "RISHI",
+          "line_start": 57
+        },
+        {
+          "type": "dialogue",
+          "text": "Take care Siddharth",
+          "character": "RISHI",
+          "line_start": 58
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 59
+        },
+        {
+          "type": "action",
+          "text": "As they walk",
+          "character": null,
+          "line_start": 60
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 61
+        },
+        {
+          "type": "dialogue",
+          "text": "Emantunnad ra Doc?",
+          "character": "SIDDHARTH",
+          "line_start": 62
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi alaane chusthu Siddhu ni, Shakes a no, shoulder meedha",
+          "character": "SIDDHARTH",
+          "line_start": 63
+        },
+        {
+          "type": "dialogue",
+          "text": "cheyyi vesi with a gentle smile",
+          "character": "SIDDHARTH",
+          "line_start": 64
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 65
+        },
+        {
+          "type": "dialogue",
+          "text": "Dhaa cheptha",
+          "character": "SIDDHARTH",
+          "line_start": 66
+        },
+        {
+          "type": "dialogue",
+          "text": "On bike, as they drive away.",
+          "character": "SIDDHARTH",
+          "line_start": 67
+        },
+        {
+          "type": "dialogue",
+          "text": "WHITE FLASH CUT:",
+          "character": "SIDDHARTH",
+          "line_start": 68
+        },
+        {
+          "type": "action",
+          "text": "TWO MONTHS EARLIER",
+          "character": null,
+          "line_start": 70
+        }
+      ]
+    },
+    {
+      "scene_number": 3,
+      "heading_raw": "EXT. ROAD-SIDE - NIGHT",
+      "int_ext": "EXT",
+      "location": "ROAD-SIDE",
+      "time_of_day": "NIGHT",
+      "page_start": 2,
+      "page_end": 3,
+      "characters_present": [
+        "GOON ONE",
+        "GOON TWO"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. ROAD-SIDE - NIGHT",
+          "character": null,
+          "line_start": 72
+        },
+        {
+          "type": "action",
+          "text": "A guy staring at unknown deeply, takes up a puff, unaware of",
+          "character": null,
+          "line_start": 73
+        },
+        {
+          "type": "action",
+          "text": "the surroundings, having a beer. 2 people, across a shop, at",
+          "character": null,
+          "line_start": 74
+        },
+        {
+          "type": "action",
+          "text": "certain distance, as they light up a cigar, one of them saw",
+          "character": null,
+          "line_start": 75
+        },
+        {
+          "type": "action",
+          "text": "him, walks towards him",
+          "character": null,
+          "line_start": 76
+        },
+        {
+          "type": "character",
+          "text": "GOON_ONE",
+          "character": "GOON ONE",
+          "line_start": 77
+        },
+        {
+          "type": "dialogue",
+          "text": "Em ra Rahul",
+          "character": "GOON ONE",
+          "line_start": 78
+        },
+        {
+          "type": "parenthetical",
+          "text": "(grabs the beer)",
+          "character": "GOON ONE",
+          "line_start": 79
+        },
+        {
+          "type": "action",
+          "text": "33..",
+          "character": null,
+          "line_start": 81
+        },
+        {
+          "type": "action",
+          "text": "Goon_one takes a sip",
+          "character": null,
+          "line_start": 83
+        },
+        {
+          "type": "action",
+          "text": "GOON_ONE (CONT’D)",
+          "character": null,
+          "line_start": 84
+        },
+        {
+          "type": "action",
+          "text": "Betting la paisal anni",
+          "character": null,
+          "line_start": 85
+        },
+        {
+          "type": "action",
+          "text": "(with a sarcastic smile)",
+          "character": null,
+          "line_start": 86
+        },
+        {
+          "type": "action",
+          "text": "Does a gesture(Thumb-little finger), conveying that Rahul has",
+          "character": null,
+          "line_start": 87
+        },
+        {
+          "type": "action",
+          "text": "lost it. Rahul with a blank stare, tries to take a puff,",
+          "character": null,
+          "line_start": 88
+        },
+        {
+          "type": "action",
+          "text": "Goon_two takes a puff by holding Rahul’s hand. Then Goon_two",
+          "character": null,
+          "line_start": 89
+        },
+        {
+          "type": "action",
+          "text": "rests his hand on Rahul’s shoulder, looking at him. As he",
+          "character": null,
+          "line_start": 90
+        },
+        {
+          "type": "action",
+          "text": "releases the smoke, look into his eyes",
+          "character": null,
+          "line_start": 91
+        },
+        {
+          "type": "character",
+          "text": "GOON_TWO",
+          "character": "GOON TWO",
+          "line_start": 92
+        },
+        {
+          "type": "dialogue",
+          "text": "Rendu rojul",
+          "character": "GOON TWO",
+          "line_start": 93
+        },
+        {
+          "type": "dialogue",
+          "text": "as he stares",
+          "character": "GOON TWO",
+          "line_start": 94
+        },
+        {
+          "type": "dialogue",
+          "text": "GOON_TWO (CONT’D)",
+          "character": "GOON TWO",
+          "line_start": 95
+        },
+        {
+          "type": "dialogue",
+          "text": "Paisal ready chesko",
+          "character": "GOON TWO",
+          "line_start": 96
+        },
+        {
+          "type": "dialogue",
+          "text": "vellipothaadu Goon_two, Goone_one laughs, nods sarcastically",
+          "character": "GOON TWO",
+          "line_start": 97
+        },
+        {
+          "type": "dialogue",
+          "text": "as if Rahul’s already in trouble.",
+          "character": "GOON TWO",
+          "line_start": 98
+        },
+        {
+          "type": "dialogue",
+          "text": "Rahul as he sips, stares at unknown without a blink.",
+          "character": "GOON TWO",
+          "line_start": 99
+        },
+        {
+          "type": "dialogue",
+          "text": "MATCH CUT",
+          "character": "GOON TWO",
+          "line_start": 100
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(EYES OF",
+          "character": "GOON TWO",
+          "line_start": 101
+        },
+        {
+          "type": "dialogue",
+          "text": "RAHUL)",
+          "character": "GOON TWO",
+          "line_start": 102
+        }
+      ]
+    },
+    {
+      "scene_number": 4,
+      "heading_raw": "INT. SIDDHU'S HOUSE - CONTINUOUS",
+      "int_ext": "INT",
+      "location": "SIDDHU'S HOUSE",
+      "time_of_day": "CONTINUOUS",
+      "page_start": 3,
+      "page_end": 4,
+      "characters_present": [
+        "RAHUL"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. SIDDHU'S HOUSE - CONTINUOUS",
+          "character": null,
+          "line_start": 104
+        },
+        {
+          "type": "action",
+          "text": "Siddharth, floor meeda kurchoni with a pad on his lap. There",
+          "character": null,
+          "line_start": 105
+        },
+        {
+          "type": "action",
+          "text": "are different pencils, an eraser, a sharpener, a whole unit",
+          "character": null,
+          "line_start": 106
+        },
+        {
+          "type": "action",
+          "text": "of box a side, all placed on the floor randomly, as he’s",
+          "character": null,
+          "line_start": 107
+        },
+        {
+          "type": "action",
+          "text": "sketching some cartoon character. Comic sketches on A4 sheets",
+          "character": null,
+          "line_start": 108
+        },
+        {
+          "type": "action",
+          "text": "placed on one another with numbers visible at the bottom",
+          "character": null,
+          "line_start": 109
+        },
+        {
+          "type": "action",
+          "text": "right circled.",
+          "character": null,
+          "line_start": 110
+        },
+        {
+          "type": "action",
+          "text": "A guy walks with random foot steps, and lands his foot on one",
+          "character": null,
+          "line_start": 111
+        },
+        {
+          "type": "action",
+          "text": "of the A4 papers. Siddharth immediately looks at that feet",
+          "character": null,
+          "line_start": 112
+        },
+        {
+          "type": "action",
+          "text": "with a shock, the guy picks up that paper with his toe,",
+          "character": null,
+          "line_start": 113
+        },
+        {
+          "type": "action",
+          "text": "Siddharth looks up to him.",
+          "character": null,
+          "line_start": 114
+        },
+        {
+          "type": "action",
+          "text": "Holding that paper in front of his face, burns a comic",
+          "character": null,
+          "line_start": 115
+        },
+        {
+          "type": "action",
+          "text": "character’s face, his single eye is visible through the hole",
+          "character": null,
+          "line_start": 116
+        },
+        {
+          "type": "action",
+          "text": "made by that cigar’s burn. With a side smile, releases smoke,",
+          "character": null,
+          "line_start": 117
+        },
+        {
+          "type": "action",
+          "text": "his face through an X mark which is being made on the paper",
+          "character": null,
+          "line_start": 118
+        },
+        {
+          "type": "action",
+          "text": "is visible. And that paper is dropped, revealing his face. As",
+          "character": null,
+          "line_start": 119
+        },
+        {
+          "type": "action",
+          "text": "he releases smokes, it’s Rahul.",
+          "character": null,
+          "line_start": 120
+        },
+        {
+          "type": "action",
+          "text": "Sidhu looking at that burnt X mark, feeling those scars as he",
+          "character": null,
+          "line_start": 121
+        },
+        {
+          "type": "action",
+          "text": "touches.",
+          "character": null,
+          "line_start": 122
+        },
+        {
+          "type": "action",
+          "text": "44..",
+          "character": null,
+          "line_start": 124
+        },
+        {
+          "type": "action",
+          "text": "Rahul will be on his bed, as he takes a puff, Sidhu looks at",
+          "character": null,
+          "line_start": 126
+        },
+        {
+          "type": "action",
+          "text": "him, takes big puff, as he slants on the pillow, throws that",
+          "character": null,
+          "line_start": 127
+        },
+        {
+          "type": "action",
+          "text": "cigar at Sidhu. Sidhu moves a side, 1-2 sparks fell over here",
+          "character": null,
+          "line_start": 128
+        },
+        {
+          "type": "action",
+          "text": "and there, he covers his face, looks at him, as he looks",
+          "character": null,
+          "line_start": 129
+        },
+        {
+          "type": "action",
+          "text": "around, the cigar’s ash being fell over those few sheets of",
+          "character": null,
+          "line_start": 130
+        },
+        {
+          "type": "action",
+          "text": "comic sketches and a hole is made on all those sheets.",
+          "character": null,
+          "line_start": 131
+        },
+        {
+          "type": "action",
+          "text": "As Siddhu looks at him with a teary eyes,",
+          "character": null,
+          "line_start": 132
+        },
+        {
+          "type": "character",
+          "text": "RAHUL",
+          "character": "RAHUL",
+          "line_start": 133
+        },
+        {
+          "type": "dialogue",
+          "text": "Light banchey!",
+          "character": "RAHUL",
+          "line_start": 134
+        },
+        {
+          "type": "dialogue",
+          "text": "(with an irritative base",
+          "character": "RAHUL",
+          "line_start": 135
+        },
+        {
+          "type": "dialogue",
+          "text": "voice)",
+          "character": "RAHUL",
+          "line_start": 136
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu kind of jerked, switches off the light immediately.",
+          "character": "RAHUL",
+          "line_start": 137
+        },
+        {
+          "type": "dialogue",
+          "text": "While Hot red cigar is being visible as Siddhu’s sorts his",
+          "character": "RAHUL",
+          "line_start": 138
+        },
+        {
+          "type": "dialogue",
+          "text": "stuff.",
+          "character": "RAHUL",
+          "line_start": 139
+        },
+        {
+          "type": "dialogue",
+          "text": "DISSOLVE",
+          "character": "RAHUL",
+          "line_start": 140
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(CIGAR",
+          "character": "RAHUL",
+          "line_start": 141
+        },
+        {
+          "type": "dialogue",
+          "text": "REDNESS TO EARLY",
+          "character": "RAHUL",
+          "line_start": 142
+        },
+        {
+          "type": "dialogue",
+          "text": "SUN RISE)",
+          "character": "RAHUL",
+          "line_start": 143
+        }
+      ]
+    },
+    {
+      "scene_number": 5,
+      "heading_raw": "EXT. METRO - MORNING",
+      "int_ext": "EXT",
+      "location": "METRO",
+      "time_of_day": "MORNING",
+      "page_start": 4,
+      "page_end": 4,
+      "characters_present": [
+        "MATCH CUT"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. METRO - MORNING",
+          "character": null,
+          "line_start": 145
+        },
+        {
+          "type": "action",
+          "text": "Siddhu with a backpack, running on the stairs. Looking at",
+          "character": null,
+          "line_start": 146
+        },
+        {
+          "type": "action",
+          "text": "clock, as train arrival is being heard, looks up towards the",
+          "character": null,
+          "line_start": 147
+        },
+        {
+          "type": "action",
+          "text": "train, stares at an escalator, tries to step on it, steps",
+          "character": null,
+          "line_start": 148
+        },
+        {
+          "type": "action",
+          "text": "down with a small panic, looks up as the train might leave.",
+          "character": null,
+          "line_start": 149
+        },
+        {
+          "type": "action",
+          "text": "Doesnt know what to do.",
+          "character": null,
+          "line_start": 150
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 151
+        },
+        {
+          "type": "action",
+          "text": "Running up the stairs. Inside the train, leaning on the",
+          "character": null,
+          "line_start": 152
+        },
+        {
+          "type": "action",
+          "text": "single rod, staring at unknown.",
+          "character": null,
+          "line_start": 153
+        },
+        {
+          "type": "character",
+          "text": "MATCH CUT",
+          "character": "MATCH CUT",
+          "line_start": 154
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(KID-SIDDHU’S",
+          "character": "MATCH CUT",
+          "line_start": 155
+        },
+        {
+          "type": "dialogue",
+          "text": "FACE)",
+          "character": "MATCH CUT",
+          "line_start": 156
+        }
+      ]
+    },
+    {
+      "scene_number": 6,
+      "heading_raw": "INT. KID SIDDHU’S HOUSE - NIGHT",
+      "int_ext": "INT",
+      "location": "KID SIDDHU’S HOUSE",
+      "time_of_day": "NIGHT",
+      "page_start": 4,
+      "page_end": 6,
+      "characters_present": [
+        "FATHER",
+        "MATCH CUT",
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. KID SIDDHU’S HOUSE - NIGHT",
+          "character": null,
+          "line_start": 158
+        },
+        {
+          "type": "action",
+          "text": "Comic books chaduthu, siddhu page turn chesthuntadu. Appude",
+          "character": null,
+          "line_start": 159
+        },
+        {
+          "type": "action",
+          "text": "door sound avthundi. Ventane comics pakkana pettesi, homework",
+          "character": null,
+          "line_start": 160
+        },
+        {
+          "type": "action",
+          "text": "chesthuntadu",
+          "character": null,
+          "line_start": 161
+        },
+        {
+          "type": "character",
+          "text": "FATHER (O.S.)",
+          "character": "FATHER",
+          "line_start": 162
+        },
+        {
+          "type": "dialogue",
+          "text": "Rey!",
+          "character": "FATHER",
+          "line_start": 163
+        },
+        {
+          "type": "action",
+          "text": "55..",
+          "character": null,
+          "line_start": 165
+        },
+        {
+          "type": "action",
+          "text": "Adi vini siddhu ala nadchukuntu velthadu. Chusthe, father,",
+          "character": null,
+          "line_start": 167
+        },
+        {
+          "type": "action",
+          "text": "akkada kindha godaki lean iyyi untaadu eyes half close open",
+          "character": null,
+          "line_start": 168
+        },
+        {
+          "type": "action",
+          "text": "chesthu dizzy ga, pakkane chips packet, okati theesi",
+          "character": null,
+          "line_start": 169
+        },
+        {
+          "type": "action",
+          "text": "thinadanki avastha padthu, Siddhu ni chusi, doubtful face tho",
+          "character": null,
+          "line_start": 170
+        },
+        {
+          "type": "action",
+          "text": "FATHER (CONT’D)",
+          "character": null,
+          "line_start": 171
+        },
+        {
+          "type": "action",
+          "text": "Thammudu eda ra?",
+          "character": null,
+          "line_start": 172
+        },
+        {
+          "type": "action",
+          "text": "Montage:",
+          "character": null,
+          "line_start": 173
+        },
+        {
+          "type": "action",
+          "text": "Rahul with in the slum/narrow road, having joints/ganja with",
+          "character": null,
+          "line_start": 174
+        },
+        {
+          "type": "action",
+          "text": "few others, some lying on the road, some are semi-conscious",
+          "character": null,
+          "line_start": 175
+        },
+        {
+          "type": "action",
+          "text": "and few are smoking ganja.",
+          "character": null,
+          "line_start": 176
+        },
+        {
+          "type": "action",
+          "text": "WHITE FLASH CUT:",
+          "character": null,
+          "line_start": 177
+        },
+        {
+          "type": "action",
+          "text": "Siddhu stutters to reply",
+          "character": null,
+          "line_start": 178
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 179
+        },
+        {
+          "type": "dialogue",
+          "text": "Intlo ledu nanna",
+          "character": "SIDDHARTH",
+          "line_start": 180
+        },
+        {
+          "type": "dialogue",
+          "text": "Father asks him to come closer(with a gesture), Siddhu walks",
+          "character": "SIDDHARTH",
+          "line_start": 181
+        },
+        {
+          "type": "dialogue",
+          "text": "towards, as he appears infront of him, as he eats a chip",
+          "character": "SIDDHARTH",
+          "line_start": 182
+        },
+        {
+          "type": "dialogue",
+          "text": "FATHER",
+          "character": "SIDDHARTH",
+          "line_start": 183
+        },
+        {
+          "type": "parenthetical",
+          "text": "(slaps sidhu)",
+          "character": "SIDDHARTH",
+          "line_start": 184
+        },
+        {
+          "type": "dialogue",
+          "text": "Aadni baitiki poniyakani enni",
+          "character": "SIDDHARTH",
+          "line_start": 185
+        },
+        {
+          "type": "dialogue",
+          "text": "saarlu cheppina? chal faalthuga!",
+          "character": "SIDDHARTH",
+          "line_start": 186
+        },
+        {
+          "type": "parenthetical",
+          "text": "(as he pushes siddhu away)",
+          "character": "SIDDHARTH",
+          "line_start": 187
+        },
+        {
+          "type": "dialogue",
+          "text": "he’ll be chewing that chip. Sidhu will be sitting with a",
+          "character": "SIDDHARTH",
+          "line_start": 188
+        },
+        {
+          "type": "dialogue",
+          "text": "folding hands rested on his knees, staring at unknown.",
+          "character": "SIDDHARTH",
+          "line_start": 189
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 190
+        },
+        {
+          "type": "action",
+          "text": "Rahul slowly walks in, stares at his father for a moment,",
+          "character": null,
+          "line_start": 191
+        },
+        {
+          "type": "action",
+          "text": "picks up the leftover chips packet, looks at Sidhu, walks",
+          "character": null,
+          "line_start": 192
+        },
+        {
+          "type": "action",
+          "text": "towards him as he eats those chips, makes him conscious with",
+          "character": null,
+          "line_start": 193
+        },
+        {
+          "type": "action",
+          "text": "a slight kick",
+          "character": null,
+          "line_start": 194
+        },
+        {
+          "type": "action",
+          "text": "RAHUL (KID)",
+          "character": null,
+          "line_start": 195
+        },
+        {
+          "type": "action",
+          "text": "Emanna cheppinva ra nagurinchi?",
+          "character": null,
+          "line_start": 196
+        },
+        {
+          "type": "action",
+          "text": "Ani siddhu ni chusthe, cheek swell iyi untadi. pauses chewing",
+          "character": null,
+          "line_start": 197
+        },
+        {
+          "type": "action",
+          "text": "for a sec, looks at that check.",
+          "character": null,
+          "line_start": 198
+        },
+        {
+          "type": "action",
+          "text": "While Rahul’s picking chips, Siddhu jerked, closed his eyes",
+          "character": null,
+          "line_start": 199
+        },
+        {
+          "type": "action",
+          "text": "forcefully, thought Rahul’s trying to hit him.",
+          "character": null,
+          "line_start": 200
+        },
+        {
+          "type": "action",
+          "text": "Rahul, akkadnundi velthu, Father ni chusi, Siddhu pakkane 2-3",
+          "character": null,
+          "line_start": 201
+        },
+        {
+          "type": "action",
+          "text": "chips padesi, velthuntadu. As Siddhu opens his eyes, father",
+          "character": null,
+          "line_start": 202
+        },
+        {
+          "type": "action",
+          "text": "pocket nundi money theeskoni count chesthuntadu",
+          "character": null,
+          "line_start": 203
+        },
+        {
+          "type": "action",
+          "text": "66..",
+          "character": null,
+          "line_start": 205
+        },
+        {
+          "type": "character",
+          "text": "MATCH CUT",
+          "character": "MATCH CUT",
+          "line_start": 207
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(RAHUL",
+          "character": "MATCH CUT",
+          "line_start": 208
+        },
+        {
+          "type": "dialogue",
+          "text": "COUNTING MONEY)",
+          "character": "MATCH CUT",
+          "line_start": 209
+        },
+        {
+          "type": "dialogue",
+          "text": "Rahul(Present) smoking a joint, counts the money. Siddhu alaa",
+          "character": "MATCH CUT",
+          "line_start": 210
+        },
+        {
+          "type": "dialogue",
+          "text": "office ki velthu, Rahul ni chusadu. Rahul saw him through his",
+          "character": "MATCH CUT",
+          "line_start": 211
+        },
+        {
+          "type": "dialogue",
+          "text": "shoulders, motham money pocket lo petkoni Siddhu ni chusthu,",
+          "character": "MATCH CUT",
+          "line_start": 212
+        },
+        {
+          "type": "dialogue",
+          "text": "smoke release chesthu vellipothuntadu. Siddhu alaa",
+          "character": "MATCH CUT",
+          "line_start": 213
+        },
+        {
+          "type": "dialogue",
+          "text": "chusthuntadu.",
+          "character": "MATCH CUT",
+          "line_start": 214
+        },
+        {
+          "type": "dialogue",
+          "text": "MATCH CUT",
+          "character": "MATCH CUT",
+          "line_start": 215
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(SIDDHU’S",
+          "character": "MATCH CUT",
+          "line_start": 216
+        },
+        {
+          "type": "dialogue",
+          "text": "FACE)",
+          "character": "MATCH CUT",
+          "line_start": 217
+        }
+      ]
+    },
+    {
+      "scene_number": 7,
+      "heading_raw": "EXT. ROAD-SIDE - MAGIC HOUR",
+      "int_ext": "EXT",
+      "location": "ROAD-SIDE",
+      "time_of_day": "MAGIC HOUR",
+      "page_start": 6,
+      "page_end": 7,
+      "characters_present": [
+        "MATCH CUT TO",
+        "SENIOR COLLEAGUE",
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. ROAD-SIDE - MAGIC HOUR",
+          "character": null,
+          "line_start": 219
+        },
+        {
+          "type": "action",
+          "text": "Sidhu walks with a one sided backpack, on the pavement. Got a",
+          "character": null,
+          "line_start": 220
+        },
+        {
+          "type": "action",
+          "text": "call, answers the call, then turns around, a guy with a",
+          "character": null,
+          "line_start": 221
+        },
+        {
+          "type": "action",
+          "text": "sharp, beardy look within formals, walks with a laptop bag in",
+          "character": null,
+          "line_start": 222
+        },
+        {
+          "type": "action",
+          "text": "hand",
+          "character": null,
+          "line_start": 223
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 224
+        },
+        {
+          "type": "dialogue",
+          "text": "Meeru ikk--",
+          "character": "SIDDHARTH",
+          "line_start": 225
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SIDDHARTH",
+          "line_start": 226
+        },
+        {
+          "type": "dialogue",
+          "text": "Emledu adi knchm work gurinch---",
+          "character": "SIDDHARTH",
+          "line_start": 227
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 228
+        },
+        {
+          "type": "dialogue",
+          "text": "Already aah work ipoindi--",
+          "character": "SIDDHARTH",
+          "line_start": 229
+        },
+        {
+          "type": "dialogue",
+          "text": "Senior pats on his shoulder, shakes a no. Senior hesitates to",
+          "character": "SIDDHARTH",
+          "line_start": 230
+        },
+        {
+          "type": "dialogue",
+          "text": "convey",
+          "character": "SIDDHARTH",
+          "line_start": 231
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SIDDHARTH",
+          "line_start": 232
+        },
+        {
+          "type": "dialogue",
+          "text": "nenu 3 days out of station",
+          "character": "SIDDHARTH",
+          "line_start": 233
+        },
+        {
+          "type": "dialogue",
+          "text": "velthunna. Customer matram work",
+          "character": "SIDDHARTH",
+          "line_start": 234
+        },
+        {
+          "type": "dialogue",
+          "text": "aagodhannadu",
+          "character": "SIDDHARTH",
+          "line_start": 235
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will still be in question face",
+          "character": "SIDDHARTH",
+          "line_start": 236
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE (CONT’D)",
+          "character": "SIDDHARTH",
+          "line_start": 237
+        },
+        {
+          "type": "dialogue",
+          "text": "So ee 3 days nu work chesi ila",
+          "character": "SIDDHARTH",
+          "line_start": 238
+        },
+        {
+          "type": "dialogue",
+          "text": "pampisthe, nenu alaa submit",
+          "character": "SIDDHARTH",
+          "line_start": 239
+        },
+        {
+          "type": "dialogue",
+          "text": "chesestha. Na holiday disturb",
+          "character": "SIDDHARTH",
+          "line_start": 240
+        },
+        {
+          "type": "dialogue",
+          "text": "avvadhu, work pending undadhu",
+          "character": "SIDDHARTH",
+          "line_start": 241
+        },
+        {
+          "type": "dialogue",
+          "text": "As he nods, Siddhu aalochisthu",
+          "character": "SIDDHARTH",
+          "line_start": 242
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 243
+        },
+        {
+          "type": "dialogue",
+          "text": "Kaani already chaala work---",
+          "character": "SIDDHARTH",
+          "line_start": 244
+        },
+        {
+          "type": "dialogue",
+          "text": "Senior looks at him as he interrupts",
+          "character": "SIDDHARTH",
+          "line_start": 245
+        },
+        {
+          "type": "action",
+          "text": "77..",
+          "character": null,
+          "line_start": 247
+        },
+        {
+          "type": "character",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 249
+        },
+        {
+          "type": "dialogue",
+          "text": "Common Siddharth. work chesedi 1",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 250
+        },
+        {
+          "type": "dialogue",
+          "text": "day ina, 1 year ina, Who cares!",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 251
+        },
+        {
+          "type": "dialogue",
+          "text": "Ultimate ga Ratings, performance,",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 252
+        },
+        {
+          "type": "dialogue",
+          "text": "hike kosame kada. Avi nen chuskunta",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 253
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu alaa alochisthunte",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 254
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 255
+        },
+        {
+          "type": "dialogue",
+          "text": "Kaani--",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 256
+        },
+        {
+          "type": "dialogue",
+          "text": "as he stares at Siddhu",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 257
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 258
+        },
+        {
+          "type": "dialogue",
+          "text": "Monna mana colleague evarno harass",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 259
+        },
+        {
+          "type": "dialogue",
+          "text": "chesadani etc etc",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 260
+        },
+        {
+          "type": "parenthetical",
+          "text": "(breaths out with mouth)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 261
+        },
+        {
+          "type": "dialogue",
+          "text": "Thank god nee peru andulo raledu!",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 262
+        },
+        {
+          "type": "dialogue",
+          "text": "Blank ga ala Senior ni chusthadu Sidhu, Senior with a gentle",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 263
+        },
+        {
+          "type": "dialogue",
+          "text": "smile, asks for a shake hand. Siddhu, with a forced smile,",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 264
+        },
+        {
+          "type": "dialogue",
+          "text": "shakes hand, walks away.",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 265
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 266
+        },
+        {
+          "type": "action",
+          "text": "Siddhu ala nilchoni, eto chusthu, metro train kosam wait",
+          "character": null,
+          "line_start": 267
+        },
+        {
+          "type": "action",
+          "text": "chesthuntadu",
+          "character": null,
+          "line_start": 268
+        },
+        {
+          "type": "character",
+          "text": "MATCH CUT TO",
+          "character": "MATCH CUT TO",
+          "line_start": 269
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHU’S FACE",
+          "character": "MATCH CUT TO",
+          "line_start": 270
+        }
+      ]
+    },
+    {
+      "scene_number": 8,
+      "heading_raw": "EXT. LAKE VIEW - MAGIC HOUR",
+      "int_ext": "EXT",
+      "location": "LAKE VIEW",
+      "time_of_day": "MAGIC HOUR",
+      "page_start": 7,
+      "page_end": 8,
+      "characters_present": [
+        "DISSOLVE",
+        "RISHI"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. LAKE VIEW - MAGIC HOUR",
+          "character": null,
+          "line_start": 272
+        },
+        {
+          "type": "action",
+          "text": "Siddhu ala nilchoni unte, Rishi as he roams to and fro",
+          "character": null,
+          "line_start": 273
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 274
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey inthe na nu inka? Bayapadthane",
+          "character": "RISHI",
+          "line_start": 275
+        },
+        {
+          "type": "dialogue",
+          "text": "untava? huh? First adginappude No",
+          "character": "RISHI",
+          "line_start": 276
+        },
+        {
+          "type": "dialogue",
+          "text": "cheppamanna, No chepthe job effect",
+          "character": "RISHI",
+          "line_start": 277
+        },
+        {
+          "type": "dialogue",
+          "text": "ithademo ani bayapadkunta--",
+          "character": "RISHI",
+          "line_start": 278
+        },
+        {
+          "type": "dialogue",
+          "text": "Shakes a no. Taps on his own head, raises hand as if he cant",
+          "character": "RISHI",
+          "line_start": 279
+        },
+        {
+          "type": "dialogue",
+          "text": "anymore, with a side smile",
+          "character": "RISHI",
+          "line_start": 280
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (CONT’D)",
+          "character": "RISHI",
+          "line_start": 281
+        },
+        {
+          "type": "parenthetical",
+          "text": "(sigs)",
+          "character": "RISHI",
+          "line_start": 282
+        },
+        {
+          "type": "dialogue",
+          "text": "Ina neeku masth istamaina",
+          "character": "RISHI",
+          "line_start": 283
+        },
+        {
+          "type": "dialogue",
+          "text": "cartoonist job offer letter",
+          "character": "RISHI",
+          "line_start": 284
+        },
+        {
+          "type": "dialogue",
+          "text": "ochinapud em cheshnv ani!",
+          "character": "RISHI",
+          "line_start": 285
+        },
+        {
+          "type": "dialogue",
+          "text": "Shakes a no as if he lost it. Siddhu will be blank.",
+          "character": "RISHI",
+          "line_start": 286
+        },
+        {
+          "type": "action",
+          "text": "88..",
+          "character": null,
+          "line_start": 288
+        },
+        {
+          "type": "character",
+          "text": "DISSOLVE",
+          "character": "DISSOLVE",
+          "line_start": 290
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(OFFER",
+          "character": "DISSOLVE",
+          "line_start": 291
+        },
+        {
+          "type": "dialogue",
+          "text": "LETTER)",
+          "character": "DISSOLVE",
+          "line_start": 292
+        }
+      ]
+    },
+    {
+      "scene_number": 9,
+      "heading_raw": "INT. SIDDHU'S HOUSE",
+      "int_ext": "INT",
+      "location": "SIDDHU'S HOUSE",
+      "time_of_day": null,
+      "page_start": 8,
+      "page_end": 8,
+      "characters_present": [
+        "RAHUL"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. SIDDHU'S HOUSE",
+          "character": null,
+          "line_start": 294
+        },
+        {
+          "type": "action",
+          "text": "Siddhu holds that letter, Rahul pulls off that letter, threw",
+          "character": null,
+          "line_start": 295
+        },
+        {
+          "type": "action",
+          "text": "down tearing it. Steps his foot on it. Siddhu reacts as he",
+          "character": null,
+          "line_start": 296
+        },
+        {
+          "type": "action",
+          "text": "pulls letter",
+          "character": null,
+          "line_start": 297
+        },
+        {
+          "type": "character",
+          "text": "RAHUL",
+          "character": "RAHUL",
+          "line_start": 298
+        },
+        {
+          "type": "dialogue",
+          "text": "Em kathal padthunnava ra? Edki",
+          "character": "RAHUL",
+          "line_start": 299
+        },
+        {
+          "type": "dialogue",
+          "text": "pothav ra?",
+          "character": "RAHUL",
+          "line_start": 300
+        },
+        {
+          "type": "dialogue",
+          "text": "Rahul releases the smoke, Siddhu looking at it lying under",
+          "character": "RAHUL",
+          "line_start": 301
+        },
+        {
+          "type": "dialogue",
+          "text": "his feet, stands still. Rahul taking a puff",
+          "character": "RAHUL",
+          "line_start": 302
+        },
+        {
+          "type": "dialogue",
+          "text": "RAHUL (CONT’D)",
+          "character": "RAHUL",
+          "line_start": 303
+        },
+        {
+          "type": "dialogue",
+          "text": "Kaadani falthu muchata cheshnv anko",
+          "character": "RAHUL",
+          "line_start": 304
+        },
+        {
+          "type": "dialogue",
+          "text": "As he nods looks at Siddhu, releases the smoke, takes a",
+          "character": "RAHUL",
+          "line_start": 305
+        },
+        {
+          "type": "dialogue",
+          "text": "moment, stretched his own hand, had cut his wrist deep.",
+          "character": "RAHUL",
+          "line_start": 306
+        },
+        {
+          "type": "dialogue",
+          "text": "Blood’s flowing. Siddhu saw that, immediately tries to stop,",
+          "character": "RAHUL",
+          "line_start": 307
+        },
+        {
+          "type": "dialogue",
+          "text": "Rahul pulls off his hand away.",
+          "character": "RAHUL",
+          "line_start": 308
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu looks at Rahul, Rahul releases smoke, walks away. The",
+          "character": "RAHUL",
+          "line_start": 309
+        },
+        {
+          "type": "dialogue",
+          "text": "offer letter is soaked with those blood drops.",
+          "character": "RAHUL",
+          "line_start": 310
+        },
+        {
+          "type": "dialogue",
+          "text": "DISSOLVE",
+          "character": "RAHUL",
+          "line_start": 311
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(SIDDHU’S",
+          "character": "RAHUL",
+          "line_start": 312
+        },
+        {
+          "type": "dialogue",
+          "text": "FACE)",
+          "character": "RAHUL",
+          "line_start": 313
+        }
+      ]
+    },
+    {
+      "scene_number": 10,
+      "heading_raw": "EXT. LAKE VIEW - CONTINUOUS",
+      "int_ext": "EXT",
+      "location": "LAKE VIEW",
+      "time_of_day": "CONTINUOUS",
+      "page_start": 8,
+      "page_end": 10,
+      "characters_present": [
+        "GOON TWO",
+        "RISHI"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. LAKE VIEW - CONTINUOUS",
+          "character": null,
+          "line_start": 315
+        },
+        {
+          "type": "action",
+          "text": "Siddhu will be blank",
+          "character": null,
+          "line_start": 316
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 317
+        },
+        {
+          "type": "dialogue",
+          "text": "Unnadi vaadokkade adi idi ani nu",
+          "character": "RISHI",
+          "line_start": 318
+        },
+        {
+          "type": "dialogue",
+          "text": "anko, vaademo manchiga emotional",
+          "character": "RISHI",
+          "line_start": 319
+        },
+        {
+          "type": "dialogue",
+          "text": "blackmail chesi control",
+          "character": "RISHI",
+          "line_start": 320
+        },
+        {
+          "type": "dialogue",
+          "text": "chesthuntadu!",
+          "character": "RISHI",
+          "line_start": 321
+        },
+        {
+          "type": "dialogue",
+          "text": "Takes a deep breath. Loks at siddhu",
+          "character": "RISHI",
+          "line_start": 322
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (CONT’D)",
+          "character": "RISHI",
+          "line_start": 323
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey evanki ina, oka deggara, oka",
+          "character": "RISHI",
+          "line_start": 324
+        },
+        {
+          "type": "dialogue",
+          "text": "saari, oka situation la NO cheppudu",
+          "character": "RISHI",
+          "line_start": 325
+        },
+        {
+          "type": "dialogue",
+          "text": "first time ante, chaltha",
+          "character": "RISHI",
+          "line_start": 326
+        },
+        {
+          "type": "dialogue",
+          "text": "Idharu(goon_one, goon_two) bike meeda ostharu, goon_one",
+          "character": "RISHI",
+          "line_start": 327
+        },
+        {
+          "type": "dialogue",
+          "text": "mundhu velthunte, goon_two smoke lit chesthuntadu",
+          "character": "RISHI",
+          "line_start": 328
+        },
+        {
+          "type": "action",
+          "text": "99..",
+          "character": null,
+          "line_start": 330
+        },
+        {
+          "type": "action",
+          "text": "RISHI (CONT’D)",
+          "character": null,
+          "line_start": 332
+        },
+        {
+          "type": "action",
+          "text": "Kaani itla prathi saari No",
+          "character": null,
+          "line_start": 333
+        },
+        {
+          "type": "action",
+          "text": "cheppadanki bayapadthe intla okad,",
+          "character": null,
+          "line_start": 334
+        },
+        {
+          "type": "action",
+          "text": "baita okad, office la okad osthane",
+          "character": null,
+          "line_start": 335
+        },
+        {
+          "type": "action",
+          "text": "untar",
+          "character": null,
+          "line_start": 336
+        },
+        {
+          "type": "action",
+          "text": "(takes a breath)",
+          "character": null,
+          "line_start": 337
+        },
+        {
+          "type": "action",
+          "text": "Rishi ala Sidhu mundhu nilchoni unte, goon_one Rishi back",
+          "character": null,
+          "line_start": 338
+        },
+        {
+          "type": "action",
+          "text": "nundi osthu, Rishi ni pakkaki thosesthuntadu",
+          "character": null,
+          "line_start": 339
+        },
+        {
+          "type": "action",
+          "text": "RISHI (O.S.) (CONT’D)",
+          "character": null,
+          "line_start": 340
+        },
+        {
+          "type": "action",
+          "text": "Rey, evar bey meeru?",
+          "character": null,
+          "line_start": 341
+        },
+        {
+          "type": "action",
+          "text": "Ani antunte, Siddhu friend ni chusthu lechi mundhuki",
+          "character": null,
+          "line_start": 342
+        },
+        {
+          "type": "action",
+          "text": "chusthunte gattiga slap chesthadu Goon_two, as he smokes,",
+          "character": null,
+          "line_start": 343
+        },
+        {
+          "type": "action",
+          "text": "Rishi silent ipothadu",
+          "character": null,
+          "line_start": 344
+        },
+        {
+          "type": "character",
+          "text": "GOON_TWO",
+          "character": "GOON TWO",
+          "line_start": 345
+        },
+        {
+          "type": "dialogue",
+          "text": "(cigar ni notlo unchi,",
+          "character": "GOON TWO",
+          "line_start": 346
+        },
+        {
+          "type": "dialogue",
+          "text": "collar patkoni)",
+          "character": "GOON TWO",
+          "line_start": 347
+        },
+        {
+          "type": "dialogue",
+          "text": "Em kathal padthurra ra, thammud eda",
+          "character": "GOON TWO",
+          "line_start": 348
+        },
+        {
+          "type": "dialogue",
+          "text": "bey? Hmm?",
+          "character": "GOON TWO",
+          "line_start": 349
+        },
+        {
+          "type": "dialogue",
+          "text": "Looks at him in the eye, releases the smoke",
+          "character": "GOON TWO",
+          "line_start": 350
+        },
+        {
+          "type": "dialogue",
+          "text": "GOON_ONE",
+          "character": "GOON TWO",
+          "line_start": 351
+        },
+        {
+          "type": "dialogue",
+          "text": "Rendu rojulla paisal iyyakunte",
+          "character": "GOON TWO",
+          "line_start": 352
+        },
+        {
+          "type": "dialogue",
+          "text": "kodka",
+          "character": "GOON TWO",
+          "line_start": 353
+        },
+        {
+          "type": "dialogue",
+          "text": "(Holding his jaw, with an",
+          "character": "GOON TWO",
+          "line_start": 354
+        },
+        {
+          "type": "dialogue",
+          "text": "eye contact)",
+          "character": "GOON TWO",
+          "line_start": 355
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani vellipotharu. Siddhu stand still ga undipothadu, so",
+          "character": "GOON TWO",
+          "line_start": 356
+        },
+        {
+          "type": "dialogue",
+          "text": "blankly. Rishi maatladthuntadu kaani Siddhu conscious ga",
+          "character": "GOON TWO",
+          "line_start": 357
+        },
+        {
+          "type": "dialogue",
+          "text": "undadu(in-audible). Siddhu ala nadusthu unte, Rishi tries to",
+          "character": "GOON TWO",
+          "line_start": 358
+        },
+        {
+          "type": "dialogue",
+          "text": "stop",
+          "character": "GOON TWO",
+          "line_start": 359
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "GOON TWO",
+          "line_start": 360
+        },
+        {
+          "type": "dialogue",
+          "text": "Undu nen drop chestha---",
+          "character": "GOON TWO",
+          "line_start": 361
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani siddhu ni aaputhu, vadili vellaleka urkuthadu bike",
+          "character": "GOON TWO",
+          "line_start": 362
+        },
+        {
+          "type": "dialogue",
+          "text": "thevadanki. Rishi bike theesthunte, Siddhu ala roadside",
+          "character": "GOON TWO",
+          "line_start": 363
+        },
+        {
+          "type": "dialogue",
+          "text": "nadusthuntaadu, Rishi alaa chusthundagaane, Siddhu’s been hit",
+          "character": "GOON TWO",
+          "line_start": 364
+        },
+        {
+          "type": "dialogue",
+          "text": "by a vehicle, road side padipothaadu. Rishi alaane chusthune",
+          "character": "GOON TWO",
+          "line_start": 365
+        },
+        {
+          "type": "dialogue",
+          "text": "undipothadu.",
+          "character": "GOON TWO",
+          "line_start": 366
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 367
+        },
+        {
+          "type": "action",
+          "text": "FLASHE CUTS:",
+          "character": null,
+          "line_start": 369
+        },
+        {
+          "type": "action",
+          "text": "Ambulance, Hospital env, Doc talking to Rishi abt Siddhu’s",
+          "character": null,
+          "line_start": 370
+        },
+        {
+          "type": "action",
+          "text": "condition, shake hands with Siddhu. Siddhu, Rishi on bike.",
+          "character": null,
+          "line_start": 371
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 372
+        },
+        {
+          "type": "action",
+          "text": "1100..",
+          "character": null,
+          "line_start": 374
+        },
+        {
+          "type": "action",
+          "text": "PRESENT:",
+          "character": null,
+          "line_start": 376
+        }
+      ]
+    },
+    {
+      "scene_number": 11,
+      "heading_raw": "EXT. TEA LOUNGE - EVENING",
+      "int_ext": "EXT",
+      "location": "TEA LOUNGE",
+      "time_of_day": "EVENING",
+      "page_start": 10,
+      "page_end": 11,
+      "characters_present": [
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. TEA LOUNGE - EVENING",
+          "character": null,
+          "line_start": 378
+        },
+        {
+          "type": "action",
+          "text": "Rishi will be handing tea to Siddhu, as Siddhu looks at Rishi",
+          "character": null,
+          "line_start": 379
+        },
+        {
+          "type": "action",
+          "text": "in a sarcastic way!",
+          "character": null,
+          "line_start": 380
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 381
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey Rishi, Accident indhi naaku",
+          "character": "SIDDHARTH",
+          "line_start": 382
+        },
+        {
+          "type": "dialogue",
+          "text": "ra! Nu enduk theda ga matladthunnv?",
+          "character": "SIDDHARTH",
+          "line_start": 383
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi as he sips",
+          "character": "SIDDHARTH",
+          "line_start": 384
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 385
+        },
+        {
+          "type": "dialogue",
+          "text": "nijam bey!",
+          "character": "SIDDHARTH",
+          "line_start": 386
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu just stares at him, Rishi nods a yes.",
+          "character": "SIDDHARTH",
+          "line_start": 387
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 388
+        },
+        {
+          "type": "dialogue",
+          "text": "nijanga nijam?",
+          "character": "SIDDHARTH",
+          "line_start": 389
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi alaane chusthunte, Siddhu thaaguthunna hot tea ni alaa",
+          "character": "SIDDHARTH",
+          "line_start": 390
+        },
+        {
+          "type": "dialogue",
+          "text": "hand meedha poskuntadu, Rishi ni chusthu.(slow-mo) Rishi",
+          "character": "SIDDHARTH",
+          "line_start": 391
+        },
+        {
+          "type": "dialogue",
+          "text": "reacts, tries stopping him. Siddhu alane poskuntadu. Hand",
+          "character": "SIDDHARTH",
+          "line_start": 392
+        },
+        {
+          "type": "dialogue",
+          "text": "nundi pogalusthuntayi. Siddhu looks at his hand, surprises",
+          "character": "SIDDHARTH",
+          "line_start": 393
+        },
+        {
+          "type": "dialogue",
+          "text": "while Rishi tries to clean that with his kerchief.",
+          "character": "SIDDHARTH",
+          "line_start": 394
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will be smiling with a surprise and thudusthunna hand",
+          "character": "SIDDHARTH",
+          "line_start": 395
+        },
+        {
+          "type": "dialogue",
+          "text": "theeseskoni, malli Tea ni theeskoni knchm poskoni cross check",
+          "character": "SIDDHARTH",
+          "line_start": 396
+        },
+        {
+          "type": "dialogue",
+          "text": "cheskuntadu",
+          "character": "SIDDHARTH",
+          "line_start": 397
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 398
+        },
+        {
+          "type": "dialogue",
+          "text": "Faalthu gaanvaa, kaalthadani",
+          "character": "SIDDHARTH",
+          "line_start": 399
+        },
+        {
+          "type": "dialogue",
+          "text": "thudusthunte malla malla atlaane---",
+          "character": "SIDDHARTH",
+          "line_start": 400
+        },
+        {
+          "type": "dialogue",
+          "text": "Realizes that he tested and it’s true. Rishi as he holds",
+          "character": "SIDDHARTH",
+          "line_start": 401
+        },
+        {
+          "type": "dialogue",
+          "text": "hand, smiles. Siddhu alaa chusthu kurchundipothadu",
+          "character": "SIDDHARTH",
+          "line_start": 402
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 403
+        },
+        {
+          "type": "dialogue",
+          "text": "Inni rojul nundi asl noppi lekunda,",
+          "character": "SIDDHARTH",
+          "line_start": 404
+        },
+        {
+          "type": "dialogue",
+          "text": "suffer avvakunda okkaroj ina",
+          "character": "SIDDHARTH",
+          "line_start": 405
+        },
+        {
+          "type": "dialogue",
+          "text": "osthada ankunna!",
+          "character": "SIDDHARTH",
+          "line_start": 406
+        },
+        {
+          "type": "dialogue",
+          "text": "Nods a yes! Siddhu will be in the trance of feeling it",
+          "character": "SIDDHARTH",
+          "line_start": 407
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 408
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey Sidhdhu, nen okasaari motham",
+          "character": "SIDDHARTH",
+          "line_start": 409
+        },
+        {
+          "type": "dialogue",
+          "text": "cheppedi vin—-",
+          "character": "SIDDHARTH",
+          "line_start": 410
+        },
+        {
+          "type": "action",
+          "text": "1111..",
+          "character": null,
+          "line_start": 412
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 414
+        },
+        {
+          "type": "dialogue",
+          "text": "Ala okkaroj ina osthe chaalu",
+          "character": "SIDDHARTH",
+          "line_start": 415
+        },
+        {
+          "type": "dialogue",
+          "text": "ankunna ra, kaani life antha itlane",
+          "character": "SIDDHARTH",
+          "line_start": 416
+        },
+        {
+          "type": "dialogue",
+          "text": "ante emo kotha feeling anpisthundi",
+          "character": "SIDDHARTH",
+          "line_start": 417
+        },
+        {
+          "type": "dialogue",
+          "text": "ra",
+          "character": "SIDDHARTH",
+          "line_start": 418
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani Rishi patkoni antuntaadu",
+          "character": "SIDDHARTH",
+          "line_start": 419
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH (CONT’D)",
+          "character": "SIDDHARTH",
+          "line_start": 420
+        },
+        {
+          "type": "dialogue",
+          "text": "em maatladv endhi ra?",
+          "character": "SIDDHARTH",
+          "line_start": 421
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi ki Doc annadi gurthosthundi",
+          "character": "SIDDHARTH",
+          "line_start": 422
+        },
+        {
+          "type": "dialogue",
+          "text": "WHITE FLASH CUT:",
+          "character": "SIDDHARTH",
+          "line_start": 423
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 424
+        },
+        {
+          "type": "dialogue",
+          "text": "Ilaa enduk indho telid kaani",
+          "character": "SIDDHARTH",
+          "line_start": 425
+        },
+        {
+          "type": "dialogue",
+          "text": "Accident maatram vaadi manchike",
+          "character": "SIDDHARTH",
+          "line_start": 426
+        },
+        {
+          "type": "dialogue",
+          "text": "indhi ankunta",
+          "character": "SIDDHARTH",
+          "line_start": 427
+        },
+        {
+          "type": "dialogue",
+          "text": "(as he takes a deep",
+          "character": "SIDDHARTH",
+          "line_start": 428
+        },
+        {
+          "type": "dialogue",
+          "text": "breath)",
+          "character": "SIDDHARTH",
+          "line_start": 429
+        },
+        {
+          "type": "dialogue",
+          "text": "Ala Siddhu happy untadane mood lo navthu Siddhu ni",
+          "character": "SIDDHARTH",
+          "line_start": 430
+        },
+        {
+          "type": "dialogue",
+          "text": "chusthunte, with cigar in Docs hand",
+          "character": "SIDDHARTH",
+          "line_start": 431
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR",
+          "character": "SIDDHARTH",
+          "line_start": 432
+        },
+        {
+          "type": "dialogue",
+          "text": "kaani ilaa permanent ga undadhu,",
+          "character": "SIDDHARTH",
+          "line_start": 433
+        },
+        {
+          "type": "dialogue",
+          "text": "temporary. Nerves partial ga damage",
+          "character": "SIDDHARTH",
+          "line_start": 434
+        },
+        {
+          "type": "dialogue",
+          "text": "avvadam valla, healing ni batti",
+          "character": "SIDDHARTH",
+          "line_start": 435
+        },
+        {
+          "type": "dialogue",
+          "text": "konni years, months, days lo kuda",
+          "character": "SIDDHARTH",
+          "line_start": 436
+        },
+        {
+          "type": "dialogue",
+          "text": "avvachu",
+          "character": "SIDDHARTH",
+          "line_start": 437
+        },
+        {
+          "type": "dialogue",
+          "text": "Sidhu alaa dooram nundi chusi veellani nadchukuntu",
+          "character": "SIDDHARTH",
+          "line_start": 438
+        },
+        {
+          "type": "dialogue",
+          "text": "osthuntadu.",
+          "character": "SIDDHARTH",
+          "line_start": 439
+        },
+        {
+          "type": "dialogue",
+          "text": "Alaa Anagaane smile tho unna Rishi face kaastha blank ipoi",
+          "character": "SIDDHARTH",
+          "line_start": 440
+        },
+        {
+          "type": "dialogue",
+          "text": "dull ipothundi. Appude siddhu ala osthuntadu.",
+          "character": "SIDDHARTH",
+          "line_start": 441
+        },
+        {
+          "type": "dialogue",
+          "text": "WHITE FLASH CUT:",
+          "character": "SIDDHARTH",
+          "line_start": 442
+        }
+      ]
+    },
+    {
+      "scene_number": 12,
+      "heading_raw": "EXT. TEA LOUNGE - CONTINUOUS",
+      "int_ext": "EXT",
+      "location": "TEA LOUNGE",
+      "time_of_day": "CONTINUOUS",
+      "page_start": 11,
+      "page_end": 13,
+      "characters_present": [
+        "DOCTOR",
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. TEA LOUNGE - CONTINUOUS",
+          "character": null,
+          "line_start": 444
+        },
+        {
+          "type": "action",
+          "text": "Siddhu santhosham ga undadam chusthu, Siddhu padina struggle",
+          "character": null,
+          "line_start": 445
+        },
+        {
+          "type": "action",
+          "text": "antha gurthosthunte, Rishi ki, Siddhu will be shaking him by",
+          "character": null,
+          "line_start": 446
+        },
+        {
+          "type": "action",
+          "text": "holding his shoulder",
+          "character": null,
+          "line_start": 447
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 448
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi, Ninne, em maatladv enti ra?",
+          "character": "SIDDHARTH",
+          "line_start": 449
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi just shakes a no",
+          "character": "SIDDHARTH",
+          "line_start": 450
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 451
+        },
+        {
+          "type": "dialogue",
+          "text": "Nu happy a kada?",
+          "character": "SIDDHARTH",
+          "line_start": 452
+        },
+        {
+          "type": "action",
+          "text": "1122..",
+          "character": null,
+          "line_start": 454
+        },
+        {
+          "type": "action",
+          "text": "Siddhu smile chesthuntaadu. Rishi stares at Siddhu with a",
+          "character": null,
+          "line_start": 455
+        },
+        {
+          "type": "action",
+          "text": "gentle smile. Siddhu enti ani nod chesthe, Rishi shakes a",
+          "character": null,
+          "line_start": 456
+        },
+        {
+          "type": "action",
+          "text": "hesitated no holding that gentle smile.",
+          "character": null,
+          "line_start": 457
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 458
+        },
+        {
+          "type": "action",
+          "text": "Montage:",
+          "character": null,
+          "line_start": 459
+        },
+        {
+          "type": "action",
+          "text": "1. Siddhu goes on a bike ride, enjoying himself throwing out",
+          "character": null,
+          "line_start": 460
+        },
+        {
+          "type": "action",
+          "text": "in the same world.",
+          "character": null,
+          "line_start": 461
+        },
+        {
+          "type": "action",
+          "text": "2. Takes on escalator, by stepping on it and coming back and",
+          "character": null,
+          "line_start": 462
+        },
+        {
+          "type": "action",
+          "text": "steps in. Senior guy calls, but Siddhu hangs up as he’s on",
+          "character": null,
+          "line_start": 463
+        },
+        {
+          "type": "action",
+          "text": "the stairs.",
+          "character": null,
+          "line_start": 464
+        },
+        {
+          "type": "action",
+          "text": "3. Goes on for a water ride together. Rishi alaane Siddhu ni",
+          "character": null,
+          "line_start": 465
+        },
+        {
+          "type": "action",
+          "text": "chusthunte remembers talk with doc",
+          "character": null,
+          "line_start": 466
+        },
+        {
+          "type": "action",
+          "text": "RISHI (CONT’D)",
+          "character": null,
+          "line_start": 467
+        },
+        {
+          "type": "action",
+          "text": "Meeremo pain okkate feel avvaledu",
+          "character": null,
+          "line_start": 468
+        },
+        {
+          "type": "action",
+          "text": "annaru, akkada vaadki bayam kuda",
+          "character": null,
+          "line_start": 469
+        },
+        {
+          "type": "action",
+          "text": "poindi! Inthakumundhu",
+          "character": null,
+          "line_start": 470
+        },
+        {
+          "type": "action",
+          "text": "cheyalekapoinvi anni ippudu",
+          "character": null,
+          "line_start": 471
+        },
+        {
+          "type": "action",
+          "text": "chesthundu",
+          "character": null,
+          "line_start": 472
+        },
+        {
+          "type": "action",
+          "text": "Doc with a gentle smile",
+          "character": null,
+          "line_start": 473
+        },
+        {
+          "type": "character",
+          "text": "DOCTOR",
+          "character": "DOCTOR",
+          "line_start": 474
+        },
+        {
+          "type": "dialogue",
+          "text": "Fear feeds on pain! Noppi unna",
+          "character": "DOCTOR",
+          "line_start": 475
+        },
+        {
+          "type": "dialogue",
+          "text": "chote bayam gudlu pedthundi Rishi!",
+          "character": "DOCTOR",
+          "line_start": 476
+        },
+        {
+          "type": "dialogue",
+          "text": "Doc Lights a lighter",
+          "character": "DOCTOR",
+          "line_start": 477
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR (CONT’D)",
+          "character": "DOCTOR",
+          "line_start": 478
+        },
+        {
+          "type": "dialogue",
+          "text": "Okasari touch cheyi!",
+          "character": "DOCTOR",
+          "line_start": 479
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi with a strange look towards doc",
+          "character": "DOCTOR",
+          "line_start": 480
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "DOCTOR",
+          "line_start": 481
+        },
+        {
+          "type": "dialogue",
+          "text": "Mazak chesthurra Doc?",
+          "character": "DOCTOR",
+          "line_start": 482
+        },
+        {
+          "type": "dialogue",
+          "text": "Doc, with an eyebrow raised, hmm?",
+          "character": "DOCTOR",
+          "line_start": 483
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (CONT’D)",
+          "character": "DOCTOR",
+          "line_start": 484
+        },
+        {
+          "type": "dialogue",
+          "text": "elu pedthe kaalada?",
+          "character": "DOCTOR",
+          "line_start": 485
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR",
+          "character": "DOCTOR",
+          "line_start": 486
+        },
+        {
+          "type": "dialogue",
+          "text": "kaalthe?",
+          "character": "DOCTOR",
+          "line_start": 487
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi with a doubt face",
+          "character": "DOCTOR",
+          "line_start": 488
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "DOCTOR",
+          "line_start": 489
+        },
+        {
+          "type": "dialogue",
+          "text": "Endhi doc atlantaru, noppi levvada?",
+          "character": "DOCTOR",
+          "line_start": 490
+        },
+        {
+          "type": "action",
+          "text": "1133..",
+          "character": null,
+          "line_start": 492
+        },
+        {
+          "type": "character",
+          "text": "DOCTOR",
+          "character": "DOCTOR",
+          "line_start": 494
+        },
+        {
+          "type": "dialogue",
+          "text": "Inka nu touch a cheyale, etla",
+          "character": "DOCTOR",
+          "line_start": 495
+        },
+        {
+          "type": "dialogue",
+          "text": "telsu?",
+          "character": "DOCTOR",
+          "line_start": 496
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi goes blank!! Looks at Doc",
+          "character": "DOCTOR",
+          "line_start": 497
+        },
+        {
+          "type": "dialogue",
+          "text": "DOCTOR (CONT’D)",
+          "character": "DOCTOR",
+          "line_start": 498
+        },
+        {
+          "type": "dialogue",
+          "text": "Ala chesthe Noppi pudthundemo ani,",
+          "character": "DOCTOR",
+          "line_start": 499
+        },
+        {
+          "type": "dialogue",
+          "text": "ne brain bayam ni trigger",
+          "character": "DOCTOR",
+          "line_start": 500
+        },
+        {
+          "type": "dialogue",
+          "text": "chesthundi",
+          "character": "DOCTOR",
+          "line_start": 501
+        },
+        {
+          "type": "parenthetical",
+          "text": "(nods a yes)",
+          "character": "DOCTOR",
+          "line_start": 502
+        },
+        {
+          "type": "dialogue",
+          "text": "Ade noppe lekapothe,",
+          "character": "DOCTOR",
+          "line_start": 503
+        },
+        {
+          "type": "parenthetical",
+          "text": "(raises his eyebrows)",
+          "character": "DOCTOR",
+          "line_start": 504
+        },
+        {
+          "type": "dialogue",
+          "text": "bayam ni trigger chesedi evaru?",
+          "character": "DOCTOR",
+          "line_start": 505
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi goes blank, as he processes it.",
+          "character": "DOCTOR",
+          "line_start": 506
+        },
+        {
+          "type": "dialogue",
+          "text": "MATCH CUT",
+          "character": "DOCTOR",
+          "line_start": 507
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:(RISHI’S",
+          "character": "DOCTOR",
+          "line_start": 508
+        },
+        {
+          "type": "dialogue",
+          "text": "BLANK FACE)",
+          "character": "DOCTOR",
+          "line_start": 509
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi stares at Siddhu, as they were on boat, Siddhu enjoys",
+          "character": "DOCTOR",
+          "line_start": 510
+        },
+        {
+          "type": "dialogue",
+          "text": "the ride, looks at Rishi, he’s with a gentle smile, till",
+          "character": "DOCTOR",
+          "line_start": 511
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu turns forward. Rishi will be in thoughts. Siddhu",
+          "character": "DOCTOR",
+          "line_start": 512
+        },
+        {
+          "type": "dialogue",
+          "text": "stands still, looking at water, by resting hands on waist.",
+          "character": "DOCTOR",
+          "line_start": 513
+        },
+        {
+          "type": "dialogue",
+          "text": "DISSOLVE TO:(NEW",
+          "character": "DOCTOR",
+          "line_start": 514
+        },
+        {
+          "type": "dialogue",
+          "text": "COMIC ON WALL)",
+          "character": "DOCTOR",
+          "line_start": 515
+        }
+      ]
+    },
+    {
+      "scene_number": 13,
+      "heading_raw": "INT. SIDDHU'S HOUSE - NIGHT",
+      "int_ext": "INT",
+      "location": "SIDDHU'S HOUSE",
+      "time_of_day": "NIGHT",
+      "page_start": 13,
+      "page_end": 14,
+      "characters_present": [
+        "RAHUL"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. SIDDHU'S HOUSE - NIGHT",
+          "character": null,
+          "line_start": 517
+        },
+        {
+          "type": "action",
+          "text": "Alaa cartoons tho unna paper wall meeda pedthuntaadu Siddhu.",
+          "character": null,
+          "line_start": 518
+        },
+        {
+          "type": "action",
+          "text": "He got so involved in cartooning and thinking, with his legs",
+          "character": null,
+          "line_start": 519
+        },
+        {
+          "type": "action",
+          "text": "stretched. Phone rang, it’s his senior calling, didnt notice.",
+          "character": null,
+          "line_start": 520
+        },
+        {
+          "type": "action",
+          "text": "Rahul entered the room, saw legs stretched, lights a cigar as",
+          "character": null,
+          "line_start": 521
+        },
+        {
+          "type": "action",
+          "text": "he walks, holds that hot match stick, till he’s about to",
+          "character": null,
+          "line_start": 522
+        },
+        {
+          "type": "action",
+          "text": "cross the stretched legs, drops of that hot match stick as he",
+          "character": null,
+          "line_start": 523
+        },
+        {
+          "type": "action",
+          "text": "passes through.",
+          "character": null,
+          "line_start": 524
+        },
+        {
+          "type": "action",
+          "text": "Sidhu didnt react to the match stick fell over his feet,",
+          "character": null,
+          "line_start": 525
+        },
+        {
+          "type": "action",
+          "text": "takes a puff, passes through. But only then Siddhu realizes",
+          "character": null,
+          "line_start": 526
+        },
+        {
+          "type": "action",
+          "text": "that Rahul has come by looking at the feet of Rahul, as he",
+          "character": null,
+          "line_start": 527
+        },
+        {
+          "type": "action",
+          "text": "crosses over, siddhu tries to pull off his stretched legs but",
+          "character": null,
+          "line_start": 528
+        },
+        {
+          "type": "action",
+          "text": "slowly as he thinks by bringing his two eyebrows together, as",
+          "character": null,
+          "line_start": 529
+        },
+        {
+          "type": "action",
+          "text": "if he feels nothing or not being scared as he thinks for a",
+          "character": null,
+          "line_start": 530
+        },
+        {
+          "type": "action",
+          "text": "moment, with a subtle smile, stretches legs, continues to",
+          "character": null,
+          "line_start": 531
+        },
+        {
+          "type": "action",
+          "text": "draw.",
+          "character": null,
+          "line_start": 532
+        },
+        {
+          "type": "action",
+          "text": "As Rahul is taking a puff, sat over his bed, saw him drawing,",
+          "character": null,
+          "line_start": 533
+        },
+        {
+          "type": "action",
+          "text": "looked at stretched legs, takes a deeeep puff, as he falls",
+          "character": null,
+          "line_start": 534
+        },
+        {
+          "type": "action",
+          "text": "over the pillow on his left",
+          "character": null,
+          "line_start": 535
+        },
+        {
+          "type": "action",
+          "text": "1144..",
+          "character": null,
+          "line_start": 537
+        },
+        {
+          "type": "character",
+          "text": "RAHUL",
+          "character": "RAHUL",
+          "line_start": 538
+        },
+        {
+          "type": "dialogue",
+          "text": "Roj cheppala bey, light bancheyyyy!",
+          "character": "RAHUL",
+          "line_start": 539
+        },
+        {
+          "type": "dialogue",
+          "text": "Takes a puff, Rahul looking at siddhu with half closed eyes",
+          "character": "RAHUL",
+          "line_start": 540
+        },
+        {
+          "type": "dialogue",
+          "text": "RAHUL (CONT’D)",
+          "character": "RAHUL",
+          "line_start": 541
+        },
+        {
+          "type": "dialogue",
+          "text": "Chepthe vinpisthale",
+          "character": "RAHUL",
+          "line_start": 542
+        },
+        {
+          "type": "dialogue",
+          "text": "(with a low pitch, fading",
+          "character": "RAHUL",
+          "line_start": 543
+        },
+        {
+          "type": "dialogue",
+          "text": "voice)",
+          "character": "RAHUL",
+          "line_start": 544
+        },
+        {
+          "type": "dialogue",
+          "text": "Releases the smoke, throws the burnt cigar at Siddhu while",
+          "character": "RAHUL",
+          "line_start": 545
+        },
+        {
+          "type": "dialogue",
+          "text": "he’s staring without a blink. Rahul looking at the cigar",
+          "character": "RAHUL",
+          "line_start": 546
+        },
+        {
+          "type": "dialogue",
+          "text": "burning Siddhu’s feet, falls a sleep.",
+          "character": "RAHUL",
+          "line_start": 547
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu as he draws, phone is ringing, it’s the Senior guy,",
+          "character": "RAHUL",
+          "line_start": 548
+        },
+        {
+          "type": "dialogue",
+          "text": "hangs-up, turns on airplane mode. Continues to draw, cigar",
+          "character": "RAHUL",
+          "line_start": 549
+        },
+        {
+          "type": "dialogue",
+          "text": "ekkada touch indho akkada, skin burn iyyi, mark padthundi.",
+          "character": "RAHUL",
+          "line_start": 550
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 551
+        }
+      ]
+    },
+    {
+      "scene_number": 14,
+      "heading_raw": "INT. A RANDOM MALL - MORNING",
+      "int_ext": "INT",
+      "location": "A RANDOM MALL",
+      "time_of_day": "MORNING",
+      "page_start": 14,
+      "page_end": 18,
+      "characters_present": [
+        "RISHI",
+        "SENIOR COLLEAGUE",
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. A RANDOM MALL - MORNING",
+          "character": null,
+          "line_start": 552
+        },
+        {
+          "type": "action",
+          "text": "Siddhu, Rishi walks in to the mall",
+          "character": null,
+          "line_start": 553
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 554
+        },
+        {
+          "type": "dialogue",
+          "text": "Eedki theeskochinv endhi ra Siddhu?",
+          "character": "RISHI",
+          "line_start": 555
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu as he smiles, looking around",
+          "character": "RISHI",
+          "line_start": 556
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 557
+        },
+        {
+          "type": "dialogue",
+          "text": "Eedki aadki ani em ankole Rishi,",
+          "character": "RISHI",
+          "line_start": 558
+        },
+        {
+          "type": "dialogue",
+          "text": "etla anpisthe atlaa",
+          "character": "RISHI",
+          "line_start": 559
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi will be staring at Siddhu, as he walks, Siddhu looks",
+          "character": "RISHI",
+          "line_start": 560
+        },
+        {
+          "type": "dialogue",
+          "text": "back at him with a subtle smile",
+          "character": "RISHI",
+          "line_start": 561
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH (CONT’D)",
+          "character": "RISHI",
+          "line_start": 562
+        },
+        {
+          "type": "dialogue",
+          "text": "20 years tarvatha, naaku nenu",
+          "character": "RISHI",
+          "line_start": 563
+        },
+        {
+          "type": "dialogue",
+          "text": "dorkadaniki vethukuntunna ra",
+          "character": "RISHI",
+          "line_start": 564
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 565
+        },
+        {
+          "type": "action",
+          "text": "Senior guy walks in to the mall following them, looking",
+          "character": null,
+          "line_start": 566
+        },
+        {
+          "type": "action",
+          "text": "around, saw Siddhu near to the escalator, goes for him.",
+          "character": null,
+          "line_start": 567
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 568
+        },
+        {
+          "type": "action",
+          "text": "Looking at Siddhu, become so casual to get on the escalator,",
+          "character": null,
+          "line_start": 569
+        },
+        {
+          "type": "action",
+          "text": "Rishi just looks at him with a smile, puts hand over the",
+          "character": null,
+          "line_start": 570
+        },
+        {
+          "type": "action",
+          "text": "shoulder",
+          "character": null,
+          "line_start": 571
+        },
+        {
+          "type": "action",
+          "text": "1155..",
+          "character": null,
+          "line_start": 573
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 575
+        },
+        {
+          "type": "dialogue",
+          "text": "avnu, edo comic gurinchi feedback",
+          "character": "RISHI",
+          "line_start": 576
+        },
+        {
+          "type": "dialogue",
+          "text": "kaa---",
+          "character": "RISHI",
+          "line_start": 577
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu got a call, silences, with a sarcastic smile",
+          "character": "RISHI",
+          "line_start": 578
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 579
+        },
+        {
+          "type": "dialogue",
+          "text": "evadanna happy ga unte veellaki",
+          "character": "RISHI",
+          "line_start": 580
+        },
+        {
+          "type": "dialogue",
+          "text": "notification pothadara? Disturb",
+          "character": "RISHI",
+          "line_start": 581
+        },
+        {
+          "type": "dialogue",
+          "text": "cheyadanki ready untaru!",
+          "character": "RISHI",
+          "line_start": 582
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi with a smile",
+          "character": "RISHI",
+          "line_start": 583
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 584
+        },
+        {
+          "type": "dialogue",
+          "text": "Evarra?",
+          "character": "RISHI",
+          "line_start": 585
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 586
+        },
+        {
+          "type": "action",
+          "text": "Senior will be on escalator, looking at him across",
+          "character": null,
+          "line_start": 587
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 588
+        },
+        {
+          "type": "action",
+          "text": "Senior calls again, Siddhu silences as he walks",
+          "character": null,
+          "line_start": 589
+        },
+        {
+          "type": "action",
+          "text": "RISHI (CONT’D)",
+          "character": null,
+          "line_start": 590
+        },
+        {
+          "type": "action",
+          "text": "Em kavalanta ra aanki?",
+          "character": null,
+          "line_start": 591
+        },
+        {
+          "type": "action",
+          "text": "Antu as he shakes a no, as they steps down the Escalator,",
+          "character": null,
+          "line_start": 592
+        },
+        {
+          "type": "action",
+          "text": "walks across, meets Senior f2f",
+          "character": null,
+          "line_start": 593
+        },
+        {
+          "type": "character",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 594
+        },
+        {
+          "type": "dialogue",
+          "text": "how are you, Siddharth?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 595
+        },
+        {
+          "type": "dialogue",
+          "text": "Says hi to Rishi with a gesture, Siddhu nods a yes, as siddhu",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 596
+        },
+        {
+          "type": "dialogue",
+          "text": "walks, they follows",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 597
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE (CONT’D)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 598
+        },
+        {
+          "type": "dialogue",
+          "text": "Manager nundi news ochindi, recover",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 599
+        },
+        {
+          "type": "dialogue",
+          "text": "iyyav ani anduke call ches--",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 600
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 601
+        },
+        {
+          "type": "dialogue",
+          "text": "Mind a inka stable kaale, appude",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 602
+        },
+        {
+          "type": "dialogue",
+          "text": "malli work gurinchi ochirra?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 603
+        },
+        {
+          "type": "parenthetical",
+          "text": "(shakes a no)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 604
+        },
+        {
+          "type": "dialogue",
+          "text": "Senior with a hesitant look tries to convey",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 605
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 606
+        },
+        {
+          "type": "dialogue",
+          "text": "Daani gurinchi maatladham ane",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 607
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 608
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey kallu thershi sakkaga 2 days",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 609
+        },
+        {
+          "type": "dialogue",
+          "text": "kaale, recover kuda kaani iyyara?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 610
+        },
+        {
+          "type": "parenthetical",
+          "text": "((MMOORREE))",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 611
+        },
+        {
+          "type": "action",
+          "text": "1166..",
+          "character": null,
+          "line_start": 613
+        },
+        {
+          "type": "action",
+          "text": "RRIISSHHII ((CCOONNTT’’DD))",
+          "character": null,
+          "line_start": 614
+        },
+        {
+          "type": "action",
+          "text": "Common boss, Medical leave la unte",
+          "character": null,
+          "line_start": 615
+        },
+        {
+          "type": "action",
+          "text": "kuda itlaa",
+          "character": null,
+          "line_start": 616
+        },
+        {
+          "type": "action",
+          "text": "(shakes a no)",
+          "character": null,
+          "line_start": 617
+        },
+        {
+          "type": "action",
+          "text": "Senior, with a death stare and a hand gesture asks Rishi to",
+          "character": null,
+          "line_start": 618
+        },
+        {
+          "type": "action",
+          "text": "shut",
+          "character": null,
+          "line_start": 619
+        },
+        {
+          "type": "character",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 620
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddharth, project review undhi ela",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 621
+        },
+        {
+          "type": "dialogue",
+          "text": "elaa ankunna, nu conscious iyyav",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 622
+        },
+        {
+          "type": "dialogue",
+          "text": "ani telsi-- adi naku entha",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 623
+        },
+        {
+          "type": "dialogue",
+          "text": "important o---",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 624
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu as he’s walking, stops and looks at Senior with a",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 625
+        },
+        {
+          "type": "dialogue",
+          "text": "surprise",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 626
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 627
+        },
+        {
+          "type": "dialogue",
+          "text": "I knew it.",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 628
+        },
+        {
+          "type": "parenthetical",
+          "text": "(with a sarcastic smile)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 629
+        },
+        {
+          "type": "dialogue",
+          "text": "Accident inaka chudniki ochnava?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 630
+        },
+        {
+          "type": "dialogue",
+          "text": "atleast call? gap la? minimum",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 631
+        },
+        {
+          "type": "dialogue",
+          "text": "concern kuda--",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 632
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 633
+        },
+        {
+          "type": "dialogue",
+          "text": "Antha ok ankunna time lo neek",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 634
+        },
+        {
+          "type": "dialogue",
+          "text": "accident iyyi, aah work ela",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 635
+        },
+        {
+          "type": "dialogue",
+          "text": "evaritho chepiyalane dantlopadi--",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 636
+        },
+        {
+          "type": "dialogue",
+          "text": "Senior stops conveying, Siddhu stares at him",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 637
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE (CONT’D)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 638
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddharth neeku idantha explanation",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 639
+        },
+        {
+          "type": "dialogue",
+          "text": "iche avsrm ledu. I’m here abt work",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 640
+        },
+        {
+          "type": "dialogue",
+          "text": "anthe",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 641
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddharth alane chusthu, thana two hands finger ni cross",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 642
+        },
+        {
+          "type": "dialogue",
+          "text": "chesi, only both hands middle finger together lift chesi",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 643
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 644
+        },
+        {
+          "type": "dialogue",
+          "text": "Bye",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 645
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani smile chesi vellipothunte, Senior alane chusthu, with a",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 646
+        },
+        {
+          "type": "dialogue",
+          "text": "serious look",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 647
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 648
+        },
+        {
+          "type": "dialogue",
+          "text": "Limits cross avthunnv, ratings,",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 649
+        },
+        {
+          "type": "dialogue",
+          "text": "feedback, anni mind lo petkoni",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 650
+        },
+        {
+          "type": "dialogue",
+          "text": "behave cheyi Siddharth!",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 651
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu, as he walks, pauses for a moment",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 652
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 653
+        },
+        {
+          "type": "dialogue",
+          "text": "Indaka escalator meedha osthunte",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 654
+        },
+        {
+          "type": "dialogue",
+          "text": "emannv Rishi?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 655
+        },
+        {
+          "type": "action",
+          "text": "1177..",
+          "character": null,
+          "line_start": 657
+        },
+        {
+          "type": "action",
+          "text": "Rishi tries to recall",
+          "character": null,
+          "line_start": 659
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 660
+        },
+        {
+          "type": "dialogue",
+          "text": "Nen em anna ra! Deni gurinchi---",
+          "character": "RISHI",
+          "line_start": 661
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 662
+        },
+        {
+          "type": "dialogue",
+          "text": "Comic book!",
+          "character": "RISHI",
+          "line_start": 663
+        },
+        {
+          "type": "parenthetical",
+          "text": "(nods a yes)",
+          "character": "RISHI",
+          "line_start": 664
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 665
+        },
+        {
+          "type": "dialogue",
+          "text": "Adaa! Ina ippudu daani gurin---",
+          "character": "RISHI",
+          "line_start": 666
+        },
+        {
+          "type": "dialogue",
+          "text": "Walks back to Senior, as he walks, uses his mobile. Siddhu",
+          "character": "RISHI",
+          "line_start": 667
+        },
+        {
+          "type": "dialogue",
+          "text": "ala ochi Senior mundhu aaguthadu, Senior ki oka notification",
+          "character": "RISHI",
+          "line_start": 668
+        },
+        {
+          "type": "dialogue",
+          "text": "sound osthundi. Siddhu points out that sound",
+          "character": "RISHI",
+          "line_start": 669
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 670
+        },
+        {
+          "type": "dialogue",
+          "text": "Na Resignation sound adi. Ivvala",
+          "character": "RISHI",
+          "line_start": 671
+        },
+        {
+          "type": "dialogue",
+          "text": "day 1, ippudu cheppu, performance",
+          "character": "RISHI",
+          "line_start": 672
+        },
+        {
+          "type": "dialogue",
+          "text": "feedback enti, ratings enti?",
+          "character": "RISHI",
+          "line_start": 673
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu stares without a blink, walks back as he faces him,",
+          "character": "RISHI",
+          "line_start": 674
+        },
+        {
+          "type": "dialogue",
+          "text": "slowly turns forward.",
+          "character": "RISHI",
+          "line_start": 675
+        },
+        {
+          "type": "dialogue",
+          "text": "Senior will be looking at Siddhu so damn seriously.",
+          "character": "RISHI",
+          "line_start": 676
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu, Rishi as they walk",
+          "character": "RISHI",
+          "line_start": 677
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 678
+        },
+        {
+          "type": "dialogue",
+          "text": "Em cheshnv ra ? edo mola diginattu,",
+          "character": "RISHI",
+          "line_start": 679
+        },
+        {
+          "type": "dialogue",
+          "text": "kadlakunda undu?",
+          "character": "RISHI",
+          "line_start": 680
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 681
+        },
+        {
+          "type": "dialogue",
+          "text": "Resign cheshna!",
+          "character": "RISHI",
+          "line_start": 682
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi oka sec aagipothadu, runs towards Siddhu",
+          "character": "RISHI",
+          "line_start": 683
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 684
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey pichonva ra? Hyper la emante",
+          "character": "RISHI",
+          "line_start": 685
+        },
+        {
+          "type": "dialogue",
+          "text": "adi chesesthava?",
+          "character": "RISHI",
+          "line_start": 686
+        },
+        {
+          "type": "dialogue",
+          "text": "As siddhu will be on mobile",
+          "character": "RISHI",
+          "line_start": 687
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 688
+        },
+        {
+          "type": "dialogue",
+          "text": "nene marchipoina ra asl!. Manchiga",
+          "character": "RISHI",
+          "line_start": 689
+        },
+        {
+          "type": "dialogue",
+          "text": "gurthu cheshnv. 2 years back apply",
+          "character": "RISHI",
+          "line_start": 690
+        },
+        {
+          "type": "dialogue",
+          "text": "cheshna",
+          "character": "RISHI",
+          "line_start": 691
+        },
+        {
+          "type": "dialogue",
+          "text": "siddhu on mobile, Rishi shakes a no",
+          "character": "RISHI",
+          "line_start": 692
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 693
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey nen em antunna nu em",
+          "character": "RISHI",
+          "line_start": 694
+        },
+        {
+          "type": "dialogue",
+          "text": "maatladthunv?",
+          "character": "RISHI",
+          "line_start": 695
+        },
+        {
+          "type": "action",
+          "text": "1188..",
+          "character": null,
+          "line_start": 697
+        },
+        {
+          "type": "action",
+          "text": "As he looks at him holding mobile",
+          "character": null,
+          "line_start": 699
+        },
+        {
+          "type": "action",
+          "text": "RISHI (CONT’D)",
+          "character": null,
+          "line_start": 700
+        },
+        {
+          "type": "action",
+          "text": "Nu phone patkunte bayam eshe laga",
+          "character": null,
+          "line_start": 701
+        },
+        {
+          "type": "action",
+          "text": "chesthunnv! Ippud em chesthunnv ra?",
+          "character": null,
+          "line_start": 702
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 703
+        },
+        {
+          "type": "dialogue",
+          "text": "Gurthu cheshnv kada, Cartoonist job",
+          "character": "SIDDHARTH",
+          "line_start": 704
+        },
+        {
+          "type": "dialogue",
+          "text": "ki apply cheseshna!!",
+          "character": "SIDDHARTH",
+          "line_start": 705
+        },
+        {
+          "type": "dialogue",
+          "text": "As they walk away Rishi reacting with a namaskar gesture and",
+          "character": "SIDDHARTH",
+          "line_start": 706
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu smiling, Senior will be staring at them.",
+          "character": "SIDDHARTH",
+          "line_start": 707
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 708
+        }
+      ]
+    },
+    {
+      "scene_number": 15,
+      "heading_raw": "EXT. TEA LOUNGE - EVENING",
+      "int_ext": "EXT",
+      "location": "TEA LOUNGE",
+      "time_of_day": "EVENING",
+      "page_start": 18,
+      "page_end": 20,
+      "characters_present": [
+        "GOON TWO",
+        "RISHI",
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. TEA LOUNGE - EVENING",
+          "character": null,
+          "line_start": 710
+        },
+        {
+          "type": "action",
+          "text": "Siddhu ala water bottle tho face wash cheskuntunte, two goons",
+          "character": null,
+          "line_start": 711
+        },
+        {
+          "type": "action",
+          "text": "ala bike meedha velthu chusthaaru. Rishi alaa two glasses ni",
+          "character": null,
+          "line_start": 712
+        },
+        {
+          "type": "action",
+          "text": "careful ga hold chesthu thesthunte, he feels how hot tea is!",
+          "character": null,
+          "line_start": 713
+        },
+        {
+          "type": "action",
+          "text": "Ala bike digi as he smokes cigar, Siddhu ala thirige time ki",
+          "character": null,
+          "line_start": 714
+        },
+        {
+          "type": "action",
+          "text": "thana mundhu untaadu goon_two, collar patkoni",
+          "character": null,
+          "line_start": 715
+        },
+        {
+          "type": "character",
+          "text": "GOON_TWO",
+          "character": "GOON TWO",
+          "line_start": 716
+        },
+        {
+          "type": "dialogue",
+          "text": "rendunella sandhi eda daskunnarra",
+          "character": "GOON TWO",
+          "line_start": 717
+        },
+        {
+          "type": "dialogue",
+          "text": "saale!",
+          "character": "GOON TWO",
+          "line_start": 718
+        },
+        {
+          "type": "dialogue",
+          "text": "Goon_two hand ni thana left hand tho twist chesthune,",
+          "character": "GOON TWO",
+          "line_start": 719
+        },
+        {
+          "type": "dialogue",
+          "text": "goon_two collar ni patkoni, Rishi ala thechina tea ni",
+          "character": "GOON TWO",
+          "line_start": 720
+        },
+        {
+          "type": "dialogue",
+          "text": "theeskoni, face meeda posthaadu. Oka few steps Goon_two ni",
+          "character": "GOON TWO",
+          "line_start": 721
+        },
+        {
+          "type": "dialogue",
+          "text": "push cheskuntu velthunte, Goon_one bike deggara aagipothadu",
+          "character": "GOON TWO",
+          "line_start": 722
+        },
+        {
+          "type": "dialogue",
+          "text": "with fear by looking goon_two’s scream",
+          "character": "GOON TWO",
+          "line_start": 723
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "GOON TWO",
+          "line_start": 724
+        },
+        {
+          "type": "dialogue",
+          "text": "Inkokasaari cheyyi eshi maaltadaku,",
+          "character": "GOON TWO",
+          "line_start": 725
+        },
+        {
+          "type": "dialogue",
+          "text": "paisal pampistha",
+          "character": "GOON TWO",
+          "line_start": 726
+        },
+        {
+          "type": "parenthetical",
+          "text": "(as he nods)",
+          "character": "GOON TWO",
+          "line_start": 727
+        },
+        {
+          "type": "dialogue",
+          "text": "PO!",
+          "character": "GOON TWO",
+          "line_start": 728
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 729
+        },
+        {
+          "type": "action",
+          "text": "Rishi will be looking at Sidhu while holding tea, Siddhu will",
+          "character": null,
+          "line_start": 730
+        },
+        {
+          "type": "action",
+          "text": "be having tea, and thana right hand finger/back palm deggara",
+          "character": null,
+          "line_start": 731
+        },
+        {
+          "type": "action",
+          "text": "he’ll be checking, emaindhi ani adguthuntadu by raising his",
+          "character": null,
+          "line_start": 732
+        },
+        {
+          "type": "action",
+          "text": "eyeBrows",
+          "character": null,
+          "line_start": 733
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 734
+        },
+        {
+          "type": "dialogue",
+          "text": "Endhi ra atla poshnv!",
+          "character": "RISHI",
+          "line_start": 735
+        },
+        {
+          "type": "action",
+          "text": "1199..",
+          "character": null,
+          "line_start": 737
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 739
+        },
+        {
+          "type": "dialogue",
+          "text": "Last time pichiga handle chesthene",
+          "character": "SIDDHARTH",
+          "line_start": 740
+        },
+        {
+          "type": "dialogue",
+          "text": "kopm ochindi, kaani em chestharo",
+          "character": "SIDDHARTH",
+          "line_start": 741
+        },
+        {
+          "type": "dialogue",
+          "text": "anna bayam untunde",
+          "character": "SIDDHARTH",
+          "line_start": 742
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi, nods a yes in a sarcastic way, as he observes Siddhu",
+          "character": "SIDDHARTH",
+          "line_start": 743
+        },
+        {
+          "type": "dialogue",
+          "text": "checking on back of his finger",
+          "character": "SIDDHARTH",
+          "line_start": 744
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 745
+        },
+        {
+          "type": "dialogue",
+          "text": "Emaindhi ra?",
+          "character": "SIDDHARTH",
+          "line_start": 746
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu ki ardam kaadu, looks blank",
+          "character": "SIDDHARTH",
+          "line_start": 747
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (CONT’D)",
+          "character": "SIDDHARTH",
+          "line_start": 748
+        },
+        {
+          "type": "dialogue",
+          "text": "Kaadu, cheyi ni atla--",
+          "character": "SIDDHARTH",
+          "line_start": 749
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 750
+        },
+        {
+          "type": "dialogue",
+          "text": "Adi vaadi meedha tea poshnapud",
+          "character": "SIDDHARTH",
+          "line_start": 751
+        },
+        {
+          "type": "dialogue",
+          "text": "padindh--",
+          "character": "SIDDHARTH",
+          "line_start": 752
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu as he talks pauses suddenly, Rishi ki ardam kaadu",
+          "character": "SIDDHARTH",
+          "line_start": 753
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "SIDDHARTH",
+          "line_start": 754
+        },
+        {
+          "type": "dialogue",
+          "text": "Undu water thesth--",
+          "character": "SIDDHARTH",
+          "line_start": 755
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani velthu, he too realizes, looks at each other for a",
+          "character": "SIDDHARTH",
+          "line_start": 756
+        },
+        {
+          "type": "dialogue",
+          "text": "moment. Siddhu tea poskuntadu, to cross check, reacts to that",
+          "character": "SIDDHARTH",
+          "line_start": 757
+        },
+        {
+          "type": "dialogue",
+          "text": "pain",
+          "character": "SIDDHARTH",
+          "line_start": 758
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 759
+        },
+        {
+          "type": "dialogue",
+          "text": "Arey lite ga noppi telusthundi ra",
+          "character": "SIDDHARTH",
+          "line_start": 760
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi fetches the bottle, tries to pour down on the hand",
+          "character": "SIDDHARTH",
+          "line_start": 761
+        },
+        {
+          "type": "dialogue",
+          "text": "doesnt give an eye contact with Siddhu. Continues to pour the",
+          "character": "SIDDHARTH",
+          "line_start": 762
+        },
+        {
+          "type": "dialogue",
+          "text": "water, Siddharth observes and hold the bottle. Rishi stares",
+          "character": "SIDDHARTH",
+          "line_start": 763
+        },
+        {
+          "type": "dialogue",
+          "text": "at him.",
+          "character": "SIDDHARTH",
+          "line_start": 764
+        },
+        {
+          "type": "dialogue",
+          "text": "FADE TO BLACK:",
+          "character": "SIDDHARTH",
+          "line_start": 765
+        },
+        {
+          "type": "dialogue",
+          "text": "Doc sharing that it wont last long, could be months, days.",
+          "character": "SIDDHARTH",
+          "line_start": 766
+        },
+        {
+          "type": "dialogue",
+          "text": "FADE TO BLACK:",
+          "character": "SIDDHARTH",
+          "line_start": 767
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will be standing with his hands resting on his waist.",
+          "character": "SIDDHARTH",
+          "line_start": 768
+        },
+        {
+          "type": "dialogue",
+          "text": "Taking a fast heavy breaths, turns and holds the collar of",
+          "character": "SIDDHARTH",
+          "line_start": 769
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi",
+          "character": "SIDDHARTH",
+          "line_start": 770
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH (CONT’D)",
+          "character": "SIDDHARTH",
+          "line_start": 771
+        },
+        {
+          "type": "dialogue",
+          "text": "Mari idantha appude enduku cheppale",
+          "character": "SIDDHARTH",
+          "line_start": 772
+        },
+        {
+          "type": "dialogue",
+          "text": "ra?",
+          "character": "SIDDHARTH",
+          "line_start": 773
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi, looking at him so much concern",
+          "character": "SIDDHARTH",
+          "line_start": 774
+        },
+        {
+          "type": "action",
+          "text": "2200..",
+          "character": null,
+          "line_start": 776
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 778
+        },
+        {
+          "type": "dialogue",
+          "text": "1 day kaadu 1 second kaadu split",
+          "character": "RISHI",
+          "line_start": 779
+        },
+        {
+          "type": "dialogue",
+          "text": "second ina sare, mind lo em",
+          "character": "RISHI",
+          "line_start": 780
+        },
+        {
+          "type": "dialogue",
+          "text": "lekunda, nuvvu ne gurinchi",
+          "character": "RISHI",
+          "line_start": 781
+        },
+        {
+          "type": "dialogue",
+          "text": "okkasarina aalochisthav ani",
+          "character": "RISHI",
+          "line_start": 782
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu leaves the collar with heavy breaths",
+          "character": "RISHI",
+          "line_start": 783
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (CONT’D)",
+          "character": "RISHI",
+          "line_start": 784
+        },
+        {
+          "type": "dialogue",
+          "text": "Inkokasaari chance isthe kuda malli",
+          "character": "RISHI",
+          "line_start": 785
+        },
+        {
+          "type": "dialogue",
+          "text": "itlane chestha Siddhu, regret ledu",
+          "character": "RISHI",
+          "line_start": 786
+        },
+        {
+          "type": "dialogue",
+          "text": "naku",
+          "character": "RISHI",
+          "line_start": 787
+        },
+        {
+          "type": "dialogue",
+          "text": "(shakes a no, with a sharp",
+          "character": "RISHI",
+          "line_start": 788
+        },
+        {
+          "type": "dialogue",
+          "text": "look)",
+          "character": "RISHI",
+          "line_start": 789
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu as he drifts in the flow of thoughts",
+          "character": "RISHI",
+          "line_start": 790
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 791
+        },
+        {
+          "type": "dialogue",
+          "text": "Anvasarmga unna life ni inka",
+          "character": "RISHI",
+          "line_start": 792
+        },
+        {
+          "type": "dialogue",
+          "text": "complicate----",
+          "character": "RISHI",
+          "line_start": 793
+        },
+        {
+          "type": "dialogue",
+          "text": "Shakes a no, slowly walks backward facing Rishi looking at",
+          "character": "RISHI",
+          "line_start": 794
+        },
+        {
+          "type": "dialogue",
+          "text": "him",
+          "character": "RISHI",
+          "line_start": 795
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH (CONT’D)",
+          "character": "RISHI",
+          "line_start": 796
+        },
+        {
+          "type": "dialogue",
+          "text": "Naa life antha ila happy ga",
+          "character": "RISHI",
+          "line_start": 797
+        },
+        {
+          "type": "dialogue",
+          "text": "untanemo ane oka abhadam lo",
+          "character": "RISHI",
+          "line_start": 798
+        },
+        {
+          "type": "dialogue",
+          "text": "bathikela chesav",
+          "character": "RISHI",
+          "line_start": 799
+        },
+        {
+          "type": "dialogue",
+          "text": "Slowly turns around walks away. Rishi, tries to talk,",
+          "character": "RISHI",
+          "line_start": 800
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 801
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu, Siddhu, na mata vinu---",
+          "character": "RISHI",
+          "line_start": 802
+        },
+        {
+          "type": "dialogue",
+          "text": "As Siddhu walks, raises his hand, to stop him. He walks away!",
+          "character": "RISHI",
+          "line_start": 803
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 804
+        }
+      ]
+    },
+    {
+      "scene_number": 16,
+      "heading_raw": "EXT. ROAD-SIDE - EVENING",
+      "int_ext": "EXT",
+      "location": "ROAD-SIDE",
+      "time_of_day": "EVENING",
+      "page_start": 20,
+      "page_end": 20,
+      "characters_present": [],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. ROAD-SIDE - EVENING",
+          "character": null,
+          "line_start": 806
+        },
+        {
+          "type": "action",
+          "text": "Siddhu as he walks, doesnt know what to do. Starts reacting",
+          "character": null,
+          "line_start": 807
+        },
+        {
+          "type": "action",
+          "text": "to his injured head, slight massage over the band aid. Feels",
+          "character": null,
+          "line_start": 808
+        },
+        {
+          "type": "action",
+          "text": "pain so much that as if past few days pain altogether flooded",
+          "character": null,
+          "line_start": 809
+        },
+        {
+          "type": "action",
+          "text": "at once(flash). Doesnt knw what to do. Collapses on to the",
+          "character": null,
+          "line_start": 810
+        },
+        {
+          "type": "action",
+          "text": "knees holding head. Trying to walk as he holds.",
+          "character": null,
+          "line_start": 811
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 812
+        }
+      ]
+    },
+    {
+      "scene_number": 17,
+      "heading_raw": "INT. SIDDHU'S HOUSE - NIGHT",
+      "int_ext": "INT",
+      "location": "SIDDHU'S HOUSE",
+      "time_of_day": "NIGHT",
+      "page_start": 20,
+      "page_end": 21,
+      "characters_present": [
+        "RAHUL"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. SIDDHU'S HOUSE - NIGHT",
+          "character": null,
+          "line_start": 814
+        },
+        {
+          "type": "action",
+          "text": "He’ll leaning on to the wall, resting with eyes closed. Woke",
+          "character": null,
+          "line_start": 815
+        },
+        {
+          "type": "action",
+          "text": "up by the senior call on mobile, looks at it, silences it.",
+          "character": null,
+          "line_start": 816
+        },
+        {
+          "type": "action",
+          "text": "2211..",
+          "character": null,
+          "line_start": 818
+        },
+        {
+          "type": "action",
+          "text": "Holding his head, slowly, looking at the comic sticked to the",
+          "character": null,
+          "line_start": 820
+        },
+        {
+          "type": "action",
+          "text": "wall, feeling the comic by touching it.",
+          "character": null,
+          "line_start": 821
+        },
+        {
+          "type": "action",
+          "text": "Rahul as he steps in, there’ll be blood, drop by drop falling",
+          "character": null,
+          "line_start": 822
+        },
+        {
+          "type": "action",
+          "text": "near to his feet. As he walks, with a cigar, as he walks",
+          "character": null,
+          "line_start": 823
+        },
+        {
+          "type": "action",
+          "text": "drops the ash, it falls over Siddhu’s hands, he reacts to",
+          "character": null,
+          "line_start": 824
+        },
+        {
+          "type": "action",
+          "text": "that burn sensation, looks up.",
+          "character": null,
+          "line_start": 825
+        },
+        {
+          "type": "action",
+          "text": "With scars bleeding, swollen cheek, reddish left eyebrow.",
+          "character": null,
+          "line_start": 826
+        },
+        {
+          "type": "action",
+          "text": "Rahul’s face is covered in blood, as he releases the smoke",
+          "character": null,
+          "line_start": 827
+        },
+        {
+          "type": "action",
+          "text": "then. As Siddhu stood up looking at him, he’ll slap Siddhu",
+          "character": null,
+          "line_start": 828
+        },
+        {
+          "type": "character",
+          "text": "RAHUL",
+          "character": "RAHUL",
+          "line_start": 829
+        },
+        {
+          "type": "dialogue",
+          "text": "Vallani evad gelkamannad ra ninnu?",
+          "character": "RAHUL",
+          "line_start": 830
+        },
+        {
+          "type": "dialogue",
+          "text": "Holds his collar and pulls him , f2f. Siddhu looks down.",
+          "character": "RAHUL",
+          "line_start": 831
+        },
+        {
+          "type": "dialogue",
+          "text": "Holds his face",
+          "character": "RAHUL",
+          "line_start": 832
+        },
+        {
+          "type": "dialogue",
+          "text": "RAHUL (CONT’D)",
+          "character": "RAHUL",
+          "line_start": 833
+        },
+        {
+          "type": "dialogue",
+          "text": "Aada kaad ra eeeda chudu",
+          "character": "RAHUL",
+          "line_start": 834
+        },
+        {
+          "type": "dialogue",
+          "text": "As he holds, points out scars, holding cigar. Takes a drop of",
+          "character": "RAHUL",
+          "line_start": 835
+        },
+        {
+          "type": "dialogue",
+          "text": "blood rolling down with a fingertip",
+          "character": "RAHUL",
+          "line_start": 836
+        },
+        {
+          "type": "dialogue",
+          "text": "RAHUL (CONT’D)",
+          "character": "RAHUL",
+          "line_start": 837
+        },
+        {
+          "type": "dialogue",
+          "text": "Nu vaan mokam kaalshinv, vaadu",
+          "character": "RAHUL",
+          "line_start": 838
+        },
+        {
+          "type": "parenthetical",
+          "text": "(shows it to Siddhu)",
+          "character": "RAHUL",
+          "line_start": 839
+        },
+        {
+          "type": "dialogue",
+          "text": "Aaah blood ni Siddhu chest meeda oka chinna cross(X) mark",
+          "character": "RAHUL",
+          "line_start": 840
+        },
+        {
+          "type": "dialogue",
+          "text": "laga chesthu, takes a big puff, cigar tip became so hot red.",
+          "character": "RAHUL",
+          "line_start": 841
+        },
+        {
+          "type": "dialogue",
+          "text": "daantho X mark meedha kaalusthu releases the smoke.",
+          "character": "RAHUL",
+          "line_start": 842
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will be looking down, staring at unknown, stand still",
+          "character": "RAHUL",
+          "line_start": 843
+        },
+        {
+          "type": "dialogue",
+          "text": "with a moment. Sighs off, as if he’s holding the tears back.",
+          "character": "RAHUL",
+          "line_start": 844
+        },
+        {
+          "type": "dialogue",
+          "text": "While Rahul falls on to the bed.",
+          "character": "RAHUL",
+          "line_start": 845
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 846
+        }
+      ]
+    },
+    {
+      "scene_number": 18,
+      "heading_raw": "EXT. OUTSIDE SIDDHU’S BOUSE - MORNING",
+      "int_ext": "EXT",
+      "location": "OUTSIDE SIDDHU’S BOUSE",
+      "time_of_day": "MORNING",
+      "page_start": 21,
+      "page_end": 21,
+      "characters_present": [],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. OUTSIDE SIDDHU’S BOUSE - MORNING",
+          "character": null,
+          "line_start": 848
+        },
+        {
+          "type": "action",
+          "text": "Senior guy on bke, saw the door is locked. Tries to call but",
+          "character": null,
+          "line_start": 849
+        },
+        {
+          "type": "action",
+          "text": "no response. Drives away.",
+          "character": null,
+          "line_start": 850
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 851
+        }
+      ]
+    },
+    {
+      "scene_number": 19,
+      "heading_raw": "EXT. ROAD-SIDE - MORNING",
+      "int_ext": "EXT",
+      "location": "ROAD-SIDE",
+      "time_of_day": "MORNING",
+      "page_start": 21,
+      "page_end": 25,
+      "characters_present": [
+        "RISHI",
+        "SENIOR COLLEAGUE",
+        "SIDDHARTH",
+        "X COMPANY"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. ROAD-SIDE - MORNING",
+          "character": null,
+          "line_start": 853
+        },
+        {
+          "type": "action",
+          "text": "Siddhu will be standing idle staring at unknown, with a blank",
+          "character": null,
+          "line_start": 854
+        },
+        {
+          "type": "action",
+          "text": "face. As Senior guy drives away, saw Siddhu on the road side.",
+          "character": null,
+          "line_start": 855
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 856
+        },
+        {
+          "type": "action",
+          "text": "2222..",
+          "character": null,
+          "line_start": 858
+        },
+        {
+          "type": "action",
+          "text": "Walks towards him with so much intense, holds his collar",
+          "character": null,
+          "line_start": 860
+        },
+        {
+          "type": "action",
+          "text": "straight up",
+          "character": null,
+          "line_start": 861
+        },
+        {
+          "type": "character",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 862
+        },
+        {
+          "type": "dialogue",
+          "text": "Call enduku ignore chesthunv?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 863
+        },
+        {
+          "type": "dialogue",
+          "text": "Balsindha? Resignation pedthe",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 864
+        },
+        {
+          "type": "dialogue",
+          "text": "ipoindhi ankuntunnava? Huh?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 865
+        },
+        {
+          "type": "parenthetical",
+          "text": "(pulls him up close)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 866
+        },
+        {
+          "type": "dialogue",
+          "text": "Female colleague tho harassment",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 867
+        },
+        {
+          "type": "dialogue",
+          "text": "case pettincha ante",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 868
+        },
+        {
+          "type": "parenthetical",
+          "text": "(nods a yes)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 869
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will be looking at him with a blank face, Senior then",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 870
+        },
+        {
+          "type": "dialogue",
+          "text": "looks at him consciously, looks at himself holding collar of",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 871
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu. Drops off instantly, goes a step back, as he raises",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 872
+        },
+        {
+          "type": "dialogue",
+          "text": "both hands. Turns around",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 873
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE (CONT’D)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 874
+        },
+        {
+          "type": "dialogue",
+          "text": "Enduku manchiga unna daanni disturb",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 875
+        },
+        {
+          "type": "dialogue",
+          "text": "cheskuntunv Siddharth. Resignation",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 876
+        },
+        {
+          "type": "dialogue",
+          "text": "venakki theeskuntunnattu oka mail",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 877
+        },
+        {
+          "type": "dialogue",
+          "text": "drop cheyi, migithadi nen",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 878
+        },
+        {
+          "type": "dialogue",
+          "text": "chuskunta. Hmm?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 879
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will be looking at him blankly",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 880
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE (CONT’D)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 881
+        },
+        {
+          "type": "dialogue",
+          "text": "Ninna mall lo jargindhi, indhaka",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 882
+        },
+        {
+          "type": "dialogue",
+          "text": "indhi",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 883
+        },
+        {
+          "type": "dialogue",
+          "text": "(balance annattu gesture",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 884
+        },
+        {
+          "type": "dialogue",
+          "text": "chesthadu)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 885
+        },
+        {
+          "type": "dialogue",
+          "text": "Nu unstable unnv, so ithuntaayi",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 886
+        },
+        {
+          "type": "dialogue",
+          "text": "Alaa ani malli ithe",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 887
+        },
+        {
+          "type": "parenthetical",
+          "text": "(shakes a no)",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 888
+        },
+        {
+          "type": "dialogue",
+          "text": "withdraw cheskuntunnate kada",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 889
+        },
+        {
+          "type": "dialogue",
+          "text": "evening vark--",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 890
+        },
+        {
+          "type": "dialogue",
+          "text": "Looks at Siddhu, and Senior couldnt say anything further as",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 891
+        },
+        {
+          "type": "dialogue",
+          "text": "he looks at Siddhu, has a dead look on his face. Senior feels",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 892
+        },
+        {
+          "type": "dialogue",
+          "text": "so insecure to speak, avoids eye contact, as he nods. As he",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 893
+        },
+        {
+          "type": "dialogue",
+          "text": "walks away, looking back and forth at Siddhu.",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 894
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 895
+        },
+        {
+          "type": "action",
+          "text": "Siddhu alaa nilchoni chusthu untaadu, ala eyes close chesi",
+          "character": null,
+          "line_start": 896
+        },
+        {
+          "type": "action",
+          "text": "towards sky face chesthadu. Phone’s ringing, call from",
+          "character": null,
+          "line_start": 897
+        },
+        {
+          "type": "action",
+          "text": "unknown number",
+          "character": null,
+          "line_start": 898
+        },
+        {
+          "type": "character",
+          "text": "X_COMPANY (V.O)",
+          "character": "X COMPANY",
+          "line_start": 899
+        },
+        {
+          "type": "dialogue",
+          "text": "Hello, is this Siddharth?",
+          "character": "X COMPANY",
+          "line_start": 900
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "X COMPANY",
+          "line_start": 901
+        },
+        {
+          "type": "dialogue",
+          "text": "Yea?",
+          "character": "X COMPANY",
+          "line_start": 902
+        },
+        {
+          "type": "action",
+          "text": "2233..",
+          "character": null,
+          "line_start": 904
+        },
+        {
+          "type": "character",
+          "text": "X_COMPANY",
+          "character": "X COMPANY",
+          "line_start": 906
+        },
+        {
+          "type": "dialogue",
+          "text": "Your application is being",
+          "character": "X COMPANY",
+          "line_start": 907
+        },
+        {
+          "type": "dialogue",
+          "text": "considered, meeru shortlist iyyaru",
+          "character": "X COMPANY",
+          "line_start": 908
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu alaane untadu em respond avvakunda",
+          "character": "X COMPANY",
+          "line_start": 909
+        },
+        {
+          "type": "dialogue",
+          "text": "X_COMPANY (CONT’D)",
+          "character": "X COMPANY",
+          "line_start": 910
+        },
+        {
+          "type": "dialogue",
+          "text": "Hello, you there?",
+          "character": "X COMPANY",
+          "line_start": 911
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "X COMPANY",
+          "line_start": 912
+        },
+        {
+          "type": "dialogue",
+          "text": "sorry, bad signal. cheppandi",
+          "character": "X COMPANY",
+          "line_start": 913
+        },
+        {
+          "type": "dialogue",
+          "text": "X_COMPANY",
+          "character": "X COMPANY",
+          "line_start": 914
+        },
+        {
+          "type": "dialogue",
+          "text": "Okay! So, internship tho paatu",
+          "character": "X COMPANY",
+          "line_start": 915
+        },
+        {
+          "type": "dialogue",
+          "text": "stipend untundi. Repu evening Pune",
+          "character": "X COMPANY",
+          "line_start": 916
+        },
+        {
+          "type": "dialogue",
+          "text": "office lo report cheyali",
+          "character": "X COMPANY",
+          "line_start": 917
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu will be in thoughts",
+          "character": "X COMPANY",
+          "line_start": 918
+        },
+        {
+          "type": "dialogue",
+          "text": "X_COMPANY (CONT’D)",
+          "character": "X COMPANY",
+          "line_start": 919
+        },
+        {
+          "type": "dialogue",
+          "text": "Further details kosam mail drop",
+          "character": "X COMPANY",
+          "line_start": 920
+        },
+        {
+          "type": "dialogue",
+          "text": "chesthanu. Good Luck, Have a great",
+          "character": "X COMPANY",
+          "line_start": 921
+        },
+        {
+          "type": "dialogue",
+          "text": "day",
+          "character": "X COMPANY",
+          "line_start": 922
+        },
+        {
+          "type": "dialogue",
+          "text": "Alaa chusthuntaadu blank ga. Remembers what Rahul has done",
+          "character": "X COMPANY",
+          "line_start": 923
+        },
+        {
+          "type": "dialogue",
+          "text": "before.",
+          "character": "X COMPANY",
+          "line_start": 924
+        },
+        {
+          "type": "dialogue",
+          "text": "Massages the head as it aches. Recalls, Goons Face, warning",
+          "character": "X COMPANY",
+          "line_start": 925
+        },
+        {
+          "type": "dialogue",
+          "text": "abt the debt that has to be paid, Rahul’s wounds, Senior’s",
+          "character": "X COMPANY",
+          "line_start": 926
+        },
+        {
+          "type": "dialogue",
+          "text": "warning. As a series of flashes. Doesnt know what to do.",
+          "character": "X COMPANY",
+          "line_start": 927
+        },
+        {
+          "type": "dialogue",
+          "text": "Screams so hard, walks around. He’ll be hitting the railing",
+          "character": "X COMPANY",
+          "line_start": 928
+        },
+        {
+          "type": "dialogue",
+          "text": "so hard. Slowly collapses down there leaning on the railing",
+          "character": "X COMPANY",
+          "line_start": 929
+        },
+        {
+          "type": "dialogue",
+          "text": "rod.",
+          "character": "X COMPANY",
+          "line_start": 930
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi calls but Siddhu ignores. Rishi feels bad/guilt. Ala",
+          "character": "X COMPANY",
+          "line_start": 931
+        },
+        {
+          "type": "dialogue",
+          "text": "aalochisthu, velthadu.",
+          "character": "X COMPANY",
+          "line_start": 932
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu sat there near to railing. Slowly sighs, picks up",
+          "character": "X COMPANY",
+          "line_start": 933
+        },
+        {
+          "type": "dialogue",
+          "text": "himself. While tears are abt to roll, wipes them eyes, nose.",
+          "character": "X COMPANY",
+          "line_start": 934
+        },
+        {
+          "type": "dialogue",
+          "text": "Takes a deep breath, as he wipes.",
+          "character": "X COMPANY",
+          "line_start": 935
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 936
+        },
+        {
+          "type": "action",
+          "text": "On call with Senior",
+          "character": null,
+          "line_start": 937
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 938
+        },
+        {
+          "type": "dialogue",
+          "text": "Resignation withdraw cheskuntanu",
+          "character": "SIDDHARTH",
+          "line_start": 939
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SIDDHARTH",
+          "line_start": 940
+        },
+        {
+          "type": "dialogue",
+          "text": "I know you’ll, Siddharth. Twaraga,",
+          "character": "SIDDHARTH",
+          "line_start": 941
+        },
+        {
+          "type": "dialogue",
+          "text": "make it ASAP. We have a lots to do.",
+          "character": "SIDDHARTH",
+          "line_start": 942
+        },
+        {
+          "type": "dialogue",
+          "text": "Senior guy smiles. Siddhu Hangs up, as he walks, Rishi walks",
+          "character": "SIDDHARTH",
+          "line_start": 943
+        },
+        {
+          "type": "dialogue",
+          "text": "opposite to him",
+          "character": "SIDDHARTH",
+          "line_start": 944
+        },
+        {
+          "type": "action",
+          "text": "2244..",
+          "character": null,
+          "line_start": 946
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 948
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu, call enduk avoid",
+          "character": "RISHI",
+          "line_start": 949
+        },
+        {
+          "type": "dialogue",
+          "text": "chesthunnv? Avoid chesi em cheddam",
+          "character": "RISHI",
+          "line_start": 950
+        },
+        {
+          "type": "dialogue",
+          "text": "ani? Huh?",
+          "character": "RISHI",
+          "line_start": 951
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 952
+        },
+        {
+          "type": "dialogue",
+          "text": "Istamaina job ochina kuda, em",
+          "character": "RISHI",
+          "line_start": 953
+        },
+        {
+          "type": "dialogue",
+          "text": "cheyalekapothunna antene---",
+          "character": "RISHI",
+          "line_start": 954
+        },
+        {
+          "type": "dialogue",
+          "text": "Closes his fist so tightly, takes a breath by closing his",
+          "character": "RISHI",
+          "line_start": 955
+        },
+        {
+          "type": "dialogue",
+          "text": "eyes, Siddhu crosses Rishi, Rishi stops him",
+          "character": "RISHI",
+          "line_start": 956
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 957
+        },
+        {
+          "type": "dialogue",
+          "text": "Nen cheppe--",
+          "character": "RISHI",
+          "line_start": 958
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 959
+        },
+        {
+          "type": "dialogue",
+          "text": "Anvsrm ga gelkaku. Resignation",
+          "character": "RISHI",
+          "line_start": 960
+        },
+        {
+          "type": "dialogue",
+          "text": "venakki theeskovali, ekkuva time",
+          "character": "RISHI",
+          "line_start": 961
+        },
+        {
+          "type": "dialogue",
+          "text": "ledu naku",
+          "character": "RISHI",
+          "line_start": 962
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu vellipothunte, Rishi alaane undipoi stare chesthu",
+          "character": "RISHI",
+          "line_start": 963
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 964
+        },
+        {
+          "type": "dialogue",
+          "text": "neeku inka enduku ardm kavatle ra?",
+          "character": "RISHI",
+          "line_start": 965
+        },
+        {
+          "type": "dialogue",
+          "text": "enduku accidnt indhi, enduku aah",
+          "character": "RISHI",
+          "line_start": 966
+        },
+        {
+          "type": "dialogue",
+          "text": "pain temp ga poindhi, ani?",
+          "character": "RISHI",
+          "line_start": 967
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu pauses as he walks, with a gentle side smile",
+          "character": "RISHI",
+          "line_start": 968
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 969
+        },
+        {
+          "type": "dialogue",
+          "text": "chance isthe nen entha pedha fool",
+          "character": "RISHI",
+          "line_start": 970
+        },
+        {
+          "type": "dialogue",
+          "text": "ithano naake chupinchadanki",
+          "character": "RISHI",
+          "line_start": 971
+        },
+        {
+          "type": "dialogue",
+          "text": "Continues to walk, Rishi walks goes along",
+          "character": "RISHI",
+          "line_start": 972
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 973
+        },
+        {
+          "type": "dialogue",
+          "text": "Pain lenappdu nen chushna Siddhu",
+          "character": "RISHI",
+          "line_start": 974
+        },
+        {
+          "type": "dialogue",
+          "text": "fool la kanpinchinda neeku? Etla",
+          "character": "RISHI",
+          "line_start": 975
+        },
+        {
+          "type": "dialogue",
+          "text": "unnde aadu, em em chesindu!",
+          "character": "RISHI",
+          "line_start": 976
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu rolls eyes as if he’s recalling those",
+          "character": "RISHI",
+          "line_start": 977
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (CONT’D)",
+          "character": "RISHI",
+          "line_start": 978
+        },
+        {
+          "type": "dialogue",
+          "text": "Life neeku chance ichindi fool",
+          "character": "RISHI",
+          "line_start": 979
+        },
+        {
+          "type": "dialogue",
+          "text": "avvadnki kaadu, freedom isthe em",
+          "character": "RISHI",
+          "line_start": 980
+        },
+        {
+          "type": "dialogue",
+          "text": "chesthavo chuddanki, aah difference",
+          "character": "RISHI",
+          "line_start": 981
+        },
+        {
+          "type": "dialogue",
+          "text": "nu thelsukodanki",
+          "character": "RISHI",
+          "line_start": 982
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi interrupts the walk by coming infront of Siddhu",
+          "character": "RISHI",
+          "line_start": 983
+        },
+        {
+          "type": "dialogue",
+          "text": "RISHI (CONT’D)",
+          "character": "RISHI",
+          "line_start": 984
+        },
+        {
+          "type": "dialogue",
+          "text": "Okkati gurthu petko Siddhu, pain",
+          "character": "RISHI",
+          "line_start": 985
+        },
+        {
+          "type": "dialogue",
+          "text": "eppudu oka purpose thoni, edo",
+          "character": "RISHI",
+          "line_start": 986
+        },
+        {
+          "type": "dialogue",
+          "text": "cheppadnki mana life loki osthadi.",
+          "character": "RISHI",
+          "line_start": 987
+        },
+        {
+          "type": "parenthetical",
+          "text": "((MMOORREE))",
+          "character": "RISHI",
+          "line_start": 988
+        },
+        {
+          "type": "action",
+          "text": "2255..",
+          "character": null,
+          "line_start": 990
+        },
+        {
+          "type": "action",
+          "text": "RRIISSHHII ((CCOONNTT’’DD))",
+          "character": null,
+          "line_start": 991
+        },
+        {
+          "type": "action",
+          "text": "Adi enduku ochindani aalochisthe,",
+          "character": null,
+          "line_start": 992
+        },
+        {
+          "type": "action",
+          "text": "daani purpose endho thelsipothadi.",
+          "character": null,
+          "line_start": 993
+        },
+        {
+          "type": "action",
+          "text": "Adi nu realize ithaavo, leda ilaane",
+          "character": null,
+          "line_start": 994
+        },
+        {
+          "type": "action",
+          "text": "untavo ne istm",
+          "character": null,
+          "line_start": 995
+        },
+        {
+          "type": "action",
+          "text": "Siddhu stands still for a moment. Will be blank for moments.",
+          "character": null,
+          "line_start": 996
+        },
+        {
+          "type": "action",
+          "text": "He just folds his hands, leaning, staring at unknown with his",
+          "character": null,
+          "line_start": 997
+        },
+        {
+          "type": "action",
+          "text": "head tilted slightly downwards. Walks along as thoughts flow.",
+          "character": null,
+          "line_start": 998
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 999
+        },
+        {
+          "type": "action",
+          "text": "Siddhu on his way to home on bike, drives, he’s so blank as",
+          "character": null,
+          "line_start": 1000
+        },
+        {
+          "type": "action",
+          "text": "thoughts drift.",
+          "character": null,
+          "line_start": 1001
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1002
+        }
+      ]
+    },
+    {
+      "scene_number": 20,
+      "heading_raw": "EXT/INT. SIDDHU'S HOUSE - CONTINUOUS",
+      "int_ext": "INT/EXT",
+      "location": "SIDDHU'S HOUSE",
+      "time_of_day": "CONTINUOUS",
+      "page_start": 25,
+      "page_end": 27,
+      "characters_present": [
+        "RAHUL",
+        "SENIOR COLLEAGUE",
+        "SIDDHARTH"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT/INT. SIDDHU'S HOUSE - CONTINUOUS",
+          "character": null,
+          "line_start": 1004
+        },
+        {
+          "type": "action",
+          "text": "Siddhu, parks infront of the house, walks into his house, as",
+          "character": null,
+          "line_start": 1005
+        },
+        {
+          "type": "action",
+          "text": "he stands at the Centre of the room, as he thinks with hands",
+          "character": null,
+          "line_start": 1006
+        },
+        {
+          "type": "action",
+          "text": "resting on waist to covering his face as he looks upward,",
+          "character": null,
+          "line_start": 1007
+        },
+        {
+          "type": "action",
+          "text": "covering his face. Without a blink and a minor stare, takes a",
+          "character": null,
+          "line_start": 1008
+        },
+        {
+          "type": "action",
+          "text": "deep breath.",
+          "character": null,
+          "line_start": 1009
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1010
+        },
+        {
+          "type": "action",
+          "text": "He packs his bag, got a call from senior, takes a moment to",
+          "character": null,
+          "line_start": 1011
+        },
+        {
+          "type": "action",
+          "text": "lift the call",
+          "character": null,
+          "line_start": 1012
+        },
+        {
+          "type": "character",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1013
+        },
+        {
+          "type": "dialogue",
+          "text": "Resignation cancel cheshnattu inka",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1014
+        },
+        {
+          "type": "dialogue",
+          "text": "mail em raaledu Siddharth?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1015
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1016
+        },
+        {
+          "type": "dialogue",
+          "text": "cheppedi correct ga vinpisthunda?",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1017
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1018
+        },
+        {
+          "type": "dialogue",
+          "text": "yea",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1019
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1020
+        },
+        {
+          "type": "dialogue",
+          "text": "Naku vere job ochindi, nenu",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1021
+        },
+        {
+          "type": "dialogue",
+          "text": "pothunna, Malli osthano rano kuda",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1022
+        },
+        {
+          "type": "dialogue",
+          "text": "thelidu",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1023
+        },
+        {
+          "type": "dialogue",
+          "text": "SENIOR_COLLEAGUE",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1024
+        },
+        {
+          "type": "dialogue",
+          "text": "neeku itlaa kaadu ra, harassment",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1025
+        },
+        {
+          "type": "dialogue",
+          "text": "complaint pettisthe, appudu",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1026
+        },
+        {
+          "type": "dialogue",
+          "text": "ostharu, adukkunta",
+          "character": "SENIOR COLLEAGUE",
+          "line_start": 1027
+        },
+        {
+          "type": "action",
+          "text": "2266..",
+          "character": null,
+          "line_start": 1029
+        },
+        {
+          "type": "character",
+          "text": "SIDDHARTH",
+          "character": "SIDDHARTH",
+          "line_start": 1031
+        },
+        {
+          "type": "dialogue",
+          "text": "Asale masth thikkalunna, irritate",
+          "character": "SIDDHARTH",
+          "line_start": 1032
+        },
+        {
+          "type": "dialogue",
+          "text": "cheshnvante manager ki inkoka mail",
+          "character": "SIDDHARTH",
+          "line_start": 1033
+        },
+        {
+          "type": "dialogue",
+          "text": "pedtha, nee work motham nene",
+          "character": "SIDDHARTH",
+          "line_start": 1034
+        },
+        {
+          "type": "dialogue",
+          "text": "cheshna ani. Last work cheshna",
+          "character": "SIDDHARTH",
+          "line_start": 1035
+        },
+        {
+          "type": "dialogue",
+          "text": "daani snippets kuda pedtha, ardm",
+          "character": "SIDDHARTH",
+          "line_start": 1036
+        },
+        {
+          "type": "dialogue",
+          "text": "indha?",
+          "character": "SIDDHARTH",
+          "line_start": 1037
+        },
+        {
+          "type": "dialogue",
+          "text": "Hangs up the call.",
+          "character": "SIDDHARTH",
+          "line_start": 1038
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1039
+        },
+        {
+          "type": "action",
+          "text": "Senior guy will be shocked, holds his head,, wipes his face",
+          "character": null,
+          "line_start": 1040
+        },
+        {
+          "type": "action",
+          "text": "as he couldnt do anything.",
+          "character": null,
+          "line_start": 1041
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1042
+        },
+        {
+          "type": "action",
+          "text": "Rahul ala nadchukuntu osthu, while Siddhu gathers his things,",
+          "character": null,
+          "line_start": 1043
+        },
+        {
+          "type": "action",
+          "text": "Rahul chusthadu, edo pack cheshnatu kanpisthundi. Rahul walks",
+          "character": null,
+          "line_start": 1044
+        },
+        {
+          "type": "action",
+          "text": "towards the bag-pack, as he throws it away",
+          "character": null,
+          "line_start": 1045
+        },
+        {
+          "type": "character",
+          "text": "RAHUL",
+          "character": "RAHUL",
+          "line_start": 1046
+        },
+        {
+          "type": "dialogue",
+          "text": "Edki pothunnv, asl evadni adgi",
+          "character": "RAHUL",
+          "line_start": 1047
+        },
+        {
+          "type": "dialogue",
+          "text": "kadluthunnv ra? aah?",
+          "character": "RAHUL",
+          "line_start": 1048
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu looks at that bag, goes towards the bag, tries to pick",
+          "character": "RAHUL",
+          "line_start": 1049
+        },
+        {
+          "type": "dialogue",
+          "text": "it up, rubs off the dusts",
+          "character": "RAHUL",
+          "line_start": 1050
+        },
+        {
+          "type": "dialogue",
+          "text": "RAHUL (CONT’D)",
+          "character": "RAHUL",
+          "line_start": 1051
+        },
+        {
+          "type": "dialogue",
+          "text": "Balsindhara, Maatladthunte?",
+          "character": "RAHUL",
+          "line_start": 1052
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani chusthu goes towards that comic sticked to the wall.",
+          "character": "RAHUL",
+          "line_start": 1053
+        },
+        {
+          "type": "dialogue",
+          "text": "Chimpesthu",
+          "character": "RAHUL",
+          "line_start": 1054
+        },
+        {
+          "type": "dialogue",
+          "text": "RAHUL (CONT’D)",
+          "character": "RAHUL",
+          "line_start": 1055
+        },
+        {
+          "type": "dialogue",
+          "text": "Naatakal aadthunnava ra",
+          "character": "RAHUL",
+          "line_start": 1056
+        },
+        {
+          "type": "dialogue",
+          "text": "Ani antu venka nundi mundhuki chusthe, Sidhu untaadu. Rahul",
+          "character": "RAHUL",
+          "line_start": 1057
+        },
+        {
+          "type": "dialogue",
+          "text": "oka step back vesthadu, Siddhu looks into his eyes for the",
+          "character": "RAHUL",
+          "line_start": 1058
+        },
+        {
+          "type": "dialogue",
+          "text": "first time. Alaa chimpesina comic paper ni hold chesthunna",
+          "character": "RAHUL",
+          "line_start": 1059
+        },
+        {
+          "type": "dialogue",
+          "text": "Rahul, mellaga drop chesthadu further chimpakunda.",
+          "character": "RAHUL",
+          "line_start": 1060
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu adi chusi for a moment, takes a breath, hugs him,",
+          "character": "RAHUL",
+          "line_start": 1061
+        },
+        {
+          "type": "dialogue",
+          "text": "fully. Rahul blank ipothadu, doesnt knw what to do, stands",
+          "character": "RAHUL",
+          "line_start": 1062
+        },
+        {
+          "type": "dialogue",
+          "text": "still.",
+          "character": "RAHUL",
+          "line_start": 1063
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu puts on his bag, as Rahul watches, walks away.",
+          "character": "RAHUL",
+          "line_start": 1064
+        },
+        {
+          "type": "dialogue",
+          "text": "Rishi appude bike digi, lopalki osthuntadu oka parcel tho,",
+          "character": "RAHUL",
+          "line_start": 1065
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu nods a yes to go in, isthadu Rahul ki, athanu alaa",
+          "character": "RAHUL",
+          "line_start": 1066
+        },
+        {
+          "type": "dialogue",
+          "text": "blank ga untadu, only observes without any reaction. Rishi",
+          "character": "RAHUL",
+          "line_start": 1067
+        },
+        {
+          "type": "dialogue",
+          "text": "parcel pettesi velthadu",
+          "character": "RAHUL",
+          "line_start": 1068
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1069
+        },
+        {
+          "type": "action",
+          "text": "2277..",
+          "character": null,
+          "line_start": 1071
+        }
+      ]
+    },
+    {
+      "scene_number": 21,
+      "heading_raw": "EXT. ROAD-SIDE - CONTINUOUS",
+      "int_ext": "EXT",
+      "location": "ROAD-SIDE",
+      "time_of_day": "CONTINUOUS",
+      "page_start": 27,
+      "page_end": 27,
+      "characters_present": [],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. ROAD-SIDE - CONTINUOUS",
+          "character": null,
+          "line_start": 1073
+        },
+        {
+          "type": "action",
+          "text": "On bike, Siddhu will be closing his eyes, takes a deep",
+          "character": null,
+          "line_start": 1074
+        },
+        {
+          "type": "action",
+          "text": "breath, with a subtle smile on his face, a bit tilted",
+          "character": null,
+          "line_start": 1075
+        },
+        {
+          "type": "action",
+          "text": "upwards. Rishi will be patting on Siddhu’s thigh on the side,",
+          "character": null,
+          "line_start": 1076
+        },
+        {
+          "type": "action",
+          "text": "with a smile",
+          "character": null,
+          "line_start": 1077
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1078
+        }
+      ]
+    },
+    {
+      "scene_number": 22,
+      "heading_raw": "INT. SIDDHU'S HOUSE - CONTINUOUS",
+      "int_ext": "INT",
+      "location": "SIDDHU'S HOUSE",
+      "time_of_day": "CONTINUOUS",
+      "page_start": 27,
+      "page_end": 28,
+      "characters_present": [
+        "MATCH CUT",
+        "RISHI",
+        "THE END"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. SIDDHU'S HOUSE - CONTINUOUS",
+          "character": null,
+          "line_start": 1080
+        },
+        {
+          "type": "action",
+          "text": "As Rahul is smoking, releases a puff, looking ,hits that",
+          "character": null,
+          "line_start": 1081
+        },
+        {
+          "type": "action",
+          "text": "parcel out of anger. As he pulls off another puff roaming, he",
+          "character": null,
+          "line_start": 1082
+        },
+        {
+          "type": "action",
+          "text": "was shocked, looking at what’s lying on the floor. Leans on",
+          "character": null,
+          "line_start": 1083
+        },
+        {
+          "type": "action",
+          "text": "to the wall, holds the wall, slowly goes settles on the",
+          "character": null,
+          "line_start": 1084
+        },
+        {
+          "type": "action",
+          "text": "floor. As he looks at it, all the money within the parcel,",
+          "character": null,
+          "line_start": 1085
+        },
+        {
+          "type": "action",
+          "text": "fell around.",
+          "character": null,
+          "line_start": 1086
+        },
+        {
+          "type": "action",
+          "text": "Holds the money with both hands, squeezes it, puts infront of",
+          "character": null,
+          "line_start": 1087
+        },
+        {
+          "type": "action",
+          "text": "him, as he looks at it and then drops off.",
+          "character": null,
+          "line_start": 1088
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1089
+        },
+        {
+          "type": "action",
+          "text": "Rishi as he drives,",
+          "character": null,
+          "line_start": 1090
+        },
+        {
+          "type": "character",
+          "text": "RISHI",
+          "character": "RISHI",
+          "line_start": 1091
+        },
+        {
+          "type": "dialogue",
+          "text": "Adendhi ra unna savings motham",
+          "character": "RISHI",
+          "line_start": 1092
+        },
+        {
+          "type": "dialogue",
+          "text": "vaankicheshnv? Aadki poinaka",
+          "character": "RISHI",
+          "line_start": 1093
+        },
+        {
+          "type": "dialogue",
+          "text": "situation etluntado emo! chuskoni",
+          "character": "RISHI",
+          "line_start": 1094
+        },
+        {
+          "type": "dialogue",
+          "text": "pampisthe avvadha?",
+          "character": "RISHI",
+          "line_start": 1095
+        },
+        {
+          "type": "dialogue",
+          "text": "Siddhu with a gentle smile",
+          "character": "RISHI",
+          "line_start": 1096
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHARTH",
+          "character": "RISHI",
+          "line_start": 1097
+        },
+        {
+          "type": "dialogue",
+          "text": "Appati varku, vaadu safe ga undali",
+          "character": "RISHI",
+          "line_start": 1098
+        },
+        {
+          "type": "dialogue",
+          "text": "kada ra",
+          "character": "RISHI",
+          "line_start": 1099
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 1100
+        },
+        {
+          "type": "action",
+          "text": "Goons kindha padi unna money ni count cheskuntu untaru,",
+          "character": null,
+          "line_start": 1101
+        },
+        {
+          "type": "action",
+          "text": "kavalsina amount theeskoni vellipotharu. Rahul cigar thaguthu",
+          "character": null,
+          "line_start": 1102
+        },
+        {
+          "type": "action",
+          "text": "without any attention, eto stare chesthu untadu.",
+          "character": null,
+          "line_start": 1103
+        },
+        {
+          "type": "action",
+          "text": "Rahul alaa cigar thaaguthu, alaane untaadu. Thanu kurchunna",
+          "character": null,
+          "line_start": 1104
+        },
+        {
+          "type": "action",
+          "text": "position, Siddhu eppudu kurchone backside wall, Rahul stick",
+          "character": null,
+          "line_start": 1105
+        },
+        {
+          "type": "action",
+          "text": "chesina comic paper chimpesthe, andulo oka portion with a",
+          "character": null,
+          "line_start": 1106
+        },
+        {
+          "type": "action",
+          "text": "comic character waving a bye kind of pose la untundi, aah",
+          "character": null,
+          "line_start": 1107
+        },
+        {
+          "type": "action",
+          "text": "place lo untadu Rahul as he stares.",
+          "character": null,
+          "line_start": 1108
+        },
+        {
+          "type": "character",
+          "text": "MATCH CUT",
+          "character": "MATCH CUT",
+          "line_start": 1109
+        },
+        {
+          "type": "dialogue",
+          "text": "TO:FROM RAHUL’S",
+          "character": "MATCH CUT",
+          "line_start": 1110
+        },
+        {
+          "type": "dialogue",
+          "text": "DULL FACE TO",
+          "character": "MATCH CUT",
+          "line_start": 1111
+        },
+        {
+          "type": "dialogue",
+          "text": "SIDDHU’S FACE",
+          "character": "MATCH CUT",
+          "line_start": 1112
+        },
+        {
+          "type": "action",
+          "text": "2288..",
+          "character": null,
+          "line_start": 1114
+        },
+        {
+          "type": "action",
+          "text": "Siddhu will be standing at the train door, waving at Rishi.",
+          "character": null,
+          "line_start": 1116
+        },
+        {
+          "type": "action",
+          "text": "Rishi is happily waving. Siddhu waving and feeling so happily",
+          "character": null,
+          "line_start": 1117
+        },
+        {
+          "type": "action",
+          "text": "like a free bird. Leaning on to the door level, on to the",
+          "character": null,
+          "line_start": 1118
+        },
+        {
+          "type": "action",
+          "text": "side grip with a closed eyes, smiley face.",
+          "character": null,
+          "line_start": 1119
+        },
+        {
+          "type": "character",
+          "text": "THE END",
+          "character": "THE END",
+          "line_start": 1121
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "message": "Parsed from PDF using layout-gap heuristics, not explicit formatting tags. Scene boundaries and character attribution are best-effort — spot-check before trusting citations in the analysis report. For higher accuracy, re-export or convert the source to Final Draft (.fdx) or Fountain if available.",
+      "scene_number": null,
+      "severity": "warning"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "scene_number": 1,
+    "applied": [
+      {
+        "old": "I'll tell you everything when this is over.",
+        "new": "[fixed] The character says something entirely different instead.",
+        "similarity": 1.0
+      }
+    ],
+    "skipped": [],
+    "applied_at": 1786392875.7498336
+  }
+]

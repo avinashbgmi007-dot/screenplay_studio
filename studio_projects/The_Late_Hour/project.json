@@ -1,0 +1,38 @@
+{
+  "project_dir": "./studio_projects\\The_Late_Hour",
+  "title": "The Late Hour",
+  "source_filename": "_sample.fountain",
+  "source_format": ".fountain",
+  "server_url": "http://localhost:8080",
+  "model_id": null,
+  "timeout": 600,
+  "stages": {
+    "parse": {
+      "status": "complete",
+      "output_paths": {
+        "parsed": "./studio_projects\\The_Late_Hour\\parsed.json",
+        "kg": "./studio_projects\\The_Late_Hour\\parsed.kg.json"
+      },
+      "error": null,
+      "updated_at": 1786398153.5001729
+    },
+    "analyze": {
+      "status": "pending",
+      "output_paths": {},
+      "error": null,
+      "updated_at": 1786398153.495192
+    },
+    "chat": {
+      "status": "pending",
+      "output_paths": {},
+      "error": null,
+      "updated_at": 1786398153.4951928
+    }
+  },
+  "cowriter_session_id": null,
+  "drafts": [],
+  "active_draft": null,
+  "report_language": "eng",
+  "created_at": 1786398153.4951935,
+  "updated_at": 1786398153.5001743
+}

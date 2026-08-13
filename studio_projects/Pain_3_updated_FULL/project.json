@@ -1,0 +1,59 @@
+{
+  "project_dir": "./studio_projects\\Pain_3_updated_FULL",
+  "title": "Pain_3_updated_FULL",
+  "source_filename": "_upload.pdf",
+  "source_format": ".pdf",
+  "server_url": "http://localhost:8080",
+  "model_id": "gemma_vn26b-experts-v1-Q4_K_M.gguf",
+  "timeout": 600,
+  "stages": {
+    "parse": {
+      "status": "complete",
+      "output_paths": {
+        "parsed": "./studio_projects\\Pain_3_updated_FULL\\parsed.json",
+        "kg": "./studio_projects\\Pain_3_updated_FULL\\parsed.kg.json"
+      },
+      "error": null,
+      "updated_at": 1786645435.2268074
+    },
+    "analyze": {
+      "status": "complete",
+      "output_paths": {
+        "report_md": "./studio_projects\\Pain_3_updated_FULL\\report.md",
+        "report_findings": "./studio_projects\\Pain_3_updated_FULL\\report.findings.json",
+        "category_outcomes": {
+          "summaries": "ok",
+          "dialogue": "ok",
+          "theme": "ok",
+          "character": "ok",
+          "structure": "ok",
+          "scene_function": "ok",
+          "principles": "ok",
+          "char_reads": "ok",
+          "coverage": "ok",
+          "logline_test": "ok",
+          "genre": "failed"
+        },
+        "failed_categories": [
+          "genre"
+        ]
+      },
+      "error": null,
+      "updated_at": 1786646051.854953
+    },
+    "chat": {
+      "status": "complete",
+      "output_paths": {
+        "session_id": "ab8820a9"
+      },
+      "error": null,
+      "updated_at": 1786647651.916711
+    }
+  },
+  "cowriter_session_id": "ab8820a9",
+  "drafts": [],
+  "active_draft": null,
+  "report_language": "tenglish",
+  "created_at": 1786645430.5806422,
+  "updated_at": 1786647651.916713
+}

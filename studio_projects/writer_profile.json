@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "dimensions": {
+    "detail_level": {
+      "value": "deep",
+      "confidence": 1.0,
+      "evidence": {
+        "pos": 20,
+        "neg": 0
+      },
+      "last_updated": 1786647693.1954148
+    },
+    "directness": {
+      "value": "direct",
+      "confidence": 1.0,
+      "evidence": {
+        "pos": 20,
+        "neg": 0
+      },
+      "last_updated": 1786647693.1954255
+    },
+    "probe_appetite": {
+      "value": "high",
+      "confidence": 0.92,
+      "evidence": {
+        "pos": 21,
+        "neg": 0
+      },
+      "last_updated": 1786647857.2341986
+    },
+    "pushback_appetite": {
+      "value": "high",
+      "confidence": 0.88,
+      "evidence": {
+        "pos": 20,
+        "neg": 1
+      },
+      "last_updated": 1786647749.0418577
+    }
+  },
+  "topic_gravity": {
+    "character": 18,
+    "structure": 16,
+    "dialogue": 1,
+    "craft": 0
+  },
+  "observations": [
+    {
+      "id": "obs_1523e88d",
+      "text": "You want the note straight — no softening.",
+      "dimension": "directness",
+      "confidence": 0.71,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": true,
+      "created": 1786551732.8383975,
+      "updated": 1786551732.8383977
+    },
+    {
+      "id": "obs_e84d6ff8",
+      "text": "You enjoy sparring over choices — you argue for what you believe.",
+      "dimension": "pushback_appetite",
+      "confidence": 0.71,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786551759.3673766,
+      "updated": 1786551759.3673766
+    },
+    {
+      "id": "obs_92220994",
+      "text": "You tend toward short, tight answers.",
+      "dimension": "detail_level",
+      "confidence": 0.62,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786551774.5653121,
+      "updated": 1786551774.5653121
+    },
+    {
+      "id": "obs_089fb32f",
+      "text": "Writer explicitly requests 'keep it short', 'keep it short and tell me straight', 'be brief' — repeatedly rejects elaboration and asks for compressed answers",
+      "dimension": "detail_level",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786551831.5639675,
+      "updated": 1786551831.5639677
+    },
+    {
+      "id": "obs_c2ea315a",
+      "text": "Writer explicitly asks for directness ('tell me straight', 'don't soften it') and then exercises that permission by telling the assistant 'I disagree' and commanding 'Push back on pacing instead'",
+      "dimension": "pushback_appetite",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786551831.5639844,
+      "updated": 1786551831.5639844
+    },
+    {
+      "id": "obs_3bca9b1b",
+      "text": "Writer consistently refuses to provide the information the assistant needs (scene text, summaries, antagonist details, ending) and instead demands answers, showing low appetite for collaborative probing and high tolerance for being told what they can't answer",
+      "dimension": "probe_appetite",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786551831.5639958,
+      "updated": 1786551831.5639958
+    },
+    {
+      "id": "obs_a7b181c4",
+      "text": "You want the note straight — no softening.",
+      "dimension": "directness",
+      "confidence": 0.88,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": true,
+      "created": 1786552243.5337036,
+      "updated": 1786552243.5337036
+    },
+    {
+      "id": "obs_aba31a75",
+      "text": "You'd rather skip the probing and get to it.",
+      "dimension": "probe_appetite",
+      "confidence": 0.84,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786552243.5337112,
+      "updated": 1786552243.5337112
+    },
+    {
+      "id": "obs_d17ad3c2",
+      "text": "You want the note straight — no softening.",
+      "dimension": "directness",
+      "confidence": 0.88,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786553078.255519,
+      "updated": 1786553078.2555192
+    },
+    {
+      "id": "obs_d7f355f9",
+      "text": "The writer is interested in giving the doctor a personal motive, specifically a long-term connection to the father.",
+      "dimension": "topic_gravity",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786554432.5192094,
+      "updated": 1786554432.51921
+    },
+    {
+      "id": "obs_78941a9e",
+      "text": "The writer is pushing for a more engaging and personal backstory for the doctor.",
+      "dimension": "general",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786554432.5192664,
+      "updated": 1786554432.5192668
+    },
+    {
+      "id": "obs_79a923ef",
+      "text": "The writer is asking increasingly specific questions about characters, prompting the assistant to provide deeper analysis.",
+      "dimension": "detail_level",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786625567.192913,
+      "updated": 1786625567.1929138
+    },
+    {
+      "id": "obs_f3a20904",
+      "text": "The writer uses short, direct prompts to drive the assistant to reveal its opinion on specific characters.",
+      "dimension": "directness",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786625567.192963,
+      "updated": 1786625567.1929631
+    },
+    {
+      "id": "obs_f876f9dd",
+      "text": "The writer's inquiries are focused on character evaluation, pushing for assessments of role and impact.",
+      "dimension": "probe_appetite",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786625567.1929803,
+      "updated": 1786625567.1929805
+    },
+    {
+      "id": "obs_5af831f8",
+      "text": "The writer asks for the overall story arc",
+      "dimension": "topic_gravity",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786647693.1956613,
+      "updated": 1786647693.1956618
+    },
+    {
+      "id": "obs_52577396",
+      "text": "The writer is open to critical analysis of character development and arc structure",
+      "dimension": "detail_level",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786647693.1956835,
+      "updated": 1786647693.1956842
+    },
+    {
+      "id": "obs_fbfa59ea",
+      "text": "The writer is receptive to the assistant's direct critique and offer of a solution",
+      "dimension": "directness",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786647693.1956992,
+      "updated": 1786647693.1956995
+    },
+    {
+      "id": "obs_7bd9c7d6",
+      "text": "You like to go deep and wander.",
+      "dimension": "detail_level",
+      "confidence": 1.0,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786647749.041901,
+      "updated": 1786647749.0419014
+    },
+    {
+      "id": "obs_a23640ce",
+      "text": "You engage well with probing questions.",
+      "dimension": "probe_appetite",
+      "confidence": 1.0,
+      "source": "rules",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1786647749.041911,
+      "updated": 1786647749.041911
+    }
+  ],
+  "meta": {
+    "total_turns_observed": 46,
+    "turns_at_last_refresh": 43,
+    "last_refresh": 1786647693.1957018,
+    "refresh_count": 6
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "project_dir": ".freebuff/preview-projects/night_shift",
+  "title": "The Night Shift",
+  "source_filename": "sample.fountain",
+  "source_format": ".fountain",
+  "server_url": "http://127.0.0.1:8196",
+  "model_id": "mock-e2e-model.gguf",
+  "timeout": 600,
+  "stages": {
+    "parse": {
+      "status": "complete",
+      "output_paths": {
+        "parsed": ".freebuff/preview-projects/night_shift\\parsed.json",
+        "kg": ".freebuff/preview-projects/night_shift\\parsed.kg.json"
+      },
+      "error": null,
+      "updated_at": 1786392277.8402982
+    },
+    "analyze": {
+      "status": "complete",
+      "output_paths": {
+        "report_md": ".freebuff/preview-projects/night_shift\\report.md",
+        "report_findings": ".freebuff/preview-projects/night_shift\\report.findings.json"
+      },
+      "error": null,
+      "updated_at": 1786394290.989099
+    },
+    "chat": {
+      "status": "pending",
+      "output_paths": {},
+      "error": null,
+      "updated_at": 1786392277.7004402
+    }
+  },
+  "cowriter_session_id": null,
+  "drafts": [],
+  "active_draft": null,
+  "created_at": 1786392277.7004406,
+  "updated_at": 1786394290.9891014
+}

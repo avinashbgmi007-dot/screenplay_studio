@@ -56,7 +56,7 @@ def cmd_run(args):
             orch.run_parse()
             print("Parse stage complete.")
         elif args.only == "analyze":
-            orch.run_analyze(categories=categories, report_language=args.lang)
+            orch.run_analyze(categories=categories, report_language=args.lang, retry_failed=args.retry_failed)
             print("Analyze stage complete.")
         elif args.only == "chat":
             session, engine, store = orch.start_chat()
@@ -64,7 +64,7 @@ def cmd_run(args):
         else:
             orch.run_parse()
             print("Parse stage complete.")
-            orch.run_analyze(categories=categories, report_language=args.lang)
+            orch.run_analyze(categories=categories, report_language=args.lang, retry_failed=args.retry_failed)
             print("Analyze stage complete.")
             if not args.skip_chat:
                 session, engine, store = orch.start_chat()
@@ -88,7 +88,7 @@ def cmd_resume(args):
     orch = Orchestrator(manifest)
     try:
         orch.run_parse()
-        orch.run_analyze(report_language=args.lang)
+        orch.run_analyze(report_language=args.lang, retry_failed=args.retry_failed)
         if not args.skip_chat:
             session, engine, store = orch.start_chat()
             _run_chat_repl(session, engine, store)
@@ -127,6 +127,8 @@ def main():
     p_run.add_argument("--categories", help="Comma-separated analyzer categories to run")
     p_run.add_argument("--only", choices=["parse", "analyze", "chat"], help="Run only one stage")
     p_run.add_argument("--skip-chat", action="store_true", help="Don't hand off to interactive chat after analyze")
+    p_run.add_argument("--retry-failed", action="store_true",
+                      help="Re-run only the categories that failed in the last analyze (merges into the existing report; takes precedence over --categories)")
     p_run.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
                       help="Language of the analysis report (eng, tenglish, hindi, tamil)")
     p_run.set_defaults(func=cmd_run)
@@ -136,6 +138,8 @@ def main():
     p_resume.add_argument("--server", help="llama-server base URL override")
     p_resume.add_argument("--model", help="Explicit model id override")
     p_resume.add_argument("--skip-chat", action="store_true")
+    p_resume.add_argument("--retry-failed", action="store_true",
+                      help="Re-run only the categories that failed in the last analyze (merges into the existing report)")
     p_resume.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
                       help="Language of the analysis report (eng, tenglish, hindi, tamil)")
     p_resume.set_defaults(func=cmd_resume)

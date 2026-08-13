@@ -94,7 +94,7 @@ analyzed at all) is recorded as failed and must be retried.
 
 ## How this was tested before being shared
 
-25 end-to-end tests, run against a unified mock server that handles both
+The original 25 end-to-end tests (the suite has since grown — 281 tests collected), run against a unified mock server that handles both
 Piece 2's structured analysis calls and Piece 3's conversational calls
 (since in real use it's the same `llama-server` the whole time):
 

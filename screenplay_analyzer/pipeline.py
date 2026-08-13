@@ -99,6 +99,11 @@ class AnalysisResult:
     verification: dict = field(default_factory=dict)
     model_used: str | None = None
     errors: list[str] = field(default_factory=list)
+    category_outcomes: dict = field(default_factory=dict)
+    """Per-category result: category name -> "ok" | "failed". Lets the
+    orchestrator record exactly which categories succeeded so a partial
+    analyze (some categories OK, some not) can be resumed category-by-
+    category instead of re-running everything."""
 
 
 def _normalize_findings(findings: list, category: str, default_severity: str = "low") -> list[dict]:
@@ -321,18 +326,46 @@ def run_logline_test(logline: str, overview: str, title: str, client: LlamaServe
     return {}
 
 
+# The full set of model-based analysis categories. Pass this explicitly to
+# run everything; `None` also means "all" (see analyze()).
+ALL_CATEGORIES = ("dialogue", "theme", "character", "structure", "scene_function", "principles", "coverage", "genre", "char_reads", "logline_test")
+
+
+def resolve_categories(run_categories) -> tuple[str, ...]:
+    """Normalize a categories argument to an explicit tuple.
+
+    - None -> ALL_CATEGORIES
+    - the string "all" or a tuple containing "all" -> ALL_CATEGORIES
+    - a comma-separated string ("dialogue,theme") -> that tuple
+    - any other tuple is returned as-is (empty tuple = run nothing extra)
+    """
+    if run_categories is None:
+        return ALL_CATEGORIES
+    if isinstance(run_categories, str):
+        run_categories = tuple(c.strip() for c in run_categories.split(",") if c.strip())
+    cats = tuple(run_categories)
+    if "all" in cats:
+        return ALL_CATEGORIES
+    return cats
+
+
 def analyze(
     doc: ScriptDocument,
     client: LlamaServerClient,
     scene_chunk_size: int = 3,
     summary_chunk_size: int = 6,
-    run_categories: tuple[str, ...] = ("dialogue", "theme", "character", "structure", "scene_function", "principles", "coverage", "genre", "char_reads", "logline_test"),
+    run_categories: tuple[str, ...] = None,
     progress_cb=None,
     report_language: str = "eng",
 ) -> AnalysisResult:
     """progress_cb: optional callable(dict) called at every stage boundary with
     {"stage": str, "status": "running"|"complete", "detail": str} — lets a UI
-    show live per-stage progress instead of a frozen spinner."""
+    show live per-stage progress instead of a frozen spinner.
+
+    run_categories: None or ("all",) runs every category (ALL_CATEGORIES);
+    any other tuple runs exactly those. An empty tuple runs only the
+    deterministic passes (no model calls beyond the mandatory resolve)."""
+    run_categories = resolve_categories(run_categories)
     result = AnalysisResult(doc=doc)
 
     def emit(stage, status, detail=""):
@@ -341,7 +374,14 @@ def analyze(
 
     try:
         rules_ctx = RulesContext()
-    except ImportError:
+    except ImportError as e:
+        import sys
+        print(
+            "[screenplay_analyzer] WARNING: knowledge_base not found — analysis will run "
+            "without craft-principle grounding. Copy the knowledge_base/ folder next to "
+            f"screenplay_analyzer/ to restore it. ({e})",
+            file=sys.stderr,
+        )
         rules_ctx = _NullRulesContext()
         result.errors.append(
             "Knowledge base not found alongside this package — analysis is running "
@@ -394,6 +434,7 @@ def analyze(
             summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language)
             emit("summaries", "complete")
             overview = build_scene_overview_text(doc, summaries)
+            result.category_outcomes["summaries"] = "failed" if summary_errors else "ok"
             if summary_errors:
                 result.errors.append(
                     f"Scene summarization had {len(summary_errors)} unresolved failure(s) even after "
@@ -401,6 +442,7 @@ def analyze(
                     + (f" (+{len(summary_errors) - 3} more)" if len(summary_errors) > 3 else "")
                 )
         except LlamaServerError as e:
+            result.category_outcomes["summaries"] = "failed"
             result.errors.append(f"Scene summarization failed: {e}")
 
     # 3. scene-level dialogue analysis
@@ -410,6 +452,7 @@ def analyze(
             dialogue_findings, dialogue_errors = run_dialogue_analysis(doc, client, rules_ctx, chunk_size=scene_chunk_size, language=report_language)
             emit("dialogue", "complete")
             all_findings.extend(dialogue_findings)
+            result.category_outcomes["dialogue"] = "failed" if dialogue_errors else "ok"
             if dialogue_errors:
                 result.errors.append(
                     f"Dialogue analysis had {len(dialogue_errors)} unresolved failure(s) even after "
@@ -417,6 +460,7 @@ def analyze(
                     + (f" (+{len(dialogue_errors) - 3} more)" if len(dialogue_errors) > 3 else "")
                 )
         except LlamaServerError as e:
+            result.category_outcomes["dialogue"] = "failed"
             result.errors.append(f"Dialogue analysis failed: {e}")
 
     # 4. script-level categories
@@ -433,7 +477,9 @@ def analyze(
                 rules_fragment = rules_ctx.prompt_fragment_for_category(cat)
                 all_findings.extend(run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language))
                 emit(cat, "complete")
+                result.category_outcomes[cat] = "ok"
             except LlamaServerError as e:
+                result.category_outcomes[cat] = "failed"
                 result.errors.append(f"{cat} analysis failed: {e}")
                 emit(cat, "complete", f"failed: {e}")
 
@@ -448,8 +494,10 @@ def analyze(
             principle_findings, principle_errors = run_principles_engine(kg, client, rules_ctx, doc.scene_count, language=report_language)
             all_findings.extend(principle_findings)
             result.errors.extend(principle_errors)
+            result.category_outcomes["principles"] = "failed" if principle_errors else "ok"
             emit("principles", "complete")
         except Exception as e:
+            result.category_outcomes["principles"] = "failed"
             result.errors.append(f"Principles engine failed: {e}")
             emit("principles", "complete", f"failed: {e}")
 
@@ -464,11 +512,14 @@ def analyze(
                 _top_characters(result.stats, doc),
                 language=report_language,
             )
+            result.category_outcomes["char_reads"] = "ok"
             emit("char_reads", "complete")
         except LlamaServerError as e:
+            result.category_outcomes["char_reads"] = "failed"
             result.errors.append(f"Character-perception read failed: {e}")
             emit("char_reads", "complete", f"failed: {e}")
         except Exception as e:
+            result.category_outcomes["char_reads"] = "failed"
             result.errors.append(f"Character-perception read failed: {e}")
             emit("char_reads", "complete", f"failed: {e}")
 
@@ -484,8 +535,10 @@ def analyze(
         try:
             emit("coverage", "running", "Writing coverage")
             result.coverage = run_coverage(doc, overview, client, language=report_language)
+            result.category_outcomes["coverage"] = "ok"
             emit("coverage", "complete")
         except LlamaServerError as e:
+            result.category_outcomes["coverage"] = "failed"
             result.errors.append(f"Coverage generation failed: {e}")
             emit("coverage", "complete", f"failed: {e}")
 
@@ -497,11 +550,14 @@ def analyze(
             result.logline_test = run_logline_test(
                 result.coverage["logline"], overview, doc.title, client, language=report_language
             )
+            result.category_outcomes["logline_test"] = "ok"
             emit("logline_test", "complete")
         except LlamaServerError as e:
+            result.category_outcomes["logline_test"] = "failed"
             result.errors.append(f"Logline test failed: {e}")
             emit("logline_test", "complete", f"failed: {e}")
         except Exception as e:
+            result.category_outcomes["logline_test"] = "failed"
             result.errors.append(f"Logline test failed: {e}")
             emit("logline_test", "complete", f"failed: {e}")
 
@@ -516,15 +572,36 @@ def analyze(
             all_findings = verify_findings(all_findings + genre_findings, doc)
             result.findings = all_findings
             result.verification = verification_summary(all_findings)
+            result.category_outcomes["genre"] = "ok"
             emit("genre", "complete")
         except LlamaServerError as e:
+            result.category_outcomes["genre"] = "failed"
             result.errors.append(f"Genre-convention check failed: {e}")
             emit("genre", "complete", f"failed: {e}")
         except Exception as e:
+            result.category_outcomes["genre"] = "failed"
             result.errors.append(f"Genre-convention check failed: {e}")
             emit("genre", "complete", f"failed: {e}")
 
-    # 7. drop non-writing feedback — meta-commentary about the script's
+    # 7. finalize category outcomes for passes that were *gated out* by a
+    # failed prerequisite. If scene summaries failed, the overview is empty
+    # so the overview-gated categories never ran; if coverage failed, genre
+    # and the logline test never ran. Recording them as "failed" (when they
+    # were requested) means a partial analyze knows the whole dependency
+    # chain is broken, and a retry re-runs summaries+overview-gated (or
+    # coverage+genre/logline) together instead of a leaf that can't run.
+    overview_gated = ("theme", "character", "structure", "scene_function", "coverage", "char_reads")
+    for cat in ALL_CATEGORIES:
+        if cat not in run_categories or cat in result.category_outcomes:
+            continue
+        if cat in overview_gated and not overview:
+            result.category_outcomes[cat] = "failed"
+        elif cat in ("genre", "logline_test"):
+            needed = "genre" if cat == "genre" else "logline"
+            if not (result.coverage or {}).get(needed):
+                result.category_outcomes[cat] = "failed"
+
+    # 8. drop non-writing feedback — meta-commentary about the script's
     # language (dialect identification, subtitles for non-native speakers)
     # is noise for the writer, not feedback. Filter after verification so
     # the summary reflects exactly what the writer will see.

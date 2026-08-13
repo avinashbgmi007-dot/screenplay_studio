@@ -1,0 +1,38 @@
+{
+  "project_dir": "./studio_projects\\Pain_FD_4_scenes",
+  "title": "Pain_FD_4_scenes",
+  "source_filename": "_upload.pdf",
+  "source_format": ".pdf",
+  "server_url": "http://localhost:8080",
+  "model_id": null,
+  "timeout": 600,
+  "stages": {
+    "parse": {
+      "status": "complete",
+      "output_paths": {
+        "parsed": "./studio_projects\\Pain_FD_4_scenes\\parsed.json",
+        "kg": "./studio_projects\\Pain_FD_4_scenes\\parsed.kg.json"
+      },
+      "error": null,
+      "updated_at": 1786648107.0877726
+    },
+    "analyze": {
+      "status": "pending",
+      "output_paths": {},
+      "error": null,
+      "updated_at": 1786648106.6641312
+    },
+    "chat": {
+      "status": "pending",
+      "output_paths": {},
+      "error": null,
+      "updated_at": 1786648106.664132
+    }
+  },
+  "cowriter_session_id": null,
+  "drafts": [],
+  "active_draft": null,
+  "report_language": "eng",
+  "created_at": 1786648106.6641338,
+  "updated_at": 1786648107.0877762
+}

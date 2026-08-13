@@ -1,0 +1,234 @@
+{
+  "title": "The Late Hour",
+  "author": "Sample Page",
+  "source_format": "fountain",
+  "source_filename": "source.fountain",
+  "parse_confidence": "medium",
+  "scene_count": 3,
+  "estimated_page_count": null,
+  "all_characters": [
+    "MEERA",
+    "RAVI"
+  ],
+  "front_matter": [],
+  "scenes": [
+    {
+      "scene_number": 1,
+      "heading_raw": "INT. WRITER'S ROOM - NIGHT",
+      "int_ext": "INT",
+      "location": "WRITER'S ROOM",
+      "time_of_day": "NIGHT",
+      "page_start": null,
+      "page_end": null,
+      "characters_present": [
+        "RAVI"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. WRITER'S ROOM - NIGHT",
+          "character": null,
+          "line_start": 3
+        },
+        {
+          "type": "action",
+          "text": "RAVI sits at a small desk under a single lamp. A stack of blank pages in",
+          "character": null,
+          "line_start": 5
+        },
+        {
+          "type": "action",
+          "text": "front of him, a clock showing 2:14 AM. He writes a line, crosses it out,",
+          "character": null,
+          "line_start": 6
+        },
+        {
+          "type": "action",
+          "text": "writes again.",
+          "character": null,
+          "line_start": 7
+        },
+        {
+          "type": "character",
+          "text": "RAVI",
+          "character": "RAVI",
+          "line_start": 9
+        },
+        {
+          "type": "parenthetical",
+          "text": "(under his breath)",
+          "character": "RAVI",
+          "line_start": 10
+        },
+        {
+          "type": "dialogue",
+          "text": "Fifty pages and the second act still won't stand up.",
+          "character": "RAVI",
+          "line_start": 11
+        },
+        {
+          "type": "action",
+          "text": "His phone buzzes. He ignores it, reaches for a cold cup of tea.",
+          "character": null,
+          "line_start": 13
+        },
+        {
+          "type": "character",
+          "text": "RAVI",
+          "character": "RAVI",
+          "line_start": 15
+        },
+        {
+          "type": "dialogue",
+          "text": "Okay. What does the character actually want? Not what I want her to want.",
+          "character": "RAVI",
+          "line_start": 16
+        }
+      ]
+    },
+    {
+      "scene_number": 2,
+      "heading_raw": "EXT. CITY ROAD - NIGHT",
+      "int_ext": "EXT",
+      "location": "CITY ROAD",
+      "time_of_day": "NIGHT",
+      "page_start": null,
+      "page_end": null,
+      "characters_present": [
+        "MEERA",
+        "RAVI"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "EXT. CITY ROAD - NIGHT",
+          "character": null,
+          "line_start": 18
+        },
+        {
+          "type": "action",
+          "text": "RAVI walks with MEERA along an empty road. She carries a folder she never",
+          "character": null,
+          "line_start": 20
+        },
+        {
+          "type": "action",
+          "text": "opens.",
+          "character": null,
+          "line_start": 21
+        },
+        {
+          "type": "character",
+          "text": "MEERA",
+          "character": "MEERA",
+          "line_start": 23
+        },
+        {
+          "type": "dialogue",
+          "text": "You keep rewriting the same scene. That's not revision, that's hiding.",
+          "character": "MEERA",
+          "line_start": 24
+        },
+        {
+          "type": "character",
+          "text": "RAVI",
+          "character": "RAVI",
+          "line_start": 26
+        },
+        {
+          "type": "dialogue",
+          "text": "Then tell me what's wrong with it.",
+          "character": "RAVI",
+          "line_start": 27
+        },
+        {
+          "type": "character",
+          "text": "MEERA",
+          "character": "MEERA",
+          "line_start": 29
+        },
+        {
+          "type": "dialogue",
+          "text": "Nothing's wrong with the words. You're scared the story is really about you.",
+          "character": "MEERA",
+          "line_start": 30
+        },
+        {
+          "type": "action",
+          "text": "RAVI stops walking.",
+          "character": null,
+          "line_start": 32
+        },
+        {
+          "type": "character",
+          "text": "RAVI",
+          "character": "RAVI",
+          "line_start": 34
+        },
+        {
+          "type": "dialogue",
+          "text": "It is. That's the part I can't fix on paper.",
+          "character": "RAVI",
+          "line_start": 35
+        },
+        {
+          "type": "transition",
+          "text": "CUT TO:",
+          "character": null,
+          "line_start": 37
+        }
+      ]
+    },
+    {
+      "scene_number": 3,
+      "heading_raw": "INT. WRITER'S ROOM - DAWN",
+      "int_ext": "INT",
+      "location": "WRITER'S ROOM",
+      "time_of_day": "DAWN",
+      "page_start": null,
+      "page_end": null,
+      "characters_present": [
+        "RAVI"
+      ],
+      "elements": [
+        {
+          "type": "scene_heading",
+          "text": "INT. WRITER'S ROOM - DAWN",
+          "character": null,
+          "line_start": 39
+        },
+        {
+          "type": "action",
+          "text": "Grey light through the window. The desk is covered in crossed-out pages,",
+          "character": null,
+          "line_start": 41
+        },
+        {
+          "type": "action",
+          "text": "but one page lies clean at the center. Ravi reads it aloud.",
+          "character": null,
+          "line_start": 42
+        },
+        {
+          "type": "character",
+          "text": "RAVI",
+          "character": "RAVI",
+          "line_start": 44
+        },
+        {
+          "type": "dialogue",
+          "text": "She doesn't forgive him. She just stops carrying it.",
+          "character": "RAVI",
+          "line_start": 45
+        },
+        {
+          "type": "action",
+          "text": "He nods once, sets the page down gently, and picks up a fresh sheet.",
+          "character": null,
+          "line_start": 47
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}
