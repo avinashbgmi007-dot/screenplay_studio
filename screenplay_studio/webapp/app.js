@@ -828,16 +828,20 @@ function renderMessageRail() {
   if (!msgs.length) { rail.classList.add("empty"); return; }
   rail.classList.remove("empty");
 
-  for (let i = 0; i < msgs.length; i++) {
-    const marker = el("button", "rail-marker" + (msgs[i].role === "user" ? "" : " assistant"));
-    marker.type = "button";
-    marker.dataset.index = i;
-    marker.title = `Message ${i + 1}`;
-    marker.setAttribute("aria-label", `Jump to message ${i + 1}`);
-    marker.addEventListener("click", () => jumpToMessage(container, i));
-    track.appendChild(marker);
-  }
+  // the strip: one small horizontal line per message, stacked in order
+  // (first message at the top, latest at the bottom); the strip's own
+  // scroller moves from first to latest, so only a few lines are visible.
+  msgs.forEach((m, i) => {
+    const line = el("button", "rail-line" + (m.role === "user" ? " user" : " assistant"));
+    line.type = "button";
+    line.dataset.index = i;
+    line.title = `Message ${i + 1}: ${truncate(m.content, 80)}`;
+    line.setAttribute("aria-label", `Jump to message ${i + 1}`);
+    line.addEventListener("click", () => jumpToMessage(container, i));
+    track.appendChild(line);
+  });
 
+  // hover preview: short version of every message, scrollable first → latest
   msgs.forEach((m, i) => {
     const row = el("button", "rail-row" + (m.role === "user" ? " user" : " assistant"));
     row.type = "button";
@@ -849,7 +853,7 @@ function renderMessageRail() {
     panel.appendChild(row);
   });
 
-  updateRailPositions(container);
+  updateRailCurrent(container);
 }
 
 function jumpToMessage(container, i) {
@@ -860,37 +864,37 @@ function jumpToMessage(container, i) {
   saveSession();
 }
 
-function updateRailPositions(container) {
-  const rail = container.querySelector("#msg-rail");
-  if (!rail || rail.classList.contains("empty")) return;
-  const scrollable = container.scrollHeight > container.clientHeight + 4;
-  rail.classList.toggle("scrollable", scrollable);
-  if (!scrollable) return;
-  const markers = rail.querySelectorAll(".rail-marker");
-  for (const marker of markers) {
-    const target = document.getElementById(`msg-${marker.dataset.index}`);
-    if (!target) continue;
-    const pct = ((target.offsetTop + target.offsetHeight / 2) / container.scrollHeight) * 100;
-    marker.style.top = Math.min(98, Math.max(2, pct)) + "%";
-  }
-  updateRailCurrent(container);
-}
-
+// the strip follows the conversation: the current message's line stays
+// highlighted and inside the small visible window
 function updateRailCurrent(container) {
   const rail = container.querySelector("#msg-rail");
-  if (!rail) return;
-  const markers = rail.querySelectorAll(".rail-marker");
+  if (!rail || rail.classList.contains("empty")) return;
+  const lines = rail.querySelectorAll(".rail-line");
+  if (!lines.length) return;
   const viewMid = container.scrollTop + container.clientHeight / 2;
   let current = null;
   let bestDist = Infinity;
-  for (const marker of markers) {
-    const target = document.getElementById(`msg-${marker.dataset.index}`);
+  for (const line of lines) {
+    const target = document.getElementById(`msg-${line.dataset.index}`);
     if (!target) continue;
     const mid = target.offsetTop + target.offsetHeight / 2;
     const dist = Math.abs(mid - viewMid);
-    if (dist < bestDist) { bestDist = dist; current = marker; }
+    if (dist < bestDist) { bestDist = dist; current = line; }
   }
-  for (const m of markers) m.classList.toggle("current", m === current);
+  for (const l of lines) l.classList.toggle("current", l === current);
+  if (current) {
+    const strip = rail;
+    const top = current.offsetTop;
+    const bottom = top + current.offsetHeight;
+    if (top < strip.scrollTop || bottom > strip.scrollTop + strip.clientHeight) {
+      strip.scrollTop = Math.max(0, top - strip.clientHeight / 2);
+    }
+  }
+}
+
+// kept as an alias so the chat-scroll handler stays wired
+function updateRailPositions(container) {
+  updateRailCurrent(container);
 }
 
 function renderBranches() {
