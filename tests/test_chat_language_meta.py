@@ -288,10 +288,12 @@ class _ChatClient:
         self._reply = reply
         self.calls = 0
         self.kwargs = None
+        self.messages = []
 
     def chat(self, messages, **kw):
         self.calls += 1
         self.kwargs = kw
+        self.messages = [dict(m) for m in messages]
         return self._reply
 
 
@@ -401,6 +403,73 @@ class TestRepeatPenaltyPayload:
         assert "repeat_penalty" not in captured["payload"]
         # the refresh path keeps the server default — its JSON output is untouched
 
+
+
+
+class TestMessageQuote:
+    def test_quote_round_trip(self):
+        m = Message(role="user", content="hi", quote={"scene_number": 2, "text": "the line"})
+        d = m.to_dict()
+        assert d["quote"] == {"scene_number": 2, "text": "the line"}
+        restored = Message.from_dict(d)
+        assert restored.quote == {"scene_number": 2, "text": "the line"}
+
+    def test_old_sessions_without_quote_load_as_none(self):
+        # persisted before the quote field existed
+        restored = Message.from_dict({"role": "user", "content": "hi", "timestamp": 1.0})
+        assert restored.quote is None
+
+    def test_quote_none_serializes(self):
+        m = Message(role="assistant", content="ok")
+        assert m.to_dict()["quote"] is None
+
+
+class TestEngineQuoteContext:
+    def test_quote_grounds_context_and_stores_on_message(self):
+        client = _ChatClient("The line works — it's earned.")
+        engine = CoWriterEngine(client, ScriptContext(), ReportContext(None))
+        session = Session.new("T")
+        reply = engine.send_message(
+            session, "What do you make of this?",
+            quote={"scene_number": 2, "text": "Just don't do anything stupid."},
+        )
+        assert reply
+        # the quoted passage reached the model as context
+        all_text = " ".join(m["content"] for m in client.messages)
+        assert "Just don't do anything stupid." in all_text
+        assert "Scene 2" in all_text
+        # stored on the user message
+        user_msg = [m for m in session.branch.messages if m.role == "user"][-1]
+        assert user_msg.quote == {"scene_number": 2, "text": "Just don't do anything stupid."}
+        assert 2 in user_msg.scene_refs
+
+    def test_malformed_quote_dropped(self):
+        client = _ChatClient("ok")
+        engine = CoWriterEngine(client, ScriptContext(), ReportContext(None))
+        session = Session.new("T")
+        engine.send_message(session, "hi", quote={"scene_number": "nope", "text": ""})
+        assert session.branch.messages[-2].quote is None
+
+    def test_no_quote_no_context(self):
+        client = _ChatClient("ok")
+        engine = CoWriterEngine(client, ScriptContext(), ReportContext(None))
+        session = Session.new("T")
+        engine.send_message(session, "hi")
+        all_text = " ".join(m["content"] for m in client.messages)
+        assert "selected this passage" not in all_text
+
+    def test_general_quote_without_scene_number(self):
+        # script-level finding: no scene ref — the passage is still grounded
+        client = _ChatClient("ok")
+        engine = CoWriterEngine(client, ScriptContext(), ReportContext(None))
+        session = Session.new("T")
+        engine.send_message(session, "what about this?", quote={"scene_number": None, "text": "The whole theme of ash."})
+        all_text = " ".join(m["content"] for m in client.messages)
+        assert "The whole theme of ash." in all_text
+        assert "from the script and is asking about it" in all_text
+        user_msg = [m for m in session.branch.messages if m.role == "user"][-1]
+        assert user_msg.quote == {"scene_number": None, "text": "The whole theme of ash."}
+        assert user_msg.scene_refs == []  # no phantom scene pulled in
 
 class TestModelFallback:
     def test_pinned_model_missing_raises_by_default(self, mock_server):

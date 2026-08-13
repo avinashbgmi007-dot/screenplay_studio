@@ -2077,3 +2077,137 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   }
   body.print-cards .bb-note-count { color: #000 !important; }
 }
+
+
+/* ============================================================
+   Select-to-reply — quote cards, the floating lamp button,
+   scene flash + discussed marking
+   ============================================================ */
+
+#script-pane { position: relative; }
+
+.quote-float {
+  position: absolute;
+  z-index: 40;
+  font-family: var(--font-typewriter);
+  font-size: 12px;
+  color: #1a140d;
+  background: linear-gradient(180deg, var(--lamp-bright), var(--lamp));
+  border: 1px solid var(--lamp-deep);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+.quote-float:hover { filter: brightness(1.08); }
+.quote-float:active { transform: translateY(1px); }
+.quote-float[hidden] { display: none; }
+
+.quote-card {
+  flex: 1 0 100%;
+  order: -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--lamp-bright);
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+.quote-card[hidden] { display: none; }
+.quote-card-meta {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lamp-bright);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.quote-card-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.quote-card-x {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+.quote-card-x:hover { color: var(--danger); }
+
+.msg-text { white-space: pre-wrap; }
+
+.quote-block {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: rgba(232, 162, 79, 0.08);
+  border: 1px solid var(--paper-line);
+  border-left: 3px solid var(--lamp);
+  border-radius: 3px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.msg.user .quote-block {
+  background: rgba(43, 36, 27, 0.06);
+  border-color: rgba(43, 36, 27, 0.22);
+  border-left-color: var(--lamp-deep);
+}
+.quote-block:hover { border-left-color: var(--lamp-bright); }
+.quote-block-meta {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--lamp-deep);
+  margin-bottom: 3px;
+}
+.msg.assistant .quote-block-meta { color: var(--lamp-bright); }
+.quote-block-text {
+  display: block;
+  font-style: italic;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.scene-discussed {
+  font-family: var(--font-typewriter);
+  font-size: 10px;
+  color: var(--lamp-deep);
+  border: 1px solid var(--paper-line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.scene-page.flash {
+  animation: scene-flash 1.4s ease;
+}
+@keyframes scene-flash {
+  0%   { box-shadow: 0 0 0 3px rgba(232, 162, 79, 0.6), 0 18px 44px -18px rgba(0, 0, 0, 0.6); }
+  60%  { box-shadow: 0 0 0 2px rgba(232, 162, 79, 0.35), 0 18px 44px -18px rgba(0, 0, 0, 0.6); }
+  100% { box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-page.flash { animation: none; box-shadow: 0 0 0 3px rgba(232, 162, 79, 0.6), 0 18px 44px -18px rgba(0, 0, 0, 0.6); }
+}

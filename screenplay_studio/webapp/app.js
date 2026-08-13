@@ -678,7 +678,8 @@ function renderMessage(m, index) {
   wrap.appendChild(head);
   const bubble = el("div", "msg-bubble");
   if (m.role === "user") {
-    bubble.textContent = m.content;
+    if (m.quote && m.quote.text) bubble.appendChild(renderQuoteBlock(m.quote));
+    bubble.appendChild(el("div", "msg-text", m.content));
   } else {
     bubble.innerHTML = formatMessageContent(m.content);
   }
@@ -697,6 +698,108 @@ function appendSystemNote(text, isError) {
   container.appendChild(note);
   container.scrollTop = container.scrollHeight;
   updateRailPositions(container);
+}
+
+// ---------- select-to-reply ----------
+// Highlight any passage in the script → a small lamp-lit button floats up →
+// the passage attaches as a quote card above the composer → Sam answers
+// grounded on that exact text. Quotes in the thread are clickable: they jump
+// back to the scene and flash it.
+
+let pendingQuote = null; // { scene_number: int|null, text: string } snapshot for the next send
+
+function setPendingQuote(quote) {
+  pendingQuote = quote;
+  renderQuoteCard();
+}
+
+function clearPendingQuote() {
+  pendingQuote = null;
+  renderQuoteCard();
+}
+
+function renderQuoteCard() {
+  const card = $("#quote-card");
+  if (!card) return;
+  if (!pendingQuote) { card.hidden = true; card.innerHTML = ""; return; }
+  card.hidden = false;
+  card.innerHTML = "";
+  const meta = el("span", "quote-card-meta", pendingQuote.scene_number ? `Scene ${pendingQuote.scene_number}` : "The script");
+  const txt = el("span", "quote-card-text", truncate(pendingQuote.text, 220));
+  const x = el("button", "quote-card-x", "✕");
+  x.type = "button";
+  x.title = "Remove the quote";
+  x.addEventListener("click", clearPendingQuote);
+  card.append(meta, txt, x);
+}
+
+function renderQuoteBlock(quote) {
+  const block = el("button", "quote-block");
+  block.type = "button";
+  block.title = "Jump back to this passage in the script";
+  const meta = el("span", "quote-block-meta", quote.scene_number ? `Scene ${quote.scene_number}` : "The script");
+  const txt = el("span", "quote-block-text", truncate(quote.text || "", 260));
+  block.append(meta, txt);
+  block.addEventListener("click", () => jumpToScene(quote.scene_number));
+  return block;
+}
+
+function jumpToScene(sceneNumber) {
+  if (sceneNumber == null) return;
+  openCowriteRoom();
+  let page = document.getElementById(`scene-page-${sceneNumber}`);
+  if (!page || page.classList.contains("hidden")) {
+    // a search filter may have hidden the scene — clear it so the jump lands
+    $("#script-search").value = "";
+    renderScriptView();
+    page = document.getElementById(`scene-page-${sceneNumber}`);
+  }
+  if (!page) { showError(`Scene ${sceneNumber} isn't in the working draft right now.`); return; }
+  page.scrollIntoView({ behavior: "smooth", block: "start" });
+  page.classList.remove("flash");
+  void page.offsetWidth; // restart the animation
+  page.classList.add("flash");
+  setTimeout(() => page.classList.remove("flash"), 1600);
+}
+
+function selectionInScriptPane() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.commonAncestorContainer;
+  const page = node.nodeType === 1
+    ? node.closest(".scene-page")
+    : (node.parentElement ? node.parentElement.closest(".scene-page") : null);
+  const pane = $("#script-scenes");
+  if (!page || !pane || !pane.contains(node)) return null;
+  const text = sel.toString().trim().replace(/\s+/g, " ");
+  if (!text || text.length < 4) return null;
+  return { scene_number: parseInt(page.dataset.sceneNumber, 10) || null, text };
+}
+
+function showQuoteFloat(quote) {
+  const btn = $("#quote-float");
+  const pane = $("#script-pane");
+  if (!btn || !pane) return;
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  const paneRect = pane.getBoundingClientRect();
+  btn.dataset.sceneNumber = quote.scene_number == null ? "" : String(quote.scene_number);
+  btn.dataset.text = quote.text;
+  btn.hidden = false;
+  btn.style.left = Math.max(8, Math.min(rect.right - paneRect.left + 10, paneRect.width - 150)) + "px";
+  btn.style.top = Math.max(4, rect.bottom - paneRect.top + 8) + "px";
+}
+
+function hideQuoteFloat() {
+  const btn = $("#quote-float");
+  if (btn) btn.hidden = true;
+}
+
+function handleScriptSelection() {
+  const quote = selectionInScriptPane();
+  if (quote) showQuoteFloat(quote); else hideQuoteFloat();
 }
 
 // ---------- conversation rail (jump markers) ----------
@@ -941,15 +1044,17 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
 
+  const quote = pendingQuote;      // snapshot the selected passage: sent once
   input.value = "";
   input.style.height = "auto";
   resetChatHistory();
+  clearPendingQuote();
   $("#send-btn").disabled = true;
 
   const container = $("#messages");
   if (container.querySelector(".chat-empty-hint")) container.innerHTML = "";
   const optimisticIndex = (currentBranchData().messages || []).length;
-  const userMsg = renderMessage({ role: "user", content: text }, optimisticIndex);
+  const userMsg = renderMessage({ role: "user", content: text, quote }, optimisticIndex);
   container.appendChild(userMsg);
   const pending = el("div", "msg assistant msg-pending");
   pending.appendChild(el("div", "msg-role", "Studio"));
@@ -962,7 +1067,7 @@ async function sendMessage() {
   try {
     const sessionId = await ensureSession();
     const res = await api(`/projects/${encodeURIComponent(state.currentProject)}/chat/sessions/${sessionId}/messages`, {
-      method: "POST", body: JSON.stringify({ text }),
+      method: "POST", body: JSON.stringify(quote ? { text, quote } : { text }),
     });
     stopTicker();
     state.branches[state.currentBranch] = { ...currentBranchData(), messages: res.messages };
@@ -1604,7 +1709,7 @@ function writerNoteEl(note) {
   return wrap;
 }
 
-function renderScenePage(scene, findings, searchQuery, notes = []) {
+function renderScenePage(scene, findings, searchQuery, notes = [], discussed = false) {
   const page = el("article", "scene-page");
   page.id = `scene-page-${scene.scene_number}`;
   page.dataset.sceneNumber = String(scene.scene_number);
@@ -1616,6 +1721,11 @@ function renderScenePage(scene, findings, searchQuery, notes = []) {
   head.appendChild(heading);
   if (scene.page_estimate) {
     head.appendChild(el("span", "scene-page-est", `≈ ${scene.page_estimate} min`));
+  }
+  if (discussed) {
+    const discussedTag = el("span", "scene-discussed", "discussed");
+    discussedTag.title = "You asked Sam about a passage in this scene";
+    head.appendChild(discussedTag);
   }
   const addNoteBtn = el("button", "note-add", "✎ note");
   addNoteBtn.type = "button";
@@ -1697,6 +1807,12 @@ function renderScriptView() {
     else (bySceneNotes[n.scene_number] = bySceneNotes[n.scene_number] || []).push(n);
   }
 
+  // scenes the writer has quoted in conversation — marked on the paper
+  const discussedScenes = new Set();
+  for (const m of (currentBranchData().messages || [])) {
+    if (m.quote && m.quote.scene_number != null) discussedScenes.add(m.quote.scene_number);
+  }
+
   renderFixQueuePanel(container);
   renderPacingPanel(container);
   renderCharacterPanel(container);
@@ -1716,7 +1832,7 @@ function renderScriptView() {
 
   let matchCount = 0;
   for (const scene of state.script.scenes) {
-    const page = renderScenePage(scene, byScene[scene.scene_number] || [], q, bySceneNotes[scene.scene_number] || []);
+    const page = renderScenePage(scene, byScene[scene.scene_number] || [], q, bySceneNotes[scene.scene_number] || [], discussedScenes.has(scene.scene_number));
     if (q) {
       const text = (scene.heading_raw + " " + scene.elements.map((e) => e.text).join(" ")).toLowerCase();
       const matches = text.includes(q.toLowerCase());
@@ -1779,7 +1895,10 @@ function openChatView() {
 function discussFinding(f, index) {
   openCowriteRoom();
   const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "the whole script";
-  $("#input").value = `About the note on ${refs} — "${f.issue}": how should I approach fixing it?`;
+  const sceneNumber = (f.scene_refs || [])[0] || null;
+  const quoteText = f.evidence_quote || f.issue;
+  if (quoteText) setPendingQuote({ scene_number: sceneNumber, text: quoteText });
+  $("#input").value = `About the note on ${refs}: how should I approach fixing it?`;
   autoResizeTextarea();
   $("#input").focus();
 }
@@ -2539,6 +2658,33 @@ function init() {
 
   // composer
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage(); });
+
+  // select-to-reply: highlight a passage in the script → ask Sam about it
+  $("#quote-float").addEventListener("click", () => {
+    const btn = $("#quote-float");
+    if (btn.hidden) return;
+    const quote = {
+      scene_number: btn.dataset.sceneNumber ? parseInt(btn.dataset.sceneNumber, 10) : null,
+      text: btn.dataset.text,
+    };
+    window.getSelection().removeAllRanges();
+    hideQuoteFloat();
+    openCowriteRoom();
+    setPendingQuote(quote);
+    $("#input").focus();
+  });
+  document.addEventListener("mouseup", handleScriptSelection);
+  document.addEventListener("keyup", handleScriptSelection);
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) hideQuoteFloat();
+    else if (!selectionInScriptPane()) hideQuoteFloat();
+  });
+  document.addEventListener("mousedown", (e) => {
+    if ($("#quote-float").hidden) return;
+    if (!e.target.closest("#quote-float") && !e.target.closest("#script-scenes")) hideQuoteFloat();
+  });
+  $("#script-scenes").addEventListener("scroll", hideQuoteFloat, { passive: true });
   $("#input").addEventListener("input", autoResizeTextarea);
   $("#input").addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" && chatHistoryArrowUp(e)) return;

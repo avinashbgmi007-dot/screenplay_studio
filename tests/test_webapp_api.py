@@ -186,6 +186,21 @@ class TestChatFlow:
         assert data["reply"]
         assert len(data["messages"]) == 2
 
+    def test_send_message_with_quote(self, http_client):
+        """select-to-reply: the message carries a quoted passage + scene number."""
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+
+        resp = http_client.post(
+            f"/api/projects/{project}/chat/sessions/{sid}/messages",
+            json={"text": "What do you make of this line?", "quote": {"scene_number": 2, "text": "Just don't do anything stupid."}},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["reply"]
+        user_msgs = [m for m in data["messages"] if m["role"] == "user"]
+        assert user_msgs and user_msgs[-1].get("quote") == {"scene_number": 2, "text": "Just don't do anything stupid."}
+
     def test_empty_message_rejected(self, http_client):
         project = self._setup_analyzed_project(http_client)
         sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]

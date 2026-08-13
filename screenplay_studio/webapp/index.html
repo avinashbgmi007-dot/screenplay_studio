@@ -139,6 +139,7 @@
         </div>
         <div id="diff-banner" class="diff-banner" style="display:none;"></div>
         <div id="script-scenes" class="script-scenes" aria-live="polite"></div>
+        <button id="quote-float" class="quote-float" type="button" hidden>✎ Ask Sam about this</button>
       </section>
 
       <!-- Co-write room: the writer's desk -->
@@ -151,6 +152,7 @@
         </div>
         <div id="messages" class="messages"></div>
         <form id="composer" class="composer">
+          <div id="quote-card" class="quote-card" hidden></div>
           <div id="history-pop" class="history-pop" role="listbox" aria-label="Previous messages" hidden></div>
           <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins…" rows="1"></textarea>
           <button type="submit" id="send-btn" aria-label="Send">➤</button>

@@ -35,6 +35,25 @@ def clean_reply(raw: str) -> str:
     )
 
 
+def _normalize_quote(quote):
+    """Select-to-reply passage from the webapp: {'scene_number': int|None, 'text': str}.
+    scene_number None means "general" (e.g. a script-level finding with no scene
+    ref). Callers (CLI, server) pass nothing — None stays None. Anything malformed
+    is dropped rather than crashing the turn."""
+    if not isinstance(quote, dict):
+        return None
+    scene_number = quote.get("scene_number")
+    text = (quote.get("text") or "").strip()
+    if not text:
+        return None
+    if scene_number is not None and not isinstance(scene_number, int):
+        return None
+    if scene_number is not None:
+        scene_number = max(1, scene_number)
+    text = text[:4000]  # a quoted passage is a snapshot; cap it defensively
+    return {"scene_number": scene_number, "text": text}
+
+
 class CoWriterEngine:
     def __init__(self, client: LlamaServerClient, script_ctx: ScriptContext, report_ctx: ReportContext,
                  history_window: int = HISTORY_WINDOW, store=None, memory=None):
@@ -52,7 +71,7 @@ class CoWriterEngine:
         # system prompt (both probe and full-turn paths).
         self.memory = memory
 
-    def send_message(self, session: Session, user_text: str) -> str:
+    def send_message(self, session: Session, user_text: str, quote: dict | None = None) -> str:
         from .peer import (
             classify_turn, should_probe, PROBE_SYSTEM_PROMPT,
             ensure_forward_momentum, cap_suggestions,
@@ -60,6 +79,12 @@ class CoWriterEngine:
         branch = session.branch
         user_text = (user_text or "").strip()
         turn_kind = classify_turn(user_text)
+
+        # Select-to-reply: the writer highlighted a passage of the script and
+        # asked about it. Normalize the shape so callers can't inject junk, and
+        # make sure the quoted scene is pulled into context even if the free
+        # text doesn't mention it by number.
+        quote = _normalize_quote(quote)
 
         # A pending probe is resolved by whatever comes next: an idea is the
         # answer to it, a question/directive is a topic change. Either way the
@@ -80,6 +105,26 @@ class CoWriterEngine:
         relationship_card = self.memory.card_text() if self.memory is not None else None
 
         scene_refs = extract_scene_refs(user_text)
+        if quote is not None and quote["scene_number"] is not None and quote["scene_number"] not in scene_refs:
+            scene_refs.append(quote["scene_number"])
+
+        quote_context = None
+        if quote is not None:
+            if quote["scene_number"] is not None:
+                quote_context = (
+                    "The writer selected this passage from Scene "
+                    f"{quote['scene_number']} and is asking about it:\n\n"
+                    f"\"{quote['text']}\"\n\n"
+                    "Ground your answer in the exact moment the passage describes. "
+                    "You may quote it back only briefly; keep the reply plain prose."
+                )
+            else:
+                quote_context = (
+                    "The writer selected this passage from the script and is asking about it:\n\n"
+                    f"\"{quote['text']}\"\n\n"
+                    "Ground your answer in the exact passage. "
+                    "You may quote it back only briefly; keep the reply plain prose."
+                )
 
         if not was_pending and should_probe(user_text):
             # Phase 1: reflect + probe, no suggestions.
@@ -91,6 +136,8 @@ class CoWriterEngine:
             messages = [{"role": "system", "content": system_prompt}]
             if scene_block:
                 messages.append({"role": "system", "content": scene_block})
+            if quote_context:
+                messages.append({"role": "system", "content": quote_context})
             for m in branch.messages[-self.history_window:]:
                 messages.append({"role": m.role, "content": m.content})
             messages.append({"role": "user", "content": user_text})
@@ -109,6 +156,8 @@ class CoWriterEngine:
             messages = [{"role": "system", "content": system_prompt}]
             if scene_block:
                 messages.append({"role": "system", "content": scene_block})
+            if quote_context:
+                messages.append({"role": "system", "content": quote_context})
             for m in branch.messages[-self.history_window:]:
                 messages.append({"role": m.role, "content": m.content})
             messages.append({"role": "user", "content": user_text})
@@ -117,7 +166,7 @@ class CoWriterEngine:
 
         reply = ensure_forward_momentum(reply, turn_kind)
 
-        branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode))
+        branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode, quote=quote))
         branch.messages.append(Message(role="assistant", content=reply, mode=branch.active_mode))
 
         if self.store is not None:

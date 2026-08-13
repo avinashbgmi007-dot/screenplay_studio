@@ -1118,8 +1118,10 @@ def send_message(name, sid):
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
 
+    # select-to-reply: optional {"scene_number": int, "text": str}
+    quote = body.get("quote")
     try:
-        reply = engine.send_message(session, text)
+        reply = engine.send_message(session, text, quote=quote)
     except Exception as e:
         return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
 
