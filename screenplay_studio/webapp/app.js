@@ -624,7 +624,7 @@ function currentBranchData() {
 }
 
 function renderMessages() {
-  const container = $("#messages");
+  const container = $("#messages-scroll");
   container.innerHTML = "";
   const msgs = currentBranchData().messages || [];
   if (!msgs.length) {
@@ -686,7 +686,7 @@ function renderMessage(m, index) {
 }
 
 function appendSystemNote(text, isError) {
-  const container = $("#messages");
+  const container = $("#messages-scroll");
   if (container.querySelector(".chat-empty-hint")) container.innerHTML = "";
   const note = el("div", "msg assistant");
   note.appendChild(el("div", "msg-role", "Studio"));
@@ -807,21 +807,29 @@ function handleScriptSelection() {
 // Click a line or an overview row to jump straight to that message.
 
 function renderMessageRail() {
-  const container = $("#messages");
-  let rail = container.querySelector("#msg-rail");
+  const wrapper = $("#messages");
+  const scroller = $("#messages-scroll");
+  if (!wrapper || !scroller) return;
+  let rail = wrapper.querySelector("#msg-rail");
+  let panel = wrapper.querySelector(".rail-panel");
   if (!rail) {
     rail = el("div", "msg-rail");
     rail.id = "msg-rail";
-    container.appendChild(rail);
+    wrapper.appendChild(rail);
     rail.appendChild(el("div", "rail-track"));
-    const panel = el("div", "rail-panel");
+    panel = el("div", "rail-panel");
     panel.setAttribute("role", "listbox");
-    rail.appendChild(panel);
-    rail.addEventListener("mouseenter", () => panel.classList.add("visible"));
-    rail.addEventListener("mouseleave", () => panel.classList.remove("visible"));
+    panel.setAttribute("aria-label", "Conversation overview");
+    wrapper.appendChild(panel);
+    // floating zone: rail and panel keep the preview open together
+    const refreshHover = () => panel.classList.toggle("visible",
+      rail.matches(":hover") || panel.matches(":hover"));
+    rail.addEventListener("mouseenter", refreshHover);
+    rail.addEventListener("mouseleave", () => setTimeout(refreshHover, 90));
+    panel.addEventListener("mouseenter", refreshHover);
+    panel.addEventListener("mouseleave", () => setTimeout(refreshHover, 90));
   }
   const track = rail.querySelector(".rail-track");
-  const panel = rail.querySelector(".rail-panel");
   track.innerHTML = "";
   panel.innerHTML = "";
   const msgs = currentBranchData().messages || [];
@@ -837,7 +845,7 @@ function renderMessageRail() {
     line.dataset.index = i;
     line.title = `Message ${i + 1}: ${truncate(m.content, 80)}`;
     line.setAttribute("aria-label", `Jump to message ${i + 1}`);
-    line.addEventListener("click", () => jumpToMessage(container, i));
+    line.addEventListener("click", () => jumpToMessage(scroller, i));
     track.appendChild(line);
   });
 
@@ -849,11 +857,11 @@ function renderMessageRail() {
     const num = el("span", "rail-row-num", String(i + 1));
     const txt = el("span", "rail-row-text", truncate(m.content, 64));
     row.append(num, txt);
-    row.addEventListener("click", () => jumpToMessage(container, i));
+    row.addEventListener("click", () => jumpToMessage(scroller, i));
     panel.appendChild(row);
   });
 
-  updateRailCurrent(container);
+  updateRailCurrent(scroller);
 }
 
 function jumpToMessage(container, i) {
@@ -867,7 +875,8 @@ function jumpToMessage(container, i) {
 // the strip follows the conversation: the current message's line stays
 // highlighted and inside the small visible window
 function updateRailCurrent(container) {
-  const rail = container.querySelector("#msg-rail");
+  // the rail floats on the chat wrapper, not inside the scrolling content
+  const rail = document.getElementById("msg-rail");
   if (!rail || rail.classList.contains("empty")) return;
   const lines = rail.querySelectorAll(".rail-line");
   if (!lines.length) return;
@@ -1049,7 +1058,7 @@ async function sendMessage() {
   clearPendingQuote();
   $("#send-btn").disabled = true;
 
-  const container = $("#messages");
+  const container = $("#messages-scroll");
   if (container.querySelector(".chat-empty-hint")) container.innerHTML = "";
   const optimisticIndex = (currentBranchData().messages || []).length;
   const userMsg = renderMessage({ role: "user", content: text, quote }, optimisticIndex);
@@ -1879,7 +1888,7 @@ function maybeShowWelcome() {
   if (!state.currentProject) return;
   if (welcomeShownFor === state.currentProject) return;
   welcomeShownFor = state.currentProject;
-  const container = $("#messages");
+  const container = $("#messages-scroll");
   if (!container) return;
   const branch = currentBranchData();
   if ((branch.messages || []).length > 0) return;
@@ -2705,14 +2714,14 @@ function init() {
   // conversation rail — keep marker positions honest as the thread scrolls
   let railFrame = null;
   const railScroll = () => {
-    const container = $("#messages");
+    const container = $("#messages-scroll");
     if (railFrame) return;
     railFrame = requestAnimationFrame(() => {
       railFrame = null;
       updateRailPositions(container);
     });
   };
-  $("#messages").addEventListener("scroll", railScroll, { passive: true });
+  $("#messages-scroll").addEventListener("scroll", railScroll, { passive: true });
   window.addEventListener("resize", railScroll);
 
   // selectors
