@@ -6,10 +6,10 @@
 <title>Script Doctor Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-room="cowrite">
 
 <div id="error-banner" class="error-banner" style="display:none;">
   <span id="error-banner-text"></span>
@@ -18,15 +18,17 @@
 
 <div id="app">
 
-  <!-- Left: project/session drawer -->
+  <!-- Left: the shelf -->
   <aside id="sidebar">
     <div class="brand">
-      <span class="brand-mark">✎</span>
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </div>
       <span class="brand-name">Script Doctor<br><span class="brand-sub">Studio</span></span>
       <span id="connection-dot" class="connection-dot" title="Checking connection…"></span>
     </div>
 
-    <button id="new-project-btn" class="btn-primary">+ Start a new page</button>
+    <button id="new-project-btn">+ Lay a new page on the desk</button>
 
     <div class="sidebar-section-label">On the shelf</div>
     <div id="project-list" class="project-list">
@@ -34,77 +36,59 @@
     </div>
 
     <div class="sidebar-footer">
-      <button id="dawn-btn" class="sidebar-footer-btn" title="Draw the curtains — switch between the night den and morning light">☀ Dawn</button>
-      <button id="settings-btn" class="sidebar-footer-btn">⚙ Study settings</button>
+      <button id="dawn-btn" class="sidebar-footer-btn" title="Draw the curtains — morning light for the room">☀ Dawn</button>
+      <button id="settings-btn" class="sidebar-footer-btn" title="Study settings">⚙ Settings</button>
     </div>
   </aside>
 
-  <!-- Center: welcome / upload OR active chat -->
+  <!-- Center -->
   <main id="main">
 
+    <!-- Welcome — the room, lamp lit -->
     <section id="welcome-view" class="view">
-      <!-- The den: a windowed night, a shelf, a lamp, a desk. Everything
-           decorative is pointer-events: none — the card is the room's
-           center of attention. -->
-      <div class="den">
-        <div class="den-window" aria-hidden="true">
-          <div class="den-moon"></div>
-          <div class="den-stars"></div>
-          <div class="den-hill"></div>
+      <div class="scene-glow" aria-hidden="true"></div>
+      <div class="scene-lamp" aria-hidden="true">
+        <div class="lamp-head"></div>
+        <div class="lamp-bulb"></div>
+        <div class="lamp-arm"></div>
+      </div>
+      <div class="scene-window" aria-hidden="true">
+        <div class="scene-moon"></div>
+        <div class="scene-stars"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="scene-hill"></div>
+      </div>
+      <div class="scene-shelf" aria-hidden="true">
+        <span class="spine s1"></span><span class="spine s2"></span><span class="spine s3"></span>
+        <span class="spine s4"></span><span class="spine s5"></span><span class="spine s6"></span>
+        <div class="shelf-board"></div>
+      </div>
+
+      <div class="welcome-card">
+        <p class="welcome-eyebrow" id="welcome-greeting">The lamp's on.</p>
+        <h1>Put the pages on the desk.</h1>
+        <p class="welcome-sub">Your story, in your language — English, Tenglish, Hindi, Tamil.
+          The room reads it, marks the margins, argues with you about it, and hands it back rewritten.</p>
+
+        <label id="dropzone" for="file-input">
+          <span class="dropzone-icon">✎</span>
+          <span class="dropzone-text">Lay a manuscript here — <code>.fdx</code> <code>.pdf</code> <code>.txt</code> <code>.fountain</code> <code>.md</code></span>
+          <input type="file" id="file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
+        </label>
+
+        <div id="upload-status" class="upload-status"></div>
+        <div class="welcome-alt">
+          <span class="welcome-alt-divider">or</span>
+          <button id="sample-btn" class="btn-paper" type="button">Open the sample page</button>
         </div>
-
-        <div class="den-shelf" aria-hidden="true">
-          <span class="spine"></span>
-          <span class="spine tall"></span>
-          <span class="spine"></span>
-          <span class="spine tilt"></span>
-          <span class="spine tall"></span>
-          <span class="spine"></span>
+        <div id="shortcut-hint" class="shortcut-hint">
+          <span>Write by keyboard: <kbd>Ctrl</kbd>+<kbd>K</kbd> commands · <kbd>j</kbd>/<kbd>k</kbd> scenes · <kbd>?</kbd> all shortcuts</span>
+          <button id="shortcut-hint-dismiss" aria-label="Dismiss" title="Don't show again">✕</button>
         </div>
-
-        <div class="den-lamp" aria-hidden="true">
-          <div class="lamp-shade"></div>
-          <div class="lamp-bulb"></div>
-          <div class="lamp-pole"></div>
-        </div>
-        <div class="den-cone" aria-hidden="true"></div>
-
-        <div class="den-desk" aria-hidden="true">
-          <div class="den-paper p1"></div>
-          <div class="den-paper p2"></div>
-          <div class="den-pencil"></div>
-          <div class="den-coffee"></div>
-        </div>
-
-        <div class="welcome-card">
-          <p class="welcome-eyebrow" id="welcome-greeting">The lamp's on.</p>
-          <h1>Put the pages on the desk.</h1>
-          <p class="welcome-sub">Your story, in your language — English, Tenglish, Hindi, Tamil.
-            The room reads it, marks the margins, argues with you about it, and hands it back rewritten.</p>
-
-          <label id="dropzone" for="file-input">
-            <div class="dropzone-inner">
-              <span class="dropzone-icon">✍</span>
-              <span class="dropzone-text">Lay a manuscript here — <code>.fdx</code> <code>.pdf</code> <code>.txt</code> <code>.fountain</code> <code>.md</code></span>
-            </div>
-            <input type="file" id="file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
-          </label>
-
-          <div id="upload-status" class="upload-status"></div>
-          <div class="welcome-alt">
-            <span class="welcome-alt-divider">or</span>
-            <button id="sample-btn" class="btn-secondary" type="button">✎ Open the sample page</button>
-          </div>
-          <div id="shortcut-hint" class="shortcut-hint">
-            <span>Write by keyboard: <kbd>Ctrl</kbd>+<kbd>K</kbd> commands · <kbd>j</kbd>/<kbd>k</kbd> scenes · <kbd>?</kbd> all shortcuts</span>
-            <button id="shortcut-hint-dismiss" aria-label="Dismiss" title="Don't show again">✕</button>
-          </div>
-          <p class="den-footnote">Everything stays on this machine — your pages, your model, your night.</p>
-        </div>
+        <p class="den-footnote">Everything stays on this machine — your pages, your model, your night.</p>
       </div>
     </section>
 
-    <header id="project-bar">
+    <header id="project-bar" style="display:none;">
       <div class="project-bar-left">
         <h2 id="project-title">—</h2>
         <div id="branch-switcher" class="branch-switcher"></div>
@@ -113,14 +97,14 @@
         <div id="room-toggle" class="room-toggle" role="tablist" aria-label="Rooms">
           <button id="room-cowrite-btn" class="room-toggle-btn active" role="tab" aria-selected="true" type="button">Co-write</button>
           <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" type="button">Feedback</button>
-          <span id="room-chip" class="room-chip">✍️ Writer's Desk</span>
         </div>
-        <button id="palette-btn" class="btn-secondary" title="Command palette (Ctrl+K)" type="button">⌘K</button>
+        <span id="room-chip" class="room-chip">Writer's Desk</span>
+        <button id="palette-btn" class="palette-btn" title="Command palette (Ctrl+K)" type="button">⌘K</button>
       </div>
     </header>
 
-    <!-- Hidden: persona/mode are conversational lenses now, but the JS still
-         reads these elements for settings — keep them in the DOM, invisible. -->
+    <!-- Hidden: persona/mode remain conversational lenses, but the JS reads
+         these elements for settings — keep them in the DOM, invisible. -->
     <div hidden>
       <select id="persona-select" title="Reader perspective"></select>
       <select id="mode-select" title="Conversation mode"></select>
@@ -129,7 +113,6 @@
     <!-- The workspace: one shared script pane, two switchable room panels -->
     <div class="workspace">
 
-      <!-- Shared script pane: the pages are always in front of you -->
       <section id="script-pane" aria-label="The script">
         <div id="script-toolbar" class="script-toolbar">
           <input id="script-search" type="search" placeholder="Search the script… (e.g. a character, a prop, a line)" aria-label="Search script text">
@@ -161,7 +144,7 @@
       <!-- Co-write room: the writer's desk -->
       <section id="cowrite-panel" class="room-panel" aria-label="Co-write">
         <div id="partner-card" class="partner-card">
-          <span class="avatar">▓</span>
+          <span class="avatar">S</span>
           <span class="partner-name">Sam — writing with you</span>
           <button id="reset-partner-btn" class="btn-secondary btn-small" title="Back to the writing partner default" type="button">back to Sam</button>
           <button id="sam-notes-btn" class="btn-secondary btn-small" title="What Sam has noticed about how you work together" type="button">Sam's notes on you</button>
@@ -207,7 +190,7 @@
 
     </div>
 
-    <!-- Beat Board: the corkboard — a proposed scene order, not the draft -->
+    <!-- Beat Board: the corkboard -->
     <section id="beatboard-view" class="view" style="display:none;">
       <div class="beatboard-toolbar">
         <div class="beatboard-toolbar-title">Beat Board</div>
@@ -222,7 +205,7 @@
       <div id="beatboard-board" class="beatboard-board" aria-live="polite"></div>
     </section>
 
-    <!-- Compare: side-by-side reading of two drafts -->
+    <!-- Compare -->
     <section id="compare-view" class="view" style="display:none;">
       <div class="compare-toolbar">
         <div class="compare-toolbar-title">Compare drafts</div>
@@ -238,7 +221,7 @@
 
   </main>
 
-  <!-- Right: checkpoint rail (pinned index cards) -->
+  <!-- Right: checkpoint rail -->
   <aside id="checkpoint-rail" aria-label="Conversation checkpoints">
     <div class="checkpoint-rail-label">Checkpoints</div>
     <div id="checkpoint-list"></div>
@@ -284,7 +267,7 @@
   </div>
 </div>
 
-<!-- Rewrite modal: generate + review + apply line replacements -->
+<!-- Rewrite modal -->
 <div id="rewrite-modal" class="modal-overlay" style="display:none;">
   <div class="modal modal-wide">
     <h3>Rewrite — <span id="rewrite-scene-title"></span></h3>
@@ -305,7 +288,7 @@
   </div>
 </div>
 
-<!-- Command palette: Ctrl/Cmd+K -->
+<!-- Command palette -->
 <div id="palette-modal" class="modal-overlay" style="display:none;">
   <div class="modal palette-modal" role="dialog" aria-label="Command palette">
     <input type="text" id="palette-input" placeholder="Type a command, a scene, a shortcut…" aria-label="Command or scene">

@@ -232,6 +232,7 @@ function renderProjectList() {
           state.currentBranch = "main";
           hideAllViews();
           $("#welcome-view").style.display = "flex";
+          $("#project-bar").style.display = "none";
           $("#input").value = "";
         }
         await loadProjects();
@@ -329,6 +330,7 @@ async function openProject(name) {
     $("#welcome-view").style.display = "none";
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "flex";
+    $("#project-bar").style.display = "flex";
     $("#project-title").textContent = project.title;
     $("#project-title").title = project.title;
 
@@ -2457,6 +2459,7 @@ function init() {
 
   $("#new-project-btn").addEventListener("click", () => {
     $("#welcome-view").style.display = "flex";
+    $("#project-bar").style.display = "none";
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "none";
     state.currentProject = null;
