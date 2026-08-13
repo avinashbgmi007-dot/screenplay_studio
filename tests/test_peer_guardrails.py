@@ -138,7 +138,7 @@ class FakeClient:
     def __init__(self, replies):
         self.replies = list(replies)
         self.calls = []
-    def chat(self, messages):
+    def chat(self, messages, **kw):
         self.calls.append(messages)
         return self.replies.pop(0)
 

@@ -14,9 +14,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from screenplay_cowriter.language_meta import strip_language_meta, strip_json_wrap
+from screenplay_cowriter.language_meta import (
+    strip_language_meta, strip_json_wrap, strip_repetition_lines, strip_repeated_blocks,
+)
 from screenplay_cowriter.context import build_system_prompt, ScriptContext, ReportContext, LANGUAGE_META_INSTRUCTION, PLAIN_TEXT_INSTRUCTION
-from screenplay_cowriter.engine import CoWriterEngine
+from screenplay_cowriter.engine import CoWriterEngine, clean_reply, REPEAT_PENALTY
 from screenplay_cowriter.llm_client import LlamaServerClient, ModelNotFoundError
 from screenplay_cowriter.models import Session, Message
 
@@ -120,13 +122,176 @@ class TestStripJsonWrap:
         assert strip_json_wrap("") == ""
 
 
+class TestStripRepetitionLines:
+    def test_underscore_tail_removed(self):
+        reply = "The scene lacks consequence.\n\n" + "\n".join(["_"] * 50)
+        out = strip_repetition_lines(reply)
+        assert out == "The scene lacks consequence."
+
+    def test_mixed_separators_removed(self):
+        reply = "A real point.\n___\n---\n=== \n" + "B real point."
+        out = strip_repetition_lines(reply)
+        assert "___" not in out and "---" not in out
+        assert "A real point." in out and "B real point." in out
+
+    def test_mixed_content_lines_untouched(self):
+        reply = "It reads like a_b_c shorthand for the audience.\n12345\nStay as-is."
+        assert strip_repetition_lines(reply) == reply
+
+    def test_mid_reply_separator_removed_but_text_kept(self):
+        reply = "Point one.\n___\nPoint two."
+        out = strip_repetition_lines(reply)
+        assert out == "Point one.\nPoint two."
+
+    def test_blank_runs_collapsed(self):
+        reply = "Line A.\n\n\n\n\nLine B."
+        assert strip_repetition_lines(reply) == "Line A.\n\nLine B."
+
+    def test_eot_tag_lines_removed(self):
+        reply = "The scene lacks consequence.\n" + "\n".join(["<im_end|>"] * 30)
+        out = strip_repetition_lines(reply)
+        assert out == "The scene lacks consequence."
+
+    def test_eot_tag_variants_removed(self):
+        reply = "Real point.\n<im_end|>\n<im_im_end|>\n<|im_end|>\n<im_im_im_end|>"
+        out = strip_repetition_lines(reply)
+        assert out == "Real point."
+
+    def test_tag_glued_to_end_peeled(self):
+        reply = "So the answer is no.<|im_end|>"
+        assert strip_repetition_lines(reply) == "So the answer is no."
+
+    def test_tag_glued_mid_text_removed(self):
+        reply = "So the answer is no.<|im_end|> More on that later."
+        assert strip_repetition_lines(reply) == "So the answer is no. More on that later."
+
+    def test_cutoff_tag_line_removed(self):
+        reply = "The scene lacks consequence.\n<im_im_im_im_im_im_im_im_im"
+        assert strip_repetition_lines(reply) == "The scene lacks consequence."
+
+    def test_no_space_tag_token_removed(self):
+        # no-space angle-bracket tokens are the EOT-loop signature, even mid-line
+        reply = "Use the <beat> marker sparingly.\nGood luck."
+        assert strip_repetition_lines(reply) == "Use the  marker sparingly.\nGood luck."
+
+    def test_html_tag_with_attributes_removed(self):
+        reply = 'Here is the note: <div class="card">The scene drags.<div class="card">'
+        assert strip_repetition_lines(reply) == "Here is the note: The scene drags."
+
+    def test_html_font_and_closing_tags_removed(self):
+        reply = '<font color="#ff69b4" size="+2">Keep the monologue.</font></br />'
+        assert strip_repetition_lines(reply) == "Keep the monologue."
+
+    def test_html_tag_own_line_removed(self):
+        reply = "The scene drags.\n<div class=\"card\">\nReally, it drags."
+        out = strip_repetition_lines(reply)
+        assert "<div" not in out
+        assert out == "The scene drags.\n\nReally, it drags."
+
+    def test_html_bold_tag_removed(self):
+        reply = "*The question remains: visually interesting but dramatically empty.*"
+        assert strip_repetition_lines(reply) == reply  # no tags here — untouched
+        reply2 = "<b>*The question remains.*</b>"
+        assert strip_repetition_lines(reply2) == "*The question remains.*"
+
+    def test_prose_operators_untouched(self):
+        # "a < b" / "<-" must survive — not tags (no letter after the bracket)
+        reply = "Keep x < y and z > w. The arrow <- points left."
+        assert strip_repetition_lines(reply) == reply
+
+    def test_empty_passthrough(self):
+        assert strip_repetition_lines("") == ""
+
+
+class TestStripRepeatedBlocks:
+    # The live failure: a model re-answers the same point 3-4 times in one
+    # reply, each repetition restarting with the same opening sentence and
+    # sometimes re-echoing the user's question first.
+    _ANSWER = (
+        "The first act has a real imbalance: the medical explanation is a data "
+        "dump for the audience rather than having any dramatic purpose for the "
+        "characters.\n\n"
+        "The dialogue needs to test the characters' values, not just explain "
+        "the situation.\n\n"
+        "Do you want the doctor to be more deeply connected, or more clinical?"
+    )
+
+    def test_question_and_answer_loop_collapsed(self):
+        reply = self._ANSWER + "\n\nHow does the dialogue in the first act feel?\n\n" + self._ANSWER
+        out = strip_repeated_blocks(reply)
+        assert out == self._ANSWER
+        assert out.count("The first act has a real imbalance") == 1
+
+    def test_multi_repeat_collapsed(self):
+        blocks = "\n\nHow does the dialogue in the first act feel?\n\n".join([self._ANSWER] * 3)
+        out = strip_repeated_blocks(self._ANSWER + "\n\n" + blocks)
+        assert out == self._ANSWER
+
+    def test_near_duplicate_opening_collapsed(self):
+        # the loop rephrases a little, but the opening sentence window matches
+        variant = self._ANSWER.replace(
+            "The dialogue needs to test the characters' values, not just explain the situation.",
+            "The dialogue needs to test the characters' values, not just explain. "
+            "The characters' painlessness feels more like a medical condition than a moral challenge.",
+        )
+        out = strip_repeated_blocks(self._ANSWER + "\n\n" + variant)
+        assert out == self._ANSWER
+
+    def test_first_occurrence_always_kept(self):
+        out = strip_repeated_blocks(self._ANSWER + "\n\n" + self._ANSWER)
+        assert out == self._ANSWER
+
+    def test_short_paragraphs_never_deduped(self):
+        # question echoes / one-liners must survive
+        text = "what about scene 4?\n\nYes.\n\nwhat about scene 4?"
+        assert strip_repeated_blocks(text) == text
+
+    def test_clean_text_untouched(self):
+        text = "Point one stands on its own.\n\nA different, unrelated paragraph.\n\nA third one."
+        assert strip_repeated_blocks(text) == text
+
+    def test_single_paragraph_untouched(self):
+        assert strip_repeated_blocks(self._ANSWER) == self._ANSWER
+
+    def test_empty_passthrough(self):
+        assert strip_repeated_blocks("") == ""
+
+
+class TestCleanReplyPipeline:
+    def test_repetition_loop_tail_and_blocks_stripped(self):
+        raw = "The scene lacks consequence.\n\n" + "\n".join(["_"] * 40)
+        out = clean_reply(raw)
+        assert out == "The scene lacks consequence."
+
+    def test_glued_separator_at_end_stripped(self):
+        # a leftover loop separator glued to the final word
+        assert clean_reply("grounded?_") == "grounded?"
+
+    def test_full_live_shapes_all_clean(self):
+        # repeated answer + question echo + glued separator + leaked tags:
+        # the loop's answer repeats collapse, the question echo (it precedes
+        # an already-seen answer) is dropped too, and the trailing glue and
+        # tag lines are gone.
+        raw = (
+            "The first act has a real imbalance.\n\n"
+            "How does the dialogue feel?\n\n"
+            "The first act has a real imbalance.\n\n"
+            "grounded?_\n\n"
+            + "\n".join(["<im_end|>"] * 5)
+        )
+        out = clean_reply(raw)
+        assert out == "The first act has a real imbalance.\n\ngrounded?"
+
+
 class _ChatClient:
     def __init__(self, reply):
         self._reply = reply
         self.calls = 0
+        self.kwargs = None
 
-    def chat(self, messages):
+    def chat(self, messages, **kw):
         self.calls += 1
+        self.kwargs = kw
         return self._reply
 
 
@@ -167,6 +332,74 @@ class TestEngineAppliesFilter:
         reply = engine.send_message(session, "What about the voiceover?")
         assert reply.startswith("Cut the voiceover.")
         assert "```" not in reply and "{" not in reply
+
+    def test_repetition_loop_tail_stripped(self):
+        garbage = "The scene lacks consequence.\n\n" + "\n".join(["_"] * 100)
+        engine = CoWriterEngine(_ChatClient(garbage), ScriptContext(), ReportContext(None))
+        session = Session.new("T")
+        reply = engine.send_message(session, "What about scene 4?")
+        assert reply.startswith("The scene lacks consequence.")
+        assert not any(set(l.strip()) == {"_"} for l in reply.split("\n"))
+        assert session.branch.messages[-1].content == reply
+
+    def test_semantic_repetition_loop_collapsed(self):
+        answer = (
+            "The first act has a real imbalance: the medical explanation is a data "
+            "dump for the audience rather than having any dramatic purpose for the "
+            "characters.\n\n"
+            "The dialogue needs to test the characters' values, not just explain "
+            "the situation."
+        )
+        looping = answer + "\n\nHow does the dialogue feel?\n\n" + answer + "\n\n" + answer
+        engine = CoWriterEngine(_ChatClient(looping), ScriptContext(), ReportContext(None))
+        session = Session.new("T")
+        reply = engine.send_message(session, "How does the dialogue in the first act feel?")
+        assert reply.count("The first act has a real imbalance") == 1
+        assert session.branch.messages[-1].content == reply
+
+    def test_chat_turn_sends_repeat_penalty(self):
+        client = _ChatClient(CRAFT_PARAGRAPH)
+        engine = CoWriterEngine(client, ScriptContext(), ReportContext(None))
+        engine.send_message(Session.new("T"), "What about scene 3?")
+        assert client.kwargs["repeat_penalty"] == REPEAT_PENALTY
+        assert client.kwargs["max_tokens"] == 600
+
+
+class TestRepeatPenaltyPayload:
+    def _client(self):
+        # bypass list_models (which would do a real GET) by pre-resolving
+        client = LlamaServerClient("http://mock", model="m.gguf", fallback_to_loaded=True)
+        client._resolved_model = "m.gguf"
+        return client
+
+    def test_repeat_penalty_sent_when_set(self, monkeypatch):
+        captured = {}
+        def fake_post(url, json=None, timeout=None, headers=None, **kw):
+            captured["payload"] = json
+            class _Resp:
+                def raise_for_status(self):
+                    pass
+                def json(self):
+                    return {"choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}}]}
+            return _Resp()
+        monkeypatch.setattr("screenplay_cowriter.llm_client.requests.post", fake_post)
+        self._client().chat([{"role": "user", "content": "hi"}], repeat_penalty=1.3)
+        assert captured["payload"]["repeat_penalty"] == 1.3
+
+    def test_repeat_penalty_omitted_by_default(self, monkeypatch):
+        captured = {}
+        def fake_post(url, json=None, timeout=None, headers=None, **kw):
+            captured["payload"] = json
+            class _Resp:
+                def raise_for_status(self):
+                    pass
+                def json(self):
+                    return {"choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}}]}
+            return _Resp()
+        monkeypatch.setattr("screenplay_cowriter.llm_client.requests.post", fake_post)
+        self._client().chat([{"role": "user", "content": "hi"}])
+        assert "repeat_penalty" not in captured["payload"]
+        # the refresh path keeps the server default — its JSON output is untouched
 
 
 class TestModelFallback:

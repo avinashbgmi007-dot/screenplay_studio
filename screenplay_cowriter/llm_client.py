@@ -80,7 +80,8 @@ class LlamaServerClient:
             self._resolved_model = available[0]
         return self._resolved_model
 
-    def chat(self, messages: list[dict], max_tokens: int = 900, temperature: float = 0.7) -> str:
+    def chat(self, messages: list[dict], max_tokens: int = 900, temperature: float = 0.7,
+             repeat_penalty: float | None = None) -> str:
         model = self.resolve_model()
         payload = {
             "model": model,
@@ -88,6 +89,14 @@ class LlamaServerClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        # llama.cpp's default repeat_penalty is 1.1, which some local models
+        # ("experts"/reasoning quants especially) find too lax — they loop,
+        # re-answering the same point several times in one reply. Pass an
+        # explicit penalty where the caller wants loop suppression; None keeps
+        # the server default (used by paths that must not change sampling,
+        # like the memory refresh).
+        if repeat_penalty is not None:
+            payload["repeat_penalty"] = repeat_penalty
         try:
             resp = requests.post(f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout, headers=self.extra_headers)
             resp.raise_for_status()
