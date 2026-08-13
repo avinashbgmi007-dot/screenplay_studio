@@ -142,11 +142,13 @@
         <button id="quote-float" class="quote-float" type="button" hidden>✎ Ask Sam about this</button>
       </section>
 
+      <div id="pane-divider" class="pane-divider" role="separator" aria-orientation="vertical" title="Drag to resize the script pane — double-click to reset"></div>
+
       <!-- Co-write room: the writer's desk -->
       <section id="cowrite-panel" class="room-panel" aria-label="Co-write">
         <div id="partner-card" class="partner-card">
           <span class="avatar">S</span>
-          <span class="partner-name">Sam — writing with you</span>
+          <span class="partner-name">Sam — AI writing partner</span>
           <button id="reset-partner-btn" class="btn-secondary btn-small" title="Back to the writing partner default" type="button">back to Sam</button>
           <button id="sam-notes-btn" class="btn-secondary btn-small" title="What Sam has noticed about how you work together" type="button">Sam's notes on you</button>
         </div>
@@ -222,12 +224,6 @@
     </section>
 
   </main>
-
-  <!-- Right: checkpoint rail -->
-  <aside id="checkpoint-rail" aria-label="Conversation checkpoints">
-    <div class="checkpoint-rail-label">Checkpoints</div>
-    <div id="checkpoint-list"></div>
-  </aside>
 
 </div>
 

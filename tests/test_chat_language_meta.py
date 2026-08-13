@@ -438,6 +438,9 @@ class TestEngineQuoteContext:
         all_text = " ".join(m["content"] for m in client.messages)
         assert "Just don't do anything stupid." in all_text
         assert "Scene 2" in all_text
+        # the passage also rides inside the user turn itself (adjacent to the
+        # question), not just in a system message
+        assert "Just don't do anything stupid." in client.messages[-1]["content"]
         # stored on the user message
         user_msg = [m for m in session.branch.messages if m.role == "user"][-1]
         assert user_msg.quote == {"scene_number": 2, "text": "Just don't do anything stupid."}

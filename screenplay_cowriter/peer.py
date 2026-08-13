@@ -54,10 +54,10 @@ def should_probe(text: str) -> bool:
 
 
 FORWARD_NUDGES = [
-    "Want me to poke at that with you?",
-    "How are you feeling about it so far?",
-    "Want to chase that thought?",
-    "Where does that leave us — want to keep going?",
+    "Want me to develop this further?",
+    "Where would you like to take it next?",
+    "Want a concrete next step on this?",
+    "Should I dig deeper into any part of it?",
 ]
 _nudge_index = 0
 

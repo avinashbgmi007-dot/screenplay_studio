@@ -126,6 +126,12 @@ class CoWriterEngine:
                     "You may quote it back only briefly; keep the reply plain prose."
                 )
 
+        # The passage also rides inside the user turn itself (not just a system
+        # message) so no model can miss it — the question sits right under it.
+        prompt_user = user_text
+        if quote is not None:
+            prompt_user = f'Passage from the script: \"{quote["text"]}\"\n\n{user_text}'
+
         if not was_pending and should_probe(user_text):
             # Phase 1: reflect + probe, no suggestions.
             system_prompt = build_system_prompt(
@@ -140,7 +146,7 @@ class CoWriterEngine:
                 messages.append({"role": "system", "content": quote_context})
             for m in branch.messages[-self.history_window:]:
                 messages.append({"role": m.role, "content": m.content})
-            messages.append({"role": "user", "content": user_text})
+            messages.append({"role": "user", "content": prompt_user})
             try:
                 reply = clean_reply(self.client.chat(messages, max_tokens=600, repeat_penalty=REPEAT_PENALTY))
             except Exception:
@@ -160,7 +166,7 @@ class CoWriterEngine:
                 messages.append({"role": "system", "content": quote_context})
             for m in branch.messages[-self.history_window:]:
                 messages.append({"role": m.role, "content": m.content})
-            messages.append({"role": "user", "content": user_text})
+            messages.append({"role": "user", "content": prompt_user})
             reply = clean_reply(self.client.chat(messages, max_tokens=600, repeat_penalty=REPEAT_PENALTY))
             reply = cap_suggestions(reply)
 

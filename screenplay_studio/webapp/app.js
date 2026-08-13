@@ -363,7 +363,6 @@ async function openProject(name) {
       state.currentBranch = "main";
       renderMessages();
       renderBranches();
-      renderCheckpoints();
       populateSelectors();
     }
 
@@ -617,7 +616,6 @@ async function loadSession(sessionId) {
   resetChatHistory();
   renderMessages();
   renderBranches();
-  renderCheckpoints();
   populateSelectors();
 }
 
@@ -802,10 +800,11 @@ function handleScriptSelection() {
   if (quote) showQuoteFloat(quote); else hideQuoteFloat();
 }
 
-// ---------- conversation rail (jump markers) ----------
-// A thin track along the right edge of the chat, one tick per question the
-// writer asked — hover a tick to peek at the question, click it to jump the
-// conversation back to exactly that message. No scrolling the whole thread.
+// ---------- conversation overview (hover rail) ----------
+// A slim strip along the chat's right edge — small horizontal lines, one per
+// message. Invisible until you hover the conversation; then a compact,
+// scrollable overview appears (first message → latest) with short previews.
+// Click a line or an overview row to jump straight to that message.
 
 function renderMessageRail() {
   const container = $("#messages");
@@ -814,36 +813,51 @@ function renderMessageRail() {
     rail = el("div", "msg-rail");
     rail.id = "msg-rail";
     container.appendChild(rail);
+    rail.appendChild(el("div", "rail-track"));
+    const panel = el("div", "rail-panel");
+    panel.setAttribute("role", "listbox");
+    rail.appendChild(panel);
+    rail.addEventListener("mouseenter", () => panel.classList.add("visible"));
+    rail.addEventListener("mouseleave", () => panel.classList.remove("visible"));
   }
-  rail.innerHTML = "";
+  const track = rail.querySelector(".rail-track");
+  const panel = rail.querySelector(".rail-panel");
+  track.innerHTML = "";
+  panel.innerHTML = "";
   const msgs = currentBranchData().messages || [];
-  const indices = msgs.map((m, i) => (m.role === "user" ? i : -1)).filter((i) => i >= 0);
-  if (!indices.length) {
-    rail.classList.add("empty");
-    return;
-  }
+  if (!msgs.length) { rail.classList.add("empty"); return; }
   rail.classList.remove("empty");
-  for (const i of indices) {
-    const marker = el("button", "rail-marker");
+
+  for (let i = 0; i < msgs.length; i++) {
+    const marker = el("button", "rail-marker" + (msgs[i].role === "user" ? "" : " assistant"));
     marker.type = "button";
     marker.dataset.index = i;
-    marker.title = msgs[i].content;
-    marker.setAttribute("aria-label", `Jump to your message: ${msgs[i].content}`);
-    marker.addEventListener("mouseenter", () => showRailTip(container, marker, msgs[i].content));
-    marker.addEventListener("mouseleave", hideRailTip);
-    marker.addEventListener("focus", () => showRailTip(container, marker, msgs[i].content));
-    marker.addEventListener("blur", hideRailTip);
-    marker.addEventListener("click", () => {
-      const target = document.getElementById(`msg-${i}`);
-      if (!target) return;
-      container.scrollTop = Math.max(0, target.offsetTop - (container.clientHeight - target.clientHeight) / 2);
-      updateRailCurrent(container);
-      saveSession();
-    });
-    rail.appendChild(marker);
+    marker.title = `Message ${i + 1}`;
+    marker.setAttribute("aria-label", `Jump to message ${i + 1}`);
+    marker.addEventListener("click", () => jumpToMessage(container, i));
+    track.appendChild(marker);
   }
-  rail.appendChild(el("div", "rail-tip"));
+
+  msgs.forEach((m, i) => {
+    const row = el("button", "rail-row" + (m.role === "user" ? " user" : " assistant"));
+    row.type = "button";
+    row.dataset.index = i;
+    const num = el("span", "rail-row-num", String(i + 1));
+    const txt = el("span", "rail-row-text", truncate(m.content, 64));
+    row.append(num, txt);
+    row.addEventListener("click", () => jumpToMessage(container, i));
+    panel.appendChild(row);
+  });
+
   updateRailPositions(container);
+}
+
+function jumpToMessage(container, i) {
+  const target = document.getElementById(`msg-${i}`);
+  if (!target) return;
+  container.scrollTop = Math.max(0, target.offsetTop - (container.clientHeight - target.clientHeight) / 2);
+  updateRailCurrent(container);
+  saveSession();
 }
 
 function updateRailPositions(container) {
@@ -879,25 +893,6 @@ function updateRailCurrent(container) {
   for (const m of markers) m.classList.toggle("current", m === current);
 }
 
-function showRailTip(container, marker, content) {
-  const rail = container.querySelector("#msg-rail");
-  if (!rail) return;
-  let tip = rail.querySelector(".rail-tip");
-  if (!tip) {
-    tip = el("div", "rail-tip");
-    rail.appendChild(tip);
-  }
-  tip.textContent = content;
-  const markerTop = marker.offsetTop;
-  tip.style.top = Math.max(0, Math.min(markerTop - 12, rail.clientHeight - 36)) + "px";
-  tip.classList.add("visible");
-}
-
-function hideRailTip() {
-  const tip = document.querySelector(".rail-tip");
-  if (tip) tip.classList.remove("visible");
-}
-
 function renderBranches() {
   const wrap = $("#branch-switcher");
   wrap.innerHTML = "";
@@ -925,7 +920,6 @@ async function switchBranch(name) {
     resetChatHistory();
     renderMessages();
     renderBranches();
-    renderCheckpoints();
     populateSelectors();
   } catch (e) {
     showError("Couldn't switch branches: " + e.message);
@@ -1072,7 +1066,6 @@ async function sendMessage() {
     stopTicker();
     state.branches[state.currentBranch] = { ...currentBranchData(), messages: res.messages };
     renderMessages();
-    renderCheckpoints();
   } catch (e) {
     stopTicker();
     pendingBubble.textContent = "Couldn't get a reply: " + e.message;
@@ -1192,32 +1185,6 @@ function chatHistoryEscape(e) {
   chatHistoryCancel();
   $("#input").focus();
   return true;
-}
-
-// ---------- checkpoint rail ----------
-
-function renderCheckpoints() {
-  const list = $("#checkpoint-list");
-  list.innerHTML = "";
-  const msgs = currentBranchData().messages || [];
-  const userIndices = msgs.map((m, i) => (m.role === "user" ? i : -1)).filter((i) => i >= 0);
-
-  if (!userIndices.length) {
-    list.appendChild(el("p", "checkpoint-empty", "Your messages will show up here so you can jump back to them."));
-    return;
-  }
-
-  for (const i of userIndices) {
-    const card = el("div", "checkpoint-card", truncate(msgs[i].content, 70));
-    card.title = "Jump to this point in the conversation";
-    card.addEventListener("click", () => {
-      const target = document.getElementById(`msg-${i}`);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      document.querySelectorAll(".checkpoint-card.current").forEach((c) => c.classList.remove("current"));
-      card.classList.add("current");
-    });
-    list.appendChild(card);
-  }
 }
 
 // ---------- script & notes view (revision loop) ----------
@@ -2685,6 +2652,40 @@ function init() {
     if (!e.target.closest("#quote-float") && !e.target.closest("#script-scenes")) hideQuoteFloat();
   });
   $("#script-scenes").addEventListener("scroll", hideQuoteFloat, { passive: true });
+
+  // resizable script pane — drag the divider; double-click resets to 55%
+  const paneDivider = $("#pane-divider");
+  const scriptPane = $("#script-pane");
+  let paneDragging = false;
+  const applyPaneWidth = (px) => {
+    const ws = document.querySelector(".workspace");
+    const max = ws ? Math.round(ws.clientWidth * 0.78) : 1200;
+    px = Math.max(300, Math.min(px, max));
+    scriptPane.style.flex = `0 0 ${px}px`;
+    localStorage.setItem("pane-width", String(px));
+  };
+  const savedPaneWidth = parseFloat(localStorage.getItem("pane-width"));
+  if (savedPaneWidth) applyPaneWidth(savedPaneWidth);
+  paneDivider.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    paneDragging = true;
+    document.body.classList.add("resizing");
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!paneDragging) return;
+    const ws = document.querySelector(".workspace");
+    const wsRect = ws.getBoundingClientRect();
+    applyPaneWidth(e.clientX - wsRect.left);
+  });
+  window.addEventListener("mouseup", () => {
+    if (!paneDragging) return;
+    paneDragging = false;
+    document.body.classList.remove("resizing");
+  });
+  paneDivider.addEventListener("dblclick", () => {
+    scriptPane.style.flex = "";
+    localStorage.removeItem("pane-width");
+  });
   $("#input").addEventListener("input", autoResizeTextarea);
   $("#input").addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" && chatHistoryArrowUp(e)) return;

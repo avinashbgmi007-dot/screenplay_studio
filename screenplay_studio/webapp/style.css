@@ -49,7 +49,6 @@
 
   /* layout */
   --sidebar-w: 264px;
-  --checkpoint-w: 232px;
   --radius: 10px;
   --radius-sm: 6px;
 }
@@ -633,7 +632,6 @@ body::after {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--line-soft);
   background: var(--ink-950);
 }
 
@@ -1137,60 +1135,91 @@ body::after {
 }
 .chat-empty-hint em { font-family: var(--font-hand); font-size: 18px; color: var(--danger); font-style: normal; }
 
-/* conversation rail — ticks riding the right edge */
+/* conversation overview — a slim hover rail on the chat's right edge */
 .msg-rail {
   position: absolute;
-  top: 0; right: 14px; bottom: 0;
-  width: 14px;
-  z-index: 6;
+  top: 14px; right: 5px; bottom: 14px;
+  width: 12px;
+  z-index: 7;
   pointer-events: none;
-  opacity: 0.35;
+  opacity: 0;
   transition: opacity 0.15s ease;
 }
-.msg-rail.scrollable:hover, .msg-rail.scrollable:focus-within { opacity: 1; }
+.messages:hover .msg-rail, .msg-rail:hover, .msg-rail:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
 .msg-rail.empty { display: none; }
-.msg-rail:not(.scrollable) { opacity: 0.12; }
+.rail-track { position: absolute; inset: 0; overflow: hidden; }
 .rail-marker {
   position: absolute;
   left: 1px;
-  width: 12px; height: 4px;
-  margin-top: -2px;
+  width: 10px; height: 3px;
+  margin-top: -1.5px;
   border: none;
   border-radius: 999px;
   padding: 0;
   background: var(--line);
   cursor: pointer;
-  pointer-events: auto;
   transition: background 0.12s ease, transform 0.12s ease;
 }
-.rail-marker:hover, .rail-marker:focus-visible { background: var(--accent); transform: scaleY(1.7); }
+.rail-marker.assistant { opacity: 0.5; }
+.rail-marker:hover, .rail-marker:focus-visible { background: var(--accent); transform: scaleX(1.35); }
 .rail-marker.current { background: var(--accent-bright); box-shadow: 0 0 6px var(--glow-strong); }
-.rail-tip {
+
+.rail-panel {
   position: absolute;
-  right: 22px;
-  max-width: 280px;
-  padding: 7px 11px;
-  border-radius: var(--radius-sm);
-  background: var(--ink-700);
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 260px;
+  max-height: 46%;
+  overflow-y: auto;
+  background: var(--ink-800);
   border: 1px solid var(--line);
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border-radius: 6px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   opacity: 0;
   pointer-events: none;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
   transition: opacity 0.12s ease;
 }
-.rail-tip.visible { opacity: 1; }
+.msg-rail:hover .rail-panel, .msg-rail:focus-within .rail-panel { opacity: 1; pointer-events: auto; }
+.rail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: var(--font-serif);
+}
+.rail-row.user { color: var(--text); }
+.rail-row:hover { background: var(--ink-700); color: var(--text); }
+.rail-row-num {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+.rail-row-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---- composer: the typewriter platen ---- */
 
 .composer {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px;
   padding: 12px 16px 14px;
@@ -1422,66 +1451,6 @@ body::after {
 /* ============================================================
    Checkpoint rail — pinned index cards
    ============================================================ */
-
-#checkpoint-rail {
-  width: var(--checkpoint-w);
-  flex-shrink: 0;
-  background:
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 2px, transparent 2px 5px),
-    linear-gradient(180deg, var(--ink-900), var(--ink-950));
-  border-left: 1px solid var(--line-soft);
-  padding: 18px 12px;
-  overflow-y: auto;
-}
-
-.checkpoint-rail-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.checkpoint-rail-label::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
-
-#checkpoint-list { display: flex; flex-direction: column; gap: 10px; }
-
-.checkpoint-card {
-  position: relative;
-  background: linear-gradient(180deg, #f6edd9, #efe3c8);
-  color: #3a2f20;
-  border-radius: 3px;
-  padding: 10px 12px 12px;
-  font-size: 12px;
-  line-height: 1.45;
-  cursor: pointer;
-  font-family: var(--font-typewriter);
-  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.55), inset 0 -10px 16px -14px rgba(90, 70, 40, 0.5);
-  transform: rotate(var(--tilt, -0.6deg));
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-.checkpoint-card:nth-child(2n) { --tilt: 0.5deg; }
-.checkpoint-card::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0; height: 14px;
-  background: repeating-linear-gradient(90deg, transparent 0 7px, rgba(90, 70, 40, 0.14) 7px 8px);
-}
-.checkpoint-card:hover { transform: rotate(0deg) translateX(-2px); box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.6); }
-.checkpoint-card.current { outline: 2px solid var(--accent); outline-offset: 1px; }
-.checkpoint-card .ic-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #8a6a3f;
-  margin-bottom: 4px;
-  display: block;
-}
-.checkpoint-empty { color: var(--text-faint); font-size: 12px; font-style: italic; }
 
 /* ============================================================
    Error banner / connection dot / badges
@@ -1877,7 +1846,7 @@ body.dawn {
   --lamp-bright: #c9973f;
   --lamp-deep: #8a6626;
 }
-body.dawn #sidebar, body.dawn #checkpoint-rail, body.dawn .room-panel {
+body.dawn #sidebar, body.dawn .room-panel {
   border-color: var(--line-soft);
 }
 body.dawn .welcome-card {
@@ -1916,14 +1885,14 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
    ============================================================ */
 
 .messages, .script-scenes, .beatboard-board, .compare-panes, .project-list,
-.palette-results, .modal, #checkpoint-list, .composer textarea, .feedback-pane {
+.palette-results, .modal, .composer textarea, .feedback-pane {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
 .messages::-webkit-scrollbar, .script-scenes::-webkit-scrollbar,
 .beatboard-board::-webkit-scrollbar, .compare-panes::-webkit-scrollbar,
 .project-list::-webkit-scrollbar, .palette-results::-webkit-scrollbar,
-.modal::-webkit-scrollbar, #checkpoint-list::-webkit-scrollbar,
+.modal::-webkit-scrollbar,
 .composer textarea::-webkit-scrollbar, .feedback-pane::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -1931,14 +1900,14 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
 .messages::-webkit-scrollbar-track, .script-scenes::-webkit-scrollbar-track,
 .beatboard-board::-webkit-scrollbar-track, .compare-panes::-webkit-scrollbar-track,
 .project-list::-webkit-scrollbar-track, .palette-results::-webkit-scrollbar-track,
-.modal::-webkit-scrollbar-track, #checkpoint-list::-webkit-scrollbar-track,
+.modal::-webkit-scrollbar-track,
 .composer textarea::-webkit-scrollbar-track, .feedback-pane::-webkit-scrollbar-track {
   background: transparent;
 }
 .messages::-webkit-scrollbar-thumb, .script-scenes::-webkit-scrollbar-thumb,
 .beatboard-board::-webkit-scrollbar-thumb, .compare-panes::-webkit-scrollbar-thumb,
 .project-list::-webkit-scrollbar-thumb, .palette-results::-webkit-scrollbar-thumb,
-.modal::-webkit-scrollbar-thumb, #checkpoint-list::-webkit-scrollbar-thumb,
+.modal::-webkit-scrollbar-thumb,
 .composer textarea::-webkit-scrollbar-thumb, .feedback-pane::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--line), var(--ink-700));
   border-radius: 999px;
@@ -1950,7 +1919,7 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
 .messages::-webkit-scrollbar-thumb:hover, .script-scenes::-webkit-scrollbar-thumb:hover,
 .beatboard-board::-webkit-scrollbar-thumb:hover, .compare-panes::-webkit-scrollbar-thumb:hover,
 .project-list::-webkit-scrollbar-thumb:hover, .palette-results::-webkit-scrollbar-thumb:hover,
-.modal::-webkit-scrollbar-thumb:hover, #checkpoint-list::-webkit-scrollbar-thumb:hover,
+.modal::-webkit-scrollbar-thumb:hover,
 .composer textarea::-webkit-scrollbar-thumb:hover, .feedback-pane::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, var(--accent-deep), var(--accent));
 }
@@ -1971,7 +1940,6 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
 }
 
 @media (max-width: 900px) {
-  #checkpoint-rail { display: none; }
   .scene-window, .scene-shelf { display: none; }
   .scene-lamp { left: 3%; }
 }
@@ -1997,7 +1965,7 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   html, body { background: #fff !important; }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  #sidebar, #checkpoint-rail, #error-banner, #welcome-view,
+  #sidebar, #error-banner, #welcome-view,
   #beatboard-view, #compare-view, #palette-modal, #settings-modal,
   #rewrite-modal, .script-toolbar, #draft-bar, #diff-banner,
   #composer, .note-add, .finding-note-actions, #project-bar,
@@ -2211,3 +2179,15 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
 @media (prefers-reduced-motion: reduce) {
   .scene-page.flash { animation: none; box-shadow: 0 0 0 3px rgba(232, 162, 79, 0.6), 0 18px 44px -18px rgba(0, 0, 0, 0.6); }
 }
+
+/* resizable script pane — draggable divider */
+.pane-divider {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: var(--line-soft);
+  position: relative;
+  z-index: 6;
+  transition: background 0.12s ease;
+}
+.pane-divider:hover { background: var(--accent); }
+body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
