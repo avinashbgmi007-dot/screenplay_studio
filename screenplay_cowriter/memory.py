@@ -30,14 +30,18 @@ REFRESH_INTERVAL = 10      # new observed turns between refreshes
 
 # Neutral value per dimension (the "nothing set" state — never gates).
 NEUTRAL = {"detail_level": "balanced", "directness": "balanced",
-           "probe_appetite": "medium", "pushback_appetite": "medium"}
+           "probe_appetite": "medium", "pushback_appetite": "medium",
+           "support_style": "balanced"}
 
-# Learnable poles per dimension.
+# Learnable poles per dimension. support_style captures HOW the writer wants
+# Sam to work beside them: concrete options to react to (generate) vs. a
+# thinking partner to talk it through with (discuss).
 DIMENSION_POLES = {
     "detail_level": ("short", "deep"),
     "directness": ("gentle", "direct"),
     "probe_appetite": ("low", "high"),
     "pushback_appetite": ("low", "high"),
+    "support_style": ("generate", "discuss"),
 }
 
 TOPIC_CATEGORIES = ("character", "structure", "dialogue", "craft")
@@ -57,6 +61,8 @@ TONE_RULES = [
     (re.compile(r"\b(?:tell me straight|just say it|don'?t soften|be blunt|be direct|no sugar.?coating)\b", re.I), "directness", "direct"),
     (re.compile(r"\b(?:be gentle|ease me in|softly|carefully|kindly|gently)\b", re.I), "directness", "gentle"),
     (re.compile(r"\b(?:push back|argue with me|disagree with me|challenge me|fight me on)\b", re.I), "pushback_appetite", "high"),
+    (re.compile(r"\b(?:give me|gimme|offer(?: me)?|come up with|sketch|draft|throw out)\b", re.I), "support_style", "generate"),
+    (re.compile(r"\b(?:what do you think|which one|help me think|your take|weigh in|talk it through|let'?s discuss)\b", re.I), "support_style", "discuss"),
 ]
 
 PUSHBACK_ARGUE = re.compile(r"\b(?:i disagree\b|no,|but |that won'?t work\b|that doesn'?t work\b|that loses\b|keep it anyway\b|actually no\b)", re.I)
@@ -204,6 +210,7 @@ DIM_LABELS = {
     "directness": ("prefers gentle, eased-in notes", "wants the note straight, no softening"),
     "probe_appetite": ("dislikes being probed before answers", "engages well with probing questions"),
     "pushback_appetite": ("prefers Sam to defer", "enjoys Sam pushing back on choices"),
+    "support_style": ("likes concrete options to react to", "prefers talking it through before committing"),
 }
 
 # Human-readable observations auto-created the moment a dimension first gates.
@@ -216,6 +223,8 @@ OBS_TEMPLATES = {
     ("probe_appetite", "high"): "You engage well with probing questions.",
     ("pushback_appetite", "low"): "You tend to accept suggestions readily.",
     ("pushback_appetite", "high"): "You enjoy sparring over choices — you argue for what you believe.",
+    ("support_style", "generate"): "You like concrete options to react to.",
+    ("support_style", "discuss"): "You prefer talking things through before committing.",
 }
 
 CARD_RULES = (
@@ -227,7 +236,9 @@ CARD_RULES = (
 
 def _maybe_add_template_observation(profile, dim):
     """When a dimension first crosses the gate, record a human-readable observation."""
-    d = profile["dimensions"][dim]
+    # _dim_state creates the entry for dimensions missing from an older stored
+    # profile (adding a learnable dimension must never crash an existing file)
+    d = _dim_state(profile, dim)
     if d["value"] not in DIMENSION_POLES[dim] or d["confidence"] < BEHAVIOR_GATE:
         return
     ev = d["evidence"]
@@ -276,9 +287,9 @@ def build_relationship_card(profile):
         idx = 0 if entry["value"] == DIMENSION_POLES[dim][0] else 1
         phrases.append(DIM_LABELS[dim][idx])
     topics = {k: v for k, v in profile.get("topic_gravity", {}).items() if v > 0}
-    if topics and sum(topics.values()) >= 10:
+    if topics and sum(topics.values()) >= 6:
         top = max(topics, key=topics.get)
-        if topics[top] / sum(topics.values()) >= 0.4:
+        if topics[top] / sum(topics.values()) >= 0.35:
             phrases.append(f"keeps returning to {top}-level concerns")
     # Only observations for dimensions Sam actually acts on (or free-standing
     # general notes) reach the card — a refresh note about a dimension whose
@@ -299,7 +310,8 @@ def cold_start_line(profile):
         return None
     if profile["observations"]:
         return None
-    return ("A light opening question for a brand-new relationship (optional to answer): "
+    return ("This is a brand-new working relationship — you've never worked together before, "
+            "so a natural, human opener fits (only if it fits the moment, never forced): "
             "\"Before we dive in — what's the one thing you're trying to fix in this draft?\"")
 
 
@@ -309,8 +321,8 @@ def refresh_prompt(recent_messages):
         "RELATIONSHIP MEMORY REFRESH — read the conversation below between a writer and "
         "their co-writer. Based ONLY on explicit evidence in it, what does this writer "
         "prefer? Output STRICT JSON object with keys detail_level, directness, "
-        "probe_appetite, pushback_appetite — each {\"value\": "
-        "\"short|deep|balanced|gentle|direct|low|high|medium|no_evidence\", "
+        "probe_appetite, pushback_appetite, support_style — each {\"value\": "
+        "\"short|deep|balanced|gentle|direct|low|high|medium|generate|discuss|no_evidence\", "
         "\"confidence\": 0.0-1.0} — plus \"observations\": a list of 0-3 objects "
         "{\"text\": \"plain language, what the writer expects/accepts/argues about\", "
         "\"dimension\": \"detail_level|directness|probe_appetite|pushback_appetite|"

@@ -18,10 +18,11 @@ _REASONING = re.compile(
 
 PROBE_SYSTEM_PROMPT = (
     "You are Sam, the writer's co-writing partner. The writer just shared an idea with "
-    "you. This turn has ONE job and only one: reflect their idea back in your own words "
-    "so they feel heard, then ask a single probing question about what's driving it "
-    "(\"why do you think so?\" or similar). Do NOT offer suggestions, alternatives, fixes, "
-    "or judgments yet — the writer hasn't asked for any. One question, in your voice."
+    "you. This turn has ONE job: let them feel heard — reflect their idea back in your "
+    "own words, naturally, like you're turning it over with them — then ask one genuine "
+    "question about what's driving it (\"why do you think so?\" or a real question in your "
+    "voice). Don't jump to suggestions, alternatives, fixes, or judgments yet — they "
+    "didn't ask for any. One question, and make it sound like you, not a form."
 )
 
 
@@ -54,10 +55,10 @@ def should_probe(text: str) -> bool:
 
 
 FORWARD_NUDGES = [
-    "Want me to develop this further?",
-    "Where would you like to take it next?",
-    "Want a concrete next step on this?",
-    "Should I dig deeper into any part of it?",
+    "Want me to run with this and see where it goes?",
+    "Where do you feel like taking it from here?",
+    "Want me to sketch a version so we can react to something real?",
+    "What's your instinct on the next move?",
 ]
 _nudge_index = 0
 

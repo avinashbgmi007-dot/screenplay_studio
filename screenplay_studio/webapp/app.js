@@ -836,25 +836,28 @@ function renderMessageRail() {
   if (!msgs.length) { rail.classList.add("empty"); return; }
   rail.classList.remove("empty");
 
-  // the strip: one small horizontal line per message, stacked in order
-  // (first message at the top, latest at the bottom); the strip's own
-  // scroller moves from first to latest, so only a few lines are visible.
-  msgs.forEach((m, i) => {
-    const line = el("button", "rail-line" + (m.role === "user" ? " user" : " assistant"));
+  // the strip shows only the WRITER's own messages — one horizontal line per
+  // question/comment, first at the top, latest at the bottom. Sam's replies
+  // stay in the conversation thread; the rail is the writer's line of intent.
+  // (i = the REAL message index, so a click still jumps to the right bubble.)
+  const userMsgs = msgs.map((m, i) => ({ m, i })).filter(({ m }) => m.role === "user");
+
+  userMsgs.forEach(({ m, i }, n) => {
+    const line = el("button", "rail-line user");
     line.type = "button";
     line.dataset.index = i;
-    line.title = `Message ${i + 1}: ${truncate(m.content, 80)}`;
-    line.setAttribute("aria-label", `Jump to message ${i + 1}`);
+    line.title = `Your message ${n + 1}: ${truncate(m.content, 80)}`;
+    line.setAttribute("aria-label", `Jump to your message ${n + 1}`);
     line.addEventListener("click", () => jumpToMessage(scroller, i));
     track.appendChild(line);
   });
 
-  // hover preview: short version of every message, scrollable first → latest
-  msgs.forEach((m, i) => {
-    const row = el("button", "rail-row" + (m.role === "user" ? " user" : " assistant"));
+  // hover preview: short version of the writer's messages, scrollable first → latest
+  userMsgs.forEach(({ m, i }, n) => {
+    const row = el("button", "rail-row user");
     row.type = "button";
     row.dataset.index = i;
-    const num = el("span", "rail-row-num", String(i + 1));
+    const num = el("span", "rail-row-num", String(n + 1));
     const txt = el("span", "rail-row-text", truncate(m.content, 64));
     row.append(num, txt);
     row.addEventListener("click", () => jumpToMessage(scroller, i));
@@ -916,11 +919,7 @@ function renderBranches() {
     pill.addEventListener("click", () => switchBranch(name));
     wrap.appendChild(pill);
   }
-  const addBtn = el("button", "branch-pill add", "+ fork");
-  addBtn.type = "button";
-  addBtn.title = "Branch this conversation into a new thread from here";
-  addBtn.addEventListener("click", () => openModal("#fork-modal"));
-  wrap.appendChild(addBtn);
+  // (the fork action was removed from the UI per the writer's preference)
 }
 
 async function switchBranch(name) {
@@ -2666,7 +2665,8 @@ function init() {
   });
   $("#script-scenes").addEventListener("scroll", hideQuoteFloat, { passive: true });
 
-  // resizable script pane — drag the divider; double-click resets to 55%
+  // resizable script pane — drag the divider; double-click resets to 70%
+  // (the manuscript is center stage by default; the chat is the right pane)
   const paneDivider = $("#pane-divider");
   const scriptPane = $("#script-pane");
   let paneDragging = false;

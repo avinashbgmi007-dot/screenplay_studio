@@ -44,6 +44,36 @@ def test_extract_pushback():
     assert s2["pushback"] == "accepted"
 
 
+def test_extract_support_style():
+    gen = mem.extract_signals("give me three options for this scene", "directive", False)
+    assert gen["poles"].get("support_style") == "generate"
+    dis = mem.extract_signals("help me think this through", "question", False)
+    assert dis["poles"].get("support_style") == "discuss"
+    # unrelated turns produce no signal
+    none_ = mem.extract_signals("that ending feels rushed", "idea", False)
+    assert "support_style" not in none_["poles"]
+
+
+def test_older_profile_missing_new_dimension_does_not_crash():
+    # a profile saved before support_style existed has only the old dims;
+    # applying signals must migrate it, not raise
+    p = mem.empty_profile()
+    del p["dimensions"]["support_style"]  # simulate a pre-support_style file
+    mem.apply_signals(p, _signal({"support_style": "generate"}))
+    assert p["dimensions"]["support_style"]["value"] == "generate"
+    mem.apply_signals(p, {"poles": {}, "topics": [], "probe_engagement": None, "pushback": None})
+    assert "support_style" in p["dimensions"]
+
+
+def test_support_style_gates_after_evidence():
+    p = mem.empty_profile()
+    for _ in range(3):
+        mem.apply_signals(p, _signal({"support_style": "generate"}))
+    g = mem.dimension_gate(p)
+    assert g["support_style"]["value"] == "generate"
+    assert "likes concrete options to react to" in mem.build_relationship_card(p)
+
+
 def test_extract_topics():
     s = mem.extract_signals("the protagonist's arc feels flat", "idea", False, None)
     assert "character" in s["topics"]

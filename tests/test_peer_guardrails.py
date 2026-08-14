@@ -33,7 +33,7 @@ def test_should_probe_only_when_reasoning_absent():
 
 
 def test_probe_prompt_forbids_suggestions():
-    assert "do not offer suggestions" in PROBE_SYSTEM_PROMPT.lower()
+    assert "don't jump to suggestions" in PROBE_SYSTEM_PROMPT.lower()
     assert "one question" in PROBE_SYSTEM_PROMPT.lower()
 
 

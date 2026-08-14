@@ -627,7 +627,8 @@ body::after {
 .workspace { display: none; flex: 1; min-height: 0; }
 
 #script-pane {
-  flex: 0 0 55%;
+  /* the manuscript is center stage — the chat room is the smaller right pane */
+  flex: 0 0 70%;
   min-width: 420px;
   min-height: 0;
   display: flex;
