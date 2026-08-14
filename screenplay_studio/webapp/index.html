@@ -30,6 +30,11 @@
 
     <button id="new-project-btn">+ Lay a new page on the desk</button>
 
+    <div class="sidebar-section-label">Ideas</div>
+    <div id="idea-list" class="idea-list">
+      <p class="empty-hint">No ideas yet — the desk is free for one.</p>
+    </div>
+
     <div class="sidebar-section-label">On the shelf</div>
     <div id="project-list" class="project-list">
       <p class="empty-hint">The shelf is empty — bring in a screenplay.</p>
@@ -78,6 +83,7 @@
         <div id="upload-status" class="upload-status"></div>
         <div class="welcome-alt">
           <span class="welcome-alt-divider">or</span>
+          <button id="idea-btn" class="btn-paper" type="button">💡 Talk to Sam about an idea</button>
           <button id="sample-btn" class="btn-paper" type="button">Open the sample page</button>
         </div>
         <div id="shortcut-hint" class="shortcut-hint">
@@ -114,10 +120,37 @@
     <div class="workspace">
 
       <section id="script-pane" aria-label="The script">
+
+        <!-- Idea room: the premise card replaces the pages until they exist -->
+        <div id="premise-pane" class="premise-pane" style="display:none;">
+          <div class="premise-head">
+            <span class="premise-title-label">Premise card</span>
+            <button id="premise-save-btn" class="btn-secondary btn-small" type="button">Save</button>
+            <button id="premise-graduate-btn" class="btn-primary btn-small" type="button">📄 Upload the first pages</button>
+            <input type="file" id="premise-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
+          </div>
+          <div class="premise-fields">
+            <label class="premise-field">Working title
+              <input id="premise-title" type="text" placeholder="The working title, if you have one">
+            </label>
+            <label class="premise-field">Logline
+              <textarea id="premise-logline" rows="2" placeholder="One or two sentences that sell the idea."></textarea>
+            </label>
+            <label class="premise-field">Premise
+              <textarea id="premise-text" rows="7" placeholder="The idea as you'd pitch it — a paragraph, freeform."></textarea>
+            </label>
+            <label class="premise-field">Open questions
+              <textarea id="premise-questions" rows="3" placeholder="What you're still circling — one per line."></textarea>
+            </label>
+          </div>
+          <p class="premise-hint">The card rides with the conversation — Sam and the premise doctor read it every turn. Save whenever it shifts.</p>
+        </div>
+
         <div id="script-toolbar" class="script-toolbar">
           <input id="script-search" type="search" placeholder="Search the script… (e.g. a character, a prop, a line)" aria-label="Search script text">
           <div id="finding-summary" class="finding-summary"></div>
           <div class="script-actions">
+            <button id="premise-btn" class="btn-secondary" title="The premise card that grew into this script" type="button" style="display:none;">📌 Premise</button>
             <button id="reader-btn" class="btn-secondary" title="Reader mode — the draft clean, no margin machinery" type="button">Reader</button>
             <button id="undo-btn" class="btn-secondary" title="Undo the last applied edit (Ctrl+Z)" disabled>↶ Undo</button>
             <button id="redo-btn" class="btn-secondary" title="Re-apply the undone edit (Ctrl+Shift+Z)" disabled>↷ Redo</button>

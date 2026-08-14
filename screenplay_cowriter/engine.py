@@ -77,11 +77,15 @@ def _normalize_quote(quote):
 
 class CoWriterEngine:
     def __init__(self, client: LlamaServerClient, script_ctx: ScriptContext, report_ctx: ReportContext,
-                 history_window: int = HISTORY_WINDOW, store=None, memory=None):
+                 history_window: int = HISTORY_WINDOW, store=None, memory=None, premise: dict | None = None):
         self.client = client
         self.script_ctx = script_ctx
         self.report_ctx = report_ctx
         self.history_window = history_window
+        # Idea room: a premise card instead of a script. When present, the
+        # system prompt switches to idea framing (no pages, no report) and the
+        # card rides in every turn as the shared, growing material.
+        self.premise = premise
         # Optional persistence hook. send_message saves the session itself
         # after a successful turn, so a caller can't forget to persist the
         # conversation on some error path. Callers may still save explicitly
@@ -161,6 +165,7 @@ class CoWriterEngine:
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
+                premise=self.premise,
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = [{"role": "system", "content": system_prompt}]
@@ -182,6 +187,7 @@ class CoWriterEngine:
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
+                premise=self.premise,
             )
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = [{"role": "system", "content": system_prompt}]

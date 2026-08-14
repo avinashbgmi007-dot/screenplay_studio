@@ -4,7 +4,11 @@ const API = "/api";
 
 const state = {
   projects: [],
+  ideas: [],              // idea room: scriptless development sessions
   currentProject: null,   // project name (string)
+  currentIdea: null,      // { id, title, card } — the desk is in idea mode when set
+  currentIdeaSession: null,
+  inIdea: false,          // true when the premise card (not pages) is on the desk
   currentSession: null,   // session id
   branches: {},           // { branchName: { messages, active_persona, active_mode, parent_branch } }
   currentBranch: "main",
@@ -17,6 +21,7 @@ const state = {
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts } from /fixqueue
   reportStats: null,      // stats from report.findings.json
+  premise: null,          // premise card carried into a graduated project
   notes: [],              // the writer's own margin notes
 };
 
@@ -251,6 +256,233 @@ function renderProjectList() {
   }
 }
 
+// ---------- idea room (scriptless development) ----------
+
+async function loadIdeas() {
+  try {
+    state.ideas = await api("/ideas");
+    renderIdeaList();
+  } catch (_) { /* ideas are optional — never break the shelf */ }
+}
+
+function renderIdeaList() {
+  const list = $("#idea-list");
+  list.innerHTML = "";
+  if (!state.ideas.length) {
+    list.appendChild(el("p", "empty-hint", "No ideas yet — the desk is free for one."));
+    return;
+  }
+  for (const idea of state.ideas) {
+    const item = el("div", "idea-item" + (state.currentIdea && idea.id === state.currentIdea.id ? " active" : ""));
+    const row = el("div", "project-item-row");
+    row.appendChild(el("span", "idea-mark", "💡"));
+    row.appendChild(document.createTextNode(idea.title || "Untitled idea"));
+    item.appendChild(row);
+    const del = el("button", "project-delete", "✕");
+    del.type = "button";
+    del.title = "Throw this idea away";
+    del.setAttribute("aria-label", "Delete idea");
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!window.confirm(`Throw away "${idea.title || "this idea"}"?\nThe premise card and the conversation go with it.`)) return;
+      try {
+        await api(`/ideas/${encodeURIComponent(idea.id)}`, { method: "DELETE" });
+        if (state.currentIdea && state.currentIdea.id === idea.id) showWelcomeDesk();
+        await loadIdeas();
+      } catch (err) {
+        showError("Couldn't delete the idea: " + err.message);
+      }
+    });
+    item.appendChild(del);
+    item.addEventListener("click", () => openIdea(idea.id));
+    list.appendChild(item);
+  }
+}
+
+function showWelcomeDesk() {
+  state.currentProject = null;
+  state.currentIdea = null;
+  state.currentIdeaSession = null;
+  state.inIdea = false;
+  $("#welcome-view").style.display = "flex";
+  $("#project-bar").style.display = "none";
+  const ws = document.querySelector(".workspace");
+  if (ws) ws.style.display = "none";
+  hideAllViews();
+  renderProjectList();
+  renderIdeaList();
+  saveSession();
+}
+
+async function createIdea() {
+  try {
+    const meta = await api("/ideas", { method: "POST", body: JSON.stringify({ title: "New idea" }) });
+    await loadIdeas();
+    await openIdea(meta.id);
+  } catch (e) {
+    showError("Couldn't start an idea: " + e.message);
+  }
+}
+
+function populatePremiseFields(card) {
+  $("#premise-title").value = card.title || "";
+  $("#premise-logline").value = card.logline || "";
+  $("#premise-text").value = card.premise || "";
+  $("#premise-questions").value = (card.questions || []).join("\n");
+}
+
+function collectPremiseFields() {
+  return {
+    title: $("#premise-title").value.trim(),
+    logline: $("#premise-logline").value.trim(),
+    premise: $("#premise-text").value.trim(),
+    questions: $("#premise-questions").value.split("\n").map((s) => s.trim()).filter(Boolean),
+  };
+}
+
+async function savePremise(flash = true) {
+  const card = collectPremiseFields();
+  try {
+    if (state.inIdea && state.currentIdea) {
+      const meta = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/card`, { method: "POST", body: JSON.stringify({ card }) });
+      state.currentIdea.card = meta.card;
+      state.currentIdea.title = meta.title;
+      $("#project-title").textContent = meta.title || "Untitled idea";
+      await loadIdeas();
+    } else if (state.currentProject) {
+      await api(`/projects/${encodeURIComponent(state.currentProject)}/premise`, { method: "POST", body: JSON.stringify({ card }) });
+    }
+    if (flash) {
+      const b = $("#premise-save-btn");
+      const old = b.textContent;
+      b.textContent = "Saved ✓";
+      setTimeout(() => { b.textContent = old; }, 1400);
+    }
+  } catch (e) {
+    showError("Couldn't save the premise card: " + e.message);
+  }
+}
+
+async function openIdea(id) {
+  try {
+    const idea = await api(`/ideas/${encodeURIComponent(id)}`);
+    state.currentIdea = idea;
+    state.inIdea = true;
+    state.currentProject = null;
+    state.script = null;
+    state.findings = [];
+    state.fixQueue = null;
+    renderIdeaList();
+
+    $("#welcome-view").style.display = "none";
+    $("#project-bar").style.display = "flex";
+    $("#project-title").textContent = idea.title || "Untitled idea";
+    $("#project-title").title = idea.title || "";
+
+    // the premise card replaces the pages
+    $("#premise-pane").style.display = "flex";
+    $("#premise-graduate-btn").style.display = "";
+    $("#script-toolbar").style.display = "none";
+    $("#script-scenes").style.display = "none";
+    $("#draft-bar").style.display = "none";
+    $("#premise-btn").style.display = "none";
+    populatePremiseFields(idea.card || {});
+
+    const ws = document.querySelector(".workspace");
+    if (ws) ws.style.display = "flex";
+    setRoom("cowrite");
+
+    if (!state.currentIdeaSession) {
+      const res = await api(`/ideas/${encodeURIComponent(id)}/chat/start`, { method: "POST" });
+      state.currentIdeaSession = res.session_id;
+    }
+    await loadIdeaSession(state.currentIdeaSession);
+    saveSession();
+  } catch (e) {
+    showError("Couldn't open the idea: " + e.message);
+  }
+}
+
+async function loadIdeaSession(sid) {
+  const data = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/chat/sessions/${sid}`);
+  state.currentIdeaSession = data.session_id;
+  state.branches = data.branches;
+  state.currentBranch = data.current_branch;
+  resetChatHistory();
+  renderMessages();
+  renderBranches();
+  populateSelectors();
+}
+
+// The two lenses of the idea room: Co-write = Sam (explore), Feedback = the
+// premise doctor (validate). Same conversation, new partner — the toggle
+// swaps the lens and persists it on the session.
+function setIdeaLens(room) {
+  const partnerName = $(".partner-name");
+  const input = $("#input");
+  if (room === "feedback") {
+    partnerName.textContent = "Premise Doctor — Development Exec";
+    input.placeholder = "Ask the premise doctor to test the idea…";
+    document.body.dataset.room = "feedback";
+  } else {
+    partnerName.textContent = "Sam — AI writing partner";
+    input.placeholder = "Talk it through with Sam…";
+    document.body.dataset.room = "cowrite";
+  }
+  const chip = $("#room-chip");
+  if (chip) chip.textContent = room === "feedback" ? "📋 Concept Validation" : "✍️ Idea Room";
+  $("#room-cowrite-btn").classList.toggle("active", room === "cowrite");
+  $("#room-feedback-btn").classList.toggle("active", room === "feedback");
+}
+
+async function applyIdeaLens(room) {
+  setIdeaLens(room);
+  if (!state.currentIdeaSession) return;
+  const persona = room === "feedback" ? "premise_doctor" : "writing_partner";
+  const mode = room === "feedback" ? "concept_validation" : "peer";
+  try {
+    const res = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/chat/sessions/${state.currentIdeaSession}/settings`, {
+      method: "POST", body: JSON.stringify({ persona, mode }),
+    });
+    state.branches[state.currentBranch] = { ...currentBranchData(), active_persona: res.active_persona, active_mode: res.active_mode };
+  } catch (_) { /* non-fatal — the lens still shows */ }
+}
+
+// On a graduated project the premise card lives behind a toolbar toggle.
+let premisePaneOpen = false;
+function togglePremisePane() {
+  premisePaneOpen = !premisePaneOpen;
+  $("#premise-pane").style.display = premisePaneOpen ? "flex" : "none";
+  $("#script-toolbar").style.display = premisePaneOpen ? "none" : "flex";
+  $("#premise-graduate-btn").style.display = "none";
+  if (premisePaneOpen) populatePremiseFields(state.premise || {});
+}
+
+async function graduateIdea(file) {
+  const btn = $("#premise-graduate-btn");
+  btn.disabled = true;
+  btn.textContent = "Parsing the pages…";
+  const form = new FormData();
+  form.append("file", file);
+  form.append("title", $("#premise-title").value.trim() || file.name.replace(/\.[^.]+$/, ""));
+  try {
+    await savePremise(false);
+    const project = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/graduate`, { method: "POST", body: form });
+    state.inIdea = false;
+    state.currentIdea = null;
+    state.currentIdeaSession = null;
+    await loadProjects();
+    await loadIdeas();
+    await openProject(project.project);
+    appendSystemNote("The premise card and your conversation came with you — same desk, same Sam.");
+  } catch (e) {
+    showError("Couldn't graduate the idea: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "📄 Upload the first pages";
+  }
+}
+
 async function uploadFile(file) {
   const status = $("#upload-status");
   status.classList.remove("error");
@@ -322,14 +554,28 @@ function restoreSession() {
 
 async function openProject(name) {
   try {
+    // leaving the idea room — the pages are back on the desk
+    state.inIdea = false;
+    state.currentIdea = null;
+    state.currentIdeaSession = null;
     state.currentProject = name;
     state.script = null;
     state.findings = [];
     state.findingStatus = {};
     state.fixQueue = null;
     state.reportStats = null;
+    state.premise = null;
+    $("#premise-pane").style.display = "none";
+    $("#script-toolbar").style.display = "flex";
+    $("#script-scenes").style.display = "";
+    $(".partner-name").textContent = "Sam — AI writing partner";
+    $("#input").placeholder = "Ask about a scene, a character, a note in the margins…";
     const project = await api(`/projects/${encodeURIComponent(name)}`);
     renderProjectList();
+
+    // an idea that graduated carries its premise card alongside the pages
+    state.premise = project.premise && (project.premise.title || project.premise.logline || project.premise.premise) ? project.premise : null;
+    $("#premise-btn").style.display = state.premise ? "inline-block" : "none";
 
     $("#welcome-view").style.display = "none";
     const ws = document.querySelector(".workspace");
@@ -388,6 +634,17 @@ async function openProject(name) {
 
 function setRoom(room) {
   state.view = room;                       // "cowrite" | "feedback"
+  if (state.inIdea) {
+    // idea room: both lenses share one conversation — the toggle swaps the
+    // partner (Sam <-> premise doctor), not the panel
+    applyIdeaLens(room);
+    $("#beatboard-view").style.display = "none";
+    $("#compare-view").style.display = "none";
+    const ws = document.querySelector(".workspace");
+    if (ws) ws.style.display = "flex";
+    saveSession();
+    return;
+  }
   document.body.dataset.room = room;       // drives CSS theming
   const chip = $("#room-chip");
   if (chip) chip.textContent = room === "feedback" ? "📋 Consultant's Desk" : "✍️ Writer's Desk";
@@ -413,6 +670,7 @@ function openCowriteRoom() {
 function openFeedbackRoom() {
   if (state.view === "feedback") return;
   setRoom("feedback");
+  if (state.inIdea) { renderMessages(); return; }
   if (typeof loadFeedbackPanels === "function") loadFeedbackPanels();  // defined in Task 10
 }
 
@@ -619,6 +877,13 @@ async function runAnalysis() {
 // ---------- sessions / chat ----------
 
 async function ensureSession() {
+  if (state.inIdea) {
+    if (state.currentIdeaSession) return state.currentIdeaSession;
+    const res = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/chat/start`, { method: "POST" });
+    state.currentIdeaSession = res.session_id;
+    await loadIdeaSession(res.session_id);
+    return res.session_id;
+  }
   if (state.currentSession) return state.currentSession;
   const res = await api(`/projects/${encodeURIComponent(state.currentProject)}/chat/start`, { method: "POST" });
   state.currentSession = res.session_id;
@@ -635,12 +900,16 @@ async function clearChat() {
   const sid = state.currentSession;
   if (!project) return;
   const label = sid ? "this conversation" : "the empty page";
-  if (!confirm(`Erase ${label} with Sam and start fresh?\n\nSam's notes on you are kept — only the chat history goes.`)) return;
+  if (!confirm(`Erase ${label} with ${state.inIdea ? "Sam and the premise doctor" : "Sam"} and start fresh?\n\nThe relationship notes are kept — only the chat history goes.`)) return;
   try {
     if (sid) {
-      await api(`/projects/${encodeURIComponent(project)}/chat/sessions/${sid}`, { method: "DELETE" });
+      const base = state.inIdea
+        ? `/ideas/${encodeURIComponent(state.currentIdea.id)}`
+        : `/projects/${encodeURIComponent(project)}`;
+      await api(`${base}/chat/sessions/${sid}`, { method: "DELETE" });
     }
     state.currentSession = null;
+    state.currentIdeaSession = null;
     state.branches = {};
     state.currentBranch = "main";
     resetChatHistory();
@@ -648,7 +917,7 @@ async function clearChat() {
     renderBranches();
     // start a brand-new session so the next message has a clean page
     await ensureSession();
-    appendSystemNote("Fresh page — a new conversation with Sam. He still remembers what he's noticed about how you write.");
+    appendSystemNote("Fresh page — a new conversation. The partner still remembers what they've noticed about how you write.");
     $("#input").focus();
   } catch (e) {
     showError("Couldn't clear the chat: " + e.message);
@@ -676,10 +945,18 @@ function renderMessages() {
   const msgs = currentBranchData().messages || [];
   if (!msgs.length) {
     const hint = el("div", "chat-empty-hint");
-    hint.innerHTML =
-      "Ask about a theme, a character, or a specific scene (e.g. <em>\"what about Scene 12?\"</em>) — " +
-      "or just say hello and we'll take it from there. Run analysis first if you want the conversation " +
-      "grounded in a full report; it works fine without one too, just more loosely.";
+    if (state.inIdea) {
+      hint.innerHTML =
+        "This is the idea desk — no pages yet, and that's the point. Talk the idea through with Sam " +
+        "(he probes before he suggests), then flip to <em>Feedback</em> to have the premise doctor " +
+        "stress-test it. Save the premise card as it sharpens — it rides with every turn and " +
+        "carries into the script when you upload the first pages.";
+    } else {
+      hint.innerHTML =
+        "Ask about a theme, a character, or a specific scene (e.g. <em>\"what about Scene 12?\"</em>) — " +
+        "or just say hello and we'll take it from there. Run analysis first if you want the conversation " +
+        "grounded in a full report; it works fine without one too, just more loosely.";
+    }
     container.appendChild(hint);
     return;
   }
@@ -1112,7 +1389,8 @@ async function sendMessage() {
   const pending = el("div", "msg assistant msg-pending");
   pending.appendChild(el("div", "msg-role", "Studio"));
   const pendingBubble = el("div", "msg-bubble");
-  pendingBubble.appendChild(document.createTextNode("Reading the pages"));
+  const workingLabel = state.inIdea ? "Thinking it through" : "Reading the pages";
+  pendingBubble.appendChild(document.createTextNode(workingLabel));
   const dots = el("span", "typing-dots");
   dots.appendChild(el("i")); dots.appendChild(el("i")); dots.appendChild(el("i"));
   pendingBubble.appendChild(dots);
@@ -1120,11 +1398,14 @@ async function sendMessage() {
   pending.appendChild(pendingBubble);
   container.appendChild(pending);
   container.scrollTop = container.scrollHeight;
-  const stopTicker = startElapsedTicker(pendingBubble, "Reading the pages");
+  const stopTicker = startElapsedTicker(pendingBubble, workingLabel);
 
   try {
     const sessionId = await ensureSession();
-    const res = await api(`/projects/${encodeURIComponent(state.currentProject)}/chat/sessions/${sessionId}/messages`, {
+    const base = state.inIdea
+      ? `/ideas/${encodeURIComponent(state.currentIdea.id)}`
+      : `/projects/${encodeURIComponent(state.currentProject)}`;
+    const res = await api(`${base}/chat/sessions/${sessionId}/messages`, {
       method: "POST", body: JSON.stringify(quote ? { text, quote } : { text }),
     });
     stopTicker();
@@ -2579,6 +2860,7 @@ function autoResizeTextarea() {
 function init() {
   loadConfig();
   const projectsPromise = loadProjects();
+  loadIdeas();
   setInterval(checkConnection, 30000);
 
   // the den greets the writer by the hour
@@ -2607,15 +2889,15 @@ function init() {
     if (file) uploadFile(file);
   });
 
-  $("#new-project-btn").addEventListener("click", () => {
-    $("#welcome-view").style.display = "flex";
-    $("#project-bar").style.display = "none";
-    const ws = document.querySelector(".workspace");
-    if (ws) ws.style.display = "none";
-    state.currentProject = null;
-    renderProjectList();
-    saveSession();
+  $("#new-project-btn").addEventListener("click", () => showWelcomeDesk());
+  $("#idea-btn").addEventListener("click", createIdea);
+  $("#premise-save-btn").addEventListener("click", () => savePremise());
+  $("#premise-graduate-btn").addEventListener("click", () => $("#premise-file-input").click());
+  $("#premise-file-input").addEventListener("change", () => {
+    if ($("#premise-file-input").files[0]) graduateIdea($("#premise-file-input").files[0]);
+    $("#premise-file-input").value = "";
   });
+  $("#premise-btn").addEventListener("click", togglePremisePane);
 
   // dawn theme + reader mode + shortcut hint (persisted preferences)
   const prefs = loadPrefs();

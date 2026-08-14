@@ -272,6 +272,112 @@ body::after {
 .project-delete:hover { color: var(--danger); background: var(--danger-bg); }
 @media (hover: none) { .project-delete { opacity: 1; } }
 
+/* ---- the idea room: scriptless ideas on the corkboard ---- */
+
+.idea-list {
+  max-height: 34%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.idea-item {
+  position: relative;
+  padding: 8px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--ink-800);
+  border: 1px dashed var(--line);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.idea-item:hover { border-color: var(--accent-deep); background: var(--ink-700); }
+.idea-item.active {
+  border-style: solid;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 20px -10px var(--glow-strong);
+}
+.idea-mark { margin-right: 6px; font-size: 12px; }
+
+/* ---- the premise card — the idea desk's pages ---- */
+
+.premise-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 26px 34px;
+  overflow-y: auto;
+  background:
+    radial-gradient(120% 70% at 50% 0%, var(--glow), transparent 55%),
+    var(--ink-950);
+}
+.premise-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.premise-title-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+  margin-right: auto;
+}
+.premise-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--ink-900);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  box-shadow: 0 14px 40px -18px rgba(0, 0, 0, 0.55);
+}
+.premise-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.premise-field input, .premise-field textarea {
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: var(--ink-950);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+.premise-field input:focus, .premise-field textarea:focus {
+  outline: none;
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 1px var(--accent-deep);
+}
+.premise-field input::placeholder, .premise-field textarea::placeholder { color: var(--text-faint); font-style: italic; }
+.premise-hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+  margin: 0;
+}
+
+body.dawn .premise-pane { background: var(--ink-950); }
+body.dawn .premise-fields { background: var(--ink-900); }
+body.dawn .premise-field input, body.dawn .premise-field textarea { background: var(--ink-800); }
+
 .sidebar-footer {
   margin-top: 12px;
   padding-top: 12px;

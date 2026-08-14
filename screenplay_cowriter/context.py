@@ -61,6 +61,18 @@ PLAIN_TEXT_INSTRUCTION = (
 # writer, never from guessing (the character-AI playbook: the companion only
 # knows what it has been shown, and its honesty about the gap is what makes it
 # feel like a real collaborator rather than a bot performing helpfulness).
+#
+# The idea room has its own boundary: there are NO pages, so the model must
+# never pretend it has read any — it works only from what the writer says and
+# the premise card they're shaping together.
+IDEA_GROUNDING_INSTRUCTION = (
+    "GROUNDING — There is no script yet: the idea and the premise card are the "
+    "only material. Never pretend you've read pages, never invent scenes, "
+    "characters, or details of the story the writer hasn't shared, and never "
+    "reference 'the report', 'the analysis', or 'the script'. If you need "
+    "something you don't have, say so plainly and ask."
+)
+
 GROUNDING_INSTRUCTION = (
     "GROUNDING — Only refer to what is actually in the script text and report "
     "provided to you. Never invent a scene, a line, an action, a name, or a "
@@ -197,24 +209,59 @@ class ReportContext:
         return "\n\n".join(parts) if parts else "(No report loaded — discussing the raw script only.)"
 
 
+def _premise_block(card: dict | None) -> str:
+    """The premise card as compact context: the shared, growing note the idea
+    room keeps on the desk. Empty parts are dropped so a fresh card doesn't
+    pad the prompt with blanks."""
+    card = card or {}
+    parts = []
+    title = (card.get("title") or "").strip()
+    logline = (card.get("logline") or "").strip()
+    premise = (card.get("premise") or "").strip()
+    questions = [str(q).strip() for q in (card.get("questions") or []) if str(q).strip()]
+    if title:
+        parts.append(f"Working title: {title}")
+    if logline:
+        parts.append(f"Logline: {logline}")
+    if premise:
+        parts.append(f"Premise: {premise}")
+    if questions:
+        parts.append("Open questions: " + " | ".join(questions))
+    return "\n".join(parts) if parts else "(The premise card is empty so far — you're shaping it together.)"
+
+
 def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, persona: str, mode: str,
-                        relationship_card: str | None = None, cold_start_line: str | None = None) -> str:
-    title = script_ctx.title or report_ctx.title or "this screenplay"
-    script_map = script_ctx.script_map()
-    map_block = f"\n\nHere is a map of the script itself:\n\n{script_map}" if script_map else ""
+                        relationship_card: str | None = None, cold_start_line: str | None = None,
+                        premise: dict | None = None) -> str:
     examples = persona_examples(persona)
     examples_block = f"\n\n{examples}" if examples else ""
-    prompt = (
-        f"{persona_text(persona)}\n\n"
-        f"{mode_text(mode)}\n\n"
-        f"{examples_block}\n"
-        f"You're discussing the screenplay \"{title}\" with its writer. Here is the "
-        f"standing analysis report for reference:\n\n{report_ctx.compact_summary()}{map_block}\n\n"
-        f"When specific scene text is relevant to the current question, it will be "
-        f"provided below as additional context for this turn. If it isn't provided "
-        f"and you need exact wording to answer precisely, say so rather than guessing "
-        f"at exact lines from memory.\n\n{GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
-    )
+    if premise is not None:
+        # Idea room: no script, no report — the premise card is the material.
+        idea_title = (premise.get("title") or "").strip() or "this idea"
+        prompt = (
+            f"{persona_text(persona)}\n\n"
+            f"{mode_text(mode)}\n\n"
+            f"{examples_block}\n"
+            f"You're developing the story idea \"{idea_title}\" with its writer. "
+            f"There are no pages yet — the idea is the material.\n\n"
+            f"PREMISE (the shared card, keeps growing as you talk):\n\n{_premise_block(premise)}\n\n"
+            f"{IDEA_GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
+        )
+    else:
+        title = script_ctx.title or report_ctx.title or "this screenplay"
+        script_map = script_ctx.script_map()
+        map_block = f"\n\nHere is a map of the script itself:\n\n{script_map}" if script_map else ""
+        prompt = (
+            f"{persona_text(persona)}\n\n"
+            f"{mode_text(mode)}\n\n"
+            f"{examples_block}\n"
+            f"You're discussing the screenplay \"{title}\" with its writer. Here is the "
+            f"standing analysis report for reference:\n\n{report_ctx.compact_summary()}{map_block}\n\n"
+            f"When specific scene text is relevant to the current question, it will be "
+            f"provided below as additional context for this turn. If it isn't provided "
+            f"and you need exact wording to answer precisely, say so rather than guessing "
+            f"at exact lines from memory.\n\n{GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
+        )
     if relationship_card:
         prompt += f"\n\n{relationship_card}"
     if cold_start_line:

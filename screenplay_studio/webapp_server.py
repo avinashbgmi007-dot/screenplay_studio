@@ -23,6 +23,7 @@ import traceback
 
 from flask import Flask, request, jsonify, send_from_directory, send_file
 
+from .ideas import IdeaStore
 from .manifest import ProjectManifest
 from .orchestrator import Orchestrator, OrchestratorError
 
@@ -331,7 +332,14 @@ def get_project(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    return jsonify(_manifest_summary(m))
+    data = _manifest_summary(m)
+    # An idea that graduated carries its premise card alongside the pages
+    try:
+        with open(os.path.join(m.project_dir, "premise.json"), "r", encoding="utf-8") as f:
+            data["premise"] = json.load(f)
+    except Exception:
+        pass
+    return jsonify(data)
 
 
 @app.route("/api/projects/<name>", methods=["DELETE"])
@@ -406,6 +414,29 @@ def get_report(name):
 
 
 # ---------- writer's margin notes ----------
+
+@app.route("/api/projects/<name>/premise", methods=["POST"])
+def save_project_premise(name):
+    """Edit the premise card that grew into this script (it rides alongside
+    the pages after an idea graduates)."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    card = (request.get_json() or {}).get("card") or {}
+    stored = {}
+    try:
+        with open(os.path.join(m.project_dir, "premise.json"), "r", encoding="utf-8") as f:
+            stored = json.load(f)
+    except Exception:
+        pass
+    for key in ("title", "logline", "premise", "questions"):
+        if key in card:
+            stored[key] = card[key]
+    with open(os.path.join(m.project_dir, "premise.json"), "w", encoding="utf-8") as f:
+        json.dump(stored, f, ensure_ascii=False, indent=2)
+    return jsonify({"premise": stored})
+
 
 @app.route("/api/projects/<name>/notes", methods=["GET"])
 def get_notes(name):
@@ -1297,6 +1328,280 @@ def refresh_writer_memory():
     recent = [m.to_dict() for m in session.branch.messages[-16:]]
     mem.refresh(client, recent)
     return jsonify({"profile": mem.to_dict(), "card": mem.card_text()})
+
+
+# ---------- idea room (scriptless story development) ----------
+
+
+def _ideas_dir() -> str:
+    return os.path.join(PROJECTS_DIR, "ideas")
+
+
+def _load_idea(idea_id: str) -> dict:
+    return IdeaStore(_ideas_dir()).load(idea_id)
+
+
+def _idea_session_payload(session) -> dict:
+    """Mirror the project get_session payload (branches, personas, fork shape)
+    so the frontend reuses the exact same rendering code for idea chats."""
+    lang_meta_mod = _import_cowriter("language_meta")
+    strip_language_meta = lang_meta_mod.strip_language_meta
+    return {
+        "session_id": session.session_id,
+        "title": session.title,
+        "current_branch": session.current_branch,
+        "branches": {
+            bname: {
+                "messages": [
+                    {**msg.to_dict(), "content": strip_language_meta(msg.content) if msg.role == "assistant" else msg.content}
+                    for msg in b.messages
+                ],
+                "parent_branch": b.parent_branch,
+                "forked_at_index": b.forked_at_index,
+                "active_persona": b.active_persona,
+                "active_mode": b.active_mode,
+            }
+            for bname, b in session.branches.items()
+        },
+    }
+
+
+def _load_idea_session_and_engine(idea_id: str, sid: str):
+    """Scriptless engine: empty script/report contexts, the premise card
+    injected every turn, the same writer relationship memory as the script
+    desk (so Sam's learning about the writer carries across the whole
+    journey, idea room through script)."""
+    store_mod = _import_cowriter("store")
+    context_mod = _import_cowriter("context")
+    engine_mod = _import_cowriter("engine")
+    llm_mod = _import_cowriter("llm_client")
+    SessionStore = store_mod.SessionStore
+    ScriptContext = context_mod.ScriptContext
+    ReportContext = context_mod.ReportContext
+    CoWriterEngine = engine_mod.CoWriterEngine
+    LlamaServerClient = llm_mod.LlamaServerClient
+
+    meta = _load_idea(idea_id)
+    store = SessionStore(IdeaStore(_ideas_dir()).sessions_dir(idea_id))
+    session = store.load(sid)
+
+    script_ctx = ScriptContext(None)
+    report_ctx = ReportContext(None)
+    client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id,
+                               timeout=CONFIG["timeout"], fallback_to_loaded=True)
+    memory = None
+    try:
+        mem_mod = _import_cowriter("memory")
+        memory = mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
+    except (CowriterUnavailableError, OSError, ValueError):
+        memory = None  # memory unavailable or unreadable — never break the chat
+    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
+                            premise=meta.get("card") or {})
+    return session, engine, store
+
+
+@app.route("/api/ideas", methods=["GET"])
+def list_ideas():
+    return jsonify(IdeaStore(_ideas_dir()).list())
+
+
+@app.route("/api/ideas", methods=["POST"])
+def create_idea():
+    body = request.get_json() or {}
+    meta = IdeaStore(_ideas_dir()).create(title=(body.get("title") or "").strip())
+    return jsonify(meta), 201
+
+
+@app.route("/api/ideas/<idea_id>", methods=["GET"])
+def get_idea(idea_id):
+    try:
+        return jsonify(_load_idea(idea_id))
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+
+
+@app.route("/api/ideas/<idea_id>/card", methods=["POST"])
+def save_idea_card(idea_id):
+    try:
+        _load_idea(idea_id)
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+    card = (request.get_json() or {}).get("card") or {}
+    meta = IdeaStore(_ideas_dir()).save_card(idea_id, card)
+    return jsonify(meta)
+
+
+@app.route("/api/ideas/<idea_id>", methods=["DELETE"])
+def delete_idea(idea_id):
+    try:
+        _load_idea(idea_id)
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+    IdeaStore(_ideas_dir()).delete(idea_id)
+    return jsonify({"deleted": idea_id})
+
+
+@app.route("/api/ideas/<idea_id>/chat/start", methods=["POST"])
+def start_idea_chat(idea_id):
+    try:
+        _load_idea(idea_id)
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+    store_mod = _import_cowriter("store")
+    llm_mod = _import_cowriter("llm_client")
+    context_mod = _import_cowriter("context")
+    SessionStore = store_mod.SessionStore
+    LlamaServerClient = llm_mod.LlamaServerClient
+    ReportContext = context_mod.ReportContext
+    try:
+        from screenplay_cowriter.discovery import resolve_model
+        client = LlamaServerClient(base_url=CONFIG["server_url"], timeout=CONFIG["timeout"], fallback_to_loaded=True)
+        model_id = resolve_model(client, ReportContext(None), explicit_model=CONFIG["model"])
+    except Exception:
+        model_id = CONFIG["model"]
+    store = SessionStore(IdeaStore(_ideas_dir()).sessions_dir(idea_id))
+    session = store.create(title="Idea room")
+    session.server_url = CONFIG["server_url"]
+    session.model_id = model_id
+    store.save(session)
+    return jsonify({"session_id": session.session_id, "branch": session.current_branch})
+
+
+@app.route("/api/ideas/<idea_id>/chat/sessions/<sid>", methods=["GET"])
+def idea_get_session(idea_id, sid):
+    try:
+        session, _, _ = _load_idea_session_and_engine(idea_id, sid)
+    except FileNotFoundError:
+        return _error("Idea or session not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return jsonify(_idea_session_payload(session))
+
+
+@app.route("/api/ideas/<idea_id>/chat/sessions/<sid>", methods=["DELETE"])
+def idea_delete_session(idea_id, sid):
+    """Clear the idea conversation — the premise card is kept."""
+    try:
+        _load_idea(idea_id)
+        store_mod = _import_cowriter("store")
+        SessionStore = store_mod.SessionStore
+        store = SessionStore(IdeaStore(_ideas_dir()).sessions_dir(idea_id))
+        store.load(sid)
+        store.delete(sid)
+    except FileNotFoundError:
+        return _error("Idea or session not found.", 404)
+    return jsonify({"deleted": sid})
+
+
+@app.route("/api/ideas/<idea_id>/chat/sessions/<sid>/messages", methods=["POST"])
+def idea_send_message(idea_id, sid):
+    body = request.get_json() or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return _error("Message text is required.", 400)
+    try:
+        session, engine, store = _load_idea_session_and_engine(idea_id, sid)
+    except FileNotFoundError:
+        return _error("Idea or session not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 500)
+    try:
+        reply = engine.send_message(session, text)
+    except Exception as e:
+        return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
+    store.save(session)
+    return jsonify({
+        "reply": reply,
+        "branch": session.current_branch,
+        "messages": [msg.to_dict() for msg in session.branch.messages],
+    })
+
+
+@app.route("/api/ideas/<idea_id>/chat/sessions/<sid>/settings", methods=["POST"])
+def idea_update_settings(idea_id, sid):
+    """Room toggle in the idea room swaps the lens: Co-write = Sam (explore),
+    Feedback = premise doctor (validate) — same conversation, new partner."""
+    body = request.get_json() or {}
+    try:
+        session, _, store = _load_idea_session_and_engine(idea_id, sid)
+    except FileNotFoundError:
+        return _error("Idea or session not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 500)
+    personas_mod = _import_cowriter("personas")
+    PERSONAS = personas_mod.PERSONAS
+    MODES = personas_mod.MODES
+    persona = body.get("persona")
+    mode = body.get("mode")
+    if persona is not None and persona not in PERSONAS:
+        return _error(f"Unknown persona '{persona}'.", 400)
+    if mode is not None and mode not in MODES:
+        return _error(f"Unknown mode '{mode}'.", 400)
+    branch = session.branch
+    if persona:
+        branch.active_persona = persona
+    if mode:
+        branch.active_mode = mode
+    store.save(session)
+    return jsonify({"active_persona": branch.active_persona, "active_mode": branch.active_mode})
+
+
+@app.route("/api/ideas/<idea_id>/graduate", methods=["POST"])
+def graduate_idea(idea_id):
+    """Upload the first pages: create a real project from the file, carry the
+    premise card (premise.json) and the idea conversation (session files) so
+    the thread continues on the script desk — same Sam, same memory."""
+    if "file" not in request.files:
+        return _error("No file uploaded (expected multipart field 'file').", 400)
+    upload = request.files["file"]
+    if not upload.filename:
+        return _error("Empty filename.", 400)
+    try:
+        _load_idea(idea_id)
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+
+    title = request.form.get("title") or os.path.splitext(upload.filename)[0]
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in title) or "project"
+    project_dir = _project_dir(safe_name)
+    suffix = 1
+    while os.path.exists(project_dir):
+        suffix += 1
+        project_dir = _project_dir(f"{safe_name}_{suffix}")
+
+    os.makedirs(project_dir, exist_ok=True)
+    ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
+    tmp_path = os.path.join(project_dir, f"_upload{ext}")
+    upload.save(tmp_path)
+    try:
+        manifest = ProjectManifest.create(project_dir, tmp_path, title=title)
+        manifest.server_url = CONFIG["server_url"]
+        manifest.timeout = CONFIG["timeout"]
+        manifest.model_id = CONFIG["model"]
+        manifest.save()
+        os.remove(tmp_path)
+        Orchestrator(manifest).run_parse()
+    except Exception as e:
+        return _error(f"Could not process uploaded file: {e}", 500)
+
+    try:
+        IdeaStore(_ideas_dir()).carry_into_project(idea_id, project_dir)
+    except Exception:
+        pass  # the pages are the point; a failed carry never blocks graduation
+
+    # pin the carried conversation so the script desk opens on the same thread
+    try:
+        sessions = sorted(
+            fn for fn in os.listdir(os.path.join(project_dir, "sessions")) if fn.endswith(".json")
+        )
+        if sessions:
+            latest = max(sessions, key=lambda fn: os.path.getmtime(os.path.join(project_dir, "sessions", fn)))
+            manifest.cowriter_session_id = os.path.splitext(latest)[0]
+            manifest.save()
+    except Exception:
+        pass
+
+    return jsonify(_manifest_summary(manifest)), 201
 
 
 def main():
