@@ -58,7 +58,7 @@ class ProjectManifest:
     cowriter_session_id: str = None
     drafts: list = field(default_factory=list)  # [{name, source_filename, uploaded_at}] — uploaded drafts
     active_draft: str = None  # None => the original first upload is active
-    report_language: str = "eng"  # language of the analysis report: eng | tenglish | hindi | tamil
+    report_language: str = "eng"  # language of the analysis report: eng | tenglish | hindi | telugu | tamil
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 

@@ -177,15 +177,15 @@ def test_idea_with_reasoning_gets_full_turn():
 def test_probe_abandoned_on_topic_change():
     client = FakeClient([
         "So the idea is Mara dies at the end. What's pulling you toward that?",  # probe reply
-        "Sure, scene 14. What's bugging you about it?",                          # full-turn reply
+        "Sure, that scene. What's bugging you about it?",                        # full-turn reply
     ])
     engine = _make_engine(client)
     s = _make_session()
     engine.send_message(s, "Mara should die at the end")  # probes
     assert s.branch.awaiting_probe is True
-    reply = engine.send_message(s, "what about scene 14?")  # question -> abandon
+    reply = engine.send_message(s, "what about the scene with the reveal?")  # question -> abandon
     assert s.branch.awaiting_probe is False
-    assert reply == "Sure, scene 14. What's bugging you about it?"
+    assert reply == "Sure, that scene. What's bugging you about it?"
 
 
 def test_probe_continuation_clears_flag_and_answers():

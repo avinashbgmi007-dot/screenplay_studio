@@ -17,8 +17,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from screenplay_cowriter.language_meta import (
     strip_language_meta, strip_json_wrap, strip_repetition_lines, strip_repeated_blocks,
 )
-from screenplay_cowriter.context import build_system_prompt, ScriptContext, ReportContext, LANGUAGE_META_INSTRUCTION, PLAIN_TEXT_INSTRUCTION
-from screenplay_cowriter.engine import CoWriterEngine, clean_reply, REPEAT_PENALTY
+from screenplay_cowriter.context import (
+    build_system_prompt, ScriptContext, ReportContext,
+    LANGUAGE_META_INSTRUCTION, PLAIN_TEXT_INSTRUCTION, GROUNDING_INSTRUCTION,
+    resolve_referenced_scenes,
+)
+from screenplay_cowriter.engine import CoWriterEngine, clean_reply, _ground_reply, REPEAT_PENALTY
 from screenplay_cowriter.llm_client import LlamaServerClient, ModelNotFoundError
 from screenplay_cowriter.models import Session, Message
 
@@ -543,3 +547,113 @@ class TestModelFallback:
         client = LlamaServerClient(mock_server, model="ghost-model.gguf", fallback_to_loaded=True)
         reply = client.chat([{"role": "user", "content": "hi"}])
         assert "[mock chat reply]" in reply  # the mock's loaded model answered
+
+
+class TestGrounding:
+    """The knowledge boundary: never invent script content that isn't in the
+    provided material — the hallucination guard, stated in the prompt."""
+
+    def _prompt(self, persona="writing_partner"):
+        return build_system_prompt(
+            ScriptContext({"title": "T"}), ReportContext(None), persona, "peer"
+        )
+
+    def test_system_prompt_contains_grounding_rule(self):
+        assert GROUNDING_INSTRUCTION in self._prompt()
+        assert "Never invent a scene" in self._prompt()
+
+    def test_grounding_applies_to_all_personas(self):
+        for persona in ("writing_partner", "script_consultant", "producer", "dev_exec", "teacher", "audience", "genre_specialist"):
+            assert "Never invent a scene" in self._prompt(persona)
+
+
+class TestCharacterSceneResolution:
+    """Writers ask about their script by naming people ('what's Rishi's deal?').
+    Those mentions must resolve to the scenes where the character actually
+    speaks, so the model gets real text to ground on instead of inventing."""
+
+    def _script(self):
+        return ScriptContext({"title": "T", "scenes": [
+            {"scene_number": 1, "heading_raw": "EXT. ROAD - NIGHT", "elements": [
+                {"type": "character", "text": "DOCTOR (O.S.)"},
+                {"type": "dialogue", "text": "We are late."},
+            ]},
+            {"scene_number": 2, "heading_raw": "INT. HALL - DAY", "elements": [
+                {"type": "character", "text": "RISHI"},
+                {"type": "dialogue", "text": "Where is he?"},
+                {"type": "character", "text": "DOCTOR (CONT'D)"},
+                {"type": "dialogue", "text": "Coming."},
+            ]},
+            {"scene_number": 3, "heading_raw": "INT. CAR - NIGHT", "elements": [
+                {"type": "character", "text": "RISHI"},
+                {"type": "dialogue", "text": "Not a word of this."},
+            ]},
+            {"scene_number": 4, "heading_raw": "INT. HOSPITAL - NIGHT", "elements": [
+                {"type": "character", "text": "SIDDHARTH"},
+                {"type": "dialogue", "text": "He can't know."},
+            ]},
+            {"scene_number": 5, "heading_raw": "EXT. ALLEY - NIGHT", "elements": [
+                {"type": "character", "text": "GOON_TWO"},
+                {"type": "dialogue", "text": "Move."},
+            ]},
+        ]})
+
+    def test_character_mention_resolves_to_their_scenes(self):
+        assert resolve_referenced_scenes("what's Rishi's deal in the hall?", self._script()) == [2, 3]
+
+    def test_case_insensitive_mention(self):
+        assert resolve_referenced_scenes("the doctor is interesting", self._script()) == [1, 2]
+
+    def test_extension_stripped_base_name_matches(self):
+        # 'DOCTOR (O.S.)' in the script must match a plain 'doctor' mention
+        assert 1 in resolve_referenced_scenes("Doctor arrives late", self._script())
+
+    def test_explicit_scene_and_character_union(self):
+        assert resolve_referenced_scenes("scene 1, and what about Rishi", self._script()) == [1, 2, 3]
+
+    def test_no_mention_no_injection(self):
+        assert resolve_referenced_scenes("the pacing feels slow", self._script()) == []
+
+    def test_character_name_not_a_common_word_substring(self):
+        # 'AM' is below CHAR_MIN_LEN — 'I am writing' must not resolve anything
+        assert resolve_referenced_scenes("I am writing a new draft", self._script()) == []
+
+    def test_nickname_resolves_to_full_name(self):
+        # 'siddhu' ~ SIDDHARTH — the writer's everyday name for the character
+        assert resolve_referenced_scenes("tell me about siddhu", self._script()) == [4]
+
+    def test_plural_prefix_matches_underscore_name(self):
+        # 'the goons' -> GOON (first token of GOON_TWO)
+        assert resolve_referenced_scenes("the goons show up", self._script()) == [5]
+
+    def test_short_prefix_matches_name(self):
+        # 'doc' -> DOCTOR via prefix (word >= CHAR_MIN_LEN)
+        assert resolve_referenced_scenes("doc is interesting", self._script()) == [1, 2]
+
+    def test_unrelated_word_does_not_fuzzy_match(self):
+        # 'ravi' vs RAHUL scores well below the bar — must not resolve
+        assert resolve_referenced_scenes("ravi is the hero", self._script()) == []
+
+
+class TestGroundReply:
+    """Reply-side hallucination guard: a scene number the model invents that
+    doesn't exist in the script gets owned honestly instead of left standing."""
+
+    def _script(self):
+        return ScriptContext({"title": "T", "scenes": [
+            {"scene_number": 1, "heading_raw": "EXT. ROAD - NIGHT", "elements": []},
+            {"scene_number": 2, "heading_raw": "INT. HALL - DAY", "elements": []},
+        ]})
+
+    def test_unknown_scene_flagged(self):
+        out = _ground_reply("The scene 27 reveal lands hard.", self._script())
+        assert "scene 27" in out
+        assert "One honest flag" in out
+
+    def test_valid_scene_reference_untouched(self):
+        reply = "Scene 2 sets up the pay-off well."
+        assert _ground_reply(reply, self._script()) == reply
+
+    def test_no_scene_reference_untouched(self):
+        reply = "The pacing drags in act two."
+        assert _ground_reply(reply, self._script()) == reply

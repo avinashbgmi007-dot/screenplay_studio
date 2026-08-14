@@ -482,6 +482,7 @@ function startAnalysisProgressUI(startedAt, resumed = false) {
   const btn = $("#analyze-btn");
   const chip = $("#analyze-progress");
   btn.disabled = true;
+  btn.classList.add("analyzing");
   chip.style.display = "flex";
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   let currentKey = "formatting";
@@ -580,7 +581,7 @@ function hideAnalysisProgressUI() {
   const chip = $("#analyze-progress");
   if (chip) chip.style.display = "none";
   const btn = $("#analyze-btn");
-  if (btn) btn.disabled = false;
+  if (btn) { btn.disabled = false; btn.classList.remove("analyzing"); }
 }
 
 async function runAnalysis() {

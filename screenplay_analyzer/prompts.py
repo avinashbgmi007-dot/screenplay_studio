@@ -75,6 +75,11 @@ REPORT_LANGUAGES = {
         "Keep English for technical craft terms (scene, act, arc, pacing, premise). "
         "Exception: evidence_quote must remain verbatim from the script, never translated."
     ),
+    "telugu": (
+        "\n\nIMPORTANT — Write your entire response in Telugu, in Telugu script (తెలుగు). "
+        "Keep English for technical craft terms (scene, act, arc, pacing, premise). "
+        "Exception: evidence_quote must remain verbatim from the script, never translated."
+    ),
     "tamil": (
         "\n\nIMPORTANT — Write your entire response in Tamil, in Tamil script. "
         "Keep English for technical craft terms (scene, act, arc, pacing, premise). "

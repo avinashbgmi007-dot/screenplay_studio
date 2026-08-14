@@ -252,7 +252,14 @@ class Orchestrator:
 
             store = SessionStore(m.sessions_dir)
             if m.cowriter_session_id:
-                session = store.load(m.cowriter_session_id)
+                try:
+                    session = store.load(m.cowriter_session_id)
+                except FileNotFoundError:
+                    # The manifest's session was deleted (Clear chat does
+                    # DELETE then start) — recover by starting a fresh page
+                    # instead of bricking chat with a 502.
+                    session = store.create(title=m.title, report_path=report_path, script_path=m.parsed_path)
+                    m.cowriter_session_id = session.session_id
             else:
                 session = store.create(title=m.title, report_path=report_path, script_path=m.parsed_path)
                 m.cowriter_session_id = session.session_id

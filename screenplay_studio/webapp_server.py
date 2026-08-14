@@ -1139,6 +1139,12 @@ def delete_session(name, sid):
         store = SessionStore(m.sessions_dir)
         store.load(sid)  # strict: 404 if the session doesn't exist
         store.delete(sid)
+        # never leave the manifest pointing at a deleted session — start_chat
+        # would otherwise 502 on the next message (Clear chat deletes then
+        # starts fresh)
+        if m.cowriter_session_id == sid:
+            m.cowriter_session_id = None
+            m.save()
     except FileNotFoundError:
         return _error("Session or project not found.", 404)
     return jsonify({"deleted": sid})

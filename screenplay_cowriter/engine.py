@@ -7,7 +7,10 @@ free operations that don't need a model call — this module handles only the
 
 from .models import Session, Message
 from .llm_client import LlamaServerClient
-from .context import ScriptContext, ReportContext, build_system_prompt, build_scene_context_block, extract_scene_refs
+from .context import (
+    ScriptContext, ReportContext, build_system_prompt, build_scene_context_block,
+    resolve_referenced_scenes, SCENE_REF_RE,
+)
 from .language_meta import (
     strip_language_meta, strip_json_wrap, strip_repetition_lines, strip_repeated_blocks,
 )
@@ -32,6 +35,24 @@ def clean_reply(raw: str) -> str:
     semantic repetition blocks, then strip language meta-commentary."""
     return strip_language_meta(
         strip_repeated_blocks(strip_repetition_lines(strip_json_wrap(raw)))
+    )
+
+
+def _ground_reply(reply: str, script_ctx: ScriptContext) -> str:
+    """Reply-side hallucination guard. If the reply references a scene number
+    that doesn't exist in the script, own it honestly instead of letting the
+    invented scene stand — a real co-writer caught reaching for a page they
+    don't have would say so. Cheap and safe: only flags numbers outside the
+    script's actual scene set, so genuine references pass untouched."""
+    refs = sorted({int(n) for n in SCENE_REF_RE.findall(reply)})
+    unknown = [n for n in refs if not script_ctx.has_scene(n)]
+    if not unknown:
+        return reply
+    reply = reply.rstrip()
+    return (
+        f"{reply}\n\n(One honest flag: I said \"scene {unknown[0]}\" — I don't "
+        "actually see that scene in the script I'm holding. Point me at the right "
+        "one and I'll dig in properly.)"
     )
 
 
@@ -104,7 +125,10 @@ class CoWriterEngine:
             cold_start_line = None
         relationship_card = self.memory.card_text() if self.memory is not None else None
 
-        scene_refs = extract_scene_refs(user_text)
+        # Explicit 'scene N' mentions plus scenes where a named character
+        # speaks — writers ask about their script by naming people, and the
+        # model can only ground on text it's actually shown.
+        scene_refs = resolve_referenced_scenes(user_text, self.script_ctx)
         if quote is not None and quote["scene_number"] is not None and quote["scene_number"] not in scene_refs:
             scene_refs.append(quote["scene_number"])
 
@@ -152,6 +176,7 @@ class CoWriterEngine:
             except Exception:
                 branch.awaiting_probe = False  # never strand the writer mid-probe
                 raise
+            reply = _ground_reply(reply, self.script_ctx)
             branch.awaiting_probe = True
         else:
             system_prompt = build_system_prompt(
@@ -168,6 +193,7 @@ class CoWriterEngine:
                 messages.append({"role": m.role, "content": m.content})
             messages.append({"role": "user", "content": prompt_user})
             reply = clean_reply(self.client.chat(messages, max_tokens=600, repeat_penalty=REPEAT_PENALTY))
+            reply = _ground_reply(reply, self.script_ctx)
             reply = cap_suggestions(reply)
 
         reply = ensure_forward_momentum(reply, turn_kind)

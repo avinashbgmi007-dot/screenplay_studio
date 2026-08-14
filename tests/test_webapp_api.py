@@ -207,6 +207,28 @@ class TestChatFlow:
         resp = http_client.post(f"/api/projects/{project}/chat/sessions/{sid}/messages", json={"text": "  "})
         assert resp.status_code == 400
 
+    def test_delete_session_then_start_recovers(self, http_client):
+        """Clear chat = DELETE then chat/start. The manifest must never be
+        left pointing at a deleted session (which 502'd the fresh page)."""
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+
+        del_resp = http_client.delete(f"/api/projects/{project}/chat/sessions/{sid}")
+        assert del_resp.status_code == 200
+
+        # a second start must recover with a fresh session, not 502
+        resp = http_client.post(f"/api/projects/{project}/chat/start")
+        assert resp.status_code == 200
+        assert resp.get_json()["session_id"] != sid
+
+    def test_delete_session_clears_manifest_reference(self, http_client):
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+        http_client.delete(f"/api/projects/{project}/chat/sessions/{sid}")
+        from screenplay_studio.manifest import ProjectManifest
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        assert m.cowriter_session_id is None
+
     def test_fork_and_isolation(self, http_client):
         project = self._setup_analyzed_project(http_client)
         sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]

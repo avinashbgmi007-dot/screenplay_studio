@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import re
+from difflib import SequenceMatcher
 
 from .personas import persona_text, persona_examples, mode_text
 
@@ -53,6 +54,23 @@ PLAIN_TEXT_INSTRUCTION = (
     "or simple sentences instead."
 )
 
+# Local models fill gaps in the provided material by inventing plausible
+# script content — a scene that doesn't exist, a line nobody said, a name not
+# in the pages. That reads as hallucination to the writer. State the knowledge
+# boundary plainly every turn: specificity must come from the pages or the
+# writer, never from guessing (the character-AI playbook: the companion only
+# knows what it has been shown, and its honesty about the gap is what makes it
+# feel like a real collaborator rather than a bot performing helpfulness).
+GROUNDING_INSTRUCTION = (
+    "GROUNDING — Only refer to what is actually in the script text and report "
+    "provided to you. Never invent a scene, a line, an action, a name, or a "
+    "detail that isn't in that material. If something isn't in front of you "
+    "(e.g. the exact wording of a scene you haven't been shown), say so plainly "
+    "— 'I don't have that scene in front of me — where does it happen?' — and "
+    "ask, rather than guessing to sound helpful. If you quote the script, quote "
+    "it exactly."
+)
+
 
 def load_json(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
@@ -82,6 +100,28 @@ class ScriptContext:
     def has_scene(self, scene_number: int) -> bool:
         return scene_number in self._by_scene
 
+    def character_presence(self) -> dict:
+        """Map of base character name (uppercase, extension stripped) to the
+        sorted scene numbers where they speak. Computed once and reused by the
+        script map and by character-mention scene resolution."""
+        if getattr(self, "_characters", None) is None:
+            chars: dict[str, list[int]] = {}
+            for s in self.data.get("scenes", []):
+                num = s.get("scene_number")
+                for el in s.get("elements", []):
+                    if el.get("type") == "character":
+                        name = (el.get("text") or "").strip().upper()
+                        # keep the base name (strip extensions like (O.S.)/(CONT'D))
+                        base = name.split("(")[0].strip()
+                        if base:
+                            chars.setdefault(base, [])
+                            if num not in chars[base]:
+                                chars[base].append(num)
+            for scenes in chars.values():
+                scenes.sort()
+            self._characters = chars
+        return self._characters
+
     def script_map(self, max_characters: int = 24) -> str:
         """A compact standing map of the script: scene headings plus which
         characters appear where. Cheap enough to ride in the system prompt
@@ -97,18 +137,7 @@ class ScriptContext:
             heading = s.get("heading_raw") or s.get("heading") or ""
             lines.append(f"Scene {num}: {heading}")
 
-        chars: dict[str, list[int]] = {}
-        for s in scenes:
-            num = s.get("scene_number")
-            for el in s.get("elements", []):
-                if el.get("type") == "character":
-                    name = (el.get("text") or "").strip().upper()
-                    # keep the base name (strip extensions like (O.S.)/(CONT'D))
-                    base = name.split("(")[0].strip()
-                    if base:
-                        chars.setdefault(base, [])
-                        if num not in chars[base]:
-                            chars[base].append(num)
+        chars = self.character_presence()
         if chars:
             ordered = sorted(chars.items(), key=lambda kv: -len(kv[1]))[:max_characters]
             lines.append("CHARACTER PRESENCE (scene numbers where each appears):")
@@ -184,7 +213,7 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         f"When specific scene text is relevant to the current question, it will be "
         f"provided below as additional context for this turn. If it isn't provided "
         f"and you need exact wording to answer precisely, say so rather than guessing "
-        f"at exact lines from memory.\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
+        f"at exact lines from memory.\n\n{GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
     )
     if relationship_card:
         prompt += f"\n\n{relationship_card}"
@@ -195,6 +224,73 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
 
 def extract_scene_refs(text: str) -> list:
     return sorted(set(int(n) for n in SCENE_REF_RE.findall(text)))[:MAX_SCENES_INJECTED_PER_TURN]
+
+
+CHAR_MIN_LEN = 3  # ignore very short names ("AM", "JO") to avoid false-positive word matches
+FUZZY_RATIO = 0.58  # nickname tier: 'siddhu' ~ 'SIDDHARTH' scores 0.67; 'ravi' ~ 'RAHUL' 0.44
+
+
+def extract_character_refs(text: str, script_ctx: ScriptContext) -> list:
+    """Base character names from the script that the text mentions. Writers
+    ask about their script by naming people ('what's Rishi's deal in the
+    hospital?'), often in shorthand (nicknames, plurals, truncated forms —
+    'siddhu', 'the goons', 'doc'). Mentions resolve to the scenes where that
+    character actually speaks, so the model gets real text to ground on.
+
+    Four tiers, least to most permissive: whole-name match, name-token match
+    (GOON_TWO -> 'goon'), prefix match both directions ('goons' -> GOON,
+    'siddh' -> SIDDHARTH), then a fuzzy best-match for diminutives
+    ('siddhu' -> SIDDHARTH). Only the single closest fuzzy candidate wins,
+    which keeps accidental lookalikes out."""
+    t = text or ""
+    words = re.findall(r"[A-Za-z][A-Za-z']{2,}", t)  # user words, len >= 3
+    presence = script_ctx.character_presence()
+    found = []
+
+    for name in presence:
+        if len(name) < CHAR_MIN_LEN:
+            continue
+        # 1) whole-name, word-boundary, case-insensitive
+        if re.search(rf"\b{re.escape(name)}\b", t, re.I):
+            found.append(name)
+            continue
+        # 2) any name token as a whole word (GOON_TWO -> 'goon', 'senior')
+        tokens = [tok for tok in re.split(r"[\s_]+", name) if len(tok) >= 4]
+        if any(re.search(rf"\b{re.escape(tok)}\b", t, re.I) for tok in tokens):
+            found.append(name)
+            continue
+        # 3) prefix match either direction against a user word ('doc' ->
+        #    DOCTOR, 'goons' -> GOON, 'siddh' -> SIDDHARTH)
+        if any(len(w) >= CHAR_MIN_LEN and (w.upper().startswith(name) or name.startswith(w.upper())) for w in words):
+            found.append(name)
+            continue
+        # 4) fuzzy best-match across names (diminutives): only the closest
+        #    candidate, and only when it clears the similarity bar
+        best, best_r = None, 0.0
+        for other in presence:
+            if len(other) < 4:
+                continue
+            r = max(SequenceMatcher(None, other, w.upper()).ratio() for w in words if len(w) >= 4)
+            if r > best_r:
+                best, best_r = other, r
+        if best and best_r >= FUZZY_RATIO and best not in found:
+            found.append(best)
+    return found
+
+
+def resolve_referenced_scenes(text: str, script_ctx: ScriptContext,
+                              max_n: int = MAX_SCENES_INJECTED_PER_TURN) -> list:
+    """Scene numbers worth pulling into this turn's context: explicit
+    'scene N' mentions plus every scene where a named character speaks.
+    Character mentions are how writers actually refer to their script —
+    without them the model answers from the map + report alone and fills the
+    gaps by inventing. The cap keeps context growth bounded on long chats."""
+    refs = extract_scene_refs(text)
+    for name in extract_character_refs(text, script_ctx):
+        for n in script_ctx.character_presence()[name]:
+            if n not in refs:
+                refs.append(n)
+    return sorted(refs)[:max_n]
 
 
 def build_scene_context_block(script_ctx: ScriptContext, scene_numbers: list):

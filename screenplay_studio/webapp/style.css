@@ -64,6 +64,7 @@ body[data-room="feedback"] { --accent: var(--consult); --accent-deep: var(--cons
 html, body {
   height: 100%;
   margin: 0;
+  overflow-x: hidden; /* a full-screen app should never gain a sideways scrollbar */
   background: var(--ink-950);
   color: var(--text);
   font-family: var(--font-serif);
@@ -1318,7 +1319,13 @@ body::after {
 .feedback-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  /* wrap + shrink: the live "Analyzing — <stage> — %" button and the progress
+     chip must never push the room wider than the pane (which scrolled the
+     whole page sideways). On a narrow room the right cluster wraps to a
+     second row instead of overflowing. */
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 8px 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line-soft);
   flex: 0 0 auto;
@@ -1327,6 +1334,7 @@ body::after {
      (child z-index 47) is never dimmed or clipped */
   z-index: 46;
 }
+.feedback-header > div:first-child { flex: 0 0 auto; min-width: 0; }
 .feedback-title { font-family: var(--font-typewriter); font-size: 14.5px; color: var(--text); }
 .feedback-sub {
   font-family: var(--font-mono);
@@ -1336,7 +1344,7 @@ body::after {
   color: var(--text-muted);
   margin-top: 2px;
 }
-.feedback-header .control-label { margin-left: auto; }
+.feedback-header .control-label { margin-left: auto; flex: 0 0 auto; }
 
 .feedback-tabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--line-soft); flex: 0 0 auto; position: relative; z-index: 2; }
 .feedback-tabs button {
@@ -1390,6 +1398,7 @@ body::after {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 6px;
   padding: 5px 9px;
   border-radius: 999px;
@@ -1404,6 +1413,11 @@ body::after {
 .ap-bar-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-deep), var(--accent-bright)); transition: width 0.6s ease; }
 .ap-pct { color: var(--accent-bright); font-weight: 500; min-width: 30px; text-align: right; }
 .ap-eta { color: var(--text-faint); white-space: nowrap; }
+
+/* the Analyze button's live text ("Analyzing — Character arcs — 34%") can get
+   long; let it shrink and ellipsize instead of widening the page */
+#analyze-btn { flex-shrink: 1; min-width: 0; white-space: nowrap; }
+#analyze-btn.analyzing { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
 
 .analyze-pipeline {
   /* Opens DOWNWARD from the header chip: the chip sits near the top of the
