@@ -532,13 +532,26 @@ function startAnalysisProgressUI(startedAt, resumed = false) {
   const poll = setInterval(async () => {
     try {
       const p = await api(`${base}/progress`);
-      if (p.stage === "done" || p.stage === "failed") {
+      if (p.stage === "done") {
         // the run finished on its own (e.g. this page resumed mid-analysis)
         clearInterval(poll);
         clearInterval(timer);
         finished = true;
         analysisUi = null;
         hideAnalysisProgressUI();
+        await loadProjects();
+        return;
+      }
+      if (p.stage === "stalled" || p.stage === "failed") {
+        // the run died (crash/stall) — stop pretending and say so plainly
+        clearInterval(poll);
+        clearInterval(timer);
+        finished = true;
+        analysisUi = null;
+        hideAnalysisProgressUI();
+        appendSystemNote(p.stage === "stalled"
+          ? "Analysis appears to have stopped mid-run — the connection to the run was lost. Re-run Analysis to start fresh."
+          : "Analysis failed — see the message in the conversation for details. You can re-run it.", true);
         await loadProjects();
         return;
       }

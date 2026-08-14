@@ -725,7 +725,14 @@ def export_beatboard(name):
 
 @app.route("/api/projects/<name>/progress", methods=["GET"])
 def get_progress(name):
-    """Latest per-stage analysis progress (written by the pipeline callback)."""
+    """Latest per-stage analysis progress (written by the pipeline callback).
+
+    A run that dies hard (killed process, OOM, crash) leaves no done/failed
+    write behind, so the last 'running' event would otherwise lie forever.
+    Every progress write carries a ts heartbeat: if a 'running' file has gone
+    silent for STALL_SECONDS, treat the run as dead and heal the manifest so
+    every consumer (shelf chip, report 400, fix queue) agrees."""
+    STALL_SECONDS = 30 * 60  # generous: one heavy stage on a big script can take 20+ min
     try:
         m = _load_manifest(name)
     except FileNotFoundError:
@@ -734,7 +741,22 @@ def get_progress(name):
         stage = m.stage("analyze").status
         return jsonify({"stage": "done" if stage == "complete" else "idle", "status": "complete" if stage == "complete" else "idle", "detail": ""})
     with open(m.progress_path, "r", encoding="utf-8") as f:
-        return jsonify(json.load(f))
+        data = json.load(f)
+    # ts is the heartbeat written by every run since the fix; a file without
+    # it is guaranteed legacy (all current runs stamp it), so its own mtime is
+    # the best available signal for when the dead run last wrote.
+    ts = data.get("ts") or os.path.getmtime(m.progress_path)
+    if data.get("status") == "running" and time.time() - ts > STALL_SECONDS:
+        try:
+            os.remove(m.progress_path)
+        except OSError:
+            pass
+        m.mark_failed("analyze", "Analysis stopped mid-run (no progress for 30+ minutes). Re-run to start fresh.")
+        return jsonify({
+            "stage": "stalled", "status": "stalled",
+            "detail": "Analysis appears to have stopped — no progress for 30+ minutes. Re-run Analysis to start fresh.",
+        })
+    return jsonify(data)
 
 
 # ---------- prioritized fix queue ----------

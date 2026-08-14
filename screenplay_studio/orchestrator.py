@@ -142,11 +142,17 @@ class Orchestrator:
             from screenplay_analyzer.report import save_report
 
             def progress_cb(event):
+                import time as _t
+                # ts = heartbeat: lets the webapp distinguish "still running"
+                # from "the process died mid-stage" (a hard crash leaves no
+                # done/failed write behind — without a timestamp that stale
+                # 'running' file would lie forever).
                 with open(m.progress_path, "w", encoding="utf-8") as f:
-                    _json.dump(event, f)
+                    _json.dump(dict(event, ts=_t.time()), f)
 
             doc = ScriptDocument.load(m.parsed_path)
-            client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout)
+            client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
+                                       fallback_to_loaded=True)
 
             kwargs = {"report_language": language}
             if categories:
@@ -173,8 +179,9 @@ class Orchestrator:
                 _merge_analysis(m, result)
 
             save_report(result, m.report_md_path, m.report_findings_path)
+            import time as _t
             with open(m.progress_path, "w", encoding="utf-8") as f:
-                _json.dump({"stage": "done", "status": "complete", "detail": "Analysis complete"}, f)
+                _json.dump({"stage": "done", "status": "complete", "detail": "Analysis complete", "ts": _t.time()}, f)
 
             if result.model_used:
                 m.model_id = result.model_used
@@ -207,9 +214,10 @@ class Orchestrator:
                 })
         except Exception as e:
             import json as _json2
+            import time as _t2
             try:
                 with open(m.progress_path, "w", encoding="utf-8") as f:
-                    _json2.dump({"stage": "failed", "status": "failed", "detail": str(e)}, f)
+                    _json2.dump({"stage": "failed", "status": "failed", "detail": str(e), "ts": _t2.time()}, f)
             except Exception:
                 pass
             m.mark_failed("analyze", str(e))

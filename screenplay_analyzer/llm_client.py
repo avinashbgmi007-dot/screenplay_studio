@@ -119,11 +119,19 @@ def _diagnose_parse_failure(error: Exception, choice: dict, data: dict, content:
 
 
 class LlamaServerClient:
-    def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None):
+    def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None,
+                 fallback_to_loaded: bool = False):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.extra_headers = extra_headers or {}
+        # When True, a pinned-but-unloaded model id falls back to whatever the
+        # server has loaded instead of raising. Used where the model id is a
+        # *remembered preference* (manifest pins) rather than an explicit
+        # choice — swapping the loaded model must not brick an analysis run
+        # that's minutes in. The CLI stays strict: an explicit --model must
+        # be loaded.
+        self.fallback_to_loaded = fallback_to_loaded
         self._resolved_model: str | None = None
 
     def list_models(self) -> list[dict]:
@@ -156,10 +164,13 @@ class LlamaServerClient:
 
         if self.model:
             if self.model not in available_ids:
-                raise ModelNotFoundError(
-                    f"Requested model '{self.model}' is not loaded at {self.base_url}. "
-                    f"Available: {available_ids}"
-                )
+                if self.fallback_to_loaded:
+                    self.model = available_ids[0]
+                else:
+                    raise ModelNotFoundError(
+                        f"Requested model '{self.model}' is not loaded at {self.base_url}. "
+                        f"Available: {available_ids}"
+                    )
             self._resolved_model = self.model
         else:
             # no explicit model requested — llama-server serves one model per
@@ -208,6 +219,17 @@ class LlamaServerClient:
             payload["chat_template_kwargs"]["enable_thinking"] = False
 
         last_error = None
+        # llama-server is single-occupancy: a request arriving while another
+        # generation is in flight (e.g. the writer chats while this analysis
+        # grinds) gets a busy error instead of queueing. Bounded retry with
+        # linear backoff lets the losing side wait and go again instead of
+        # failing the category. 400 is also used for genuine bad requests, so
+        # only retry when the body actually sounds busy; 429/503 are busy by
+        # definition.
+        _BUSY_STATUS = (400, 429, 503)
+        _BUSY_BODY = re.compile(r"(busy|in progress|already running|another request)", re.IGNORECASE)
+        _MAX_BUSY = 6
+        _busy = 0
         for attempt in range(retries + 1):
             try:
                 resp = requests.post(
@@ -216,6 +238,12 @@ class LlamaServerClient:
                     timeout=self.timeout,
                     headers=self.extra_headers,
                 )
+                status = getattr(resp, "status_code", 200)
+                if status in _BUSY_STATUS and _busy < _MAX_BUSY:
+                    if status in (429, 503) or _BUSY_BODY.search(getattr(resp, "text", "") or ""):
+                        _busy += 1
+                        time.sleep(1.5 * _busy)
+                        continue
                 resp.raise_for_status()
                 data = resp.json()
             except requests.exceptions.Timeout as e:

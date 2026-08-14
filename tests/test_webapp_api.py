@@ -401,3 +401,98 @@ class TestConnectionTest:
         http_client.post("/api/config", json={"server_url": mock_server})
         resp = http_client.post("/api/test-connection", json={})
         assert resp.get_json()["ok"] is True
+
+
+class TestProgressStall:
+    """A hard-crashed analysis leaves a 'running' progress file with no
+    done/failed write. The heartbeat ts must let the API detect the stall,
+    report it as 'stalled', and heal the manifest so the UI stops lying."""
+
+    def _upload_only(self, http_client):
+        return _upload(http_client).get_json()["project"]
+
+    def test_stale_running_progress_reports_stalled_and_heals_manifest(self, http_client):
+        import json
+        import time
+
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_running("analyze")  # simulate: run started, then died hard
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            json.dump({"stage": "dialogue", "status": "running", "detail": "Reading dialogue & action",
+                       "ts": time.time() - 3600}, f)
+
+        resp = http_client.get(f"/api/projects/{project}/progress")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["stage"] == "stalled"
+        assert data["status"] == "stalled"
+
+        # manifest healed: analyze is failed now, not running — every consumer
+        # (shelf chip, report 400, fix queue) agrees the run is dead
+        m2 = ProjectManifest.load(webapp_server._project_dir(project))
+        assert m2.stage("analyze").status == "failed"
+        assert not os.path.exists(m.progress_path)
+
+    def test_fresh_running_progress_not_stalled(self, http_client):
+        import json
+        import time
+
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_running("analyze")
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            json.dump({"stage": "dialogue", "status": "running", "detail": "Reading dialogue & action",
+                       "ts": time.time() - 60}, f)
+
+        resp = http_client.get(f"/api/projects/{project}/progress")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["stage"] == "dialogue"
+        assert data["status"] == "running"
+
+    def test_legacy_progress_without_ts_left_alone(self, http_client):
+        import json
+
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_running("analyze")
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            json.dump({"stage": "dialogue", "status": "running", "detail": "Reading dialogue & action"}, f)
+
+        resp = http_client.get(f"/api/projects/{project}/progress")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        # no ts, but the file is FRESH (just written) → still a live run
+        assert data["status"] == "running"
+        assert os.path.exists(m.progress_path)
+
+    def test_stale_legacy_progress_without_ts_heals_too(self, http_client):
+        """A legacy (pre-ts) 'running' file is guaranteed to be from a dead
+        run — every current run stamps ts. Its mtime is the heartbeat."""
+        import json
+        import time
+
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_running("analyze")
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            json.dump({"stage": "dialogue", "status": "running", "detail": "Reading dialogue & action"}, f)
+        old = time.time() - 3600
+        os.utime(m.progress_path, (old, old))  # the dead run last wrote an hour ago
+
+        resp = http_client.get(f"/api/projects/{project}/progress")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["stage"] == "stalled"
+        m2 = ProjectManifest.load(webapp_server._project_dir(project))
+        assert m2.stage("analyze").status == "failed"
+        assert not os.path.exists(m.progress_path)
