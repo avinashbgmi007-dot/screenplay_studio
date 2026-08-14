@@ -63,7 +63,11 @@ function startElapsedTicker(targetEl, label) {
   const startedAt = Date.now();
   const tick = () => {
     const elapsed = (Date.now() - startedAt) / 1000;
-    targetEl.textContent = `${label} — ${formatElapsed(elapsed)} elapsed`;
+    // If the target carries a dedicated elapsed sink (a .elapsed span next
+    // to the typing dots), update just that; otherwise replace the whole text.
+    const sink = targetEl.querySelector && targetEl.querySelector(".elapsed");
+    if (sink) sink.textContent = `${label} — ${formatElapsed(elapsed)} elapsed`;
+    else targetEl.textContent = `${label} — ${formatElapsed(elapsed)} elapsed`;
   };
   tick();
   const handle = setInterval(tick, 1000);
@@ -608,6 +612,35 @@ async function ensureSession() {
   return res.session_id;
 }
 
+async function clearChat() {
+  // End-user control: erase this conversation with Sam and start a fresh
+  // page. The relationship memory is deliberately kept (backend keeps
+  // writer_profile.json) so Sam's learning about how the writer works
+  // survives a cleared thread.
+  const project = state.currentProject;
+  const sid = state.currentSession;
+  if (!project) return;
+  const label = sid ? "this conversation" : "the empty page";
+  if (!confirm(`Erase ${label} with Sam and start fresh?\n\nSam's notes on you are kept — only the chat history goes.`)) return;
+  try {
+    if (sid) {
+      await api(`/projects/${encodeURIComponent(project)}/chat/sessions/${sid}`, { method: "DELETE" });
+    }
+    state.currentSession = null;
+    state.branches = {};
+    state.currentBranch = "main";
+    resetChatHistory();
+    renderMessages();
+    renderBranches();
+    // start a brand-new session so the next message has a clean page
+    await ensureSession();
+    appendSystemNote("Fresh page — a new conversation with Sam. He still remembers what he's noticed about how you write.");
+    $("#input").focus();
+  } catch (e) {
+    showError("Couldn't clear the chat: " + e.message);
+  }
+}
+
 async function loadSession(sessionId) {
   const data = await api(`/projects/${encodeURIComponent(state.currentProject)}/chat/sessions/${sessionId}`);
   state.currentSession = data.session_id;
@@ -1064,11 +1097,16 @@ async function sendMessage() {
   container.appendChild(userMsg);
   const pending = el("div", "msg assistant msg-pending");
   pending.appendChild(el("div", "msg-role", "Studio"));
-  const pendingBubble = el("div", "msg-bubble", "Reading the pages…");
+  const pendingBubble = el("div", "msg-bubble");
+  pendingBubble.appendChild(document.createTextNode("Reading the pages"));
+  const dots = el("span", "typing-dots");
+  dots.appendChild(el("i")); dots.appendChild(el("i")); dots.appendChild(el("i"));
+  pendingBubble.appendChild(dots);
+  pendingBubble.appendChild(el("span", "elapsed"));
   pending.appendChild(pendingBubble);
   container.appendChild(pending);
   container.scrollTop = container.scrollHeight;
-  const stopTicker = startElapsedTicker(pendingBubble, "Reading the pages…");
+  const stopTicker = startElapsedTicker(pendingBubble, "Reading the pages");
 
   try {
     const sessionId = await ensureSession();
@@ -2758,6 +2796,7 @@ function init() {
   $("#bb-icon").addEventListener("click", openBeatboardView);
   $("#compare-icon").addEventListener("click", openCompareView);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
+  $("#clear-chat-btn").addEventListener("click", clearChat);
   $("#sam-notes-btn").addEventListener("click", openSamNotes);
   $("#sam-notes-close").addEventListener("click", closeSamNotes);
   $("#sam-notes-refresh").addEventListener("click", async () => {

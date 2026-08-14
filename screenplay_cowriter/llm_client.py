@@ -7,6 +7,9 @@ works standalone without Piece 2 installed, per the composability goal.
 
 from __future__ import annotations
 
+import re
+import time
+
 import requests
 
 
@@ -81,7 +84,7 @@ class LlamaServerClient:
         return self._resolved_model
 
     def chat(self, messages: list[dict], max_tokens: int = 900, temperature: float = 0.7,
-             repeat_penalty: float | None = None) -> str:
+             repeat_penalty: float | None = None, busy_retries: int = 6) -> str:
         model = self.resolve_model()
         payload = {
             "model": model,
@@ -97,24 +100,43 @@ class LlamaServerClient:
         # like the memory refresh).
         if repeat_penalty is not None:
             payload["repeat_penalty"] = repeat_penalty
-        try:
-            resp = requests.post(f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout, headers=self.extra_headers)
-            resp.raise_for_status()
-            data = resp.json()
-        except requests.exceptions.ConnectionError as e:
-            raise LlamaServerError(f"Could not connect to llama-server at {self.base_url}.") from e
-        except requests.exceptions.Timeout as e:
-            raise LlamaServerError(
-                f"The model didn't respond within {self.timeout}s. For a large local model "
-                f"(especially with CPU-offloaded MoE experts, quantized KV cache, or a large "
-                f"context window), a single reply can genuinely take a while — this isn't "
-                f"necessarily a problem, just slow. If this keeps happening, either wait it out "
-                f"or reduce how much context is being sent per turn."
-            ) from e
-        except requests.exceptions.HTTPError as e:
-            raise LlamaServerError(f"llama-server request failed: {e}") from e
-        except (ValueError, requests.exceptions.JSONDecodeError) as e:
-            raise LlamaServerError(f"llama-server at {self.base_url} returned a non-JSON response: {e}") from e
+        # llama-server is single-occupancy: a request that arrives while another
+        # generation is in flight (e.g. the user chats while a long analysis is
+        # grinding) gets a busy error instead of queueing. A bounded retry with
+        # linear backoff smooths that overlap out — the losing request waits a
+        # few seconds and goes again instead of failing the user's turn.
+        _BUSY_STATUS = (400, 429, 503)
+        _BUSY_BODY = re.compile(r"(busy|in progress|already running|another request)", re.IGNORECASE)
+        attempt = 0
+        while True:
+            try:
+                resp = requests.post(f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout, headers=self.extra_headers)
+                status = getattr(resp, "status_code", 200)
+                if status in _BUSY_STATUS and attempt < busy_retries:
+                    # 400 is also used for genuinely bad requests, so only retry
+                    # when the body actually sounds busy. 429/503 are busy by
+                    # definition.
+                    if status in (429, 503) or _BUSY_BODY.search(getattr(resp, "text", "") or ""):
+                        attempt += 1
+                        time.sleep(1.5 * attempt)
+                        continue
+                resp.raise_for_status()
+                data = resp.json()
+                break
+            except requests.exceptions.ConnectionError as e:
+                raise LlamaServerError(f"Could not connect to llama-server at {self.base_url}.") from e
+            except requests.exceptions.Timeout as e:
+                raise LlamaServerError(
+                    f"The model didn't respond within {self.timeout}s. For a large local model "
+                    f"(especially with CPU-offloaded MoE experts, quantized KV cache, or a large "
+                    f"context window), a single reply can genuinely take a while — this isn't "
+                    f"necessarily a problem, just slow. If this keeps happening, either wait it out "
+                    f"or reduce how much context is being sent per turn."
+                ) from e
+            except requests.exceptions.HTTPError as e:
+                raise LlamaServerError(f"llama-server request failed: {e}") from e
+            except (ValueError, requests.exceptions.JSONDecodeError) as e:
+                raise LlamaServerError(f"llama-server at {self.base_url} returned a non-JSON response: {e}") from e
 
         try:
             return data["choices"][0]["message"]["content"]

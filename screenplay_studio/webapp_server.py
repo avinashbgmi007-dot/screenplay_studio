@@ -1104,6 +1104,24 @@ def get_session(name, sid):
     })
 
 
+@app.route("/api/projects/<name>/chat/sessions/<sid>", methods=["DELETE"])
+def delete_session(name, sid):
+    """End-user control: erase this conversation with Sam. Only the chat
+    history is deleted — the writer's relationship memory (writer_profile.json)
+    is deliberately kept, so Sam's learning about how the writer works survives
+    a fresh page. The frontend immediately starts a new session after this."""
+    try:
+        m = _load_manifest(name)
+        store_mod = _import_cowriter("store")
+        SessionStore = store_mod.SessionStore
+        store = SessionStore(m.sessions_dir)
+        store.load(sid)  # strict: 404 if the session doesn't exist
+        store.delete(sid)
+    except FileNotFoundError:
+        return _error("Session or project not found.", 404)
+    return jsonify({"deleted": sid})
+
+
 @app.route("/api/projects/<name>/chat/sessions/<sid>/messages", methods=["POST"])
 def send_message(name, sid):
     body = request.get_json() or {}
