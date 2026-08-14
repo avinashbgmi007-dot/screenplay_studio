@@ -84,7 +84,8 @@ class LlamaServerClient:
         return self._resolved_model
 
     def chat(self, messages: list[dict], max_tokens: int = 900, temperature: float = 0.7,
-             repeat_penalty: float | None = None, busy_retries: int = 6) -> str:
+             repeat_penalty: float | None = None, busy_retries: int = 6,
+             presence_penalty: float | None = None, frequency_penalty: float | None = None) -> str:
         model = self.resolve_model()
         payload = {
             "model": model,
@@ -100,6 +101,16 @@ class LlamaServerClient:
         # like the memory refresh).
         if repeat_penalty is not None:
             payload["repeat_penalty"] = repeat_penalty
+        # Presence/frequency penalties (OpenAI-compat, supported by llama-server)
+        # fight the runaway-synonym cascade some reasoning quants fall into (a
+        # chain of "enduringness perpetuity immortality..."): presence_penalty
+        # discourages re-using any token already emitted, frequency_penalty
+        # damps repeated tokens harder the more often they appear. Default None
+        # keeps every existing caller's sampling untouched.
+        if presence_penalty is not None:
+            payload["presence_penalty"] = presence_penalty
+        if frequency_penalty is not None:
+            payload["frequency_penalty"] = frequency_penalty
         # llama-server is single-occupancy: a request that arrives while another
         # generation is in flight (e.g. the user chats while a long analysis is
         # grinding) gets a busy error instead of queueing. A bounded retry with
