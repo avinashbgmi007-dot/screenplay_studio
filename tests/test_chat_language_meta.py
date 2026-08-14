@@ -85,6 +85,22 @@ class TestPromptRule:
             prompt = build_system_prompt(ScriptContext({"title": "T"}), ReportContext(None), persona, "brainstorm")
             assert "Never comment on the script's LANGUAGE itself" in prompt
 
+    def test_writing_partner_embeds_example_dialogue(self):
+        # The character-card lever: example exchanges lock the voice better
+        # than adjectives. Sam's examples must ride the writing_partner prompt.
+        prompt = build_system_prompt(
+            ScriptContext({"title": "T"}), ReportContext(None), "writing_partner", "peer"
+        )
+        assert "How Sam talks" in prompt
+        assert "Bold call" in prompt
+        assert "want my honest take" in prompt
+
+    def test_other_personas_have_no_example_dialogue(self):
+        prompt = build_system_prompt(
+            ScriptContext({"title": "T"}), ReportContext(None), "script_consultant", "evidence_discussion"
+        )
+        assert "How Sam talks" not in prompt
+
 
 class TestScriptMap:
     """Sam gets a compact standing map of the script (headings + character

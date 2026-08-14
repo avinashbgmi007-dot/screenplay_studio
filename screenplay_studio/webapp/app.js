@@ -2679,9 +2679,15 @@ function init() {
   };
   // v2 key: the v1 value was saved while the layout still defaulted to a wide
   // chat, so honoring it now would override the small-chat default. A stale
-  // v1 value is deliberately ignored.
+  // v1 value is deliberately ignored. The same rule extends to v2: a stored
+  // width that would leave the chat under ~30% is treated as a leftover from
+  // a wide-drag session and dropped, so the manuscript is center stage on
+  // every fresh load (drag to resize still works live, up to the 78% clamp).
   const savedPaneWidth = parseFloat(localStorage.getItem("pane-width-v2"));
-  if (savedPaneWidth) applyPaneWidth(savedPaneWidth);
+  const wsEl = document.querySelector(".workspace");
+  if (savedPaneWidth && wsEl && savedPaneWidth <= Math.round(wsEl.clientWidth * 0.70)) {
+    applyPaneWidth(savedPaneWidth);
+  }
   paneDivider.addEventListener("mousedown", (e) => {
     e.preventDefault();
     paneDragging = true;

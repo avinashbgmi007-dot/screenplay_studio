@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import re
 
-from .personas import persona_text, mode_text
+from .personas import persona_text, persona_examples, mode_text
 
 SCENE_REF_RE = re.compile(r"[Ss]cene\s+(\d+)")
 
@@ -173,9 +173,12 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
     title = script_ctx.title or report_ctx.title or "this screenplay"
     script_map = script_ctx.script_map()
     map_block = f"\n\nHere is a map of the script itself:\n\n{script_map}" if script_map else ""
+    examples = persona_examples(persona)
+    examples_block = f"\n\n{examples}" if examples else ""
     prompt = (
         f"{persona_text(persona)}\n\n"
         f"{mode_text(mode)}\n\n"
+        f"{examples_block}\n"
         f"You're discussing the screenplay \"{title}\" with its writer. Here is the "
         f"standing analysis report for reference:\n\n{report_ctx.compact_summary()}{map_block}\n\n"
         f"When specific scene text is relevant to the current question, it will be "

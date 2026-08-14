@@ -1323,7 +1323,9 @@ body::after {
   border-bottom: 1px solid var(--line-soft);
   flex: 0 0 auto;
   position: relative;
-  z-index: 2;
+  /* above the night vignette (40) + grain (45) so the pipeline popover
+     (child z-index 47) is never dimmed or clipped */
+  z-index: 46;
 }
 .feedback-title { font-family: var(--font-typewriter); font-size: 14.5px; color: var(--text); }
 .feedback-sub {
@@ -1404,8 +1406,12 @@ body::after {
 .ap-eta { color: var(--text-faint); white-space: nowrap; }
 
 .analyze-pipeline {
+  /* Opens DOWNWARD from the header chip: the chip sits near the top of the
+     room, so an upward popover used to fly behind the project bar / off the
+     top of the viewport ("hiding behind the banner"). z-index clears the
+     night vignette (body::before, 40) and grain (45). */
   position: absolute;
-  bottom: calc(100% + 10px);
+  top: calc(100% + 8px);
   right: 0;
   width: 300px;
   max-height: 420px;
@@ -1417,9 +1423,9 @@ body::after {
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(4px);
+  transform: translateY(-4px);
   transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
-  z-index: 30;
+  z-index: 47;
 }
 .analyze-progress:hover .analyze-pipeline,
 .analyze-progress:focus-within .analyze-pipeline { opacity: 1; visibility: visible; transform: translateY(0); }
@@ -1846,29 +1852,57 @@ body::after {
    ============================================================ */
 
 body.dawn {
-  --ink-950: #f3ede0;
-  --ink-900: #ece4d2;
-  --ink-850: #e6dcc6;
-  --ink-800: #ddd2ba;
-  --ink-700: #d3c6aa;
-  --line: #c9ba9a;
-  --line-soft: #d9cdb3;
+  /* the morning room — sand walls, panels lifted to warm white, strong
+     warm-gray borders so surfaces read as separate, dark ink text */
+  --ink-950: #e7dfcd;   /* walls / page behind the panels */
+  --ink-900: #f6f1e4;   /* room panels, sidebar */
+  --ink-850: #faf6ec;   /* raised surfaces, popovers, modals */
+  --ink-800: #fffdf6;   /* inputs, chips, hover fills */
+  --ink-700: #ffffff;
+  --line: #c6baa0;      /* visible borders */
+  --line-soft: #d9cfb8;
 
-  --paper: #fdfaf1;
-  --paper-2: #f4eddd;
-  --paper-line: #e2d8c0;
+  --paper: #fffdf5;     /* the manuscript — clean warm white */
+  --paper-2: #f5efe0;
+  --paper-line: #e3d9c0;
+  --paper-ink: #2a2318;
+  --paper-muted: #6b6150;
 
-  --text: #2b261e;
-  --text-muted: #6f6758;
-  --text-faint: #9b9280;
+  --text: #2b2419;
+  --text-muted: #574e3e;
+  --text-faint: #84795f;
 
-  --lamp: #b5842f;
-  --lamp-bright: #c9973f;
-  --lamp-deep: #8a6626;
+  --lamp: #a97a28;      /* deeper amber — reads on light backgrounds */
+  --lamp-bright: #bd8a35;
+  --lamp-deep: #7c5517;
+  --consult: #64849b;
+  --consult-deep: #4a6880;
+
+  --danger: #a83f30;
+  --danger-bg: rgba(168, 63, 48, 0.12);
+  --ok: #5a7a49;
+  --ok-bg: rgba(90, 122, 73, 0.12);
 }
 body.dawn #sidebar, body.dawn .room-panel {
   border-color: var(--line-soft);
 }
+/* soft morning vignette instead of the night room's dark one */
+body.dawn::before {
+  background: radial-gradient(120% 100% at 50% 40%, transparent 62%, rgba(139, 118, 80, 0.18) 100%);
+}
+/* buttons: night's translucent fills vanish on light — give them real surfaces */
+body.dawn .btn-secondary {
+  background: var(--ink-800);
+  color: var(--text);
+  border-color: var(--line);
+}
+body.dawn .btn-secondary:hover { background: var(--paper-2); border-color: var(--accent-deep); }
+body.dawn .sidebar-footer-btn:hover { background: var(--ink-800); }
+body.dawn .room-panel::before { background: radial-gradient(120% 70% at 20% -10%, rgba(176, 124, 40, 0.10), transparent 60%); }
+/* the progress pill is hardcoded dark — lift it for light mode */
+body.dawn .analyze-progress { background: var(--ink-800); border-color: var(--line); }
+body.dawn .ap-pct { color: var(--accent-deep); }
+body.dawn .pipeline-now { color: var(--accent-deep); border-color: rgba(124, 85, 23, 0.45); }
 body.dawn .welcome-card {
   box-shadow: 0 18px 60px rgba(120, 95, 55, 0.28);
 }
