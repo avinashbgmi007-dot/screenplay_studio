@@ -76,13 +76,20 @@ PARENTHETICAL_RE = re.compile(r"^\s*\(.*\)\s*$")
 # sentence).
 # Underscore is allowed because transliterated Indian names / beat markers
 # often use it as a space substitute (e.g. GOON_ONE, KID_SIDDHU).
+# U+2019 (curly apostrophe) appears in real script exports — Final Draft PDFs
+# map it to an unmapped glyph that pdfplumber emits as-is, and typed .txt files
+# often carry it in extensions like (CONT'D). The cue regexes accept both.
+_EXT_CHARS = r"[A-Z0-9 ._'\-/’]"
+
 CHARACTER_CUE_RE = re.compile(
-    r"^\s*([A-Z][A-Z0-9 ._\-'#]{0,40}?)"
-    r"(\s*\((?:[A-Z0-9 ._'\-/]+)\))?"
+    rf"^\s*([A-Z][A-Z0-9 ._\-'#’]{{0,40}}?)"
+    rf"(\s*\({_EXT_CHARS}+\))?"
     r"\s*$"
 )
 
-CHARACTER_EXTENSION_RE = re.compile(r"\((V\.?O\.?|O\.?S\.?|CONT'?D|OFF|INTO PHONE|FILTERED)\)", re.IGNORECASE)
+# CONT'D arrives with either apostrophe (ASCII from typed files, U+2019 from
+# Final Draft PDF exports) — accept both.
+CHARACTER_EXTENSION_RE = re.compile(r"\((V\.?O\.?|O\.?S\.?|CONT['’]?D|OFF|INTO PHONE|FILTERED)\)", re.IGNORECASE)
 
 
 def looks_like_scene_heading(line: str) -> bool:

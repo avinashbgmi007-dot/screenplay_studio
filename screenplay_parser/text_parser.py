@@ -24,6 +24,7 @@ from .heuristics import (
     looks_like_parenthetical,
     looks_like_scene_heading,
     looks_like_shot,
+    looks_like_time_marker,
     looks_like_transition,
     normalize_character_name,
     parse_scene_heading,
@@ -95,6 +96,7 @@ def _parse_lines(
     author: str = None,
     start_idx: int = 0,
     page_of_line: dict = None,
+    line_layout: dict = None,
 ) -> ScriptDocument:
     """
     Core classifier shared by the .txt/.fountain path and the PDF path (which
@@ -109,9 +111,10 @@ def _parse_lines(
     scene_num = 0
     pending_character: str | None = None
     dialogue_open = False
+    paren_open = False  # a multi-line parenthetical is in progress (first line opened it)
 
     def add_scene(heading_text: str):
-        nonlocal current_scene, scene_num, pending_character, dialogue_open
+        nonlocal current_scene, scene_num, pending_character, dialogue_open, paren_open
         scene_num += 1
         parsed = parse_scene_heading(heading_text)
         page = page_of_line.get(idx) if page_of_line else None
@@ -128,6 +131,7 @@ def _parse_lines(
         doc.scenes.append(current_scene)
         pending_character = None
         dialogue_open = False
+        paren_open = False
 
     def add_element(etype: ElementType, text: str, character: str | None = None):
         target = current_scene
@@ -141,13 +145,51 @@ def _parse_lines(
         if character and character not in target.characters_present:
             target.characters_present.append(character)
 
+    def classify_fresh(idx: int, stripped: str, layout: str | None):
+        """Classify a line that is NOT dialogue continuation: character cue or
+        action. Used both for lines seen with no dialogue open and for lines
+        that *close* an open dialogue block (PDF layout says the block ended)."""
+        nonlocal pending_character, dialogue_open, paren_open
+        # caseless scripts (Devanagari/Hindi, Tamil) have no uppercase, so the
+        # cue test needs the next non-blank line for context — a short
+        # native-script line is only a speaker if followed by content.
+        nxt = ""
+        nxt2 = ""
+        for j in range(idx + 1, len(lines)):
+            if lines[j].strip():
+                nxt = lines[j].strip()
+                for k in range(j + 1, len(lines)):
+                    if lines[k].strip():
+                        nxt2 = lines[k].strip()
+                        break
+                break
+        is_cue = looks_like_character_cue(stripped, nxt, nxt2)
+        if not is_cue and layout == "center":
+            # A centered short all-caps line at the classic character-cue
+            # position is a cue even if the bare text heuristic is unsure —
+            # column position is strong evidence on its own.
+            is_cue = looks_like_character_cue(stripped)
+        if is_cue:
+            pending_character = normalize_character_name(stripped)
+            add_element(ElementType.CHARACTER, stripped, character=pending_character)
+            dialogue_open = True
+            paren_open = False
+        else:
+            add_element(ElementType.ACTION, stripped)
+            paren_open = False
+
+    skip: set[int] = set()  # line indices absorbed into a merged multi-line transition
     for idx in range(start_idx, len(lines)):
+        if idx in skip:
+            continue
         line = lines[idx]
         stripped = line.strip()
+        layout = line_layout.get(idx) if line_layout else None
 
         if not stripped:
             dialogue_open = False
             pending_character = None
+            paren_open = False
             continue
 
         # ---- Fountain forced syntax ----
@@ -159,11 +201,13 @@ def _parse_lines(
                 pending_character = normalize_character_name(stripped[1:].strip())
                 add_element(ElementType.CHARACTER, stripped[1:].strip(), character=pending_character)
                 dialogue_open = True
+                paren_open = False
                 continue
             if stripped.startswith(">") and not stripped.endswith("<"):
                 add_element(ElementType.TRANSITION, stripped[1:].strip())
                 pending_character = None
                 dialogue_open = False
+                paren_open = False
                 continue
             if stripped.startswith("#") or stripped.startswith("="):
                 continue  # section header / synopsis — metadata, not screenplay content
@@ -178,40 +222,52 @@ def _parse_lines(
         # ---- shared heuristic classification ----
         if looks_like_scene_heading(stripped):
             add_scene(stripped)
-        elif looks_like_transition(stripped):
+        elif looks_like_transition(stripped) or layout == "right":
+            # Custom transitions often wrap over several right-aligned lines
+            # ("MATCH CUT / TO:(EYES OF / RAHUL)") — absorb the whole run into
+            # one transition element instead of three orphan fragments.
+            text = stripped
+            j = idx + 1
+            while j < len(lines) and lines[j].strip() and (line_layout or {}).get(j) == "right":
+                text += " " + lines[j].strip()
+                skip.add(j)
+                j += 1
+            add_element(ElementType.TRANSITION, text)
+            pending_character = None
+            dialogue_open = False
+            paren_open = False
+        elif looks_like_time_marker(stripped):
+            # "2 MONTHS LATER" / "TWO YEARS EARLIER" — beat markers, not action
             add_element(ElementType.TRANSITION, stripped)
             pending_character = None
             dialogue_open = False
+            paren_open = False
         elif looks_like_shot(stripped):
             add_element(ElementType.SHOT, stripped)
-        elif dialogue_open and pending_character and looks_like_parenthetical(stripped):
+        elif dialogue_open and pending_character and (paren_open or looks_like_parenthetical(stripped) or stripped.startswith("(")):
+            # parenthetical — including the opening line of a multi-line one
+            # ("(as he takes a deep" ... "breath)") which doesn't match the
+            # complete-parenthetical regex on its own
             add_element(ElementType.PARENTHETICAL, stripped, character=pending_character)
-        elif not dialogue_open and current_scene is not None:
-            # caseless scripts (Devanagari/Hindi, Tamil) have no uppercase, so
-            # the cue test needs the next non-blank line for context — a short
-            # native-script line is only a speaker if followed by content.
-            nxt = ""
-            nxt2 = ""
-            for j in range(idx + 1, len(lines)):
-                if lines[j].strip():
-                    nxt = lines[j].strip()
-                    for k in range(j + 1, len(lines)):
-                        if lines[k].strip():
-                            nxt2 = lines[k].strip()
-                            break
-                    break
-            if looks_like_character_cue(stripped, nxt, nxt2):
-                pending_character = normalize_character_name(stripped)
-                add_element(ElementType.CHARACTER, stripped, character=pending_character)
-                dialogue_open = True
-            else:
-                add_element(ElementType.ACTION, stripped)
+            paren_open = not stripped.rstrip().endswith(")")
+        elif dialogue_open and pending_character and layout in ("left", "center"):
+            # PDFs carry no blank line between a dialogue block and the action
+            # that follows it, so the open-dialogue state would otherwise
+            # swallow the action (and any new character cue) as dialogue.
+            # Column position resolves it: action resumes at the left margin,
+            # a new cue sits centered. Close the block and reclassify fresh.
+            dialogue_open = False
+            pending_character = None
+            classify_fresh(idx, stripped, layout)
         elif dialogue_open and pending_character:
             add_element(ElementType.DIALOGUE, stripped, character=pending_character)
+        elif current_scene is not None:
+            classify_fresh(idx, stripped, layout)
         else:
             add_element(ElementType.ACTION, stripped)
             pending_character = None
             dialogue_open = False
+            paren_open = False
 
     for scene in doc.scenes:
         scene.characters_present.sort()

@@ -54,6 +54,72 @@ def _looks_unrecoverable(lines: list[str]) -> bool:
 PARAGRAPH_BREAK_FACTOR = 1.35  # gap > this * median line-height counts as a paragraph break
 
 # ---------------------------------------------------------------------------
+# Text-layer cleanup and layout hints.
+#
+# Two artifacts show up in real-world screenplay PDFs:
+#   1. Glyph doubling — some exporters (and pdfplumber's own line merge of
+#      overlapping text objects) emit every character twice: "DOCTOR (CONT'D)"
+#      comes back as "DDOOCCTTOORR ((CCOONNTT''DD))". The every-char-twice
+#      pattern is unambiguous, so we collapse it.
+#   2. Page-number footers like "2." / "3." (sometimes doubled to "22.."),
+#      which are never screenplay content.
+#
+# The parser also reattaches each line's *column position* (normalized to the
+# page width) so the shared classifier can use indentation as a strong hint:
+# screenplay PDFs use the same relative indents regardless of exporter —
+# action & scene headings at the left margin, dialogue ~1in in, character
+# cues centered, transitions right-aligned. Normalized bands adapt to
+# whatever margins the exporting tool used.
+# ---------------------------------------------------------------------------
+
+_PAGE_NUMBER_RE = re.compile(r"^\d{1,3}\.?\s*$")
+
+
+def _collapse_doubled(line: str) -> str:
+    """Collapse an every-glyph-doubled line (see above) back to its real text.
+
+    Exporters double every *character* but not spaces — the two interleaved
+    halves differ only where a space fell on the odd positions — so the halves
+    are compared without spaces and the even half (which keeps the spaces) is
+    returned."""
+    if len(line) < 4:
+        return line
+    half_a = line[::2]
+    half_b = line[1::2]
+    if half_a.replace(" ", "") == half_b.replace(" ", ""):
+        return half_a
+    return line
+
+
+# Type3 fonts with a partial ToUnicode map emit U+FFFD for glyphs they can't
+# map — in these scripts (and Final Draft exports generally) that is always the
+# apostrophe, e.g. "SIDDHU\uFFFDS" and "(CONT\uFFFD D)". A replacement char is
+# never legit screenplay content, so normalize it to a straight apostrophe;
+# this also keeps character-cue detection working on names like
+# "GOON_ONE (CONT'D)" that would otherwise fail the cue regex.
+
+def _normalize_unmapped(text: str) -> str:
+    return text.replace("\ufffd", "'")
+
+
+def _clean_line(raw: str) -> str:
+    return _normalize_unmapped(_collapse_doubled(raw.strip()).strip())
+
+
+def _layout_band(x0, page_width: float) -> str:
+    """Relative column band for a line's left edge: left | dialogue | center | right."""
+    if not page_width or x0 is None:
+        return "left"
+    r = x0 / page_width
+    if r >= 0.60:
+        return "right"
+    if r >= 0.34:
+        return "center"
+    if r >= 0.22:
+        return "dialogue"
+    return "left"
+
+# ---------------------------------------------------------------------------
 # OCR fallback for PDFs without a usable text layer (Type3 fonts / no ToUnicode
 # maps — common with some Final Draft exports, and virtually all scanned or
 # hand-typed PDFs). Rendering + OCR is the only way to read those; this path is
@@ -154,9 +220,16 @@ def _ocr_extract(pdf_path: str, engine) -> list[str]:
     return lines
 
 
-def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict]:
+def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict, dict]:
+    """Returns (lines, page_of_line, line_layout): the reconstructed plain-text
+    lines (with synthetic blank lines at paragraph breaks, glyph doubling
+    collapsed, and page-number footers dropped), each line's source page, and
+    each line's relative column band ('left'|'dialogue'|'center'|'right') —
+    the layout hint the shared classifier uses to disambiguate dialogue vs.
+    action and to catch right-aligned transitions."""
     lines: list[str] = []
     page_of_line: dict[int, int] = {}
+    line_layout: dict[int, str] = {}
 
     with pdfplumber.open(pdf_path) as pdf:
         for page_index, page in enumerate(pdf.pages, start=1):
@@ -168,14 +241,15 @@ def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict]:
             if not page_lines:
                 continue
 
+            width = page.width or 1.0
             tops = [pl["top"] for pl in page_lines]
             gaps = [b - a for a, b in zip(tops, tops[1:]) if b > a]
             median_gap = statistics.median(gaps) if gaps else 12.0
 
             prev_bottom = None
             for pl in page_lines:
-                text = pl.get("text", "").strip()
-                if not text:
+                text = _clean_line(pl.get("text") or "")
+                if not text or _PAGE_NUMBER_RE.match(text):
                     continue
                 top = pl["top"]
                 bottom = pl.get("bottom", top)
@@ -186,6 +260,7 @@ def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict]:
                         lines.append("")  # synthetic blank line = paragraph break
 
                 page_of_line[len(lines)] = page_index
+                line_layout[len(lines)] = _layout_band(pl.get("x0"), width)
                 lines.append(text)
                 prev_bottom = bottom
 
@@ -195,12 +270,12 @@ def _extract_reconstructed_lines(pdf_path: str) -> tuple[list[str], dict]:
             # dialogue block split across a page turn may get closed early.
             lines.append("")
 
-    return lines, page_of_line
+    return lines, page_of_line, line_layout
 
 
 def parse_pdf(path: str):
     filename = os.path.basename(path)
-    lines, page_of_line = _extract_reconstructed_lines(path)
+    lines, page_of_line, line_layout = _extract_reconstructed_lines(path)
 
     if _looks_unrecoverable(lines) or not lines or not any(l.strip() for l in lines):
         engine = _get_ocr_engine()
@@ -230,7 +305,7 @@ def parse_pdf(path: str):
         ))
         return doc
 
-    doc = _parse_lines(lines, source_format="pdf", filename=filename, page_of_line=page_of_line)
+    doc = _parse_lines(lines, source_format="pdf", filename=filename, page_of_line=page_of_line, line_layout=line_layout)
     doc.parse_confidence = "low"
     doc.warnings.insert(0, ParseWarning(
         message="Parsed from PDF using layout-gap heuristics, not explicit formatting tags. "
