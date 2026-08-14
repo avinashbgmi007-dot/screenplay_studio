@@ -35,7 +35,8 @@ TIME_OF_DAY_WORDS = [
 TRANSITION_RE = re.compile(
     r"^\s*(CUT TO:|SMASH CUT TO:|MATCH CUT TO:|DISSOLVE TO:|FADE TO:|"
     r"FADE OUT\.?|FADE IN:|FADE TO BLACK\.?|JUMP CUT TO:|TIME CUT TO:|"
-    r"CONTINUOUS:|INTERCUT WITH:?)\s*$",
+    r"CONTINUOUS:|INTERCUT WITH:?|WHITE FLASH CUT:?|FLASH CUT:?|"
+    r"FLASHE? CUTS?:|PRESENT:|MONTAGE:)\s*$",
     re.IGNORECASE,
 )
 
@@ -88,8 +89,12 @@ CHARACTER_CUE_RE = re.compile(
 )
 
 # CONT'D arrives with either apostrophe (ASCII from typed files, U+2019 from
-# Final Draft PDF exports) — accept both.
-CHARACTER_EXTENSION_RE = re.compile(r"\((V\.?O\.?|O\.?S\.?|CONT['’]?D|OFF|INTO PHONE|FILTERED)\)", re.IGNORECASE)
+# Final Draft PDF exports) — accept both. Any short all-caps parenthetical is a
+# valid cue extension ((O.S.), (CONT'D), (KID), (PRESENT), ...) — real scripts
+# use many more than the canonical list, and a cue line's short all-caps shape
+# is the actual signal. The guardrail against false positives is the cue regex
+# itself (whole line must be short + uppercase once stripped).
+CHARACTER_EXTENSION_RE = re.compile(r"\([A-Z0-9 ._'’\-/]{1,15}\)", re.IGNORECASE)
 
 
 def looks_like_scene_heading(line: str) -> bool:
@@ -141,6 +146,11 @@ def looks_like_character_cue(line: str, next_nonblank_line: str = "", second_nex
     if not stripped or len(stripped) > 45:
         return False
     if looks_like_scene_heading(stripped) or looks_like_transition(stripped) or looks_like_time_marker(stripped):
+        return False
+    # "THE END" (and its native-script equivalents) close the script — it is
+    # not a speaker, and often sits alone at the end with no following line for
+    # the cue lookahead to disambiguate it.
+    if stripped.upper() == "THE END":
         return False
 
     script_chars, letters = _script_share(stripped)

@@ -163,6 +163,15 @@ def _parse_lines(
                         nxt2 = lines[k].strip()
                         break
                 break
+        # "THE END" closes the script — it is a transition-style marker, never a
+        # speaker. Guarded here as well as in the heuristic so a centered layout
+        # can't force it into a cue.
+        if stripped.upper() == "THE END":
+            add_element(ElementType.TRANSITION, stripped)
+            pending_character = None
+            dialogue_open = False
+            paren_open = False
+            return
         is_cue = looks_like_character_cue(stripped, nxt, nxt2)
         if not is_cue and layout == "center":
             # A centered short all-caps line at the classic character-cue

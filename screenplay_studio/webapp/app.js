@@ -1004,7 +1004,7 @@ function renderSamNotes(data) {
     chip.textContent = `${name.replace(/_/g, " ")}: ${entry.value} (${Math.round(entry.confidence * 100)}%)`;
     dims.appendChild(chip);
   });
-  const observations = (profile.observations || []).filter((o) => !o.suppressed);
+  const observations = (data.profile?.observations || []).filter((o) => !o.suppressed);
   observations.forEach((o) => {
     const li = document.createElement("li");
     li.className = "sam-notes-obs";
@@ -2675,9 +2675,12 @@ function init() {
     const max = ws ? Math.round(ws.clientWidth * 0.78) : 1200;
     px = Math.max(300, Math.min(px, max));
     scriptPane.style.flex = `0 0 ${px}px`;
-    localStorage.setItem("pane-width", String(px));
+    localStorage.setItem("pane-width-v2", String(px));
   };
-  const savedPaneWidth = parseFloat(localStorage.getItem("pane-width"));
+  // v2 key: the v1 value was saved while the layout still defaulted to a wide
+  // chat, so honoring it now would override the small-chat default. A stale
+  // v1 value is deliberately ignored.
+  const savedPaneWidth = parseFloat(localStorage.getItem("pane-width-v2"));
   if (savedPaneWidth) applyPaneWidth(savedPaneWidth);
   paneDivider.addEventListener("mousedown", (e) => {
     e.preventDefault();
@@ -2697,7 +2700,7 @@ function init() {
   });
   paneDivider.addEventListener("dblclick", () => {
     scriptPane.style.flex = "";
-    localStorage.removeItem("pane-width");
+    localStorage.removeItem("pane-width-v2");
   });
   $("#input").addEventListener("input", autoResizeTextarea);
   $("#input").addEventListener("keydown", (e) => {

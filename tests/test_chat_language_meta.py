@@ -86,6 +86,49 @@ class TestPromptRule:
             assert "Never comment on the script's LANGUAGE itself" in prompt
 
 
+class TestScriptMap:
+    """Sam gets a compact standing map of the script (headings + character
+    presence) so answers aren't vague for questions that don't name a scene."""
+
+    def _script(self):
+        return {"title": "T", "scenes": [
+            {"scene_number": 1, "heading_raw": "EXT. ROAD - NIGHT", "elements": [
+                {"type": "action", "text": "A car pulls up."},
+                {"type": "character", "text": "DOCTOR (O.S.)"},
+                {"type": "dialogue", "text": "We are late."},
+            ]},
+            {"scene_number": 2, "heading_raw": "INT. HALL - DAY", "elements": [
+                {"type": "character", "text": "RISHI"},
+                {"type": "dialogue", "text": "Where is he?"},
+                {"type": "character", "text": "DOCTOR (CONT'D)"},
+                {"type": "dialogue", "text": "Coming."},
+            ]},
+        ]}
+
+    def test_map_lists_headings_and_character_presence(self):
+        m = ScriptContext(self._script()).script_map()
+        assert "Scene 1: EXT. ROAD - NIGHT" in m
+        assert "Scene 2: INT. HALL - DAY" in m
+        assert "DOCTOR: 1, 2" in m
+        assert "RISHI: 2" in m
+
+    def test_map_strips_extensions_from_character_names(self):
+        m = ScriptContext(self._script()).script_map()
+        assert "DOCTOR (O.S.)" not in m  # extensions normalized to the base name
+
+    def test_map_empty_script_returns_empty(self):
+        assert ScriptContext({"scenes": []}).script_map() == ""
+
+    def test_build_system_prompt_embeds_map(self):
+        prompt = build_system_prompt(ScriptContext(self._script()), ReportContext(None), "writing_partner", "peer")
+        assert "SCRIPT MAP — 2 scenes" in prompt
+        assert "CHARACTER PRESENCE" in prompt
+
+    def test_build_system_prompt_without_scenes_has_no_map(self):
+        prompt = build_system_prompt(ScriptContext({"title": "T"}), ReportContext(None), "writing_partner", "peer")
+        assert "SCRIPT MAP" not in prompt
+
+
 class TestStripJsonWrap:
     def test_fenced_json_with_content_key(self):
         reply = '```json\n{"content": "The ending lands hard because of the setup."}\n```'

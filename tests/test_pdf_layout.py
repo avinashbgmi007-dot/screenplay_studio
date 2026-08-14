@@ -138,6 +138,36 @@ def test_contd_cue_with_curly_apostrophe():
     assert looks_like_character_cue("GOON_ONE (CONT\u2019D)", "Betting la paisal anni", "(with a sarcastic smile)")
 
 
+def test_nonstandard_cue_extension_is_still_a_cue():
+    # (KID) isn't in the canonical extension list but is a real cue extension —
+    # a centered short all-caps line followed by dialogue must be a cue
+    assert looks_like_character_cue("RAHUL (KID)", "Emanna cheppinva ra nagurinchi?")
+    assert looks_like_character_cue("RAHUL (PRESENT)", "line here")
+    lines = ["INT. ROOM - DAY", "RAHUL (KID)", "Emanna cheppinva ra nagurinchi?"]
+    layout = {1: "center", 2: "dialogue"}
+    els = _parse(lines, layout)
+    # cue text keeps the extension; the normalized character drops it
+    assert ("character", "RAHUL (KID)", "RAHUL") in els
+    assert ("dialogue", "Emanna cheppinva ra nagurinchi?", "RAHUL") in els
+
+
+def test_cut_style_and_montage_markers_are_transitions():
+    # left-aligned cut/time markers from this script's export — transitions, not action
+    assert looks_like_character_cue("FLASHE CUTS:") is False
+    for marker in ("FLASHE CUTS:", "PRESENT:", "MONTAGE:", "Montage:"):
+        lines = ["INT. ROOM - DAY", "Some action.", marker]
+        els = _parse(lines, None)
+        assert ("transition", marker, None) in els, marker
+
+
+def test_the_end_is_a_transition_not_a_character():
+    assert looks_like_character_cue("THE END") is False
+    lines = ["INT. ROOM - DAY", "Some action.", "THE END"]
+    els = _parse(lines, None)
+    assert ("transition", "THE END", None) in els
+    assert ("character", "THE END", "THE END") not in els
+
+
 # ---------------------------------------------------------------------------
 # End-to-end on the real recoverable PDF
 # ---------------------------------------------------------------------------
