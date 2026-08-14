@@ -43,7 +43,13 @@ def edits_redo_path(m) -> str:
 
 
 def ensure_working(m) -> str:
-    """Create the working copy from the parsed document on first use."""
+    """Create the working copy from the parsed document on first use.
+
+    Also self-heals a stale copy: when the source parse has been regenerated
+    (a re-parse, e.g. after a parser fix or a new draft upload) and the writer
+    has NOT applied any edits, the working copy is rebuilt from the fresh
+    parse so the viewer/chat never show outdated classification. If the writer
+    HAS edits, their work is never overwritten silently."""
     path = working_path(m)
     if not os.path.exists(path):
         if not os.path.exists(m.parsed_path):
@@ -54,6 +60,18 @@ def ensure_working(m) -> str:
             data = json.load(f)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        return path
+
+    # re-parse refreshes the display copy when there's nothing to preserve
+    if not has_edits(m) and os.path.exists(m.parsed_path):
+        try:
+            if os.path.getmtime(m.parsed_path) > os.path.getmtime(path):
+                with open(m.parsed_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+        except (OSError, ValueError):
+            pass  # if the timestamps/parse are unreadable, keep the existing copy
     return path
 
 

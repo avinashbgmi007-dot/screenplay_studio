@@ -6,6 +6,7 @@ finding-resolution status (addressed / still_present / unknown).
 """
 
 import json
+import time
 
 import pytest
 
@@ -44,6 +45,34 @@ class TestWorkingCopy:
         revision.ensure_working(manifest)
         revision.reset_working(manifest)
         assert not revision.has_edits(manifest)
+
+    def test_working_copy_self_heals_after_reparse(self, manifest):
+        # first view creates the working copy from the parse
+        path = revision.ensure_working(manifest)
+        with open(path, "r", encoding="utf-8") as f:
+            original = f.read()
+        # simulate a re-parse regenerating parsed.json (e.g. a parser fix)
+        time.sleep(0.02)  # ensure a newer mtime
+        Orchestrator(manifest).run_parse()
+        path = revision.ensure_working(manifest)
+        with open(path, "r", encoding="utf-8") as f:
+            refreshed = f.read()
+        assert refreshed == original  # same source -> same working copy
+
+    def test_working_copy_preserved_when_edits_exist(self, manifest, sample_fountain):
+        # a writer's applied edits must never be clobbered by a re-parse
+        from screenplay_parser.models import ScriptDocument, Element, ElementType
+        doc = revision.load_working(manifest)
+        doc.scenes[0].elements.append(Element(type=ElementType.ACTION, text="Writers edit here."))
+        revision.save_working(manifest, doc, record={"summary": "test edit"})
+        with open(revision.working_path(manifest), "r", encoding="utf-8") as f:
+            edited = f.read()
+        assert "Writers edit here." in edited
+        time.sleep(0.02)
+        Orchestrator(manifest).run_parse()
+        with open(revision.working_path(manifest), "r", encoding="utf-8") as f:
+            after = f.read()
+        assert "Writers edit here." in after
 
 
 class TestApplyReplacements:
