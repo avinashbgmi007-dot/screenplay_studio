@@ -2913,6 +2913,13 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 }
 .msg-pending .elapsed { color: var(--text-faint); font-family: var(--font-mono); font-size: 11px; margin-left: 6px; }
 
+/* generation watchdog — "still working, keep waiting?" inside the pending bubble */
+.wd-ask { display: block; margin-bottom: 8px; }
+.wd-btn { border: 1px solid var(--line-soft); background: transparent; color: var(--text-muted); border-radius: 999px; padding: 4px 12px; margin-right: 8px; font-size: 12px; font-family: var(--font-ui); cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+.wd-btn:hover { border-color: var(--accent-bright); color: var(--accent-bright); }
+.wd-keep { border-color: var(--accent-dim); color: var(--accent-bright); }
+.wd-keep:hover { background: color-mix(in srgb, var(--accent-dim) 18%, transparent); }
+
 /* a selected passage attaching to the composer pops in */
 .quote-card { animation: quoteIn 0.28s cubic-bezier(0.2, 0.7, 0.25, 1) both; }
 .quote-float { animation: quoteIn 0.25s ease-out both; }

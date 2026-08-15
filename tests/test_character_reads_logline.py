@@ -64,7 +64,7 @@ class QueueClient:
         self.responses = list(responses)
         self.calls = 0
 
-    def chat_json(self, system, user, grammar=None, max_tokens=None):
+    def chat_json(self, system, user, grammar=None, max_tokens=None, **kw):
         self.calls += 1
         if self.responses:
             return self.responses.pop(0)
@@ -128,7 +128,7 @@ class SmartClient:
     def resolve_model(self):
         return "test-model"
 
-    def chat_json(self, system, user, grammar=None, max_tokens=None):
+    def chat_json(self, system, user, grammar=None, max_tokens=None, **kw):
         self.seen.append(system)
         if "Summarize each of these scenes" in user or "summarize" in system.lower():
             return {"summaries": [{"scene_number": n, "summary": "Scene does something."} for n in range(1, 7)]}
@@ -186,7 +186,7 @@ def test_logline_test_skipped_without_coverage_logline():
     client.skip_logline = True
     # a client variant that produces coverage WITHOUT a logline
     class NoLogline(SmartClient):
-        def chat_json(self, system, user, grammar=None, max_tokens=None):
+        def chat_json(self, system, user, grammar=None, max_tokens=None, **kw):
             if "logline" in system.lower() and "tightened" in system:
                 return {"logline": "", "signal": "muddled", "what_works": "", "what_muddles": "", "missing": "", "tightened": ""}
             if "coverage" in system.lower():

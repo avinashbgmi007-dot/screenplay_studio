@@ -228,7 +228,9 @@ def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_
 
     def call(chunk_):
         system, user = prompts.scene_summary_prompt(chunk_, language=language)
-        result = client.chat_json(system, user, grammar=grammar, max_tokens=800)
+        # Summaries are the cheap tier's work: short, structured, and the
+        # highest-volume calls in the pipeline — the good model is wasted here.
+        result = client.chat_json(system, user, grammar=grammar, max_tokens=800, fast=True)
         return _extract_items(result, "summaries")
 
     for chunk in _chunk_by_budget(scene_dicts, chunk_size):
@@ -313,7 +315,7 @@ def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerC
         return []
     grammar = character_reads_grammar()
     system, user = prompts.character_reads_prompt(overview, doc.title, characters, language=language)
-    result = client.chat_json(system, user, grammar=grammar, max_tokens=1200)
+    result = client.chat_json(system, user, grammar=grammar, max_tokens=1200, fast=True)
     items = _extract_items(result, "reads")
     reads = [r for r in items if isinstance(r, dict) and r.get("character")]
     for r in reads:
@@ -332,7 +334,7 @@ def run_logline_test(logline: str, overview: str, title: str, client: LlamaServe
         return {}
     grammar = logline_test_grammar()
     system, user = prompts.logline_test_prompt(logline, overview, title, language=language)
-    result = client.chat_json(system, user, grammar=grammar, max_tokens=700)
+    result = client.chat_json(system, user, grammar=grammar, max_tokens=700, fast=True)
     if isinstance(result, dict):
         return result
     return {}

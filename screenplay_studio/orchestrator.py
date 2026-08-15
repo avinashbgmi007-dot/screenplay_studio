@@ -152,7 +152,7 @@ class Orchestrator:
 
             doc = ScriptDocument.load(m.parsed_path)
             client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
-                                       fallback_to_loaded=True)
+                                       fallback_to_loaded=True, fast_model=m.fast_model)
 
             kwargs = {"report_language": language}
             if categories:

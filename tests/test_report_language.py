@@ -85,7 +85,7 @@ class RecordingClient:
         self.responses = responses
         self.system_prompts = []
 
-    def chat_json(self, system, user, grammar=None, max_tokens=None):
+    def chat_json(self, system, user, grammar=None, max_tokens=None, **kw):
         self.system_prompts.append(system)
         return self.responses.pop(0)
 

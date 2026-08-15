@@ -47,7 +47,13 @@ async function api(path, options = {}) {
   try { data = await resp.json(); } catch (_) { /* no body */ }
   if (!resp.ok) {
     const message = (data && data.error) || `Request failed (${resp.status})`;
-    throw new Error(message);
+    const err = new Error(message);
+    // Status + watchdog flag ride on the error so callers can offer a
+    // "keep waiting?" retry on 408 instead of treating a slow model turn
+    // like a dead server.
+    err.status = resp.status;
+    err.stillWorking = !!(data && data.still_working);
+    throw err;
   }
   return data;
 }
@@ -71,11 +77,17 @@ function startElapsedTicker(targetEl, label) {
   const startedAt = Date.now();
   const tick = () => {
     const elapsed = (Date.now() - startedAt) / 1000;
-    // If the target carries a dedicated elapsed sink (a .elapsed span next
-    // to the typing dots), update just that; otherwise replace the whole text.
-    const sink = targetEl.querySelector && targetEl.querySelector(".elapsed");
+    // Update the dedicated .elapsed sink when present. If it's missing,
+    // find-or-create it rather than overwriting the bubble's whole text —
+    // the watchdog dialog lives in that bubble and a wholesale textContent
+    // replacement would erase it one second after it appears.
+    let sink = targetEl.querySelector && targetEl.querySelector(".elapsed");
+    if (!sink && targetEl.appendChild) {
+      sink = document.createElement("span");
+      sink.className = "elapsed";
+      targetEl.appendChild(sink);
+    }
     if (sink) sink.textContent = `${label} — ${formatElapsed(elapsed)} elapsed`;
-    else targetEl.textContent = `${label} — ${formatElapsed(elapsed)} elapsed`;
   };
   tick();
   const handle = setInterval(tick, 1000);
@@ -143,6 +155,8 @@ async function loadConfig() {
     state.config = await api("/config");
     $("#server-url-input").value = state.config.server_url || "";
     $("#timeout-input").value = state.config.timeout || 600;
+    $("#fast-model-input").value = state.config.fast_model || "";
+    $("#turn-timeout-input").value = state.config.turn_timeout || 120;
   } catch (e) {
     console.warn("Could not load config:", e);
   }
@@ -153,8 +167,13 @@ async function loadConfig() {
 async function saveConfig() {
   const server_url = $("#server-url-input").value.trim();
   const timeout = parseInt($("#timeout-input").value, 10) || 600;
+  const fast_model = $("#fast-model-input").value.trim();
+  const turn_timeout = parseInt($("#turn-timeout-input").value, 10) || 120;
   try {
-    state.config = await api("/config", { method: "POST", body: JSON.stringify({ server_url, timeout }) });
+    state.config = await api("/config", {
+      method: "POST",
+      body: JSON.stringify({ server_url, timeout, fast_model, turn_timeout }),
+    });
     closeModal("#settings-modal");
     checkConnection();
   } catch (e) {
@@ -2069,42 +2088,93 @@ async function sendMessage() {
   const optimisticIndex = (currentBranchData().messages || []).length;
   const userMsg = renderMessage({ role: "user", content: text, quote }, optimisticIndex);
   container.appendChild(userMsg);
-  const pending = el("div", "msg assistant msg-pending");
-  pending.appendChild(el("div", "msg-role", "Studio"));
-  const pendingBubble = el("div", "msg-bubble");
   const workingLabel = state.inIdea ? "Thinking it through" : "Reading the pages";
-  pendingBubble.appendChild(document.createTextNode(workingLabel));
-  const dots = el("span", "typing-dots");
-  dots.appendChild(el("i")); dots.appendChild(el("i")); dots.appendChild(el("i"));
-  pendingBubble.appendChild(dots);
-  pendingBubble.appendChild(el("span", "elapsed"));
-  pending.appendChild(pendingBubble);
-  container.appendChild(pending);
-  container.scrollTop = container.scrollHeight;
-  const stopTicker = startElapsedTicker(pendingBubble, workingLabel);
 
-  try {
-    const sessionId = await ensureSession();
-    const base = state.inIdea
-      ? `/ideas/${encodeURIComponent(state.currentIdea.id)}`
-      : `/projects/${encodeURIComponent(state.currentProject)}`;
-    const res = await api(`${base}/chat/sessions/${sessionId}/messages`, {
-      method: "POST", body: JSON.stringify(quote ? { text, quote } : { text }),
-    });
-    stopTicker();
-    state.branches[state.currentBranch] = { ...currentBranchData(), messages: res.messages };
-    renderMessages();
-    refreshMetrics();  // reply timing landed — update the loop readout
-  } catch (e) {
-    stopTicker();
-    pendingBubble.textContent = "Couldn't get a reply: " + e.message;
-    pending.classList.remove("msg-pending");
-    pendingBubble.style.color = "var(--rust-flag)";
-    showError("Chat message failed: " + e.message);
-  }
-
-  $("#send-btn").disabled = false;
-  input.focus();
+  // One turn may be attempted more than once: when the generation watchdog
+  // fires (the model was still working at the per-turn cap), the writer can
+  // choose to keep waiting — which re-POSTs the same turn. That's safe
+  // because the backend appends the user message only after the model call
+  // succeeds, so a timed-out turn was never stored.
+  const finishTurn = () => {
+    $("#send-btn").disabled = false;
+    input.focus();
+  };
+  const attemptTurn = async () => {
+    // pending/pendingBubble/stopTicker live at function scope (not inside
+    // the try) so the watchdog branch in catch can reach them.
+    let pending = null, pendingBubble = null, stopTicker = null;
+    try {
+      const sessionId = await ensureSession();
+      // ensureSession may re-render (a brand-new session's loadSession wipes
+      // the optimistic DOM) — re-attach the user message if it was detached,
+      // and build the pending bubble fresh so it's never orphaned.
+      if (!container.contains(userMsg)) {
+        container.appendChild(userMsg);
+        container.scrollTop = container.scrollHeight;
+      }
+      pending = el("div", "msg assistant msg-pending");
+      pending.appendChild(el("div", "msg-role", "Studio"));
+      pendingBubble = el("div", "msg-bubble");
+      pendingBubble.appendChild(document.createTextNode(workingLabel));
+      const dots = el("span", "typing-dots");
+      dots.appendChild(el("i")); dots.appendChild(el("i")); dots.appendChild(el("i"));
+      pendingBubble.appendChild(dots);
+      pendingBubble.appendChild(el("span", "elapsed"));
+      pending.appendChild(pendingBubble);
+      container.appendChild(pending);
+      container.scrollTop = container.scrollHeight;
+      stopTicker = startElapsedTicker(pendingBubble, workingLabel);
+      const base = state.inIdea
+        ? `/ideas/${encodeURIComponent(state.currentIdea.id)}`
+        : `/projects/${encodeURIComponent(state.currentProject)}`;
+      const res = await api(`${base}/chat/sessions/${sessionId}/messages`, {
+        method: "POST", body: JSON.stringify(quote ? { text, quote } : { text }),
+      });
+      stopTicker();
+      state.branches[state.currentBranch] = { ...currentBranchData(), messages: res.messages };
+      renderMessages();
+      refreshMetrics();  // reply timing landed — update the loop readout
+      finishTurn();
+    } catch (e) {
+      if (e.stillWorking && pendingBubble) {
+        // Watchdog: the turn hit its cap mid-generation. Offer a choice
+        // instead of failing the turn. IMPORTANT: keep the .elapsed span
+        // alive — the ticker updates ONLY that span, and if it's gone the
+        // ticker's fallback overwrites the whole bubble, erasing this dialog
+        // one second after it appears. So drop just the typing dots.
+        const dotsEl = pendingBubble.querySelector(".typing-dots");
+        if (dotsEl) dotsEl.remove();
+        const ask = el("span", "wd-ask", workingLabel + " — still working. Keep waiting?");
+        pendingBubble.appendChild(ask);
+        const keepBtn = el("button", "wd-btn wd-keep", "Keep waiting");
+        const stopBtn = el("button", "wd-btn wd-stop", "Give up");
+        pendingBubble.appendChild(keepBtn);
+        pendingBubble.appendChild(stopBtn);
+        keepBtn.addEventListener("click", () => {
+          attemptTurn();  // same text+quote — safe to resend
+        });
+        stopBtn.addEventListener("click", () => {
+          stopTicker();
+          pending.classList.remove("msg-pending");
+          pendingBubble.textContent = "Stopped waiting — Sam was still working when the time cap hit. Send the message again to retry.";
+          pendingBubble.style.color = "var(--rust-flag)";
+          finishTurn();
+        });
+      } else if (pendingBubble) {
+        stopTicker();
+        pendingBubble.textContent = "Couldn't get a reply: " + e.message;
+        pending.classList.remove("msg-pending");
+        pendingBubble.style.color = "var(--rust-flag)";
+        showError("Chat message failed: " + e.message);
+        finishTurn();
+      } else {
+        // ensureSession itself failed before the bubble existed
+        showError("Couldn't start the conversation: " + e.message);
+        finishTurn();
+      }
+    }
+  };
+  await attemptTurn();
 }
 
 // ---- idea-room explore paths (Sudowrite-style guided spins) ----

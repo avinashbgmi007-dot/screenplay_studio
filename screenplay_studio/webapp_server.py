@@ -46,7 +46,12 @@ class ServerConfig:
     callers and tests keep working unchanged.
     """
 
-    _DEFAULTS = {"server_url": "http://localhost:8080", "model": None, "timeout": 600}
+    # turn_timeout: per-chat-turn generation cap (the watchdog). A turn that
+    # exceeds it surfaces a "still working?" prompt instead of a silent
+    # multi-minute hang. Analysis calls keep the long `timeout` — only chat
+    # turns run on the short clock.
+    _DEFAULTS = {"server_url": "http://localhost:8080", "model": None, "timeout": 600,
+                 "fast_model": None, "turn_timeout": 120}
 
     def __init__(self):
         self._data = dict(self._DEFAULTS)
@@ -69,8 +74,15 @@ class ServerConfig:
                 value = self._DEFAULTS["server_url"]
             else:
                 value = str(value).rstrip("/")
-        if key == "model" and value == "":
+        if key in ("model", "fast_model") and value == "":
             value = None
+        if key == "turn_timeout":
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                raise ValueError("turn_timeout must be an integer number of seconds")
+            if value <= 0:
+                raise ValueError("turn_timeout must be positive")
         self._data[key] = value
 
     def get(self, key, default=None):
@@ -139,7 +151,8 @@ def _manifest_summary(m: ProjectManifest) -> dict:
 
 def _make_client(m: ProjectManifest):
     from screenplay_analyzer.llm_client import LlamaServerClient
-    return LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout)
+    return LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
+                             fast_model=m.fast_model)
 
 
 def _sanitize_report(report: dict) -> dict:
@@ -229,6 +242,10 @@ def set_config():
         CONFIG["server_url"] = body["server_url"]
     if "model" in body:
         CONFIG["model"] = body["model"] or None
+    if "fast_model" in body:
+        CONFIG["fast_model"] = body["fast_model"] or None
+    if "turn_timeout" in body:
+        CONFIG["turn_timeout"] = body["turn_timeout"]
     if "timeout" in body:
         try:
             CONFIG["timeout"] = int(body["timeout"])
@@ -368,6 +385,7 @@ def analyze_project(name):
 
     m.server_url = CONFIG["server_url"]
     m.model_id = CONFIG["model"]
+    m.fast_model = CONFIG["fast_model"]
     m.timeout = CONFIG["timeout"]
     m.save()
 
@@ -1196,8 +1214,12 @@ def _load_session_and_engine(project: str, session_id: str):
     script_ctx = ScriptContext(load_json(script_path))
     report = _sanitize_report(load_json(report_path)) if report_path else None
     report_ctx = ReportContext(report)
+    # Chat turns run on the short turn clock (the generation watchdog) — a
+    # slow reply surfaces a "still working?" prompt instead of a silent
+    # multi-minute hang. Analysis calls keep the long timeout; only chat
+    # turns use turn_timeout.
     client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id,
-                               timeout=CONFIG["timeout"], fallback_to_loaded=True)
+                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
     memory = None
     try:
         mem_mod = _import_cowriter("memory")
@@ -1295,6 +1317,16 @@ def send_message(name, sid):
     try:
         reply = engine.send_message(session, text, quote=quote)
     except Exception as e:
+        # Generation watchdog: the turn hit its per-turn cap while the model
+        # was still working. Distinct from a dead server — send a 408 the
+        # frontend recognizes, so it can offer "keep waiting?" instead of
+        # failing the turn. Safe to retry: send_message appends the user
+        # message only AFTER the model call succeeds, so nothing was stored.
+        if type(e).__name__ == "WatchdogTimeoutError" or "didn't respond within" in str(e):
+            return jsonify({
+                "error": "The model was still working when the per-turn time cap was hit.",
+                "still_working": True,
+            }), 408
         return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
 
     try:
@@ -1491,8 +1523,9 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
 
     script_ctx = ScriptContext(None)
     report_ctx = ReportContext(None)
+    # Idea chats run on the same short turn clock as script chats (watchdog).
     client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id,
-                               timeout=CONFIG["timeout"], fallback_to_loaded=True)
+                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
     memory = None
     try:
         mem_mod = _import_cowriter("memory")
@@ -1632,6 +1665,12 @@ def idea_send_message(idea_id, sid):
     try:
         reply = engine.send_message(session, text)
     except Exception as e:
+        # Same watchdog as the script chat route (see send_message above).
+        if type(e).__name__ == "WatchdogTimeoutError" or "didn't respond within" in str(e):
+            return jsonify({
+                "error": "The model was still working when the per-turn time cap was hit.",
+                "still_working": True,
+            }), 408
         return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
     store.save(session)
     return jsonify({

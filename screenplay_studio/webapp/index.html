@@ -10,7 +10,7 @@
 <!-- v2e607ed — bump the version query whenever style.css/app.js change so
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch). -->
-<link rel="stylesheet" href="style.css?v=4b2c6d2">
+<link rel="stylesheet" href="style.css?v=6c4e8d2">
 </head>
 <body data-room="cowrite">
 
@@ -357,6 +357,16 @@
       CPU-offloaded experts, a quantized KV cache, or a large context window — raise this if
       replies are timing out rather than actually failing.</p>
 
+    <label class="modal-label">Fast model (optional)</label>
+    <input type="text" id="fast-model-input" placeholder="e.g. qwen2.5-1.5b — leave blank to use one model for everything">
+    <p class="modal-hint">The cheap tier: scene summaries and quick reads route here, the deep
+      analysis stays on the main model. Leave blank on a one-model box — it auto-falls back.</p>
+
+    <label class="modal-label">Chat turn cap (seconds)</label>
+    <input type="text" id="turn-timeout-input" placeholder="120">
+    <p class="modal-hint">If a reply is still generating when this hits, you get a
+      “still working — keep waiting?” prompt instead of a silent hang.</p>
+
     <button id="test-connection-btn" class="btn-secondary" style="width:100%; margin-bottom:10px;">Test Connection</button>
     <div id="test-connection-result" class="test-connection-result"></div>
 
@@ -410,6 +420,6 @@
   </div>
 </div>
 
-<script src="app.js?v=4b2c6d2"></script>
+<script src="app.js?v=6c4e8d2"></script>
 </body>
 </html>

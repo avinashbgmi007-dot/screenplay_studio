@@ -120,9 +120,10 @@ def _diagnose_parse_failure(error: Exception, choice: dict, data: dict, content:
 
 class LlamaServerClient:
     def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None,
-                 fallback_to_loaded: bool = False):
+                 fallback_to_loaded: bool = False, fast_model: str | None = None):
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.fast_model = fast_model or None
         self.timeout = timeout
         self.extra_headers = extra_headers or {}
         # When True, a pinned-but-unloaded model id falls back to whatever the
@@ -133,6 +134,35 @@ class LlamaServerClient:
         # be loaded.
         self.fallback_to_loaded = fallback_to_loaded
         self._resolved_model: str | None = None
+        self._available_ids: list[str] | None = None
+
+    def _available(self) -> list[str]:
+        """Loaded model ids, cached per client (the server's model list only
+        changes when someone swaps the loaded GGUF — mid-analysis that's a
+        manual act worth re-probing, but the list itself is cheap to cache)."""
+        if self._available_ids is None:
+            available = self.list_models()
+            ids = [m.get("id") or m.get("name") for m in available]
+            self._available_ids = [a for a in ids if a]
+        return self._available_ids
+
+    def resolve_model_id(self, model_id: str | None) -> str:
+        """Resolve a specific model id against what's loaded, applying the
+        fallback policy. Never mutates self.model — used for the optional
+        fast (cheap) tier so one analysis can mix two models safely."""
+        available_ids = self._available()
+        if not available_ids:
+            raise LlamaServerError(f"llama-server at {self.base_url} reports no loaded models.")
+        if model_id:
+            if model_id in available_ids:
+                return model_id
+            if self.fallback_to_loaded:
+                return available_ids[0]
+            raise ModelNotFoundError(
+                f"Requested model '{model_id}' is not loaded at {self.base_url}. "
+                f"Available: {available_ids}"
+            )
+        return available_ids[0]
 
     def list_models(self) -> list[dict]:
         try:
@@ -152,31 +182,8 @@ class LlamaServerClient:
         return data.get("data", []) or data.get("models", [])
 
     def resolve_model(self) -> str:
-        if self._resolved_model:
-            return self._resolved_model
-
-        available = self.list_models()
-        available_ids = [m.get("id") or m.get("name") for m in available]
-        available_ids = [a for a in available_ids if a]
-
-        if not available_ids:
-            raise LlamaServerError(f"llama-server at {self.base_url} reports no loaded models.")
-
-        if self.model:
-            if self.model not in available_ids:
-                if self.fallback_to_loaded:
-                    self.model = available_ids[0]
-                else:
-                    raise ModelNotFoundError(
-                        f"Requested model '{self.model}' is not loaded at {self.base_url}. "
-                        f"Available: {available_ids}"
-                    )
-            self._resolved_model = self.model
-        else:
-            # no explicit model requested — llama-server serves one model per
-            # instance, so take whatever's running
-            self._resolved_model = available_ids[0]
-
+        if not self._resolved_model:
+            self._resolved_model = self.resolve_model_id(self.model)
         return self._resolved_model
 
     def chat_json(
@@ -187,14 +194,24 @@ class LlamaServerClient:
         max_tokens: int = 1500,
         temperature: float = 0.3,
         retries: int = 2,
+        fast: bool = False,
     ):
         """
         Sends a chat completion request and returns parsed JSON. Uses the
         llama.cpp `grammar` extension field (GBNF) when provided, on top of
         response_format json_object as a fallback signal for servers/paths
         that honor that instead.
+
+        fast=True routes the call to the optional cheap tier (fast_model):
+        summaries/refresh-style calls where a lighter model is fine. If no
+        fast model is configured or it isn't loaded, resolve_model_id falls
+        back to whatever is loaded — one-model boxes just use that model for
+        everything, which is exactly the auto-fallback the audit asks for.
         """
-        model = self.resolve_model()
+        if fast and self.fast_model:
+            model = self.resolve_model_id(self.fast_model)
+        else:
+            model = self.resolve_model()
         payload = {
             "model": model,
             "messages": [

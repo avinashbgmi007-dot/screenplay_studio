@@ -51,6 +51,7 @@ class ProjectManifest:
     source_format: str
     server_url: str = "http://localhost:8080"
     model_id: str = None
+    fast_model: str = None  # optional cheap tier: summaries/refresh route here
     timeout: int = 600
     stages: dict = field(default_factory=lambda: {
         "parse": StageStatus(), "analyze": StageStatus(), "chat": StageStatus(),
@@ -129,6 +130,7 @@ class ProjectManifest:
             "source_format": self.source_format,
             "server_url": self.server_url,
             "model_id": self.model_id,
+            "fast_model": self.fast_model,
             "timeout": self.timeout,
             "stages": {k: v.to_dict() for k, v in self.stages.items()},
             "cowriter_session_id": self.cowriter_session_id,
@@ -146,6 +148,7 @@ class ProjectManifest:
             source_filename=d["source_filename"], source_format=d["source_format"],
             server_url=d.get("server_url", "http://localhost:8080"),
             model_id=d.get("model_id"),
+            fast_model=d.get("fast_model"),
             timeout=d.get("timeout", 600),
             cowriter_session_id=d.get("cowriter_session_id"),
             drafts=d.get("drafts", []),

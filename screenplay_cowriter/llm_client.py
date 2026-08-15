@@ -21,6 +21,14 @@ class ModelNotFoundError(LlamaServerError):
     pass
 
 
+class WatchdogTimeoutError(LlamaServerError):
+    """A chat turn exceeded the per-turn generation cap. Distinct from other
+    LlamaServerErrors so the webapp can offer a "keep waiting?" retry instead
+    of failing the turn — a slow local model is not the same failure as a
+    dead server, and the writer shouldn't have to retype a long message."""
+    pass
+
+
 class LlamaServerClient:
     def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None,
                  fallback_to_loaded: bool = False):
@@ -137,7 +145,7 @@ class LlamaServerClient:
             except requests.exceptions.ConnectionError as e:
                 raise LlamaServerError(f"Could not connect to llama-server at {self.base_url}.") from e
             except requests.exceptions.Timeout as e:
-                raise LlamaServerError(
+                raise WatchdogTimeoutError(
                     f"The model didn't respond within {self.timeout}s. For a large local model "
                     f"(especially with CPU-offloaded MoE experts, quantized KV cache, or a large "
                     f"context window), a single reply can genuinely take a while — this isn't "
