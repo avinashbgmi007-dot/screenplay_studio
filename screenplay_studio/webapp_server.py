@@ -1160,9 +1160,9 @@ def get_session(name, sid):
 
 @app.route("/api/projects/<name>/chat/sessions/<sid>", methods=["DELETE"])
 def delete_session(name, sid):
-    """End-user control: erase this conversation with Sam. Only the chat
+    """End-user control: erase this conversation with Sameer. Only the chat
     history is deleted — the writer's relationship memory (writer_profile.json)
-    is deliberately kept, so Sam's learning about how the writer works survives
+    is deliberately kept, so Sameer's learning about how the writer works survives
     a fresh page. The frontend immediately starts a new session after this."""
     try:
         m = _load_manifest(name)
@@ -1291,7 +1291,7 @@ def get_writer_memory():
         mem = _load_writer_memory()
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
-    # The card (what Sam actually uses) is scope-filtered: observations tagged
+    # The card (what Sameer actually uses) is scope-filtered: observations tagged
     # for another project/idea never leak in. The writer's own full profile
     # stays visible — it's their memory, they should see all of it.
     scope = request.args.get("scope") or None
@@ -1374,7 +1374,7 @@ def _idea_session_payload(session) -> dict:
 def _load_idea_session_and_engine(idea_id: str, sid: str):
     """Scriptless engine: empty script/report contexts, the premise card
     injected every turn, the same writer relationship memory as the script
-    desk (so Sam's learning about the writer carries across the whole
+    desk (so Sameer's learning about the writer carries across the whole
     journey, idea room through script)."""
     store_mod = _import_cowriter("store")
     context_mod = _import_cowriter("context")
@@ -1525,7 +1525,7 @@ def idea_send_message(idea_id, sid):
 
 @app.route("/api/ideas/<idea_id>/chat/sessions/<sid>/settings", methods=["POST"])
 def idea_update_settings(idea_id, sid):
-    """Room toggle in the idea room swaps the lens: Co-write = Sam (explore),
+    """Room toggle in the idea room swaps the lens: Co-write = Sameer (explore),
     Feedback = premise doctor (validate) — same conversation, new partner."""
     body = request.get_json() or {}
     try:
@@ -1556,7 +1556,7 @@ def idea_update_settings(idea_id, sid):
 def graduate_idea(idea_id):
     """Upload the first pages: create a real project from the file, carry the
     premise card (premise.json) and the idea conversation (session files) so
-    the thread continues on the script desk — same Sam, same memory."""
+    the thread continues on the script desk — same Sameer, same memory."""
     if "file" not in request.files:
         return _error("No file uploaded (expected multipart field 'file').", 400)
     upload = request.files["file"]

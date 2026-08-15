@@ -91,11 +91,11 @@ class TestPromptRule:
 
     def test_writing_partner_embeds_example_dialogue(self):
         # The character-card lever: example exchanges lock the voice better
-        # than adjectives. Sam's examples must ride the writing_partner prompt.
+        # than adjectives. Sameer's examples must ride the writing_partner prompt.
         prompt = build_system_prompt(
             ScriptContext({"title": "T"}), ReportContext(None), "writing_partner", "peer"
         )
-        assert "How Sam talks" in prompt
+        assert "How Sameer talks" in prompt
         assert "Bold call" in prompt
         assert "want my honest take" in prompt
 
@@ -103,11 +103,11 @@ class TestPromptRule:
         prompt = build_system_prompt(
             ScriptContext({"title": "T"}), ReportContext(None), "script_consultant", "evidence_discussion"
         )
-        assert "How Sam talks" not in prompt
+        assert "How Sameer talks" not in prompt
 
 
 class TestScriptMap:
-    """Sam gets a compact standing map of the script (headings + character
+    """Sameer gets a compact standing map of the script (headings + character
     presence) so answers aren't vague for questions that don't name a scene."""
 
     def _script(self):

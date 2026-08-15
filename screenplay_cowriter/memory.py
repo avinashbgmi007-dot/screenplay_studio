@@ -1,4 +1,4 @@
-"""Writer relationship memory — Sam's gradually-learned sense of how the
+"""Writer relationship memory — Sameer's gradually-learned sense of how the
 writer likes to work, persisted writer-level (across all projects).
 
 Spec: docs/superpowers/specs/2026-08-12-writer-relationship-memory-design.md
@@ -34,7 +34,7 @@ NEUTRAL = {"detail_level": "balanced", "directness": "balanced",
            "support_style": "balanced"}
 
 # Learnable poles per dimension. support_style captures HOW the writer wants
-# Sam to work beside them: concrete options to react to (generate) vs. a
+# Sameer to work beside them: concrete options to react to (generate) vs. a
 # thinking partner to talk it through with (discuss).
 DIMENSION_POLES = {
     "detail_level": ("short", "deep"),
@@ -173,7 +173,7 @@ def _current_belief_rejected(profile, dim):
     """Has the writer rejected the dimension's CURRENT belief?
 
     'Forget this' suppresses the human-readable observation for the belief;
-    that rejection must stop the belief from steering Sam's tone until it is
+    that rejection must stop the belief from steering Sameer's tone until it is
     re-learned. Keyed to the template of the *current* value so that
     contradiction auto-suppression of an OLD pole's observation (the writer
     argued the old belief away and the dimension flipped) does NOT silence
@@ -212,7 +212,7 @@ DIM_LABELS = {
     "detail_level": ("prefers short, tight answers", "likes to go deep and wander"),
     "directness": ("prefers gentle, eased-in notes", "wants the note straight, no softening"),
     "probe_appetite": ("dislikes being probed before answers", "engages well with probing questions"),
-    "pushback_appetite": ("prefers Sam to defer", "enjoys Sam pushing back on choices"),
+    "pushback_appetite": ("prefers Sameer to defer", "enjoys Sameer pushing back on choices"),
     "support_style": ("likes concrete options to react to", "prefers talking it through before committing"),
 }
 
@@ -304,7 +304,7 @@ def _entity_in_text(entity: str, text: str) -> bool:
 
 def _obs_scope(profile, text: str, scope: str | None, entities) -> str:
     """Classify a new observation's scope: writer-behavior patterns are
-    global (Sam uses them in every room); anything that names an entity from
+    global (Sameer uses them in every room); anything that names an entity from
     the current script/idea is scoped to that project so it can inform
     conversations there but never leaks elsewhere."""
     if not scope:
@@ -372,7 +372,7 @@ def build_relationship_card(profile, scope: str | None = None):
         top = max(topics, key=topics.get)
         if topics[top] / sum(topics.values()) >= 0.35:
             phrases.append(f"keeps returning to {top}-level concerns")
-    # Only observations for dimensions Sam actually acts on (or free-standing
+    # Only observations for dimensions Sameer actually acts on (or free-standing
     # general notes) reach the card — a refresh note about a dimension whose
     # belief the writer forgot must not sneak the rejected belief back in.
     # Scope gate: observations tagged for another project/idea never cross

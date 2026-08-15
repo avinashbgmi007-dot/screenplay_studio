@@ -44,7 +44,7 @@ knowledge_base/       34 attributed craft rules grounding analyzer judgments (no
 screenplay_analyzer/  Piece 2 — 11-pass LLM pipeline, GBNF grammar-constrained JSON, quote verification
 screenplay_cowriter/  Piece 3 — branch-based chat, 6 personas x 3 modes, file-based session store
 screenplay_studio/    Orchestrator (manifest-driven resume) + Flask webapp server
-.agents/skills/       Persona humanization playbooks (sam-humanizer, script-doctor-humanizer)
+.agents/skills/       Persona humanization playbooks (sameer-humanizer, script-doctor-humanizer)
 ```
 
 Key flows:
@@ -72,7 +72,7 @@ Key flows:
 - `docs/DATA_FORMATS.md` — JSON bridge schemas (parsed/kg/report/manifest/session/progress)
 - `docs/DEVELOPMENT.md` — setup, conventions, how to extend (pipeline pass, rule, persona, endpoint)
 - `docs/TESTING.md` — test suite layout and the mock llama-server
-- `docs/debates/` — live Sam-vs-Premise-Doctor debate transcripts (re-run with `_debate.py`)
+- `docs/debates/` — live Sameer-vs-Premise-Doctor debate transcripts (re-run with `_debate.py`)
 - `NOTES.md` — handoff log; read it first, update it as you work
 
 ## Efficient workflow (avoid re-scanning the repo)

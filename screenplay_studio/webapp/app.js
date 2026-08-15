@@ -130,7 +130,7 @@ function hideError() {
 const FALLBACK_PERSONAS = ["script_consultant", "producer", "dev_exec", "teacher", "audience", "genre_specialist"];
 const FALLBACK_MODES = ["evidence_discussion", "brainstorm", "character_interview"];
 const FALLBACK_PERSONA_LABELS = {
-  script_consultant: "Script Consultant", producer: "Producer", dev_exec: "Dev Exec",
+  script_consultant: "Dr. Sushruta", producer: "Producer", dev_exec: "Dev Exec",
   teacher: "Teacher", audience: "Audience", genre_specialist: "Genre Specialist",
 };
 const FALLBACK_MODE_LABELS = { evidence_discussion: "Grounded Discussion", brainstorm: "Brainstorm", character_interview: "Character Interview" };
@@ -414,7 +414,7 @@ async function loadIdeaSession(sid) {
   populateSelectors();
 }
 
-// The two lenses of the idea room: Co-write = Sam (explore), Feedback = the
+// The two lenses of the idea room: Co-write = Sameer (explore), Feedback = the
 // premise doctor (validate). Same conversation, new partner — the toggle
 // swaps the lens and persists it on the session.
 function setIdeaLens(room) {
@@ -425,8 +425,8 @@ function setIdeaLens(room) {
     input.placeholder = "Ask the premise doctor to test the idea…";
     document.body.dataset.room = "feedback";
   } else {
-    partnerName.textContent = "Sam — AI writing partner";
-    input.placeholder = "Talk it through with Sam…";
+    partnerName.textContent = "Sameer — AI writing partner";
+    input.placeholder = "Talk it through with Sameer…";
     document.body.dataset.room = "cowrite";
   }
   const chip = $("#room-chip");
@@ -474,7 +474,7 @@ async function graduateIdea(file) {
     await loadProjects();
     await loadIdeas();
     await openProject(project.project);
-    appendSystemNote("The premise card and your conversation came with you — same desk, same Sam.");
+    appendSystemNote("The premise card and your conversation came with you — same desk, same Sameer.");
   } catch (e) {
     showError("Couldn't graduate the idea: " + e.message);
   } finally {
@@ -568,7 +568,7 @@ async function openProject(name) {
     $("#premise-pane").style.display = "none";
     $("#script-toolbar").style.display = "flex";
     $("#script-scenes").style.display = "";
-    $(".partner-name").textContent = "Sam — AI writing partner";
+    $(".partner-name").textContent = "Sameer — AI writing partner";
     $("#input").placeholder = "Ask about a scene, a character, a note in the margins…";
     const project = await api(`/projects/${encodeURIComponent(name)}`);
     renderProjectList();
@@ -636,7 +636,7 @@ function setRoom(room) {
   state.view = room;                       // "cowrite" | "feedback"
   if (state.inIdea) {
     // idea room: both lenses share one conversation — the toggle swaps the
-    // partner (Sam <-> premise doctor), not the panel
+    // partner (Sameer <-> premise doctor), not the panel
     applyIdeaLens(room);
     $("#beatboard-view").style.display = "none";
     $("#compare-view").style.display = "none";
@@ -894,15 +894,15 @@ async function ensureSession() {
 }
 
 async function clearChat() {
-  // End-user control: erase this conversation with Sam and start a fresh
+  // End-user control: erase this conversation with Sameer and start a fresh
   // page. The relationship memory is deliberately kept (backend keeps
-  // writer_profile.json) so Sam's learning about how the writer works
+  // writer_profile.json) so Sameer's learning about how the writer works
   // survives a cleared thread.
   const project = state.currentProject;
   const sid = state.currentSession;
   if (!project) return;
   const label = sid ? "this conversation" : "the empty page";
-  if (!confirm(`Erase ${label} with ${state.inIdea ? "Sam and the premise doctor" : "Sam"} and start fresh?\n\nThe relationship notes are kept — only the chat history goes.`)) return;
+  if (!confirm(`Erase ${label} with ${state.inIdea ? "Sameer and the premise doctor" : "Sameer"} and start fresh?\n\nThe relationship notes are kept — only the chat history goes.`)) return;
   try {
     if (sid) {
       const base = state.inIdea
@@ -949,7 +949,7 @@ function renderMessages() {
     const hint = el("div", "chat-empty-hint");
     if (state.inIdea) {
       hint.innerHTML =
-        "This is the idea desk — no pages yet, and that's the point. Talk the idea through with Sam " +
+        "This is the idea desk — no pages yet, and that's the point. Talk the idea through with Sameer " +
         "(he probes before he suggests), then flip to <em>Feedback</em> to have the premise doctor " +
         "stress-test it. Save the premise card as it sharpens — it rides with every turn and " +
         "carries into the script when you upload the first pages.";
@@ -1026,7 +1026,7 @@ function appendSystemNote(text, isError) {
 
 // ---------- select-to-reply ----------
 // Highlight any passage in the script → a small lamp-lit button floats up →
-// the passage attaches as a quote card above the composer → Sam answers
+// the passage attaches as a quote card above the composer → Sameer answers
 // grounded on that exact text. Quotes in the thread are clickable: they jump
 // back to the scene and flash it.
 
@@ -1163,7 +1163,7 @@ function renderMessageRail() {
   rail.classList.remove("empty");
 
   // the strip shows only the WRITER's own messages — one horizontal line per
-  // question/comment, first at the top, latest at the bottom. Sam's replies
+  // question/comment, first at the top, latest at the bottom. Sameer's replies
   // stay in the conversation thread; the rail is the writer's line of intent.
   // (i = the REAL message index, so a click still jumps to the right bubble.)
   const userMsgs = msgs.map((m, i) => ({ m, i })).filter(({ m }) => m.role === "user");
@@ -1307,12 +1307,12 @@ async function updateSettings() {
 }
 
 async function resetToPartner() {
-  // "back to Sam": reset the current branch to the writing-partner default
+  // "back to Sameer": reset the current branch to the writing-partner default
   await _setPersonaMode("writing_partner", "peer");
   renderMessages();
 }
 
-// ---- Sam's notes on you (writer relationship memory) ----
+// ---- Sameer's notes on you (writer relationship memory) ----
 async function loadSamNotes() {
   const data = await api("/writer-memory");
   renderSamNotes(data);
@@ -1322,7 +1322,7 @@ function renderSamNotes(data) {
   dims.innerHTML = "";
   obsList.innerHTML = "";
   // The chips come from the server's suppression-aware gate (the same set
-  // that steers Sam), so a forgotten belief stops showing here too.
+  // that steers Sameer), so a forgotten belief stops showing here too.
   const gated = Object.entries(data.gated || {});
   gated.forEach(([name, entry]) => {
     const chip = document.createElement("span");
@@ -2042,7 +2042,7 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
   }
   if (discussed) {
     const discussedTag = el("span", "scene-discussed", "discussed");
-    discussedTag.title = "You asked Sam about a passage in this scene";
+    discussedTag.title = "You asked Sameer about a passage in this scene";
     head.appendChild(discussedTag);
   }
   const addNoteBtn = el("button", "note-add", "✎ note");
@@ -2231,7 +2231,7 @@ function maybeShowWelcome() {
   const branch = currentBranchData();
   if ((branch.messages || []).length > 0) return;
   if (!container.querySelector(".chat-empty-hint")) {
-    container.appendChild(el("div", "chat-empty-hint", "Sam: Hey — I'm here. What are we working on?"));
+    container.appendChild(el("div", "chat-empty-hint", "Sameer: Hey — I'm here. What are we working on?"));
   }
 }
 
@@ -2978,7 +2978,7 @@ function init() {
   // composer
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage(); });
 
-  // select-to-reply: highlight a passage in the script → ask Sam about it
+  // select-to-reply: highlight a passage in the script → ask Sameer about it
   $("#quote-float").addEventListener("click", () => {
     const btn = $("#quote-float");
     if (btn.hidden) return;

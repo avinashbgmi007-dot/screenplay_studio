@@ -1,4 +1,4 @@
-"""Regression tests for the humanized persona voices (Sam, script consultant,
+"""Regression tests for the humanized persona voices (Sameer, Dr. Sushruta,
 premise doctor) and the shared human-voice rules distilled from the
 character-AI ecosystem playbook (RealChar / Soul-of-Waifu / humanizer)."""
 
@@ -35,10 +35,10 @@ class TestSharedVoiceRules:
             assert "I'm a language model" not in text, key
 
 
-class TestSamVoice:
+class TestSameerVoice:
     def test_sam_keeps_his_examples_and_guards(self):
         p = _prompt("writing_partner")
-        assert "How Sam talks" in p
+        assert "How Sameer talks" in p
         assert "Bold call" in p
         assert "want my honest take" in p
         assert "Never invent the pages" in p
@@ -54,9 +54,9 @@ class TestDoctorVoice:
         p = _prompt("script_consultant", "evidence_discussion")
         assert "dry wit" in p
         assert "argue with the script, never with the writer" in p
-        assert "How this consultant talks" in p  # example dialogue embedded
-        # still does not leak Sam's examples
-        assert "How Sam talks" not in p
+        assert "How Dr. Sushruta talks" in p  # example dialogue embedded
+        # still does not leak Sameer's examples
+        assert "How Sameer talks" not in p
 
     def test_premise_doctor_has_voice_and_examples(self):
         p = _prompt("premise_doctor", "concept_validation", premise={"title": "Idea"})

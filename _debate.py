@@ -1,4 +1,4 @@
-"""Live debate: Sam (co-writer) vs the Premise Doctor (development executive).
+"""Live debate: Sameer (co-writer) vs the Premise Doctor (development executive).
 
 Drives a real conversation through the local model using the ACTUAL personas
 from personas.py — no special "debate" prompt, just the two rooms talking,
@@ -32,7 +32,7 @@ MODEL = "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-MTP-I-Compact_
 
 client = LlamaServerClient(base_url=BASE_URL, model=MODEL, fallback_to_loaded=True)
 
-# Bare premise card: the idea starts as nothing but Sam's pitch and the card
+# Bare premise card: the idea starts as nothing but Sameer's pitch and the card
 # is the shared, growing material the whole debate works from.
 PREMISE = {"title": "", "logline": "", "premise": "", "questions": ""}
 
@@ -155,36 +155,36 @@ def exchange(who: str, system: str, directive: str, header: str, needs_verdict: 
 
 
 exchange(
-    "Sam", sam_system(),
+    "Sameer", sam_system(),
     "You're at the desk with your writer, who has nothing in the hopper and wants to build "
     "something new. They said: \"I've got a scene-shaped hole in my week. Pitch me something "
     "— an idea we can actually build.\" Pitch them ONE genuinely interesting idea, concrete "
     "enough to see, and end by asking what lands for them.",
-    "ROUND 1 — Sam pitches the idea",
+    "ROUND 1 — Sameer pitches the idea",
 )
 
 exchange(
     "Premise Doctor", doctor_system(),
-    "Sam — the co-writer — just pitched that idea to the writer. The writer brings it to you "
+    "Sameer — the co-writer — just pitched that idea to the writer. The writer brings it to you "
     "for your honest read: what's the hook, is this actually a movie, and where is it thin "
     "right now? End with the one question that matters most.",
     "ROUND 2 — The Premise Doctor's first read",
 )
 
 exchange(
-    "Sam", sam_system(),
+    "Sameer", sam_system(),
     "The writer took your idea to a script doctor for a read, and that's the note above. Give "
     "the writer YOUR OWN read of the doctor's note — in your own words, your own position, "
     "your own reaction. Do not quote the doctor or re-argue their exact sentences; say what "
     "you actually think is right and wrong about their take, and where you'd strengthen the "
     "idea in response.",
-    "ROUND 3 — Sam pushes back",
+    "ROUND 3 — Sameer pushes back",
 )
 
 exchange(
     "Premise Doctor", doctor_system(),
-    "Sam has responded to your read, above. Where does that leave the idea? Push on whatever "
-    "still worries you, and say so plainly if Sam has actually answered it. Then give your "
+    "Sameer has responded to your read, above. Where does that leave the idea? Push on whatever "
+    "still worries you, and say so plainly if Sameer has actually answered it. Then give your "
     "verdict in one tight paragraph: verdict first, the one thing that would fully win you "
     "over, and the one next step for the writer.",
     "ROUND 4 — The Premise Doctor's verdict",
@@ -195,7 +195,7 @@ out_dir = "docs/debates"
 os.makedirs(out_dir, exist_ok=True)
 out_path = os.path.join(out_dir, f"sam-vs-premise-doctor-{date.today().isoformat()}.md")
 with open(out_path, "w", encoding="utf-8") as f:
-    f.write(f"# Sam vs. the Premise Doctor — a live debate\n\n")
+    f.write(f"# Sameer vs. the Premise Doctor — a live debate\n\n")
     f.write(f"_Generated {date.today().isoformat()} on the local model, "
             f"through the app's real personas. Neither speaker knows it's an AI._\n\n")
     for who, reply in thread:
