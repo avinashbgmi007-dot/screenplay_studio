@@ -391,6 +391,8 @@ def analyze_project(name):
     report_language = body.get("report_language") or m.report_language or "eng"
 
     orch = Orchestrator(m)
+    import time as _t
+    _t0 = _t.time()
     try:
         orch.run_analyze(report_language=report_language)
     except OrchestratorError as e:
@@ -399,6 +401,8 @@ def analyze_project(name):
         traceback.print_exc()
         return _error(f"Unexpected error during analysis: {e}", 500)
 
+    from .metrics import record_analysis
+    record_analysis(m, _t.time() - _t0)
     return jsonify(_manifest_summary(m))
 
 
@@ -669,6 +673,7 @@ def apply_edits(name):
             "applied_at": time.time(),
         })
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+    _record_findings_metrics(m, statuses)
     return jsonify({
         **result,
         "scene_text_after": scene_text(doc, scene_number),
@@ -688,7 +693,31 @@ def undo_edits(name):
     except ValueError as e:
         return _error(str(e), 400)
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+    _record_findings_metrics(m, statuses)
     return jsonify({**result, "findings_status": statuses})
+
+
+def _record_findings_metrics(m, statuses) -> None:
+    """Findings-per-fix: how much of the last report is resolved now."""
+    try:
+        from .metrics import record_findings
+        summary = statuses.get("summary") or {}
+        open_count = (summary.get("still_present") or 0) + (summary.get("unknown") or 0)
+        total = (summary.get("addressed") or 0) + (summary.get("still_present") or 0) + (summary.get("unknown") or 0)
+        if total:
+            record_findings(m, open_count, total)
+    except Exception:
+        pass  # metrics are best-effort; never break an edit
+
+
+@app.route("/api/projects/<name>/metrics", methods=["GET"])
+def get_metrics(name):
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    from .metrics import summarize
+    return jsonify(summarize(m))
 
 
 @app.route("/api/projects/<name>/edits/redo", methods=["POST"])
@@ -703,6 +732,7 @@ def redo_edits(name):
     except ValueError as e:
         return _error(str(e), 400)
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+    _record_findings_metrics(m, statuses)
     return jsonify({**result, "findings_status": statuses})
 
 
@@ -1260,11 +1290,18 @@ def send_message(name, sid):
 
     # select-to-reply: optional {"scene_number": int, "text": str}
     quote = body.get("quote")
+    import time as _t
+    _t0 = _t.time()
     try:
         reply = engine.send_message(session, text, quote=quote)
     except Exception as e:
         return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
 
+    try:
+        from .metrics import record_reply
+        record_reply(_load_manifest(name), _t.time() - _t0, quoted=bool(quote))
+    except Exception:
+        pass  # metrics are best-effort — never break a chat turn
     store.save(session)
     return jsonify({
         "reply": reply,

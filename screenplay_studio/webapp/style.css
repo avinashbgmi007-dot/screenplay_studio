@@ -388,6 +388,51 @@ body::after {
   margin: 0;
 }
 
+/* ---- idea-room explore paths (Sudowrite-style guided spins) ---- */
+.premise-explore {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-soft);
+}
+.premise-explore-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.explore-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+.explore-chip {
+  font-size: 12px;
+  color: var(--text);
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.explore-chip:hover {
+  border-color: var(--accent-deep);
+  color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -6px var(--glow-strong);
+}
+.explore-chip:active { transform: translateY(0); }
+.premise-journey {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin: 11px 0 0;
+  line-height: 1.6;
+}
+.premise-journey b { color: var(--text-muted); font-weight: 500; }
+
 body.dawn .premise-pane { background: var(--ink-950); }
 body.dawn .premise-fields { background: var(--ink-900); }
 body.dawn .premise-field input, body.dawn .premise-field textarea { background: var(--ink-800); }
@@ -437,6 +482,20 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   background: var(--ink-900);
   flex: 0 0 auto;
 }
+.home-btn {
+  flex: none;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  font-size: 15px;
+  color: var(--text-muted);
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.home-btn:hover { color: var(--accent); border-color: var(--accent-deep); transform: translateY(-1px); }
+.home-btn:active { transform: translateY(0); }
 .project-bar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 #project-title {
   font-family: var(--font-typewriter);
@@ -755,6 +814,16 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   background:
     repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 3px),
     var(--ink-950);
+}
+
+/* The desk: script + divider + the active room share one 70/30 row. It sits
+   AFTER the rail in the workspace row, so the rail's width never eats into
+   the room's share (70% here means 70% of the desk, not of the whole row). */
+.desk {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
 }
 
 #script-pane {
@@ -1117,6 +1186,70 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 }
 .fix-row-body { flex: 1; min-width: 0; }
 .fix-row-issue { font-size: 13px; color: var(--text); line-height: 1.5; }
+.fix-row-locate {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--accent);
+  margin-left: 8px; opacity: 0.75;
+}
+.fix-row-locate:hover { opacity: 1; text-decoration: underline; }
+
+/* ---- anchored findings: the quoted line in the paper is clickable ---- */
+.el-anchored {
+  cursor: pointer;
+  border-left: 2px solid var(--accent-deep);
+  padding-left: 7px;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+.el-anchored:hover { background: rgba(233, 223, 206, 0.06); }
+.el-anchored::after {
+  content: "❋";
+  color: var(--accent);
+  font-size: 10px;
+  margin-left: 6px;
+  opacity: 0.6;
+  vertical-align: 1px;
+}
+/* the target line flashes after Locate */
+.finding-highlight {
+  background: linear-gradient(120deg, rgba(233, 223, 206, 0.10), rgba(233, 223, 206, 0.16)) !important;
+  outline: 1px solid var(--accent-deep);
+  border-radius: 3px;
+  animation: findingPulse 1.6s ease-in-out 2;
+}
+@keyframes findingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(233, 223, 206, 0); }
+  50% { box-shadow: 0 0 0 3px var(--glow); }
+}
+.finding-flash {
+  outline: 1px solid var(--accent);
+  animation: findingPulse 1.6s ease-in-out 2;
+}
+
+/* ---- change-mark stars: applied edits leave a star on the line (Arc Studio) ---- */
+.el-changed {
+  position: relative;
+}
+.el-changed::before {
+  content: "★";
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  font-size: 11px;
+  opacity: 0.75;
+  text-shadow: 0 0 6px var(--glow);
+}
+.el-changed:hover::before { opacity: 1; }
+
+/* ---- loop instrumentation in the status strip (IMPROVEMENT_AUDIT 1.3) ---- */
+#status-metrics {
+  color: var(--text-faint);
+  font-size: 10.5px;
+}
+#status-metrics:hover { color: var(--text-muted); }
+#status-metrics.ok { color: var(--ok); }
+#status-metrics.fail { color: var(--danger); }
 .fix-row-why { font-size: 11.5px; color: var(--text-faint); font-style: italic; margin-top: 2px; }
 .fix-row-actions { display: flex; gap: 6px; margin-top: 6px; }
 .fix-row-actions button {
@@ -1234,6 +1367,13 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   flex-direction: column;
   background: var(--ink-900);
   position: relative;
+}
+/* belt-and-braces: ID specificity so the room always shrinks to its share of
+   the desk row (the class rule above is the source of truth — this only
+   guards against any future class-level override) */
+#cowrite-panel, #feedback-panel {
+  flex: 1 1 0%;
+  min-width: 0;
 }
 /* lamp tint on the room — it breathes slowly, never busy */
 .room-panel::before {
@@ -2254,9 +2394,10 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   #composer, .note-add, .finding-note-actions, #project-bar,
   #room-toggle, #room-chip, #partner-card, #feedback-tabs,
   .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
-  #cowrite-panel, #feedback-panel {
+  #cowrite-panel, #feedback-panel, #struct-rail, #status-strip {
     display: none !important;
   }
+  .desk { display: block !important; }
   body::before, body::after { display: none !important; }
 
   #main { padding: 0 !important; margin: 0 !important; }

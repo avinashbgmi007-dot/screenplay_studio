@@ -180,6 +180,39 @@ async function testConnection() {
   btn.disabled = false;
 }
 
+// ---- loop instrumentation (IMPROVEMENT_AUDIT 1.3) ----
+// Quiet metrics in the status strip: avg reply time · findings fixed,
+// with analysis duration / discussed count in the hover detail.
+
+function fmtDuration(seconds) {
+  if (seconds == null) return "—";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+}
+
+async function refreshMetrics() {
+  const el = $("#status-metrics");
+  if (!el) return;
+  if (!state.currentProject) { el.textContent = "⚡ —"; el.title = "Your writing loop, measured quietly on this machine"; return; }
+  try {
+    const m = await api(`/projects/${encodeURIComponent(state.currentProject)}/metrics`);
+    const avg = m.avg_reply_seconds;
+    let label = "⚡ ";
+    label += avg != null ? `${avg}s` : "—";
+    if (m.findings_total) label += ` · ${m.findings_fixed || 0}/${m.findings_total} fixed`;
+    el.textContent = label;
+    const parts = [];
+    parts.push(`Average reply: ${avg != null ? avg + "s" : "no chats yet"}`);
+    parts.push(`Last analysis: ${fmtDuration(m.analysis_seconds)}`);
+    if (m.findings_total) parts.push(`${m.findings_fixed || 0} of ${m.findings_total} findings fixed (${m.findings_fixed_pct || 0}%)`);
+    parts.push(`Passages discussed with Sameer: ${m.discussed || 0}`);
+    el.title = parts.join("\n");
+  } catch (_) {
+    el.textContent = "⚡ —";
+    el.title = "Your writing loop, measured quietly on this machine";
+  }
+}
+
 async function checkConnection() {
   const dot = $("#connection-dot");
   const connEl = $("#status-conn");
@@ -943,6 +976,34 @@ function restoreSession() {
   }
 }
 
+// ---- Home: back to the welcome desk (shelf · library · ideas) ----
+// Distinct from the room toggle and the idea room: this leaves the project
+// entirely. The session is cleared so a refresh lands on the desk, not back
+// inside the script.
+
+function goHome() {
+  state.currentProject = null;
+  state.currentSession = null;
+  state.currentIdea = null;
+  state.currentIdeaSession = null;
+  state.inIdea = false;
+  state.script = null;
+  state.findings = [];
+  state.findingStatus = {};
+  state.fixQueue = null;
+  state.editsData = null;
+  state.branches = { main: { messages: [], active_persona: "writing_partner", active_mode: "peer" } };
+  state.currentBranch = "main";
+  hideAllViews();
+  $("#welcome-view").style.display = "flex";
+  $("#project-bar").style.display = "none";
+  const input = $("#input");
+  if (input) input.value = "";
+  try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+  refreshMetrics();
+  loadProjects();
+}
+
 async function openProject(name) {
   try {
     // leaving the idea room — the pages are back on the desk
@@ -965,6 +1026,7 @@ async function openProject(name) {
     renderProjectList();
     renderLibraryList();
     loadStash();
+    refreshMetrics();
 
     // an idea that graduated carries its premise card alongside the pages
     state.premise = project.premise && (project.premise.title || project.premise.logline || project.premise.premise) ? project.premise : null;
@@ -1260,6 +1322,7 @@ async function runAnalysis() {
     await loadScriptData();
     renderScriptView();
     if (state.view === "feedback") loadFeedbackPanels();
+    refreshMetrics();
   } catch (e) {
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
@@ -1477,6 +1540,83 @@ function jumpToScene(sceneNumber) {
   void page.offsetWidth; // restart the animation
   page.classList.add("flash");
   setTimeout(() => page.classList.remove("flash"), 1600);
+}
+
+// ---- anchored findings (IMPROVEMENT_AUDIT 1.1) ----
+// Findings and the paper are joined two ways: a finding jumps to its exact
+// line (🎯 Locate), and lines the analysis quoted carry a marker that opens
+// the finding. Matching is whitespace/punctuation-insensitive so a quote
+// whose text got re-wrapped still lands.
+
+function normText(t) {
+  return String(t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function scrollToSceneInPlace(sceneNumber) {
+  if (sceneNumber == null) return;
+  // close full-screen tools so the shared script pane is visible, but don't
+  // yank the writer out of the Feedback room while locating
+  $("#beatboard-view").style.display = "none";
+  $("#compare-view").style.display = "none";
+  const ws = document.querySelector(".workspace");
+  if (ws) ws.style.display = "flex";
+  let page = document.getElementById(`scene-page-${sceneNumber}`);
+  if (!page || page.classList.contains("hidden")) {
+    // a search filter may have hidden the scene — clear it so the jump lands
+    $("#script-search").value = "";
+    renderScriptView();
+    page = document.getElementById(`scene-page-${sceneNumber}`);
+  }
+  if (!page) { showError(`Scene ${sceneNumber} isn't in the working draft right now.`); return; }
+  page.scrollIntoView({ behavior: "smooth", block: "start" });
+  page.classList.remove("flash");
+  void page.offsetWidth;
+  page.classList.add("flash");
+  setTimeout(() => page.classList.remove("flash"), 1600);
+}
+
+function findingTargetScene(f) {
+  // the verification pass corrects the scene the quote actually lives in
+  if (f.verification && f.verification.status === "verified" && f.verification.matched_scene) {
+    return f.verification.matched_scene;
+  }
+  return (f.scene_refs && f.scene_refs[0]) || null;
+}
+
+function locateFinding(f, index) {
+  const scene = findingTargetScene(f);
+  if (scene == null) { showError("This finding isn't tied to a specific scene."); return; }
+  scrollToSceneInPlace(scene);
+  const quote = (f.evidence_quote || "").trim();
+  if (!quote) return;
+  setTimeout(() => {
+    const page = document.getElementById(`scene-page-${scene}`);
+    if (!page) return;
+    const q = normText(quote);
+    if (q.length < 4) return;
+    for (const line of page.querySelectorAll("[class^=el-]")) {
+      const lt = normText(line.textContent);
+      if (lt.length >= 4 && (lt.includes(q) || q.includes(lt.slice(0, 40)))) {
+        line.classList.add("finding-highlight");
+        line.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => line.classList.remove("finding-highlight"), 2600);
+        return;
+      }
+    }
+  }, 140);
+}
+
+function openFindingCard(index) {
+  const card = document.querySelector(`[data-finding-index="${index}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("finding-flash");
+    void card.offsetWidth;
+    card.classList.add("finding-flash");
+    setTimeout(() => card.classList.remove("finding-flash"), 1800);
+    return true;
+  }
+  return false;
 }
 
 function selectionInScriptPane() {
@@ -1843,6 +1983,7 @@ async function sendMessage() {
     stopTicker();
     state.branches[state.currentBranch] = { ...currentBranchData(), messages: res.messages };
     renderMessages();
+    refreshMetrics();  // reply timing landed — update the loop readout
   } catch (e) {
     stopTicker();
     pendingBubble.textContent = "Couldn't get a reply: " + e.message;
@@ -1853,6 +1994,33 @@ async function sendMessage() {
 
   $("#send-btn").disabled = false;
   input.focus();
+}
+
+// ---- idea-room explore paths (Sudowrite-style guided spins) ----
+// One tap sends a framed prompt to whichever lens is active (Sameer explores,
+// the premise doctor validates). The card context rides every turn already.
+
+function sendPrefilled(text) {
+  const input = $("#input");
+  if (!input) return;
+  input.value = text;
+  sendMessage();
+}
+
+function wireExploreChips() {
+  const wrap = document.getElementById("premise-explore");
+  if (!wrap) return;
+  wrap.querySelectorAll(".explore-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const prompt = (chip.dataset.prompt || "").trim();
+      if (!prompt) return;
+      if (!state.currentIdea && !state.currentProject) {
+        showError("Open an idea first — the explore paths need a card to work with.");
+        return;
+      }
+      sendPrefilled(prompt);
+    });
+  });
 }
 
 // ---------- chat input history (↑/↓ like Claude / the shell) ----------
@@ -2030,6 +2198,10 @@ function renderFixQueuePanel(container) {
     if (item.why_it_matters) issue.appendChild(el("div", "fix-row-why", item.why_it_matters));
     body.appendChild(issue);
     const actions = el("div", "fix-row-actions");
+    const locateBtn = el("button", "", "🎯 Locate");
+    locateBtn.type = "button";
+    locateBtn.title = "Jump to the exact line in the script";
+    locateBtn.addEventListener("click", () => locateFinding(item, item.index));
     const rewriteBtn = el("button", "", "Rewrite");
     rewriteBtn.type = "button";
     rewriteBtn.addEventListener("click", () => {
@@ -2039,6 +2211,7 @@ function renderFixQueuePanel(container) {
     const discussBtn = el("button", "", "Discuss");
     discussBtn.type = "button";
     discussBtn.addEventListener("click", () => discussFinding(item, item.index));
+    actions.appendChild(locateBtn);
     actions.appendChild(rewriteBtn);
     actions.appendChild(discussBtn);
     body.appendChild(actions);
@@ -2329,6 +2502,7 @@ function findingStatusSummary() {
 
 function findingNoteEl(f, index, opts = {}) {
   const note = el("div", "finding-note" + (SEVERITY_CLASS[f.severity] || "") + (opts.addressed ? " addressed" : ""));
+  note.dataset.findingIndex = String(index);
   const top = el("div", "finding-note-top");
   const cat = el("span", "finding-note-cat", CATEGORY_LABELS[f.category] || f.category);
   const stateEl = el("span", "finding-note-state", opts.addressed ? "addressed" : "");
@@ -2338,6 +2512,13 @@ function findingNoteEl(f, index, opts = {}) {
   note.appendChild(el("span", "finding-note-text", f.issue));
 
   const actions = el("div", "finding-note-actions");
+  const locateBtn = el("button", "", "🎯 Locate");
+  locateBtn.type = "button";
+  locateBtn.title = "Jump to the exact line this finding quotes";
+  locateBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    locateFinding(f, index);
+  });
   const rewriteBtn = el("button", "", "Rewrite");
   rewriteBtn.type = "button";
   rewriteBtn.addEventListener("click", (e) => {
@@ -2351,6 +2532,7 @@ function findingNoteEl(f, index, opts = {}) {
     e.stopPropagation();
     discussFinding(f, index);
   });
+  actions.appendChild(locateBtn);
   actions.appendChild(rewriteBtn);
   actions.appendChild(discussBtn);
   note.appendChild(actions);
@@ -2457,7 +2639,7 @@ function writerNoteEl(note) {
   return wrap;
 }
 
-function renderScenePage(scene, findings, searchQuery, notes = [], discussed = false) {
+function renderScenePage(scene, findings, searchQuery, notes = [], discussed = false, changedTexts = []) {
   const page = el("article", "scene-page");
   page.id = `scene-page-${scene.scene_number}`;
   page.dataset.sceneNumber = String(scene.scene_number);
@@ -2489,6 +2671,13 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
     if (e.type === "parenthetical" && !text.startsWith("(")) text = `(${text})`;
     line.textContent = text;
     if (searchQuery) highlightMatches(line, text, searchQuery);
+    // change-mark star: this line is the NEW text of an applied edit (Arc
+    // Studio's most-praised touch) — hover shows what it replaced
+    const changed = changedTexts.find((rep) => normText(rep.new) === normText(text) && normText(rep.new).length >= 2);
+    if (changed) {
+      line.classList.add("el-changed");
+      line.title = `Edited — was: ${changed.old}`;
+    }
     page.appendChild(line);
   }
 
@@ -2547,6 +2736,22 @@ function renderScriptView() {
     }
   });
 
+  // change-mark stars: which lines are the NEW text of an applied edit
+  const changedByScene = {};
+  for (const ed of (state.editsData && state.editsData.edits) || []) {
+    if (!ed.scene_number || !(ed.applied || []).length) continue;
+    (changedByScene[ed.scene_number] = changedByScene[ed.scene_number] || []).push(...ed.applied);
+  }
+
+  // anchored findings: the verification pass records the scene each
+  // evidence quote actually lives in — those lines become clickable
+  const anchorsByScene = {};
+  state.findings.forEach((f, index) => {
+    const sc = findingTargetScene(f);
+    if (sc == null || !(f.evidence_quote || "").trim()) return;
+    (anchorsByScene[sc] = anchorsByScene[sc] || []).push({ f, index });
+  });
+
   // the writer's own notes, grouped the same way
   const bySceneNotes = {};
   const scriptLevelNotes = [];
@@ -2580,12 +2785,28 @@ function renderScriptView() {
 
   let matchCount = 0;
   for (const scene of state.script.scenes) {
-    const page = renderScenePage(scene, byScene[scene.scene_number] || [], q, bySceneNotes[scene.scene_number] || [], discussedScenes.has(scene.scene_number));
+    const page = renderScenePage(scene, byScene[scene.scene_number] || [], q, bySceneNotes[scene.scene_number] || [], discussedScenes.has(scene.scene_number), changedByScene[scene.scene_number] || []);
     if (q) {
       const text = (scene.heading_raw + " " + scene.elements.map((e) => e.text).join(" ")).toLowerCase();
       const matches = text.includes(q.toLowerCase());
       if (!matches) { page.classList.add("hidden"); }
       else matchCount += 1;
+    }
+    // anchor pass: mark the quoted lines so a click opens the finding
+    for (const { f, index } of anchorsByScene[scene.scene_number] || []) {
+      const qq = normText(f.evidence_quote);
+      if (qq.length < 4) continue;
+      for (const line of page.querySelectorAll("[class^=el-]")) {
+        const lt = normText(line.textContent);
+        if (lt.length >= 4 && (lt.includes(qq) || qq.includes(lt.slice(0, 40)))) {
+          line.classList.add("el-anchored");
+          line.title = `${CATEGORY_LABELS[f.category] || f.category}: ${f.issue}`;
+          line.addEventListener("click", () => {
+            if (!openFindingCard(index)) locateFinding(f, index);
+          });
+          break;
+        }
+      }
     }
     container.appendChild(page);
   }
@@ -2812,6 +3033,11 @@ function renderReportPanel() {
       const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "General";
       const issue = el("p", "fix-row-issue", `[${(f.severity || "low").toUpperCase()}] ${refs}: ${f.issue}`);
       if (f.why_it_matters) issue.appendChild(el("p", "fix-row-why", f.why_it_matters));
+      const rowBtns = el("span", "fix-row-locate", "🎯 Locate");
+      rowBtns.title = "Jump to the exact line in the script";
+      rowBtns.style.cursor = "pointer";
+      rowBtns.addEventListener("click", () => locateFinding(f));
+      issue.appendChild(rowBtns);
       card.appendChild(issue);
     });
     c.appendChild(card);
@@ -3591,11 +3817,16 @@ function init() {
   const paneDivider = $("#pane-divider");
   const scriptPane = $("#script-pane");
   let paneDragging = false;
+  const deskEl = () => document.querySelector(".desk") || document.querySelector(".workspace");
+  const railOffset = () => {
+    const rail = document.getElementById("struct-rail");
+    return (rail && !rail.classList.contains("rail-collapsed")) ? rail.offsetWidth : 0;
+  };
   const applyPaneWidth = (px) => {
-    const ws = document.querySelector(".workspace");
+    const desk = deskEl();
     // the manuscript never shrinks below half the desk (Phase 0 rule)
-    const min = ws ? Math.round(ws.clientWidth * 0.5) : 300;
-    const max = ws ? Math.round(ws.clientWidth * 0.78) : 1200;
+    const min = desk ? Math.round(desk.clientWidth * 0.5) : 300;
+    const max = desk ? Math.round(desk.clientWidth * 0.78) : 1200;
     px = Math.max(min, Math.min(px, max));
     scriptPane.style.flex = `0 0 ${px}px`;
     localStorage.setItem("pane-width-v2", String(px));
@@ -3607,7 +3838,7 @@ function init() {
   // a wide-drag session and dropped, so the manuscript is center stage on
   // every fresh load (drag to resize still works live, up to the 78% clamp).
   const savedPaneWidth = parseFloat(localStorage.getItem("pane-width-v2"));
-  const wsEl = document.querySelector(".workspace");
+  const wsEl = deskEl();
   // honor a stored width only inside the 50–78% band; anything wider (a
   // leftover from a wide-drag session) is treated as stale and dropped
   const minPane = wsEl ? Math.round(wsEl.clientWidth * 0.5) : 300;
@@ -3623,7 +3854,9 @@ function init() {
     if (!paneDragging) return;
     const ws = document.querySelector(".workspace");
     const wsRect = ws.getBoundingClientRect();
-    applyPaneWidth(e.clientX - wsRect.left);
+    // measure from the desk's left edge (past the rail), so the drag gives
+    // the script exactly the width the pointer asks for
+    applyPaneWidth(e.clientX - wsRect.left - railOffset());
   });
   window.addEventListener("mouseup", () => {
     if (!paneDragging) return;
@@ -3728,6 +3961,9 @@ function init() {
 
   // palette
   $("#palette-btn").addEventListener("click", () => openPalette(false));
+  const homeBtn = $("#home-btn");
+  if (homeBtn) homeBtn.addEventListener("click", goHome);
+  wireExploreChips();
   $("#palette-input").addEventListener("input", renderPalette);
   bindGlobalShortcuts();
 

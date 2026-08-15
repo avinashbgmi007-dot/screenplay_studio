@@ -7,7 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<!-- v2e607ed — bump the version query whenever style.css/app.js change so
+     browsers never revalidate into a stale sheet (no-cache only revalidates
+     against the browser's own copy; a versioned URL forces a fresh fetch). -->
+<link rel="stylesheet" href="style.css?v=3a1f5c1">
 </head>
 <body data-room="cowrite">
 
@@ -101,6 +104,7 @@
 
     <header id="project-bar" style="display:none;">
       <div class="project-bar-left">
+        <button id="home-btn" class="home-btn" type="button" title="Back to the desk — the shelf, your library, and the idea room">⌂</button>
         <h2 id="project-title">—</h2>
         <div id="branch-switcher" class="branch-switcher"></div>
       </div>
@@ -150,6 +154,10 @@
         </div>
       </aside>
 
+      <!-- The desk: script + divider + the active room, sized as one 70/30 row
+           after the rail (the rail is a sibling so it can't eat the room's width) -->
+      <div class="desk">
+
       <section id="script-pane" aria-label="The script">
 
         <!-- Idea room: the premise card replaces the pages until they exist -->
@@ -175,6 +183,18 @@
             </label>
           </div>
           <p class="premise-hint">The card rides with the conversation — Sameer and the premise doctor read it every turn. Save whenever it shifts.</p>
+          <div id="premise-explore" class="premise-explore">
+            <span class="premise-explore-label">Explore paths — one tap, Sameer (or the doctor) runs with it:</span>
+            <div class="explore-chips">
+              <button type="button" class="explore-chip" data-prompt="Give me 3 unexpected 'what if' twists on this idea — each one pushing it in a different genre direction. Keep each to a sentence.">🔮 What if…?</button>
+              <button type="button" class="explore-chip" data-prompt="Who is this really about? Name the protagonist, what they want more than anything, and what they're afraid of losing. Then tell me why I should care in one line.">🎭 Who's the heart?</button>
+              <button type="button" class="explore-chip" data-prompt="Where is the conflict hiding in this idea? Show me 3 pressure points that could drive whole scenes, and which one is the strongest.">⚔️ Where's the heat?</button>
+              <button type="button" class="explore-chip" data-prompt="How could this open on screen in the first 60 seconds? Give me 2-3 cold open options that hook without exposition.">📽️ Cold open</button>
+              <button type="button" class="explore-chip" data-prompt="What's the riskiest, boldest version of this idea? Push past the safe version and show me what it becomes.">🧨 Push it further</button>
+              <button type="button" class="explore-chip" data-prompt="Who is this story for, and what would make them lean in? Give me the genre positioning and the audience hook.">👥 Who's it for?</button>
+            </div>
+            <p class="premise-journey">The usual path: <b>explore</b> with Sameer → <b>validate</b> with the premise doctor → <b>upload the first pages</b> and keep the same conversation.</p>
+          </div>
         </div>
 
         <div id="script-toolbar" class="script-toolbar">
@@ -260,12 +280,15 @@
         <div id="feedback-empty" class="feedback-empty">No analysis yet — Run Analysis to get the consultant's report.</div>
       </section>
 
+      </div>
+
     </div>
 
-    <!-- Status strip: model · connection · sprint · room light — always one thin line -->
+    <!-- Status strip: model · connection · loop metrics · sprint · room light -->
     <footer id="status-strip" class="status-strip">
       <span id="status-model" class="status-item" title="Model server">…</span>
       <span id="status-conn" class="status-item">—</span>
+      <span id="status-metrics" class="status-item status-metrics" title="Your writing loop, measured quietly on this machine">⚡ —</span>
       <span class="status-spacer"></span>
       <span id="sprint-timer" class="status-item status-btn" title="A 25-minute writing sprint. Click to start or pause, double-click to reset." role="button" tabindex="0">⏱ 25:00</span>
       <span id="status-elapsed" class="status-item"></span>
@@ -386,6 +409,6 @@
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=3a1f5c1"></script>
 </body>
 </html>
