@@ -1,8 +1,10 @@
 """
 Writer's own margin notes — the writer's pencil, distinct from the tool's
-findings. Notes are pinned to scenes (or the script as a whole) and saved
-per project in a small JSON file. The parser/analyzer never touch them, so
-re-analysis or re-parse never loses the writer's thoughts.
+findings. Notes pin to a scene (or the script as a whole); a note can also
+carry an ``anchor`` — the exact line text it is pinned to (Google-Docs-style
+margin comments). Saved per project in a small JSON file. The parser/analyzer
+never touch them, so re-analysis or re-parse never loses the writer's
+thoughts.
 """
 
 from __future__ import annotations
@@ -47,7 +49,7 @@ def notes_for_scene(m, scene_number) -> list[dict]:
     return [n for n in load_notes(m) if n.get("scene_number") == scene_number]
 
 
-def add_note(m, scene_number, text: str) -> dict:
+def add_note(m, scene_number, text: str, anchor: str | None = None) -> dict:
     text = (text or "").strip()
     if not text:
         raise ValueError("Note text is required.")
@@ -56,11 +58,13 @@ def add_note(m, scene_number, text: str) -> dict:
             scene_number = int(scene_number)
         except (TypeError, ValueError):
             raise ValueError("scene_number must be an integer or null.")
+    anchor = (anchor or "").strip() or None
     now = time.time()
     note = {
         "id": uuid.uuid4().hex[:12],
         "scene_number": scene_number,
         "text": text,
+        "anchor": anchor,
         "created_at": now,
         "updated_at": now,
     }

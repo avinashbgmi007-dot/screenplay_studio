@@ -399,18 +399,23 @@ function renderRailNotes() {
   if (!list) return;
   list.innerHTML = "";
   if (!state.notes.length) {
-    list.appendChild(el("p", "empty-hint", "No margin notes yet."));
+    list.appendChild(el("p", "empty-hint", "No margin notes yet — select a line and press 📝 Note this line."));
     return;
   }
+  // the rail notes panel is the notes wiki: every note, newest first,
+  // click to jump to where it lives (its anchored line, else its scene)
   state.notes.forEach((n) => {
-    const item = el("div", "rail-note");
-    item.appendChild(el("div", "rail-note-text", n.text || ""));
+    const item = el("div", "rail-note" + (n.anchor ? " anchored" : ""));
+    item.title = n.anchor ? `Pinned to: ${n.anchor.slice(0, 60)}` : "Click to jump to this scene";
+    item.appendChild(el("div", "rail-note-text", (n.text || "").slice(0, 160)));
     const foot = el("div", "rail-note-foot");
-    if (n.scene_number) foot.appendChild(el("span", "stash-item-meta", `Scene ${n.scene_number}`));
+    const loc = el("span", "stash-item-meta", n.scene_number ? `Scene ${n.scene_number}${n.anchor ? " · 📌" : ""}` : "Script");
+    foot.appendChild(loc);
     const del = el("button", "project-delete", "✕");
     del.type = "button";
     del.title = "Remove this note";
-    del.addEventListener("click", async () => {
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
       try {
         await api(`/projects/${encodeURIComponent(state.currentProject)}/notes/${n.id}`, { method: "DELETE" });
         await reloadNotesAndRender();
@@ -421,6 +426,26 @@ function renderRailNotes() {
     });
     foot.appendChild(del);
     item.appendChild(foot);
+    item.addEventListener("click", () => {
+      if (n.anchor) {
+        const page = document.getElementById(`scene-page-${n.scene_number}`);
+        if (page) {
+          const q = normText(n.anchor);
+          for (const line of page.querySelectorAll("[class^=el-]")) {
+            const lt = normText(line.textContent);
+            if (lt === q || (q.length > 4 && lt.includes(q))) {
+              line.scrollIntoView({ behavior: "smooth", block: "center" });
+              line.classList.add("finding-highlight");
+              setTimeout(() => line.classList.remove("finding-highlight"), 2600);
+              return;
+            }
+          }
+        }
+        scrollToSceneInPlace(n.scene_number);
+      } else {
+        scrollToSceneInPlace(n.scene_number);
+      }
+    });
     list.appendChild(item);
   });
 }
@@ -855,9 +880,11 @@ function applyFocusMode(on) {
   if (btn) btn.classList.toggle("active", !!on);
   if (on) {
     markCurrentScene();
+    markCurrentLine();
     document.getElementById("script-scenes")?.addEventListener("scroll", onFocusScroll, { passive: true });
   } else {
     document.getElementById("script-scenes")?.removeEventListener("scroll", onFocusScroll);
+    document.querySelectorAll(".focus-line").forEach((l) => l.classList.remove("focus-line"));
   }
 }
 
@@ -866,13 +893,17 @@ function onFocusScroll() {
   focusScrollRAF = requestAnimationFrame(() => {
     focusScrollRAF = null;
     markCurrentScene();
+    markCurrentLine();
   });
 }
 
+// the scene whose spine crosses the middle of the pane — Highland-style
+// "you are here" tracking (queried on the REAL script pages; earlier this
+// hit the decorative night window and silently marked nothing)
 function markCurrentScene() {
   const container = document.getElementById("script-scenes");
   if (!container) return;
-  const pages = [...container.querySelectorAll(".scene-window")];
+  const pages = [...container.querySelectorAll(".scene-page")];
   if (!pages.length) return;
   const viewportMid = container.getBoundingClientRect().top + container.clientHeight / 2;
   let current = pages[0];
@@ -883,11 +914,32 @@ function markCurrentScene() {
   pages.forEach((p) => p.classList.toggle("scene-current", p === current));
 }
 
-// ---- Sprint timer: a 25-minute writing sprint in the status strip ----
-// Click to start/pause, double-click to reset. Persisted across reloads.
+// typewriter focus: within the current scene, the line nearest the pane's
+// vertical center is the live line — everything else greys out (CSS)
+function markCurrentLine() {
+  if (!document.body.classList.contains("focus-mode")) return;
+  const container = document.getElementById("script-scenes");
+  if (!container) return;
+  const current = container.querySelector(".scene-page.scene-current");
+  if (!current) return;
+  const lines = [...current.querySelectorAll("[class^=el-]")];
+  if (!lines.length) return;
+  const mid = container.getBoundingClientRect().top + container.clientHeight / 2;
+  let best = lines[0], bestDist = Infinity;
+  for (const l of lines) {
+    const d = Math.abs(l.getBoundingClientRect().top + l.offsetHeight / 2 - mid);
+    if (d < bestDist) { bestDist = d; best = l; }
+  }
+  lines.forEach((l) => l.classList.toggle("focus-line", l === best));
+}// ---- Sprint timer: a 25-minute writing sprint in the status strip ----
+// Click to start/pause, double-click to reset. The running sprint survives a
+// reload (the strip keeps counting in the background — it's a real timer,
+// not a page-scoped toy).
 const SPRINT_MS = 25 * 60 * 1000;
+const SPRINT_KEY = "screenplay_studio.sprint.v1";
 let sprintState = { running: false, remaining: SPRINT_MS, endAt: 0 };
 let sprintTick = null;
+let sprintFlashTimer = null;
 
 function sprintEl() { return $("#sprint-timer"); }
 
@@ -897,12 +949,27 @@ function formatSprint(ms) {
   return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
+function persistSprint() {
+  try {
+    localStorage.setItem(SPRINT_KEY, JSON.stringify({
+      running: sprintState.running, remaining: sprintState.remaining, endAt: sprintState.endAt,
+    }));
+  } catch (_) { /* private mode */ }
+}
+
 function renderSprint() {
   const el = sprintEl();
   if (!el) return;
-  el.textContent = `⏱ ${formatSprint(sprintState.remaining)}`;
+  const done = sprintState.remaining <= 0;
+  el.textContent = done ? "⏱ done" : `⏱ ${formatSprint(sprintState.remaining)}`;
   el.classList.toggle("running", sprintState.running);
-  el.classList.toggle("done", !sprintState.running && sprintState.remaining <= 0);
+  el.classList.toggle("done", done);
+  el.title = done
+    ? "Sprint complete. Click for a fresh 25:00 — or double-click anywhere to reset."
+    : (sprintState.running
+        ? `Writing sprint — ${formatSprint(SPRINT_MS - sprintState.remaining)} in. Click to pause, double-click to reset.`
+        : `Sprint paused (${formatSprint(SPRINT_MS - sprintState.remaining)} in). Click to resume, double-click to reset.`);
+  persistSprint();
 }
 
 function sprintPulse() {
@@ -913,6 +980,15 @@ function sprintPulse() {
     sprintState.remaining = 0;
     clearInterval(sprintTick);
     sprintTick = null;
+    // a quiet "the sprint is over" cue — the strip flashes, nothing louder
+    const el = sprintEl();
+    if (el) {
+      el.classList.remove("sprint-done-flash");
+      void el.offsetWidth;
+      el.classList.add("sprint-done-flash");
+      if (sprintFlashTimer) clearTimeout(sprintFlashTimer);
+      sprintFlashTimer = setTimeout(() => el.classList.remove("sprint-done-flash"), 3000);
+    }
   }
   renderSprint();
 }
@@ -946,6 +1022,19 @@ function resetSprint() {
 function wireSprint() {
   const el = sprintEl();
   if (!el) return;
+  // restore a live sprint across reloads: if it was running, keep counting
+  // from its endAt (it may already have finished while the tab was away)
+  try {
+    const saved = JSON.parse(localStorage.getItem(SPRINT_KEY) || "null");
+    if (saved && typeof saved.remaining === "number") {
+      sprintState.remaining = saved.remaining;
+      if (saved.running && saved.endAt) {
+        sprintState.endAt = saved.endAt;
+        sprintState.remaining = Math.max(0, saved.endAt - Date.now());
+        if (sprintState.remaining > 0) { sprintState.running = true; sprintTick = setInterval(sprintPulse, 1000); }
+      }
+    }
+  } catch (_) { /* private mode */ }
   el.addEventListener("click", toggleSprint);
   el.addEventListener("dblclick", resetSprint);
   renderSprint();
@@ -1609,13 +1698,23 @@ function locateFinding(f, index) {
 function openFindingCard(index) {
   const card = document.querySelector(`[data-finding-index="${index}"]`);
   if (card) {
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
-    card.classList.remove("finding-flash");
-    void card.offsetWidth;
-    card.classList.add("finding-flash");
-    setTimeout(() => card.classList.remove("finding-flash"), 1800);
+    flashCard(card);
     return true;
   }
+  return false;
+}
+
+function flashCard(card) {
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.remove("finding-flash");
+  void card.offsetWidth;
+  card.classList.add("finding-flash");
+  setTimeout(() => card.classList.remove("finding-flash"), 1800);
+}
+
+function openNoteCard(noteId) {
+  const card = document.querySelector(`[data-note-id="${noteId}"]`);
+  if (card) { flashCard(card); return true; }
   return false;
 }
 
@@ -1637,6 +1736,7 @@ function selectionInScriptPane() {
 function showQuoteFloat(quote) {
   const btn = $("#quote-float");
   const stashBtn = $("#stash-float");
+  const noteBtn = $("#note-float");
   const pane = $("#script-pane");
   if (!btn || !pane) return;
   const sel = window.getSelection();
@@ -1648,12 +1748,21 @@ function showQuoteFloat(quote) {
   btn.hidden = false;
   btn.style.left = Math.max(8, Math.min(rect.right - paneRect.left + 10, paneRect.width - 150)) + "px";
   btn.style.top = Math.max(4, rect.bottom - paneRect.top + 8) + "px";
+  let row = 1;
   if (stashBtn) {
     stashBtn.dataset.sceneNumber = quote.scene_number == null ? "" : String(quote.scene_number);
     stashBtn.dataset.text = quote.text;
     stashBtn.hidden = false;
     stashBtn.style.left = btn.style.left;
-    stashBtn.style.top = Math.max(4, rect.bottom - paneRect.top + 8 + 30) + "px";
+    stashBtn.style.top = Math.max(4, rect.bottom - paneRect.top + 8 + 30 * row) + "px";
+    row += 1;
+  }
+  if (noteBtn) {
+    noteBtn.dataset.sceneNumber = quote.scene_number == null ? "" : String(quote.scene_number);
+    noteBtn.dataset.text = quote.text;
+    noteBtn.hidden = false;
+    noteBtn.style.left = btn.style.left;
+    noteBtn.style.top = Math.max(4, rect.bottom - paneRect.top + 8 + 30 * row) + "px";
   }
 }
 
@@ -1662,6 +1771,8 @@ function hideQuoteFloat() {
   if (btn) btn.hidden = true;
   const stashBtn = $("#stash-float");
   if (stashBtn) stashBtn.hidden = true;
+  const noteBtn = $("#note-float");
+  if (noteBtn) noteBtn.hidden = true;
   clearContextPlaceholder();
 }
 
@@ -2632,6 +2743,31 @@ function writerNoteEl(note) {
     }
   });
   actions.appendChild(editBtn);
+  // anchored notes (Google-Docs style): the ↩ returns to the exact line
+  if (note.anchor) {
+    wrap.classList.add("anchored");
+    const jumpBtn = el("button", "", "↩");
+    jumpBtn.type = "button";
+    jumpBtn.title = "Jump to the line this note is pinned to";
+    jumpBtn.addEventListener("click", () => {
+      scrollToSceneInPlace(note.scene_number);
+      setTimeout(() => {
+        const page = document.getElementById(`scene-page-${note.scene_number}`);
+        if (!page) return;
+        const q = normText(note.anchor);
+        if (q.length < 2) return;
+        for (const line of page.querySelectorAll("[class^=el-]")) {
+          if (normText(line.textContent) === q || (q.length > 4 && normText(line.textContent).includes(q))) {
+            line.classList.add("finding-highlight");
+            line.scrollIntoView({ behavior: "smooth", block: "center" });
+            setTimeout(() => line.classList.remove("finding-highlight"), 2600);
+            break;
+          }
+        }
+      }, 140);
+    });
+    actions.appendChild(jumpBtn);
+  }
   actions.appendChild(delBtn);
   view.appendChild(text);
   view.appendChild(actions);
@@ -2804,6 +2940,21 @@ function renderScriptView() {
           line.addEventListener("click", () => {
             if (!openFindingCard(index)) locateFinding(f, index);
           });
+          break;
+        }
+      }
+    }
+    // anchored margin notes: lines with a pinned note get a 📌; click opens it
+    for (const n of bySceneNotes[scene.scene_number] || []) {
+      if (!n.anchor) continue;
+      const qq = normText(n.anchor);
+      if (qq.length < 2) continue;
+      for (const line of page.querySelectorAll("[class^=el-]")) {
+        const lt = normText(line.textContent);
+        if (lt === qq || (qq.length > 4 && lt.includes(qq))) {
+          line.classList.add("el-noted");
+          line.title = `Your margin note: ${n.text}`;
+          line.addEventListener("click", () => openNoteCard(n.id));
           break;
         }
       }
@@ -3799,6 +3950,41 @@ function init() {
       showError("Couldn't stash that: " + err.message);
     }
   });
+  // 📝 Note this line — pin a margin note to the exact line (Google-Docs style)
+  $("#note-float").addEventListener("click", () => {
+    const btn = $("#note-float");
+    if (btn.hidden || !state.currentProject) return;
+    const anchor = (btn.dataset.text || "").trim();
+    const sceneNum = btn.dataset.sceneNumber ? parseInt(btn.dataset.sceneNumber, 10) : null;
+    window.getSelection().removeAllRanges();
+    hideQuoteFloat();
+    if (!anchor) return;
+    const editor = noteTextarea("A margin note pinned to this line… (Enter to save, Esc to cancel)");
+    const line = document.querySelector(`[data-scene-number="${sceneNum}"] .scene-notes`);
+    const container = line || document.getElementById("script-scenes");
+    editor.dataset.anchorScene = String(sceneNum);
+    editor.dataset.anchorText = anchor;
+    container.prepend(editor);
+    editor.focus();
+    let done = false;
+    const finish = (saved, text) => {
+      if (done) return;
+      done = true;
+      if (saved && text) {
+        api(`/projects/${encodeURIComponent(state.currentProject)}/notes`, {
+          method: "POST",
+          body: JSON.stringify({ scene_number: sceneNum, text, anchor }),
+        }).then(reloadNotesAndRender).catch((e) => showError("Couldn't save note: " + e.message));
+      } else {
+        reloadNotesAndRender();
+      }
+    };
+    editor.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); finish(true, editor.value.trim()); }
+      else if (e.key === "Escape") { finish(false); }
+    });
+    editor.addEventListener("blur", () => { if (editor.value.trim()) finish(true, editor.value.trim()); else finish(false); });
+  });
   document.addEventListener("mouseup", handleScriptSelection);
   document.addEventListener("keyup", handleScriptSelection);
   document.addEventListener("selectionchange", () => {
@@ -3808,7 +3994,7 @@ function init() {
   });
   document.addEventListener("mousedown", (e) => {
     if ($("#quote-float").hidden) return;
-    if (!e.target.closest("#quote-float") && !e.target.closest("#stash-float") && !e.target.closest("#script-scenes")) hideQuoteFloat();
+    if (!e.target.closest("#quote-float") && !e.target.closest("#stash-float") && !e.target.closest("#note-float") && !e.target.closest("#script-scenes")) hideQuoteFloat();
   });
   $("#script-scenes").addEventListener("scroll", hideQuoteFloat, { passive: true });
 

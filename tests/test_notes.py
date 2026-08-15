@@ -76,6 +76,17 @@ class TestNotesModule:
         assert notes_module.load_notes(m) == []
         assert notes_module.delete_note(m, note["id"]) is False
 
+    def test_anchored_note(self, tmp_path):
+        """P2: a note can pin to an exact line (Google-Docs-style margin comment)."""
+        m = _make_project(tmp_path)
+        note = notes_module.add_note(m, 1, "This line could open with a bang.", anchor="MARA takes out an old REVOLVER")
+        assert note["anchor"] == "MARA takes out an old REVOLVER"
+        # scene-level notes stay backward-compatible (no anchor key surprises)
+        plain = notes_module.add_note(m, 1, "Just a scene thought.")
+        assert plain["anchor"] is None
+        loaded = [n for n in notes_module.load_notes(m) if n["id"] == note["id"]][0]
+        assert loaded["anchor"] == "MARA takes out an old REVOLVER"
+
     def test_blank_text_rejected(self, tmp_path):
         m = _make_project(tmp_path)
         with pytest.raises(ValueError):
@@ -122,6 +133,18 @@ class TestNotesAPI:
         resp = http_client.delete(f"/api/projects/{project}/notes/{note['id']}")
         assert resp.status_code == 200
         assert http_client.get(f"/api/projects/{project}/notes").get_json() == {"notes": []}
+
+    def test_anchored_note_via_api(self, http_client):
+        """P2: POST /notes carries the anchor (the exact line) end-to-end."""
+        project = _upload(http_client).get_json()["project"]
+        resp = http_client.post(f"/api/projects/{project}/notes",
+                                json={"scene_number": 1, "text": "pinned", "anchor": "MARA takes out an old REVOLVER"})
+        assert resp.status_code == 201
+        body = resp.get_json()
+        assert body["anchor"] == "MARA takes out an old REVOLVER"
+        # it round-trips through GET
+        got = http_client.get(f"/api/projects/{project}/notes").get_json()["notes"]
+        assert got[0]["anchor"] == "MARA takes out an old REVOLVER"
 
     def test_missing_text_400(self, http_client):
         project = _upload(http_client).get_json()["project"]

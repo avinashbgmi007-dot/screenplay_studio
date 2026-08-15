@@ -515,7 +515,7 @@ def add_note_endpoint(name):
     body = request.get_json() or {}
     try:
         from .notes import add_note
-        note = add_note(m, body.get("scene_number"), body.get("text", ""))
+        note = add_note(m, body.get("scene_number"), body.get("text", ""), anchor=body.get("anchor"))
     except ValueError as e:
         return _error(str(e), 400)
     return jsonify(note), 201

@@ -1336,6 +1336,17 @@ body.focus-mode .script-scenes .scene-page.scene-current {
   filter: none;
   box-shadow: 0 0 0 1px var(--glow-strong), 0 18px 44px -18px rgba(0, 0, 0, 0.6);
 }
+/* typewriter focus: inside the current scene only the live line stays full;
+   the rest of the page greys out so the eye lands on one line at a time */
+body.focus-mode .script-scenes .scene-page.scene-current .scene-page-head,
+body.focus-mode .script-scenes .scene-page.scene-current [class^=el-] {
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+body.focus-mode .script-scenes .scene-page.scene-current [class^=el-].focus-line {
+  opacity: 1;
+  text-shadow: 0 0 14px var(--glow-strong);
+}
 body.focus-mode #script-pane { background: var(--ink-950); }
 
 /* ---- Sprint timer ---- */
@@ -1351,6 +1362,33 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   margin-right: 4px;
 }
 #sprint-timer.done { color: var(--ok); }
+#sprint-timer.sprint-done-flash { animation: sprintFlash 3s ease-in-out; }
+@keyframes sprintFlash {
+  0%, 100% { color: var(--ok); }
+  40% { color: var(--accent); text-shadow: 0 0 10px var(--glow); }
+}
+
+/* ---- anchored margin notes (P2): the pinned line gets a 📌 ---- */
+.el-noted {
+  cursor: pointer;
+  border-left: 2px solid var(--glow);
+  padding-left: 7px;
+  border-radius: 2px;
+}
+.el-noted:hover { background: rgba(233, 223, 206, 0.06); }
+.el-noted::after {
+  content: "📌";
+  font-size: 9px;
+  margin-left: 6px;
+  opacity: 0.7;
+  vertical-align: 1px;
+}
+.rail-note.anchored {
+  border-left: 2px solid var(--accent-deep);
+  padding-left: 6px;
+  cursor: pointer;
+}
+.rail-note.anchored:hover { background: rgba(233, 223, 206, 0.05); }
 
 /* ---- Context placeholders ---- */
 #input.context-quote::placeholder { color: var(--accent); }
