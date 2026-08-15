@@ -33,6 +33,7 @@ from .llm_client import LlamaServerClient, LlamaServerError
 from .rules_context import RulesContext
 from .principles_engine import run_principles_engine
 from .setup_payoff import run_setup_payoff_ledger, dangling_findings
+from .dials import run_character_dials
 from screenplay_parser.knowledge_graph import build_knowledge_graph
 
 
@@ -96,6 +97,12 @@ class AnalysisResult:
     character_reads: list[dict] = field(default_factory=list)
     logline_test: dict | None = None
     setup_payoff: list[dict] = field(default_factory=list)
+    character_dials: list[dict] = field(default_factory=list)
+    """Per-character trait scores: [{character, traits: [{trait, score,
+    scene_refs, note}]}] — the ScreenplayIQ-style dials read."""
+    pacing: list[dict] = field(default_factory=list)
+    """Deterministic per-scene pace index: [{scene_number, words, beats,
+    density, action_share, pace_score, drag}]. No model call."""
     """End-of-pipeline setup/payoff ledger: [{setup, kind, setup_scenes,
     payoff_scenes, status, note}]. Status: paid | dangling | abandoned |
     red_herring."""
@@ -333,7 +340,7 @@ def run_logline_test(logline: str, overview: str, title: str, client: LlamaServe
 
 # The full set of model-based analysis categories. Pass this explicitly to
 # run everything; `None` also means "all" (see analyze()).
-ALL_CATEGORIES = ("dialogue", "theme", "character", "structure", "scene_function", "principles", "setup_payoff", "coverage", "genre", "char_reads", "logline_test")
+ALL_CATEGORIES = ("dialogue", "theme", "character", "structure", "scene_function", "principles", "setup_payoff", "char_reads", "character_dials", "coverage", "genre", "logline_test")
 
 
 def resolve_categories(run_categories) -> tuple[str, ...]:
@@ -447,8 +454,21 @@ def analyze(
         result.errors.append(f"Continuity pass failed: {e}")
         emit("continuity", "complete", f"failed: {e}")
 
+    # 1d. deterministic pacing pass — per-scene pace index, no model call.
+    # Long, talky scenes flag as pace drags (structure findings) and the
+    # index itself feeds the pacing chart in the report.
+    try:
+        emit("pacing", "running", "Measuring scene pace")
+        from .pacing import per_scene_pace, drag_findings
+        result.pacing = per_scene_pace(doc)
+        all_findings.extend(drag_findings(result.pacing))
+        emit("pacing", "complete")
+    except Exception as e:
+        result.errors.append(f"Pacing pass failed: {e}")
+        emit("pacing", "complete", f"failed: {e}")
+
     # 2. scene summaries (needed for every script-level category + coverage)
-    needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "setup_payoff", "coverage", "genre", "char_reads", "logline_test"))
+    needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "setup_payoff", "char_reads", "character_dials", "coverage", "genre", "logline_test"))
     overview = ""
     if needs_summaries:
         try:
@@ -572,6 +592,28 @@ def analyze(
             result.errors.append(f"Setup/payoff ledger failed: {e}")
             emit("setup_payoff", "complete", f"failed: {e}")
 
+    # 4e. character dials — ScreenplayIQ-style trait scores for the main
+    # cast. Needs the overview + character stats; runs after the character
+    # reads so the deterministic stats are ready.
+    if "character_dials" in run_categories and overview:
+        try:
+            emit("character_dials", "running", "Scoring character dials")
+            result.character_dials = run_character_dials(
+                doc, overview, client,
+                _top_characters(result.stats, doc),
+                language=report_language,
+            )
+            result.category_outcomes["character_dials"] = "ok"
+            emit("character_dials", "complete")
+        except LlamaServerError as e:
+            result.category_outcomes["character_dials"] = "failed"
+            result.errors.append(f"Character dials failed: {e}")
+            emit("character_dials", "complete", f"failed: {e}")
+        except Exception as e:
+            result.category_outcomes["character_dials"] = "failed"
+            result.errors.append(f"Character dials failed: {e}")
+            emit("character_dials", "complete", f"failed: {e}")
+
     # 5. verification — check every quoted finding against real scene text
     emit("verification", "running", "Verifying quotes against the script")
     all_findings = verify_findings(all_findings, doc)
@@ -639,7 +681,7 @@ def analyze(
     # were requested) means a partial analyze knows the whole dependency
     # chain is broken, and a retry re-runs summaries+overview-gated (or
     # coverage+genre/logline) together instead of a leaf that can't run.
-    overview_gated = ("theme", "character", "structure", "scene_function", "setup_payoff", "coverage", "char_reads")
+    overview_gated = ("theme", "character", "structure", "scene_function", "setup_payoff", "char_reads", "character_dials", "coverage")
     for cat in ALL_CATEGORIES:
         if cat not in run_categories or cat in result.category_outcomes:
             continue

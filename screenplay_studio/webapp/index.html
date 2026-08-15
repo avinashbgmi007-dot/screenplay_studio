@@ -133,6 +133,8 @@
         <div class="rail-body">
           <div class="rail-section-label">Scenes</div>
           <div id="rail-scenes" class="rail-scenes"></div>
+          <div class="rail-section-label">Characters</div>
+          <div id="rail-characters" class="rail-characters"></div>
           <div class="rail-section-label">The Stash</div>
           <div id="stash-list" class="stash-list"></div>
           <div class="rail-section-label">Margin notes</div>
@@ -180,6 +182,7 @@
           <div id="finding-summary" class="finding-summary"></div>
           <div class="script-actions">
             <button id="premise-btn" class="btn-secondary" title="The premise card that grew into this script" type="button" style="display:none;">📌 Premise</button>
+            <button id="focus-btn" class="btn-secondary" title="Focus mode — the page dims to the line you're on, and the script follows you (typewriter scroll)" type="button">✳ Focus</button>
             <button id="reader-btn" class="btn-secondary" title="Reader mode — the draft clean, no margin machinery" type="button">Reader</button>
             <button id="undo-btn" class="btn-secondary" title="Undo the last applied edit (Ctrl+Z)" disabled>↶ Undo</button>
             <button id="redo-btn" class="btn-secondary" title="Re-apply the undone edit (Ctrl+Shift+Z)" disabled>↷ Redo</button>
@@ -259,11 +262,12 @@
 
     </div>
 
-    <!-- Status strip: model · connection · room light — always one thin line -->
+    <!-- Status strip: model · connection · sprint · room light — always one thin line -->
     <footer id="status-strip" class="status-strip">
       <span id="status-model" class="status-item" title="Model server">…</span>
       <span id="status-conn" class="status-item">—</span>
       <span class="status-spacer"></span>
+      <span id="sprint-timer" class="status-item status-btn" title="A 25-minute writing sprint. Click to start or pause, double-click to reset." role="button" tabindex="0">⏱ 25:00</span>
       <span id="status-elapsed" class="status-item"></span>
       <button id="status-dawn" class="status-item status-btn" type="button" title="Draw the curtains — morning light for the room">☀ Dawn</button>
     </footer>

@@ -413,6 +413,21 @@ def get_report(name):
     return jsonify(_load_report_sanitized(m))
 
 
+@app.route("/api/projects/<name>/characters", methods=["GET"])
+def get_character_tracks(name):
+    """Per-character track layer — presence, traits, interactions, reads —
+    assembled from the knowledge graph + report. Instant (no model calls)."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    report = None
+    if m.stage("analyze").status == "complete" and os.path.exists(m.report_findings_path):
+        report = _load_report_sanitized(m)
+    from .character_track import build_character_tracks
+    return jsonify({"characters": build_character_tracks(m.kg_path, report)})
+
+
 # ---------- writer's margin notes ----------
 
 # ---------- the Stash (saved snippets beside the script) ----------

@@ -133,6 +133,14 @@ def chat_completions():
             "apparent_intent": "Resolute and guarded.", "gap": "Minimal.",
             "scene_refs": refs, "evidence_quote": None,
         }]}))
+    # ---- Character dials (ScreenplayIQ-style trait scores) ----
+    if "CHARACTER DIALS" in system:
+        chars = re.findall(r"\n\s*([A-Z][A-Z0-9 .'-]{1,30})\n", user)
+        dials = [{"character": c.strip(), "traits": [
+            {"trait": "proactive", "score": 7, "scene_refs": scene_nums[:1] or [1], "note": "Mock dial."},
+            {"trait": "warm", "score": 4, "scene_refs": scene_nums[:1] or [1], "note": "Mock dial."},
+        ]} for c in (chars or ["MARA"])[:2]]
+        return _reply(json.dumps({"dials": dials}))
     # ---- Setup/payoff ledger (the end-of-pipeline whole-script audit) ----
     if "setup/payoff audit" in system.lower():
         return _reply(json.dumps({"ledger": [

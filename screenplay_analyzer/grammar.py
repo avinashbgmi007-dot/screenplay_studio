@@ -158,6 +158,21 @@ status ::= "\\"paid\\"" | "\\"dangling\\"" | "\\"abandoned\\"" | "\\"red_herring
 '''
 
 
+def character_dials_grammar() -> str:
+    """Grammar for the character-dials pass: per-character trait scores.
+    {"dials": [ {character, traits: [{trait, score, scene_refs, note}]} ]}"""
+    return f'''root ::= ws "{{" ws "\\"dials\\"" ws ":" ws dials-array ws "}}" ws
+dials-array ::= "[" ws (dials-item (ws "," ws dials-item)*)? ws "]"
+dials-item ::= "{{" ws "\\"character\\"" ws ":" ws string ws "," ws "\\"traits\\"" ws ":" ws traits-array ws "}}"
+traits-array ::= "[" ws (trait-item (ws "," ws trait-item)*)? ws "]"
+trait-item ::= "{{" ws "\\"trait\\"" ws ":" ws string ws "," ws "\\"score\\"" ws ":" ws score ws "," ws "\\"scene_refs\\"" ws ":" ws int-array ws "," ws "\\"note\\"" ws ":" ws string ws "}}"
+score ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10"
+{_INT_ARRAY}
+{_STRING}
+{_WS}
+'''
+
+
 def coverage_grammar() -> str:
     """Grammar for the single-object coverage report."""
     return f'''root ::= ws "{{" ws "\\"logline\\"" ws ":" ws string ws "," ws "\\"genre\\"" ws ":" ws string ws "," ws "\\"tone\\"" ws ":" ws string ws "," ws "\\"one_page_synopsis\\"" ws ":" ws string ws "," ws "\\"strengths\\"" ws ":" ws string-array ws "," ws "\\"weaknesses\\"" ws ":" ws string-array ws "," ws "\\"comparable_films\\"" ws ":" ws string-array ws "," ws "\\"recommendation\\"" ws ":" ws recommendation ws "}}" ws

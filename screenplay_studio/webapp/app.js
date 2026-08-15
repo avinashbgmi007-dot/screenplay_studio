@@ -25,6 +25,7 @@ const state = {
   reportStats: null,      // stats from report.findings.json
   premise: null,          // premise card carried into a graduated project
   notes: [],              // the writer's own margin notes
+  charTracks: [],         // per-character track layer from /characters
 };
 
 // ---------- utilities ----------
@@ -391,6 +392,111 @@ function renderRailNotes() {
   });
 }
 
+async function loadCharacters() {
+  if (!state.currentProject) return;
+  try {
+    const data = await api(`/projects/${encodeURIComponent(state.currentProject)}/characters`);
+    state.charTracks = (data && data.characters) || [];
+  } catch (_) { state.charTracks = []; /* track layer is optional */ }
+  renderRailCharacters();
+}
+
+function renderRailCharacters() {
+  const list = $("#rail-characters");
+  if (!list) return;
+  list.innerHTML = "";
+  const tracks = state.charTracks || [];
+  if (!tracks.length) {
+    list.appendChild(el("p", "empty-hint", "Run an analysis to map who's in this script."));
+    return;
+  }
+  const mains = tracks.filter((t) => t.importance === "main");
+  const rest = tracks.filter((t) => t.importance !== "main");
+  const renderRow = (t) => {
+    const item = el("div", "rail-char" + (t.importance === "main" ? " main" : ""));
+    const head = el("div", "rail-char-head");
+    head.appendChild(el("span", "rail-char-name", t.name));
+    head.appendChild(el("span", "rail-char-meta", `${t.scene_count} sc · ${t.dialogue_lines} ln`));
+    item.appendChild(head);
+    const body = el("div", "rail-char-body");
+    body.hidden = true;
+    // presence strip: scenes present as ticks, click to jump
+    if (state.script && state.script.scene_count) {
+      const strip = el("div", "rail-char-strip");
+      const total = state.script.scene_count;
+      const present = new Set(t.scenes_present || []);
+      for (let n = 1; n <= total; n++) {
+        const dot = el("span", "rail-char-dot" + (present.has(n) ? " on" : ""), "");
+        if (present.has(n)) {
+          dot.title = `Scene ${n}`;
+          dot.addEventListener("click", (ev) => { ev.stopPropagation(); jumpToScene(n); });
+        }
+        strip.appendChild(dot);
+      }
+      body.appendChild(strip);
+    }
+    // dials (trait scores) as labelled sliders
+    if (t.dials && t.dials.length) {
+      const dials = el("div", "rail-char-dials");
+      t.dials.forEach((d) => {
+        const row = el("div", "dial-row");
+        row.appendChild(el("span", "dial-label", d.trait));
+        const trackEl = el("span", "dial-track");
+        const fill = el("span", "dial-fill");
+        fill.style.width = `${d.score * 10}%`;
+        trackEl.appendChild(fill);
+        row.appendChild(trackEl);
+        row.appendChild(el("span", "dial-score", String(d.score)));
+        if (d.note) row.title = d.note;
+        dials.appendChild(row);
+      });
+      body.appendChild(dials);
+    }
+    // trait mentions from the page (age/descriptor parentheticals)
+    if (t.traits && t.traits.length) {
+      const tm = el("div", "rail-char-traits");
+      t.traits.forEach((x) => {
+        const chip = el("span", "trait-chip", x.text);
+        if (x.scene) { chip.title = `Scene ${x.scene}`; chip.addEventListener("click", () => jumpToScene(x.scene)); }
+        tm.appendChild(chip);
+      });
+      body.appendChild(tm);
+    }
+    // interactions: who they share scenes with
+    if (t.interactions && t.interactions.length) {
+      const ix = el("div", "rail-char-ix");
+      ix.appendChild(el("span", "rail-char-ix-label", "On stage with:"));
+      t.interactions.forEach((i) => {
+        const chip = el("span", "ix-chip", `${i.name} ×${i.scenes.length}`);
+        chip.title = `Scenes: ${i.scenes.join(", ")}`;
+        ix.appendChild(chip);
+      });
+      body.appendChild(ix);
+    }
+    // reads (how they come across) — if the analysis produced them
+    if (t.reads && (t.reads.how_reads || t.reads.apparent_intent)) {
+      const rd = el("div", "rail-char-reads");
+      if (t.reads.how_reads) rd.appendChild(el("p", "", `Reads: ${t.reads.how_reads}`));
+      if (t.reads.apparent_intent && t.reads.apparent_intent !== t.reads.how_reads) rd.appendChild(el("p", "", `Intent: ${t.reads.apparent_intent}`));
+      body.appendChild(rd);
+    }
+    item.appendChild(body);
+    head.addEventListener("click", () => { body.hidden = !body.hidden; });
+    return item;
+  };
+  mains.forEach((t) => list.appendChild(renderRow(t)));
+  if (rest.length) {
+    const toggle = el("button", "rail-char-more", `+ ${rest.length} more`);
+    toggle.type = "button";
+    const restWrap = el("div", "rail-char-rest");
+    restWrap.hidden = true;
+    rest.forEach((t) => restWrap.appendChild(renderRow(t)));
+    toggle.addEventListener("click", () => { restWrap.hidden = !restWrap.hidden; toggle.textContent = restWrap.hidden ? `+ ${rest.length} more` : "− fewer"; });
+    list.appendChild(toggle);
+    list.appendChild(restWrap);
+  }
+}
+
 function toggleRail(collapsed) {
   const rail = $("#struct-rail");
   if (!rail) return;
@@ -702,6 +808,114 @@ function applyReaderMode(on) {
   document.body.classList.toggle("reader-mode", !!on);
   const btn = $("#reader-btn");
   if (btn) btn.classList.toggle("active", !!on);
+}
+
+// ---- Focus mode: the page dims to the line you're on ----
+// One ambient-mode toggle. On: chrome dims, the script's non-current scenes
+// fade, and the script scrolls typewriter-style — the current scene stays
+// centered and the others follow behind it.
+let focusScrollRAF = null;
+
+function applyFocusMode(on) {
+  document.body.classList.toggle("focus-mode", !!on);
+  const btn = $("#focus-btn");
+  if (btn) btn.classList.toggle("active", !!on);
+  if (on) {
+    markCurrentScene();
+    document.getElementById("script-scenes")?.addEventListener("scroll", onFocusScroll, { passive: true });
+  } else {
+    document.getElementById("script-scenes")?.removeEventListener("scroll", onFocusScroll);
+  }
+}
+
+function onFocusScroll() {
+  if (focusScrollRAF) return;
+  focusScrollRAF = requestAnimationFrame(() => {
+    focusScrollRAF = null;
+    markCurrentScene();
+  });
+}
+
+function markCurrentScene() {
+  const container = document.getElementById("script-scenes");
+  if (!container) return;
+  const pages = [...container.querySelectorAll(".scene-window")];
+  if (!pages.length) return;
+  const viewportMid = container.getBoundingClientRect().top + container.clientHeight / 2;
+  let current = pages[0];
+  for (const p of pages) {
+    const r = p.getBoundingClientRect();
+    if (r.top <= viewportMid) current = p; else break;
+  }
+  pages.forEach((p) => p.classList.toggle("scene-current", p === current));
+}
+
+// ---- Sprint timer: a 25-minute writing sprint in the status strip ----
+// Click to start/pause, double-click to reset. Persisted across reloads.
+const SPRINT_MS = 25 * 60 * 1000;
+let sprintState = { running: false, remaining: SPRINT_MS, endAt: 0 };
+let sprintTick = null;
+
+function sprintEl() { return $("#sprint-timer"); }
+
+function formatSprint(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(s / 60), r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
+
+function renderSprint() {
+  const el = sprintEl();
+  if (!el) return;
+  el.textContent = `⏱ ${formatSprint(sprintState.remaining)}`;
+  el.classList.toggle("running", sprintState.running);
+  el.classList.toggle("done", !sprintState.running && sprintState.remaining <= 0);
+}
+
+function sprintPulse() {
+  if (!sprintState.running) return;
+  sprintState.remaining = Math.max(0, sprintState.endAt - Date.now());
+  if (sprintState.remaining <= 0) {
+    sprintState.running = false;
+    sprintState.remaining = 0;
+    clearInterval(sprintTick);
+    sprintTick = null;
+  }
+  renderSprint();
+}
+
+function startSprint() {
+  sprintState.running = true;
+  sprintState.endAt = Date.now() + sprintState.remaining;
+  if (!sprintTick) sprintTick = setInterval(sprintPulse, 1000);
+  renderSprint();
+}
+
+function pauseSprint() {
+  sprintState.running = false;
+  sprintState.remaining = Math.max(0, sprintState.endAt - Date.now());
+  if (sprintTick) { clearInterval(sprintTick); sprintTick = null; }
+  renderSprint();
+}
+
+function toggleSprint() {
+  if (sprintState.running) pauseSprint();
+  else if (sprintState.remaining <= 0) { sprintState.remaining = SPRINT_MS; startSprint(); }
+  else startSprint();
+}
+
+function resetSprint() {
+  pauseSprint();
+  sprintState.remaining = SPRINT_MS;
+  renderSprint();
+}
+
+function wireSprint() {
+  const el = sprintEl();
+  if (!el) return;
+  el.addEventListener("click", toggleSprint);
+  el.addEventListener("dblclick", resetSprint);
+  renderSprint();
 }
 
 function saveSession() {
@@ -1308,11 +1522,38 @@ function hideQuoteFloat() {
   if (btn) btn.hidden = true;
   const stashBtn = $("#stash-float");
   if (stashBtn) stashBtn.hidden = true;
+  clearContextPlaceholder();
+}
+
+// ---- Context-aware placeholder: the composer speaks to the selection ----
+let savedPlaceholder = null;
+
+function setContextPlaceholder() {
+  const input = $("#input");
+  if (!input || input.value.trim()) return;
+  if (savedPlaceholder == null) savedPlaceholder = input.placeholder;
+  input.classList.add("context-quote");
+  input.placeholder = "Reply to the highlighted passage…";
+}
+
+function clearContextPlaceholder() {
+  const input = $("#input");
+  if (!input) return;
+  if (savedPlaceholder != null) {
+    input.placeholder = savedPlaceholder;
+    savedPlaceholder = null;
+  }
+  input.classList.remove("context-quote");
 }
 
 function handleScriptSelection() {
   const quote = selectionInScriptPane();
-  if (quote) showQuoteFloat(quote); else hideQuoteFloat();
+  if (quote) {
+    showQuoteFloat(quote);
+    setContextPlaceholder();
+  } else {
+    hideQuoteFloat();
+  }
 }
 
 // ---------- conversation overview (hover rail) ----------
@@ -2374,6 +2615,8 @@ function renderScriptView() {
 
   renderRailScenes();
   renderRailNotes();
+  loadCharacters();
+  if (document.body.classList.contains("focus-mode")) markCurrentScene();
 }
 
 async function hideAllViews() {
@@ -2494,6 +2737,68 @@ function renderReportPanel() {
       spCard.appendChild(row);
     });
     c.appendChild(spCard);
+  }
+
+  // Pacing — the per-scene pace index as an SVG line. Scene numbers on the
+  // x-axis, drags flagged in amber, click a bar to jump to that scene.
+  const pacing = state.report && state.report.pacing;
+  if (pacing && pacing.length) {
+    const paceCard = el("div", "craft-panel");
+    const paceHead = el("div", "craft-panel-head");
+    paceHead.appendChild(el("span", "craft-panel-title", "Pacing — where the script drags"));
+    paceCard.appendChild(paceHead);
+    const W = 720, H = 170, pad = 30;
+    const scores = pacing.map((r) => r.pace_score || 0);
+    const maxScore = Math.max(68, ...scores);
+    const barW = (W - pad - 10) / pacing.length;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pace per scene; flagged scenes are drags" class="pacing-svg">`;
+    svg += `<line x1="${pad}" y1="${H - 34 - (68 / maxScore) * (H - 60)}" x2="${W - 6}" y2="${H - 34 - (68 / maxScore) * (H - 60)}" class="pace-drag-line"/>`;
+    pacing.forEach((r, i) => {
+      const x = pad + i * barW;
+      const h = Math.max(2, (r.pace_score / maxScore) * (H - 60));
+      const y = H - 34 - h;
+      const cls = r.drag ? "bar-pace drag" : "bar-pace";
+      svg += `<rect data-scene="${r.scene_number}" class="${cls}" x="${x}" y="${y}" width="${barW - 3}" height="${h}"><title>Scene ${r.scene_number} — pace ${r.pace_score}/100${r.drag ? " (drag)" : ""}</title></rect>`;
+      if (pacing.length <= 26) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${r.scene_number}</text>`;
+    });
+    svg += `</svg>`;
+    const body = el("div", "pacing-body");
+    body.innerHTML = svg;
+    body.addEventListener("click", (ev) => {
+      const rect = ev.target.closest(".bar-pace");
+      if (rect && rect.dataset.scene) jumpToScene(Number(rect.dataset.scene));
+    });
+    paceCard.appendChild(body);
+    const legend = el("p", "pacing-legend", "Amber bars = pace drags (long, low-movement scenes). Click a bar to jump to the scene. The dashed line is the drag threshold.");
+    paceCard.appendChild(legend);
+    c.appendChild(paceCard);
+  }
+
+  // Character dials — ScreenplayIQ-style trait scores per main character
+  const dials = state.report && state.report.character_dials;
+  if (dials && dials.length) {
+    const dialCard = el("div", "craft-panel");
+    const dialHead = el("div", "craft-panel-head");
+    dialHead.appendChild(el("span", "craft-panel-title", "Character dials — how each main character reads"));
+    dialCard.appendChild(dialHead);
+    dials.forEach((d) => {
+      const block = el("div", "dial-block");
+      block.appendChild(el("div", "dial-char-name", d.character));
+      (d.traits || []).forEach((t) => {
+        const row = el("div", "dial-row");
+        row.appendChild(el("span", "dial-label", t.trait));
+        const trackEl = el("span", "dial-track");
+        const fill = el("span", "dial-fill");
+        fill.style.width = `${t.score * 10}%`;
+        trackEl.appendChild(fill);
+        row.appendChild(trackEl);
+        row.appendChild(el("span", "dial-score", String(t.score)));
+        if (t.note) row.title = t.note;
+        block.appendChild(row);
+      });
+      dialCard.appendChild(block);
+    });
+    c.appendChild(dialCard);
   }
 
   const byCat = {};
@@ -3147,6 +3452,8 @@ function init() {
   applyDawn(prefs.dawn);
   if (prefs.rail_collapsed) toggleRail(true);
   applyReaderMode(prefs.reader);
+  applyFocusMode(prefs.focus);
+  wireSprint();
   $("#dawn-btn").addEventListener("click", () => {
     const dawn = !document.body.classList.contains("dawn");
     applyDawn(dawn);
@@ -3156,6 +3463,11 @@ function init() {
     const on = !document.body.classList.contains("reader-mode");
     applyReaderMode(on);
     savePrefs({ reader: on });
+  });
+  $("#focus-btn").addEventListener("click", () => {
+    const on = !document.body.classList.contains("focus-mode");
+    applyFocusMode(on);
+    savePrefs({ focus: on });
   });
   if (!prefs.hintDismissed) {
     $("#shortcut-hint").style.display = "flex";

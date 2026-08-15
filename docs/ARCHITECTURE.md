@@ -36,6 +36,8 @@ screenplay-studio_1/
 │   ├── verifier.py             # Fuzzy matching, sliding-window verification
 │   ├── principles_engine.py    # Two-stage Chekhov's Gun detection
 │   ├── setup_payoff.py         # End-of-pipeline setup/payoff ledger (whole-script audit)
+│   ├── pacing.py               # Deterministic per-scene pace index (drag flagging, no model)
+│   ├── dials.py                # Character dials: model-scored 1-10 trait poles per main character
 │   ├── voice.py                # Deterministic voice-bleed, subtext & idiolect passes
 │   ├── continuity.py           # Deterministic continuity pass (time flips, name variants)
 │   ├── genre.py                # Genre-convention check
@@ -69,6 +71,7 @@ screenplay-studio_1/
 │   ├── beatboard.py            # Scene reordering / beat board
 │   ├── notes.py                # Per-project notes store
 │   ├── stash_store.py          # The Stash: per-project saved snippets (stash.json)
+│   ├── character_track.py      # Per-character track layer (presence/traits/interactions/reads)
 │   ├── watch.py                # Watch-folder auto-analysis
 │   ├── sample.py               # Sample-script generator
 │   ├── webapp_server.py        # Flask backend (port 8500)
@@ -94,7 +97,9 @@ screenplay-studio_1/
 - **Single-page app** — `screenplay_studio/webapp/index.html` serves as the SPA shell.
 - **No build step** — vanilla JS, no framework, no bundler.
 - **Dark ink-blue palette** with serif fonts throughout.
-- **Two rooms, one script.** The workspace is a shared script pane (always visible) plus a right-hand panel switched by the top-bar room toggle: **Co-write** (the writer's desk — one consistent partner "Sam", warm brass accent) and **Feedback** (the consultant's desk — Report + Fix Queue tabs, cool slate accent). `body[data-room]` drives the room theming. Beat Board and Compare are full-screen tools opened from the script-pane toolbar icons.
+- **Two rooms, one script.** The workspace is a shared script pane (always visible) plus a right-hand panel switched by the top-bar room toggle: **Co-write** (the writer's desk — one consistent partner "Sameer", warm brass accent) and **Feedback** (the consultant's desk — Dr. Sushruta's Report + Fix Queue tabs, cool slate accent). `body[data-room]` drives the room theming. Beat Board and Compare are full-screen tools opened from the script-pane toolbar icons.
+- **Three-zone shell.** Collapsible left structural rail (`#struct-rail`) holds the scene outline (click → jump + flash), the **character track layer** (`#rail-characters` — per-character presence strip, dials, trait chips, interactions, reads; mains expandable, rest behind "+ N more"), the Stash, and margin notes. The script pane never shrinks below 50%. A thin status strip shows model · connection · sprint timer · dawn toggle.
+- **Phase 1-2 mood features.** Focus mode (`✳ Focus`, persisted) dims chrome + non-current scenes and typewriter-scrolls with the page; a 25-min **sprint timer** lives in the status strip (click start/pause, double-click reset); the composer placeholder becomes "Reply to the highlighted passage…" while text is selected; ambient motion (breathing lamp glow, room/paper/welcome entrance animations) is `prefers-reduced-motion`-safe.
 - **The idea room (scriptless development).** An idea is a small sibling of a project under `studio_projects/ideas/<id>/` (`screenplay_studio/ideas.py` — a premise card in `idea.json` + a SessionStore `sessions/` dir). The welcome screen's "Talk to Sam about an idea" door creates one; the shelf has a separate **Ideas** row. Inside, the premise card replaces the script pane (editable: working title, logline, premise, open questions), and the two rooms become two *lenses on one conversation*: Co-write = Sam (writing_partner/peer, explore) and Feedback = the **premise doctor** (premise_doctor/concept_validation — a development-exec persona that stress-tests the concept). The room toggle swaps the lens via `/api/ideas/<id>/chat/sessions/<sid>/settings`. The engine runs scriptless (empty Script/Report contexts) with the premise card injected every turn (`build_system_prompt(..., premise=...)` → idea framing + `IDEA_GROUNDING_INSTRUCTION` — never pretend pages exist). The same global `writer_profile.json` memory powers both desks. **Graduation:** upload the first pages via `/api/ideas/<id>/graduate` — a real project is created, the premise card is copied to `premise.json`, and the idea's session files are carried into the project's sessions dir (manifest re-pinned), so the thread, Sam, and the memory continue on the script desk; the carried card is surfaced via the script toolbar's 📌 Premise toggle (`/api/projects/<name>/premise` saves edits).
 
 ### Client-Side JavaScript (`screenplay_studio/webapp/app.js`)
@@ -227,10 +232,15 @@ Message
 5. **Script-level categories** — theme, character, structure, scene-function (one model call each, over the scene-summary overview).
 6. **Principles engine** — Two-stage Chekhov's Gun (knowledge-graph candidate generation + model significance judgment).
 7. **Character-perception reads** — how each character comes across vs. apparent intent.
-8. **Verification** — fuzzy matching (SequenceMatcher, threshold 0.72) and sliding-window comparison; flags unverified findings.
-9. **Coverage** — logline / genre / synopsis / recommendation.
-10. **Logline test & genre check** — premise lands in one sentence; genre conventions (uses coverage output).
-11. **Feedback filter** — drops non-writing meta-commentary (dialect/subtitle noise) from the final set.
+8. **Pacing** — deterministic per-scene pace index (density × inverted action-share), drags flagged over a threshold, capped at 4. Also emits `pacing_drag` findings. No model call.
+9. **Setup/payoff ledger** — the FINAL whole-script audit: one grammar-constrained call over the full scene overview + mechanically-flagged candidates, returns a ledger {setup, kind, setup_scenes, payoff_scenes, status: paid|dangling|abandoned|red_herring, note}; dangling/abandoned fold into plot_thread findings (deduped vs. the principles engine).
+10. **Character dials** — one model call scoring the main cast (≤8, by scene+dialogue share) on five 1-10 trait poles with scene_refs.
+11. **Verification** — fuzzy matching (SequenceMatcher, threshold 0.72) and sliding-window comparison; flags unverified findings.
+12. **Coverage** — logline / genre / synopsis / recommendation.
+13. **Logline test & genre check** — premise lands in one sentence; genre conventions (uses coverage output).
+14. **Feedback filter** — drops non-writing meta-commentary (dialect/subtitle noise) from the final set.
+
+**Report surface (`report.findings.json`)** carries `pacing` (per-scene pace rows), `character_dials` (trait scores), `setup_payoff` (ledger) and `character_reads` alongside `findings` — the webapp's character-track layer (`GET /api/projects/<p>/characters`, `character_track.py`) assembles per-character presence/traits/interactions/reads from the on-disk KG + report at serve time (no model calls).
 
 ---
 

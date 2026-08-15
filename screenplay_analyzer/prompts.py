@@ -319,6 +319,33 @@ def principle_judgment_prompt(
     return system, user
 
 
+def character_dials_prompt(scene_overview: str, title: str, characters: list[str], language: str = "eng") -> tuple[str, str]:
+    system = (
+        "You are a script doctor producing CHARACTER DIALS — a ScreenplayIQ-style "
+        "read of how each main character actually comes across on the page. "
+        "For each character below, score five trait poles on a 1-10 scale "
+        "(1 = the left pole, 10 = the right pole), judging ONLY from what the "
+        "scenes show — never from what the writer might intend. "
+        "The five poles: Proactive/Passive (does the story happen to them or "
+        "because of them?), Warm/Cold (do they extend or withhold warmth?), "
+        "Articulate/Terse (do they say a lot or little?), Emotional/Stoic (do "
+        "feelings show or stay buried?), Grounded/Dreamy (are they practical or "
+        "in their head?). Cite the specific scene numbers where each trait "
+        "shows (scene_refs), and keep the note to one short sentence naming "
+        "the moment that earned the score. Be honest — a middle score is fine; "
+        "don't push every character to the edges. Diagnosis only, never prescribe. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
+        "Respond only with JSON matching the required schema."
+    )
+    user = (
+        f"Screenplay: {title or '(untitled)'}\n"
+        f"Characters to dial: {', '.join(characters)}\n\n"
+        f"Scene-by-scene overview:\n\n{scene_overview}\n\n"
+        "Now produce the character dials."
+    )
+    return system, user
+
+
 def setup_payoff_ledger_prompt(
     scene_overview: str,
     seed_block: str,

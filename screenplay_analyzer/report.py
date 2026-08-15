@@ -188,6 +188,36 @@ def render_markdown(result: AnalysisResult) -> str:
                 lines.append(f"  - {note}")
             lines.append("")
 
+    # --- Pacing (deterministic per-scene pace index) ---
+    if result.pacing:
+        lines.append("## Pacing — where the script drags")
+        lines.append("*Per-scene pace index (density × movement share). Scenes at or "
+                     "above the drag threshold run long with little on-page movement.*")
+        lines.append("")
+        drags = [r for r in result.pacing if r.get("drag")]
+        if drags:
+            lines.append("**Pace drags:** " + ", ".join(
+                f"Scene {r['scene_number']} ({r['pace_score']:.0f}/100)" for r in drags) + "")
+        else:
+            lines.append("*No pace drags detected — the script keeps its momentum.*")
+        lines.append("")
+
+    # --- Character dials (model-scored trait poles) ---
+    if result.character_dials:
+        lines.append("## Character Dials")
+        lines.append("*How each main character reads on the page, 1–10 per trait pole. "
+                     "Diagnosis only — the dial shows the page, not the intent.*")
+        lines.append("")
+        for d in result.character_dials:
+            lines.append(f"**{d.get('character', '')}**")
+            for t in d.get("traits") or []:
+                refs = t.get("scene_refs") or []
+                ref_str = f" (scenes {', '.join(str(n) for n in refs)})" if refs else ""
+                note = (t.get("note") or "").strip()
+                note_str = f" — {note}" if note else ""
+                lines.append(f"- {t.get('trait', '')}: **{t.get('score')}/10**{ref_str}{note_str}")
+            lines.append("")
+
     # --- Formatting (deterministic) ---
     lines.append("### Formatting & Industry Standards")
     if not result.formatting_findings:
@@ -288,6 +318,8 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "character_reads": result.character_reads,
         "logline_test": result.logline_test,
         "setup_payoff": result.setup_payoff,
+        "character_dials": result.character_dials,
+        "pacing": result.pacing,
         "findings": result.findings,
         "formatting_findings": result.formatting_findings,
         "stats": result.stats,
