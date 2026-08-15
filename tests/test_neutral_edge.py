@@ -38,7 +38,10 @@ class TestPartialCategorySelection:
         orch.run_analyze(categories=("coverage",))
 
         findings = json.load(open(manifest.report_findings_path))
-        assert findings["findings"] == []  # no analysis categories ran
+        # No MODEL categories ran — only the free deterministic passes
+        # (voice / subtext / continuity) may contribute, and only if the
+        # fixture happens to trip them.
+        assert all(f["category"] in ("voice", "subtext", "continuity") for f in findings["findings"])
         assert findings["coverage"] is not None  # coverage still ran
 
 

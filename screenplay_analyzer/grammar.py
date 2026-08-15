@@ -44,6 +44,7 @@ integer ::= "-"? [0-9]+'''
 
 FINDING_CATEGORIES = [
     "theme", "character", "structure", "dialogue", "scene_function", "plot_thread", "genre",
+    "continuity",
 ]
 
 SEVERITIES = ["low", "medium", "high"]

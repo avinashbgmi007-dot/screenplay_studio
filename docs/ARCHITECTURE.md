@@ -35,7 +35,8 @@ screenplay-studio_1/
 │   ├── grammar.py              # Hand-written GBNF grammars
 │   ├── verifier.py             # Fuzzy matching, sliding-window verification
 │   ├── principles_engine.py    # Two-stage Chekhov's Gun detection
-│   ├── voice.py                # Deterministic voice-bleed & subtext passes
+│   ├── voice.py                # Deterministic voice-bleed, subtext & idiolect passes
+│   ├── continuity.py           # Deterministic continuity pass (time flips, name variants)
 │   ├── genre.py                # Genre-convention check
 │   ├── feedback_filter.py      # Drops non-writing meta-commentary findings
 │   ├── formatting_check.py     # Formatting rule checks

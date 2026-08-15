@@ -3,6 +3,10 @@
 Plan: docs/superpowers/plans/2026-08-12-writer-relationship-memory.md
 """
 
+import json
+import os
+import tempfile
+
 import pytest
 
 from screenplay_cowriter import memory as mem
@@ -400,3 +404,111 @@ def test_observe_called_each_turn(tmp_path):
     engine.send_message(s, "what do you think?")
     engine.send_message(s, "what about the ending?")
     assert m.profile["meta"]["total_turns_observed"] == 2
+
+
+# ---------- two-scope memory (global writer patterns vs project content) ----------
+
+
+def _profile_with_obs(obs):
+    p = mem.empty_profile()
+    for i, (text, scope) in enumerate(obs):
+        p["observations"].append({
+            "id": f"obs_{i}", "text": text, "dimension": "general",
+            "confidence": 0.7, "source": "refresh", "contradictions": 0,
+            "suppressed": False, "created": 1.0, "updated": 1.0, "scope": scope,
+        })
+    # gate one dimension so build_relationship_card actually builds a card
+    for _ in range(mem.MIN_EVIDENCE):
+        mem._bump(p, "detail_level", "short")
+    return p
+
+
+def test_card_text_filters_other_project_observations():
+    p = _profile_with_obs([
+        ("prefers short, tight answers", "global"),
+        ("asks about Rishi without context", "project:Pain_3_updated_FULL"),
+        ("likes talking premises through", "idea:xyz"),
+    ])
+    card = mem.build_relationship_card(p, scope="project:Pain_3_updated_FULL")
+    assert "prefers short, tight answers" in card
+    assert "asks about Rishi" in card            # its own project sees it
+    assert "likes talking premises through" not in card  # other idea stays out
+    # another project never sees Pain's script-scoped note
+    other = mem.build_relationship_card(p, scope="project:Other")
+    assert "Rishi" not in other
+    assert "prefers short, tight answers" in other
+
+
+def test_card_text_no_scope_is_global_only():
+    p = _profile_with_obs([
+        ("prefers short, tight answers", "global"),
+        ("asks about Rishi without context", "project:Pain_3_updated_FULL"),
+    ])
+    card = mem.build_relationship_card(p)  # no scope context (welcome screen etc.)
+    assert "prefers short, tight answers" in card
+    assert "Rishi" not in card
+
+
+def test_merge_refresh_scopes_entity_mentions(tmp_path):
+    p = mem.empty_profile()
+    mem.set_refresh_context("project:Pain_3_updated_FULL", ["RISHI"])
+    mem.merge_refresh(p, {
+        "detail_level": {"value": "no_evidence", "confidence": 0.0},
+        "observations": [
+            {"text": "The user asks a single question about a character named Rishi without context", "dimension": "general"},
+            {"text": "prefers short, tight answers", "dimension": "detail_level"},
+        ],
+    })
+    scopes = {o["text"]: o.get("scope") for o in p["observations"]}
+    assert scopes["The user asks a single question about a character named Rishi without context"] == "project:Pain_3_updated_FULL"
+    assert scopes["prefers short, tight answers"] == "global"
+    mem.set_refresh_context()  # reset for other tests
+
+
+def test_refresh_prompt_forbids_script_facts():
+    prompt = mem.refresh_prompt([{"role": "user", "content": "hi"}])
+    assert "NEVER record facts about the script" in prompt
+    assert "character names" in prompt
+
+
+def test_migrate_v2_tags_script_specific_observation():
+    p = mem.empty_profile()
+    p["version"] = 1
+    p["observations"] = [
+        {"id": "a", "text": "asks about a character named Rishi", "dimension": "general",
+         "confidence": 0.6, "suppressed": False},
+        {"id": "b", "text": "prefers short answers", "dimension": "detail_level",
+         "confidence": 0.6, "suppressed": False},
+    ]
+    changed = mem._migrate_v2(p, {"RISHI": "Pain_3_updated_FULL", "DOCTOR": "Pain_3_updated_FULL"})
+    assert changed
+    by_id = {o["id"]: o["scope"] for o in p["observations"]}
+    assert by_id["a"] == "project:Pain_3_updated_FULL"
+    assert by_id["b"] == "global"
+    assert p["version"] == 2
+
+
+def test_migrate_v2_idempotent():
+    p = mem.empty_profile()
+    p["observations"].append({"id": "a", "text": "x", "dimension": "general",
+                              "confidence": 0.6, "suppressed": False, "scope": "global"})
+    assert mem._migrate_v2(p, None) is False  # nothing to do
+
+
+def test_entity_scope_map_resolves_relative_projects_dir():
+    # Regression: the caller passes dirname(dirname(profile_path)) which can be
+    # a relative path that collapses (./studio_projects -> "."); the map must
+    # still find the projects or every observation stays global.
+    tmp = tempfile.mkdtemp(dir=os.getcwd())  # same drive so relpath works
+    try:
+        proj = os.path.join(tmp, "Pain_X")
+        os.makedirs(proj)
+        with open(os.path.join(proj, "parsed.json"), "w", encoding="utf-8") as f:
+            json.dump({"all_characters": ["RISHI", "DOCTOR"]}, f)
+        rel = os.path.relpath(tmp)  # simulate the relative collapse
+        mapping = mem._entity_scope_map(rel)
+        assert mapping.get("RISHI") == "Pain_X"
+        assert mapping.get("DOCTOR") == "Pain_X"
+    finally:
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)

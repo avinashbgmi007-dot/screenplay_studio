@@ -172,6 +172,74 @@ _ON_THE_NOSE_RE = re.compile(
 )
 
 
+# ---------------------------------------------------------------------------
+# idiolect consistency — does a character still sound like themselves?
+# ---------------------------------------------------------------------------
+
+MIN_IDIOLECT_LINES = 6      # below this there isn't enough to measure a shift
+MIN_HALF_LINES = 3          # each half needs enough lines to be a fair sample
+IDIOLECT_SHIFT = 0.45       # relative mean-line-length change that reads as a voice break
+
+
+def _lines_by_scene(doc: ScriptDocument, character: str) -> list[tuple[int, str]]:
+    """(scene_number, line) pairs for a character, in script order."""
+    out = []
+    for scene in doc.scenes:
+        current = None
+        for e in scene.elements:
+            if e.type == ElementType.CHARACTER:
+                current = e.text.strip()
+            elif e.type == ElementType.DIALOGUE and current == character:
+                out.append((scene.scene_number, e.text.strip()))
+                current = None
+    return out
+
+
+def run_idiolect_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
+    """Voice-consistency across the script: a character whose dialogue style
+    changes sharply between the first and second half of their appearances
+    reads as two different people. Compares mean line length and question/
+    exclamation rate per half; flags only strong shifts with both halves
+    well sampled."""
+    findings = []
+    chars = {n for s in doc.scenes for n in s.characters_present}
+    for name in sorted(chars):
+        pairs = _lines_by_scene(doc, name)
+        if len(pairs) < MIN_IDIOLECT_LINES:
+            continue
+        lines = [t for _, t in pairs]
+        half = len(lines) // 2
+        if half < MIN_HALF_LINES or len(lines) - half < MIN_HALF_LINES:
+            continue
+        first, second = lines[:half], lines[half:]
+        f_len = sum(len(t.split()) for t in first) / len(first)
+        s_len = sum(len(t.split()) for t in second) / len(second)
+        rel = abs(f_len - s_len) / max(f_len, s_len) if max(f_len, s_len) else 0.0
+        if rel < IDIOLECT_SHIFT:
+            continue
+        first_scenes = {n for n, _ in pairs[:half]}
+        second_scenes = {n for n, _ in pairs[half:]}
+        findings.append({
+            "category": "voice",
+            "issue": (
+                f"{name} doesn't sound like the same person across the script: "
+                f"their lines average {f_len:.1f} words early on (scenes "
+                f"{', '.join(map(str, sorted(first_scenes)))}) but {s_len:.1f} words "
+                f"later (scenes {', '.join(map(str, sorted(second_scenes)))}) — "
+                f"a {rel:.0%} shift in rhythm."
+            ),
+            "why_it_matters": "A character's sentence rhythm is part of who they are. "
+                              "When it snaps between halves of the script, the reader feels "
+                              "a different person arrive — usually the writer's own voice "
+                              "taking over during a stretch that was written in one sitting.",
+            "severity": "low",
+            "scene_refs": sorted(first_scenes | second_scenes)[:6],
+            "evidence_quote": first[0] if first else None,
+            "rule_id": "idiolect_consistency",
+        })
+    return findings, []
+
+
 def run_subtext_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
     findings = []
     for scene in doc.scenes:

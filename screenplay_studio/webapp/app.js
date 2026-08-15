@@ -685,6 +685,8 @@ const ANALYSIS_STAGES = [
   { key: "formatting", label: "Formatting checks", weight: 1 },
   { key: "voice", label: "Character voice fingerprints", weight: 1 },
   { key: "subtext", label: "On-the-nose scan", weight: 1 },
+  { key: "idiolect", label: "Voice consistency", weight: 1 },
+  { key: "continuity", label: "Continuity check", weight: 1 },
   { key: "summaries", label: "Scene summaries", weight: 3 },
   { key: "dialogue", label: "Dialogue & action", weight: 5 },
   { key: "theme", label: "Theme & subtext", weight: 2 },
@@ -1538,7 +1540,7 @@ const SEVERITY_CLASS = { high: "", medium: " sev-medium", low: " sev-low" };
 const CATEGORY_LABELS = {
   theme: "Theme", character: "Character", structure: "Structure", dialogue: "Dialogue",
   scene_function: "Scene function", plot_thread: "Plot economy", genre: "Genre",
-  voice: "Voice", subtext: "Subtext",
+  voice: "Voice", subtext: "Subtext", continuity: "Continuity",
 };
 
 async function loadScriptData() {
@@ -1752,9 +1754,13 @@ function renderWriterMirrorPanel(container) {
 
 function renderDraftBar() {
   const bar = $("#draft-bar");
+  // Always visible while a project is open — the "+ Upload new draft" entry
+  // is how a writer discovers draft management in the first place, and hiding
+  // it until a second draft exists means it's never discovered.
+  const inProject = Boolean(state.currentProject);
   const hasDrafts = state.drafts && state.drafts.drafts && state.drafts.drafts.length > 0;
-  bar.style.display = hasDrafts ? "flex" : "none";
-  if (!hasDrafts) return;
+  bar.style.display = inProject ? "flex" : "none";
+  if (!inProject) return;
 
   const sel = $("#draft-select");
   const active = state.drafts.active_draft || "original";

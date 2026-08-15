@@ -41,6 +41,20 @@ PROMISE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Tenglish / Telugu dialogue makes the same promise constructions in a
+# different language — "Dhaa cheptha" (I'll tell), "nammuko" (trust me). The
+# English-only PROMISE_RE above structurally can't see them, so a Tenglish
+# script produced zero promise candidates and the principles engine had
+# nothing to judge. These are the common first-person commitment / trust
+# markers; deliberately conservative (future-tense verbs + trust phrases),
+# so ordinary narration isn't flagged as a promise.
+TELUGU_PROMISE_RE = re.compile(
+    r"\b(cheptha(?:nu)?|chepthaam?|chupistha(?:nu)?|chestha(?:nu)?|istha(?:nu)?|"
+    r"nammuko|pratijna|pratigya|oka roju|tappakunda|nee kosam|marchiponu|"
+    r"wait chey|appudu choodu|nijam ga cheptha|satyam ga cheptha)\b",
+    re.IGNORECASE,
+)
+
 # capitalized or emphasized noun phrase candidates in action text — the heuristic
 # proxy for "this object was given narrative weight". Deliberately conservative:
 # requires the phrase to appear with a leading article (a/an/the) OR be fully
@@ -234,7 +248,7 @@ def _extract_promise_candidates(doc: ScriptDocument) -> list:
         for el in scene.elements:
             if el.type != ElementType.DIALOGUE or not el.character:
                 continue
-            m = PROMISE_RE.search(el.text)
+            m = PROMISE_RE.search(el.text) or TELUGU_PROMISE_RE.search(el.text)
             if m:
                 promises.append(PromiseCandidate(
                     scene_number=scene.scene_number,

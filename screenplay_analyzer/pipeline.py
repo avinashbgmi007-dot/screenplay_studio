@@ -421,9 +421,26 @@ def analyze(
         subtext_findings, _ = run_subtext_analysis(doc)
         all_findings.extend(subtext_findings)
         emit("subtext", "complete")
+        emit("idiolect", "running", "Checking voices stay consistent")
+        from .voice import run_idiolect_analysis
+        idiolect_findings, _ = run_idiolect_analysis(doc)
+        all_findings.extend(idiolect_findings)
+        emit("idiolect", "complete")
     except Exception as e:
         result.errors.append(f"Craft passes (voice/subtext) failed: {e}")
         emit("voice", "complete", f"failed: {e}")
+
+    # 1c. deterministic continuity pass — time-of-day flips and character
+    # name variants. No model call; same pattern as the craft passes.
+    try:
+        emit("continuity", "running", "Checking scene continuity")
+        from .continuity import run_continuity_analysis
+        continuity_findings, _ = run_continuity_analysis(doc)
+        all_findings.extend(continuity_findings)
+        emit("continuity", "complete")
+    except Exception as e:
+        result.errors.append(f"Continuity pass failed: {e}")
+        emit("continuity", "complete", f"failed: {e}")
 
     # 2. scene summaries (needed for every script-level category + coverage)
     needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "coverage", "genre", "char_reads", "logline_test"))

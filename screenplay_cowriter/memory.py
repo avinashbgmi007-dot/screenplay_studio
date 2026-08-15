@@ -70,9 +70,12 @@ PUSHBACK_AGREE = re.compile(r"\b(?:ok(?:ay)?|sure|fine|good point|makes sense|ag
 PROBE_REASON = re.compile(r"\b(?:because|since|the reason|my instinct|i feel|i think|the thing is)\b", re.I)
 
 
+PROFILE_VERSION = 2
+
+
 def empty_profile() -> dict:
     return {
-        "version": 1,
+        "version": PROFILE_VERSION,
         "dimensions": {dim: {"value": NEUTRAL[dim], "confidence": 0.5,
                              "evidence": {"pos": 0, "neg": 0},
                              "last_updated": time.time()} for dim in DIMENSION_POLES},
@@ -234,6 +237,84 @@ CARD_RULES = (
 )
 
 
+def _entity_scope_map(projects_dir: str) -> dict:
+    """Character name -> project id, scanned once from the projects dir so the
+    v2 migration can tag pre-existing script-specific observations with the
+    project they belong to instead of letting them leak as global."""
+    mapping: dict[str, str] = {}
+    # The caller passes dirname(dirname(profile_path)) which can be RELATIVE
+    # ("./studio_projects" -> ".") — resolve to absolute so the project scan
+    # actually finds the projects (a relative collapse silently empties the
+    # map and every observation stays global).
+    base = os.path.abspath(projects_dir) if projects_dir else "."
+    try:
+        entries = os.listdir(base) if os.path.isdir(base) else []
+    except OSError:
+        return mapping
+    for entry in entries:
+        parsed = os.path.join(base, entry, "parsed.json")
+        if not os.path.isfile(parsed):
+            continue
+        try:
+            with open(parsed, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (ValueError, json.JSONDecodeError, OSError):
+            continue
+        names = data.get("all_characters") or []
+        for name in names:
+            mapping.setdefault(str(name).upper(), entry)
+    return mapping
+
+
+def _migrate_v2(profile: dict, entity_scope_map: dict | None) -> bool:
+    """Upgrade a pre-scope profile: every observation gains a 'scope' key.
+    Observations that name a character from one of the user's projects are
+    scoped to that project (they were made there and belong there); the rest
+    are global writer-behavior patterns. Returns True when anything changed."""
+    if not isinstance(profile, dict):
+        return False
+    changed = False
+    if profile.get("version", 1) < PROFILE_VERSION:
+        profile["version"] = PROFILE_VERSION
+        changed = True
+    for obs in profile.get("observations", []):
+        if not isinstance(obs, dict) or "scope" in obs:
+            continue
+        text = str(obs.get("text") or "")
+        scope = "global"
+        if entity_scope_map:
+            for ent, project in entity_scope_map.items():
+                if _entity_in_text(ent, text):
+                    scope = f"project:{project}"
+                    break
+        obs["scope"] = scope
+        changed = True
+    return changed
+
+
+def _entity_in_text(entity: str, text: str) -> bool:
+    """Word-boundary, case-insensitive: does an uppercase character name
+    appear in an observation's text? Guards the refresh so script content
+    ("asks about Rishi") can't leak into the global memory under the cover
+    of a behavior pattern."""
+    if not entity or not text:
+        return False
+    return re.search(rf"\b{re.escape(entity)}\b", text, re.IGNORECASE) is not None
+
+
+def _obs_scope(profile, text: str, scope: str | None, entities) -> str:
+    """Classify a new observation's scope: writer-behavior patterns are
+    global (Sam uses them in every room); anything that names an entity from
+    the current script/idea is scoped to that project so it can inform
+    conversations there but never leaks elsewhere."""
+    if not scope:
+        return "global"
+    for ent in entities or ():
+        if _entity_in_text(ent, text):
+            return scope
+    return "global"
+
+
 def _maybe_add_template_observation(profile, dim):
     """When a dimension first crosses the gate, record a human-readable observation."""
     # _dim_state creates the entry for dimensions missing from an older stored
@@ -278,7 +359,7 @@ def _note_contradictions(profile, signals):
                     obs["suppressed"] = True
 
 
-def build_relationship_card(profile):
+def build_relationship_card(profile, scope: str | None = None):
     gated = dimension_gate(profile)
     if not gated:
         return None
@@ -294,10 +375,13 @@ def build_relationship_card(profile):
     # Only observations for dimensions Sam actually acts on (or free-standing
     # general notes) reach the card — a refresh note about a dimension whose
     # belief the writer forgot must not sneak the rejected belief back in.
+    # Scope gate: observations tagged for another project/idea never cross
+    # into this conversation — script content stays where it belongs.
     active_dims = set(gated) | {"general", "topic_gravity"}
     obs_lines = [o["text"] for o in profile.get("observations", [])
                  if not o["suppressed"] and o["confidence"] >= BEHAVIOR_GATE
-                 and o.get("dimension") in active_dims]
+                 and o.get("dimension") in active_dims
+                 and (o.get("scope", "global") == "global" or (scope and o.get("scope") == scope))]
     card = ("ABOUT HOW YOU TWO WORK TOGETHER — what you've noticed about how this writer "
             "likes to work: " + "; ".join(phrases) + ".")
     if obs_lines:
@@ -327,6 +411,12 @@ def refresh_prompt(recent_messages):
         "{\"text\": \"plain language, what the writer expects/accepts/argues about\", "
         "\"dimension\": \"detail_level|directness|probe_appetite|pushback_appetite|"
         "topic_gravity|general\"}. Do NOT invent. If unclear, use \"no_evidence\".\n\n"
+        "CRITICAL: observations must describe HOW THE WRITER LIKES TO WORK — their "
+        "preferences, patterns, and reactions (\"wants notes straight, no softening\"). "
+        "NEVER record facts about the script itself — no character names, scene numbers, "
+        "or plot points (\"asks about Rishi\" is a script fact; \"tends to ask about "
+        "individual characters without context\" is a writer pattern). If a pattern "
+        "cannot be described without naming script content, leave it out.\n\n"
         "CONVERSATION:\n" + transcript
     )
 
@@ -358,6 +448,22 @@ def novel_observation(profile, text):
         if o == t or (len(t) > 20 and (o in t or t in o)):
             return False
     return True
+
+
+# The refresh call happens in a background thread, so the scope/entities of
+# the conversation that triggered it are threaded through module state rather
+# than through every signature (keeps the public API unchanged for callers
+# that don't care). Reset at the start of each refresh.
+_REFRESH_SCOPE = None
+_REFRESH_ENTITIES = ()
+
+
+def set_refresh_context(scope: str | None = None, entities=()):
+    """Scope + entity names for the next refresh merge (project/idea the
+    conversation belongs to, and that project's character names)."""
+    global _REFRESH_SCOPE, _REFRESH_ENTITIES
+    _REFRESH_SCOPE = scope
+    _REFRESH_ENTITIES = tuple(entities or ())
 
 
 def merge_refresh(profile, proposal):
@@ -392,6 +498,7 @@ def merge_refresh(profile, proposal):
             "id": "obs_" + uuid.uuid4().hex[:8],
             "text": text,
             "dimension": obs.get("dimension", "general"),
+            "scope": _obs_scope(profile, text, _REFRESH_SCOPE, _REFRESH_ENTITIES),
             "confidence": 0.6,
             "source": "refresh",
             "contradictions": 0,
@@ -413,19 +520,30 @@ class WriterMemory:
 
     @classmethod
     def load(cls, path):
+        profile = None
         with _FILE_LOCK:
             if os.path.exists(path):
                 try:
                     with open(path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     if isinstance(data, dict):
-                        return cls(path, profile=data)
+                        profile = data
                 except (ValueError, json.JSONDecodeError):
                     # corrupt: back it up, start fresh — chat must never break
                     try:
                         os.replace(path, path + ".bak")
                     except OSError:
                         pass
+        if profile is not None:
+            changed = _migrate_v2(profile, _entity_scope_map(os.path.dirname(os.path.dirname(path))))
+            if changed:
+                with _FILE_LOCK:
+                    try:
+                        with open(path, "w", encoding="utf-8") as f:
+                            json.dump(profile, f, indent=2, ensure_ascii=False)
+                    except OSError:
+                        pass
+            return cls(path, profile=profile)
         return cls(path)
 
     def save(self):
@@ -443,8 +561,8 @@ class WriterMemory:
         self.profile["meta"]["total_turns_observed"] += 1
         self.save()
 
-    def card_text(self):
-        return build_relationship_card(self.profile)
+    def card_text(self, scope: str | None = None):
+        return build_relationship_card(self.profile, scope=scope)
 
     def gated_dimensions(self):
         """The dimensions currently steering behavior (suppression-aware) —
@@ -469,29 +587,30 @@ class WriterMemory:
         meta = self.profile["meta"]
         return (meta["total_turns_observed"] - meta["turns_at_last_refresh"]) >= REFRESH_INTERVAL
 
-    def maybe_refresh_async(self, client, recent_messages):
+    def maybe_refresh_async(self, client, recent_messages, scope: str | None = None, entities=()):
         """Fire-and-forget: never blocks the writer's reply. Double-checked so
         concurrent requests can't pile up refreshes (see _refresh_worker)."""
         if self._refresh_in_flight or not self.refresh_due():
             return
         self._refresh_in_flight = True
-        t = threading.Thread(target=self._refresh_worker, args=(client, recent_messages), daemon=True)
+        t = threading.Thread(target=self._refresh_worker, args=(client, recent_messages, scope, entities), daemon=True)
         t.start()
 
-    def _refresh_worker(self, client, recent_messages):
+    def _refresh_worker(self, client, recent_messages, scope=None, entities=()):
         try:
             if not self.refresh_due():
                 return
-            self._refresh_sync(client, recent_messages)
+            self._refresh_sync(client, recent_messages, scope=scope, entities=entities)
         finally:
             self._refresh_in_flight = False
 
-    def refresh(self, client, recent_messages):
+    def refresh(self, client, recent_messages, scope: str | None = None, entities=()):
         """Synchronous refresh — used by the webapp's 'refresh now' button.
         force=True so a user-initiated refresh always runs, even when not due."""
-        self._refresh_sync(client, recent_messages, force=True)
+        self._refresh_sync(client, recent_messages, force=True, scope=scope, entities=entities)
 
-    def _refresh_sync(self, client, recent_messages, force=False):
+    def _refresh_sync(self, client, recent_messages, force=False, scope=None, entities=()):
+        set_refresh_context(scope, entities)
         reply = client.chat([{"role": "user", "content": refresh_prompt(recent_messages)}])
         proposal = parse_refresh_json(reply)
         with _FILE_LOCK:

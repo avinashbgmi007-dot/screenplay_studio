@@ -1120,7 +1120,8 @@ def _load_session_and_engine(project: str, session_id: str):
         memory = mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
     except (CowriterUnavailableError, OSError, ValueError):
         memory = None  # memory unavailable or unreadable — never break the chat
-    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory)
+    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
+                            memory_scope=f"project:{project}")
     return session, engine, store
 
 
@@ -1290,7 +1291,11 @@ def get_writer_memory():
         mem = _load_writer_memory()
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
-    return jsonify({"profile": mem.to_dict(), "card": mem.card_text(), "gated": mem.gated_dimensions()})
+    # The card (what Sam actually uses) is scope-filtered: observations tagged
+    # for another project/idea never leak in. The writer's own full profile
+    # stays visible — it's their memory, they should see all of it.
+    scope = request.args.get("scope") or None
+    return jsonify({"profile": mem.to_dict(), "card": mem.card_text(scope=scope), "gated": mem.gated_dimensions()})
 
 
 @app.route("/api/writer-memory/observations/<obs_id>/suppress", methods=["POST"])
@@ -1312,7 +1317,7 @@ def refresh_writer_memory():
     if not project or not session_id:
         return _error("project and session_id are required.", 400)
     try:
-        session, _, _ = _load_session_and_engine(project, session_id)
+        session, engine, _ = _load_session_and_engine(project, session_id)
     except FileNotFoundError:
         return _error("Session or project not found.", 404)
     except CowriterUnavailableError as e:
@@ -1326,8 +1331,8 @@ def refresh_writer_memory():
                                        model=session.model_id, timeout=CONFIG["timeout"],
                                        fallback_to_loaded=True)
     recent = [m.to_dict() for m in session.branch.messages[-16:]]
-    mem.refresh(client, recent)
-    return jsonify({"profile": mem.to_dict(), "card": mem.card_text()})
+    mem.refresh(client, recent, scope=engine.memory_scope, entities=engine._memory_entities())
+    return jsonify({"profile": mem.to_dict(), "card": mem.card_text(scope=engine.memory_scope)})
 
 
 # ---------- idea room (scriptless story development) ----------
@@ -1396,7 +1401,8 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
     except (CowriterUnavailableError, OSError, ValueError):
         memory = None  # memory unavailable or unreadable — never break the chat
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
-                            premise=meta.get("card") or {})
+                            premise=meta.get("card") or {},
+                            memory_scope=f"idea:{idea_id}")
     return session, engine, store
 
 
