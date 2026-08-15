@@ -1395,7 +1395,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 
 /* ============================================================
    Room panels — co-write and feedback
-   ============================================================
+   ============================================================ */
 
 .room-panel {
   flex: 1;
@@ -1435,6 +1435,10 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   flex: 0 0 auto;
   position: relative;
   z-index: 2;
+  /* the room is narrow (30% of the desk) — let the header wrap so the
+     action buttons drop to a second row instead of spilling past the panel */
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 #partner-card .avatar {
   width: 32px; height: 32px;
@@ -1445,12 +1449,19 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   font-family: var(--font-typewriter);
   font-size: 14px;
   box-shadow: 0 0 14px -2px var(--glow-strong);
+  flex: 0 0 auto;
 }
 #partner-card .partner-name {
   font-family: var(--font-typewriter);
   font-size: 13.5px;
   color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 1 auto;
 }
+#partner-card .btn-secondary { flex: 0 0 auto; }
 #reset-partner-btn { margin-left: auto; }
 
 /* ---- the conversation ---- */
@@ -1727,7 +1738,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
      (child z-index 47) is never dimmed or clipped */
   z-index: 46;
 }
-.feedback-header > div:first-child { flex: 0 0 auto; min-width: 0; }
+.feedback-header > div:first-child { flex: 1 1 auto; min-width: 0; }
 .feedback-title { font-family: var(--font-typewriter); font-size: 14.5px; color: var(--text); }
 .feedback-sub {
   font-family: var(--font-mono);
@@ -1736,6 +1747,8 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   text-transform: uppercase;
   color: var(--text-muted);
   margin-top: 2px;
+  white-space: normal;
+  word-break: break-word;
 }
 .feedback-header .control-label { margin-left: auto; flex: 0 0 auto; }
 
