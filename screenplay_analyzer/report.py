@@ -158,6 +158,36 @@ def render_markdown(result: AnalysisResult) -> str:
                 lines.append(_format_finding(f))
         lines.append("")
 
+    # --- Setup / Payoff ledger (end-of-pipeline whole-script audit) ---
+    if result.setup_payoff:
+        lines.append("## Setup / Payoff")
+        lines.append(
+            "*The final whole-script audit: what the story set up and whether it "
+            "ever came back — paid, still dangling, abandoned, or a deliberate "
+            "red herring. Dangling/abandoned entries also appear in the Plot "
+            "Economy findings above so they can be worked in the Fix Queue.*"
+        )
+        lines.append("")
+        STATUS_LABEL = {
+            "paid": "✅ Paid off", "dangling": "🚩 Dangling",
+            "abandoned": "🪦 Abandoned", "red_herring": "🪄 Red herring",
+        }
+        for e in result.setup_payoff:
+            setup_scenes = e.get("setup_scenes") or []
+            setup_str = ", ".join(f"Scene {n}" for n in setup_scenes) if setup_scenes else "General"
+            payoff = e.get("payoff_scenes")
+            if payoff:
+                payoff_str = ", ".join(f"Scene {n}" for n in payoff)
+            else:
+                payoff_str = "never"
+            kind = e.get("kind") or "other"
+            lines.append(f"**{STATUS_LABEL.get(e.get('status'), e.get('status', ''))}** — {e.get('setup', '')} "
+                        f"({kind}; set up in {setup_str}; payoff: {payoff_str})")
+            note = (e.get("note") or "").strip()
+            if note:
+                lines.append(f"  - {note}")
+            lines.append("")
+
     # --- Formatting (deterministic) ---
     lines.append("### Formatting & Industry Standards")
     if not result.formatting_findings:
@@ -257,6 +287,7 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "coverage": result.coverage,
         "character_reads": result.character_reads,
         "logline_test": result.logline_test,
+        "setup_payoff": result.setup_payoff,
         "findings": result.findings,
         "formatting_findings": result.formatting_findings,
         "stats": result.stats,

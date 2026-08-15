@@ -78,7 +78,7 @@ def _normalize_quote(quote):
 class CoWriterEngine:
     def __init__(self, client: LlamaServerClient, script_ctx: ScriptContext, report_ctx: ReportContext,
                  history_window: int = HISTORY_WINDOW, store=None, memory=None, premise: dict | None = None,
-                 memory_scope: str | None = None):
+                 memory_scope: str | None = None, writer_library_text: str | None = None):
         self.client = client
         self.script_ctx = script_ctx
         self.report_ctx = report_ctx
@@ -100,6 +100,11 @@ class CoWriterEngine:
         # Global writer-behavior patterns always ride along; observations
         # tagged for a DIFFERENT scope never cross into this conversation.
         self.memory_scope = memory_scope
+        # The writer's past work, as a compact digest block (see
+        # writer_library.py). When present it rides in every turn so Sameer /
+        # the doctor can draw on earlier scripts without confusing them with
+        # the current one. None by default — CLI stays byte-identical.
+        self.writer_library_text = writer_library_text
 
     def _memory_entities(self) -> list:
         """Character names from the current script, used to classify refresh
@@ -178,7 +183,7 @@ class CoWriterEngine:
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
-                premise=self.premise,
+                premise=self.premise, writer_library_text=self.writer_library_text,
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = [{"role": "system", "content": system_prompt}]
@@ -200,7 +205,7 @@ class CoWriterEngine:
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
-                premise=self.premise,
+                premise=self.premise, writer_library_text=self.writer_library_text,
             )
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = [{"role": "system", "content": system_prompt}]

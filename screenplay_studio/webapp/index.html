@@ -30,7 +30,7 @@
 
     <button id="new-project-btn">+ Lay a new page on the desk</button>
 
-    <div class="sidebar-section-label">Ideas</div>
+    <div class="sidebar-section-label"><span>Ideas</span><button id="new-idea-btn" class="sidebar-new-btn" type="button" title="Start a new idea with Sameer">+ New idea</button></div>
     <div id="idea-list" class="idea-list">
       <p class="empty-hint">No ideas yet — the desk is free for one.</p>
     </div>
@@ -38,6 +38,11 @@
     <div class="sidebar-section-label">On the shelf</div>
     <div id="project-list" class="project-list">
       <p class="empty-hint">The shelf is empty — bring in a screenplay.</p>
+    </div>
+
+    <div class="sidebar-section-label"><span>Your library</span></div>
+    <div id="library-list" class="library-list">
+      <p class="empty-hint">Past scripts gather here — Sameer and the doctor read this shelf too.</p>
     </div>
 
     <div class="sidebar-footer">
@@ -119,6 +124,30 @@
     <!-- The workspace: one shared script pane, two switchable room panels -->
     <div class="workspace">
 
+      <!-- Left structural rail: scenes outline · the Stash · margin notes · beats -->
+      <aside id="struct-rail" class="struct-rail">
+        <div class="rail-head">
+          <span class="rail-title">Structure</span>
+          <button id="rail-toggle" class="rail-toggle" type="button" title="Collapse the structure rail">«</button>
+        </div>
+        <div class="rail-body">
+          <div class="rail-section-label">Scenes</div>
+          <div id="rail-scenes" class="rail-scenes"></div>
+          <div class="rail-section-label">The Stash</div>
+          <div id="stash-list" class="stash-list"></div>
+          <div class="rail-section-label">Margin notes</div>
+          <div id="rail-notes" class="rail-notes"></div>
+          <form id="rail-note-form" class="rail-note-form">
+            <input id="rail-note-input" type="text" placeholder="A note to pin beside the script…" maxlength="400" aria-label="New margin note">
+            <button type="submit" title="Pin the note">＋</button>
+          </form>
+        </div>
+        <div class="rail-foot">
+          <button id="rail-beats-btn" class="btn-secondary btn-small" type="button">📋 Beat Board</button>
+          <button id="rail-compare-btn" class="btn-secondary btn-small" type="button">🗂 Compare</button>
+        </div>
+      </aside>
+
       <section id="script-pane" aria-label="The script">
 
         <!-- Idea room: the premise card replaces the pages until they exist -->
@@ -173,6 +202,7 @@
         <div id="diff-banner" class="diff-banner" style="display:none;"></div>
         <div id="script-scenes" class="script-scenes" aria-live="polite"></div>
         <button id="quote-float" class="quote-float" type="button" hidden>✎ Ask Sameer about this</button>
+        <button id="stash-float" class="quote-float stash-float" type="button" hidden title="Keep this passage in your Stash — cut material stays a click away">📥 Stash this</button>
       </section>
 
       <div id="pane-divider" class="pane-divider" role="separator" aria-orientation="vertical" title="Drag to resize the script pane — double-click to reset"></div>
@@ -228,6 +258,15 @@
       </section>
 
     </div>
+
+    <!-- Status strip: model · connection · room light — always one thin line -->
+    <footer id="status-strip" class="status-strip">
+      <span id="status-model" class="status-item" title="Model server">…</span>
+      <span id="status-conn" class="status-item">—</span>
+      <span class="status-spacer"></span>
+      <span id="status-elapsed" class="status-item"></span>
+      <button id="status-dawn" class="status-item status-btn" type="button" title="Draw the curtains — morning light for the room">☀ Dawn</button>
+    </footer>
 
     <!-- Beat Board: the corkboard -->
     <section id="beatboard-view" class="view" style="display:none;">

@@ -133,6 +133,14 @@ def chat_completions():
             "apparent_intent": "Resolute and guarded.", "gap": "Minimal.",
             "scene_refs": refs, "evidence_quote": None,
         }]}))
+    # ---- Setup/payoff ledger (the end-of-pipeline whole-script audit) ----
+    if "setup/payoff audit" in system.lower():
+        return _reply(json.dumps({"ledger": [
+            {"setup": "The cigar", "kind": "object", "setup_scenes": [1, 2],
+             "payoff_scenes": None, "status": "dangling", "note": "Never used."},
+            {"setup": "The debt", "kind": "theme", "setup_scenes": [2],
+             "payoff_scenes": [2], "status": "paid", "note": "Lands."},
+        ]}))
 
     # ---- Piece 3 (co-writer) request shape: none of the above matched,
     # so this is a conversational turn. Echo context markers, same as

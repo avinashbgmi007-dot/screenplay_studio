@@ -319,6 +319,58 @@ def principle_judgment_prompt(
     return system, user
 
 
+def setup_payoff_ledger_prompt(
+    scene_overview: str,
+    seed_block: str,
+    rule_fragment: str = "",
+    total_scenes: int = 0,
+    language: str = "eng",
+) -> tuple[str, str]:
+    """The final whole-script audit. Unlike the Principles Engine's
+    per-candidate judgment (which sees only a candidate's own mentions), this
+    runs with the entire script's scene-by-scene overview in context, so
+    'paid off?' is judged against the actual arc, not a snippet."""
+    system = (
+        "You are a script doctor doing the FINAL setup/payoff audit of a complete "
+        "screenplay. You have read the whole story below, scene by scene. Your job "
+        "is the ledger every consultant keeps at the end of a read: what did the "
+        "story set up, and did it ever come back?\n\n"
+        "A setup is anything given narrative weight with the clear shape of a "
+        "promise: an object the camera lingers on or a character reacts to, a "
+        "dialogue promise ('I'll tell you everything'), a stated goal or deadline, "
+        "a relationship or secret the script makes us wait for. A payoff is the "
+        "moment the promise lands — the object is used, the information is "
+        "delivered, the goal is confronted.\n\n"
+        "Mechanically-flagged candidates from the parser are listed below — treat "
+        "them as leads, NOT verdicts: most are ordinary continuity, and only some "
+        "are true setups. Judge each against the WHOLE arc. Also add any true "
+        "setups the list missed that you can see clearly in the overview (a "
+        "thematic promise, an emphasized object that never recurs, a secret the "
+        "story abandons).\n\n"
+        "Use the four statuses precisely:\n"
+        "- paid: set up, and the script delivers on it (cite the payoff scene).\n"
+        "- dangling: set up with real weight and never paid off — this is the "
+        "finding the writer needs.\n"
+        "- abandoned: set up, then the story simply stops caring (no payoff, but "
+        "lower emotional cost than dangling — flag it anyway).\n"
+        "- red_herring: deliberately planted to mislead, and that misdirection "
+        "itself resolves — this is a legit exception, not an error.\n\n"
+        "Be conservative and specific: a passing mention is NOT a setup. Only "
+        "include entries you can point at in the overview. Keep notes to one or "
+        "two sentences, named to the scene where the reader can feel it. Cite "
+        "scene numbers from the overview, never invented ones. "
+        f"{language_instruction(language)} {LANGUAGE_META_INSTRUCTION} "
+        "Respond only with JSON matching the required schema."
+    )
+    user = (
+        f"Screenplay has {total_scenes} scenes.\n\n"
+        f"MECHANICALLY FLAGGED CANDIDATES (leads, not verdicts):\n{seed_block}\n\n"
+        f"THE WHOLE STORY, SCENE BY SCENE:\n{scene_overview}\n\n"
+        "Now produce the setup/payoff ledger for this script."
+    )
+    return system, user
+
+
 def genre_check_prompt(genre: str, conventions: list[str], scene_overview: str, language: str = "eng") -> tuple[str, str]:
     conventions_text = "\n".join(f"- {c}" for c in conventions)
     system = (

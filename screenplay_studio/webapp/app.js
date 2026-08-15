@@ -5,6 +5,8 @@ const API = "/api";
 const state = {
   projects: [],
   ideas: [],              // idea room: scriptless development sessions
+  library: [],            // writer's library: digest of past projects
+  stash: [],              // the Stash: saved snippets for the current project
   currentProject: null,   // project name (string)
   currentIdea: null,      // { id, title, card } — the desk is in idea mode when set
   currentIdeaSession: null,
@@ -143,6 +145,7 @@ async function loadConfig() {
   } catch (e) {
     console.warn("Could not load config:", e);
   }
+  updateStatusStrip();
   checkConnection();
 }
 
@@ -178,14 +181,33 @@ async function testConnection() {
 
 async function checkConnection() {
   const dot = $("#connection-dot");
+  const connEl = $("#status-conn");
   try {
     const res = await api("/test-connection", { method: "POST", body: JSON.stringify({}) });
     dot.className = "connection-dot " + (res.ok ? "ok" : "fail");
     dot.title = res.message;
+    if (connEl) {
+      connEl.textContent = res.ok ? "● model ready" : "● model unreachable";
+      connEl.className = "status-item " + (res.ok ? "ok" : "fail");
+      connEl.title = res.message;
+    }
   } catch (e) {
     dot.className = "connection-dot fail";
     dot.title = "Couldn't check connection: " + e.message;
+    if (connEl) {
+      connEl.textContent = "● model unreachable";
+      connEl.className = "status-item fail";
+      connEl.title = dot.title;
+    }
   }
+}
+
+function updateStatusStrip() {
+  const modelEl = $("#status-model");
+  if (!modelEl) return;
+  const url = state.config && state.config.server_url;
+  modelEl.textContent = url ? `llama · ${url.replace(/^https?:\/\//, "")}` : "model server not set";
+  modelEl.title = url ? `Model server: ${url}` : "Set the model server in Settings";
 }
 
 // ---------- projects ----------
@@ -251,6 +273,159 @@ function renderProjectList() {
       }
     });
     item.appendChild(del);
+    item.addEventListener("click", () => openProject(p.project));
+    list.appendChild(item);
+  }
+}
+
+// ---------- the Stash (saved snippets beside the script) ----------
+
+async function loadStash() {
+  if (!state.currentProject) return;
+  try {
+    const data = await api(`/projects/${encodeURIComponent(state.currentProject)}/stash`);
+    state.stash = (data && data.stash) || [];
+    renderStashList();
+  } catch (_) { /* stash is optional — never break the desk */ }
+}
+
+function renderStashList() {
+  const list = $("#stash-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!state.stash.length) {
+    list.appendChild(el("p", "empty-hint", "Nothing stashed yet — select a line and press 📥 Stash this."));
+    return;
+  }
+  state.stash.forEach((e) => {
+    const item = el("div", "stash-item");
+    const meta = e.scene_number ? `Scene ${e.scene_number}` : "From the desk";
+    item.appendChild(el("div", "stash-item-text", e.text));
+    const row = el("div", "stash-item-foot");
+    row.appendChild(el("span", "stash-item-meta", meta));
+    const del = el("button", "project-delete", "✕");
+    del.type = "button";
+    del.title = "Remove from the Stash";
+    del.addEventListener("click", async () => {
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/stash/${e.id}`, { method: "DELETE" });
+        await loadStash();
+      } catch (err) {
+        showError("Couldn't remove that: " + err.message);
+      }
+    });
+    row.appendChild(del);
+    item.appendChild(row);
+    list.appendChild(item);
+  });
+}
+
+// ---------- Phase 0: the structural rail (scenes outline · stash · notes) ----------
+
+function renderRailScenes() {
+  const list = $("#rail-scenes");
+  if (!list) return;
+  list.innerHTML = "";
+  const scenes = state.script && state.script.scenes;
+  if (!scenes || !scenes.length) {
+    list.appendChild(el("p", "empty-hint", "No scenes yet."));
+    return;
+  }
+  scenes.forEach((scene) => {
+    const item = el("div", "rail-scene");
+    item.appendChild(el("span", "rail-scene-num", String(scene.scene_number)));
+    item.appendChild(el("span", "rail-scene-head", scene.heading_raw || `Scene ${scene.scene_number}`));
+    if (scene.page_start) item.appendChild(el("span", "rail-scene-page", `p.${scene.page_start}`));
+    item.addEventListener("click", () => jumpToScene(scene.scene_number));
+    list.appendChild(item);
+  });
+}
+
+function jumpToScene(sceneNumber) {
+  const page = document.getElementById(`scene-page-${sceneNumber}`);
+  if (!page) return;
+  page.scrollIntoView({ behavior: "auto", block: "start" });
+  // a search filter would hide the scene — clear it so the jump lands
+  const search = $("#script-search");
+  if (search && search.value.trim()) {
+    search.value = "";
+    renderScriptView();
+  }
+  const railItem = [...document.querySelectorAll("#rail-scenes .rail-scene")]
+    .find((n) => n.querySelector(".rail-scene-num").textContent === String(sceneNumber));
+  if (railItem) {
+    railItem.classList.remove("flash");
+    void railItem.offsetWidth; // restart the animation
+    railItem.classList.add("flash");
+  }
+}
+
+function renderRailNotes() {
+  const list = $("#rail-notes");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!state.notes.length) {
+    list.appendChild(el("p", "empty-hint", "No margin notes yet."));
+    return;
+  }
+  state.notes.forEach((n) => {
+    const item = el("div", "rail-note");
+    item.appendChild(el("div", "rail-note-text", n.text || ""));
+    const foot = el("div", "rail-note-foot");
+    if (n.scene_number) foot.appendChild(el("span", "stash-item-meta", `Scene ${n.scene_number}`));
+    const del = el("button", "project-delete", "✕");
+    del.type = "button";
+    del.title = "Remove this note";
+    del.addEventListener("click", async () => {
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/notes/${n.id}`, { method: "DELETE" });
+        await reloadNotesAndRender();
+        renderRailNotes();
+      } catch (err) {
+        showError("Couldn't remove the note: " + err.message);
+      }
+    });
+    foot.appendChild(del);
+    item.appendChild(foot);
+    list.appendChild(item);
+  });
+}
+
+function toggleRail(collapsed) {
+  const rail = $("#struct-rail");
+  if (!rail) return;
+  const btn = $("#rail-toggle");
+  rail.classList.toggle("rail-collapsed", collapsed);
+  if (btn) btn.textContent = collapsed ? "»" : "«";
+  savePrefs({ rail_collapsed: collapsed });
+}
+
+// ---------- writer's library (past work the personas can draw on) ----------
+
+async function loadLibrary() {
+  try {
+    const data = await api("/writer-library");
+    state.library = (data && data.projects) || [];
+    renderLibraryList();
+  } catch (_) { /* library is optional — never break the shelf */ }
+}
+
+function renderLibraryList() {
+  const list = $("#library-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!state.library.length) {
+    list.appendChild(el("p", "empty-hint", "Past scripts gather here — Sameer and the doctor read this shelf too."));
+    return;
+  }
+  for (const p of state.library) {
+    const item = el("div", "idea-item" + (p.project === state.currentProject ? " active" : ""));
+    const row = el("div", "project-item-row");
+    row.appendChild(el("span", "idea-mark", "📚"));
+    row.appendChild(document.createTextNode(p.title));
+    item.appendChild(row);
+    const meta = `${p.scene_count || "?"} scenes · ${(p.characters || []).slice(0, 4).join(", ") || "no characters parsed"}`;
+    item.appendChild(el("div", "project-item-status", meta));
     item.addEventListener("click", () => openProject(p.project));
     list.appendChild(item);
   }
@@ -519,6 +694,8 @@ function applyDawn(dawn) {
   document.body.classList.toggle("dawn", !!dawn);
   const btn = $("#dawn-btn");
   if (btn) btn.textContent = dawn ? "🌙 Night" : "☀ Dawn";
+  const statusBtn = $("#status-dawn");
+  if (statusBtn) statusBtn.textContent = dawn ? "🌙 Night" : "☀ Dawn";
 }
 
 function applyReaderMode(on) {
@@ -529,7 +706,7 @@ function applyReaderMode(on) {
 
 function saveSession() {
   try {
-    const payload = { project: state.currentProject, view: state.view };
+    const payload = { project: state.currentProject, view: state.view, idea: state.currentIdea ? state.currentIdea.id : null };
     if ((state.view === "cowrite" || state.view === "feedback") && state.script && state.script.scenes && state.script.scenes.length) {
       const container = document.getElementById("script-scenes");
       const pages = container ? [...container.querySelectorAll(".scene-page")] : [];
@@ -572,6 +749,8 @@ async function openProject(name) {
     $("#input").placeholder = "Ask about a scene, a character, a note in the margins…";
     const project = await api(`/projects/${encodeURIComponent(name)}`);
     renderProjectList();
+    renderLibraryList();
+    loadStash();
 
     // an idea that graduated carries its premise card alongside the pages
     state.premise = project.premise && (project.premise.title || project.premise.logline || project.premise.premise) ? project.premise : null;
@@ -1103,6 +1282,7 @@ function selectionInScriptPane() {
 
 function showQuoteFloat(quote) {
   const btn = $("#quote-float");
+  const stashBtn = $("#stash-float");
   const pane = $("#script-pane");
   if (!btn || !pane) return;
   const sel = window.getSelection();
@@ -1114,11 +1294,20 @@ function showQuoteFloat(quote) {
   btn.hidden = false;
   btn.style.left = Math.max(8, Math.min(rect.right - paneRect.left + 10, paneRect.width - 150)) + "px";
   btn.style.top = Math.max(4, rect.bottom - paneRect.top + 8) + "px";
+  if (stashBtn) {
+    stashBtn.dataset.sceneNumber = quote.scene_number == null ? "" : String(quote.scene_number);
+    stashBtn.dataset.text = quote.text;
+    stashBtn.hidden = false;
+    stashBtn.style.left = btn.style.left;
+    stashBtn.style.top = Math.max(4, rect.bottom - paneRect.top + 8 + 30) + "px";
+  }
 }
 
 function hideQuoteFloat() {
   const btn = $("#quote-float");
   if (btn) btn.hidden = true;
+  const stashBtn = $("#stash-float");
+  if (stashBtn) stashBtn.hidden = true;
 }
 
 function handleScriptSelection() {
@@ -2182,6 +2371,9 @@ function renderScriptView() {
   $("#export-fountain").download = `${state.script.title || "script"}.fountain`;
   $("#export-fdx").download = `${state.script.title || "script"}.fdx`;
   $("#export-txt").download = `${state.script.title || "script"}.txt`;
+
+  renderRailScenes();
+  renderRailNotes();
 }
 
 async function hideAllViews() {
@@ -2285,12 +2477,31 @@ function renderReportPanel() {
     (cov.weaknesses || []).forEach((w) => card.appendChild(el("p", "fix-row-why", `• ${w}`)));
     c.appendChild(card);
   }
+  // Setup / Payoff — the end-of-pipeline whole-script audit (paid / dangling /
+  // abandoned / red herring). Rendered as its own card above the findings.
+  const sp = state.report && state.report.setup_payoff;
+  if (sp && sp.length) {
+    const spCard = el("div", "craft-panel");
+    const spHead = el("div", "craft-panel-head");
+    spHead.appendChild(el("span", "craft-panel-title", "Setup / Payoff"));
+    spCard.appendChild(spHead);
+    const SP_STATUS = { paid: "✅ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
+    sp.forEach((e) => {
+      const setScenes = (e.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
+      const payScenes = (e.payoff_scenes && e.payoff_scenes.length) ? e.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
+      const row = el("p", "fix-row-issue", `[${SP_STATUS[e.status] || e.status}] ${e.setup} — set up in ${setScenes}, payoff: ${payScenes}`);
+      if (e.note) row.appendChild(el("p", "fix-row-why", e.note));
+      spCard.appendChild(row);
+    });
+    c.appendChild(spCard);
+  }
+
   const byCat = {};
   (state.report.findings || []).forEach((f) => { (byCat[f.category] = byCat[f.category] || []).push(f); });
   for (const [cat, list] of Object.entries(byCat)) {
     const card = el("div", "craft-panel");
     const head = el("div", "craft-panel-head");
-    head.appendChild(el("span", "craft-panel-title", cat));
+    head.appendChild(el("span", "craft-panel-title", CATEGORY_LABELS[cat] || cat));
     card.appendChild(head);
     list.forEach((f) => {
       const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "General";
@@ -2865,8 +3076,8 @@ function autoResizeTextarea() {
 
 function init() {
   loadConfig();
-  const projectsPromise = loadProjects();
-  loadIdeas();
+  const projectsPromise = Promise.all([loadProjects(), loadIdeas()]);
+  loadLibrary();
   setInterval(checkConnection, 30000);
 
   // the den greets the writer by the hour
@@ -2896,6 +3107,32 @@ function init() {
   });
 
   $("#new-project-btn").addEventListener("click", () => showWelcomeDesk());
+  $("#new-idea-btn").addEventListener("click", createIdea);
+  // Phase 0: structural rail
+  $("#rail-toggle").addEventListener("click", () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")));
+  $("#rail-beats-btn").addEventListener("click", openBeatboardView);
+  $("#rail-compare-btn").addEventListener("click", openCompareView);
+  $("#rail-note-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = $("#rail-note-input");
+    const text = (input.value || "").trim();
+    if (!text || !state.currentProject) return;
+    try {
+      await api(`/projects/${encodeURIComponent(state.currentProject)}/notes`, {
+        method: "POST", body: JSON.stringify({ scene_number: null, text }),
+      });
+      input.value = "";
+      await reloadNotesAndRender();
+      renderRailNotes();
+    } catch (err) {
+      showError("Couldn't pin the note: " + err.message);
+    }
+  });
+  $("#status-dawn").addEventListener("click", () => {
+    const dawn = !document.body.classList.contains("dawn");
+    applyDawn(dawn);
+    savePrefs({ dawn });
+  });
   $("#idea-btn").addEventListener("click", createIdea);
   $("#premise-save-btn").addEventListener("click", () => savePremise());
   $("#premise-graduate-btn").addEventListener("click", () => $("#premise-file-input").click());
@@ -2908,6 +3145,7 @@ function init() {
   // dawn theme + reader mode + shortcut hint (persisted preferences)
   const prefs = loadPrefs();
   applyDawn(prefs.dawn);
+  if (prefs.rail_collapsed) toggleRail(true);
   applyReaderMode(prefs.reader);
   $("#dawn-btn").addEventListener("click", () => {
     const dawn = !document.body.classList.contains("dawn");
@@ -2941,10 +3179,17 @@ function init() {
     }
   });
 
-  // pick up where the writer left off — last project, view, and scene
+  // pick up where the writer left off — last idea OR project, view, and scene
   projectsPromise.then(() => {
     const s = restoreSession();
-    if (!s || !s.project || !(state.projects || []).some((p) => p.project === s.project)) return;
+    if (!s) return;
+    // the idea room is restored too: refresh lands you back in the
+    // brainstorming session, not just on the script desk
+    if (s.idea && (state.ideas || []).some((i) => i.id === s.idea)) {
+      openIdea(s.idea).catch(() => showWelcomeDesk());
+      return;
+    }
+    if (!s.project || !(state.projects || []).some((p) => p.project === s.project)) return;
     openProject(s.project).then(() => {
       if (s.view === "chat" || s.view === "script") {
         // legacy saved views map to the Co-write room (the script is the shared pane)
@@ -2992,6 +3237,30 @@ function init() {
     setPendingQuote(quote);
     $("#input").focus();
   });
+  // The Stash: park a selected passage beside the script — cut material,
+  // good lines, saved without leaving the page. Listed in the Stash panel.
+  $("#stash-float").addEventListener("click", async () => {
+    const btn = $("#stash-float");
+    if (btn.hidden || !state.currentProject) return;
+    const entry = {
+      text: btn.dataset.text || "",
+      scene_number: btn.dataset.sceneNumber ? parseInt(btn.dataset.sceneNumber, 10) : null,
+    };
+    window.getSelection().removeAllRanges();
+    hideQuoteFloat();
+    if (!entry.text) return;
+    const original = btn.textContent;
+    try {
+      await api(`/projects/${encodeURIComponent(state.currentProject)}/stash`, {
+        method: "POST", body: JSON.stringify(entry),
+      });
+      btn.textContent = "Stashed ✓";
+      setTimeout(() => { btn.textContent = original; }, 1200);
+      await loadStash();
+    } catch (err) {
+      showError("Couldn't stash that: " + err.message);
+    }
+  });
   document.addEventListener("mouseup", handleScriptSelection);
   document.addEventListener("keyup", handleScriptSelection);
   document.addEventListener("selectionchange", () => {
@@ -3001,7 +3270,7 @@ function init() {
   });
   document.addEventListener("mousedown", (e) => {
     if ($("#quote-float").hidden) return;
-    if (!e.target.closest("#quote-float") && !e.target.closest("#script-scenes")) hideQuoteFloat();
+    if (!e.target.closest("#quote-float") && !e.target.closest("#stash-float") && !e.target.closest("#script-scenes")) hideQuoteFloat();
   });
   $("#script-scenes").addEventListener("scroll", hideQuoteFloat, { passive: true });
 
@@ -3012,8 +3281,10 @@ function init() {
   let paneDragging = false;
   const applyPaneWidth = (px) => {
     const ws = document.querySelector(".workspace");
+    // the manuscript never shrinks below half the desk (Phase 0 rule)
+    const min = ws ? Math.round(ws.clientWidth * 0.5) : 300;
     const max = ws ? Math.round(ws.clientWidth * 0.78) : 1200;
-    px = Math.max(300, Math.min(px, max));
+    px = Math.max(min, Math.min(px, max));
     scriptPane.style.flex = `0 0 ${px}px`;
     localStorage.setItem("pane-width-v2", String(px));
   };
@@ -3025,7 +3296,10 @@ function init() {
   // every fresh load (drag to resize still works live, up to the 78% clamp).
   const savedPaneWidth = parseFloat(localStorage.getItem("pane-width-v2"));
   const wsEl = document.querySelector(".workspace");
-  if (savedPaneWidth && wsEl && savedPaneWidth <= Math.round(wsEl.clientWidth * 0.70)) {
+  // honor a stored width only inside the 50–78% band; anything wider (a
+  // leftover from a wide-drag session) is treated as stale and dropped
+  const minPane = wsEl ? Math.round(wsEl.clientWidth * 0.5) : 300;
+  if (savedPaneWidth && wsEl && savedPaneWidth >= minPane && savedPaneWidth <= Math.round(wsEl.clientWidth * 0.78)) {
     applyPaneWidth(savedPaneWidth);
   }
   paneDivider.addEventListener("mousedown", (e) => {

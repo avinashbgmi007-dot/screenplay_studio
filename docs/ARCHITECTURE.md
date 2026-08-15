@@ -35,6 +35,7 @@ screenplay-studio_1/
 │   ├── grammar.py              # Hand-written GBNF grammars
 │   ├── verifier.py             # Fuzzy matching, sliding-window verification
 │   ├── principles_engine.py    # Two-stage Chekhov's Gun detection
+│   ├── setup_payoff.py         # End-of-pipeline setup/payoff ledger (whole-script audit)
 │   ├── voice.py                # Deterministic voice-bleed, subtext & idiolect passes
 │   ├── continuity.py           # Deterministic continuity pass (time flips, name variants)
 │   ├── genre.py                # Genre-convention check
@@ -53,6 +54,7 @@ screenplay-studio_1/
 │   ├── personas.py             # 7 personas, 4 modes (default: writing_partner/peer)
 │   ├── peer.py                 # guardrails: two-phase probe, forward-momentum, idea cap
 │   ├── memory.py               # writer relationship memory: signals, confidence gate, card, refresh
+│   ├── writer_library.py       # writer's library: deterministic digest of past projects (PAST WORK block)
 │   ├── discovery.py            # Model selection (explicit > inherited > loaded)
 │   ├── llm_client.py           # Lightweight chat client (free text)
 │   ├── models.py               # Session, Branch, Message dataclasses
@@ -66,6 +68,7 @@ screenplay-studio_1/
 │   ├── diff.py                 # Draft snapshots + cross-draft diffing
 │   ├── beatboard.py            # Scene reordering / beat board
 │   ├── notes.py                # Per-project notes store
+│   ├── stash_store.py          # The Stash: per-project saved snippets (stash.json)
 │   ├── watch.py                # Watch-folder auto-analysis
 │   ├── sample.py               # Sample-script generator
 │   ├── webapp_server.py        # Flask backend (port 8500)

@@ -32,6 +32,7 @@ from .feedback_filter import filter_findings
 from .llm_client import LlamaServerClient, LlamaServerError
 from .rules_context import RulesContext
 from .principles_engine import run_principles_engine
+from .setup_payoff import run_setup_payoff_ledger, dangling_findings
 from screenplay_parser.knowledge_graph import build_knowledge_graph
 
 
@@ -94,6 +95,10 @@ class AnalysisResult:
     coverage: dict | None = None
     character_reads: list[dict] = field(default_factory=list)
     logline_test: dict | None = None
+    setup_payoff: list[dict] = field(default_factory=list)
+    """End-of-pipeline setup/payoff ledger: [{setup, kind, setup_scenes,
+    payoff_scenes, status, note}]. Status: paid | dangling | abandoned |
+    red_herring."""
     formatting_findings: list[dict] = field(default_factory=list)
     stats: dict = field(default_factory=dict)
     verification: dict = field(default_factory=dict)
@@ -328,7 +333,7 @@ def run_logline_test(logline: str, overview: str, title: str, client: LlamaServe
 
 # The full set of model-based analysis categories. Pass this explicitly to
 # run everything; `None` also means "all" (see analyze()).
-ALL_CATEGORIES = ("dialogue", "theme", "character", "structure", "scene_function", "principles", "coverage", "genre", "char_reads", "logline_test")
+ALL_CATEGORIES = ("dialogue", "theme", "character", "structure", "scene_function", "principles", "setup_payoff", "coverage", "genre", "char_reads", "logline_test")
 
 
 def resolve_categories(run_categories) -> tuple[str, ...]:
@@ -443,7 +448,7 @@ def analyze(
         emit("continuity", "complete", f"failed: {e}")
 
     # 2. scene summaries (needed for every script-level category + coverage)
-    needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "coverage", "genre", "char_reads", "logline_test"))
+    needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "setup_payoff", "coverage", "genre", "char_reads", "logline_test"))
     overview = ""
     if needs_summaries:
         try:
@@ -540,6 +545,33 @@ def analyze(
             result.errors.append(f"Character-perception read failed: {e}")
             emit("char_reads", "complete", f"failed: {e}")
 
+    # 4d. Setup/payoff ledger — the FINAL whole-script audit. Runs last (after
+    # the scene summaries exist) because 'was this set up and never paid off?'
+    # can only be answered with the whole arc in context, not a candidate's
+    # own mentions. Dangling entries fold back into the findings (deduped
+    # against the Principles Engine's per-candidate findings) so they reach
+    # the Fix Queue; the ledger itself is also carried on the result as its
+    # own report section.
+    if "setup_payoff" in run_categories and overview:
+        try:
+            emit("setup_payoff", "running", "Auditing setups & payoffs across the whole script")
+            kg = build_knowledge_graph(doc)
+            ledger, ledger_errors = run_setup_payoff_ledger(
+                overview, kg, client, rules_ctx.prompt_fragment_for_category("plot_thread"),
+                doc.scene_count, language=report_language,
+            )
+            result.setup_payoff = ledger
+            existing_plot = [f for f in all_findings if f.get("category") == "plot_thread"]
+            all_findings.extend(dangling_findings(ledger, existing_plot))
+            result.category_outcomes["setup_payoff"] = "failed" if ledger_errors else "ok"
+            if ledger_errors:
+                result.errors.extend(ledger_errors)
+            emit("setup_payoff", "complete")
+        except Exception as e:
+            result.category_outcomes["setup_payoff"] = "failed"
+            result.errors.append(f"Setup/payoff ledger failed: {e}")
+            emit("setup_payoff", "complete", f"failed: {e}")
+
     # 5. verification — check every quoted finding against real scene text
     emit("verification", "running", "Verifying quotes against the script")
     all_findings = verify_findings(all_findings, doc)
@@ -607,7 +639,7 @@ def analyze(
     # were requested) means a partial analyze knows the whole dependency
     # chain is broken, and a retry re-runs summaries+overview-gated (or
     # coverage+genre/logline) together instead of a leaf that can't run.
-    overview_gated = ("theme", "character", "structure", "scene_function", "coverage", "char_reads")
+    overview_gated = ("theme", "character", "structure", "scene_function", "setup_payoff", "coverage", "char_reads")
     for cat in ALL_CATEGORIES:
         if cat not in run_categories or cat in result.category_outcomes:
             continue

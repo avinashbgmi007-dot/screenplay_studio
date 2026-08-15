@@ -41,14 +41,17 @@ Four sibling packages + a knowledge base, wired by an orchestrator. Pieces are i
 ```
 screenplay_parser/    Piece 1 — deterministic parsing -> parsed.json + knowledge graph (no model)
 knowledge_base/       34 attributed craft rules grounding analyzer judgments (no model)
-screenplay_analyzer/  Piece 2 — 11-pass LLM pipeline, GBNF grammar-constrained JSON, quote verification
-screenplay_cowriter/  Piece 3 — branch-based chat, 6 personas x 3 modes, file-based session store
-screenplay_studio/    Orchestrator (manifest-driven resume) + Flask webapp server
+screenplay_analyzer/  Piece 2 — 12-pass LLM pipeline (incl. setup/payoff ledger), GBNF grammar-constrained JSON, quote verification
+screenplay_cowriter/  Piece 3 — branch-based chat, 6 personas x 3 modes, file-based session store, writer relationship memory, writer library (past-work digest)
+screenplay_studio/    Orchestrator (manifest-driven resume) + Flask webapp server + Stash store
 .agents/skills/       Persona humanization playbooks (sameer-humanizer, script-doctor-humanizer)
 ```
 
 Key flows:
-- **Pipeline (11 passes, `pipeline.py:analyze()`):** formatting & stats → voice/subtext (deterministic) → scene summaries → dialogue analysis → script-level categories (theme/character/structure/scene_function) → principles engine (2-stage Chekhov's Gun) → character reads → verification (fuzzy match, threshold 0.72) → coverage → logline test & genre check → feedback filter
+- **Pipeline (12 passes, `pipeline.py:analyze()`):** formatting & stats → voice/subtext/idiolect (deterministic) → continuity (deterministic) → scene summaries → dialogue analysis → script-level categories (theme/character/structure/scene_function) → principles engine (2-stage Chekhov's Gun) → **setup/payoff ledger** (end-of-pipeline whole-script audit; dangling entries fold into Plot Economy findings) → character reads → verification (fuzzy match, threshold 0.72) → coverage → logline test & genre check → feedback filter
+- **Cross-project memory:** the writer's library (`screenplay_cowriter/writer_library.py`) digests every parsed project (characters/themes/scenes, no model calls) into a PAST WORK block Sameer and Dr. Sushruta ride in every turn — never merged with the current script (grounding guard).
+- **The Stash:** per-project saved snippets (`screenplay_studio/stash_store.py` + `stash.json`); select a passage → 📥 Stash this; the rail lists them.
+- **Three-zone shell (Phase 0):** left structural rail (scene outline · Stash · margin notes · beats), script pane never <50%, docked right room panel, thin status strip (model · connection · dawn).
 - **Resume semantics:** `project.json` manifest tracks each stage as `pending`/`complete`/`failed`. A *total* analyze failure is `failed` (raises); a *partial* failure (some categories OK) is `complete` with visible errors.
 - **Model discovery:** explicit flag → model inherited from report → first available on llama-server.
 - **Webapp:** Flask JSON API (port 8500), SPA frontend, projects stored under `studio_projects/`.

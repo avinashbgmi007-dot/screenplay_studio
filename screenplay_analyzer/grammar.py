@@ -143,6 +143,21 @@ read-item ::= "{{" ws "\\"character\\"" ws ":" ws string ws "," ws "\\"how_reads
 '''
 
 
+def setup_payoff_ledger_grammar() -> str:
+    """Grammar for the end-of-pipeline setup/payoff ledger:
+    {"ledger": [ {setup, kind, setup_scenes, payoff_scenes, status, note}, ... ]}
+    payoff_scenes may be null (the setup never paid off)."""
+    return f'''root ::= ws "{{" ws "\\"ledger\\"" ws ":" ws ledger-array ws "}}" ws
+ledger-array ::= "[" ws (ledger-entry (ws "," ws ledger-entry)*)? ws "]"
+ledger-entry ::= "{{" ws "\\"setup\\"" ws ":" ws string ws "," ws "\\"kind\\"" ws ":" ws kind ws "," ws "\\"setup_scenes\\"" ws ":" ws int-array ws "," ws "\\"payoff_scenes\\"" ws ":" ws (int-array | "null") ws "," ws "\\"status\\"" ws ":" ws status ws "," ws "\\"note\\"" ws ":" ws string ws "}}"
+kind ::= "\\"object\\"" | "\\"promise\\"" | "\\"theme\\"" | "\\"relationship\\"" | "\\"other\\""
+status ::= "\\"paid\\"" | "\\"dangling\\"" | "\\"abandoned\\"" | "\\"red_herring\\""
+{_INT_ARRAY}
+{_STRING}
+{_WS}
+'''
+
+
 def coverage_grammar() -> str:
     """Grammar for the single-object coverage report."""
     return f'''root ::= ws "{{" ws "\\"logline\\"" ws ":" ws string ws "," ws "\\"genre\\"" ws ":" ws string ws "," ws "\\"tone\\"" ws ":" ws string ws "," ws "\\"one_page_synopsis\\"" ws ":" ws string ws "," ws "\\"strengths\\"" ws ":" ws string-array ws "," ws "\\"weaknesses\\"" ws ":" ws string-array ws "," ws "\\"comparable_films\\"" ws ":" ws string-array ws "," ws "\\"recommendation\\"" ws ":" ws recommendation ws "}}" ws

@@ -232,7 +232,7 @@ def _premise_block(card: dict | None) -> str:
 
 def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, persona: str, mode: str,
                         relationship_card: str | None = None, cold_start_line: str | None = None,
-                        premise: dict | None = None) -> str:
+                        premise: dict | None = None, writer_library_text: str | None = None) -> str:
     examples = persona_examples(persona)
     examples_block = f"\n\n{examples}" if examples else ""
     if premise is not None:
@@ -266,6 +266,10 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         prompt += f"\n\n{relationship_card}"
     if cold_start_line:
         prompt += f"\n\n{cold_start_line}"
+    if writer_library_text:
+        # The writer's past work — a different shelf, with a grounding guard
+        # baked into the block itself (never merged with the current script).
+        prompt += f"\n\n{writer_library_text}"
     return prompt
 
 

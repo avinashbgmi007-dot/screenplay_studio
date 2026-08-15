@@ -415,6 +415,45 @@ def get_report(name):
 
 # ---------- writer's margin notes ----------
 
+# ---------- the Stash (saved snippets beside the script) ----------
+
+@app.route("/api/projects/<name>/stash", methods=["GET"])
+def get_stash(name):
+    m = _load_manifest(name)
+    from .stash_store import load_stash
+    return jsonify({"stash": load_stash(m.project_dir)})
+
+
+@app.route("/api/projects/<name>/stash", methods=["POST"])
+def add_stash(name):
+    m = _load_manifest(name)
+    body = request.get_json(silent=True) or {}
+    try:
+        entry = add_stash_entry(m.project_dir, body)
+    except ValueError as e:
+        return _error(str(e), 400)
+    return jsonify(entry), 201
+
+
+def add_stash_entry(project_dir: str, body: dict) -> dict:
+    from .stash_store import add_to_stash
+    scene = body.get("scene_number")
+    try:
+        scene = int(scene) if scene is not None else None
+    except (TypeError, ValueError):
+        scene = None
+    return add_to_stash(project_dir, body.get("text") or "", title=body.get("title") or "", scene_number=scene)
+
+
+@app.route("/api/projects/<name>/stash/<entry_id>", methods=["DELETE"])
+def delete_stash_entry(name, entry_id):
+    m = _load_manifest(name)
+    from .stash_store import remove_from_stash
+    if not remove_from_stash(m.project_dir, entry_id):
+        return _error("Stash entry not found.", 404)
+    return jsonify({"deleted": entry_id})
+
+
 @app.route("/api/projects/<name>/premise", methods=["POST"])
 def save_project_premise(name):
     """Edit the premise card that grew into this script (it rides alongside
@@ -1120,8 +1159,16 @@ def _load_session_and_engine(project: str, session_id: str):
         memory = mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
     except (CowriterUnavailableError, OSError, ValueError):
         memory = None  # memory unavailable or unreadable — never break the chat
+    # The writer's past work rides along so Sameer/the doctor can draw on
+    # earlier scripts — with the current project excluded so the digest never
+    # blurs into the script on the desk.
+    try:
+        lib_mod = _import_cowriter("writer_library")
+        lib_text = lib_mod.library_digest_text(_writer_library(exclude=project))
+    except Exception:
+        lib_text = None
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
-                            memory_scope=f"project:{project}")
+                            memory_scope=f"project:{project}", writer_library_text=lib_text)
     return session, engine, store
 
 
@@ -1400,10 +1447,29 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
         memory = mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
     except (CowriterUnavailableError, OSError, ValueError):
         memory = None  # memory unavailable or unreadable — never break the chat
+    try:
+        lib_mod = _import_cowriter("writer_library")
+        lib_text = lib_mod.library_digest_text(_writer_library())
+    except Exception:
+        lib_text = None
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
                             premise=meta.get("card") or {},
-                            memory_scope=f"idea:{idea_id}")
+                            memory_scope=f"idea:{idea_id}", writer_library_text=lib_text)
     return session, engine, store
+
+
+def _writer_library(exclude: str | None = None) -> list[dict]:
+    """Digest of the writer's parsed projects — deterministic, no model calls."""
+    try:
+        lib_mod = _import_cowriter("writer_library")
+        return lib_mod.build_library(PROJECTS_DIR, exclude=exclude)
+    except (CowriterUnavailableError, OSError, ValueError):
+        return []
+
+
+@app.route("/api/writer-library", methods=["GET"])
+def get_writer_library():
+    return jsonify({"projects": _writer_library()})
 
 
 @app.route("/api/ideas", methods=["GET"])
