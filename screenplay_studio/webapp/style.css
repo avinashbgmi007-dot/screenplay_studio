@@ -901,6 +901,9 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   align-items: center;
   gap: 28px;
 }
+/* focusable scroll container (`s` focuses the manuscript) — no ring, the
+   whole pane is the surface */
+.script-scenes:focus { outline: none; }
 
 .scene-page {
   width: 100%;

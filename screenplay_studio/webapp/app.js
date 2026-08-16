@@ -2614,18 +2614,27 @@ function buildCraftShelf(panels) {
   if (state.report && (state.report.logline_test || (state.report.character_reads || []).length)) bits.push("mirror");
   head.appendChild(el("span", "craft-shelf-summary", bits.join(" · ")));
   head.appendChild(el("span", "craft-shelf-caret", craftOpen ? "▾" : "▸"));
-  head.addEventListener("click", () => {
-    craftOpen = !craftOpen;
-    wrap.classList.toggle("open", craftOpen);
-    head.setAttribute("aria-expanded", craftOpen ? "true" : "false");
-    head.querySelector(".craft-shelf-caret").textContent = craftOpen ? "▾" : "▸";
-    savePrefs({ craft_open: craftOpen });
-  });
+  head.addEventListener("click", toggleCraftShelf);
   wrap.appendChild(head);
   const body = el("div", "craft-shelf-body");
   for (const p of panels) body.appendChild(p);
   wrap.appendChild(body);
   return wrap;
+}
+
+// flip the shelf from anywhere — the header click, the `a` shortcut, Esc
+function toggleCraftShelf() {
+  craftOpen = !craftOpen;
+  savePrefs({ craft_open: craftOpen });
+  const shelf = document.querySelector(".craft-shelf");
+  if (!shelf) return;
+  shelf.classList.toggle("open", craftOpen);
+  const head = shelf.querySelector(".craft-shelf-head");
+  if (head) {
+    head.setAttribute("aria-expanded", craftOpen ? "true" : "false");
+    const caret = head.querySelector(".craft-shelf-caret");
+    if (caret) caret.textContent = craftOpen ? "▾" : "▸";
+  }
 }
 
 // ---- drafts & diffing ----
@@ -3340,6 +3349,11 @@ function renderReportPanel() {
     c.appendChild(dialCard);
   }
 
+  // Writer's Mirror — how the premise lands in one sentence + how each
+  // character reads to a stranger. Same panel as the craft shelf, reused
+  // verbatim so the doctor's desk carries the whole analysis.
+  renderWriterMirrorPanel(c);
+
   const byCat = {};
   (state.report.findings || []).forEach((f) => { (byCat[f.category] = byCat[f.category] || []).push(f); });
   for (const [cat, list] of Object.entries(byCat)) {
@@ -3725,9 +3739,12 @@ const SHORTCUTS = [
   ["Ctrl/⌘ K", "Command palette"],
   ["Ctrl/⌘ Z", "Undo last applied edit"],
   ["Ctrl/⌘ Shift Z", "Redo the undone edit"],
-  ["c", "Switch to Co-write"],
-  ["f", "Switch to Feedback"],
-  ["s", "Focus the script pane"],
+  ["c", "Switch to Co-write (Sameer)"],
+  ["f", "Switch to Feedback (Consultant)"],
+  ["s", "Focus the manuscript — dismiss the partner, back to the page"],
+  ["a", "Toggle the Craft shelf (analysis panels)"],
+  ["r", "Toggle the Structure rail"],
+  ["Esc", "Dismiss — partner drawer → craft shelf → structure rail"],
   ["b", "Open the Beat Board"],
   ["d", "Compare drafts side by side"],
   ["j / n", "Next scene (script view)"],
@@ -3745,6 +3762,8 @@ function paletteCommands() {
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
     { type: "command", label: "Start a new page", keys: "", run: () => { $("#new-project-btn").click(); } },
     { type: "command", label: "Focus the conversation", keys: "", run: () => { openCowriteRoom(); setTimeout(() => $("#input").focus(), 60); } },
+    { type: "command", label: "Toggle the Craft shelf (analysis panels)", keys: "a", run: toggleCraftShelf },
+    { type: "command", label: "Toggle the Structure rail", keys: "r", run: () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")) },
     { type: "command", label: "Search the script", keys: "/", run: () => { if (state.view !== "cowrite" && state.view !== "feedback") openCowriteRoom(); setTimeout(() => $("#script-search").focus(), 80); } },
     { type: "command", label: "Export working draft (.fountain)", keys: "", run: () => $("#export-fountain").click() },
     { type: "command", label: "Study settings", keys: "", run: () => $("#settings-btn").click() },
@@ -3897,13 +3916,34 @@ function bindGlobalShortcuts() {
     }
 
     if (isTypingTarget(e.target)) return;
-    if (!state.currentProject) return;
+
+    // Esc — the page wins: dismiss the partner drawer, then the craft shelf,
+    // then the structure rail (palette Esc is handled above; modals keep Esc).
+    if (e.key === "Escape") {
+      const modalOpen = [...document.querySelectorAll(".modal-overlay")].some((m) => m.style.display === "flex");
+      if (!modalOpen) {
+        const drawer = $("#room-drawer");
+        if (drawer && drawer.classList.contains("open")) { closeRoomDrawer(); return; }
+        const shelf = document.querySelector(".craft-shelf");
+        if (shelf && shelf.classList.contains("open")) { toggleCraftShelf(); return; }
+        const rail = $("#struct-rail");
+        if (rail && !rail.classList.contains("rail-collapsed")) { toggleRail(true); return; }
+      }
+      return;
+    }
+
+    // idea room has no project — but the room keys (c/f), the craft shelf (a)
+    // and the rail (r) belong there too
+    if (!state.currentProject && !state.inIdea) return;
 
     if (e.key === "?") { e.preventDefault(); openPalette(true); }
     else if (e.key === "/") { e.preventDefault(); paletteCommands().find((c) => c.keys === "/").run(); }
     else if (e.key === "c") { openCowriteRoom(); }
     else if (e.key === "f") { openFeedbackRoom(); }
-    else if (e.key === "b") { openBeatboardView(); }
+    else if (e.key === "a") { toggleCraftShelf(); }
+    else if (e.key === "r") { toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")); }
+    else if (e.key === "s") { closeRoomDrawer(); const sc = $("#script-scenes"); if (sc) sc.focus(); }
+    else if (e.key === "b" && state.currentProject) { openBeatboardView(); }
     else if (e.key === "d" && state.currentProject) { openCompareView(); }
     else if (e.key === "j" || e.key === "n") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(1); } }
     else if (e.key === "k" || e.key === "p") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(-1); } }
