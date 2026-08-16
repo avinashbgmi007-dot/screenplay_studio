@@ -10,7 +10,7 @@
 <!-- v2e607ed — bump the version query whenever style.css/app.js change so
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch). -->
-<link rel="stylesheet" href="style.css?v=7f3a9c3">
+<link rel="stylesheet" href="style.css?v=ms1a2b3">
 </head>
 <body data-room="cowrite">
 
@@ -154,8 +154,9 @@
         </div>
       </aside>
 
-      <!-- The desk: script + divider + the active room, sized as one 70/30 row
-           after the rail (the rail is a sibling so it can't eat the room's width) -->
+      <button id="rail-edge-tab" class="rail-edge-tab" type="button" title="Open the structure rail — scenes, characters, the stash, margin notes">☰ Structure</button>
+
+      <!-- The desk: the manuscript owns the room — full width, no divider -->
       <div class="desk">
 
       <section id="script-pane" aria-label="The script">
@@ -230,6 +231,16 @@
       </section>
 
       <div id="pane-divider" class="pane-divider" role="separator" aria-orientation="vertical" title="Drag to resize the script pane — double-click to reset"></div>
+      </div>
+
+      <!-- Manuscript Stage: the partner drawer — summoned from the gutter, gone
+           when you close it. The script keeps the room. -->
+      <div class="drawer" id="room-drawer" aria-label="Partner">
+        <div class="drawer-head">
+          <div class="drawer-avatar sam" id="drawer-av">S</div>
+          <div class="drawer-name" id="drawer-name">Sameer <small>co-writer — beside you</small></div>
+          <button class="drawer-close" id="drawer-close" type="button" title="Dismiss the partner — the page stays">✕</button>
+        </div>
 
       <!-- Co-write room: the writer's desk -->
       <section id="cowrite-panel" class="room-panel" aria-label="Co-write">
@@ -280,7 +291,12 @@
         <div id="feedback-fixqueue" class="feedback-pane" style="display:none;"></div>
         <div id="feedback-empty" class="feedback-empty">No analysis yet — Run Analysis to get the consultant's report.</div>
       </section>
+      </div>
 
+      <!-- the edge tabs — the only chrome on the right -->
+      <div class="gutter">
+        <button class="gutter-tab sam on" id="gutter-sam" type="button"><span class="dot"></span>Sameer</button>
+        <button class="gutter-tab doc" id="gutter-doc" type="button">Consultant</button>
       </div>
 
     </div>
@@ -420,6 +436,6 @@
   </div>
 </div>
 
-<script src="app.js?v=7f3a9c1"></script>
+<script src="app.js?v=ms1a2b4"></script>
 </body>
 </html>

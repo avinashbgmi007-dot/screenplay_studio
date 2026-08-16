@@ -809,6 +809,9 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   flex: 1;
   min-height: 0;
   position: relative;
+  /* the drawer and the structure rail slide over the page — clip them at the
+     workspace bounds so a closed drawer never scrolls the body sideways */
+  overflow: hidden;
   /* the desk at night: a faint wood-grain field so the manuscript floats on
      something, not on void. Purely decorative — pointer-events: none. */
   background:
@@ -816,9 +819,8 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
     var(--ink-950);
 }
 
-/* The desk: script + divider + the active room share one 70/30 row. It sits
-   AFTER the rail in the workspace row, so the rail's width never eats into
-   the room's share (70% here means 70% of the desk, not of the whole row). */
+/* The desk: the manuscript owns the whole row. No divider, no docked room —
+   the partners live in a summoned drawer (see the Manuscript Stage block). */
 .desk {
   flex: 1;
   min-width: 0;
@@ -827,9 +829,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 }
 
 #script-pane {
-  /* the manuscript is center stage — the chat room is the smaller right pane */
-  flex: 0 0 70%;
-  min-width: 420px;
+  /* the manuscript is center stage — full width, the page column centered */
+  flex: 1 1 auto !important;  /* !important: the retired divider code must never
+                                 squeeze the page back into a 70/30 split */
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -2416,6 +2419,10 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
 @media (max-width: 900px) {
   .scene-window, .scene-shelf { display: none; }
   .scene-lamp { left: 3%; }
+  /* narrow desks: the gutter is chrome the page can't spare — the drawer
+     docks flush to the edge and is summoned by the room toggle instead */
+  .gutter { display: none; }
+  .drawer { right: 0; }
 }
 
 @media (max-width: 640px) {
@@ -2427,6 +2434,7 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   #script-pane { flex: 1 1 100%; min-width: 0; }
   .workspace { flex-direction: column; }
   .room-panel { flex: 1 1 100%; min-height: 380px; }
+  .drawer { width: 100%; max-width: none; }
 }
 
 /* ============================================================
@@ -2445,7 +2453,8 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   #composer, .note-add, .finding-note-actions, #project-bar,
   #room-toggle, #room-chip, #partner-card, #feedback-tabs,
   .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
-  #cowrite-panel, #feedback-panel, #struct-rail, #status-strip {
+  #cowrite-panel, #feedback-panel, #struct-rail, #status-strip,
+  .drawer, .gutter, .rail-edge-tab {
     display: none !important;
   }
   .desk { display: block !important; }
@@ -2529,19 +2538,22 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
 
 #script-pane { position: relative; }
 
+/* Manuscript Stage ask-bar: a dark ink pill that floats above the selected
+   line. "Ask Sameer" is the primary ask; Stash and Note sit below it. It
+   rides above the partner drawer so it's reachable even while Sam is open. */
 .quote-float {
   position: absolute;
-  z-index: 40;
+  z-index: 700;
   font-family: var(--font-typewriter);
   font-size: 12px;
-  color: #1a140d;
-  background: linear-gradient(180deg, var(--lamp-bright), var(--lamp));
-  border: 1px solid var(--lamp-deep);
+  color: var(--paper, #f5efe2);
+  background: linear-gradient(180deg, #2a231b, #1d1812);
+  border: 1px solid rgba(233, 223, 206, 0.25);
   border-radius: 999px;
   padding: 6px 14px;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 .quote-float:hover { filter: brightness(1.08); }
 .quote-float:active { transform: translateY(1px); }
@@ -2663,8 +2675,11 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   .scene-page.flash { animation: none; box-shadow: 0 0 0 3px rgba(232, 162, 79, 0.6), 0 18px 44px -18px rgba(0, 0, 0, 0.6); }
 }
 
-/* resizable script pane — draggable divider */
+/* resizable script pane — the divider is retired in the Manuscript Stage
+   (the script owns the row; the room is a drawer), kept in the DOM only
+   because the resize code still reads it. */
 .pane-divider {
+  display: none;
   flex: 0 0 5px;
   cursor: col-resize;
   background: var(--line-soft);
@@ -2701,21 +2716,176 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
    (scenes / stash / notes / beats) lives in a collapsible rail.
    ============================================================ */
 
+/* Manuscript Stage: the structure rail is a summoned drawer — it slides over
+   the page from the left edge, collapsed (off-canvas) by default. The scene
+   list, characters, stash and notes are one summon away, never persistent. */
 #struct-rail {
-  width: 232px;
-  flex: 0 0 232px;
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 240px;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, var(--ink-900), var(--ink-950));
   border-right: 1px solid var(--line-soft);
-  transition: width 0.18s ease, flex-basis 0.18s ease;
+  box-shadow: 18px 0 40px rgba(0, 0, 0, 0.35);
+  transition: transform 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
   overflow: hidden;
+  z-index: 520;
 }
 #struct-rail.rail-collapsed {
-  width: 0;
-  flex-basis: 0;
+  transform: translateX(-105%);
   border-right: none;
+  box-shadow: none;
+}
+/* the slim edge tab that summons the rail back when it's off-canvas */
+.rail-edge-tab {
+  display: none;
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  z-index: 515;
+  writing-mode: vertical-rl;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--ink-900);
+  border: 1px solid var(--line-soft);
+  border-left: none;
+  padding: 14px 8px;
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.rail-edge-tab:hover { color: var(--accent); border-color: var(--accent-deep); }
+#struct-rail.rail-collapsed + .rail-edge-tab { display: block; }
+
+/* ============================================================
+   Manuscript Stage — the partner drawer + the right-edge gutter
+   Sameer and the consultant live in a drawer that slides in from
+   the edge when summoned, and leave the page alone the rest of
+   the time. The gutter tabs are the only chrome on the right.
+   ============================================================ */
+
+.drawer {
+  position: absolute;
+  top: 0; right: 56px; bottom: 0;
+  width: 380px;
+  max-width: calc(100vw - 140px);
+  background: var(--ink-900);
+  border-left: 1px solid var(--line-soft);
+  box-shadow: -18px 0 46px rgba(0, 0, 0, 0.35);
+  transform: translateX(110%);
+  transition: transform 0.38s cubic-bezier(0.22, 0.8, 0.3, 1);
+  z-index: 590;
+  display: flex;
+  flex-direction: column;
+}
+.drawer.open { transform: translateX(0); }
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--ink-900);
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+}
+.drawer-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  flex: none;
+  box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.5);
+}
+.drawer-avatar.sam { background: #8a4b2f; }
+.drawer-avatar.doc { background: #2f4b6b; }
+.drawer-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drawer-name small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.drawer-close {
+  margin-left: auto;
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--ink-800);
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.drawer-close:hover { color: var(--text); border-color: var(--line); }
+
+/* the partner card inside the drawer already repeats the name — the drawer
+   head owns the identity now; the card keeps its action buttons */
+.drawer .partner-name { display: none; }
+
+.gutter {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 56px;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.gutter-tab {
+  writing-mode: vertical-rl;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  border: 1px solid var(--line-soft);
+  border-right: none;
+  background: var(--ink-900);
+  color: var(--text-muted);
+  padding: 16px 9px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  border-radius: 10px 0 0 10px;
+}
+.gutter-tab:hover { color: var(--text); }
+.gutter-tab.sam:hover { border-color: #8a4b2f; color: #b97a54; }
+.gutter-tab.doc:hover { border-color: #2f4b6b; color: #6d9ec2; }
+.gutter-tab.on { background: var(--ink-800); color: var(--text); border-color: var(--line); }
+.gutter-tab .dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #8a4b2f;
+  margin-right: 6px;
+  vertical-align: middle;
+  animation: dotPulse 2s ease-in-out infinite;
+}
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
 }
 
 .rail-head {

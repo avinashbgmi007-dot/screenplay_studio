@@ -662,6 +662,7 @@ function showWelcomeDesk() {
   state.currentIdea = null;
   state.currentIdeaSession = null;
   state.inIdea = false;
+  closeRoomDrawer();
   $("#welcome-view").style.display = "flex";
   $("#project-bar").style.display = "none";
   const ws = document.querySelector(".workspace");
@@ -749,6 +750,9 @@ async function openIdea(id) {
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "flex";
     setRoom("cowrite");
+    // the idea room is a conversation — Sameer (or the premise doctor) rides
+    // along in the drawer from the first moment, beside the premise card
+    openRoomDrawer();
 
     if (!state.currentIdeaSession) {
       const res = await api(`/ideas/${encodeURIComponent(id)}/chat/start`, { method: "POST" });
@@ -791,6 +795,8 @@ function setIdeaLens(room) {
   if (chip) chip.textContent = room === "feedback" ? "📋 Concept Validation" : "✍️ Idea Room";
   $("#room-cowrite-btn").classList.toggle("active", room === "cowrite");
   $("#room-feedback-btn").classList.toggle("active", room === "feedback");
+  setDrawerIdentity(room, true);
+  syncGutter();
 }
 
 async function applyIdeaLens(room) {
@@ -1185,6 +1191,9 @@ async function openProject(name) {
     maybeShowWelcome();
 
     setRoom("cowrite");
+    // a project opens with the manuscript center stage — the partner drawer
+    // stays closed until summoned (gutter tab, room toggle, or select-to-ask)
+    closeRoomDrawer();
     saveSession();
   } catch (e) {
     showError("Couldn't open that project: " + e.message);
@@ -1192,8 +1201,45 @@ async function openProject(name) {
 }
 
 // ---------- rooms: Co-write (writer's desk) vs Feedback (consultant's desk) ----------
-// The script pane is shared and always visible; the room toggle swaps the right
-// panel and the room's visual identity (see body[data-room] in style.css).
+// The script pane is shared and always visible; the room toggle swaps which
+// partner occupies the drawer (see body[data-room] in style.css).
+
+// Manuscript Stage: the partner drawer + the right-edge gutter. Sameer and the
+// consultant live in a drawer that slides in from the edge when summoned and
+// leaves the page alone the rest of the time.
+function openRoomDrawer() {
+  const d = $("#room-drawer");
+  if (d) d.classList.add("open");
+  syncGutter();
+}
+function closeRoomDrawer() {
+  const d = $("#room-drawer");
+  if (d) d.classList.remove("open");
+  syncGutter();
+}
+function syncGutter() {
+  const sam = state.view !== "feedback";
+  const gs = $("#gutter-sam"), gd = $("#gutter-doc");
+  if (gs) gs.classList.toggle("on", sam);
+  if (gd) gd.classList.toggle("on", !sam);
+}
+function setDrawerIdentity(room, idea) {
+  const av = $("#drawer-av"), name = $("#drawer-name");
+  if (!av || !name) return;
+  if (room === "feedback") {
+    av.textContent = "D";
+    av.className = "drawer-avatar doc";
+    name.innerHTML = idea
+      ? 'Premise Doctor <small>development exec — testing the idea</small>'
+      : 'Consultant <small>script doctor — reading the draft</small>';
+  } else {
+    av.textContent = "S";
+    av.className = "drawer-avatar sam";
+    name.innerHTML = idea
+      ? 'Sameer <small>co-writer — exploring the idea</small>'
+      : 'Sameer <small>co-writer — beside you</small>';
+  }
+}
 
 function setRoom(room) {
   state.view = room;                       // "cowrite" | "feedback"
@@ -1209,6 +1255,8 @@ function setRoom(room) {
     return;
   }
   document.body.dataset.room = room;       // drives CSS theming
+  setDrawerIdentity(room, false);
+  syncGutter();
   const chip = $("#room-chip");
   if (chip) chip.textContent = room === "feedback" ? "📋 Consultant's Desk" : "✍️ Writer's Desk";
   $("#room-cowrite-btn").classList.toggle("active", room === "cowrite");
@@ -1224,17 +1272,19 @@ function setRoom(room) {
 }
 
 function openCowriteRoom() {
-  if (state.view === "cowrite") return;
+  if (state.view === "cowrite") { openRoomDrawer(); return; }
   setRoom("cowrite");
   renderMessages();
   maybeShowWelcome();
+  openRoomDrawer();
 }
 
 function openFeedbackRoom() {
-  if (state.view === "feedback") return;
+  if (state.view === "feedback") { openRoomDrawer(); return; }
   setRoom("feedback");
-  if (state.inIdea) { renderMessages(); return; }
+  if (state.inIdea) { renderMessages(); openRoomDrawer(); return; }
   if (typeof loadFeedbackPanels === "function") loadFeedbackPanels();  // defined in Task 10
+  openRoomDrawer();
 }
 
 // ---------- analysis progress pipeline ----------
@@ -3897,7 +3947,10 @@ function init() {
   // dawn theme + reader mode + shortcut hint (persisted preferences)
   const prefs = loadPrefs();
   applyDawn(prefs.dawn);
-  if (prefs.rail_collapsed) toggleRail(true);
+  // Manuscript Stage: the structure rail starts off-canvas — the page owns the
+  // room. Only an explicit "open" preference keeps it out; anything else (or
+  // nothing) collapses it.
+  if (prefs.rail_collapsed !== false) toggleRail(true);
   applyReaderMode(prefs.reader);
   applyFocusMode(prefs.focus);
   wireSprint();
@@ -4170,6 +4223,11 @@ function init() {
   // rooms
   $("#room-cowrite-btn").addEventListener("click", openCowriteRoom);
   $("#room-feedback-btn").addEventListener("click", openFeedbackRoom);
+  // Manuscript Stage: the gutter tabs summon the partner drawer
+  $("#gutter-sam").addEventListener("click", openCowriteRoom);
+  $("#gutter-doc").addEventListener("click", openFeedbackRoom);
+  $("#drawer-close").addEventListener("click", closeRoomDrawer);
+  $("#rail-edge-tab").addEventListener("click", () => toggleRail(false));
   $("#bb-icon").addEventListener("click", openBeatboardView);
   $("#compare-icon").addEventListener("click", openCompareView);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
