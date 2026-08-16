@@ -2408,6 +2408,12 @@ async function loadScriptData() {
 }
 
 // ---- fix queue / craft panels ----
+// append-or-push: the panels render into the script pane's craft shelf (an
+// array) or directly into the Feedback room's Fix Queue tab (a real node).
+function addPanel(container, panel) {
+  if (container && container.push) container.push(panel);
+  else if (container) container.appendChild(panel);
+}
 
 function renderFixQueuePanel(container) {
   const items = (state.fixQueue && state.fixQueue.items) || [];
@@ -2451,7 +2457,7 @@ function renderFixQueuePanel(container) {
     row.appendChild(body);
     panel.appendChild(row);
   }
-  container.appendChild(panel);
+  addPanel(container, panel);
 }
 
 function renderPacingPanel(container) {
@@ -2482,7 +2488,7 @@ function renderPacingPanel(container) {
   const body = el("div", "pacing-body");
   body.innerHTML = svg;
   panel.appendChild(body);
-  container.appendChild(panel);
+  addPanel(container, panel);
 }
 
 function renderCharacterPanel(container) {
@@ -2506,7 +2512,7 @@ function renderCharacterPanel(container) {
     row.appendChild(meta);
     panel.appendChild(row);
   }
-  container.appendChild(panel);
+  addPanel(container, panel);
 }
 
 // ---- writer's mirror: logline test + character-perception read ----
@@ -2581,7 +2587,45 @@ function renderWriterMirrorPanel(container) {
     panel.appendChild(block);
   }
 
-  container.appendChild(panel);
+  addPanel(container, panel);
+}
+
+// ---- Craft shelf: a collapsed-by-default lid over the analysis panels ----
+// The four panels (fix queue · pacing · characters · writer's mirror) used to
+// stack ABOVE the first scene — a 9,000px wall of analysis between the writer
+// and page one. Now they live behind a slim header: the manuscript owns the
+// top of the page, and one click opens the whole shelf. The choice persists,
+// but the default is always closed. (The script-level notes chips stay out —
+// they're small, and they include the writer's own pinned notes.)
+let craftOpen = loadPrefs().craft_open === true;
+
+function buildCraftShelf(panels) {
+  const wrap = el("div", "craft-shelf" + (craftOpen ? " open" : ""));
+  const head = el("button", "craft-shelf-head");
+  head.type = "button";
+  head.setAttribute("aria-expanded", craftOpen ? "true" : "false");
+  head.appendChild(el("span", "craft-shelf-title", "Craft"));
+  const bits = [];
+  const items = (state.fixQueue && state.fixQueue.items) || [];
+  const open = items.filter((i) => i.status !== "addressed");
+  if (items.length) bits.push(`${open.length} open · ${items.length} total`);
+  const pacing = state.reportStats && state.reportStats.pacing;
+  if (pacing && pacing.segments && pacing.segments.length) bits.push(`${pacing.total_pages}-page pacing`);
+  if (state.report && (state.report.logline_test || (state.report.character_reads || []).length)) bits.push("mirror");
+  head.appendChild(el("span", "craft-shelf-summary", bits.join(" · ")));
+  head.appendChild(el("span", "craft-shelf-caret", craftOpen ? "▾" : "▸"));
+  head.addEventListener("click", () => {
+    craftOpen = !craftOpen;
+    wrap.classList.toggle("open", craftOpen);
+    head.setAttribute("aria-expanded", craftOpen ? "true" : "false");
+    head.querySelector(".craft-shelf-caret").textContent = craftOpen ? "▾" : "▸";
+    savePrefs({ craft_open: craftOpen });
+  });
+  wrap.appendChild(head);
+  const body = el("div", "craft-shelf-body");
+  for (const p of panels) body.appendChild(p);
+  wrap.appendChild(body);
+  return wrap;
 }
 
 // ---- drafts & diffing ----
@@ -3022,10 +3066,13 @@ function renderScriptView() {
     if (m.quote && m.quote.scene_number != null) discussedScenes.add(m.quote.scene_number);
   }
 
-  renderFixQueuePanel(container);
-  renderPacingPanel(container);
-  renderCharacterPanel(container);
-  renderWriterMirrorPanel(container);
+  // the analysis panels ride in a collapsed craft shelf — page one first
+  const craftPanels = [];
+  renderFixQueuePanel(craftPanels);
+  renderPacingPanel(craftPanels);
+  renderCharacterPanel(craftPanels);
+  renderWriterMirrorPanel(craftPanels);
+  if (craftPanels.length) container.appendChild(buildCraftShelf(craftPanels));
 
   if (scriptLevel.length || scriptLevelNotes.length) {
     const bucket = el("div", "script-level-notes");

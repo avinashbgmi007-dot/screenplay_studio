@@ -1119,6 +1119,59 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 }
 
 .writer-mirror { border-color: var(--accent-deep); }
+
+/* craft shelf — the analysis panels behind a collapsed-by-default header so
+   the first page greets the writer; one click opens the whole shelf */
+.craft-shelf {
+  width: 100%;
+  max-width: 700px;
+}
+.craft-shelf-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: linear-gradient(180deg, var(--ink-850), var(--ink-900));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.craft-shelf-head:hover { border-color: var(--accent-deep); background: var(--ink-850); }
+.craft-shelf-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+.craft-shelf-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.craft-shelf-caret {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: transform 0.2s ease;
+}
+.craft-shelf.open .craft-shelf-caret { transform: rotate(90deg); }
+.craft-shelf-body { display: none; }
+.craft-shelf.open .craft-shelf-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.craft-shelf-body .craft-panel { margin-bottom: 0; }
 .wm-block + .wm-block { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
 .wm-intro { font-size: 13px; color: var(--text-muted); margin: 0 0 10px; line-height: 1.5; }
 .wm-logline-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
@@ -2346,6 +2399,7 @@ body.reader-mode .note-mine,
 body.reader-mode .note-add,
 body.reader-mode .scene-notes,
 body.reader-mode .craft-panel,
+body.reader-mode .craft-shelf,
 body.reader-mode .finding-summary { display: none !important; }
 body.reader-mode .scene-page {
   max-width: 640px;
