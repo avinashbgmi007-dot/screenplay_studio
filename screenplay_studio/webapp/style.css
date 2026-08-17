@@ -2378,11 +2378,23 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .revision-nav-row .rn-head { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .revision-nav-row.ok { opacity: 0.5; }
 .revision-nav-row.ok .rn-head { text-decoration: line-through; text-decoration-color: rgba(143, 174, 126, 0.6); }
-.rn-dots { display: inline-flex; gap: 3px; align-items: center; }
-.rn-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-.rn-dot.high { background: #e5484d; }
-.rn-dot.medium { background: #f5a623; }
-.rn-dot.low { background: #46a758; }
+.sev-dots { display: inline-flex; gap: 3px; align-items: center; }
+.sev-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.sev-dot.high { background: #e5484d; }
+.sev-dot.medium { background: #f5a623; }
+.sev-dot.low { background: #46a758; }
+.bb-card-findings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--paper-line);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.bb-find-count { color: var(--danger); font-weight: 600; }
 .rn-count {
   font-family: var(--font-mono);
   font-size: 10.5px;

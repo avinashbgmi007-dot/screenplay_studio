@@ -3610,9 +3610,9 @@ function renderRevisionView() {
     row.appendChild(el("span", "rn-num", `S${scene.scene_number}`));
     row.appendChild(el("span", "rn-head", scene.heading_raw));
     if (fg.length) {
-      const dots = el("span", "rn-dots");
+      const dots = el("span", "sev-dots");
       for (const sev of ["high", "medium", "low"]) {
-        if (fg.some(({ f }) => (f.severity || "low") === sev)) dots.appendChild(el("i", "rn-dot " + sev));
+        if (fg.some(({ f }) => (f.severity || "low") === sev)) dots.appendChild(el("i", "sev-dot " + sev));
       }
       row.appendChild(dots);
       row.appendChild(el("span", "rn-count", String(fg.length)));
@@ -3754,6 +3754,25 @@ function renderBeatboard() {
     meta.appendChild(el("span", "scene-page-est", `≈ ${c.page_estimate || 0} min`));
     if (c.your_notes) meta.appendChild(el("span", "bb-note-count", `${c.your_notes} note${c.your_notes > 1 ? "s" : ""}`));
     card.appendChild(meta);
+    // finding flags: which scenes are bleeding — open findings only (addressed
+    // ones are done; that's the Revision view's story). Same severity-dot
+    // language as the Revision navigator, so the dots mean one thing everywhere.
+    const openForScene = [];
+    (state.findings || []).forEach((f, index) => {
+      if (state.findingStatus[index] === "addressed") return;
+      if ((f.scene_refs || []).includes(num)) openForScene.push(f);
+    });
+    if (openForScene.length) {
+      const flags = el("div", "bb-card-findings");
+      flags.title = `${openForScene.length} open finding${openForScene.length === 1 ? "" : "s"} in this scene`;
+      const dots = el("span", "sev-dots");
+      for (const sev of ["high", "medium", "low"]) {
+        if (openForScene.some((f) => (f.severity || "low") === sev)) dots.appendChild(el("i", "sev-dot " + sev));
+      }
+      flags.appendChild(dots);
+      flags.appendChild(el("span", "bb-find-count", `${openForScene.length} open`));
+      card.appendChild(flags);
+    }
     const moves = el("div", "bb-card-moves");
     const upBtn = el("button", "bb-move", "↑");
     upBtn.type = "button";
