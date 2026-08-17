@@ -2444,6 +2444,30 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   .revision-findings { width: auto; min-width: 0; border-left: none; border-top: 1px solid var(--line-soft); max-height: 40%; }
 }
 
+/* ---- Spotlight mode: nothing but the page ----
+   The power mode: project bar, script toolbar, rail tab, gutter and drawer
+   all vanish; the manuscript owns the screen. The status strip keeps only
+   what a session uses — project/room orientation, the sprint timer, the
+   mood toggle. Everything else is one ⌘K or one key away. */
+.spotlight-mode #project-bar,
+.spotlight-mode #script-toolbar,
+.spotlight-mode #draft-bar,
+.spotlight-mode #diff-banner,
+.spotlight-mode #rail-edge-tab,
+.spotlight-mode .gutter,
+.spotlight-mode #room-drawer,
+.spotlight-mode .craft-shelf,
+.spotlight-mode .script-level-notes { display: none !important; }
+
+/* the manuscript breathes — wider pages, no toolbar crowding above */
+.spotlight-mode #script-scenes { padding-top: 26px; }
+.spotlight-mode #script-scenes .scene-page { max-width: 720px; }
+
+/* the status strip dims to a whisper: only the session companions stay lit */
+.spotlight-mode .status-strip { background: transparent; border-top-color: transparent; }
+.spotlight-mode .status-strip .status-item:not(#status-project):not(#sprint-timer):not(#status-elapsed):not(#status-dawn) { opacity: 0.45; }
+.status-project { font-weight: 600; letter-spacing: 0.02em; }
+
 /* ============================================================
    Dawn — draw the curtains: a warm morning room
    ============================================================ */

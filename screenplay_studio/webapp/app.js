@@ -956,7 +956,41 @@ function markCurrentLine() {
     if (d < bestDist) { bestDist = d; best = l; }
   }
   lines.forEach((l) => l.classList.toggle("focus-line", l === best));
-}// ---- Sprint timer: a 25-minute writing sprint in the status strip ----
+}// ---- Spotlight mode: nothing but the page ----
+// The "power mode" from the layout review, critically scoped: the app
+// already had the palette + focus mode, so this adds only what Spotlight
+// uniquely means — TOTAL chrome removal. project-bar, script toolbar, rail
+// tab, gutter and drawer all vanish; the manuscript owns the screen; the
+// status strip keeps only what a writer actually uses in a session (the
+// sprint timer + project/room orientation). Everything else is one ⌘K or
+// one key away. z toggles, Esc leaves.
+function enterSpotlight() {
+  if (document.body.classList.contains("spotlight-mode")) return;
+  closeRoomDrawer();
+  document.body.classList.add("spotlight-mode");
+  const proj = $("#status-project");
+  if (proj) {
+    const room = state.view === "feedback" ? "Consultant" : state.inIdea ? "Idea room" : "Sameer";
+    proj.textContent = `${state.currentProject || ""} · ${room} · Esc to leave`;
+    proj.style.display = "inline";
+  }
+}
+
+function exitSpotlight() {
+  document.body.classList.remove("spotlight-mode");
+  const proj = $("#status-project");
+  if (proj) proj.style.display = "none";
+}
+
+function toggleSpotlight() {
+  // spotlight is a manuscript-surface mode — full-screen tools (revision,
+  // beat board, compare) supersede it, so it only toggles in the rooms
+  if (state.view !== "cowrite" && state.view !== "feedback") return;
+  if (document.body.classList.contains("spotlight-mode")) exitSpotlight();
+  else enterSpotlight();
+}
+
+// ---- Sprint timer: a 25-minute writing sprint in the status strip ----
 // Click to start/pause, double-click to reset. The running sprint survives a
 // reload (the strip keeps counting in the background — it's a real timer,
 // not a page-scoped toy).
@@ -3439,6 +3473,7 @@ let compareFrom = "original";
 
 async function openCompareView() {
   if (state.view === "compare") return;
+  exitSpotlight();
   state.view = "compare";
   hideAllViews();
   $("#compare-view").style.display = "flex";
@@ -3519,6 +3554,7 @@ let revisionPrevRoom = "cowrite";
 
 async function openRevisionView() {
   if (state.view === "revision") return;
+  exitSpotlight();
   revisionPrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
   state.view = "revision";
   hideAllViews();
@@ -3708,6 +3744,7 @@ let bbDirty = false;
 
 async function openBeatboardView() {
   if (state.view === "beatboard") return;
+  exitSpotlight();
   state.view = "beatboard";
   hideAllViews();
   $("#beatboard-view").style.display = "flex";
@@ -4011,7 +4048,8 @@ const SHORTCUTS = [
   ["s", "Focus the manuscript — dismiss the partner, back to the page"],
   ["a", "Toggle the Craft shelf (analysis panels)"],
   ["r", "Toggle the Structure rail"],
-  ["Esc", "Dismiss — partner drawer → craft shelf → structure rail"],
+  ["z", "Spotlight mode — nothing but the page (Esc leaves)"],
+  ["Esc", "Leave spotlight → dismiss partner drawer → craft shelf → structure rail"],
   ["b", "Open the Beat Board"],
   ["d", "Compare drafts side by side"],
   ["j / n", "Next scene (script view)"],
@@ -4027,6 +4065,7 @@ function paletteCommands() {
     { type: "command", label: "Open the Beat Board", keys: "b", run: () => openBeatboardView() },
     { type: "command", label: "Compare drafts side by side", keys: "d", run: () => { if (state.currentProject) openCompareView(); } },
     { type: "command", label: "Open the Revision view", keys: "v", run: () => { if (state.currentProject) openRevisionView(); } },
+    { type: "command", label: "Spotlight mode — nothing but the page", keys: "z", run: () => { if (state.currentProject) toggleSpotlight(); } },
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
     { type: "command", label: "Start a new page", keys: "", run: () => { $("#new-project-btn").click(); } },
     { type: "command", label: "Focus the conversation", keys: "", run: () => { openCowriteRoom(); setTimeout(() => $("#input").focus(), 60); } },
@@ -4092,10 +4131,34 @@ function closePalette() {
   if (input) input.blur();
 }
 
+// Spotlight-style fuzzy ranking: subsequence match with bonuses for
+// adjacency and word starts. 'rv' finds "Open the Revision view"; a plain
+// substring match scores highest (100+), then true fuzzy matches by score.
+function fuzzyScore(q, label) {
+  if (!q) return 1;
+  const s = label.toLowerCase();
+  if (s.includes(q)) return 100 + s.length - q.length;
+  let qi = 0;
+  let score = 0;
+  let prev = -2;
+  for (let i = 0; i < s.length && qi < q.length; i++) {
+    if (s[i] !== q[qi]) continue;
+    score += i === prev + 1 ? 2 : 1;
+    if (i === 0 || s[i - 1] === " " || s[i - 1] === "-") score += 5;
+    prev = i;
+    qi++;
+  }
+  return qi === q.length ? score : 0;
+}
+
 function renderPalette() {
   const q = ($("#palette-input").value || "").trim().toLowerCase();
   const all = paletteHelpMode ? paletteHelp() : [...paletteCommands(), ...paletteScenes()];
-  paletteResults = all.filter((item) => !q || item.label.toLowerCase().includes(q));
+  paletteResults = all
+    .map((item) => ({ item, score: fuzzyScore(q, item.label) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || (all.indexOf(a.item) - all.indexOf(b.item)))
+    .map((x) => x.item);
   paletteIndex = 0;
   const wrap = $("#palette-results");
   wrap.innerHTML = "";
@@ -4188,6 +4251,7 @@ function bindGlobalShortcuts() {
     // Esc — the page wins: dismiss the partner drawer, then the craft shelf,
     // then the structure rail (palette Esc is handled above; modals keep Esc).
     if (e.key === "Escape") {
+      if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
       if (state.view === "revision") { closeRevisionView(); return; }
       const modalOpen = [...document.querySelectorAll(".modal-overlay")].some((m) => m.style.display === "flex");
       if (!modalOpen) {
@@ -4215,6 +4279,7 @@ function bindGlobalShortcuts() {
     else if (e.key === "b" && state.currentProject) { openBeatboardView(); }
     else if (e.key === "d" && state.currentProject) { openCompareView(); }
     else if (e.key === "v" && state.currentProject) { if (state.view === "revision") closeRevisionView(); else openRevisionView(); }
+    else if (e.key === "z" && state.currentProject) { toggleSpotlight(); }
     else if (e.key === "j" || e.key === "n") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(1); } }
     else if (e.key === "k" || e.key === "p") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(-1); } }
   });
