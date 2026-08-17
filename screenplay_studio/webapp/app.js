@@ -636,6 +636,41 @@ function renderIdeaList() {
     row.appendChild(el("span", "idea-mark", "💡"));
     row.appendChild(document.createTextNode(idea.title || "Untitled idea"));
     item.appendChild(row);
+    // inline rename in the shelf — the title is the writer's, always
+    const ren = el("button", "idea-rename", "✎");
+    ren.type = "button";
+    ren.title = "Rename this idea";
+    ren.setAttribute("aria-label", "Rename idea");
+    ren.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      row.innerHTML = "";
+      row.appendChild(el("span", "idea-mark", "💡"));
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = idea.title || "";
+      inp.className = "idea-rename-input";
+      inp.maxLength = 80;
+      row.appendChild(inp);
+      inp.focus();
+      inp.select();
+      const finish = async (save) => {
+        const t = inp.value.trim();
+        if (save && t && t !== idea.title) {
+          try {
+            await api(`/ideas/${encodeURIComponent(idea.id)}/rename`, { method: "POST", body: JSON.stringify({ title: t }) });
+          } catch (err) {
+            showError("Couldn't rename: " + err.message);
+          }
+        }
+        await loadIdeas();
+      };
+      inp.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+        else if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+      });
+      inp.addEventListener("blur", () => finish(true));
+    });
+    item.appendChild(ren);
     const del = el("button", "project-delete", "✕");
     del.type = "button";
     del.title = "Throw this idea away";
@@ -662,6 +697,7 @@ function showWelcomeDesk() {
   state.currentIdea = null;
   state.currentIdeaSession = null;
   state.inIdea = false;
+  document.body.classList.remove("idea-mode");
   closeRoomDrawer();
   $("#welcome-view").style.display = "flex";
   $("#project-bar").style.display = "none";
@@ -731,6 +767,8 @@ async function openIdea(id) {
     state.script = null;
     state.findings = [];
     state.fixQueue = null;
+    state.currentIdeaSession = null; // lazy — created on the first Sameer summon
+    document.body.classList.add("idea-mode"); // no doctor / scripts / shelf chrome
     renderIdeaList();
 
     $("#welcome-view").style.display = "none";
@@ -738,30 +776,128 @@ async function openIdea(id) {
     $("#project-title").textContent = idea.title || "Untitled idea";
     $("#project-title").title = idea.title || "";
 
-    // the premise card replaces the pages
-    $("#premise-pane").style.display = "flex";
-    $("#premise-graduate-btn").style.display = "";
+    // the blank canvas replaces the pages — and the premise form (that form
+    // belongs to the script desk's premise card; ideas get a page)
+    $("#premise-pane").style.display = "none";
+    $("#idea-canvas").style.display = "flex";
     $("#script-toolbar").style.display = "none";
     $("#script-scenes").style.display = "none";
     $("#draft-bar").style.display = "none";
     $("#premise-btn").style.display = "none";
-    populatePremiseFields(idea.card || {});
+    populateIdeaCanvas(idea);
 
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "flex";
     setRoom("cowrite");
-    // the idea room is a conversation — Sameer (or the premise doctor) rides
-    // along in the drawer from the first moment, beside the premise card
-    openRoomDrawer();
-
-    if (!state.currentIdeaSession) {
-      const res = await api(`/ideas/${encodeURIComponent(id)}/chat/start`, { method: "POST" });
-      state.currentIdeaSession = res.session_id;
-    }
-    await loadIdeaSession(state.currentIdeaSession);
+    closeRoomDrawer(); // Sameer stays OFF the stage until the writer summons him
     saveSession();
   } catch (e) {
     showError("Couldn't open the idea: " + e.message);
+  }
+}
+
+// ---- the idea page: a blank canvas, autosaved, self-titled ----
+
+function populateIdeaCanvas(idea) {
+  $("#idea-title-input").value = idea.title || "Untitled idea";
+  $("#idea-content").value = idea.content || "";
+  const card = idea.card || {};
+  $("#idea-logline").value = card.logline || "";
+  $("#idea-questions").value = (card.questions || []).join("\n");
+}
+
+let ideaSaveTimer = null;
+
+function handleIdeaContentInput() {
+  // the /sameer command: a first line of "/sameer" (or "/sameer <ask>")
+  // summons the chat for THIS idea; anything after the command pre-fills the
+  // composer, the rest of the page stays on the page
+  const lines = $("#idea-content").value.split("\n");
+  const m = lines[0].match(/^\/sameer(?:\s+(.+))?$/);
+  if (m) {
+    $("#idea-content").value = lines.slice(1).join("\n");
+    summonIdeaSam((m[1] || "").trim());
+    return;
+  }
+  scheduleIdeaSave();
+}
+
+function scheduleIdeaSave() {
+  clearTimeout(ideaSaveTimer);
+  ideaSaveTimer = setTimeout(saveIdeaContent, 1200);
+}
+
+async function saveIdeaContent() {
+  clearTimeout(ideaSaveTimer);
+  if (!state.currentIdea || !state.inIdea) return;
+  const content = $("#idea-content").value;
+  try {
+    const res = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/content`, { method: "POST", body: JSON.stringify({ content }) });
+    state.currentIdea.content = content;
+    if (res && res.auto_title) {
+      state.currentIdea.title = res.title;
+      $("#idea-title-input").value = res.title;
+      $("#project-title").textContent = res.title;
+      $("#project-title").title = res.title;
+    }
+    await loadIdeas(); // keep the shelf in sync (auto-title / rename)
+  } catch (_) { /* autosave must never interrupt writing */ }
+}
+
+async function renameIdea(title) {
+  if (!state.currentIdea) return;
+  try {
+    const res = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/rename`, { method: "POST", body: JSON.stringify({ title }) });
+    state.currentIdea.title = res.title;
+    $("#idea-title-input").value = res.title;
+    $("#project-title").textContent = res.title;
+    $("#project-title").title = res.title;
+    await loadIdeas();
+  } catch (e) {
+    showError("Couldn't rename the idea: " + e.message);
+  }
+}
+
+async function summonIdeaSam(prefill) {
+  if (!state.currentIdea) return;
+  try {
+    if (!state.currentIdeaSession) {
+      const res = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/chat/start`, { method: "POST" });
+      state.currentIdeaSession = res.session_id;
+    }
+    await loadIdeaSession(state.currentIdeaSession);
+    openRoomDrawer();
+    $("#idea-explore").style.display = "";
+    const input = $("#input");
+    if (prefill) { input.value = prefill; }
+    input.focus();
+  } catch (e) {
+    showError("Couldn't start the conversation: " + e.message);
+  }
+}
+
+function toggleIdeaStructure() {
+  const panel = $("#idea-structure-panel");
+  const open = panel.style.display === "flex";
+  panel.style.display = open ? "none" : "flex";
+  $("#idea-structure-btn").textContent = open ? "▸ Structure" : "▾ Structure";
+}
+
+async function saveIdeaStructure() {
+  if (!state.currentIdea) return;
+  const card = {
+    logline: $("#idea-logline").value.trim(),
+    questions: $("#idea-questions").value.split("\n").map((s) => s.trim()).filter(Boolean),
+  };
+  try {
+    const meta = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/card`, { method: "POST", body: JSON.stringify({ card }) });
+    state.currentIdea.card = meta.card;
+    const b = $("#idea-structure-save");
+    const old = b.textContent;
+    b.textContent = "Saved ✓";
+    setTimeout(() => { b.textContent = old; }, 1400);
+  } catch (e) {
+    showError("Couldn't save the structure: " + e.message);
   }
 }
 
@@ -823,12 +959,12 @@ function togglePremisePane() {
 }
 
 async function graduateIdea(file) {
-  const btn = $("#premise-graduate-btn");
+  const btn = $("#idea-graduate-btn");
   btn.disabled = true;
   btn.textContent = "Parsing the pages…";
   const form = new FormData();
   form.append("file", file);
-  form.append("title", $("#premise-title").value.trim() || file.name.replace(/\.[^.]+$/, ""));
+  form.append("title", $("#idea-title-input").value.trim() || file.name.replace(/\.[^.]+$/, ""));
   try {
     await savePremise(false);
     const project = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/graduate`, { method: "POST", body: form });
@@ -1158,6 +1294,7 @@ async function openProject(name) {
     state.inIdea = false;
     state.currentIdea = null;
     state.currentIdeaSession = null;
+    document.body.classList.remove("idea-mode");
     state.currentProject = name;
     state.script = null;
     state.findings = [];
@@ -1316,6 +1453,10 @@ function openCowriteRoom() {
 }
 
 function openFeedbackRoom() {
+  // idea phase has no doctor — there's only Sameer here; feedback is a
+  // script-desk room. (The room toggle and gutter tab are hidden in idea
+  // mode; this guards the keyboard and palette paths too.)
+  if (state.inIdea) { openCowriteRoom(); return; }
   if (state.view === "feedback") { openRoomDrawer(); return; }
   setRoom("feedback");
   if (state.inIdea) { renderMessages(); openRoomDrawer(); return; }
@@ -1580,7 +1721,7 @@ async function clearChat() {
   const sid = state.currentSession;
   if (!project) return;
   const label = sid ? "this conversation" : "the empty page";
-  if (!confirm(`Erase ${label} with ${state.inIdea ? "Sameer and the premise doctor" : "Sameer"} and start fresh?\n\nThe relationship notes are kept — only the chat history goes.`)) return;
+  if (!confirm(`Erase ${label} with Sameer and start fresh?\n\nThe relationship notes are kept — only the chat history goes.`)) return;
   try {
     if (sid) {
       const base = state.inIdea
@@ -2328,19 +2469,28 @@ function sendPrefilled(text) {
 }
 
 function wireExploreChips() {
-  const wrap = document.getElementById("premise-explore");
-  if (!wrap) return;
-  wrap.querySelectorAll(".explore-chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const prompt = (chip.dataset.prompt || "").trim();
-      if (!prompt) return;
-      if (!state.currentIdea && !state.currentProject) {
-        showError("Open an idea first — the explore paths need a card to work with.");
-        return;
-      }
-      sendPrefilled(prompt);
+  const wire = (wrap) => {
+    if (!wrap) return;
+    wrap.querySelectorAll(".explore-chip").forEach((chip) => {
+      chip.addEventListener("click", async () => {
+        const prompt = (chip.dataset.prompt || "").trim();
+        if (!prompt) return;
+        if (state.inIdea && state.currentIdea) {
+          // idea phase: chips live in the Sameer chat — summon it, then send
+          await summonIdeaSam();
+          sendPrefilled(prompt);
+          return;
+        }
+        if (!state.currentProject) {
+          showError("Open an idea first — the explore paths need a page to work with.");
+          return;
+        }
+        sendPrefilled(prompt);
+      });
     });
-  });
+  };
+  wire(document.getElementById("premise-explore"));
+  wire(document.getElementById("idea-explore"));
 }
 
 // ---------- chat input history (↑/↓ like Claude / the shell) ----------
@@ -4363,6 +4513,18 @@ function init() {
   $("#premise-file-input").addEventListener("change", () => {
     if ($("#premise-file-input").files[0]) graduateIdea($("#premise-file-input").files[0]);
     $("#premise-file-input").value = "";
+  });
+  // idea canvas: the blank page, autosaved; /sameer; the pill; structure
+  $("#idea-content").addEventListener("input", handleIdeaContentInput);
+  $("#idea-content").addEventListener("blur", saveIdeaContent);
+  $("#idea-title-input").addEventListener("change", () => renameIdea($("#idea-title-input").value.trim()));
+  $("#idea-sam-pill").addEventListener("click", () => summonIdeaSam());
+  $("#idea-structure-btn").addEventListener("click", toggleIdeaStructure);
+  $("#idea-structure-save").addEventListener("click", saveIdeaStructure);
+  $("#idea-graduate-btn").addEventListener("click", () => $("#idea-file-input").click());
+  $("#idea-file-input").addEventListener("change", () => {
+    if ($("#idea-file-input").files[0]) graduateIdea($("#idea-file-input").files[0]);
+    $("#idea-file-input").value = "";
   });
   $("#premise-btn").addEventListener("click", togglePremisePane);
 

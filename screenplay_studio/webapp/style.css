@@ -2444,6 +2444,151 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   .revision-findings { width: auto; min-width: 0; border-left: none; border-top: 1px solid var(--line-soft); max-height: 40%; }
 }
 
+/* ---- idea canvas: a blank page, not a form ----
+   The idea phase is free-form: an open page that autosaves and titles
+   itself. Sameer is a floating pill (or /sameer) — off the stage until
+   summoned. In idea mode the doctor/scripts/shelf chrome is gone entirely. */
+.idea-canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  padding: 22px 28px 70px;
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+}
+.idea-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.idea-title-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-typewriter);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 2px 0;
+}
+.idea-title-input:focus { border-bottom: 1px dashed var(--accent); }
+.idea-structure-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.idea-structure-btn:hover { color: var(--text); background: rgba(232, 162, 79, 0.08); }
+.idea-content {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  margin-top: 18px;
+  font-family: var(--font-typewriter);
+  font-size: 17px;
+  line-height: 1.8;
+  color: var(--text);
+  caret-color: var(--accent);
+}
+.idea-content::placeholder { color: var(--text-faint); }
+.idea-structure-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  margin-top: 12px;
+  background: rgba(232, 162, 79, 0.05);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+.idea-structure-panel .premise-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-muted); }
+.idea-structure-panel textarea {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-typewriter);
+  font-size: 14px;
+  color: var(--text);
+  resize: vertical;
+}
+.idea-sam-pill {
+  position: absolute;
+  right: 10px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 162, 79, 0.4);
+  background: rgba(30, 26, 20, 0.85);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.idea-sam-pill:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.6); }
+.idea-sam-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(232, 162, 79, 0.2); }
+.idea-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed var(--accent);
+  outline: none;
+  color: var(--text);
+  font-size: 13.5px;
+  padding: 1px 2px;
+}
+.idea-rename {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.idea-item:hover .idea-rename { opacity: 1; }
+.idea-rename:hover { color: var(--accent); }
+
+/* idea phase: no doctor, no scripts shelf, no structure rail — the page only */
+body.idea-mode #room-toggle,
+body.idea-mode .gutter,
+body.idea-mode #rail-edge-tab { display: none !important; }
+
+/* explore chips live inside the Sameer chat sheet, not on the blank page */
+.idea-explore { padding: 0 12px 8px; }
+.idea-explore .explore-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.idea-explore .explore-chip {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.idea-explore .explore-chip:hover { color: var(--accent); border-color: rgba(232, 162, 79, 0.5); }
+
 /* ---- Spotlight mode: nothing but the page ----
    The power mode: project bar, script toolbar, rail tab, gutter and drawer
    all vanish; the manuscript owns the screen. The status strip keeps only

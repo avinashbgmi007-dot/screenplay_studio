@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
 <!-- v2e607ed — bump the version query whenever style.css/app.js change so
      browsers never revalidate into a stale sheet (no-cache only revalidates
-     against the browser's own copy; a versioned URL forces a fresh fetch). -->  <link rel="stylesheet" href="style.css?v=sp1a2b3">
+     against the browser's own copy; a versioned URL forces a fresh fetch). -->  <link rel="stylesheet" href="style.css?v=id1a2b3">
 </head>
 <body data-room="cowrite">
 
@@ -197,6 +197,32 @@
           </div>
         </div>
 
+        <!-- Idea canvas: a blank page, not a form. The idea phase is free-form
+             — you type whatever comes; it autosaves and titles itself. Sameer is
+             OPTIONAL: the floating pill (or /sameer) summons a chat dedicated to
+             this idea alone. The structured logline/questions live behind the
+             Structure toggle, out of the way. No doctor, no scripts, no shelf
+             here. -->
+        <div id="idea-canvas" class="idea-canvas" style="display:none;">
+          <div class="idea-head">
+            <input id="idea-title-input" class="idea-title-input" type="text" value="" maxlength="80" spellcheck="false" aria-label="Idea title" title="Click to rename">
+            <button id="idea-structure-btn" class="idea-structure-btn" type="button" title="The structured logline / open-questions view — kept out of the way">▸ Structure</button>
+            <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script">📄 First pages</button>
+            <input type="file" id="idea-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
+          </div>
+          <textarea id="idea-content" class="idea-content" spellcheck="false" aria-label="The idea page"></textarea>
+          <div id="idea-structure-panel" class="idea-structure-panel" style="display:none;">
+            <label class="premise-field">Logline
+              <textarea id="idea-logline" rows="2" placeholder="One or two sentences that sell the idea."></textarea>
+            </label>
+            <label class="premise-field">Open questions
+              <textarea id="idea-questions" rows="3" placeholder="What you're still circling — one per line."></textarea>
+            </label>
+            <button id="idea-structure-save" class="btn-secondary btn-small" type="button">Save structure</button>
+          </div>
+          <button id="idea-sam-pill" class="idea-sam-pill" type="button" title="Talk to Sameer about this idea — the chat carries the whole page">Sameer</button>
+        </div>
+
         <div id="script-toolbar" class="script-toolbar">
           <input id="script-search" type="search" placeholder="Search the script… (e.g. a character, a prop, a line)" aria-label="Search script text">
           <div id="finding-summary" class="finding-summary"></div>
@@ -252,6 +278,16 @@
           <button id="clear-chat-btn" class="btn-secondary btn-small" title="Erase this conversation and start a fresh page — Sameer's notes on you are kept" type="button">🗑 Clear chat</button>
         </div>
         <div id="messages" class="messages"><div id="messages-scroll" class="messages-scroll"></div></div>
+        <div id="idea-explore" class="idea-explore" style="display:none;">
+          <span class="premise-explore-label">Explore paths — one tap, Sameer runs with it:</span>
+          <div class="explore-chips">
+            <button type="button" class="explore-chip" data-prompt="Give me 3 unexpected 'what if' twists on this idea — each one pushing it in a different genre direction. Keep each to a sentence.">🔮 What if…?</button>
+            <button type="button" class="explore-chip" data-prompt="Who is this really about? Name the protagonist, what they want more than anything, and what they're afraid of losing. Then tell me why I should care in one line.">🎭 Who's the heart?</button>
+            <button type="button" class="explore-chip" data-prompt="Where is the conflict hiding in this idea? Show me 3 pressure points that could drive whole scenes, and which one is the strongest.">⚔️ Where's the heat?</button>
+            <button type="button" class="explore-chip" data-prompt="How could this open on screen in the first 60 seconds? Give me 2-3 cold open options that hook without exposition.">📽️ Cold open</button>
+            <button type="button" class="explore-chip" data-prompt="What's the riskiest, boldest version of this idea? Push past the safe version and show me what it becomes.">🧨 Push it further</button>
+          </div>
+        </div>
         <form id="composer" class="composer">
           <div id="quote-card" class="quote-card" hidden></div>
           <div id="history-pop" class="history-pop" role="listbox" aria-label="Previous messages" hidden></div>
@@ -451,6 +487,6 @@
       <button id="fork-save" class="btn-primary">Create fork</button>
     </div>
   </div>
-</div>  <script src="app.js?v=sp1a2b4"></script>
+</div>  <script src="app.js?v=id1a2b4"></script>
 </body>
 </html>

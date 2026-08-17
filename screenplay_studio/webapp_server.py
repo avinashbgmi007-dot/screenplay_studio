@@ -1578,20 +1578,23 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
     # Idea chats run on the same short turn clock as script chats (watchdog).
     client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id,
                                timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
+    # Isolation (writer-first rule): the idea chat knows ONLY this idea — the
+    # free-form page + the conversation. The past-scripts library digest is
+    # deliberately NOT injected (no cross-idea content leakage until the
+    # writer brings it up). Sameer's learned TONE is kept: the relationship
+    # memory carries how the writer likes to work, never idea content, and
+    # memory_scope pins observations to this idea.
     memory = None
     try:
         mem_mod = _import_cowriter("memory")
         memory = mem_mod.WriterMemory.load(os.path.join(PROJECTS_DIR, "writer_profile.json"))
     except (CowriterUnavailableError, OSError, ValueError):
         memory = None  # memory unavailable or unreadable — never break the chat
-    try:
-        lib_mod = _import_cowriter("writer_library")
-        lib_text = lib_mod.library_digest_text(_writer_library())
-    except Exception:
-        lib_text = None
+    premise = dict(meta.get("card") or {})
+    premise["content"] = meta.get("content") or ""
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
-                            premise=meta.get("card") or {},
-                            memory_scope=f"idea:{idea_id}", writer_library_text=lib_text)
+                            premise=premise,
+                            memory_scope=f"idea:{idea_id}", writer_library_text=None)
     return session, engine, store
 
 
@@ -1627,6 +1630,31 @@ def get_idea(idea_id):
         return jsonify(_load_idea(idea_id))
     except FileNotFoundError:
         return _error("Idea not found.", 404)
+
+
+@app.route("/api/ideas/<idea_id>/content", methods=["POST"])
+def save_idea_content(idea_id):
+    """Save the free-form idea page (autosaved, debounced, from the canvas).
+    The shelf title follows the page's first line until the writer renames."""
+    try:
+        _load_idea(idea_id)
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+    body = request.get_json() or {}
+    meta = IdeaStore(_ideas_dir()).save_content(idea_id, body.get("content") or "")
+    return jsonify({"title": meta["title"], "auto_title": meta.get("auto_title", True)})
+
+
+@app.route("/api/ideas/<idea_id>/rename", methods=["POST"])
+def rename_idea(idea_id):
+    """A deliberate rename — stops the auto-title from the page's first line."""
+    try:
+        _load_idea(idea_id)
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+    body = request.get_json() or {}
+    meta = IdeaStore(_ideas_dir()).rename(idea_id, body.get("title") or "")
+    return jsonify({"title": meta["title"], "auto_title": False})
 
 
 @app.route("/api/ideas/<idea_id>/card", methods=["POST"])

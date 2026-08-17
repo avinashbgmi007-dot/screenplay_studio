@@ -104,6 +104,39 @@ class TestIdeaStore:
         assert os.path.exists(os.path.join(project_dir, "sessions", "abc123.json"))
 
 
+class TestIdeaPage:
+    def test_save_content_auto_titles_from_first_line(self, tmp_path):
+        store = IdeaStore(str(tmp_path / "ideas"))
+        meta = store.create(title="New idea")
+        meta = store.save_content(meta["id"], "A lighthouse keeper finds a girl's diary\n\nIt changes everything.")
+        assert meta["title"] == "A lighthouse keeper finds a girl's diary"
+        assert meta["auto_title"] is True
+        # the chat sees the working title too (card stays in sync)
+        assert store.load(meta["id"])["card"]["title"] == meta["title"]
+
+    def test_rename_stops_auto_title(self, tmp_path):
+        store = IdeaStore(str(tmp_path / "ideas"))
+        meta = store.create(title="New idea")
+        store.save_content(meta["id"], "First line drives the title")
+        meta = store.rename(meta["id"], "My deliberate title")
+        assert meta["title"] == "My deliberate title"
+        assert meta["auto_title"] is False
+        # content changes no longer override a deliberate rename
+        meta = store.save_content(meta["id"], "A brand new first line now")
+        assert meta["title"] == "My deliberate title"
+
+    def test_carry_into_project_includes_page_content(self, tmp_path):
+        store = IdeaStore(str(tmp_path / "ideas"))
+        meta = store.create(title="Embers")
+        store.save_content(meta["id"], "The page material — the notes the idea grew from.")
+        project_dir = tmp_path / "proj"
+        os.makedirs(project_dir, exist_ok=True)
+        store.carry_into_project(meta["id"], str(project_dir))
+        with open(os.path.join(project_dir, "premise.json"), encoding="utf-8") as f:
+            premise = json.load(f)
+        assert premise["content"] == "The page material — the notes the idea grew from."
+
+
 class TestIdeaPrompt:
     def test_premise_framing(self):
         prompt = build_system_prompt(
@@ -130,6 +163,26 @@ class TestIdeaPrompt:
         from screenplay_cowriter.personas import PERSONAS, MODES
         assert "premise_doctor" in PERSONAS
         assert "concept_validation" in MODES
+
+    def test_page_content_framed_in_prompt(self):
+        prompt = build_system_prompt(
+            ScriptContext(None), ReportContext(None), "writing_partner", "peer",
+            premise={"title": "Embers", "content": "A lighthouse keeper finds a girl's diary."},
+        )
+        assert "THE PAGE" in prompt
+        assert "A lighthouse keeper finds a girl's diary" in prompt
+
+    def test_page_content_capped(self):
+        from screenplay_cowriter.context import MAX_PAGE_CONTENT_CHARS
+        long = "HEAD_MARKER_" + "x" * (MAX_PAGE_CONTENT_CHARS + 1000) + "_TAIL_MARKER"
+        prompt = build_system_prompt(
+            ScriptContext(None), ReportContext(None), "writing_partner", "peer",
+            premise={"content": long},
+        )
+        # the tail (what the writer is shaping) is kept; the head is cut
+        assert "(earlier notes cut for space)" in prompt
+        assert "HEAD_MARKER_" not in prompt
+        assert "_TAIL_MARKER" in prompt
 
 
 class TestIdeaApi:
@@ -172,6 +225,28 @@ class TestIdeaApi:
     def test_unknown_idea_404s(self, http_client):
         assert http_client.get("/api/ideas/nope").status_code == 404
         assert http_client.post("/api/ideas/nope/card", json={"card": {}}).status_code == 404
+        assert http_client.post("/api/ideas/nope/content", json={"content": "x"}).status_code == 404
+        assert http_client.post("/api/ideas/nope/rename", json={"title": "x"}).status_code == 404
+
+    def test_content_and_rename_api(self, http_client):
+        idea_id = self._create(http_client)
+        r = http_client.post(f"/api/ideas/{idea_id}/content", json={"content": "A girl finds a lighthouse\n\nMore notes"})
+        assert r.status_code == 200
+        assert r.get_json()["title"] == "A girl finds a lighthouse"
+        assert r.get_json()["auto_title"] is True
+
+        r = http_client.post(f"/api/ideas/{idea_id}/rename", json={"title": "The Lighthouse Girl"})
+        assert r.status_code == 200
+        assert r.get_json()["title"] == "The Lighthouse Girl"
+
+        meta = http_client.get(f"/api/ideas/{idea_id}").get_json()
+        assert meta["content"] == "A girl finds a lighthouse\n\nMore notes"
+        assert meta["title"] == "The Lighthouse Girl"
+
+        # a deliberate rename is never overridden by later content
+        http_client.post(f"/api/ideas/{idea_id}/content", json={"content": "Something entirely new"})
+        meta = http_client.get(f"/api/ideas/{idea_id}").get_json()
+        assert meta["title"] == "The Lighthouse Girl"
 
     def test_graduate_idea(self, http_client):
         """Upload the first pages: a real project appears carrying the premise

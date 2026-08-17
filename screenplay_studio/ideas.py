@@ -24,6 +24,12 @@ import uuid
 
 EMPTY_CARD = {"title": "", "logline": "", "premise": "", "questions": []}
 
+# The idea page is a blank canvas, not a form: free-form `content` is the
+# primary material. The structured card stays for the (hidden) structure
+# view and backward-compat; `auto_title` means the shelf title follows the
+# page's first line until the writer renames it by hand.
+MAX_AUTO_TITLE_LEN = 48
+
 
 class IdeaStore:
     def __init__(self, ideas_dir: str):
@@ -54,6 +60,8 @@ class IdeaStore:
             "created_at": time.time(),
             "updated_at": time.time(),
             "card": dict(EMPTY_CARD),
+            "content": "",
+            "auto_title": True,
         }
         self._write(idea_id, meta)
         return meta
@@ -66,6 +74,42 @@ class IdeaStore:
         meta["updated_at"] = time.time()
         with open(self._meta_path(idea_id), "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def auto_title_from(content: str) -> str:
+        """The working title grows out of the page: the first non-empty line,
+        stripped of markdown decoration, truncated. Empty page -> Untitled."""
+        for line in (content or "").splitlines():
+            line = line.strip().lstrip("#*- ").strip()
+            if line:
+                return line[:MAX_AUTO_TITLE_LEN].rstrip() or "Untitled idea"
+        return "Untitled idea"
+
+    def save_content(self, idea_id: str, content: str) -> dict:
+        """Save the free-form page. While the title is auto (the writer hasn't
+        renamed by hand), the shelf title follows the page's first line and
+        the card's working title stays in sync so the chat sees it."""
+        meta = self.load(idea_id)
+        meta["content"] = content or ""
+        if meta.get("auto_title", True):
+            meta["title"] = self.auto_title_from(meta["content"])
+            card = dict(meta.get("card") or EMPTY_CARD)
+            card["title"] = meta["title"]
+            meta["card"] = card
+        self._write(idea_id, meta)
+        return meta
+
+    def rename(self, idea_id: str, title: str) -> dict:
+        """A deliberate rename — from here the title is the writer's, and the
+        page's first line stops overriding it."""
+        meta = self.load(idea_id)
+        meta["title"] = (title or "").strip() or "Untitled idea"
+        meta["auto_title"] = False
+        card = dict(meta.get("card") or EMPTY_CARD)
+        card["title"] = meta["title"]
+        meta["card"] = card
+        self._write(idea_id, meta)
+        return meta
 
     def save_card(self, idea_id: str, card: dict) -> dict:
         """Merge the incoming card fields into the stored card (partial saves
@@ -105,7 +149,10 @@ class IdeaStore:
         """Copy the premise card and the idea's conversation into a real
         project so the thread survives the move to the script desk."""
         meta = self.load(idea_id)
-        card = meta.get("card") or EMPTY_CARD
+        card = dict(meta.get("card") or EMPTY_CARD)
+        # the blank page is the primary material — carry it too, so the script
+        # desk keeps the notes the idea grew from
+        card["content"] = meta.get("content") or ""
         with open(os.path.join(project_dir, "premise.json"), "w", encoding="utf-8") as f:
             json.dump(card, f, ensure_ascii=False, indent=2)
         src = self.sessions_dir(idea_id)

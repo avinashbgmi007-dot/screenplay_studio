@@ -209,10 +209,17 @@ class ReportContext:
         return "\n\n".join(parts) if parts else "(No report loaded — discussing the raw script only.)"
 
 
+# The idea page's free-form notes, capped so a long canvas can't blow the
+# prompt; the tail is what the writer is currently shaping, which matters
+# most for the conversation.
+MAX_PAGE_CONTENT_CHARS = 6000
+
+
 def _premise_block(card: dict | None) -> str:
-    """The premise card as compact context: the shared, growing note the idea
-    room keeps on the desk. Empty parts are dropped so a fresh card doesn't
-    pad the prompt with blanks."""
+    """The idea page as compact context: the shared, growing note the idea
+    room keeps on the desk. The free-form page is the primary material;
+    the structured card (logline/questions) rides behind it. Empty parts
+    are dropped so a fresh page doesn't pad the prompt with blanks."""
     card = card or {}
     parts = []
     title = (card.get("title") or "").strip()
@@ -221,13 +228,18 @@ def _premise_block(card: dict | None) -> str:
     questions = [str(q).strip() for q in (card.get("questions") or []) if str(q).strip()]
     if title:
         parts.append(f"Working title: {title}")
+    content = (card.get("content") or "").strip()
+    if content:
+        if len(content) > MAX_PAGE_CONTENT_CHARS:
+            content = "…(earlier notes cut for space)…\n" + content[-MAX_PAGE_CONTENT_CHARS:]
+        parts.append("THE PAGE — the writer's free-form notes, as they stand:\n\n" + content)
     if logline:
         parts.append(f"Logline: {logline}")
     if premise:
         parts.append(f"Premise: {premise}")
     if questions:
         parts.append("Open questions: " + " | ".join(questions))
-    return "\n".join(parts) if parts else "(The premise card is empty so far — you're shaping it together.)"
+    return "\n".join(parts) if parts else "(The page is empty so far — you're shaping the idea together.)"
 
 
 def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, persona: str, mode: str,
