@@ -1249,6 +1249,7 @@ function setRoom(room) {
     applyIdeaLens(room);
     $("#beatboard-view").style.display = "none";
     $("#compare-view").style.display = "none";
+    $("#revision-view").style.display = "none";
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "flex";
     saveSession();
@@ -1266,6 +1267,7 @@ function setRoom(room) {
   // closing a full-screen tool returns to the active room
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
+  $("#revision-view").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "flex";
   saveSession();
@@ -1487,6 +1489,34 @@ async function runAnalysis() {
     btn.textContent = "Run Analysis";
     showError("Analysis failed: " + e.message, true);
     appendSystemNote("Analysis failed: " + e.message, true);
+  }
+}
+
+async function reparseProject() {
+  // In-app re-parse: re-runs the parser on the active source file. This is
+  // the fix for a mis-parsed script — formatting/classification errors show
+  // up in the pane and poison the report, so re-parsing then re-running
+  // analysis regenerates everything from a clean parse.
+  const btn = $("#reparse-btn");
+  const project = state.currentProject;
+  if (!project) return;
+  if (!confirm(`Re-parse "${project}" from its source file?\n\nThe script is re-parsed with the current parser and the analysis is reset — Run Analysis again to regenerate the report and fix queue.`)) return;
+  btn.disabled = true;
+  try {
+    await api(`/projects/${encodeURIComponent(project)}/reparse`, { method: "POST" });
+    appendSystemNote("Script re-parsed. The analysis was reset — Run Analysis to regenerate the report from the fresh parse.");
+    await loadProjects();
+    await loadScriptData();
+    renderScriptView();
+    const ab = $("#analyze-btn");
+    if (ab) { ab.textContent = "Run Analysis"; ab.disabled = false; }
+    if (state.view === "feedback") loadFeedbackPanels();
+    refreshMetrics();
+  } catch (e) {
+    showError("Re-parse failed: " + e.message, true);
+    appendSystemNote("Re-parse failed: " + e.message, true);
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -1744,6 +1774,31 @@ function findingTargetScene(f) {
 function locateFinding(f, index) {
   const scene = findingTargetScene(f);
   if (scene == null) { showError("This finding isn't tied to a specific scene."); return; }
+  // in the revision view, stay inside it — jump the revision column instead
+  // of yanking the writer back to the workspace
+  if (state.view === "revision") {
+    jumpRevisionScene(scene);
+    const quote = (f.evidence_quote || "").trim();
+    if (quote) {
+      const q = normText(quote);
+      if (q.length >= 4) {
+        setTimeout(() => {
+          const box = $("#revision-script");
+          if (!box) return;
+          for (const line of box.querySelectorAll("[class^=el-]")) {
+            const lt = normText(line.textContent);
+            if (lt.length >= 4 && (lt.includes(q) || q.includes(lt.slice(0, 40)))) {
+              line.classList.add("finding-highlight");
+              line.scrollIntoView({ behavior: "smooth", block: "center" });
+              setTimeout(() => line.classList.remove("finding-highlight"), 2600);
+              return;
+            }
+          }
+        }, 140);
+      }
+    }
+    return;
+  }
   scrollToSceneInPlace(scene);
   const quote = (f.evidence_quote || "").trim();
   if (!quote) return;
@@ -2427,6 +2482,7 @@ function renderFixQueuePanel(container) {
 
   for (const item of items) {
     const row = el("div", "fix-row" + (item.status === "addressed" ? " done" : ""));
+    row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
     const act = el("span", "act-chip", item.act_name || "Script-level");
     const sceneLabel = item.scene_heading ? `Scene ${(item.scene_refs || [])[0]} — ${item.scene_heading}` : "General";
@@ -3171,6 +3227,7 @@ async function hideAllViews() {
   // full-screen tools only — the rooms are handled by setRoom()
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
+  $("#revision-view").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "none";
 }
@@ -3450,6 +3507,197 @@ function renderCompare(data) {
     block.appendChild(cols);
     pane.appendChild(block);
   }
+}
+
+// ---- revision view: the doctor's desk beside the draft ----
+// A summoned full-screen view (like the Beat Board / Compare): scene
+// navigator | the pages | the findings queue, plus a mono status strip.
+// Everything reuses the manuscript renderers — this view only changes WHERE
+// things live, so the default workspace is untouched.
+
+let revisionPrevRoom = "cowrite";
+
+async function openRevisionView() {
+  if (state.view === "revision") return;
+  revisionPrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
+  state.view = "revision";
+  hideAllViews();
+  closeRoomDrawer();
+  $("#revision-view").style.display = "flex";
+  try {
+    await loadScriptData();
+  } catch (e) {
+    showError("Couldn't load the script: " + e.message);
+  }
+  renderRevisionView();
+  saveSession();
+}
+
+function closeRevisionView() {
+  setRoom(revisionPrevRoom);
+}
+
+function jumpRevisionScene(num) {
+  const box = $("#revision-script");
+  if (!box) return;
+  const page = box.querySelector(`#scene-page-${num}`);
+  if (!page) return;
+  page.scrollIntoView({ behavior: "smooth", block: "start" });
+  page.classList.remove("flash");
+  void page.offsetWidth;
+  page.classList.add("flash");
+  setTimeout(() => page.classList.remove("flash"), 1600);
+}
+
+function flashFindingRow(index) {
+  const box = $("#revision-findings");
+  if (!box) return;
+  const row = box.querySelector(`.fix-row[data-findex="${index}"]`);
+  if (!row) return;
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  row.classList.remove("finding-flash");
+  void row.offsetWidth;
+  row.classList.add("finding-flash");
+  setTimeout(() => row.classList.remove("finding-flash"), 1800);
+}
+
+function renderRevisionView() {
+  const nav = $("#revision-nav");
+  const box = $("#revision-script");
+  const findings = $("#revision-findings");
+  nav.innerHTML = "";
+  box.innerHTML = "";
+  findings.innerHTML = "";
+
+  if (!state.script || !state.script.scenes || !state.script.scenes.length) {
+    box.appendChild(el("p", "script-empty-hint", "No scenes to revise yet — upload a script first."));
+    updateRevisionStatus();
+    return;
+  }
+
+  // groupings — the same data-shaping the manuscript uses (kept local so the
+  // main workspace renderer is untouched)
+  const byScene = {};
+  const scriptLevel = [];
+  state.findings.forEach((f, index) => {
+    const refs = f.scene_refs || [];
+    if (!refs.length) { scriptLevel.push({ f, index }); return; }
+    for (const n of refs) (byScene[n] = byScene[n] || []).push({ f, index });
+  });
+  const changedByScene = {};
+  for (const ed of (state.editsData && state.editsData.edits) || []) {
+    if (!ed.scene_number || !(ed.applied || []).length) continue;
+    (changedByScene[ed.scene_number] = changedByScene[ed.scene_number] || []).push(...ed.applied);
+  }
+  const bySceneNotes = {};
+  const scriptLevelNotes = [];
+  for (const n of state.notes) {
+    if (n.scene_number == null) scriptLevelNotes.push(n);
+    else (bySceneNotes[n.scene_number] = bySceneNotes[n.scene_number] || []).push(n);
+  }
+  const discussedScenes = new Set();
+  for (const m of (currentBranchData().messages || [])) {
+    if (m.quote && m.quote.scene_number != null) discussedScenes.add(m.quote.scene_number);
+  }
+
+  // navigator: one row per scene — severity dots + count; click jumps the page
+  for (const scene of state.script.scenes) {
+    const fg = byScene[scene.scene_number] || [];
+    const allAddressed = fg.length > 0 && fg.every(({ index }) => state.findingStatus[index] === "addressed");
+    const row = el("button", "revision-nav-row" + (allAddressed ? " ok" : ""));
+    row.type = "button";
+    row.title = `Scene ${scene.scene_number} — ${fg.length} finding${fg.length === 1 ? "" : "s"}${allAddressed ? " (all addressed)" : ""}`;
+    row.appendChild(el("span", "rn-num", `S${scene.scene_number}`));
+    row.appendChild(el("span", "rn-head", scene.heading_raw));
+    if (fg.length) {
+      const dots = el("span", "rn-dots");
+      for (const sev of ["high", "medium", "low"]) {
+        if (fg.some(({ f }) => (f.severity || "low") === sev)) dots.appendChild(el("i", "rn-dot " + sev));
+      }
+      row.appendChild(dots);
+      row.appendChild(el("span", "rn-count", String(fg.length)));
+    } else {
+      row.appendChild(el("span", "rn-count none", "·"));
+    }
+    row.addEventListener("click", () => jumpRevisionScene(scene.scene_number));
+    nav.appendChild(row);
+  }
+  if (scriptLevel.length) {
+    nav.appendChild(el("div", "rn-level", `${scriptLevel.length} script-level finding${scriptLevel.length === 1 ? "" : "s"} — in the queue`));
+  }
+
+  // the pages — the same renderer the manuscript uses (margin notes, change stars)
+  for (const scene of state.script.scenes) {
+    const page = renderScenePage(
+      scene,
+      byScene[scene.scene_number] || [],
+      "",
+      bySceneNotes[scene.scene_number] || [],
+      discussedScenes.has(scene.scene_number),
+      changedByScene[scene.scene_number] || []
+    );
+    // anchored findings: clicking the quoted line flashes its queue row
+    for (const { f, index } of byScene[scene.scene_number] || []) {
+      const qq = normText(f.evidence_quote);
+      if (qq.length < 4) continue;
+      for (const line of page.querySelectorAll("[class^=el-]")) {
+        const lt = normText(line.textContent);
+        if (lt.length >= 4 && (lt.includes(qq) || qq.includes(lt.slice(0, 40)))) {
+          line.classList.add("el-anchored");
+          line.title = `${CATEGORY_LABELS[f.category] || f.category}: ${f.issue}`;
+          line.addEventListener("click", () => flashFindingRow(index));
+          break;
+        }
+      }
+    }
+    // anchored margin notes: 📌 opens the note card
+    for (const n of bySceneNotes[scene.scene_number] || []) {
+      if (!n.anchor) continue;
+      const qq = normText(n.anchor);
+      if (qq.length < 2) continue;
+      for (const line of page.querySelectorAll("[class^=el-]")) {
+        const lt = normText(line.textContent);
+        if (lt === qq || (qq.length > 4 && lt.includes(qq))) {
+          line.classList.add("el-noted");
+          line.title = `Your margin note: ${n.text}`;
+          line.addEventListener("click", () => openNoteCard(n.id));
+          break;
+        }
+      }
+    }
+    box.appendChild(page);
+  }
+
+  // the findings queue — the doctor's desk beside the draft (Locate stays
+  // inside this view via the locateFinding guard)
+  if ((state.fixQueue && state.fixQueue.items && state.fixQueue.items.length)) {
+    renderFixQueuePanel(findings);
+  } else {
+    findings.appendChild(el("p", "rf-empty", "No findings yet — Run Analysis in the Feedback room to generate the queue."));
+  }
+
+  updateRevisionStatus();
+}
+
+function updateRevisionStatus() {
+  const box = $("#revision-script");
+  const pages = box ? box.querySelectorAll(".scene-page") : [];
+  let cur = pages.length ? 1 : 0;
+  const mid = (box ? box.scrollTop : 0) + 60;
+  for (let i = 0; i < pages.length; i++) {
+    if (pages[i].offsetTop <= mid) cur = i + 1;
+  }
+  const scenes = (state.script && state.script.scenes) || [];
+  const words = scenes.reduce((a, s) => a + (s.word_count || 0), 0);
+  const sum = findingStatusSummary();
+  const strip = $("#revision-status");
+  if (!strip) return;
+  strip.innerHTML = "";
+  strip.appendChild(el("span", "", `Scene ${cur} of ${pages.length}`));
+  strip.appendChild(el("span", "", `${words.toLocaleString()} words`));
+  strip.appendChild(el("span", "", `${sum.open} open / ${sum.addressed} addressed`));
+  const title = state.script && state.script.title;
+  if (title) strip.appendChild(el("span", "", title));
 }
 
 // ---- beat board ----
@@ -3759,6 +4007,7 @@ function paletteCommands() {
     { type: "command", label: "Switch to Feedback", keys: "f", run: () => { openFeedbackRoom(); } },
     { type: "command", label: "Open the Beat Board", keys: "b", run: () => openBeatboardView() },
     { type: "command", label: "Compare drafts side by side", keys: "d", run: () => { if (state.currentProject) openCompareView(); } },
+    { type: "command", label: "Open the Revision view", keys: "v", run: () => { if (state.currentProject) openRevisionView(); } },
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
     { type: "command", label: "Start a new page", keys: "", run: () => { $("#new-project-btn").click(); } },
     { type: "command", label: "Focus the conversation", keys: "", run: () => { openCowriteRoom(); setTimeout(() => $("#input").focus(), 60); } },
@@ -3920,6 +4169,7 @@ function bindGlobalShortcuts() {
     // Esc — the page wins: dismiss the partner drawer, then the craft shelf,
     // then the structure rail (palette Esc is handled above; modals keep Esc).
     if (e.key === "Escape") {
+      if (state.view === "revision") { closeRevisionView(); return; }
       const modalOpen = [...document.querySelectorAll(".modal-overlay")].some((m) => m.style.display === "flex");
       if (!modalOpen) {
         const drawer = $("#room-drawer");
@@ -3945,6 +4195,7 @@ function bindGlobalShortcuts() {
     else if (e.key === "s") { closeRoomDrawer(); const sc = $("#script-scenes"); if (sc) sc.focus(); }
     else if (e.key === "b" && state.currentProject) { openBeatboardView(); }
     else if (e.key === "d" && state.currentProject) { openCompareView(); }
+    else if (e.key === "v" && state.currentProject) { if (state.view === "revision") closeRevisionView(); else openRevisionView(); }
     else if (e.key === "j" || e.key === "n") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(1); } }
     else if (e.key === "k" || e.key === "p") { if (state.view === "cowrite" || state.view === "feedback") { e.preventDefault(); stepScene(-1); } }
   });
@@ -4100,10 +4351,12 @@ function init() {
         });
       } else if (s.view === "beatboard") openBeatboardView();
       else if (s.view === "compare") openCompareView();
+      else if (s.view === "revision") openRevisionView();
     }).catch(() => { /* project vanished — stay on the welcome scene */ });
   });
 
   $("#analyze-btn").addEventListener("click", runAnalysis);
+  $("#reparse-btn").addEventListener("click", reparseProject);
 
   // script pane
   $("#script-search").addEventListener("input", () => renderScriptView());
@@ -4317,6 +4570,9 @@ function init() {
   $("#rail-edge-tab").addEventListener("click", () => toggleRail(false));
   $("#bb-icon").addEventListener("click", openBeatboardView);
   $("#compare-icon").addEventListener("click", openCompareView);
+  $("#revise-btn").addEventListener("click", openRevisionView);
+  $("#revision-close").addEventListener("click", closeRevisionView);
+  $("#revision-script").addEventListener("scroll", updateRevisionStatus);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
   $("#clear-chat-btn").addEventListener("click", clearChat);
   $("#sam-notes-btn").addEventListener("click", openSamNotes);

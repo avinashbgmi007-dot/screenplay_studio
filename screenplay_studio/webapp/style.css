@@ -2326,6 +2326,112 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   .cmp-col + .cmp-col { border-left: none; border-top: 1px solid var(--line); }
 }
 
+/* ---- revision view: the doctor's desk beside the draft ----
+   A summoned full-screen view — scene navigator | pages | findings
+   queue, with a mono status strip. The manuscript stays the hero; this
+   is the room the writer enters for a revision pass. */
+.revision-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  flex-wrap: wrap;
+}
+.revision-title { font-family: var(--font-typewriter); font-size: 14px; color: var(--text); letter-spacing: 0.04em; }
+.revision-sub { font-size: 12px; color: var(--text-faint); font-style: italic; flex: 1; min-width: 220px; }
+.revision-body { flex: 1; display: flex; min-height: 0; }
+
+.revision-nav {
+  width: 232px;
+  min-width: 232px;
+  overflow-y: auto;
+  border-right: 1px solid var(--line-soft);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.revision-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.revision-nav-row:hover { background: rgba(232, 162, 79, 0.08); border-color: rgba(232, 162, 79, 0.22); }
+.revision-nav-row .rn-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 11px;
+  min-width: 24px;
+}
+.revision-nav-row .rn-head { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.revision-nav-row.ok { opacity: 0.5; }
+.revision-nav-row.ok .rn-head { text-decoration: line-through; text-decoration-color: rgba(143, 174, 126, 0.6); }
+.rn-dots { display: inline-flex; gap: 3px; align-items: center; }
+.rn-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.rn-dot.high { background: #e5484d; }
+.rn-dot.medium { background: #f5a623; }
+.rn-dot.low { background: #46a758; }
+.rn-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(232, 162, 79, 0.14);
+  color: var(--text);
+}
+.rn-count.none { background: transparent; color: var(--text-faint); }
+.rn-level { font-size: 11.5px; color: var(--text-muted); padding: 8px 9px 2px; font-style: italic; }
+
+.revision-script { flex: 1; overflow-y: auto; padding: 22px 28px 80px; }
+.revision-script .scene-page { max-width: 640px; margin: 0 auto 30px; }
+
+.revision-findings {
+  width: 336px;
+  min-width: 336px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line-soft);
+  padding: 12px 14px 40px;
+}
+.revision-findings .craft-panel { padding: 0; background: transparent; border: none; box-shadow: none; }
+.revision-findings .craft-panel-head { padding: 0 0 8px; }
+.revision-findings .fix-row { flex-wrap: wrap; gap: 6px 10px; }
+.revision-findings .fix-row-actions { width: 100%; }
+.rf-empty { font-size: 12.5px; color: var(--text-muted); font-style: italic; }
+
+.revision-status {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 6px 18px;
+  border-top: 1px solid var(--line-soft);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+@media (max-width: 900px) {
+  .revision-nav { width: 190px; min-width: 190px; }
+  .revision-findings { width: 280px; min-width: 280px; }
+}
+@media (max-width: 700px) {
+  .revision-body { flex-direction: column; }
+  .revision-nav { width: auto; min-width: 0; border-right: none; border-bottom: 1px solid var(--line-soft); max-height: 180px; }
+  .revision-findings { width: auto; min-width: 0; border-left: none; border-top: 1px solid var(--line-soft); max-height: 40%; }
+}
+
 /* ============================================================
    Dawn — draw the curtains: a warm morning room
    ============================================================ */

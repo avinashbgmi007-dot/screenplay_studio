@@ -9,8 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
 <!-- v2e607ed — bump the version query whenever style.css/app.js change so
      browsers never revalidate into a stale sheet (no-cache only revalidates
-     against the browser's own copy; a versioned URL forces a fresh fetch). -->
-<link rel="stylesheet" href="style.css?v=kb2c3d4">
+     against the browser's own copy; a versioned URL forces a fresh fetch). -->  <link rel="stylesheet" href="style.css?v=rv1a2b3">
 </head>
 <body data-room="cowrite">
 
@@ -207,6 +206,7 @@
             <button id="reader-btn" class="btn-secondary" title="Reader mode — the draft clean, no margin machinery" type="button">Reader</button>
             <button id="undo-btn" class="btn-secondary" title="Undo the last applied edit (Ctrl+Z)" disabled>↶ Undo</button>
             <button id="redo-btn" class="btn-secondary" title="Re-apply the undone edit (Ctrl+Shift+Z)" disabled>↷ Redo</button>
+            <button id="revise-btn" class="btn-secondary" title="Revision view — the doctor's findings beside the draft, with a scene navigator" type="button">✎ Revise</button>
             <button id="bb-icon" class="btn-secondary icon-btn" title="Beat Board — try a new scene order" type="button">📋</button>
             <button id="compare-icon" class="btn-secondary icon-btn" title="Compare drafts side by side" type="button">🗂</button>
             <a id="export-fountain" class="btn-secondary" download>Export .fountain</a>
@@ -282,6 +282,7 @@
             <span class="ap-eta">…</span>
           </div>
           <button id="analyze-btn" class="btn-secondary">Run Analysis</button>
+          <button id="reparse-btn" class="btn-secondary" title="Re-parse the source file with the current parser — fixes mis-parsed formatting, then Run Analysis again">↻ Re-parse</button>
         </div>
         <div id="feedback-tabs" class="feedback-tabs" style="display:none;">
           <button id="tab-report-btn" class="active" type="button">Report</button>
@@ -339,6 +340,21 @@
         <span class="compare-hint">Read the change, side by side. Added lines are underlined, removed lines struck through.</span>
       </div>
       <div id="compare-panes" class="compare-panes" aria-live="polite"></div>
+    </section>
+
+    <!-- Revision view: the doctor's desk beside the draft -->
+    <section id="revision-view" class="view" style="display:none;">
+      <div class="revision-head">
+        <div class="revision-title">Revision desk</div>
+        <span class="revision-sub">The doctor's findings beside the draft — navigate by scene, work the queue.</span>
+        <button id="revision-close" class="btn-secondary" type="button" title="Back to the page">← Back to the page</button>
+      </div>
+      <div class="revision-body">
+        <nav id="revision-nav" class="revision-nav" aria-label="Scene navigator"></nav>
+        <div id="revision-script" class="revision-script" tabindex="-1"></div>
+        <aside id="revision-findings" class="revision-findings" aria-label="Findings queue"></aside>
+      </div>
+      <footer id="revision-status" class="revision-status"></footer>
     </section>
 
   </main>
@@ -434,8 +450,6 @@
       <button id="fork-save" class="btn-primary">Create fork</button>
     </div>
   </div>
-</div>
-
-<script src="app.js?v=kb2c3d5"></script>
+</div>  <script src="app.js?v=rv1a2b4"></script>
 </body>
 </html>

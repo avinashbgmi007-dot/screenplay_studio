@@ -424,6 +424,58 @@ def analyze_project(name):
     return jsonify(_manifest_summary(m))
 
 
+@app.route("/api/projects/<name>/reparse", methods=["POST"])
+def reparse_project(name):
+    """Re-run the parse stage on the active source file, in-app.
+
+    The in-app fix for a mis-parsed script: re-parses the source with the
+    current parser, regenerates parsed.json + the knowledge graph, refreshes
+    the working copy (writer edits are preserved by revision.ensure_working),
+    and invalidates the old analysis so the report/fix queue get rebuilt from
+    the fresh parse on the next Run Analysis.
+    """
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+
+    # Re-parse must actually re-run even when parse is complete — the
+    # orchestrator short-circuits on complete by design (so resume/retry never
+    # redoes finished work), so an explicit re-parse resets the stage first.
+    from .manifest import StageStatus
+    m.stages["parse"] = StageStatus()
+    m.save()
+
+    orch = Orchestrator(m)
+    try:
+        orch.run_parse()
+    except OrchestratorError as e:
+        return _error(str(e), 502)
+    except Exception as e:
+        traceback.print_exc()
+        return _error(f"Unexpected error during re-parse: {e}", 500)
+
+    # The analysis (report, fix queue, findings) was built from the OLD parse
+    # — it's now stale, so invalidate the analyze stage and drop its artifacts
+    # so the next Run Analysis regenerates everything from the fresh parse.
+    m.stages["analyze"] = StageStatus()
+    m.save()
+    for p in (m.report_findings_path, m.report_md_path, m.progress_path):
+        if os.path.exists(p):
+            os.remove(p)
+
+    # Refresh the display copy from the fresh parse. revision.ensure_working
+    # self-heals a stale working copy only when the writer has NO edits; if
+    # edits exist, their work is preserved untouched (by design).
+    from .revision import ensure_working
+    try:
+        ensure_working(m)
+    except Exception:
+        pass  # the viewer will rebuild it lazily on first load if this fails
+
+    return jsonify(_manifest_summary(m))
+
+
 @app.route("/api/projects/<name>/report", methods=["GET"])
 def get_report(name):
     try:

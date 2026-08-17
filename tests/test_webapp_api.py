@@ -140,6 +140,51 @@ class TestProjectLifecycle:
         m = ProjectManifest.load(webapp_server._project_dir(project))
         assert os.path.exists(m.progress_path)
 
+    def test_reparse_resets_analysis_and_regenerates_parse(self, http_client):
+        upload_resp = _upload(http_client)
+        project = upload_resp.get_json()["project"]
+        # complete an analysis first so we have stale artifacts to clear
+        http_client.post(f"/api/projects/{project}/analyze")
+        report_path = os.path.join(webapp_server._project_dir(project), "report.findings.json")
+        assert os.path.exists(report_path)
+
+        resp = http_client.post(f"/api/projects/{project}/reparse")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        # parse re-ran to completion, analyze was invalidated
+        assert data["stages"]["parse"] == "complete"
+        assert data["stages"]["analyze"] == "pending"
+        # stale report artifacts were dropped so the next run rebuilds them
+        assert not os.path.exists(report_path)
+        report_md = os.path.join(webapp_server._project_dir(project), "report.md")
+        assert not os.path.exists(report_md)
+
+        # the fresh parse is what the viewer serves
+        script_resp = http_client.get(f"/api/projects/{project}/script")
+        assert script_resp.status_code == 200
+        assert "scenes" in script_resp.get_json()
+        assert "MARA" in script_resp.get_json()["all_characters"]
+
+    def test_reparse_then_analyze_regenerates_report(self, http_client):
+        upload_resp = _upload(http_client)
+        project = upload_resp.get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+
+        http_client.post(f"/api/projects/{project}/reparse")
+        # report is gone until analysis is re-run
+        assert http_client.get(f"/api/projects/{project}/report").status_code == 400
+
+        resp = http_client.post(f"/api/projects/{project}/analyze")
+        assert resp.status_code == 200
+        assert resp.get_json()["stages"]["analyze"] == "complete"
+        report_resp = http_client.get(f"/api/projects/{project}/report")
+        assert report_resp.status_code == 200
+        assert "findings" in report_resp.get_json()
+
+    def test_reparse_nonexistent_project_404(self, http_client):
+        resp = http_client.post("/api/projects/nope/reparse")
+        assert resp.status_code == 404
+
 
 class TestChatFlow:
     def _setup_analyzed_project(self, http_client):
