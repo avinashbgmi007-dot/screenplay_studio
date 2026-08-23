@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "dimensions": {
     "detail_level": {
       "value": "deep",
@@ -21,26 +21,35 @@
     },
     "probe_appetite": {
       "value": "high",
-      "confidence": 0.92,
+      "confidence": 0.71,
       "evidence": {
-        "pos": 21,
-        "neg": 0
+        "pos": 27,
+        "neg": 10
       },
-      "last_updated": 1786647857.2341986
+      "last_updated": 1787427155.7480502
     },
     "pushback_appetite": {
       "value": "high",
-      "confidence": 0.88,
+      "confidence": 0.74,
       "evidence": {
-        "pos": 20,
-        "neg": 1
+        "pos": 21,
+        "neg": 6
       },
-      "last_updated": 1786647749.0418577
+      "last_updated": 1787425059.3178034
+    },
+    "support_style": {
+      "value": "discuss",
+      "confidence": 0.67,
+      "evidence": {
+        "pos": 2,
+        "neg": 0
+      },
+      "last_updated": 1787412808.4590116
     }
   },
   "topic_gravity": {
     "character": 18,
-    "structure": 16,
+    "structure": 37,
     "dialogue": 1,
     "craft": 0
   },
@@ -54,7 +63,8 @@
       "contradictions": 0,
       "suppressed": true,
       "created": 1786551732.8383975,
-      "updated": 1786551732.8383977
+      "updated": 1786551732.8383977,
+      "scope": "global"
     },
     {
       "id": "obs_e84d6ff8",
@@ -65,7 +75,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786551759.3673766,
-      "updated": 1786551759.3673766
+      "updated": 1786551759.3673766,
+      "scope": "global"
     },
     {
       "id": "obs_92220994",
@@ -76,7 +87,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786551774.5653121,
-      "updated": 1786551774.5653121
+      "updated": 1786551774.5653121,
+      "scope": "global"
     },
     {
       "id": "obs_089fb32f",
@@ -87,7 +99,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786551831.5639675,
-      "updated": 1786551831.5639677
+      "updated": 1786551831.5639677,
+      "scope": "global"
     },
     {
       "id": "obs_c2ea315a",
@@ -98,7 +111,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786551831.5639844,
-      "updated": 1786551831.5639844
+      "updated": 1786551831.5639844,
+      "scope": "global"
     },
     {
       "id": "obs_3bca9b1b",
@@ -109,7 +123,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786551831.5639958,
-      "updated": 1786551831.5639958
+      "updated": 1786551831.5639958,
+      "scope": "global"
     },
     {
       "id": "obs_a7b181c4",
@@ -120,7 +135,8 @@
       "contradictions": 0,
       "suppressed": true,
       "created": 1786552243.5337036,
-      "updated": 1786552243.5337036
+      "updated": 1786552243.5337036,
+      "scope": "global"
     },
     {
       "id": "obs_aba31a75",
@@ -131,7 +147,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786552243.5337112,
-      "updated": 1786552243.5337112
+      "updated": 1786552243.5337112,
+      "scope": "global"
     },
     {
       "id": "obs_d17ad3c2",
@@ -142,7 +159,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786553078.255519,
-      "updated": 1786553078.2555192
+      "updated": 1786553078.2555192,
+      "scope": "global"
     },
     {
       "id": "obs_d7f355f9",
@@ -153,7 +171,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786554432.5192094,
-      "updated": 1786554432.51921
+      "updated": 1786554432.51921,
+      "scope": "global"
     },
     {
       "id": "obs_78941a9e",
@@ -164,7 +183,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786554432.5192664,
-      "updated": 1786554432.5192668
+      "updated": 1786554432.5192668,
+      "scope": "global"
     },
     {
       "id": "obs_79a923ef",
@@ -175,7 +195,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786625567.192913,
-      "updated": 1786625567.1929138
+      "updated": 1786625567.1929138,
+      "scope": "global"
     },
     {
       "id": "obs_f3a20904",
@@ -186,7 +207,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786625567.192963,
-      "updated": 1786625567.1929631
+      "updated": 1786625567.1929631,
+      "scope": "global"
     },
     {
       "id": "obs_f876f9dd",
@@ -197,7 +219,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786625567.1929803,
-      "updated": 1786625567.1929805
+      "updated": 1786625567.1929805,
+      "scope": "global"
     },
     {
       "id": "obs_5af831f8",
@@ -208,7 +231,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786647693.1956613,
-      "updated": 1786647693.1956618
+      "updated": 1786647693.1956618,
+      "scope": "global"
     },
     {
       "id": "obs_52577396",
@@ -219,7 +243,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786647693.1956835,
-      "updated": 1786647693.1956842
+      "updated": 1786647693.1956842,
+      "scope": "global"
     },
     {
       "id": "obs_fbfa59ea",
@@ -230,7 +255,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786647693.1956992,
-      "updated": 1786647693.1956995
+      "updated": 1786647693.1956995,
+      "scope": "global"
     },
     {
       "id": "obs_7bd9c7d6",
@@ -241,7 +267,8 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786647749.041901,
-      "updated": 1786647749.0419014
+      "updated": 1786647749.0419014,
+      "scope": "global"
     },
     {
       "id": "obs_a23640ce",
@@ -252,13 +279,26 @@
       "contradictions": 0,
       "suppressed": false,
       "created": 1786647749.041911,
-      "updated": 1786647749.041911
+      "updated": 1786647749.041911,
+      "scope": "global"
+    },
+    {
+      "id": "obs_f46763ee",
+      "text": "The writer likes to explore character motives at length.",
+      "dimension": "topic_gravity",
+      "scope": "global",
+      "confidence": 0.6,
+      "source": "refresh",
+      "contradictions": 0,
+      "suppressed": false,
+      "created": 1787396852.5965004,
+      "updated": 1787396852.5965004
     }
   ],
   "meta": {
-    "total_turns_observed": 46,
-    "turns_at_last_refresh": 43,
-    "last_refresh": 1786647693.1957018,
-    "refresh_count": 6
+    "total_turns_observed": 150,
+    "turns_at_last_refresh": 143,
+    "last_refresh": 1787427270.3322108,
+    "refresh_count": 16
   }
 }

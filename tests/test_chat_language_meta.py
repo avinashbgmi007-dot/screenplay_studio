@@ -426,7 +426,10 @@ class TestEngineAppliesFilter:
         client = _ChatClient(CRAFT_PARAGRAPH)
         engine = CoWriterEngine(client, ScriptContext(), ReportContext(None))
         engine.send_message(Session.new("T"), "What about scene 3?")
-        assert client.kwargs["repeat_penalty"] == REPEAT_PENALTY
+        # chat turns run WARM sampling (anti-robotic-loop levers) -- the
+        # analyzer keeps its own conservative settings elsewhere
+        assert client.kwargs["repeat_penalty"] == CoWriterEngine.CHAT_REPEAT_PENALTY
+        assert client.kwargs["temperature"] == CoWriterEngine.CHAT_TEMPERATURE
         assert client.kwargs["max_tokens"] == 600
 
 
@@ -502,8 +505,11 @@ class TestEngineQuoteContext:
         assert "Just don't do anything stupid." in all_text
         assert "Scene 2" in all_text
         # the passage also rides inside the user turn itself (adjacent to the
-        # question), not just in a system message
-        assert "Just don't do anything stupid." in client.messages[-1]["content"]
+        # question), not just in a system message. The FINAL message is now
+        # the post-history voice reminder by design; the writer's turn sits
+        # just before it.
+        last_user = [m for m in client.messages if m["role"] == "user"][-1]
+        assert "Just don't do anything stupid." in last_user["content"]
         # stored on the user message
         user_msg = [m for m in session.branch.messages if m.role == "user"][-1]
         assert user_msg.quote == {"scene_number": 2, "text": "Just don't do anything stupid."}

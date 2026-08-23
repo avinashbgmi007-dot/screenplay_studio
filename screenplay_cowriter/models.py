@@ -84,6 +84,11 @@ class Session:
     script_path: str | None = None      # Piece 1 output (ScriptDocument json) — optional but recommended
     server_url: str | None = None
     model_id: str | None = None
+    # Idea-room diff baseline: the page content as Sameer last READ it. Set
+    # after each successful turn; the next turn's prompt carries a
+    # deterministic ADDED/REMOVED note for anything the writer changed since.
+    # None = he hasn't read a page yet (first summon).
+    last_seen_content: str | None = None
     branches: dict[str, Branch] = field(default_factory=dict)
     current_branch: str = "main"
     created_at: float = field(default_factory=time.time)
@@ -136,6 +141,7 @@ class Session:
             "script_path": self.script_path,
             "server_url": self.server_url,
             "model_id": self.model_id,
+            "last_seen_content": self.last_seen_content,
             "branches": {k: v.to_dict() for k, v in self.branches.items()},
             "current_branch": self.current_branch,
             "created_at": self.created_at,
@@ -148,6 +154,7 @@ class Session:
             session_id=d["session_id"], title=d.get("title", "Untitled"),
             report_path=d.get("report_path"), script_path=d.get("script_path"),
             server_url=d.get("server_url"), model_id=d.get("model_id"),
+            last_seen_content=d.get("last_seen_content"),
             current_branch=d.get("current_branch", "main"),
             created_at=d.get("created_at", time.time()), updated_at=d.get("updated_at", time.time()),
             branches={},

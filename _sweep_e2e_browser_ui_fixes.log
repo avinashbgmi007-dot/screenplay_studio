@@ -1,0 +1,12 @@
+  PASS  idea page is a full-height surface again (>480px)
+  PASS  mic chip still rides the idea page
+  PASS  hover Ideas -> only ideas flyout
+  PASS  move to Shelf -> ideas closes, shelf opens
+  PASS  move to Library -> only library flyout
+  PASS  opening a project hides the idea canvas
+  PASS  project pages actually render
+  PASS  welcome desk keeps the idea canvas hidden
+  PASS  reopening the idea restores its content
+  PASS  no JS page errors
+
+=== 10 passed, 0 failed ===

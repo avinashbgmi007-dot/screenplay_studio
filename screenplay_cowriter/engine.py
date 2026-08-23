@@ -56,6 +56,17 @@ def _ground_reply(reply: str, script_ctx: ScriptContext) -> str:
     )
 
 
+def _persona_register(reply: str, persona: str) -> str:
+    """Deterministic register guard, per persona. The doctor's card forbids
+    exclamation marks; a local model excited by a good beat can still emit one,
+    so the register is enforced here — the character never breaks voice at the
+    mechanical level, no matter what the model feels like. (Sameer keeps his
+    natural register; HUMAN_VOICE_RULES already caps his exclamations.)"""
+    if persona == "script_consultant":
+        reply = reply.replace("!", ".")
+    return reply
+
+
 def _normalize_quote(quote):
     """Select-to-reply passage from the webapp: {'scene_number': int|None, 'text': str}.
     scene_number None means "general" (e.g. a script-level finding with no scene
@@ -78,7 +89,8 @@ def _normalize_quote(quote):
 class CoWriterEngine:
     def __init__(self, client: LlamaServerClient, script_ctx: ScriptContext, report_ctx: ReportContext,
                  history_window: int = HISTORY_WINDOW, store=None, memory=None, premise: dict | None = None,
-                 memory_scope: str | None = None, writer_library_text: str | None = None):
+                 memory_scope: str | None = None, writer_library_text: str | None = None,
+                 mood_text: str | None = None, doctor_case_text: str | None = None):
         self.client = client
         self.script_ctx = script_ctx
         self.report_ctx = report_ctx
@@ -105,6 +117,21 @@ class CoWriterEngine:
         # the doctor can draw on earlier scripts without confusing them with
         # the current one. None by default — CLI stays byte-identical.
         self.writer_library_text = writer_library_text
+        # Deterministic room state (facts from real project data) and the
+        # doctor's cross-project case file. Both optional; build_system_prompt
+        # routes the case file to the script_consultant persona only. None by
+        # default — CLI byte-identical.
+        self.mood_text = mood_text
+        self.doctor_case_text = doctor_case_text
+
+    def _ground_reply_for_room(self, reply: str) -> str:
+        """Reply-side hallucination guard, room-aware. In the idea room there
+        IS no script, so any 'scene N' is hypothetical by definition — the
+        guard must stay silent there or every premise discussion that mentions
+        a speculative scene number gets falsely flagged as a hallucination."""
+        if self.premise is not None:
+            return reply
+        return _ground_reply(reply, self.script_ctx)
 
     def _memory_entities(self) -> list:
         """Character names from the current script, used to classify refresh
@@ -114,7 +141,64 @@ class CoWriterEngine:
         except Exception:
             return []
 
-    def send_message(self, session: Session, user_text: str, quote: dict | None = None) -> str:
+    # Chat sampling: greedy/low-temperature generation is THE robotic-loop
+    # culprit on local models. Chat turns get warm settings (analyzer keeps
+    # its own conservative client config).
+    CHAT_TEMPERATURE = 0.85
+    CHAT_REPEAT_PENALTY = 1.15
+    FEWSHOT_CHAR_BUDGET = 24000  # drop example blocks before starving history
+    TRAIT_DEPTH = 6              # trait re-injection position from the end
+
+    def _generate(self, messages, on_token=None):
+        """One chat completion. With on_token, raw pieces stream to the caller
+        as they arrive (the perceived-latency win for slow local models); the
+        returned full RAW text feeds the exact same hygiene pipeline either
+        way — streaming changes how a reply APPEARS, never what gets stored.
+        Clients without chat_stream (test fakes, older callers) fall back to
+        the blocking call."""
+        if on_token is not None and hasattr(self.client, "chat_stream"):
+            return self.client.chat_stream(messages, on_token=on_token, max_tokens=600,
+                                           temperature=self.CHAT_TEMPERATURE,
+                                           repeat_penalty=self.CHAT_REPEAT_PENALTY)
+        return self.client.chat(messages, max_tokens=600,
+                                temperature=self.CHAT_TEMPERATURE,
+                                repeat_penalty=self.CHAT_REPEAT_PENALTY)
+
+    def _assemble_messages(self, system_prompt, history, prompt_user, persona,
+                           scene_block=None, quote_context=None):
+        """Shared turn assembly for both probe and full paths. Order matters:
+        system -> scene/quote context -> few-shot examples (budget-permitting)
+        -> [history with trait reminder at fixed depth] -> user turn ->
+        post-history voice reminder (last word before generation carries the
+        most weight -- the SillyTavern post-history lever)."""
+        from .personas import (post_history_reminder, trait_reminder,
+                               persona_examples, FIRST_LINE_ANCHOR)
+        messages = [{"role": "system", "content": system_prompt}]
+        if scene_block:
+            messages.append({"role": "system", "content": scene_block})
+        if quote_context:
+            messages.append({"role": "system", "content": quote_context})
+        total = sum(len(m["content"]) for m in messages)
+        examples = persona_examples(persona)
+        if examples and total + len(examples) <= self.FEWSHOT_CHAR_BUDGET:
+            messages.append({"role": "system", "content": examples})
+            total += len(examples)
+        hist = list(history)[-self.history_window:]
+        msgs = [{"role": m.role, "content": m.content} for m in hist]
+        if len(msgs) >= self.TRAIT_DEPTH:
+            msgs.insert(-self.TRAIT_DEPTH + 1,
+                        {"role": "system", "content": trait_reminder(persona)})
+        messages.extend(msgs)
+        messages.append({"role": "user", "content": prompt_user})
+        anchor = ""
+        if not hist:
+            anchor = "\n\n" + FIRST_LINE_ANCHOR
+        messages.append({"role": "system",
+                         "content": post_history_reminder(persona) + anchor})
+        return messages
+
+    def send_message(self, session: Session, user_text: str, quote: dict | None = None,
+                     on_token=None) -> str:
         from .peer import (
             classify_turn, should_probe, PROBE_SYSTEM_PROMPT,
             ensure_forward_momentum, cap_suggestions,
@@ -133,6 +217,17 @@ class CoWriterEngine:
         # answer to it, a question/directive is a topic change. Either way the
         # flag clears — and we must NOT re-probe the writer who just answered
         # (capturing was_pending BEFORE clearing prevents that loop).
+        # Answer-first contract: when the writer asked a DIRECT question, the
+        # reply must open with the answer -- probing/redirecting first reads
+        # as evasive. One short follow-up at most.
+        answer_first = ""
+        if turn_kind == "question":
+            answer_first = (
+                "\n\nANSWER FIRST: the writer asked a direct question. Open with "
+                "the actual answer to THAT question -- no preamble, no redirect. "
+                "After the answer, at most one short follow-up."
+            )
+
         was_pending = branch.awaiting_probe
         if was_pending:
             branch.awaiting_probe = False
@@ -156,6 +251,8 @@ class CoWriterEngine:
 
         quote_context = None
         if quote is not None:
+            # wording follows the room: idea pages have no scenes
+            source = ("their idea page" if self.premise is not None else "the script")
             if quote["scene_number"] is not None:
                 quote_context = (
                     "The writer selected this passage from Scene "
@@ -166,9 +263,9 @@ class CoWriterEngine:
                 )
             else:
                 quote_context = (
-                    "The writer selected this passage from the script and is asking about it:\n\n"
+                    f"The writer selected this passage from {source} and is asking about it:\n\n"
                     f"\"{quote['text']}\"\n\n"
-                    "Ground your answer in the exact passage. "
+                    "Ground your answer in the exact words they highlighted. "
                     "You may quote it back only briefly; keep the reply plain prose."
                 )
 
@@ -178,47 +275,59 @@ class CoWriterEngine:
         if quote is not None:
             prompt_user = f'Passage from the script: \"{quote["text"]}\"\n\n{user_text}'
 
+        # Language mirror: reply in the register the writer used (Telugu /
+        # Hindi / Tenglish / Hinglish / English). Deterministic detection on
+        # the CURRENT message -- writers switch mid-conversation.
+        lang_note = ""
+        try:
+            from .language_mirror import mirror_instruction
+            lang_note = mirror_instruction(user_text)
+        except Exception:
+            lang_note = ""  # mirroring is an enhancement, never a dependency
+
         if not was_pending and should_probe(user_text):
             # Phase 1: reflect + probe, no suggestions.
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
                 premise=self.premise, writer_library_text=self.writer_library_text,
+                mood_text=self.mood_text, doctor_case_text=self.doctor_case_text,
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
+            if lang_note:
+                system_prompt += "\n\n" + lang_note
+            # the probe path already redirects short ideas; a QUESTION that
+            # reached the probe branch still deserves an answer-first note
+            system_prompt += answer_first
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
-            messages = [{"role": "system", "content": system_prompt}]
-            if scene_block:
-                messages.append({"role": "system", "content": scene_block})
-            if quote_context:
-                messages.append({"role": "system", "content": quote_context})
-            for m in branch.messages[-self.history_window:]:
-                messages.append({"role": m.role, "content": m.content})
-            messages.append({"role": "user", "content": prompt_user})
+            messages = self._assemble_messages(
+                system_prompt, branch.messages, prompt_user, branch.active_persona,
+                scene_block=scene_block, quote_context=quote_context)
             try:
-                reply = clean_reply(self.client.chat(messages, max_tokens=600, repeat_penalty=REPEAT_PENALTY))
+                reply = clean_reply(self._generate(messages, on_token))
             except Exception:
                 branch.awaiting_probe = False  # never strand the writer mid-probe
                 raise
-            reply = _ground_reply(reply, self.script_ctx)
+            reply = self._ground_reply_for_room(reply)
             branch.awaiting_probe = True
         else:
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
                 premise=self.premise, writer_library_text=self.writer_library_text,
+                mood_text=self.mood_text, doctor_case_text=self.doctor_case_text,
             )
+            if lang_note:
+                system_prompt += "\n\n" + lang_note
+            system_prompt += answer_first
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
-            messages = [{"role": "system", "content": system_prompt}]
-            if scene_block:
-                messages.append({"role": "system", "content": scene_block})
-            if quote_context:
-                messages.append({"role": "system", "content": quote_context})
-            for m in branch.messages[-self.history_window:]:
-                messages.append({"role": m.role, "content": m.content})
-            messages.append({"role": "user", "content": prompt_user})
-            reply = clean_reply(self.client.chat(messages, max_tokens=600, repeat_penalty=REPEAT_PENALTY))
-            reply = _ground_reply(reply, self.script_ctx)
+            messages = self._assemble_messages(
+                system_prompt, branch.messages, prompt_user, branch.active_persona,
+                scene_block=scene_block, quote_context=quote_context)
+            reply = clean_reply(self._generate(messages, on_token))
+            reply = self._ground_reply_for_room(reply)
             reply = cap_suggestions(reply)
+
+        reply = _persona_register(reply, branch.active_persona)
 
         reply = ensure_forward_momentum(reply, turn_kind)
 

@@ -1,0 +1,44 @@
+DEMO MODEL active (in-process) — no real llama-server needed.
+Projects directory: /tmp/e2e_rm
+Default model server: http://127.0.0.1:8099
+Open http://localhost:8565 in your browser.
+ * Serving Flask app 'webapp_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8565
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [23/Aug/2026 20:09:25] "[35m[1mPOST /api/projects HTTP/1.1[0m" 201 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET /style.css?v=id2b101 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET /app.js?v=id2b102 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET /api/config HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET /api/projects HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET /api/ideas HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET /api/writer-library HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "GET /v1/models HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:25] "POST /api/test-connection HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:26] "[35m[1mPOST /api/ideas HTTP/1.1[0m" 201 -
+127.0.0.1 - - [23/Aug/2026 20:09:26] "GET /api/ideas HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:26] "GET /api/ideas/3349d64d HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:30] "POST /api/ideas/3349d64d/content HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:30] "GET /api/ideas HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "POST /api/ideas/3349d64d/content HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/stash HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/drafts HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/edits HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/notes HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/script HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "[31m[1mGET /api/projects/Rain_Courier/report HTTP/1.1[0m" 400 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/fixqueue HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects/Rain_Courier/characters HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:31] "GET /api/projects HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:32] "GET /api/ideas/3349d64d HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:33] "POST /api/ideas/3349d64d/content HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:33] "GET /api/ideas HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:33] "GET /v1/models HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:33] "POST /api/ideas/3349d64d/chat/start HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:33] "GET /api/ideas/3349d64d/chat/sessions/77113a88 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:35] "POST /api/ideas/3349d64d/content HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2026 20:09:35] "GET /api/ideas HTTP/1.1" 200 -

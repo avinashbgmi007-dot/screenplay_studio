@@ -1,0 +1,11 @@
+  PASS  room opens via summon
+  PASS  room auto-hides when the editor is clicked
+  PASS  selection chip floats over the idea page
+  PASS  chip carries the exact highlighted passage
+  PASS  ask pre-filled referencing the selection
+  PASS  reply grounds on the selected passage
+  PASS  translation renders inline in English
+  PASS  translation adds no new chat turns
+  PASS  no JS page errors
+
+=== 9 passed, 0 failed ===

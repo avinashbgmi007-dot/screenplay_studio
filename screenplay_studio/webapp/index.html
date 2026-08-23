@@ -4,12 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Script Doctor Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23201a14'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z' fill='none' stroke='%23e8a24f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
 <!-- v2e607ed — bump the version query whenever style.css/app.js change so
      browsers never revalidate into a stale sheet (no-cache only revalidates
-     against the browser's own copy; a versioned URL forces a fresh fetch). -->  <link rel="stylesheet" href="style.css?v=id1a2b3">
+     against the browser's own copy; a versioned URL forces a fresh fetch). -->  <link rel="stylesheet" href="style.css?v=id2b101">
 </head>
 <body data-room="cowrite">
 
@@ -32,19 +33,38 @@
 
     <button id="new-project-btn">+ Lay a new page on the desk</button>
 
-    <div class="sidebar-section-label"><span>Ideas</span><button id="new-idea-btn" class="sidebar-new-btn" type="button" title="Start a new idea with Sameer">+ New idea</button></div>
-    <div id="idea-list" class="idea-list">
-      <p class="empty-hint">No ideas yet — the desk is free for one.</p>
+    <div class="sidebar-section" id="ideas-section">
+      <div class="sidebar-section-head">
+        <button id="ideas-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="idea-list" title="Your idea pages — hover or click to browse">
+          <span>Ideas</span><em class="section-count" id="idea-count"></em><span class="flyout-caret">▾</span>
+        </button>
+        <button id="new-idea-btn" class="sidebar-new-btn" type="button" title="Start a new idea with Sameer">+ New idea</button>
+      </div>
+      <div id="idea-list" class="idea-list sidebar-flyout">
+        <p class="empty-hint">No ideas yet — the desk is free for one.</p>
+      </div>
     </div>
 
-    <div class="sidebar-section-label">On the shelf</div>
-    <div id="project-list" class="project-list">
-      <p class="empty-hint">The shelf is empty — bring in a screenplay.</p>
+    <div class="sidebar-section" id="shelf-section">
+      <div class="sidebar-section-head">
+        <button id="shelf-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="project-list" title="Screenplays on the desk — hover or click to browse">
+          <span>On the shelf</span><em class="section-count" id="shelf-count"></em><span class="flyout-caret">▾</span>
+        </button>
+      </div>
+      <div id="project-list" class="project-list sidebar-flyout">
+        <p class="empty-hint">The shelf is empty — bring in a screenplay.</p>
+      </div>
     </div>
 
-    <div class="sidebar-section-label"><span>Your library</span></div>
-    <div id="library-list" class="library-list">
-      <p class="empty-hint">Past scripts gather here — Sameer and the doctor read this shelf too.</p>
+    <div class="sidebar-section" id="library-section">
+      <div class="sidebar-section-head">
+        <button id="library-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="library-list" title="Everything you've written before — hover or click to browse">
+          <span>Your library</span><em class="section-count" id="library-count"></em><span class="flyout-caret">▾</span>
+        </button>
+      </div>
+      <div id="library-list" class="library-list sidebar-flyout">
+        <p class="empty-hint">Past scripts gather here — Sameer and the doctor read this shelf too.</p>
+      </div>
     </div>
 
     <div class="sidebar-footer">
@@ -98,6 +118,21 @@
           <button id="shortcut-hint-dismiss" aria-label="Dismiss" title="Don't show again">✕</button>
         </div>
         <p class="den-footnote">Everything stays on this machine — your pages, your model, your night.</p>
+      </div>
+
+      <!-- The dashboard: every script on the desk as a card — status, stats,
+           one-click actions. Nothing buried in menus. -->
+      <div id="dashboard" class="dashboard" aria-label="Your scripts">
+        <div class="dash-head">
+          <span class="dash-title">On the desk</span>
+          <span id="dash-conn" class="dash-conn" title="Model server status">…</span>
+        </div>
+        <div id="dash-grid" class="dash-grid"></div>
+        <div class="dash-how">
+          <div class="how-step"><span class="how-num">1</span><b>Lay the pages down</b><small>Upload .fdx · .pdf · .txt · .fountain · .md — parsed on the spot.</small></div>
+          <div class="how-step"><span class="how-num">2</span><b>Run the doctor</b><small>One click: findings, fix queue, logline test — every quote verified.</small></div>
+          <div class="how-step"><span class="how-num">3</span><b>Rewrite with Sameer</b><small>Double-click any line to edit · select text to ask · export when done.</small></div>
+        </div>
       </div>
     </section>
 
@@ -206,6 +241,7 @@
         <div id="idea-canvas" class="idea-canvas" style="display:none;">
           <div class="idea-head">
             <input id="idea-title-input" class="idea-title-input" type="text" value="" maxlength="80" spellcheck="false" aria-label="Idea title" title="Click to rename">
+            <span id="idea-save-state" class="idea-save-state" aria-live="polite"></span>
             <button id="idea-structure-btn" class="idea-structure-btn" type="button" title="The structured logline / open-questions view — kept out of the way">▸ Structure</button>
             <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script">📄 First pages</button>
             <input type="file" id="idea-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
@@ -235,6 +271,7 @@
             <button id="revise-btn" class="btn-secondary" title="Revision view — the doctor's findings beside the draft, with a scene navigator" type="button">✎ Revise</button>
             <button id="bb-icon" class="btn-secondary icon-btn" title="Beat Board — try a new scene order" type="button">📋</button>
             <button id="compare-icon" class="btn-secondary icon-btn" title="Compare drafts side by side" type="button">🗂</button>
+            <a id="export-backup" class="btn-secondary" title="Download the whole project — source, parse, report, chats, edits — as one .zip" download>⬇ Backup .zip</a>
             <a id="export-fountain" class="btn-secondary" download>Export .fountain</a>
             <a id="export-fdx" class="btn-secondary" download>Export .fdx</a>
             <a id="export-txt" class="btn-secondary" download>Export .txt</a>
@@ -252,6 +289,7 @@
         <div id="diff-banner" class="diff-banner" style="display:none;"></div>
         <div id="script-scenes" class="script-scenes" aria-live="polite" tabindex="-1"></div>
         <button id="quote-float" class="quote-float" type="button" hidden>✎ Ask Sameer about this</button>
+        <button id="idea-quote-float" class="quote-float idea-quote-float" type="button" hidden>✦ Ask Sameer</button>
         <button id="stash-float" class="quote-float stash-float" type="button" hidden title="Keep this passage in your Stash — cut material stays a click away">📥 Stash this</button>
         <button id="note-float" class="quote-float note-float" type="button" hidden title="Pin your own margin note to this line">📝 Note this line</button>
       </section>
@@ -291,7 +329,7 @@
         <form id="composer" class="composer">
           <div id="quote-card" class="quote-card" hidden></div>
           <div id="history-pop" class="history-pop" role="listbox" aria-label="Previous messages" hidden></div>
-          <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins…" rows="1"></textarea>
+          <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins — Sameer answers as he thinks…" rows="1"></textarea>
           <button type="submit" id="send-btn" aria-label="Send">➤</button>
         </form>
       </section>
@@ -319,6 +357,7 @@
           </div>
           <button id="analyze-btn" class="btn-secondary">Run Analysis</button>
           <button id="reparse-btn" class="btn-secondary" title="Re-parse the source file with the current parser — fixes mis-parsed formatting, then Run Analysis again">↻ Re-parse</button>
+          <button id="retry-failed-btn" class="btn-secondary retry-failed" style="display:none;" type="button" title="Re-run only the categories that failed last time and merge into the existing report">⚠ Retry failed</button>
         </div>
         <div id="feedback-tabs" class="feedback-tabs" style="display:none;">
           <button id="tab-report-btn" class="active" type="button">Report</button>
@@ -487,6 +526,6 @@
       <button id="fork-save" class="btn-primary">Create fork</button>
     </div>
   </div>
-</div>  <script src="app.js?v=id1a2b4"></script>
+</div>  <script src="app.js?v=id2b102"></script>
 </body>
 </html>

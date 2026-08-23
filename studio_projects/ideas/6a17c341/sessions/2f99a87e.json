@@ -1,0 +1,56 @@
+{
+  "session_id": "2f99a87e",
+  "title": "Idea room",
+  "report_path": null,
+  "script_path": null,
+  "server_url": "http://127.0.0.1:8099",
+  "model_id": "demo-craft-model",
+  "branches": {
+    "main": {
+      "name": "main",
+      "messages": [
+        {
+          "role": "user",
+          "content": "how about the idea ?",
+          "timestamp": 1787402781.3807561,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nOkay, the page is in my head.\n\nBecause that choice decides everything downstream. And \"how about the idea ?\" — good, push on that; don't settle it yet.",
+          "timestamp": 1787402781.380758,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "what do you think ?",
+          "timestamp": 1787402818.900571,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nOkay, the page is in my head.\n\nAn idea starts earning its keep the moment someone pays for it. And \"what do you think ?\" — good, push on that; don't settle it yet.",
+          "timestamp": 1787402818.9005728,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        }
+      ],
+      "parent_branch": null,
+      "forked_at_index": null,
+      "active_persona": "writing_partner",
+      "active_mode": "peer",
+      "awaiting_probe": false,
+      "created_at": 1787402763.566606
+    }
+  },
+  "current_branch": "main",
+  "created_at": 1787402763.5666022,
+  "updated_at": 1787402818.9010096
+}

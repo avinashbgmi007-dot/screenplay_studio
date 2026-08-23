@@ -1,0 +1,94 @@
+{
+  "session_id": "64b018e6",
+  "title": "Demo Night",
+  "report_path": "./studio_projects/Demo_Night/report.findings.json",
+  "script_path": "./studio_projects/Demo_Night/parsed.json",
+  "server_url": "http://127.0.0.1:33611",
+  "model_id": "demo-craft-model",
+  "branches": {
+    "main": {
+      "name": "main",
+      "messages": [
+        {
+          "role": "user",
+          "content": "what about scene 1?",
+          "timestamp": 1787395750.158198,
+          "mode": "peer",
+          "scene_refs": [
+            1
+          ],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nYou asked: \"what about scene 1?\"\n\nThe desk holds 1 scenes — starting at scene 1 (INT. STUDY - NIGHT]).\n\nI'm also carrying 9 margin findings from the doctor's read — worth pulling one into the rewrite loop.\n\nPoint me at a scene or a character and I'll go deeper; select any passage to have me read it closely.",
+          "timestamp": 1787395750.1582005,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "tell me about the revolver",
+          "timestamp": 1787395750.1777709,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nYou asked: \"tell me about the revolver\"\n\nI'm also carrying 9 margin findings from the doctor's read — worth pulling one into the rewrite loop.\n\nPoint me at a scene or a character and I'll go deeper; select any passage to have me read it closely.",
+          "timestamp": 1787395750.1777725,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "what about scene 1?",
+          "timestamp": 1787396066.399314,
+          "mode": "peer",
+          "scene_refs": [
+            1
+          ],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nYou asked: \"what about scene 1?\"\n\nThe desk holds 1 scenes — starting at scene 1 (INT. STUDY - NIGHT).\n\nI'm also carrying 9 margin findings from the doctor's read — worth pulling one into the rewrite loop.\n\nPoint me at a scene or a character and I'll go deeper; select any passage to have me read it closely.",
+          "timestamp": 1787396066.3993156,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "what about scene 1?",
+          "timestamp": 1787396852.5933435,
+          "mode": "peer",
+          "scene_refs": [
+            1
+          ],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nYou asked: \"what about scene 1?\"\n\nThe desk holds 1 scenes — starting at scene 1 (INT. STUDY - NIGHT).\n\nI'm also carrying 9 margin findings from the doctor's read — worth pulling one into the rewrite loop.\n\nPoint me at a scene or a character and I'll go deeper; select any passage to have me read it closely.",
+          "timestamp": 1787396852.5933456,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        }
+      ],
+      "parent_branch": null,
+      "forked_at_index": null,
+      "active_persona": "writing_partner",
+      "active_mode": "peer",
+      "awaiting_probe": false,
+      "created_at": 1787395750.0939748
+    }
+  },
+  "current_branch": "main",
+  "created_at": 1787395750.0939693,
+  "updated_at": 1787396852.5969758
+}

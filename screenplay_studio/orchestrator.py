@@ -35,14 +35,20 @@ def _merge_analysis(m, result):
         return  # nothing to merge into — fresh report is fine
 
     rerun = set(result.category_outcomes.keys())
-    # Deterministic passes (voice/subtext) regenerate on EVERY analyze run and
-    # never appear in category_outcomes — dropping the old copies avoids
-    # duplicating them in the merged report.
-    always_regenerated = {"voice", "subtext"}
+    # Deterministic passes (voice, subtext, idiolect, continuity, pacing drags)
+    # regenerate on EVERY analyze run and never appear in category_outcomes —
+    # dropping the old copies avoids duplicating them in the merged report.
+    # Matched by rule_id rather than category: every deterministic finding tags
+    # its rule id, and two of them (pace drags) share the "structure" category
+    # with model-judged findings that must be KEPT when structure wasn't re-run.
+    deterministic_rule_ids = {
+        "voice_bleed", "on_the_nose", "idiolect_consistency",
+        "unmarked_time_flip", "character_name_variant", "pacing_drag",
+    }
     # keep previous findings whose category wasn't part of this re-run
     prev_findings = [
         f for f in (prev.get("findings") or [])
-        if f.get("category") not in rerun and f.get("category") not in always_regenerated
+        if f.get("category") not in rerun and f.get("rule_id") not in deterministic_rule_ids
     ]
     result.findings = prev_findings + list(result.findings)
 

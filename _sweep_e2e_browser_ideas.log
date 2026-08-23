@@ -1,0 +1,16 @@
+  PASS  app loads
+  PASS  idea shelf reachable
+  PASS  /sameer consumed off the page
+  PASS  late line stays on the page
+  PASS  Sameer summoned & replied
+  PASS  reply is humanized (no pipeline tags)
+  PASS  he probes rather than recites
+  PASS  fresh context: knows the PRE-summon line
+  PASS  never parrots the page title back
+  PASS  session memory: follow-up understood
+  PASS  cross-idea isolation (no courier/key/midnight leak)
+  PASS  delete control visible on hover
+  PASS  delete removes the idea from the shelf
+  PASS  no JS page errors
+
+=== 14 passed, 0 failed ===

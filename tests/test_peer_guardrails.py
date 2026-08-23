@@ -61,7 +61,9 @@ def test_no_nudge_for_factual_answer():
 
 def test_short_factual_turn_still_gets_nudge():
     from screenplay_cowriter.peer import ensure_forward_momentum
-    assert ensure_forward_momentum("Act two.", "question") != "Act two."
+    assert ensure_forward_momentum("Act two.", "idea") != "Act two."
+    # a DIRECT QUESTION gets a clean answer -- no trailing nudge (evasive)
+    assert ensure_forward_momentum("Act two.", "question") == "Act two."
 
 
 def test_nudges_rotate_no_repeat_back_to_back():
@@ -210,6 +212,19 @@ def test_dead_end_nudge_applied_when_needed():
     client = FakeClient(["That could work."])
     engine = _make_engine(client)
     s = _make_session()
-    reply = engine.send_message(s, "what do you think about cutting the monologue?")
+    # an IDEA (not a direct question) still gets the stranded-reply nudge
+    reply = engine.send_message(s, "maybe we cut the monologue entirely")
     assert "one at a time" not in reply  # no bullets, so no cap
     assert reply.rstrip().endswith("?")  # nudge appended to the stranded reply
+
+
+def test_direct_question_gets_clean_answer_no_nudge():
+    client = FakeClient(["That could work."])
+    engine = _make_engine(client)
+    s = _make_session()
+    reply = engine.send_message(s, "what do you think about cutting the monologue?")
+    assert reply == "That could work."  # answered, not nudged
+    # and the answer-first contract reached the prompt
+    last_call = client.calls[-1]
+    sys_msgs = " ".join(m["content"] for m in last_call if m["role"] == "system")
+    assert "ANSWER FIRST" in sys_msgs

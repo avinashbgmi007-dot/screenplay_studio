@@ -1,0 +1,105 @@
+PASS flyouts collapsed on load
+PASS hover opens the Ideas flyout
+PASS count badge shows items
+PASS flyout item click opens the idea
+PASS /sameer summons from the flyout-opened idea
+PASS Sameer replies in the summoned room
+Traceback (most recent call last):
+  File "/home/daytona/codebase/tests/e2e_browser_ui_batch.py", line 162, in <module>
+    main()
+  File "/home/daytona/codebase/tests/e2e_browser_ui_batch.py", line 111, in main
+    expect(page.locator(".lang-menu").last).to_be_visible()
+  File "/usr/local/lib/python3.10/dist-packages/playwright/sync_api/_generated.py", line 23332, in to_be_visible
+    self._sync(
+  File "/usr/local/lib/python3.10/dist-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+  File "/usr/local/lib/python3.10/dist-packages/playwright/_impl/_assertions.py", line 852, in to_be_visible
+    await self._expect_impl(
+  File "/usr/local/lib/python3.10/dist-packages/playwright/_impl/_assertions.py", line 128, in _expect_impl
+    _record_soft_or_raise(
+  File "/usr/local/lib/python3.10/dist-packages/playwright/_impl/_assertions.py", line 60, in _record_soft_or_raise
+    raise error
+AssertionError: Locator expected to be visible
+Actual value: None
+Error: element(s) not found 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator(".lang-menu").last
+
+Aria snapshot:
+- complementary:
+  - text: Script Doctor Studio
+  - button "+ Lay a new page on the desk"
+  - button "Ideas 2 ▾":
+    - text: Ideas
+    - emphasis: "2"
+    - text: ▾
+  - button "+ New idea"
+  - button "On the shelf ▾":
+    - text: On the shelf
+    - emphasis
+    - text: ▾
+  - button "Your library ▾":
+    - text: Your library
+    - emphasis
+    - text: ▾
+  - button "☀ Dawn"
+  - button "⚙ Settings"
+- main:
+  - button "⌂"
+  - heading "Flyout Probe" [level=2]
+  - button "main"
+  - text: ✍️ Idea Room
+  - button "⌘K"
+  - complementary:
+    - text: Structure
+    - button "»"
+    - text: Scenes Characters The Stash Margin notes
+    - textbox "New margin note":
+      - /placeholder: A note to pin beside the script…
+    - button "Dictate"
+    - button "＋"
+    - button "📋 Beat Board"
+    - button "🗂 Compare"
+  - region "The script":
+    - textbox "Idea title": Flyout Probe
+    - button "▸ Structure"
+    - button "📄 First pages"
+    - textbox "The idea page": "Flyout Probe A night courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from the recipient's greatest regret. She keeps one swapped item: a brass key nobody has claimed."
+    - button "Dictate"
+    - button "Sameer"
+  - text: S Sameer co-writer — exploring the idea
+  - button "✕"
+  - region "Co-write":
+    - text: S
+    - button "back to Sameer"
+    - button "Sameer's notes on you"
+    - button "🗑 Clear chat"
+    - text: 📄 Sameer has your idea page in front of him — 34 words in context. No need to repeat it.
+    - button "show"
+    - text: You main what about the brass key? Studio
+    - button "🌐"
+    - text: main
+    - paragraph: You keep circling back to brass key — good instinct. So make it cost something. What does it take from someone before the story ends? Who benefits from it staying exactly as you wrote it?
+    - text: You main what does the key unlock? Studio
+    - button "🌐"
+    - text: main
+    - paragraph: I've read the page — I'm not going to read it back to you. The bit I keep snagging on is a brass key nobody has claimed..
+    - paragraph: Tell me the version where a brass key nobody has claimed. goes wrong. What breaks? I think the idea's real test lives one step past that.
+    - button "Jump to your message 1"
+    - button "Jump to your message 2"
+    - listbox "Conversation overview":
+      - button "1 what about the brass key?"
+      - button "2 what does the key unlock?"
+    - text: "Explore paths — one tap, Sameer runs with it:"
+    - button "🔮 What if…?"
+    - button "🎭 Who's the heart?"
+    - button "⚔️ Where's the heat?"
+    - button "📽️ Cold open"
+    - button "🧨 Push it further"
+    - textbox "Talk it through with Sameer…"
+    - button "Dictate"
+    - button "Send": ➤
+  - text: llama · 127.0.0.1:8099 ● model ready ⚡ —
+  - button "⏱ 25:00"
+  - button "☀ Dawn"

@@ -58,6 +58,158 @@ async function api(path, options = {}) {
   return data;
 }
 
+// ---- streaming chat turn (SSE) ----
+// Raw tokens stream into the pending bubble AS the model writes them — the
+// perceived-latency win for slow local models. The final SSE event carries
+// the CLEANED, stored reply + full history, so what lands in state is
+// exactly what the server persisted (streaming never changes what is kept).
+// Falls back to the blocking endpoint when the stream route is missing.
+async function streamChatTurn(base, text, quote, bubble, scrollContainer) {
+  const body = JSON.stringify(quote ? { text, quote } : { text });
+  const resp = await fetch(API + base + "/messages/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  if (resp.status === 404 || !resp.body) {
+    return api(`${base}/messages`, { method: "POST", body });
+  }
+  if (!resp.ok) {
+    let data = null;
+    try { data = await resp.json(); } catch (_) { /* no body */ }
+    const err = new Error((data && data.error) || `Request failed (${resp.status})`);
+    err.status = resp.status;
+    err.stillWorking = !!(data && data.still_working);
+    throw err;
+  }
+  // swap the typing dots for a live stream sink; keep the .elapsed span the
+  // ticker updates so it doesn't get recreated after streamed text each tick
+  const dotsEl = bubble.querySelector(".typing-dots");
+  if (dotsEl) dotsEl.remove();
+  let sink = bubble.querySelector(".stream-text");
+  if (!sink) {
+    sink = el("span", "stream-text");
+    bubble.insertBefore(sink, bubble.querySelector(".elapsed"));
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "", final = null, sseError = null;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const frame = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      const line = frame.split("\n").find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      let evt;
+      try { evt = JSON.parse(line.slice(5).trim()); } catch (_) { continue; }
+      if (evt.token) {
+        sink.textContent += evt.token;
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      } else if (evt.done) final = evt;
+      else if (evt.error) sseError = evt;
+    }
+  }
+  if (sseError) {
+    const err = new Error(sseError.error);
+    err.stillWorking = !!sseError.still_working;
+    throw err;
+  }
+  if (!final) throw new Error("The stream ended before the reply completed.");
+  return final;
+}
+
+// ---- finding triage: reload just the fix queue ----
+async function reloadFixQueue() {
+  try {
+    state.fixQueue = await api(`/projects/${encodeURIComponent(state.currentProject)}/fixqueue${state.fixQueueShowDismissed ? "?include_dismissed=1" : ""}`);
+  } catch (_) { /* keep whatever we had */ }
+}
+
+// ---- retry only the failed analysis categories (partial-report recovery) ----
+async function retryFailedCategories() {
+  const btn = $("#retry-failed-btn");
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "Retrying…";
+  try {
+    await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/retry-failed`, {
+      method: "POST", body: JSON.stringify({}),
+    });
+    appendSystemNote("Failed categories re-run — the report has been merged and updated.");
+    await loadProjects();
+    await loadScriptData();
+    renderScriptView();
+    loadFeedbackPanels();
+    refreshMetrics();
+  } catch (e) {
+    showError("Retry failed: " + e.message, true);
+  } finally {
+    btn.disabled = false;
+    const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
+    const still = ((projSummary && projSummary.failed_categories) || []).length;
+    btn.textContent = still ? `⚠ Retry failed (${still})` : label;
+    btn.style.display = still ? "inline-block" : "none";
+  }
+}
+
+// ---- inline editing: double-click a line on the page, type, done ----
+// Rides the EXISTING apply/undo path underneath (one {old, new} replacement
+// through /edits/apply), so undo, change-stars, finding re-verification and
+// exports all see it — no parallel edit machinery.
+function wireInlineEdit(lineEl, sceneNumber, originalText) {
+  lineEl.title = "Double-click to edit this line in place";
+  lineEl.addEventListener("dblclick", (ev) => {
+    ev.preventDefault();
+    if (lineEl.isContentEditable && lineEl.contentEditable === "true") return;
+    const cancelled = { value: false };
+    lineEl.contentEditable = "true";
+    lineEl.classList.add("inline-editing");
+    lineEl.focus();
+    // caret at end, like continuing a thought
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(lineEl);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    let busy = false;
+    const finish = async (save) => {
+      if (busy) return;
+      busy = true;
+      lineEl.contentEditable = "false";
+      lineEl.classList.remove("inline-editing");
+      const newText = (lineEl.textContent || "").trim();
+      const oldText = originalText.trim();
+      if (!save || cancelled.value || !newText || newText === oldText) {
+        renderScriptView();
+        return;
+      }
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/apply`, {
+          method: "POST",
+          body: JSON.stringify({ scene_number: sceneNumber, replacements: [{ old: originalText, new: newText }] }),
+        });
+        appendSystemNote("Line edited on the page — ↶ Undo takes it back.");
+      } catch (err) {
+        showError("Inline edit failed: " + err.message);
+      }
+      await loadScriptData();
+      renderScriptView();
+      refreshMetrics();
+    };
+    lineEl.addEventListener("blur", () => finish(true), { once: true });
+    lineEl.addEventListener("keydown", (kev) => {
+      if (kev.key === "Enter" && !kev.shiftKey) { kev.preventDefault(); lineEl.blur(); }
+      if (kev.key === "Escape") { kev.preventDefault(); cancelled.value = true; lineEl.blur(); }
+    });
+  });
+}
+
 function truncate(text, n) {
   text = text.trim().replace(/\s+/g, " ");
   return text.length > n ? text.slice(0, n - 1) + "…" : text;
@@ -237,6 +389,8 @@ async function checkConnection() {
   const connEl = $("#status-conn");
   try {
     const res = await api("/test-connection", { method: "POST", body: JSON.stringify({}) });
+    state.connState = { ok: !!res.ok, message: res.message };
+    renderDashboard();  // the dashboard's connection pill follows the strip
     dot.className = "connection-dot " + (res.ok ? "ok" : "fail");
     dot.title = res.message;
     if (connEl) {
@@ -269,8 +423,112 @@ async function loadProjects() {
   try {
     state.projects = await api("/projects");
     renderProjectList();
+    renderDashboard();
   } catch (e) {
     showError("Couldn't load your projects: " + e.message, true);
+  }
+}
+
+// ---- dashboard: every script as an intuitive card ----
+
+function _stageStep(label, status) {
+  const cls = status === "complete" ? "done" : status === "failed" ? "failed" : status === "running" ? "running" : "";
+  return `<span class="step ${cls}" title="${label}: ${status || "pending"}"><i></i>${label}</span>`;
+}
+
+function renderDashboard() {
+  const grid = $("#dash-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const projects = state.projects || [];
+
+  if (!projects.length) {
+    const empty = el("p", "dash-empty", "Nothing here yet — lay a manuscript on the desk above, or open the sample page.");
+    grid.appendChild(empty);
+  }
+
+  for (const p of projects) {
+    const card = el("div", "dash-card" + (p.project === state.currentProject ? " active" : ""));
+    card.title = `Open "${p.title}" on the desk`;
+
+    // head: title + format chip + delete
+    const head = el("div", "dash-card-head");
+    head.appendChild(el("span", "dash-card-title", p.title));
+    if (p.source_format) head.appendChild(el("span", "dash-format", p.source_format.replace(".", "").toUpperCase()));
+    const del = el("button", "project-delete", "✕");
+    del.type = "button";
+    del.title = `Remove "${p.title}" from the shelf`;
+    del.setAttribute("aria-label", `Remove ${p.title}`);
+    del.addEventListener("click", (e) => { e.stopPropagation(); deleteProjectFlow(p.project, p.title); });
+    head.appendChild(del);
+    card.appendChild(head);
+
+    // pipeline stepper: parse -> analyze -> chat
+    const steps = el("div", "dash-steps");
+    steps.innerHTML =
+      _stageStep("Parse", p.stages.parse) +
+      _stageStep("Analyze", p.stages.analyze) +
+      _stageStep("Chat", p.stages.chat);
+    card.appendChild(steps);
+
+    // stats row
+    const stats = el("div", "dash-stats");
+    stats.appendChild(el("span", null, `${(p.sessions || []).length} chat${(p.sessions || []).length === 1 ? "" : "s"}`));
+    stats.appendChild(el("span", null, `${p.edit_count || 0} edit${(p.edit_count || 0) === 1 ? "" : "s"}`));
+    if ((p.failed_categories || []).length) {
+      const warn = el("span", "dash-warn", `⚠ ${(p.failed_categories).length} failed`);
+      warn.title = "Some analysis categories failed — Retry failed in the Feedback room";
+      stats.appendChild(warn);
+    }
+    card.appendChild(stats);
+
+    // actions
+    const actions = el("div", "dash-actions");
+    const openBtn = el("button", "dash-open", "Open desk →");
+    openBtn.type = "button";
+    openBtn.addEventListener("click", (e) => { e.stopPropagation(); openProject(p.project); });
+    const backup = el("a", "dash-backup", "⬇ Backup");
+    backup.href = `/api/projects/${encodeURIComponent(p.project)}/backup`;
+    backup.download = `${p.project}-backup.zip`;
+    backup.title = "Download everything — source, report, chats, edits";
+    backup.addEventListener("click", (e) => e.stopPropagation());
+    actions.appendChild(openBtn);
+    actions.appendChild(backup);
+    card.appendChild(actions);
+
+    card.addEventListener("click", () => openProject(p.project));
+    grid.appendChild(card);
+  }
+
+  // connection pill mirrors the status strip's model state
+  const conn = $("#dash-conn");
+  if (conn && state.connState) {
+    conn.className = "dash-conn " + (state.connState.ok ? "ok" : "fail");
+    conn.textContent = state.connState.ok ? "● model connected" : "○ model offline";
+  }
+}
+
+async function deleteProjectFlow(name, title) {
+  if (!window.confirm(`Remove "${title}" from the shelf?\nThis deletes the project and its analysis from this machine.`)) return;
+  try {
+    await api(`/projects/${encodeURIComponent(name)}`, { method: "DELETE" });
+    if (state.currentProject === name) {
+      state.currentProject = null;
+      state.currentSession = null;
+      state.script = null;
+      state.findings = [];
+      state.fixQueue = null;
+      state.branches = { main: { messages: [], active_persona: "script_consultant", active_mode: "evidence_discussion" } };
+      state.currentBranch = "main";
+      hideAllViews();
+      $("#welcome-view").style.display = "flex";
+      $("#project-bar").style.display = "none";
+      $("#input").value = "";
+    }
+    await loadProjects();
+    saveSession();
+  } catch (err) {
+    showError("Couldn't remove the project: " + err.message);
   }
 }
 
@@ -285,6 +543,7 @@ function stageLabel(p) {
 function renderProjectList() {
   const list = $("#project-list");
   list.innerHTML = "";
+  setSectionCount("#shelf-count", state.projects.length);
   if (!state.projects.length) {
     list.appendChild(el("p", "empty-hint", "No screenplays yet — upload one to begin."));
     return;
@@ -597,6 +856,7 @@ function renderLibraryList() {
   const list = $("#library-list");
   if (!list) return;
   list.innerHTML = "";
+  setSectionCount("#library-count", state.library.length);
   if (!state.library.length) {
     list.appendChild(el("p", "empty-hint", "Past scripts gather here — Sameer and the doctor read this shelf too."));
     return;
@@ -626,6 +886,7 @@ async function loadIdeas() {
 function renderIdeaList() {
   const list = $("#idea-list");
   list.innerHTML = "";
+  setSectionCount("#idea-count", state.ideas.length);
   if (!state.ideas.length) {
     list.appendChild(el("p", "empty-hint", "No ideas yet — the desk is free for one."));
     return;
@@ -701,6 +962,7 @@ function showWelcomeDesk() {
   closeRoomDrawer();
   $("#welcome-view").style.display = "flex";
   $("#project-bar").style.display = "none";
+  $("#idea-canvas").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "none";
   hideAllViews();
@@ -804,35 +1066,89 @@ function populateIdeaCanvas(idea) {
   const card = idea.card || {};
   $("#idea-logline").value = card.logline || "";
   $("#idea-questions").value = (card.questions || []).join("\n");
+  updateIdeaSamPill();
+}
+
+// the summon pill only makes sense when there's something to talk ABOUT —
+// on a blank page it hides; the first word typed brings him back
+function updateIdeaSamPill() {
+  const pill = $("#idea-sam-pill");
+  if (!pill) return;
+  const has = (($("#idea-content") || {}).value || "").trim().length > 0;
+  pill.style.display = has ? "" : "none";
 }
 
 let ideaSaveTimer = null;
+let sameerSummonTimer = null;
 
 function handleIdeaContentInput() {
-  // the /sameer command: a first line of "/sameer" (or "/sameer <ask>")
-  // summons the chat for THIS idea; anything after the command pre-fills the
-  // composer, the rest of the page stays on the page
-  const lines = $("#idea-content").value.split("\n");
-  const m = lines[0].match(/^\/sameer(?:\s+(.+))?$/);
-  if (m) {
-    $("#idea-content").value = lines.slice(1).join("\n");
-    summonIdeaSam((m[1] || "").trim());
+  // the /sameer command: type it ANYWHERE — its own line, the end of a line,
+  // or mid-sentence — and this idea's own Sameer summons with the WHOLE page
+  // in front of him. Only the command token itself is spent; the sentence it
+  // sat in stays on the page, and any words right after the command become
+  // his opening ask in the composer.
+  //
+  // The summon waits ~350ms of typing silence first: a fast-typing writer (or
+  // a paste) finishes landing before he reads, so nothing gets split between
+  // the page and the composer. He still feels instant — a breath, not a wait.
+  const value = $("#idea-content").value;
+  updateIdeaSamPill();
+  if (/\/sameer(?![\w-])/.test(value)) {
+    clearTimeout(sameerSummonTimer);
+    sameerSummonTimer = setTimeout(() => {
+      const v2 = $("#idea-content").value;
+      const m2 = v2.match(/\/sameer(?![\w-])[ \t]?([^\n]*)/);
+      if (!m2) return; // edited away in the meantime
+      const ask = (m2[1] || "").trim();
+      $("#idea-content").value =
+        (v2.slice(0, m2.index) + v2.slice(m2.index + m2[0].length))
+          .replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "");
+      updateIdeaSamPill();
+      summonIdeaSam(ask);
+    }, 350);
     return;
   }
+  clearTimeout(sameerSummonTimer);
   scheduleIdeaSave();
 }
 
 function scheduleIdeaSave() {
+  // near-instant autosave: the page is the material Sameer reads — a slow
+  // debounce risks him missing the last lines before an invocation
   clearTimeout(ideaSaveTimer);
-  ideaSaveTimer = setTimeout(saveIdeaContent, 1200);
+  ideaSaveTimer = setTimeout(saveIdeaContent, 300);
+}
+
+// tiny trust signal: the page saves itself, quietly -- but the writer should
+// SEE that it saved ("did I lose anything?" must never be a question here)
+let _ideaSaveStateTimer = null;
+function setIdeaSaveState(phase) {
+  const elm = $("#idea-save-state");
+  if (!elm) return;
+  clearTimeout(_ideaSaveStateTimer);
+  if (phase === "saving") {
+    elm.textContent = "saving\u2026";
+    elm.classList.add("busy");
+    return;
+  }
+  elm.classList.remove("busy");
+  if (phase === "saved") {
+    const t = new Date();
+    elm.textContent = "saved " + t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    _ideaSaveStateTimer = setTimeout(() => { elm.textContent = ""; }, 4000);
+  } else {
+    elm.textContent = "";
+  }
 }
 
 async function saveIdeaContent() {
   clearTimeout(ideaSaveTimer);
   if (!state.currentIdea || !state.inIdea) return;
   const content = $("#idea-content").value;
+  setIdeaSaveState("saving");
   try {
     const res = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/content`, { method: "POST", body: JSON.stringify({ content }) });
+    setIdeaSaveState("saved");
     state.currentIdea.content = content;
     if (res && res.auto_title) {
       state.currentIdea.title = res.title;
@@ -858,9 +1174,28 @@ async function renameIdea(title) {
   }
 }
 
+function hideIdeaQuoteFloat() {
+  const btn = $("#idea-quote-float");
+  if (btn) btn.hidden = true;
+}
+
+// called by the floating chip: opens Sameer with the highlighted passage as
+// a pending quote card -- his next answer grounds on THOSE exact lines
+function askSamAboutSelection(btn) {
+  const text = (btn.dataset.text || "").trim();
+  hideIdeaQuoteFloat();
+  if (!text) return;
+  window.getSelection().removeAllRanges();
+  setPendingQuote({ scene_number: null, text });
+  summonIdeaSam(`What about this part \u2014 "${text.slice(0, 80)}${text.length > 80 ? "\u2026" : ""}"?`);
+}
+
 async function summonIdeaSam(prefill) {
   if (!state.currentIdea) return;
   try {
+    // flush any pending autosave BEFORE he reads: the whole point is that he
+    // has everything typed up to the exact moment you called him
+    await saveIdeaContent();
     if (!state.currentIdeaSession) {
       const res = await api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/chat/start`, { method: "POST" });
       state.currentIdeaSession = res.session_id;
@@ -906,6 +1241,15 @@ async function loadIdeaSession(sid) {
   state.currentIdeaSession = data.session_id;
   state.branches = data.branches;
   state.currentBranch = data.current_branch;
+  // Welcome-back recap: Sameer keeps a baseline of the page AS HE LAST READ
+  // it. If this is a returning conversation, say so out loud (and whether the
+  // page moved under him since).
+  const _msgs = ((data.branches || {})[data.current_branch] || {}).messages || [];
+  const _seen = (data.last_seen_content || "").trim();
+  const _now = ((state.currentIdea || {}).content || "").trim();
+  state.ideaRecap = _msgs.length
+    ? { turns: _msgs.length, changed: !!_seen && _seen !== _now }
+    : null;
   resetChatHistory();
   renderMessages();
   renderBranches();
@@ -1303,6 +1647,9 @@ async function openProject(name) {
     state.reportStats = null;
     state.premise = null;
     $("#premise-pane").style.display = "none";
+    // leaving the idea room must put the canvas AWAY, or it stays stacked
+    // above the project's pages (reported: idea page took the top half)
+    $("#idea-canvas").style.display = "none";
     $("#script-toolbar").style.display = "flex";
     $("#script-scenes").style.display = "";
     $(".partner-name").textContent = "Sameer — AI writing partner";
@@ -1763,19 +2110,57 @@ function currentBranchData() {
 function renderMessages() {
   const container = $("#messages-scroll");
   container.innerHTML = "";
+  if (state.inIdea && state.ideaRecap &&
+      (currentBranchData().messages || []).length) {
+    const r = state.ideaRecap;
+    state.ideaRecap = null;   // once per visit, not per message
+    container.appendChild(el("div", "idea-recap-chip",
+      "\u21a9 Picked up where you left off \u2014 " + r.turns +
+      (r.turns === 1 ? " message" : " messages") + " with Sameer" +
+      (r.changed ? " \u00b7 your page changed since his last read" : "")));
+  }
+  // the context card: PROOF Sameer has the page -- word count + a peek at
+  // the actual material he is reading. Deterministic UI evidence.
+  if (state.inIdea && state.currentIdea) {
+    const content = (state.currentIdea.content || "").trim();
+    if (content) {
+      const words = content.split(/\s+/).length;
+      const card = el("div", "idea-context-card");
+      const head = el("div", "idea-context-head");
+      const label = el("span", "idea-context-label",
+        "\u{1F4C4} Sameer has your idea page in front of him \u2014 " + words +
+        " word" + (words === 1 ? "" : "s") + " in context. No need to repeat it.");
+      const toggle = el("button", "idea-context-toggle", "show");
+      toggle.type = "button";
+      const snap = el("div", "idea-context-snap");
+      snap.hidden = true;
+      snap.textContent = content;
+      toggle.addEventListener("click", () => {
+        snap.hidden = !snap.hidden;
+        toggle.textContent = snap.hidden ? "show" : "hide";
+      });
+      head.appendChild(label);
+      head.appendChild(toggle);
+      card.appendChild(head);
+      card.appendChild(snap);
+      container.appendChild(card);
+    }
+  }
   const msgs = currentBranchData().messages || [];
   if (!msgs.length) {
     const hint = el("div", "chat-empty-hint");
     if (state.inIdea) {
-      hint.innerHTML =
-        "This is the idea desk — no pages yet, and that's the point. Talk the idea through with Sameer " +
-        "(he probes before he suggests), then flip to <em>Feedback</em> to have the premise doctor " +
-        "stress-test it. Save the premise card as it sharpens — it rides with every turn and " +
-        "carries into the script when you upload the first pages.";
+      const hasPage = state.currentIdea && (state.currentIdea.content || "").trim();
+      hint.innerHTML = hasPage
+        ? "He\u2019s read every word of your page \u2014 start anywhere, or ask what snagged him. Flip to <em>Feedback</em> when you want the premise doctor to stress-test it."
+        : "This is the idea desk \u2014 no pages yet, and that\u2019s the point. Talk the idea through with Sameer " +
+          "(he probes before he suggests), then flip to <em>Feedback</em> to have the premise doctor " +
+          "stress-test it. Save the premise card as it sharpens \u2014 it rides with every turn and " +
+          "carries into the script when you upload the first pages.";
     } else {
       hint.innerHTML =
-        "Ask about a theme, a character, or a specific scene (e.g. <em>\"what about Scene 12?\"</em>) — " +
-        "or just say hello and we'll take it from there. Run analysis first if you want the conversation " +
+        "Ask about a theme, a character, or a specific scene (e.g. <em>\"what about Scene 12?\"</em>) \u2014 " +
+        "or just say hello and we\'ll take it from there. Run analysis first if you want the conversation " +
         "grounded in a full report; it works fine without one too, just more loosely.";
     }
     container.appendChild(hint);
@@ -1813,6 +2198,83 @@ function renderMessage(m, index) {
   wrap.id = `msg-${index}`;
   const head = el("div", "msg-head");
   head.appendChild(el("div", "msg-role", m.role === "user" ? "You" : "Studio"));
+  if (m.role === "assistant") {
+    // "what does that mean?" -- ephemeral rendering in ANY supported register,
+    // display-only. Hovering the globe floats the language menu; picking one
+    // renders inline under the bubble and is never stored.
+    const tr = el("button", "translate-btn", "\u{1F310}");
+    tr.type = "button";
+    tr.title = "Translate this reply \u2014 hover to pick a language";
+    tr.setAttribute("aria-label", "Translate this reply");
+    const LANG_TARGETS = [
+      ["en", "English"],
+      ["te", "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41"],
+      ["hi", "\u0939\u093f\u0928\u094d\u0926\u0940"],
+      ["teng", "Tenglish"],
+      ["hing", "Hinglish"],
+    ];
+    let menu = null;
+    let hideMenuTimer = null;
+    const closeMenu = () => { if (menu) { menu.remove(); menu = null; } };
+    const openMenu = () => {
+      if (menu) return;
+      clearTimeout(hideMenuTimer);
+      menu = el("div", "lang-menu");
+      for (const [code, label] of LANG_TARGETS) {
+        const opt = el("button", "lang-menu-item", label);
+        opt.type = "button";
+        opt.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          closeMenu();
+          let existing = wrap.querySelector(".msg-translation");
+          if (existing && existing.dataset.lang === code) { existing.hidden = !existing.hidden; return; }
+          if (existing) existing.remove();
+          tr.textContent = "\u2026";
+          try {
+            const res = await api(`${state.currentIdea
+              ? `/ideas/${encodeURIComponent(state.currentIdea.id)}/chat/sessions/${state.currentIdeaSession}`
+              : `/projects/${encodeURIComponent(state.currentProject)}/chat/sessions/${state.currentSession}`}/translate`,
+              { method: "POST", body: JSON.stringify({ index, target_lang: code }) });
+            const panel = el("div", "msg-translation");
+            panel.dataset.lang = code;
+            const lbl = LANG_TARGETS.find((l) => l[0] === code);
+            panel.appendChild(el("div", "msg-translation-label", `\u{1F310} in ${lbl ? lbl[1] : code}:`));
+            panel.appendChild(el("div", "msg-translation-text", res.translation || "(nothing to translate)"));
+            wrap.appendChild(panel);
+          } catch (err) {
+            appendSystemNote("Translation unavailable: " + err.message, true);
+          } finally {
+            tr.textContent = "\u{1F310}";
+          }
+        });
+        menu.appendChild(opt);
+      }
+      document.querySelectorAll(".lang-menu").forEach((m) => m.remove());
+      document.body.appendChild(menu);
+      // Anchor AT the globe: fixed coords from the button's live rect put the
+      // menu right under the hovered icon -- flipped above and clamped when
+      // the message sits near a viewport edge.
+      const r = tr.getBoundingClientRect();
+      menu.style.position = "fixed";
+      // the chat drawer itself stacks at z-index 590 -- a body child must
+      // out-stack it or the bubbles paint right over the menu
+      menu.style.zIndex = "600";
+      LANG_MENU_TRIGGER.set(menu, tr);
+      const mw = menu.offsetWidth || 130, mh = menu.offsetHeight || 150;
+      let left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+      let top = r.bottom + 4;
+      if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+      menu.style.left = left + "px";
+      menu.style.top = top + "px";
+      wireLangMenuDismiss();
+    };
+    tr.addEventListener("mouseenter", openMenu);
+    tr.addEventListener("mouseleave", () => {
+      hideMenuTimer = setTimeout(() => { if (!menu?.matches(":hover")) closeMenu(); }, 260);
+    });
+    tr.addEventListener("click", (e) => { e.stopPropagation(); if (menu) closeMenu(); else openMenu(); });
+    head.appendChild(tr);
+  }
   const origin = messageOriginBranch(index);
   const badge = el("span", "branch-badge", origin);
   badge.style.setProperty("--badge-h", branchHue(origin));
@@ -2407,9 +2869,7 @@ async function sendMessage() {
       const base = state.inIdea
         ? `/ideas/${encodeURIComponent(state.currentIdea.id)}`
         : `/projects/${encodeURIComponent(state.currentProject)}`;
-      const res = await api(`${base}/chat/sessions/${sessionId}/messages`, {
-        method: "POST", body: JSON.stringify(quote ? { text, quote } : { text }),
-      });
+      const res = await streamChatTurn(`${base}/chat/sessions/${sessionId}`, text, quote, pendingBubble, container);
       stopTicker();
       state.branches[state.currentBranch] = { ...currentBranchData(), messages: res.messages };
       renderMessages();
@@ -2656,16 +3116,31 @@ function addPanel(container, panel) {
 
 function renderFixQueuePanel(container) {
   const items = (state.fixQueue && state.fixQueue.items) || [];
-  const open = items.filter((i) => i.status !== "addressed");
-  if (!items.length) return;
+  const open = items.filter((i) => i.status !== "addressed" && !i.dismissed);
+  if (!items.length && !state.fixQueueShowDismissed) return;
+  const total = (state.fixQueue && (state.fixQueue.total_count ?? items.length)) || items.length;
 
   const panel = el("div", "craft-panel fix-queue");
   const head = el("div", "craft-panel-head");
-  head.appendChild(el("span", "craft-panel-title", `Fix queue — ${open.length} open / ${items.length} total`));
+  head.appendChild(el("span", "craft-panel-title", `Fix queue — ${open.length} open / ${total} total`));
+  // triage: dismissed findings stay in the report but out of the writer's way
+  const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
+  if (dismissedCount) {
+    const show = !!state.fixQueueShowDismissed;
+    const toggleBtn = el("button", "fq-toggle-dismissed", show ? `Hide dismissed (${dismissedCount})` : `Show dismissed (${dismissedCount})`);
+    toggleBtn.type = "button";
+    toggleBtn.addEventListener("click", async () => {
+      state.fixQueueShowDismissed = !show;
+      await reloadFixQueue();
+      if (state.view === "feedback") loadFeedbackPanels();
+      else renderScriptView();
+    });
+    head.appendChild(toggleBtn);
+  }
   panel.appendChild(head);
 
   for (const item of items) {
-    const row = el("div", "fix-row" + (item.status === "addressed" ? " done" : ""));
+    const row = el("div", "fix-row" + (item.status === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
     row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
     const act = el("span", "act-chip", item.act_name || "Script-level");
@@ -2688,9 +3163,25 @@ function renderFixQueuePanel(container) {
     const discussBtn = el("button", "", "Discuss");
     discussBtn.type = "button";
     discussBtn.addEventListener("click", () => discussFinding(item, item.index));
+    const triageBtn = el("button", item.dismissed ? "fq-undismiss" : "fq-dismiss", item.dismissed ? "Restore" : "Dismiss");
+    triageBtn.type = "button";
+    triageBtn.title = item.dismissed
+      ? "Put this finding back in the queue"
+      : "I've read it — choosing to live with this one (hidden from the queue, kept in the report)";
+    triageBtn.addEventListener("click", async () => {
+      try {
+        const verb = item.dismissed ? "undismiss" : "dismiss";
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/findings/${item.index}/${verb}`,
+          { method: "POST", body: JSON.stringify({ issue: item.issue || "" }) });
+        await reloadFixQueue();
+        if (state.view === "feedback") loadFeedbackPanels();
+        else renderScriptView();
+      } catch (err) { showError("Triage failed: " + err.message); }
+    });
     actions.appendChild(locateBtn);
     actions.appendChild(rewriteBtn);
     actions.appendChild(discussBtn);
+    actions.appendChild(triageBtn);
     body.appendChild(actions);
     row.appendChild(sev);
     row.appendChild(act);
@@ -3222,6 +3713,7 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
     if (searchQuery) highlightMatches(line, text, searchQuery);
     // change-mark star: this line is the NEW text of an applied edit (Arc
     // Studio's most-praised touch) — hover shows what it replaced
+    wireInlineEdit(line, scene.scene_number, e.text);
     const changed = changedTexts.find((rep) => normText(rep.new) === normText(text) && normText(rep.new).length >= 2);
     if (changed) {
       line.classList.add("el-changed");
@@ -3400,6 +3892,8 @@ function renderScriptView() {
   $("#export-fountain").download = `${state.script.title || "script"}.fountain`;
   $("#export-fdx").download = `${state.script.title || "script"}.fdx`;
   $("#export-txt").download = `${state.script.title || "script"}.txt`;
+  $("#export-backup").href = `/api/projects/${encodeURIComponent(state.currentProject)}/backup`;
+  $("#export-backup").download = `${state.currentProject}-backup.zip`;
 
   renderRailScenes();
   renderRailNotes();
@@ -3428,10 +3922,6 @@ async function openScriptView() {
     showError("Couldn't load the script: " + e.message);
   }
   renderScriptView();
-}
-
-function openChatView() {
-  openCowriteRoom();
 }
 
 function discussFinding(f, index) {
@@ -3467,6 +3957,14 @@ async function loadFeedbackPanels() {
   try {
     if (!state.fixQueue) state.fixQueue = await api(`${base}/fixqueue`);
   } catch (_) { /* no analysis yet */ }
+  // partial-analysis recovery: offer a one-click retry when categories failed
+  const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
+  const failedCats = (projSummary && projSummary.failed_categories) || [];
+  const retryBtn = $("#retry-failed-btn");
+  if (retryBtn) {
+    retryBtn.style.display = failedCats.length ? "inline-block" : "none";
+    if (failedCats.length) retryBtn.textContent = `⚠ Retry failed (${failedCats.length})`;
+  }
   const hasReport = !!(state.report && (state.report.findings || state.report.coverage));
   const empty = $("#feedback-empty");
   const tabs = $("#feedback-tabs");
@@ -3517,7 +4015,7 @@ function renderReportPanel() {
     const spHead = el("div", "craft-panel-head");
     spHead.appendChild(el("span", "craft-panel-title", "Setup / Payoff"));
     spCard.appendChild(spHead);
-    const SP_STATUS = { paid: "✅ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
+    const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
     sp.forEach((e) => {
       const setScenes = (e.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
       const payScenes = (e.payoff_scenes && e.payoff_scenes.length) ? e.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
@@ -4448,8 +4946,254 @@ function autoResizeTextarea() {
   input.style.height = Math.min(input.scrollHeight, 160) + "px";
 }
 
+// ---------- sidebar flyouts: collapsed shelves that open on hover ----------
+// The three shelves (Ideas / On the shelf / Your library) stay collapsed as
+// labeled chips; hovering a section floats its scrollable list over the desk
+// (click pins it open). Same visual language as the chat checkpoint rail.
+function setSectionCount(sel, n) {
+  const badge = document.querySelector(sel);
+  if (!badge) return;
+  badge.textContent = n ? String(n) : "";
+}
+
+function closeSidebarFlyouts(except) {
+  for (const s of document.querySelectorAll(".sidebar-section.open")) {
+    if (s === except) continue;
+    s.classList.remove("open", "pinned");
+    const t = s.querySelector(".sidebar-section-trigger");
+    if (t) t.setAttribute("aria-expanded", "false");
+  }
+}
+
+function wireSidebarFlyouts() {
+  for (const section of document.querySelectorAll(".sidebar-section")) {
+    const trigger = section.querySelector(".sidebar-section-trigger");
+    if (!trigger) continue;
+    let hideTimer = null;
+    const open = () => {
+      clearTimeout(hideTimer);
+      closeSidebarFlyouts(section);
+      section.classList.add("open");
+      trigger.setAttribute("aria-expanded", "true");
+    };
+    const scheduleClose = () => {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        if (section.classList.contains("pinned")) return;
+        section.classList.remove("open");
+        trigger.setAttribute("aria-expanded", "false");
+      }, 220);
+    };
+    // Hover opens from the SECTION TRIGGER only -- a section head can carry
+    // sibling actions beside the trigger (the Ideas row also holds
+    // "+ New idea"), and hovering those must never drop the list. The 220ms
+    // grace covers the hop from the trigger into its own flyout below.
+    trigger.addEventListener("mouseenter", open);
+    trigger.addEventListener("mouseleave", scheduleClose);
+    trigger.addEventListener("click", () => {
+      if (section.classList.contains("open") && section.classList.contains("pinned")) {
+        section.classList.remove("pinned", "open");
+        trigger.setAttribute("aria-expanded", "false");
+        return;
+      }
+      closeSidebarFlyouts(section);
+      section.classList.add("open", "pinned");
+      trigger.setAttribute("aria-expanded", "true");
+    });
+    // interacting inside a pinned flyout keeps it open
+    section.querySelector(".sidebar-flyout").addEventListener("mouseenter", () => clearTimeout(hideTimer));
+  }
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSidebarFlyouts(null); });
+  // A dropped-down flyout OVERLAYS the sections beneath it -- and sliding the
+  // pointer across it keeps cancelling its close timer, so it lingers over
+  // the shelf/library triggers and swallows their hover/clicks (invisible
+  // dead zones). The moment the pointer leaves the owning section's box,
+  // close it so the triggers underneath are reachable again. Pinned flyouts
+  // stay until an explicit dismissal.
+  document.addEventListener("mousemove", (e) => {
+    const opened = document.querySelector(".sidebar-section.open:not(.pinned)");
+    if (!opened) return;
+    // the keep-open region is the section PLUS its dropped-down flyout (the
+    // flyout is absolutely positioned, so the section's own rect excludes it)
+    const r = opened.getBoundingClientRect();
+    let left = r.left, right = r.right, top = r.top, bottom = r.bottom;
+    const fly = opened.querySelector(".sidebar-flyout");
+    if (fly && getComputedStyle(fly).display !== "none") {
+      const f = fly.getBoundingClientRect();
+      left = Math.min(left, f.left); right = Math.max(right, f.right);
+      top = Math.min(top, f.top); bottom = Math.max(bottom, f.bottom);
+    }
+    if (e.clientX < left || e.clientX > right || e.clientY < top || e.clientY > bottom) {
+      opened.classList.remove("open");
+      const t = opened.querySelector(".sidebar-section-trigger");
+      if (t) t.setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".sidebar-section")) closeSidebarFlyouts(null);
+  });
+}
+
+// ---------- local dictation (STT): a mic chip beside every writing surface ----------
+// Fully local: MediaRecorder captures -> /api/stt -> faster-whisper (or the
+// writer's own local whisper server) -> text lands at the caret. No cloud.
+const MIC_LANGS = [
+  ["auto", "Auto-detect"],
+  ["en", "English"],
+  ["hi", "\u0939\u093f\u0928\u094d\u0926\u0940"],
+  ["te", "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41"],
+];
+
+function sttLanguage() {
+  return localStorage.getItem("studio-stt-lang") || "auto";
+}
+
+function insertAtCaret(input, text) {
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? start;
+  const before = input.value.slice(0, start);
+  const after = input.value.slice(end);
+  const glue = before && !/\s$/.test(before) && !/^\s/.test(text) ? " " : "";
+  input.value = before + glue + text + after;
+  const pos = (before + glue + text).length;
+  input.setSelectionRange(pos, pos);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.focus();
+}
+
+// Generic studio-mic glyph (SVG) -- the emoji stage mic read as a gadget.
+const MIC_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+const REC_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg>';
+
+// The lang menu lives on <body>: the drawer/room/message ancestors carry
+// identity transforms, which turn them into the containing block for
+// position:fixed and would drag the menu out of place. Body has none.
+function dismissStrayLangMenus() {
+  document.querySelectorAll(".lang-menu").forEach((m) => {
+    // while the writer still points at the owning globe, an auto-scroll from
+    // a streaming reply must NOT yank the menu away from under the cursor
+    const t = LANG_MENU_TRIGGER.get(m);
+    if (t && t.matches(":hover")) return;
+    if (!m.matches(":hover")) m.remove();
+  });
+}
+const LANG_MENU_TRIGGER = new WeakMap();
+let _langMenuScrollWired = false;
+function wireLangMenuDismiss() {
+  if (_langMenuScrollWired) return;
+  _langMenuScrollWired = true;
+  document.addEventListener("scroll", (e) => {
+    if (e.target && e.target.closest && e.target.closest(".messages-scroll")) {
+      dismissStrayLangMenus();
+    }
+  }, true);
+}
+
+function attachMic(inputEl) {
+  if (!inputEl || inputEl.dataset.micAttached) return;
+  inputEl.dataset.micAttached = "1";
+  const wrap = document.createElement("div");
+  wrap.className = "mic-wrap";
+  inputEl.parentNode.insertBefore(wrap, inputEl);
+  wrap.appendChild(inputEl);
+
+  const btn = el("button", "mic-btn");
+  btn.innerHTML = MIC_ICON_SVG;
+  btn.type = "button";
+  btn.title = "Dictate \u2014 hands-free typing. Right-click to pick the spoken language.";
+  btn.setAttribute("aria-label", "Dictate");
+  wrap.appendChild(btn);
+
+  let recorder = null;
+  let chunks = [];
+  let stream = null;
+  const setRecording = (on) => {
+    btn.classList.toggle("recording", on);
+    btn.innerHTML = on ? REC_ICON_SVG : MIC_ICON_SVG;
+    btn.title = on ? "Recording \u2014 click again to transcribe"
+                   : "Dictate \u2014 hands-free typing. Right-click to pick the spoken language.";
+  };
+
+  const stopAndSend = async () => {
+    if (!recorder || recorder.state === "inactive") return;
+    recorder.stop(); // onstop below does the upload
+  };
+
+  recorder = null;
+  btn.addEventListener("click", async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === "undefined") {
+      appendSystemNote("Dictation isn't available in this browser \u2014 it needs microphone access.", true);
+      return;
+    }
+    if (btn.classList.contains("recording")) { await stopAndSend(); return; }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (_) {
+      appendSystemNote("Microphone access was blocked \u2014 allow it in the browser to dictate.", true);
+      return;
+    }
+    chunks = [];
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setRecording(false);
+      const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+      if (!blob.size) return;
+      btn.textContent = "\u2026";
+      btn.title = "Transcribing\u2026";
+      try {
+        const fd = new FormData();
+        fd.append("audio", blob, "speech.webm");
+        fd.append("language", sttLanguage());
+        const res = await fetch("/api/stt", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "transcription failed");
+        if ((data.text || "").trim()) insertAtCaret(inputEl, data.text.trim());
+      } catch (err) {
+        appendSystemNote("Dictation failed: " + err.message, true);
+      } finally {
+        btn.innerHTML = MIC_ICON_SVG;
+      }
+    };
+    recorder.start();
+    setRecording(true);
+  });
+
+  // right-click: pick the spoken language (remembered per writer)
+  btn.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    document.querySelectorAll(".mic-lang-menu").forEach((m) => m.remove());
+    const menu = el("div", "mic-lang-menu");
+    for (const [code, label] of MIC_LANGS) {
+      const opt = el("button", "mic-lang-item" + (sttLanguage() === code ? " current" : ""), label);
+      opt.type = "button";
+      opt.addEventListener("click", () => {
+        localStorage.setItem("studio-stt-lang", code);
+        menu.remove();
+      });
+      menu.appendChild(opt);
+    }
+    wrap.appendChild(menu);
+    const dismiss = (ev) => {
+      if (menu.contains(ev.target)) return;
+      menu.remove();
+      document.removeEventListener("click", dismiss);
+    };
+    setTimeout(() => document.addEventListener("click", dismiss), 0);
+  });
+}
+
+function wireMics() {
+  ["#idea-content", "#input", "#premise-logline", "#premise-text",
+   "#premise-questions", "#idea-logline", "#idea-questions", "#rail-note-input",
+  ].forEach((sel) => attachMic(document.querySelector(sel)));
+}
+
 function init() {
   loadConfig();
+  wireSidebarFlyouts();
+  wireMics();
   const projectsPromise = Promise.all([loadProjects(), loadIdeas()]);
   loadLibrary();
   setInterval(checkConnection, 30000);
@@ -4517,6 +5261,68 @@ function init() {
   // idea canvas: the blank page, autosaved; /sameer; the pill; structure
   $("#idea-content").addEventListener("input", handleIdeaContentInput);
   $("#idea-content").addEventListener("blur", saveIdeaContent);
+
+  // back to the page = the partner steps back: clicking/focusing the editor
+  // dismisses the room drawer so the writer always has the full page
+  for (const ev of ["focus", "click"]) {
+    $("#idea-content").addEventListener(ev, () => {
+      const d = $("#room-drawer");
+      if (d && d.classList.contains("open")) closeRoomDrawer();
+    });
+  }
+
+  // select-to-ask on the IDEA PAGE: highlight any lines -> "Ask Sameer"
+  // floats up -> the passage rides as a quote card, exactly like the script
+  // pane. Precision by construction: he answers THOSE words.
+  const ideaEl = $("#idea-content");
+
+  function updateIdeaQuoteFloat() {
+    const btn = $("#idea-quote-float");
+    if (!btn) return;
+    const sel = window.getSelection();
+    // NOTE: no isCollapsed check -- some engines report textarea selections
+    // as collapsed while toString() still carries the full text. The length
+    // guard below is the real gate.
+    if (!sel || !sel.rangeCount) { hideIdeaQuoteFloat(); return; }
+    // Textarea selections report unreliable ancestors (sometimes the document
+    // itself). The editor OWNS this selection when it holds focus -- that's
+    // the real gate; the ancestor walk is only a secondary check.
+    const node = sel.getRangeAt(0).commonAncestorContainer;
+    const el = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
+    const ownedByEditor = document.activeElement === ideaEl
+      || ideaEl.contains(node)
+      || (el && ideaEl.contains(el));
+    if (!ownedByEditor) { hideIdeaQuoteFloat(); return; }
+    const text = sel.toString().trim().replace(/\s+/g, " ");
+    if (!text || text.length < 4 || text.length > 600) { hideIdeaQuoteFloat(); return; }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    const hostRect = ideaEl.closest(".idea-canvas, .editor-wrap, body").getBoundingClientRect();
+    btn.dataset.text = text;
+    btn.hidden = false;
+    if (rect && (rect.width || rect.height)) {
+      btn.style.left = Math.max(8, Math.min(rect.right - hostRect.left - 60, hostRect.width - 140)) + "px";
+      btn.style.top = Math.max(4, rect.bottom - hostRect.top + 6) + "px";
+    } else {
+      // degenerate range rect (some engines/headless): anchor bottom-right of
+      // the editor -- still next to the writer's eyes, never in the way
+      btn.style.left = Math.max(8, hostRect.width - 150) + "px";
+      btn.style.top = Math.max(4, hostRect.height - 44) + "px";
+    }
+  }
+
+  ideaEl.addEventListener("mouseup", () => setTimeout(updateIdeaQuoteFloat, 10));
+  // keyboard selections (shift+arrows, shift+home) never fire mouseup
+  let _ideaSelTimer = null;
+  document.addEventListener("selectionchange", () => {
+    if (!state.inIdea) return;
+    clearTimeout(_ideaSelTimer);
+    _ideaSelTimer = setTimeout(updateIdeaQuoteFloat, 60);
+  });
+  document.addEventListener("mousedown", (e) => {
+    const btn = $("#idea-quote-float");
+    if (btn && !btn.hidden && !btn.contains(e.target) && e.target !== ideaEl) hideIdeaQuoteFloat();
+  });
+  $("#idea-quote-float").addEventListener("click", function () { askSamAboutSelection(this); });
   $("#idea-title-input").addEventListener("change", () => renameIdea($("#idea-title-input").value.trim()));
   $("#idea-sam-pill").addEventListener("click", () => summonIdeaSam());
   $("#idea-structure-btn").addEventListener("click", toggleIdeaStructure);
@@ -4603,6 +5409,7 @@ function init() {
 
   $("#analyze-btn").addEventListener("click", runAnalysis);
   $("#reparse-btn").addEventListener("click", reparseProject);
+  $("#retry-failed-btn").addEventListener("click", retryFailedCategories);
 
   // script pane
   $("#script-search").addEventListener("input", () => renderScriptView());

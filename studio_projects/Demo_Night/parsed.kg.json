@@ -1,0 +1,78 @@
+{
+  "characters": {
+    "MARA": {
+      "name": "MARA",
+      "scenes_present": [
+        1,
+        2
+      ],
+      "scene_dialogue_counts": {
+        "1": 1,
+        "2": 1
+      },
+      "first_scene": 1,
+      "last_scene": 2,
+      "trait_mentions": []
+    }
+  },
+  "prop_candidates": [
+    {
+      "name": "REVOLVER",
+      "scenes_mentioned": [
+        1,
+        2,
+        3
+      ],
+      "mention_count": 3,
+      "mention_texts": [
+        {
+          "scene": 1,
+          "text": "MARA unlocks a drawer and takes out an old REVOLVER, setting it on the desk."
+        },
+        {
+          "scene": 2,
+          "text": "Mara sits at the table, the REVOLVER beside her."
+        },
+        {
+          "scene": 3,
+          "text": "MARA checks the REVOLVER one last time before hiding it."
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "scene_number": 1,
+      "int_ext": "INT",
+      "time_of_day": "NIGHT",
+      "explicit_markers": []
+    },
+    {
+      "scene_number": 2,
+      "int_ext": "INT",
+      "time_of_day": "DAY",
+      "explicit_markers": []
+    },
+    {
+      "scene_number": 3,
+      "int_ext": "INT",
+      "time_of_day": "NIGHT",
+      "explicit_markers": []
+    }
+  ],
+  "promise_candidates": [
+    {
+      "scene_number": 1,
+      "character": "MARA",
+      "text": "I'll tell you everything when this is over.",
+      "pattern_matched": "I'll tell"
+    },
+    {
+      "scene_number": 2,
+      "character": "MARA",
+      "text": "I promise I'll explain everything.",
+      "pattern_matched": "I promise"
+    }
+  ],
+  "character_cooccurrence": {}
+}

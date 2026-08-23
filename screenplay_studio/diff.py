@@ -86,14 +86,17 @@ def upload_new_draft(m, uploaded_path: str, filename: str):
     if m.stage("parse").status == "complete":
         snapshot_active(m, m.active_draft or "original")
 
-    old_source = m.source_path
-    if os.path.exists(old_source):
-        os.remove(old_source)
-
     ext = os.path.splitext(filename)[1].lower()
     m.source_filename = filename
     m.source_format = ext
-    shutil.copy2(uploaded_path, m.source_path)
+    # Copy FIRST, swap SECOND: the new upload lands beside the old source and
+    # an atomic replace swaps them, so a failed copy can never destroy the
+    # writer's only copy of the script (previously the old source was deleted
+    # before the copy ran — a copy failure on a project with no draft snapshot
+    # meant unrecoverable data loss).
+    incoming = m.source_path + ".incoming"
+    shutil.copy2(uploaded_path, incoming)
+    os.replace(incoming, m.source_path)
 
     _reset_derived_state(m)
     m.stages["parse"] = StageStatus()  # new source -> re-parse

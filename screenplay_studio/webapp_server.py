@@ -17,11 +17,14 @@ import argparse
 import io
 import json
 import os
+import queue
 import re
+import threading
 import time
 import traceback
+import zipfile
 
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 
 from .ideas import IdeaStore
 from .manifest import ProjectManifest
@@ -146,6 +149,9 @@ def _manifest_summary(m: ProjectManifest) -> dict:
         "drafts": m.drafts,
         "active_draft": m.active_draft,
         "report_language": m.report_language,
+        # categories that failed in the last analyze run (partial success) —
+        # the frontend offers a one-click "retry failed" when this is non-empty
+        "failed_categories": (m.stage("analyze").output_paths or {}).get("failed_categories") or [],
     }
 
 
@@ -424,6 +430,67 @@ def analyze_project(name):
     return jsonify(_manifest_summary(m))
 
 
+@app.route("/api/projects/<name>/analyze/retry-failed", methods=["POST"])
+def retry_failed_categories(name):
+    """Re-run ONLY the categories that failed in the last analyze run and
+    merge into the existing report — the in-app face of --retry-failed.
+    A partial analysis (genre gated, logline broke, server hiccup) no longer
+    forces a full re-run."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    if m.stage("analyze").status != "complete":
+        return _error("Analysis hasn't completed yet — run the full analysis first.", 400)
+
+    m.server_url = CONFIG["server_url"]
+    m.model_id = CONFIG["model"]
+    m.fast_model = CONFIG["fast_model"]
+    m.timeout = CONFIG["timeout"]
+    m.save()
+
+    orch = Orchestrator(m)
+    import time as _t
+    _t0 = _t.time()
+    try:
+        orch.run_analyze(retry_failed=True)
+    except OrchestratorError as e:
+        return _error(str(e), 502)
+    except Exception as e:
+        traceback.print_exc()
+        return _error(f"Unexpected error during retry: {e}", 500)
+
+    from .metrics import record_analysis
+    record_analysis(m, _t.time() - _t0)
+    return jsonify(_manifest_summary(m))
+
+
+@app.route("/api/projects/<name>/backup", methods=["GET"])
+def backup_project(name):
+    """Whole-project backup as a single .zip — source, parse, knowledge graph,
+    report, sessions, edits, notes, stash. The writer's archive of their own
+    desk, one click, nothing leaves the machine."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+
+    project_dir = os.path.realpath(m.project_dir)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, _dirs, files in os.walk(project_dir):
+            for fname in files:
+                full = os.path.join(root, fname)
+                arcname = os.path.join(name, os.path.relpath(full, project_dir))
+                try:
+                    zf.write(full, arcname)
+                except OSError:
+                    continue  # a file vanishing mid-zip shouldn't kill the backup
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name=f"{name}-backup.zip")
+
+
 @app.route("/api/projects/<name>/reparse", methods=["POST"])
 def reparse_project(name):
     """Re-run the parse stage on the active source file, in-app.
@@ -508,14 +575,20 @@ def get_character_tracks(name):
 
 @app.route("/api/projects/<name>/stash", methods=["GET"])
 def get_stash(name):
-    m = _load_manifest(name)
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
     from .stash_store import load_stash
     return jsonify({"stash": load_stash(m.project_dir)})
 
 
 @app.route("/api/projects/<name>/stash", methods=["POST"])
 def add_stash(name):
-    m = _load_manifest(name)
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
     body = request.get_json(silent=True) or {}
     try:
         entry = add_stash_entry(m.project_dir, body)
@@ -536,7 +609,10 @@ def add_stash_entry(project_dir: str, body: dict) -> dict:
 
 @app.route("/api/projects/<name>/stash/<entry_id>", methods=["DELETE"])
 def delete_stash_entry(name, entry_id):
-    m = _load_manifest(name)
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
     from .stash_store import remove_from_stash
     if not remove_from_stash(m.project_dir, entry_id):
         return _error("Stash entry not found.", 404)
@@ -677,6 +753,14 @@ def rewrite_scene_endpoint(name):
     except (TypeError, ValueError):
         return _error("scene_number is required.")
 
+    # Validate the scene BEFORE spending a model call or grounding text on it,
+    # so a missing scene is a clean 404 rather than a conflated error.
+    from .revision import load_working as _lw, scene_elements as _se
+    try:
+        _se(_lw(m), scene_number)
+    except ValueError as e:
+        return _error(str(e), 404)
+
     finding_text = ""
     finding_index = body.get("finding_index")
     if finding_index is not None:
@@ -702,8 +786,6 @@ def rewrite_scene_endpoint(name):
         from .revision import load_working, rewrite_scene, scene_text
         doc = load_working(m)
         result = rewrite_scene(_make_client(m), doc, scene_number, finding_text, instruction)
-    except ValueError as e:
-        return _error(str(e), 404)
     except Exception as e:
         return _error(f"Rewrite failed: {e}", 502)
 
@@ -971,6 +1053,9 @@ def get_fixqueue(name):
     scene_heading = {s.scene_number: s.heading_raw for s in doc.scenes}
     status_by_index = {s["index"]: s["status"] for s in finding_statuses(m)["findings"]}
 
+    from .revision import dismissed_issues as _dismissed
+    dismissed_keys = _dismissed(m)
+
     items = []
     for idx, f in enumerate(report.get("findings", [])):
         refs = f.get("scene_refs") or []
@@ -989,7 +1074,141 @@ def get_fixqueue(name):
             "status": status_by_index.get(idx, "unknown"),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
-    return jsonify({"items": items, "acts": acts})
+
+    # Triage: dismissed findings are flagged (flag-don't-drop applies to the
+    # writer's own judgment too) but hidden unless explicitly asked for. A
+    # dismissal only sticks while the report still says the same thing at
+    # that index — a regenerated report re-opens everything honestly.
+    for it in items:
+        it["dismissed"] = (it["index"], (it["issue"] or "")) in dismissed_keys
+    include_dismissed = request.args.get("include_dismissed") == "1"
+    visible = [i for i in items if include_dismissed or not i["dismissed"]]
+    return jsonify({"items": visible, "acts": acts,
+                    "dismissed_count": len(items) - len(visible),
+                    "total_count": len(items)})
+
+
+@app.route("/api/projects/<name>/findings/<int:index>/dismiss", methods=["POST"])
+def dismiss_finding_route(name, index):
+    """Writer triage: 'I've read it, I'm choosing to live with this one.'
+    The finding is hidden from the queue (flag-don't-drop: it stays in the
+    report and comes back if the report is regenerated with a different
+    issue at this index)."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    body = request.get_json(silent=True) or {}
+    from .revision import dismiss_finding
+    dismiss_finding(m, index, body.get("issue") or "")
+    return jsonify({"ok": True, "index": index})
+
+
+@app.route("/api/projects/<name>/findings/<int:index>/undismiss", methods=["POST"])
+def undismiss_finding_route(name, index):
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    from .revision import undismiss_finding
+    undismiss_finding(m, index)
+    return jsonify({"ok": True, "index": index})
+
+
+# ---------- streaming chat (SSE) ----------
+
+
+def _sse_chat_stream(engine, session, store, text, quote, manifest=None, on_success=None):
+    """Shared generator behind both streaming chat routes. Raw model tokens
+    stream to the browser as they arrive (perceived-latency win on slow local
+    models); the FINAL event carries the cleaned, stored reply + full message
+    history, so what gets persisted is byte-identical to the non-streaming
+    path — streaming changes how a reply appears, never what is kept."""
+    q = queue.Queue()
+    result = {}
+    t0 = time.time()
+
+    def on_token(piece):
+        q.put(("token", piece))
+
+    def worker():
+        try:
+            result["reply"] = engine.send_message(session, text, quote=quote, on_token=on_token)
+            q.put(("done", None))
+        except Exception as e:  # mapped below — a failed turn must end the stream, not hang it
+            result["error"] = e
+            q.put(("error", str(e)))
+
+    threading.Thread(target=worker, daemon=True).start()
+    while True:
+        kind, _payload = q.get()
+        if kind == "token":
+            yield f"data: {json.dumps({'token': _payload})}\n\n"
+            continue
+        if kind == "done":
+            if manifest is not None:
+                try:
+                    from .metrics import record_reply
+                    record_reply(manifest, time.time() - t0, quoted=bool(quote))
+                except Exception:
+                    pass  # metrics are best-effort — never break a chat turn
+            if on_success is not None:
+                try:
+                    on_success()
+                except Exception:
+                    pass  # bookkeeping must never break the turn
+            store.save(session)  # engine already saved under the store's lock; idempotent
+            yield "data: " + json.dumps({
+                "done": True,
+                "reply": result["reply"],
+                "branch": session.current_branch,
+                "messages": [m.to_dict() for m in session.branch.messages],
+            }) + "\n\n"
+            return
+        err = result.get("error")
+        still_working = type(err).__name__ == "WatchdogTimeoutError" or "didn't respond within" in str(err)
+        message = ("The model was still working when the per-turn time cap was hit." if still_working
+                   else f"The model server couldn't be reached or returned an error: {err}")
+        yield "data: " + json.dumps({"error": message, "still_working": still_working}) + "\n\n"
+        return
+
+
+def _stream_response(generator):
+    return Response(generator, mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/projects/<name>/chat/sessions/<sid>/messages/stream", methods=["POST"])
+def send_message_stream(name, sid):
+    body = request.get_json() or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return _error("Message text is required.")
+    try:
+        session, engine, store = _load_session_and_engine(name, sid)
+    except FileNotFoundError:
+        return _error("Session or project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return _stream_response(_sse_chat_stream(engine, session, store, text, body.get("quote")))
+
+
+@app.route("/api/ideas/<idea_id>/chat/sessions/<sid>/messages/stream", methods=["POST"])
+def send_idea_message_stream(idea_id, sid):
+    body = request.get_json() or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return _error("Message text is required.")
+    try:
+        session, engine, store = _load_idea_session_and_engine(idea_id, sid)
+    except FileNotFoundError:
+        return _error("Session or idea not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return _stream_response(_sse_chat_stream(
+        engine, session, store, text, body.get("quote"),
+        on_success=lambda: setattr(session, "last_seen_content",
+                                   getattr(engine, "_current_page_content", None))))
 
 
 # ---------- shareable report export ----------
@@ -1003,7 +1222,7 @@ def _md_to_html(md: str) -> str:
     from html import escape
 
     lines = md.split("\n")
-    out, para, in_list, in_table = [], [], False, False
+    out, para, in_list, in_table, table_rows = [], [], False, False, 0
 
     def flush_para():
         nonlocal para
@@ -1027,15 +1246,18 @@ def _md_to_html(md: str) -> str:
             if not in_table:
                 out.append("<table>")
                 in_table = True
+                table_rows = 0  # per-table: the FIRST row of EVERY table is a header
             cells = [c.strip() for c in line.strip("|").split("|")]
             if all(re.match(r"^:?-+:?$", c) for c in cells):
                 continue  # separator row
-            tag = "th" if out.count("<tr>") == 0 and not any("<th" in o for o in out[-2:]) else "td"
+            tag = "th" if table_rows == 0 else "td"
+            table_rows += 1
             out.append("<tr>" + "".join(f"<{tag}>{inline(c)}</{tag}>" for c in cells) + "</tr>")
             continue
         if in_table:
             out.append("</table>")
             in_table = False
+            table_rows = 0
         if not line.strip():
             flush_para()
             if in_list:
@@ -1242,6 +1464,16 @@ def start_chat(name):
     return jsonify({"session_id": session.session_id, "model_id": session.model_id, "branch": session.current_branch})
 
 
+def _engine_base_url(session):
+    """Base URL for a chat engine. Sessions remember the server they were
+    created with (a remembered preference), but in DEMO mode there is exactly
+    one server — the in-process one — and its port changes every restart, so
+    a stale pin would 502 forever. Live config wins in demo mode."""
+    if _DEMO_MODEL_ACTIVE:
+        return CONFIG["server_url"]
+    return session.server_url or CONFIG["server_url"]
+
+
 def _load_session_and_engine(project: str, session_id: str):
     store_mod = _import_cowriter("store")
     context_mod = _import_cowriter("context")
@@ -1270,7 +1502,7 @@ def _load_session_and_engine(project: str, session_id: str):
     # slow reply surfaces a "still working?" prompt instead of a silent
     # multi-minute hang. Analysis calls keep the long timeout; only chat
     # turns use turn_timeout.
-    client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id,
+    client = LlamaServerClient(base_url=_engine_base_url(session), model=session.model_id,
                                timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
     memory = None
     try:
@@ -1287,7 +1519,8 @@ def _load_session_and_engine(project: str, session_id: str):
     except Exception:
         lib_text = None
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
-                            memory_scope=f"project:{project}", writer_library_text=lib_text)
+                            memory_scope=f"project:{project}", writer_library_text=lib_text,
+                            mood_text=_mood_fragment(m), doctor_case_text=_doctor_case_file(exclude=project))
     return session, engine, store
 
 
@@ -1308,6 +1541,7 @@ def get_session(name, sid):
         "session_id": session.session_id,
         "title": session.title,
         "current_branch": session.current_branch,
+        "last_seen_content": getattr(session, "last_seen_content", None),
         "branches": {
             bname: {
                 "messages": [
@@ -1538,6 +1772,7 @@ def _idea_session_payload(session) -> dict:
         "session_id": session.session_id,
         "title": session.title,
         "current_branch": session.current_branch,
+        "last_seen_content": getattr(session, "last_seen_content", None),
         "branches": {
             bname: {
                 "messages": [
@@ -1576,7 +1811,7 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
     script_ctx = ScriptContext(None)
     report_ctx = ReportContext(None)
     # Idea chats run on the same short turn clock as script chats (watchdog).
-    client = LlamaServerClient(base_url=session.server_url or CONFIG["server_url"], model=session.model_id,
+    client = LlamaServerClient(base_url=_engine_base_url(session), model=session.model_id,
                                timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
     # Isolation (writer-first rule): the idea chat knows ONLY this idea — the
     # free-form page + the conversation. The past-scripts library digest is
@@ -1592,10 +1827,156 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
         memory = None  # memory unavailable or unreadable — never break the chat
     premise = dict(meta.get("card") or {})
     premise["content"] = meta.get("content") or ""
+    # Deterministic page-diff: what changed on the idea page since Sameer last
+    # READ it (baseline persisted on the session). Computed here so ANY model
+    # -- local GGUF or demo -- demonstrably notices edits without guessing.
+    premise["page_update"] = _page_update_note(session.last_seen_content, premise["content"])
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
                             premise=premise,
                             memory_scope=f"idea:{idea_id}", writer_library_text=None)
+    engine._current_page_content = premise["content"]
     return session, engine, store
+
+
+def _page_update_note(last_seen, current):
+    """Compact deterministic line-level diff of the idea page since Sameer's
+    last read. Empty string when nothing changed (or no baseline yet)."""
+    if last_seen is None:
+        return ""
+    import difflib
+    old_lines = (last_seen or "").splitlines()
+    new_lines = (current or "").splitlines()
+    added, removed = [], []
+    sm = difflib.SequenceMatcher(a=old_lines, b=new_lines, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag in ("delete", "replace"):
+            removed.extend(old_lines[i1:i2])
+        if tag in ("insert", "replace"):
+            added.extend(new_lines[j1:j2])
+
+    def _fmt(lines):
+        out = []
+        for ln in lines:
+            t = ln.strip()
+            if t:
+                out.append('  - "' + (t[:120] + ("..." if len(t) > 120 else "")) + '"')
+        return out
+
+    parts = []
+    a, r = _fmt(added), _fmt(removed)
+    if a:
+        parts.append("ADDED since your last read:\n" + "\n".join(a))
+    if r:
+        parts.append("REMOVED or changed since your last read:\n" + "\n".join(r))
+    return "\n\n".join(parts)
+
+
+
+
+# ---------- humanization v2: deterministic mood + the doctor's case file ----------
+#
+# Both are COMPUTED, never model-improvised: the personas color their energy
+# with these facts, but cannot invent beyond them (the honest-memory guard).
+# The case file stores PATTERNS about the writing across the shelf — never
+# script content — so writer memory stays shared while script discussions stay
+# in their own session/project.
+
+def _mood_fragment(m) -> str | None:
+    """Room state for the persona cards — facts from real project data."""
+    try:
+        now = time.time()
+        days = max(0, int((now - (m.updated_at or now)) // 86400))
+        from .revision import edits_log
+        try:
+            edit_count = len(edits_log(m))
+        except Exception:
+            edit_count = 0
+        drafts = len(m.drafts or [])
+        analyze_status = m.stage("analyze").status
+        visit = "today" if days == 0 else f"{days} day(s) ago"
+        lines = [
+            "Room state (facts computed from this project — let it color your energy; "
+            "never quote it as script content):",
+            f"- Last desk visit: {visit}.",
+            f"- {drafts} draft(s) on file; {edit_count} line edit(s) applied this revision.",
+        ]
+        if analyze_status == "complete":
+            lines.append("- The doctor's report sits on the desk.")
+        elif analyze_status in ("pending", "failed"):
+            lines.append("- No analysis has been run yet.")
+        return "\n".join(lines)
+    except Exception:
+        return None  # mood is garnish — never break a chat turn
+
+
+def _doctor_case_file(exclude: str | None = None) -> str | None:
+    """Dr. Sushruta's case file on the WRITER: patterns across their whole shelf,
+    computed from manifests + findings + edit logs. Evidence-only — patterns and
+    numbers, never passages. None when there's nothing to say."""
+    try:
+        root = os.path.abspath(PROJECTS_DIR)
+        if not os.path.isdir(root):
+            return None
+        from .manifest import ProjectManifest as _PM
+        from .revision import finding_statuses
+
+        per_script = []
+        category_hits: dict = {}
+        total_open = total_addressed = 0
+        for name in sorted(os.listdir(root)):
+            pdir = os.path.join(root, name)
+            if name == "ideas" or name == exclude or not os.path.isdir(pdir):
+                continue
+            try:
+                m = _PM.load(pdir)
+            except Exception:
+                continue
+            if m.stage("analyze").status != "complete" or not os.path.exists(m.report_findings_path):
+                continue
+            try:
+                with open(m.report_findings_path, "r", encoding="utf-8") as f:
+                    report = json.load(f)
+                findings = report.get("findings", [])
+                statuses = finding_statuses(m)["findings"]
+                status_by_idx = {s["index"]: s["status"] for s in statuses}
+                addressed = sum(1 for s in status_by_idx.values() if s == "addressed")
+                open_highs = sorted({
+                    (f.get("category") or "?") for i, f in enumerate(findings)
+                    if status_by_idx.get(i) != "addressed" and (f.get("severity") == "high")
+                })
+                total_open += len(findings) - addressed
+                total_addressed += addressed
+                for c in open_highs:
+                    category_hits[c] = category_hits.get(c, 0) + 1
+                per_script.append((name, addressed, len(findings), open_highs))
+            except Exception:
+                continue
+
+        if not per_script:
+            return None
+
+        lines = [
+            "CASE FILE — your notes on this writer, from their whole shelf "
+            "(patterns and numbers only; never invent beyond this, never quote passages):",
+            f"- Scripts analyzed on the shelf: {len(per_script)}.",
+        ]
+        reviewed = total_open + total_addressed
+        if reviewed:
+            pct = round(100 * total_addressed / reviewed)
+            lines.append(f"- Followthrough: {total_addressed} of {reviewed} findings addressed via edits ({pct}%).")
+        recurring = sorted(((c, n) for c, n in category_hits.items() if n >= 2),
+                           key=lambda x: -x[1])
+        if recurring:
+            cats = ", ".join(f"{c} ({n} scripts)" for c, n in recurring)
+            lines.append(f"- Recurring open HIGH findings across scripts: {cats}.")
+        for name, addressed, total, open_highs in per_script[:6]:
+            highs = f"; open highs: {', '.join(open_highs)}" if open_highs else ""
+            lines.append(f"- \u201c{name}\u201d: {addressed}/{total} findings addressed{highs}.")
+        lines.append("Use this the way a doctor uses history: patterns inform the diagnosis; "
+                     "the current script is judged on its own pages.")
+        return "\n".join(lines)
+    except Exception:
+        return None  # the case file is garnish too
 
 
 def _writer_library(exclude: str | None = None) -> list[dict]:
@@ -1697,7 +2078,14 @@ def start_idea_chat(idea_id):
     except Exception:
         model_id = CONFIG["model"]
     store = SessionStore(IdeaStore(_ideas_dir()).sessions_dir(idea_id))
-    session = store.create(title="Idea room")
+    # RESUME, don't abandon: an idea's Sameer conversation is one continuing
+    # relationship. A reload (or a return visit) picks up the most recent
+    # session; only a genuinely first summon (or after Clear chat) creates.
+    existing = store.list()
+    if existing:
+        session = store.load(existing[0]["session_id"])
+    else:
+        session = store.create(title="Idea room")
     session.server_url = CONFIG["server_url"]
     session.model_id = model_id
     store.save(session)
@@ -1743,7 +2131,9 @@ def idea_send_message(idea_id, sid):
     except CowriterUnavailableError as e:
         return _error(str(e), 500)
     try:
-        reply = engine.send_message(session, text)
+        # selection-to-reply works in the idea room too: a highlighted page
+        # passage rides to the model exactly like a script quote
+        reply = engine.send_message(session, text, quote=body.get("quote"))
     except Exception as e:
         # Same watchdog as the script chat route (see send_message above).
         if type(e).__name__ == "WatchdogTimeoutError" or "didn't respond within" in str(e):
@@ -1752,12 +2142,120 @@ def idea_send_message(idea_id, sid):
                 "still_working": True,
             }), 408
         return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
+    # he READ the page this turn -- move the diff baseline (failed turns keep
+    # the old baseline so the next attempt re-reports the same changes)
+    session.last_seen_content = getattr(engine, "_current_page_content", None)
     store.save(session)
     return jsonify({
         "reply": reply,
         "branch": session.current_branch,
         "messages": [msg.to_dict() for msg in session.branch.messages],
     })
+
+
+# ---------- local speech-to-text (dictation) ----------
+from screenplay_studio import stt as _stt
+
+
+@app.route("/api/stt", methods=["POST"])
+def stt_transcribe():
+    """Dictation: multipart audio in, transcribed text out. Fully local --
+    faster-whisper in-process, or a user-run local whisper server."""
+    f = request.files.get("audio")
+    if f is None:
+        return _error("No audio file part named 'audio' in the request.", 400)
+    try:
+        result = _stt.transcribe(f.read(), f.filename or "audio.webm",
+                                 (request.form.get("language") or "auto"))
+        return jsonify(result)
+    except ValueError as e:
+        return _error(str(e), 400)
+    except _stt.STTUnavailableError as e:
+        return _error(str(e), 503)
+    except Exception as e:
+        return _error(f"Transcription failed: {e}", 500)
+
+
+@app.route("/api/stt/languages", methods=["GET"])
+def stt_languages():
+    return jsonify({"languages": _stt.supported_languages(),
+                    "engine": "whisper-server" if _stt.EXTERNAL_WHISPER_URL else "faster-whisper"})
+
+
+# ---------- ephemeral reply translation ----------
+#
+# "What does that mean?" -- render one assistant reply in plain English.
+# The translation is DISPLAY-ONLY: never persisted to the branch, so the
+# conversation keeps its mirrored register and Sameer never "remembers"
+# having spoken the translated words.
+
+
+# The honest target set: the registers this desk actually models. Anything
+# else would be fake scope for local models.
+_TRANSLATE_TARGETS = {
+    "en": "plain, natural English",
+    "te": "natural Telugu (Telugu script)",
+    "hi": "natural Hindi (Devanagari script)",
+    "teng": ("Tenglish -- Telugu written in Latin script, mixed naturally with "
+             "English words, the way bilingual writers actually text"),
+    "hing": ("Hinglish -- Hindi written in Latin script, mixed naturally with "
+             "English words, the way bilingual writers actually text"),
+}
+
+
+def _translate_reply_payload(session, engine, index, target_lang="en"):
+    target = (target_lang or "en").strip().lower()
+    if target not in _TRANSLATE_TARGETS:
+        return None, _error(
+            f"Unknown translation target '{target}'. Supported: {', '.join(_TRANSLATE_TARGETS)}.", 400)
+    msgs = session.branch.messages
+    if not isinstance(index, int) or not (0 <= index < len(msgs)):
+        return None, _error("Message index out of range.", 400)
+    if msgs[index].role != "assistant":
+        return None, _error("Only assistant replies can be translated.", 400)
+    original = msgs[index].content.strip()
+    persona = session.branch.active_persona
+    sys_prompt = (
+        f"[TRANSLATE TASK] Render the reply below in {_TRANSLATE_TARGETS[target]}. "
+        "Keep the meaning and tone exactly -- no additions, no commentary, "
+        "no disclaimers. Output only the translated reply. "
+        f"[TRANSLATE TARGET: {target}]"
+    )
+    messages = [
+        {"role": "system", "content": sys_prompt},
+        {"role": "user", "content": original},
+    ]
+    try:
+        raw = engine._generate(messages)
+    except Exception as e:
+        return None, _error(f"Translation failed: {e}", 502)
+    cowriter_engine = _import_cowriter("engine")
+    translation = cowriter_engine.clean_reply(raw)
+    return {"index": index, "translation": translation}, None
+
+
+@app.route("/api/ideas/<idea_id>/chat/sessions/<sid>/translate", methods=["POST"])
+def idea_translate_message(idea_id, sid):
+    body = request.get_json() or {}
+    try:
+        session, engine, store = _load_idea_session_and_engine(idea_id, sid)
+    except FileNotFoundError:
+        return _error("Idea or session not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    payload, err = _translate_reply_payload(session, engine, body.get("index"), body.get("target_lang", "en"))
+    return payload if payload is not None else err
+
+
+@app.route("/api/projects/<name>/chat/sessions/<sid>/translate", methods=["POST"])
+def project_translate_message(name, sid):
+    body = request.get_json() or {}
+    try:
+        session, engine, store = _load_session_and_engine(name, sid)
+    except FileNotFoundError:
+        return _error("Project or session not found.", 404)
+    payload, err = _translate_reply_payload(session, engine, body.get("index"), body.get("target_lang", "en"))
+    return payload if payload is not None else err
 
 
 @app.route("/api/ideas/<idea_id>/chat/sessions/<sid>/settings", methods=["POST"])
@@ -1853,16 +2351,72 @@ def main():
     parser.add_argument("--port", type=int, default=8500)
     parser.add_argument("--projects-dir", default="./studio_projects")
     parser.add_argument("--server", default="http://localhost:8080", help="Default llama-server URL")
+    parser.add_argument("--demo-model", action="store_true",
+                        help="Run with the built-in demo craft model instead of a real "
+                             "llama-server — the whole desk (analysis, chat, streaming) "
+                             "works live without a GGUF. Testing only; the default flow "
+                             "(your llama-server on :8080) is untouched.")
     args = parser.parse_args()
 
     PROJECTS_DIR = args.projects_dir
     os.makedirs(PROJECTS_DIR, exist_ok=True)
-    CONFIG["server_url"] = args.server
+    # env-var demo trigger already pointed CONFIG at the demo server at import
+    # time -- don't clobber it back to :8080 (keeps flag/env parity honest).
+    if not _DEMO_MODEL_ACTIVE:
+        CONFIG["server_url"] = args.server
+    if args.demo_model:
+        _use_demo_model()
 
     print(f"Projects directory: {os.path.abspath(PROJECTS_DIR)}")
     print(f"Default model server: {CONFIG['server_url']}")
     print(f"Open http://localhost:{args.port} in your browser.")
     app.run(host="127.0.0.1", port=args.port, debug=False)
+
+
+_DEMO_MODEL_ACTIVE = False
+
+
+def _use_demo_model() -> str:
+    """Point CONFIG at the built-in demo craft model (started in-process).
+    Opt-in only — never runs unless asked for by flag or env."""
+    global _DEMO_MODEL_ACTIVE
+    try:
+        from .demo_model import start_demo_server
+        url = start_demo_server()
+        CONFIG["server_url"] = url
+        _DEMO_MODEL_ACTIVE = True
+        print("DEMO MODEL active (in-process) — no real llama-server needed.")
+        return url
+    except Exception as e:  # demo is a convenience — never block startup on it
+        print("Demo model unavailable; keeping the configured server.")
+        return CONFIG["server_url"]
+
+
+# The flask CLI path (`flask --app screenplay_studio.webapp_server run`) never
+# calls main(), so startup gating happens here at import. Two ways in:
+#   1. SCREENPLAY_STUDIO_DEMO_MODEL=1 — explicit demo mode (env/flag parity)
+#   2. Auto-fallback: the configured model server is unreachable at startup,
+#      so instead of a dead desk, run on the built-in demo craft model.
+# A reachable llama-server ALWAYS wins — the real flow is never hijacked.
+_DEMO_ENV = os.environ.get("SCREENPLAY_STUDIO_DEMO_MODEL", "").strip()
+if _DEMO_ENV not in ("", "0", "false"):
+    _use_demo_model()
+else:
+    def _server_reachable(url: str) -> bool:
+        try:
+            from screenplay_analyzer.llm_client import LlamaServerClient
+            return LlamaServerClient(base_url=url).is_reachable()
+        except Exception:
+            return False
+
+    under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
+        any("pytest" in str(a).lower() for a in __import__("sys").argv)
+    if not under_pytest and not _server_reachable(CONFIG["server_url"]):
+        print("Configured model server is unreachable at startup — falling back "
+              "to the built-in DEMO craft model so the desk still works.")
+        print("It is used again automatically whenever your llama-server is up; "
+              "set SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback.")
+        _use_demo_model()
 
 
 if __name__ == "__main__":

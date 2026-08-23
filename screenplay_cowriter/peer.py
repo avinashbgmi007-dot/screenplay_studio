@@ -82,10 +82,15 @@ def ensure_forward_momentum(reply: str, turn_kind: str) -> str:
     end forward. A substantial reply (a complete answer, a developed thought)
     is never stranded — real humans end on a period; the goal is the writer
     never feels left hanging, not that every message interrogates them.
-    `turn_kind` is accepted for interface stability / future use."""
+
+    A DIRECT QUESTION from the writer never gets a nudge: they asked, we
+    answered -- tacking "want me to run with this?" onto an answer reads as
+    evasive. Questions get clean answers."""
     global _nudge_index
     t = (reply or "").strip()
     if not t:
+        return reply
+    if turn_kind == "question":
         return reply
     if _has_forward_ending(t):
         return reply

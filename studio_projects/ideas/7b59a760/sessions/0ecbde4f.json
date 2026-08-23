@@ -1,0 +1,57 @@
+{
+  "session_id": "0ecbde4f",
+  "title": "Idea room",
+  "report_path": null,
+  "script_path": null,
+  "server_url": "http://127.0.0.1:8099",
+  "model_id": "demo-craft-model",
+  "last_seen_content": "Flyout Probe\n\nA night courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from the recipient's greatest regret.\nShe keeps one swapped item: a brass key nobody has claimed.\n ",
+  "branches": {
+    "main": {
+      "name": "main",
+      "messages": [
+        {
+          "role": "user",
+          "content": "what about the brass key?",
+          "timestamp": 1787429513.2159355,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "You keep circling back to brass key — good instinct. So make it cost something. What does it take from someone before the story ends? Who benefits from it staying exactly as you wrote it?",
+          "timestamp": 1787429513.2159379,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "what does the key unlock?",
+          "timestamp": 1787429515.5829506,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "I've read the page — I'm not going to read it back to you. The bit I keep snagging on is a brass key nobody has claimed..\n\nTell me the version where a brass key nobody has claimed. goes wrong. What breaks? I think the idea's real test lives one step past that.",
+          "timestamp": 1787429515.5829525,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        }
+      ],
+      "parent_branch": null,
+      "forked_at_index": null,
+      "active_persona": "writing_partner",
+      "active_mode": "peer",
+      "awaiting_probe": false,
+      "created_at": 1787429513.2038543
+    }
+  },
+  "current_branch": "main",
+  "created_at": 1787429513.203847,
+  "updated_at": 1787429515.5834212
+}

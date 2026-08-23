@@ -19,8 +19,14 @@ CATEGORY_TITLES = {
     "theme": "Theme & Subtext",
     "character": "Character Arcs & Consistency",
     "structure": "Structure & Pacing",
-    "dialogue": "Dialogue & Action",
     "scene_function": "Scene Functionality",
+    # Deterministic craft passes — these categories were previously missing
+    # here, so their findings existed in report.findings.json and the Fix
+    # Queue but silently never rendered in the markdown/HTML report.
+    "continuity": "Continuity",
+    "voice": "Voice & Idiolect",
+    "subtext": "Subtext",
+    "dialogue": "Dialogue & Action",
     "plot_thread": "Plot Economy (Setups, Payoffs & Chekhov's Gun)",
     "genre": "Genre Conventions",
 }

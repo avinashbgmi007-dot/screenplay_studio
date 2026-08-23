@@ -7,6 +7,7 @@ works standalone without Piece 2 installed, per the composability goal.
 
 from __future__ import annotations
 
+import json
 import re
 import time
 
@@ -161,3 +162,62 @@ class LlamaServerClient:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as e:
             raise LlamaServerError(f"Unexpected response shape from llama-server: {data}") from e
+
+    def chat_stream(self, messages: list[dict], on_token, max_tokens: int = 900, temperature: float = 0.7,
+                    repeat_penalty: float | None = None) -> str:
+        """Streaming variant of chat(): calls `on_token(piece)` for each text
+        chunk as it arrives (SSE from llama-server's OpenAI-compat endpoint)
+        and returns the FULL raw text once the stream completes.
+
+        The streamed pieces are RAW model output — the caller's reply-hygiene
+        pipeline still runs on the returned full text before anything is
+        stored. Sampling matches chat() exactly; no busy-retry loop here (a
+        stream that starts has committed — a busy server fails fast and the
+        caller can retry the turn)."""
+        model = self.resolve_model()
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        if repeat_penalty is not None:
+            payload["repeat_penalty"] = repeat_penalty
+        try:
+            resp = requests.post(f"{self.base_url}/v1/chat/completions", json=payload,
+                                 timeout=self.timeout, headers=self.extra_headers, stream=True)
+            if resp.status_code in (429, 503):
+                raise LlamaServerError("llama-server is busy with another request. Try again in a moment.")
+            resp.raise_for_status()
+        except requests.exceptions.ConnectionError as e:
+            raise LlamaServerError(f"Could not connect to llama-server at {self.base_url}.") from e
+        except requests.exceptions.Timeout as e:
+            raise WatchdogTimeoutError(
+                f"The model didn't respond within {self.timeout}s. This isn't necessarily a "
+                f"problem, just slow — retry the turn."
+            ) from e
+        except requests.exceptions.HTTPError as e:
+            raise LlamaServerError(f"llama-server request failed: {e}") from e
+
+        parts: list[str] = []
+        try:
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
+                    continue
+                data_str = line[len("data:"):].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(data_str)
+                except ValueError:
+                    continue  # keep-alive comment or partial frame — skip
+                choices = obj.get("choices") or [{}]
+                delta = choices[0].get("delta") or {}
+                piece = delta.get("content")
+                if piece:
+                    parts.append(piece)
+                    on_token(piece)
+        finally:
+            resp.close()
+        return "".join(parts)

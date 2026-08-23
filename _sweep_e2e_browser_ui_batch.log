@@ -1,0 +1,14 @@
+PASS flyouts collapsed on load
+PASS hover opens the Ideas flyout
+PASS count badge shows items
+PASS flyout item click opens the idea
+PASS /sameer summons from the flyout-opened idea
+PASS Sameer replies in the summoned room
+PASS globe hover shows language menu
+PASS Telugu target renders a labeled inline panel
+PASS mic click starts recording state
+PASS transcribed text lands at the caret
+PASS speech language remembered
+PASS no JS errors during the whole flow
+
+=== 12/12 browser checks green ===

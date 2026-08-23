@@ -1,0 +1,239 @@
+"""Browser-level regression e2e for the three reported UI bugs:
+
+  1. Idea page collapsed into a small scrollable textarea once the mic chip
+     reparented it into .mic-wrap (flex chain broken) -> the canvas must fill
+     the page again.
+  2. After visiting an idea room, opening ANY project left #idea-canvas
+     visible, stacking the idea page over the top half of the script ->
+     switching views must hide the canvas.
+  3. An open sidebar flyout overlays the sections below it and swallows their
+     hover/clicks (ideas flyout blocking shelf/library) -> moving the pointer
+     to another trigger must close the stray flyout and open the right one.
+
+Run (server + test in ONE command -- background processes get reaped):
+  SCREENPLAY_STUDIO_DEMO_MODEL=1 nohup python3 -m screenplay_studio.webapp_server \\
+      --port 8555 --projects-dir /tmp/e2e_ui_proj & sleep 3;
+      E2E_BASE=http://127.0.0.1:8555 python3 tests/e2e_browser_ui_fixes.py; kill %1
+
+Needs: pip install playwright && python -m playwright install chromium
+"""
+import os
+import re
+import sys
+
+import requests
+from playwright.sync_api import sync_playwright
+
+BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8555")
+FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
+
+PASS, FAIL = [], []
+
+
+def check(name, cond, detail=""):
+    (PASS if cond else FAIL).append((name, detail))
+    print(f"  {'PASS' if cond else 'FAIL'}  {name}" + (f"  [{detail}]" if not cond and detail else ""))
+
+
+def seed_project():
+    with open(FIXTURE, "rb") as f:
+        r = requests.post(f"{BASE}/api/projects",
+                          files={"file": ("Rain Courier.fountain", f, "text/plain")},
+                          data={"title": "Rain Courier"}, timeout=60)
+    assert r.status_code in (200, 201), r.text
+    return r.json()["name"] if isinstance(r.json(), dict) and "name" in r.json() else "Rain Courier"
+
+
+def glide(page, x0, y0, x1, y1, steps=8):
+    """Move in small steps so mousemove-driven UI actually sees the travel."""
+    for i in range(1, steps + 1):
+        page.mouse.move(x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps)
+        page.wait_for_timeout(30)
+
+
+def visible_flyouts(page):
+    return page.evaluate("""() => {
+        const vis = {};
+        for (const [k, sel] of [["ideas","#idea-list"],["shelf","#project-list"],["library","#library-list"]]) {
+            const el = document.querySelector(sel);
+            vis[k] = !!el && getComputedStyle(el).display !== 'none';
+        }
+        return vis;
+    }""")
+
+
+def run():
+    name = seed_project()
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("dialog", lambda d: d.accept())
+        page.goto(BASE, wait_until="networkidle")
+        page.wait_for_timeout(500)
+
+        # ---- Bug 1: the idea page fills its canvas -------------------------
+        page.locator("#new-idea-btn").click()
+        page.wait_for_timeout(600)
+        geo = page.evaluate("""() => {
+            const ta = document.querySelector('#idea-content');
+            return { h: Math.round(ta.getBoundingClientRect().height),
+                     mic: !!(ta.closest('.mic-wrap')?.querySelector('.mic-btn')) };
+        }""")
+        check("idea page is a full-height surface again (>480px)",
+              geo["h"] > 480, f"h={geo['h']}")
+        check("mic chip still rides the idea page", geo["mic"])
+
+        # ---- Bug 3: each trigger opens ITS OWN flyout, no dead zones -------
+        def center(sel):
+            b = page.locator(sel).bounding_box()
+            return b["x"] + b["width"] / 2, b["y"] + b["height"] / 2
+
+        ix, iy = center("#ideas-trigger")
+        page.mouse.move(ix, iy); page.wait_for_timeout(350)
+        st = visible_flyouts(page)
+        check("hover Ideas -> only ideas flyout",
+              st == {"ideas": True, "shelf": False, "library": False}, str(st))
+
+        # ---- Bug 4: hover scope -- "+ New idea" sits BESIDE the Ideas
+        # trigger in the same head row; hovering it must never drop the
+        # ideas list. Only the trigger owns the flyout.
+        nx, ny = center("#new-idea-btn")
+        glide(page, ix, iy, nx, ny)     # straight from Ideas onto '+ New idea'
+        page.wait_for_timeout(450)
+        st = visible_flyouts(page)
+        check("Ideas -> '+ New idea' closes the ideas list",
+              st == {"ideas": False, "shelf": False, "library": False}, str(st))
+
+        # fresh approach: hovering '+ New idea' cold opens NOTHING
+        page.mouse.move(720, 500)
+        page.wait_for_timeout(450)      # park off the sidebar; let all close
+        page.hover("#new-idea-btn")
+        page.wait_for_timeout(450)
+        st = visible_flyouts(page)
+        check("hovering '+ New idea' alone drops no flyout",
+              st == {"ideas": False, "shelf": False, "library": False}, str(st))
+
+        # Accordion layout: opening one list PUSHES the tabs below it down,
+        # and leaving it collapses everything again -- so a long single glide
+        # can overshoot as the layout reflows under the pointer. A writer's
+        # hand corrects in small steps; the test converges the same way.
+        # (These legs used to be impossible dead zones when the flyout
+        # overlaid the sibling tabs.)
+        def converge(trig, want):
+            last = None
+            st = None
+            for _ in range(5):
+                tx, ty = center(trig)
+                if last:
+                    glide(page, last[0], last[1], tx, ty)
+                else:
+                    page.mouse.move(tx, ty)
+                page.wait_for_timeout(380)
+                st = visible_flyouts(page)
+                if st == want:
+                    return st
+                last = (tx, ty)
+            return st
+
+        st = converge("#shelf-trigger",
+                      {"ideas": False, "shelf": True, "library": False})
+        check("move to Shelf -> ideas closes, shelf opens", bool(st and st["shelf"]), str(st))
+
+        st = converge("#library-trigger",
+                      {"ideas": False, "shelf": False, "library": True})
+        check("move to Library -> only library flyout", bool(st and st["library"]), str(st))
+
+        # ---- Bug 2: idea room -> project must put the canvas away ----------
+        page.locator("#idea-content").fill("A courier story about regret.")
+        page.wait_for_timeout(500)          # autosave
+        page.hover("#shelf-trigger")        # fresh position; opens the shelf list
+        page.wait_for_timeout(400)
+        page.locator("#project-list .project-item").first.click()
+        expect_visible = page.wait_for_selector("#script-scenes .scene-page", timeout=25000)
+        st2 = page.evaluate("""() => ({
+            canvas: getComputedStyle(document.querySelector('#idea-canvas')).display,
+            idea_mode: document.body.classList.contains('idea-mode'),
+        })""")
+        check("opening a project hides the idea canvas",
+              st2["canvas"] == "none" and not st2["idea_mode"], str(st2))
+        check("project pages actually render", expect_visible is not None)
+
+        # margin-note input keeps its row width after mic reparenting
+        rn = page.evaluate("""() => {
+            const i = document.querySelector('#rail-note-input');
+            if (!i) return null;
+            return { i: i.getBoundingClientRect().width,
+                     f: i.closest('form').getBoundingClientRect().width };
+        }""")
+        check("margin-note input fills its row",
+              rn is not None and rn["f"] > 0 and rn["i"] / rn["f"] > 0.5, str(rn))
+
+        # welcome desk also puts it away
+        page.locator("#home-btn").click()
+        page.wait_for_timeout(600)
+        st3 = page.evaluate(
+            "() => getComputedStyle(document.querySelector('#idea-canvas')).display")
+        check("welcome desk keeps the idea canvas hidden", st3 == "none", st3)
+
+        # ...and returning to the SAME idea still shows the words
+        page.hover("#ideas-trigger")
+        page.wait_for_timeout(400)
+        page.locator("#idea-list .idea-item").first.click()
+        page.wait_for_timeout(700)
+        val = page.locator("#idea-content").input_value()
+        check("reopening the idea restores its content",
+              "courier story" in val, val[:60])
+
+        # ---- Bug 5: composer input keeps its width + grows multi-line ------
+        page.locator("#idea-sam-pill").click()   # open this idea's chat drawer
+        page.wait_for_timeout(700)
+        comp = page.evaluate("""() => {
+            const w = (s) => document.querySelector(s)?.getBoundingClientRect().width || 0;
+            return { ta: w('#input'), form: w('#composer') };
+        }""")
+        check("composer ask box fills the composer (>55% of its row)",
+              comp["form"] > 0 and comp["ta"] / comp["form"] > 0.55, str(comp))
+        ask = page.locator("#input")
+        ask.click()
+        # Shift+Enter wraps (Enter alone SENDS -- standard chat contract)
+        ask.type("line one", delay=4)
+        ask.press("Shift+Enter")
+        ask.type("line two", delay=4)
+        ask.press("Shift+Enter")
+        ask.type("line three", delay=4)
+        page.wait_for_timeout(250)
+        grew = page.evaluate("""() => {
+            const t = document.querySelector('#input');
+            return { client: t.clientHeight,
+                     fits: t.scrollHeight - t.clientHeight <= 2 };
+        }""")
+        check("multi-line ask grows visibly and never clips",
+              grew["client"] >= 60 and grew["fits"], str(grew))
+        ask.fill("")   # leave no stray draft behind
+
+        # autosave trust signal appears on the idea head after typing
+        page.keyboard.press("Escape")   # drawer away; back to the page
+        page.wait_for_timeout(300)
+        ed2 = page.locator("#idea-content")
+        ed2.click()
+        ed2.press("End")
+        ed2.type(" more words.", delay=4)
+        page.wait_for_selector("#idea-save-state:not(:empty)", timeout=8000)
+        state_txt = page.locator("#idea-save-state").inner_text()
+        check("autosave indicator shows on the idea head",
+              state_txt.startswith("saving") or state_txt.startswith("saved"), state_txt)
+
+        check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
+        page.screenshot(path="_browser_ui_fixes.png", full_page=True)
+        browser.close()
+
+    print(f"\n=== {len(PASS)} passed, {len(FAIL)} failed ===")
+    for n, d in FAIL:
+        print(f"FAILED: {n}: {d}")
+    sys.exit(1 if FAIL else 0)
+
+
+if __name__ == "__main__":
+    run()

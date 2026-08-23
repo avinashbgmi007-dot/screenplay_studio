@@ -1,0 +1,127 @@
+{
+  "session_id": "bab6d0fc",
+  "title": "The Long Rain",
+  "report_path": "./studio_projects/The_Long_Rain_5/report.findings.json",
+  "script_path": "./studio_projects/The_Long_Rain_5/parsed.json",
+  "server_url": "http://127.0.0.1:8099",
+  "model_id": "demo-craft-model",
+  "branches": {
+    "main": {
+      "name": "main",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I keep staring at scene 1 and I can't tell if Meera's opening line is too on-the-nose.",
+          "timestamp": 1787400167.6339495,
+          "mode": "peer",
+          "scene_refs": [
+            1,
+            3
+          ],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nAlright — \"I keep staring at scene 1 and I can't tell if Meera's opening line is too on-the-nose.\"\n\nlet me get my bearings: we open at scene 1 (INT. POLICE STATION - NIGHT), and I like the footing.\n\nAlso — the desk says your last visit was today. The pages didn't get worse in the gap, but they weren't getting better either. Good to be back.\n\nThere are 8 findings riding along (and yes, the margins are full of the doctor's handwriting again). Want my honest take on which one actually matters? Because they don't all weigh the same.",
+          "timestamp": 1787400167.6339512,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "What about scene 2? Veeru watching her from the tea stall — is that enough of an introduction?",
+          "timestamp": 1787400167.6481543,
+          "mode": "peer",
+          "scene_refs": [
+            2
+          ],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nAlright — \"What about scene 2? Veeru watching her from the tea stall — is that enough of an introduction?\"\n\nlet me get my bearings: we open at scene 2 (INT. TEA STALL - DAY), and I like the footing.\n\nAlso — the desk says your last visit was today. The pages didn't get worse in the gap, but they weren't getting better either. Good to be back.\n\nThere are 8 findings riding along (and yes, the margins are full of the doctor's handwriting again). Want my honest take on which one actually matters? Because they don't all weigh the same.",
+          "timestamp": 1787400167.6481562,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "Honestly I'm worried the middle of this script has no engine at all.",
+          "timestamp": 1787400167.6620069,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Sameer speaking)\n\nAlright — \"Honestly I'm worried the middle of this script has no engine at all.\"\n\nAlso — the desk says your last visit was today. The pages didn't get worse in the gap, but they weren't getting better either. Good to be back.\n\nThere are 8 findings riding along (and yes, the margins are full of the doctor's handwriting again). Want my honest take on which one actually matters? Because they don't all weigh the same.",
+          "timestamp": 1787400167.6620085,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "Fine, doctor. Give it to me straight about the structure.",
+          "timestamp": 1787400167.6824114,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Dr. Sushruta speaking)\n\nFollowthrough so far: 0 of 41 findings addressed (0%). The notes only work if the pages do.\n\nDiagnosis delivered. The fix is Sameer's department — though for the record, cutting is also a fix.",
+          "timestamp": 1787400167.6824136,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "Sameer thinks Veeru's intro in scene 2 is doing quiet work. Your report disagrees?",
+          "timestamp": 1787400167.6982155,
+          "mode": "peer",
+          "scene_refs": [
+            2
+          ],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Dr. Sushruta speaking)\n\n1 scenes on the page. My read stands: competent connective tissue, two or three moments doing more than connecting — and the report's 8 findings mostly circle the same few habits.\n\nFollowthrough so far: 0 of 41 findings addressed (0%). The notes only work if the pages do.\n\nDiagnosis delivered. The fix is Sameer's department — though for the record, cutting is also a fix.",
+          "timestamp": 1787400167.6982172,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "user",
+          "content": "How bad is my followthrough across everything on my shelf?",
+          "timestamp": 1787400167.7109284,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        },
+        {
+          "role": "assistant",
+          "content": "(demo craft model — Dr. Sushruta speaking)\n\nFollowthrough so far: 0 of 41 findings addressed (0%). The notes only work if the pages do.\n\nDiagnosis delivered. The fix is Sameer's department — though for the record, cutting is also a fix.",
+          "timestamp": 1787400167.71093,
+          "mode": "peer",
+          "scene_refs": [],
+          "quote": null
+        }
+      ],
+      "parent_branch": null,
+      "forked_at_index": null,
+      "active_persona": "script_consultant",
+      "active_mode": "peer",
+      "awaiting_probe": false,
+      "created_at": 1787400167.619505
+    }
+  },
+  "current_branch": "main",
+  "created_at": 1787400167.6195009,
+  "updated_at": 1787400167.7117636
+}

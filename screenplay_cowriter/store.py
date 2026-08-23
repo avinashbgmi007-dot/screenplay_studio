@@ -7,8 +7,24 @@ keeps the whole thing inspectable/hand-editable if something goes wrong.
 
 import glob
 import os
+import threading
 
 from .models import Session
+
+# One lock per session file path (process-wide). Streaming turns and the
+# every-10-turns memory refresh can overlap a save from another request;
+# without this, two concurrent saves of the SAME session file race and the
+# last write wins — silently dropping a just-stored message.
+_LOCKS_GUARD = threading.Lock()
+_LOCKS: dict = {}
+
+
+def _lock_for(path: str) -> threading.Lock:
+    key = os.path.abspath(path)
+    with _LOCKS_GUARD:
+        if key not in _LOCKS:
+            _LOCKS[key] = threading.Lock()
+        return _LOCKS[key]
 
 
 class SessionStore:
@@ -31,7 +47,16 @@ class SessionStore:
         return Session.load(path)
 
     def save(self, session: Session) -> None:
-        session.save(self._path(session.session_id))
+        # Serialize writes per session file: concurrent turns on the same
+        # conversation (e.g. a retry racing a slow first attempt) must not
+        # clobber each other's messages. The write also lands atomically
+        # (temp file + os.replace) so a concurrent reader never sees a torn,
+        # half-written JSON file.
+        path = self._path(session.session_id)
+        with _lock_for(path):
+            tmp = path + ".tmp"
+            session.save(tmp)
+            os.replace(tmp, path)
 
     def list(self) -> list[dict]:
         """Lightweight listing (id, title, branch count, last updated) without full deserialization cost."""

@@ -71,6 +71,11 @@ IDEA_GROUNDING_INSTRUCTION = (
     "characters, or details of the story the writer hasn't shared, and never "
     "reference 'the report', 'the analysis', or 'the script'. If you need "
     "something you don't have, say so plainly and ask."
+    " The page is the WRITER's material — never recite it back, never summarize "
+    "what they already wrote down; they know what's on it. Respond to what's "
+    "new in their message, build on the page in your own words, and when the "
+    "next step isn't obvious, probe: one sharp question about the part that's "
+    "still fuzzy beats a paragraph of restatement."
 )
 
 GROUNDING_INSTRUCTION = (
@@ -244,19 +249,27 @@ def _premise_block(card: dict | None) -> str:
 
 def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, persona: str, mode: str,
                         relationship_card: str | None = None, cold_start_line: str | None = None,
-                        premise: dict | None = None, writer_library_text: str | None = None) -> str:
+                        premise: dict | None = None, writer_library_text: str | None = None,
+                        mood_text: str | None = None, doctor_case_text: str | None = None) -> str:
     examples = persona_examples(persona)
     examples_block = f"\n\n{examples}" if examples else ""
     if premise is not None:
         # Idea room: no script, no report — the premise card is the material.
         idea_title = (premise.get("title") or "").strip() or "this idea"
+        update_note = (premise.get("page_update") or "").strip()
+        update_block = (
+            f"\n\nPAGE UPDATE — a deterministic diff of the page since you last read it. "
+            f"These changes are facts, not guesses; react to what's new naturally:\n{update_note}\n"
+            if update_note else ""
+        )
         prompt = (
             f"{persona_text(persona)}\n\n"
             f"{mode_text(mode)}\n\n"
             f"{examples_block}\n"
             f"You're developing the story idea \"{idea_title}\" with its writer. "
             f"There are no pages yet — the idea is the material.\n\n"
-            f"PREMISE (the shared card, keeps growing as you talk):\n\n{_premise_block(premise)}\n\n"
+            f"PREMISE (the shared card, keeps growing as you talk):\n\n{_premise_block(premise)}\n"
+            f"{update_block}\n"
             f"{IDEA_GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
         )
     else:
@@ -274,6 +287,15 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
             f"and you need exact wording to answer precisely, say so rather than guessing "
             f"at exact lines from memory.\n\n{GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
         )
+    if mood_text:
+        # Deterministic room state (facts computed from real project data —
+        # never model-improvised). Colors energy/patience; carries no facts
+        # the persona could misquote as script content.
+        prompt += f"\n\n{mood_text}"
+    if doctor_case_text and persona == "script_consultant":
+        # The doctor's case file on this writer — cross-project PATTERNS only,
+        # never script content. Sameer never sees it; it's not his lens.
+        prompt += f"\n\n{doctor_case_text}"
     if relationship_card:
         prompt += f"\n\n{relationship_card}"
     if cold_start_line:

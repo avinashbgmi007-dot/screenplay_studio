@@ -1,0 +1,20 @@
+  PASS  Sameer reply landed
+  PASS  globe icon on every assistant reply (1)
+  PASS  no globe on writer bubbles
+  PASS  language menu lists all five registers
+  PASS  Tenglish panel labelled + filled
+  PASS  Telugu panel renders native script or honest pass-through
+       (demo glossary rendered Telugu script: False)
+  PASS  panel label follows the picked language
+  PASS  re-picking a language hides the panel
+  PASS  mic chip beside the chat composer
+  PASS  mic chip beside the idea page
+  PASS  spoken-language picker lists auto/en/hi/te
+  PASS  picked speech language persists
+  PASS  /api/stt answered OK through the local engine
+  PASS  transcript text came back
+  PASS  dictated text landed at the caret
+  PASS  dictated words survived the autosave round-trip
+  PASS  no JS page errors
+
+=== 17 passed, 0 failed ===

@@ -320,6 +320,53 @@ def rewrite_scene(client, doc: ScriptDocument, scene_number: int, finding_text: 
     return client.chat_json(system, user, grammar=replacements_grammar(), max_tokens=1500)
 
 
+# ---------- finding triage (dismiss / restore) ----------
+
+# The writer's own judgment layer over the report: a finding they've decided
+# to live with. Stored as (index, issue) pairs so a dismissal only sticks
+# while the report still says the same thing at that index — a regenerated
+# report re-opens everything honestly (flag-don't-drop, applied both ways).
+
+def dismissed_path(m) -> str:
+    return os.path.join(m.project_dir, "dismissed_findings.json")
+
+
+def dismissed_issues(m) -> set:
+    """Set of (index, issue) tuples currently dismissed for this project."""
+    try:
+        with open(dismissed_path(m), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {(int(d["index"]), d.get("issue") or "") for d in data if isinstance(d, dict)}
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+        return set()
+
+
+def dismiss_finding(m, index: int, issue: str) -> None:
+    path = dismissed_path(m)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = []
+    entry = {"index": int(index), "issue": issue or ""}
+    if entry not in data:
+        data.append(entry)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def undismiss_finding(m, index: int) -> None:
+    path = dismissed_path(m)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return
+    data = [d for d in data if not (isinstance(d, dict) and int(d.get("index", -1)) == int(index))]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
 def quote_present(doc: ScriptDocument, quote: str | None) -> bool:
     """Is a finding's evidence quote still present in the working copy?
 
