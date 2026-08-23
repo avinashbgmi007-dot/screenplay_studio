@@ -509,7 +509,7 @@ function renderDashboard() {
 }
 
 async function deleteProjectFlow(name, title) {
-  if (!window.confirm(`Remove "${title}" from the shelf?\nThis deletes the project and its analysis from this machine.`)) return;
+  if (!window.confirm(`Remove "${title}"?\n\nYour library and the shelf are one source -- this deletes the script and its analysis from this machine, and its library entry goes with it.`)) return;
   try {
     await api(`/projects/${encodeURIComponent(name)}`, { method: "DELETE" });
     if (state.currentProject === name) {
@@ -525,7 +525,7 @@ async function deleteProjectFlow(name, title) {
       $("#project-bar").style.display = "none";
       $("#input").value = "";
     }
-    await loadProjects();
+    await Promise.all([loadProjects(), loadLibrary()]);   // both shelves drop the row
     saveSession();
   } catch (err) {
     showError("Couldn't remove the project: " + err.message);
@@ -560,29 +560,12 @@ function renderProjectList() {
     del.type = "button";
     del.title = `Remove "${p.title}" from the shelf (deletes its files)`;
     del.setAttribute("aria-label", `Remove ${p.title} from the shelf`);
-    del.addEventListener("click", async (e) => {
+    // ONE shared delete flow (same as the dashboard card) -- this inline
+    // duplicate used to skip the library refresh and leave a ghost entry in
+    // Your library until a full reload.
+    del.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (!window.confirm(`Remove "${p.title}" from the shelf?\nThis deletes the project and its analysis from this machine.`)) return;
-      try {
-        await api(`/projects/${encodeURIComponent(p.project)}`, { method: "DELETE" });
-        if (state.currentProject === p.project) {
-          state.currentProject = null;
-          state.currentSession = null;
-          state.script = null;
-          state.findings = [];
-          state.fixQueue = null;
-          state.branches = { main: { messages: [], active_persona: "script_consultant", active_mode: "evidence_discussion" } };
-          state.currentBranch = "main";
-          hideAllViews();
-          $("#welcome-view").style.display = "flex";
-          $("#project-bar").style.display = "none";
-          $("#input").value = "";
-        }
-        await loadProjects();
-        saveSession();
-      } catch (err) {
-        showError("Couldn't remove the project: " + err.message);
-      }
+      deleteProjectFlow(p.project, p.title);
     });
     item.appendChild(del);
     item.addEventListener("click", () => openProject(p.project));
@@ -869,6 +852,15 @@ function renderLibraryList() {
     item.appendChild(row);
     const meta = `${p.scene_count || "?"} scenes · ${(p.characters || []).slice(0, 4).join(", ") || "no characters parsed"}`;
     item.appendChild(el("div", "project-item-status", meta));
+    // Your library has no storage of its own -- every entry IS a shelf
+    // project's parsed files. Deleting here deletes that script (same flow
+    // as the shelf's X), so the two shelves can never disagree.
+    const del = el("button", "project-delete", "\u2715");
+    del.type = "button";
+    del.title = `Remove "${p.title}" -- this deletes the script and its analysis from the machine`;
+    del.setAttribute("aria-label", `Delete ${p.title} from the library`);
+    del.addEventListener("click", (e) => { e.stopPropagation(); deleteProjectFlow(p.project, p.title); });
+    item.appendChild(del);
     item.addEventListener("click", () => openProject(p.project));
     list.appendChild(item);
   }

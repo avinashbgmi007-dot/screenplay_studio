@@ -4,6 +4,14 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+- **2026-08-23 — Library delete + shelf/library single-source-of-truth pinned.**
+  - Confirmed by code: Your library has NO store of its own -- `build_library()` projects each shelf project's parsed.json from PROJECTS_DIR. Library is a live view of the shelf; deleting one IS deleting the other.
+  - Fixed: library rows now carry the same hover-reveal ✕ as the shelf (delegates to the shared flow with cascade-honest confirm copy). Shelf-delete refreshes BOTH lists (was shelf-only -> ghost entry in the library until reload). Root cause of the ghost: the shelf-flyout row had its own duplicated inline DELETE handler (old copy, no loadLibrary) -- consolidated into `deleteProjectFlow` (dashboard card already used it).
+  - New suite `tests/e2e_browser_library_delete.py` (8 checks, self-cleaning): hover-reveal on library rows; delete-from-library removes script from every pane + disk + digest; delete-from-shelf empties the library with no ghost; zero JS errors. Cache-bust id2e102.
+  - Verified: **659 pytest · 96/96 browser checks** across all 7 suites.
+
+## Completed
+
 - **2026-08-23 — Idea-room Clear chat fixed + translate-menu shrink-wrap.**
   - **Clear chat was a silent no-op in the idea room**: `clearChat()` read `state.currentProject`/`state.currentSession` (project-room state) and bailed early when no project was open — idea sessions live in `state.currentIdeaSession` under `/ideas/<id>/chat/sessions/<sid>`. Fixed: mode-aware base + session id; DELETE now really fires (route existed all along), fresh session minted after.
   - **Translate hover menu stretched to the viewport's right edge**: `.lang-menu` CSS kept `right:0` while JS positions it on <body> with inline `left` — over-constrained box spanned left→right edge. Fixed: placement fully JS-owned (CSS offsets removed, `position:fixed` base).
