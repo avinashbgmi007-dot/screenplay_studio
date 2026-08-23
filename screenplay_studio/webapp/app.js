@@ -2064,16 +2064,17 @@ async function clearChat() {
   // page. The relationship memory is deliberately kept (backend keeps
   // writer_profile.json) so Sameer's learning about how the writer works
   // survives a cleared thread.
-  const project = state.currentProject;
-  const sid = state.currentSession;
-  if (!project) return;
+  // The idea room keeps its own base + session id -- reading the project ones
+  // made Clear chat a silent no-op there (no project open -> early return).
+  const base = state.inIdea
+    ? (state.currentIdea ? `/ideas/${encodeURIComponent(state.currentIdea.id)}` : null)
+    : (state.currentProject ? `/projects/${encodeURIComponent(state.currentProject)}` : null);
+  if (!base) return;
+  const sid = state.inIdea ? state.currentIdeaSession : state.currentSession;
   const label = sid ? "this conversation" : "the empty page";
   if (!confirm(`Erase ${label} with Sameer and start fresh?\n\nThe relationship notes are kept — only the chat history goes.`)) return;
   try {
     if (sid) {
-      const base = state.inIdea
-        ? `/ideas/${encodeURIComponent(state.currentIdea.id)}`
-        : `/projects/${encodeURIComponent(project)}`;
       await api(`${base}/chat/sessions/${sid}`, { method: "DELETE" });
     }
     state.currentSession = null;

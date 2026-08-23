@@ -4,6 +4,14 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+- **2026-08-23 — Idea-room Clear chat fixed + translate-menu shrink-wrap.**
+  - **Clear chat was a silent no-op in the idea room**: `clearChat()` read `state.currentProject`/`state.currentSession` (project-room state) and bailed early when no project was open — idea sessions live in `state.currentIdeaSession` under `/ideas/<id>/chat/sessions/<sid>`. Fixed: mode-aware base + session id; DELETE now really fires (route existed all along), fresh session minted after.
+  - **Translate hover menu stretched to the viewport's right edge**: `.lang-menu` CSS kept `right:0` while JS positions it on <body> with inline `left` — over-constrained box spanned left→right edge. Fixed: placement fully JS-owned (CSS offsets removed, `position:fixed` base).
+  - Cache-bust bumped (`id2c101/102`). Regression checks added: menu width ≤240px + right edge inside viewport (translate_mic, 22/22); full clear-chat flow — user bubbles gone, sid changes, old session GETs 404 server-side (ui_fixes, 19/19).
+  - Verified: **659 pytest · 88/88 browser checks** across all six suites.
+
+## Completed
+
 ## Completed
 
 - **2026-08-23 — Full-project critical audit + polish batch (all verified).**

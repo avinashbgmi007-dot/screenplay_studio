@@ -134,12 +134,20 @@ def run():
             const m = document.querySelector('.lang-menu').getBoundingClientRect();
             const pane = document.querySelector('.messages-scroll').getBoundingClientRect();
             return { bTop: b.top, bBottom: b.bottom,
-                     mTop: m.top, mBottom: m.bottom, paneBottom: pane.bottom };
+                     mTop: m.top, mBottom: m.bottom, paneBottom: pane.bottom,
+                     mLeft: m.left, mRight: m.right, mWidth: m.width,
+                     vw: window.innerWidth };
         }""")
         below = -8 <= geo["mTop"] - geo["bBottom"] <= 60      # opens under the icon
         above = -8 <= geo["bTop"] - geo["mBottom"] <= 60      # or flipped above it
         check("menu opens right at the hovered globe",
               (below or above) and geo["mTop"] < geo["paneBottom"] - 10, str(geo))
+
+        # the box must hug its five short labels -- no stretching to the
+        # viewport's right end (over-constrained left+right positioning)
+        check("menu shrinks to its text (never spans to the screen edge)",
+              geo["mWidth"] <= 240 and geo["mRight"] <= geo["vw"] - 4,
+              f"w={geo['mWidth']:.0f} right={geo['mRight']:.0f} vw={geo['vw']}")
 
         # ---- D. Tenglish translation renders inline -----------------------
         menu.locator(".lang-menu-item", has_text="Tenglish").click()

@@ -3811,8 +3811,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .sidebar-flyout .empty-hint { font-size: 0.72rem; padding: 8px; }
 
 /* ---------- translate language menu (hover the globe) ---------- */
+/* Placement is owned by openMenu() in app.js: the menu is appended to <body>
+   with position:fixed + inline left/top. No CSS offsets here -- right:0 plus an
+   inline left used to stretch the box all the way to the viewport edge. */
 .lang-menu {
-  position: absolute; top: calc(100% + 2px); right: 0;
+  position: fixed;
   z-index: 600; display: flex; flex-direction: column;
   background: var(--panel-bg, #201a14);
   border: 1px solid rgba(232, 162, 79, 0.28);

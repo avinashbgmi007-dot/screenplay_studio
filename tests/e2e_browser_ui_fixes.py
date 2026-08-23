@@ -225,6 +225,37 @@ def run():
         check("autosave indicator shows on the idea head",
               state_txt.startswith("saving") or state_txt.startswith("saved"), state_txt)
 
+        # ---- Bug 6: Clear chat works INSIDE the idea room ------------------
+        # (it used to read the project-session state and silently no-op when
+        #  only an idea was open)
+        page.locator("#idea-sam-pill").click()   # this idea's chat drawer back
+        page.wait_for_timeout(500)
+        ask2 = page.locator("#input")
+        page.wait_for_selector("#input", state="visible", timeout=5000)
+        ask2.click()
+        ask2.type("seed line before clearing", delay=4)
+        ask2.press("Enter")
+        page.wait_for_selector(".msg.assistant:not(.msg-pending)", timeout=15000)
+        old_sid = page.evaluate("state.currentIdeaSession")
+        got_old = page.evaluate(
+            "async (sid) => (await fetch(`/api/ideas/${state.currentIdea.id}/chat/sessions/${sid}`)).status",
+            old_sid)
+        check("session exists server-side before clear", got_old == 200, f"GET {got_old}")
+        page.locator("#clear-chat-btn").click()   # dialog auto-accepted
+        # the fresh-page note itself renders as .msg.assistant -- so judge the
+        # wipe by USER bubbles only + the note's own text
+        page.get_by_text("Fresh page", exact=False).first.wait_for(timeout=8000)
+        user_bubbles = page.locator(".msg.user").count()
+        new_sid = page.evaluate("state.currentIdeaSession")
+        check("clear chat wipes the thread and starts fresh",
+              user_bubbles == 0 and new_sid and new_sid != old_sid,
+              f"user_bubbles={user_bubbles} sid {old_sid} -> {new_sid}")
+        gone = page.evaluate(
+            "async (sid) => (await fetch(`/api/ideas/${state.currentIdea.id}/chat/sessions/${sid}`)).status",
+            old_sid)
+        check("cleared conversation is really deleted server-side",
+              gone == 404, f"GET old session after clear: {gone}")
+
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         page.screenshot(path="_browser_ui_fixes.png", full_page=True)
         browser.close()

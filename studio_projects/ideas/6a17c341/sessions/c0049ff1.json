@@ -5,6 +5,7 @@
   "script_path": null,
   "server_url": "http://127.0.0.1:8099",
   "model_id": "demo-craft-model",
+  "last_seen_content": null,
   "branches": {
     "main": {
       "name": "main",
@@ -36,5 +37,5 @@
   },
   "current_branch": "main",
   "created_at": 1787397600.0554986,
-  "updated_at": 1787397607.095381
+  "updated_at": 1787521707.3268888
 }
