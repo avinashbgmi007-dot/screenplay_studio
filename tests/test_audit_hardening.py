@@ -9,6 +9,7 @@ Covers the audit fixes:
 - P4  /api/stt/languages stays the mic menu's source of truth
 """
 import io
+import io
 import json
 import os
 import threading
@@ -179,3 +180,50 @@ def test_faster_whisper_is_not_a_hard_dependency():
     active = [ln for ln in lines if ln and not ln.startswith("#")]
     assert not any("faster-whisper" in ln for ln in active), \
         "STT is optional; it must stay out of the hard requirements"
+
+
+# ---- flag-don't-drop for projects (same contract as ideas) ----
+
+def test_corrupt_manifest_stays_on_the_shelf(client):
+    good = client.post(
+        "/api/projects",
+        data={"file": (io.BytesIO(b"Title: t\n\nINT. A - DAY\n"), "ok.fountain")},
+        content_type="multipart/form-data",
+    ).get_json()["project"]
+    # a damaged neighbor
+    bad_dir = os.path.join(webapp_server.PROJECTS_DIR, "Broken_Show")
+    os.makedirs(bad_dir, exist_ok=True)
+    with open(os.path.join(bad_dir, "project.json"), "w") as f:
+        f.write("{ torn")
+
+    listing = client.get("/api/projects").get_json()
+    by_name = {p["project"]: p for p in listing}
+    assert good in by_name and not by_name[good].get("unreadable")
+    assert "Broken_Show" in by_name, "corrupt project must stay visible"
+    assert by_name["Broken_Show"].get("unreadable") is True
+    # empty stage dicts keep every frontend reader safe
+    assert by_name["Broken_Show"]["stages"]["analyze"] == {}
+
+
+def test_non_project_dirs_are_still_not_listed(client):
+    client.post("/api/projects",
+                data={"file": (io.BytesIO(b"Title: t\n\nINT. A - DAY\n"), "x.fountain")},
+                content_type="multipart/form-data")
+    listing = client.get("/api/projects").get_json()
+    names = {p["project"] for p in listing}
+    assert "ideas" not in names  # the ideas store is not a shelf project
+
+
+def test_corrupt_parse_flagged_in_writer_library(client):
+    made = client.post(
+        "/api/projects",
+        data={"file": (io.BytesIO(b"Title: t\n\nINT. A - DAY\n"), "torn.fountain")},
+        content_type="multipart/form-data",
+    ).get_json()["project"]
+    with open(os.path.join(webapp_server.PROJECTS_DIR, made, "parsed.json"), "w") as f:
+        f.write("{ torn")
+
+    lib = client.get("/api/writer-library").get_json()["projects"]
+    entry = next((e for e in lib if e.get("name") == made or e.get("project") == made), None)
+    assert entry is not None, "corrupt parse must stay in past work"
+    assert entry.get("unreadable") is True

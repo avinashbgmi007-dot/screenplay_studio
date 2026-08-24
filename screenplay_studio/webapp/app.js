@@ -461,6 +461,10 @@ function renderDashboard() {
     // head: title + format chip + delete
     const head = el("div", "dash-card-head");
     head.appendChild(el("span", "dash-card-title", p.title));
+    if (p.unreadable) {
+      head.appendChild(el("span", "idea-unreadable", "\u26A0 unreadable"));
+      card.title = "Damaged on disk \u2014 can't be opened. Remove it with \u2715.";
+    }
     if (p.source_format) head.appendChild(el("span", "dash-format", p.source_format.replace(".", "").toUpperCase()));
     const del = el("button", "project-delete", "✕");
     del.type = "button";
@@ -493,7 +497,11 @@ function renderDashboard() {
     const actions = el("div", "dash-actions");
     const openBtn = el("button", "dash-open", "Open desk →");
     openBtn.type = "button";
-    openBtn.addEventListener("click", (e) => { e.stopPropagation(); openProject(p.project); });
+    openBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+      openProject(p.project);
+    });
     const backup = el("a", "dash-backup", "⬇ Backup");
     backup.href = `/api/projects/${encodeURIComponent(p.project)}/backup`;
     backup.download = `${p.project}-backup.zip`;
@@ -503,7 +511,10 @@ function renderDashboard() {
     actions.appendChild(backup);
     card.appendChild(actions);
 
-    card.addEventListener("click", () => openProject(p.project));
+    card.addEventListener("click", () => {
+      if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+      openProject(p.project);
+    });
     grid.appendChild(card);
   }
 
@@ -557,10 +568,15 @@ function renderProjectList() {
   }
   for (const p of state.projects) {
     const item = el("div", "project-item" + (p.project === state.currentProject ? " active" : ""));
-    const dotClass = p.stages.analyze === "complete" ? "complete" : p.stages.analyze === "failed" ? "failed" : "";
+    const stage = (p.stages && p.stages.analyze) || "";
+    const dotClass = stage === "complete" ? "complete" : stage === "failed" ? "failed" : "";
     const row = el("div", "project-item-row");
     row.appendChild(el("span", "stage-dot" + (dotClass ? " " + dotClass : "")));
     row.appendChild(document.createTextNode(p.title));
+    if (p.unreadable) {
+      row.appendChild(el("span", "idea-unreadable", "\u26A0 unreadable"));
+      item.title = "This project's manifest is damaged on disk \u2014 it couldn't be opened. Remove it with \u2715 or inspect studio_projects/ by hand.";
+    }
     item.appendChild(row);
     item.appendChild(el("div", "project-item-status", stageLabel(p)));
     const del = el("button", "project-delete", "✕");
@@ -575,7 +591,10 @@ function renderProjectList() {
       deleteProjectFlow(p.project, p.title);
     });
     item.appendChild(del);
-    item.addEventListener("click", () => openProject(p.project));
+    item.addEventListener("click", () => {
+      if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+      openProject(p.project);
+    });
     list.appendChild(item);
   }
 }

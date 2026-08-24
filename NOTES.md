@@ -4,6 +4,11 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+- **2026-08-24 — flag-don't-drop symmetry for projects:** `list_projects` no longer silently skips corrupt manifests — damaged projects stay on the shelf flagged "⚠ unreadable" (empty stage dicts keep stageLabel/dot/steps readers safe); clicking one errors instead of opening; delete stays available as the remedy. Same treatment for `writer_library.build_library` (corrupt parse still counts as past work). Frontend guards on shelf rows, dashboard cards, and Open buttons. Unit coverage in test_audit_hardening.py (shelf flag, non-project dirs still hidden, library flag) and browser checks in e2e_browser_export_flush.py (flagged row visible → click errors, desk never opens → healthy project unaffected). Cache-bust id4a001/002.
+- **Verification:** 673 pytest passed; browser suites 22+10+19+8+14+12+9+12 = **106 checks green**.
+
+## Completed
+
 - **2026-08-24 — Leftover-critique batch:** (1) `.gitignore` now covers local env files (`!.env.example` kept) so secrets can never enter history. (2) **faster-whisper optionalized**: removed from `requirements.txt` (commented with rationale), install hint pinned in `stt.py`'s actionable 503, AGENTS.md stack line updated; STT tests all monkeypatch `_get_model` so no test needs the real package. (3) **Upload cap**: `MAX_CONTENT_LENGTH = 256MB` + JSON 413 handler. (4) **The two behaviors that shipped without live proof now have it** — new `tests/e2e_browser_export_flush.py` (dual-mode: self-hosted, or shared-server via E2E_BASE + E2E_PROJECTS_DIR): 📥 Report button visible/href/download-name/actual download; pagehide flush proven by typing into an idea and closing the tab mid-debounce — last line persisted server-side via sendBeacon. (5) **CODEBASE_MAP completion pass**: added continuity/pacing/dials/setup_payoff (analyzer), language_mirror/peer/memory/writer_library (cowriter), ideas/stt/character_track/metrics/stash_store/demo_model/webapp_demo (studio); personas row corrected (8 personas incl. writing_partner/premise_doctor, `_examples` keys documented as prompt-only).
 - **Verification:** 670 pytest passed; browser suites 22+19+8+7+14+12+9+12 = **103 checks green**, zero JS errors.
 

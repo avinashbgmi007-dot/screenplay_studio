@@ -59,6 +59,12 @@ def seed_project(projects_dir: str) -> None:
     with open(os.path.join(d, "report.findings.json"), "w") as f:
         json.dump(report, f)
 
+    # a damaged neighbor: torn manifest must stay on the shelf, flagged
+    broken = os.path.join(projects_dir, "Broken_Show")
+    os.makedirs(broken, exist_ok=True)
+    with open(os.path.join(broken, "project.json"), "w") as f:
+        f.write("{ torn")
+
 
 def main() -> None:
     external_base = os.environ.get("E2E_BASE")
@@ -104,11 +110,29 @@ def main() -> None:
             page.on("pageerror", lambda e: js_errors.append(str(e)))
             page.goto(BASE, wait_until="networkidle")
 
-            # ---- A. export button lives in the Feedback room ----
+            # ---- A2 first, on a pristine welcome desk: corrupt project ----
             page.locator("#shelf-trigger").hover()
             page.wait_for_timeout(400)
+            shelf_txt = page.locator("#shelf-section").inner_text()
+            ok("corrupt project flagged on shelf", "unreadable" in shelf_txt)
+
+            page.locator(".project-item", has_text="Broken_Show").first.click()
+            page.wait_for_timeout(500)
+            banner_visible = page.locator("#error-banner").evaluate(
+                "el => getComputedStyle(el).display !== 'none'")
+            desk_open = page.locator("#project-bar").evaluate(
+                "el => getComputedStyle(el).display !== 'none'")
+            ok("clicking flagged project errors instead of opening",
+               banner_visible and not desk_open,
+               f"banner={banner_visible} desk={desk_open}")
+
+            # ---- A. export button lives in the Feedback room ----
+            page.locator("#shelf-trigger").hover()
+            page.wait_for_timeout(300)
             page.locator(".project-item", has_text="Seed Export").first.click()
             page.wait_for_timeout(800)
+            ok("healthy project opens normally",
+               page.locator("#project-title").inner_text().strip() == "Seed Export")
             page.locator("#room-feedback-btn").click()
             page.wait_for_timeout(600)
 

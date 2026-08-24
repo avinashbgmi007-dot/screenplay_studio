@@ -293,8 +293,19 @@ def list_projects():
         try:
             m = ProjectManifest.load(_project_dir(name))
             out.append(_manifest_summary(m))
+        except FileNotFoundError:
+            continue  # not a project (stray file / the ideas store)
         except Exception:
-            continue
+            # Flag, don't drop: a damaged manifest stays visible on the shelf
+            # so the writer knows it exists and can remove it. Empty stage
+            # dicts keep every frontend reader (stageLabel/dot/steps) safe.
+            out.append({
+                "project": name,
+                "title": name,
+                "unreadable": True,
+                "stages": {"parse": {}, "analyze": {}, "chat": {}},
+                "sessions": [],
+            })
     out.sort(key=lambda p: p.get("title", ""))
     return jsonify(out)
 

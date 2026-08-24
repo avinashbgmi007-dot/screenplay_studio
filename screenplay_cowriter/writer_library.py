@@ -54,6 +54,8 @@ def build_library(projects_dir: str, exclude: str | None = None, limit: int = 0)
             with open(parsed_path, "r", encoding="utf-8") as f:
                 p = json.load(f)
         except (OSError, ValueError):
+            # Flag, don't drop: a corrupt parse still counts as past work.
+            entries.append({"name": name, "title": name, "unreadable": True})
             continue
         themes = []
         report_path = os.path.join(d, "report.findings.json")
