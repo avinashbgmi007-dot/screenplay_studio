@@ -26,6 +26,8 @@ import zipfile
 
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 
+from .jsonio import check_safe_id
+
 from .ideas import IdeaStore
 from .manifest import ProjectManifest
 from .orchestrator import Orchestrator, OrchestratorError
@@ -98,6 +100,12 @@ class ServerConfig:
 CONFIG = ServerConfig()
 
 
+@app.errorhandler(ValueError)
+def _value_error(e):
+    """Bad ids/names (incl. traversal probes) answer as 400, never a 500."""
+    return jsonify({"error": str(e)}), 400
+
+
 # ---------- static frontend ----------
 
 @app.route("/")
@@ -119,6 +127,7 @@ def static_files(filename):
 # ---------- helpers ----------
 
 def _project_dir(name: str) -> str:
+    check_safe_id(name, "project name")
     return os.path.join(PROJECTS_DIR, name)
 
 
@@ -233,8 +242,10 @@ def get_config():
     # co-writer isn't installed; the UI then shows its built-in defaults).
     try:
         personas_mod = _import_cowriter("personas")
-        cfg["personas"] = list(personas_mod.PERSONAS.keys())
-        cfg["modes"] = list(personas_mod.MODES.keys())
+        cfg["personas"] = [p for p in personas_mod.PERSONAS
+                           if not p.endswith("_examples")]
+        cfg["modes"] = [m for m in personas_mod.MODES
+                        if not m.endswith("_examples")]
     except CowriterUnavailableError:
         cfg["personas"] = []
         cfg["modes"] = []
@@ -2370,7 +2381,8 @@ def main():
     print(f"Projects directory: {os.path.abspath(PROJECTS_DIR)}")
     print(f"Default model server: {CONFIG['server_url']}")
     print(f"Open http://localhost:{args.port} in your browser.")
-    app.run(host="127.0.0.1", port=args.port, debug=False)
+    # threaded: one long LLM turn must never freeze autosave/sidebar/etc.
+    app.run(host="127.0.0.1", port=args.port, debug=False, threaded=True)
 
 
 _DEMO_MODEL_ACTIVE = False

@@ -34,8 +34,8 @@ def _load_raw(m) -> list[dict]:
 
 
 def _save(m, notes: list[dict]) -> None:
-    with open(_path(m), "w", encoding="utf-8") as f:
-        json.dump(notes, f, indent=2, ensure_ascii=False)
+    from .jsonio import atomic_write_json
+    atomic_write_json(_path(m), notes)
 
 
 def load_notes(m) -> list[dict]:

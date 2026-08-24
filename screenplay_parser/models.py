@@ -64,17 +64,6 @@ class Scene:
             "elements": [e.to_dict() for e in self.elements],
         }
 
-    def action_text(self) -> str:
-        return "\n".join(e.text for e in self.elements if e.type == ElementType.ACTION)
-
-    def dialogue_text(self, character: Optional[str] = None) -> str:
-        lines = []
-        for e in self.elements:
-            if e.type == ElementType.DIALOGUE:
-                if character is None or (e.character or "").upper() == character.upper():
-                    lines.append(e.text)
-        return "\n".join(lines)
-
 
 @dataclass
 class ParseWarning:

@@ -60,5 +60,5 @@ def remove_from_stash(project_dir: str, entry_id: str) -> bool:
 
 def _save(project_dir: str, stash: list[dict]) -> None:
     os.makedirs(project_dir, exist_ok=True)
-    with open(stash_path(project_dir), "w", encoding="utf-8") as f:
-        json.dump(stash, f, ensure_ascii=False, indent=2)
+    from .jsonio import atomic_write_json
+    atomic_write_json(stash_path(project_dir), stash)

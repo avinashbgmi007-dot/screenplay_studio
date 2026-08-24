@@ -22,6 +22,8 @@ import shutil
 import time
 import uuid
 
+from .jsonio import atomic_write_json, check_safe_id
+
 EMPTY_CARD = {"title": "", "logline": "", "premise": "", "questions": []}
 
 # The idea page is a blank canvas, not a form: free-form `content` is the
@@ -39,6 +41,7 @@ class IdeaStore:
     # ---- paths ----
 
     def _dir(self, idea_id: str) -> str:
+        check_safe_id(idea_id, "idea id")
         return os.path.join(self.ideas_dir, idea_id)
 
     def _meta_path(self, idea_id: str) -> str:
@@ -72,8 +75,7 @@ class IdeaStore:
 
     def _write(self, idea_id: str, meta: dict) -> None:
         meta["updated_at"] = time.time()
-        with open(self._meta_path(idea_id), "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
+        atomic_write_json(self._meta_path(idea_id), meta)
 
     @staticmethod
     def auto_title_from(content: str) -> str:
@@ -136,12 +138,20 @@ class IdeaStore:
             try:
                 out.append(self.load(name))
             except Exception:
-                continue
+                # Flag, don't drop: a corrupt/unreadable idea must still show
+                # on the shelf so the writer knows it exists.
+                out.append({
+                    "id": name,
+                    "title": name,
+                    "unreadable": True,
+                    "created_at": 0,
+                    "updated_at": 0,
+                })
         out.sort(key=lambda m: m.get("updated_at", 0), reverse=True)
         return out
 
     def delete(self, idea_id: str) -> None:
-        shutil.rmtree(self._dir(idea_id), ignore_errors=True)
+        shutil.rmtree(self._dir(idea_id))
 
     # ---- graduation ----
 

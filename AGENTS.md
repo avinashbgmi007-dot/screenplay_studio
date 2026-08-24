@@ -30,7 +30,7 @@ python -m screenplay_cowriter chat --new "Name" --report report.findings.json --
 # Web app (Flask, port 8500) — module, not a studio subcommand
 python -m screenplay_studio.webapp_server --port 8500 --projects-dir ./studio_projects
 
-# Tests (281 tests collected; mock llama-server, no model needed)
+# Tests (660+ tests collected; mock llama-server, no model needed)
 python -m pytest tests/
 ```
 

@@ -294,13 +294,20 @@ function hideError() {
 // Canonical fallbacks for the persona/mode dropdowns. The server exposes the
 // real lists via /api/config; these are used only when the server doesn't
 // (e.g. the co-writer package isn't installed) so the UI never renders empty.
-const FALLBACK_PERSONAS = ["script_consultant", "producer", "dev_exec", "teacher", "audience", "genre_specialist"];
-const FALLBACK_MODES = ["evidence_discussion", "brainstorm", "character_interview"];
+// Mirrors screenplay_cowriter.personas — kept in sync manually; the server's
+// /api/config list always wins when it answers.
+const FALLBACK_PERSONAS = ["writing_partner", "premise_doctor", "script_consultant", "producer", "dev_exec", "teacher", "audience", "genre_specialist"];
+const FALLBACK_MODES = ["peer", "evidence_discussion", "concept_validation", "brainstorm", "character_interview"];
 const FALLBACK_PERSONA_LABELS = {
+  writing_partner: "Sameer", premise_doctor: "Premise Doctor",
   script_consultant: "Dr. Sushruta", producer: "Producer", dev_exec: "Dev Exec",
   teacher: "Teacher", audience: "Audience", genre_specialist: "Genre Specialist",
 };
-const FALLBACK_MODE_LABELS = { evidence_discussion: "Grounded Discussion", brainstorm: "Brainstorm", character_interview: "Character Interview" };
+const FALLBACK_MODE_LABELS = {
+  peer: "Peer (default)", evidence_discussion: "Grounded Discussion",
+  concept_validation: "Concept Validation", brainstorm: "Brainstorm",
+  character_interview: "Character Interview",
+};
 
 async function loadConfig() {
   try {
@@ -888,6 +895,10 @@ function renderIdeaList() {
     const row = el("div", "project-item-row");
     row.appendChild(el("span", "idea-mark", "💡"));
     row.appendChild(document.createTextNode(idea.title || "Untitled idea"));
+    if (idea.unreadable) {
+      row.appendChild(el("span", "idea-unreadable", "\u26A0 unreadable"));
+      item.title = "This idea's file is damaged on disk \u2014 it couldn't be opened. Delete it with \u2715 or inspect studio_projects/ideas/ by hand.";
+    }
     item.appendChild(row);
     // inline rename in the shelf — the title is the writer's, always
     const ren = el("button", "idea-rename", "✎");
@@ -940,7 +951,10 @@ function renderIdeaList() {
       }
     });
     item.appendChild(del);
-    item.addEventListener("click", () => openIdea(idea.id));
+    item.addEventListener("click", () => {
+      if (idea.unreadable) { showError("This idea's file is damaged on disk and can't be opened."); return; }
+      openIdea(idea.id);
+    });
     list.appendChild(item);
   }
 }
@@ -958,6 +972,8 @@ function showWelcomeDesk() {
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "none";
   hideAllViews();
+  const expBtn = $("#report-export-btn");
+  if (expBtn) expBtn.style.display = "none";
   renderProjectList();
   renderIdeaList();
   saveSession();
@@ -3988,6 +4004,13 @@ function switchFeedbackTab(tab) {
 function renderReportPanel() {
   const c = $("#feedback-report");
   if (!c) return;
+  // the doctor's report is the writer's document — let them take it away
+  const exp = $("#report-export-btn");
+  if (exp && state.currentProject && state.report) {
+    exp.href = `/api/projects/${encodeURIComponent(state.currentProject)}/report/export`;
+    exp.download = `${state.currentProject}-report.md`;
+    exp.style.display = "";
+  } else if (exp) exp.style.display = "none";
   c.innerHTML = "";
   const cov = state.report && state.report.coverage;
   if (cov) {
@@ -5030,15 +5053,47 @@ function wireSidebarFlyouts() {
 // ---------- local dictation (STT): a mic chip beside every writing surface ----------
 // Fully local: MediaRecorder captures -> /api/stt -> faster-whisper (or the
 // writer's own local whisper server) -> text lands at the caret. No cloud.
-const MIC_LANGS = [
-  ["auto", "Auto-detect"],
-  ["en", "English"],
-  ["hi", "\u0939\u093f\u0928\u094d\u0926\u0940"],
-  ["te", "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41"],
-];
+const STT_LANG_LABELS = {
+  auto: "Auto-detect",
+  en: "English",
+  hi: "\u0939\u093f\u0928\u094d\u0926\u0940",
+  te: "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41",
+};
+const MIC_LANGS = Object.entries(STT_LANG_LABELS);
 
 function sttLanguage() {
   return localStorage.getItem("studio-stt-lang") || "auto";
+}
+
+// ---- Session elapsed: how long you've been at the desk today ----
+// Spotlight keeps this lit by design (see .spotlight-mode status rules).
+const SESSION_START_KEY = "studio.session.start";
+function sessionStart() {
+  let t = Number(sessionStorage.getItem(SESSION_START_KEY) || 0);
+  if (!t) { t = Date.now(); sessionStorage.setItem(SESSION_START_KEY, String(t)); }
+  return t;
+}
+function fmtDeskElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${m}m` : m ? `${m}m` : `${Math.max(s, 1)}s`;
+}
+function tickSessionElapsed() {
+  const elc = $("#status-elapsed");
+  if (elc) elc.textContent = `\u23F1 ${fmtDeskElapsed(Date.now() - sessionStart())} at the desk`;
+}
+setInterval(tickSessionElapsed, 30000);
+
+// The mic menu prefers the engine's own language list (so adding a whisper
+// language server-side shows up here), falling back to these built-ins.
+async function refreshSttLanguages() {
+  try {
+    const res = await api("/stt/languages");
+    const codes = (res && Array.isArray(res.languages)) ? res.languages : [];
+    if (!codes.length) return;
+    MIC_LANGS.length = 0;
+    for (const code of codes) MIC_LANGS.push([code, STT_LANG_LABELS[code] || code]);
+  } catch (_) { /* engine offline: built-ins stay */ }
 }
 
 function insertAtCaret(input, text) {
@@ -5254,6 +5309,25 @@ function init() {
   // idea canvas: the blank page, autosaved; /sameer; the pill; structure
   $("#idea-content").addEventListener("input", handleIdeaContentInput);
   $("#idea-content").addEventListener("blur", saveIdeaContent);
+
+  // Closing/reloading within the autosave debounce must not eat keystrokes:
+  // flush any pending save (sendBeacon survives unload).
+  window.addEventListener("pagehide", () => {
+    if (!state.currentIdea || !state.inIdea || !ideaSaveTimer) return;
+    clearTimeout(ideaSaveTimer);
+    ideaSaveTimer = null;
+    const content = $("#idea-content").value;
+    if (content === state.currentIdea.content) return;
+    const url = `${API}/ideas/${encodeURIComponent(state.currentIdea.id)}/content`;
+    try {
+      navigator.sendBeacon(url, new Blob([JSON.stringify({ content })], { type: "application/json" }));
+    } catch (_) {
+      fetch(url, { method: "POST", body: JSON.stringify({ content }), keepalive: true });
+    }
+  });
+
+  tickSessionElapsed();
+  refreshSttLanguages();
 
   // back to the page = the partner steps back: clicking/focusing the editor
   // dismisses the room drawer so the writer always has the full page

@@ -118,10 +118,6 @@ class ProjectManifest:
         self.stages[name] = StageStatus(status="failed", error=error)
         self.save()
 
-    def mark_skipped(self, name: str):
-        self.stages[name] = StageStatus(status="skipped")
-        self.save()
-
     def to_dict(self) -> dict:
         return {
             "project_dir": self.project_dir,
@@ -167,8 +163,8 @@ class ProjectManifest:
     def save(self) -> None:
         self.updated_at = time.time()
         os.makedirs(self.project_dir, exist_ok=True)
-        with open(self.manifest_path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
+        from .jsonio import atomic_write_json
+        atomic_write_json(self.manifest_path, self.to_dict())
 
     @staticmethod
     def load(project_dir: str) -> "ProjectManifest":

@@ -64,6 +64,7 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `watch.py` | `process_pending`, `watch_loop` | Watch-folder auto-analysis |
 | `sample.py` | `SAMPLE_TITLE`, `SAMPLE_SCRIPT` | Bundled 3-scene sample ("The Late Hour") |
 | `webapp_server.py` | Flask app + `main`, `ServerConfig`, `_import_cowriter`, `CowriterUnavailableError` | Web UI backend (port 8500); serves `webapp/` static + JSON API; `/api/config` exposes personas/modes |
+| `jsonio.py` | `atomic_write_json`, `check_safe_id` | Shared atomic JSON persistence (tmp + os.replace + per-path lock) and the safe-id contract that blocks path traversal at every store |
 | `cli.py` | `main`, `cmd_run`, `cmd_resume`, `cmd_status`, `cmd_watch` | `run`/`resume`/`status`/`watch` subcommands |
 | `webapp/` | `index.html`, `app.js`, `style.css` | Vanilla JS SPA (no build step) |
 
@@ -80,4 +81,4 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 - `conftest.py` — session-scoped mock llama-server fixture (port **8196**) + `sample_fountain` fixture
 - `mock_unified_server.py` — Flask mock handling Piece 2 (grammar JSON) + Piece 3 (chat echo) + revision-loop request shapes
 - `fixtures/pain_tenglish.fountain` — small Tenglish sample
-- `test_*.py` — one file per feature area (see TESTING.md); 281 tests collected
+- `test_*.py` — one file per feature area (see TESTING.md); 660+ tests collected

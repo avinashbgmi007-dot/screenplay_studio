@@ -33,8 +33,8 @@ def _load(m) -> dict:
 
 
 def _save(m, data: dict) -> None:
-    with open(_path(m), "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    from .jsonio import atomic_write_json
+    atomic_write_json(_path(m), data)
 
 
 def scene_numbers(m) -> list[int]:

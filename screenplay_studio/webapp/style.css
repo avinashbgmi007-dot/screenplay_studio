@@ -214,19 +214,6 @@ body::after {
 }
 #new-project-btn:hover { filter: brightness(1.06); }
 
-.sidebar-section-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-}
-.sidebar-section-label::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
 .sidebar-new-btn {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -958,7 +945,6 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .scene-page:hover { transform: rotate(0deg); }
 .scene-page:nth-child(even) { --tilt: 0.4deg; }
 .scene-page.hidden { display: none; }
-.scene-page.dimmed { opacity: 0.25; }
 
 .scene-page-head {
   display: flex;
@@ -2017,8 +2003,6 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .connection-dot.ok { background: var(--ok); box-shadow: 0 0 7px rgba(143, 174, 126, 0.7); }
 .connection-dot.fail { background: var(--danger); box-shadow: 0 0 7px rgba(201, 106, 90, 0.7); }
 
-.badge-verified { color: var(--ok); background: var(--ok-bg); padding: 1px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 10.5px; }
-.badge-unverified { color: var(--danger); background: var(--danger-bg); padding: 1px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 10.5px; }
 
 .test-connection-result { font-size: 12px; font-family: var(--font-mono); min-height: 16px; margin-bottom: 4px; }
 .test-connection-result.ok { color: var(--ok); }
@@ -3881,3 +3865,18 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 }
 .mic-lang-item:hover { background: rgba(232, 162, 79, 0.14); }
 .mic-lang-item.current::after { content: " \u2713"; color: #e8a24f; }
+
+/* unreadable ideas stay on the shelf, flagged — flag, don't drop */
+.idea-unreadable {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* the doctor's report is a document — the download link dresses like a button */
+a.report-export { text-decoration: none; display: inline-flex; align-items: center; }

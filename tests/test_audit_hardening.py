@@ -1,0 +1,154 @@
+"""Hardening batch: traversal guards, atomic writes, flag-don't-drop, wiring.
+
+Covers the audit fixes:
+- C1  path-traversal ids/names answer 400 at every chokepoint (ideas AND
+      projects), including the proven kill-shot DELETE /api/ideas/..
+- H1  concurrent idea saves/renames never tear idea.json
+- H2  a corrupt idea is flagged on the shelf (unreadable), not dropped
+- C3  config personas exclude internal *_examples keys
+- P4  /api/stt/languages stays the mic menu's source of truth
+"""
+import json
+import os
+import threading
+
+import pytest
+
+import screenplay_studio.webapp_server as webapp_server
+from screenplay_studio.ideas import IdeaStore
+
+
+@pytest.fixture
+def client(tmp_path, mock_server):
+    webapp_server.PROJECTS_DIR = str(tmp_path / "hard_projects")
+    os.makedirs(webapp_server.PROJECTS_DIR, exist_ok=True)
+    webapp_server.CONFIG["server_url"] = mock_server
+    webapp_server.CONFIG["model"] = None
+    webapp_server.app.config["TESTING"] = True
+    return webapp_server.app.test_client()
+
+
+# ---- C1: traversal probes are rejected everywhere ----
+
+def test_idea_traversal_ids_are_400(client):
+    for method, path in (("POST", "/api/ideas/../content"),
+                         ("POST", "/api/ideas/../rename"),
+                         ("POST", "/api/ideas/../card"),
+                         ("DELETE", "/api/ideas/..")):
+        r = client.open(path, method=method, json={"content": "x", "title": "x", "card": {}})
+        assert r.status_code == 400, (method, path)
+        assert "invalid" in r.get_json()["error"].lower()
+
+
+def test_project_traversal_name_is_400_not_500(client):
+    r = client.get("/api/projects/../report")
+    assert r.status_code == 400
+
+
+def test_delete_ideas_dotdot_cannot_nuke_projects_dir(client):
+    # The kill-shot from the audit: gate file present, then DELETE /api/ideas/..
+    gate = os.path.join(webapp_server.PROJECTS_DIR, "idea.json")
+    with open(gate, "w") as f:
+        f.write("{}")
+    r = client.delete("/api/ideas/..")
+    assert r.status_code == 400
+    assert os.path.isdir(webapp_server.PROJECTS_DIR)
+    assert os.path.exists(gate), "projects dir contents must survive"
+
+
+def test_store_rejects_bad_ids_directly(tmp_path):
+    store = IdeaStore(str(tmp_path / "ideas"))
+    with pytest.raises(ValueError):
+        store._dir("..")
+    with pytest.raises(ValueError):
+        store._dir("a/../b")
+    with pytest.raises(ValueError):
+        store._dir("")
+    # legit ids still work
+    meta = store.create("ok")
+    assert store.load(meta["id"])["title"] == "ok"
+
+
+# ---- H1: atomic writes survive a save/rename race ----
+
+def test_save_rename_race_never_tears_json(client):
+    meta = client.post("/api/ideas", json={"title": "race"}).get_json()
+    iid = meta["id"]
+    errors = []
+
+    def save(i):
+        try:
+            r = client.post(f"/api/ideas/{iid}/content",
+                            json={"content": f"line {i}\nsecond {i}"})
+            assert r.status_code == 200
+        except Exception as e:  # pragma: no cover
+            errors.append(e)
+
+    def rename(i):
+        try:
+            r = client.post(f"/api/ideas/{iid}/rename", json={"title": f"T{i}"})
+            assert r.status_code == 200
+        except Exception as e:  # pragma: no cover
+            errors.append(e)
+
+    threads = [threading.Thread(target=save, args=(i,)) for i in range(10)]
+    threads += [threading.Thread(target=rename, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors
+
+    final = client.get(f"/api/ideas/{iid}").get_json()
+    assert isinstance(final.get("content"), str) and final["content"]
+    assert final["title"].startswith("T")
+    # no tmp litter left behind
+    leftovers = [f for f in os.listdir(os.path.join(webapp_server.PROJECTS_DIR,
+                                                    "ideas", iid)) if f.endswith(".tmp")]
+    assert leftovers == []
+
+
+# ---- H2: corrupt ideas are flagged, never silently dropped ----
+
+def test_corrupt_idea_is_flagged_on_shelf(client):
+    made = client.post("/api/ideas", json={"title": "broken"}).get_json()
+    iid = made["id"]
+    path = os.path.join(webapp_server.PROJECTS_DIR, "ideas", iid, "idea.json")
+    with open(path, "w") as f:
+        f.write("{ this is not json")
+
+    listing = client.get("/api/ideas").get_json()
+    entry = next((m for m in listing if m["id"] == iid), None)
+    assert entry is not None, "corrupt idea must stay on the shelf"
+    assert entry.get("unreadable") is True
+
+    # opening it answers a clean client error, not a raw traceback
+    r = client.get(f"/api/ideas/{iid}")
+    assert r.status_code in (400, 500)
+    body = r.get_json()
+    assert body and "error" in body
+
+
+def test_healthy_ideas_are_not_flagged(client):
+    client.post("/api/ideas", json={"title": "healthy"})
+    listing = client.get("/api/ideas").get_json()
+    assert all(not m.get("unreadable") for m in listing if m.get("id"))
+
+
+# ---- C2/C3: persona list is clean for the dropdown ----
+
+def test_config_personas_exclude_example_keys(client):
+    cfg = client.get("/api/config").get_json()
+    personas = cfg.get("personas") or []
+    assert personas, "co-writer installed: real persona list expected"
+    assert not [p for p in personas if p.endswith("_examples")]
+    assert "writing_partner" in personas and "premise_doctor" in personas
+
+
+# ---- P4b: stt languages endpoint remains the mic source of truth ----
+
+def test_stt_languages_shape(client):
+    r = client.get("/api/stt/languages")
+    assert r.status_code == 200
+    langs = r.get_json()["languages"]
+    assert isinstance(langs, list) and "auto" in langs and "en" in langs

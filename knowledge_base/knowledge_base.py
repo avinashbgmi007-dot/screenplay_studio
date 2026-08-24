@@ -93,10 +93,11 @@ class KnowledgeBase:
         return [r for r in self._rules.values() if r.taxonomy_level == level]
 
     def for_category(self, category: str) -> list:
+        """Public query API — reserved for per-category prompt building."""
         return [r for r in self._rules.values() if r.category == category]
 
     def requiring(self, capability: str) -> list:
-        """Rules that need a specific data capability, e.g. 'knowledge_graph'."""
+        """Public query API — rules needing a capability, e.g. 'knowledge_graph'."""
         return [r for r in self._rules.values() if capability in r.requires]
 
     def by_confidence_tier(self, tier: str) -> list:
