@@ -8,6 +8,7 @@ Covers the audit fixes:
 - C3  config personas exclude internal *_examples keys
 - P4  /api/stt/languages stays the mic menu's source of truth
 """
+import io
 import json
 import os
 import threading
@@ -152,3 +153,29 @@ def test_stt_languages_shape(client):
     assert r.status_code == 200
     langs = r.get_json()["languages"]
     assert isinstance(langs, list) and "auto" in langs and "en" in langs
+
+
+# ---- upload cap answers a clean 413 ----
+
+def test_oversized_upload_answers_413_json(client):
+    webapp_server.app.config["MAX_CONTENT_LENGTH"] = 1000  # shrink for the test
+    try:
+        big = b"x" * 2000
+        r = client.post("/api/projects",
+                        data={"file": (io.BytesIO(big), "big.fountain")},
+                        content_type="multipart/form-data")
+        assert r.status_code == 413
+        assert "too large" in r.get_json()["error"].lower()
+    finally:
+        webapp_server.app.config["MAX_CONTENT_LENGTH"] = 256 * 1024 * 1024
+
+
+# ---- faster-whisper is optional, not a hard dependency ----
+
+def test_faster_whisper_is_not_a_hard_dependency():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "requirements.txt")) as f:
+        lines = [ln.strip() for ln in f.readlines()]
+    active = [ln for ln in lines if ln and not ln.startswith("#")]
+    assert not any("faster-whisper" in ln for ln in active), \
+        "STT is optional; it must stay out of the hard requirements"

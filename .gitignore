@@ -42,3 +42,8 @@ studio_projects/
 /_*.log
 /_*.json
 /_*.txt
+
+# Local env / secrets
+.env
+.env.*
+!..env.example

@@ -45,7 +45,8 @@ def _get_model():
     except ImportError as e:
         raise STTUnavailableError(
             "Local transcription needs the faster-whisper package "
-            "(pip install faster-whisper). It is not installed in this environment."
+            '(pip install "faster-whisper>=1.0.0"). '
+            "It is not installed in this environment."
         ) from e
     model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
     _model_cache[MODEL_SIZE] = model

@@ -106,6 +106,17 @@ def _value_error(e):
     return jsonify({"error": str(e)}), 400
 
 
+# Screenplays are text; even scanned PDFs are tens of MB. 256MB is generous;
+# anything bigger is abuse or accident and would otherwise fill the disk.
+app.config["MAX_CONTENT_LENGTH"] = 256 * 1024 * 1024
+
+
+@app.errorhandler(413)
+def _too_large(e):
+    return jsonify({"error": "Upload too large (limit 256MB). "
+                             "Split the file or export a smaller PDF."}), 413
+
+
 # ---------- static frontend ----------
 
 @app.route("/")

@@ -6,7 +6,7 @@ Local, privacy-first screenplay analysis & co-writing suite. Parses `.fdx`/`.fou
 
 - **Language:** Python 3 (no build step, stdlib-first)
 - **Package manager:** pip — `requirements.txt` is the source of truth (no `pyproject.toml`)
-- **Runtime deps:** `requests`, `flask`, `pdfplumber`
+- **Runtime deps:** `requests`, `flask`, `pdfplumber` (dictation/STT is optional: pip install "faster-whisper>=1.0.0")
 - **Optional:** `pytesseract`/`easyocr` (OCR fallback for text-less PDFs) + `pypdfium2` (lazy-imported PNG rendering for OCR); tesseract lang packs for tel/hin/tam
 - **Frontend:** vanilla JS + CSS SPA in `screenplay_studio/webapp/` — no framework, no bundler, no node
 - **External service:** `llama-server` (llama.cpp, `--jinja`), any GGUF model, default `http://localhost:8080`

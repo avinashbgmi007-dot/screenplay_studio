@@ -31,6 +31,10 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `voice.py` | `run_voice_analysis`, `run_subtext_analysis` | Deterministic craft passes (voice-bleed, on-the-nose) |
 | `genre.py` | `run_genre_check`, `conventions_for` | Genre-convention check against coverage genre |
 | `feedback_filter.py` | `filter_findings` | Drops non-writing meta-commentary (dialect/subtitle noise) |
+| `continuity.py` | `run_continuity_analysis` | Deterministic continuity pass: unmarked time-of-day flips, character-name variants |
+| `pacing.py` | `per_scene_pace`, `drag_findings` | Deterministic per-scene pace index + drag flags |
+| `dials.py` | `run_character_dials` | Model-scored per-character dials (grammar-constrained) |
+| `setup_payoff.py` | `run_setup_payoff_ledger`, `dangling_findings` | End-of-pipeline whole-script setup/payoff audit; dangling entries feed Plot Economy |
 | `rules_context.py` | `RulesContext` | Injects knowledge-base rules into prompts; `_NullRulesContext` fallback |
 | `prompts.py` | `scene_summary_prompt`, `dialogue_analysis_prompt`, `theme_analysis_prompt`, `character_analysis_prompt`, `structure_analysis_prompt`, `scene_function_prompt`, `logline_test_prompt`, `character_reads_prompt`, `principle_judgment_prompt`, `genre_check_prompt`, `coverage_prompt`, `language_instruction` | Two-tier citation prompts |
 | `report.py` | `render_markdown`, `to_findings_json`, `save_report` | `.md` + `.findings.json` output |
@@ -44,10 +48,14 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `store.py` | `SessionStore` | File-backed session store (one JSON per session) |
 | `engine.py` | `CoWriterEngine` | `send_message()` — one grounded chat turn; saves the session itself when constructed with `store=` |
 | `context.py` | `ScriptContext`, `ReportContext`, `build_system_prompt`, `build_scene_context_block`, `extract_scene_refs`, `load_json` | Context + scene injection |
-| `personas.py` | `PERSONAS`, `MODES`, `persona_text`, `mode_text` | 6 personas × 3 modes |
+| `personas.py` | `PERSONAS`, `PERSONAS["*_examples"]`, `MODES`, `persona_text`, `mode_text`, `DEFAULT_PERSONA` | Persona bible (writing_partner/premise_doctor/script_consultant/producer/dev_exec/teacher/audience/genre_specialist) × modes incl. peer; `_examples` keys are prompt-only, never exposed via /api/config |
 | `discovery.py` | `resolve_model` | explicit > inherited > loaded |
 | `llm_client.py` | `LlamaServerClient`, `LlamaServerError`, `ModelNotFoundError` | Lightweight free-text chat client |
 | `language_meta.py` | `strip_language_meta` | Strips wrapper-language markers from replies |
+| `language_mirror.py` | `detect_register`, `mirror_instruction` | Mirrors the writer's register (Tenglish/Hindi/Telugu/English) in replies |
+| `peer.py` | `classify_turn`, `should_probe`, `ensure_forward_momentum`, `cap_suggestions`, `has_embedded_reasoning` | Peer-mode guardrails: probe instead of parrot, forward momentum, suggestion cap |
+| `memory.py` | `WriterMemory`, `build_relationship_card`, `merge_refresh`, `extract_signals`, `apply_signals`, `dimension_gate`, `_migrate_v2` | Writer relationship memory (scoped global/project/idea), notes-on-you card, refresh sync |
+| `writer_library.py` | `build_library`, `library_digest_text` | Past-work digest from every parsed project; rides every turn as PAST WORK (firewalled from current script) |
 | `server.py` | `main` + Flask routes | Standalone Flask API (port 8300) |
 | `cli.py` | `main`, `run_repl`, `cmd_chat`, `cmd_list` | `chat`/`list` subcommands + slash commands |
 
@@ -62,6 +70,13 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `beatboard.py` | `get_order`, `set_order`, `reset_order`, `has_board`, `export_reordered`, `board_view` | Scene reordering / beat board |
 | `notes.py` | `load_notes`, `notes_for_scene`, `add_note`, `update_note`, `delete_note` | Per-project notes |
 | `watch.py` | `process_pending`, `watch_loop` | Watch-folder auto-analysis |
+| `ideas.py` | `IdeaStore` | Idea room store: free-form page + premise card + auto-title, graduation into projects; ids validated by jsonio |
+| `stt.py` | `transcribe`, `supported_languages`, `STTUnavailableError` | Local dictation (faster-whisper lazy import or localhost whisper server); never off-machine |
+| `character_track.py` | `build_character_tracks` | Per-character presence/traits/interactions rail from KG + report |
+| `metrics.py` | `load`, `record_analysis`, `record_reply`, `record_findings` | Quiet local writing-loop metrics (status strip ⚡) |
+| `stash_store.py` | `stash_path`, `load_stash`, `add_to_stash`, `remove_from_stash` | The Stash: saved snippets per project |
+| `demo_model.py` | `start_demo_server` | In-process demo craft model (rule-based) so the desk works without llama-server; a reachable real server always wins |
+| `webapp_demo.py` | `main` | Launcher alias: webapp_server with the demo model forced on |
 | `sample.py` | `SAMPLE_TITLE`, `SAMPLE_SCRIPT` | Bundled 3-scene sample ("The Late Hour") |
 | `webapp_server.py` | Flask app + `main`, `ServerConfig`, `_import_cowriter`, `CowriterUnavailableError` | Web UI backend (port 8500); serves `webapp/` static + JSON API; `/api/config` exposes personas/modes |
 | `jsonio.py` | `atomic_write_json`, `check_safe_id` | Shared atomic JSON persistence (tmp + os.replace + per-path lock) and the safe-id contract that blocks path traversal at every store |

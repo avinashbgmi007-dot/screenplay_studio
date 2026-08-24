@@ -1,4 +1,8 @@
 requests>=2.31.0
 flask>=3.0.0
 pdfplumber>=0.11.0
-faster-whisper>=1.0.0
+
+# Optional — local dictation (STT) only; the rest of the desk never needs it.
+# The app lazy-imports it and answers dictation with an actionable message
+# until you install it.
+# faster-whisper>=1.0.0
