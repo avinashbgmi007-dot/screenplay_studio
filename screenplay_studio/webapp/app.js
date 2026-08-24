@@ -391,19 +391,52 @@ async function refreshMetrics() {
   }
 }
 
+function shortModelId(id) {
+  if (!id) return "";
+  return id.length > 30 ? id.slice(0, 29) + "…" : id;
+}
+
 async function checkConnection() {
   const dot = $("#connection-dot");
   const connEl = $("#status-conn");
+  const demo = !!(state.config && state.config.demo_model);
   try {
     const res = await api("/test-connection", { method: "POST", body: JSON.stringify({}) });
-    state.connState = { ok: !!res.ok, message: res.message };
+    state.connState = { ok: !!res.ok, message: res.message, models: res.models || [] };
     renderDashboard();  // the dashboard's connection pill follows the strip
-    dot.className = "connection-dot " + (res.ok ? "ok" : "fail");
-    dot.title = res.message;
-    if (connEl) {
-      connEl.textContent = res.ok ? "● model ready" : "● model unreachable";
-      connEl.className = "status-item " + (res.ok ? "ok" : "fail");
-      connEl.title = res.message;
+    if (demo) {
+      // honesty first: green means YOUR model — the demo shows amber
+      dot.className = "connection-dot demo";
+      dot.title = "Built-in demo craft model — not your llama-server.";
+      if (connEl) {
+        connEl.textContent = "● demo craft model (built-in)";
+        connEl.className = "status-item demo";
+        connEl.title = dot.title;
+      }
+      // is the writer's real server back? offer the one-click switch
+      try {
+        const probe = await api("/real-server-check");
+        state.realServer = probe.available
+          ? { available: true, url: probe.url, models: probe.models || [] }
+          : { available: false };
+        if (probe.available && connEl) {
+          connEl.textContent = "● your model is back — click to switch";
+          connEl.className = "status-item switch";
+          connEl.title = `Your llama-server answered at ${probe.url}` +
+            (probe.models && probe.models.length ? ` — ${probe.models[0]}` : "");
+        }
+      } catch (_) { state.realServer = { available: false }; }
+    } else {
+      const mid = state.connState.models[0];
+      dot.className = "connection-dot " + (res.ok ? "ok" : "fail");
+      dot.title = res.message;
+      if (connEl) {
+        connEl.textContent = res.ok
+          ? `● model ready${mid ? " — " + shortModelId(mid) : ""}`
+          : "● model unreachable";
+        connEl.className = "status-item " + (res.ok ? "ok" : "fail");
+        connEl.title = res.message;
+      }
     }
   } catch (e) {
     dot.className = "connection-dot fail";
@@ -414,14 +447,41 @@ async function checkConnection() {
       connEl.title = dot.title;
     }
   }
+  updateStatusStrip();
+  renderConnCard();
 }
 
 function updateStatusStrip() {
-  const modelEl = $("#status-model");
-  if (!modelEl) return;
+  const label = $("#status-model-label");
+  if (!label) return;
   const url = state.config && state.config.server_url;
-  modelEl.textContent = url ? `llama · ${url.replace(/^https?:\/\//, "")}` : "model server not set";
-  modelEl.title = url ? `Model server: ${url}` : "Set the model server in Settings";
+  const demo = !!(state.config && state.config.demo_model);
+  const mid = state.connState && state.connState.models && state.connState.models[0];
+  let text;
+  if (demo) text = "demo craft model";
+  else if (mid) text = shortModelId(mid);
+  else if (url) text = `llama · ${url.replace(/^https?:\/\//, "")}`;
+  else text = "model server not set";
+  label.textContent = text;
+}
+
+// Hover card on the bottom-left: which brain, which server, how connected.
+function renderConnCard() {
+  const card = $("#conn-card");
+  if (!card) return;
+  card.hidden = false;  // visibility itself is CSS :hover-driven
+  const url = (state.config && state.config.server_url) || "—";
+  const demo = !!(state.config && state.config.demo_model);
+  const mid = state.connState && state.connState.models && state.connState.models[0];
+  const ok = !!(state.connState && state.connState.ok);
+  const stateTxt = demo ? "Demo (built-in stand-in)" : ok ? "Connected" : "Unreachable";
+  const cls = demo ? "demo" : ok ? "ok" : "fail";
+  card.innerHTML =
+    `<div class="conn-card-row ${cls}"><b>${stateTxt}</b></div>` +
+    `<div class="conn-card-row">model <b>${demo ? "demo craft model" : (mid || "—")}</b></div>` +
+    `<div class="conn-card-row">server <b>${url}</b></div>` +
+    (demo && state.realServer && state.realServer.available
+      ? `<div class="conn-card-row switch">your model is back — click "switch" beside</div>` : "");
 }
 
 // ---------- projects ----------
@@ -5347,6 +5407,21 @@ function init() {
 
   tickSessionElapsed();
   refreshSttLanguages();
+
+  // the strip never lies quietly: re-check every 30s so a llama-server that
+  // comes up AFTER the studio gets noticed (demo mode offers the switch)
+  setInterval(checkConnection, 30000);
+  $("#status-conn").addEventListener("click", async () => {
+    if (!(state.realServer && state.realServer.available)) return;
+    try {
+      await api("/config", { method: "POST", body: JSON.stringify({ server_url: state.realServer.url }) });
+      await loadConfig();
+      state.realServer = { available: false };
+      await checkConnection();
+    } catch (e) {
+      showError("Couldn't switch to your model: " + e.message);
+    }
+  });
 
   // back to the page = the partner steps back: clicking/focusing the editor
   // dismisses the room drawer so the writer always has the full page

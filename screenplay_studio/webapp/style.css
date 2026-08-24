@@ -3880,3 +3880,39 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 
 /* the doctor's report is a document — the download link dresses like a button */
 a.report-export { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* ---- status strip honesty: demo vs your model ---- */
+.connection-dot.demo { background: #d9a441; box-shadow: 0 0 7px rgba(217, 164, 65, 0.7); }
+.status-item.demo { color: #d9a441; }
+.status-item.switch {
+  color: var(--accent-bright, #e8c47a);
+  cursor: pointer;
+  animation: switch-nudge 1.6s ease-in-out infinite;
+}
+@keyframes switch-nudge { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+/* hover card: which brain, which server, how connected */
+.status-model-wrap { position: relative; }
+.conn-card {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  min-width: 260px;
+  max-width: 340px;
+  background: var(--panel, #1c1814);
+  border: 1px solid var(--line, #3a322a);
+  border-radius: 8px;
+  padding: 10px 12px;
+  z-index: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.status-model-wrap:hover .conn-card { display: block; }
+.conn-card-row { color: var(--text-muted, #9a8f80); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-card-row b { color: var(--text, #e6dcc8); font-weight: 600; }
+.conn-card-row.ok b { color: var(--ok, #7fae72); }
+.conn-card-row.demo b { color: #d9a441; }
+.conn-card-row.fail b { color: var(--danger, #c96a5a); }
+.conn-card-row.switch { color: var(--accent-bright, #e8c47a); white-space: normal; }

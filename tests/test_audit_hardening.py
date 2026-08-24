@@ -227,3 +227,60 @@ def test_corrupt_parse_flagged_in_writer_library(client):
     entry = next((e for e in lib if e.get("name") == made or e.get("project") == made), None)
     assert entry is not None, "corrupt parse must stay in past work"
     assert entry.get("unreadable") is True
+
+
+# ---- demo honesty: config exposes it; switching back deactivates it ----
+
+def test_config_exposes_demo_flag_and_switch_back(client):
+    webapp_server._DEMO_MODEL_ACTIVE = True
+    webapp_server._DEMO_URL = "http://127.0.0.1:59998"
+    webapp_server.CONFIG["real_server_url"] = "http://127.0.0.1:59999"
+    webapp_server.CONFIG["server_url"] = "http://127.0.0.1:59998"
+    try:
+        cfg = client.get("/api/config").get_json()
+        assert cfg["demo_model"] is True
+        assert cfg["real_server_url"] == "http://127.0.0.1:59999"
+
+        r = client.post("/api/config", json={"server_url": "http://127.0.0.1:59999"})
+        assert r.status_code == 200
+        assert webapp_server._DEMO_MODEL_ACTIVE is False, \
+            "pointing at a non-demo URL must deactivate the demo"
+        cfg = client.get("/api/config").get_json()
+        assert cfg["demo_model"] is False
+        assert "real_server_url" not in cfg
+    finally:
+        webapp_server._DEMO_MODEL_ACTIVE = False
+        webapp_server._DEMO_URL = None
+        webapp_server.CONFIG["real_server_url"] = None
+
+
+def test_engine_base_ignores_stale_demo_pin(client):
+    webapp_server._DEMO_URL = "http://127.0.0.1:59998"
+    webapp_server.CONFIG["server_url"] = "http://real:8080"
+    try:
+        class DemoPinned:
+            server_url = "http://127.0.0.1:59998"
+        assert webapp_server._engine_base_url(DemoPinned()) == "http://real:8080", \
+            "sessions created during demo must not pin the dead demo port"
+
+        class Other:
+            server_url = "http://other:9999"
+        assert webapp_server._engine_base_url(Other()) == "http://other:9999"
+    finally:
+        webapp_server._DEMO_URL = None
+
+
+def test_real_server_check_reports_availability(client):
+    webapp_server._DEMO_MODEL_ACTIVE = True
+    webapp_server._DEMO_URL = "http://127.0.0.1:59998"
+    webapp_server.CONFIG["real_server_url"] = "http://127.0.0.1:59999"  # nothing there
+    try:
+        body = client.get("/api/real-server-check").get_json()
+        assert body["demo"] is True and body["available"] is False
+
+        webapp_server._DEMO_MODEL_ACTIVE = False
+        assert client.get("/api/real-server-check").get_json() == {"demo": False}
+    finally:
+        webapp_server._DEMO_MODEL_ACTIVE = False
+        webapp_server._DEMO_URL = None
+        webapp_server.CONFIG["real_server_url"] = None

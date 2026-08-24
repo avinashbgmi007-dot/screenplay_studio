@@ -200,6 +200,11 @@ class LlamaServerClient:
         except requests.exceptions.HTTPError as e:
             raise LlamaServerError(f"llama-server request failed: {e}") from e
 
+        # SSE has no charset by default; requests then decodes with ISO-8859-1,
+        # turning every em dash into mojibake and Telugu into mush.
+        # llama-server speaks UTF-8, always. Pin it.
+        resp.encoding = "utf-8"
+
         parts: list[str] = []
         try:
             for line in resp.iter_lines(decode_unicode=True):

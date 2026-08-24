@@ -154,6 +154,56 @@ def main() -> None:
             except Exception as e:
                 ok("clicking downloads the report", False, str(e)[:80])
 
+            # ---- C. status strip honesty: demo badge, then live re-attach ----
+            dot_cls = page.locator("#connection-dot").get_attribute("class") or ""
+            ok("demo mode shows amber dot, not green", "demo" in dot_cls, dot_cls)
+            ok("strip names the demo, not a fake model id",
+               page.locator("#status-model-label").inner_text().strip() == "demo craft model")
+
+            page.locator("#status-model").hover()
+            page.wait_for_timeout(300)
+            card_txt = page.locator("#conn-card").inner_text()
+            ok("hover card tells the truth about the demo",
+               "Demo (built-in stand-in)" in card_txt, card_txt[:60].replace("\n", " | "))
+
+            # the writer's llama-server comes up AFTER the studio:
+            import http.server
+            import socketserver
+            import threading
+
+            class FakeLlama(http.server.BaseHTTPRequestHandler):
+                def log_message(self, *args):
+                    pass
+
+                def do_GET(self):
+                    payload = json.dumps(
+                        {"object": "list", "data": [{"id": "fake-qwen"}]}).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+
+            with socketserver.TCPServer(("127.0.0.1", 8080), FakeLlama) as fake:
+                threading.Thread(target=fake.serve_forever, daemon=True).start()
+                page.evaluate("checkConnection()")
+                page.wait_for_timeout(400)
+
+                conn_txt = page.locator("#status-conn").inner_text()
+                ok("real server noticed — switch offered",
+                   "click to switch" in conn_txt, conn_txt)
+
+                page.locator("#status-conn").click()
+                page.wait_for_timeout(1000)
+
+                dot_cls = page.locator("#connection-dot").get_attribute("class") or ""
+                ok("after switch: green dot", "ok" in dot_cls, dot_cls)
+                ok("after switch: strip shows the real model id",
+                   "fake-qwen" in page.locator("#status-model-label").inner_text())
+                cfg_now = page.evaluate(
+                    "async () => (await (await fetch('/api/config')).json()).demo_model")
+                ok("server-side demo flag cleared", cfg_now is False)
+
             # ---- B. pagehide flush of pending idea autosave ----
             page.locator("#room-cowrite-btn").click()
             page.locator("#ideas-trigger").hover()

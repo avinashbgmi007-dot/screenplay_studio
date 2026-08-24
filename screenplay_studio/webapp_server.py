@@ -245,12 +245,36 @@ def test_connection():
     return jsonify({"ok": True, "message": f"Connected — model loaded: {ids[0]}", "models": ids})
 
 
+@app.route("/api/real-server-check", methods=["GET"])
+def real_server_check():
+    """While the demo fallback is active: is the writer's real llama-server
+    back? Drives the status strip's click-to-switch affordance."""
+    if not _DEMO_MODEL_ACTIVE:
+        return jsonify({"demo": False})
+    url = CONFIG.get("real_server_url")
+    if not url:
+        return jsonify({"demo": True, "available": False})
+    from screenplay_analyzer.llm_client import LlamaServerClient
+    try:
+        models = LlamaServerClient(base_url=url, timeout=5).list_models()
+        ids = [m.get("id") or m.get("name") for m in models if isinstance(m, dict)]
+        return jsonify({"demo": True, "available": bool(ids),
+                        "url": url, "models": [i for i in ids if i]})
+    except Exception:
+        return jsonify({"demo": True, "available": False, "url": url})
+
+
 @app.route("/api/config", methods=["GET"])
 def get_config():
     cfg = CONFIG.to_dict()
     # Personas/modes come from the co-writer so the frontend dropdown never
     # drifts from the server's canonical list (falls back to empty when the
     # co-writer isn't installed; the UI then shows its built-in defaults).
+    cfg["demo_model"] = _DEMO_MODEL_ACTIVE
+    if _DEMO_MODEL_ACTIVE:
+        cfg["real_server_url"] = CONFIG.get("real_server_url")
+    else:
+        cfg.pop("real_server_url", None)  # to_dict picks up the stashed key
     try:
         personas_mod = _import_cowriter("personas")
         cfg["personas"] = [p for p in personas_mod.PERSONAS
@@ -265,9 +289,14 @@ def get_config():
 
 @app.route("/api/config", methods=["POST"])
 def set_config():
+    global _DEMO_MODEL_ACTIVE
     body = request.get_json() or {}
     if "server_url" in body:
         CONFIG["server_url"] = body["server_url"]
+        # pointing at anything other than the demo IS the switch back:
+        # the demo thread keeps running but stops answering the desk
+        if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
+            _DEMO_MODEL_ACTIVE = False
     if "model" in body:
         CONFIG["model"] = body["model"] or None
     if "fast_model" in body:
@@ -1504,6 +1533,10 @@ def _engine_base_url(session):
     a stale pin would 502 forever. Live config wins in demo mode."""
     if _DEMO_MODEL_ACTIVE:
         return CONFIG["server_url"]
+    # a session created during demo mode pins the demo port; once the writer
+    # switches back to their real server, that pin must not win
+    if session.server_url and _DEMO_URL and session.server_url == _DEMO_URL:
+        return CONFIG["server_url"]
     return session.server_url or CONFIG["server_url"]
 
 
@@ -2408,16 +2441,22 @@ def main():
 
 
 _DEMO_MODEL_ACTIVE = False
+_DEMO_URL = None  # the in-process demo server's URL while active
 
 
 def _use_demo_model() -> str:
     """Point CONFIG at the built-in demo craft model (started in-process).
     Opt-in only — never runs unless asked for by flag or env."""
-    global _DEMO_MODEL_ACTIVE
+    global _DEMO_MODEL_ACTIVE, _DEMO_URL
     try:
         from .demo_model import start_demo_server
         url = start_demo_server()
+        if not CONFIG.get("real_server_url"):
+            # remember where the writer's real server was supposed to be,
+            # so the strip can offer the switch back when it comes up
+            CONFIG["real_server_url"] = CONFIG["server_url"]
         CONFIG["server_url"] = url
+        _DEMO_URL = url
         _DEMO_MODEL_ACTIVE = True
         print("DEMO MODEL active (in-process) — no real llama-server needed.")
         return url

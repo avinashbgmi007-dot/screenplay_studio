@@ -110,3 +110,57 @@ def test_resolve_model_fallback_to_loaded():
     fallback = LlamaServerClient(base_url="http://127.0.0.1:9999", model="missing", fallback_to_loaded=True)
     with mock.patch.object(fallback, "list_models", return_value=["loaded-a"]):
         assert fallback.resolve_model() == "loaded-a"
+
+
+# ---- regression: SSE must decode as UTF-8, never ISO-8859-1 ----
+
+def test_chat_stream_decodes_utf8_not_latin1():
+    """SSE responses carry no charset; requests then defaults to ISO-8859-1,
+    which turned every em dash into "â€"" and Telugu into mush — and the
+    mojibake was STORED into sessions. The client must pin UTF-8."""
+    import http.server
+    import json
+    import socketserver
+    import threading
+
+    expected = "The shadow — నీకోసం — done."
+    pieces = ["The shadow — ", "నీకోసం — done."]
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):  # /v1/models for resolve_model
+            payload = json.dumps({"object": "list",
+                                  "data": [{"id": "test-model"}]}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def do_POST(self):  # SSE stream — deliberately WITHOUT charset
+            body = b""
+            for piece in pieces:
+                frame = json.dumps({"choices": [{"delta": {"content": piece}}]},
+                                   ensure_ascii=False)
+                body += ("data: " + frame + "\n\n").encode("utf-8")
+            body += b"data: [DONE]\n\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    with socketserver.TCPServer(("127.0.0.1", 0), Handler) as httpd:
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            client = LlamaServerClient(base_url=f"http://127.0.0.1:{port}")
+            got = client.chat_stream([{"role": "user", "content": "hi"}],
+                                     on_token=lambda piece: None)
+        finally:
+            httpd.shutdown()
+
+    assert got == expected, repr(got)
+    assert "â" not in got
