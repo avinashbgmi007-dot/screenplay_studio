@@ -6,44 +6,27 @@ command) -> talk -> add lines -> summon again -> he NOTICES the new material
 -> reload the app -> summon -> the same conversation continues.
 """
 import re
-import sys
 
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import expect, sync_playwright
 
-BASE = __import__("os").environ.get("E2E_BASE", "http://localhost:8500")
+from e2e_browser_common import Checks, assert_no_js_errors, last_reply, launch, open_studio, send_chat
 L1 = "A courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from the recipient's greatest regret."
 L2 = "She keeps one swapped item: a brass key nobody has claimed."
 LATE = "Her rule: never open the bag after midnight. Tonight she breaks it."
 
-PASS, FAIL = [], []
+checks = Checks()
+check = checks.ok
 
 
-def check(name, cond, detail=""):
-    (PASS if cond else FAIL).append((name, detail))
-    print(f"  {'PASS' if cond else 'FAIL'}  {name}" + (f"  [{detail}]" if not cond and detail else ""))
-
-
-def run():
+def run(base):
     with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("dialog", lambda d: d.accept())
-
-        def last_reply():
-            return page.locator(".msg.assistant .msg-bubble").last.inner_text().strip()
-
-        def send(text):
-            box = page.locator("#input")
-            box.fill(text)
-            page.get_by_role("button", name="Send").click()
+        browser, page, errors = launch(p)
 
         def editor():
             return page.locator("#idea-content")
 
         # ---- blank idea: pill hidden (#1) -----------------------------------
-        page.goto(BASE, wait_until="networkidle")
+        page.goto(base, wait_until="networkidle")
         page.locator("#new-idea-btn").click()
         page.wait_for_timeout(400)
         op = page.locator("#idea-sam-pill").evaluate("el => el.style.display")
@@ -82,9 +65,9 @@ def run():
         check("context card shows word count",
               re.search(r"\d+ words? in context", card_txt) is not None, card_txt[:90])
 
-        send("what do you make of the brass key?")
+        send_chat(page, "what do you make of the brass key?")
         page.wait_for_timeout(1800)
-        r1 = last_reply()
+        r1 = last_reply(page)
         check("first discussion reply lands (humanized)",
               len(r1) > 20 and "demo craft model" not in r1 and "?" in r1, r1[:120])
 
@@ -99,9 +82,9 @@ def run():
         editor().type("\n/sameer read it again", delay=4)
         page.wait_for_timeout(1200)          # debounced summon fires
         expect(page.locator(".idea-context-card").first).to_be_visible(timeout=15000)
-        send("anything changed since you last read?")
+        send_chat(page, "anything changed since you last read?")
         page.wait_for_timeout(2000)
-        r2 = last_reply()
+        r2 = last_reply(page)
         added_ok = "never open the bag after midnight" in r2.lower()
         check("he QUOTES the newly added line unprompted", added_ok, r2[:160])
         check("update reaction is humanized (no tags)",
@@ -128,21 +111,19 @@ def run():
         resume_ok = "brass key" in body_text.lower()
         check("reload resumes the SAME conversation (no orphan)", resume_ok,
               f"{page.locator('.msg').count()} msgs")
-        send("so — the midnight rule. talk to me.")
+        send_chat(page, "so — the midnight rule. talk to me.")
         page.wait_for_timeout(1800)
-        r3 = last_reply().lower()
+        r3 = last_reply(page).lower()
         check("continued chat still knows the material",
               "midnight" in r3 or "bag" in r3 or "rule" in r3, r3[:140])
 
-        check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
+        assert_no_js_errors(checks, errors)
         page.screenshot(path="_browser_v3.png", full_page=True)
         browser.close()
 
-    print(f"\n=== {len(PASS)} passed, {len(FAIL)} failed ===")
-    for name, detail in FAIL:
-        print(f"FAILED: {name}: {detail}")
-    sys.exit(1 if FAIL else 0)
+    checks.finish()
 
 
 if __name__ == "__main__":
-    run()
+    with open_studio() as base:
+        run(base)

@@ -11,34 +11,25 @@ summon is read), command consumed off the page, humanized replies (no
 pipeline tags), probing questions instead of parroting, per-idea session
 memory, cross-idea isolation, shelf delete visibility + function.
 """
-import re
-import sys
 
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import expect, sync_playwright
 
-BASE = __import__("os").environ.get("E2E_BASE", "http://localhost:8500")
+from e2e_browser_common import Checks, assert_no_js_errors, last_reply, launch, open_studio, send_chat
+
 L1 = "A courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from the recipient's greatest regret."
 L2 = "She keeps one swapped item: a brass key nobody has claimed."
 L3 = "Her rule: never open the bag after midnight. Tonight she breaks it."
 LATE_LINE = "The last package on her route is addressed to her own door."
 
-PASS, FAIL = [], []
+checks = Checks()
+check = checks.ok
 
 
-def check(name, cond, detail=""):
-    (PASS if cond else FAIL).append((name, detail))
-    print(f"  {'PASS' if cond else 'FAIL'}  {name}" + (f"  [{detail}]" if not cond and detail else ""))
-
-
-def run():
+def run(base):
     with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("dialog", lambda d: d.accept())
+        browser, page, errors = launch(p)
 
-        page.goto(BASE, wait_until="networkidle")
+        page.goto(base, wait_until="networkidle")
         check("app loads", page.title() != "")
 
         # the Ideas shelf is a collapsed sidebar flyout (#idea-list) summoned
@@ -53,14 +44,6 @@ def run():
 
         def editor():
             return page.locator("#idea-content")
-
-        def last_reply():
-            return page.locator(".msg.assistant .msg-bubble").last.inner_text().strip()
-
-        def send(text):
-            box = page.locator("#input")
-            box.fill(text)
-            page.get_by_role("button", name="Send").click()
 
         # ================= IDEA 1 =============================================
         new_idea()
@@ -82,9 +65,9 @@ def run():
 
         # he answers the writer's typed ask (composer was pre-filled empty here,
         # so we send our own question about the freshest material)
-        send("I just wrote that last line about her own door — thoughts?")
+        send_chat(page, "I just wrote that last line about her own door — thoughts?")
         page.wait_for_timeout(1800)
-        r1 = last_reply()
+        r1 = last_reply(page)
         check("Sameer summoned & replied", len(r1) > 20, r1[:80])
         check("reply is humanized (no pipeline tags)",
               "demo craft model" not in r1 and "speaking)" not in r1, r1[:120])
@@ -95,9 +78,9 @@ def run():
               r1.lower().count("rain courier") == 0 or True, "")  # title only exists after auto-title
 
         # per-idea session memory: follow-up without restating
-        send("and who do you think claimed that brass key?")
+        send_chat(page, "and who do you think claimed that brass key?")
         page.wait_for_timeout(1800)
-        r2 = last_reply()
+        r2 = last_reply(page)
         check("session memory: follow-up understood",
               "key" in r2.lower(), r2[:140])
 
@@ -108,9 +91,9 @@ def run():
         editor().type("A lighthouse keeper collects unposted letters.\n/sameer", delay=4)
         expect(page.get_by_text("Sameer co-writer").first).to_be_visible(timeout=15000)
         page.wait_for_timeout(800)
-        send("where should this story start?")
+        send_chat(page, "where should this story start?")
         page.wait_for_timeout(1800)
-        r3 = last_reply().lower()
+        r3 = last_reply(page).lower()
         check("cross-idea isolation (no courier/key/midnight leak)",
               not any(k in r3 for k in ("brass key", "courier", "midnight")), r3[:140])
 
@@ -130,15 +113,13 @@ def run():
         after = page.locator(".idea-item").count()
         check("delete removes the idea from the shelf", after == before - 1, f"{before} -> {after}")
 
-        check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
+        assert_no_js_errors(checks, errors)
         page.screenshot(path="_browser_e2e.png", full_page=True)
         browser.close()
 
-    print(f"\n=== {len(PASS)} passed, {len(FAIL)} failed ===")
-    for name, detail in FAIL:
-        print(f"FAILED: {name}: {detail}")
-    sys.exit(1 if FAIL else 0)
+    checks.finish()
 
 
 if __name__ == "__main__":
-    run()
+    with open_studio() as base:
+        run(base)

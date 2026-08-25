@@ -99,7 +99,6 @@ def run_principles_engine(
     findings = []
     errors = []
 
-    chekhov_rules = rules_ctx.rules_for_category("plot_thread") if hasattr(rules_ctx, "rules_for_category") else []
     rules_fragment = rules_ctx.prompt_fragment_for_category("plot_thread") if hasattr(rules_ctx, "prompt_fragment_for_category") else ""
 
     prop_candidates = sorted(kg.prop_candidates, key=lambda p: -p.mention_count)[:max_candidates]

@@ -265,6 +265,10 @@ def _idea_probe_reply(system: str, user: str, lang=None, script=None) -> str:
         if any(w in low for w in ("grounding", "premise card", "recite", "pages")):
             return True
         try:
+            # language-meta garbage filter (repetition/loop phrases). Lazy
+            # import mirrors detect_register above; tolerated absence keeps
+            # the demo server usable in stripped-down deployments.
+            from screenplay_cowriter.language_meta import _matches_any
             if _matches_any(h):
                 return True
         except Exception:

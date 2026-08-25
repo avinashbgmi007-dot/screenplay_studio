@@ -12,55 +12,45 @@ project's parsed.json. This suite pins the writer-facing consequences:
      no ghost entry, without a page reload
   E. zero JS page errors
 
-Run (server + test in ONE command -- background processes get reaped):
-  SCREENPLAY_STUDIO_DEMO_MODEL=1 python3 -m screenplay_studio.webapp_server \\
-    --port 8565 --projects-dir /tmp/e2e_lib & sleep 2;
-  E2E_BASE=http://127.0.0.1:8565 python3 tests/e2e_browser_library_delete.py; kill %1
+Run:  python tests/e2e_browser_library_delete.py   (boots its own demo studio;
+      set E2E_BASE to reuse an already-running one)\
 
 Needs: pip install playwright && python -m playwright install chromium
 """
 import os
-import sys
 
 import requests
 from playwright.sync_api import sync_playwright
 
+from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURE = os.path.join(HERE, "fixtures", "pain_tenglish.fountain")
-BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8565")
 
-PASS, FAIL = [], []
-
-
-def check(name, cond, detail=""):
-    (PASS if cond else FAIL).append((name, detail))
-    print(("  PASS  " if cond else "  FAIL  ") + name + (f"   [{detail}]" if detail and not cond else ""))
+checks = Checks()
+check = checks.ok
 
 
-def seed(title):
+def seed(base, title):
     with open(FIXTURE, "rb") as f:
-        r = requests.post(f"{BASE}/api/projects",
+        r = requests.post(f"{base}/api/projects",
                           files={"file": (f"{title}.fountain", f, "text/plain")},
                           data={"title": title}, timeout=60)
     assert r.status_code in (200, 201), r.text
     return r.json().get("name", title)
 
 
-def run():
-    # self-cleaning: the sweep shares one projects dir across suites -- purge
-    # leftovers so this suite's counts mean exactly what it seeded
-    for p0 in requests.get(f"{BASE}/api/projects", timeout=15).json():
-        requests.delete(f"{BASE}/api/projects/{p0['project']}", timeout=15)
-    seed("Rain Courier")
-    seed("Night Ferry")
+def run(base):
+    # self-cleaning for shared-server sweeps: purge leftovers so this suite's
+    # counts mean exactly what it seeded (a no-op on a fresh private studio)
+    for p0 in requests.get(f"{base}/api/projects", timeout=15).json():
+        requests.delete(f"{base}/api/projects/{p0['project']}", timeout=15)
+    seed(base, "Rain Courier")
+    seed(base, "Night Ferry")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("dialog", lambda d: d.accept())
-        page.goto(BASE, wait_until="networkidle")
+        browser, page, errors = launch(p)
+        page.goto(base, wait_until="networkidle")
 
         # ---- A. both parsed projects show up as library entries -------------
         page.hover("#library-trigger")
@@ -86,8 +76,8 @@ def run():
         # ---- C. deleting FROM THE LIBRARY removes the script everywhere ----
         first.locator(".project-delete").click()   # dialog auto-accepted
         page.wait_for_timeout(900)
-        names = {p["project"] for p in requests.get(f"{BASE}/api/projects", timeout=15).json()}
-        lib_names = {e["project"] for e in requests.get(f"{BASE}/api/writer-library", timeout=15).json()["projects"]}
+        names = {p["project"] for p in requests.get(f"{base}/api/projects", timeout=15).json()}
+        lib_names = {e["project"] for e in requests.get(f"{base}/api/writer-library", timeout=15).json()["projects"]}
         check("deleted entry is gone from every pane + the disk",
               len(names) == 1 and len(lib_names) == 1,
               f"projects={sorted(names)} library={sorted(lib_names)}")
@@ -105,7 +95,7 @@ def run():
         # judge the source of truth first: the disk must be empty
         remaining = None
         for _ in range(20):
-            remaining = requests.get(f"{BASE}/api/projects", timeout=15).json()
+            remaining = requests.get(f"{base}/api/projects", timeout=15).json()
             if not remaining:
                 break
             page.wait_for_timeout(250)
@@ -114,14 +104,12 @@ def run():
         page.wait_for_selector("#library-list .empty-hint", timeout=8000)
         check("no ghost entry -- library empties after a shelf delete", True)
 
-        check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
+        assert_no_js_errors(checks, errors)
         browser.close()
 
-    print(f"\n=== {len(PASS)} passed, {len(FAIL)} failed ===")
-    for n, d in FAIL:
-        print(f"FAILED: {n}: {d}")
-    sys.exit(1 if FAIL else 0)
+    checks.finish()
 
 
 if __name__ == "__main__":
-    run()
+    with open_studio() as base:
+        run(base)

@@ -52,6 +52,47 @@ python -m screenplay_studio resume ./my_project --server http://localhost:8080
 python -m screenplay_studio status ./my_project
 ```
 
+## Web app — the Studio
+
+The pipeline above has a full point-and-click front end:
+
+```bash
+python -m screenplay_studio.webapp_server --port 8500 --projects-dir ./studio_projects
+```
+
+Then open http://127.0.0.1:8500.
+
+- **`--port`** defaults to `8500`; pass another if it's taken.
+- **`--projects-dir`** defaults to `./studio_projects` — keep passing the same
+  value across restarts, or your shelf will look empty.
+- **No llama-server running?** The studio falls back to a built-in demo craft
+  model so every surface stays explorable; the status strip shows an amber
+  "demo" marker until your real server answers (then it's one click to switch).
+- Lay down `.fdx` / `.pdf` / `.txt` / `.fountain` / `.md`, run analysis from
+  the Feedback room, and co-write with Sameer in the Co-write room. Every
+  artifact — parses, reports, chats, edits — stays under `--projects-dir`.
+- Model URL, timeouts, and an optional fast model live behind ⚙ Settings.
+  Local env flags belong in `.env.local` (see `.env.example`) — e.g.
+  `SCREENPLAY_STUDIO_DEMO_MODEL=1` forces the demo model.
+
+### Browser tests (Playwright)
+
+Every `tests/e2e_browser_*.py` suite is self-contained: one command boots the
+studio **with the demo model** on a free port with a throwaway projects dir,
+walks a real browser through it, and tears everything down (needs
+`pip install playwright && playwright install chromium`). They share the
+boot/page/check scaffolding in `tests/e2e_browser_common.py`:
+
+```bash
+python tests/e2e_browser_smoke.py          # desk boots; a chat turn streams;
+                                           #   streamed tokens == the persisted reply
+python tests/e2e_browser_ideas.py          # Ideas room: summons, memory, isolation
+python tests/e2e_browser_translate_mic.py  # hover translator + dictation round-trip
+```
+
+To sweep several suites against ONE already-running studio instead, export
+`E2E_BASE=http://127.0.0.1:<port>` — nothing is spawned then.
+
 ## Project layout
 
 Each run creates a self-contained project directory:

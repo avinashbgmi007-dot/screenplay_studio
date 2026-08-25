@@ -44,11 +44,11 @@ _GLYPH_NAME_RE = re.compile(r"^[/0-9 ]+$")
 
 
 def _looks_unrecoverable(lines: list[str]) -> bool:
-    nonblank = [l for l in lines if l.strip()]
+    nonblank = [ln for ln in lines if ln.strip()]
     if not nonblank:
         return False
-    cid_lines = sum(1 for l in nonblank if _CID_TOKEN_RE.search(l))
-    glyph_lines = sum(1 for l in nonblank if _GLYPH_NAME_RE.match(l.strip()))
+    cid_lines = sum(1 for ln in nonblank if _CID_TOKEN_RE.search(ln))
+    glyph_lines = sum(1 for ln in nonblank if _GLYPH_NAME_RE.match(ln.strip()))
     return (cid_lines / len(nonblank)) > 0.5 or (glyph_lines / len(nonblank)) > 0.5
 
 PARAGRAPH_BREAK_FACTOR = 1.35  # gap > this * median line-height counts as a paragraph break
@@ -277,11 +277,11 @@ def parse_pdf(path: str):
     filename = os.path.basename(path)
     lines, page_of_line, line_layout = _extract_reconstructed_lines(path)
 
-    if _looks_unrecoverable(lines) or not lines or not any(l.strip() for l in lines):
+    if _looks_unrecoverable(lines) or not lines or not any(ln.strip() for ln in lines):
         engine = _get_ocr_engine()
         if engine is not None:
             ocr_lines = _ocr_extract(path, engine)
-            if any(l.strip() for l in ocr_lines):
+            if any(ln.strip() for ln in ocr_lines):
                 doc = _parse_lines(ocr_lines, source_format="pdf", filename=filename)
                 doc.parse_confidence = "low"
                 doc.warnings.insert(0, ParseWarning(

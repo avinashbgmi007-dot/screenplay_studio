@@ -10,34 +10,26 @@
      hover/clicks (ideas flyout blocking shelf/library) -> moving the pointer
      to another trigger must close the stray flyout and open the right one.
 
-Run (server + test in ONE command -- background processes get reaped):
-  SCREENPLAY_STUDIO_DEMO_MODEL=1 nohup python3 -m screenplay_studio.webapp_server \\
-      --port 8555 --projects-dir /tmp/e2e_ui_proj & sleep 3;
-      E2E_BASE=http://127.0.0.1:8555 python3 tests/e2e_browser_ui_fixes.py; kill %1
+Run:  python tests/e2e_browser_ui_fixes.py   (boots its own demo studio;
+      set E2E_BASE to reuse an already-running one)
 
 Needs: pip install playwright && python -m playwright install chromium
 """
 import os
-import re
-import sys
 
 import requests
 from playwright.sync_api import sync_playwright
 
-BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8555")
+from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
-PASS, FAIL = [], []
+checks = Checks()
+check = checks.ok
 
 
-def check(name, cond, detail=""):
-    (PASS if cond else FAIL).append((name, detail))
-    print(f"  {'PASS' if cond else 'FAIL'}  {name}" + (f"  [{detail}]" if not cond and detail else ""))
-
-
-def seed_project():
+def seed_project(base):
     with open(FIXTURE, "rb") as f:
-        r = requests.post(f"{BASE}/api/projects",
+        r = requests.post(f"{base}/api/projects",
                           files={"file": ("Rain Courier.fountain", f, "text/plain")},
                           data={"title": "Rain Courier"}, timeout=60)
     assert r.status_code in (200, 201), r.text
@@ -62,15 +54,11 @@ def visible_flyouts(page):
     }""")
 
 
-def run():
-    name = seed_project()
+def run(base):
+    name = seed_project(base)
     with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("dialog", lambda d: d.accept())
-        page.goto(BASE, wait_until="networkidle")
+        browser, page, errors = launch(p)
+        page.goto(base, wait_until="networkidle")
         page.wait_for_timeout(500)
 
         # ---- Bug 1: the idea page fills its canvas -------------------------
@@ -256,15 +244,13 @@ def run():
         check("cleared conversation is really deleted server-side",
               gone == 404, f"GET old session after clear: {gone}")
 
-        check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
+        assert_no_js_errors(checks, errors)
         page.screenshot(path="_browser_ui_fixes.png", full_page=True)
         browser.close()
 
-    print(f"\n=== {len(PASS)} passed, {len(FAIL)} failed ===")
-    for n, d in FAIL:
-        print(f"FAILED: {n}: {d}")
-    sys.exit(1 if FAIL else 0)
+    checks.finish()
 
 
 if __name__ == "__main__":
-    run()
+    with open_studio() as base:
+        run(base)

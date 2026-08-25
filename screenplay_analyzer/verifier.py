@@ -79,7 +79,6 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
         finding["verification"] = {"status": "no_quote", "matched_scene": None, "confidence": None}
         return finding
 
-    best_status = "not_found"
     best_scene = None
     best_conf = 0.0
 

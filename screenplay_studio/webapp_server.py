@@ -901,7 +901,7 @@ def undo_edits(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    from .revision import load_working, undo_last_edit, finding_statuses
+    from .revision import undo_last_edit, finding_statuses
     try:
         result = undo_last_edit(m)
     except ValueError as e:
@@ -940,7 +940,7 @@ def redo_edits(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    from .revision import load_working, redo_last_edit, finding_statuses
+    from .revision import redo_last_edit, finding_statuses
     try:
         result = redo_last_edit(m)
     except ValueError as e:
@@ -1280,7 +1280,7 @@ def _md_to_html(md: str) -> str:
     """Tiny, dependency-free markdown -> HTML renderer for the report. Handles
     the subset report.py emits: #/##/### headings, **bold**, *italic*, tables,
     - bullets, hr, and paragraphs."""
-    import html as _html
+
     from html import escape
 
     lines = md.split("\n")
@@ -1327,21 +1327,27 @@ def _md_to_html(md: str) -> str:
                 in_list = False
             continue
         if line.startswith("### "):
-            flush_para(); out.append(f"<h3>{inline(line[4:])}</h3>")
+            flush_para()
+            out.append(f"<h3>{inline(line[4:])}</h3>")
         elif line.startswith("## "):
-            flush_para(); out.append(f"<h2>{inline(line[3:])}</h2>")
+            flush_para()
+            out.append(f"<h2>{inline(line[3:])}</h2>")
         elif line.startswith("# "):
-            flush_para(); out.append(f"<h1>{inline(line[2:])}</h1>")
+            flush_para()
+            out.append(f"<h1>{inline(line[2:])}</h1>")
         elif line == "---":
-            flush_para(); out.append("<hr/>")
+            flush_para()
+            out.append("<hr/>")
         elif line.startswith("- "):
             flush_para()
             if not in_list:
-                out.append("<ul>"); in_list = True
+                out.append("<ul>")
+                in_list = True
             out.append(f"<li>{inline(line[2:])}</li>")
         else:
             if in_list:
-                out.append("</ul>"); in_list = False
+                out.append("</ul>")
+                in_list = False
             para.append(inline(line))
     flush_para()
     if in_list:
@@ -2280,7 +2286,6 @@ def _translate_reply_payload(session, engine, index, target_lang="en"):
     if msgs[index].role != "assistant":
         return None, _error("Only assistant replies can be translated.", 400)
     original = msgs[index].content.strip()
-    persona = session.branch.active_persona
     sys_prompt = (
         f"[TRANSLATE TASK] Render the reply below in {_TRANSLATE_TARGETS[target]}. "
         "Keep the meaning and tone exactly -- no additions, no commentary, "
@@ -2460,7 +2465,7 @@ def _use_demo_model() -> str:
         _DEMO_MODEL_ACTIVE = True
         print("DEMO MODEL active (in-process) — no real llama-server needed.")
         return url
-    except Exception as e:  # demo is a convenience — never block startup on it
+    except Exception:  # demo is a convenience — never block startup on it
         print("Demo model unavailable; keeping the configured server.")
         return CONFIG["server_url"]
 

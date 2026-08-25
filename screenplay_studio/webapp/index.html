@@ -5,12 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Script Doctor Studio</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23201a14'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z' fill='none' stroke='%23e8a24f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
-<!-- v2e607ed — bump the version query whenever style.css/app.js change so
+<!-- v2e607ed — bump the version query whenever style.css/app.js/core.js change so
      browsers never revalidate into a stale sheet (no-cache only revalidates
-     against the browser's own copy; a versioned URL forces a fresh fetch). -->  <link rel="stylesheet" href="style.css?v=id5a001">
+     against the browser's own copy; a versioned URL forces a fresh fetch).
+     Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1a101">
 </head>
 <body data-room="cowrite">
 
@@ -220,14 +219,7 @@
           <p class="premise-hint">The card rides with the conversation — Sameer and the premise doctor read it every turn. Save whenever it shifts.</p>
           <div id="premise-explore" class="premise-explore">
             <span class="premise-explore-label">Explore paths — one tap, Sameer (or the doctor) runs with it:</span>
-            <div class="explore-chips">
-              <button type="button" class="explore-chip" data-prompt="Give me 3 unexpected 'what if' twists on this idea — each one pushing it in a different genre direction. Keep each to a sentence.">🔮 What if…?</button>
-              <button type="button" class="explore-chip" data-prompt="Who is this really about? Name the protagonist, what they want more than anything, and what they're afraid of losing. Then tell me why I should care in one line.">🎭 Who's the heart?</button>
-              <button type="button" class="explore-chip" data-prompt="Where is the conflict hiding in this idea? Show me 3 pressure points that could drive whole scenes, and which one is the strongest.">⚔️ Where's the heat?</button>
-              <button type="button" class="explore-chip" data-prompt="How could this open on screen in the first 60 seconds? Give me 2-3 cold open options that hook without exposition.">📽️ Cold open</button>
-              <button type="button" class="explore-chip" data-prompt="What's the riskiest, boldest version of this idea? Push past the safe version and show me what it becomes.">🧨 Push it further</button>
-              <button type="button" class="explore-chip" data-prompt="Who is this story for, and what would make them lean in? Give me the genre positioning and the audience hook.">👥 Who's it for?</button>
-            </div>
+            <div class="explore-chips"></div>
             <p class="premise-journey">The usual path: <b>explore</b> with Sameer → <b>validate</b> with the premise doctor → <b>upload the first pages</b> and keep the same conversation.</p>
           </div>
         </div>
@@ -318,13 +310,7 @@
         <div id="messages" class="messages"><div id="messages-scroll" class="messages-scroll"></div></div>
         <div id="idea-explore" class="idea-explore" style="display:none;">
           <span class="premise-explore-label">Explore paths — one tap, Sameer runs with it:</span>
-          <div class="explore-chips">
-            <button type="button" class="explore-chip" data-prompt="Give me 3 unexpected 'what if' twists on this idea — each one pushing it in a different genre direction. Keep each to a sentence.">🔮 What if…?</button>
-            <button type="button" class="explore-chip" data-prompt="Who is this really about? Name the protagonist, what they want more than anything, and what they're afraid of losing. Then tell me why I should care in one line.">🎭 Who's the heart?</button>
-            <button type="button" class="explore-chip" data-prompt="Where is the conflict hiding in this idea? Show me 3 pressure points that could drive whole scenes, and which one is the strongest.">⚔️ Where's the heat?</button>
-            <button type="button" class="explore-chip" data-prompt="How could this open on screen in the first 60 seconds? Give me 2-3 cold open options that hook without exposition.">📽️ Cold open</button>
-            <button type="button" class="explore-chip" data-prompt="What's the riskiest, boldest version of this idea? Push past the safe version and show me what it becomes.">🧨 Push it further</button>
-          </div>
+          <div class="explore-chips"></div>
         </div>
         <form id="composer" class="composer">
           <div id="quote-card" class="quote-card" hidden></div>
@@ -442,9 +428,9 @@
 </div>
 
 <!-- Sameer's notes on you modal -->
-<div id="sam-notes-modal" class="modal-overlay" style="display:none;">
+<div id="sam-notes-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="sam-notes-modal-title" style="display:none;">
   <div class="modal">
-    <h3 class="modal-label">📝 Sameer's notes on you</h3>
+    <h3 class="modal-label" id="sam-notes-modal-title">📝 Sameer's notes on you</h3>
     <p class="modal-hint">Inferred from how you've worked together — you stay the editor. Nothing here is final; forget anything that's wrong.</p>
     <div id="sam-notes-dimensions" class="sam-notes-dimensions"></div>
     <ul id="sam-notes-observations" class="sam-notes-observations"></ul>
@@ -457,14 +443,14 @@
 </div>
 
 <!-- Settings modal -->
-<div id="settings-modal" class="modal-overlay" style="display:none;">
+<div id="settings-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" style="display:none;">
   <div class="modal">
-    <h3>Server &amp; Model</h3>
+    <h3 id="settings-modal-title">Server &amp; Model</h3>
     <label class="modal-label">llama-server URL</label>
     <input type="text" id="server-url-input" placeholder="http://localhost:8080">
 
     <label class="modal-label">Response timeout (seconds)</label>
-    <input type="text" id="timeout-input" placeholder="600">
+    <input type="number" id="timeout-input" placeholder="600" min="30" max="7200" step="10">
     <p class="modal-hint">Local models can genuinely take minutes per reply, especially with
       CPU-offloaded experts, a quantized KV cache, or a large context window — raise this if
       replies are timing out rather than actually failing.</p>
@@ -475,7 +461,7 @@
       analysis stays on the main model. Leave blank on a one-model box — it auto-falls back.</p>
 
     <label class="modal-label">Chat turn cap (seconds)</label>
-    <input type="text" id="turn-timeout-input" placeholder="120">
+    <input type="number" id="turn-timeout-input" placeholder="120" min="15" max="1800" step="5">
     <p class="modal-hint">If a reply is still generating when this hits, you get a
       “still working — keep waiting?” prompt instead of a silent hang.</p>
 
@@ -490,9 +476,9 @@
 </div>
 
 <!-- Rewrite modal -->
-<div id="rewrite-modal" class="modal-overlay" style="display:none;">
+<div id="rewrite-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rewrite-modal-title" style="display:none;">
   <div class="modal modal-wide">
-    <h3>Rewrite — <span id="rewrite-scene-title"></span></h3>
+    <h3 id="rewrite-modal-title">Rewrite — <span id="rewrite-scene-title"></span></h3>
     <p id="rewrite-finding" class="rewrite-finding"></p>
 
     <label class="modal-label" for="rewrite-instruction">Your instruction (optional)</label>
@@ -520,9 +506,9 @@
 </div>
 
 <!-- Fork name prompt -->
-<div id="fork-modal" class="modal-overlay" style="display:none;">
+<div id="fork-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="fork-modal-title" style="display:none;">
   <div class="modal">
-    <h3>Fork this conversation</h3>
+    <h3 id="fork-modal-title">Fork this conversation</h3>
     <label class="modal-label">Name this branch</label>
     <input type="text" id="fork-name-input" placeholder="e.g. alt-ending">
     <div class="modal-actions">
@@ -530,6 +516,7 @@
       <button id="fork-save" class="btn-primary">Create fork</button>
     </div>
   </div>
-</div>  <script src="app.js?v=id5a002"></script>
+</div>  <script src="core.js?v=hx1a102"></script>
+<script src="app.js?v=hx1a103"></script>
 </body>
 </html>

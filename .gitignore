@@ -46,4 +46,12 @@ studio_projects/
 # Local env / secrets
 .env
 .env.*
-!..env.example
+!.env.example
+
+# Personal creative source — never versioned
+/Pain_3_updated_FULL.pdf
+
+# Orphaned experiment artifacts (kept on disk, never versioned)
+/graph_fragment_chunk3.json
+/knowledge_graph_chunk3.json
+/app_findings.gbnf

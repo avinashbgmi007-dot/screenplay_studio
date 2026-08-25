@@ -132,7 +132,6 @@ def character_arc(doc: ScriptDocument, kg_characters: dict | None = None) -> lis
     and per-scene dialogue counts when provided)."""
     from collections import Counter, defaultdict
 
-    scene_of = {s.scene_number: s for s in doc.scenes}
     presence: dict = defaultdict(list)
     dialogue_counts: dict = Counter()
 

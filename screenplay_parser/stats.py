@@ -8,7 +8,7 @@ check on parse quality (e.g. a character with 1 line when they should be a
 lead usually means a name-normalization mismatch upstream).
 """
 
-from collections import Counter, defaultdict
+from collections import Counter
 
 from .models import ElementType, ScriptDocument
 from .structure import assign_acts, pacing_curve, character_arc

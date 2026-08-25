@@ -6,39 +6,22 @@ auto-hides) -> highlight a line (chip floats) -> Ask Sameer (quote card rides)
 appears inline).
 """
 import re
-import sys
 
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import expect, sync_playwright
 
-BASE = __import__("os").environ.get("E2E_BASE", "http://localhost:8500")
+from e2e_browser_common import Checks, assert_no_js_errors, last_reply, launch, open_studio, send_chat
 L1 = "A courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from regret."
 L2 = "She keeps one swapped item: a brass key nobody has claimed."
 
-PASS, FAIL = [], []
+checks = Checks()
+check = checks.ok
 
 
-def check(name, cond, detail=""):
-    (PASS if cond else FAIL).append((name, detail))
-    print(f"  {'PASS' if cond else 'FAIL'}  {name}" + (f"  [{detail}]" if not cond and detail else ""))
-
-
-def run():
+def run(base):
     with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("dialog", lambda d: d.accept())
+        browser, page, errors = launch(p)
 
-        def last_reply():
-            return page.locator(".msg.assistant .msg-bubble").last.inner_text().strip()
-
-        def send(text):
-            box = page.locator("#input")
-            box.fill(text)
-            page.get_by_role("button", name="Send").click()
-
-        page.goto(BASE, wait_until="networkidle")
+        page.goto(base, wait_until="networkidle")
         page.locator("#new-idea-btn").click()
         page.wait_for_timeout(400)
 
@@ -90,9 +73,9 @@ def run():
         check("ask pre-filled referencing the selection",
               "brass key" in composer_txt.lower() or "part" in composer_txt.lower(),
               composer_txt[:80])
-        send("yes -- that exact line. what does it mean for her?")
+        send_chat(page, "yes -- that exact line. what does it mean for her?")
         page.wait_for_timeout(2000)
-        r1 = last_reply().lower()
+        r1 = last_reply(page).lower()
         check("reply grounds on the selected passage",
               "key" in r1 or "claimed" in r1 or "brass" in r1, r1[:140])
 
@@ -111,15 +94,13 @@ def run():
         msgs = page.locator(".msg.assistant").count()
         check("translation adds no new chat turns", True, f"{msgs} assistant msgs")
 
-        check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
+        assert_no_js_errors(checks, errors)
         page.screenshot(path="_browser_sel_tr.png", full_page=True)
         browser.close()
 
-    print(f"\n=== {len(PASS)} passed, {len(FAIL)} failed ===")
-    for name, detail in FAIL:
-        print(f"FAILED: {name}: {detail}")
-    sys.exit(1 if FAIL else 0)
+    checks.finish()
 
 
 if __name__ == "__main__":
-    run()
+    with open_studio() as base:
+        run(base)

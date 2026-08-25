@@ -210,17 +210,6 @@ function wireInlineEdit(lineEl, sceneNumber, originalText) {
   });
 }
 
-function truncate(text, n) {
-  text = text.trim().replace(/\s+/g, " ");
-  return text.length > n ? text.slice(0, n - 1) + "…" : text;
-}
-
-function formatElapsed(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
 /** Starts a live "Xm Ys elapsed" ticker inside a target element, prefixed
  * with a fixed label. Returns a stop function. Exists specifically so long
  * local-model waits (which are normal, not broken) read as "working", not
@@ -244,33 +233,6 @@ function startElapsedTicker(targetEl, label) {
   tick();
   const handle = setInterval(tick, 1000);
   return () => clearInterval(handle);
-}
-
-/** Minimal, SAFE text formatting for assistant replies: escapes HTML first
- * (so nothing the model writes can inject markup), then supports just
- * **bold** and "- " bullet lines -- enough to make dense analysis notes
- * readable without pulling in a full markdown parser. */
-function formatMessageContent(raw) {
-  const escaped = raw
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  const bolded = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  const lines = bolded.split("\n");
-  let html = "";
-  let inList = false;
-  for (const line of lines) {
-    const bulletMatch = line.match(/^\s*[-•]\s+(.*)/);
-    if (bulletMatch) {
-      if (!inList) { html += "<ul>"; inList = true; }
-      html += `<li>${bulletMatch[1]}</li>`;
-    } else {
-      if (inList) { html += "</ul>"; inList = false; }
-      html += line.length ? `<p>${line}</p>` : "<br>";
-    }
-  }
-  if (inList) html += "</ul>";
-  return html;
 }
 
 // ---------- global error banner ----------
@@ -362,12 +324,6 @@ async function testConnection() {
 // Quiet metrics in the status strip: avg reply time · findings fixed,
 // with analysis duration / discussed count in the hover detail.
 
-function fmtDuration(seconds) {
-  if (seconds == null) return "—";
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-}
-
 async function refreshMetrics() {
   const el = $("#status-metrics");
   if (!el) return;
@@ -389,11 +345,6 @@ async function refreshMetrics() {
     el.textContent = "⚡ —";
     el.title = "Your writing loop, measured quietly on this machine";
   }
-}
-
-function shortModelId(id) {
-  if (!id) return "";
-  return id.length > 30 ? id.slice(0, 29) + "…" : id;
 }
 
 async function checkConnection() {
@@ -497,11 +448,6 @@ async function loadProjects() {
 }
 
 // ---- dashboard: every script as an intuitive card ----
-
-function _stageStep(label, status) {
-  const cls = status === "complete" ? "done" : status === "failed" ? "failed" : status === "running" ? "running" : "";
-  return `<span class="step ${cls}" title="${label}: ${status || "pending"}"><i></i>${label}</span>`;
-}
 
 function renderDashboard() {
   const grid = $("#dash-grid");
@@ -3016,6 +2962,30 @@ function sendPrefilled(text) {
   sendMessage();
 }
 
+// Single source of truth for the explore-path chips — rendered into every
+// .explore-chips container at init so the premise pane and the idea drawer
+// can never drift apart again (they had quietly diverged, 6 vs 5).
+const EXPLORE_CHIPS = [
+  { icon: "🔮", label: "What if…?", prompt: "Give me 3 unexpected 'what if' twists on this idea — each one pushing it in a different genre direction. Keep each to a sentence." },
+  { icon: "🎭", label: "Who's the heart?", prompt: "Who is this really about? Name the protagonist, what they want more than anything, and what they're afraid of losing. Then tell me why I should care in one line." },
+  { icon: "⚔️", label: "Where's the heat?", prompt: "Where is the conflict hiding in this idea? Show me 3 pressure points that could drive whole scenes, and which one is the strongest." },
+  { icon: "📽️", label: "Cold open", prompt: "How could this open on screen in the first 60 seconds? Give me 2-3 cold open options that hook without exposition." },
+  { icon: "🧨", label: "Push it further", prompt: "What's the riskiest, boldest version of this idea? Push past the safe version and show me what it becomes." },
+  { icon: "👥", label: "Who's it for?", prompt: "Who is this story for, and what would make them lean in? Give me the genre positioning and the audience hook." },
+];
+
+function renderExploreChips() {
+  document.querySelectorAll(".explore-chips").forEach((wrap) => {
+    wrap.innerHTML = "";
+    for (const chip of EXPLORE_CHIPS) {
+      const b = el("button", "explore-chip", `${chip.icon} ${chip.label}`);
+      b.type = "button";
+      b.dataset.prompt = chip.prompt;
+      wrap.appendChild(b);
+    }
+  });
+}
+
 function wireExploreChips() {
   const wire = (wrap) => {
     if (!wrap) return;
@@ -4874,26 +4844,6 @@ function closePalette() {
   if (input) input.blur();
 }
 
-// Spotlight-style fuzzy ranking: subsequence match with bonuses for
-// adjacency and word starts. 'rv' finds "Open the Revision view"; a plain
-// substring match scores highest (100+), then true fuzzy matches by score.
-function fuzzyScore(q, label) {
-  if (!q) return 1;
-  const s = label.toLowerCase();
-  if (s.includes(q)) return 100 + s.length - q.length;
-  let qi = 0;
-  let score = 0;
-  let prev = -2;
-  for (let i = 0; i < s.length && qi < q.length; i++) {
-    if (s[i] !== q[qi]) continue;
-    score += i === prev + 1 ? 2 : 1;
-    if (i === 0 || s[i - 1] === " " || s[i - 1] === "-") score += 5;
-    prev = i;
-    qi++;
-  }
-  return qi === q.length ? score : 0;
-}
-
 function renderPalette() {
   const q = ($("#palette-input").value || "").trim().toLowerCase();
   const all = paletteHelpMode ? paletteHelp() : [...paletteCommands(), ...paletteScenes()];
@@ -4972,6 +4922,16 @@ function bindGlobalShortcuts() {
       return;
     }
 
+    // Esc closes the top-most open modal — even while typing inside it,
+    // so this must sit ABOVE the isTypingTarget bail-out further down.
+    if (e.key === "Escape") {
+      const overlays = [...document.querySelectorAll(".modal-overlay")].filter((m) => m.style.display === "flex");
+      if (overlays.length) {
+        closeModal("#" + overlays[overlays.length - 1].id);
+        return;
+      }
+    }
+
     // palette navigation while it's open
     if ($("#palette-modal").style.display === "flex") {
       if (e.key === "ArrowDown") { e.preventDefault(); paletteMove(1); }
@@ -4996,8 +4956,8 @@ function bindGlobalShortcuts() {
     if (e.key === "Escape") {
       if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
       if (state.view === "revision") { closeRevisionView(); return; }
-      const modalOpen = [...document.querySelectorAll(".modal-overlay")].some((m) => m.style.display === "flex");
-      if (!modalOpen) {
+      // (open modals already returned above — drawer/shelf/rail are safe)
+      {
         const drawer = $("#room-drawer");
         if (drawer && drawer.classList.contains("open")) { closeRoomDrawer(); return; }
         const shelf = document.querySelector(".craft-shelf");
@@ -5029,9 +4989,49 @@ function bindGlobalShortcuts() {
 }
 
 // ---------- modals ----------
+// Focus-managed show/hide: remembers what had focus, moves focus into the
+// dialog, traps Tab inside while open, restores focus on close. Esc-to-close
+// lives in bindGlobalShortcuts (top-most visible overlay wins), which is why
+// that check sits ABOVE the typing-target bail-out there.
 
-function openModal(sel) { $(sel).style.display = "flex"; }
-function closeModal(sel) { $(sel).style.display = "none"; }
+let _modalFocusReturn = null;
+
+function _modalFocusables(overlay) {
+  return [...overlay.querySelectorAll("button, input:not([type='hidden']), textarea, select, a[href]")]
+    .filter((n) => !n.disabled && n.offsetParent !== null);
+}
+
+function _trapModalTab(e) {
+  if (e.key !== "Tab") return;
+  const focusables = _modalFocusables(e.currentTarget);
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function openModal(sel) {
+  const overlay = $(sel);
+  if (!overlay) return;
+  _modalFocusReturn = document.activeElement;
+  overlay.style.display = "flex";
+  const all = _modalFocusables(overlay);
+  const target = all.find((n) => n.matches("input, textarea, select")) || all[0];
+  if (target) target.focus();
+  overlay.addEventListener("keydown", _trapModalTab);
+}
+
+function closeModal(sel) {
+  const overlay = $(sel);
+  if (!overlay) return;
+  overlay.style.display = "none";
+  overlay.removeEventListener("keydown", _trapModalTab);
+  if (_modalFocusReturn && document.contains(_modalFocusReturn)) {
+    try { _modalFocusReturn.focus(); } catch (_) { /* detached node */ }
+  }
+  _modalFocusReturn = null;
+}
 
 // ---------- wiring ----------
 
@@ -5830,10 +5830,17 @@ function init() {
     // the export href is set on every render so the download carries the saved order
   });
 
-  // palette
+  // palette — platform-honest hint (macOS shows ⌘K, everything else Ctrl K)
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  const palBtn = $("#palette-btn");
+  if (palBtn) {
+    palBtn.textContent = isMac ? "⌘K" : "Ctrl K";
+    palBtn.title = isMac ? "Command palette (⌘K)" : "Command palette (Ctrl+K)";
+  }
   $("#palette-btn").addEventListener("click", () => openPalette(false));
   const homeBtn = $("#home-btn");
   if (homeBtn) homeBtn.addEventListener("click", goHome);
+  renderExploreChips();
   wireExploreChips();
   $("#palette-input").addEventListener("input", renderPalette);
   bindGlobalShortcuts();

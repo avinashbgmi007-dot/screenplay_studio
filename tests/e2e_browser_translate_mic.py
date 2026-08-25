@@ -16,35 +16,30 @@ Covers the two shipped features end-to-end through the REAL UI:
      lands at the caret + survives the autosave
   I. zero JS page errors throughout
 
-Run (server + test in ONE command -- background processes get reaped):
-  SCREENPLAY_STUDIO_DEMO_MODEL=1 SCREENPLAY_STUDIO_WHISPER_URL=http://127.0.0.1:8077 \\
-    python3 -m screenplay_studio.webapp_demo --port 8555 ... & sleep 3;
-    python3 tests/e2e_browser_translate_mic.py; kill %1
+Run:  python tests/e2e_browser_translate_mic.py   (boots its own demo studio;
+      set E2E_BASE to reuse an already-running one)
 
 Needs: pip install playwright && python -m playwright install chromium
 """
 import os
 import re
-import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import expect, sync_playwright
 
-BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8555")
+from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio, send_chat
 
 # What the mock whisper server always "hears". Deterministic -> assertable.
 MOCK_TEXT = "the brass key hums when it rains"
+# The studio forwards /api/stt to this URL (set below before the studio boots).
+WHISPER_PORT = 8077
 
 L1 = "A courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from regret."
 L2 = "She keeps one swapped item: a brass key nobody has claimed."
 
-PASS, FAIL = [], []
-
-
-def check(name, cond, detail=""):
-    (PASS if cond else FAIL).append((name, detail))
-    print(f"  {'PASS' if cond else 'FAIL'}  {name}" + (f"  [{detail}]" if not cond and detail else ""))
+checks = Checks()
+check = checks.ok
 
 
 class _MockWhisper(BaseHTTPRequestHandler):
@@ -68,38 +63,28 @@ def start_mock_whisper(port=8077):
     return srv
 
 
-def run():
+def run(base):
     start_mock_whisper()
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=[
+        browser, page, errors = launch(p, launch_args=[
             "--use-fake-ui-for-media-stream",     # auto-grant the mic prompt
             "--use-fake-device-for-media-stream",  # a real (synthetic-tone) audio track
-        ])
-        page = browser.new_context(viewport={"width": 1440, "height": 900},
-                                   permissions=["microphone"]).new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("dialog", lambda d: d.accept())
+        ], permissions=["microphone"])
 
         def last_reply_bubble():
             return page.locator(".msg.assistant .msg-bubble").last
-
-        def send(text):
-            box = page.locator("#input")
-            box.fill(text)
-            page.get_by_role("button", name="Send").click()
 
         def editor():
             return page.locator("#idea-content")
 
         # ---- A. idea + summon + a Sameer reply ---------------------------
-        page.goto(BASE, wait_until="networkidle")
+        page.goto(base, wait_until="networkidle")
         page.locator("#new-idea-btn").click()
         page.wait_for_timeout(400)
         editor().click()
         editor().type(L1 + "\n" + L2 + "\n/sameer", delay=3)
         page.wait_for_timeout(1100)   # debounced summon -> drawer opens
-        send("what snagged you about this page?")
+        send_chat(page, "what snagged you about this page?")
         # wait for the REAL reply (the pending dots bubble also matches .assistant)
         page.wait_for_selector(".msg.assistant:not(.msg-pending)", timeout=25000)
         page.wait_for_timeout(600)
@@ -259,15 +244,20 @@ def run():
               MOCK_TEXT in editor().input_value(), editor().input_value()[-90:])
 
         # ---- I. clean flight ----------------------------------------------
-        check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
+        assert_no_js_errors(checks, errors)
         page.screenshot(path="_browser_translate_mic.png", full_page=True)
         browser.close()
 
-    print(f"\n=== {len(PASS)} passed, {len(FAIL)} failed ===")
-    for name, detail in FAIL:
-        print(f"FAILED: {name}: {detail}")
-    sys.exit(1 if FAIL else 0)
+    checks.finish()
 
 
 if __name__ == "__main__":
-    run()
+    # the mock STT engine must exist BEFORE the studio boots: the studio is
+    # pointed at it via SCREENPLAY_STUDIO_WHISPER_URL (inherited env)
+    start_mock_whisper(WHISPER_PORT)
+    os.environ["SCREENPLAY_STUDIO_WHISPER_URL"] = f"http://127.0.0.1:{WHISPER_PORT}"
+    try:
+        with open_studio() as base:
+            run(base)
+    finally:
+        pass  # the mock daemon thread dies with the process

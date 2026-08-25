@@ -6,12 +6,11 @@ shelves -> open an idea from the flyout -> summon Sameer mid-page -> ask ->
 hover the globe for Telugu -> dictate a follow-up with the mic.
 """
 import re
-import sys
 
 import requests
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import expect, sync_playwright
 
-BASE = __import__("os").environ.get("E2E_BASE", "http://localhost:8500")
+from e2e_browser_common import Checks, launch, open_studio
 PAGE = (
     "Flyout Probe\n\n"
     "A night courier in Mumbai discovers her delivery bag swaps whatever is "
@@ -19,34 +18,25 @@ PAGE = (
     "She keeps one swapped item: a brass key nobody has claimed.\n"
 )
 
-PASS = 0
+checks = Checks(fail_fast=True)
+ok = checks.ok
 
 
-def ok(name, cond=True):
-    global PASS
-    if not cond:
-        print(f"FAIL {name}")
-        sys.exit(1)
-    PASS += 1
-    print(f"PASS {name}")
-
-
-def main():
+def main(base):
     api = requests.Session()
     # seed an idea + conversation over HTTP (the browser then navigates via UI)
-    iid = api.post(f"{BASE}/api/ideas", json={"title": "Flyout Probe"}).json()["id"]
+    iid = api.post(f"{base}/api/ideas", json={"title": "Flyout Probe"}).json()["id"]
     # sweep leftovers from earlier aborted runs so counts are deterministic
-    for old in api.get(f"{BASE}/api/ideas").json():
+    for old in api.get(f"{base}/api/ideas").json():
         if old["title"] == "Flyout Probe" and old["id"] != iid:
-            api.delete(f"{BASE}/api/ideas/{old['id']}")
-    n_ideas = len(api.get(f"{BASE}/api/ideas").json())
-    api.post(f"{BASE}/api/ideas/{iid}/content", json={"content": PAGE})
-    sid = api.post(f"{BASE}/api/ideas/{iid}/chat/start").json()["session_id"]
-    r = api.post(f"{BASE}/api/ideas/{iid}/chat/sessions/{sid}/messages",
+            api.delete(f"{base}/api/ideas/{old['id']}")
+    n_ideas = len(api.get(f"{base}/api/ideas").json())
+    api.post(f"{base}/api/ideas/{iid}/content", json={"content": PAGE})
+    sid = api.post(f"{base}/api/ideas/{iid}/chat/start").json()["session_id"]
+    r = api.post(f"{base}/api/ideas/{iid}/chat/sessions/{sid}/messages",
                  json={"text": "what about the brass key?"})
     assert r.ok, r.text
 
-    errors = []
     mic_stub = """
     window.__mic_chunks = [];
     navigator.mediaDevices.getUserMedia = async () =>
@@ -62,13 +52,11 @@ def main():
     """
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch()
-        page = browser.new_page(viewport={"width": 1440, "height": 900})
-        page.on("pageerror", lambda e: errors.append(str(e)))
+        browser, page, errors = launch(pw)
         page.add_init_script(mic_stub)
         page.route("**/api/stt", lambda route: route.fulfill(
             json={"text": "dictated brass key line", "language": "en", "engine": "stub"}))
-        page.goto(BASE, wait_until="networkidle")
+        page.goto(base, wait_until="networkidle")
 
         # ---- sidebar flyouts ----
         ideas_section = page.locator("#ideas-section")
@@ -155,9 +143,11 @@ def main():
         browser.close()
 
     # cleanup the probe idea
-    api.delete(f"{BASE}/api/ideas/{iid}")
-    print(f"\n=== {PASS}/{PASS} browser checks green ===")
+    api.delete(f"{base}/api/ideas/{iid}")
+
+    checks.finish()
 
 
 if __name__ == "__main__":
-    main()
+    with open_studio() as base:
+        main(base)

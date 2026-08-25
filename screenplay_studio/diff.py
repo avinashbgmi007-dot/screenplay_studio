@@ -27,7 +27,7 @@ import shutil
 import time
 from difflib import SequenceMatcher
 
-from screenplay_parser.models import ScriptDocument, ElementType
+from screenplay_parser.models import ScriptDocument
 
 from .manifest import StageStatus
 from .revision import reset_working, quote_present

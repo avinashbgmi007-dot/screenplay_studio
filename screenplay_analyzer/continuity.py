@@ -28,7 +28,6 @@ is a verbatim script line.
 
 from __future__ import annotations
 
-import re
 
 from screenplay_parser.models import ElementType, ScriptDocument
 from screenplay_parser.knowledge_graph import TIME_SKIP_RE
