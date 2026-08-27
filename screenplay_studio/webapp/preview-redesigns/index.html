@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UIUX Redesign Previews — pick the desk of your dreams</title>
+<style>
+:root{--ink:#16130f;--bg:#0f0d0a;--amber:#e8a54b;--muted:#94897a;--line:#2b261f}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:#efe7d7;font-family:Georgia,serif;line-height:1.5;min-height:100vh}
+header{padding:40px 32px 10px;text-align:center}
+header h1{font-size:34px;font-weight:600;letter-spacing:-.01em}
+header h1 em{color:var(--amber);font-style:italic}
+header p{color:var(--muted);max-width:620px;margin:12px auto 0;font-size:15px}
+.viewbar{display:flex;justify-content:center;gap:8px;padding:18px 16px;flex-wrap:wrap}
+.viewbar button{background:none;border:1px solid var(--line);color:var(--muted);padding:6px 14px;border-radius:99px;cursor:pointer;font:15px Georgia,serif}
+.viewbar button:hover{color:#fff;border-color:var(--amber)}
+.viewbar button.on{background:var(--amber);border-color:var(--amber);color:var(--ink);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;padding:8px 32px 40px;max-width:1400px;margin:0 auto}
+@media (max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:680px){.grid{grid-template-columns:1fr}}
+.card{background:#181410;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .2s ease, border-color .2s ease;cursor:pointer}
+@media (prefers-reduced-motion: reduce){.card{transition:none!important}}
+.card:hover{transform:translateY(-5px);border-color:var(--amber)}
+.swatch-strip{height:34px;display:flex}
+.swatch-strip i{flex:1}
+.thumb{height:210px;border-bottom:1px solid var(--line);overflow:hidden;display:block;background:#000}
+.thumb iframe{width:calc(100% + 40px);height:800px;border:0;transform:scale(.45);transform-origin:0 0;pointer-events:none;filter:saturate(.95)}
+.card .body{padding:16px 18px 14px;flex:1;display:flex;flex-direction:column}
+.num{font-size:11px;color:var(--amber);letter-spacing:.24em;text-transform:uppercase}
+.name{font-family:Georgia,serif;font-size:21px;margin-top:3px}
+.personality{color:var(--muted);font-size:13px;margin-top:7px;flex:1}
+.open-link{margin-top:13px;font-size:13.5px;color:var(--amber);text-decoration:none}
+.open-link:hover{text-decoration:underline}
+.howto{max-width:860px;margin:0 auto 56px;padding:0 32px;color:var(--muted);font-size:14px;text-align:center}
+.howto b{color:#efe7d7}
+.frame-view{display:none;height:calc(100vh - 100px)}
+.frame-view.on{display:block}
+.frame-view iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Six desks, one writer.<br><em>Pick where you want to work.</em></h1>
+  <p>Every design below shows the full journey — bookshelf → script pages (always first) → Sameer's co-writing room → the long-form feedback report. All four fixes are wired everywhere: click-outside dismissal, explore chips that tuck away after you type, and a composer that grows with you.</p>
+</header>
+
+<div class="viewbar" id="viewbar">
+  <button class="on" data-view="cards">Cards</button>
+  <button data-view="fr">Live side-by-side ▸</button>
+  <select id="pick" style="background:#181410;color:#efe7d7;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font:inherit;display:none">
+    <option value="noir">① Noir Desk</option><option value="paper">② Paper Atelier</option><option value="brutal">③ Brutal Print</option><option value="swiss">④ Swiss Signal</option><option value="terminal">⑤ Terminal Draft</option><option value="organic">⑥ Organic Magazine</option>
+  </select>
+</div>
+
+<section class="frame-view" id="frameView"><iframe id="live" title="live preview"></iframe></section>
+
+<div class="grid" id="cards"></div>
+
+<p class="howto"><b>How to review:</b> click any card to open it live, or hover a card for a peek. Inside each design: the top preview bar switches screens; on the Desk screen click the edge tabs (S / D) to summon Sameer & the Doctor — then <b>click anywhere else</b> to dismiss them; type one line in any composer to watch the explore-chips collapse to icons and the input grow.</p>
+
+<script>
+const designs=[
+ {id:"noir",n:"①",name:"Noir Desk",p:"Dark cinematic lamp-light. Amber margins around ink-black pages; the current evolution of the studio's brand. Edge-summon round tabs.",sw:["#121014","#241f2c","#e8a54b","#efe7d7"]},
+ {id:"paper",n:"②",name:"Paper Atelier",p:"Light rice-paper calm. Serif voice, book-spine room tabs sliding from the left margin, report as a typeset manuscript review.",sw:["#f7f2e9","#fdfaf4","#3d5a4c","#e0d6c4"]},
+ {id:"brutal",n:"③",name:"Brutal Print",p:"Editorial slap: hard rules, offset shadows, loud type. High-alert orange for summons, cobalt signals. Feedback reads like newsprint sport section.",sw:["#f4f1ea","#ff5a1f","#2545d9","#111111"]},
+ {id:"swiss",n:"④",name:"Swiss Signal",p:"Minimal productivity. One accent does all the talking; segmented control flips rooms; report is crisp numbered sections. Nothing decorative survives.",sw:["#fafafa","#ffffff","#2545d9","#e6e8ec"]},
+ {id:"terminal",n:"⑤",name:"Terminal Draft",p:"Pro-mode phosphor: writing feels like compilation. ⌘K palette navigates everything; findings print as [HIGH]/[MED] log blocks.",sw:["#0a0f0a","#7ee787","#79c0ff","#e3b341"]},
+ {id:"organic",n:"⑥",name:"Organic Magazine",p:"The report becomes a feature article: masthead shelf, pull-quotes, drop caps, TOC rail. Warmest of the six; Sameer lives in a 'study'.",sw:["#f4ecdd","#fbf6ea","#c65b3f","#6d7a4e"]}
+];
+const cards=document.getElementById('cards');
+designs.forEach(d=>{
+  const c=document.createElement('div');
+  c.className='card';
+  c.innerHTML=`
+   <div class="swatch-strip">${d.sw.map(s=>`<i style="background:${s}"></i>`).join('')}</div>
+   <span class="thumb"><iframe src="${d.id}.html" loading="lazy" title="${d.name} thumbnail" tabindex="-1"></iframe></span>
+   <div class="body">
+     <span class="num">preview ${d.n}</span>
+     <span class="name serif">${d.name}</span>
+     <span class="personality">${d.p}</span>
+     <a class="open-link" href="${d.id}.html" onclick="event.stopPropagation()">Open ${d.id}.html ↗ · </a><a class="open-link" href="#" data-open="${d.id}">open in-frame here</a>
+   </div>`;
+  c.addEventListener('click',()=>show(d.id));
+  cards.appendChild(c);
+});
+document.getElementById('viewbar').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-view]');if(!b)return;
+  document.querySelectorAll('#viewbar button').forEach(x=>x.classList.toggle('on',x===b));
+  const fr=b.dataset.view==='fr';
+  document.getElementById('cards').style.display=fr?'none':'grid';
+  document.getElementById('frameView').classList.toggle('on',fr);
+  document.getElementById('pick').style.display=fr?'inline-block':'none';
+});
+function show(id){
+  document.querySelectorAll('#viewbar button').forEach((x,i)=>x.classList.toggle('on',x.dataset.view==='fr'));
+  document.getElementById('cards').style.display='none';
+  document.getElementById('frameView').classList.add('on');
+  document.getElementById('pick').style.display='inline-block';
+  document.getElementById('pick').value=id;
+  document.getElementById('live').src=id+'.html';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.getElementById('pick').addEventListener('change',e=>{
+  if(e.target.value)document.getElementById('live').src=e.target.value+'.html';
+});
+</script>
+</body>
+</html>
