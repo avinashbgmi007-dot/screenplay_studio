@@ -1,0 +1,847 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lumen — Studio UX v3</title>
+<link rel="stylesheet" href="shared/kit.css">
+<link rel="stylesheet" href="shared/motion.css">
+<link rel="stylesheet" href="shared/graphics.css">
+<style>
+/* ---------- LUMEN SKIN — glass depth over ambient light ---------- */
+:root{
+  --bg:#07070d;--ink:#f4f2fa;--muted:#a5a1b8;
+  --line:rgba(255,255,255,.13);--surface:rgba(255,255,255,.045);
+  --glass:rgba(255,255,255,.06);--glass-strong:rgba(20,20,32,.72);
+  --accent:#a78bfa;--accent-ink:#17121f;
+  --b1:#5b5bd6;--b2:#2dd4bf;--b3:#f472b6;--b4:#fbbf24;
+  --ring:0 0 0 2px var(--bg),0 0 0 4px color-mix(in oklab,var(--accent) 65%,#fff);
+}
+body.dawn{--bg:#eef0fb;--ink:#211d33;--muted:#6d687f;--line:rgba(33,29,51,.14);
+  --surface:rgba(255,255,255,.5);--glass:rgba(255,255,255,.55);--glass-strong:rgba(255,255,255,.85);
+  --accent:#7c5cf0;
+  --b1:#c3d0ff;--b2:#a9ead9;--b3:#ffd1e8;--b4:#ffe6ad}
+body.dawn .grain{mix-blend-mode:multiply;opacity:.04}
+
+/* sky */
+.sky{position:fixed;inset:0;z-index:0;background:var(--bg)}
+.sky i{position:absolute;border-radius:50%;filter:blur(75px);will-change:transform}
+.b1{width:560px;height:560px;left:-120px;top:-140px;background:var(--b1);opacity:.42;animation:drift-a 23s ease-in-out infinite}
+.b2{width:520px;height:520px;right:-140px;bottom:-120px;background:var(--b2);opacity:.26;animation:drift-b 27s ease-in-out infinite}
+.b3{width:380px;height:380px;left:34%;top:52%;background:var(--b3);opacity:.17;animation:drift-c 31s ease-in-out infinite}
+.b4{width:300px;height:300px;right:22%;top:-80px;background:var(--b4);opacity:.15;animation:drift-a 19s ease-in-out infinite reverse}
+
+/* deck of floating panels */
+.deck{position:fixed;inset:0;z-index:10}
+.panel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:26px 26px 110px;
+  opacity:0;transform:scale(.95) translateY(28px);filter:blur(12px);pointer-events:none;
+  transition:opacity .5s var(--ease-out),transform .65s var(--spring),filter .5s var(--ease-out)}
+.panel.on{opacity:1;transform:none;filter:none;pointer-events:auto}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:22px;
+  backdrop-filter:blur(26px) saturate(160%);-webkit-backdrop-filter:blur(26px) saturate(160%);
+  box-shadow:0 30px 90px -30px rgba(0,0,0,.55),0 1px 0 rgba(255,255,255,.09) inset}
+
+/* status chip */
+.status-chip{position:fixed;top:16px;right:16px;z-index:50;display:flex;align-items:center;gap:9px;
+  padding:7px 13px;border-radius:99px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.status-chip .dot-conn{width:6px;height:6px}
+
+/* ---------- WELCOME ---------- */
+.hero{width:min(620px,100%);text-align:center;padding:46px 40px;display:flex;flex-direction:column;
+  align-items:center;gap:0}
+.greet{font-family:var(--display);font-style:italic;font-size:clamp(30px,4.4vw,38px)}
+.greet-sub{color:var(--muted);margin:10px 0 28px;font-size:14px}
+.dropzone{width:100%;border:1.5px dashed color-mix(in oklab,var(--ink) 24%,transparent);border-radius:18px;
+  padding:36px 24px;display:flex;flex-direction:column;align-items:center;gap:12px;transition:all var(--t)}
+.dropzone.over{border-color:var(--accent);transform:rotate(-.6deg) scale(1.01);
+  background:color-mix(in oklab,var(--accent) 8%,transparent)}
+.dropzone .ic{width:32px;height:32px;color:var(--muted)}
+.fmts{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.fmt{font-family:var(--mono);font-size:10.5px;color:var(--muted);border:1px solid var(--line);
+  border-radius:6px;padding:3px 8px}
+.or-row{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px;margin-top:14px}
+.textbtn{color:var(--accent);font-weight:600}.textbtn:hover{text-decoration:underline}
+.tiles{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;justify-content:center}
+.tile{padding:11px 16px;border-radius:14px;font-size:12.5px;color:var(--muted);
+  display:flex;gap:8px;align-items:center}
+.tile b{color:var(--ink)}
+.steps{display:flex;gap:20px;margin-top:26px;flex-wrap:wrap;justify-content:center}
+.step{display:flex;gap:9px;font-size:12px;color:var(--muted);max-width:190px;text-align:left;align-items:flex-start}
+.step b{display:grid;place-items:center;width:22px;height:22px;border-radius:8px;flex:none;font-size:11px;
+  color:var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent)}
+.privacy{margin-top:24px;font-size:11px;color:var(--muted)}
+
+/* ---------- DESK (script + satellites) ---------- */
+.desk-wrap{display:flex;gap:18px;align-items:stretch;width:min(1060px,100%);max-height:100%}
+.script-panel{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.sp-head{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.sp-title{font-weight:700;font-size:14px}
+.sp-head .sp{flex:1}
+.tb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;
+  color:var(--muted);transition:all var(--t)}
+.tb:hover{background:var(--surface2);color:var(--ink)}
+.tb.wide{width:auto;padding:0 11px;font-size:12px;font-weight:600;gap:6px}
+.script-scroll{overflow-y:auto;padding:26px 40px;scrollbar-gutter:stable}
+.script{font-family:var(--script);font-size:13px;line-height:1.6;max-width:560px;margin:0 auto}
+body.focusmode .script p:not(:hover){opacity:.3}
+.script p{transition:opacity .25s}
+.s-h{font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:22px 0 10px;font-size:12.5px}
+.s-h:first-child{margin-top:0}.s-h.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,60%{color:var(--accent)}100%{}}
+.s-act{margin-bottom:12px}.s-char{text-transform:uppercase;margin:12px 0 0 22%}
+.s-dial{margin:0 15% 0 22%}.s-paren{margin:2px 30% 0 32%;font-size:11.5px;color:var(--muted)}
+.script mark{background:color-mix(in oklab,var(--accent) 30%,transparent);border-radius:3px}
+.sp-foot{display:flex;align-items:center;gap:10px;padding:11px 18px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--muted)}
+.sat-col{width:250px;flex:none;display:flex;flex-direction:column;gap:14px;justify-content:center}
+.sat{padding:15px 16px;animation:floaty 8s ease-in-out infinite alternate}
+.sat:nth-child(2){animation-delay:-3s}.sat:nth-child(3){animation-delay:-5.5s}
+@keyframes floaty{from{transform:translateY(-4px)}to{transform:translateY(5px)}}
+.sat h4{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  margin-bottom:9px}
+.char-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--line);
+  border-radius:99px;padding:4px 11px;margin:2px 3px 2px 0;background:var(--surface)}
+.margnote{font-size:12.5px;border-left:2px solid var(--accent);padding:3px 0 3px 10px;margin:7px 0;
+  color:var(--muted);font-style:italic}
+.note-in{display:flex;gap:6px;margin-top:9px}
+.note-in input{flex:1;min-height:32px;border:1px solid var(--line);border-radius:8px;background:transparent;
+  padding:4px 9px;font-size:12px;color:var(--ink)}
+
+/* ---------- FEEDBACK ---------- */
+.fb-panel{width:min(760px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.fb-head{display:flex;align-items:center;gap:10px;padding:16px 20px 12px;flex-wrap:wrap}
+.fb-title{font-family:var(--display);font-size:21px}
+.fb-head .sp{flex:1}
+.fb-scroll{overflow-y:auto;padding:6px 20px 22px;display:flex;flex-direction:column;gap:12px}
+.verdict{position:relative;overflow:hidden;display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center;
+  padding:22px 24px;border-radius:20px}
+.verdict.running::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg,transparent 42%,color-mix(in oklab,#fff 16%,transparent) 50%,transparent 58%);
+  transform:translateX(-110%);animation:sweep 1.7s ease-in-out infinite}
+@keyframes sweep{to{transform:translateX(110%)}}
+.v-meta{display:flex;flex-direction:column;gap:8px;min-width:0}
+.v-line{font-family:var(--display);font-size:16px;line-height:1.45}
+.v-tags{display:flex;gap:7px;flex-wrap:wrap}
+.sheet{border-radius:16px;padding:14px 18px}
+.sheet h3{font-size:13.5px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.sheet .bar{flex:1;height:4px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.sheet .bar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent),#67e8f9);transition:width 1s cubic-bezier(.16,1,.3,1)}
+.sheet .cs{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.notes{display:none;padding-top:8px}
+.sheet.open .notes{display:block;animation:rise .35s var(--ease-out)}
+.note{display:flex;gap:10px;padding:9px 0;border-top:1px dashed var(--line);font-size:13px}
+.note .nx{flex:1}
+.n-meta{display:flex;gap:13px;margin-top:5px;font-size:11.5px;color:var(--muted);flex-wrap:wrap;align-items:center}
+.jump{cursor:pointer;display:inline-flex;gap:5px;align-items:center}.jump:hover{color:var(--accent)}
+.empty-state,.run-card{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;
+  padding:46px 20px;border-radius:20px;border:1px dashed var(--line)}
+.run-card{border-style:solid}
+.run-pct{font-family:var(--mono);font-size:40px;font-weight:700}
+.run-stage{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.run-stage b{color:var(--accent)}
+.qrow{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px dashed var(--line)}
+.qt{flex:1;font-size:13px}.qt small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+.retry-failed{display:none}.fb-error .retry-failed{display:inline-flex}
+.fb-error .empty-state{border-color:color-mix(in oklab,var(--bad) 45%,transparent)}
+
+/* ---------- CO-WRITE side panel ---------- */
+.side-back{position:fixed;inset:0;z-index:44;background:rgba(4,4,10,.32);backdrop-filter:blur(3px);
+  -webkit-backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .35s ease}
+.side-back.on{opacity:1;pointer-events:auto}
+.side{position:fixed;top:16px;right:16px;bottom:96px;z-index:45;width:min(430px,calc(100vw - 32px));
+  display:flex;flex-direction:column;overflow:hidden;
+  transform:translateX(calc(100% + 40px)) scale(.98);transition:transform .55s var(--spring)}
+.side.on{transform:none}
+.cw-head{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.cw-name{font-weight:700;font-size:13.5px}.cw-sub{font-size:11px;color:var(--muted)}
+.thread{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:13px;padding:16px}
+.msg{max-width:86%;font-size:13px;line-height:1.55;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;
+  padding:10px 14px;border-radius:15px 15px 4px 15px}
+.msg.ai{align-self:flex-start;background:var(--glass-strong);border:1px solid var(--line);
+  padding:12px 14px;border-radius:15px 15px 15px 4px}
+.grounded{display:flex;gap:6px;align-items:center;margin-top:9px;padding-top:8px;font-size:10.5px;
+  color:var(--muted);border-top:1px dashed var(--line)}
+.composer-zone{border-top:1px solid var(--line);padding:12px 14px 14px;display:flex;flex-direction:column;gap:9px}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.used .chips{display:none}
+.orb{display:none;width:42px;height:42px;border-radius:50%;place-items:center;color:var(--accent);
+  border:1px solid color-mix(in oklab,var(--accent) 45%,var(--line));
+  background:color-mix(in oklab,var(--accent) 12%,transparent);
+  box-shadow:0 0 22px -4px color-mix(in oklab,var(--accent) 60%,transparent)}
+.used .orb-row{display:flex;align-items:center;gap:9px}
+.used .orb{display:grid}
+.ta-box{display:flex;align-items:flex-end;gap:8px;border:1px solid var(--line);border-radius:16px;
+  background:var(--surface);padding:10px 10px 10px 14px;transition:border-color var(--t)}
+.ta-box:focus-within{border-color:color-mix(in oklab,var(--accent) 60%,var(--line))}
+.ta{flex:1;border:none;background:transparent;resize:none;min-height:24px;max-height:40vh;line-height:1.55;color:var(--ink)}
+.send{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff}
+.quote-chip{display:none;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);
+  border:1px dashed color-mix(in oklab,var(--accent) 50%,var(--line));border-radius:10px;padding:6px 11px}
+.quote-chip.on{display:flex}
+
+/* ---------- IDEAS ---------- */
+.premise{width:min(560px,100%);padding:26px;display:flex;flex-direction:column;gap:0;max-height:100%;overflow-y:auto}
+.premise h2{font-family:var(--display);font-size:19px;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.autosave{margin-left:auto;font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.act-bar{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.act-bar i{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--accent),#67e8f9)}
+
+/* ---------- DOCK ---------- */
+.dock-wrap{position:fixed;left:0;right:0;bottom:18px;z-index:48;display:flex;justify-content:center;pointer-events:none}
+.dock{pointer-events:auto;display:flex;gap:6px;align-items:flex-end;padding:9px 11px;border-radius:22px}
+.dock button{position:relative;width:48px;height:48px;border-radius:15px;display:grid;place-items:center;
+  color:var(--muted);transform:scale(var(--s,1)) translateY(var(--ty,0px));transition:transform .18s ease-out,color .2s}
+.dock button:hover{color:var(--ink)}
+.dock button .ind{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;
+  border-radius:50%;background:var(--accent);opacity:0;transition:opacity .2s;box-shadow:0 0 8px var(--accent)}
+.dock button[aria-selected="true"]{color:var(--ink)}
+.dock button[aria-selected="true"] .ind{opacity:1}
+.dock .sep{width:1px;height:30px;background:var(--line);margin:0 4px;align-self:center}
+.dock [data-tip]::after{top:auto;bottom:calc(100% + 10px)}
+@keyframes floaty{}
+
+/* palette (frosted) */
+.pal-wrap{position:fixed;inset:0;z-index:110;display:none;padding:14vh 20px 20px;
+  background:rgba(4,4,10,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.pal-wrap.open{display:block;animation:fade-in .18s ease}
+.pal{width:min(580px,100%);margin:0 auto;border-radius:20px;border:1px solid var(--line);
+  background:var(--glass-strong);backdrop-filter:blur(30px) saturate(170%);
+  -webkit-backdrop-filter:blur(30px) saturate(170%);
+  box-shadow:0 40px 110px -20px rgba(0,0,0,.7);overflow:hidden;animation:pal-in .3s var(--spring)}
+@keyframes pal-in{from{opacity:0;transform:translateY(-12px) scale(.97)}to{opacity:1}}
+.pal-in-row{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line)}
+.pal-in-row .ic{color:var(--accent)}
+.pal-in-row input{flex:1;border:none;background:transparent;font-size:15px;color:var(--ink)}
+.pal-list{max-height:370px;overflow-y:auto;padding:8px}
+.pal-g{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  padding:10px 12px 5px}
+.pal-it{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:9px 12px;min-height:42px;
+  border-radius:11px;font-size:13.5px}
+.pal-it .ic{color:var(--muted)}
+.pal-it.on{background:color-mix(in oklab,var(--accent) 18%,transparent)}.pal-it.on .ic{color:var(--accent)}
+.pal-it b{color:#c4b5fd}
+.pl{flex:none}.ph{flex:1;text-align:right;font-size:11.5px;color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.pal-empty{padding:26px;text-align:center;color:var(--muted);font-size:13px}
+.pal-foot{display:flex;gap:16px;padding:10px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.pal-foot span{display:flex;gap:6px;align-items:center}
+
+/* diff modal */
+.diff2{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-family:var(--script);font-size:12px}
+.dcol{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--surface)}
+.del{background:color-mix(in oklab,var(--bad) 16%,transparent);text-decoration:line-through;border-radius:3px}
+.ins{background:color-mix(in oklab,var(--ok) 16%,transparent);border-radius:3px}
+.outline-list{list-style:none;display:flex;flex-direction:column;gap:6px}
+.outline-list li{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;
+  padding:9px 12px;font-size:13px}
+.outline-list .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.about{max-width:min(760px,92vw);margin:18px auto 0;font-size:11.5px;color:var(--muted)}
+.about summary{cursor:pointer;font-family:var(--mono);letter-spacing:.06em}
+.about .ab{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:14px 16px;
+  margin-top:10px;line-height:1.7}
+@media(max-width:900px){.sat-col{display:none}}
+</style></head>
+<body>
+<div class="sky"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></div>
+<div class="grain"></div>
+
+<div class="status-chip glass lum-edge" data-fid="status-strip">
+  <span class="dot-conn breathe"></span>demo-craft · local · <b id="elapsed" style="color:var(--ink)">02:12</b>
+</div>
+
+<main class="deck" id="deck">
+
+  <!-- HOME -->
+  <section class="panel on" data-p="home">
+    <div style="display:flex;flex-direction:column;align-items:center;width:100%">
+      <div class="hero glass lum-edge" data-depth=".35">
+        <h1 class="greet">Evening, Avi.</h1>
+        <p class="greet-sub">Drop a draft into the light — Sameer takes it from there.</p>
+        <div class="dropzone" id="dz" data-fid="dropzone">
+          <svg class="ic"><use href="#i-file"/></svg>
+          <div style="font-weight:700;font-size:14.5px">Drop your screenplay</div>
+          <div class="fmts"><span class="fmt">.fdx</span><span class="fmt">.fountain</span><span class="fmt">.pdf</span><span class="fmt">.txt</span><span class="fmt">.md</span></div>
+          <button class="btn ghost sm" id="browseBtn">Browse files</button>
+          <input type="file" id="fileInput" class="sr-only" accept=".fdx,.fountain,.pdf,.txt,.md">
+          <div id="upProg" hidden style="width:min(320px,100%)">
+            <div class="progress"><i id="upBar"></i></div>
+            <p style="font-size:11.5px;color:var(--muted);margin-top:7px" id="upName"></p>
+          </div>
+        </div>
+        <div class="or-row">or <button class="textbtn" id="sampleBtn">open the sample project</button> ·
+          <button class="textbtn" data-fid="new-project" id="newProj">+ new project</button></div>
+        <div class="tiles" data-stagger>
+          <span class="tile glass"><b>Draft 3</b>· 96 pages</span>
+          <button class="tile glass" id="libBtn" data-fid="library"><svg class="ic" style="width:14px;height:14px"><use href="#i-book"/></svg>Your library · <b>4</b></button>
+          <button class="tile glass" id="shelfBtn" data-fid="shelf"><svg class="ic" style="width:14px;height:14px"><use href="#i-folder"/></svg>On the shelf · <b>2</b></button>
+        </div>
+        <ol class="steps" style="list-style:none">
+          <li class="step"><b>1</b>Upload any screenwriting format</li>
+          <li class="step"><b>2</b>Coverage returns grounded notes in ~40 s</li>
+          <li class="step"><b>3</b>Co-write fixes and apply them</li>
+        </ol>
+        <p class="privacy">✦ runs locally against your llama-server · nothing leaves this machine · press <kbd>⌘K</kbd> anywhere</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DESK -->
+  <section class="panel" data-p="desk">
+    <div class="desk-wrap">
+      <div class="script-panel glass lum-edge" data-depth=".3" data-fid="script-pane">
+        <div class="sp-head">
+          <span class="sp-title">The Late Hour</span>
+          <select class="sel" style="width:auto;min-height:32px;font-size:12px" data-fid="branch" id="branchSel"><option>Draft 3</option><option>Draft 2</option></select>
+          <span class="sp"></span>
+          <button class="tb" id="undoBtn" data-tip="Undo" data-fid="undo"><svg class="ic"><use href="#i-undo"/></svg></button>
+          <button class="tb" id="redoBtn" data-tip="Redo" data-fid="redo"><svg class="ic"><use href="#i-redo"/></svg></button>
+          <button class="tb wide" data-nav="ideas" data-fid="premise"><svg class="ic" style="width:13px;height:13px"><use href="#i-bulb"/></svg>Premise</button>
+          <button class="tb wide" id="focusBtn" data-fid="focus"><svg class="ic" style="width:13px;height:13px"><use href="#i-zap"/></svg>Focus</button>
+          <button class="tb wide" data-pop="#expMenu" data-fid="exports">Export<svg class="ic" style="width:12px;height:12px"><use href="#i-chevd"/></svg></button>
+          <button class="tb wide" data-modal="#m-compare" data-fid="compare"><svg class="ic" style="width:13px;height:13px"><use href="#i-compare"/></svg>Compare</button>
+          <button class="tb" id="searchBtn" data-tip="Find (/)" data-fid="search"><svg class="ic"><use href="#i-search"/></svg></button>
+        </div>
+        <div class="script-scroll" id="scriptScroll">
+          <article class="script" id="script">
+            <h2 class="s-h" id="sc1">1 INT. APARTMENT — NIGHT</h2>
+            <p class="s-act">Rain ticks the window. MARA types with two fingers, fast, a chipped mug dying beside the keyboard. She stops. Reads the line back. Deletes it anyway.</p>
+            <p class="s-act">She holds up the KEY on her keyring, considering it like a stranger.</p>
+            <h2 class="s-h" id="sc2">2 INT. STAIRWELL — CONTINUOUS</h2>
+            <p class="s-act">DEV takes the steps two at a time, a paper bag of oranges clutched like evidence.</p>
+            <p class="s-char">DEV</p><p class="s-dial">You said nine. It's nine-oh-two and I'm the one apologizing.</p>
+            <h2 class="s-h" id="sc3">3 INT. WRITER'S ROOM — DAWN</h2>
+            <p class="s-act">Grey light. Mara sets the key on the sill beside a dead plant.</p>
+            <p class="s-char">MARA</p><p class="s-dial">I kept the key.</p>
+            <p class="s-paren">(to no one)</p><p class="s-dial">You can have the rest back.</p>
+          </article>
+        </div>
+        <div class="sp-foot">
+          <button class="chip" style="min-height:30px;font-size:11.5px" id="uploadMini" data-fid="upload"><svg class="ic" style="width:12px;height:12px"><use href="#i-up"/></svg>Upload draft</button>
+          <span class="saved" style="display:inline-flex;gap:5px;align-items:center;color:var(--ok);font-size:11.5px"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>saved</span>
+          <span style="flex:1"></span><span style="font-family:var(--mono);font-size:10.5px">96 pp · rev 214</span>
+        </div>
+      </div>
+      <div class="sat-col">
+        <div class="sat glass" data-depth=".55" data-fid="characters">
+          <h4>Characters</h4>
+          <span class="char-chip">MARA</span><span class="char-chip">DEV</span>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">with stage presence: THE KEY (prop)</div>
+        </div>
+        <div class="sat glass" data-depth=".7" data-fid="margin-notes">
+          <h4>Margin notes</h4>
+          <div id="noteList">
+            <p class="margnote">exit line lands twice — cut the second</p>
+            <p class="margnote">oranges deserve a payoff</p>
+          </div>
+          <form class="note-in" id="noteForm"><input placeholder="Add note…" aria-label="Add margin note"><button class="ibtn" style="width:32px;height:32px" aria-label="Add"><svg class="ic"><use href="#i-plus"/></svg></button></form>
+        </div>
+        <div class="sat glass" data-depth=".45" data-fid="stash">
+          <h4>Stash</h4>
+          <button class="chip" style="min-height:30px;font-size:11.5px" id="stashBtn"><svg class="ic" style="width:12px;height:12px"><use href="#i-cut"/></svg>Cut lines · <b id="stashN">&nbsp;2</b></button>
+          <div style="display:flex;gap:6px;margin-top:9px">
+            <button class="chip" style="min-height:28px;font-size:11px" data-modal="#m-beatboard" data-fid="beatboard"><svg class="ic" style="width:12px;height:12px"><use href="#i-board"/></svg>Beat board</button>
+            <button class="chip" style="min-height:28px;font-size:11px" id="revDesk" data-fid="revise-desk"><svg class="ic" style="width:12px;height:12px"><use href="#i-cut"/></svg>Revision desk</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEEDBACK -->
+  <section class="panel" data-p="feedback">
+    <div class="fb-panel glass lum-edge" data-depth=".25">
+      <div class="fb-head">
+        <h1 class="fb-title">Coverage</h1>
+        <select class="sel" style="width:auto;min-height:34px;font-size:12px" data-fid="language">
+          <option>English</option><option>हिन्दी</option><option>தமிழ்</option><option>తెలుగు</option><option>Español</option>
+        </select>
+        <span class="sp"></span>
+        <div class="seg" role="tablist" data-fid="fb-tabs" id="fbTabs">
+          <button aria-selected="true" data-fbt="report">Report</button>
+          <button aria-selected="false" data-fbt="queue">Fix queue · 3</button>
+        </div>
+        <button class="btn ghost sm" id="reparseBtn" data-fid="re-parse"><svg class="ic" style="width:13px;height:13px"><use href="#i-refresh"/></svg>Re-parse</button>
+        <button class="btn ghost sm retry-failed" id="retryBtn" data-fid="retry"><svg class="ic" style="width:13px;height:13px"><use href="#i-refresh"/></svg>Retry failed</button>
+        <button class="btn ghost sm" id="exportMd" data-fid="export-md"><svg class="ic" style="width:13px;height:13px"><use href="#i-download"/></svg>.md</button>
+      </div>
+      <div class="fb-scroll" id="fbScroll">
+        <div class="empty-state glass" id="fbEmpty">
+          <svg class="ring" width="110" height="110" viewBox="0 0 128 128"><circle class="score-track" cx="64" cy="64" r="54"/></svg>
+          <div style="font-family:var(--display);font-size:18px">No coverage yet</div>
+          <p style="color:var(--muted);font-size:13px;max-width:44ch">Sameer reads all 96 pages against 34 craft rules and verifies every quote before it reaches you.</p>
+          <button class="btn pri" id="runBtn" data-fid="run-analysis"><svg class="ic"><use href="#i-play"/></svg>Run analysis<span style="opacity:.7;font-weight:500">&nbsp;· about 40 s</span></button>
+        </div>
+        <div class="run-card glass" id="fbRun" hidden>
+          <div class="run-pct" id="runPct">0%</div>
+          <div class="progress-wrap" style="width:min(400px,100%)"><div class="progress"><i id="runBar"></i></div></div>
+          <div class="run-stage">pass <b id="runStage">parse</b> · light moves as the pipeline does</div>
+          <span style="font-size:12px;color:var(--muted)" id="eta">~40 s</span>
+        </div>
+        <div id="fbDone" hidden style="display:flex;flex-direction:column;gap:12px">
+          <div class="verdict glass lum-edge" id="verdictCard" data-reveal>
+            <svg class="ring" width="126" height="126" viewBox="0 0 128 128" role="img" aria-label="Score 84">
+              <circle class="score-track" cx="64" cy="64" r="54"/>
+              <circle class="score-arc" cx="64" cy="64" r="54" style="--c:339.3" id="scoreArc"/>
+              <text class="score-num" x="64" y="76" text-anchor="middle" font-size="36" fill="currentColor" id="scoreNum">0</text>
+            </svg>
+            <div class="v-meta">
+              <span class="badge acc" style="width:fit-content;color:var(--accent);border-color:color-mix(in oklab,var(--accent) 40%,var(--line))"><svg class="ic" style="width:11px;height:11px"><use href="#i-check"/></svg>verified quotes</span>
+              <div class="v-line">A tight, honest draft. The dawn pays off; Act II needs a spine check.</div>
+              <div class="v-tags">
+                <span class="badge" style="color:var(--ok)">▲ +4 vs Draft 2</span>
+                <span class="badge">confidence · high</span><span class="badge">3 scenes sampled</span>
+              </div>
+            </div>
+          </div>
+          <div id="cats" style="display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+        <div id="fbQueue" hidden data-fid="fix-queue" style="display:flex;flex-direction:column"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IDEAS -->
+  <section class="panel" data-p="ideas">
+    <div class="premise glass lum-edge" data-depth=".3" data-fid="premise-card">
+      <h2><svg class="ic" style="color:var(--accent)"><use href="#i-bulb"/></svg>Premise<span class="autosave" id="autosave">saving…</span></h2>
+      <div class="f-row"><label>Title</label><input class="input" style="background:var(--surface)" value="The Late Hour"></div>
+      <div class="f-row"><label>Logline</label><textarea class="ta" rows="2" style="border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:9px 12px">A night-shift typist keeps a key she promised to return; by dawn, someone has to decide what it opens.</textarea></div>
+      <div class="f-row"><label>Open questions</label><div class="chips">
+        <button class="chip" data-q="What does the key literally open?" style="min-height:30px;font-size:11.5px">What does the key open?</button>
+        <button class="chip" data-q="Who is waiting at the stairwell?" style="min-height:30px;font-size:11.5px">Who waits at the stairwell?</button></div></div>
+      <div class="acts" data-fid="structure-panel">
+        <div class="act-bar">ACT I<i style="width:34%"></i></div>
+        <div class="act-bar">ACT II<i style="width:41%;opacity:.7"></i></div>
+        <div class="act-bar">ACT III<i style="width:25%;opacity:.45"></i></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="btn pri" id="graduateBtn" data-fid="graduate"><svg class="ic" style="width:15px;height:15px"><use href="#i-aright"/></svg>Graduate to pages</button>
+        <button class="btn ghost" id="savePremise">Save premise</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- co-write side panel -->
+<div class="side-back" id="sideBack"></div>
+<aside class="side glass lum-edge" id="cwSide" data-fid="cowrite-room" aria-label="Co-write">
+  <div class="cw-head">
+    <span class="avatar" style="width:34px;height:34px;font-size:13px">S</span>
+    <div><div class="cw-name" data-fid="partner">Sameer</div><div class="cw-sub">co-writer · grounded in Draft 3</div></div>
+    <span style="flex:1"></span>
+    <div class="seg" style="transform:scale(.88)" data-fid="lens" id="lensSeg">
+      <button aria-selected="true">Dramaturg</button><button>Line doctor</button><button>Brainstorm</button>
+    </div>
+    <button class="ibtn" style="width:34px;height:34px" data-pop="#cwMenu" aria-label="More"><svg class="ic"><use href="#i-more"/></svg></button>
+    <button class="ibtn" style="width:34px;height:34px" id="cwClose" aria-label="Close co-write"><svg class="ic"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="thread" id="thread">
+    <div class="msg ai">Read Draft 3 overnight. The stairwell scene sings — Dev apologizing with oranges is doing so much quiet work.</div>
+  </div>
+  <div class="composer-zone" id="cwZone">
+    <div class="quote-chip" id="quoteChip"><svg class="ic" style="width:12px;height:12px"><use href="#i-quote"/></svg><span></span>
+      <button class="ibtn" style="width:24px;height:24px" onclick="this.parentElement.classList.remove('on')" aria-label="Remove quote"><svg class="ic" style="width:11px;height:11px"><use href="#i-x"/></svg></button></div>
+    <div class="chips">
+      <button class="chip" data-q="Punch up the dialogue in Scene 2." style="min-height:32px;font-size:12px">✦ Punch up Scene 2</button>
+      <button class="chip" data-q="Deepen Mara's backstory without flashback." style="min-height:32px;font-size:12px">Deepen Mara</button>
+      <button class="chip" data-q="Where does Act II sag?" style="min-height:32px;font-size:12px">Act II sag?</button>
+    </div>
+    <div class="orb-row" style="display:flex;align-items:center;gap:9px">
+      <button class="orb" id="orbRestore" data-tip="Show prompts again" aria-label="Show prompts"><svg class="ic"><use href="#i-spark"/></svg></button>
+      <span style="font-size:11px;color:var(--muted)" class="orb-hint">prompts minimized — tap the lens</span>
+    </div>
+    <style>.composer-zone:not(.used) .orb-hint{display:none}</style>
+    <div class="ta-box">
+      <textarea class="ta" id="ta" rows="1" placeholder="Write with Sameer…"></textarea>
+      <button class="send" id="sendBtn" data-fid="send" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
+    </div>
+  </div>
+</aside>
+
+<!-- popovers -->
+<div class="pop glass" id="expMenu" style="top:64px;right:180px">
+  <button data-exp="Fountain">Fountain (.fountain)</button><button data-exp="Final Draft">Final Draft (.fdx)</button>
+  <button data-exp="Plain text">Plain text (.txt)</button><button data-exp="Print">Print / PDF</button>
+  <button data-exp="Backup">Backup (.zip)</button>
+</div>
+<div class="pop glass" id="cwMenu" style="bottom:110px;right:20px">
+  <button data-modal="#m-notes">Sam's notes</button>
+  <button id="resetPersona" data-fid="reset-persona">Reset persona</button>
+  <button id="clearChat">Clear chat</button>
+  <button id="histBtn" data-fid="history">↑ Session history</button>
+</div>
+<div class="pop glass" id="searchPop" style="top:64px;left:calc(50% - 130px);padding:10px">
+  <input class="input" id="searchInput" placeholder="Find in script…" style="min-height:36px">
+  <div style="font-size:11px;color:var(--muted);margin-top:7px" id="searchCount">Type, press ↵</div>
+</div>
+
+<!-- quote float -->
+<div class="qfloat" id="qfloat" style="position:fixed;z-index:70;display:none;gap:2px;padding:4px;border-radius:12px;border:1px solid var(--line);background:var(--glass-strong);backdrop-filter:blur(20px);box-shadow:0 16px 44px -12px rgba(0,0,0,.6)">
+  <button id="qAsk" style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--muted)"><svg class="ic" style="width:13px;height:13px"><use href="#i-chat"/></svg>Ask Sameer</button>
+  <button id="qNote" style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--muted)"><svg class="ic" style="width:13px;height:13px"><use href="#i-note"/></svg>Note</button>
+  <button id="qStash" style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--muted)"><svg class="ic" style="width:13px;height:13px"><use href="#i-cut"/></svg>Stash</button>
+</div>
+
+<!-- DOCK -->
+<nav class="dock-wrap" aria-label="Rooms">
+  <div class="dock glass lum-edge" id="dock">
+    <button data-nav="home" aria-selected="false" data-tip="Home" data-fid="nav-home"><svg class="ic"><use href="#i-home"/></svg><span class="ind"></span></button>
+    <button data-nav="desk" aria-selected="true" data-tip="Desk" data-fid="nav-desk"><svg class="ic"><use href="#i-film"/></svg><span class="ind"></span></button>
+    <button data-nav="cowrite" aria-selected="false" data-tip="Co-write" data-fid="nav-cowrite"><svg class="ic"><use href="#i-chat"/></svg><span class="ind"></span></button>
+    <button data-nav="feedback" aria-selected="false" data-tip="Coverage" data-fid="nav-feedback"><svg class="ic"><use href="#i-chart"/></svg><span class="ind"></span></button>
+    <button data-nav="ideas" aria-selected="false" data-tip="Ideas" data-fid="nav-ideas"><svg class="ic"><use href="#i-bulb"/></svg><span class="ind"></span></button>
+    <span class="sep"></span>
+    <button id="palDockBtn" data-tip="Commands ⌘K"><svg class="ic"><use href="#i-cmd"/></svg></button>
+    <button data-modal="#m-settings" data-tip="Settings" data-fid="settings"><svg class="ic"><use href="#i-gear"/></svg></button>
+    <button id="dawnToggle" data-tip="Dawn light" data-fid="dawn"><svg class="ic"><use href="#i-sun"/></svg></button>
+  </div>
+</nav>
+
+<!-- PALETTE -->
+<div class="pal-wrap" id="palette">
+  <div class="pal" role="dialog" aria-label="Command palette">
+    <div class="pal-in-row"><svg class="ic"><use href="#i-spark"/></svg>
+      <input id="palInput" placeholder="Summon anything…" aria-label="Command search"><kbd>esc</kbd></div>
+    <div class="pal-list" id="palList"></div>
+    <div class="pal-foot"><span><kbd>↑↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-back" id="m-settings"><div class="modal glass" style="background:var(--glass-strong)">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-gear"/></svg>Settings</h2>
+  <div class="f-row"><label>llama-server URL</label><input class="input" value="http://localhost:8080"></div>
+  <div class="f-row"><label>Timeout (s)</label><input class="input" type="number" value="180"></div>
+  <div class="f-row"><label>Fast model</label><select class="sel"><option>demo-craft (bundled)</option><option>qwen2.5:7b</option></select></div>
+  <div class="f-row"><label>Max co-write turns</label><input class="input" type="number" value="12"></div>
+  <button class="btn pri" id="testConn">Test connection</button>
+</div></div>
+
+<div class="modal-back" id="m-rewrite"><div class="modal glass" style="background:var(--glass-strong)">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-pen"/></svg>Rewrite with Sameer</h2>
+  <div class="f-row"><label>Finding</label><select class="sel" id="rwFinding"><option>S3 · exit line lands twice</option><option>S2 · orange bag prop dropped</option></select></div>
+  <div class="f-row"><label>Instruction</label><textarea class="ta" rows="2" style="border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:9px 12px">Keep subtext at the window, cut the spelled-out repeat.</textarea></div>
+  <button class="btn ghost" id="genCands"><svg class="ic" style="width:14px;height:14px"><use href="#i-spark"/></svg>Generate candidates</button>
+  <div class="cands" id="cands" hidden style="display:flex;flex-direction:column;gap:8px;margin:10px 0 16px">
+    <button class="cand sel" style="text-align:left;border:1px solid var(--line);border-radius:11px;padding:10px 13px;font-size:12.5px"><i>A</i>&nbsp;“I kept the key.” — hold on her hand, cut to black.</button>
+    <button class="cand" style="text-align:left;border:1px solid var(--line);border-radius:11px;padding:10px 13px;font-size:12.5px"><i>B</i>&nbsp;Move the line to the sill; let Dev find the key instead.</button>
+    <button class="cand" style="text-align:left;border:1px solid var(--line);border-radius:11px;padding:10px 13px;font-size:12.5px"><i>C</i>&nbsp;Cut dialogue entirely; plant payoff on the dead plant.</button>
+  </div>
+  <button class="btn pri" id="applyRewrite" disabled style="opacity:.5">Apply to script</button>
+</div></div>
+
+<div class="modal-back" id="m-compare"><div class="modal glass" style="width:min(720px,94vw);background:var(--glass-strong)">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-compare"/></svg>Draft 2 → Draft 3</h2>
+  <div class="diff2">
+    <div class="dcol"><b style="font-family:var(--ui);font-size:10.5px;color:var(--muted)">DRAFT 2</b><br>MARA<br>You can have everything back. I kept the key but I don't want it. <span class="del">I never wanted any of this house.</span></div>
+    <div class="dcol"><b style="font-family:var(--ui);font-size:10.5px;color:var(--muted)">DRAFT 3</b><br>MARA<br><span class="ins">I kept the key.</span><br><span class="ins">(to no one)</span><br><span class="ins">You can have the rest back.</span></div>
+  </div>
+</div></div>
+
+<div class="modal-back" id="m-notes"><div class="modal glass" style="background:var(--glass-strong)">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-note"/></svg>Sam's notes</h2>
+  <ul class="outline-list" style="font-size:12.5px">
+    <li>Watch the oranges — props that carry feeling should return.</li>
+    <li>Your act break is a silence, not a line. Protect it.</li>
+  </ul>
+</div></div>
+
+<div class="modal-back" id="m-beatboard"><div class="modal glass" style="background:var(--glass-strong)">
+  <button class="ibtn x" data-close><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-board"/></svg>Beat board</h2>
+  <ul class="outline-list">
+    <li><span class="no">S1</span>Apartment — key introduced</li>
+    <li><span class="no">S2</span>Stairwell — Dev arrives</li>
+    <li><span class="no">S3</span>Writer's room — key pays off</li>
+  </ul>
+  <p style="font-size:12px;color:var(--muted);margin-top:10px">For the full spatial version, see the <b>Beatwall</b> direction.</p>
+</div></div>
+
+<div class="banner" id="banner" role="alert">
+  <svg class="ic" style="color:var(--bad)"><use href="#i-alert"/></svg>
+  <span class="msg"><b>Connection lost</b> — llama-server didn't answer.</span>
+  <span class="sp"></span><button class="btn ghost sm" id="banRetry">Retry</button>
+  <button class="ibtn" style="width:32px;height:32px" id="banX" aria-label="Dismiss"><svg class="ic"><use href="#i-x"/></svg></button>
+</div>
+
+<script src="shared/kit.js"></script>
+<script>
+(function(){
+"use strict";
+const {$,$$,icons,countUp,ticker,chat,palette,toast} = KIT;
+icons();
+
+/* ---------- room switching with depth morph ---------- */
+let cur="desk";
+function go(name){
+  if(name==="cowrite"){openSide();return}
+  closeSide();
+  if(name===cur)return;
+  $$(".panel").forEach(p=>p.classList.toggle("on",p.dataset.p===name));
+  cur=name;
+  $$("#dock [data-nav]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.nav===name)));
+}
+$$("[data-nav]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.nav)));
+
+/* ---------- parallax depth ---------- */
+const deck=$("#deck");
+if(!KIT.REDUCED&&KIT.FINE){
+  let tx=0,ty=0,cx=0,cy=0,raf=null;
+  document.addEventListener("pointermove",e=>{
+    tx=e.clientX/innerWidth-.5;ty=e.clientY/innerHeight-.5;
+    if(!raf)raf=requestAnimationFrame(step);
+  },{passive:true});
+  function step(){
+    cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;
+    $$("[data-depth]").forEach(el=>{
+      const d=+el.dataset.depth;
+      el.style.translate=`${(-cx*d*46).toFixed(1)}px ${(-cy*d*30).toFixed(1)}px`;
+    });
+    raf=(Math.abs(tx-cx)+Math.abs(ty-cy)>.001)?requestAnimationFrame(step):null;
+  }
+}
+
+/* ---------- dock magnification ---------- */
+const dock=$("#dock"),items=$$("button",dock);
+if(KIT.FINE&&!KIT.REDUCED){
+  dock.addEventListener("pointermove",e=>{
+    items.forEach(it=>{
+      const r=it.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2);
+      const g=Math.max(0,1-Math.abs(dx)/95);
+      it.style.setProperty("--s",(1+g*.28).toFixed(3));
+      it.style.setProperty("--ty",(-g*7).toFixed(1)+"px");
+    });
+  });
+  dock.addEventListener("pointerleave",()=>items.forEach(it=>{
+    it.style.setProperty("--s",1);it.style.setProperty("--ty","0px");}));
+}
+
+/* ---------- palette ---------- */
+const recents=["run-analysis"];
+palette({root:$("#palette"),input:$("#palInput"),list:$("#palList"),recents,commands:[
+  {id:"n-desk",g:"Rooms",label:"Desk — read the script",icon:"film",run:()=>go("desk")},
+  {id:"n-cow",g:"Rooms",label:"Co-write with Sameer",icon:"chat",run:()=>go("cowrite")},
+  {id:"n-fb",g:"Rooms",label:"Coverage — report & fix queue",icon:"chart",run:()=>go("feedback")},
+  {id:"n-id",g:"Rooms",label:"Ideas — premise canvas",icon:"bulb",run:()=>go("ideas")},
+  {id:"sc-1",g:"Scenes",label:"S1 · APARTMENT — NIGHT",icon:"film",run:()=>jump("#sc1")},
+  {id:"sc-2",g:"Scenes",label:"S2 · STAIRWELL — CONT.",icon:"film",run:()=>jump("#sc2")},
+  {id:"sc-3",g:"Scenes",label:"S3 · WRITER'S ROOM — DAWN",icon:"film",run:()=>jump("#sc3")},
+  {id:"ask-p",g:"Ask Sameer",label:"Punch up Scene 2 dialogue",icon:"spark",run:()=>askWith("Punch up the dialogue in Scene 2.")},
+  {id:"ask-b",g:"Ask Sameer",label:"Deepen Mara's backstory",icon:"pen",run:()=>askWith("Deepen Mara's backstory without flashback.")},
+  {id:"run-analysis",g:"Studio",label:"Run analysis",hint:"~40 s",icon:"play",run:()=>{go("feedback");setTimeout(startRun,KIT.REDUCED?0:250)}},
+  {id:"reparse",g:"Studio",label:"Re-parse script",icon:"refresh",run:()=>toast("Re-parsed · 3 scenes","refresh")},
+  {id:"compare",g:"Studio",label:"Compare drafts",icon:"compare",run:()=>$$("#m-compare")[0].classList.add("open")},
+  {id:"beat",g:"Studio",label:"Beat board",icon:"board",run:()=>$$("#m-beatboard")[0].classList.add("open")},
+  {id:"err",g:"System",label:"Simulate connection error",icon:"alert",run:showBanner},
+  {id:"settings",g:"System",label:"Settings",icon:"gear",run:()=>$$("#m-settings")[0].classList.add("open")},
+  {id:"exp-f",g:"Export",label:"Fountain (.fountain)",icon:"download",run:()=>toast("Exported late-hour.fountain","download")},
+  {id:"exp-x",g:"Export",label:"Final Draft (.fdx)",icon:"download",run:()=>toast("Exported late-hour.fdx","download")}
+]});
+function jump(sel){
+  const p=$("[data-p='desk']");
+  if(cur!=="desk")go("desk");
+  setTimeout(()=>{const el=$(sel);el.scrollIntoView({behavior:KIT.REDUCED?"auto":"smooth"});
+    el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");},KIT.REDUCED?0:420);
+}
+document.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();$("#palette").classList.toggle("open");
+    $("#palInput").focus()}
+  else if(e.key==="/"&&cur==="desk"&&!e.target.closest("input,textarea")){
+    e.preventDefault();$$("#searchPop")[0].classList.add("open");$$("#searchInput")[0].focus()}
+  else if(e.key==="Escape"){$("#palette").classList.remove("open");closeSide();document.body.classList.remove("focusmode")}
+});
+$("#palDockBtn").addEventListener("click",()=>{$("#palette").classList.add("open");$("#palInput").focus()});
+
+/* ---------- selection quote float ---------- */
+const qf=$("#qfloat");let selText="";
+document.addEventListener("mouseup",e=>{
+  if(e.target.closest("#qfloat"))return;
+  const s=getSelection();
+  if(s&&!s.isCollapsed&&s.toString().trim().length>2&&e.target.closest(".script")){
+    selText=s.toString().trim();
+    const r=s.getRangeAt(0).getBoundingClientRect();
+    qf.style.left=Math.max(100,r.left+r.width/2)+"px";qf.style.top=(r.top-8)+"px";
+    qf.style.transform="translate(-50%,-100%)";
+    qf.style.display="flex";qf.classList.add("rise-pop");
+  } else qf.style.display="none";
+});
+function askWith(q){
+  qf.style.display="none";go("cowrite");
+  setTimeout(()=>{$("#ta").value=q;$("#ta").dispatchEvent(new Event("input"));$("#ta").focus()},350);
+}
+$("#qAsk").addEventListener("click",()=>{const qc=$("#quoteChip");
+  qc.querySelector("span").textContent="“"+selText.slice(0,64)+(selText.length>64?"…":"")+"”";
+  qc.classList.add("on");askWith("")});
+$("#qNote").addEventListener("click",()=>{qf.style.display="none";addNote(selText.slice(0,60)+"…");toast("Margin note added","note")});
+$("#qStash").addEventListener("click",()=>{qf.style.display="none";
+  const n=$$("#stashN")[0];n.textContent=" "+((parseInt(n.textContent)||2)+1);toast("Line stashed","cut")});
+
+/* ---------- co-write side ---------- */
+function openSide(){$("#cwSide").classList.add("on");$("#sideBack").classList.add("on")}
+function closeSide(){$("#cwSide").classList.remove("on");$("#sideBack").classList.remove("on")}
+$("#cwClose").addEventListener("click",closeSide);
+$("#sideBack").addEventListener("click",closeSide);
+$$("#lensSeg button").forEach(b=>b.addEventListener("click",()=>{
+  $$("#lensSeg button").forEach(x=>x.setAttribute("aria-selected",String(x===b)))}));
+chat({zone:$$("#cwZone")[0],thread:$$("#thread")[0],ta:$$("#ta")[0],sendBtn:$$("#sendBtn")[0],
+  onSend:()=>$("#quoteChip").classList.remove("on")});
+$("#orbRestore").addEventListener("click",()=>$("#cwZone").classList.remove("used"));
+$("#clearChat").addEventListener("click",()=>{$$("#thread .msg").forEach(m=>m.remove());toast("Chat cleared","x")});
+$("#resetPersona").addEventListener("click",()=>toast("Persona reset to Dramaturg","user"));
+$("#histBtn").addEventListener("click",()=>toast("3 past sessions restored to view","clock"));
+
+/* ---------- feedback state machine ---------- */
+const CATS=[
+ {n:"Premise & stakes",s:82,notes:[["low","Logline test passes cleanly.","S1"]]},
+ {n:"Structure & pacing",s:74,notes:[["high","Exit line lands twice — cut the spelled-out repeat.","S3"],["med","Midpoint arrives 12 pages late; promote the stairwell.","S2"]]},
+ {n:"Dialogue & voice",s:68,notes:[["med","Dev apologizes twice in two pages — keep the orange line.","S2"]]},
+ {n:"Continuity",s:91,notes:[["low","Orange bag unaddressed later — track or drop.","S2"]]}];
+const QUEUE=[
+ {sev:"high",t:"Cut the repeated exit line",sc:"S3",st:"open"},
+ {sev:"med",t:"Give the orange bag a payoff",sc:"S2",st:"open"},
+ {sev:"low",t:"Time-of-day on S1 slug",sc:"S1",st:"applied"}];
+function renderQueue(){
+  const host=$$("#fbQueue")[0];host.innerHTML="";
+  QUEUE.forEach((r,i)=>{
+    const d=document.createElement("div");d.className="qrow rise-drop";d.style.setProperty("--i",i);
+    d.innerHTML=`<span class="sev ${r.sev}"></span><div class="qt">${r.t}<small>${r.sc} · ${r.sev}</small></div>
+      <span class="status-pill ${r.st}">${r.st}</span>`+
+      (r.st==="open"?`<button class="btn ghost sm">Apply</button>`:"");
+    const ap=d.querySelector(".btn");
+    if(ap)ap.addEventListener("click",()=>{r.st="applying";renderQueue();
+      setTimeout(()=>{r.st="applied";renderQueue();toast("Applied to "+r.sc,"check")},1300)});
+    host.appendChild(d);});
+}
+$$("#fbTabs button").forEach(b=>b.addEventListener("click",()=>{
+  $$("#fbTabs button").forEach(x=>x.setAttribute("aria-selected",String(x===b)));
+  $$("#fbQueue")[0].hidden=b.dataset.fbt!=="queue";
+  $$("#fbDone")[0].hidden=b.dataset.fbt!=="report"||$$("#fbDone")[0].dataset.ready!=="1";
+}));
+$("#runBtn").addEventListener("click",startRun);
+$("#reparseBtn").addEventListener("click",()=>toast("Re-parsed · 3 scenes","refresh"));
+$("#exportMd").addEventListener("click",()=>toast("coverage.md exported","download"));
+$("#retryBtn").addEventListener("click",()=>{$("#fbEmpty").classList.remove("fb-error");startRun()});
+let running=false;
+function startRun(){
+  if(running)return;running=true;
+  $$("#fbEmpty")[0].hidden=true;$$("#fbQueue")[0].hidden=true;
+  const run=$$("#fbRun")[0];run.hidden=false;$$("#fbDone")[0].hidden=true;
+  $$("#verdictCard")[0].classList.add("running");
+  const stages=[["parse",0],["craft",22],["continuity",58],["verify",82]];
+  let p=0;const total=KIT.REDUCED?300:5200;
+  const iv=setInterval(()=>{
+    p=Math.min(100,p+(KIT.REDUCED?12:Math.random()*3.4+.6));
+    $$("#runPct")[0].textContent=Math.floor(p)+"%";
+    $$("#runBar")[0].style.width=p+"%";
+    $$("#eta")[0].textContent="~"+Math.max(1,Math.round((100-p)/100*(total/1000)))+" s";
+    const st=[...stages].reverse().find(s=>p>=s[1]);
+    $$("#runStage")[0].textContent=st[0];
+    if(p>=100){clearInterval(iv);running=false;run.hidden=true;paintVerdict();}
+  },40);
+}
+function paintVerdict(){
+  const done=$$("#fbDone")[0];done.hidden=false;done.dataset.ready="1";
+  $$("#fbTabs button")[0].setAttribute("aria-selected","true");
+  $$("#fbTabs button")[1].setAttribute("aria-selected","false");
+  $$("#verdictCard")[0].classList.remove("running");
+  const arc=$$("#scoreArc")[0],C=339.3;
+  arc.style.transition="none";arc.style.strokeDashoffset=C;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    arc.style.transition="stroke-dashoffset 1.5s cubic-bezier(.16,1,.3,1)";
+    arc.style.strokeDashoffset=C*(1-.84);}));
+  countUp($$("#scoreNum")[0],84,1350);
+  const cats=$$("#cats")[0];cats.innerHTML="";
+  CATS.forEach((c,i)=>{
+    const d=document.createElement("div");d.className="sheet glass rise-drop";d.style.setProperty("--i",i);
+    d.innerHTML=`<h3>${c.n}<span class="bar"><i></i></span><span class="cs">${c.s}</span></h3>
+      <div class="notes">${c.notes.map(([sv,t,sc])=>`<div class="note"><span class="sev ${sv}" style="margin-top:6px"></span>
+      <div class="nx">${t}<div class="n-meta"><span class="jump" data-sc="${sc}"><svg class="ic" style="width:12px;height:12px"><use href="#i-jump"/></svg>${sc} · jump</span>
+      <span class="verify" style="color:var(--ok);display:inline-flex;gap:4px;align-items:center"><svg class="ic" style="width:11px;height:11px"><use href="#i-check"/></svg>verified quote</span></div></div></div>`).join("")}</div>`;
+    d.querySelector("h3").addEventListener("click",()=>d.classList.toggle("open"));
+    d.querySelectorAll(".jump").forEach(j=>j.addEventListener("click",ev=>{ev.stopPropagation();jump("#sc"+j.dataset.sc.slice(1))}));
+    cats.appendChild(d);
+    requestAnimationFrame(()=>setTimeout(()=>d.querySelector(".bar i").style.width=c.s+"%",260+i*150));
+  });
+}
+
+/* ---------- upload flow (R1) ---------- */
+const dz=$("#dz"),fi=$("#fileInput");
+["dragover","dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();
+  dz.classList.toggle("over",ev==="dragover");
+  if(ev==="drop")upload(e.dataTransfer.files[0]?e.dataTransfer.files[0].name:"late-hour.fountain")}));
+$("#browseBtn").addEventListener("click",()=>fi.click());
+fi.addEventListener("change",()=>upload(fi.files[0]?fi.files[0].name:"late-hour.fountain"));
+$("#sampleBtn").addEventListener("click",()=>upload("the-late-hour.fountain"));
+$("#uploadMini").addEventListener("click",()=>upload("late-hour-draft3.fdx"));
+$("#newProj").addEventListener("click",()=>toast("Project created · untitled-2","plus"));
+$("#libBtn").addEventListener("click",()=>toast("Your library — 4 past works","book"));
+$("#shelfBtn").addEventListener("click",()=>toast("On the shelf — 2 dormant projects","folder"));
+let uploaded=false;
+function upload(name){
+  if(uploaded)return;uploaded=true;
+  dz.querySelectorAll(":scope > :not(#upProg)").forEach(x=>x.style.display="none");
+  const prog=$$("#upProg")[0];prog.hidden=false;$$("#upName")[0].textContent=name;
+  let p=0;const iv=setInterval(()=>{p=Math.min(100,p+9);$$("#upBar")[0].style.width=p+"%";
+    if(p>=100){clearInterval(iv);
+      setTimeout(()=>{go("feedback");setTimeout(startRun,KIT.REDUCED?0:300)},350)}},110);
+}
+
+/* ---------- misc ---------- */
+$$("[data-exp]").forEach(b=>b.addEventListener("click",()=>toast("Exported via "+b.dataset.exp,"download")));
+$("#testConn").addEventListener("click",e=>{e.target.textContent="Testing…";
+  setTimeout(()=>{e.target.textContent="Test connection";toast("Connected · 212 ms","check")},650)});
+$("#savePremise").addEventListener("click",()=>toast("Premise saved","check"));
+setInterval(()=>{$$("#autosave")[0].textContent="saved ✓"},4200);
+$("#graduateBtn").addEventListener("click",()=>{go("desk");toast("Premise graduated to pages","aright")});
+$("#undoBtn").addEventListener("click",()=>toast("Nothing to undo yet","undo"));
+$("#redoBtn").addEventListener("click",()=>toast("Nothing to redo","redo"));
+$("#focusBtn").addEventListener("click",()=>{document.body.classList.toggle("focusmode");
+  toast(document.body.classList.contains("focusmode")?"Focus — hover to light a line":"Focus off","zap")});
+$("#searchBtn").addEventListener("click",()=>$$("#searchPop")[0].classList.toggle("open"));
+$("#searchInput").addEventListener("keydown",e=>{
+  if(e.key!=="Enter")return;const q=e.target.value.trim();
+  const sp=$$("#script")[0];sp.querySelectorAll("mark").forEach(m=>m.replaceWith(document.createTextNode(m.textContent)));
+  if(!q){$$("#searchCount")[0].textContent="Type, press ↵";return}
+  let n=0;
+  const walk=node=>{[...node.childNodes].forEach(ch=>{
+    if(ch.nodeType===3&&ch.textContent.toLowerCase().includes(q.toLowerCase())){
+      const frag=document.createDocumentFragment();let rest=ch.textContent;
+      while(true){const i=rest.toLowerCase().indexOf(q.toLowerCase());if(i<0)break;
+        frag.append(rest.slice(0,i));const mk=document.createElement("mark");
+        mk.textContent=rest.substr(i,q.length);frag.append(mk);n++;rest=rest.slice(i+q.length);}
+      frag.append(rest);ch.replaceWith(frag);
+    }else if(ch.nodeType===1&&!ch.classList.contains("s-h"))walk(ch);});};
+  walk(sp);$$("#searchCount")[0].textContent=n?n+" hit"+(n>1?"s":""):"no hits";
+});
+function addNote(t){const p=document.createElement("p");p.className="margnote";p.textContent=t;
+  $$("#noteList")[0].appendChild(p)}
+$("#noteForm").addEventListener("submit",e=>{e.preventDefault();
+  const v=e.target.querySelector("input").value.trim();if(!v)return;
+  addNote(v);e.target.reset();toast("Note pinned","note")});
+$("#stashBtn").addEventListener("click",()=>toast("2 cut lines — select text to stash more","cut"));
+$("#revDesk").addEventListener("click",()=>{go("feedback");
+  if($$("#fbDone")[0].hidden&&!running)setTimeout(startRun,KIT.REDUCED?0:200)});
+$("#dawnToggle").addEventListener("click",()=>{document.body.classList.toggle("dawn");
+  toast(document.body.classList.contains("dawn")?"Dawn light on":"Night light on","sun")});
+function showBanner(){$$("#banner")[0].classList.add("open")}
+$("#banX").addEventListener("click",()=>$$("#banner")[0].classList.remove("open"));
+$("#banRetry").addEventListener("click",()=>{$$("#banner")[0].classList.remove("open");toast("Reconnected","check")});
+ticker($$("#elapsed")[0],132);
+
+/* rewrite modal */
+$("#genCands").addEventListener("click",()=>{$$("#cands")[0].hidden=false;
+  const ap=$$("#applyRewrite")[0];ap.disabled=false;ap.style.opacity="1"});
+$$(".cand").forEach(c=>c.addEventListener("click",()=>{
+  $$(".cand").forEach(x=>{x.classList.remove("sel");x.style.borderColor=""});
+  c.classList.add("sel");c.style.borderColor="var(--accent)"}));
+$("#applyRewrite").addEventListener("click",()=>{$$("#m-rewrite")[0].classList.remove("open");
+  toast("Applied to Scene 3 — diff saved","check")});
+
+KIT.reveal(document);KIT.stagger(document);
+})();
+</script></body></html>

@@ -1,0 +1,65 @@
+/* ux2026 v3 motion — spring easings, entrances, view transitions, reduced-motion clamp */
+
+:root{
+  /* overshooting spring expressed with linear(); browsers without support fall back below */
+  --spring:linear(0,.0088 1.04%,.0347 2.19%,.1416 5.79%,.7188 15.38%,.9297 20.46%,
+    1.0329 24.44%,1.0909 28.72%,1.1219 33.75%,1.1231 36.43%,1.1043 41.21%,
+    1.026 51.31%,.9824 58.15%,.9739 65.79%,1.0011 84.89%,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+}
+@supports not (transition-timing-function:linear(0,1)){
+  :root{--spring:cubic-bezier(.34,1.56,.64,1)}
+}
+
+/* scroll/summon reveals — kit.js adds .in via IntersectionObserver */
+[data-reveal]{opacity:0;transform:translateY(16px)}
+[data-reveal].in{opacity:1;transform:none;
+  transition:opacity .55s var(--ease-out),transform .65s var(--spring);
+  transition-delay:calc(var(--i,0)*55ms)}
+
+/* immediate entrances (no observer needed) */
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rise{animation:rise .55s var(--spring) both;animation-delay:calc(var(--i,0)*50ms)}
+@keyframes pop-in-spring{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1}}
+.rise-pop{animation:pop-in-spring .45s var(--spring) both;animation-delay:calc(var(--i,0)*45ms)}
+@keyframes drop-in{from{opacity:0;transform:translateY(-26px) scale(.96)}to{opacity:1}}
+.rise-drop{animation:drop-in .6s var(--spring) both;animation-delay:calc(var(--i,0)*70ms)}
+
+/* word-streaming text (chat replies): spans get .w */
+.w{display:inline-block;animation:w-in .3s var(--ease-out) both}
+@keyframes w-in{from{opacity:0;transform:translateY(5px);filter:blur(2px)}to{opacity:1;filter:none}}
+
+/* glowing caret shown while streaming */
+.caret{display:inline-block;width:9px;height:17px;border-radius:2px;margin-left:3px;
+  vertical-align:-3px;background:var(--accent);animation:pulse 1s ease-in-out infinite;
+  box-shadow:0 0 10px color-mix(in oklab,var(--accent) 80%,transparent)}
+@keyframes pulse{50%{opacity:.25;transform:scaleY(.82)}}
+
+/* skeleton shimmer */
+.skel{position:relative;overflow:hidden;background:var(--surface2);border-radius:8px;color:transparent!important}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,color-mix(in oklab,var(--ink) 10%,transparent),transparent);
+  animation:shim 1.4s linear infinite}
+@keyframes shim{to{transform:translateX(100%)}}
+
+/* breathing dot (connection / live states) */
+.breathe{animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.35}}
+
+/* View Transitions (room/surface morphs) */
+::view-transition-old(root){animation:vt-out .26s var(--ease-out) both}
+::view-transition-new(root){animation:vt-in .42s var(--spring) both}
+@keyframes vt-out{to{opacity:0;transform:translateY(-10px) scale(.99)}}
+@keyframes vt-in{from{opacity:0;transform:translateY(12px) scale(.995)}to{opacity:1}}
+
+/* one shared keyframe set for ambient drift (pages point blobs at these) */
+@keyframes drift-a{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(60px,-40px) scale(1.15)}}
+@keyframes drift-b{0%,100%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-70px,30px) scale(.95)}}
+@keyframes drift-c{0%,100%{transform:translate(0,0) rotate(0deg)}50%{transform:translate(30px,50px) rotate(20deg)}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important}
+  [data-reveal]{opacity:1;transform:none}
+}

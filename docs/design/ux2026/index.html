@@ -1,0 +1,151 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio UX v3 — Three Architectures</title>
+<link rel="stylesheet" href="shared/kit.css">
+<link rel="stylesheet" href="shared/motion.css">
+<style>
+:root{--bg:#0a0a10;--ink:#eeeaf6;--muted:#8f8b9e;--line:rgba(255,255,255,.09);
+  --accent:#7c6cff;--accent2:#53c7f0}
+body{background:
+  radial-gradient(900px 500px at 80% -12%,color-mix(in oklab,var(--accent) 10%,transparent),transparent 60%),
+  radial-gradient(760px 460px at 8% 110%,color-mix(in oklab,var(--accent2) 8%,transparent),transparent 60%),
+  var(--bg);overflow:auto}
+.grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.hub{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:56px 28px 90px}
+.kick{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--accent);display:flex;align-items:center;gap:10px}
+.kick::before{content:"";width:26px;height:1px;background:var(--accent)}
+h1{font-family:Georgia,serif;font-size:clamp(30px,4.6vw,44px);letter-spacing:-.02em;margin:14px 0 10px;line-height:1.12}
+.lede{color:var(--muted);max-width:66ch;line-height:1.65;font-size:15px}
+.lede b{color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:20px;margin-top:40px}
+.card{position:relative;display:flex;flex-direction:column;border-radius:20px;overflow:hidden;
+  border:1px solid var(--line);background:rgba(255,255,255,.03);text-decoration:none;color:inherit;
+  transition:transform .5s var(--spring),box-shadow .4s ease,border-color .3s}
+.card:hover{transform:translateY(-6px);border-color:color-mix(in oklab,var(--accent) 45%,var(--line));
+  box-shadow:0 34px 70px -24px color-mix(in oklab,var(--accent) 30%,transparent)}
+.preview{height:170px;position:relative;overflow:hidden}
+.pv{position:absolute;inset:0}
+/* nocta preview */
+.pv-nocta{background:#0a0a12;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px}
+.pv-nocta .spot{position:absolute;width:220px;height:220px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in oklab,#7e6bff 28%,transparent),transparent 65%);
+  animation:pv-spot 5s ease-in-out infinite alternate}
+@keyframes pv-spot{from{transform:translate(-70px,-40px)}to{transform:translate(60px,30px)}}
+.pv-nocta .bar{width:72%;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.13);
+  background:rgba(20,20,32,.8);display:flex;align-items:center;gap:8px;padding:0 12px;position:relative}
+.pv-nocta .dot{width:7px;height:7px;border-radius:50%;background:#7e6cff;box-shadow:0 0 8px #7e6cff}
+.pv-nocta .ln{width:46%;height:5px;border-radius:99px;background:rgba(255,255,255,.16)}
+.pv-nocta .kbd{margin-left:auto;font-size:8.5px;color:#8b889c;border:1px solid rgba(255,255,255,.14);
+  border-radius:4px;padding:1px 5px;font-family:ui-monospace}
+.pv-nocta .row{display:flex;gap:6px;width:72%}
+.pv-nocta .it{flex:1;height:22px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+/* lumen preview */
+.pv-lumen{background:#07070d}
+.pv-lumen i{position:absolute;border-radius:50%;filter:blur(34px)}
+.pv-lumen .p1{width:150px;height:150px;left:-30px;top:-40px;background:#5b5bd6;opacity:.55;animation:drift-a 9s ease-in-out infinite}
+.pv-lumen .p2{width:130px;height:130px;right:-20px;bottom:-40px;background:#2dd4bf;opacity:.35;animation:drift-b 11s ease-in-out infinite}
+.pv-lumen .p3{width:90px;height:90px;right:36%;top:-20px;background:#f472b6;opacity:.3;animation:drift-c 13s ease-in-out infinite}
+.pv-lumen .pane{position:absolute;left:18%;right:18%;top:44%;bottom:26%;border-radius:16px;
+  border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);backdrop-filter:blur(8px);
+  animation:pv-float 6s ease-in-out infinite alternate}
+@keyframes pv-float{from{transform:translateY(-5px)}to{transform:translateY(6px)}}
+.pv-lumen .dock{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;display:flex;gap:5px;
+  padding:5px 7px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.09)}
+.pv-lumen .dock i{width:12px;height:12px;border-radius:4px;background:rgba(255,255,255,.4)}
+/* beatwall preview */
+.pv-wall{background:#f4f6f9;
+  background-image:radial-gradient(rgba(23,26,32,.16) 1px,transparent 1px);background-size:16px 16px}
+.pv-wall .lane{position:absolute;left:8%;right:8%;height:26%;border-radius:12px;border:1.5px dashed #d6dbe4}
+.pv-wall .sc{position:absolute;width:74px;height:48px;border-radius:9px;background:#fff;
+  border:1px solid #dfe4ec;box-shadow:0 6px 16px -8px rgba(15,20,30,.3);animation:pv-card 5s ease-in-out infinite alternate}
+@keyframes pv-card{from{transform:translateY(0) rotate(0deg)}to{transform:translateY(-6px) rotate(-1.2deg)}}
+.pv-wall .pin{position:absolute;width:52px;height:30px;border-radius:7px;background:#fff;
+  border-left:3px solid #dc5847;box-shadow:0 6px 14px -8px rgba(15,20,30,.3)}
+.pv-wall svg{position:absolute;inset:0;width:100%;height:100%}
+.meta{padding:20px 22px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.tag{font-family:ui-monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.card h2{font-size:19px;font-family:Georgia,serif;letter-spacing:-.01em}
+.card p{font-size:13px;color:var(--muted);line-height:1.6}
+.sig{font-size:12px}.sig b{color:var(--accent)}
+.open-hint{margin-top:auto;padding-top:12px;font-size:11px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:7px}
+.review{margin-top:44px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.03);padding:24px 26px}
+.review h3{font-family:Georgia,serif;font-size:17px;margin-bottom:12px}
+.review li{line-height:1.85;font-size:13.5px;color:var(--muted)}
+.review li b{color:var(--ink)}
+.links{display:flex;gap:18px;margin-top:26px;flex-wrap:wrap;font-size:13px}
+.links a{color:var(--muted)}
+.links a:hover{color:var(--accent)}
+</style></head>
+<body>
+<div class="grain"></div>
+<div class="hub">
+  <div class="kick rise">studio ux · v3 · three architectures</div>
+  <h1 class="rise" style="--i:1">Same product.<br>Three different skeletons.</h1>
+  <p class="lede rise" style="--i:2">The v1 six shared one shell and swapped paint. These don't. Each direction is a
+  <b>different layout architecture and navigation model</b>, sharing only a motion &amp; graphics toolkit —
+  spring physics everywhere, ambient graphics, and every product requirement (R1–R5) intact.</p>
+
+  <div class="grid">
+    <a class="card rise-drop" style="--i:1" href="nocta.html">
+      <div class="preview"><div class="pv pv-nocta"><span class="spot"></span>
+        <div class="row"><span class="it"></span><span class="it" style="flex:.5"></span></div>
+        <div class="bar"><span class="dot"></span><span class="ln"></span><span class="kbd">⌘K</span></div>
+      </div></div>
+      <div class="meta"><span class="tag">command-driven · dark glass</span>
+        <h2>Nocta</h2>
+        <p>Linear/Raycast DNA. No tabs, no rails — one focused surface, and a spotlight palette that runs
+        the entire studio. Rooms morph in place with view transitions.</p>
+        <p class="sig"><b>Signature:</b> ⌘K is the app · cursor spotlight</p>
+        <span class="open-hint">Open Nocta →</span></div>
+    </a>
+    <a class="card rise-drop" style="--i:2" href="lumen.html">
+      <div class="preview"><div class="pv pv-lumen"><i class="p1"></i><i class="p2"></i><i class="p3"></i>
+        <div class="pane"></div><div class="dock"><i></i><i></i><i></i><i></i></div>
+      </div></div>
+      <div class="meta"><span class="tag">glass depth · ambient light</span>
+        <h2>Lumen</h2>
+        <p>VisionOS DNA. Floating frosted panels drift over an aurora with real parallax depth; analysis is a
+        refraction sweep; a magnifying dock navigates. Dawn flips it all to daylight.</p>
+        <p class="sig"><b>Signature:</b> depth = hierarchy · refracting verdict</p>
+        <span class="open-hint">Open Lumen →</span></div>
+    </a>
+    <a class="card rise-drop" style="--i:3" href="beatwall.html">
+      <div class="preview"><div class="pv pv-wall">
+        <svg viewBox="0 0 300 170" preserveAspectRatio="none"><path d="M120 96 C 140 76, 160 76, 176 92" fill="none" stroke="#dc5847" stroke-width="1.6" stroke-dasharray="4 4"/></svg>
+        <div class="lane" style="top:12%"></div><div class="lane" style="top:44%"></div><div class="lane" style="top:76%"></div>
+        <div class="sc" style="left:14%;top:16%"></div>
+        <div class="sc" style="left:42%;top:47%;animation-delay:-2s"></div>
+        <div class="sc" style="left:64%;top:78%;animation-delay:-3.4s"></div>
+        <div class="pin" style="left:60%;top:33%"></div>
+      </div></div>
+      <div class="meta"><span class="tag">spatial canvas · precision tool</span>
+        <h2>Beatwall</h2>
+        <p>Figma/Framer DNA. Your script is a zoomable wall of scene cards on act lanes; findings pin to scenes
+        with spring physics; drag one into the Fix queue lane. Minimap + list-view twin included.</p>
+        <p class="sig"><b>Signature:</b> structure you can grab · camera fly-to</p>
+        <span class="open-hint">Open Beatwall →</span></div>
+    </a>
+  </div>
+
+  <div class="review rise" style="--i:4">
+    <h3>How to review each direction (3 minutes)</h3>
+    <ol>
+      <li><b>R1 — upload:</b> drop any file (or “open the sample project”). You must land Feedback-ready with Run Analysis as the hero action.</li>
+      <li><b>R2 — click away:</b> open Export ▾ or Sameer's menu, then click elsewhere or press Esc — everything dismisses.</li>
+      <li><b>R3 — send one message:</b> explore chips collapse to a hover/focus-reveal rail (Nocta, Beatwall) or minimize to a lens orb (Lumen). “···” restores.</li>
+      <li><b>R4 — type three lines:</b> the composer autogrows to ~40vh then scrolls internally; Enter sends, Shift+Enter breaks.</li>
+      <li><b>R5 — coverage first-class:</b> run analysis; the report reads top-to-bottom with verified quotes; the fix queue is a peer surface.</li>
+      <li><b>Motion check:</b> enable prefers-reduced-motion — every animation collapses to opacity fades, nothing breaks.</li>
+    </ol>
+  </div>
+
+  <div class="links rise" style="--i:5">
+    <a href="archive-v1/index.html">← v1 archive (the six that shared a shell)</a>
+    <a href="../../superpowers/specs/2026-08-26-studio-ux-v3-three-architectures-design.md">Design spec →</a>
+    <a href="../../superpowers/plans/2026-08-26-studio-ux-v2-redesign.md">Original v2 plan (feature inventory source)</a>
+  </div>
+</div>
+</body></html>

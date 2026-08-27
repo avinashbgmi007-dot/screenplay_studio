@@ -1,0 +1,925 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nocta — Studio UX v3</title>
+<link rel="stylesheet" href="shared/kit.css">
+<link rel="stylesheet" href="shared/motion.css">
+<link rel="stylesheet" href="shared/graphics.css">
+<style>
+/* ---------- NOCTA SKIN — command-driven dark glass ---------- */
+:root{
+  --bg:#09090e;--ink:#ecebf4;--muted:#8b889c;
+  --line:rgba(255,255,255,.085);--surface:rgba(255,255,255,.032);--surface2:rgba(255,255,255,.06);
+  --glass:rgba(17,17,26,.66);--glass-strong:rgba(19,19,29,.82);
+  --accent:#7e6bff;--accent2:#53c7f0;--on-accent:#fff;
+  --ring:0 0 0 2px var(--bg),0 0 0 4px color-mix(in oklab,var(--accent) 70%,#fff);
+}
+body.dawn{--bg:#f1ede4;--ink:#26242e;--muted:#75707f;--line:rgba(30,25,50,.12);
+  --surface:rgba(255,255,255,.55);--surface2:rgba(30,25,50,.06);
+  --glass:rgba(255,255,255,.72);--glass-strong:rgba(255,255,255,.88)}
+body{background:
+  radial-gradient(900px 480px at 78% -10%,color-mix(in oklab,var(--accent) 9%,transparent),transparent 60%),
+  radial-gradient(700px 420px at 12% 108%,color-mix(in oklab,var(--accent2) 7%,transparent),transparent 60%),
+  var(--bg)}
+
+/* chrome */
+.chrome{position:fixed;top:0;left:0;right:0;height:54px;z-index:40;display:flex;align-items:center;
+  gap:10px;padding:0 14px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 62%,transparent);backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13.5px;padding:6px 10px;
+  border-radius:9px;transition:background var(--t)}
+.brand:hover{background:var(--surface2)}
+.brand .mark{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;color:#fff;font-size:11px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  box-shadow:0 0 16px -2px color-mix(in oklab,var(--accent) 80%,transparent)}
+.crumb{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em;
+  padding:5px 10px;border-radius:8px;border:1px solid transparent}
+.chrome .sp{flex:1}
+.model-chip{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--muted);
+  padding:6px 11px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.kbtn{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border-radius:9px;
+  border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:12.5px;
+  font-weight:600;transition:all var(--t)}
+.kbtn:hover{border-color:color-mix(in oklab,var(--accent) 50%,var(--line));color:var(--ink)}
+
+/* stage + surfaces */
+.stage{position:fixed;inset:54px 0 32px;z-index:10}
+.surface{position:absolute;inset:0;overflow-y:auto;display:none}
+.surface.on{display:block}
+
+/* generic inner column */
+.col{max-width:768px;margin:0 auto;padding:34px 28px 120px}
+
+/* ---------- DESK ---------- */
+.toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:flex-end;margin-bottom:-46px;pointer-events:none}
+.toolbar .pill{pointer-events:auto;display:flex;gap:2px;padding:4px;border-radius:12px;border:1px solid var(--line);
+  background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  box-shadow:0 14px 40px -14px rgba(0,0,0,.6)}
+.tb{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:9px;color:var(--muted);
+  transition:all var(--t)}
+.tb:hover{background:var(--surface2);color:var(--ink)}
+.tb.wide{width:auto;padding:0 11px;font-size:12px;font-weight:600;gap:6px}
+.tb-sep{width:1px;background:var(--line);margin:5px 3px}
+
+.scene-dots{position:fixed;left:10px;top:50%;transform:translateY(-50%);z-index:30;display:flex;
+  flex-direction:column;gap:10px}
+.scene-dots button{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--muted);
+  transition:all var(--t)}
+.scene-dots button i{width:6px;height:6px;border-radius:50%;background:currentColor;transition:all var(--t);display:block}
+.scene-dots button.on{color:var(--accent)}
+.scene-dots button.on i{box-shadow:0 0 10px var(--accent);transform:scale(1.35)}
+
+.script{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:44px 52px;
+  font-family:var(--script);font-size:13.5px;line-height:1.6;position:relative;transition:opacity .3s}
+body.reader .chrome,body.reader .scene-dots,body.reader .toolbar,body.reader .find-jump,
+body.reader .draftbar,body.reader .strip{opacity:0;pointer-events:none}
+body.reader .col{padding-top:70px}
+.s-h{font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:26px 0 12px;color:var(--ink);
+  font-size:13px;transition:opacity .25s}
+.s-h:first-child{margin-top:0}
+.s-h.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,60%{color:var(--accent)}100%{}}
+.s-act{margin-bottom:14px}.s-char{text-transform:uppercase;margin:14px 0 0 22%}
+.s-dial{margin:0 15% 0 22%}.s-paren{margin:2px 30% 0 32%;font-size:12px;color:var(--muted)}
+body.focusmode .script p:not(:hover){opacity:.3}
+.script p{transition:opacity .25s}
+.script mark{background:color-mix(in oklab,var(--accent) 30%,transparent);color:inherit;border-radius:3px;padding:0 1px}
+
+.find-jump{position:fixed;right:22px;bottom:52px;z-index:30;display:flex;align-items:center;gap:9px;
+  min-height:40px;padding:0 15px;border-radius:99px;border:1px solid color-mix(in oklab,var(--accent) 45%,var(--line));
+  background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;
+  box-shadow:0 10px 34px -10px color-mix(in oklab,var(--accent) 45%,transparent);transition:transform var(--t)}
+.find-jump:hover{transform:translateY(-2px)}
+.find-jump b{color:var(--accent)}
+
+.draftbar{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:12.5px;color:var(--muted)}
+.draftbar .sel{width:auto;min-height:34px;padding:5px 30px 5px 10px;background:transparent;font-size:12.5px}
+.saved{display:inline-flex;align-items:center;gap:6px;color:var(--ok);font-size:12px}
+.draftbar .sp{flex:1}
+
+/* quote float (selection actions) */
+.qfloat{position:fixed;z-index:70;display:none;gap:2px;padding:4px;border-radius:11px;
+  border:1px solid var(--line);background:var(--glass-strong);backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);box-shadow:0 16px 44px -12px rgba(0,0,0,.65)}
+.qfloat.open{display:flex;animation:pop-in .16s cubic-bezier(.2,.8,.2,1)}
+.qfloat button{display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:8px;font-size:12.5px;
+  font-weight:600;color:var(--muted)}
+.qfloat button:hover{background:var(--surface2);color:var(--ink)}
+
+/* notes edge tab */
+.notes-tab{position:fixed;right:0;top:56px;z-index:31;writing-mode:vertical-rl;padding:14px 8px;
+  font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);border:1px solid var(--line);border-right:0;
+  border-radius:10px 0 0 10px;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  cursor:pointer;transition:all var(--t)}
+.notes-tab:hover{color:var(--ink);padding-right:12px}
+.notes-tab b{color:var(--accent)}
+
+/* ---------- CO-WRITE ---------- */
+.cw-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 0 12px;
+  background:linear-gradient(var(--bg) 62%,transparent);}
+.cw-name{font-weight:700;font-size:14px}
+.cw-sub{font-size:11.5px;color:var(--muted)}
+.thread{display:flex;flex-direction:column;gap:16px;padding:8px 0 20px}
+.msg{max-width:82%;font-size:13.5px;line-height:1.6;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--on-accent);
+  padding:11px 15px;border-radius:16px 16px 5px 16px;
+  box-shadow:0 10px 30px -10px color-mix(in oklab,var(--accent) 60%,transparent)}
+.msg.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--line);
+  padding:13px 16px;border-radius:16px 16px 16px 5px}
+.grounded{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:9px;width:100%;
+  font-size:11px;color:var(--muted);border-top:1px dashed var(--line)}
+.grounded svg{color:var(--ok)}
+.quote-chip{display:none;align-self:flex-start;align-items:center;gap:8px;max-width:82%;font-size:12px;
+  color:var(--muted);border:1px dashed color-mix(in oklab,var(--accent) 50%,var(--line));
+  background:color-mix(in oklab,var(--accent) 8%,transparent);border-radius:10px;padding:7px 12px}
+.quote-chip.on{display:flex}
+.composer-zone{position:sticky;bottom:0;display:flex;gap:10px;align-items:flex-end;padding:18px 0 26px;
+  background:linear-gradient(transparent,var(--bg) 34%)}
+.explore-rail{display:none;flex-direction:column;gap:5px;padding:5px;border-radius:12px;
+  border:1px solid var(--line);background:var(--glass)}
+.rail-btn{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;color:var(--muted);
+  transition:all var(--t)}
+.rail-btn:hover,.rail-btn:focus-visible{background:var(--surface2);color:var(--accent)}
+.used .chips{display:none}
+.used .explore-rail{display:flex}
+.composer{flex:1;display:flex;flex-direction:column;gap:9px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;padding-left:2px}
+.ta-box{display:flex;align-items:flex-end;gap:8px;border:1px solid var(--line);border-radius:18px;
+  background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  padding:12px 12px 12px 16px;transition:border-color var(--t),box-shadow var(--t)}
+.ta-box:focus-within{border-color:color-mix(in oklab,var(--accent) 60%,var(--line));
+  box-shadow:0 0 0 4px color-mix(in oklab,var(--accent) 12%,transparent),
+  0 18px 50px -18px color-mix(in oklab,var(--accent) 40%,transparent)}
+.ta{flex:1;border:none;background:transparent;resize:none;min-height:24px;max-height:40vh;line-height:1.55;
+  padding:4px 0;color:var(--ink)}
+.ta:focus-visible{box-shadow:none}
+.send{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;
+  background:linear-gradient(135deg,var(--accent),color-mix(in oklab,var(--accent) 60%,var(--accent2)));
+  color:#fff;transition:transform var(--t),filter var(--t)}
+.send:hover{filter:brightness(1.12)}.send:active{transform:scale(.92)}
+.c-hint{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);padding-left:6px}
+
+/* ---------- FEEDBACK ---------- */
+.fb-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 0 18px}
+.fb-title{font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:-.01em}
+.fb-head .sp{flex:1}
+.fb-body{display:flex;flex-direction:column;gap:14px}
+.verdict{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;padding:24px 26px;
+  border-radius:18px;border:1px solid var(--line);background:var(--surface);overflow:hidden;position:relative}
+.v-meta{display:flex;flex-direction:column;gap:9px}
+.v-line{font-family:var(--display);font-size:17px}
+.v-tags{display:flex;gap:8px;flex-wrap:wrap}
+.v-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;padding:4px 11px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.v-tag.good{color:var(--ok);border-color:color-mix(in oklab,var(--ok) 40%,var(--line))}
+.v-tag.acc{color:var(--accent);border-color:color-mix(in oklab,var(--accent) 45%,var(--line))}
+.cat{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:15px 18px}
+.cat-row{display:flex;align-items:center;gap:12px;cursor:pointer}
+.cat h3{font-size:13.5px;font-weight:700}
+.cat .bar{flex:1;height:4px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.cat .bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width 1s cubic-bezier(.16,1,.3,1)}
+.cat .cs{font-family:var(--mono);font-size:12px;color:var(--muted);width:26px;text-align:right}
+.cat .chev{color:var(--muted);transition:transform var(--t)}
+.cat.open .chev{transform:rotate(180deg)}
+.notes{display:none;padding:10px 2px 2px;flex-direction:column}
+.cat.open .notes{display:flex;animation:rise .35s var(--ease-out)}
+.note{display:flex;gap:11px;padding:10px 0;border-top:1px dashed var(--line);font-size:13px}
+.note .sev{margin-top:6px}
+.note .nx{flex:1}
+.n-meta{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:11.5px;color:var(--muted)}
+.jump{display:inline-flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer}
+.jump:hover{color:var(--accent)}
+.empty-state,.run-card{display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;
+  padding:56px 20px;border:1px dashed var(--line);border-radius:18px}
+.empty-state .big{font-family:var(--display);font-size:19px}
+.empty-state p{color:var(--muted);font-size:13px;max-width:46ch}
+.run-card{border-style:solid;padding:44px 20px}
+.run-pct{font-family:var(--mono);font-size:44px;font-weight:700;letter-spacing:-.02em}
+.run-stage{font-family:var(--mono);font-size:11.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.run-stage b{color:var(--accent)}
+.progress-wrap{width:min(420px,100%);position:relative}
+.pipeline-tip{position:absolute;left:50%;top:-64px;transform:translateX(-50%);display:none;gap:6px;
+  padding:6px;border-radius:10px;border:1px solid var(--line);background:var(--glass-strong);z-index:5}
+.progress-wrap:hover .pipeline-tip,.progress-wrap:focus-within .pipeline-tip{display:flex}
+.pipeline-tip span{font-size:10.5px;font-family:var(--mono);padding:4px 9px;border-radius:7px;color:var(--muted)}
+.pipeline-tip span.cur{background:color-mix(in oklab,var(--accent) 18%,transparent);color:var(--ink)}
+.eta{font-size:12px;color:var(--muted)}
+.queue{display:flex;flex-direction:column}
+.qrow{display:flex;align-items:center;gap:13px;padding:13px 4px;border-bottom:1px dashed var(--line)}
+.qrow .sev{margin-top:0}
+.qt{flex:1;font-size:13px}.qt small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+.retry-failed{display:none}
+.fb-error .retry-failed{display:inline-flex}
+.fb-error .empty-state{border-color:color-mix(in oklab,var(--bad) 45%,transparent)}
+
+/* ---------- WELCOME ---------- */
+.welcome{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 24px 90px;text-align:center}
+.greet{font-family:var(--display);font-style:italic;font-size:clamp(30px,4.6vw,40px);letter-spacing:-.01em}
+.greet-sub{color:var(--muted);margin:10px 0 30px;font-size:14.5px}
+.dropzone{width:min(600px,100%);border:1.5px dashed color-mix(in oklab,var(--ink) 22%,var(--line));
+  border-radius:20px;padding:44px 30px;display:flex;flex-direction:column;align-items:center;gap:14px;
+  transition:all var(--t);background:var(--surface);position:relative;overflow:hidden}
+.dropzone.over{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 7%,transparent);
+  box-shadow:0 0 0 6px color-mix(in oklab,var(--accent) 10%,transparent)}
+.dropzone .ic{width:34px;height:34px;color:var(--muted)}
+.dz-t{font-size:15px;font-weight:700}
+.fmts{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.fmt{font-family:var(--mono);font-size:10.5px;color:var(--muted);border:1px solid var(--line);
+  border-radius:6px;padding:3px 8px}
+.or-row{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12.5px;margin-top:16px}
+.textbtn{color:var(--accent);font-weight:600}
+.textbtn:hover{text-decoration:underline}
+.stat-chips{display:flex;gap:8px;margin-top:26px;flex-wrap:wrap;justify-content:center}
+.steps{display:flex;gap:22px;margin-top:34px;flex-wrap:wrap;justify-content:center}
+.step{display:flex;gap:10px;align-items:flex-start;text-align:left;max-width:200px;font-size:12px;color:var(--muted)}
+.step b{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;flex:none;
+  font-size:11px;color:var(--accent);border:1px solid color-mix(in oklab,var(--accent) 45%,var(--line));
+  background:color-mix(in oklab,var(--accent) 9%,transparent)}
+.privacy{margin-top:30px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.hint-k{margin-top:14px;font-size:12px;color:var(--muted)}
+
+/* ---------- IDEAS ---------- */
+.premise{border:1px solid var(--line);border-radius:18px;background:var(--surface);padding:24px}
+.premise h2{font-family:var(--display);font-size:18px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.autosave{margin-left:auto;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;font-family:var(--mono)}
+.acts{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.act-bar{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.act-bar i{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));display:block}
+.sameer-pill{position:sticky;bottom:18px;margin-top:26px;display:inline-flex;gap:10px;align-items:center;
+  padding:9px 16px 9px 9px;border-radius:99px;border:1px solid var(--line);background:var(--glass);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);font-size:13px;font-weight:600;cursor:pointer;
+  box-shadow:0 14px 40px -12px rgba(0,0,0,.55);transition:transform var(--t)}
+.sameer-pill:hover{transform:translateY(-2px)}
+
+/* ---------- STATUS STRIP ---------- */
+.strip{position:fixed;left:0;right:0;bottom:0;height:32px;z-index:40;display:flex;align-items:center;gap:18px;
+  padding:0 16px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--bg) 70%,transparent);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.strip .grow{flex:1}
+.strip button{font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.strip button:hover{color:var(--ink)}
+
+/* ---------- PALETTE ---------- */
+.pal-wrap{position:fixed;inset:0;z-index:110;display:none;padding:14vh 20px 20px;
+  background:rgba(4,4,9,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.pal-wrap.open{display:block;animation:fade-in .18s ease}
+.pal{width:min(600px,100%);margin:0 auto;border-radius:18px;border:1px solid var(--line);
+  background:var(--glass-strong);backdrop-filter:blur(30px) saturate(160%);
+  -webkit-backdrop-filter:blur(30px) saturate(160%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 40px 110px -20px rgba(0,0,0,.8);
+  overflow:hidden;animation:pal-in .3s var(--spring)}
+@keyframes pal-in{from{opacity:0;transform:translateY(-12px) scale(.97)}to{opacity:1}}
+.pal-in-row{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.pal-in-row .ic{color:var(--accent);width:19px;height:19px}
+.pal-in-row input{flex:1;border:none;background:transparent;font-size:15px;color:var(--ink)}
+.pal-in-row input:focus-visible{box-shadow:none}
+.pal-list{max-height:390px;overflow-y:auto;padding:8px}
+.pal-g{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  padding:10px 12px 5px}
+.pal-it{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:9px 12px;min-height:42px;
+  border-radius:10px;font-size:13.5px;color:var(--ink);transition:background .12s}
+.pal-it .ic{color:var(--muted)}
+.pal-it.on{background:color-mix(in oklab,var(--accent) 16%,transparent)}
+.pal-it.on .ic{color:var(--accent)}
+.pal-it b{color:var(--accent2)}
+.pl{flex:none}.ph{flex:1;text-align:right;font-size:11.5px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pal-empty{padding:26px;text-align:center;color:var(--muted);font-size:13px}
+.pal-foot{display:flex;gap:16px;padding:10px 16px;border-top:1px solid var(--line);
+  font-size:11px;color:var(--muted)}
+.pal-foot span{display:flex;gap:6px;align-items:center}
+
+/* modals helpers */
+.cands{display:flex;flex-direction:column;gap:8px;margin:10px 0 16px}
+.cand{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1px solid var(--line);border-radius:11px;
+  padding:11px 13px;font-size:12.5px;transition:all var(--t)}
+.cand:hover{border-color:color-mix(in oklab,var(--accent) 50%,var(--line))}
+.cand.sel{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 9%,transparent)}
+.cand i{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid
+  color-mix(in oklab,var(--accent) 45%,var(--line));border-radius:5px;padding:2px 6px;flex:none;margin-top:2px}
+.diff2{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-family:var(--script);font-size:12.5px}
+.diff2 .dcol{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--surface)}
+.del{background:color-mix(in oklab,var(--bad) 16%,transparent);text-decoration:line-through;
+  border-radius:3px;padding:0 2px}
+.ins{background:color-mix(in oklab,var(--ok) 16%,transparent);border-radius:3px;padding:0 2px}
+.outline-list{list-style:none;display:flex;flex-direction:column;gap:6px}
+.outline-list li{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;
+  padding:9px 12px;font-size:13px}
+.outline-list .no{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* about footer */
+.about{margin-top:60px}
+.about summary{cursor:pointer;font-size:11.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em}
+.about[open] summary{margin-bottom:10px}
+.about .ab{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:16px 18px;
+  font-size:12.5px;color:var(--muted);line-height:1.7}
+.about b{color:var(--ink)}
+</style></head>
+<body data-default="desk">
+<div class="spotlight" id="spot"></div>
+
+<header class="chrome">
+  <button class="brand" id="homeBtn"><span class="mark">◆</span>The Late Hour</button>
+  <span class="dot-conn breathe" title="llama-server connected"></span>
+  <span class="crumb" id="crumb">desk · scene 2</span>
+  <span class="sp"></span>
+  <span class="model-chip"><svg class="ic" style="width:12px;height:12px"><use href="#i-spark"/></svg>demo-craft</span>
+  <button class="kbtn" id="openPal"><svg class="ic" style="width:13px;height:13px"><use href="#i-cmd"/></svg>K</button>
+  <button class="ibtn" data-modal="#m-settings" data-fid="settings" aria-label="Settings"><svg class="ic"><use href="#i-gear"/></svg></button>
+</header>
+
+<main class="stage">
+
+  <!-- WELCOME -->
+  <section class="surface" data-sur="home">
+    <div class="welcome">
+      <h1 class="greet rise">Evening, Avi.</h1>
+      <p class="greet-sub rise" style="--i:1">Drop a draft — Sameer takes it from there.</p>
+      <div class="dropzone rise" style="--i:2" id="dz" data-fid="dropzone">
+        <svg class="ic"><use href="#i-file"/></svg>
+        <div class="dz-t">Drop your screenplay</div>
+        <div class="fmts"><span class="fmt">.fdx</span><span class="fmt">.fountain</span><span class="fmt">.pdf</span><span class="fmt">.txt</span><span class="fmt">.md</span></div>
+        <button class="btn ghost" id="browseBtn">Browse files</button>
+        <input type="file" id="fileInput" class="sr-only" accept=".fdx,.fountain,.pdf,.txt,.md">
+        <div class="progress-wrap" id="upProg" hidden style="width:min(340px,100%)">
+          <div class="progress"><i id="upBar"></i></div>
+          <p class="eta" id="upName" style="margin-top:8px"></p>
+        </div>
+      </div>
+      <div class="or-row rise" style="--i:3">or <button class="textbtn" id="sampleBtn">open the sample project</button> · <button class="textbtn" data-fid="new-project" id="newProj">+ new project</button></div>
+      <div class="stat-chips rise" style="--i:4" data-stagger>
+        <span class="chip">Draft 3</span><span class="chip">96 pages</span><span class="chip">opened today</span>
+        <button class="chip" id="libBtn" data-fid="library">Your library · 4</button>
+        <button class="chip" id="shelfBtn" data-fid="shelf">On the shelf · 2</button>
+      </div>
+      <ol class="steps rise" style="--i:5">
+        <li class="step"><b>1</b>Upload a draft in any screenwriting format</li>
+        <li class="step"><b>2</b>Run coverage — grounded, verified notes in ~40 s</li>
+        <li class="step"><b>3</b>Co-write fixes with Sameer, apply to the script</li>
+      </ol>
+      <p class="privacy rise" style="--i:6"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Runs locally against your own llama-server · nothing leaves this machine</p>
+      <p class="hint-k rise" style="--i:7">Press <kbd>⌘K</kbd> anywhere — it runs this whole studio.</p>
+    </div>
+  </section>
+
+  <!-- DESK -->
+  <section class="surface on" data-sur="desk">
+    <div class="toolbar"><div class="pill" role="toolbar" aria-label="Script tools">
+      <button class="tb" id="undoBtn" data-fid="undo" data-tip="Undo"><svg class="ic"><use href="#i-undo"/></svg></button>
+      <button class="tb" id="redoBtn" data-fid="redo" data-tip="Redo"><svg class="ic"><use href="#i-redo"/></svg></button>
+      <span class="tb-sep"></span>
+      <button class="tb wide" data-nav="ideas" data-fid="premise"><svg class="ic" style="width:14px;height:14px"><use href="#i-bulb"/></svg>Premise</button>
+      <button class="tb wide" id="focusBtn" data-fid="focus"><svg class="ic" style="width:14px;height:14px"><use href="#i-zap"/></svg>Focus</button>
+      <button class="tb wide" id="readerBtn" data-fid="reader"><svg class="ic" style="width:14px;height:14px"><use href="#i-eye"/></svg>Reader</button>
+      <span class="tb-sep"></span>
+      <button class="tb" id="searchBtn" data-fid="search" data-tip="Find (/)"><svg class="ic"><use href="#i-search"/></svg></button>
+      <button class="tb wide" data-pop="#expMenu" data-fid="exports">Export<svg class="ic" style="width:13px;height:13px"><use href="#i-chevd"/></svg></button>
+      <button class="tb wide" data-modal="#m-compare" data-fid="compare">Compare</button>
+    </div></div>
+    <nav class="scene-dots" id="sceneDots" aria-label="Scenes"></nav>
+    <div class="col">
+      <article class="script" id="script">
+        <h2 class="s-h" id="sc1">1 INT. APARTMENT — NIGHT</h2>
+        <p class="s-act">Rain ticks the window. MARA types with two fingers, fast, a chipped mug dying beside the keyboard. She stops. Reads the line back. Deletes it anyway.</p>
+        <p class="s-act">She holds up the KEY on her keyring, considering it like a stranger.</p>
+        <h2 class="s-h" id="sc2">2 INT. STAIRWELL — CONTINUOUS</h2>
+        <p class="s-act">DEV takes the steps two at a time, a paper bag of oranges clutched like evidence.</p>
+        <p class="s-char">DEV</p><p class="s-dial">You said nine. It's nine-oh-two and I'm the one apologizing.</p>
+        <h2 class="s-h" id="sc3">3 INT. WRITER'S ROOM — DAWN</h2>
+        <p class="s-act">Grey light. Mara sets the key on the sill beside a dead plant.</p>
+        <p class="s-char">MARA</p><p class="s-dial">I kept the key.</p>
+        <p class="s-paren">(to no one)</p>
+        <p class="s-dial">You can have the rest back.</p>
+      </article>
+      <div class="draftbar" data-fid="draftbar">
+        <select class="sel" data-fid="branch" id="branchSel"><option>Draft 3</option><option>Draft 2</option></select>
+        <button class="chip" id="uploadMini" data-fid="upload"><svg class="ic" style="width:13px;height:13px"><use href="#i-up"/></svg>Upload draft</button>
+        <span class="saved"><svg class="ic" style="width:13px;height:13px"><use href="#i-check"/></svg>saved · autosync</span>
+        <span class="sp"></span><span style="font-family:var(--mono);font-size:11px">96 pages · rev 214</span>
+      </div>
+      <details class="about"><summary>about this direction · R1–R5 map</summary><div class="ab">
+        <b>Nocta</b> — command-driven dark glass. One focused surface, zero permanent rails; <b>⌘K is the app</b>.
+        Surfaces morph in place with View Transitions; a soft spotlight follows your cursor.<br>
+        <b>R1</b> upload lands in Feedback ready-state automatically · <b>R2</b> every popover/modal dismisses outside-click + Esc ·
+        <b>R3</b> explore chips live above the composer, collapse to a hover-reveal rail after first send (“···” restores) ·
+        <b>R4</b> composer autogrows to 40vh, Enter sends · <b>R5</b> Feedback is a full reading surface; Fix Queue is its peer tab.
+      </div></details>
+    </div>
+  </section>
+
+  <!-- CO-WRITE -->
+  <section class="surface" data-sur="cowrite">
+    <div class="col" style="padding-bottom:0">
+      <div class="cw-head">
+        <span class="avatar">S</span>
+        <div><div class="cw-name" data-fid="partner">Sameer</div><div class="cw-sub">co-writer · grounded in your draft</div></div>
+        <span style="flex:1"></span>
+        <div class="seg" role="tablist" aria-label="Lens" data-fid="lens">
+          <button aria-selected="true">Dramaturg</button><button>Line doctor</button><button>Brainstorm</button>
+        </div>
+        <button class="ibtn" data-pop="#cwMenu" aria-label="More"><svg class="ic"><use href="#i-more"/></svg></button>
+      </div>
+      <div class="thread" id="thread">
+        <div class="msg ai" data-reveal>Read Draft 3 overnight. The stairwell scene sings — Dev apologizing with oranges is doing so much quiet work.</div>
+      </div>
+      <div class="composer-zone" id="cwZone">
+        <div class="explore-rail" role="group" aria-label="Explore prompts">
+          <button class="rail-btn" data-q="Punch up the dialogue in Scene 2." data-tip="Punch up dialogue"><svg class="ic"><use href="#i-spark"/></svg></button>
+          <button class="rail-btn" data-q="Deepen Mara's backstory without flashback." data-tip="Deepen backstory"><svg class="ic"><use href="#i-pen"/></svg></button>
+          <button class="rail-btn" data-q="Where does Act II sag?" data-tip="Find the sag"><svg class="ic"><use href="#i-zap"/></svg></button>
+          <button class="rail-btn rail-restore" data-tip="Show all prompts"><svg class="ic"><use href="#i-more"/></svg></button>
+        </div>
+        <div class="composer">
+          <div class="chips" data-stagger>
+            <button class="chip" data-q="Punch up the dialogue in Scene 2.">✦ Punch up Scene 2</button>
+            <button class="chip" data-q="Deepen Mara's backstory without flashback.">Deepen Mara</button>
+            <button class="chip" data-q="Where does Act II sag?">Where does Act II sag?</button>
+          </div>
+          <div class="quote-chip" id="quoteChip"><svg class="ic" style="width:13px;height:13px"><use href="#i-quote"/></svg><span></span><button class="ibtn" style="width:26px;height:26px" onclick="this.parentElement.classList.remove('on')" aria-label="Remove quote"><svg class="ic" style="width:12px;height:12px"><use href="#i-x"/></svg></button></div>
+          <div class="ta-box">
+            <textarea class="ta" id="ta" rows="1" placeholder="Write with Sameer…"></textarea>
+            <button class="send" id="sendBtn" data-fid="send" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
+          </div>
+          <div class="c-hint"><kbd>↵</kbd> send · <kbd>⇧↵</kbd> newline · <button class="textbtn" style="font-size:11px" data-pop="#histPop" data-fid="history">↑ history</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEEDBACK -->
+  <section class="surface" data-sur="feedback">
+    <div class="col">
+      <div class="fb-head">
+        <h1 class="fb-title">Coverage</h1>
+        <select class="sel" style="width:auto" data-fid="language" aria-label="Report language">
+          <option>English</option><option>हिन्दी</option><option>தமிழ்</option><option>తెలుగు</option><option>Español</option>
+        </select>
+        <span class="sp"></span>
+        <div class="seg" data-fid="fb-tabs" role="tablist">
+          <button aria-selected="true" data-fbt="report">Report</button>
+          <button aria-selected="false" data-fbt="queue">Fix queue · 3</button>
+        </div>
+        <button class="btn ghost sm" id="reparseBtn" data-fid="re-parse"><svg class="ic" style="width:14px;height:14px"><use href="#i-refresh"/></svg>Re-parse</button>
+        <button class="btn ghost sm retry-failed" id="retryBtn" data-fid="retry"><svg class="ic" style="width:14px;height:14px"><use href="#i-refresh"/></svg>Retry failed</button>
+        <button class="btn ghost sm" id="exportMd" data-fid="export-md"><svg class="ic" style="width:14px;height:14px"><use href="#i-download"/></svg>.md</button>
+      </div>
+      <div class="fb-body" id="fbBody">
+        <div class="empty-state" id="fbEmpty" data-reveal>
+          <svg class="ring" width="120" height="120" viewBox="0 0 128 128" aria-hidden="true">
+            <circle class="score-track" cx="64" cy="64" r="54"/>
+          </svg>
+          <div class="big">No coverage yet</div>
+          <p>Sameer reads all 96 pages against 34 craft rules, verifies every quote, and returns a verdict you can argue with.</p>
+          <button class="btn pri" id="runBtn" data-fid="run-analysis"><svg class="ic"><use href="#i-play"/></svg>Run analysis<span style="opacity:.7;font-weight:500">· about 40 s</span></button>
+        </div>
+        <div class="run-card" id="fbRun" hidden>
+          <div class="run-pct" id="runPct">0%</div>
+          <div class="progress-wrap">
+            <div class="pipeline-tip" id="pipeTip"><span data-st="parse">parse</span><span data-st="craft">craft</span><span data-st="continuity">continuity</span><span data-st="verify">verify</span></div>
+            <div class="progress"><i id="runBar"></i></div>
+          </div>
+          <div class="run-stage">pass <b id="runStage">parse</b> · grounding quotes as it goes</div>
+          <span class="eta" id="eta">~40 s</span>
+        </div>
+        <div id="fbDone" hidden>
+          <div class="verdict" data-reveal>
+            <svg class="ring" width="132" height="132" viewBox="0 0 128 128" role="img" aria-label="Overall score 84">
+              <circle class="score-track" cx="64" cy="64" r="54"/>
+              <circle class="score-arc" cx="64" cy="64" r="54" style="--c:339.3" id="scoreArc"/>
+              <text class="score-num" x="64" y="76" text-anchor="middle" font-size="38" fill="currentColor" id="scoreNum">0</text>
+            </svg>
+            <div class="v-meta">
+              <span class="badge acc" style="width:fit-content"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>verified quotes</span>
+              <div class="v-line">A tight, honest draft. The dawn pays off; Act II needs a spine check.</div>
+              <div class="v-tags"><span class="v-tag good">▲ +4 vs Draft 2</span><span class="v-tag">confidence · high</span><span class="v-tag">96 pages · 3 scenes sampled</span></div>
+            </div>
+          </div>
+          <div id="cats"></div>
+        </div>
+        <div class="queue" id="fbQueue" hidden data-fid="fix-queue"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IDEAS -->
+  <section class="surface" data-sur="ideas">
+    <div class="col" style="max-width:640px">
+      <div class="premise" data-fid="premise-card">
+        <h2><svg class="ic" style="color:var(--accent)"><use href="#i-bulb"/></svg>Premise<span class="autosave" id="autosave"><span class="dot-conn breathe" style="background:var(--accent);box-shadow:none"></span>saving…</span></h2>
+        <div class="f-row"><label>Title</label><input class="input" value="The Late Hour"></div>
+        <div class="f-row"><label>Logline</label><textarea class="ta" rows="2" style="border:1px solid var(--line);border-radius:10px;background:transparent;padding:9px 12px">A night-shift typist keeps a key she promised to return; by dawn, someone has to decide what it opens.</textarea></div>
+        <div class="f-row"><label>Open questions</label>
+          <div class="chips" style="padding:0"><button class="chip" data-q="What does the key literally open?">What does the key open?</button><button class="chip" data-q="Who is waiting at the stairwell?">Who waits at the stairwell?</button></div>
+        </div>
+        <div class="acts" data-fid="structure-panel">
+          <div class="act-bar">ACT I<i style="width:34%"></i></div>
+          <div class="act-bar">ACT II<i style="width:41%;opacity:.7"></i></div>
+          <div class="act-bar">ACT III<i style="width:25%;opacity:.45"></i></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <button class="btn pri" id="graduateBtn" data-fid="graduate"><svg class="ic" style="width:15px;height:15px"><use href="#i-aright"/></svg>Graduate to pages</button>
+          <button class="btn ghost" id="savePremise">Save premise</button>
+        </div>
+      </div>
+      <button class="sameer-pill" data-nav="cowrite" data-fid="sameer-pill"><span class="avatar" style="width:28px;height:28px;font-size:12px">S</span>Ask Sameer about this idea</button>
+    </div>
+  </section>
+</main>
+
+<!-- popovers -->
+<div class="pop" id="expMenu" style="top:64px;right:210px">
+  <button data-exp="Fountain"><svg class="ic"><use href="#i-file"/></svg>Fountain (.fountain)</button>
+  <button data-exp="Final Draft"><svg class="ic"><use href="#i-file"/></svg>Final Draft (.fdx)</button>
+  <button data-exp="Plain text"><svg class="ic"><use href="#i-file"/></svg>Plain text (.txt)</button>
+  <button data-exp="Print"><svg class="ic"><use href="#i-print"/></svg>Print / PDF</button>
+  <button data-exp="Backup"><svg class="ic"><use href="#i-folder"/></svg>Backup (.zip)</button>
+</div>
+<div class="pop" id="cwMenu" style="top:118px;right:max(18px,calc(50% - 372px))">
+  <button data-modal="#m-notes"><svg class="ic"><use href="#i-note"/></svg>Sam's notes</button>
+  <button id="resetPersona" data-fid="reset-persona"><svg class="ic"><use href="#i-user"/></svg>Reset persona</button>
+  <button id="clearChat"><svg class="ic"><use href="#i-x"/></svg>Clear chat</button>
+</div>
+<div class="pop" id="histPop" style="bottom:130px;left:calc(50% - 330px)">
+  <button><svg class="ic"><use href="#i-clock"/></svg>Today · punch-up session</button>
+  <button><svg class="ic"><use href="#i-clock"/></svg>Yesterday · Act II surgery</button>
+</div>
+<div class="pop" id="searchPop" style="top:64px;right:270px;padding:10px">
+  <input class="input" id="searchInput" placeholder="Find in script…" style="width:220px;min-height:36px">
+  <div style="font-size:11px;color:var(--muted);margin-top:7px" id="searchCount">Type, press ↵</div>
+</div>
+
+<!-- quote float -->
+<div class="qfloat" id="qfloat">
+  <button id="qAsk"><svg class="ic" style="width:14px;height:14px"><use href="#i-chat"/></svg>Ask Sameer</button>
+  <button id="qNote"><svg class="ic" style="width:14px;height:14px"><use href="#i-note"/></svg>Note</button>
+  <button id="qStash"><svg class="ic" style="width:14px;height:14px"><use href="#i-cut"/></svg>Stash</button>
+</div>
+
+<button class="notes-tab" id="notesTab" data-fid="margin-notes">margin notes · <b id="noteCount">2</b></button>
+<button class="find-jump" id="findJump" data-fid="finding-summary"><svg class="ic" style="width:14px;height:14px;color:var(--accent)"><use href="#i-alert"/></svg><b>3</b>&nbsp;findings in S2–S3<svg class="ic" style="width:13px;height:13px"><use href="#i-aright"/></svg></button>
+
+<!-- PALETTE -->
+<div class="pal-wrap" id="palette">
+  <div class="pal" role="dialog" aria-label="Command palette">
+    <div class="pal-in-row"><svg class="ic"><use href="#i-spark"/></svg>
+      <input id="palInput" placeholder="Type a command — scenes, Sameer, exports…" aria-label="Command search">
+      <kbd>esc</kbd></div>
+    <div class="pal-list" id="palList"></div>
+    <div class="pal-foot"><span><kbd>↑↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span><span style="margin-left:auto">Nocta runs everything</span></div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-back" id="m-settings"><div class="modal">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-gear"/></svg>Settings</h2>
+  <div class="f-row"><label>llama-server URL</label><input class="input" value="http://localhost:8080"></div>
+  <div class="f-row"><label>Timeout (s)</label><input class="input" type="number" value="180"></div>
+  <div class="f-row"><label>Fast model</label><select class="sel"><option>demo-craft (bundled)</option><option>qwen2.5:7b</option></select></div>
+  <div class="f-row"><label>Max co-write turns</label><input class="input" type="number" value="12"></div>
+  <button class="btn pri" id="testConn">Test connection</button>
+</div></div>
+
+<div class="modal-back" id="m-rewrite"><div class="modal">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-pen"/></svg>Rewrite with Sameer</h2>
+  <div class="f-row"><label>Finding</label><select class="sel" id="rwFinding"><option>S3 · exit line lands twice</option><option>S2 · orange bag prop dropped</option><option>S1 · late slug missing time-of-day</option></select></div>
+  <div class="f-row"><label>Instruction</label><textarea class="ta" rows="2" style="border:1px solid var(--line);border-radius:10px;background:transparent;padding:9px 12px">Keep subtext at the window, cut the spelled-out repeat.</textarea></div>
+  <button class="btn ghost" id="genCands"><svg class="ic" style="width:14px;height:14px"><use href="#i-spark"/></svg>Generate candidates</button>
+  <div class="cands" id="cands" hidden>
+    <button class="cand sel"><i>A</i>“I kept the key.” — hold on her hand, cut to black.</button>
+    <button class="cand"><i>B</i>Move the line to the sill; let Dev find the key instead.</button>
+    <button class="cand"><i>C</i>Cut dialogue entirely; plant payoff on the dead plant.</button>
+  </div>
+  <button class="btn pri" id="applyRewrite" disabled style="opacity:.5">Apply to script</button>
+</div></div>
+
+<div class="modal-back" id="m-compare"><div class="modal" style="width:min(720px,94vw)">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-compare"/></svg>Draft 2 → Draft 3</h2>
+  <div class="diff2">
+    <div class="dcol"><b style="font-family:var(--ui);font-size:11px;color:var(--muted)">DRAFT 2</b><br>MARA<br>You can have everything back. I kept the key but I don't want it. <span class="del">I never wanted any of this house.</span></div>
+    <div class="dcol"><b style="font-family:var(--ui);font-size:11px;color:var(--muted)">DRAFT 3</b><br>MARA<br><span class="ins">I kept the key.</span><br><span class="ins">(to no one)</span><br><span class="ins">You can have the rest back.</span></div>
+  </div>
+</div></div>
+
+<div class="modal-back" id="m-fork"><div class="modal">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-branch"/></svg>Fork draft</h2>
+  <div class="f-row"><label>New draft name</label><input class="input" id="forkName" value="Draft 4"></div>
+  <button class="btn pri" id="forkGo">Create fork</button>
+</div></div>
+
+<div class="modal-back" id="m-notes"><div class="modal">
+  <button class="ibtn x" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-note"/></svg>Sam's notes</h2>
+  <ul class="outline-list" style="font-size:12.5px">
+    <li>Watch the oranges — props that carry feeling should return.</li>
+    <li>Your act break is a silence, not a line. Protect it.</li>
+  </ul>
+</div></div>
+
+<div class="modal-back" id="m-beatboard"><div class="modal">
+  <button class="ibtn x" data-close><svg class="ic"><use href="#i-x"/></svg></button>
+  <h2><svg class="ic"><use href="#i-board"/></svg>Beat board — outline</h2>
+  <ul class="outline-list">
+    <li><svg class="ic" style="color:var(--muted)"><use href="#i-grip"/></svg><span class="no">S1</span>Apartment — key introduced</li>
+    <li><svg class="ic" style="color:var(--muted)"><use href="#i-grip"/></svg><span class="no">S2</span>Stairwell — Dev arrives</li>
+    <li><svg class="ic" style="color:var(--muted)"><use href="#i-grip"/></svg><span class="no">S3</span>Writer's room — key pays off</li>
+  </ul>
+  <p style="font-size:12px;color:var(--muted);margin-top:12px">Drag to reorder in the real app — or try the <b>Beatwall</b> direction, where the board is the studio.</p>
+</div></div>
+
+<!-- error banner -->
+<div class="banner" id="banner" role="alert">
+  <svg class="ic" style="color:var(--bad)"><use href="#i-alert"/></svg>
+  <span class="msg"><b>Connection lost</b> — llama-server didn't answer.</span>
+  <span class="sp"></span>
+  <button class="btn ghost sm" id="banRetry">Retry</button>
+  <button class="ibtn" style="width:32px;height:32px" id="banX" aria-label="Dismiss"><svg class="ic"><use href="#i-x"/></svg></button>
+</div>
+
+<footer class="strip">
+  <span>model <b style="color:var(--ink)">demo-craft</b></span>
+  <span style="display:flex;align-items:center;gap:6px">conn <span class="dot-conn" style="width:6px;height:6px"></span>local</span>
+  <span id="pages">96 pp</span><span>sprint <b id="clock" style="color:var(--ink)">24:18</b></span><span>dawn off</span>
+  <span class="grow"></span>
+  <button id="dawnToggle" data-fid="dawn"><svg class="ic" style="width:12px;height:12px"><use href="#i-sun"/></svg>dawn</button>
+</footer>
+
+<script src="shared/kit.js"></script>
+<script>
+(function(){
+"use strict";
+const {$,$$,vt,icons,countUp,ticker,chat,palette,toast,stream} = KIT;
+icons();
+
+/* ---------- surfaces (view-transition morphs) ---------- */
+const CRUMBS={home:"home",desk:"desk · scene 2",cowrite:"co-write · dramaturg",feedback:"feedback",ideas:"idea canvas"};
+let cur="desk";
+function go(name,after){
+  if(name===cur){after&&after();return}
+  vt(()=>{$$("[data-sur]").forEach(s=>s.classList.toggle("on",s.dataset.sur===name));
+    cur=name;$$("#crumb")[0].textContent=CRUMBS[name];});
+  setTimeout(()=>after&&after(),REDUCED_MS());
+  function REDUCED_MS(){return KIT.REDUCED?0:120}
+}
+$$("[data-nav]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.nav)));
+$("#homeBtn").addEventListener("click",()=>go("home"));
+
+/* ---------- palette ---------- */
+const recents=["run-analysis","nav-feedback"];
+const pal=palette({root:$("#palette"),input:$("#palInput"),list:$("#palList"),recents,
+  commands:[
+    {id:"nav-desk",g:"Navigate",label:"Desk — read the script",icon:"film",kbd:"⌘1",run:()=>go("desk")},
+    {id:"nav-cowrite",g:"Navigate",label:"Co-write with Sameer",icon:"chat",kbd:"⌘2",run:()=>go("cowrite")},
+    {id:"nav-feedback",g:"Navigate",label:"Feedback — coverage & fix queue",icon:"chart",kbd:"⌘3",run:()=>go("feedback")},
+    {id:"nav-ideas",g:"Navigate",label:"Ideas — premise canvas",icon:"bulb",kbd:"⌘4",run:()=>go("ideas")},
+    {id:"nav-home",g:"Navigate",label:"Home — projects & upload",icon:"home",run:()=>go("home")},
+    {id:"sc-1",g:"Scenes",label:"S1 · INT. APARTMENT — NIGHT",hint:"key introduced",icon:"film",run:()=>jumpScene("#sc1")},
+    {id:"sc-2",g:"Scenes",label:"S2 · INT. STAIRWELL — CONT.",hint:"Dev arrives",icon:"film",run:()=>jumpScene("#sc2")},
+    {id:"sc-3",g:"Scenes",label:"S3 · INT. WRITER'S ROOM — DAWN",hint:"key pays off",icon:"film",run:()=>jumpScene("#sc3")},
+    {id:"ask-punch",g:"Ask Sameer",label:"Punch up the dialogue in Scene 2",icon:"spark",run:()=>askWith("Punch up the dialogue in Scene 2.")},
+    {id:"ask-back",g:"Ask Sameer",label:"Deepen Mara's backstory",icon:"pen",run:()=>askWith("Deepen Mara's backstory without flashback.")},
+    {id:"ask-sag",g:"Ask Sameer",label:"Where does Act II sag?",icon:"zap",run:()=>askWith("Where does Act II sag?")},
+    {id:"run-analysis",g:"Studio",label:"Run analysis",hint:"~40 s",icon:"play",run:()=>{go("feedback");setTimeout(startRun,KIT.REDUCED?0:250)}},
+    {id:"reparse",g:"Studio",label:"Re-parse script",icon:"refresh",run:()=>toast("Re-parsed · 3 scenes, 2 characters","check")},
+    {id:"compare",g:"Studio",label:"Compare drafts 2 → 3",icon:"compare",run:()=>$$("#m-compare")[0].classList.add("open")},
+    {id:"beatboard",g:"Studio",label:"Beat board — outline",icon:"board",run:()=>$$("#m-beatboard")[0].classList.add("open")},
+    {id:"fork",g:"Studio",label:"Fork as new draft",icon:"branch",run:()=>$$("#m-fork")[0].classList.add("open")},
+    {id:"new-project",g:"Studio",label:"New project",icon:"plus",run:()=>{go("home");toast("New project created","plus")}},
+    {id:"err-sim",g:"System",label:"Simulate connection error",icon:"alert",run:showBanner},
+    {id:"settings",g:"System",label:"Settings",icon:"gear",kbd:"⌘,",run:()=>$$("#m-settings")[0].classList.add("open")},
+    {id:"exp-f",g:"Export",label:"Fountain (.fountain)",icon:"download",run:()=>toast("Exported late-hour.fountain","download")},
+    {id:"exp-x",g:"Export",label:"Final Draft (.fdx)",icon:"download",run:()=>toast("Exported late-hour.fdx","download")},
+    {id:"exp-t",g:"Export",label:"Plain text (.txt)",icon:"download",run:()=>toast("Exported late-hour.txt","download")},
+    {id:"exp-p",g:"Export",label:"Print / PDF",icon:"print",run:()=>toast("Print sheet prepared","print")},
+    {id:"exp-z",g:"Export",label:"Backup (.zip)",icon:"folder",run:()=>toast("Backup.zip written to project","folder")}
+  ]});
+function jumpScene(sel){
+  go("desk",()=>{
+    const el=$(sel);el.scrollIntoView({behavior:KIT.REDUCED?"auto":"smooth",block:"start"});
+    el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");
+  });
+}
+function askWith(q){go("cowrite",()=>{const ta=$("#ta");ta.value=q;ta.dispatchEvent(new Event("input"));ta.focus()})}
+$("#openPal").addEventListener("click",()=>pal.toggle());
+document.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();pal.toggle()}
+  else if((e.metaKey||e.ctrlKey)&&["1","2","3","4"].includes(e.key)){e.preventDefault();
+    go(["desk","cowrite","feedback","ideas"][+e.key-1])}
+  else if(e.key==="/"&&cur==="desk"&&!e.target.closest("input,textarea")){e.preventDefault();
+    $$("#searchPop")[0].classList.add("open");$$("#searchInput")[0].focus()}
+  else if(e.key==="Escape"){ $("#palette").classList.remove("open");
+    document.body.classList.remove("reader","focusmode");}
+});
+
+/* ---------- scene dots + active tracking ---------- */
+const dots=$("#sceneDots");
+["sc1|INT. APARTMENT — NIGHT","sc2|STAIRWELL — CONT.","sc3|WRITER'S ROOM — DAWN"].forEach(p=>{
+  const[id,label]=p.split("|");const b=document.createElement("button");
+  b.dataset.tip=label;b.className="tip-left";b.innerHTML="<i></i>";
+  b.addEventListener("click",()=>jumpScene("#"+id));dots.appendChild(b);
+});
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){const i=["sc1","sc2","sc3"].indexOf(e.target.id)+1;
+    $$(".scene-dots button").forEach((d,j)=>d.classList.toggle("on",j===i-1));}
+}),{root:$("[data-sur='desk']"),threshold:.4});
+$$(".s-h").forEach(h=>io.observe(h));
+
+/* ---------- selection quote float ---------- */
+const qf=$("#qfloat");let selText="";
+document.addEventListener("mouseup",e=>{
+  if(e.target.closest(".qfloat"))return;
+  const s=getSelection();
+  if(s && !s.isCollapsed && s.toString().trim().length>2 &&
+     e.target.closest(".script")){
+    selText=s.toString().trim();
+    const r=s.getRangeAt(0).getBoundingClientRect();
+    qf.style.left=Math.max(90,r.left+r.width/2)+"px";qf.style.top=(r.top-8)+"px";
+    qf.style.transform="translate(-50%,-100%)";qf.classList.add("open");
+  } else if(!e.target.closest(".qfloat")) qf.classList.remove("open");
+});
+$("#qAsk").addEventListener("click",()=>{qf.classList.remove("open");
+  const qc=$("#quoteChip");qc.querySelector("span").textContent="“"+selText.slice(0,72)+(selText.length>72?"…":"")+"”";
+  qc.classList.add("on");go("cowrite");$("#ta").focus()});
+$("#qNote").addEventListener("click",()=>{qf.classList.remove("open");
+  const n=document.createElement("div");toast("Margin note added","note");bumpNotes(1)});
+$("#qStash").addEventListener("click",()=>{qf.classList.remove("open");
+  toast("Line stashed — one undo away","cut")});
+function bumpNotes(d){const el=$$("#noteCount")[0];el.textContent=+el.textContent+d}
+
+/* ---------- search ---------- */
+$("#searchBtn").addEventListener("click",()=>$$("#searchPop")[0].classList.toggle("open"));
+$("#searchInput").addEventListener("keydown",e=>{
+  if(e.key!=="Enter")return;
+  const q=e.target.value.trim();const sp=$$("#script")[0];
+  sp.querySelectorAll("mark").forEach(m=>{m.replaceWith(document.createTextNode(m.textContent))});
+  if(!q){$$("#searchCount")[0].textContent="Type, press ↵";return}
+  let n=0;const walk=(node)=>{[...node.childNodes].forEach(ch=>{
+    if(ch.nodeType===3&&ch.textContent.toLowerCase().includes(q.toLowerCase())){
+      const frag=document.createDocumentFragment();let rest=ch.textContent;
+      while(true){const i=rest.toLowerCase().indexOf(q.toLowerCase());if(i<0)break;
+        frag.append(rest.slice(0,i));const mk=document.createElement("mark");
+        mk.textContent=rest.substr(i,q.length);frag.append(mk);n++;
+        rest=rest.slice(i+q.length);}
+      frag.append(rest);ch.replaceWith(frag);
+    } else if(ch.nodeType===1&&!ch.classList.contains("s-h")) walk(ch);});};
+  walk(sp);$$("#searchCount")[0].textContent=n?n+" hit"+(n>1?"s":""):"no hits";
+});
+
+/* ---------- focus / reader ---------- */
+$("#focusBtn").addEventListener("click",()=>{document.body.classList.toggle("focusmode");
+  toast(document.body.classList.contains("focusmode")?"Focus mode — hover to light a line":"Focus off","zap")});
+$("#readerBtn").addEventListener("click",()=>document.body.classList.add("reader"));
+
+/* ---------- undo/redo (demo stack) ---------- */
+const hist=[];
+$("#undoBtn").addEventListener("click",()=>hist.length?toast("Undid: "+hist.pop(),"undo"):toast("Nothing to undo yet","undo"));
+$("#redoBtn").addEventListener("click",()=>toast("Nothing to redo","redo"));
+window.__pushHist=l=>hist.push(l);
+
+/* ---------- exports / misc ---------- */
+$$("[data-exp]").forEach(b=>b.addEventListener("click",()=>toast("Exported via "+b.dataset.exp,"download")));
+$("#resetPersona").addEventListener("click",()=>toast("Persona reset to Dramaturg","user"));
+$("#clearChat").addEventListener("click",()=>{$$("#thread .msg").forEach(m=>m.remove());toast("Chat cleared","x")});
+$("#testConn").addEventListener("click",e=>{e.target.textContent="Testing…";
+  setTimeout(()=>{e.target.textContent="Test connection";toast("Connected · 212 ms","check")},650)});
+$("#savePremise").addEventListener("click",()=>toast("Premise saved","check"));
+setInterval(()=>{const a=$$("#autosave")[0];a.lastChild.textContent="saved ·"+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})},4000);
+$("#forkGo").addEventListener("click",()=>{const n=$$("#forkName")[0].value||"Draft 4";
+  const o=document.createElement("option");o.textContent=n;$$("#branchSel")[0].prepend(o);
+  $$("#m-fork")[0].classList.remove("open");toast(n+" created — branching from Draft 3","branch")});
+ticker($$("#clock")[0],24*60+18);
+
+/* ---------- error banner ---------- */
+function showBanner(){$$("#banner")[0].classList.add("open")}
+$("#banX").addEventListener("click",()=>$$("#banner")[0].classList.remove("open"));
+$("#banRetry").addEventListener("click",()=>{$$("#banner")[0].classList.remove("open");toast("Reconnected to llama-server","check")});
+
+/* ---------- dawn ---------- */
+$("#dawnToggle").addEventListener("click",e=>{document.body.classList.toggle("dawn");
+  e.currentTarget.lastChild.textContent=document.body.classList.contains("dawn")?"dawn":"night"});
+
+/* ---------- co-write engine (R3/R4) ---------- */
+chat({zone:$$("#cwZone")[0],thread:$$("#thread")[0],ta:$$("#ta")[0],sendBtn:$$("#sendBtn")[0],
+  onSend:t=>{const qc=$("#quoteChip");if(qc.classList.contains("on"))qc.classList.remove("on")},
+  onDone:ai=>window.__pushHist&&0});
+
+/* lens toggle */
+$$(".seg[data-fid='lens'] button").forEach(b=>b.addEventListener("click",()=>{
+  $$(".seg[data-fid='lens'] button").forEach(x=>x.setAttribute("aria-selected",String(x===b)));}));
+
+/* ---------- FEEDBACK state machine (R1/R5) ---------- */
+const CATS=[
+ {n:"Premise & stakes",s:82,notes:[["low","Logline test passes cleanly.","S1"]]},
+ {n:"Structure & pacing",s:74,notes:[["high","Exit line lands twice — subtext at the window, then spelled out to Dev. Cut the second.","S3"],["med","Act II midpoint arrives 12 pages late; consider promoting the stairwell.","S2"]]},
+ {n:"Dialogue & voice",s:68,notes:[["med","Dev apologizes twice in two pages; keep the orange line, cut the second sorry.","S2"],["low","Mara's idiolect is consistent and dry — protect it in revisions.","S3"]]},
+ {n:"Continuity & logic",s:91,notes:[["low","Orange bag introduced S2, unaddressed later — track or drop it.","S2"]]}];
+const QUEUE=[
+ {sev:"high",t:"Cut the repeated exit line",sc:"S3",st:"open"},
+ {sev:"med",t:"Give the orange bag a payoff",sc:"S2",st:"open"},
+ {sev:"low",t:"Add time-of-day to S1 slug",sc:"S1",st:"applied"}];
+function renderQueue(){
+  const q=$$("#fbQueue")[0];q.innerHTML="";
+  QUEUE.forEach((r,i)=>{
+    const d=document.createElement("div");d.className="qrow rise-drop";d.style.setProperty("--i",i);
+    d.innerHTML=`<span class="sev ${r.sev}"></span><div class="qt">${r.t}<small>${r.sc} · ${r.sev} severity</small></div>
+      <span class="status-pill ${r.st}">${r.st}</span>`+
+      (r.st==="open"?`<button class="btn ghost sm">Apply</button>`:`<button class="ibtn" data-tip="Reopen" style="width:36px;height:36px"><svg class="ic"><use href="#i-refresh"/></svg></button>`);
+    const ap=d.querySelector(".btn");if(ap)ap.addEventListener("click",()=>{
+      r.st="applying";renderQueue();
+      setTimeout(()=>{r.st="applied";renderQueue();toast("Applied to "+r.sc+" — diff saved","check")},1400);});
+    q.appendChild(d);});
+  const ex=document.createElement("button");ex.className="btn ghost sm";ex.style.marginTop="14px";
+  ex.innerHTML=`<svg class="ic" style="width:14px;height:14px"><use href="#i-download"/></svg>Export fix queue (.md)`;
+  ex.addEventListener("click",()=>toast("fix-queue.md exported","download"));
+  q.appendChild(ex);
+}
+function setTabs(which){
+  $$(".seg[data-fid='fb-tabs'] button").forEach(b=>b.setAttribute("aria-selected",
+    String(b.dataset.fbt===which)));
+  $$("#fbBody > *:not(#fbEmpty):not(#fbRun)").forEach(x=>x.hidden=true);
+  if(which==="queue"){renderQueue();$$("#fbQueue")[0].hidden=false}
+  else if(! $$("#fbDone")[0].hidden)$$("#fbDone")[0].hidden=false;
+}
+$$(".seg[data-fid='fb-tabs'] button").forEach(b=>b.addEventListener("click",()=>setTabs(b.dataset.fbt)));
+$("#runBtn").addEventListener("click",startRun);
+$("#reparseBtn").addEventListener("click",()=>toast("Re-parsed · 3 scenes","refresh"));
+$("#retryBtn").addEventListener("click",()=>{$$("#fbBody")[0].classList.remove("fb-error");startRun()});
+$("#exportMd").addEventListener("click",()=>toast("coverage.md exported","download"));
+let running=false;
+function startRun(){
+  if(running)return;running=true;
+  $$("#fbEmpty")[0].hidden=true;$$("#fbQueue")[0].hidden=true;
+  const run=$$("#fbRun")[0],done=$$("#fbDone")[0];run.hidden=false;done.hidden=true;
+  const pct=$$("#runPct")[0],bar=$$("#runBar")[0],eta=$$("#eta")[0],stage=$$("#runStage")[0];
+  const stages=[["parse",0],["craft",22],["continuity",58],["verify",82]];
+  let p=0;const t0=Date.now(),total=KIT.REDUCED?300:5200;
+  const iv=setInterval(()=>{
+    p=Math.min(100,p+(KIT.REDUCED?12:Math.random()*3.4+.6));
+    pct.textContent=Math.floor(p)+"%";bar.style.width=p+"%";
+    eta.textContent="~"+Math.max(1,Math.round((100-p)/100*(total/1000)))+" s";
+    const st=[...stages].reverse().find(s=>p>=s[1]);
+    stage.textContent=st[0];
+    $$("#pipeTip span").forEach(x=>x.classList.toggle("cur",x.dataset.st===st[0]));
+    if(p>=100){clearInterval(iv);running=false;run.hidden=true;done.hidden=false;setTabs("report");paintVerdict();}
+  },40);
+}
+function paintVerdict(){
+  const arc=$$("#scoreArc")[0],num=$$("#scoreNum")[0],C=339.3;
+  arc.style.transition="none";arc.style.strokeDashoffset=C;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    arc.style.transition="stroke-dashoffset 1.4s cubic-bezier(.16,1,.3,1)";
+    arc.style.strokeDashoffset=C*(1-.84);}));
+  countUp(num,84,1300);
+  const catsHost=$$("#cats")[0];catsHost.innerHTML="";
+  CATS.forEach((c,i)=>{
+    const d=document.createElement("div");d.className="cat rise-drop";d.style.setProperty("--i",i+2);
+    d.innerHTML=`<div class="cat-row"><h3>${c.n}</h3><span class="bar"><i></i></span>
+      <span class="cs">${c.s}</span><svg class="ic chev" style="width:14px;height:14px"><use href="#i-down"/></svg></div>
+      <div class="notes">${c.notes.map(([sv,t,sc])=>`<div class="note"><span class="sev ${sv}"></span>
+        <div class="nx">${t}<div class="n-meta"><span class="jump" data-sc="${sc}"><svg class="ic" style="width:12px;height:12px"><use href="#i-jump"/></svg>${sc} · jump to scene</span>
+        <span class="verify"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>verified quote</span></div></div></div>`).join("")}</div>`;
+    d.querySelector(".cat-row").addEventListener("click",()=>d.classList.toggle("open"));
+    d.querySelectorAll(".jump").forEach(j=>j.addEventListener("click",ev=>{ev.stopPropagation();jumpScene("#sc"+j.dataset.sc.slice(1))}));
+    catsHost.appendChild(d);
+    requestAnimationFrame(()=>setTimeout(()=>d.querySelector(".bar i").style.width=c.s+"%",300+i*140));
+  });
+  /* wire fix queue trigger from findings */
+  $$("#cats .jump").forEach(()=>{});
+}
+/* deep-link pill */
+$("#findJump").addEventListener("click",()=>{go("feedback");
+  if($("#fbDone").hidden&&!running)startRun();else setTabs("report")});
+
+/* ---------- upload flow (R1) ---------- */
+const dz=$("#dz"),fi=$("#fileInput");
+["dragover","dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();
+  dz.classList.toggle("over",ev==="dragover");
+  if(ev==="drop")upload(e.dataTransfer.files[0]?e.dataTransfer.files[0].name:"late-hour.fountain");}));
+$("#browseBtn").addEventListener("click",()=>fi.click());
+fi.addEventListener("change",()=>upload(fi.files[0]?fi.files[0].name:"late-hour.fountain"));
+$("#sampleBtn").addEventListener("click",()=>upload("the-late-hour.fountain"));
+$("#uploadMini").addEventListener("click",()=>upload("late-hour-draft3.fdx"));
+$("#newProj").addEventListener("click",()=>toast("Project created · untitled-2","plus"));
+$("#libBtn").addEventListener("click",()=>toast("Your library — 4 past works digested","book"));
+$("#shelfBtn").addEventListener("click",()=>toast("On the shelf — 2 dormant projects","folder"));
+let uploaded=false;
+function upload(name){
+  if(uploaded)return;uploaded=true;
+  dz.querySelectorAll(":scope > :not(.progress-wrap)").forEach(x=>x.style.display="none");
+  const prog=$$("#upProg")[0],bar=$$("#upBar")[0];prog.hidden=false;
+  $$("#upName")[0].textContent=name;
+  let p=0;const iv=setInterval(()=>{p=Math.min(100,p+9);bar.style.width=p+"%";
+    if(p>=100){clearInterval(iv);
+      setTimeout(()=>{go("feedback");setTimeout(startRun,KIT.REDUCED?0:260)},350);}},110);
+}
+/* welcome reveals */
+KIT.reveal(document);KIT.stagger(document);
+})();
+</script></body></html>

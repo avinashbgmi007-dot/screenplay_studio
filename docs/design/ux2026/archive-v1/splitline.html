@@ -1,0 +1,141 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio v2 — 5 · Splitline</title>
+<link rel="stylesheet" href="shared/base.css">
+<style>
+/* splitline: co-write | feedback side by side, red seam, mirrored headers */
+:root{--bg:#ffffff;--surface:#fff;--surface2:#f4f4f2;--ink:#141414;--muted:#71717a;
+--line:#e6e6e3;--accent:#d92d20;--on-accent:#fff}
+.topbar{background:#fff}.brand{font-weight:800;letter-spacing:-.01em}
+.rooms{background:#f4f4f2}.room-btn[aria-selected="true"]{background:#141414;color:#fff;box-shadow:none}
+.split{flex:1;display:flex;min-height:0}
+.half{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--half-bg,#fff)}
+.half.warm{--half-bg:#faf7f2}.half.cool{--half-bg:#f5f7fa;border-left:3px solid var(--accent)}
+.half-h{display:flex;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid var(--line);
+ font-weight:700;font-size:13px;letter-spacing:.02em}
+.half-h .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);border:1px solid var(--line);
+ border-radius:99px;padding:1px 8px;margin-left:auto}
+.script{border:none;border-radius:0;border-bottom:1px solid var(--line);width:min(600px,100%)}
+.msg.ai{background:#fff;border:1px solid var(--line)}
+.chip{background:#fff}.ta{background:#fff}
+.send,.btn-pri{background:#141414;color:#fff;border-radius:8px}
+.cat,.verdict{box-shadow:none;border-radius:0;border-left:none;border-right:none}
+.score{font-size:64px;letter-spacing:-.04em}
+.v-tag{border-radius:0}
+.sev.high{background:#d92d20}.sev.med{background:#dc9a06}.sev.low{background:#12805c}
+.verify{color:#12805c}.q-applied{color:#12805c;border-color:#9fd3ba}
+.btn-ghost,.chip{border-radius:8px}
+</style></head>
+<body data-default-room="desk">
+<header class="topbar">
+ <span class="brand">Screenplay Studio</span><span class="dot-conn"></span>
+ <nav class="rooms"><button class="room-btn" data-room-btn="desk" aria-selected="true">Desk</button>
+  <button class="room-btn" data-room-btn="split" aria-selected="false">Co-write ∥ Feedback</button></nav>
+ <div class="top-actions"><button class="btn-ghost" style="min-height:32px;padding:5px 12px" data-fid="new-project">＋ New</button>
+  <button class="icon-btn" data-modal="settings" data-fid="settings">⚙</button></div>
+</header>
+<div class="frame">
+ <div class="main">
+  <div class="projbar"><span class="proj-title">The Late Hour</span><span class="crumb">feature · draft 3</span>
+   <select class="sel" data-fid="branch" style="margin-left:auto"><option>Draft 3</option><option>Draft 2</option></select><kbd>Ctrl K</kbd></div>
+
+  <!-- DESK -->
+  <section class="panel on" data-room-panel="desk" style="flex-direction:column">
+   <div class="toolbar">
+    <button class="t-btn" data-fid="undo">↶</button><button class="t-btn" data-fid="redo">↷</button>
+    <button class="t-btn" data-fid="premise">Premise</button><button class="t-btn" data-fid="focus">Focus</button>
+    <button class="t-btn" data-fid="reader">Reader</button><button class="t-btn" data-dismiss-target="#smenu" data-fid="exports">Export ▾</button>
+    <button class="t-btn" data-fid="revise-desk">Revision desk</button>
+    <div class="findbar"><input class="search" placeholder="Find…"><span data-fid="finding-summary">3 findings S2–S3</span></div>
+    <div class="dismissable" id="smenu" style="position:absolute;left:240px;top:40px;z-index:20;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;min-width:190px">
+     <button class="rail-item">Fountain</button><button class="rail-item">Final Draft .fdx</button>
+     <button class="rail-item">Text</button><button class="rail-item">Print / PDF</button><button class="rail-item">Backup .zip</button></div></div>
+   <div style="display:flex;flex:1;min-height:0">
+    <aside class="struc"><div class="rail-h">Scenes</div>
+     <button class="scene-it active"><span class="no">1</span>INT. APARTMENT — NIGHT</button>
+     <button class="scene-it"><span class="no">2</span>INT. STAIRWELL — CONT.</button>
+     <button class="scene-it"><span class="no">3</span>INT. WRITER'S ROOM — DAWN</button>
+     <div class="rail-h">Characters</div><div><span class="char-chip">MARA</span><span class="char-chip">DEV</span></div>
+     <div class="rail-h">Margin notes</div><p class="margnote">exit line ×2 — cut second</p>
+     <p class="margnote">key prop S1 → payoff S3 ✓</p>
+     <button class="rail-item" data-fid="stash">Stash<span class="count">2</span></button>
+     <button class="rail-item" data-fid="beatboard">Beat board</button>
+     <button class="rail-item" data-fid="compare">Compare drafts</button></aside>
+    <div class="scriptwrap"><article class="script">
+     <p class="s-h">3 INT. WRITER'S ROOM — DAWN</p>
+     <p class="s-act">Grey light. SHE KEPT THE KEY. Mara sets it on the sill beside a dead plant.</p>
+     <p class="s-char">MARA</p><p class="s-dial">I kept the key.</p>
+     <p class="s-act" style="opacity:.65">(She doesn't look back.)</p></article></div>
+    <aside style="width:250px;border-left:1px solid var(--line);padding:12px" data-fid="context-script">
+     <div class="rail-h">Draft bar</div>
+     <select class="sel" style="width:100%"><option>Draft 3 (current)</option><option>Draft 2</option></select>
+     <button class="btn-ghost" data-fid="upload" style="width:100%;margin-top:8px;justify-content:center">⤒ Upload script</button>
+     <p class="crumb" style="margin-top:8px">autosave on · saved 12s ago</p>
+     <div class="rail-h" style="margin-top:14px">Why this room exists</div>
+     <p style="font-size:12px;color:var(--muted);line-height:1.55">Pick “Co-write ∥ Feedback” above — the two main rooms stop sharing walls with the script and stand as equals.</p></aside></div>
+  </section>
+
+  <!-- SPLIT: the thesis -->
+  <section class="panel" data-room-panel="split">
+   <div class="split">
+    <!-- WARM HALF: co-write -->
+    <div class="half warm cowrite" style="border-right:1px solid var(--line)">
+     <div class="half-h">✎ Co-write<span class="n">room 1 of 2</span></div>
+     <div class="partner" style="border-color:var(--line);background:transparent">
+      <span class="avatar" style="background:#b45309">S</span>
+      <div><p class="p-name">Sameer</p><p class="p-sub">craft partner · scene 3</p></div>
+      <div class="lens"><button aria-pressed="true">Craft</button><button aria-pressed="false">Doctor</button></div>
+      <button class="icon-btn" data-fid="clear-chat">⌫</button></div>
+     <div class="thread">
+      <div class="msg user" style="background:#b45309">Does the dawn scene earn its ending?</div>
+      <div class="msg ai">It does — if you trust the key. You state the feeling twice.<span class="grounded">✓ grounded · Scene 3</span></div></div>
+     <div class="composer-zone cowrite" style="background:transparent">
+      <div class="explore-rail">
+       <button class="rail-btn" data-q="Punch up Mara's exit line.">⚡<span>Punch up exit</span></button>
+       <button class="rail-btn" data-q="What does Dev want?">?<span>Dev's want</span></button>
+       <button class="rail-btn restore" title="Restore chips">···<span>Restore chips</span></button></div>
+      <div class="composer">
+       <div class="chips"><button class="chip" data-q="Punch up Mara's exit line.">⚡ Punch up Mara's exit</button>
+        <button class="chip" data-q="What does Dev want in this scene?">What does Dev want?</button>
+        <button class="chip" data-q="Where does scene 3 slow down?">Where's it slow?</button></div>
+       <label class="c-label" for="ta-sl">Ask Sameer — Enter sends · Shift+Enter newline</label>
+       <textarea id="ta-sl" class="ta" rows="2"></textarea>
+       <div class="send-row"><button class="send" style="background:#b45309">Send ⏎</button></div></div></div></div>
+    <!-- COOL HALF: feedback -->
+    <div class="half cool feedback">
+     <div class="half-h">◉ Feedback<span class="n">room 2 of 2</span></div>
+     <div class="fb-head" style="border-color:var(--line)">
+      <select class="sel"><option>English</option><option>हिन्दी</option></select>
+      <button class="btn-pri" style="background:var(--accent)">▶ Run analysis</button>
+      <button class="btn-ghost">Re-parse</button><button class="btn-ghost">Retry failed</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto"><span class="crumb">done · 41s</span>
+       <div class="progress"><i style="width:100%;background:var(--accent)"></i></div><span class="v-tag">verified</span></div></div>
+     <nav class="tabs"><button class="tab" data-tab-for="s-rep" aria-selected="true">Report</button>
+      <button class="tab" data-tab-for="s-q" aria-selected="false">Fix queue · 4</button>
+      <button class="btn-ghost" style="margin-left:auto;margin-top:4px;min-height:30px;padding:3px 10px;font-size:12px">Export .md</button></nav>
+     <div class="fb-body tabpane" id="s-rep">
+      <div class="verdict"><span class="score">7.4<small>/10</small></span>
+       <div class="meta"><strong>Draft 3 vs Draft 2 — up 0.6</strong><span>Confidence high · grounded 3/3</span></div></div>
+      <section class="cat"><h3>Craft<span class="c-score">7.8</span></h3>
+       <div class="note"><span class="sev med"></span><div>Exit line lands twice — keep window subtext.
+        <div class="n-meta"><button class="jump">→ Scene 3</button><span class="verify">✓ “I kept the key.”</span></div></div></div></section>
+      <section class="cat"><h3>Continuity<span class="c-score">6.9</span></h3>
+       <div class="note"><span class="sev high"></span><div>Orange bag vanishes S2→S3.
+        <div class="n-meta"><button class="jump">→ Scenes 2–3</button><span class="verify">✓ prop ledger ×1</span></div></div></div></section></div>
+     <div class="fb-body tabpane hidden" id="s-q">
+      <div class="cat">
+       <div class="queue-row"><div style="flex:1">Fix orange-bag continuity</div><span class="q-status q-applied">applied</span></div>
+       <div class="queue-row"><div style="flex:1">Cut repeated exit line</div><span class="q-status q-open">open</span></div>
+       <div class="queue-row"><div style="flex:1">Vary Dev's second apology</div><span class="q-status q-open">open</span></div>
+       <div class="queue-row"><div style="flex:1">Act I turn earlier ~4pp</div><span class="q-status q-open">skipped</span></div></div></div></div>
+   </div>
+  </section>
+ </div>
+</div>
+<footer class="statusbar"><span>● demo craft model · connected</span><span>tok/s 38</span>
+ <span>sprint 24:13</span><span class="grow"></span>seam is the thesis: two rooms, equal weight, one red line</footer>
+<div class="checklist"><b>R1–R5 verified:</b> feedback stands as a full half-room with Run analysis primary (R1/R5); desk menus close outside/Esc (R2); chips→rail after first send (R3); composer autogrows (R4). Signature: the red seam — co-write and feedback are literally equal halves you can see at once.</div>
+<div class="modal-back" id="settings"><div class="modal"><h2>Settings</h2>
+ <div class="f-row"><label for="sl-u">llama-server URL</label><input id="sl-u" value="http://127.0.0.1:8080"></div>
+ <button class="btn-pri" data-close>Done</button></div></div>
+<script src="shared/app.js"></script></body></html>
