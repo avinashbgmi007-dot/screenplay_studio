@@ -377,6 +377,13 @@ document.querySelectorAll('.composer').forEach(t=>{
     if(t.value.trim())document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
   });
 });
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  document.querySelectorAll('.center-tabs button').forEach(b=>b.classList.remove('on'));
+  const first=document.querySelector('.center-tabs button');
+  if(first)first.classList.add('on');
+});
 </script>
 </body>
 </html>

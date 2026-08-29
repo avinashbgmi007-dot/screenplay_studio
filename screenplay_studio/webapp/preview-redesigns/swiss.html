@@ -304,6 +304,11 @@ document.querySelectorAll('.composer').forEach(t=>{
     if(t.value.trim())document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
   });
 });
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  document.querySelectorAll('.split.solo-left,.split.solo-right').forEach(s=>s.classList.remove('solo-left','solo-right'));
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+});
 </script>
 </body>
 </html>
