@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1a101">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b101">
 </head>
 <body data-room="cowrite">
 
@@ -231,11 +231,18 @@
              Structure toggle, out of the way. No doctor, no scripts, no shelf
              here. -->
         <div id="idea-canvas" class="idea-canvas" style="display:none;">
+          <div class="spark-ambience" aria-hidden="true">
+            <div class="spark-stars"></div>
+            <svg class="spark-threads" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <defs><linearGradient id="sparkTg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ee7ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+              <path d="M10 24 L36 14 M10 24 L24 60 M36 14 L66 28 M66 28 L90 18 M24 60 L56 68 M56 68 L86 56" fill="none" stroke="url(#sparkTg)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+            </svg>
+          </div>
           <div class="idea-head">
             <input id="idea-title-input" class="idea-title-input" type="text" value="" maxlength="80" spellcheck="false" aria-label="Idea title" title="Click to rename">
             <span id="idea-save-state" class="idea-save-state" aria-live="polite"></span>
             <button id="idea-structure-btn" class="idea-structure-btn" type="button" title="The structured logline / open-questions view — kept out of the way">▸ Structure</button>
-            <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script">📄 First pages</button>
+            <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script — the wall grows up">✦ Grow into pages</button>
             <input type="file" id="idea-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
           </div>
           <textarea id="idea-content" class="idea-content" spellcheck="false" aria-label="The idea page"></textarea>
@@ -258,6 +265,7 @@
             <button id="premise-btn" class="btn-secondary" title="The premise card that grew into this script" type="button" style="display:none;">📌 Premise</button>
             <button id="focus-btn" class="btn-secondary" title="Focus mode — the page dims to the line you're on, and the script follows you (typewriter scroll)" type="button">✳ Focus</button>
             <button id="reader-btn" class="btn-secondary" title="Reader mode — the draft clean, no margin machinery" type="button">Reader</button>
+            <button id="flow-btn" class="btn-secondary" title="River read — the draft as one continuous flow; a current nav tracks your drift (Esc leaves)" type="button">≋ Flow</button>
             <button id="undo-btn" class="btn-secondary" title="Undo the last applied edit (Ctrl+Z)" disabled>↶ Undo</button>
             <button id="redo-btn" class="btn-secondary" title="Re-apply the undone edit (Ctrl+Shift+Z)" disabled>↷ Redo</button>
             <button id="revise-btn" class="btn-secondary" title="Revision view — the doctor's findings beside the draft, with a scene navigator" type="button">✎ Revise</button>
@@ -516,7 +524,9 @@
       <button id="fork-save" class="btn-primary">Create fork</button>
     </div>
   </div>
-</div>  <script src="core.js?v=hx1a102"></script>
-<script src="app.js?v=hx1a103"></script>
+</div>
+<div id="river-current" aria-hidden="true"></div>
+<div class="dawn-wash" aria-hidden="true"></div>  <script src="core.js?v=hx1b101"></script>
+<script src="app.js?v=hx1b102"></script>
 </body>
 </html>

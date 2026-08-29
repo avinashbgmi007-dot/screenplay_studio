@@ -4020,3 +4020,157 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
 .conn-card-row.demo b { color: #d9a441; }
 .conn-card-row.fail b { color: var(--danger, #c96a5a); }
 .conn-card-row.switch { color: var(--accent-bright, #e8c47a); white-space: normal; }
+
+/* ==================================================================
+   SPARK WALL — the chosen world, wired into the real desk
+   ① idea room  = the wall (void + glass page + threads + star drift)
+   ② verdict    = the dawn meter (resolve findings, the room warms)
+   ③ river read = the draft as one continuous flow, current nav
+   All motion sits behind prefers-reduced-motion guards.
+   ================================================================== */
+
+:root { --spark-dawn: 0; }
+
+/* ---- ① the wall: ambience behind the idea page ---- */
+.spark-ambience {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 16px;
+  display: none;
+  z-index: 0;
+}
+body.idea-mode .spark-ambience { display: block; }
+.idea-canvas > *:not(.spark-ambience) { position: relative; z-index: 1; }
+.spark-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 67% 9%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1.4px 1.4px at 85% 62%, rgba(255, 255, 255, 0.32), transparent),
+    radial-gradient(1px 1px at 30% 76%, rgba(255, 255, 255, 0.26), transparent),
+    radial-gradient(1px 1px at 52% 38%, rgba(255, 255, 255, 0.22), transparent),
+    radial-gradient(1.2px 1.2px at 44% 88%, rgba(255, 255, 255, 0.2), transparent);
+}
+.spark-threads { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.5; }
+@media (prefers-reduced-motion: no-preference) {
+  .spark-threads path {
+    stroke-dasharray: 5 11;
+    animation: sparkThreadFlow 26s linear infinite;
+  }
+  .spark-stars { animation: sparkStarDrift 60s ease-in-out infinite alternate; }
+}
+@keyframes sparkThreadFlow { to { stroke-dashoffset: -320; } }
+@keyframes sparkStarDrift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-14px, 10px); }
+}
+/* the glass page on the void */
+body.idea-mode .idea-canvas {
+  background:
+    radial-gradient(700px 320px at 50% -6%, rgba(110, 231, 255, 0.07), transparent 70%),
+    radial-gradient(500px 300px at 88% 90%, rgba(167, 139, 250, 0.06), transparent 70%);
+}
+body.idea-mode .idea-head { border-bottom-color: rgba(160, 180, 255, 0.18); }
+body.idea-mode .idea-content {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(160, 180, 255, 0.16);
+  border-radius: 16px;
+  padding: 26px 30px;
+  margin-top: 16px;
+  backdrop-filter: blur(8px);
+  caret-color: #6ee7ff;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+body.idea-mode .idea-content:focus {
+  border-color: rgba(110, 231, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(110, 231, 255, 0.08);
+}
+body.idea-mode .idea-sam-pill {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.9), rgba(110, 231, 255, 0.9));
+  color: #0a0e1a;
+  font-weight: 600;
+  box-shadow: 0 8px 26px -8px rgba(110, 231, 255, 0.45);
+}
+body.idea-mode .idea-graduate-btn { background: linear-gradient(135deg, #a78bfa, #6ee7ff); border: 0; color: #0a0e1a; }
+
+/* ---- explore chips: icon + label, collapse to icons after first input ----
+   The mockup contract: expanded on open, .collapsed on first composer input,
+   hover on a lone icon reveals its label again. */
+.explore-chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.explore-chip .chip-ic { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.explore-chips.collapsed { flex-direction: column; align-items: flex-start; }
+.explore-chips.collapsed .explore-chip .lbl { display: none; }
+.explore-chips.collapsed:hover .explore-chip .lbl { display: inline; }
+@media (prefers-reduced-motion: no-preference) {
+  .explore-chips { transition: flex-direction 0s, padding 0.2s ease; }
+}
+
+/* ---- ② the dawn meter: resolve findings, the room warms ---- */
+.dawn-wash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: calc(var(--spark-dawn) * 0.5);
+  background: linear-gradient(180deg, rgba(255, 169, 77, 0.14), rgba(242, 165, 107, 0.06) 55%, transparent);
+  transition: opacity 0.6s ease;
+}
+@media (prefers-reduced-motion: reduce) { .dawn-wash { transition: none; } }
+.dawn-meter { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.dawn-cap { font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-faint); }
+.dawn-track { width: 110px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.dawn-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5a4a8a, #e8a54b); transition: width 0.5s ease; }
+@media (prefers-reduced-motion: reduce) { .dawn-fill { transition: none; } }
+.dawn-pct { font-size: 10.5px; color: var(--text-muted); min-width: 30px; text-align: right; font-weight: 600; }
+
+/* ---- ③ river read: the draft as one continuous flow ---- */
+body.river-read .scene-page {
+  border-radius: 22px 22px 22px 6px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  transform: none;
+}
+body.river-read .scene-page + .scene-page { margin-top: -6px; }
+body.river-read .scene-page::after {
+  content: "";
+  display: block;
+  height: 22px;
+  margin: 22px auto 0;
+  width: 70%;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 22' preserveAspectRatio='none'><path d='M0 11 C 20 2 40 20 60 11 C 80 2 100 20 120 11' fill='none' stroke='%23a3906d' stroke-width='1.4'/></svg>") no-repeat center / 100% 100%;
+  opacity: 0.7;
+}
+body.river-read .finding-note,
+body.river-read .note-mine,
+body.river-read .scene-notes,
+body.river-read .finding-summary { display: none !important; }
+body.river-read #flow-btn.active { color: var(--accent-bright); border-color: var(--accent); }
+#river-current {
+  position: fixed;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 60;
+}
+body.river-read #river-current { display: flex; }
+#river-current i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) { #river-current i { transition: none; } }
+#river-current i:hover { background: rgba(255, 255, 255, 0.45); }
+#river-current i.on {
+  background: var(--accent);
+  box-shadow: 0 0 12px 3px rgba(232, 162, 79, 0.25);
+  transform: scale(1.3);
+}
