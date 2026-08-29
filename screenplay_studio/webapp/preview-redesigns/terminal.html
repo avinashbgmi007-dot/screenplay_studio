@@ -3,299 +3,269 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Terminal Draft — Screenplay Studio redesign preview ⑤</title>
+<title>Terminal Draft — The Command Palette Desk ⑤</title>
 <style>
 :root{
-  --bg:#0a0f0a; --panel:#0e150f; --grn:#7ee787; --grn-dim:#3fae56;
-  --txt:#c9d6c9; --dim:#5d6f5d; --line:#1c2b1e;
+  --bg:#070c07; --panel:#0c130d; --grn:#7ee787; --grn-dim:#3fae56;
+  --txt:#c9d6c9; --dim:#5d6f5d; --line:#182519;
   --red:#ff6b6b; --amber:#e3b341; --cyan:#79c0ff;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--txt);font-family:Consolas,"Cascadia Mono","Courier New",monospace;font-size:14px;line-height:1.55;overflow-x:hidden}
-.mono{font-family:inherit}
+body{background:var(--bg);color:var(--txt);font-family:Consolas,"Cascadia Mono","Courier New",monospace;font-size:13.5px;line-height:1.55;overflow:hidden}
 ::selection{background:rgba(126,231,135,.25)}
 
 #pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#000;border-bottom:1px solid var(--line);font-size:12px}
 #pv b{color:var(--grn);margin-right:10px}
 #pv button{background:none;border:1px solid var(--line);color:var(--dim);padding:4px 12px;cursor:pointer;font:inherit}
-#pv button:hover{border-color:var(--grn-dim);color:var(--grn)}
 #pv button.on{background:var(--grn-dim);border-color:var(--grn-dim);color:#031004;font-weight:700}
-main{padding-top:44px}
-[data-screen]{display:none;height:calc(100vh - 44px);position:relative;overflow:hidden}
-[data-screen].active{display:block}
+main{padding-top:42px;height:calc(100vh - 42px);display:flex;flex-direction:column}
+[data-screen]{display:none;flex:1;min-height:0;flex-direction:column;position:relative}
+[data-screen].active{display:flex}
 
-/* scanline overlay — subtle */
-.scan{position:absolute;inset:0;pointer-events:none;z-index:800;background:repeating-linear-gradient(0deg, rgba(255,255,255,.015) 0 1px, transparent 1px 3px)}
+.scan{position:absolute;inset:0;pointer-events:none;z-index:500;background:repeating-linear-gradient(0deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px)}
 
-/* welcome */
-.s-welcome{display:flex;flex-direction:column;justify-content:center;padding:0 max(8vw,64px)}
-.s-welcome h1{font-size:min(5vw,42px);color:var(--grn);font-weight:400}
-.cursor-blink::after{content:"▋";animation:blink 1.1s steps(1) infinite;color:var(--grn)}
+/* ====== WELCOME: the shell boot ====== */
+.s-welcome{background:var(--bg);overflow-y:auto;display:block}
+.boot{max-width:820px;margin:0 auto;padding:60px 40px 80px}
+.boot .ln{white-space:pre-wrap;padding:1px 0;color:var(--dim)}
+.boot .ln b{color:var(--txt);font-weight:400}
+.boot .cmd{color:var(--grn)}
+.boot h1{font-size:30px;color:var(--grn);font-weight:400;margin:10px 0 4px}
+.blink::after{content:"▋";animation:blink 1.1s steps(1) infinite;color:var(--grn)}
 @keyframes blink{50%{opacity:0}}
-@media (prefers-reduced-motion: reduce){.cursor-blink::after{animation:none}}
-.term-line{color:var(--dim);margin-top:8px}
-.term-line b{color:var(--txt);font-weight:400}
-.tree{margin-top:26px;color:var(--dim);font-size:13.5px}
-.tree div{padding:2px 0}
-.tree .sel{color:var(--bg);background:var(--grn);font-weight:700;display:inline-block;padding:0 8px}
-.tree span.nm{color:var(--txt)}
-.tree .st{margin-left:14px;color:var(--grn)}
-.tree .pn{color:var(--amber)}
+@media (prefers-reduced-motion: reduce){.blink::after{animation:none}}
+.dir{margin-top:26px}
+.dir .row{display:flex;gap:10px;padding:4px 10px;color:var(--dim);cursor:pointer}
+.dir .row:hover{background:rgba(126,231,135,.07)}
+.dir .row.open{color:var(--bg);background:var(--grn);font-weight:700}
+.dir .row.open .st,.dir .row.open .p{color:#031004}
+.dir .st{margin-left:auto;color:var(--grn)}
+.dir .p{color:var(--amber)}
 
-/* desk */
-.desk-top{height:46px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:#07230b;--x:0}
-.proj{color:var(--grn);font-weight:700}
-.room-pills{margin-left:auto;display:flex;gap:10px;font-size:12px;color:var(--dim)}
-.room-pills .pill{cursor:pointer}.room-pills .pill:hover{color:var(--grn)}
-.pages{height:calc(100% - 46px);overflow-y:auto;padding:36px 0 90px}
-.page-wrap{max-width:780px;margin:0 auto;padding:0 32px}
-.scene-page{border:1px solid var(--line);background:var(--panel);padding:64px 70px;margin-bottom:22px;position:relative}
-.scene-page::before{content:"┌─[ " attr(data-scene) " ]";position:absolute;top:-10px;left:24px;background:var(--bg);color:var(--grn-dim);font-size:11.5px;padding:0 8px}
-.slug{color:var(--cyan);margin-bottom:13px}
-.char-cue{text-transform:uppercase;margin:17px 0 2px 140px;color:var(--amber)}
-.dialogue{margin-left:70px;max-width:430px;color:var(--txt)}
-.action{margin:12px 0;color:var(--dim)}
-.el-anchored{background:rgba(227,179,65,.12);border-bottom:1px dashed var(--amber);cursor:pointer}
-.fn-note{position:absolute;right:-16px;top:160px;width:250px;border:1px solid var(--line);background:#050c06;padding:12px 14px;font-size:12.5px;color:var(--dim)}
-.fn-note b{color:var(--amber);display:block;margin-bottom:4px;font-size:11px;text-transform:uppercase}
-.edge-tabs{position:absolute;right:14px;bottom:88px;display:flex;flex-direction:column;gap:8px;z-index:50;align-items:flex-end}
-.edge-tab{border:1px solid var(--line);background:var(--panel);color:var(--grn);padding:8px 14px;font:inherit;font-size:12.5px;cursor:pointer}
-.edge-tab:hover{border-color:var(--grn-dim)}
-.pane-pop{position:absolute;right:84px;bottom:62px;width:420px;height:500px;background:#05120873;background:var(--panel);border:1px solid var(--grn-dim);z-index:60;display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(8px)}
-.pane-pop.open{opacity:1;pointer-events:auto;transform:none}
-.pane-head{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);color:var(--grn)}
-.avatar{width:26px;height:26px;border:1px solid var(--grn-dim);display:grid;place-items:center;font-size:12px;color:var(--grn)}
-.nm{font-weight:700}.rl{font-size:11px;color:var(--dim)}
-.pane-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:11px}
-.msg.them .bubble{color:var(--txt);font-size:13px;border-left:2px solid var(--grn-dim);padding-left:11px}
-.msg.me{align-self:flex-end}.msg.me .bubble{color:var(--cyan);font-size:13px}
+/* ====== BUFFER: numbered editor pane (desk) ====== */
+.buf{flex:1;overflow-y:auto;min-height:0}
+.buf-inner{max-width:860px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:44px 1fr;column-gap:14px}
+.ln-no{color:#2e3f2f;text-align:right;user-select:none;font-size:12px;line-height:1.9}
+.script-body{line-height:1.9}
+.sl{color:var(--cyan)}
+.cue{color:var(--amber);margin-top:14px}
+.dl{color:var(--txt);margin-left:44px;max-width:520px}
+.ac{color:var(--dim);margin:8px 0}
+.ac.mark{background:rgba(227,179,65,.1);outline:1px dashed var(--amber);outline-offset:2px;cursor:pointer}
+.sc-h{color:var(--grn-dim);margin:22px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+
+/* status line + command input (the ONLY chrome) */
+.statusline{flex:0 0 auto;background:var(--grn-dim);color:#031004;display:flex;align-items:center;gap:0;font-size:12.5px;height:26px}
+.statusline .mode-tag{background:#031004;color:var(--grn);padding:0 10px;font-weight:700;height:100%;display:flex;align-items:center}
+.statusline .path{padding:0 12px}
+.statusline .stat{margin-left:auto;display:flex;height:100%}
+.statusline .stat span{padding:0 10px;display:flex;align-items:center;border-left:1px solid rgba(3,16,4,.25)}
+.cmdline{flex:0 0 auto;height:34px;background:var(--panel);border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 14px}
+.cmdline .sig{color:var(--grn);font-weight:700}
+.cmdline input{flex:1;background:none;border:0;outline:none;color:var(--txt);font:inherit;font-size:13.5px}
+.cmdline .hint{color:var(--dim);font-size:11.5px}
+
+/* ====== PALETTE overlay ====== */
+.pal-back{position:absolute;inset:0;background:rgba(3,7,3,.78);z-index:800;display:none;justify-content:center;padding-top:14vh}
+.pal-back.open{display:flex}
+.pal{width:min(600px,88vw);background:var(--panel);border:1px solid var(--grn-dim);height:fit-content}
+.pal input{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--grn);padding:13px 16px;font:inherit;outline:none}
+.pal .rows{max-height:320px;overflow-y:auto}
+.pal .rows div{display:flex;justify-content:space-between;gap:14px;padding:9px 16px;cursor:pointer;color:var(--txt)}
+.pal .rows div:hover{background:rgba(126,231,135,.09);color:var(--grn)}
+.pal .rows small{color:var(--dim)}
+
+/* ====== ROOM: partner window as overlay pane ====== */
+.win{position:absolute;top:6vh;left:50%;transform:translateX(-50%);width:min(680px,90vw);height:min(70vh,560px);background:var(--panel);border:1px solid var(--grn-dim);z-index:600;display:none;flex-direction:column;box-shadow:0 0 80px rgba(0,0,0,.7)}
+.win.open{display:flex}
+.win-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);color:var(--grn)}
+.win-head .ttl{font-weight:700}
+.win-head .sub{color:var(--dim);font-size:11px}
+.win-head .x{margin-left:auto;color:var(--dim);cursor:pointer;border:1px solid var(--line);padding:2px 9px}
+.win-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:86%;font-size:13px}
+.msg.them .bubble{border-left:2px solid var(--grn-dim);padding-left:11px}
+.msg.me{align-self:flex-end}.msg.me .bubble{color:var(--cyan)}
 .msg.them .who{font-size:10.5px;color:var(--grn-dim);margin-bottom:3px}
-.explore-chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 14px 9px;transition:.2s ease}
-.chip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--grn-dim);color:var(--grn);background:none;padding:4px 10px;font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap}
-.chip:hover{background:rgba(126,231,135,.08)}
-.explore-chips.collapsed{flex-direction:column;align-items:flex-start}
+.explore-chips{display:flex;flex-wrap:wrap;gap:7px;transition:.2s ease}
+.chip{border:1px dashed var(--grn-dim);color:var(--grn);background:none;padding:4px 10px;font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap}
+.explore-chips.collapsed{flex-direction:column;align-items:flex-start;width:120px}
 .explore-chips.collapsed .chip span.lbl{display:none}
+.explore-chips.collapsed .chip:hover{width:auto}
 .explore-chips.collapsed:hover .chip span.lbl{display:inline}
-.composer-zone{position:relative;padding:0 14px 14px}
-.composer{width:100%;min-height:40px;max-height:168px;resize:none;background:#020703;border:1px solid var(--line);color:var(--grn);padding:10px 38px 10px 12px;font:inherit;font-size:13px;outline:none}
+.win-foot{border-top:1px solid var(--line);padding:12px 14px}
+.composer{width:100%;min-height:40px;max-height:130px;resize:none;background:#020703;border:1px solid var(--line);color:var(--grn);padding:10px 12px;font:inherit;font-size:13px;outline:none}
 .composer:focus{border-color:var(--grn-dim)}
-.send{position:absolute;right:22px;bottom:22px;background:none;border:0;color:var(--grn);font-size:15px;cursor:pointer}
-.status-strip{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;gap:16px;padding:0 18px;background:#000;border-top:1px solid var(--line);font-size:11px;color:var(--dim);z-index:40}
-.ok{color:var(--grn)}.warn{color:var(--amber)}
-.st-sprint{margin-left:auto;color:var(--grn)}
 
-/* command palette */
-.palette-backdrop{position:absolute;inset:0;background:rgba(2,6,3,.72);z-index:850;display:none;align-items:flex-start;justify-content:center;padding-top:16vh}
-.palette-backdrop.open{display:flex}
-.palette{width:min(560px,86vw);background:var(--panel);border:1px solid var(--grn-dim)}
-.palette input{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--grn);padding:13px 16px;font:inherit;font-size:14px;outline:none}
-.palette .p-list div{padding:9px 16px;color:var(--txt);cursor:pointer;font-size:13px;display:flex;justify-content:space-between}
-.palette .p-list div:hover{background:rgba(126,231,135,.09);color:var(--grn)}
-.palette .p-list small{color:var(--dim)}
-.cmdk-hint{position:absolute;top:54px;right:18px;z-index:70;border:1px solid var(--line);background:#000;color:var(--dim);font-size:11.5px;padding:5px 10px}
-kbd{border:1px solid var(--line);padding:1px 5px;color:var(--grn);font-family:inherit}
-
-/* co-writer */
-.s-cowrite{display:flex;flex-direction:column}
-.cw-head{display:flex;align-items:center;gap:13px;padding:13px 20px;border-bottom:1px solid var(--line);background:#07230b}
-.cw-head h2{font-size:16px;color:var(--grn);font-weight:400}
-.sub{color:var(--dim);font-size:11.5px}
-.memory-card{margin:11px 20px 0;border:1px solid var(--line);background:var(--panel);padding:9px 13px;font-size:12px;color:var(--dim)}
-.memory-card b{color:var(--grn);font-weight:400}
-.cw-chat{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;max-width:900px;width:100%;margin:0 auto}
-.cw-chat .msg{max-width:84%}
-.cw-composer{position:relative;max-width:900px;width:100%;margin:0 auto 16px;padding:0 20px}
-.cw-explore{padding:8px 20px 0;max-width:900px;margin:0 auto;width:100%}
-.cw-status{height:28px;border-top:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 20px;font-size:11px;color:var(--dim);background:#000}
-
-/* feedback */
-.s-feedback{display:flex}
-.fb-nav{width:262px;border-right:1px solid var(--line);background:#000;padding:18px 14px;overflow-y:auto}
-.fb-nav h3{font-size:11px;text-transform:uppercase;color:var(--grn-dim);margin-bottom:11px;letter-spacing:.1em}
-.fb-nav a{display:block;color:var(--dim);text-decoration:none;padding:6px 9px;font-size:12.5px}
-.fb-nav a:hover,.fb-nav a.on{color:var(--grn);background:rgba(126,231,135,.06)}
-.score-box{margin-top:20px;border:1px solid var(--grn-dim);padding:13px;text-align:center}
-.score-box .n{font-size:36px;color:var(--grn)}
-.cap{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em}
-.fb-read{flex:1;overflow-y:auto}
-.fb-doc{max-width:760px;margin:0 auto;padding:42px 38px 90px}
-.kicker{color:var(--grn-dim);font-size:11.5px;margin-bottom:12px}
-.fb-doc h1{font-size:27px;color:var(--grn);font-weight:400;line-height:1.25}
-.verdict{margin:16px 0 30px;border-left:2px solid var(--grn-dim);padding:6px 0 6px 14px;color:var(--txt)}
-.cat-h{margin:34px 0 12px;color:var(--grn)}
-.cat-h .rule{color:var(--line)}
-.finding{border:1px solid var(--line);background:var(--panel);padding:12px 15px;margin-bottom:10px}
-.f-h{display:flex;align-items:center;gap:8px;color:var(--txt);margin-bottom:6px;font-size:13px}
+/* ====== FEEDBACK: log-file report ====== */
+.s-feedback .buf-inner{grid-template-columns:1fr;max-width:860px}
+.log-h{color:var(--grn);margin:20px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.log-h:first-child{margin-top:0}
+.entry{border:1px solid var(--line);background:var(--panel);padding:11px 14px;margin-bottom:9px}
+.entry .t{display:flex;gap:10px;align-items:center;color:var(--txt)}
 .sev-tag{font-size:10.5px;padding:1px 8px;border:1px solid}
 .sev.high{color:var(--red)}.sev.med{color:var(--amber)}.sev.low{color:var(--dim)}
-.finding blockquote{color:var(--cyan);margin:7px 0;padding:2px 0 2px 12px;border-left:1px solid var(--line);font-size:12px}
-.jtsc{float:right;font-size:11px;color:var(--grn);text-decoration:none;border:1px solid var(--line);padding:2px 9px}
+.entry blockquote{color:var(--cyan);margin:7px 0 3px;padding-left:11px;border-left:1px solid var(--line);font-size:12px}
+.entry .body{color:var(--dim);font-size:12.5px}
+.entry .jtsc{color:var(--grn);text-decoration:none;border:1px solid var(--line);padding:1px 8px;font-size:10.5px;margin-left:auto}
+.score-line{color:var(--dim);margin-bottom:6px}
+.score-line b{color:var(--grn);font-size:22px;font-weight:400}
 </style>
 </head>
 <body>
 
-<nav id="pv"><b>⑤ Terminal Draft</b>
-<button data-go="welcome" class="on">boot</button><button data-go="desk">desk</button><button data-go="cowrite">partner</button><button data-go="feedback">report</button>
-<span style="margin-left:auto;color:var(--dim)">screenplay-studio redesign mockup</span></nav>
+<nav id="pv"><b>⑤ Terminal — Command Palette Desk</b>
+<button data-go="welcome" class="on">boot</button><button data-go="desk">buffer</button><button data-go="cowrite">:sam window</button><button data-go="feedback">:report</button>
+<span style="margin-left:auto;color:var(--dim)">structural rebuild — the command line is the interface</span></nav>
 
 <main>
 
+<!-- WELCOME -->
 <section data-screen="welcome" class="active s-welcome">
   <div class="scan"></div>
-  <div class="term-line">$ screenplay-studio --local</div>
-  <h1>studio ready<span class="cursor-blink"></span></h1>
-  <div class="term-line">engine: <b>llama-server @ localhost:8080</b> · network egress: <span style="color:var(--grn)">none</span> · your files never leave this machine.</div>
-  <div class="tree">
-    <div>projects/</div>
-    <div>├── <span class="nm" data-go="desk" style="cursor:pointer">Pain/</span><span class="st">✓ analysed · v3 · score 7.2</span></div>
-    <div>│&nbsp;&nbsp;&nbsp;<i style="color:var(--dim)">(open → the pages load first. always.)</i></div>
-    <div>├── Gun_Pen/<span class="pn">analysis pending</span></div>
-    <div>└── ideas/new-blank-page.md&nbsp;&nbsp;<span style="color:var(--dim)">— start loose, structure later</span></div>
+  <div class="boot">
+    <div class="ln"><span class="cmd">$ screenplay-studio</span> --local</div>
+    <h1>ready.<span class="blink"></span></h1>
+    <div class="ln">engine <b>llama-server @ localhost:8080</b> · egress <b style="color:var(--grn)">none</b> · 41 sessions on record</div>
+    <div class="ln">press <b style="color:var(--grn)">⌘K</b> anywhere, or type a command below — try <b>:open pain</b></div>
+    <div class="dir">
+      <div class="ln" style="padding:6px 10px 2px">projects/</div>
+      <div class="row" data-go="desk"><span>📄 pain/draft_v3.fountain</span><span class="st">✓ analysed · 7.2 · 12/44 open</span></div>
+      <div class="row"><span>📄 gun_pen.fountain</span><span class="p">analysis pending</span></div>
+      <div class="row"><span>✎ ideas/new-page.md</span><span class="st">blank</span></div>
+    </div>
   </div>
-  <div class="term-line" style="margin-top:26px">[ <span style="color:var(--grn)">⌘K</span> ] command palette works on every screen in this preview.</div>
 </section>
 
+<!-- DESK: numbered buffer + statusline + cmdline -->
 <section data-screen="desk" class="s-desk">
   <div class="scan"></div>
-  <div class="cmdk-hint">press <kbd>⌘K</kbd> to navigate anything</div>
-  <div class="desk-top">
-    <span class="proj">~/pain/draft_v3</span>
-    <div class="room-pills">
-      <span class="pill" style="color:var(--grn)">● pages</span>
-      <span class="pill" data-go="cowrite">partner room</span>
-      <span class="pill" data-go="feedback">report</span>
-      <span class="pill">beats[]</span>
-      <span class="pill" id="pal-open" title="Open palette">⌘K</span>
+  <div class="buf">
+    <div class="buf-inner">
+      <div class="ln-no">001<br>002<br>003<br>004<br>005<br>006<br>007<br>008<br>009<br>010<br>011<br>012<br>013<br>014</div>
+      <div class="script-body">
+        <div class="sc-h">── SC 01/22 · INT. RENTED ROOM — KUKATPALLY — NIGHT ──────────</div>
+        <p class="ac">A ceiling fan turns slow. On a cot, <span class="ac mark">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
+        <p class="cue">ARJUN</p>
+        <p class="dl">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
+        <div class="sc-h">── SC 02/22 · EXT. ROAD-SIDE TEA STALL — DAY ─────────────────</div>
+        <p class="ac">Steam. Tumbling glasses. <span class="ac mark">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
+        <p class="cue">STALL OWNER</p>
+        <p class="dl">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
+        <p class="ac">Arjun laughs. It dies in the steam.</p>
+        <p class="ac" style="color:#3b4d3b">— highlighted lines carry findings or margin notes; hover ⌘K to act on them —</p>
+      </div>
     </div>
   </div>
-  <div class="pages"><div class="page-wrap">
-      <article class="scene-page" data-scene="sc 01/22 · INT">
-        <p class="slug">INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
-        <p class="action">A ceiling fan turns slow. On a cot, <span class="el-anchored">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
-        <p class="char-cue">Arjun</p>
-        <p class="dialogue">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
-        <aside class="fn-note"><b>MARGIN-NOTE 📌</b>The phone glow does the lamp's job here — his face half-lit. A quiet mirror for Act II when the calls stop coming.</aside>
-      </article>
-      <article class="scene-page" data-scene="sc 02/22 · EXT">
-        <p class="slug">EXT. ROAD-SIDE TEA STALL — DAY</p>
-        <p class="action">Steam. Tumbling glasses. <span class="el-anchored">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
-        <p class="char-cue">Stall Owner</p>
-        <p class="dialogue">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
-        <p class="action">Arjun laughs. It dies in the steam.</p>
-      </article>
-  </div></div>
-
-  <div class="edge-tabs">
-    <button class="edge-tab" id="tab-sam">sameer ● (has reply)</button>
-    <button class="edge-tab" id="tab-doc">doctor</button>
-    <button class="edge-tab">stash [3]</button>
+  <div class="statusline">
+    <span class="mode-tag">NORMAL</span><span class="path">~/pain/draft_v3.fountain</span>
+    <div class="stat"><span>sc 2/22</span><span>214w</span><span style="color:#7a2020;background:rgba(255,107,107,.12)">12/44 findings</span><span>⏱18:42</span></div>
+  </div>
+  <div class="cmdline">
+    <span class="sig">:</span>
+    <input id="cmd" placeholder="type a command… (sam · doc · report · board · open &lt;project&gt;)" autocomplete="off">
+    <span class="hint">⌘K palette · :sam opens the partner window</span>
   </div>
 
-  <aside class="pane-pop" id="pane-sam">
-    <div class="pane-head"><span class="avatar">S</span><div><div class="nm">sameer.exe</div><div class="rl">writing partner · writer_library loaded</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="who">SAMEER</div><div class="bubble">Scene 2 ka double coin-count — bina dialogue ke shortage bol gaya. Scene 1 ke phone-glow ke saath Act I setup complete ho gaya.</div></div>
+  <div class="pal-back" id="pal">
+    <div class="pal">
+      <input placeholder="jump to… " autofocus>
+      <div class="rows">
+        <div data-go="welcome">boot screen <small>projects directory</small></div>
+        <div data-go="desk">pain — buffer <small>the script itself</small></div>
+        <div data-open="win-sam">sameer <small>partner window · :sam</small></div>
+        <div data-open="win-doc">premise doctor <small>:doc</small></div>
+        <div data-go="feedback">report <small>:report · log-style readout</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win" id="win-sam">
+    <div class="win-head"><span style="border:1px solid var(--grn-dim);padding:1px 7px">S</span><div><div class="ttl">sameer</div><div class="sub">writing partner · peer mode · session branched</div></div><span class="x" data-close>esc</span></div>
+    <div class="win-body">
+      <div class="msg them"><div class="who">SAMEER</div><div class="bubble">Scene 2 ka double coin-count — badhiya. Bina ek word bole "shortage". Act I setup complete.</div></div>
       <div class="msg me"><div class="bubble">&gt; stall owner ko zyada do?</div></div>
-      <div class="msg them"><div class="bubble">Ek line kaafi hai. Aage badhaya to character gayab, plot ban jayega. Cheap steering nahi.</div></div>
+      <div class="msg them"><div class="bubble">Ek line kaafi hai. Aur diya to character gayab, plot ban jayega.</div></div>
     </div>
-    <div class="explore-chips">
+    <div class="explore-chips" style="padding:0 14px 10px">
       <button class="chip">✂ <span class="lbl">tighten scene 1</span></button>
       <button class="chip">🎭 <span class="lbl">push arjun's want</span></button>
       <button class="chip">⚖ <span class="lbl">is act i earning it?</span></button>
     </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="$ sameer>" rows="1"></textarea><button class="send">↵</button></div>
-  </aside>
+    <div class="win-foot"><textarea class="composer" placeholder="$ sameer>" rows="1"></textarea></div>
+  </div>
 
-  <aside class="pane-pop" id="pane-doc">
-    <div class="pane-head"><span class="avatar">D</span><div><div class="nm">premise_doctor.exe</div><div class="rl">diagnosis without sugar</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="bubble">why this week? rent trouble is generic. what makes arjun unable to walk away TODAY is the real premise — and it's not on the page yet. finding #3, severity high.</div></div>
+  <div class="win" id="win-doc">
+    <div class="win-head"><span style="border:1px solid var(--grn-dim);padding:1px 7px">D</span><div><div class="ttl">premise_doctor</div><div class="sub">diagnosis without sugar</div></div><span class="x" data-close>esc</span></div>
+    <div class="win-body">
+      <div class="msg them"><div class="bubble">why this week? what makes arjun unable to walk away TODAY is the real premise — and it isn't on the page yet. finding #3, severity high.</div></div>
     </div>
-    <div class="explore-chips">
+    <div class="explore-chips" style="padding:0 14px 10px">
       <button class="chip">🩺 <span class="lbl">diagnose premise</span></button>
       <button class="chip">🔓 <span class="lbl">escalate stakes</span></button>
     </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="$ doctor>" rows="1"></textarea></div>
-  </aside>
-
-  <div class="status-strip">
-    <span class="ok">● qwen3-14B @ :8080</span><span>sc2 · 214w</span><span class="warn">findings 12/44 open</span><span>⚡ loop ok</span>
-    <span class="st-sprint">⏱ sprint 18:42</span>
+    <div class="win-foot"><textarea class="composer" placeholder="$ doctor>" rows="1"></textarea></div>
   </div>
+</section>
 
-  <div class="palette-backdrop" id="palette">
-    <div class="palette">
-      <input placeholder="jump to… (pages / partner room / report / scene N)" autofocus>
-      <div class="p-list">
-        <div data-go="welcome">boot screen <small>shelf of projects</small></div>
-        <div data-go="desk">pages <small>the script itself — home base</small></div>
-        <div data-go="cowrite">partner room <small>sameer, full conversation</small></div>
-        <div data-go="feedback">report <small>long-form analysis readout</small></div>
-        <div data-open="pane-sam">summon sameer <small>pane over current screen</small></div>
-        <div data-open="pane-doc">summon doctor <small>pane over current screen</small></div>
+<!-- COWRITE: partner window open over dim buffer -->
+<section data-screen="cowrite" class="s-desk">
+  <div class="scan"></div>
+  <div class="buf" style="opacity:.25">
+    <div class="buf-inner">
+      <div class="ln-no">001<br>002<br>003<br>004</div>
+      <div class="script-body">
+        <div class="sc-h">── SC 02/22 · EXT. ROAD-SIDE TEA STALL — DAY ─────────────────</div>
+        <p class="ac"><span class="ac mark">Arjun counts coins twice before ordering one.</span></p>
       </div>
     </div>
   </div>
+  <div class="statusline"><span class="mode-tag">CHAT</span><span class="path">~/pain — sameer window</span>
+    <div class="stat"><span>peer mode</span><span>⏱18:42</span></div></div>
+  <div class="cmdline"><span class="sig">:</span><input placeholder="sam · doc · report · board"><span class="hint">window open — esc to close</span></div>
+
+  <div class="win open" id="win-sam2" style="display:flex">
+    <div class="win-head"><span style="border:1px solid var(--grn-dim);padding:1px 7px">S</span><div><div class="ttl">sameer — full conversation</div><div class="sub">past work loaded · tonight's script isolated</div></div><span class="x" data-go="desk">back</span></div>
+    <div class="win-body">
+      <div class="msg them"><div class="who">SAMEER</div><div class="bubble">Achhi khabar pehle: Arjun ka want ab Scene 1 se crystal clear hai.</div></div>
+      <div class="msg them"><div class="bubble">Ab kadwi baat — scenes 8–14 ek hi beat teen baar. Pressure dikhata hai, badhta nahi. Audience ko washroom break milega — humein dena nahi hai.</div></div>
+      <div class="msg me"><div class="bubble">&gt; to kya hatayein?</div></div>
+      <div class="msg them"><div class="bubble">Kis ek scene me Arjun CHOOSE karta hai? Wohi rakho. Baaki do 1.5 page me collapse. Likh dikhau?</div></div>
+    </div>
+    <div class="explore-chips" style="padding:0 14px 10px">
+      <button class="chip">📄 <span class="lbl">show the collapsed scene</span></button>
+      <button class="chip">🧗 <span class="lbl">raise stakes instead</span></button>
+      <button class="chip">🔁 <span class="lbl">compare with gun pen's mid</span></button>
+      <button class="chip">🗣 <span class="lbl">read it in tenglish voice</span></button>
+    </div>
+    <div class="win-foot"><textarea class="composer" rows="1" placeholder="$ sameer — write here…"></textarea></div>
+  </div>
 </section>
 
-<section data-screen="cowrite" class="s-cowrite">
-  <div class="scan"></div>
-  <div class="cw-head">
-    <span class="avatar" style="width:34px;height:34px;font-size:14px">S</span>
-    <div><h2>sameer — partner room</h2><div class="sub">the long conversation · memory &amp; library live here</div></div>
-    <div class="room-pills" style="margin-left:auto"><span class="pill" data-go="desk">← pages</span><span class="pill" data-go="feedback">report</span></div>
-  </div>
-  <div class="memory-card"><b>PAST WORK:</b> Gun Pen (family-pressure core) · honored note: "no cheap steering". <b>RELATIONSHIP:</b> 41 sessions · pushback welcomed · tenglish register. <b>TONIGHT:</b> Pain v3 — kept separate from past work.</div>
-  <div class="cw-chat">
-    <div class="msg them"><div class="who">SAMEER</div><div class="bubble">Achhi khabar pehle: Arjun ka want ab Scene 1 se crystal clear hai.</div></div>
-    <div class="msg them"><div class="bubble">Ab kadwi baat — scenes 8–14 ek hi beat teen baar. Pressure dikhata hai, badhta nahi. Audience ko waqt milega washroom jaane ka — humein dena nahi hai.</div></div>
-    <div class="msg me"><div class="bubble">&gt; to kya hatayein?</div></div>
-    <div class="msg them"><div class="bubble">Sawaal pehle: kis ek scene me Arjun CHOOSE karta hai? Wohi rakho. Baaki do ko 1.5 page me collapse kar. Likh dikhau?</div></div>
-  </div>
-  <div class="cw-explore explore-chips">
-    <button class="chip">📄 <span class="lbl">show the collapsed scene</span></button>
-    <button class="chip">🧗 <span class="lbl">raise stakes instead</span></button>
-    <button class="chip">🔁 <span class="lbl">compare with gun pen's mid</span></button>
-    <button class="chip">🗣 <span class="lbl">read it in tenglish voice</span></button>
-  </div>
-  <div class="cw-composer composer-zone" style="padding:0"><textarea class="composer" rows="1" placeholder="$ sameer — write here…"></textarea><button class="send">↵</button></div>
-  <div class="cw-status"><span class="ok">● peer mode</span><span>branched session · main path</span><span class="st-sprint">⏱ 18:42</span></div>
-</section>
-
+<!-- FEEDBACK -->
 <section data-screen="feedback" class="s-feedback">
   <div class="scan"></div>
-  <nav class="fb-nav">
-    <h3>// report index</h3>
-    <a class="on" href="#fb-v">verdict</a><a href="#fb-plot">plot_economy [5]</a><a href="#fb-char">character [4]</a><a href="#fb-dialogue">dialogue [2]</a><a href="#fb-pacing">pacing_graph</a>
-    <div class="score-box"><div class="n">7.2</div><div class="cap">script score</div></div>
-    <div class="score-box" style="margin-top:8px"><div class="n" style="font-size:20px;padding-top:4px">12/44</div><div class="cap">findings open</div></div>
-  </nav>
-  <div class="fb-read"><div class="fb-doc">
-    <p class="kicker">// analysis · pain v3 · verified quotes only</p>
-    <h1 id="fb-v">A tight first act carrying an unaired second.</h1>
-    <div class="verdict">Arjun's need to know — “cheppalekha ante nenu intlo unna leda?” — is a real engine. The premise earns itself by page 12. What hasn't been earned yet is forty pages of pressure without escalation.</div>
-
-    <div class="cat-h" id="fb-plot">plot_economy <span class="rule">──────────────────</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-tag sev high">[HIGH]</span>Chekhov's gun never fires <a class="jtsc" href="#fb-v" onclick="go('desk')">↦ jump-to-scene</a></div>
-    <blockquote>“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — INT. RENTED ROOM (Sc 1)</blockquote>
-    The father-call promise pays off only as mood, never as event. Land the call by Act III midpoint — or cut the specificity.</div>
-    <div class="finding"><div class="f-h"><span class="sev-tag sev med">[MED]</span>Duplicate pressure beats</div>
-    Scenes 9, 11 and 13 stage identical money-shortage confrontations with flat intensity. Ledger flags all three as setups paying into nothing.</div>
-
-    <div class="cat-h" id="fb-char">character <span class="rule">────────────────────</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-tag sev med">[MED]</span>Stall owner vanishes after peak</div>
-    <blockquote>“Nee account tho guddi pattuko ra.” — EXT. TEA STALL (Sc 2)</blockquote>
-    Best early antagonist beat — then zero mentions across the remaining twenty scenes.</div>
-
-    <div class="cat-h" id="fb-dialogue">dialogue <span class="rule">─────────────────────</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-tag sev low">[LOW]</span>Voice bleed: Arjun edging formal</div>
-    Two scenes slip into school-Telugu constructions while the idiolect otherwise runs street-Tenglish.</div>
-
-    <div class="cat-h" id="fb-pacing">pacing_graph <span class="rule">─────────────────</span></div>
-    <div class="finding" style="display:flex;align-items:flex-end;gap:5px;height:110px;padding:14px 16px 10px"><span style="font-size:10px;color:var(--dim)">pace ▸</span>
-    <div style="flex:1;display:flex;align-items:flex-end;gap:5px;height:76px"><i style="flex:1;background:var(--line);height:46%"></i><i style="flex:1;background:var(--line);height:62%"></i><i style="flex:1;background:var(--amber);height:90%"></i><i style="flex:1;background:var(--line);height:55%"></i><i style="flex:1;background:var(--amber);height:84%"></i><i style="flex:1;background:var(--line);height:40%"></i><i style="flex:1;background:var(--amber);height:76%"></i><i style="flex:1;background:var(--line);height:66%"></i></div>
-    <span style="font-size:10px;color:var(--dim)">sc 1–8 · amber=drag</span></div>
-  </div></div>
+  <div class="buf">
+    <div class="buf-inner">
+      <div class="score-line">── analysis: pain v3 · verified quotes only · score <b>7.2</b> · findings 12/44 open ──</div>
+      <div class="entry"><div class="t"><span class="sev-tag sev high">[HIGH]</span>Chekhov's gun never fires<a class="jtsc" href="#" onclick="go('desk');return false;">↦ :open sc01</a></div>
+      <blockquote>“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — sc01</blockquote>
+      <div class="body">the father-call promise pays off only as mood, never as event. land the call by act iii midpoint — or cut the specificity.</div></div>
+      <div class="entry"><div class="t"><span class="sev-tag sev med">[MED]</span>Duplicate pressure beats</div>
+      <div class="body">sc09 · sc11 · sc13 stage identical confrontations; ledger flags all three as setups paying into nothing.</div></div>
+      <div class="entry"><div class="t"><span class="sev-tag sev med">[MED]</span>Stall owner vanishes after peak</div>
+      <blockquote>“Nee account tho guddi pattuko ra.” — sc02</blockquote>
+      <div class="body">best early antagonist beat — then zero mentions for twenty scenes.</div></div>
+      <div class="entry"><div class="t"><span class="sev-tag sev low">[LOW]</span>Voice bleed: arjun edging formal</div>
+      <div class="body">two scenes slip into school-telugu while the idiolect runs street-tenglish.</div></div>
+      <div class="entry" style="display:flex;align-items:flex-end;gap:4px;height:96px;padding:14px 16px 10px"><span style="font-size:10px;color:var(--dim)">pace ▸</span>
+      <div style="flex:1;display:flex;align-items:flex-end;gap:4px;height:64px"><i style="flex:1;background:var(--line);height:46%"></i><i style="flex:1;background:var(--line);height:62%"></i><i style="flex:1;background:var(--amber);height:90%"></i><i style="flex:1;background:var(--line);height:55%"></i><i style="flex:1;background:var(--amber);height:84%"></i><i style="flex:1;background:var(--line);height:40%"></i><i style="flex:1;background:var(--amber);height:76%"></i><i style="flex:1;background:var(--line);height:66%"></i></div>
+      <span style="font-size:10px;color:var(--dim)">sc01–08 · amber=drag</span></div>
+    </div>
+  </div>
+  <div class="statusline"><span class="mode-tag">REPORT</span><span class="path">~/pain/report.md</span>
+    <div class="stat"><span>verified quotes</span><span>⏱18:42</span></div></div>
+  <div class="cmdline"><span class="sig">:</span><input placeholder="sam · doc · board"><span class="hint">discuss any entry with :sam</span></div>
 </section>
 
 </main>
@@ -304,46 +274,44 @@ kbd{border:1px solid var(--line);padding:1px 5px;color:var(--grn);font-family:in
 function go(name){
   document.querySelectorAll('[data-screen]').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
   document.querySelectorAll('#pv [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===name));
-  closePanes();closePal();
+  document.querySelectorAll('.win.open').forEach(w=>{if(w.id!=='win-sam2')w.classList.remove('open');});
+  closePal();
 }
+const pal=document.getElementById('pal');
+function openPal(){pal.classList.add('open');pal.querySelector('input').focus();}
+function closePal(){pal.classList.remove('open');}
 document.addEventListener('click',function(e){
   const goBtn=e.target.closest('[data-go]');
   if(goBtn){go(goBtn.dataset.go);return;}
-  const palItem=e.target.closest('[data-open]');
-  if(palItem){
-    document.getElementById(palItem.dataset.open).classList.add('open');
+  const act=e.target.closest('[data-open]');
+  if(act){
+    const w=document.getElementById(act.dataset.open);
+    if(w)w.classList.add('open');
     closePal();e.stopPropagation();return;
   }
-  if(e.target.closest('#pal-open')){openPal();return;}
-  const opener=e.target.closest('.edge-tab');
-  if(opener && (opener.id==='tab-sam'||opener.id==='tab-doc')){
-    const pane=document.getElementById(opener.id);
-    const was=pane.classList.contains('open');
-    closePanes();
-    if(!was)pane.classList.add('open');
-    e.stopPropagation();return;
-  }
-  if(!e.target.closest('.pane-pop')&&!e.target.closest('.palette'))closePanes();
+  const x=e.target.closest('[data-close]');
+  if(x){x.closest('.win').classList.remove('open');return;}
+  if(!e.target.closest('.pal')&&!e.target.closest('.win'))closePal();
 });
-function closePanes(){document.querySelectorAll('.pane-pop.open').forEach(p=>p.classList.remove('open'));}
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();pal.classList.contains('open')?closePal():openPal();return;}
+  if(e.key==='Escape'){document.querySelectorAll('.win.open').forEach(w=>w.classList.remove('open'));closePal();}
+});
+const cmd=document.getElementById('cmd');
+if(cmd)cmd.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const c=cmd.value.trim().toLowerCase();
+  if(c==='sam'||c==='sam'){document.getElementById('win-sam').classList.add('open');cmd.value='';}
+  else if(c==='doc'){document.getElementById('win-doc').classList.add('open');cmd.value='';}
+  else if(c==='report'){go('feedback');cmd.value='';}
+  else if(c==='board'){cmd.value='';}
+});
 document.querySelectorAll('.composer').forEach(t=>{
   t.addEventListener('input',()=>{
     t.style.height='auto';
-    t.style.height=Math.min(t.scrollHeight,168)+'px';
+    t.style.height=Math.min(t.scrollHeight,130)+'px';
     if(t.value.trim())document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
   });
-});
-const pal=document.getElementById('palette');
-function openPal(){pal.classList.add('open');const i=pal.querySelector('input');if(i)i.focus();}
-function closePal(){if(pal)pal.classList.remove('open');}
-document.addEventListener('keydown',e=>{
-  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();pal.classList.contains('open')?closePal():openPal();return;}
-  if(e.key==='Escape'){closePanes();closePal();}
-});
-// fill pane from palette only on desk screen
-document.querySelectorAll('.p-list [data-open]').forEach(d=>{
-  d.dataset.orig=d.getAttribute('data-open');
-  d.addEventListener('click',()=>go('desk'));
 });
 </script>
 </body>
