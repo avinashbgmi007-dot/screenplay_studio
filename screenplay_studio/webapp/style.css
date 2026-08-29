@@ -4146,8 +4146,8 @@ body.idea-mode .idea-graduate-btn { background: linear-gradient(135deg, #a78bfa,
 @media (prefers-reduced-motion: reduce) { .dawn-wash { transition: none; } }
 .dawn-meter { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .dawn-cap { font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-faint); }
-.dawn-track { width: 110px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
-.dawn-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5a4a8a, #e8a54b); transition: width 0.5s ease; }
+.dawn-track { width: 110px; height: 5px; border-radius: 3px; background: var(--line, rgba(255, 255, 255, 0.16)); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18); }
+.dawn-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5a4a8a, #e8a54b); transition: width 0.5s ease; box-shadow: 0 0 8px rgba(232, 165, 75, 0.45); }
 @media (prefers-reduced-motion: reduce) { .dawn-fill { transition: none; } }
 .dawn-pct { font-size: 10.5px; color: var(--text-muted); min-width: 30px; text-align: right; font-weight: 600; }
 
