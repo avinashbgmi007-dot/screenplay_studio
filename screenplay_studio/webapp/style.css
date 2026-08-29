@@ -112,14 +112,14 @@
    ============================================================ */
 
 :root {
-  /* ink — the night room */
-  --ink-950: #14110e;
-  --ink-900: #1b1713;
-  --ink-850: #1f1a15;
-  --ink-800: #251f1a;
-  --ink-700: #2e2720;
-  --line: #3b322a;
-  --line-soft: #2a241e;
+  /* the void — night room, Spark Wall edition */
+  --ink-950: #0a0e1a;
+  --ink-900: #0e1322;
+  --ink-850: #121830;
+  --ink-800: #161d36;
+  --ink-700: #1d2544;
+  --line: #262f52;
+  --line-soft: #1c2340;
 
   /* paper — the manuscript */
   --paper: #f2e8d4;
@@ -136,9 +136,9 @@
   --consult-deep: #5b7c95;
 
   /* ink on paper / text on dark */
-  --text: #e9dfce;
-  --text-muted: #9a8e7b;
-  --text-faint: #6f6555;
+  --text: #dbe2f4;
+  --text-muted: #8b96b8;
+  --text-faint: #5d6b8a;
   --danger: #c96a5a;
   --danger-bg: rgba(201, 106, 90, 0.14);
   --ok: #8fae7e;
@@ -4253,4 +4253,31 @@ body.river-read #river-current { right: 68px; display: flex; }
   border-color: #6ee7ff;
   box-shadow: 0 0 14px 3px rgba(110, 231, 255, 0.4);
   transform: scale(1.35);
+}
+
+/* ==================================================================
+   SPARK SHELL — the whole night app wears the void now
+   The ink ramp above is the Spark Wall palette (deep blue-black,
+   cool light text, blue-tinted lines); the amber lamp stays as the
+   single warm signal — desk lamp, findings, CTAs. Dawn is untouched:
+   it re-overrides every var it needs.
+   ================================================================== */
+body:not(.dawn) {
+  background:
+    radial-gradient(1000px 520px at 12% -10%, rgba(110, 231, 255, 0.06), transparent 60%),
+    radial-gradient(900px 560px at 92% 104%, rgba(167, 139, 250, 0.07), transparent 65%),
+    var(--ink-950);
+}
+/* glass edges: panels get a faint cool rim so surfaces read as glass on void */
+body:not(.dawn) #sidebar,
+body:not(.dawn) .room-panel,
+body:not(.dawn) .drawer,
+body:not(.dawn) .modal,
+body:not(.dawn) .craft-panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+body:not(.dawn) #project-bar,
+body:not(.dawn) #script-toolbar,
+body:not(.dawn) .status-strip {
+  border-color: var(--line-soft);
 }
