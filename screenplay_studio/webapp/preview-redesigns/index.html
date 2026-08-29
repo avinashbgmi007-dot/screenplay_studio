@@ -3,38 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UIUX Redesign Previews — pick the desk of your dreams</title>
+<title>Six Concept Worlds — Screenplay Studio redesign</title>
 <style>
-:root{--ink:#16130f;--bg:#0f0d0a;--amber:#e8a54b;--muted:#94897a;--line:#2b261f}
+:root{--ink:#efe7d7;--bg:#0d0b10;--amber:#e8a54b;--muted:#94897a;--line:#2b261f}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:#efe7d7;font-family:Georgia,serif;line-height:1.5;min-height:100vh}
-header{padding:40px 32px 10px;text-align:center}
-header h1{font-size:34px;font-weight:600;letter-spacing:-.01em}
+body{background:var(--bg);color:var(--ink);font-family:Georgia,serif;line-height:1.55;min-height:100vh}
+header{padding:44px 32px 8px;text-align:center}
+header h1{font-size:33px;font-weight:600}
 header h1 em{color:var(--amber);font-style:italic}
-header p{color:var(--muted);max-width:620px;margin:12px auto 0;font-size:15px}
+header p{color:var(--muted);max-width:660px;margin:12px auto 0;font-size:14.5px}
 .viewbar{display:flex;justify-content:center;gap:8px;padding:18px 16px;flex-wrap:wrap}
 .viewbar button{background:none;border:1px solid var(--line);color:var(--muted);padding:6px 14px;border-radius:99px;cursor:pointer;font:15px Georgia,serif}
-.viewbar button:hover{color:#fff;border-color:var(--amber)}
 .viewbar button.on{background:var(--amber);border-color:var(--amber);color:var(--ink);font-weight:700}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;padding:8px 32px 40px;max-width:1400px;margin:0 auto}
 @media (max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:680px){.grid{grid-template-columns:1fr}}
-.card{background:#181410;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .2s ease, border-color .2s ease;cursor:pointer}
-@media (prefers-reduced-motion: reduce){.card{transition:none!important}}
+.card{background:#181410;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .2s ease,border-color .2s ease;cursor:pointer}
+@media (prefers-reduced-motion: reduce){.card{transition:none}}
 .card:hover{transform:translateY(-5px);border-color:var(--amber)}
 .swatch-strip{height:34px;display:flex}
 .swatch-strip i{flex:1}
-.thumb{height:210px;border-bottom:1px solid var(--line);overflow:hidden;display:block;background:#000}
-.thumb iframe{width:calc(100% + 40px);height:800px;border:0;transform:scale(.45);transform-origin:0 0;pointer-events:none;filter:saturate(.95)}
+.thumb{height:206px;border-bottom:1px solid var(--line);overflow:hidden;display:block;background:#000}
+.thumb iframe{width:calc(100% + 40px);height:800px;border:0;transform:scale(.45);transform-origin:0 0;pointer-events:none}
 .card .body{padding:16px 18px 14px;flex:1;display:flex;flex-direction:column}
 .num{font-size:11px;color:var(--amber);letter-spacing:.24em;text-transform:uppercase}
-.name{font-family:Georgia,serif;font-size:21px;margin-top:3px}
+.name{font-size:20px;margin-top:3px}
 .personality{color:var(--muted);font-size:13px;margin-top:7px;flex:1}
 .open-link{margin-top:13px;font-size:13.5px;color:var(--amber);text-decoration:none}
 .open-link:hover{text-decoration:underline}
-.howto{max-width:860px;margin:0 auto 56px;padding:0 32px;color:var(--muted);font-size:14px;text-align:center}
-.howto b{color:#efe7d7}
-.frame-view{display:none;height:calc(100vh - 100px)}
+.howto{max-width:880px;margin:0 auto 56px;padding:0 32px;color:var(--muted);font-size:14px;text-align:center}
+.howto b{color:var(--ink)}
+.frame-view{display:none;height:calc(100vh - 100px);padding:0 32px 32px}
 .frame-view.on{display:block}
 .frame-view iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;display:block}
 </style>
@@ -42,32 +41,32 @@ header p{color:var(--muted);max-width:620px;margin:12px auto 0;font-size:15px}
 <body>
 
 <header>
-  <h1>Six desks, one writer.<br><em>Pick where you want to work.</em></h1>
-  <p>Every design below shows the full journey — bookshelf → script pages (always first) → Sameer's co-writing room → the long-form feedback report. All four fixes are wired everywhere: click-outside dismissal, explore chips that tuck away after you type, and a composer that grows with you.</p>
+  <h1>Six concept worlds.<br><em>One writer's life, imagined six ways.</em></h1>
+  <p>Each world is born from a single metaphor of the writing life and carries the four real moments — the nervous upload, the verdict read alone, the late-night Sameer debate, the spark that becomes a script. Same bones everywhere: script-first, click-outside dismissal, chips that tuck away, a composer that grows with you.</p>
 </header>
 
-<div class="viewbar" id="viewbar">
+<div class="viewbar">
   <button class="on" data-view="cards">Cards</button>
-  <button data-view="fr">Live side-by-side ▸</button>
-  <select id="pick" style="background:#181410;color:#efe7d7;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font:inherit;display:none">
-    <option value="noir">① Noir Desk</option><option value="paper">② Paper Atelier</option><option value="brutal">③ Brutal Print</option><option value="swiss">④ Swiss Signal</option><option value="terminal">⑤ Terminal Draft</option><option value="organic">⑥ Organic Magazine</option>
+  <button data-view="fr">Live view ▸</button>
+  <select id="pick" style="background:#181410;color:var(--ink);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font:inherit;display:none">
+    <option value="noir">① Midnight Desk</option><option value="paper">② The Verdict</option><option value="brutal">③ Spark Wall</option><option value="swiss">④ The Theatre</option><option value="organic">⑤ First Light</option><option value="terminal">⑥ The River</option>
   </select>
 </div>
 
-<section class="frame-view" id="frameView"><iframe id="live" title="live preview"></iframe></section>
+<section class="frame-view" id="frameView"><iframe id="live" title="live world preview"></iframe></section>
 
 <div class="grid" id="cards"></div>
 
-<p class="howto"><b>How to review:</b> click any card to open it live, or hover a card for a peek. Inside each design: the top preview bar switches screens; on the Desk screen click the edge tabs (S / D) to summon Sameer & the Doctor — then <b>click anywhere else</b> to dismiss them; type one line in any composer to watch the explore-chips collapse to icons and the input grow.</p>
+<p class="howto"><b>How to review:</b> the top preview bar inside each world walks the four moments — but play with the world itself: pull the lamp cord in ①, break the wax seal's letter in ②, answer Sameer's one question on the wall in ③, scroll the spotlight down the stage in ④, <b>tick findings resolved and watch the sun rise in ⑤</b>, and drift the river end-to-end in ⑥.</p>
 
 <script>
 const designs=[
- {id:"noir",n:"①",name:"Noir — Manuscript Stage",p:"STRUCTURE: full-bleed script sanctuary — zero bars above the page. Book-spine shelf; partners slide in as full-height sheets from a right gutter. Co-writer room is a two-column study with a memory ledger.",sw:["#121014","#241f2c","#e8a54b","#efe7d7"]},
- {id:"paper",n:"②",name:"Paper — 3-Column Suite",p:"STRUCTURE: three persistent columns — scene tree │ pages │ tabbed room (Sameer/Doctor/Queue). The report swaps into the center column; everything stays visible at once.",sw:["#f7f2e9","#fdfaf4","#3d5a4c","#e0d6c4"]},
- {id:"brutal",n:"③",name:"Brutal — Corkboard + Dock",p:"STRUCTURE: desk is a corkboard of draggable scene index cards with severity stamps. Sameer lives in a bottom dock bar that expands upward into the chat. Newsprint masthead nav.",sw:["#f4f1ea","#ff5a1f","#2545d9","#111111"]},
- {id:"swiss",n:"④",name:"Swiss — Split Workbench",p:"STRUCTURE: dual-pane frame — script left, mode right (Chat/Report/Beats) with a top segmented control and pane-maximize buttons. Script and AI literally share the screen.",sw:["#fafafa","#ffffff","#2545d9","#e6e8ec"]},
- {id:"terminal",n:"⑤",name:"Terminal — Command Desk",p:"STRUCTURE: zero chrome — a numbered script buffer with a vim-style statusline and :command line. ⌘K palette summons everything; Sameer opens as a floating window; report prints as log entries.",sw:["#0a0f0a","#7ee787","#79c0ff","#e3b341"]},
- {id:"organic",n:"⑥",name:"Organic — Report-First Magazine",p:"STRUCTURE: the feedback report IS the hero landing spread, with script excerpts embedded inside it. Sameer's study rides as a right rail that widens into the full room. Contents strip navigates.",sw:["#f4ecdd","#fbf6ea","#c65b3f","#6d7a4e"]}
+ {id:"noir",n:"①",name:"Midnight Desk",p:"THE LAMP. A pool of light in a dark room; the page glows warm at the center. Findings drift in as fireflies with hover-tips; Sameer is a glowing orb at the desk's edge. Pull the cord to begin.",sw:["#0d0b10","#e8a54b","#f5ecd8","#241d12"]},
+ {id:"paper",n:"②",name:"The Verdict",p:"THE LETTER. The report as a craftsman's typed letter — wax-seal score, evidence quotes set into the prose, red-pencil margin notes. The P.S. is Sameer; the enclosures are your sparks.",sw:["#e9e2d2","#fbf7ec","#7a2e2e","#a04b3a"]},
+ {id:"brutal",n:"③",name:"Spark Wall — ★ chosen spine",p:"CHOSEN WORLD (hybrid): the glass spark canvas is home; the verdict room carries First Light's dawn meter — resolve findings and the sky warms; 'Read like water' opens the River as a continuous read mode. One question at a time; sparks graduate into pages.",sw:["#0a0e1a","#6ee7ff","#a78bfa","#ffd58a"]},
+ {id:"swiss",n:"④",name:"The Theatre",p:"THE STAGE. Scenes sit under a spotlight that follows your scroll; the Doctor's notes hang in the balcony beside each beat; Sameer whispers from the wings; findings are director's notes.",sw:["#0b0a0c","#7a1f2b","#d8b26a","#efe6d4"]},
+ {id:"organic",n:"⑤",name:"First Light",p:"NIGHT → DAWN. The whole sky is the progress bar: tick findings resolved and the sun climbs the horizon, stars fade, the room warms. Feedback becomes a ritual you can finish.",sw:["#0e1220","#f2a56b","#ffd9a3","#e8a54b"]},
+ {id:"terminal",n:"⑥",name:"The River",p:"ONE FLOW. No rooms at all — source stones flow into pages, the debate joins as a confluence, findings settle in the estuary, sparks feed the tributary. Scroll is the whole navigation.",sw:["#081316","#5eead4","#f2e9d4","#2c2620"]}
 ];
 const cards=document.getElementById('cards');
 designs.forEach(d=>{
@@ -75,12 +74,12 @@ designs.forEach(d=>{
   c.className='card';
   c.innerHTML=`
    <div class="swatch-strip">${d.sw.map(s=>`<i style="background:${s}"></i>`).join('')}</div>
-   <span class="thumb"><iframe src="${d.id}.html" loading="lazy" title="${d.name} thumbnail" tabindex="-1"></iframe></span>
+   <span class="thumb"><iframe src="${d.id}.html" loading="lazy" title="${d.name}" tabindex="-1"></iframe></span>
    <div class="body">
-     <span class="num">preview ${d.n}</span>
+     <span class="num">world ${d.n}</span>
      <span class="name serif">${d.name}</span>
      <span class="personality">${d.p}</span>
-     <a class="open-link" href="${d.id}.html" onclick="event.stopPropagation()">Open ${d.id}.html ↗ · </a><a class="open-link" href="#" data-open="${d.id}">open in-frame here</a>
+     <a class="open-link" href="${d.id}.html" onclick="event.stopPropagation()">open ${d.id}.html ↗</a>
    </div>`;
   c.addEventListener('click',()=>show(d.id));
   cards.appendChild(c);
@@ -94,7 +93,7 @@ document.getElementById('viewbar').addEventListener('click',e=>{
   document.getElementById('pick').style.display=fr?'inline-block':'none';
 });
 function show(id){
-  document.querySelectorAll('#viewbar button').forEach((x,i)=>x.classList.toggle('on',x.dataset.view==='fr'));
+  document.querySelectorAll('#viewbar button').forEach(x=>x.classList.toggle('on',x.dataset.view==='fr'));
   document.getElementById('cards').style.display='none';
   document.getElementById('frameView').classList.add('on');
   document.getElementById('pick').style.display='inline-block';
