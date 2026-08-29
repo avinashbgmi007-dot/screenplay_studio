@@ -4158,6 +4158,9 @@ body.river-read #flow-btn.active { color: var(--accent-bright); border-color: va
   gap: 10px;
   z-index: 60;
 }
+/* the partner gutter owns the right edge — the current nav lives beside it,
+   not under it (the gutter otherwise intercepts the dot clicks) */
+body.river-read #river-current { right: 68px; }
 body.river-read #river-current { display: flex; }
 #river-current i {
   width: 8px;
