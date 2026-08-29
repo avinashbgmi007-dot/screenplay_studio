@@ -109,6 +109,18 @@ def main():
                 wall["graduate"])
         c.check("thread paths present in the ambience svg", wall["threadPaths"] >= 1)
         c.check("Sameer pill rides the wall", wall["pill"])
+        # VISUAL assertions — pin the look numerically, not just DOM presence
+        look = page.evaluate("""() => ({
+            canvasBg: getComputedStyle(document.getElementById('idea-canvas')).backgroundColor,
+            pageBg: getComputedStyle(document.getElementById('idea-content')).backgroundColor,
+            threadOp: getComputedStyle(document.querySelector('.spark-threads')).opacity,
+        })""")
+        c.check("the void is actually dark (#0a0e1a)", look["canvasBg"] == "rgb(10, 14, 26)",
+                json.dumps(look))
+        c.check("the page is real dark glass, not a whisper",
+                look["pageBg"] == "rgba(13, 17, 32, 0.78)", look["pageBg"])
+        c.check("threads read at >= 0.7 opacity", float(look["threadOp"]) >= 0.7,
+                look["threadOp"])
         page.screenshot(path=f"preview_shots/e2e-spark-idea-{shot_prefix}.png")
 
         # ---- 3. chips contract ---------------------------------------------
@@ -169,6 +181,18 @@ def main():
         c.check("current nav carries one dot per scene (3)", river["dots"] == 3 and river["firstDotOn"],
                 f"dots={river['dots']}")
         c.check("wave separator styled between pages", river["waveStyled"])
+        glassy = page.evaluate("""() => {
+            const sp = document.querySelector('#script-scenes .scene-page');
+            const act = sp.querySelector('.el-action');
+            return {
+                spBg: getComputedStyle(sp).backgroundColor,
+                actColor: act ? getComputedStyle(act).color : null,
+            };
+        }""")
+        c.check("river pages are dark glass, not paper",
+                glassy["spBg"] == "rgba(10, 14, 26, 0.82)", json.dumps(glassy))
+        c.check("script text reads light on the dark glass",
+                glassy["actColor"] == "rgb(207, 224, 218)", glassy["actColor"])
         page.screenshot(path=f"preview_shots/e2e-spark-river-{shot_prefix}.png")
         # dot click jumps scenes: click dot 3, expect scroll to move
         page.locator("#river-current i").nth(2).click()
@@ -200,6 +224,19 @@ def main():
         ok = dawn.get("fn") and abs(float(dawn.get("pct", "0") or 0) - 0.333) < 0.01 and float(dawn.get("pctEmpty", "1") or 1) == 0.0
         c.check("updateDawnMeter drives --spark-dawn from fixQueue (1/3 -> 0.333, empty -> 0)", ok,
                 json.dumps(dawn))
+        page.evaluate("""() => {
+            state.fixQueue = { items: [
+                { status: 'addressed' }, { status: 'open' }, { status: 'open' }] };
+            updateDawnMeter();
+        }""")
+        page.wait_for_timeout(750)  # the wash eases in over 0.6s — sample after
+        wash = page.evaluate("() => getComputedStyle(document.querySelector('.dawn-wash')).opacity")
+        page.evaluate("""() => {
+            state.fixQueue = { items: [] };
+            updateDawnMeter();
+        }""")
+        c.check("dawn wash visibly answers (1/3 resolved -> ~0.283 opacity)",
+                abs(float(wash) - 0.283) < 0.02, wash)
 
         # ---- cleanup: remove the probe idea (live-server runs stay clean) ---
         page.evaluate("""async (title) => {
