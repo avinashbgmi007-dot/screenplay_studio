@@ -3,202 +3,164 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Noir Desk — Screenplay Studio redesign preview ①</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Noir — The Manuscript Stage ①</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#121014; --ink2:#1b1820; --ink3:#241f2c;
+  --ink:#100e12; --ink2:#191621; --ink3:#221d2c;
   --amber:#e8a54b; --amber-dim:#a97832; --cream:#efe7d7; --muted:#9a9186;
-  --line:rgba(232,165,75,.16); --red:#e05555; --ok:#79b779;
+  --line:rgba(232,165,75,.16); --red:#e05555;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{background:var(--ink);color:var(--cream);font-family:"Inter",system-ui,sans-serif;font-size:15px;line-height:1.55;overflow-x:hidden}
-h1,h2,h3,.serif{font-family:"Fraunces",Georgia,serif}
+body{background:var(--ink);color:var(--cream);font-family:Georgia,serif;font-size:15px;line-height:1.6;overflow-x:hidden}
 .mono{font-family:"JetBrains Mono",Consolas,monospace}
 
-/* ---------- preview bar ---------- */
-#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#000;border-bottom:1px solid var(--line);font-size:12px}
-#pv b{font-family:"Fraunces",serif;color:var(--amber);margin-right:10px;font-weight:600}
+#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#000;border-bottom:1px solid var(--line);font-size:12px;font-family:system-ui,sans-serif}
+#pv b{font-family:Georgia,serif;color:var(--amber);margin-right:10px}
 #pv button{background:none;border:1px solid var(--line);color:var(--muted);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
-#pv button:hover{color:var(--cream);border-color:var(--amber-dim)}
 #pv button.on{background:var(--amber);border-color:var(--amber);color:var(--ink);font-weight:600}
-main{padding-top:44px}
-
-/* ---------- screens ---------- */
-[data-screen]{display:none;height:calc(100vh - 44px);position:relative;overflow:hidden}
+main{padding-top:42px}
+[data-screen]{display:none;height:calc(100vh - 42px);position:relative;overflow:hidden}
 [data-screen].active{display:block}
 
-/* ---------- welcome / shelf ---------- */
-.s-welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:
- radial-gradient(1200px 500px at 50% -10%, rgba(232,165,75,.09), transparent 60%), var(--ink)}
-.lamp{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 50% 30%, rgba(232,165,75,.35), rgba(232,165,75,.05) 60%, transparent);filter:blur(2px)}
-.s-welcome h1{font-size:52px;font-weight:700;letter-spacing:-.02em;margin-top:-60px}
-.s-welcome h1 em{color:var(--amber);font-style:italic}
-.s-welcome p{color:var(--muted);max-width:520px;margin:12px auto 34px}
-.actions{display:flex;gap:14px}
-.btn{cursor:pointer;border-radius:8px;padding:11px 22px;font-weight:600;font-size:14px;border:1px solid transparent}
-.btn-primary{background:var(--amber);color:var(--ink)}
-.btn-primary:hover{filter:brightness(1.08)}
-.btn-ghost{background:none;border-color:var(--line);color:var(--cream)}
-.btn-ghost:hover{border-color:var(--amber-dim)}
-.shelf{display:flex;gap:22px;margin-top:64px}
-.book{width:190px;height:270px;border-radius:6px 12px 12px 6px;padding:20px 16px;display:flex;flex-direction:column;justify-content:flex-end;cursor:pointer;background:linear-gradient(160deg,var(--ink3),var(--ink2));border-left:5px solid var(--amber-dim);transition:transform .25s ease, box-shadow .25s ease;box-shadow:0 14px 30px rgba(0,0,0,.45)}
-.book:hover{transform:translateY(-10px) rotate(-1deg)}
-.book .t{font-family:"Fraunces",serif;font-size:19px;font-weight:600}
-.book .s{color:var(--muted);font-size:12px;margin-top:6px}
-.book.idea{border-left-style:dashed;justify-content:center;align-items:center;color:var(--muted);text-align:center}
-.book.idea span{font-size:38px;color:var(--amber)}
+/* ====== WELCOME: lamp over a dark desk, shelf as a row of spines ====== */
+.s-welcome{display:grid;place-items:center;background:radial-gradient(900px 420px at 50% 120%, rgba(232,165,75,.13), transparent 70%),var(--ink)}
+.w-inner{text-align:center;max-width:760px;padding:0 24px}
+.wordmark{font-family:"Fraunces",serif;font-size:15px;letter-spacing:.5em;text-transform:uppercase;color:var(--amber-dim)}
+.s-welcome h1{font-family:"Fraunces",serif;font-size:56px;font-weight:700;line-height:1.05;margin:14px 0 12px}
+.s-welcome h1 em{font-style:italic;color:var(--amber)}
+.s-welcome p{color:var(--muted);font-family:system-ui,sans-serif;font-size:14px;max-width:480px;margin:0 auto 30px}
+.shelf-row{display:flex;justify-content:center;gap:0;margin-top:44px;perspective:900px}
+.spine{writing-mode:vertical-rl;padding:26px 12px;background:linear-gradient(180deg,var(--ink3),#151219);border:1px solid var(--line);border-radius:4px 4px 0 0;margin:0 -3px;cursor:pointer;transition:transform .25s ease;font-family:"Fraunces",serif;font-size:15px;color:var(--cream)}
+@media (prefers-reduced-motion: reduce){.spine{transition:none}}
+.spine:hover{transform:translateY(-14px)}
+.spine .meta{font-family:system-ui,sans-serif;font-size:10px;color:var(--muted);letter-spacing:.14em;margin-top:14px}
+.spine.tall{height:210px}.spine.taller{height:240px}
+.spine.idea{height:170px;color:var(--amber);border-style:dashed}
 
-/* ---------- desk (script-first) ---------- */
-.desk-top{height:58px;display:flex;align-items:center;gap:18px;padding:0 26px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.25)}
-.desk-top .proj{font-family:"Fraunces",serif;font-weight:600;font-size:17px}
-.room-pills{display:flex;gap:8px;margin-left:auto}
-.pill{border:1px solid var(--line);border-radius:99px;padding:5px 14px;font-size:12.5px;color:var(--muted);cursor:pointer}
-.pill.on,.pill:hover{border-color:var(--amber-dim);color:var(--cream)}
-.pages{height:calc(100% - 58px);overflow-y:auto;padding:56px 0 120px}
-.page-wrap{max-width:740px;margin:0 auto;padding:0 32px}
-.scene-page{background:#fbf6ec;color:#211c15;border-radius:4px;padding:88px 92px;margin-bottom:36px;box-shadow:0 24px 60px rgba(0,0,0,.55);position:relative;font-family:"Courier Prime","Courier New",monospace;font-size:15px;line-height:1.65}
-.scene-page::before{content:attr(data-scene);position:absolute;top:24px;left:40px;font:600 11px "Inter";letter-spacing:.14em;text-transform:uppercase;color:#a3906d}
-.slug{font-weight:700;margin-bottom:16px}
-.char-cue{text-transform:uppercase;margin:18px 0 2px 140px}
-.dialogue{margin-left:70px;max-width:420px}
+/* ====== DESK: the manuscript stage — nothing but the page ====== */
+.s-desk{background:radial-gradient(700px 300px at 50% -5%, rgba(232,165,75,.07), transparent),var(--ink)}
+.stage{height:100%;overflow-y:auto;padding:54px 0 90px}
+.ms-col{max-width:720px;margin:0 auto;padding:0 28px}
+.scene-page{background:#fbf6ec;color:#221c13;padding:80px 84px;margin-bottom:34px;border-radius:3px;box-shadow:0 26px 70px rgba(0,0,0,.65),0 2px 0 rgba(255,255,255,.06) inset;position:relative;font-family:"Courier Prime","Courier New",monospace;font-size:15px;line-height:1.65}
+.scene-page::before{content:attr(data-scene);position:absolute;top:20px;right:32px;font:600 10px system-ui;letter-spacing:.16em;color:#b3a184}
+.slug{font-weight:700;margin-bottom:15px}
+.char-cue{text-transform:uppercase;margin:17px 0 2px 140px}
+.dialogue{margin-left:72px;max-width:410px}
 .action{margin:12px 0}
 .el-anchored{border-bottom:2px dotted var(--amber-dim);cursor:pointer}
-.fn-note{position:absolute;right:-52px;top:180px;width:230px;background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:"Inter";font-size:12.5px}
-.fn-note b{color:var(--amber);display:block;margin-bottom:4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
-/* summoned panes */
-.edge-tabs{position:absolute;right:20px;bottom:96px;display:flex;flex-direction:column;gap:10px;z-index:50}
-.edge-tab{width:46px;height:46px;border-radius:50%;background:var(--ink3);border:1px solid var(--line);color:var(--amber);font-size:19px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.5);transition:transform .2s ease}
-.edge-tab:hover{transform:scale(1.08)}
-.edge-tab.sam.has-msg::after{content:"";position:absolute;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-left:31px;margin-top:-4px}
-.pane-pop{position:absolute;right:84px;bottom:70px;width:380px;height:480px;background:var(--ink2);border:1px solid var(--line);border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,.6);z-index:60;display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(14px) scale(.98)}
-.pane-pop.open{opacity:1;pointer-events:auto;transform:none}
-@media (prefers-reduced-motion: reduce){.pane-pop,.edge-tab,.book{transition:none!important}}
-.pane-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
-.avatar{width:30px;height:30px;border-radius:50%;background:var(--amber);color:var(--ink);display:grid;place-items:center;font-weight:700;font-size:13px}
-.avatar.doc{background:transparent;border:1px solid var(--muted);color:var(--muted)}
-.pane-head .nm{font-weight:600}
-.pane-head .rl{font-size:11px;color:var(--muted)}
-.pane-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
-.msg{max-width:86%}
-.msg.them{align-self:flex-start}
-.msg.me{align-self:flex-end}
-.bubble{padding:10px 13px;border-radius:12px;font-size:13.5px}
-.msg.them .bubble{background:var(--ink3);border:1px solid var(--line);border-top-left-radius:3px}
-.msg.me .bubble{background:var(--amber);color:var(--ink);border-top-right-radius:3px}
-.msg.them .who{font-size:10.5px;color:var(--muted);margin-bottom:3px}
-/* explore chips → icons */
-.explore-chips{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;padding:0 16px 10px;transition:.25s ease}
-.chip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--amber-dim);color:var(--amber);border-radius:99px;padding:5px 12px;font-size:12px;cursor:pointer;white-space:nowrap}
-.chip:hover{background:rgba(232,165,75,.1)}
-.chip .ic{font-size:13px}
-.explore-chips.collapsed{flex-direction:column;align-items:center;padding-bottom:12px}
+.fn-note{position:absolute;right:-46px;top:150px;width:220px;background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:system-ui,sans-serif;font-size:12px;color:var(--muted)}
+.fn-note b{color:var(--amber);display:block;margin-bottom:4px;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+/* the only chrome: a right-edge gutter */
+.gutter{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:2px;z-index:60}
+.g-pill{writing-mode:vertical-rl;background:var(--ink2);border:1px solid var(--line);border-right:0;color:var(--amber);font:600 11.5px "Fraunces",serif;letter-spacing:.18em;padding:22px 10px;cursor:pointer;transition:padding .2s ease}
+@media (prefers-reduced-motion: reduce){.g-pill{transition:none}}
+.g-pill:hover{padding-right:18px}
+.g-pill .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-top:10px}
+/* sheets slide from the right edge */
+.sheet{position:absolute;top:0;right:-420px;width:400px;height:100%;background:var(--ink2);border-left:1px solid var(--line);box-shadow:-30px 0 80px rgba(0,0,0,.55);z-index:70;display:flex;flex-direction:column;transition:right .28s ease}
+@media (prefers-reduced-motion: reduce){.sheet{transition:none}}
+.sheet.open{right:0}
+.sheet-head{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--line)}
+.av{width:32px;height:32px;border-radius:50%;background:var(--amber);color:var(--ink);display:grid;place-items:center;font:700 14px system-ui}
+.av.doc{background:none;border:1px solid var(--muted);color:var(--muted)}
+.nm{font-family:"Fraunces",serif;font-weight:600}
+.rl{font:11px system-ui;color:var(--muted)}
+.full-link{margin-left:auto;font:11.5px system-ui;color:var(--amber);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:4px 11px}
+.sheet-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:88%;font-family:system-ui,sans-serif;font-size:13.5px}
+.msg.them .bubble{background:var(--ink3);border:1px solid var(--line);border-radius:12px 12px 12px 3px;padding:10px 13px}
+.msg.me{align-self:flex-end}.msg.me .bubble{background:var(--amber);color:var(--ink);border-radius:12px 12px 3px 12px;padding:10px 13px}
+.msg.them .who{font:10px system-ui;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.explore-chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 18px 10px;transition:.25s ease}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--amber-dim);color:var(--amber);border-radius:99px;padding:5px 12px;font:12px system-ui;cursor:pointer;white-space:nowrap;background:none}
+.explore-chips.collapsed{flex-direction:column;align-items:flex-start}
 .explore-chips.collapsed .chip span.lbl{display:none}
-.explore-chips.collapsed .chip{padding:8px;border-radius:50%}
 .explore-chips.collapsed:hover .chip span.lbl{display:inline}
 .explore-chips.collapsed .chip:hover{border-radius:99px;padding-right:14px}
-/* composer grows */
-.composer-zone{padding:0 16px 16px}
-.composer{width:100%;min-height:42px;max-height:170px;resize:none;background:var(--ink3);border:1px solid var(--line);border-radius:10px;color:var(--cream);padding:11px 40px 11px 13px;font:inherit;font-size:13.5px;outline:none}
+.composer-zone{position:relative;padding:0 18px 18px}
+.composer{width:100%;min-height:42px;max-height:172px;resize:none;background:var(--ink3);border:1px solid var(--line);border-radius:10px;color:var(--cream);padding:11px 40px 11px 13px;font:13.5px system-ui;outline:none}
 .composer:focus{border-color:var(--amber-dim)}
 .send{position:absolute;right:26px;bottom:26px;width:30px;height:30px;border-radius:50%;background:var(--amber);color:var(--ink);border:0;cursor:pointer;font-weight:700}
-/* status strip */
-.status-strip{position:absolute;left:0;right:0;bottom:0;height:30px;display:flex;align-items:center;gap:18px;padding:0 20px;background:rgba(0,0,0,.4);border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);z-index:40}
-.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
-.dot.g{background:var(--ok)}.dot.a{background:var(--amber)}
+.status-strip{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;gap:16px;padding:0 18px;background:rgba(0,0,0,.45);border-top:1px solid var(--line);font:11px system-ui;color:var(--muted);z-index:40}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px}
+.dot.g{background:#79b779}
 .st-sprint{margin-left:auto;color:var(--amber)}
 
-/* ---------- co-writer room ---------- */
-.s-cowrite{display:flex;flex-direction:column}
-.cw-head{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:1px solid var(--line)}
-.cw-head h2{font-size:21px}
-.cw-head .sub{color:var(--muted);font-size:12.5px}
-.cw-head .avatar{width:44px;height:44px;font-size:18px}
-.memory-card{margin:0 28px;margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--muted);background:rgba(232,165,75,.04)}
-.memory-card b{color:var(--amber)}
-.cw-chat{flex:1;overflow-y:auto;padding:24px 28px;display:flex;flex-direction:column;gap:14px;max-width:860px;width:100%;margin:0 auto}
-.cw-chat .msg{max-width:78%}
-.cw-composer{position:relative;max-width:860px;width:100%;margin:0 auto 20px;padding:0 28px}
-.cw-explore{padding:10px 28px 0;max-width:860px;margin:0 auto;width:100%}
-.cw-status{height:30px;border-top:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 28px;font-size:11.5px;color:var(--muted)}
+/* ====== CO-WRITER ROOM: fireplace study, chat column + memory ledger ====== */
+.s-cowrite{display:grid;grid-template-columns:280px 1fr;background:var(--ink)}
+.cw-side{border-right:1px solid var(--line);padding:26px 20px;background:linear-gradient(180deg,var(--ink2),var(--ink))}
+.cw-side h2{font-family:"Fraunces",serif;font-size:24px}
+.cw-side .sub{font:12px system-ui;color:var(--muted);margin-top:4px}
+.ledger{margin-top:26px;border:1px solid var(--line);border-radius:10px;padding:14px;font:12.5px system-ui;color:var(--muted)}
+.ledger b{color:var(--amber);display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+.ledger p+p{margin-top:10px}
+.cw-main{display:flex;flex-direction:column;height:100%}
+.cw-top{display:flex;align-items:center;gap:12px;padding:14px 24px;border-bottom:1px solid var(--line);font:12.5px system-ui;color:var(--muted)}
+.cw-top a{color:var(--cream);text-decoration:none;border-bottom:1px dotted var(--amber-dim)}
+.cw-chat{flex:1;overflow-y:auto;padding:26px;display:flex;flex-direction:column;gap:14px;max-width:780px;width:100%;margin:0 auto}
+.cw-chat .msg{max-width:80%}
+.cw-foot{padding:0 24px 22px;max-width:780px;width:100%;margin:0 auto}
+.cw-foot .explore-chips{padding:0 0 10px}
 
-/* ---------- feedback room ---------- */
-.s-feedback{display:flex}
-.fb-nav{width:250px;border-right:1px solid var(--line);padding:22px 18px;overflow-y:auto}
-.fb-nav h3{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
-.fb-nav a{display:block;color:var(--muted);text-decoration:none;padding:7px 10px;border-radius:6px;font-size:13px}
-.fb-nav a:hover,.fb-nav a.on{background:rgba(232,165,75,.08);color:var(--amber)}
-.fb-score{margin-top:26px;border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
-.fb-score .n{font-family:"Fraunces",serif;font-size:40px;color:var(--amber)}
-.fb-score .cap{font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
-.fb-read{flex:1;overflow-y:auto;background:radial-gradient(1000px 400px at 30% -5%, rgba(232,165,75,.06), transparent),var(--ink)}
-.fb-doc{max-width:720px;margin:0 auto;padding:48px 40px 100px}
-.fb-kicker{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
-.fb-doc h1{font-size:34px;line-height:1.2;letter-spacing:-.01em}
-.fb-verdict{margin:18px 0 30px;padding:18px 20px;border-left:3px solid var(--amber);background:rgba(232,165,75,.06);border-radius:0 10px 10px 0;font-size:15px}
-.fb-cat{margin:36px 0 14px;display:flex;align-items:center;gap:10px}
-.fb-cat .serif{font-size:19px}
-.finding{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:var(--ink2)}
+/* ====== FEEDBACK: candle-lit reading room, verdict folio ====== */
+.s-feedback{background:var(--ink);display:flex;justify-content:center}
+.fb-scroll{width:min(760px,92vw);overflow-y:auto;padding:50px 34px 90px}
+.folio-head{text-align:center;border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:34px}
+.kicker{font:11px system-ui;letter-spacing:.3em;text-transform:uppercase;color:var(--amber)}
+.folio-head h1{font-family:"Fraunces",serif;font-size:36px;font-weight:600;line-height:1.2;margin:14px 0 10px}
+.score{font-family:"Fraunces",serif;font-size:52px;color:var(--amber);line-height:1}
+.score small{font:11px system-ui;color:var(--muted);letter-spacing:.14em;display:block;margin-top:6px}
+.verdict{font-size:17px;font-style:italic;color:#d8cdb8;border-left:3px solid var(--amber);padding:4px 0 4px 18px;margin:0 0 38px}
+.finding{border:1px solid var(--line);border-radius:10px;padding:15px 17px;margin-bottom:13px;background:var(--ink2);font-family:system-ui,sans-serif;font-size:13.5px}
 .f-h{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;margin-bottom:6px}
-.sev-dot{width:9px;height:9px;border-radius:50%}
+.sev-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
 .sev.high{background:var(--red)}.sev.med{background:var(--amber)}.sev.low{background:#5d5766}
 .finding blockquote{border-left:2px solid var(--line);margin:8px 0;padding:2px 12px;color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:12px}
-.jtsc{float:right;font-size:11px;color:var(--amber);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.jtsc{float:right;font-size:11px;color:var(--amber);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:2px 10px;font-family:system-ui}
+.cat-h{display:flex;align-items:center;gap:10px;margin:38px 0 14px;font-family:"Fraunces",serif;font-size:20px}
+.cat-h::after{content:"";flex:1;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
 
-<nav id="pv">
-  <b>① Noir Desk</b>
-  <button data-go="welcome" class="on">Welcome/Shelf</button>
-  <button data-go="desk">Desk · script</button>
-  <button data-go="cowrite">Co-Writer</button>
-  <button data-go="feedback">Feedback Report</button>
-  <span style="margin-left:auto;color:var(--muted)">screenplay-studio redesign mockup</span>
-</nav>
+<nav id="pv"><b>① Noir — Manuscript Stage</b>
+<button data-go="welcome" class="on">Shelf</button><button data-go="desk">Desk</button><button data-go="cowrite">Co-Writer Room</button><button data-go="feedback">Feedback Folio</button>
+<span style="margin-left:auto;color:var(--muted)">structural rebuild — the page is the interface</span></nav>
 
 <main>
 
 <!-- WELCOME -->
 <section data-screen="welcome" class="active s-welcome">
-  <div class="lamp"></div>
-  <h1>The desk is <em>lit.</em></h1>
-  <p>Local-only screenplay analysis and co-writing. Your scripts never leave this machine. Pick a book from the shelf to pick up where you left off.</p>
-  <div class="actions">
-    <button class="btn btn-primary" data-go="desk">Open “Pain” ↦ the pages</button>
-    <button class="btn btn-ghost">＋ Upload a script (.fdx · .fountain · .pdf)</button>
-  </div>
-  <div class="shelf">
-    <div class="book" data-go="desk"><div class="t">Pain</div><div class="s">Feature draft v3 · 98 pp<br>✓ analysed yesterday</div></div>
-    <div class="book"><div class="t">Gun Pen</div><div class="s">Short · 3 scenes<br>analysis pending</div></div>
-    <div class="book idea"><span>✎</span><div class="s" style="margin-top:10px">New idea —<br>blank page awaits</div></div>
+  <div class="w-inner">
+    <div class="wordmark">Screenplay Studio</div>
+    <h1>Open the book.<br><em>The desk lights itself.</em></h1>
+    <p>No dashboard greets you here — only your scripts standing on the shelf. Pull one out and the pages fill the room.</p>
+    <div style="display:flex;gap:12px;justify-content:center">
+      <button class="chip" data-go="desk" style="border-style:solid;padding:9px 20px;font-size:13px">Pull “Pain” off the shelf ↦</button>
+      <button class="chip" style="padding:9px 20px;font-size:13px">＋ New script / idea</button>
+    </div>
+    <div class="shelf-row">
+      <div class="spine tall" data-go="desk">Pain<span class="meta">v3 · 98PP</span></div>
+      <div class="spine taller">Gun Pen<span class="meta">SHORT · 3SC</span></div>
+      <div class="spine tall">Old Notes<span class="meta">ARCHIVE</span></div>
+      <div class="spine idea">✎ New Idea<span class="meta">BLANK</span></div>
+    </div>
   </div>
 </section>
 
-<!-- DESK -->
+<!-- DESK: manuscript stage -->
 <section data-screen="desk" class="s-desk">
-  <div class="desk-top">
-    <span class="proj serif">Pain</span>
-    <div class="room-pills">
-      <span class="pill on">The Pages</span>
-      <span class="pill" data-go="cowrite">Sameer</span>
-      <span class="pill" data-go="feedback">Feedback Report</span>
-      <span class="pill" title="Beat board">▦ Beats</span>
-    </div>
-  </div>
-
-  <div class="pages" id="desk-pages">
-    <div class="page-wrap">
-      <article class="scene-page" data-scene="Scene 1 of 22">
+  <div class="stage" id="desk-stage">
+    <div class="ms-col">
+      <article class="scene-page" data-scene="SC 1 / 22">
         <p class="slug">INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
         <p class="action">A ceiling fan turns slow. On a cot, <span class="el-anchored">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
         <p class="char-cue">Arjun</p>
         <p class="dialogue">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
-        <aside class="fn-note"><b>Margin note 📌</b>The phone glow does the lamp's job here — his face half-lit. Nice mirror for Act II when the calls stop coming.</aside>
+        <aside class="fn-note"><b>Margin note 📌</b>The phone glow does the lamp's job — his face half-lit. A quiet mirror for Act II when the calls stop coming.</aside>
       </article>
-      <article class="scene-page" data-scene="Scene 2 of 22">
+      <article class="scene-page" data-scene="SC 2 / 22">
         <p class="slug">EXT. ROAD-SIDE TEA STALL — DAY</p>
         <p class="action">Steam. Tumbling glasses. <span class="el-anchored">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
         <p class="char-cue">Stall Owner</p>
@@ -208,145 +170,106 @@ main{padding-top:44px}
     </div>
   </div>
 
-  <!-- summoned partners -->
-  <div class="edge-tabs">
-    <button class="edge-tab sam has-msg" id="tab-sam" title="Summon Sameer — writing partner">S</button>
-    <button class="edge-tab doc" id="tab-doc" title="Summon the Premise Doctor">D</button>
-    <button class="edge-tab" title="The Stash">📥</button>
+  <div class="gutter">
+    <button class="g-pill" data-sheet="pane-sam">Sameer <span class="dot"></span></button>
+    <button class="g-pill" data-sheet="pane-doc">Doctor</button>
+    <button class="g-pill">Stash 📥</button>
   </div>
 
-  <aside class="pane-pop" id="pane-sam">
-    <div class="pane-head">
-      <span class="avatar">S</span>
-      <div><div class="nm">Sameer</div><div class="rl">writing partner · knows your past work</div></div>
-    </div>
-    <div class="pane-body">
-      <div class="msg them"><div class="who">SAMEER · just now</div><div class="bubble">Scene 2 me woh double coin-count — arre wah. Kharcha ka math, bina ek word bole. Yehi chahiye. Scene 1 ke phone-glow se milke Act I ka "shortage" theme set ho gaya — setup strong hai.</div></div>
+  <aside class="sheet" id="pane-sam">
+    <div class="sheet-head"><span class="av">S</span><div><div class="nm">Sameer</div><div class="rl">writing partner · knows your past work</div></div>
+      <a class="full-link" data-go="cowrite" href="#">full room ↗</a></div>
+    <div class="sheet-body">
+      <div class="msg them"><div class="who">Sameer · just now</div><div class="bubble">Scene 2 ka double coin-count — badhiya. Bina ek word bole "shortage" bol gaya. Scene 1 ke phone-glow ke saath Act I ka setup complete.</div></div>
       <div class="msg me"><div class="bubble">stall owner ko zyada do?</div></div>
-      <div class="msg them"><div class="bubble">Ek line hi kaafi hai. Aur do — to stall wala plot ban jayega, character reh jayega gaayab. Cheap steering mat karo.</div></div>
-    </div>
-    <div class="explore-chips" id="chips-desk">
-      <button class="chip"><span class="ic">✂</span><span class="lbl">Tighten scene 1</span></button>
-      <button class="chip"><span class="ic">🎭</span><span class="lbl">Push Arjun's want</span></button>
-      <button class="chip"><span class="ic">⚖</span><span class="lbl">Is act I earning it?</span></button>
-    </div>
-    <div class="composer-zone">
-      <textarea class="composer" id="composer-desk" placeholder="Talk to Sameer about what you highlighted…" rows="1"></textarea>
-      <button class="send">↑</button>
-    </div>
-  </aside>
-
-  <aside class="pane-pop" id="pane-doc">
-    <div class="pane-head">
-      <span class="avatar doc">D</span>
-      <div><div class="nm">Premise Doctor</div><div class="rl">diagnosis first, no sugar</div></div>
-    </div>
-    <div class="pane-body">
-      <div class="msg them"><div class="who">PREMISE DOCTOR</div><div class="bubble">Why now? Every Telugu middle-class film has rent trouble. What makes THIS kid unable to walk away this week? If your answer isn't in the pages yet, that's finding #3 in the report — severity high.</div></div>
+      <div class="msg them"><div class="bubble">Ek line kaafi hai. Aur diya to character gayab, plot ban jayega. Subtle chhodo.</div></div>
     </div>
     <div class="explore-chips">
-      <button class="chip"><span class="ic">🩺</span><span class="lbl">Diagnose premise</span></button>
-      <button class="chip"><span class="ic">🔓</span><span class="lbl">Escalate stakes</span></button>
+      <button class="chip">✂ <span class="lbl">Tighten scene 1</span></button>
+      <button class="chip">🎭 <span class="lbl">Push Arjun's want</span></button>
+      <button class="chip">⚖ <span class="lbl">Is act I earning it?</span></button>
     </div>
-    <div class="composer-zone">
-      <textarea class="composer" placeholder="Ask the doctor…" rows="1"></textarea>
+    <div class="composer-zone"><textarea class="composer" placeholder="Talk to Sameer about what you highlighted…" rows="1"></textarea><button class="send">↑</button></div>
+  </aside>
+
+  <aside class="sheet" id="pane-doc">
+    <div class="sheet-head"><span class="av doc">D</span><div><div class="nm">Premise Doctor</div><div class="rl">diagnosis first, no sugar</div></div></div>
+    <div class="sheet-body">
+      <div class="msg them"><div class="bubble">Why now? Every Telugu middle-class film has rent trouble. What makes THIS kid unable to walk away this week is the real premise — and it isn't on the page yet. Finding #3, severity high.</div></div>
     </div>
+    <div class="explore-chips">
+      <button class="chip">🩺 <span class="lbl">Diagnose premise</span></button>
+      <button class="chip">🔓 <span class="lbl">Escalate stakes</span></button>
+    </div>
+    <div class="composer-zone"><textarea class="composer" placeholder="Ask the doctor…" rows="1"></textarea></div>
   </aside>
 
   <div class="status-strip">
-    <span><span class="dot g"></span>qwen3-14B @ localhost:8080</span>
-    <span>Scene 2 · 214 words</span>
-    <span>Findings open: <b style="color:var(--amber)">12</b>/44</span>
-    <span class="st-sprint">⏱ 18:42 sprint</span>
-    <span>⚡ loop: healthy</span>
-  </div>
-</section>
-
-<!-- CO-WRITER ROOM -->
-<section data-screen="cowrite" class="s-cowrite">
-  <div class="cw-head">
-    <span class="avatar">S</span>
-    <div><h2 class="serif">Sameer</h2><div class="sub">Writing partner room — full conversation with memory & your writer library</div></div>
-    <div class="room-pills" style="margin-left:auto">
-      <span class="pill" data-go="desk">← back to the pages</span>
-      <span class="pill" data-go="feedback">Feedback Report</span>
-    </div>
-  </div>
-  <div class="memory-card"><b>Past work digest:</b> Gun Pen (short, family-pressure core) · Pain v2 notes honored: "no cheap steering." <b>Relationship:</b> 41 sessions · pushback welcomed · Tenglish register preferred. <b>Tonight's script:</b> Pain v3 — kept separate from past work.</div>
-
-  <div class="cw-chat">
-    <div class="msg them"><div class="who">SAMEER</div><div class="bubble">Pura v3 padha. Good news pehle — Arjun ka want ab crystal clear hai, Scene 1 se hi. Baaki theek baat.</div></div>
-    <div class="msg them"><div class="bubble">Ab mushkil sach. Bich ka second act sagging feel kar raha hai — scenes 8–14 sab "pressure dikhana" kar rahe, par pressure badhta nahi. Same beat, three repetitions. Audience ko waqt milega washroom jaane ka — humein dena nahi hai.</div></div>
-    <div class="msg me"><div class="bubble">to kya hatayein?</div></div>
-    <div class="msg them"><div class="bubble">Hatane se pehle sawaal: in teeno scenes me se kis ek me Arjun CHOOSE karta hai? Wohi rakhne layak hai. Baaki do — collapse kar 1.5 page me. Ek tehreeka dekhna chahega? Bolo, likh dikhata hoon.</div></div>
-  </div>
-
-  <div class="cw-explore explore-chips" id="chips-cw">
-    <button class="chip"><span class="ic">📄</span><span class="lbl">Show me the collapsed scene</span></button>
-    <button class="chip"><span class="ic">🧗</span><span class="lbl">Raise stakes instead</span></button>
-    <button class="chip"><span class="ic">🔁</span><span class="lbl">Compare with Gun Pen's mid</span></button>
-    <button class="chip"><span class="ic">🗣</span><span class="lbl">Read it in Tenglish voice</span></button>
-  </div>
-  <div class="cw-composer composer-zone" style="padding:0">
-    <textarea class="composer" id="composer-cw" placeholder="Write to Sameer… (Shift+Enter for new line)" rows="1"></textarea>
-    <button class="send">↑</button>
-  </div>
-  <div class="cw-status">
-    <span><span class="dot g"></span>sameer · peer mode</span>
-    <span>session branched 3 ways · main path active</span>
+    <span><span class="dot g"></span>qwen3-14B @ localhost:8080</span><span>sc 2 · 214 words</span><span>findings 12/44 open</span>
     <span class="st-sprint">⏱ 18:42</span>
   </div>
 </section>
 
-<!-- FEEDBACK ROOM -->
-<section data-screen="feedback" class="s-feedback">
-  <nav class="fb-nav">
-    <h3>The Report</h3>
-    <a class="on" href="#fb-v">Verdict</a>
-    <a href="#fb-plot">Plot Economy · 5</a>
-    <a href="#fb-char">Character · 4</a>
-    <a href="#fb-dialogue">Dialogue · 2</a>
-    <a href="#fb-pacing">Pacing graph</a>
-    <div class="fb-score"><div class="n">7.2</div><div class="cap">script score</div></div>
-    <div class="fb-score" style="margin-top:10px"><div class="n mono" style="font-size:20px;padding-top:6px">12/44</div><div class="cap">findings open</div></div>
-  </nav>
-  <div class="fb-read">
-    <div class="fb-doc">
-      <p class="fb-kicker">Analysis · Pain v3 · verified quotes only</p>
-      <h1 id="fb-v">A tight first act carrying an unaired second.</h1>
-      <div class="fb-verdict">Arjun's need to know — “cheppalekha ante nenu intlo unna leda?” — is a real engine. The script earns its premise by page 12. What it hasn't earned yet: forty pages of pressure without escalation.</div>
-
-      <div class="fb-cat" id="fb-plot"><span class="sev-dot sev med"></span><span class="serif">Plot Economy</span><span style="color:var(--muted);font-size:12px">5 findings</span></div>
-      <div class="finding">
-        <div class="f-h"><span class="sev-dot sev high"></span>Chekhov's gun never fires <a class="jtsc" href="#fb-v" onclick="go('desk')">↦ jump to scene</a></div>
-        <blockquote>“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — INT. RENTED ROOM (Sc 1)</blockquote>
-        The father-call promise setup in Sc 1 pays off only as mood, never as event. Either the call must land (or visibly fail) by Act III's midpoint, or cut the specificity.
-      </div>
-      <div class="finding">
-        <div class="f-h"><span class="sev-dot sev med"></span>Duplicate pressure beats</div>
-        Scenes 9, 11 and 13 stage identical money-shortage confrontations at escalating locations but flat intensity. Ledger flags all three as setups paying off into nothing.
-
-        <div class="fb-cat" id="fb-char"><span class="sev-dot sev low"></span><span class="serif">Character</span><span style="color:var(--muted);font-size:12px">4 findings</span></div>
-        <div class="finding" style="margin-top:10px">
-          <div class="f-h"><span class="sev-dot sev med"></span>Stall owner vanishes after peak</div>
-          <blockquote>“Nee account tho guddi pattuko ra.” — EXT. TEA STALL (Sc 2)</blockquote>
-          Best early antagonist beat, then zero mentions across remaining 20 scenes.
-        </div>
-      </div>
-
-      <div class="fb-cat" id="fb-dialogue"><span class="sev-dot sev low"></span><span class="serif">Dialogue</span><span style="color:var(--muted);font-size:12px">2 findings</span></div>
-      <div class="finding"><div class="f-h"><span class="sev-dot sev low"></span>Voice bleed: Arjun edging formal</div>
-      Two scenes slip into school-Telugu constructions while the rest of the idiolect runs street-Tenglish. Reader noticed; audience will too.</div>
-
-      <div class="fb-cat" id="fb-pacing"><span class="serif">Pacing</span><span style="color:var(--muted);font-size:12px">drag bars amber</span></div>
-      <div class="finding" style="display:flex;align-items:flex-end;gap:4px;height:110px;padding:14px 16px 10px">
-        <div class="mono" style="font-size:10px;color:var(--muted);align-self:flex-start">per-scene pace index ▸</div>
-        <div style="flex:1;display:flex;align-items:flex-end;gap:4px;height:80px">
-          <i style="flex:1;background:#4b4354;height:46%"></i><i style="flex:1;background:#4b4354;height:62%"></i><i style="flex:1;background:var(--amber);height:90%" title="drag"></i><i style="flex:1;background:#4b4354;height:55%"></i><i style="flex:1;background:var(--amber);height:84%"></i><i style="flex:1;background:#4b4354;height:40%"></i><i style="flex:1;background:var(--amber);height:76%"></i><i style="flex:1;background:#4b4354;height:66%"></i>
-        </div>
-        <div class="mono" style="font-size:10px;color:var(--muted);align-self:flex-end">sc 1–8</div>
-      </div>
+<!-- CO-WRITER ROOM: study with memory ledger -->
+<section data-screen="cowrite" class="s-cowrite">
+  <div class="cw-side">
+    <h2>Sameer's<br>study.</h2>
+    <div class="sub">the long conversation lives here</div>
+    <div class="ledger">
+      <b>Past work</b>
+      <p>Gun Pen — family-pressure core. Pain v2 notes honored: "no cheap steering."</p>
+      <b>Relationship</b>
+      <p>41 sessions · pushback welcomed · Tenglish register preferred.</p>
+      <b>Tonight</b>
+      <p>Pain v3 — kept strictly separate from past work.</p>
     </div>
+    <p style="margin-top:22px;font:12px system-ui"><a data-go="desk" href="#" style="color:var(--amber);text-decoration:none">← back to the pages</a></p>
+  </div>
+  <div class="cw-main">
+    <div class="cw-top">peer mode · branched session, main path · <a data-go="feedback" href="#">open the feedback folio →</a></div>
+    <div class="cw-chat">
+      <div class="msg them"><div class="who">Sameer</div><div class="bubble">Pura v3 padha. Pehle acchi khabar — Arjun ka want ab Scene 1 se crystal clear hai.</div></div>
+      <div class="msg them"><div class="bubble">Ab kadwi baat: scenes 8–14 ek hi beat teen baar dikhate hain. Pressure dikhata hai, badhta nahi. Audience ko washroom break milega — humein dena nahi hai.</div></div>
+      <div class="msg me"><div class="bubble">to kya hatayein?</div></div>
+      <div class="msg them"><div class="bubble">Sawaal pehle: in teeno me se kis ek me Arjun CHOOSE karta hai? Wohi rakho, baaki do 1.5 page me collapse. Likh dikhau?</div></div>
+    </div>
+    <div class="cw-foot">
+      <div class="explore-chips">
+        <button class="chip">📄 <span class="lbl">Show the collapsed scene</span></button>
+        <button class="chip">🧗 <span class="lbl">Raise stakes instead</span></button>
+        <button class="chip">🔁 <span class="lbl">Compare with Gun Pen's mid</span></button>
+        <button class="chip">🗣 <span class="lbl">Read it in Tenglish voice</span></button>
+      </div>
+      <div class="composer-zone" style="padding:0"><textarea class="composer" rows="1" placeholder="Write to Sameer… (Shift+Enter for a new line)"></textarea><button class="send">↑</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEEDBACK: candle-lit folio -->
+<section data-screen="feedback" class="s-feedback">
+  <div class="fb-scroll">
+    <div class="folio-head">
+      <div class="kicker">The Feedback Folio · Pain v3 · verified quotes only</div>
+      <h1>A tight first act<br>carrying an unaired second.</h1>
+      <div class="score">7.2<small>script score · 12 of 44 findings open</small></div>
+    </div>
+    <p class="verdict">Arjun's need to know — “cheppalekha ante nenu intlo unna leda?” — is a real engine. The premise earns itself by page 12. What hasn't been earned yet is forty pages of pressure without escalation.</p>
+
+    <div class="cat-h">Plot Economy</div>
+    <div class="finding"><div class="f-h"><span class="sev-dot sev high"></span>Chekhov's gun never fires <a class="jtsc" href="#" onclick="go('desk');return false;">↦ to the page</a></div>
+    <blockquote>“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — INT. RENTED ROOM (Sc 1)</blockquote>
+    The father-call promise pays off only as mood, never as event. Land the call by Act III midpoint — or cut the specificity.</div>
+    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Duplicate pressure beats</div>
+    Scenes 9, 11, 13 stage identical money-shortage confrontations with flat intensity. The ledger flags all three as setups paying into nothing.</div>
+
+    <div class="cat-h">Character</div>
+    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Stall owner vanishes after peak</div>
+    <blockquote>“Nee account tho guddi pattuko ra.” — EXT. TEA STALL (Sc 2)</blockquote>
+    The best early antagonist beat — then zero mentions across the remaining twenty scenes.</div>
+
+    <div class="cat-h">Dialogue</div>
+    <div class="finding"><div class="f-h"><span class="sev-dot sev low"></span>Voice bleed: Arjun edging formal</div>
+    Two scenes slip into school-Telugu constructions while the idiolect otherwise runs street-Tenglish.</div>
   </div>
 </section>
 
@@ -356,37 +279,30 @@ main{padding-top:44px}
 function go(name){
   document.querySelectorAll('[data-screen]').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
   document.querySelectorAll('#pv [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===name));
-  // fresh per-screen: keep panes closed on arrival (script-first)
-  closePanes();
+  closeSheets();
 }
 document.addEventListener('click',function(e){
   const goBtn=e.target.closest('[data-go]');
   if(goBtn){go(goBtn.dataset.go);return;}
-  const opener=e.target.closest('.edge-tab');
-  if(opener){
-    const pane=opener.id==='tab-sam'?document.getElementById('pane-sam'):document.getElementById('pane-doc');
+  const pill=e.target.closest('.g-pill[data-sheet]');
+  if(pill){
+    const pane=document.getElementById(pill.dataset.sheet);
     const was=pane.classList.contains('open');
-    closePanes();
+    closeSheets();
     if(!was)pane.classList.add('open');
-    e.stopPropagation();
-    return;
+    e.stopPropagation();return;
   }
-  if(!e.target.closest('.pane-pop'))closePanes();
+  if(!e.target.closest('.sheet'))closeSheets();
 });
-function closePanes(){document.querySelectorAll('.pane-pop.open').forEach(p=>p.classList.remove('open'));}
-// growing composer
+function closeSheets(){document.querySelectorAll('.sheet.open').forEach(p=>p.classList.remove('open'));}
 document.querySelectorAll('.composer').forEach(t=>{
   t.addEventListener('input',()=>{
     t.style.height='auto';
-    t.style.height=Math.min(t.scrollHeight,170)+'px';
-    // chips collapse after first real input
-    if(t.value.trim()){
-      document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
-    }
+    t.style.height=Math.min(t.scrollHeight,172)+'px';
+    if(t.value.trim())document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
   });
 });
-// Escape closes panes
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanes();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheets();});
 </script>
 </body>
 </html>
