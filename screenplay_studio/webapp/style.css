@@ -4179,6 +4179,17 @@ body.river-read .scene-page .el-dialogue mark,
 body.river-read .scene-page .el-action mark,
 body.river-read .scene-page .el-character mark,
 body.river-read .scene-page .scene-heading-line mark { background: rgba(94, 234, 212, 0.18); color: #eafff9; }
+/* paper-theme leftovers that vanish on dark glass: anchored findings,
+   margin-note pins and change stars all shift to the teal river palette */
+body.river-read .scene-page .el-anchored {
+  background: rgba(94, 234, 212, 0.12);
+  border-bottom: 1px dashed #5eead4;
+}
+body.river-read .scene-page .el-anchored:hover { background: rgba(94, 234, 212, 0.2); }
+body.river-read .scene-page .el-noted { background: rgba(255, 213, 138, 0.1); }
+body.river-read .scene-page .el-noted:hover { background: rgba(255, 213, 138, 0.18); }
+body.river-read .scene-page .el-noted::after { color: #ffd58a; }
+body.river-read .scene-page .el-changed::before { color: #ffd58a; }
 body.river-read .scene-page + .scene-page { margin-top: -6px; }
 body.river-read .scene-page::after {
   content: "";
