@@ -248,6 +248,10 @@ main{padding-bottom:88px;height:100vh;overflow:hidden}
       </div>
       <div class="searchbar"><span class="pfx">/</span><input type="search" id="search" placeholder="search buffer…" aria-label="Search"></div>
       <div id="script-pages"></div>
+      <div class="sect">~/stash — saved lines &amp; margin notes</div>
+      <button class="tape" data-quote="“she takes the box anyway. it is warm.”" style="border-style:dashed;padding:12px 16px"><span class="t" style="font-style:italic">“she takes the box anyway. it is warm.”</span><span class="go" style="font-size:11px">[stash · s1]</span></button>
+      <button class="tape" data-quote="“nobody has won.”" style="border-style:dashed;padding:12px 16px"><span class="t" style="font-style:italic">“nobody has won.”</span><span class="go" style="font-size:11px">[stash · s4]</span></button>
+      <button class="tape" data-quote="NOTE: the song is the midpoint; protect it." style="border-style:dashed;padding:12px 16px"><span class="t" style="font-style:italic">NOTE: the song is the midpoint; protect it.</span><span class="go" style="font-size:11px">[margin · s3]</span></button>
     </div>
   </section>
 
@@ -596,6 +600,11 @@ function wire(){
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); $("#palette").classList.remove("open"); } });
   $("#quote-card [data-close]").addEventListener("click", closeQ);
   $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
+  $$("#desk [data-quote]").forEach(s => s.addEventListener("click", () => {
+    qf.classList.add("open");
+    $("#quote-text").textContent = s.dataset.quote;
+    $("#quote-src").textContent = "from the stash / margin notes";
+  }));
 
   const input = $("#input");
   input.addEventListener("input", () => growComposer(input));

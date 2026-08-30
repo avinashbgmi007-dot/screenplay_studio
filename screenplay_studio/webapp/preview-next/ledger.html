@@ -293,8 +293,8 @@ tr.status-abandoned .setup-name{color:var(--med)}
         <div class="stashitem">“She takes the box anyway. It is warm.” — saved from scene 1</div>
         <div class="stashitem">“Nobody has won.” — scene 4, keep the flat landing</div>
         <h4 style="margin-top:22px">Margin notes</h4>
-        <div class="stashitem">📌 Scene 3 — the song is the midpoint; protect it</div>
-        <div class="stashitem">📌 Scene 2 — the unanswered phone: motif or noise?</div>
+        <div class="stashitem">Scene 3 — the song is the midpoint; protect it</div>
+        <div class="stashitem">Scene 2 — the unanswered phone: motif or noise?</div>
       </aside>
     </div>
   </section>
@@ -587,7 +587,7 @@ function wire(){
   $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
   $$(".stashitem").forEach(s => s.addEventListener("click", () => {
     qf.classList.add("open");
-    $("#quote-text").textContent = s.textContent.replace(/^📌 /, "");
+    $("#quote-text").textContent = s.textContent.replace(/^(the stash|margin)[:,]? /i, "").trim();
     $("#quote-src").textContent = "FROM THE STASH / MARGIN NOTES";
   }));
 
