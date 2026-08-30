@@ -91,9 +91,14 @@ placeholder positions, interaction patterns, and identity.
 
 Every world is audited against this checklist before review (see §8).
 
-1. **Three full-screen rooms** — Script Desk / Co-write Room / Feedback Room — one persistent
-   switcher in the world's own idiom; each room owns the viewport; nothing primary is a
-   summoned pane. The **Script Desk is the default landing** when a project opens.
+1. **Tri-pane desk** — when a project is open: the **Script is center-docked**, the
+   **Feedback room is a collapsible LEFT pane**, and the **Co-write room is a collapsible
+   RIGHT pane**. Pane controls: independent left/right toggles PLUS one master
+   both-at-once control (hide both / show both). Each pane can **expand to its full room**
+   for focus and collapse back to the desk. The desk lands with **both panes open**.
+   Journey surfaces (shelf → upload → idea) remain full-screen and come before the desk.
+   (2026-08-30 revision: supersedes the original "three full-screen rooms" model — the
+   full rooms survive as pane-expand states.)
 2. **Feedback as the hero** — the report is the room. Must include:
    - **Lifecycle states:** empty (not analyzed → Run Analysis CTA), running (progress with
      pipeline stage names), complete (the full report). All three designed and reachable via
@@ -130,7 +135,19 @@ Every world is audited against this checklist before review (see §8).
      no generic hero copy, no emoji as design elements.
 10. **Aesthetic spread (binding):** 2 dark cinematic (Midnight Desk, Screening Room), 2 light
     editorial (The Ledger, The Quarterly), 2 wildcards (The Terminal, The Studio Wall).
-    No two worlds share a navigation paradigm.
+    No two worlds share a navigation paradigm. **Structural uniqueness (2026-08-30
+    revision, binding):** the six worlds share ONLY the payload, the interaction contract,
+    and the `data-*` test hooks — every world carries its own DOM skeleton, navigation
+    mechanics, journey staging, component anatomy, placeholder voice, and review-bar
+    physical form. A world whose structure reads as a palette-swap of another fails the
+    contract.
+13. **Semantic token layer (2026-08-30 addition):** each world's `:root` declares a
+    documented token hierarchy — brand values → semantic roles (`--surface`, `--surface-raised`,
+    `--text`, `--text-muted`, `--finding-high/medium/low`, `--line`, `--accent`) → component
+    tokens — written in OKLCH where a browser-defined color helps, plus named motion tokens
+    (`--motion-fast/room/ambient` + named keyframes) with a single `prefers-reduced-motion`
+    kill. Plain CSS only — no Tailwind, no build step (the toolchain conflicts with the
+    zero-dependency constraint; the architecture is what we adopt).
 11. **Cross-room bridges designed in each world's idiom:** a finding's **Locate** moves from
     the Feedback Room to the Script Desk at the exact scene (with a visual flash); **Discuss**
     opens the Co-write Room with the finding's quote pre-filled as a quote card.
@@ -140,6 +157,36 @@ Every world is audited against this checklist before review (see §8).
 
 All six satisfy the same contract; each answers "how does a verdict deserve to be read" in its
 own idiom, and each carries its own identity (palette, typography, motion character).
+
+### 5a. Structural blueprints (2026-08-30 R1 revision — binding skeletons)
+
+The first build shared one page skeleton; the R1 rebuild replaces it. Binding per world:
+
+1. **The Ledger → "The Submission File"** — a bound dossier, no app chrome. Nav =
+   physical **index tabs on the page edge**. Opens on a dossier cover with a RECEIVED
+   stamp (not a grid shelf). Tri-pane = a bound spread: center manuscript, feedback folds
+   in from the left as a carbon-copy flimsy, Sameer's correspondence slips fold from the
+   right; panes fold **under** the center page. Voice: typesetter's marks.
+2. **The Midnight Desk → "The Desk Itself"** — no nav bar; desk objects ARE the nav
+   (script stack, case-file folder, intercom, idea napkin, in/out trays). Opens with a
+   lamp pull-cord that lights the desk. Tri-pane = drawers: case file slides from the
+   left drawer, intercom panel rises from the right; master = "clear the desk". Voice:
+   night-shift radio.
+3. **The Screening Room → "The Projection Booth"** — nav = a **reel rack**: thread a
+   reel to change rooms; marquee names the current one. Opens with a projector boot
+   sequence. Tri-pane = editing bench: film viewer center, producer's clipboard on left
+   rails, talkback panel on right rails; panes slide off on rails. Voice: call sheet.
+4. **The Quarterly → "The Magazine Issue"** — nav = a **die-cut cover opening to the
+   TOC**; sections turn like gathered signatures. Shelf = back issues. Tri-pane =
+   gatefolds: galley center, Critics' Column folds out left, Letters to the Editor folds
+   out right; master = "close the spreads". Voice: editorial captions.
+5. **The Terminal → "The Session"** — boot/MOTD on open; buffers as **tmux windows**;
+   the tri-pane IS a tmux split (script | verdict | sam panes, focus rings); `z` zooms,
+   `:monocle`/`:triage` = master both/none. Voice: man-page terse.
+6. **The Studio Wall → "The Atelier Room"** — **no section switching at all**: one
+   continuous wall panned horizontally; pages pinned center, verdict board left region,
+   Sameer's corner right region; pane toggles = **hinged panels that fold shut**; master
+   = "clear the wall"; a mini-map keeps orientation. Voice: studio graffiti.
 
 ### 5.1 The Ledger — light editorial
 Cream paper, ink text, red-pencil severity marks. Serif throughout (`Georgia, 'Iowan Old

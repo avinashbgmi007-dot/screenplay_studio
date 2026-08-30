@@ -601,6 +601,20 @@ git commit -m "docs(notes): preview-next quality gates + design-review pass reco
 
 ---
 
+## Rework (2026-08-30 R1) — structural rebuild + tri-pane desk
+
+> Supersedes the layout model of Tasks 3–8 for structure; keeps payload, interaction contract, and data hooks.
+
+**R0 — docs:** spec §4 pt 1 revised to the tri-pane desk (script center; feedback LEFT pane; Sameer RIGHT pane; independent toggles + master both-at-once; panes expand to full rooms; desk lands both-open), §4 pt 10 structural-uniqueness clause, §4 pt 13 semantic token layer, §5a binding blueprints.
+
+**R1 — rebuild ×6** (per §5a blueprints; shared: `_payload.js`, interaction contract, `data-*` hooks incl. new pane hooks):
+- Pane hooks (uniform): `[data-pane-left-toggle]`, `[data-pane-right-toggle]`, `[data-panes-master]`, `[data-expand="left|right"]`, `[data-collapse-to-desk]`, and `data-desk-state` on the desk container ∈ `both-open | left-only | right-only | none-open | focus-left | focus-right`. Desk lands `both-open`.
+- R1.1 Ledger — index-tab dossier; R1.2 Midnight — desk-object nav + drawers; R1.3 Screening — reel rack + rails; R1.4 Quarterly — die-cut cover + gatefolds; R1.5 Terminal — tmux session (`z` zoom, `:monocle`/`:triage`); R1.6 Studio Wall — free-pan wall + hinged panels + mini-map.
+
+**R2 — e2e v2:** keep v1 hooks; add pane-state walk (default both-open → left toggle → right toggle → master both ways → expand left/right → collapse) with per-world nav params. Run to green.
+
+**R3 — re-audit:** 15-pt contract ×6 (+ pane + uniqueness checks), AA contrast re-probe, fresh screenshots, NOTES record.
+
 ## Self-Review (done at plan-writing time; re-verify after any plan change)
 
 **Spec coverage:** §3 files ↔ Tasks 1–8 (8 files, 1:1) · §4 contract ↔ Shared patterns + per-world requirements + Task 9 audit · §5 identities ↔ Tasks 3–8 identity blocks (tokens named exactly) · §6 tiers ↔ per-world requirements item 8 · §7 screens/review bar ↔ shared `show()` + `wireReviewBar` · §8 verification ↔ Tasks 9–11. No spec requirement lacks a task.
