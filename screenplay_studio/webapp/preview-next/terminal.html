@@ -597,7 +597,7 @@ function wire(){
     if (qf.classList.contains("open") && !$("#quote-card").contains(e.target)) closeQ();
     if ($("#palette").classList.contains("open") && !$("#palette .pal").contains(e.target)) $("#palette").classList.remove("open");
   });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); $("#palette").classList.remove("open"); } });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); $("#in-quote").classList.remove("show"); $("#palette").classList.remove("open"); } });
   $("#quote-card [data-close]").addEventListener("click", closeQ);
   $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
   $$("#desk [data-quote]").forEach(s => s.addEventListener("click", () => {

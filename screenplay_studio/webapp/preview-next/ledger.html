@@ -121,7 +121,7 @@ main{padding-top:76px;height:calc(100vh - 76px);overflow:hidden}
 .msg .tools{margin-top:6px;display:flex;gap:10px}
 .msg .tools button{font-family:Verdana,Geneva,sans-serif;font-size:11px;color:var(--graphite);min-height:30px;padding:2px 4px;display:inline-flex;gap:5px;align-items:center}
 .msg .tools button:hover{color:var(--red)}
-.qcard{border:1px solid var(--hair);background:var(--page);padding:12px 16px;margin:6px 0 12px;font-style:italic;font-size:14.5px;display:flex;gap:10px;align-items:baseline}
+.qcard{border:1px solid var(--hair);background:var(--page);padding:12px 16px;margin:6px 0 12px;font-style:italic;font-size:14.5px}
 .qcard .src{display:block;font-style:normal;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.14em;color:var(--red);margin-top:6px}
 .composer{border-top:1px solid var(--hair);padding-top:14px;display:flex;gap:10px;align-items:flex-end}
 .composer textarea{flex:1;resize:none;background:var(--page);border:1px solid var(--hair);color:var(--ink);padding:12px 14px;font:inherit;font-size:16px;min-height:46px;max-height:200px}
@@ -582,7 +582,7 @@ function wire(){
   const qf = $("#quote-float");
   const closeQ = () => qf.classList.remove("open");
   document.addEventListener("mousedown", e => { if (qf.classList.contains("open") && !$("#quote-card").contains(e.target)) closeQ(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeQ(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); const iq = $("#in-quote"); if (iq) iq.hidden = true; } });
   $("#quote-card [data-close]").addEventListener("click", closeQ);
   $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
   $$(".stashitem").forEach(s => s.addEventListener("click", () => {

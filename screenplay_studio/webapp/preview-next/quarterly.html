@@ -557,7 +557,7 @@ function wire(){
   const qf = $("#quote-float");
   const closeQ = () => qf.classList.remove("open");
   document.addEventListener("mousedown", e => { if (qf.classList.contains("open") && !$("#quote-card").contains(e.target)) closeQ(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeQ(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); const iq = $("#in-quote"); if (iq) iq.hidden = true; } });
   $("#quote-card [data-close]").addEventListener("click", closeQ);
   $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
   $$(".stashline").forEach(s => s.addEventListener("click", () => {
