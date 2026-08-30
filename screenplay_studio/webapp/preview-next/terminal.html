@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⑤ The Terminal — monospace wildcard</title>
+<style>
+:root{
+  --ink:#0a0f0a; --raised:#0e150e; --line:#1c2a1c; --ph:#7ee787; --cy:#67d6e8; --warn:#e3c567; --fail:#e07070; --dim:#5d7a5d; --txt:#b8d8b8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{background:var(--ink);color:var(--txt);font-family:'Cascadia Mono','Cascadia Code',Consolas,'Courier New',monospace;font-size:16px;line-height:1.55;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--ph);outline-offset:1px}
+svg.i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+::selection{background:var(--ph);color:var(--ink)}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+.cursor{display:inline-block;width:8px;height:1.05em;background:var(--ph);vertical-align:-3px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ===== bottom status line (world idiom) ===== */
+#status{position:fixed;bottom:44px;left:0;right:0;z-index:900;display:flex;align-items:center;gap:0;background:var(--raised);border-top:1px solid var(--line);font-size:13px}
+#status .bufs{display:flex}
+#status .bufs button{padding:10px 16px;min-height:44px;color:var(--dim);border-right:1px solid var(--line)}
+#status .bufs button:hover{color:var(--txt)}
+#status .bufs button.on{background:var(--ph);color:var(--ink);font-weight:700}
+#status .cmdrow{flex:1;display:flex;align-items:center;padding:0 12px;gap:8px}
+#status .cmdrow input{flex:1;background:transparent;border:none;color:var(--ph);font:inherit;font-size:13px;outline:none}
+#status .cmdrow .pfx{color:var(--ph)}
+#status .keys{color:var(--dim);padding:0 12px;font-size:11.5px;white-space:nowrap}
+
+/* ===== review bar ===== */
+#pv{position:fixed;bottom:0;left:0;right:0;z-index:950;display:flex;align-items:center;gap:6px;padding:7px 16px;background:#060a06;color:var(--dim);font-size:11.5px;border-top:1px solid var(--line)}
+#pv b{color:var(--ph);letter-spacing:.16em;margin-right:8px}
+#pv button{color:var(--dim);border:1px solid var(--line);padding:8px 12px;min-height:32px}
+#pv button:hover{border-color:var(--ph);color:var(--txt)}
+#pv button.on{background:var(--ph);border-color:var(--ph);color:var(--ink)}
+#pv .sep{flex:1}#pv a{color:var(--dim)}#pv-close{opacity:.7}
+
+main{padding-bottom:88px;height:100vh;overflow:hidden}
+[data-room],[data-screen]{display:none;height:100%;overflow-y:auto}
+[data-room].active,[data-screen].active{display:block}
+[data-room].active,[data-screen].active{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+
+/* ===== shelf ===== */
+#shelf .col{max-width:860px;margin:0 auto;padding:40px 30px}
+#shelf .hd{color:var(--ph);margin-bottom:4px}
+#shelf .sub{color:var(--dim);margin-bottom:26px;font-size:13.5px}
+.tape{display:block;width:100%;text-align:left;background:var(--raised);border:1px solid var(--line);padding:16px 20px;min-height:44px;margin-bottom:12px}
+.tape:hover{border-color:var(--ph)}
+.tape .t{color:var(--txt)}
+.tape .m{color:var(--dim);font-size:12px;margin-top:4px}
+.tape .go{color:var(--ph);font-size:12px;float:right}
+.newtape{margin-bottom:8px;border-style:dashed;color:var(--dim)}
+.newtape:hover{color:var(--ph);border-color:var(--ph)}
+.sect{color:var(--dim);font-size:11.5px;letter-spacing:.14em;margin:26px 0 10px;text-transform:uppercase}
+.ideatape{display:inline-block;border:1px dashed var(--line);color:var(--txt);padding:10px 16px;min-height:44px;margin:0 8px 8px 0}
+.ideatape:hover{border-color:var(--ph)}
+
+/* ===== upload ===== */
+#upload.active{display:grid;place-items:center}
+.press{max-width:520px}
+.press .box{border:1px solid var(--line);background:var(--raised);padding:28px 30px}
+.press .box .t{color:var(--ph)}
+.press .box .m{color:var(--dim);font-size:13px;margin-top:4px}
+.btnrow{margin-top:20px;display:flex;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--ph);color:var(--ink);padding:12px 20px;min-height:44px;font-size:13px;font-weight:700}
+.btn:hover{filter:brightness(1.1)}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.press .echo{color:var(--dim);margin-top:14px;font-size:13px}
+
+/* ===== desk — script buffer ===== */
+#desk .buf{max-width:980px;margin:0 auto;padding:24px 30px}
+.desktools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.chipbtn{border:1px solid var(--line);background:var(--raised);color:var(--dim);padding:9px 13px;min-height:44px;font-size:12px;display:inline-flex;align-items:center;gap:7px}
+.chipbtn:hover{color:var(--ph);border-color:var(--ph)}
+.searchbar{margin-bottom:14px;display:flex;gap:8px;align-items:center}
+.searchbar .pfx{color:var(--dim)}
+.searchbar input{background:var(--raised);border:1px solid var(--line);color:var(--ph);padding:9px 13px;min-height:44px;width:min(360px,100%);font:inherit;font-size:14px;outline:none}
+.searchbar input:focus{border-color:var(--ph)}
+.scenebuf{border:1px solid var(--line);background:var(--raised);padding:16px 18px;margin-bottom:16px;scroll-margin-top:16px}
+.scenebuf .slug{color:var(--ph);display:flex;gap:12px;margin-bottom:10px;font-size:14px}
+.scenebuf .slug .no{color:var(--dim)}
+.scenebuf .slug .pg{margin-left:auto;color:var(--dim);font-size:11.5px}
+.scenebuf.flash-target{animation:invflash 1.6s steps(2)}
+@keyframes invflash{0%,60%{background:var(--ph)}61%{background:var(--raised)}80%{background:var(--ph)}}
+.line{display:flex;gap:14px;font-size:15px;line-height:1.6}
+.line .no{color:var(--dim);width:34px;text-align:right;flex:0 0 auto;font-size:12px;padding-top:2px;user-select:none}
+.el.action .tx{max-width:78ch}
+.el.char .tx{color:var(--warn);margin:8px 0 0 auto;width:52%;text-align:center}
+.el.char{display:flex;justify-content:center}
+.el.dialogue .tx{max-width:56ch;margin:0 0 0 22%}
+.el.paren .tx{color:var(--dim);font-style:italic;margin-left:22%;font-size:14px}
+.el.trans .tx{color:var(--cy);text-align:right}
+.el .star{color:var(--warn);cursor:help}
+.marginal .tx{color:var(--cy);font-style:italic;font-size:13.5px}
+
+/* ===== co-write — sam buffer ===== */
+#cowrite .chatwrap{max-width:860px;margin:0 auto;padding:24px 30px;display:flex;flex-direction:column;height:100%}
+.chathead{color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:14px;display:flex;gap:14px}
+.chathead .who{color:var(--cy)}
+.chathead .clear{margin-left:auto;min-height:44px}
+.chathead .clear:hover{color:var(--fail)}
+#msgs{flex:1;overflow-y:auto;padding:2px 2px 14px}
+.msg{margin-bottom:12px;font-size:15px}
+.msg .who{color:var(--dim);font-size:11px;letter-spacing:.14em;margin-bottom:3px}
+.msg.sam .who{color:var(--cy)}
+.msg .bubble{max-width:78ch}
+.msg.me .bubble{color:var(--txt)}
+.msg.sam .bubble{color:var(--txt);border-left:2px solid var(--cy);padding-left:12px}
+.msg .tools button{color:var(--dim);font-size:11.5px;min-height:30px}
+.msg .tools button:hover{color:var(--cy)}
+.qcard{border:1px dashed var(--cy);color:var(--cy);padding:9px 13px;margin:8px 0;font-size:14px;font-style:italic;display:none}
+.qcard.show{display:block}
+.qcard .src{display:block;font-style:normal;color:var(--dim);font-size:11px;margin-top:4px}
+.composer{border-top:1px solid var(--line);padding-top:12px;display:flex;gap:10px;align-items:flex-end}
+.composer .pfx{color:var(--cy);padding-bottom:12px}
+.composer textarea{flex:1;resize:none;background:var(--raised);border:1px solid var(--line);color:var(--txt);padding:11px 13px;font:inherit;font-size:15px;min-height:44px;max-height:200px;outline:none}
+.composer textarea:focus{border-color:var(--cy)}
+.composer .send{border:1px solid var(--line);min-width:44px;min-height:44px;display:grid;place-items:center;color:var(--ph)}
+.micbtn{border:1px solid var(--line);min-width:44px;min-height:44px;display:grid;place-items:center;color:var(--dim)}
+.micbtn:hover{color:var(--ph);border-color:var(--ph)}
+
+/* ===== feedback — lint stream ===== */
+#feedback .lint{max-width:1000px;margin:0 auto;padding:24px 30px 60px}
+.lint .hd{color:var(--dim);margin-bottom:14px;font-size:13px}
+.lint .hd b{color:var(--ph);font-weight:400}
+.warnline{display:block;width:100%;text-align:left;border-left:3px solid var(--dim);background:var(--raised);padding:10px 14px;min-height:44px;margin-bottom:8px;font-size:14.5px;line-height:1.5}
+.warnline:hover{border-color:var(--ph)}
+.warnline.sev-high{border-left-color:var(--fail)}
+.warnline.sev-medium{border-left-color:var(--warn)}
+.warnline .g{font-weight:700;margin-right:8px}
+.warnline.sev-high .g{color:var(--fail)}
+.warnline.sev-medium .g{color:var(--warn)}
+.warnline .g{color:var(--dim)}
+.warnline .cat{color:var(--dim)}
+.warnline .vtag{color:var(--dim);font-size:11px}
+.warnline .note{color:var(--txt);display:block;margin:3px 0}
+.warnline .q{color:var(--ph);font-style:italic;display:block}
+.warnline .verbs{margin-top:5px;display:inline-flex;gap:10px}
+.warnline .verbs button{color:var(--cy);min-height:30px;font-size:12px;border:1px solid transparent;padding:2px 6px}
+.warnline .verbs button:hover{border-color:var(--cy)}
+.warnline .verbs button.act-dismiss{color:var(--dim)}
+.lint table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0 20px}
+.lint th{color:var(--dim);text-align:left;font-size:11px;letter-spacing:.14em;padding:6px 8px;border-bottom:1px solid var(--line);text-transform:uppercase;font-weight:400}
+.lint td{padding:7px 8px;border-bottom:1px dashed var(--line);vertical-align:top;font-size:13.5px}
+.st-dangling td:first-child{color:var(--fail)}
+.st-dangling .nm{text-decoration:line-through;text-decoration-color:var(--fail)}
+.st-paid td:first-child{color:var(--ph)}
+.gauge{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);margin:4px 0}
+.gauge .gbar{color:var(--ph);letter-spacing:1px}
+.gauge.drag .gbar,.gauge.drag .lbl{color:var(--fail)}
+.gauge .lbl{width:110px;color:var(--txt)}
+.signoff{color:var(--dim);margin-top:26px;font-style:italic}
+
+/* lifecycle */
+.fblife{max-width:640px;margin:0 auto;padding:80px 30px;text-align:left}
+.fblife .big{color:var(--ph);font-size:19px;margin-bottom:8px}
+.fblife .warm{color:var(--dim);margin:0 0 22px;max-width:60ch}
+.stages{font-size:13.5px;color:var(--dim)}
+.stages div{padding:5px 0;display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);max-width:440px}
+.stages .done::after{content:"[ok]";color:var(--ph)}
+.stages .now{color:var(--warn)}
+.stages .now::after{content:"[...]";color:var(--warn)}
+
+/* ===== idea — scratch buffer ===== */
+#idea .ideawrap{max-width:860px;margin:0 auto;padding:24px 30px;display:flex;flex-direction:column;height:100%}
+#idea .ideahd{display:flex;gap:14px;align-items:baseline;margin-bottom:10px;color:var(--dim);font-size:12.5px}
+#idea .ideahd b{color:var(--ph);font-weight:400}
+#idea-content{flex:1;resize:none;background:var(--raised);border:1px solid var(--line);color:var(--txt);padding:18px 20px;font:inherit;font-size:16px;line-height:1.65;min-height:200px;outline:none}
+#idea-content:focus{border-color:var(--ph)}
+.ideafoot{margin-top:12px;display:flex;gap:12px;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips.tucked{flex-direction:column;gap:6px;align-items:flex-start}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px dashed var(--line);color:var(--txt);padding:9px 13px;min-height:44px;font-size:13px;max-width:280px;overflow:hidden;white-space:nowrap}
+.chip:hover{border-color:var(--ph);color:var(--ph)}
+.chip .n{color:var(--dim)}
+.chip svg{flex:0 0 auto}
+.chips.tucked{position:absolute;right:18px;flex-direction:column;align-items:flex-end}
+.chips.tucked .chip{width:44px;justify-content:center;padding:9px}
+.chips.tucked .chip span,.chips.tucked .chip .n{display:none}
+.chips.tucked.peeking .chip:hover{width:auto}
+.chips.tucked.peeking .chip:hover span,.chips.tucked.peeking .chip:hover .n{display:inline}
+.ideafoot{position:relative}
+.sam-pill{margin-left:auto;border:1px solid var(--cy);color:var(--cy);padding:10px 16px;min-height:44px;font-size:12.5px}
+.sam-pill:hover{background:var(--cy);color:var(--ink)}
+
+/* quote float + palette */
+#quote-float{position:fixed;inset:0;z-index:800;display:none}
+#quote-float.open{display:flex;align-items:flex-end;justify-content:center;padding-bottom:150px}
+#quote-card{background:var(--raised);border:1px solid var(--ph);padding:14px 18px;max-width:600px;width:94%}
+#quote-card .qtxt{font-style:italic;font-size:14.5px}
+#quote-card .qsrc{color:var(--dim);font-size:11px;margin-top:6px}
+#quote-card .qrow{margin-top:8px;display:flex;gap:8px;justify-content:flex-end}
+#quote-card .qrow button{border:1px solid var(--line);padding:7px 12px;min-height:36px;font-size:12px;color:var(--txt)}
+#quote-card .qrow button:hover{border-color:var(--ph);color:var(--ph)}
+#palette{position:fixed;inset:0;z-index:850;display:none;background:rgba(4,8,4,.6)}
+#palette.open{display:flex;align-items:flex-start;justify-content:center;padding-top:120px}
+#palette .pal{background:var(--raised);border:1px solid var(--ph);width:520px;max-width:94%}
+#palette .pal input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--ph);padding:12px 14px;font:inherit;font-size:14px;outline:none}
+#palette .pal .pitem{display:block;width:100%;text-align:left;padding:9px 14px;min-height:36px;color:var(--txt);font-size:13.5px}
+#palette .pal .pitem:hover{background:var(--line);color:var(--ph)}
+#palette .pal .pitem b{color:var(--dim);font-weight:400;margin-left:8px;font-size:11px}
+</style>
+</head>
+<body>
+
+<main>
+  <section data-screen="shelf" id="shelf">
+    <div class="col">
+      <div class="hd">~/shelf $ ls --scripts</div>
+      <div class="sub">everything filed, waiting for a read</div>
+      <button class="tape" data-open>
+        <span class="t">the-second-shift.fountain</span><span class="go">open &gt;</span>
+        <div class="m">fountain · 9.5 pages · 4 scenes · analyzed — meera keeps ward 3 alive on routine; tonight her brother files a complaint</div>
+      </button>
+      <button class="tape newtape" id="newvol">+ add a new script (.fdx / .fountain / .txt / .md / .pdf)</button>
+      <div class="sect">~/ideas — before the pages exist</div>
+      <button class="ideatape" data-go="idea">“the cartographer of missing hours”</button>
+      <button class="ideatape" data-go="idea">+ a fresh idea</button>
+    </div>
+  </section>
+
+  <section data-screen="upload" id="upload">
+    <div class="press">
+      <div class="box">
+        <div class="t">&gt; staging: the-second-shift.fountain</div>
+        <div class="m">9.5 pages · 4 scenes · ready for the buffer</div>
+        <div class="btnrow">
+          <button class="btn" id="submit-btn">open buffer</button>
+          <button class="btn ghost" data-go="shelf">cancel</button>
+        </div>
+      </div>
+      <div class="echo" id="echo">press [open buffer] — the parse runs locally, nothing leaves this machine</div>
+    </div>
+  </section>
+
+  <section data-room="desk" id="desk">
+    <div class="buf">
+      <div class="desktools" role="toolbar" aria-label="Desk tools">
+        <button class="chipbtn">beat board</button>
+        <button class="chipbtn">revision view</button>
+        <button class="chipbtn">compare drafts</button>
+        <button class="chipbtn">reader / print</button>
+        <button class="chipbtn">focus · sprint 25:00</button>
+        <button class="chipbtn">export / backup</button>
+      </div>
+      <div class="searchbar"><span class="pfx">/</span><input type="search" id="search" placeholder="search buffer…" aria-label="Search"></div>
+      <div id="script-pages"></div>
+    </div>
+  </section>
+
+  <section data-room="cowrite" id="cowrite">
+    <div class="chatwrap">
+      <div class="chathead"><span class="who">-- sam buffer --</span><span>ai writing partner</span><button class="clear">[clear]</button></div>
+      <div id="msgs">
+        <div class="msg me"><div class="who">you</div><div class="bubble">read the verdict?</div></div>
+        <div class="msg sam"><div class="who">sameer</div><div class="bubble">twice. the finger curl is the best thing in the buffer and it lands with a whole act still owed. scene 2 drags — talk about it, or argue first?</div>
+          <div class="tools"><button class="trbtn">[translate]</button></div>
+        </div>
+      </div>
+      <div class="qcard" id="in-quote"><span id="in-quote-text"></span><span id="in-quote-src" class="src"></span></div>
+      <div class="composer">
+        <button class="micbtn" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+        <span class="pfx">&gt;</span>
+        <textarea id="input" rows="1" placeholder="ask about a scene, a character, a margin note…"></textarea>
+        <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <section data-room="feedback" id="feedback">
+    <div data-state="empty" style="display:none"><div class="fblife">
+      <div class="big">$ verdict --run</div>
+      <p class="warm">no findings yet — the script hasn't been read. run the analysis; the linter writes the whole stream: findings, gauges, the ledger of promises.</p>
+      <button class="btn">run analysis</button>
+    </div></div>
+    <div data-state="running" style="display:none"><div class="fblife">
+      <div class="big">$ verdict --running</div>
+      <div class="stages">
+        <div class="done"><span>formatting &amp; stats</span></div>
+        <div class="done"><span>voice &amp; subtext</span></div>
+        <div class="now"><span>scene summaries</span></div>
+        <div><span>dialogue analysis</span></div>
+        <div><span>script categories</span></div>
+        <div><span>principles engine</span></div>
+        <div><span>setup/payoff ledger</span></div>
+        <div><span>verification</span></div>
+        <div><span>coverage</span></div>
+      </div>
+    </div></div>
+    <div data-state="complete"><div class="lint">
+      <div class="hd">$ verdict <b>--the-second-shift.fountain</b> · 9.5pp · 4 scenes · <span id="fcount"></span> findings · analysis no.1
+        <span style="float:right"><button class="chipbtn" style="min-height:32px">re-parse</button> <select class="chipbtn" style="min-height:32px" aria-label="Report language"><option>en</option><option>tenglish</option><option>hi</option><option>te</option></select> <button class="chipbtn" style="min-height:32px;color:var(--fail)">retry failed (0)</button> <button class="chipbtn" style="min-height:32px">export</button></span></div>
+      <div id="lintlines"></div>
+      <div class="hd" style="margin-top:26px">$ fixqueue <b>--open</b></div>
+      <div id="fixqueue"></div>
+      <div class="hd" style="margin-top:26px">$ coverage <b>--block</b></div>
+      <pre class="mono" id="covbox" style="border:1px solid var(--line);background:var(--raised);padding:16px;color:var(--txt);font-size:13.5px;overflow-x:auto"></pre>
+      <div class="hd" style="margin-top:22px">$ pacing <b>--gauges</b></div>
+      <div id="pacing"></div>
+      <div class="hd" style="margin-top:22px">$ dials <b>--meters</b></div>
+      <div id="dials"></div>
+      <div class="hd" style="margin-top:22px">$ ledger <b>--promises</b></div>
+      <table id="ledger-t"></table>
+      <div class="hd" style="margin-top:22px">$ reads <b>--mirror</b></div>
+      <div id="reads" style="max-width:80ch"></div>
+      <p class="signoff">— dr. sushruta · linter of promises</p>
+    </div></div>
+  </section>
+
+  <section data-screen="idea" id="idea">
+    <div class="ideawrap">
+      <div class="ideahd"><b>~/ideas/scratch</b><span>autosaves as you write · /sameer anywhere</span></div>
+      <textarea id="idea-content" spellcheck="false" placeholder="whatever comes. a line, a scene, a worry…"></textarea>
+      <div class="ideafoot">
+        <div class="chips" id="idea-chips" aria-label="Explore paths">
+          <button class="chip"><span class="n">[1]</span><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg><span>what if the mother knew?</span></button>
+          <button class="chip"><span class="n">[2]</span><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg><span>make the ward a character</span></button>
+          <button class="chip"><span class="n">[3]</span><svg class="i" viewBox="0 0 24 24"><path d="M4 18V6l8 6 8-6v12"/></svg><span>end on the empty tiffin</span></button>
+          <button class="chip"><span class="n">[4]</span><svg class="i" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><span>slow the dawn, earn it</span></button>
+        </div>
+        <button class="sam-pill" id="sam-pill">/sameer</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="status" role="navigation" aria-label="Buffers">
+  <div class="bufs">
+    <button data-go="shelf">[shelf]</button>
+    <button data-go="desk" class="on">[script]</button>
+    <button data-go="cowrite">[sam]</button>
+    <button data-go="feedback">[verdict]</button>
+    <button data-go="idea">[ideas]</button>
+  </div>
+  <div class="cmdrow">
+    <span class="pfx">:</span>
+    <input id="cmd" placeholder="try :verdict · :loc 2 · :empty · :running · :complete" aria-label="Command line">
+  </div>
+  <div class="keys"><button id="palbtn">⌘K palette</button></div>
+</div>
+
+<div id="palette">
+  <div class="pal">
+    <input id="pal-input" placeholder="type a command…" aria-label="Palette">
+    <div id="pal-items"></div>
+  </div>
+</div>
+
+<div id="quote-float">
+  <div id="quote-card" role="dialog" aria-label="Quoted passage">
+    <div class="qtxt" id="quote-text"></div>
+    <div class="qsrc" id="quote-src"></div>
+    <div class="qrow"><button data-close>[dismiss]</button><button data-goto-cowrite>[discuss with sam]</button></div>
+  </div>
+</div>
+
+<div id="pv">
+  <b>REVIEW</b>
+  <button data-go="shelf">Shelf</button>
+  <button data-go="desk">Desk</button>
+  <button data-go="cowrite">Co-write</button>
+  <button data-go="feedback">Feedback</button>
+  <button data-go="idea">Ideas</button>
+  <span class="sep"></span>
+  <button data-fb="empty">Empty</button>
+  <button data-fb="running">Running</button>
+  <button data-fb="complete" class="on">Complete</button>
+  <span class="sep"></span>
+  <a href="index.html">Gallery</a>
+  <button id="pv-close" aria-label="Dismiss review bar">✕</button>
+</div>
+
+<script src="_payload.js"></script>
+<script>
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+let FEEDBACK_STATE = "complete";
+const P = window.PAYLOAD;
+
+function show(id){
+  $$("[data-room],[data-screen]").forEach(el =>
+    el.classList.toggle("active", el.dataset.room === id || el.dataset.screen === id));
+  $$("#status .bufs [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  (document.querySelector(`[data-room="${id}"].active, [data-screen="${id}"].active`) || {}).scrollTop = 0;
+}
+function renderFeedback(){
+  $$("[data-state]").forEach(el => el.style.display = "none");
+  const el = $(`#feedback [data-state="${FEEDBACK_STATE}"]`);
+  if (el) el.style.display = "";
+}
+function locateFinding(f){
+  show("desk");
+  const page = $(`[data-scene="${f.scene}"]`);
+  if (page){
+    page.classList.remove("flash-target"); void page.offsetWidth;
+    page.classList.add("flash-target");
+    page.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+}
+function discussFinding(f){
+  show("cowrite");
+  const q = $("#in-quote");
+  q.classList.add("show");
+  $("#in-quote-text").textContent = "“" + f.quote + "”";
+  $("#in-quote-src").textContent = `warning ${String(f.id).padStart(2,"0")} · ${f.category} · scene ${f.scene}`;
+  $("#input").focus();
+}
+
+function renderScript(){
+  let ln = 1;
+  $("#script-pages").innerHTML = P.script.map(sc => `
+    <div class="scenebuf" data-scene="${sc.n}">
+      <div class="slug"><span class="no">s${sc.n}</span><span>${sc.slug.toLowerCase()}</span><span class="pg">pp. ${sc.page}</span></div>
+      ${sc.elements.map(([type, a, b]) => {
+        const n = ln++;
+        if (type === "dialogue") return `<div class="el char"><span class="no">${n}</span><span class="tx">${a.toLowerCase()}</span></div><div class="el dialogue"><span class="no">${ln++}</span><span class="tx">${b}</span></div>`;
+        if (type === "parenthetical") return `<div class="el paren"><span class="no">${n}</span><span class="tx">${a}</span></div>`;
+        if (type === "transition") return `<div class="el trans"><span class="no">${n}</span><span class="tx">${a.toLowerCase()}</span></div>`;
+        if (type === "action") return `<div class="el action"><span class="no">${n}</span><span class="tx">${a}${sc.n === 1 && a.startsWith("She takes the box") ? '<span class="star" title="edited — was: she pockets the box.">★</span>' : ""}</span></div>`;
+        return "";
+      }).join("")}
+      ${sc.n === 1 ? `<div class="el marginal"><span class="no">m</span><span class="tx">note: this warmth is the spine — don’t lose the box.</span></div>` : ""}
+      ${sc.n === 3 ? `<div class="el marginal"><span class="no">m</span><span class="tx">note: the doorway beat is the whole scene. hold it one breath longer.</span></div>` : ""}
+    </div>`).join("");
+}
+
+function renderLint(){
+  $("#fcount").textContent = P.findings.length;
+  $("#lintlines").innerHTML = P.findings.map(f => `
+    <div class="warnline sev-${f.severity}" data-finding="${f.id}">
+      <span class="g">${f.severity === "high" ? "!!" : f.severity === "medium" ? "! " : "· "}</span>
+      <span class="cat">${f.category} · s${f.scene} · </span><span class="vtag">[${f.verified ? "verified" : "UNVERIFIED — quote not matched"}]</span>
+      <span class="note">${f.note}</span>
+      <span class="q">“${f.quote}”</span>
+      <span class="verbs">
+        <button data-act="locate" data-fid="${f.id}">[loc ${f.scene}]</button>
+        <button data-act="discuss" data-fid="${f.id}">[discuss]</button>
+        <button data-act="dismiss" data-fid="${f.id}" class="act-dismiss">[dismiss]</button>
+      </span>
+    </div>`).join("");
+
+  $("#fixqueue").innerHTML = P.findings.filter(f => f.severity !== "low" || f.id === 8).map(f => `
+    <div class="warnline sev-${f.severity}" style="border-left-style:dashed">
+      <span class="g">${f.severity === "high" ? "!!" : "! "}</span>
+      <span class="note" style="display:inline">fix ${String(f.id).padStart(2,"0")}: ${f.note.split(". ")[0]}.</span>
+      <span class="verbs" style="margin-left:10px">
+        <button data-act="locate" data-fid="${f.id}">[:loc ${f.scene}]</button>
+        <button data-act="discuss" data-fid="${f.id}">[:discuss]</button>
+        <button data-act="rewrite" data-fid="${f.id}">[:rewrite]</button>
+      </span>
+    </div>`).join("");
+
+  const C = P.coverage;
+  const pad = (s, n) => (s + " ".repeat(Math.max(0, n - s.length)));
+  $("#covbox").textContent =
+`+----------------------------------------------------------+
+| LOGLINE   ${pad("", 0)}
+| ${C.logline}
++----------------------------------------------------------+
+| GENRE     ${C.genre}
+| REC       ${C.recommendation}
++----------------------------------------------------------+
+| SYNOPSIS  ${C.synopsis.split(". ").slice(0, 2).join(". ")}... (full text in the editor's letter)`;
+
+  $("#pacing").innerHTML = P.pacing.map(p => {
+    const blocks = Math.round(p.pace * 10);
+    return `<div class="gauge ${p.drag ? "drag" : ""}">
+      <span class="lbl">scene ${p.scene}</span>
+      <span class="gbar">${"▇".repeat(blocks)}${"·".repeat(10 - blocks)}</span>
+      <span>pace ${p.pace.toFixed(2)} ${p.drag ? "-- DRAG" : ""}</span></div>`;
+  }).join("");
+
+  $("#dials").innerHTML = P.dials.map(d => `
+    <div style="margin-bottom:10px">
+      <div style="color:var(--warn)">${d.character.toLowerCase()} <span style="color:var(--dim)">· scenes ${d.scenes.join(",")}</span></div>
+      ${Object.entries(d.poles).map(([k, v]) => {
+        const fill = Math.round(v / 2);
+        return `<div class="gauge"><span class="lbl">${k}</span>
+          <span class="gbar" style="color:var(--cy)">${"|".repeat(fill)}${"·".repeat(5 - fill)}</span>
+          <span>${v}/10</span></div>`;
+      }).join("")}
+    </div>`).join("");
+
+  $("#ledger-t").innerHTML = `<tr><th>setup</th><th>kind</th><th>scene</th><th>status</th><th>note</th></tr>` +
+    P.ledger.map(l => `<tr class="st-${l.status}">
+      <td class="nm">${l.setup}</td><td>${l.kind}</td><td>s${l.setup_scene}</td>
+      <td style="color:${l.status === "paid" ? "var(--ph)" : l.status === "dangling" || l.status === "abandoned" ? "var(--fail)" : "var(--dim)"}">${l.status.toUpperCase()}</td>
+      <td style="color:var(--dim)">${l.note}</td></tr>`).join("");
+
+  $("#reads").innerHTML = P.reads.map(r => `
+    <p style="margin-bottom:10px"><span style="color:var(--warn)">${r.character.toLowerCase()}:</span> ${r.read}</p>`).join("");
+}
+
+/* command line + palette */
+function runCmd(raw){
+  const c = raw.trim().replace(/^:/, "").toLowerCase();
+  if (!c) return;
+  const [head, arg] = c.split(/\s+/);
+  const maps = { script: "desk", sam: "cowrite", verdict: "feedback", ideas: "idea", shelf: "shelf" };
+  if (maps[head]) return show(maps[head]);
+  if (head === "empty" || head === "running" || head === "complete") {
+    FEEDBACK_STATE = head; renderFeedback(); show("feedback");
+    $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x.dataset.fb === head));
+    return;
+  }
+  if (head === "loc" || head === "discuss" || head === "rewrite") {
+    const f = P.findings.find(x => x.id === +arg) || P.findings[0];
+    if (head === "loc") locateFinding(f);
+    if (head === "discuss") discussFinding(f);
+    if (head === "rewrite") { show("cowrite"); $("#input").value = `rewrite ${f.id}: `; $("#input").focus(); }
+    return;
+  }
+  $("#echo") && ($("#echo").textContent = `unknown command: :${c} — try :verdict · :loc 2`);
+}
+const COMMANDS = [
+  [":verdict", "open the verdict buffer"], [":sam", "open the sam buffer"],
+  [":script", "open the script buffer"], [":ideas", "open the scratch buffer"],
+  [":empty", "show verdict: empty state"], [":running", "show verdict: running state"],
+  [":complete", "show verdict: complete state"],
+  [":loc 1", "jump to finding 1's scene"], [":loc 2", "jump to finding 2's scene"],
+  [":loc 4", "jump to finding 4's scene"], [":discuss 2", "discuss finding 2 with sam"]
+];
+function openPalette(){
+  $("#palette").classList.add("open");
+  renderPalette("");
+  $("#pal-input").value = ""; $("#pal-input").focus();
+}
+function renderPalette(q){
+  const items = COMMANDS.filter(([c, d]) => (c + " " + d).toLowerCase().includes(q.toLowerCase()));
+  $("#pal-items").innerHTML = items.map(([c, d]) => `<button class="pitem" data-cmd="${c}">${c}<b>${d}</b></button>`).join("") ||
+    '<button class="pitem" disabled>no match</button>';
+}
+
+function wire(){
+  $$("#pv [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("#status .bufs [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("[data-go]").forEach(b => { if (!b.closest("#pv") && !b.closest("#status")) b.addEventListener("click", () => show(b.dataset.go)); });
+  $$("#pv [data-fb]").forEach(b => b.addEventListener("click", () => {
+    FEEDBACK_STATE = b.dataset.fb; renderFeedback();
+    $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x === b));
+  }));
+  $("#pv-close").addEventListener("click", () => $("#pv").remove());
+
+  $("#cmd").addEventListener("keydown", e => {
+    if (e.key === "Enter") { runCmd(e.target.value); e.target.value = ""; }
+  });
+  $("#palbtn").addEventListener("click", openPalette);
+  $("#palette").addEventListener("click", e => {
+    if (e.target.id === "palette") $("#palette").classList.remove("open");
+    const b = e.target.closest("[data-cmd]");
+    if (b) { runCmd(b.dataset.cmd); $("#palette").classList.remove("open"); }
+  });
+  $("#pal-input").addEventListener("input", e => renderPalette(e.target.value));
+  $("#pal-input").addEventListener("keydown", e => {
+    if (e.key === "Escape") $("#palette").classList.remove("open");
+    if (e.key === "Enter") {
+      const first = $("#pal-items .pitem[data-cmd]");
+      if (first) { runCmd(first.dataset.cmd); $("#palette").classList.remove("open"); }
+    }
+  });
+  document.addEventListener("keydown", e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPalette(); }
+  });
+
+  $("[data-open]").addEventListener("click", () => show("upload"));
+  $("#newvol").addEventListener("click", () => show("upload"));
+  $("#submit-btn").addEventListener("click", () => {
+    $("#echo").textContent = "» parsing… 4 scenes · 0 warnings · buffer ready";
+    setTimeout(() => show("desk"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700);
+  });
+
+  $("#search").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    $$(".scenebuf").forEach(pg => pg.style.display = !q || pg.textContent.toLowerCase().includes(q) ? "" : "none");
+  });
+
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const f = P.findings.find(x => x.id === +b.dataset.fid);
+    if (b.dataset.act === "locate") locateFinding(f);
+    if (b.dataset.act === "discuss") discussFinding(f);
+    if (b.dataset.act === "dismiss") b.closest(".warnline").style.opacity = .35;
+    if (b.dataset.act === "rewrite") { show("cowrite"); $("#input").value = `rewrite ${f.id}: `; $("#input").focus(); growComposer($("#input")); }
+  });
+
+  const qf = $("#quote-float");
+  const closeQ = () => qf.classList.remove("open");
+  document.addEventListener("mousedown", e => {
+    if (qf.classList.contains("open") && !$("#quote-card").contains(e.target)) closeQ();
+    if ($("#palette").classList.contains("open") && !$("#palette .pal").contains(e.target)) $("#palette").classList.remove("open");
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); $("#palette").classList.remove("open"); } });
+  $("#quote-card [data-close]").addEventListener("click", closeQ);
+  $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
+
+  const input = $("#input");
+  input.addEventListener("input", () => growComposer(input));
+  const idea = $("#idea-content");
+  idea.addEventListener("input", () => growComposer(idea));
+  wireChips(idea, $("#idea-chips"));
+  $("#sam-pill").addEventListener("click", () => show("cowrite"));
+}
+function growComposer(ta){
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+}
+function wireChips(surface, chipRow){
+  surface.addEventListener("input", () => chipRow.classList.toggle("tucked", surface.value.length > 0));
+  chipRow.addEventListener("mouseover", e => { if (chipRow.classList.contains("tucked") && e.target.closest(".chip")) chipRow.classList.add("peeking"); });
+  chipRow.addEventListener("mouseout", () => chipRow.classList.remove("peeking"));
+}
+
+renderScript();
+renderLint();
+renderFeedback();
+wire();
+show("shelf");
+</script>
+</body>
+</html>
