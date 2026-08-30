@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>③ The Screening Room — dark cinema</title>
+<style>
+:root{
+  --hall:#0c0d10; --panel:#14161c; --line:#23262e; --txt:#c9cdd6; --dim:#7d828e;
+  --amber:#f5a623; --red:#e05252; --green:#7fb069;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{background:var(--hall);color:var(--txt);font-family:'Segoe UI',Tahoma,sans-serif;font-size:16px;line-height:1.55;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+svg.i{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+.mono,code{font-family:'Cascadia Mono',Consolas,monospace;font-variant-numeric:tabular-nums}
+.poster{font-family:'Franklin Gothic Medium','Arial Narrow','Segoe UI',sans-serif;text-transform:uppercase;letter-spacing:.06em}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important;scroll-behavior:auto !important}}
+
+/* ===== top marquee ===== */
+#top{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:16px;padding:12px 28px;background:linear-gradient(180deg,#08090b,#0c0d10);border-bottom:1px solid var(--line)}
+#top .marquee{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:15px;letter-spacing:.3em;text-transform:uppercase;color:var(--amber)}
+#top .nowplaying{margin-left:auto;font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;color:var(--dim)}
+
+/* ===== bottom film-strip scrubber (world idiom) ===== */
+#strip{position:fixed;bottom:44px;left:0;right:0;z-index:900;display:flex;justify-content:center;gap:10px;padding:8px 0;background:linear-gradient(0deg,#08090b,rgba(8,9,11,.75));border-top:1px solid var(--line)}
+.frame{display:flex;align-items:center;gap:9px;padding:8px 18px;min-height:44px;border:1px solid var(--line);background:var(--panel);color:var(--dim);font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;position:relative}
+.frame::before,.frame::after{content:"";position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--hall);border:1px solid var(--line);transform:translateY(-50%)}
+.frame::before{left:5px}.frame::after{right:5px}
+.frame:hover{color:var(--txt);border-color:var(--dim)}
+.frame.on{color:#14161c;background:var(--amber);border-color:var(--amber);font-weight:700}
+.frame.on::before,.frame.on::after{background:var(--amber);border-color:#8a5f0e}
+
+/* ===== review bar ===== */
+#pv{position:fixed;bottom:0;left:0;right:0;z-index:950;display:flex;align-items:center;gap:6px;padding:7px 16px;background:#08090b;color:var(--dim);font-family:'Cascadia Mono',Consolas,monospace;font-size:11.5px;border-top:1px solid var(--line)}
+#pv b{color:var(--amber);letter-spacing:.16em;margin-right:8px}
+#pv button{color:var(--dim);border:1px solid var(--line);padding:8px 12px;min-height:32px}
+#pv button:hover{border-color:var(--amber);color:var(--txt)}
+#pv button.on{background:var(--amber);border-color:var(--amber);color:#14161c}
+#pv .sep{flex:1}#pv a{color:var(--dim)}#pv-close{opacity:.7}
+
+main{padding-top:52px;height:calc(100vh - 52px - 92px);overflow:hidden;position:relative}
+[data-room],[data-screen]{display:none;height:100%;overflow-y:auto}
+[data-room].active,[data-screen].active{display:block}
+
+/* ===== shelf ===== */
+#shelf .col{max-width:880px;margin:0 auto;padding:44px 30px}
+#shelf h1{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:30px;letter-spacing:.04em;text-transform:uppercase;color:var(--txt)}
+#shelf .sub{color:var(--dim);margin:6px 0 28px}
+.reelcard{display:flex;gap:20px;align-items:center;background:var(--panel);border:1px solid var(--line);padding:20px;cursor:pointer}
+.reelcard:hover{border-color:var(--amber)}
+.reelcard .reel{width:74px;height:74px;border-radius:50%;border:7px dotted var(--dim);position:relative;flex:0 0 auto}
+.reelcard .reel::after{content:"";position:absolute;inset:14px;border-radius:50%;background:var(--amber);opacity:.25}
+.reelcard h3{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:21px;letter-spacing:.03em}
+.reelcard .meta{font-family:'Cascadia Mono',Consolas,monospace;font-size:11.5px;color:var(--amber);margin:6px 0 8px;letter-spacing:.1em}
+.reelcard p{color:var(--dim);font-size:15px;max-width:56ch}
+.reelcard .hint{margin-left:auto;font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;color:var(--amber)}
+.newreel{margin-top:16px;width:100%;border:1px dashed var(--line);color:var(--dim);padding:18px;min-height:44px;font-family:'Cascadia Mono',Consolas,monospace;font-size:12.5px;text-align:left}
+.newreel:hover{color:var(--amber);border-color:var(--amber)}
+.ideasrow{margin-top:34px;border-top:1px solid var(--line);padding-top:18px}
+.ideasrow .lbl{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;letter-spacing:.2em;color:var(--dim);margin-bottom:10px;text-transform:uppercase}
+.ideacard{border:1px dashed var(--line);color:var(--txt);padding:12px 18px;min-height:44px;margin-right:10px}
+.ideacard:hover{border-color:var(--amber)}
+
+/* ===== upload ===== */
+#upload.active{display:grid;place-items:center}
+.press{max-width:440px;text-align:center}
+.press .doc{background:var(--panel);border:1px solid var(--line);padding:34px 30px}
+.press h3{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:22px;letter-spacing:.03em}
+.press .meta{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--dim);margin-top:6px}
+.btnrow{margin-top:22px;display:flex;gap:10px;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--amber);color:#14161c;padding:12px 22px;min-height:44px;font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.stamp{display:inline-block;margin-top:20px;padding:8px 16px;border:2px solid var(--amber);color:var(--amber);font-family:'Cascadia Mono',Consolas,monospace;font-size:13px;letter-spacing:.26em;transform:rotate(-4deg) scale(1.6);opacity:0}
+.stamping .stamp{animation:stampin .45s ease-out forwards}
+@keyframes stampin{to{transform:rotate(-4deg) scale(1);opacity:1}}
+
+/* ===== desk — the cutting table ===== */
+#desk .deskwrap{max-width:1200px;margin:0 auto;padding:28px 30px}
+.desktools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.chipbtn{border:1px solid var(--line);background:var(--panel);color:var(--dim);padding:9px 14px;min-height:44px;font-family:'Cascadia Mono',Consolas,monospace;font-size:11.5px;display:inline-flex;align-items:center;gap:7px}
+.chipbtn:hover{color:var(--amber);border-color:var(--amber)}
+.searchbar{margin-bottom:16px}
+.searchbar input{background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:10px 14px;min-height:44px;width:min(340px,100%);font:inherit;font-size:15px}
+.strip-page{background:var(--panel);border:1px solid var(--line);padding:34px 44px 30px;margin-bottom:20px;position:relative;scroll-margin-top:70px}
+.strip-page::before{content:"";position:absolute;top:0;left:0;right:0;height:8px;background:repeating-linear-gradient(90deg,var(--line) 0 14px,transparent 14px 26px)}
+.strip-page .slug{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:14px;display:flex;gap:14px;align-items:baseline}
+.strip-page .slug .pg{margin-left:auto;font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--dim);letter-spacing:0;text-transform:none}
+.strip-page.flash-target{animation:filmflash 1.6s ease-out}
+@keyframes filmflash{0%,60%{box-shadow:0 0 0 2px var(--amber), 0 0 46px rgba(245,166,35,.28)}100%{box-shadow:none}}
+.el{margin:9px 0;font-size:16px}
+.el.action{max-width:66ch;color:var(--txt)}
+.el.char{text-align:center;font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:13.5px;letter-spacing:.14em;margin:16px 0 2px}
+.el.dialogue{margin-left:90px;max-width:52ch}
+.el.paren{margin-left:90px;font-style:italic;color:var(--dim);font-size:14.5px}
+.el.trans{text-align:right;font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;letter-spacing:.2em;color:var(--amber)}
+.el .star{color:var(--amber);cursor:help;margin-left:8px}
+.marginal{color:var(--amber);font-size:13px;margin:2px 0 10px 90px;font-style:italic}
+
+/* ===== co-write — director's chair ===== */
+#cowrite .chatwrap{max-width:880px;margin:0 auto;padding:26px 30px;display:flex;flex-direction:column;height:100%}
+.chathead{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:14px}
+.chathead .who{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:18px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+.chathead .role{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--dim)}
+.chathead .clear{margin-left:auto;font-family:'Cascadia Mono',Consolas,monospace;font-size:11.5px;color:var(--dim);min-height:44px}
+.chathead .clear:hover{color:var(--red)}
+#msgs{flex:1;overflow-y:auto;padding:4px 2px 16px}
+.msg{max-width:70%;margin-bottom:14px}
+.msg .who{font-family:'Cascadia Mono',Consolas,monospace;font-size:10px;letter-spacing:.2em;color:var(--dim);margin-bottom:4px}
+.msg .bubble{padding:12px 16px;font-size:15.5px;background:var(--panel);border:1px solid var(--line)}
+.msg.me{margin-left:auto}
+.msg.me .bubble{background:var(--amber);color:#14161c;border-color:var(--amber)}
+.msg .tools button{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--dim);min-height:30px}
+.msg .tools button:hover{color:var(--amber)}
+.qcard{border:1px solid var(--line);border-left:4px solid var(--amber);background:var(--panel);padding:12px 16px;margin:6px 0 12px;font-style:italic;font-size:14.5px}
+.qcard .src{display:block;font-style:normal;font-family:'Cascadia Mono',Consolas,monospace;font-size:10.5px;color:var(--amber);margin-top:6px}
+.composer{border-top:1px solid var(--line);padding-top:12px;display:flex;gap:10px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:12px 14px;font:inherit;font-size:16px;min-height:46px;max-height:200px}
+.composer textarea:focus{border-color:var(--amber);outline:none}
+.composer .send{background:var(--amber);color:#14161c;min-width:46px;min-height:46px;display:grid;place-items:center}
+.micbtn{border:1px solid var(--line);min-width:46px;min-height:46px;display:grid;place-items:center;color:var(--dim)}
+.micbtn:hover{color:var(--amber);border-color:var(--amber)}
+
+/* ===== feedback — the screening ===== */
+#feedback{position:relative}
+.statebox{height:100%;overflow-y:auto}
+.leader{max-width:640px;margin:0 auto;padding:90px 30px;text-align:center}
+.leader .count{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:110px;color:var(--amber);line-height:1;animation:flicker 1.2s steps(2) infinite}
+@keyframes flicker{50%{opacity:.72}}
+.leader .big{font-size:20px;margin:18px 0 8px}
+.leader .warm{color:var(--dim);max-width:46ch;margin:0 auto 26px}
+.reeltimer{font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;color:var(--dim);margin-top:20px}
+.stages{list-style:none;text-align:left;max-width:420px;margin:0 auto;font-family:'Cascadia Mono',Consolas,monospace;font-size:12.5px;color:var(--dim)}
+.stages li{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:1px dashed var(--line)}
+.stages li.done::after{content:"ok";color:var(--green)}
+.stages li.now{color:var(--amber)}
+.stages li.now::after{content:"rolling…"}
+
+.screening{max-width:960px;margin:0 auto;padding:30px 30px 60px}
+.titlecard{background:var(--panel);border:1px solid var(--line);padding:56px 40px;text-align:center;margin-bottom:26px;position:relative;overflow:hidden}
+.titlecard::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 42%,rgba(245,166,35,.06) 50%,transparent 58%)}
+.titlecard .studio{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
+.titlecard h2{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:30px;letter-spacing:.05em;text-transform:uppercase;margin:16px 0 18px;color:var(--txt)}
+.titlecard .logline{max-width:56ch;margin:0 auto;font-size:17px;font-style:italic;color:var(--txt)}
+.titlecard .rec{display:inline-block;margin-top:20px;border:1px solid var(--amber);color:var(--amber);padding:8px 18px;font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase}
+.filmstripnav{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.filmstripnav button{border:1px solid var(--line);min-width:44px;min-height:44px;display:grid;place-items:center;color:var(--dim)}
+.filmstripnav button:hover{color:var(--amber);border-color:var(--amber)}
+.dots{display:flex;gap:6px;flex-wrap:wrap}
+.dots button{width:12px;height:12px;min-height:12px;border-radius:50%;border:1px solid var(--dim);padding:0}
+.dots button.on{background:var(--amber);border-color:var(--amber)}
+.slide{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--dim);padding:30px 36px;position:relative}
+.slide.sev-high{border-top-color:var(--red)} .slide.sev-medium{border-top-color:var(--amber)} .slide.sev-low{border-top-color:var(--dim)}
+.slide .reelno{position:absolute;top:14px;right:18px;font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--dim)}
+.slide h3{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:21px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:10px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.slide .sev{font-family:'Cascadia Mono',Consolas,monospace;font-size:10.5px;letter-spacing:.18em;padding:3px 9px;border:1px solid currentColor}
+.sev-high{color:var(--red)} .sev-medium{color:var(--amber)} .sev-low{color:var(--dim)}
+.slide .cat{font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--dim);letter-spacing:.1em}
+.slide .note{max-width:64ch;margin:10px 0;font-size:15.5px}
+.slide .evid{border-left:3px solid var(--amber);padding:8px 14px;font-style:italic;margin:10px 0}
+.slide .evid.unverified{border-left-style:dashed;border-left-color:var(--dim);opacity:.75}
+.slide .vbadge{font-family:'Cascadia Mono',Consolas,monospace;font-size:10px;color:var(--dim)}
+.slide .verbs{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.slide .verbs button{border:1px solid var(--line);padding:9px 13px;min-height:44px;font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--txt);display:inline-flex;gap:6px;align-items:center}
+.slide .verbs button:hover{border-color:var(--amber);color:var(--amber)}
+.wavebox{margin-top:30px}
+.wavebox h4{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.wave{display:flex;align-items:flex-end;gap:4px;height:56px;border-bottom:1px solid var(--line);padding-bottom:0}
+.wave .wcol{flex:1;position:relative}
+.wave .wcol i{position:absolute;bottom:0;left:0;right:0;background:var(--amber);display:block}
+.wave .wcol.drag i{background:var(--red)}
+.wave .wcol span{position:absolute;bottom:-22px;left:0;right:0;text-align:center;font-family:'Cascadia Mono',Consolas,monospace;font-size:10px;color:var(--dim)}
+.wave.dragmark .wcol.drag span{color:var(--red)}
+.credits{margin-top:40px;border-top:1px solid var(--line);padding-top:22px}
+.credits h4{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:13px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);margin-bottom:14px}
+.credit{display:flex;gap:14px;align-items:baseline;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14.5px}
+.credit .st{font-family:'Cascadia Mono',Consolas,monospace;font-size:10.5px;letter-spacing:.16em;min-width:86px}
+.credit.paid .st{color:var(--green)} .credit.dangling .st{color:var(--red)} .credit.abandoned .st{color:var(--dim)}
+.credit .nm{min-width:190px}
+
+/* ===== idea ===== */
+#idea .ideawrap{max-width:820px;margin:0 auto;padding:30px;display:flex;flex-direction:column;height:100%}
+#idea .ideahd{display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
+#idea h2{font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-weight:400;font-size:20px;letter-spacing:.04em;text-transform:uppercase}
+#idea .hint{color:var(--dim);font-size:13.5px}
+#idea-content{flex:1;resize:none;background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:22px 26px;font:inherit;font-size:17px;line-height:1.7;min-height:200px}
+#idea-content:focus{outline:none;border-color:var(--amber)}
+.ideafoot{margin-top:14px;display:flex;gap:14px;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips.tucked{flex-direction:column;gap:6px;align-items:flex-start}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);padding:10px 14px;min-height:44px;font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;color:var(--txt);max-width:260px;overflow:hidden;white-space:nowrap}
+.chip:hover{border-color:var(--amber);color:var(--amber)}
+.chip svg{flex:0 0 auto}
+.chips.tucked .chip{width:44px;padding:10px}
+.chips.tucked .chip span{display:none}
+.chips.tucked.peeking .chip:hover{width:auto}
+.chips.tucked.peeking .chip:hover span{display:inline}
+.sam-pill{margin-left:auto;border:1px solid var(--amber);color:var(--amber);padding:11px 18px;min-height:44px;font-family:'Franklin Gothic Medium','Arial Narrow',sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+.sam-pill:hover{background:var(--amber);color:#14161c}
+
+/* quote float */
+#quote-float{position:fixed;inset:0;z-index:800;display:none}
+#quote-float.open{display:flex;align-items:flex-end;justify-content:center;padding-bottom:150px}
+#quote-card{background:var(--panel);border:1px solid var(--amber);padding:16px 20px;max-width:560px;width:92%}
+#quote-card .qtxt{font-style:italic;font-size:15.5px}
+#quote-card .qsrc{font-family:'Cascadia Mono',Consolas,monospace;font-size:10.5px;color:var(--amber);margin-top:8px}
+#quote-card .qrow{margin-top:10px;display:flex;gap:8px;justify-content:flex-end}
+#quote-card .qrow button{border:1px solid var(--line);padding:8px 12px;min-height:36px;font-family:'Cascadia Mono',Consolas,monospace;font-size:11px;color:var(--txt)}
+#quote-card .qrow button:hover{border-color:var(--amber);color:var(--amber)}
+</style>
+</head>
+<body>
+
+<header id="top">
+  <div class="marquee">The Screening Room</div>
+  <div class="nowplaying" id="nowplaying"></div>
+</header>
+
+<main>
+  <section data-screen="shelf" id="shelf">
+    <div class="col">
+      <h1>Reels on the shelf</h1>
+      <p class="sub">Every script waiting for its screening.</p>
+      <div class="reelcard" data-open>
+        <div class="reel" aria-hidden="true"></div>
+        <div>
+          <h3>The Second Shift</h3>
+          <div class="meta">fountain · 9.5 pages · 4 scenes · analyzed</div>
+          <p>Meera has kept Ward 3 alive on routine for 61 days. Tonight her brother files a complaint — and her private ritual is witnessed.</p>
+        </div>
+        <span class="hint">screen it →</span>
+      </div>
+      <button class="newreel" id="newvol">+ deliver a new print (.fdx / .fountain / .txt / .md / .pdf)</button>
+      <div class="ideasrow">
+        <div class="lbl">Ideas — scripts not yet shot</div>
+        <button class="ideacard" data-go="idea">“The Cartographer of Missing Hours”</button>
+        <button class="ideacard" data-go="idea">+ a fresh idea</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen="upload" id="upload">
+    <div class="press">
+      <div class="doc">
+        <h3>the-second-shift.fountain</h3>
+        <div class="meta">9.5 pages · 4 scenes · print received</div>
+        <div class="btnrow">
+          <button class="btn" id="submit-btn">Screen it</button>
+          <button class="btn ghost" data-go="shelf">Not yet</button>
+        </div>
+      </div>
+      <div class="stamp" id="stamp">RECEIVED</div>
+    </div>
+  </section>
+
+  <section data-room="desk" id="desk">
+    <div class="deskwrap">
+      <div class="desktools" role="toolbar" aria-label="Desk tools">
+        <button class="chipbtn">Beat board</button>
+        <button class="chipbtn">Revision view</button>
+        <button class="chipbtn">Compare drafts</button>
+        <button class="chipbtn">Reader &amp; print</button>
+        <button class="chipbtn">Focus · sprint 25:00</button>
+        <button class="chipbtn">Export · backup</button>
+      </div>
+      <div class="searchbar"><input type="search" id="search" placeholder="Search the script…" aria-label="Search the script"></div>
+      <div id="script-pages"></div>
+      <aside style="max-width:320px;margin:6px 0 40px" aria-label="The Stash">
+        <h4 class="wavebox" style="font-family:'Cascadia Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--dim)">THE STASH · MARGIN NOTES</h4>
+        <div class="qcard" style="cursor:pointer">“She takes the box anyway. It is warm.” — scene 1</div>
+        <div class="qcard" style="cursor:pointer">scene 3 — the song is the midpoint; protect it</div>
+      </aside>
+    </div>
+  </section>
+
+  <section data-room="cowrite" id="cowrite">
+    <div class="chatwrap">
+      <div class="chathead"><span class="who">Sameer</span><span class="role">DIRECTOR'S CHAIR · AI WRITING PARTNER</span><button class="clear">Clear chat</button></div>
+      <div id="msgs">
+        <div class="msg me"><div class="who">YOU</div><div class="bubble">Saw the screening?</div></div>
+        <div class="msg sam"><div class="who">SAMEER</div><div class="bubble">Twice. The finger curl is your best frame and it lands with a whole act still to shoot. Scene 2 sags on the waveform — talk, or argue first?</div>
+          <div class="tools"><button class="trbtn">Translate</button></div>
+        </div>
+      </div>
+      <div class="qcard" id="in-quote" hidden><span id="in-quote-text" class="qtxt" style="display:inline"></span><span id="in-quote-src" class="src"></span></div>
+      <div class="composer">
+        <button class="micbtn" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+        <textarea id="input" rows="1" placeholder="Ask about a scene, a character, a note in the margins…"></textarea>
+        <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <section data-room="feedback" id="feedback">
+    <div data-state="empty" style="display:none"><div class="statebox"><div class="leader">
+      <div class="count">8</div>
+      <div class="big">No print delivered.</div>
+      <p class="warm">The projector is warm but there's nothing on the reel. Run the analysis and take a seat — the verdict plays like a film: title card first, evidence after.</p>
+      <button class="btn">Run Analysis</button>
+    </div></div></div>
+    <div data-state="running" style="display:none"><div class="statebox"><div class="leader">
+      <div class="count" style="font-size:64px">REEL</div>
+      <ul class="stages">
+        <li class="done"><span>Formatting &amp; stats</span></li>
+        <li class="done"><span>Voice &amp; subtext</span></li>
+        <li class="now"><span>Scene summaries</span></li>
+        <li><span>Dialogue analysis</span></li>
+        <li><span>Script categories</span></li>
+        <li><span>Principles engine</span></li>
+        <li><span>Setup/payoff ledger</span></li>
+        <li><span>Verification</span></li>
+        <li><span>Coverage</span></li>
+      </ul>
+      <div class="reeltimer">footage: 9.5 pages · 4 scenes</div>
+    </div></div></div>
+    <div data-state="complete"><div class="statebox"><div class="screening">
+      <div class="titlecard">
+        <div class="studio">a verdict in four scenes · 9.5 pages · analysis no. 1</div>
+        <h2 id="t-title">The Second Shift</h2>
+        <p class="logline" id="t-logline"></p>
+        <div class="rec" id="t-rec"></div>
+      </div>
+      <div class="filmstripnav">
+        <button id="prev-slide" aria-label="Previous finding"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <div class="dots" id="dots" role="tablist" aria-label="Findings"></div>
+        <button id="next-slide" aria-label="Next finding"><svg class="i" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        <button class="chipbtn" style="margin-left:auto">re-parse</button>
+        <select class="chipbtn" aria-label="Report language"><option>English</option><option>Tenglish</option><option>हिन्दी</option><option>తెలుగు</option></select>
+        <button class="chipbtn" style="color:var(--red)">retry failed (0)</button>
+        <button class="chipbtn">export</button>
+      </div>
+      <div id="slides"></div>
+      <div class="wavebox">
+        <h4>Pacing — the waveform</h4>
+        <div class="wave dragmark" id="wave"></div>
+        <h4 style="margin-top:44px">Dials — frame meters</h4>
+        <table class="file-t mono" id="dials-t" style="width:100%;border-collapse:collapse;font-size:13px"></table>
+        <div class="credits">
+          <h4>End credits — setup / payoff</h4>
+          <div id="credits"></div>
+          <h4 style="margin-top:28px">Reads — the writer's mirror</h4>
+          <div id="reads"></div>
+          <p style="margin-top:30px;color:var(--dim);font-style:italic">— Dr. Sushruta, director of photography for this verdict</p>
+        </div>
+      </div>
+    </div></div></div>
+  </section>
+
+  <section data-screen="idea" id="idea">
+    <div class="ideawrap">
+      <div class="ideahd"><h2>A fresh idea</h2><span class="hint">autosaves as you write · Sameer is one word away</span></div>
+      <textarea id="idea-content" spellcheck="false" placeholder="Whatever comes. A line, a scene, a worry…"></textarea>
+      <div class="ideafoot">
+        <div class="chips" id="idea-chips" aria-label="Explore paths">
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg><span>What if the mother knew?</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg><span>Make the ward a character</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 18V6l8 6 8-6v12"/></svg><span>End on the empty tiffin</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><span>Slow the dawn, earn it</span></button>
+        </div>
+        <button class="sam-pill" id="sam-pill">/sameer</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="strip" role="navigation" aria-label="Rooms">
+  <button class="frame on" data-go="desk">Cutting table</button>
+  <button class="frame" data-go="cowrite">Director's chair</button>
+  <button class="frame" data-go="feedback">Screening</button>
+</div>
+
+<div id="quote-float">
+  <div id="quote-card" role="dialog" aria-label="Quoted passage">
+    <div class="qtxt" id="quote-text"></div>
+    <div class="qsrc" id="quote-src"></div>
+    <div class="qrow"><button data-close>Dismiss</button><button data-goto-cowrite>Discuss with Sameer →</button></div>
+  </div>
+</div>
+
+<div id="pv">
+  <b>REVIEW</b>
+  <button data-go="shelf">Shelf</button>
+  <button data-go="desk">Desk</button>
+  <button data-go="cowrite">Co-write</button>
+  <button data-go="feedback">Feedback</button>
+  <button data-go="idea">Ideas</button>
+  <span class="sep"></span>
+  <button data-fb="empty">Empty</button>
+  <button data-fb="running">Running</button>
+  <button data-fb="complete" class="on">Complete</button>
+  <span class="sep"></span>
+  <a href="index.html">Gallery</a>
+  <button id="pv-close" aria-label="Dismiss review bar">✕</button>
+</div>
+
+<script src="_payload.js"></script>
+<script>
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+let FEEDBACK_STATE = "complete";
+let SLIDE = 0;
+const P = window.PAYLOAD;
+const ROOMS = ["desk","cowrite","feedback"];
+
+function show(id){
+  $$("[data-room],[data-screen]").forEach(el =>
+    el.classList.toggle("active", el.dataset.room === id || el.dataset.screen === id));
+  $$("#strip [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  (document.querySelector(`[data-room="${id}"].active, [data-screen="${id}"].active`) || {}).scrollTop = 0;
+}
+function renderFeedback(){
+  $$("[data-state]").forEach(el => el.style.display = "none");
+  const el = $(`#feedback [data-state="${FEEDBACK_STATE}"]`);
+  if (el) el.style.display = "";
+}
+function locateFinding(f){
+  show("desk");
+  const page = $(`[data-scene="${f.scene}"]`);
+  if (page){
+    page.classList.remove("flash-target"); void page.offsetWidth;
+    page.classList.add("flash-target");
+    page.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+}
+function discussFinding(f){
+  show("cowrite");
+  const q = $("#in-quote");
+  q.hidden = false;
+  $("#in-quote-text").textContent = "“" + f.quote + "”";
+  $("#in-quote-src").textContent = `REEL ${String(f.id).padStart(2,"0")} · ${f.category.toUpperCase()} · SCENE ${f.scene}`;
+  $("#input").focus();
+}
+
+function renderScript(){
+  $("#nowplaying").textContent = `NOW ON THE TABLE: “${P.project.title.toUpperCase()}” · ${P.project.format.toUpperCase()} · ${P.project.pages} PP.`;
+  $("#script-pages").innerHTML = P.script.map(sc => `
+    <article class="strip-page" data-scene="${sc.n}">
+      <div class="slug"><span>Scene ${sc.n}</span><span style="font-family:'Segoe UI',Tahoma,sans-serif;font-size:14px;letter-spacing:0;text-transform:none">${sc.slug}</span><span class="pg">pp. ${sc.page}</span></div>
+      ${sc.elements.map(([type, a, b]) => {
+        if (type === "dialogue") return `<div class="el char">${a}</div><div class="el dialogue">${b}</div>`;
+        if (type === "parenthetical") return `<div class="el paren">${a}</div>`;
+        if (type === "transition") return `<div class="el trans">${a}</div>`;
+        if (type === "action") return `<div class="el action">${a}${sc.n === 1 && a.startsWith("She takes the box") ? '<span class="star" title="Edited — was: She pockets the box.">★</span>' : ""}</div>`;
+        return "";
+      }).join("")}
+      ${sc.n === 1 ? `<div class="marginal">tape mark: this warmth is the spine — don’t lose the box.</div>` : ""}
+      ${sc.n === 3 ? `<div class="marginal">tape mark: the doorway beat is the whole scene. Hold it one breath longer.</div>` : ""}
+    </article>`).join("");
+}
+
+function renderScreening(){
+  $("#t-title").textContent = P.project.title;
+  $("#t-logline").textContent = P.coverage.logline;
+  $("#t-rec").textContent = P.coverage.recommendation.split("—")[0].trim();
+  $("#dots").innerHTML = P.findings.map((f, i) =>
+    `<button data-slide="${i}" class="${i === 0 ? "on" : ""}" aria-label="Finding ${f.id}"></button>`).join("");
+  $("#slides").innerHTML = P.findings.map((f, i) => `
+    <div class="slide sev-${f.severity}" data-finding="${f.id}" data-slide-i="${i}" style="${i === 0 ? "" : "display:none"}">
+      <span class="reelno">REEL ${String(f.id).padStart(2,"0")} / ${String(P.findings.length).padStart(2,"0")} · scene ${f.scene}</span>
+      <h3><span class="sev sev-${f.severity}">${f.severity.toUpperCase()}</span> <span class="cat">${f.category}${f.verified ? "" : " · UNVERIFIED"}</span></h3>
+      <p class="note">${f.note}</p>
+      <div class="evid ${f.verified ? "" : "unverified"}">“${f.quote}”</div>
+      <div class="verbs">
+        <button data-act="locate" data-fid="${f.id}">cue — scene ${f.scene}</button>
+        <button data-act="discuss" data-fid="${f.id}">discuss</button>
+        <button data-act="dismiss" data-fid="${f.id}">dismiss</button>
+      </div>
+    </div>`).join("");
+
+  const max = Math.max(...P.pacing.map(p => p.pace));
+  $("#wave").innerHTML = P.pacing.map(p => `
+    <div class="wcol ${p.drag ? "drag" : ""}" style="height:56px">
+      <i style="height:${Math.round(p.pace / max * 52)}px" title="Scene ${p.scene} — pace ${p.pace}"></i>
+      <span>s${p.scene}</span>
+    </div>`).join("");
+
+  $("#dials-t").innerHTML = `<tr><th style="text-align:left;padding:8px 6px">Character</th><th>Poles (1–10)</th><th>Scenes</th></tr>` +
+    P.dials.map(d => `<tr><td style="padding:8px 6px">${d.character}</td>
+      <td class="mono">${Object.entries(d.poles).map(([k, v]) => `${k[0]}${v}`).join(" · ")}</td>
+      <td class="mono">${d.scenes.join(",")}</td></tr>`).join("");
+
+  $("#credits").innerHTML = P.ledger.map(l => `
+    <div class="credit ${l.status}">
+      <span class="st">${l.status.toUpperCase()}</span>
+      <span class="nm">${l.setup}</span>
+      <span style="color:var(--dim);font-size:13.5px">${l.note}</span>
+    </div>`).join("");
+
+  $("#reads").innerHTML = P.reads.map(r => `
+    <div class="credit"><span class="st" style="color:var(--amber)">${r.character.toUpperCase()}</span>
+      <span style="font-size:14.5px">${r.read}</span></div>`).join("");
+}
+
+function setSlide(i){
+  SLIDE = (i + P.findings.length) % P.findings.length;
+  $$("#slides .slide").forEach(s => s.style.display = +s.dataset.slideI === SLIDE ? "" : "none");
+  $$("#dots button").forEach(d => d.classList.toggle("on", +d.dataset.slide === SLIDE));
+}
+
+function wire(){
+  $$("#pv [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("#strip [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("[data-go]").forEach(b => { if (!b.closest("#pv") && !b.closest("#strip")) b.addEventListener("click", () => show(b.dataset.go)); });
+  $$("#pv [data-fb]").forEach(b => b.addEventListener("click", () => {
+    FEEDBACK_STATE = b.dataset.fb; renderFeedback();
+    $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x === b));
+  }));
+  $("#pv-close").addEventListener("click", () => $("#pv").remove());
+
+  // film-strip idiom: ← / → scrub rooms (unless typing in a field)
+  document.addEventListener("keydown", e => {
+    if (["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) return;
+    if (e.key === "ArrowRight") { const cur = ROOMS.indexOf(ROOMS.find(r => $(`[data-room="${r}"]`).classList.contains("active"))); show(ROOMS[(cur + 1) % 3]); }
+    if (e.key === "ArrowLeft")  { const cur = ROOMS.indexOf(ROOMS.find(r => $(`[data-room="${r}"]`).classList.contains("active"))); show(ROOMS[(cur + 2) % 3]); }
+  });
+
+  $("#prev-slide").addEventListener("click", () => setSlide(SLIDE - 1));
+  $("#next-slide").addEventListener("click", () => setSlide(SLIDE + 1));
+  $("#dots").addEventListener("click", e => { const b = e.target.closest("[data-slide]"); if (b) setSlide(+b.dataset.slide); });
+
+  $("[data-open]").addEventListener("click", () => show("upload"));
+  $("#newvol").addEventListener("click", () => show("upload"));
+  $("#submit-btn").addEventListener("click", () => {
+    $("#upload").classList.add("stamping");
+    setTimeout(() => show("desk"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 950);
+  });
+
+  $("#search").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    $$(".strip-page").forEach(pg => pg.style.display = !q || pg.textContent.toLowerCase().includes(q) ? "" : "none");
+  });
+
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const f = P.findings.find(x => x.id === +b.dataset.fid);
+    if (b.dataset.act === "locate") locateFinding(f);
+    if (b.dataset.act === "discuss") discussFinding(f);
+    if (b.dataset.act === "dismiss") b.closest(".slide").style.opacity = .35;
+    if (b.dataset.act === "rewrite") { show("cowrite"); $("#input").value = `Rewrite idea for reel ${f.id}: `; $("#input").focus(); growComposer($("#input")); }
+  });
+
+  const qf = $("#quote-float");
+  const closeQ = () => qf.classList.remove("open");
+  document.addEventListener("mousedown", e => { if (qf.classList.contains("open") && !$("#quote-card").contains(e.target)) closeQ(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeQ(); });
+  $("#quote-card [data-close]").addEventListener("click", closeQ);
+  $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
+  $$("#desk .qcard[style*='cursor']").forEach(s => s.addEventListener("click", () => {
+    qf.classList.add("open");
+    $("#quote-text").textContent = s.textContent;
+    $("#quote-src").textContent = "FROM THE STASH / MARGIN NOTES";
+  }));
+
+  const input = $("#input");
+  input.addEventListener("input", () => growComposer(input));
+  const idea = $("#idea-content");
+  idea.addEventListener("input", () => growComposer(idea));
+  wireChips(idea, $("#idea-chips"));
+  $("#sam-pill").addEventListener("click", () => show("cowrite"));
+}
+function growComposer(ta){
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+}
+function wireChips(surface, chipRow){
+  surface.addEventListener("input", () => chipRow.classList.toggle("tucked", surface.value.length > 0));
+  chipRow.addEventListener("mouseover", e => { if (chipRow.classList.contains("tucked") && e.target.closest(".chip")) chipRow.classList.add("peeking"); });
+  chipRow.addEventListener("mouseout", () => chipRow.classList.remove("peeking"));
+}
+
+renderScript();
+renderScreening();
+renderFeedback();
+wire();
+show("shelf");
+</script>
+</body>
+</html>
