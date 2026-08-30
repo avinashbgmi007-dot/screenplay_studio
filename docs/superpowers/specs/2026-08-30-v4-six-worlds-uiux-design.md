@@ -46,14 +46,17 @@ screenplay_studio/webapp/preview-next/
 ├── screening.html      ← The Screening Room (dark cinema)
 ├── quarterly.html      ← The Quarterly     (light magazine)
 ├── terminal.html       ← The Terminal      (wildcard, monospace)
-└── studio-wall.html    ← The Studio Wall   (warm craft wildcard)
+├── studio-wall.html    ← The Studio Wall   (warm craft wildcard)
+└── _payload.js         ← shared demo payload (single source of truth)
 ```
 
 - The existing Flask server serves any path under `webapp/` via its catch-all
   `<path:filename>` route (`webapp_server.py:129-135`) — **zero server changes needed**.
   Review URL: `/preview-next/index.html`.
-- Each page: single HTML file, inline CSS/JS, **zero external dependencies** (no CDN fonts,
-  no libraries) — offline-safe, consistent with the privacy-first product.
+- Each world: single HTML file with inline CSS/JS. The demo payload lives once in
+  `_payload.js`, loaded via `<script src="_payload.js">` (plain script tag — works over
+  `file://`, no fetch/CORS involved). One payload edit updates all six worlds; each page
+  still needs no network and no build step.
 - Demo-level interactivity: rooms switch, chips collapse, composer grows, click-outside and
   Esc dismiss floating surfaces, cross-room bridges work. Nothing talks to a backend.
 - Old `preview-redesigns/` folder stays untouched as history.
@@ -64,8 +67,9 @@ screenplay_studio/webapp/preview-next/
 
 Same content, different presentation — the comparison isolates design, not data:
 
-- **Script:** a 4-scene sample, mixed English/Tenglish, in the project's voice (characters,
-  headings, dialogue with Tenglish lines), including one transition and one parenthetical.
+- **Script:** "The Second Shift" — a 4-scene sample, mixed English/Tenglish, in the project's
+  voice (characters MEERA, VIKRAM, AMMA — fresh names, not borrowed from prior test scripts),
+  including one transition and one parenthetical.
 - **Findings:** 9 findings — 3 high / 4 medium / 2 low — with verbatim evidence quotes,
   category labels, verification badges (verified on most, one unverified), scene refs.
 - **Fix queue:** derived from the same findings with severities + verbs
