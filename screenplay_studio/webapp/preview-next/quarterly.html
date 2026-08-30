@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>④ The Quarterly — light magazine</title>
+<style>
+:root{
+  --ivory:#fbfaf5; --ink:#1a1a18; --ox:#7d2a2a; --sage:#5f7464; --stone:#9b978c; --rule:#e3e0d6; --soft:#faf8f0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:light}
+body{background:var(--ivory);color:var(--ink);font-family:Corbel,'Gill Sans Nova',Calibri,'Segoe UI',sans-serif;font-size:16px;line-height:1.6;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--ox);outline-offset:2px}
+svg.i{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+.display{font-family:'Bodoni MT',Didot,'Playfair Display',Georgia,serif;font-weight:400}
+.kick{font-family:Corbel,Calibri,sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ox)}
+.mono,code{font-family:Consolas,'Courier New',monospace;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+
+/* ===== contents spine (world idiom) ===== */
+#spine{position:fixed;top:0;left:0;bottom:0;width:236px;z-index:900;background:var(--soft);border-right:1px solid var(--rule);padding:30px 22px;overflow-y:auto}
+#spine .mast{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:23px;line-height:1.1;margin-bottom:4px}
+#spine .issue{font-family:Corbel,Calibri,sans-serif;font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--stone);margin-bottom:28px}
+#spine ol{list-style:none}
+#spine li{position:relative}
+#spine li button{display:block;width:100%;text-align:left;padding:13px 12px 13px 16px;min-height:44px;font-size:15px;color:var(--ink);border-left:3px solid transparent}
+#spine li button:hover{color:var(--ox)}
+#spine li button .no{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:17px;color:var(--stone);margin-right:10px}
+#spine li button.on{border-left-color:var(--ox);background:#fff}
+#spine li button.on .no{color:var(--ox)}
+#spine .spine-proj{margin-top:26px;padding-top:16px;border-top:1px solid var(--rule);font-size:13px;color:var(--stone);font-style:italic}
+
+/* ===== review bar ===== */
+#pv{position:fixed;bottom:0;left:236px;right:0;z-index:950;display:flex;align-items:center;gap:6px;padding:7px 16px;background:#22221e;color:#d9d6ca;font-family:Consolas,monospace;font-size:11.5px}
+#pv b{color:#e8c25a;letter-spacing:.16em;margin-right:8px}
+#pv button{color:#d9d6ca;border:1px solid #3c3b33;padding:8px 12px;min-height:32px}
+#pv button:hover{border-color:#e8c25a;color:#fff}
+#pv button.on{background:#e8c25a;border-color:#e8c25a;color:#22221e}
+#pv .sep{flex:1}#pv a{color:#d9d6ca}#pv-close{opacity:.7}
+
+main{margin-left:236px;padding-bottom:44px;height:100vh;overflow:hidden}
+[data-room],[data-screen]{display:none;height:100%;overflow-y:auto}
+[data-room].active,[data-screen].active{display:block;animation:enter .22s ease-out}
+@keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ===== shelf ===== */
+#shelf .col{max-width:800px;margin:0 auto;padding:52px 40px}
+#shelf h1{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:34px;margin-bottom:4px}
+#shelf .sub{color:var(--stone);margin-bottom:30px}
+.card1{border:1px solid var(--rule);background:#fff;padding:24px 26px;cursor:pointer}
+.card1:hover{border-color:var(--ox)}
+.card1 .kick{margin-bottom:8px}
+.card1 h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px;margin-bottom:8px}
+.card1 p{color:var(--stone);max-width:58ch}
+.card1 .go{display:block;margin-top:12px;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ox)}
+.newsub{margin-top:16px;width:100%;border:1px dashed var(--stone);color:var(--stone);padding:18px;min-height:44px;font-size:13px;letter-spacing:.08em;text-align:left}
+.newsub:hover{color:var(--ox);border-color:var(--ox)}
+.ideasrow{margin-top:36px;border-top:1px solid var(--rule);padding-top:20px}
+.ideasrow .lbl{font-size:11px;letter-spacing:.22em;color:var(--stone);margin-bottom:12px;text-transform:uppercase}
+.ideacard{border:1px dashed var(--rule);color:var(--ink);padding:12px 18px;min-height:44px;margin-right:10px;font-style:italic;font-family:'Bodoni MT',Didot,Georgia,serif;font-size:16px}
+.ideacard:hover{border-color:var(--ox);color:var(--ox)}
+
+/* ===== upload ===== */
+#upload.active{display:grid;place-items:center}
+.press{max-width:440px;text-align:center}
+.press .doc{border:1px solid var(--rule);background:#fff;padding:34px 30px}
+.press h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px}
+.press .meta{font-size:11.5px;color:var(--stone);margin-top:6px;letter-spacing:.1em}
+.btnrow{margin-top:22px;display:flex;gap:10px;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--ivory);padding:12px 22px;min-height:44px;font-size:12px;letter-spacing:.18em;text-transform:uppercase}
+.btn:hover{background:var(--ox)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.stamp{display:inline-block;margin-top:20px;padding:8px 16px;border:3px double var(--ox);color:var(--ox);font-size:13px;letter-spacing:.26em;text-transform:uppercase;transform:rotate(-6deg) scale(1.6);opacity:0}
+.stamping .stamp{animation:stampin .45s ease-out forwards}
+@keyframes stampin{to{transform:rotate(-6deg) scale(1);opacity:1}}
+
+/* ===== desk — the manuscript ===== */
+#desk .manuscript{max-width:860px;margin:0 auto;padding:40px 44px}
+.desktools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.chipbtn{border:1px solid var(--rule);background:#fff;color:var(--stone);padding:9px 14px;min-height:44px;font-size:11.5px;letter-spacing:.06em;display:inline-flex;align-items:center;gap:7px}
+.chipbtn:hover{color:var(--ox);border-color:var(--ox)}
+.searchbar{margin-bottom:20px}
+.searchbar input{background:#fff;border:1px solid var(--rule);color:var(--ink);padding:10px 14px;min-height:44px;width:min(340px,100%);font:inherit;font-size:15px}
+.sheet{background:#fff;border:1px solid var(--rule);padding:44px 52px 36px;margin-bottom:24px;scroll-margin-top:20px;max-width:100%}
+.sheet .slug{border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:16px;display:flex;gap:14px;align-items:baseline}
+.sheet .slug .sc{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ox)}
+.sheet .slug .sl{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:17px}
+.sheet .slug .pg{margin-left:auto;font-family:Consolas,monospace;font-size:11.5px;color:var(--stone)}
+.sheet.flash-target{animation:oxflash 1.6s ease-out}
+@keyframes oxflash{0%,60%{box-shadow:0 0 0 2px var(--ox)}100%{box-shadow:none}}
+.el{margin:9px 0;font-size:16px;max-width:66ch}
+.el.char{text-align:center;font-size:13.5px;letter-spacing:.14em;margin:16px 0 2px;text-transform:uppercase}
+.el.dialogue{margin-left:90px;max-width:52ch}
+.el.paren{margin-left:90px;font-style:italic;color:var(--stone);font-size:14.5px}
+.el.trans{text-align:right;font-size:12px;letter-spacing:.2em;color:var(--stone);text-transform:uppercase}
+.el .star{color:var(--ox);cursor:help;margin-left:8px}
+.marginal{color:var(--ox);font-style:italic;font-size:13.5px;margin:2px 0 10px 90px}
+.stashbox{max-width:860px;margin:0 auto 44px;padding:0 44px}
+.stashbox h4{font-size:11px;letter-spacing:.22em;color:var(--stone);margin-bottom:12px;text-transform:uppercase}
+.stashline{display:inline-block;border:1px solid var(--rule);background:#fff;padding:9px 14px;min-height:44px;margin:0 8px 8px 0;font-size:14px;color:var(--ink);cursor:pointer;font-style:italic}
+.stashline:hover{border-color:var(--ox);color:var(--ox)}
+
+/* ===== co-write — in conversation ===== */
+#cowrite .chatwrap{max-width:800px;margin:0 auto;padding:34px 40px;display:flex;flex-direction:column;height:100%}
+.chathead{border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:18px;display:flex;align-items:baseline;gap:12px}
+.chathead .who{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:24px}
+.chathead .role{font-size:11px;letter-spacing:.2em;color:var(--stone);text-transform:uppercase}
+.chathead .clear{margin-left:auto;font-size:12px;color:var(--stone);min-height:44px}
+.chathead .clear:hover{color:var(--ox)}
+#msgs{flex:1;overflow-y:auto;padding:4px 2px 16px}
+.msg{max-width:74%;margin-bottom:16px}
+.msg .who{font-size:10.5px;letter-spacing:.18em;color:var(--stone);margin-bottom:4px;text-transform:uppercase}
+.msg .bubble{padding:13px 17px;font-size:15.5px}
+.msg.sam .bubble{background:#fff;border:1px solid var(--rule);border-top:3px solid var(--ink)}
+.msg.me{margin-left:auto}
+.msg.me .bubble{background:var(--ink);color:var(--ivory)}
+.msg .tools button{font-size:11.5px;color:var(--stone);min-height:30px}
+.msg .tools button:hover{color:var(--ox)}
+.qcard{border:1px solid var(--rule);border-top:3px solid var(--ox);background:#fff;padding:12px 16px;margin:6px 0 12px;font-style:italic;font-size:14.5px;font-family:'Bodoni MT',Didot,Georgia,serif;font-size:16px}
+.qcard .src{display:block;font-style:normal;font-family:Corbel,Calibri,sans-serif;font-size:10.5px;letter-spacing:.14em;color:var(--ox);margin-top:6px;text-transform:uppercase}
+.composer{border-top:1px solid var(--rule);padding-top:14px;display:flex;gap:10px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;background:#fff;border:1px solid var(--rule);color:var(--ink);padding:12px 14px;font:inherit;font-size:16px;min-height:46px;max-height:200px}
+.composer textarea:focus{border-color:var(--ink);outline:none}
+.composer .send{background:var(--ink);color:var(--ivory);min-width:46px;min-height:46px;display:grid;place-items:center}
+.composer .send:hover{background:var(--ox)}
+.micbtn{border:1px solid var(--rule);min-width:46px;min-height:46px;display:grid;place-items:center;color:var(--stone)}
+.micbtn:hover{color:var(--ox);border-color:var(--ox)}
+
+/* ===== feedback — the feature well ===== */
+#feedback .well{max-width:1060px;margin:0 auto;padding:44px 44px 90px}
+.issuehead{text-align:center;border-bottom:3px double var(--ink);padding-bottom:22px;margin-bottom:8px}
+.issuehead .over{font-size:11px;letter-spacing:.3em;color:var(--stone);text-transform:uppercase}
+.issuehead h2{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:42px;margin:10px 0 6px}
+.issuehead .issline{font-size:13px;color:var(--stone);font-style:italic}
+.ctl-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:16px 0 30px}
+.ctl-row button,.ctl-row select{border:1px solid var(--rule);background:#fff;color:var(--stone);padding:8px 13px;min-height:40px;font:inherit;font-size:12px}
+.ctl-row button:hover{color:var(--ox);border-color:var(--ox)}
+.editors-letter{background:var(--soft);border:1px solid var(--rule);padding:24px 28px;margin-bottom:36px}
+.editors-letter h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:8px}
+.editors-letter p{font-size:15.5px;max-width:72ch}
+.editors-letter .ll{font-style:italic;font-size:17px;margin:8px 0}
+.items{column-count:2;column-gap:36px}
+.item{break-inside:avoid;margin-bottom:30px}
+.item .kick{margin-bottom:4px}
+.item h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:22px;line-height:1.2;margin-bottom:8px}
+.item p{font-size:15px;color:var(--ink);margin-bottom:8px}
+.item blockquote{border-top:3px solid var(--ox);padding-top:8px;font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:17.5px;margin:10px 0}
+.item blockquote.unverified{border-top-style:dashed;border-top-color:var(--stone);color:var(--stone)}
+.item .vb{font-size:10.5px;letter-spacing:.1em;color:var(--stone);text-transform:uppercase}
+.item .verbs{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.item .verbs button{border:1px solid var(--rule);background:#fff;padding:8px 12px;min-height:40px;font-size:11px;letter-spacing:.08em;color:var(--ink);text-transform:uppercase}
+.item .verbs button:hover{border-color:var(--ox);color:var(--ox)}
+.corrections{border:2px solid var(--ink);padding:20px 24px;margin:10px 0 36px}
+.corrections h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:19px;margin-bottom:12px}
+.crow{display:flex;gap:12px;align-items:baseline;padding:9px 0;border-bottom:1px dashed var(--rule);font-size:14.5px}
+.crow:last-child{border-bottom:none}
+.crow .verbs{margin-left:auto;display:flex;gap:6px}
+.crow .verbs button{border:1px solid var(--rule);background:var(--soft);padding:6px 10px;min-height:36px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+.crow .verbs button:hover{border-color:var(--ox);color:var(--ox)}
+.folio{margin-bottom:36px}
+.folio h3, .tasting h3, .accounts h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:12px}
+.sparkline{display:flex;align-items:flex-end;gap:10px;height:90px;border-bottom:1px solid var(--ink);padding-bottom:0}
+.sparkline .scol{flex:1;position:relative}
+.sparkline .scol i{position:absolute;bottom:0;left:0;right:0;background:var(--ink);display:block}
+.sparkline .scol.drag i{background:var(--ox)}
+.sparkline .scol span{position:absolute;bottom:-24px;left:0;right:0;text-align:center;font-family:Consolas,monospace;font-size:11px;color:var(--stone)}
+.folio .cap{margin-top:34px;font-size:13px;color:var(--stone);font-style:italic}
+.tasting table{width:100%;border-collapse:collapse;font-size:14px}
+.tasting th{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--stone);text-align:left;padding:8px;border-bottom:1px solid var(--ink)}
+.tasting td{padding:9px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
+.tasting td:first-child{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:15.5px}
+.dialpole{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--stone);margin:3px 0}
+.dialpole .polebar{width:100px;height:4px;background:var(--rule);position:relative}
+.dialpole .polebar i{position:absolute;top:-3px;width:2px;height:10px;background:var(--ink)}
+.accounts table{width:100%;border-collapse:collapse;font-size:14px}
+.accounts th{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--stone);text-align:left;padding:8px;border-bottom:1px solid var(--ink)}
+.accounts td{padding:9px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
+.acct-st{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
+.acct-st.dangling,.acct-st.abandoned{color:var(--ox)}
+.acct-st.paid{color:var(--sage)}
+tr.st-dangling td:first-child .nm{text-decoration:line-through;text-decoration-color:var(--ox)}
+.signoff{text-align:right;font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:18px;margin-top:34px}
+
+/* lifecycle */
+.fblife{max-width:600px;margin:0 auto;padding:90px 30px;text-align:center}
+.fblife .big{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:30px;margin-bottom:10px}
+.fblife .warm{color:var(--stone);max-width:46ch;margin:0 auto 26px}
+.stages{list-style:none;text-align:left;max-width:400px;margin:0 auto;font-size:13px;color:var(--stone)}
+.stages li{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:1px dashed var(--rule)}
+.stages li.done::after{content:"set";color:var(--sage)}
+.stages li.now{color:var(--ox)}
+.stages li.now::after{content:"in progress…"}
+
+/* ===== idea ===== */
+#idea .ideawrap{max-width:780px;margin:0 auto;padding:40px 40px;display:flex;flex-direction:column;height:100%}
+#idea .ideahd{display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
+#idea h2{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px}
+#idea .hint{color:var(--stone);font-size:13.5px}
+#idea-content{flex:1;resize:none;background:#fff;border:1px solid var(--rule);color:var(--ink);padding:22px 26px;font:inherit;font-size:17px;line-height:1.7;min-height:200px}
+#idea-content:focus{outline:none;border-color:var(--ink)}
+.ideafoot{margin-top:14px;display:flex;gap:14px;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips.tucked{flex-direction:column;gap:6px;align-items:flex-start}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--rule);background:#fff;padding:10px 14px;min-height:44px;font-size:12.5px;color:var(--ink);max-width:260px;overflow:hidden;white-space:nowrap;font-style:italic}
+.chip:hover{border-color:var(--ox);color:var(--ox)}
+.chip svg{flex:0 0 auto}
+.chips.tucked .chip{width:44px;padding:10px}
+.chips.tucked .chip span{display:none}
+.chips.tucked.peeking .chip:hover{width:auto}
+.chips.tucked.peeking .chip:hover span{display:inline}
+.sam-pill{margin-left:auto;border:1px solid var(--ink);padding:11px 18px;min-height:44px;font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+.sam-pill:hover{background:var(--ink);color:var(--ivory)}
+
+/* quote float */
+#quote-float{position:fixed;inset:0;z-index:800;display:none}
+#quote-float.open{display:flex;align-items:flex-end;justify-content:center;padding-bottom:110px}
+#quote-card{background:#fff;border:1px solid var(--ink);box-shadow:0 18px 44px rgba(26,26,24,.18);padding:16px 20px;max-width:560px;width:92%}
+#quote-card .qtxt{font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:17px}
+#quote-card .qsrc{font-size:10.5px;letter-spacing:.14em;color:var(--ox);margin-top:8px;text-transform:uppercase}
+#quote-card .qrow{margin-top:10px;display:flex;gap:8px;justify-content:flex-end}
+#quote-card .qrow button{border:1px solid var(--rule);padding:8px 12px;min-height:36px;font-size:11px}
+#quote-card .qrow button:hover{border-color:var(--ox);color:var(--ox)}
+</style>
+</head>
+<body>
+
+<aside id="spine">
+  <div class="mast">The<br>Quarterly</div>
+  <div class="issue">A journal of the second draft</div>
+  <ol>
+    <li><button data-go="shelf"><span class="no">i</span>Submissions</button></li>
+    <li><button data-go="desk" class="on"><span class="no">1</span>The Script</button></li>
+    <li><button data-go="cowrite"><span class="no">2</span>In Conversation</button></li>
+    <li><button data-go="feedback"><span class="no">3</span>The Verdict</button></li>
+    <li><button data-go="idea"><span class="no">4</span>Marginalia</button></li>
+  </ol>
+  <div class="spine-proj" id="spine-proj"></div>
+</aside>
+
+<main>
+  <section data-screen="shelf" id="shelf">
+    <div class="col">
+      <h1>Submissions</h1>
+      <p class="sub">Manuscripts received, awaiting the editor's pencil.</p>
+      <div class="card1" data-open>
+        <div class="kick">Accepted for review · fountain</div>
+        <h3>The Second Shift</h3>
+        <p>Meera has kept Ward 3 alive on routine for 61 days. Tonight her brother files a complaint — and her private ritual is witnessed.</p>
+        <span class="go">Open the manuscript →</span>
+      </div>
+      <button class="newsub" id="newvol">＋ Submit a manuscript (.fdx / .fountain / .txt / .md / .pdf)</button>
+      <div class="ideasrow">
+        <div class="lbl">Marginalia — not yet manuscripts</div>
+        <button class="ideacard" data-go="idea">“The Cartographer of Missing Hours”</button>
+        <button class="ideacard" data-go="idea">＋ a fresh idea</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen="upload" id="upload">
+    <div class="press">
+      <div class="doc">
+        <h3>the-second-shift.fountain</h3>
+        <div class="meta">9.5 pages · 4 scenes · received in good order</div>
+        <div class="btnrow">
+          <button class="btn" id="submit-btn">Send to the editor</button>
+          <button class="btn ghost" data-go="shelf">Not yet</button>
+        </div>
+      </div>
+      <div class="stamp" id="stamp">RECEIVED</div>
+    </div>
+  </section>
+
+  <section data-room="desk" id="desk">
+    <div class="manuscript">
+      <div class="desktools" role="toolbar" aria-label="Desk tools">
+        <button class="chipbtn">Beat board</button>
+        <button class="chipbtn">Revision view</button>
+        <button class="chipbtn">Compare drafts</button>
+        <button class="chipbtn">Reader &amp; print</button>
+        <button class="chipbtn">Focus · sprint 25:00</button>
+        <button class="chipbtn">Export · backup</button>
+      </div>
+      <div class="searchbar"><input type="search" id="search" placeholder="Search the manuscript…" aria-label="Search"></div>
+      <div id="script-pages"></div>
+    </div>
+    <div class="stashbox">
+      <h4>The Stash · Margin notes</h4>
+      <span class="stashline">“She takes the box anyway. It is warm.” — scene 1</span>
+      <span class="stashline">scene 3 — the song is the midpoint; protect it</span>
+      <span class="stashline">“Nobody has won.” — scene 4</span>
+    </div>
+  </section>
+
+  <section data-room="cowrite" id="cowrite">
+    <div class="chatwrap">
+      <div class="chathead"><span class="who">Sameer</span><span class="role">In conversation</span><button class="clear">Clear chat</button></div>
+      <div id="msgs">
+        <div class="msg me"><div class="who">You</div><div class="bubble">Have you read the verdict?</div></div>
+        <div class="msg sam"><div class="who">Sameer</div><div class="bubble">Twice. The finger curl is the best page in the issue and it arrives with a whole act still owed. Scene 2 idles — shall we talk about it, or would you rather argue first?</div>
+          <div class="tools"><button class="trbtn">Translate</button></div>
+        </div>
+      </div>
+      <div class="qcard" id="in-quote" hidden><span id="in-quote-text" class="qtxt" style="display:inline"></span><span id="in-quote-src" class="src"></span></div>
+      <div class="composer">
+        <button class="micbtn" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+        <textarea id="input" rows="1" placeholder="Ask about a scene, a character, a note in the margins…"></textarea>
+        <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <section data-room="feedback" id="feedback">
+    <div data-state="empty" style="display:none"><div class="fblife">
+      <div class="big">The issue is unwritten.</div>
+      <p class="warm">No verdict has been set in type. Run the analysis and this becomes the magazine of your draft — findings as features, pacing as a folio, the ledger as accounts.</p>
+      <button class="btn">Run Analysis</button>
+    </div></div>
+    <div data-state="running" style="display:none"><div class="fblife">
+      <div class="big">Setting the type…</div>
+      <ul class="stages">
+        <li class="done"><span>Formatting &amp; stats</span></li>
+        <li class="done"><span>Voice &amp; subtext</span></li>
+        <li class="now"><span>Scene summaries</span></li>
+        <li><span>Dialogue analysis</span></li>
+        <li><span>Script categories</span></li>
+        <li><span>Principles engine</span></li>
+        <li><span>Setup/payoff ledger</span></li>
+        <li><span>Verification</span></li>
+        <li><span>Coverage</span></li>
+      </ul>
+    </div></div>
+    <div data-state="complete"><div class="well">
+      <div class="issuehead">
+        <div class="over">The Quarterly · analysis no. 1 · <span class="mono">9.5 pages · 4 scenes</span></div>
+        <h2 id="iss-title">The Second Shift</h2>
+        <div class="issline">A family drama in four scenes, read twice by the doctor</div>
+      </div>
+      <div class="ctl-row">
+        <button>Re-parse</button>
+        <select aria-label="Report language"><option>Report in English</option><option>Tenglish</option><option>हिन्दी</option><option>తెలుగు</option></select>
+        <button style="color:var(--ox)">Retry failed (0)</button>
+        <button>Export</button>
+        <button>Backup .zip</button>
+      </div>
+      <div class="editors-letter">
+        <h3>The editor's letter</h3>
+        <p class="ll" id="ll"></p>
+        <p id="syn"></p>
+      </div>
+      <div class="items" id="items"></div>
+      <div class="corrections">
+        <h3>Corrections — the fix queue</h3>
+        <div id="fixqueue"></div>
+      </div>
+      <div class="folio">
+        <h3>The folio — pacing</h3>
+        <div class="sparkline" id="spark"></div>
+        <div class="cap">Bar height is pace; the oxblood column drags.</div>
+      </div>
+      <div class="tasting">
+        <h3>Tasting notes — character dials</h3>
+        <table id="dials-t"></table>
+      </div>
+      <div class="accounts">
+        <h3>Accounts — setup / payoff</h3>
+        <table id="ledger-t"></table>
+      </div>
+      <h3 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin:30px 0 12px">The writer's mirror</h3>
+      <div id="reads" style="max-width:76ch"></div>
+      <p class="signoff">— Dr. Sushruta, editor-at-large</p>
+    </div></div>
+  </section>
+
+  <section data-screen="idea" id="idea">
+    <div class="ideawrap">
+      <div class="ideahd"><h2>Marginalia</h2><span class="hint">autosaves as you write · Sameer is one word away</span></div>
+      <textarea id="idea-content" spellcheck="false" placeholder="Whatever comes. A line, a scene, a worry…"></textarea>
+      <div class="ideafoot">
+        <div class="chips" id="idea-chips" aria-label="Explore paths">
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg><span>What if the mother knew?</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg><span>Make the ward a character</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 18V6l8 6 8-6v12"/></svg><span>End on the empty tiffin</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><span>Slow the dawn, earn it</span></button>
+        </div>
+        <button class="sam-pill" id="sam-pill">/sameer — ask</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="quote-float">
+  <div id="quote-card" role="dialog" aria-label="Quoted passage">
+    <div class="qtxt" id="quote-text"></div>
+    <div class="qsrc" id="quote-src"></div>
+    <div class="qrow"><button data-close>Dismiss</button><button data-goto-cowrite>Discuss with Sameer →</button></div>
+  </div>
+</div>
+
+<div id="pv">
+  <b>REVIEW</b>
+  <button data-go="shelf">Shelf</button>
+  <button data-go="desk">Desk</button>
+  <button data-go="cowrite">Co-write</button>
+  <button data-go="feedback">Feedback</button>
+  <button data-go="idea">Ideas</button>
+  <span class="sep"></span>
+  <button data-fb="empty">Empty</button>
+  <button data-fb="running">Running</button>
+  <button data-fb="complete" class="on">Complete</button>
+  <span class="sep"></span>
+  <a href="index.html">Gallery</a>
+  <button id="pv-close" aria-label="Dismiss review bar">✕</button>
+</div>
+
+<script src="_payload.js"></script>
+<script>
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+let FEEDBACK_STATE = "complete";
+const P = window.PAYLOAD;
+
+function show(id){
+  $$("[data-room],[data-screen]").forEach(el =>
+    el.classList.toggle("active", el.dataset.room === id || el.dataset.screen === id));
+  $$("#spine [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  (document.querySelector(`[data-room="${id}"].active, [data-screen="${id}"].active`) || {}).scrollTop = 0;
+}
+function renderFeedback(){
+  $$("[data-state]").forEach(el => el.style.display = "none");
+  const el = $(`#feedback [data-state="${FEEDBACK_STATE}"]`);
+  if (el) el.style.display = "";
+}
+function locateFinding(f){
+  show("desk");
+  const page = $(`[data-scene="${f.scene}"]`);
+  if (page){
+    page.classList.remove("flash-target"); void page.offsetWidth;
+    page.classList.add("flash-target");
+    page.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+}
+function discussFinding(f){
+  show("cowrite");
+  const q = $("#in-quote");
+  q.hidden = false;
+  $("#in-quote-text").textContent = "“" + f.quote + "”";
+  $("#in-quote-src").textContent = `Item ${String(f.id).padStart(2,"0")} · ${f.category} · scene ${f.scene}`;
+  $("#input").focus();
+}
+
+function renderScript(){
+  $("#spine-proj").textContent = `“${P.project.title}” · ${P.project.format} · ${P.project.pages} pp.`;
+  $("#script-pages").innerHTML = P.script.map(sc => `
+    <article class="sheet" data-scene="${sc.n}">
+      <div class="slug"><span class="sc">Scene ${sc.n}</span><span class="sl">${sc.slug}</span><span class="pg mono">pp. ${sc.page}</span></div>
+      ${sc.elements.map(([type, a, b]) => {
+        if (type === "dialogue") return `<div class="el char">${a}</div><div class="el dialogue">${b}</div>`;
+        if (type === "parenthetical") return `<div class="el paren">${a}</div>`;
+        if (type === "transition") return `<div class="el trans">${a}</div>`;
+        if (type === "action") return `<div class="el action">${a}${sc.n === 1 && a.startsWith("She takes the box") ? '<span class="star" title="Edited — was: She pockets the box.">★</span>' : ""}</div>`;
+        return "";
+      }).join("")}
+      ${sc.n === 1 ? `<div class="marginal">in the gutter: this warmth is the spine — don’t lose the box.</div>` : ""}
+      ${sc.n === 3 ? `<div class="marginal">in the gutter: the doorway beat is the whole scene. Hold it one breath longer.</div>` : ""}
+    </article>`).join("");
+}
+
+function renderIssue(){
+  $("#iss-title").textContent = P.project.title;
+  $("#ll").textContent = P.coverage.logline;
+  $("#syn").textContent = P.coverage.synopsis;
+
+  $("#items").innerHTML = P.findings.map(f => `
+    <div class="item" data-finding="${f.id}">
+      <div class="kick">${f.category}${f.verified ? "" : " · unverified — quote not matched"}</div>
+      <h3>${f.note.split(". ")[0]}.</h3>
+      <p>${f.note.split(". ").slice(1).join(". ")}</p>
+      <blockquote class="${f.verified ? "" : "unverified"}">“${f.quote}”</blockquote>
+      <span class="vb">scene ${f.scene} · ${f.severity}</span>
+      <div class="verbs">
+        <button data-act="locate" data-fid="${f.id}">¶ see page</button>
+        <button data-act="discuss" data-fid="${f.id}">discuss</button>
+        <button data-act="dismiss" data-fid="${f.id}">dismiss</button>
+      </div>
+    </div>`).join("");
+
+  $("#fixqueue").innerHTML = P.findings.filter(f => f.severity !== "low" || f.id === 8).map(f => `
+    <div class="crow"><span class="acct-st ${f.severity === "high" ? "dangling" : ""}" style="color:${f.severity === "high" ? "var(--ox)" : f.severity === "medium" ? "var(--ink)" : "var(--stone)"}">${f.severity}</span>
+      <span>Item ${f.id} — ${f.note.split(". ")[0]}.</span>
+      <span class="verbs">
+        <button data-act="locate" data-fid="${f.id}">see page</button>
+        <button data-act="discuss" data-fid="${f.id}">discuss</button>
+        <button data-act="rewrite" data-fid="${f.id}">rewrite</button>
+      </span></div>`).join("");
+
+  const max = Math.max(...P.pacing.map(p => p.pace));
+  $("#spark").innerHTML = P.pacing.map(p => `
+    <div class="scol ${p.drag ? "drag" : ""}" style="height:90px">
+      <i style="height:${Math.round(p.pace / max * 84)}px" title="Scene ${p.scene} — pace ${p.pace}"></i>
+      <span>s${p.scene}</span>
+    </div>`).join("");
+
+  const poleNames = { proactive: "proactive–passive", warm: "warm–cold", articulate: "articulate–terse", emotional: "emotional–stoic", grounded: "grounded–dreamy" };
+  $("#dials-t").innerHTML = `<tr><th>Character</th><th>Poles</th><th>Scenes</th></tr>` +
+    P.dials.map(d => `<tr><td>${d.character}</td>
+      <td><div style="display:grid;gap:4px">${Object.entries(d.poles).map(([k, v]) => `
+        <div class="dialpole"><span style="width:104px">${poleNames[k]}</span>
+          <span class="polebar"><i style="left:${v * 10}%"></i></span>
+          <span class="mono">${v}</span></div>`).join("")}</div></td>
+      <td class="mono">${d.scenes.join(", ")}</td></tr>`).join("");
+
+  $("#ledger-t").innerHTML = `<tr><th>Setup</th><th>Kind</th><th>Scene</th><th>Status</th><th>Note</th></tr>` +
+    P.ledger.map(l => `<tr class="st-${l.status}">
+      <td class="nm">${l.setup}</td><td>${l.kind}</td><td class="mono">s${l.setup_scene}</td>
+      <td><span class="acct-st ${l.status}">${l.status}</span></td>
+      <td>${l.note}</td></tr>`).join("");
+
+  $("#reads").innerHTML = P.reads.map(r => `
+    <p style="margin-bottom:12px"><b style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:17px">${r.character}.</b> ${r.read}</p>`).join("");
+}
+
+function wire(){
+  $$("#pv [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("#spine [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("[data-go]").forEach(b => { if (!b.closest("#pv") && !b.closest("#spine")) b.addEventListener("click", () => show(b.dataset.go)); });
+  $$("#pv [data-fb]").forEach(b => b.addEventListener("click", () => {
+    FEEDBACK_STATE = b.dataset.fb; renderFeedback();
+    $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x === b));
+  }));
+  $("#pv-close").addEventListener("click", () => $("#pv").remove());
+
+  $("[data-open]").addEventListener("click", () => show("upload"));
+  $("#newvol").addEventListener("click", () => show("upload"));
+  $("#submit-btn").addEventListener("click", () => {
+    $("#upload").classList.add("stamping");
+    setTimeout(() => show("desk"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 950);
+  });
+
+  $("#search").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    $$(".sheet").forEach(pg => pg.style.display = !q || pg.textContent.toLowerCase().includes(q) ? "" : "none");
+  });
+
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const f = P.findings.find(x => x.id === +b.dataset.fid);
+    if (b.dataset.act === "locate") locateFinding(f);
+    if (b.dataset.act === "discuss") discussFinding(f);
+    if (b.dataset.act === "dismiss") b.closest(".item,.crow").style.opacity = .35;
+    if (b.dataset.act === "rewrite") { show("cowrite"); $("#input").value = `Rewrite item ${f.id}: `; $("#input").focus(); growComposer($("#input")); }
+  });
+
+  const qf = $("#quote-float");
+  const closeQ = () => qf.classList.remove("open");
+  document.addEventListener("mousedown", e => { if (qf.classList.contains("open") && !$("#quote-card").contains(e.target)) closeQ(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeQ(); });
+  $("#quote-card [data-close]").addEventListener("click", closeQ);
+  $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
+  $$(".stashline").forEach(s => s.addEventListener("click", () => {
+    qf.classList.add("open");
+    $("#quote-text").textContent = s.textContent;
+    $("#quote-src").textContent = "From the stash / margin notes";
+  }));
+
+  const input = $("#input");
+  input.addEventListener("input", () => growComposer(input));
+  const idea = $("#idea-content");
+  idea.addEventListener("input", () => growComposer(idea));
+  wireChips(idea, $("#idea-chips"));
+  $("#sam-pill").addEventListener("click", () => show("cowrite"));
+}
+function growComposer(ta){
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+}
+function wireChips(surface, chipRow){
+  surface.addEventListener("input", () => chipRow.classList.toggle("tucked", surface.value.length > 0));
+  chipRow.addEventListener("mouseover", e => { if (chipRow.classList.contains("tucked") && e.target.closest(".chip")) chipRow.classList.add("peeking"); });
+  chipRow.addEventListener("mouseout", () => chipRow.classList.remove("peeking"));
+}
+
+renderScript();
+renderIssue();
+renderFeedback();
+wire();
+show("shelf");
+</script>
+</body>
+</html>
