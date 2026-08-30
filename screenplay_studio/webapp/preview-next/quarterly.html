@@ -3,316 +3,448 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>④ The Quarterly — light magazine</title>
+<title>④ The Magazine Issue — Quarterly</title>
 <style>
+/* ===== token layer ===== */
 :root{
-  --ivory:#fbfaf5; --ink:#1a1a18; --ox:#7d2a2a; --sage:#5f7464; --stone:#6f6b60; --rule:#e3e0d6; --soft:#faf8f0;
+  --brand-ivory: oklch(98% 0.006 95);
+  --brand-ink: oklch(22% 0.008 90);
+  --brand-ox: oklch(42% 0.11 25);
+  --brand-sage: oklch(52% 0.06 150);
+  --brand-stone: oklch(52% 0.012 90);
+  --brand-rule: oklch(89% 0.008 95);
+  --surface: var(--brand-ivory);
+  --surface-raised: oklch(99.3% 0.003 95);
+  --text: var(--brand-ink);
+  --text-muted: var(--brand-stone);
+  --accent: var(--brand-ox);
+  --line: var(--brand-rule);
+  --finding-high: var(--brand-ox);
+  --finding-medium: oklch(60% 0.09 80);
+  --finding-low: var(--brand-stone);
+  --motion-fast: 150ms;
+  --motion-room: 300ms;
+  --motion-ambient: 650ms;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{color-scheme:light}
-body{background:var(--ivory);color:var(--ink);font-family:Corbel,'Gill Sans Nova',Calibri,'Segoe UI',sans-serif;font-size:16px;line-height:1.6;overflow:hidden}
+body{background:oklch(93% 0.008 90);color:var(--text);font-family:Corbel,'Gill Sans Nova',Calibri,'Segoe UI',sans-serif;font-size:16px;line-height:1.6;overflow:hidden}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
-:focus-visible{outline:2px solid var(--ox);outline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 svg.i{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
 .display{font-family:'Bodoni MT',Didot,'Playfair Display',Georgia,serif;font-weight:400}
-.kick{font-family:Corbel,Calibri,sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ox)}
+.kick{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent)}
 .mono,code{font-family:Consolas,'Courier New',monospace;font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
 
-/* ===== contents spine (world idiom) ===== */
-#spine{position:fixed;top:0;left:0;bottom:0;width:236px;z-index:900;background:var(--soft);border-right:1px solid var(--rule);padding:30px 22px;overflow-y:auto}
-#spine .mast{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:23px;line-height:1.1;margin-bottom:4px}
-#spine .issue{font-family:Corbel,Calibri,sans-serif;font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--stone);margin-bottom:28px}
-#spine ol{list-style:none}
-#spine li{position:relative}
-#spine li button{display:block;width:100%;text-align:left;padding:13px 12px 13px 16px;min-height:44px;font-size:15px;color:var(--ink);border-left:3px solid transparent}
-#spine li button:hover{color:var(--ox)}
-#spine li button .no{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:17px;color:var(--stone);margin-right:10px}
-#spine li button.on{border-left-color:var(--ox);background:#fff}
-#spine li button.on .no{color:var(--ox)}
-#spine .spine-proj{margin-top:26px;padding-top:16px;border-top:1px solid var(--rule);font-size:13px;color:var(--stone);font-style:italic}
+/* the issue shell */
+#issue{position:fixed;inset:16px 16px 54px;background:var(--surface);box-shadow:0 22px 56px rgba(26,26,24,.24);overflow:hidden}
 
-/* ===== review bar ===== */
-#pv{position:fixed;bottom:0;left:236px;right:0;z-index:950;display:flex;align-items:center;gap:6px;padding:7px 16px;background:#22221e;color:#d9d6ca;font-family:Consolas,monospace;font-size:11.5px}
+/* spread navigation (page-turn corners, bottom) */
+#pagecorners{position:absolute;bottom:0;left:0;right:0;z-index:930;display:flex;align-items:center;justify-content:center;gap:4px;padding:9px 0;background:var(--surface-raised);border-top:3px double var(--text)}
+#pagecorners button{padding:9px 16px;min-height:44px;font-size:12px;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;font-family:'Bodoni MT',Didot,Georgia,serif}
+#pagecorners button:hover{color:var(--accent)}
+#pagecorners button.on{color:var(--accent);border-bottom:2px solid var(--accent)}
+
+/* review bar */
+#pv{position:fixed;bottom:0;left:0;right:0;z-index:950;display:flex;align-items:center;gap:6px;padding:7px 16px;background:#22221e;color:#d9d6ca;font-family:Consolas,monospace;font-size:11.5px}
 #pv b{color:#e8c25a;letter-spacing:.16em;margin-right:8px}
 #pv button{color:#d9d6ca;border:1px solid #3c3b33;padding:8px 12px;min-height:32px}
 #pv button:hover{border-color:#e8c25a;color:#fff}
 #pv button.on{background:#e8c25a;border-color:#e8c25a;color:#22221e}
 #pv .sep{flex:1}#pv a{color:#d9d6ca}#pv-close{opacity:.7}
 
-main{margin-left:236px;padding-bottom:44px;height:100vh;overflow:hidden}
-[data-room],[data-screen]{display:none;height:100%;overflow-y:auto}
-[data-room].active,[data-screen].active{display:block;animation:enter .22s ease-out}
-@keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* sections: leaves */
+.leaf{position:absolute;inset:0;display:none;overflow-y:auto}
+.leaf.on{display:block;animation:leafturn var(--motion-room) ease-out}
+@keyframes leafturn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
-/* ===== shelf ===== */
-#shelf .col{max-width:800px;margin:0 auto;padding:52px 40px}
-#shelf h1{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:34px;margin-bottom:4px}
-#shelf .sub{color:var(--stone);margin-bottom:30px}
-.card1{border:1px solid var(--rule);background:#fff;padding:24px 26px;cursor:pointer}
-.card1:hover{border-color:var(--ox)}
-.card1 .kick{margin-bottom:8px}
-.card1 h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px;margin-bottom:8px}
-.card1 p{color:var(--stone);max-width:58ch}
-.card1 .go{display:block;margin-top:12px;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ox)}
-.newsub{margin-top:16px;width:100%;border:1px dashed var(--stone);color:var(--stone);padding:18px;min-height:44px;font-size:13px;letter-spacing:.08em;text-align:left}
-.newsub:hover{color:var(--ox);border-color:var(--ox)}
-.ideasrow{margin-top:36px;border-top:1px solid var(--rule);padding-top:20px}
-.ideasrow .lbl{font-size:11px;letter-spacing:.22em;color:var(--stone);margin-bottom:12px;text-transform:uppercase}
-.ideacard{border:1px dashed var(--rule);color:var(--ink);padding:12px 18px;min-height:44px;margin-right:10px;font-style:italic;font-family:'Bodoni MT',Didot,Georgia,serif;font-size:16px}
-.ideacard:hover{border-color:var(--ox);color:var(--ox)}
+/* ===== back issues (shelf) ===== */
+#backissues .col{max-width:760px;margin:0 auto;padding:46px 40px}
+#backissues h1{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:34px;margin-bottom:4px}
+#backissues .sub{color:var(--text-muted);margin-bottom:28px}
+.issue-row{display:flex;gap:18px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface-raised);padding:18px 22px;margin-bottom:12px;min-height:44px}
+.issue-row:hover{border-color:var(--accent)}
+.issue-row .coverthumb{width:46px;height:62px;background:linear-gradient(160deg,oklch(96% 0.01 95),oklch(90% 0.015 90));border:1px solid var(--line);display:grid;place-items:center;font-family:'Bodoni MT',Didot,Georgia,serif;font-size:10px;color:var(--text-muted)}
+.issue-row h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:21px}
+.issue-row .meta{font-size:12px;color:var(--text-muted);margin-top:3px}
+.issue-row .go{margin-left:auto;color:var(--accent);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.newissue{width:100%;border:1px dashed var(--text-muted);color:var(--text-muted);padding:16px;min-height:44px;text-align:left;font-size:13px}
+.newissue:hover{color:var(--accent);border-color:var(--accent)}
 
-/* ===== upload ===== */
-#upload.active{display:grid;place-items:center}
-.press{max-width:440px;text-align:center}
-.press .doc{border:1px solid var(--rule);background:#fff;padding:34px 30px}
-.press h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px}
-.press .meta{font-size:11.5px;color:var(--stone);margin-top:6px;letter-spacing:.1em}
+/* ===== the editor's desk (upload) ===== */
+#intake .col{max-width:460px;margin:70px auto;text-align:center}
+#intake .ms{border:1px solid var(--line);background:var(--surface-raised);padding:36px 30px}
+#intake h2{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px}
+#intake .meta{font-size:12px;color:var(--text-muted);margin-top:6px}
 .btnrow{margin-top:22px;display:flex;gap:10px;justify-content:center}
-.btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--ivory);padding:12px 22px;min-height:44px;font-size:12px;letter-spacing:.18em;text-transform:uppercase}
-.btn:hover{background:var(--ox)}
-.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
-.stamp{display:inline-block;margin-top:20px;padding:8px 16px;border:3px double var(--ox);color:var(--ox);font-size:13px;letter-spacing:.26em;text-transform:uppercase;transform:rotate(-6deg) scale(1.6);opacity:0}
-.stamping .stamp{animation:stampin .45s ease-out forwards}
-@keyframes stampin{to{transform:rotate(-6deg) scale(1);opacity:1}}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--text);color:var(--surface);padding:12px 22px;min-height:44px;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+.btn:hover{background:var(--accent)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--text)}
 
-/* ===== desk — the manuscript ===== */
-#desk .manuscript{max-width:860px;margin:0 auto;padding:40px 44px}
-.desktools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
-.chipbtn{border:1px solid var(--rule);background:#fff;color:var(--stone);padding:9px 14px;min-height:44px;font-size:11.5px;letter-spacing:.06em;display:inline-flex;align-items:center;gap:7px}
-.chipbtn:hover{color:var(--ox);border-color:var(--ox)}
-.searchbar{margin-bottom:20px}
-.searchbar input{background:#fff;border:1px solid var(--rule);color:var(--ink);padding:10px 14px;min-height:44px;width:min(340px,100%);font:inherit;font-size:15px}
-.sheet{background:#fff;border:1px solid var(--rule);padding:44px 52px 36px;margin-bottom:24px;scroll-margin-top:20px;max-width:100%}
-.sheet .slug{border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:16px;display:flex;gap:14px;align-items:baseline}
-.sheet .slug .sc{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ox)}
+/* ===== THE SPREAD — tri-pane gatefolds ===== */
+#spread{position:absolute;inset:0;display:none;grid-template-columns:0 1fr 0;transition:grid-template-columns var(--motion-room) ease}
+#spread.on{display:grid;grid-template-columns:minmax(300px,380px) 1fr minmax(290px,350px)}
+#spread.left-closed{grid-template-columns:0 1fr minmax(290px,350px)}
+#spread.right-closed{grid-template-columns:minmax(300px,380px) 1fr 0}
+#spread.left-closed.right-closed{grid-template-columns:0 1fr 0}
+.gf{overflow-y:auto;position:relative;transition:transform var(--motion-room) ease, opacity var(--motion-room)}
+#spread.left-closed .gf-left{transform:translateX(-102%);opacity:0;pointer-events:none}
+#spread.right-closed .gf-right{transform:translateX(102%);opacity:0;pointer-events:none}
+.gf-left{background:var(--surface-raised);border-right:1px solid var(--line);padding:16px 18px 40px;box-shadow:inset 12px 0 18px -14px rgba(26,26,24,.25)}
+.gf-right{background:var(--surface-raised);border-left:1px solid var(--line);padding:16px 18px 40px;box-shadow:inset -12px 0 18px -14px rgba(26,26,24,.25)}
+.gf-head{display:flex;align-items:baseline;gap:10px;border-bottom:2px solid var(--text);padding-bottom:9px;margin-bottom:14px}
+.gf-head h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:17px}
+.gf-head .kick{margin-left:auto;font-size:9.5px}
+.gf-head button{font-size:10.5px;letter-spacing:.08em;color:var(--text-muted);border:1px solid var(--line);padding:6px 9px;min-height:34px}
+.gf-head button:hover{color:var(--accent);border-color:var(--accent)}
+/* center galley */
+.galley{overflow-y:auto;padding:30px 40px 70px}
+.foliorow{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.foliorow .pub{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted)}
+.foliorow .ctl{margin-left:auto;display:flex;flex-wrap:wrap;gap:7px}
+.foliorow button,.foliorow .gtab{border:1px solid var(--line);background:var(--surface-raised);color:var(--text-muted);padding:7px 11px;min-height:38px;font:inherit;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+.foliorow button:hover{color:var(--accent);border-color:var(--accent)}
+.foliorow .gtab{cursor:default;color:var(--accent);border-color:var(--accent)}
+.galley-tools{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.galley-tools button{border:1px solid var(--line);background:var(--surface-raised);color:var(--text-muted);padding:8px 11px;min-height:40px;font:inherit;font-size:10.5px}
+.galley-tools button:hover{color:var(--accent);border-color:var(--accent)}
+.sheet{background:var(--surface-raised);border:1px solid var(--line);padding:40px 48px 34px;margin-bottom:22px;scroll-margin-top:12px;max-width:76ch}
+.sheet .slug{border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:15px;display:flex;gap:14px;align-items:baseline}
+.sheet .slug .sc{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 .sheet .slug .sl{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:17px}
-.sheet .slug .pg{margin-left:auto;font-family:Consolas,monospace;font-size:11.5px;color:var(--stone)}
+.sheet .slug .pg{margin-left:auto;font-family:Consolas,monospace;font-size:11px;color:var(--text-muted)}
 .sheet.flash-target{animation:oxflash 1.6s ease-out}
-@keyframes oxflash{0%,60%{box-shadow:0 0 0 2px var(--ox)}100%{box-shadow:none}}
-.el{margin:9px 0;font-size:16px;max-width:66ch}
-.el.char{text-align:center;font-size:13.5px;letter-spacing:.14em;margin:16px 0 2px;text-transform:uppercase}
-.el.dialogue{margin-left:90px;max-width:52ch}
-.el.paren{margin-left:90px;font-style:italic;color:var(--stone);font-size:14.5px}
-.el.trans{text-align:right;font-size:12px;letter-spacing:.2em;color:var(--stone);text-transform:uppercase}
-.el .star{color:var(--ox);cursor:help;margin-left:8px}
-.marginal{color:var(--ox);font-style:italic;font-size:13.5px;margin:2px 0 10px 90px}
-.stashbox{max-width:860px;margin:0 auto 44px;padding:0 44px}
-.stashbox h4{font-size:11px;letter-spacing:.22em;color:var(--stone);margin-bottom:12px;text-transform:uppercase}
-.stashline{display:inline-block;border:1px solid var(--rule);background:#fff;padding:9px 14px;min-height:44px;margin:0 8px 8px 0;font-size:14px;color:var(--ink);cursor:pointer;font-style:italic}
-.stashline:hover{border-color:var(--ox);color:var(--ox)}
-
-/* ===== co-write — in conversation ===== */
-#cowrite .chatwrap{max-width:800px;margin:0 auto;padding:34px 40px;display:flex;flex-direction:column;height:100%}
-.chathead{border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:18px;display:flex;align-items:baseline;gap:12px}
-.chathead .who{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:24px}
-.chathead .role{font-size:11px;letter-spacing:.2em;color:var(--stone);text-transform:uppercase}
-.chathead .clear{margin-left:auto;font-size:12px;color:var(--stone);min-height:44px}
-.chathead .clear:hover{color:var(--ox)}
-#msgs{flex:1;overflow-y:auto;padding:4px 2px 16px}
-.msg{max-width:74%;margin-bottom:16px}
-.msg .who{font-size:10.5px;letter-spacing:.18em;color:var(--stone);margin-bottom:4px;text-transform:uppercase}
-.msg .bubble{padding:13px 17px;font-size:15.5px}
-.msg.sam .bubble{background:#fff;border:1px solid var(--rule);border-top:3px solid var(--ink)}
-.msg.me{margin-left:auto}
-.msg.me .bubble{background:var(--ink);color:var(--ivory)}
-.msg .tools button{font-size:11.5px;color:var(--stone);min-height:30px}
-.msg .tools button:hover{color:var(--ox)}
-.qcard{border:1px solid var(--rule);border-top:3px solid var(--ox);background:#fff;padding:12px 16px;margin:6px 0 12px;font-style:italic;font-size:14.5px;font-family:'Bodoni MT',Didot,Georgia,serif;font-size:16px}
-.qcard .src{display:block;font-style:normal;font-family:Corbel,Calibri,sans-serif;font-size:10.5px;letter-spacing:.14em;color:var(--ox);margin-top:6px;text-transform:uppercase}
-.composer{border-top:1px solid var(--rule);padding-top:14px;display:flex;gap:10px;align-items:flex-end}
-.composer textarea{flex:1;resize:none;background:#fff;border:1px solid var(--rule);color:var(--ink);padding:12px 14px;font:inherit;font-size:16px;min-height:46px;max-height:200px}
-.composer textarea:focus{border-color:var(--ink);outline:none}
-.composer .send{background:var(--ink);color:var(--ivory);min-width:46px;min-height:46px;display:grid;place-items:center}
-.composer .send:hover{background:var(--ox)}
-.micbtn{border:1px solid var(--rule);min-width:46px;min-height:46px;display:grid;place-items:center;color:var(--stone)}
-.micbtn:hover{color:var(--ox);border-color:var(--ox)}
-
-/* ===== feedback — the feature well ===== */
-#feedback .well{max-width:1060px;margin:0 auto;padding:44px 44px 90px}
-.issuehead{text-align:center;border-bottom:3px double var(--ink);padding-bottom:22px;margin-bottom:8px}
-.issuehead .over{font-size:11px;letter-spacing:.3em;color:var(--stone);text-transform:uppercase}
-.issuehead h2{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:42px;margin:10px 0 6px}
-.issuehead .issline{font-size:13px;color:var(--stone);font-style:italic}
-.ctl-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:16px 0 30px}
-.ctl-row button,.ctl-row select{border:1px solid var(--rule);background:#fff;color:var(--stone);padding:8px 13px;min-height:40px;font:inherit;font-size:12px}
-.ctl-row button:hover{color:var(--ox);border-color:var(--ox)}
-.editors-letter{background:var(--soft);border:1px solid var(--rule);padding:24px 28px;margin-bottom:36px}
-.editors-letter h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:8px}
-.editors-letter p{font-size:15.5px;max-width:72ch}
-.editors-letter .ll{font-style:italic;font-size:17px;margin:8px 0}
-.items{column-count:2;column-gap:36px}
-.item{break-inside:avoid;margin-bottom:30px}
-.item .kick{margin-bottom:4px}
-.item h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:22px;line-height:1.2;margin-bottom:8px}
-.item p{font-size:15px;color:var(--ink);margin-bottom:8px}
-.item blockquote{border-top:3px solid var(--ox);padding-top:8px;font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:17.5px;margin:10px 0}
-.item blockquote.unverified{border-top-style:dashed;border-top-color:var(--stone);color:var(--stone)}
-.item .vb{font-size:10.5px;letter-spacing:.1em;color:var(--stone);text-transform:uppercase}
-.item .verbs{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
-.item .verbs button{border:1px solid var(--rule);background:#fff;padding:8px 12px;min-height:40px;font-size:11px;letter-spacing:.08em;color:var(--ink);text-transform:uppercase}
-.item .verbs button:hover{border-color:var(--ox);color:var(--ox)}
-.corrections{border:2px solid var(--ink);padding:20px 24px;margin:10px 0 36px}
-.corrections h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:19px;margin-bottom:12px}
-.crow{display:flex;gap:12px;align-items:baseline;padding:9px 0;border-bottom:1px dashed var(--rule);font-size:14.5px}
+@keyframes oxflash{0%,60%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:none}}
+.el{margin:9px 0;max-width:66ch}
+.el.char{text-align:center;font-size:13px;letter-spacing:.14em;margin:15px 0 2px;text-transform:uppercase}
+.el.dialogue{margin-left:86px;max-width:52ch}
+.el.paren{margin-left:86px;font-style:italic;color:var(--text-muted);font-size:14px}
+.el.trans{text-align:right;font-size:11.5px;letter-spacing:.2em;color:var(--text-muted);text-transform:uppercase}
+.el .star{color:var(--accent);cursor:help;margin-left:6px}
+.guttermargin{color:var(--accent);font-style:italic;font-size:13px;margin:2px 0 10px 86px}
+/* critics' column items (left) */
+.cc-item{margin-bottom:22px;padding-bottom:14px;border-bottom:1px dashed var(--line)}
+.cc-item .kick{margin-bottom:4px;font-size:10px}
+.cc-item h4{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:18px;line-height:1.25;margin-bottom:7px}
+.cc-item p{font-size:14.5px;margin-bottom:7px}
+.cc-item blockquote{border-top:3px solid var(--accent);padding-top:7px;font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:16px}
+.cc-item blockquote.unverified{border-top-style:dashed;border-top-color:var(--text-muted);color:var(--text-muted)}
+.cc-item .vb{font-size:10px;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase}
+.cc-item .verbs{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.cc-item .verbs button{border:1px solid var(--line);background:var(--surface);padding:7px 10px;min-height:38px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+.cc-item .verbs button:hover{border-color:var(--accent);color:var(--accent)}
+/* letters to the editor (right) */
+.letterbox{border:1px solid var(--line);background:var(--surface);padding:12px 14px;margin-bottom:12px}
+.letterbox .who{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:14px;margin-bottom:4px}
+.letterbox p{font-size:14.5px}
+.letterbox .tools button{font-size:10.5px;color:var(--text-muted);min-height:30px}
+.letterbox .tools button:hover{color:var(--accent)}
+.letterbox.me{border-left:3px solid var(--text)}
+.letterbox.ed{border-left:3px solid var(--accent)}
+.masthead-form{border-top:2px solid var(--text);margin-top:12px;padding-top:12px}
+.masthead-form .lbl{font-size:9.5px;letter-spacing:.18em;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px}
+.composer{display:flex;gap:8px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:11px 13px;font:inherit;font-size:15.5px;min-height:44px;max-height:200px}
+.composer textarea:focus{border-color:var(--text);outline:none}
+.composer .send{background:var(--text);color:var(--surface);min-width:44px;min-height:44px;display:grid;place-items:center}
+.composer .send:hover{background:var(--accent)}
+.micbtn{border:1px solid var(--line);min-width:44px;min-height:44px;display:grid;place-items:center;color:var(--text-muted)}
+.micbtn:hover{color:var(--accent);border-color:var(--accent)}
+/* full leaves (expanded pane content) */
+#verdict-leaf .well{max-width:1000px;margin:0 auto;padding:40px 44px 90px}
+.issuehead{text-align:center;border-bottom:3px double var(--text);padding-bottom:20px;margin-bottom:20px}
+.issuehead .over{font-size:11px;letter-spacing:.3em;color:var(--text-muted);text-transform:uppercase}
+.issuehead h2{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:40px;margin:10px 0 6px}
+.backline{display:flex;gap:10px;justify-content:center;margin:14px 0 8px;flex-wrap:wrap}
+.backline button,.backline select{border:1px solid var(--line);background:var(--surface-raised);color:var(--text-muted);padding:8px 12px;min-height:38px;font:inherit;font-size:11.5px}
+.backline button:hover{color:var(--accent);border-color:var(--accent)}
+.fblife{max-width:560px;margin:40px auto;text-align:center}
+.fblife .big{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:28px;margin-bottom:10px}
+.fblife .warm{color:var(--text-muted);max-width:46ch;margin:0 auto 22px}
+.stages{list-style:none;text-align:left;max-width:400px;margin:0 auto;font-size:12.5px;color:var(--text-muted)}
+.stages li{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px dashed var(--line)}
+.stages li.done::after{content:"set";color:var(--brand-sage)}
+.stages li.now{color:var(--accent)}
+.stages li.now::after{content:"in progress…"}
+.sparkline{display:flex;align-items:flex-end;gap:10px;height:88px;border-bottom:1px solid var(--text);margin:12px 0 30px}
+.sparkline .scol{flex:1;position:relative}
+.sparkline .scol i{position:absolute;bottom:0;left:0;right:0;background:var(--text);display:block}
+.sparkline .scol.drag i{background:var(--accent)}
+.sparkline .scol span{position:absolute;bottom:-24px;left:0;right:0;text-align:center;font-family:Consolas,monospace;font-size:11px;color:var(--text-muted)}
+.tasting table,.accounts table{width:100%;border-collapse:collapse;font-size:14px}
+.tasting th,.accounts th{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);text-align:left;padding:7px 8px;border-bottom:1px solid var(--text)}
+.tasting td,.accounts td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tasting td:first-child{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:15px}
+.acct-st{font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.acct-st.dangling,.acct-st.abandoned{color:var(--accent)}
+.acct-st.paid{color:var(--brand-sage)}
+tr.st-dangling td:first-child .nm{text-decoration:line-through;text-decoration-color:var(--accent)}
+.corrections{border:2px solid var(--text);padding:18px 22px;margin:0 0 30px}
+.corrections h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:19px;margin-bottom:10px}
+.crow{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
 .crow:last-child{border-bottom:none}
 .crow .verbs{margin-left:auto;display:flex;gap:6px}
-.crow .verbs button{border:1px solid var(--rule);background:var(--soft);padding:6px 10px;min-height:36px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
-.crow .verbs button:hover{border-color:var(--ox);color:var(--ox)}
-.folio{margin-bottom:36px}
-.folio h3, .tasting h3, .accounts h3{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:12px}
-.sparkline{display:flex;align-items:flex-end;gap:10px;height:90px;border-bottom:1px solid var(--ink);padding-bottom:0}
-.sparkline .scol{flex:1;position:relative}
-.sparkline .scol i{position:absolute;bottom:0;left:0;right:0;background:var(--ink);display:block}
-.sparkline .scol.drag i{background:var(--ox)}
-.sparkline .scol span{position:absolute;bottom:-24px;left:0;right:0;text-align:center;font-family:Consolas,monospace;font-size:11px;color:var(--stone)}
-.folio .cap{margin-top:34px;font-size:13px;color:var(--stone);font-style:italic}
-.tasting table{width:100%;border-collapse:collapse;font-size:14px}
-.tasting th{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--stone);text-align:left;padding:8px;border-bottom:1px solid var(--ink)}
-.tasting td{padding:9px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
-.tasting td:first-child{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:15.5px}
-.dialpole{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--stone);margin:3px 0}
-.dialpole .polebar{width:100px;height:4px;background:var(--rule);position:relative}
-.dialpole .polebar i{position:absolute;top:-3px;width:2px;height:10px;background:var(--ink)}
-.accounts table{width:100%;border-collapse:collapse;font-size:14px}
-.accounts th{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--stone);text-align:left;padding:8px;border-bottom:1px solid var(--ink)}
-.accounts td{padding:9px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
-.acct-st{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
-.acct-st.dangling,.acct-st.abandoned{color:var(--ox)}
-.acct-st.paid{color:var(--sage)}
-tr.st-dangling td:first-child .nm{text-decoration:line-through;text-decoration-color:var(--ox)}
-.signoff{text-align:right;font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:18px;margin-top:34px}
-
-/* lifecycle */
-.fblife{max-width:600px;margin:0 auto;padding:90px 30px;text-align:center}
-.fblife .big{font-family:'Bodoni MT',Didot,Georgia,serif;font-size:30px;margin-bottom:10px}
-.fblife .warm{color:var(--stone);max-width:46ch;margin:0 auto 26px}
-.stages{list-style:none;text-align:left;max-width:400px;margin:0 auto;font-size:13px;color:var(--stone)}
-.stages li{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:1px dashed var(--rule)}
-.stages li.done::after{content:"set";color:var(--sage)}
-.stages li.now{color:var(--ox)}
-.stages li.now::after{content:"in progress…"}
-
-/* ===== idea ===== */
-#idea .ideawrap{max-width:780px;margin:0 auto;padding:40px 40px;display:flex;flex-direction:column;height:100%}
-#idea .ideahd{display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
-#idea h2{font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px}
-#idea .hint{color:var(--stone);font-size:13.5px}
-#idea-content{flex:1;resize:none;background:#fff;border:1px solid var(--rule);color:var(--ink);padding:22px 26px;font:inherit;font-size:17px;line-height:1.7;min-height:200px}
-#idea-content:focus{outline:none;border-color:var(--ink)}
-.ideafoot{margin-top:14px;display:flex;gap:14px;align-items:center}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
+.crow .verbs button{border:1px solid var(--line);background:var(--surface);padding:6px 9px;min-height:34px;font-size:10px;text-transform:uppercase}
+.crow .verbs button:hover{border-color:var(--accent);color:var(--accent)}
+.signoff{text-align:right;font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:17px;margin-top:30px}
+/* marginalia leaf (ideas) */
+#marginalia .col{max-width:760px;margin:0 auto;padding:36px 40px;display:flex;flex-direction:column;height:100%}
+#idea-content{flex:1;resize:none;background:var(--surface-raised);border:1px solid var(--line);color:var(--text);padding:22px 26px;font:inherit;font-size:16.5px;line-height:1.7;min-height:200px}
+#idea-content:focus{outline:none;border-color:var(--text)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .chips.tucked{flex-direction:column;gap:6px;align-items:flex-start}
-.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--rule);background:#fff;padding:10px 14px;min-height:44px;font-size:12.5px;color:var(--ink);max-width:260px;overflow:hidden;white-space:nowrap;font-style:italic}
-.chip:hover{border-color:var(--ox);color:var(--ox)}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface-raised);padding:10px 13px;min-height:44px;font-size:12.5px;font-style:italic;color:var(--text);max-width:250px;overflow:hidden;white-space:nowrap}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
 .chip svg{flex:0 0 auto}
 .chips.tucked .chip{width:44px;padding:10px}
 .chips.tucked .chip span{display:none}
 .chips.tucked.peeking .chip:hover{width:auto}
 .chips.tucked.peeking .chip:hover span{display:inline}
-.sam-pill{margin-left:auto;border:1px solid var(--ink);padding:11px 18px;min-height:44px;font-size:12px;letter-spacing:.14em;text-transform:uppercase}
-.sam-pill:hover{background:var(--ink);color:var(--ivory)}
-
 /* quote float */
 #quote-float{position:fixed;inset:0;z-index:800;display:none}
 #quote-float.open{display:flex;align-items:flex-end;justify-content:center;padding-bottom:110px}
-#quote-card{background:#fff;border:1px solid var(--ink);box-shadow:0 18px 44px rgba(26,26,24,.18);padding:16px 20px;max-width:560px;width:92%}
+#quote-card{background:var(--surface-raised);border:1px solid var(--text);box-shadow:0 18px 44px rgba(26,26,24,.18);padding:16px 20px;max-width:560px;width:92%}
 #quote-card .qtxt{font-family:'Bodoni MT',Didot,Georgia,serif;font-style:italic;font-size:17px}
-#quote-card .qsrc{font-size:10.5px;letter-spacing:.14em;color:var(--ox);margin-top:8px;text-transform:uppercase}
+#quote-card .qsrc{font-size:10px;letter-spacing:.14em;color:var(--accent);margin-top:8px;text-transform:uppercase}
 #quote-card .qrow{margin-top:10px;display:flex;gap:8px;justify-content:flex-end}
-#quote-card .qrow button{border:1px solid var(--rule);padding:8px 12px;min-height:36px;font-size:11px}
-#quote-card .qrow button:hover{border-color:var(--ox);color:var(--ox)}
+#quote-card .qrow button{border:1px solid var(--line);padding:8px 12px;min-height:36px;font-size:11px}
+#quote-card .qrow button:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
 
-<aside id="spine">
-  <div class="mast">The<br>Quarterly</div>
-  <div class="issue">A journal of the second draft</div>
-  <ol>
-    <li><button data-go="shelf"><span class="no">i</span>Submissions</button></li>
-    <li><button data-go="desk" class="on"><span class="no">1</span>The Script</button></li>
-    <li><button data-go="cowrite"><span class="no">2</span>In Conversation</button></li>
-    <li><button data-go="feedback"><span class="no">3</span>The Verdict</button></li>
-    <li><button data-go="idea"><span class="no">4</span>Marginalia</button></li>
-  </ol>
-  <div class="spine-proj" id="spine-proj"></div>
-</aside>
+<div id="issue">
 
-<main>
-  <section data-screen="shelf" id="shelf">
+  <!-- back issues (shelf) -->
+  <section data-screen="shelf" class="leaf on" id="backissues">
     <div class="col">
-      <h1>Submissions</h1>
-      <p class="sub">Manuscripts received, awaiting the editor's pencil.</p>
-      <div class="card1" data-open>
-        <div class="kick">Accepted for review · fountain</div>
-        <h3>The Second Shift</h3>
-        <p>Meera has kept Ward 3 alive on routine for 61 days. Tonight her brother files a complaint — and her private ritual is witnessed.</p>
-        <span class="go">Open the manuscript →</span>
-      </div>
-      <button class="newsub" id="newvol">＋ Submit a manuscript (.fdx / .fountain / .txt / .md / .pdf)</button>
-      <div class="ideasrow">
-        <div class="lbl">Marginalia — not yet manuscripts</div>
-        <button class="ideacard" data-go="idea">“The Cartographer of Missing Hours”</button>
-        <button class="ideacard" data-go="idea">＋ a fresh idea</button>
-      </div>
+      <h1>Back issues</h1>
+      <p class="sub">Every script becomes an issue. This quarter's is still being set.</p>
+      <button class="issue-row" data-open>
+        <span class="coverthumb">№1</span>
+        <span><h3>The Second Shift</h3><div class="meta">fountain · 9.5 pp · 4 scenes · proofed</div></span>
+        <span class="go">read the issue →</span>
+      </button>
+      <button class="newissue" id="newvol">＋ Submit a manuscript (.fdx / .fountain / .txt / .md / .pdf)</button>
     </div>
   </section>
 
-  <section data-screen="upload" id="upload">
-    <div class="press">
-      <div class="doc">
-        <h3>the-second-shift.fountain</h3>
-        <div class="meta">9.5 pages · 4 scenes · received in good order</div>
+  <!-- intake (upload) -->
+  <section data-screen="upload" class="leaf" id="intake">
+    <div class="col">
+      <div class="ms">
+        <h2>the-second-shift.fountain</h2>
+        <div class="meta">9.5 pp · 4 scenes · received in good order</div>
         <div class="btnrow">
-          <button class="btn" id="submit-btn">Send to the editor</button>
+          <button class="btn" id="submit-btn">Send to composition</button>
           <button class="btn ghost" data-go="shelf">Not yet</button>
         </div>
       </div>
-      <div class="stamp" id="stamp">RECEIVED</div>
     </div>
   </section>
 
-  <section data-room="desk" id="desk">
-    <div class="manuscript">
-      <div class="desktools" role="toolbar" aria-label="Desk tools">
-        <button class="chipbtn">Beat board</button>
-        <button class="chipbtn">Revision view</button>
-        <button class="chipbtn">Compare drafts</button>
-        <button class="chipbtn">Reader &amp; print</button>
-        <button class="chipbtn">Focus · sprint 25:00</button>
-        <button class="chipbtn">Export · backup</button>
+  <!-- THE SPREAD — tri-pane gatefolds -->
+  <div data-room="desk" id="spread" class="leaf" data-desk-state="both-open">
+    <aside class="gf gf-left" aria-label="Critics' column (feedback)">
+      <div class="gf-head"><h3>The Critics' Column</h3><span class="kick">verdict</span><button data-expand="left">full page</button></div>
+      <div id="cc-body"><p style="color:var(--text-muted);font-style:italic;font-size:14px">The column is unwritten. Critics file after the analysis — run it from the full page.</p></div>
+    </aside>
+    <div class="galley">
+      <div class="foliorow">
+        <span class="pub">The Quarterly · folio 1</span>
+        <span class="ctl">
+          <button data-panes-master>close the spreads / open both</button>
+          <button data-pane-left-toggle>critics: folded out</button>
+          <button data-pane-right-toggle>letters: folded out</button>
+          <button data-go="marginalia">marginalia</button>
+        </span>
       </div>
-      <div class="searchbar"><input type="search" id="search" placeholder="Search the manuscript…" aria-label="Search"></div>
+      <div class="galley-tools" role="toolbar" aria-label="Galley tools">
+        <button>Beat board</button><button>Revision view</button><button>Compare drafts</button>
+        <button>Reader &amp; print</button><button>Focus · sprint 25:00</button><button>Export · backup</button>
+      </div>
+      <div style="margin-bottom:14px"><input type="search" id="search" placeholder="Search the galley…" aria-label="Search" style="background:var(--surface-raised);border:1px solid var(--line);color:var(--text);padding:10px 14px;min-height:44px;width:min(340px,100%);font:inherit;font-size:15px"></div>
       <div id="script-pages"></div>
     </div>
-    <div class="stashbox">
-      <h4>The Stash · Margin notes</h4>
-      <span class="stashline">“She takes the box anyway. It is warm.” — scene 1</span>
-      <span class="stashline">scene 3 — the song is the midpoint; protect it</span>
-      <span class="stashline">“Nobody has won.” — scene 4</span>
-    </div>
-  </section>
-
-  <section data-room="cowrite" id="cowrite">
-    <div class="chatwrap">
-      <div class="chathead"><span class="who">Sameer</span><span class="role">In conversation</span><button class="clear">Clear chat</button></div>
-      <div id="msgs">
-        <div class="msg me"><div class="who">You</div><div class="bubble">Have you read the verdict?</div></div>
-        <div class="msg sam"><div class="who">Sameer</div><div class="bubble">Twice. The finger curl is the best page in the issue and it arrives with a whole act still owed. Scene 2 idles — shall we talk about it, or would you rather argue first?</div>
-          <div class="tools"><button class="trbtn">Translate</button></div>
+    <aside class="gf gf-right" aria-label="Letters to the editor (Sameer)">
+      <div class="gf-head"><h3>Letters to the Editor</h3><span class="kick">sameer</span><button data-expand="right">full page</button></div>
+      <div id="letters-body">
+        <div class="letterbox me"><div class="who">The Writer</div><p>Read the critics' column?</p></div>
+        <div class="letterbox ed"><div class="who">Sameer</div><p>Twice. The finger curl is the best page in the issue and it arrives with a whole act still owed. Scene 2 idles — talk, or argue first?
+          <span class="tools"><button class="trbtn">translate</button></span></p></div>
+      </div>
+      <div class="qcard" id="in-quote" hidden style="border:1px dashed var(--accent);padding:9px 12px;margin:8px 0;font-style:italic;font-size:13.5px"><span id="in-quote-text" style="display:inline"></span><span id="in-quote-src" class="mono" style="display:block;color:var(--accent);font-size:10px;margin-top:5px"></span></div>
+      <div class="masthead-form">
+        <div class="lbl">Letters accepted — the editor reads everything</div>
+        <div class="composer">
+          <button class="micbtn" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+          <textarea id="input" rows="1" placeholder="Write to Sameer…"></textarea>
+          <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
         </div>
       </div>
-      <div class="qcard" id="in-quote" hidden><span id="in-quote-text" class="qtxt" style="display:inline"></span><span id="in-quote-src" class="src"></span></div>
-      <div class="composer">
-        <button class="micbtn" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-        <textarea id="input" rows="1" placeholder="Ask about a scene, a character, a note in the margins…"></textarea>
-        <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
+    </aside>
+  </div>
+
+  <!-- verdict leaf (feedback full) -->
+  <section data-room="feedback" class="leaf" id="verdict-leaf">
+    <div class="well">
+      <div class="issuehead">
+        <div class="over">The Quarterly · analysis no. 1 · 9.5 pp · 4 scenes</div>
+        <h2 id="iss-title"></h2>
+        <div class="backline">
+          <button data-collapse-to-desk>← back to the spread</button>
+          <button>Re-parse</button>
+          <select aria-label="Report language"><option>Report in English</option><option>Tenglish</option><option>हिन्दी</option><option>తెలుగు</option></select>
+          <button style="color:var(--accent)">Retry failed (0)</button>
+          <button>Export</button>
+        </div>
+      </div>
+      <div id="verdict-body"></div>
+    </div>
+  </section>
+
+  <!-- letters leaf (cowrite full) -->
+  <section data-room="cowrite" class="leaf" id="letters-leaf">
+    <div style="max-width:720px;margin:0 auto;padding:40px">
+      <div style="display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--text);padding-bottom:10px;margin-bottom:16px">
+        <h2 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px">Letters — full page</h2>
+        <button data-collapse-to-desk style="margin-left:auto;font-size:11px;letter-spacing:.1em;color:var(--text-muted);border:1px solid var(--line);padding:8px 12px;min-height:38px">← back to the spread</button>
+      </div>
+      <div id="letters-full"></div>
+      <div class="masthead-form" style="max-width:560px">
+        <div class="lbl">Write to Sameer</div>
+        <div class="composer">
+          <textarea id="input-full" rows="1" placeholder="Write to Sameer…"></textarea>
+          <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
+        </div>
       </div>
     </div>
   </section>
 
-  <section data-room="feedback" id="feedback">
+  <!-- marginalia leaf (ideas) -->
+  <section data-screen="idea" class="leaf" id="marginalia">
+    <div class="col">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px">
+        <h2 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:24px">Marginalia</h2>
+        <button data-collapse-to-desk style="margin-left:auto;font-size:11px;color:var(--text-muted)">← back to the spread</button>
+      </div>
+      <textarea id="idea-content" spellcheck="false" placeholder="Whatever comes. A line, a scene, a worry…"></textarea>
+      <div class="chips" id="idea-chips" aria-label="Explore paths">
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg><span>What if the mother knew?</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg><span>Make the ward a character</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 18V6l8 6 8-6v12"/></svg><span>End on the empty tiffin</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><span>Slow the dawn, earn it</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- page corners -->
+  <nav id="pagecorners" aria-label="Turn the issue">
+    <button data-go="backissues" class="on">Back issues</button>
+    <button data-go="desk">The galley</button>
+    <button data-go="cowrite">Letters</button>
+    <button data-go="feedback">The verdict</button>
+    <button data-go="marginalia">Marginalia</button>
+  </nav>
+</div>
+
+<div id="quote-float">
+  <div id="quote-card" role="dialog" aria-label="Quoted passage">
+    <div class="qtxt" id="quote-text"></div>
+    <div class="qsrc" id="quote-src"></div>
+    <div class="qrow"><button data-close>Dismiss</button><button data-goto-cowrite>Discuss with Sameer →</button></div>
+  </div>
+</div>
+
+<div id="pv">
+  <b>COLOPHON</b>
+  <button data-go="shelf">Shelf</button>
+  <button data-go="desk">Galley</button>
+  <button data-go="cowrite">Letters</button>
+  <button data-go="feedback">Verdict</button>
+  <button data-go="idea">Marginalia</button>
+  <span class="sep"></span>
+  <button data-fb="empty">Empty</button>
+  <button data-fb="running">Running</button>
+  <button data-fb="complete" class="on">Complete</button>
+  <span class="sep"></span>
+  <a href="index.html">Gallery</a>
+  <button id="pv-close" aria-label="Dismiss colophon">✕</button>
+</div>
+
+<script src="_payload.js"></script>
+<script>
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+const P = window.PAYLOAD;
+let FEEDBACK_STATE = "complete";
+let desk = { left: true, right: true };
+
+function show(id){
+  $$(".leaf").forEach(el => el.classList.toggle("on", (el.dataset.screen || el.dataset.room) === id));
+  $$("#spread").forEach(el => el.style.display = id === "desk" ? "" : "none");
+  $$("#pagecorners [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  $$("#pv [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  const on = document.querySelector(".leaf.on"); if (on) on.scrollTop = 0;
+}
+function renderFeedback(){
+  $$("[data-state]", $("#verdict-body")).forEach(el => el.style.display = "none");
+  const el = $(`#verdict-body [data-state="${FEEDBACK_STATE}"]`);
+  if (el) el.style.display = "";
+}
+function deskState(){
+  if (desk.left && desk.right) return "both-open";
+  if (desk.left) return "left-only";
+  if (desk.right) return "right-only";
+  return "none-open";
+}
+function renderPanes(){
+  const d = $("#spread");
+  d.dataset.deskState = deskState();
+  d.classList.toggle("left-closed", !desk.left);
+  d.classList.toggle("right-closed", !desk.right);
+  $('[data-pane-left-toggle]').textContent = desk.left ? "critics: folded out" : "critics: folded in";
+  $('[data-pane-right-toggle]').textContent = desk.right ? "letters: folded out" : "letters: folded in";
+}
+function locateFinding(f){
+  show("desk");
+  const page = $(`[data-scene="${f.scene}"]`);
+  if (page){
+    page.classList.remove("flash-target"); void page.offsetWidth;
+    page.classList.add("flash-target");
+    page.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+}
+function discussFinding(f){
+  show("desk");
+  desk.left = true; desk.right = true; renderPanes();
+  const q = $("#in-quote");
+  q.hidden = false;
+  $("#in-quote-text").textContent = "“" + f.quote + "”";
+  $("#in-quote-src").textContent = `Item ${String(f.id).padStart(2,"0")} · ${f.category} · scene ${f.scene}`;
+  $("#input").focus();
+}
+
+function renderScript(){
+  $("#script-pages").innerHTML = P.script.map(sc => `
+    <article class="sheet" data-scene="${sc.n}">
+      <div class="slug"><span class="sc">Scene ${sc.n}</span><span class="sl">${sc.slug}</span><span class="pg mono">pp. ${sc.page}</span></div>
+      ${sc.elements.map(([type, a, b]) => {
+        if (type === "dialogue") return `<div class="el char">${a}</div><div class="el dialogue">${b}</div>`;
+        if (type === "parenthetical") return `<div class="el paren">${a}</div>`;
+        if (type === "transition") return `<div class="el trans">${a}</div>`;
+        if (type === "action") return `<div class="el action">${a}${sc.n === 1 && a.startsWith("She takes the box") ? '<span class="star" title="Edited — was: She pockets the box.">★</span>' : ""}</div>`;
+        return "";
+      }).join("")}
+      ${sc.n === 1 ? `<div class="guttermargin">in the gutter: this warmth is the spine — don’t lose the box.</div>` : ""}
+      ${sc.n === 3 ? `<div class="guttermargin">in the gutter: the doorway beat is the whole scene. hold it one breath longer.</div>` : ""}
+    </article>`).join("");
+}
+
+function renderVerdict(){
+  $("#iss-title").textContent = P.project.title;
+  $("#verdict-body").innerHTML = `
     <div data-state="empty" style="display:none"><div class="fblife">
       <div class="big">The issue is unwritten.</div>
       <p class="warm">No verdict has been set in type. Run the analysis and this becomes the magazine of your draft — findings as features, pacing as a folio, the ledger as accounts.</p>
@@ -332,154 +464,39 @@ tr.st-dangling td:first-child .nm{text-decoration:line-through;text-decoration-c
         <li><span>Coverage</span></li>
       </ul>
     </div></div>
-    <div data-state="complete"><div class="well">
-      <div class="issuehead">
-        <div class="over">The Quarterly · analysis no. 1 · <span class="mono">9.5 pages · 4 scenes</span></div>
-        <h2 id="iss-title">The Second Shift</h2>
-        <div class="issline">A family drama in four scenes, read twice by the doctor</div>
+    <div data-state="complete">
+      <div class="editors-letter" style="background:var(--surface);border:1px solid var(--line);padding:22px 26px;margin-bottom:30px">
+        <h3 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:8px">The editor's letter</h3>
+        <p class="mono" style="font-style:italic;font-size:16.5px;margin-bottom:8px">${P.coverage.logline}</p>
+        <p style="font-size:15px;max-width:74ch">${P.coverage.synopsis}</p>
+        <p style="font-size:14px;margin-top:8px;color:var(--text-muted)"><b style="color:var(--accent)">Recommendation:</b> ${P.coverage.recommendation}</p>
       </div>
-      <div class="ctl-row">
-        <button>Re-parse</button>
-        <select aria-label="Report language"><option>Report in English</option><option>Tenglish</option><option>हिन्दी</option><option>తెలుగు</option></select>
-        <button style="color:var(--ox)">Retry failed (0)</button>
-        <button>Export</button>
-        <button>Backup .zip</button>
-      </div>
-      <div class="editors-letter">
-        <h3>The editor's letter</h3>
-        <p class="ll" id="ll"></p>
-        <p id="syn"></p>
-      </div>
-      <div class="items" id="items"></div>
+      <div class="items" style="column-count:2;column-gap:34px" id="ccitems"></div>
       <div class="corrections">
         <h3>Corrections — the fix queue</h3>
         <div id="fixqueue"></div>
       </div>
-      <div class="folio">
-        <h3>The folio — pacing</h3>
-        <div class="sparkline" id="spark"></div>
-        <div class="cap">Bar height is pace; the oxblood column drags.</div>
-      </div>
-      <div class="tasting">
-        <h3>Tasting notes — character dials</h3>
+      <h3 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:8px">The folio — pacing</h3>
+      <div class="sparkline" id="spark"></div>
+      <div class="tasting" style="margin-bottom:30px">
+        <h3 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:8px">Tasting notes — dials</h3>
         <table id="dials-t"></table>
       </div>
       <div class="accounts">
-        <h3>Accounts — setup / payoff</h3>
+        <h3 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin-bottom:8px">Accounts — setup / payoff</h3>
         <table id="ledger-t"></table>
       </div>
-      <h3 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin:30px 0 12px">The writer's mirror</h3>
+      <h3 style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:20px;margin:26px 0 10px">The writer's mirror</h3>
       <div id="reads" style="max-width:76ch"></div>
       <p class="signoff">— Dr. Sushruta, editor-at-large</p>
-    </div></div>
-  </section>
+    </div>`;
 
-  <section data-screen="idea" id="idea">
-    <div class="ideawrap">
-      <div class="ideahd"><h2>Marginalia</h2><span class="hint">autosaves as you write · Sameer is one word away</span></div>
-      <textarea id="idea-content" spellcheck="false" placeholder="Whatever comes. A line, a scene, a worry…"></textarea>
-      <div class="ideafoot">
-        <div class="chips" id="idea-chips" aria-label="Explore paths">
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg><span>What if the mother knew?</span></button>
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg><span>Make the ward a character</span></button>
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 18V6l8 6 8-6v12"/></svg><span>End on the empty tiffin</span></button>
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><span>Slow the dawn, earn it</span></button>
-        </div>
-        <button class="sam-pill" id="sam-pill">/sameer — ask</button>
-      </div>
-    </div>
-  </section>
-</main>
-
-<div id="quote-float">
-  <div id="quote-card" role="dialog" aria-label="Quoted passage">
-    <div class="qtxt" id="quote-text"></div>
-    <div class="qsrc" id="quote-src"></div>
-    <div class="qrow"><button data-close>Dismiss</button><button data-goto-cowrite>Discuss with Sameer →</button></div>
-  </div>
-</div>
-
-<div id="pv">
-  <b>REVIEW</b>
-  <button data-go="shelf">Shelf</button>
-  <button data-go="desk">Desk</button>
-  <button data-go="cowrite">Co-write</button>
-  <button data-go="feedback">Feedback</button>
-  <button data-go="idea">Ideas</button>
-  <span class="sep"></span>
-  <button data-fb="empty">Empty</button>
-  <button data-fb="running">Running</button>
-  <button data-fb="complete" class="on">Complete</button>
-  <span class="sep"></span>
-  <a href="index.html">Gallery</a>
-  <button id="pv-close" aria-label="Dismiss review bar">✕</button>
-</div>
-
-<script src="_payload.js"></script>
-<script>
-const $  = (s, r) => (r || document).querySelector(s);
-const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
-let FEEDBACK_STATE = "complete";
-const P = window.PAYLOAD;
-
-function show(id){
-  $$("[data-room],[data-screen]").forEach(el =>
-    el.classList.toggle("active", el.dataset.room === id || el.dataset.screen === id));
-  $$("#spine [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
-  (document.querySelector(`[data-room="${id}"].active, [data-screen="${id}"].active`) || {}).scrollTop = 0;
-}
-function renderFeedback(){
-  $$("[data-state]").forEach(el => el.style.display = "none");
-  const el = $(`#feedback [data-state="${FEEDBACK_STATE}"]`);
-  if (el) el.style.display = "";
-}
-function locateFinding(f){
-  show("desk");
-  const page = $(`[data-scene="${f.scene}"]`);
-  if (page){
-    page.classList.remove("flash-target"); void page.offsetWidth;
-    page.classList.add("flash-target");
-    page.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  }
-}
-function discussFinding(f){
-  show("cowrite");
-  const q = $("#in-quote");
-  q.hidden = false;
-  $("#in-quote-text").textContent = "“" + f.quote + "”";
-  $("#in-quote-src").textContent = `Item ${String(f.id).padStart(2,"0")} · ${f.category} · scene ${f.scene}`;
-  $("#input").focus();
-}
-
-function renderScript(){
-  $("#spine-proj").textContent = `“${P.project.title}” · ${P.project.format} · ${P.project.pages} pp.`;
-  $("#script-pages").innerHTML = P.script.map(sc => `
-    <article class="sheet" data-scene="${sc.n}">
-      <div class="slug"><span class="sc">Scene ${sc.n}</span><span class="sl">${sc.slug}</span><span class="pg mono">pp. ${sc.page}</span></div>
-      ${sc.elements.map(([type, a, b]) => {
-        if (type === "dialogue") return `<div class="el char">${a}</div><div class="el dialogue">${b}</div>`;
-        if (type === "parenthetical") return `<div class="el paren">${a}</div>`;
-        if (type === "transition") return `<div class="el trans">${a}</div>`;
-        if (type === "action") return `<div class="el action">${a}${sc.n === 1 && a.startsWith("She takes the box") ? '<span class="star" title="Edited — was: She pockets the box.">★</span>' : ""}</div>`;
-        return "";
-      }).join("")}
-      ${sc.n === 1 ? `<div class="marginal">in the gutter: this warmth is the spine — don’t lose the box.</div>` : ""}
-      ${sc.n === 3 ? `<div class="marginal">in the gutter: the doorway beat is the whole scene. Hold it one breath longer.</div>` : ""}
-    </article>`).join("");
-}
-
-function renderIssue(){
-  $("#iss-title").textContent = P.project.title;
-  $("#ll").textContent = P.coverage.logline;
-  $("#syn").textContent = P.coverage.synopsis;
-
-  $("#items").innerHTML = P.findings.map(f => `
-    <div class="item" data-finding="${f.id}">
-      <div class="kick">${f.category}${f.verified ? "" : " · unverified — quote not matched"}</div>
-      <h3>${f.note.split(". ")[0]}.</h3>
+  $("#ccitems").innerHTML = P.findings.map(f => `
+    <div class="cc-item" data-finding="${f.id}" style="break-inside:avoid;margin-bottom:26px">
+      <div class="kick">${f.category}${f.verified ? "" : " · unverified"} · scene ${f.scene}</div>
+      <h4>${f.note.split(". ")[0]}.</h4>
       <p>${f.note.split(". ").slice(1).join(". ")}</p>
       <blockquote class="${f.verified ? "" : "unverified"}">“${f.quote}”</blockquote>
-      <span class="vb">scene ${f.scene} · ${f.severity}</span>
       <div class="verbs">
         <button data-act="locate" data-fid="${f.id}">¶ see page</button>
         <button data-act="discuss" data-fid="${f.id}">discuss</button>
@@ -488,7 +505,7 @@ function renderIssue(){
     </div>`).join("");
 
   $("#fixqueue").innerHTML = P.findings.filter(f => f.severity !== "low" || f.id === 8).map(f => `
-    <div class="crow"><span class="acct-st ${f.severity === "high" ? "dangling" : ""}" style="color:${f.severity === "high" ? "var(--ox)" : f.severity === "medium" ? "var(--ink)" : "var(--stone)"}">${f.severity}</span>
+    <div class="crow"><span style="color:${f.severity === "high" ? "var(--accent)" : "var(--text-muted)"};font-size:10px;letter-spacing:.1em;text-transform:uppercase">${f.severity}</span>
       <span>Item ${f.id} — ${f.note.split(". ")[0]}.</span>
       <span class="verbs">
         <button data-act="locate" data-fid="${f.id}">see page</button>
@@ -498,34 +515,34 @@ function renderIssue(){
 
   const max = Math.max(...P.pacing.map(p => p.pace));
   $("#spark").innerHTML = P.pacing.map(p => `
-    <div class="scol ${p.drag ? "drag" : ""}" style="height:90px">
-      <i style="height:${Math.round(p.pace / max * 84)}px" title="Scene ${p.scene} — pace ${p.pace}"></i>
+    <div class="scol ${p.drag ? "drag" : ""}" style="height:88px">
+      <i style="height:${Math.round(p.pace / max * 82)}px" title="Scene ${p.scene} — pace ${p.pace}"></i>
       <span>s${p.scene}</span>
     </div>`).join("");
 
   const poleNames = { proactive: "proactive–passive", warm: "warm–cold", articulate: "articulate–terse", emotional: "emotional–stoic", grounded: "grounded–dreamy" };
-  $("#dials-t").innerHTML = `<tr><th>Character</th><th>Poles</th><th>Scenes</th></tr>` +
-    P.dials.map(d => `<tr><td>${d.character}</td>
+  $("#dials-t").innerHTML = `<tr><th>Character</th><th>Poles</th><th>Scenes</th></tr>` + P.dials.map(d => `
+    <tr><td>${d.character}</td>
       <td><div style="display:grid;gap:4px">${Object.entries(d.poles).map(([k, v]) => `
-        <div class="dialpole"><span style="width:104px">${poleNames[k]}</span>
-          <span class="polebar"><i style="left:${v * 10}%"></i></span>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)"><span style="width:104px">${poleNames[k]}</span>
+          <span style="width:100px;height:4px;background:var(--line);position:relative"><i style="position:absolute;top:-3px;left:${v * 10}%;width:2px;height:10px;background:var(--text)"></i></span>
           <span class="mono">${v}</span></div>`).join("")}</div></td>
       <td class="mono">${d.scenes.join(", ")}</td></tr>`).join("");
 
-  $("#ledger-t").innerHTML = `<tr><th>Setup</th><th>Kind</th><th>Scene</th><th>Status</th><th>Note</th></tr>` +
-    P.ledger.map(l => `<tr class="st-${l.status}">
+  $("#ledger-t").innerHTML = `<tr><th>Setup</th><th>Kind</th><th>Scene</th><th>Status</th><th>Note</th></tr>` + P.ledger.map(l => `
+    <tr class="st-${l.status}">
       <td class="nm">${l.setup}</td><td>${l.kind}</td><td class="mono">s${l.setup_scene}</td>
       <td><span class="acct-st ${l.status}">${l.status}</span></td>
       <td>${l.note}</td></tr>`).join("");
 
   $("#reads").innerHTML = P.reads.map(r => `
-    <p style="margin-bottom:12px"><b style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:17px">${r.character}.</b> ${r.read}</p>`).join("");
+    <p style="margin-bottom:10px"><b style="font-family:'Bodoni MT',Didot,Georgia,serif;font-weight:400;font-size:17px">${r.character}.</b> ${r.read}</p>`).join("");
 }
 
 function wire(){
   $$("#pv [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
-  $$("#spine [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
-  $$("[data-go]").forEach(b => { if (!b.closest("#pv") && !b.closest("#spine")) b.addEventListener("click", () => show(b.dataset.go)); });
+  $$("#pagecorners [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("[data-go]").forEach(b => { if (!b.closest("#pv") && !b.closest("#pagecorners")) b.addEventListener("click", () => show(b.dataset.go)); });
   $$("#pv [data-fb]").forEach(b => b.addEventListener("click", () => {
     FEEDBACK_STATE = b.dataset.fb; renderFeedback();
     $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x === b));
@@ -535,8 +552,7 @@ function wire(){
   $("[data-open]").addEventListener("click", () => show("upload"));
   $("#newvol").addEventListener("click", () => show("upload"));
   $("#submit-btn").addEventListener("click", () => {
-    $("#upload").classList.add("stamping");
-    setTimeout(() => show("desk"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 950);
+    setTimeout(() => show("desk"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 500);
   });
 
   $("#search").addEventListener("input", e => {
@@ -544,14 +560,24 @@ function wire(){
     $$(".sheet").forEach(pg => pg.style.display = !q || pg.textContent.toLowerCase().includes(q) ? "" : "none");
   });
 
+  $('[data-pane-left-toggle]').addEventListener("click", () => { desk.left = !desk.left; renderPanes(); });
+  $('[data-pane-right-toggle]').addEventListener("click", () => { desk.right = !desk.right; renderPanes(); });
+  $('[data-panes-master]').addEventListener("click", () => {
+    if (desk.left || desk.right){ desk.left = false; desk.right = false; }
+    else { desk.left = true; desk.right = true; }
+    renderPanes();
+  });
+  $$("[data-expand]").forEach(b => b.addEventListener("click", () => show(b.dataset.expand === "left" ? "feedback" : "cowrite")));
+  $$("[data-collapse-to-desk]").forEach(b => b.addEventListener("click", () => show("desk")));
+
   document.addEventListener("click", e => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
     const f = P.findings.find(x => x.id === +b.dataset.fid);
     if (b.dataset.act === "locate") locateFinding(f);
     if (b.dataset.act === "discuss") discussFinding(f);
-    if (b.dataset.act === "dismiss") b.closest(".item,.crow").style.opacity = .35;
-    if (b.dataset.act === "rewrite") { show("cowrite"); $("#input").value = `Rewrite item ${f.id}: `; $("#input").focus(); growComposer($("#input")); }
+    if (b.dataset.act === "dismiss") b.closest(".cc-item,.crow").style.opacity = .35;
+    if (b.dataset.act === "rewrite") { show("desk"); desk.left = true; desk.right = true; renderPanes(); $("#input").value = `Rewrite item ${f.id}: `; $("#input").focus(); growComposer($("#input")); }
   });
 
   const qf = $("#quote-float");
@@ -560,18 +586,15 @@ function wire(){
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); const iq = $("#in-quote"); if (iq) iq.hidden = true; } });
   $("#quote-card [data-close]").addEventListener("click", closeQ);
   $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
-  $$(".stashline").forEach(s => s.addEventListener("click", () => {
-    qf.classList.add("open");
-    $("#quote-text").textContent = s.textContent;
-    $("#quote-src").textContent = "From the stash / margin notes";
-  }));
 
   const input = $("#input");
   input.addEventListener("input", () => growComposer(input));
+  const inputFull = $("#input-full");
+  inputFull.addEventListener("input", () => growComposer(inputFull));
   const idea = $("#idea-content");
   idea.addEventListener("input", () => growComposer(idea));
   wireChips(idea, $("#idea-chips"));
-  $("#sam-pill").addEventListener("click", () => show("cowrite"));
+  $("#letters-full").innerHTML = $("#letters-body").innerHTML;
 }
 function growComposer(ta){
   ta.style.height = "auto";
@@ -584,9 +607,9 @@ function wireChips(surface, chipRow){
 }
 
 renderScript();
-renderIssue();
-renderFeedback();
+renderVerdict();
 wire();
+renderPanes();
 show("shelf");
 </script>
 </body>
