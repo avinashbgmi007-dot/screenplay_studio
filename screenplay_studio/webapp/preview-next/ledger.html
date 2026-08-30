@@ -3,405 +3,362 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>① The Ledger — light editorial</title>
+<title>① The Submission File — The Ledger</title>
 <style>
+/* ===== token layer: brand → semantic → component ===== */
 :root{
-  --paper:#f7f3e8; --page:#fdfaf1; --ink:#221d14; --graphite:#6b6355; --hair:#d8cfbc;
-  --red:#b3372c; --med:#6b6355; --low:#a39a8a; --stamp:#b3372c;
+  /* brand (OKLCH) */
+  --brand-cream: oklch(96.5% 0.014 95);
+  --brand-page: oklch(98.2% 0.008 95);
+  --brand-ink: oklch(23% 0.02 80);
+  --brand-graphite: oklch(46% 0.015 80);
+  --brand-red: oklch(50% 0.14 30);
+  --brand-hair: oklch(86% 0.02 90);
+  /* semantic */
+  --surface: var(--brand-cream);
+  --surface-raised: var(--brand-page);
+  --text: var(--brand-ink);
+  --text-muted: var(--brand-graphite);
+  --accent: var(--brand-red);
+  --line: var(--brand-hair);
+  --finding-high: var(--brand-red);
+  --finding-medium: var(--brand-graphite);
+  --finding-low: oklch(70% 0.012 80);
+  /* motion */
+  --motion-fast: 140ms;
+  --motion-room: 260ms;
+  --motion-ambient: 600ms;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{color-scheme:light}
-body{background:var(--paper);color:var(--ink);font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-size:16px;line-height:1.55;overflow:hidden}
+body{background:oklch(90% 0.012 85);color:var(--text);font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-size:16px;line-height:1.55;overflow:hidden}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
-:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 svg.i{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
-.mono, code{font-family:Consolas,'Courier New',monospace;font-variant-numeric:tabular-nums}
+.mono,code{font-family:Consolas,'Courier New',monospace;font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important;scroll-behavior:auto !important}}
 
-/* ===== masthead nav (world idiom) ===== */
-#mast{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:baseline;gap:26px;padding:14px 34px 12px;background:var(--paper);border-bottom:2px solid var(--ink)}
-#mast .wordmark{font-size:19px;letter-spacing:.06em}
-#mast .wordmark small{display:block;font-family:Verdana,Geneva,sans-serif;font-size:9.5px;letter-spacing:.3em;color:var(--graphite)}
-#mast nav{display:flex;gap:4px;margin-left:16px}
-#mast nav button{padding:12px 18px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.2em;color:var(--graphite);border-bottom:3px solid transparent}
-#mast nav button:hover{color:var(--ink)}
-#mast nav button.on{color:var(--ink);border-bottom-color:var(--red)}
-#mast .proj{margin-left:auto;font-style:italic;color:var(--graphite);font-size:14px}
+/* ===== the dossier shell ===== */
+#dossier{position:fixed;inset:14px 14px 56px;background:var(--surface);box-shadow:0 24px 60px rgba(34,29,20,.30);overflow:hidden}
+.sheetfold{height:100%;position:relative}
 
-/* ===== review bar ===== */
+/* ===== index tabs on the right edge (nav idiom) ===== */
+#tabs{position:absolute;top:34px;right:-2px;z-index:940;display:flex;flex-direction:column;gap:8px}
+#tabs button{writing-mode:vertical-rl;background:var(--surface-raised);border:1px solid var(--line);border-right:none;padding:16px 7px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.2em;color:var(--text-muted);transition:transform var(--motion-fast) ease}
+#tabs button:hover{color:var(--accent)}
+#tabs button.on{background:var(--text);color:var(--surface);transform:translateX(-6px);font-weight:700}
+
+/* ===== review reader's slip (bottom) ===== */
 #pv{position:fixed;bottom:0;left:0;right:0;z-index:950;display:flex;align-items:center;gap:6px;padding:7px 16px;background:#221d14;color:#d8cfbc;font-family:Verdana,Geneva,sans-serif;font-size:11.5px}
 #pv b{letter-spacing:.16em;color:#f7f3e8;margin-right:8px}
 #pv button{color:#d8cfbc;border:1px solid #4a4436;padding:8px 12px;min-height:32px}
-#pv button:hover{border-color:#b3372c;color:#fff}
-#pv button.on{background:#b3372c;border-color:#b3372c;color:#fff}
-#pv .sep{flex:1}
-#pv-close{opacity:.7}
+#pv button:hover{border-color:var(--brand-red);color:#fff}
+#pv button.on{background:var(--brand-red);border-color:var(--brand-red);color:#fff}
+#pv .sep{flex:1}#pv a{color:#d8cfbc}#pv-close{opacity:.7}
 
-/* ===== surfaces ===== */
-main{padding-top:76px;height:calc(100vh - 76px);overflow:hidden}
-[data-room],[data-screen]{display:none;height:100%;overflow-y:auto}
-[data-room].active,[data-screen].active{display:block}
+/* ===== sections (dividers) ===== */
+.divider{position:absolute;inset:0;display:none;overflow-y:auto;padding:38px 120px 40px 48px}
+.divider.on{display:block;animation:turnpage var(--motion-room) ease-out}
+@keyframes turnpage{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rulehead{border-bottom:2px solid var(--text);padding-bottom:10px;margin-bottom:6px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.rulehead h1{font-size:27px;font-weight:400}
+.rulehead .folio{margin-left:auto;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.2em;color:var(--text-muted)}
+.ts{font-family:Verdana,Geneva,sans-serif;font-size:11px;color:var(--text-muted);letter-spacing:.06em}
+.ts::before{content:"[ ";color:var(--accent)}
+.ts::after{content:" ]";color:var(--accent)}
 
-/* ===== shelf (submissions) ===== */
-#shelf .col{max-width:860px;margin:0 auto;padding:44px 30px}
-#shelf h1{font-size:30px;font-weight:400;margin-bottom:6px}
-#shelf .sub{color:var(--graphite);margin-bottom:28px}
-.volume{display:flex;gap:22px;align-items:stretch;background:var(--page);border:1px solid var(--hair);padding:22px;cursor:pointer;transition:border-color .15s}
-.volume:hover{border-color:var(--red)}
-.volume .spine{width:14px;background:var(--ink);position:relative}
-.volume .spine::after{content:"";position:absolute;top:8px;left:3px;right:3px;height:38px;background:var(--red)}
-.volume h3{font-size:21px;font-weight:400}
-.volume .meta{font-family:Verdana,Geneva,sans-serif;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--graphite);margin:6px 0 10px}
-.volume p{color:var(--graphite);font-size:15px;max-width:58ch}
-.volume .open-hint{align-self:center;margin-left:auto;font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--red);white-space:nowrap}
-.newvol{margin-top:16px;border:1px dashed var(--graphite);background:transparent;padding:18px;width:100%;text-align:left;font-family:Verdana,Geneva,sans-serif;font-size:12.5px;letter-spacing:.12em;color:var(--graphite);min-height:44px}
-.newvol:hover{color:var(--red);border-color:var(--red)}
-.ideasrow{margin-top:34px;border-top:1px solid var(--hair);padding-top:20px}
-.ideasrow .lbl{font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--graphite);margin-bottom:10px}
-.ideacard{display:inline-block;border:1px dashed var(--hair);background:transparent;color:var(--ink);padding:12px 18px;min-height:44px;margin-right:10px;font-style:italic}
+/* ===== cover + transmittal pocket (shelf) ===== */
+#cover .coverpage{max-width:680px;margin:30px auto;border:1px solid var(--line);background:var(--surface-raised);padding:44px 48px;position:relative}
+#cover .coverpage::after{content:"RECEIVED";position:absolute;top:26px;right:30px;border:3px double var(--accent);color:var(--accent);font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.3em;padding:6px 12px;transform:rotate(7deg);opacity:.85}
+#cover h1{font-size:34px;font-weight:400;letter-spacing:.01em}
+#cover .tsline{margin:10px 0 26px}
+.pocket{border:2px dashed var(--text-muted);padding:20px;margin-top:8px}
+.pocket .plabel{font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.22em;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase}
+.enclosure{display:flex;gap:16px;align-items:baseline;width:100%;text-align:left;border-bottom:1px solid var(--line);padding:12px 6px;min-height:44px}
+.enclosure:hover{background:var(--surface)}
+.enclosure .eno{font-family:Consolas,monospace;color:var(--accent)}
+.enclosure:hover .en-go{color:var(--accent)}
+.en-go{margin-left:auto;font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.14em;color:var(--text-muted)}
+.newencl{width:100%;border:1px dashed var(--text-muted);color:var(--text-muted);padding:13px;min-height:44px;margin-top:12px;font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.1em;text-align:left}
+.newencl:hover{color:var(--accent);border-color:var(--accent)}
 
-/* ===== upload moment ===== */
-#upload{display:none}
-#upload.active{display:grid;place-items:center}
-.press{max-width:460px;text-align:center}
-.press .doc{border:1px solid var(--hair);background:var(--page);padding:34px 30px;box-shadow:0 12px 30px rgba(34,29,20,.08)}
-.press .doc h3{font-weight:400;font-size:22px}
-.press .doc .meta{font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.16em;color:var(--graphite);margin-top:6px}
-.press .btnrow{margin-top:22px}
-.btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);padding:12px 22px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase}
-.btn:hover{background:var(--red)}
-.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
-.btn.ghost:hover{border-color:var(--red);color:var(--red)}
-.stamp{display:inline-block;margin-top:20px;padding:8px 16px;border:3px double var(--stamp);color:var(--stamp);font-family:Verdana,Geneva,sans-serif;font-size:13px;letter-spacing:.26em;text-transform:uppercase;transform:rotate(-6deg) scale(1.6);opacity:0}
-.stamping .stamp{animation:stampin .45s ease-out forwards}
-@keyframes stampin{to{transform:rotate(-6deg) scale(1);opacity:1}}
+/* ===== stamping tray (upload) ===== */
+#tray .traybox{max-width:480px;margin:60px auto;border:1px solid var(--line);background:var(--surface-raised);padding:36px 40px;text-align:center}
+#tray h2{font-weight:400;font-size:22px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--text);color:var(--surface);padding:12px 22px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:11.5px;letter-spacing:.18em;margin-top:18px}
+.btn:hover{background:var(--accent)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--text)}
+.stamping #traybox{position:relative}
+.stamping .traybox::after{content:"RECEIVED";position:absolute;top:18px;right:22px;border:3px double var(--accent);color:var(--accent);font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.3em;padding:6px 12px;transform:rotate(-8deg) scale(1.7);opacity:0;animation:stampin .45s ease-out forwards}
+@keyframes stampin{to{transform:rotate(-8deg) scale(1);opacity:1}}
 
-/* ===== script desk ===== */
-#desk .deskwrap{max-width:1180px;margin:0 auto;padding:30px;display:flex;gap:26px}
-#desk .pages{flex:1;min-width:0}
-.desktools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
-.desktools .chipbtn{border:1px solid var(--hair);background:var(--page);color:var(--graphite);padding:9px 14px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:11.5px;letter-spacing:.1em;display:inline-flex;align-items:center;gap:7px}
-.desktools .chipbtn:hover{color:var(--ink);border-color:var(--ink)}
-.searchbar{display:flex;gap:8px;margin-bottom:18px}
-.searchbar input{flex:0 1 320px;background:var(--page);border:1px solid var(--hair);color:var(--ink);padding:10px 14px;min-height:44px;font:inherit;font-size:15px}
-.searchbar input::placeholder{color:var(--low)}
-.page{background:var(--page);border:1px solid var(--hair);padding:40px 48px 34px;margin-bottom:22px;scroll-margin-top:90px}
-.page .slug{font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.18em;color:var(--ink);border-bottom:1px solid var(--hair);padding-bottom:8px;margin-bottom:16px;display:flex;gap:14px;align-items:baseline}
-.page .slug .pg{margin-left:auto;color:var(--low);letter-spacing:.06em}
-.page .flash-target{animation:pencilflash 1.6s ease-out}
-@keyframes pencilflash{0%{box-shadow:inset 0 0 0 2px var(--red)}60%{box-shadow:inset 0 0 0 2px var(--red)}100%{box-shadow:inset 0 0 0 0 rgba(179,55,44,0)}}
-.el{margin:9px 0;font-size:16px}
-.el.action{max-width:66ch}
-.el.char{text-align:center;font-family:Verdana,Geneva,sans-serif;font-size:13px;letter-spacing:.14em;margin:16px 0 2px}
-.el.dialogue{margin-left:90px;max-width:52ch}
-.el.paren{margin-left:90px;font-style:italic;color:var(--graphite);font-size:14.5px}
-.el.trans{text-align:right;font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.2em;color:var(--graphite)}
-.el.noteline{position:relative}
-.el .star{color:var(--red);cursor:help;margin-left:8px}
-.marginal{color:var(--red);font-style:italic;font-size:13.5px;margin:2px 0 10px 90px}
-.stashrail{flex:0 0 250px}
-.stashrail h4{font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--graphite);margin-bottom:12px}
-.stashitem{border-left:3px solid var(--hair);padding:8px 12px;margin-bottom:10px;font-size:14px;color:var(--graphite);cursor:pointer}
-.stashitem:hover{border-left-color:var(--red);color:var(--ink)}
+/* ===== THE FILE DESK — tri-pane spread ===== */
+#file-desk{position:absolute;inset:0;display:none}
+#file-desk.on{display:grid;grid-template-columns:minmax(250px,300px) 1fr minmax(280px,330px);transition:grid-template-columns var(--motion-room) ease}
+#file-desk.left-closed{grid-template-columns:0 1fr minmax(280px,330px)}
+#file-desk.right-closed{grid-template-columns:minmax(250px,300px) 1fr 0}
+#file-desk.left-closed.right-closed{grid-template-columns:0 1fr 0}
+#file-desk.focus-left{grid-template-columns:1fr 0 0}
+#file-desk.focus-right{grid-template-columns:0 0 1fr}
+/* left: carbon-copy flimsy (feedback) */
+.pane{overflow-y:auto;position:relative;transition:transform var(--motion-room) ease, opacity var(--motion-room)}
+#file-desk.left-closed .pane-left{transform:translateX(-101%);opacity:0;pointer-events:none}
+#file-desk.right-closed .pane-right{transform:translateX(101%);opacity:0;pointer-events:none}
+.pane-left{background:repeating-linear-gradient(180deg,var(--surface-raised) 0 26px,oklch(94% 0.01 95) 26px 27px);border-right:1px solid var(--line);border-left:6px solid oklch(78% 0.02 30);padding:16px 14px 40px}
+.pane-right{background:var(--surface-raised);border-left:1px solid var(--line);border-right:6px solid oklch(80% 0.03 70);padding:16px 14px 40px}
+#file-desk.left-closed .pane-left,#file-desk.right-closed .pane-right{overflow:hidden}
+.pane-head{display:flex;align-items:baseline;gap:8px;border-bottom:2px solid var(--text);padding-bottom:8px;margin-bottom:12px}
+.pane-head h3{font-size:15px;font-weight:400;letter-spacing:.04em}
+.pane-head .ts{margin-left:auto}
+.pane-head button{font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.12em;color:var(--text-muted);border:1px solid var(--line);padding:5px 8px;min-height:34px}
+.pane-head button:hover{color:var(--accent);border-color:var(--accent)}
+/* center: the manuscript */
+.manuscript{overflow-y:auto;padding:26px 30px 60px;border-right:1px solid var(--line);position:relative}
+.desktools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.chipbtn{border:1px solid var(--line);background:var(--surface-raised);color:var(--text-muted);padding:9px 13px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.08em;display:inline-flex;align-items:center;gap:7px}
+.chipbtn:hover{color:var(--text);border-color:var(--text)}
+.searchbar{margin-bottom:16px;display:flex;gap:8px}
+.searchbar input{background:var(--surface-raised);border:1px solid var(--line);color:var(--text);padding:10px 14px;min-height:44px;width:min(320px,100%);font:inherit;font-size:15px}
+.page{background:var(--surface-raised);border:1px solid var(--line);padding:36px 42px 30px;margin-bottom:20px;scroll-margin-top:12px;position:relative}
+.page .runninghead{position:absolute;top:8px;right:14px;font-family:Verdana,Geneva,sans-serif;font-size:9.5px;letter-spacing:.22em;color:var(--finding-low);text-transform:uppercase}
+.page .slug{font-family:Verdana,Geneva,sans-serif;font-size:11.5px;letter-spacing:.16em;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:14px;display:flex;gap:12px;align-items:baseline}
+.page .slug .pg{margin-left:auto;color:var(--finding-low);letter-spacing:.04em}
+.page.flash-target{animation:pencilflash 1.6s ease-out}
+@keyframes pencilflash{0%,60%{box-shadow:inset 0 0 0 2px var(--accent)}100%{box-shadow:none}}
+.el{margin:9px 0;max-width:66ch}
+.el.char{text-align:center;font-family:Verdana,Geneva,sans-serif;font-size:12.5px;letter-spacing:.14em;margin:16px 0 2px}
+.el.dialogue{margin-left:84px;max-width:52ch}
+.el.paren{margin-left:84px;font-style:italic;color:var(--text-muted);font-size:14.5px}
+.el.trans{text-align:right;font-family:Verdana,Geneva,sans-serif;font-size:11.5px;letter-spacing:.2em;color:var(--text-muted)}
+.el .star{color:var(--accent);cursor:help;margin-left:6px}
+.scholion{color:var(--accent);font-style:italic;font-size:13px;margin:2px 0 10px 84px}
+/* findings as carbon-copy notes */
+.cnote{margin-bottom:20px;padding-bottom:14px;border-bottom:1px dashed var(--line)}
+.cnote .no{font-family:Consolas,monospace;color:var(--accent);font-size:13px}
+.cnote .sev{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:9.5px;letter-spacing:.18em;padding:3px 8px;border:1px solid currentColor;margin:0 8px}
+.sev-high{color:var(--finding-high)}.sev-medium{color:var(--finding-medium)}.sev-low{color:var(--finding-low)}
+.cnote .cat{font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.14em;color:var(--text-muted)}
+.cnote .note{font-size:14.5px;margin:6px 0}
+.cnote blockquote{border-left:3px solid var(--accent);padding:4px 0 4px 12px;font-style:italic;font-size:15px;margin:8px 0}
+.cnote blockquote.unverified{border-left-style:dashed;border-left-color:var(--finding-low)}
+.cnote .verbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.cnote .verbs button{border:1px solid var(--line);background:var(--surface);padding:7px 10px;min-height:40px;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;color:var(--text)}
+.cnote .verbs button:hover{border-color:var(--accent);color:var(--accent)}
+/* correspondence slips (chat) */
+.slip{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--text);padding:10px 12px;margin-bottom:12px;font-size:14.5px}
+.slip .who{font-family:Verdana,Geneva,sans-serif;font-size:9.5px;letter-spacing:.2em;color:var(--text-muted);margin-bottom:4px}
+.slip.me{border-top-color:var(--accent)}
+.slip .tools button{font-family:Verdana,Geneva,sans-serif;font-size:10px;color:var(--text-muted);min-height:30px}
+.slip .tools button:hover{color:var(--accent)}
+.slipform{border-top:2px solid var(--text);margin-top:10px;padding-top:10px}
+.slipform .flabel{font-family:Verdana,Geneva,sans-serif;font-size:9.5px;letter-spacing:.18em;color:var(--text-muted);margin-bottom:6px}
+.composer{display:flex;gap:8px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:10px 12px;font:inherit;font-size:15px;min-height:44px;max-height:200px}
+.composer textarea:focus{border-color:var(--text);outline:none}
+.composer .send{background:var(--text);color:var(--surface);min-width:44px;min-height:44px;display:grid;place-items:center}
+.composer .send:hover{background:var(--accent)}
+.micbtn{border:1px solid var(--line);min-width:44px;min-height:44px;display:grid;place-items:center;color:var(--text-muted)}
+.micbtn:hover{color:var(--accent);border-color:var(--accent)}
+/* master paperclip control + fold tabs */
+#clipbar{position:absolute;left:50%;transform:translateX(-50%);top:-14px;z-index:30;display:flex;gap:6px}
+#clipbar button{background:var(--text);color:var(--surface);border:1px solid var(--text);padding:8px 14px;min-height:36px;font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.14em}
+#clipbar button:hover{background:var(--accent);border-color:var(--accent)}
+/* the letter lives inside the left pane header link? no — feedback IS the left pane */
 
-/* ===== co-write (Sameer's column) ===== */
-#cowrite .chatwrap{max-width:880px;margin:0 auto;padding:30px;display:flex;flex-direction:column;height:100%}
-.chathead{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--hair);padding-bottom:12px;margin-bottom:16px}
-.chathead .who{font-size:19px}
-.chathead .role{font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.18em;color:var(--graphite)}
-.chathead .clear{margin-left:auto;font-family:Verdana,Geneva,sans-serif;font-size:11.5px;color:var(--graphite);min-height:44px}
-.chathead .clear:hover{color:var(--red)}
-#msgs{flex:1;overflow-y:auto;padding:4px 2px 18px}
-.msg{max-width:70%;margin-bottom:14px}
-.msg .who{font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.2em;color:var(--graphite);margin-bottom:4px}
-.msg .bubble{padding:12px 16px;font-size:15.5px}
-.msg.sam .bubble{background:var(--page);border:1px solid var(--hair)}
-.msg.me{margin-left:auto}
-.msg.me .bubble{background:var(--ink);color:var(--paper)}
-.msg .tools{margin-top:6px;display:flex;gap:10px}
-.msg .tools button{font-family:Verdana,Geneva,sans-serif;font-size:11px;color:var(--graphite);min-height:30px;padding:2px 4px;display:inline-flex;gap:5px;align-items:center}
-.msg .tools button:hover{color:var(--red)}
-.qcard{border:1px solid var(--hair);background:var(--page);padding:12px 16px;margin:6px 0 12px;font-style:italic;font-size:14.5px}
-.qcard .src{display:block;font-style:normal;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.14em;color:var(--red);margin-top:6px}
-.composer{border-top:1px solid var(--hair);padding-top:14px;display:flex;gap:10px;align-items:flex-end}
-.composer textarea{flex:1;resize:none;background:var(--page);border:1px solid var(--hair);color:var(--ink);padding:12px 14px;font:inherit;font-size:16px;min-height:46px;max-height:200px}
-.composer textarea:focus{border-color:var(--ink);outline:none}
-.composer .send{background:var(--ink);color:var(--paper);min-width:46px;min-height:46px;display:grid;place-items:center}
-.composer .send:hover{background:var(--red)}
-.micbtn{border:1px solid var(--hair);min-width:46px;min-height:46px;display:grid;place-items:center;color:var(--graphite)}
-.micbtn:hover{color:var(--red);border-color:var(--red)}
+/* ===== verdict divider: the letter (full-room view of left pane content, shared renderer) ===== */
+.letterwrap{max-width:860px}
+.analysis-controls{display:flex;flex-wrap:wrap;gap:12px;font-family:Verdana,Geneva,sans-serif;font-size:11px;color:var(--text-muted);margin-bottom:20px}
+.analysis-controls button,.analysis-controls select{font:inherit;color:var(--text-muted);border:1px solid var(--line);background:var(--surface-raised);padding:7px 11px;min-height:36px}
+.analysis-controls button:hover{color:var(--accent);border-color:var(--accent)}
+table.ledger-t{width:100%;border-collapse:collapse;font-size:14px}
+table.ledger-t th{font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.16em;color:var(--text-muted);text-align:left;padding:7px 9px;border-bottom:1px solid var(--text);text-transform:uppercase}
+table.ledger-t td{padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.st-dangling td:first-child{color:var(--accent)}
+tr.st-dangling .nm{text-decoration:line-through;text-decoration-color:var(--accent)}
+tr.st-paid .nm{color:oklch(45% 0.07 145)}
+.pacerow{display:flex;align-items:center;gap:12px;margin:8px 0;font-size:13.5px}
+.pacerow .lbl{width:74px;color:var(--text-muted)}
+.pacerow .bar{height:7px;background:var(--text)}
+.pacerow.drag .bar{background:var(--accent)}
+.pacerow.drag .lbl{color:var(--accent)}
+.pacerow .val{font-family:Consolas,monospace;color:var(--text-muted)}
+.dialpole{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin:3px 0}
+.dialpole .polebar{width:104px;height:5px;background:var(--line);position:relative}
+.dialpole .polebar i{position:absolute;top:-3px;width:2px;height:11px;background:var(--text)}
+.appx{margin-top:26px}
+.appx h3{font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.24em;text-transform:uppercase;margin:24px 0 10px}
+.corrections{border:1px solid var(--text);padding:14px 16px}
+.crow{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.crow:last-child{border-bottom:none}
+.crow .verbs{margin-left:auto;display:flex;gap:6px}
+.crow .verbs button{border:1px solid var(--line);background:var(--surface);padding:6px 9px;min-height:34px;font-family:Verdana,Geneva,sans-serif;font-size:10px}
+.crow .verbs button:hover{border-color:var(--accent);color:var(--accent)}
+.signoff{margin-top:34px;font-style:italic;font-size:17px}
+/* lifecycle (full-room letter states) */
+.fblife{max-width:560px;margin:40px auto;text-align:center}
+.fblife .big{font-size:24px;font-weight:400;margin-bottom:8px}
+.fblife .warm{color:var(--text-muted);max-width:44ch;margin:0 auto 20px}
+.stages{list-style:none;text-align:left;max-width:380px;margin:0 auto;font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--text-muted)}
+.stages li{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px dashed var(--line)}
+.stages li.done::after{content:"set";color:oklch(45% 0.07 145)}
+.stages li.now{color:var(--accent)}
+.stages li.now::after{content:"in hand…"}
 
-/* ===== feedback (THE VERDICT — the letter) ===== */
-#feedback .letterwrap{max-width:900px;margin:0 auto;padding:34px 30px 90px}
-.letterhead{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:18px;flex-wrap:wrap}
-.letterhead .dateline{font-family:Verdana,Geneva,sans-serif;font-size:11.5px;letter-spacing:.16em;color:var(--graphite)}
-.letterhead h2{font-size:28px;font-weight:400}
-.analysis-controls{display:flex;flex-wrap:wrap;gap:14px;font-family:Verdana,Geneva,sans-serif;font-size:11.5px;color:var(--graphite);margin-bottom:26px}
-.analysis-controls button, .analysis-controls select{font:inherit;color:var(--graphite);border:1px solid var(--hair);background:var(--page);padding:7px 12px;min-height:36px}
-.analysis-controls button:hover,.analysis-controls select:hover{color:var(--red);border-color:var(--red)}
-.salut{font-size:18px;font-style:italic;margin-bottom:18px}
-.finding{margin:0 0 26px;position:relative;padding-left:56px}
-.finding .para{position:absolute;left:0;top:2px;font-size:22px;color:var(--low);font-style:italic}
-.finding .sev{display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.2em;padding:4px 9px;border:1px solid currentColor;margin-right:10px}
-.sev-high{color:var(--red)} .sev-medium{color:var(--med)} .sev-low{color:var(--graphite)}
-.finding .cat{font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.16em;color:var(--graphite)}
-.finding .note{max-width:64ch;margin:7px 0}
-.finding blockquote{border-left:3px solid var(--red);padding:6px 0 6px 16px;font-style:italic;font-size:16.5px;margin:10px 0;color:var(--ink)}
-.finding blockquote.unverified{border-left-style:dashed;border-left-color:var(--low)}
-.finding .vbadge{font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.14em;color:var(--graphite)}
-.finding .verbs{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap}
-.finding .verbs button{border:1px solid var(--hair);background:var(--page);padding:9px 13px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.12em;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
-.finding .verbs button:hover{border-color:var(--red);color:var(--red)}
-.appendix{border-top:2px solid var(--ink);margin-top:34px;padding-top:8px}
-.appendix h3{font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.26em;text-transform:uppercase;margin:26px 0 12px;color:var(--ink)}
-table.ledger-t{width:100%;border-collapse:collapse;font-size:14.5px}
-table.ledger-t th{font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--graphite);text-align:left;padding:8px 10px;border-bottom:1px solid var(--ink)}
-table.ledger-t td{padding:9px 10px;border-bottom:1px solid var(--hair);vertical-align:top}
-tr.status-dangling td:first-child{color:var(--red)}
-tr.status-dangling .setup-name{text-decoration:line-through;text-decoration-color:var(--red)}
-tr.status-paid .setup-name{color:#3d6b3f}
-tr.status-abandoned .setup-name{color:var(--med)}
-.pacerow{display:flex;align-items:center;gap:14px;margin:9px 0;font-size:14px}
-.pacerow .lbl{width:76px;color:var(--graphite)}
-.pacerow .bar{height:8px;background:var(--ink)}
-.pacerow.drag .bar{background:var(--red)}
-.pacerow.drag .lbl{color:var(--red)}
-.pacerow .val{font-family:Consolas,monospace;color:var(--graphite)}
-.dialtable td:first-child{font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.1em}
-.dialpole{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--graphite)}
-.dialpole .polebar{width:110px;height:5px;background:var(--hair);position:relative}
-.dialpole .polebar i{position:absolute;top:-3px;width:2px;height:11px;background:var(--ink)}
-.corrections{border:1px solid var(--ink);padding:16px 18px;margin-top:10px}
-.corrections .crow{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px dashed var(--hair);font-size:14.5px}
-.corrections .crow:last-child{border-bottom:none}
-.corrections .verbs{margin-left:auto;display:flex;gap:6px}
-.corrections .verbs button{border:1px solid var(--hair);background:var(--paper);padding:7px 10px;min-height:36px;font-family:Verdana,Geneva,sans-serif;font-size:10.5px;color:var(--ink)}
-.corrections .verbs button:hover{border-color:var(--red);color:var(--red)}
-.signoff{margin-top:40px;font-style:italic;font-size:18px}
-
-/* feedback lifecycle: empty + running */
-.fblife{max-width:620px;margin:0 auto;padding:80px 30px;text-align:center}
-.fblife .big{font-size:26px;font-weight:400;margin-bottom:10px}
-.fblife .warm{color:var(--graphite);max-width:46ch;margin:0 auto 26px}
-.stages{list-style:none;text-align:left;max-width:420px;margin:0 auto;font-family:Verdana,Geneva,sans-serif;font-size:12.5px;color:var(--graphite)}
-.stages li{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:1px dashed var(--hair)}
-.stages li.done::after{content:"✓";color:#3d6b3f}
-.stages li.now{color:var(--red)}
-.stages li.now::after{content:"reading…";font-style:italic}
-
-/* ===== idea room ===== */
-#idea .ideawrap{max-width:820px;margin:0 auto;padding:34px 30px;display:flex;flex-direction:column;height:100%}
-#idea .ideahd{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
-#idea h2{font-weight:400;font-size:22px}
-#idea .hint{color:var(--graphite);font-size:13.5px}
-#idea-content{flex:1;resize:none;background:var(--page);border:1px solid var(--hair);color:var(--ink);padding:22px 26px;font:inherit;font-size:17px;line-height:1.7;min-height:200px}
-#idea-content:focus{outline:none;border-color:var(--ink)}
-.ideafoot{margin-top:14px;display:flex;gap:14px;align-items:center}
-.chips{display:flex;flex-wrap:wrap;gap:8px;transition:none}
+/* ===== notepad divider (ideas) ===== */
+#notepad .notewrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;height:100%}
+#idea-content{flex:1;resize:none;background:var(--surface-raised);border:1px solid var(--line);color:var(--text);padding:22px 26px;font:inherit;font-size:16.5px;line-height:1.7;min-height:200px}
+#idea-content:focus{outline:none;border-color:var(--text)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .chips.tucked{flex-direction:column;gap:6px;align-items:flex-start}
-.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--hair);background:var(--page);padding:10px 14px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--ink);max-width:260px;overflow:hidden;white-space:nowrap}
-.chip:hover{border-color:var(--red);color:var(--red)}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface-raised);padding:10px 13px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:11.5px;color:var(--text);max-width:250px;overflow:hidden;white-space:nowrap}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
 .chip svg{flex:0 0 auto}
 .chips.tucked .chip{width:44px;padding:10px}
 .chips.tucked .chip span{display:none}
 .chips.tucked.peeking .chip:hover{width:auto}
 .chips.tucked.peeking .chip:hover span{display:inline}
-.sam-pill{margin-left:auto;border:1px solid var(--ink);padding:11px 18px;min-height:44px;font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.14em}
-.sam-pill:hover{background:var(--ink);color:var(--paper)}
 
-/* ===== floating quote card (one float; Esc + click-outside) ===== */
+/* quote float */
 #quote-float{position:fixed;inset:0;z-index:800;display:none}
 #quote-float.open{display:flex;align-items:flex-end;justify-content:center;padding-bottom:110px}
-#quote-card{background:var(--page);border:1px solid var(--ink);box-shadow:0 18px 44px rgba(34,29,20,.22);padding:16px 20px;max-width:560px;width:92%}
+#quote-card{background:var(--surface-raised);border:1px solid var(--text);box-shadow:0 18px 44px rgba(34,29,20,.22);padding:16px 20px;max-width:560px;width:92%}
 #quote-card .qtxt{font-style:italic;font-size:15.5px}
-#quote-card .qsrc{font-family:Verdana,Geneva,sans-serif;font-size:10.5px;letter-spacing:.14em;color:var(--red);margin-top:8px}
+#quote-card .qsrc{font-family:Verdana,Geneva,sans-serif;font-size:10px;letter-spacing:.14em;color:var(--accent);margin-top:8px}
 #quote-card .qrow{margin-top:10px;display:flex;gap:8px;justify-content:flex-end}
-#quote-card .qrow button{border:1px solid var(--hair);padding:8px 12px;min-height:36px;font-family:Verdana,Geneva,sans-serif;font-size:11px}
-#quote-card .qrow button:hover{border-color:var(--red);color:var(--red)}
+#quote-card .qrow button{border:1px solid var(--line);padding:8px 12px;min-height:36px;font-family:Verdana,Geneva,sans-serif;font-size:10.5px}
+#quote-card .qrow button:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
 
-<header id="mast">
-  <div class="wordmark">THE LEDGER<small>SCRIPT · CO-WRITE · VERDICT</small></div>
-  <nav aria-label="Sections">
-    <button data-go="desk" class="on">SCRIPT</button>
+<div id="dossier"><div class="sheetfold">
+
+  <!-- index tabs on the page edge -->
+  <nav id="tabs" aria-label="File dividers">
+    <button data-go="cover" class="on">COVER</button>
+    <button data-go="desk">SCRIPT</button>
     <button data-go="cowrite">CO-WRITE</button>
     <button data-go="feedback">VERDICT</button>
+    <button data-go="notepad">NOTES</button>
   </nav>
-  <div class="proj" id="projtitle"></div>
-</header>
 
-<main>
-  <!-- ============ SHELF ============ -->
-  <section data-screen="shelf" id="shelf">
-    <div class="col">
-      <h1>Submissions</h1>
-      <p class="sub">Every script on the shelf, awaiting its second read.</p>
-      <div class="volume" data-open>
-        <div class="spine" aria-hidden="true"></div>
-        <div>
-          <h3>The Second Shift</h3>
-          <div class="meta">fountain · 9.5 pages · 4 scenes · analyzed</div>
-          <p>Meera has kept Ward 3 alive on routine for 61 days. Tonight her brother files a complaint — and her private ritual is witnessed.</p>
-        </div>
-        <span class="open-hint">Open the desk →</span>
+  <!-- COVER — transmittal pocket (shelf) -->
+  <section data-go="cover" class="divider on" id="cover">
+    <div class="coverpage">
+      <h1>The Submission File</h1>
+      <p class="tsline ts">a. writer · fountain · 9.5 pages · four scenes · one reading copy</p>
+      <p style="color:var(--text-muted);max-width:56ch;margin-bottom:24px">Everything the doctor needs, bound in order of arrival. The verdict is the last enclosure; it is not the first thing read.</p>
+      <div class="pocket">
+        <div class="plabel">Enclosures</div>
+        <button class="enclosure" data-open>
+          <span class="eno">ENCL. 1</span>
+          <span><b style="font-weight:400;font-size:17px">The Second Shift</b><br><span class="ts" style="letter-spacing:.1em">fountain · 9.5 pp · 4 scenes · analyzed</span></span>
+          <span class="en-go">open the file →</span>
+        </button>
+        <button class="newencl" id="newvol">＋ insert a new enclosure (.fdx / .fountain / .txt / .md / .pdf)</button>
       </div>
-      <button class="newvol" id="newvol">＋ Submit a new script (.fdx / .fountain / .txt / .md / .pdf)</button>
-      <div class="ideasrow">
-        <div class="lbl">Ideas — before the pages exist</div>
-        <button class="ideacard" data-go="idea">“The Cartographer of Missing Hours”</button>
-        <button class="ideacard" data-go="idea">＋ a fresh idea</button>
-      </div>
+      <p class="ts" style="margin-top:18px">set solid · measure 66 · no widow lines</p>
     </div>
   </section>
 
-  <!-- ============ UPLOAD MOMENT ============ -->
-  <section data-screen="upload" id="upload">
-    <div class="press">
-      <div class="doc">
-        <h3>the-second-shift.fountain</h3>
-        <div class="meta">9.5 pages · 4 scenes · ready for the desk</div>
-        <div class="btnrow">
-          <button class="btn" id="submit-btn">Submit for review</button>
-          <button class="btn ghost" data-go="shelf">Not yet</button>
-        </div>
-      </div>
-      <div class="stamp" id="stamp">RECEIVED</div>
+  <!-- STAMPING TRAY (upload) -->
+  <section data-go="tray" class="divider" id="tray">
+    <div class="traybox" id="traybox">
+      <h2>the-second-shift.fountain</h2>
+      <p class="ts" style="margin-top:8px">9.5 pages · 4 scenes · ready for binding</p>
+      <button class="btn" id="submit-btn">Bind into the file</button>
+      <button class="btn ghost" data-go="cover">Not yet</button>
     </div>
   </section>
 
-  <!-- ============ SCRIPT DESK ============ -->
-  <section data-room="desk" id="desk">
-    <div class="deskwrap">
-      <div class="pages">
-        <div class="desktools" role="toolbar" aria-label="Desk tools">
-          <button class="chipbtn"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="1"/><path d="M7 9h4M7 13h7"/></svg> Beat board</button>
-          <button class="chipbtn"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l4-1L20 7l-3-3L5 16l-1 4z"/></svg> Revision view</button>
-          <button class="chipbtn"><svg class="i" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M10 10l4 4"/></svg> Compare drafts</button>
-          <button class="chipbtn"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8"/></svg> Reader &amp; print</button>
-          <button class="chipbtn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 13V9M10 3h4"/></svg> Focus · sprint 25:00</button>
-          <button class="chipbtn"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M5 21h14"/></svg> Export · backup</button>
-        </div>
-        <div class="searchbar">
-          <input type="search" id="search" placeholder="Search the script…" aria-label="Search the script">
-        </div>
-        <div id="script-pages"></div>
+  <!-- THE FILE DESK — tri-pane spread (script center) -->
+  <div data-go="desk" class="divider" id="file-desk" data-desk-state="both-open">
+    <div id="clipbar">
+      <button data-pane-left-toggle>fold left</button>
+      <button data-panes-master>paperclip: clear the spread</button>
+      <button data-pane-right-toggle>fold right</button>
+    </div>
+    <aside class="pane pane-left" aria-label="The verdict — carbon copies">
+      <div class="pane-head"><h3>Carbon copies — the verdict</h3><span class="ts">flimsy</span><button data-expand="left">full sheet</button></div>
+      <div id="pane-left-body"><p class="ts">the carbon copies are pulled when the analysis runs — run it from the full sheet.</p></div>
+    </aside>
+    <div class="manuscript">
+      <div class="desktools" role="toolbar" aria-label="Desk tools">
+        <button class="chipbtn">Beat board</button>
+        <button class="chipbtn">Revision view</button>
+        <button class="chipbtn">Compare drafts</button>
+        <button class="chipbtn">Reader &amp; print</button>
+        <button class="chipbtn">Focus · sprint 25:00</button>
+        <button class="chipbtn">Export · backup</button>
       </div>
-      <aside class="stashrail" aria-label="The Stash">
-        <h4>The Stash</h4>
-        <div class="stashitem">“She takes the box anyway. It is warm.” — saved from scene 1</div>
-        <div class="stashitem">“Nobody has won.” — scene 4, keep the flat landing</div>
-        <h4 style="margin-top:22px">Margin notes</h4>
-        <div class="stashitem">Scene 3 — the song is the midpoint; protect it</div>
-        <div class="stashitem">Scene 2 — the unanswered phone: motif or noise?</div>
-      </aside>
+      <div class="searchbar"><input type="search" id="search" placeholder="Search the manuscript…" aria-label="Search"></div>
+      <div id="script-pages"></div>
+    </div>
+    <aside class="pane pane-right" aria-label="Correspondence — Sameer">
+      <div class="pane-head"><h3>Correspondence</h3><span class="ts">sameer</span><button data-expand="right">full sheet</button></div>
+      <div id="slips">
+        <div class="slip me"><div class="who">THE WRITER</div>Read the carbons yet?</div>
+        <div class="slip"><div class="who">SAMEER</div>Twice. The finger curl is the best page in the file and it arrives with a whole act still owed. Scene 2 idles — talk, or argue first?
+          <div class="tools"><button class="trbtn">translate</button></div></div>
+      </div>
+      <div class="qcard" id="in-quote" hidden style="border:1px dashed var(--accent);padding:9px 12px;margin-bottom:10px;font-style:italic;font-size:13.5px"><span id="in-quote-text" style="display:inline"></span><span id="in-quote-src" class="ts" style="display:block;color:var(--accent);margin-top:5px"></span></div>
+      <div class="slipform">
+        <div class="flabel">FROM THE WRITER — TO SAMEER</div>
+        <div class="composer">
+          <button class="micbtn" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+          <textarea id="input" rows="1" placeholder="Ask about a scene, a character, a note in the margins…"></textarea>
+          <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- FULL SHEET — verdict (expanded left pane content) -->
+  <section data-go="feedback" class="divider" id="feedback">
+    <div class="letterwrap" id="letterwrap">
+      <div class="analysis-controls">
+        <button>↻ Re-parse</button>
+        <select aria-label="Report language"><option>Report in English</option><option>Tenglish</option><option>हिन्दी</option><option>తెలుగు</option></select>
+        <button style="color:var(--accent)">⚠ Retry failed (0)</button>
+        <button>Export report</button>
+        <button>Backup .zip</button>
+        <button data-collapse-to-desk style="margin-left:auto">← back to the spread</button>
+      </div>
+      <div id="letter-body"></div>
     </div>
   </section>
 
-  <!-- ============ CO-WRITE ============ -->
-  <section data-room="cowrite" id="cowrite">
-    <div class="chatwrap">
-      <div class="chathead">
-        <span class="who">Sameer</span><span class="role">AI WRITING PARTNER</span>
-        <button class="clear">Clear chat</button>
-      </div>
-      <div id="msgs">
-        <div class="msg me"><div class="who">YOU</div><div class="bubble">Read the verdict yet?</div></div>
-        <div class="msg sam"><div class="who">SAMEER</div><div class="bubble">Twice. The midpoint owns the story — the finger curl is your best moment and it happens with a whole act left to fill. Want to talk scene 2? It's the one dragging its feet.</div>
-          <div class="tools"><button class="trbtn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18"/></svg> Translate</button></div>
-        </div>
-      </div>
-      <div class="qcard" id="in-quote" hidden>
-        <span id="in-quote-text" class="qtxt"></span>
-        <span id="in-quote-src" class="src"></span>
-      </div>
-      <div class="composer">
-        <button class="micbtn" title="Dictate (local whisper)" aria-label="Dictate"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-        <textarea id="input" rows="1" placeholder="Ask about a scene, a character, a note in the margins…"></textarea>
-        <button class="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ FEEDBACK = THE VERDICT ============ -->
-  <section data-room="feedback" id="feedback">
-    <div data-state="empty" style="display:none">
-      <div class="fblife">
-        <div class="big">The ledger is blank.</div>
-        <p class="warm">Nothing has been read yet. Run the analysis and the doctor will write you the letter — findings, pacing, the works. It takes a few quiet minutes.</p>
-        <button class="btn">Run Analysis</button>
-      </div>
-    </div>
-    <div data-state="running" style="display:none">
-      <div class="fblife">
-        <div class="big">Reading the script…</div>
-        <ul class="stages">
-          <li class="done"><span>Formatting &amp; stats</span></li>
-          <li class="done"><span>Voice &amp; subtext</span></li>
-          <li class="now"><span>Scene summaries</span></li>
-          <li><span>Dialogue analysis</span></li>
-          <li><span>Script categories</span></li>
-          <li><span>Principles engine</span></li>
-          <li><span>Setup/payoff ledger</span></li>
-          <li><span>Verification</span></li>
-          <li><span>Coverage</span></li>
-        </ul>
-      </div>
-    </div>
-    <div data-state="complete">
-      <div class="letterwrap">
-        <div class="analysis-controls">
-          <button>↻ Re-parse</button>
-          <select aria-label="Report language"><option>Report in English</option><option>Tenglish</option><option>हिन्दी</option><option>తెలుగు</option></select>
-          <button style="color:var(--red)">⚠ Retry failed (0)</button>
-          <button>Export report</button>
-          <button>Backup .zip</button>
-        </div>
-        <div class="letterhead">
-          <h2>The Verdict</h2>
-          <div class="dateline" id="dateline"></div>
-        </div>
-        <p class="salut">Dear A. Writer — I read it twice; the second read is the honest one.</p>
-        <div id="findings"></div>
-        <div class="appendix">
-          <h3>Corrections — the fix queue</h3>
-          <div class="corrections" id="fixqueue"></div>
-          <h3>Coverage</h3>
-          <table class="ledger-t" id="coverage-t"></table>
-          <h3>Pacing — per-scene rhythm</h3>
-          <div id="pacing"></div>
-          <h3>Character dials</h3>
-          <table class="ledger-t dialtable" id="dials-t"></table>
-          <h3>Setup / payoff ledger</h3>
-          <table class="ledger-t" id="ledger-t"></table>
-          <h3>Character reads — the writer's mirror</h3>
-          <div id="reads"></div>
-          <p class="signoff">— Dr. Sushruta</p>
+  <!-- FULL SHEET — co-write (expanded right pane content) -->
+  <section data-go="cowrite" class="divider" id="cowrite">
+    <div style="max-width:720px;margin:0 auto">
+      <div class="rulehead"><h1>Correspondence — full sheet</h1><button data-collapse-to-desk style="margin-left:auto" class="ts">← back to the spread</button></div>
+      <div id="slips-full"></div>
+      <div class="slipform" style="max-width:560px">
+        <div class="flabel">FROM THE WRITER — TO SAMEER</div>
+        <div class="composer" style="max-width:560px">
+          <textarea id="input-full" rows="1" placeholder="Ask about a scene, a character…"></textarea>
+          <button class="send" aria-label="Send" onclick="document.getElementById('input').focus()"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></button>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============ IDEA ROOM ============ -->
-  <section data-screen="idea" id="idea">
-    <div class="ideawrap">
-      <div class="ideahd"><h2>A fresh idea</h2><span class="hint">It autosaves as you write. Sameer is one word away.</span></div>
+  <!-- NOTEPAD (ideas) -->
+  <section data-go="notepad" class="divider" id="notepad">
+    <div class="notewrap">
+      <div class="rulehead"><h1>The Notepad</h1><span class="ts">loose leaves · autosaved</span></div>
       <textarea id="idea-content" spellcheck="false" placeholder="Whatever comes. A line, a scene, a worry…"></textarea>
-      <div class="ideafoot">
-        <div class="chips" id="idea-chips" aria-label="Explore paths">
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg><span>What if the mother knew?</span></button>
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg><span>Make the ward a character</span></button>
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 18V6l8 6 8-6v12"/></svg><span>End on the empty tiffin</span></button>
-          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><span>Slow the dawn, earn it</span></button>
-        </div>
-        <button class="sam-pill" id="sam-pill">/sameer — ask</button>
+      <div class="chips" id="idea-chips" aria-label="Explore paths">
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z"/></svg><span>What if the mother knew?</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg><span>Make the ward a character</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 18V6l8 6 8-6v12"/></svg><span>End on the empty tiffin</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><span>Slow the dawn, earn it</span></button>
       </div>
     </div>
   </section>
-</main>
 
-<!-- floating quote card (demo float; Esc + click-outside dismiss) -->
+</div></div>
+
 <div id="quote-float">
   <div id="quote-card" role="dialog" aria-label="Quoted passage">
     <div class="qtxt" id="quote-text"></div>
@@ -410,40 +367,55 @@ tr.status-abandoned .setup-name{color:var(--med)}
   </div>
 </div>
 
-<!-- review bar -->
 <div id="pv">
-  <b>REVIEW</b>
-  <button data-go="shelf">Shelf</button>
+  <b>READER'S SLIP</b>
+  <button data-go="cover">Cover</button>
   <button data-go="desk">Desk</button>
   <button data-go="cowrite">Co-write</button>
   <button data-go="feedback">Feedback</button>
-  <button data-go="idea">Ideas</button>
+  <button data-go="notepad">Ideas</button>
   <span class="sep"></span>
   <button data-fb="empty">Empty</button>
   <button data-fb="running">Running</button>
   <button data-fb="complete" class="on">Complete</button>
   <span class="sep"></span>
-  <a href="index.html" style="color:#d8cfbc">Gallery</a>
-  <button id="pv-close" aria-label="Dismiss review bar">✕</button>
+  <a href="index.html">Gallery</a>
+  <button id="pv-close" aria-label="Dismiss reader's slip">✕</button>
 </div>
 
 <script src="_payload.js"></script>
 <script>
 const $  = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
-let FEEDBACK_STATE = "complete";
 const P = window.PAYLOAD;
+let FEEDBACK_STATE = "complete";
+let desk = { left: true, right: true };
 
 function show(id){
-  $$("[data-room],[data-screen]").forEach(el =>
-    el.classList.toggle("active", el.dataset.room === id || el.dataset.screen === id));
-  $$("#mast nav [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
-  (document.querySelector(`[data-room="${id}"].active, [data-screen="${id}"].active`) || {}).scrollTop = 0;
+  $$(".divider").forEach(el => el.classList.toggle("on", el.dataset.go === id));
+  $$("#tabs [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  (document.querySelector(`.divider.on`) || {}).scrollTop = 0;
 }
 function renderFeedback(){
-  $$("[data-state]").forEach(el => el.style.display = "none");
-  const el = $(`#feedback [data-state="${FEEDBACK_STATE}"]`);
+  const empty = $('#letter-body [data-state="empty"]');
+  if (!empty) return;
+  $$("[data-state]", $("#letterwrap")).forEach(el => el.style.display = "none");
+  const el = $(`#letter-body [data-state="${FEEDBACK_STATE}"]`);
   if (el) el.style.display = "";
+}
+function deskState(){
+  if (desk.left && desk.right) return "both-open";
+  if (desk.left) return "left-only";
+  if (desk.right) return "right-only";
+  return "none-open";
+}
+function renderPanes(){
+  const d = $("#file-desk");
+  d.dataset.deskState = deskState();
+  d.classList.toggle("left-closed", !desk.left);
+  d.classList.toggle("right-closed", !desk.right);
+  $('[data-pane-left-toggle]').textContent = desk.left ? "fold left" : "unfold left";
+  $('[data-pane-right-toggle]').textContent = desk.right ? "fold right" : "unfold right";
 }
 function locateFinding(f){
   show("desk");
@@ -455,20 +427,21 @@ function locateFinding(f){
   }
 }
 function discussFinding(f){
-  show("cowrite");
+  show("desk");
+  desk.left = true; desk.right = true; renderPanes();
   const q = $("#in-quote");
   q.hidden = false;
   $("#in-quote-text").textContent = "“" + f.quote + "”";
-  $("#in-quote-src").textContent = `FINDING ${String(f.id).padStart(2,"0")} · ${f.category.toUpperCase()} · SCENE ${f.scene}`;
+  $("#in-quote-src").textContent = `ENCL. 1 · FINDING ${String(f.id).padStart(2,"0")} · ${f.category.toUpperCase()} · SCENE ${f.scene}`;
   $("#input").focus();
 }
 
-/* ---------- script pages ---------- */
+/* ---------- manuscript ---------- */
 function renderScript(){
-  $("#projtitle").textContent = `“${P.project.title}” — ${P.project.format}, ${P.project.pages} pp.`;
   $("#script-pages").innerHTML = P.script.map(sc => `
     <article class="page" data-scene="${sc.n}">
-      <div class="slug"><span>SCENE ${sc.n}</span><span style="letter-spacing:.04em;text-transform:none;font-family:Georgia,serif;font-size:14px">${sc.slug}</span><span class="pg mono">pp. ${sc.page}</span></div>
+      <span class="runninghead">the second shift · ${sc.n}/4</span>
+      <div class="slug"><span>SCENE ${sc.n}</span><span style="letter-spacing:.03em;font-family:Georgia,serif;font-size:14px;text-transform:none">${sc.slug}</span><span class="pg mono">pp. ${sc.page}</span></div>
       ${sc.elements.map(([type, a, b]) => {
         if (type === "dialogue") return `<div class="el char">${a}</div><div class="el dialogue">${b}</div>`;
         if (type === "parenthetical") return `<div class="el paren">${a}</div>`;
@@ -476,32 +449,71 @@ function renderScript(){
         if (type === "action") return `<div class="el action">${a}${sc.n === 1 && a.startsWith("She takes the box") ? '<span class="star" title="Edited — was: She pockets the box.">★</span>' : ""}</div>`;
         return "";
       }).join("")}
-      ${sc.n === 1 ? `<div class="marginal">margin, in red pencil: this warmth is the spine — don’t lose the box.</div>` : ""}
-      ${sc.n === 3 ? `<div class="marginal">margin: the doorway beat is the whole scene. Hold it one breath longer.</div>` : ""}
+      ${sc.n === 1 ? `<div class="scholion">margin, in red pencil: this warmth is the spine — don’t lose the box.</div>` : ""}
+      ${sc.n === 3 ? `<div class="scholion">margin: the doorway beat is the whole scene. hold it one breath longer.</div>` : ""}
     </article>`).join("");
 }
 
-/* ---------- the letter ---------- */
+/* ---------- the letter (full-sheet verdict) ---------- */
 function renderLetter(){
-  $("#dateline").textContent = `${P.project.title.toUpperCase()} · ${P.project.format.toUpperCase()} · ${P.project.pages} PP. · FOUR SCENES · ANALYSIS №1`;
+  $("#letter-body").innerHTML = `
+    <div data-state="empty" style="display:none"><div class="fblife">
+      <div class="big">The verdict is not yet set.</div>
+      <p class="warm">No carbons have been pulled. Run the analysis and the letter is typeset — findings, rhythm, the ledger of promises.</p>
+      <button class="btn">Run Analysis</button>
+    </div></div>
+    <div data-state="running" style="display:none"><div class="fblife">
+      <div class="big">Setting the type…</div>
+      <ul class="stages">
+        <li class="done"><span>Formatting &amp; stats</span></li>
+        <li class="done"><span>Voice &amp; subtext</span></li>
+        <li class="now"><span>Scene summaries</span></li>
+        <li><span>Dialogue analysis</span></li>
+        <li><span>Script categories</span></li>
+        <li><span>Principles engine</span></li>
+        <li><span>Setup/payoff ledger</span></li>
+        <li><span>Verification</span></li>
+        <li><span>Coverage</span></li>
+      </ul>
+    </div></div>
+    <div data-state="complete">
+      <div class="rulehead"><h1>The Verdict</h1><span class="folio">ANALYSIS №1 · ${P.project.pages} PP · FOUR SCENES</span></div>
+      <p style="font-style:italic;margin:14px 0 18px">Dear A. Writer — I read it twice; the second read is the honest one.</p>
+      <div id="findings"></div>
+      <div class="appx">
+        <h3>Corrections — the fix queue</h3>
+        <div class="corrections" id="fixqueue"></div>
+        <h3>Coverage</h3>
+        <table class="ledger-t" id="coverage-t"></table>
+        <h3>Pacing — the rhythm, ruled</h3>
+        <div id="pacing"></div>
+        <h3>Character dials</h3>
+        <table class="ledger-t" id="dials-t"></table>
+        <h3>Setup / payoff ledger</h3>
+        <table class="ledger-t" id="ledger-t"></table>
+        <h3>The writer's mirror</h3>
+        <div id="reads"></div>
+        <p class="signoff">— Dr. Sushruta</p>
+      </div>
+    </div>`;
+
   $("#findings").innerHTML = P.findings.map(f => `
-    <div class="finding" data-finding="${f.id}">
-      <span class="para" aria-hidden="true">¶${f.id}</span>
+    <div class="cnote" data-finding="${f.id}">
+      <span class="no">¶${String(f.id).padStart(2,"0")}</span>
       <span class="sev sev-${f.severity}">${f.severity.toUpperCase()}</span>
-      <span class="cat">${f.category}</span>
-      ${f.verified ? "" : '<span class="vbadge"> · UNVERIFIED — quote not matched</span>'}
+      <span class="cat">${f.category}${f.verified ? "" : " · UNVERIFIED — quote not matched"}</span>
       <p class="note">${f.note}</p>
       <blockquote class="${f.verified ? "" : "unverified"}">“${f.quote}”</blockquote>
       <div class="verbs">
-        <button data-act="locate" data-fid="${f.id}"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg> Locate — scene ${f.scene}</button>
-        <button data-act="discuss" data-fid="${f.id}"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-3-6l3-1z"/></svg> Discuss</button>
-        <button data-act="dismiss" data-fid="${f.id}">Dismiss</button>
+        <button data-act="locate" data-fid="${f.id}">locate — scene ${f.scene}</button>
+        <button data-act="discuss" data-fid="${f.id}">discuss</button>
+        <button data-act="dismiss" data-fid="${f.id}">dismiss</button>
       </div>
     </div>`).join("");
 
   $("#fixqueue").innerHTML = P.findings.filter(f => f.severity !== "low" || f.id === 8).map(f => `
-    <div class="crow"><span class="sev sev-${f.severity}">${f.severity[0].toUpperCase()}</span>
-      <span>¶${f.id} · ${f.note.split(". ")[0]}.</span>
+    <div class="crow"><span class="sev sev-${f.severity}" style="font-size:9px;padding:2px 6px">${f.severity[0].toUpperCase()}</span>
+      <span>¶${f.id} — ${f.note.split(". ")[0]}.</span>
       <span class="verbs">
         <button data-act="locate" data-fid="${f.id}">locate</button>
         <button data-act="discuss" data-fid="${f.id}">discuss</button>
@@ -510,7 +522,7 @@ function renderLetter(){
 
   const C = P.coverage;
   $("#coverage-t").innerHTML = `
-    <tr><th style="width:130px">Logline</th><td>${C.logline}</td></tr>
+    <tr><th style="width:120px">Logline</th><td>${C.logline}</td></tr>
     <tr><th>Genre</th><td>${C.genre}</td></tr>
     <tr><th>Synopsis</th><td>${C.synopsis}</td></tr>
     <tr><th>Recommendation</th><td><b>${C.recommendation}</b></td></tr>`;
@@ -518,55 +530,68 @@ function renderLetter(){
   $("#pacing").innerHTML = P.pacing.map(p => `
     <div class="pacerow ${p.drag ? "drag" : ""}">
       <span class="lbl">Scene ${p.scene}</span>
-      <span class="bar" style="width:${Math.round(p.pace * 320)}px" title="pace ${p.pace}"></span>
+      <span class="bar" style="width:${Math.round(p.pace * 300)}px" title="pace ${p.pace}"></span>
       <span class="val">pace ${p.pace.toFixed(2)} · density ${p.density.toFixed(2)} · action ${p.action_share}%</span>
-      ${p.drag ? '<span class="sev sev-high" style="margin-left:auto">DRAG</span>' : ""}
+      ${p.drag ? '<span class="sev sev-high" style="margin-left:auto;font-size:9px;padding:2px 6px">DRAG</span>' : ""}
     </div>`).join("");
 
   const poleNames = { proactive: "proactive–passive", warm: "warm–cold", articulate: "articulate–terse", emotional: "emotional–stoic", grounded: "grounded–dreamy" };
   $("#dials-t").innerHTML = P.dials.map(d => `
-    <tr><td>${d.character}</td>
-      <td><div style="display:grid;gap:5px">${Object.entries(d.poles).map(([k, v]) => `
-        <div class="dialpole"><span style="width:110px">${poleNames[k]}</span>
+    <tr><td style="font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:.08em">${d.character}</td>
+      <td><div style="display:grid;gap:4px">${Object.entries(d.poles).map(([k, v]) => `
+        <div class="dialpole"><span style="width:104px">${poleNames[k]}</span>
           <span class="polebar"><i style="left:${v * 10}%"></i></span>
           <span class="mono">${v}/10</span></div>`).join("")}</div></td>
       <td class="mono">scenes ${d.scenes.join(", ")}</td></tr>`).join("");
 
   $("#ledger-t").innerHTML = P.ledger.map(l => `
-    <tr class="status-${l.status}">
-      <td class="setup-name">${l.setup}</td><td>${l.kind}</td><td class="mono">s${l.setup_scene}</td>
-      <td><span class="sev ${l.status === "paid" ? "sev-low" : "sev-high"}" style="border:none">${l.status.toUpperCase()}</span></td>
+    <tr class="st-${l.status}">
+      <td class="nm">${l.setup}</td><td>${l.kind}</td><td class="mono">s${l.setup_scene}</td>
+      <td><span class="sev ${l.status === "paid" ? "sev-low" : "sev-high"}" style="border:none;padding:0">${l.status.toUpperCase()}</span></td>
       <td>${l.note}</td></tr>`).join("");
 
   $("#reads").innerHTML = P.reads.map(r => `
-    <div class="finding" style="padding-left:0">
-      <span class="sev sev-medium" style="border:none;padding:0">${r.character}</span>
-      <p class="note">${r.read}</p></div>`).join("");
+    <p style="max-width:70ch;margin-bottom:10px"><b style="font-weight:400">${r.character}.</b> ${r.read}</p>`).join("");
 }
 
-/* ---------- wire everything ---------- */
+/* ---------- wire ---------- */
 function wire(){
+  $$("#tabs [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
   $$("#pv [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
-  $$("[data-go]").forEach(b => { if (!b.closest("#pv") && !b.closest("#mast")) b.addEventListener("click", () => show(b.dataset.go)); });
-  $$("#mast nav [data-go]").forEach(b => b.addEventListener("click", () => show(b.dataset.go)));
+  $$("[data-go]").forEach(b => { if (!b.closest("#tabs") && !b.closest("#pv") && b.tagName !== "SECTION" && b.tagName !== "DIV") b.addEventListener("click", () => show(b.dataset.go)); });
   $$("#pv [data-fb]").forEach(b => b.addEventListener("click", () => {
     FEEDBACK_STATE = b.dataset.fb; renderFeedback();
     $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x === b));
   }));
   $("#pv-close").addEventListener("click", () => $("#pv").remove());
 
-  $("[data-open]").addEventListener("click", () => show("upload"));
-  $("#newvol").addEventListener("click", () => show("upload"));
+  $("[data-open]").addEventListener("click", () => show("tray"));
+  $("#newvol").addEventListener("click", () => show("tray"));
   $("#submit-btn").addEventListener("click", () => {
-    $("#upload").classList.add("stamping");
+    $("#tray").classList.add("stamping");
     setTimeout(() => show("desk"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 950);
   });
 
   $("#search").addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
-    $$(".page").forEach(pg => pg.style.display =
-      !q || pg.textContent.toLowerCase().includes(q) ? "" : "none");
+    $$(".page").forEach(pg => pg.style.display = !q || pg.textContent.toLowerCase().includes(q) ? "" : "none");
   });
+
+  // pane controls (expand = the pane's full-sheet divider)
+  $('[data-pane-left-toggle]').addEventListener("click", () => { desk.left = !desk.left; renderPanes(); });
+  $('[data-pane-right-toggle]').addEventListener("click", () => { desk.right = !desk.right; renderPanes(); });
+  $('[data-panes-master]').addEventListener("click", () => {
+    if (desk.left || desk.right){ desk.left = false; desk.right = false; }
+    else { desk.left = true; desk.right = true; }
+    renderPanes();
+  });
+  $$("[data-expand]").forEach(b => b.addEventListener("click", () => {
+    show(b.dataset.expand === "left" ? "feedback" : "cowrite");
+  }));
+  $$("[data-collapse-to-desk]").forEach(b => b.addEventListener("click", () => show("desk")));
+  $("#slips-full").innerHTML = $("#slips").innerHTML;
+  const inputFull = $("#input-full");
+  inputFull.addEventListener("input", () => growComposer(inputFull));
 
   document.addEventListener("click", e => {
     const b = e.target.closest("[data-act]");
@@ -574,52 +599,38 @@ function wire(){
     const f = P.findings.find(x => x.id === +b.dataset.fid);
     if (b.dataset.act === "locate") locateFinding(f);
     if (b.dataset.act === "discuss") discussFinding(f);
-    if (b.dataset.act === "dismiss") b.closest(".finding,.crow").style.opacity = .35;
-    if (b.dataset.act === "rewrite") { show("cowrite"); $("#input").value = `Rewrite idea for ¶${f.id}: `; $("#input").focus(); growComposer($("#input")); }
+    if (b.dataset.act === "dismiss") b.closest(".cnote,.crow").style.opacity = .35;
+    if (b.dataset.act === "rewrite") { show("desk"); desk.left = true; desk.right = true; renderPanes(); $("#input").value = `Rewrite ¶${f.id}: `; $("#input").focus(); growComposer($("#input")); }
   });
 
-  // quote-card float: Esc + click-outside (topmost float wins)
   const qf = $("#quote-float");
   const closeQ = () => qf.classList.remove("open");
   document.addEventListener("mousedown", e => { if (qf.classList.contains("open") && !$("#quote-card").contains(e.target)) closeQ(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeQ(); const iq = $("#in-quote"); if (iq) iq.hidden = true; } });
   $("#quote-card [data-close]").addEventListener("click", closeQ);
   $("#quote-card [data-goto-cowrite]").addEventListener("click", closeQ);
-  $$(".stashitem").forEach(s => s.addEventListener("click", () => {
-    qf.classList.add("open");
-    $("#quote-text").textContent = s.textContent.replace(/^(the stash|margin)[:,]? /i, "").trim();
-    $("#quote-src").textContent = "FROM THE STASH / MARGIN NOTES";
-  }));
 
-  // composer + idea page growth
   const input = $("#input");
   input.addEventListener("input", () => growComposer(input));
   const idea = $("#idea-content");
   idea.addEventListener("input", () => growComposer(idea));
-
-  // chips tuck-away (idea room — mandatory)
   wireChips(idea, $("#idea-chips"));
-  $("#sam-pill").addEventListener("click", () => show("cowrite"));
 }
 function growComposer(ta){
   ta.style.height = "auto";
   ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
 }
 function wireChips(surface, chipRow){
-  surface.addEventListener("input", () => {
-    chipRow.classList.toggle("tucked", surface.value.length > 0);
-  });
-  chipRow.addEventListener("mouseover", e => {
-    if (chipRow.classList.contains("tucked") && e.target.closest(".chip")) chipRow.classList.add("peeking");
-  });
+  surface.addEventListener("input", () => chipRow.classList.toggle("tucked", surface.value.length > 0));
+  chipRow.addEventListener("mouseover", e => { if (chipRow.classList.contains("tucked") && e.target.closest(".chip")) chipRow.classList.add("peeking"); });
   chipRow.addEventListener("mouseout", () => chipRow.classList.remove("peeking"));
 }
 
 renderScript();
 renderLetter();
-renderFeedback();
 wire();
-show("shelf");
+renderPanes();
+show("cover");
 </script>
 </body>
 </html>
