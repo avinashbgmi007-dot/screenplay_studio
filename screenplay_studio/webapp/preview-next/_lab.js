@@ -305,6 +305,141 @@
     });
   }
 
+  /* ---------- shared chrome: top bar + review bar + tri-pane desk ----------
+   * The IA contract pieces (switcher, live badge, title, pane toggles,
+   * findings pane, script pages, Sameer thread, composer, quote card) are
+   * injected identically into every world — what differs per world is only
+   * the landing view and how it links into the desk. */
+
+  const DESK_HTML = `
+    <aside class="pane pane-left" aria-label="Feedback">
+      <div class="pane-head"><h3>Feedback</h3></div>
+      <div class="lab-thread" id="lab-desk-findings" style="padding:14px 16px"></div>
+    </aside>
+    <div class="lab-scroll lab-pages" aria-label="Script" id="lab-desk-pages"></div>
+    <aside class="pane pane-right" aria-label="Sameer">
+      <div class="pane-head"><h3>Sameer</h3></div>
+      <div class="lab-thread" data-lab-thread id="lab-thread"></div>
+      <div class="lab-quote" data-lab-quote hidden>
+        <span data-lab-quote-text></span>
+        <span class="qsrc" data-lab-quote-src></span>
+      </div>
+      <div class="lab-composer">
+        <textarea data-lab-composer-input rows="1" placeholder="Reply to Sameer — a real turn on the real script…"></textarea>
+        <button class="send" data-lab-composer-send aria-label="Send">↑</button>
+      </div>
+    </aside>`;
+
+  const TOP_HTML = `
+    <header class="lab-top">
+      <span class="mark">${IA}-first</span>
+      <span class="who" data-lab-title></span>
+      <span class="live" data-lab-live></span>
+      <span class="switcher">project
+        <select data-lab-switcher aria-label="Project"></select>
+      </span>
+      <a class="home" href="index.html">Lab</a>
+    </header>`;
+
+  const PV_HTML = `
+    <div id="pv">
+      <b>REVIEW</b>
+      <button data-lab-home>Home</button>
+      <span class="sep"></span>
+      <button data-fb="empty">Empty</button>
+      <button data-fb="running">Running</button>
+      <button data-fb="complete" class="on">Complete</button>
+      <span class="sep"></span>
+      <a href="index.html">Gallery</a>
+      <button id="pv-close" aria-label="Dismiss review bar">✕</button>
+    </div>`;
+
+  function mountChrome() {
+    document.body.insertAdjacentHTML("afterbegin", TOP_HTML + PV_HTML);
+    $("#pv-close").addEventListener("click", () => $("#pv").remove());
+    $$("[data-lab-home]").forEach(b => b.addEventListener("click", () => { showDesk(false); if (Lab.onHome) Lab.onHome(); }));
+  }
+
+  function mountDesk(hiddenOnLoad) {
+    document.body.insertAdjacentHTML("beforeend", `<div data-desk="both-open" style="${hiddenOnLoad ? "display:none" : ""}">${DESK_HTML}</div>
+      <div class="desk-ctl" style="display:none">
+        <button data-pane-left-toggle title="Fold/unfold feedback (left)">left</button>
+        <button data-panes-master>fold both / open both</button>
+        <button data-pane-right-toggle title="Fold/unfold Sameer (right)">right</button>
+      </div>`);
+    renderPanes();
+    wirePaneControls();
+    wireFeedbackToggle();
+    wireComposer("[data-lab-composer-input]", "[data-lab-composer-send]", "[data-lab-thread]");
+  }
+
+  function showDesk(show) {
+    const d = $("[data-desk]"), ctl = $(".desk-ctl");
+    if (!d) return;
+    if (d.style.display === "none" || d.style.display === "") d.style.display = show ? "grid" : "none";
+    else d.style.display = show ? "grid" : "none";
+    if (ctl) ctl.style.display = show ? "flex" : "none";
+  }
+  function deskVisible() {
+    const d = $("[data-desk]");
+    return d && d.style.display !== "none";
+  }
+
+  function renderDeskFromData() {
+    // script pages
+    const scenes = (DATA.parsed || {}).scenes || [];
+    const pages = $("#lab-desk-pages");
+    if (pages) pages.innerHTML = scenes.map(sc => `
+      <article class="lab-page" data-scene="${sc.scene_number}">
+        <div class="slug">SCENE ${sc.scene_number} — ${esc(sc.heading_raw || "")}</div>
+        ${(sc.elements || []).map(el => {
+          const t = el.type || "general";
+          if (t === "character") return `<div class="lab-el character">${esc(el.text)}</div>`;
+          if (t === "dialogue") return `<div class="lab-el dialogue">${esc(el.text)}</div>`;
+          if (t === "parenthetical") return `<div class="lab-el parenthetical">${esc(el.text)}</div>`;
+          if (t === "transition") return `<div class="lab-el transition">${esc(el.text)}</div>`;
+          return `<div class="lab-el action">${esc(el.text)}</div>`;
+        }).join("")}
+      </article>`).join("");
+    // findings pane
+    const df = $("#lab-desk-findings");
+    if (df) {
+      df.innerHTML = fixItems().map(f => `
+        <div class="lab-finding ${f.dismissed ? "dismissed" : ""}" data-finding="${f.index}">
+          <div class="fhead">
+            <span class="lab-sev sev-${f.severity}">${f.severity || "?"}</span>
+            <span class="fcat">s${(f.scene_refs || [])[0] || "—"}</span>
+          </div>
+          <div style="font-size:13.5px">${esc((f.issue || "").split(". ")[0])}.</div>
+          <div class="fverbs">
+            <button data-verb="locate">locate</button>
+            <button data-verb="discuss">discuss</button>
+            <button data-verb="${f.dismissed ? "undismiss" : "dismiss"}">${f.dismissed ? "restore" : "dismiss"}</button>
+          </div>
+        </div>`).join("") || '<div class="lab-empty-note">No findings yet.</div>';
+    }
+  }
+
+  function renderFindingsInto(sel) {
+    const box = $(sel);
+    if (!box) return;
+    box.innerHTML = fixItems().map(f => `
+      <div class="lab-finding ${f.dismissed ? "dismissed" : ""}" data-finding="${f.index}">
+        <div class="fhead">
+          <span class="lab-sev sev-${f.severity}">${f.severity || "?"}</span>
+          <span class="fcat">${esc(f.category || "")} · scene ${(f.scene_refs || [])[0] || "—"}</span>
+          ${f.verified === false ? '<span class="vtag">unverified</span>' : ""}
+        </div>
+        <div style="font-size:14.5px">${esc(f.issue || "")}</div>
+        ${f.quote ? `<div class="fquote ${f.verified === false ? "unverified" : ""}">“${esc(f.quote)}”</div>` : ""}
+        <div class="fverbs">
+          <button data-verb="locate">📍 Locate</button>
+          <button data-verb="discuss">💬 Discuss</button>
+          <button data-verb="${f.dismissed ? "undismiss" : "dismiss"}">${f.dismissed ? "Restore" : "Dismiss"}</button>
+        </div>
+      </div>`).join("") || '<div class="lab-empty-note">No findings yet — Run Analysis from the studio.</div>';
+  }
+
   /* ---------- boot ---------- */
   async function boot(opts) {
     opts = opts || {};
@@ -325,6 +460,7 @@
     if (!PROJECT && DATA.shelf && DATA.shelf.length) PROJECT = DATA.shelf[0].name;
     if (PROJECT) { try { localStorage.setItem("labProject", JSON.stringify(PROJECT)); } catch (e) {} }
     await loadShelf();
+    renderDeskFromData();
     renderPanes();
     renderFeedback();
     wirePaneControls();
@@ -347,7 +483,8 @@
     chatHistory, chatSend, chatClear, renderThread, wireComposer,
     setQuote, getQuote, clearQuote, fillQuoteUI,
     locateFinding, discussFinding, dismissFinding, undismissFinding, wireFindingVerbs,
-    ready: false, onLocate: null, onDiscuss: null,
+    mountChrome, mountDesk, showDesk, deskVisible, renderDeskFromData, renderFindingsInto,
+    ready: false, onLocate: null, onDiscuss: null, onHome: null,
   };
   window.Lab = Lab;
 })();

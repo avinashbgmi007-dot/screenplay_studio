@@ -6,8 +6,7 @@
 <title>Report-first — Design Lab</title>
 <link rel="stylesheet" href="_lab.css">
 <style>
-/* IA layout only — components live in _lab.css */
-.report-hero{max-width:880px;margin:0 auto;padding:34px 34px 90px;overflow-y:auto;height:100vh}
+.report-hero{max-width:880px;margin:0 auto;padding:64px 34px 90px;overflow-y:auto;height:100vh}
 .report-head{margin-bottom:22px}
 .report-head .kick{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.22em;color:var(--lab-muted);text-transform:uppercase}
 .report-head h1{font-size:26px;font-weight:600;margin:8px 0 4px}
@@ -28,8 +27,8 @@
 .workbench-cta button{background:var(--lab-accent);color:#14110e;padding:11px 18px;min-height:44px;font-weight:600;font-size:13px}
 .workbench-cta button:hover{filter:brightness(1.08)}
 [data-desk]{position:fixed;inset:46px 0 84px;display:none}
-[data-desk].on{display:grid}
 .desk-ctl{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);z-index:930;display:flex;gap:6px;background:var(--lab-raised);border:1px solid var(--lab-line);padding:6px;border-radius:99px}
+.desk-ctl[style*="flex"]{display:flex!important}
 .desk-ctl button{color:var(--lab-muted);border:1px solid var(--lab-line);padding:8px 13px;min-height:36px;border-radius:99px;font-size:11px}
 .desk-ctl button:hover{color:var(--lab-accent);border-color:var(--lab-accent)}
 [data-state] .fblife{max-width:520px;margin:60px auto;text-align:center;color:var(--lab-muted)}
@@ -40,16 +39,6 @@
 </style>
 </head>
 <body>
-
-<header class="lab-top">
-  <span class="mark">Report-first</span>
-  <span class="who" data-lab-title></span>
-  <span class="live" data-lab-live></span>
-  <span class="switcher">project
-    <select data-lab-switcher aria-label="Project"></select>
-  </span>
-  <a class="home" href="index.html">Lab</a>
-</header>
 
 <!-- THE LANDING: the verdict IS the app -->
 <div class="report-hero" id="report-hero" data-ia-landing>
@@ -80,54 +69,12 @@
       <div class="rcard"><h3>Coverage</h3><div style="font-size:13.5px" data-synopsis></div></div>
       <div class="rcard pace"><h3>Pacing</h3><div id="pace-rows"></div></div>
     </div>
-    <h2 style="font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--lab-muted);margin-bottom:12px" id="findings-h">Findings</h2>
-    <div class="findings-list" id="findings"></div>
+    <h2 style="font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--lab-muted);margin-bottom:12px">Findings</h2>
+    <div class="findings-list" id="findings" data-findings-surface></div>
     <div class="workbench-cta">
-      <button id="open-desk" data-open-desk>Open the workbench — script + Sameer alongside →</button>
+      <button data-open-desk>Open the workbench — script + Sameer alongside →</button>
     </div>
   </div>
-</div>
-
-<!-- THE WORKBENCH: tri-pane desk (script center · feedback LEFT · Sameer RIGHT) -->
-<div data-desk="both-open" aria-label="Workbench">
-  <aside class="pane pane-left" aria-label="Feedback">
-    <div class="pane-head"><h3>Verdict — findings</h3></div>
-    <div class="lab-thread" id="desk-findings" style="padding:14px 16px"></div>
-  </aside>
-  <div class="lab-pages" aria-label="Script">
-    <div id="desk-pages"></div>
-  </div>
-  <aside class="pane pane-right" aria-label="Sameer">
-    <div class="pane-head"><h3>Sameer</h3></div>
-    <div class="lab-thread" id="desk-thread" data-lab-thread></div>
-    <div class="lab-quote" data-lab-quote hidden>
-      <span data-lab-quote-text></span>
-      <span class="qsrc" data-lab-quote-src></span>
-    </div>
-    <div class="lab-composer" data-lab-composer-focus>
-      <textarea id="desk-input" data-lab-composer-input rows="1" placeholder="Reply to Sameer — real model, real turn…"></textarea>
-      <button class="send" id="desk-send" data-lab-composer-send aria-label="Send">↑</button>
-    </div>
-  </aside>
-</div>
-
-<div class="desk-ctl" id="desk-ctl" style="display:none">
-  <button data-pane-left-toggle title="Fold/unfold findings (left)">left</button>
-  <button data-panes-master>fold both / open both</button>
-  <button data-pane-right-toggle title="Fold/unfold Sameer (right)">right</button>
-  <button data-go-back>← back to the report</button>
-</div>
-
-<div id="pv">
-  <b>REVIEW</b>
-  <button data-go-back>Report</button>
-  <span class="sep"></span>
-  <button data-fb="empty">Empty</button>
-  <button data-fb="running">Running</button>
-  <button data-fb="complete" class="on">Complete</button>
-  <span class="sep"></span>
-  <a href="index.html">Gallery</a>
-  <button id="pv-close" aria-label="Dismiss review bar">✕</button>
 </div>
 
 <script>window.LAB_IA = "report"; window.LAB_PROJECT = null;</script>
@@ -136,16 +83,16 @@
 <script>
 (function(){
   const $ = Lab.$, $$ = Lab.$$;
-  Lab.onLocate = () => openDesk();
-  Lab.onDiscuss = () => openDesk();
+  Lab.onLocate = () => Lab.showDesk(true);
+  Lab.onDiscuss = () => Lab.showDesk(true);
+  Lab.onHome = () => Lab.showDesk(false);
 
-  function renderReport(){
+  function renderLanding(){
     const R = Lab.data.report;
     if (!R) return;
     $$("[data-ll]").forEach(el => el.textContent = R.logline || "");
     $$("[data-rec]").forEach(el => el.textContent = "Recommendation: " + (R.recommendation || "—"));
     $$("[data-synopsis]").forEach(el => el.textContent = R.synopsis || "");
-    // pacing rows
     const pr = $("#pace-rows");
     if (pr && (R.pacing || []).length) {
       const max = Math.max(...R.pacing.map(p => p.pace || 0)) || 1;
@@ -154,88 +101,21 @@
         <span class="pbar ${p.drag ? "drag" : ""}" style="width:${Math.round((p.pace||0)/max*140)}px"></span>
         ${p.drag ? '<span style="color:var(--lab-red)">drag</span>' : ""}</div>`).join("");
     }
-    // findings (the hero)
-    const items = Lab.fixItems();
-    const box = $("#findings");
-    if (box) {
-      box.innerHTML = items.map(f => `
-        <div class="lab-finding ${f.dismissed ? "dismissed" : ""}" data-finding="${f.index}">
-          <div class="fhead">
-            <span class="lab-sev sev-${f.severity}">${f.severity || "?"}</span>
-            <span class="fcat">${Lab.esc(f.category || "")} · scene ${((f.scene_refs||[])[0]) || "—"}</span>
-            ${f.verified === false ? '<span class="vtag">unverified</span>' : ""}
-          </div>
-          <div style="font-size:14.5px">${Lab.esc(f.issue || "")}</div>
-          ${f.quote ? `<div class="fquote ${f.verified === false ? "unverified" : ""}">“${Lab.esc(f.quote)}”</div>` : ""}
-          <div class="fverbs">
-            <button data-verb="locate">📍 Locate</button>
-            <button data-verb="discuss">💬 Discuss</button>
-            <button data-verb="${f.dismissed ? "undismiss" : "dismiss"}">${f.dismissed ? "Restore" : "Dismiss"}</button>
-          </div>
-        </div>`).join("");
-    }
-    // desk findings (same items, pane-sized)
-    const df = $("#desk-findings");
-    if (df) {
-      df.innerHTML = items.map(f => `
-        <div class="lab-finding ${f.dismissed ? "dismissed" : ""}" data-finding="${f.index}">
-          <div class="fhead">
-            <span class="lab-sev sev-${f.severity}">${f.severity || "?"}</span>
-            <span class="fcat">s${((f.scene_refs||[])[0]) || "—"}</span>
-          </div>
-          <div style="font-size:13.5px">${Lab.esc((f.issue || "").split(". ")[0])}.</div>
-          <div class="fverbs">
-            <button data-verb="locate">locate</button>
-            <button data-verb="discuss">discuss</button>
-            <button data-verb="${f.dismissed ? "undismiss" : "dismiss"}">${f.dismissed ? "restore" : "dismiss"}</button>
-          </div>
-        </div>`).join("") || '<div class="lab-empty-note">No findings.</div>';
-    }
-    // stage list for the running state
+    Lab.renderFindingsInto("#findings");
     const sl = $("#stage-list");
     if (sl) sl.innerHTML = Lab.STAGE_NAMES.map((n, i) =>
       `<li class="${i < 2 ? "" : i === 2 ? "now" : ""}"><span>${n}</span><span>${i < 2 ? "done" : i === 2 ? "…" : ""}</span></li>`).join("");
+    Lab.wireFindingVerbs("#report-hero", renderLanding);
   }
 
-  function renderScript(){
-    const scenes = (Lab.data.parsed || {}).scenes || [];
-    const box = $("#desk-pages");
-    if (!box) return;
-    box.innerHTML = scenes.map(sc => `
-      <article class="lab-page" data-scene="${sc.scene_number}">
-        <div class="slug">SCENE ${sc.scene_number} — ${Lab.esc(sc.heading_raw || "")}</div>
-        ${(sc.elements || []).map(el => {
-          const t = el.type || "general";
-          if (t === "character") return `<div class="lab-el character">${Lab.esc(el.text)}</div>`;
-          if (t === "dialogue") return `<div class="lab-el dialogue">${Lab.esc(el.text)}</div>`;
-          if (t === "parenthetical") return `<div class="lab-el parenthetical">${Lab.esc(el.text)}</div>`;
-          if (t === "transition") return `<div class="lab-el transition">${Lab.esc(el.text)}</div>`;
-          return `<div class="lab-el action">${Lab.esc(el.text)}</div>`;
-        }).join("")}
-      </article>`).join("");
-  }
-
-  function openDesk(){
-    $("#report-hero").style.display = "none";
-    $("[data-desk]").classList.add("on");
-    $("#desk-ctl").style.display = "flex";
-  }
-  function closeDesk(){
-    $("#report-hero").style.display = "";
-    $("[data-desk]").classList.remove("on");
-    $("#desk-ctl").style.display = "none";
-  }
-  $("#open-desk").addEventListener("click", openDesk);
-  $$("[data-go-back]").forEach(b => b.addEventListener("click", closeDesk));
-
+  Lab.mountChrome();
+  Lab.mountDesk(true); // hidden on load — the report is the landing
   Lab.boot({
     render(){
-      renderReport();
-      renderScript();
-      Lab.wireFindingVerbs("#report-hero", renderReport);
-      Lab.wireFindingVerbs("[data-desk]", renderReport);
-      Lab.wireComposer("#desk-input", "#desk-send", "#desk-thread");
-      Lab.chatHistory().then(h => Lab.renderThread($("#desk-thread"), h.messages)).catch(() => {});
+      renderLanding();
+      Lab.wireFindingVerbs("[data-desk]", () => Lab.renderFindingsInto("#lab-desk-findings"));
+      Lab.chatHistory().then(h => Lab.renderThread($("#lab-thread"), h.messages)).catch(() => {});
+      $$("[data-open-desk]").forEach(b => b.addEventListener("click", () => Lab.showDesk(true)));
     }
   });
 })();

@@ -3,110 +3,97 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Six Worlds — v4 UIUX gallery</title>
+<title>Design Lab — six IA prototypes on your real data</title>
 <style>
 :root{
-  --paper:#f4f1e9; --ink:#26221a; --muted:#6d675a; --line:#d9d3c4; --accent:#8a5a2b;
+  --void:#0a0e1a; --raised:#12172b; --panel:#161c33; --line:#262f52;
+  --text:#dbe2f4; --muted:#8b96b8; --accent:#e8a24f; --cyan:#5eead4;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{color-scheme:light}
-body{background:var(--paper);color:var(--ink);font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-size:16px;line-height:1.55;padding:48px 40px 64px}
+html{color-scheme:dark}
+body{background:var(--void);color:var(--text);font-family:'Segoe UI',Tahoma,Verdana,sans-serif;font-size:16px;line-height:1.55;padding:48px 40px 64px}
 .wrap{max-width:1060px;margin:0 auto}
-.kicker{font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
-h1{font-size:34px;font-weight:400;letter-spacing:-.01em;margin-bottom:14px}
-.how{max-width:72ch;color:var(--muted);margin-bottom:8px}
-.how b{color:var(--ink);font-weight:600}
+.kicker{font-family:Consolas,monospace;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:32px;font-weight:600;margin-bottom:12px}
+.how{max-width:76ch;color:var(--muted);margin-bottom:6px}
+.how b{color:var(--text)}
 .rule{height:1px;background:var(--line);margin:26px 0 34px}
-
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
-.card{display:flex;flex-direction:column;text-decoration:none;color:inherit;border:1px solid var(--line);background:#fffdf6;padding:22px 22px 18px;min-height:230px;position:relative;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease}
-.card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 10px 26px rgba(38,34,26,.10)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:20px}
+.card{display:flex;flex-direction:column;text-decoration:none;color:inherit;border:1px solid var(--line);background:var(--raised);padding:22px;min-height:210px;position:relative;transition:transform .18s ease, border-color .18s ease}
+.card:hover{transform:translateY(-3px);border-color:var(--accent)}
 .card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.card .num{position:absolute;top:16px;right:20px;font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--muted)}
-.swatch{display:flex;height:10px;margin-bottom:16px}
-.swatch span{flex:1}
-.card h2{font-size:22px;font-weight:400;margin-bottom:6px}
-.card .meta{font-family:Verdana,Geneva,sans-serif;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
-.card p{color:var(--muted);font-size:15px;flex:1}
-.card .nav{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line);font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--muted)}
-.card .nav b{color:var(--ink);font-weight:600}
-.card .open{display:inline-block;margin-top:10px;font-family:Verdana,Geneva,sans-serif;font-size:12px;letter-spacing:.1em;color:var(--accent)}
+.card .num{position:absolute;top:16px;right:20px;font-family:Consolas,monospace;font-size:12px;color:var(--muted)}
+.card h2{font-size:19px;font-weight:600;margin-bottom:6px}
+.card .meta{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.card p{color:var(--muted);font-size:14px;flex:1}
+.card .nav{margin-top:14px;padding-top:11px;border-top:1px dashed var(--line);font-family:Consolas,monospace;font-size:11px;color:var(--muted)}
+.card .nav b{color:var(--text);font-weight:600}
+.card .open{display:inline-block;margin-top:10px;font-size:12px;color:var(--accent)}
 .card:hover .open{text-decoration:underline}
-.foot{margin-top:36px;font-family:Verdana,Geneva,sans-serif;font-size:12px;color:var(--muted)}
+.foot{margin-top:34px;font-family:Consolas,monospace;font-size:11.5px;color:var(--muted)}
 @media (prefers-reduced-motion: reduce){.card{transition:none}.card:hover{transform:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="kicker">Screenplay Studio · redesign v4</div>
-  <h1>Six Worlds</h1>
-  <p class="how">Six complete redesigns of the same product — same demo script (“The Second Shift”), same features, different answers. Each world is a <b>full journey</b>: shelf → upload → script desk → co-write → feedback → ideas. Use the <b>review bar</b> pinned to each world to jump rooms and flip the feedback report through its <b>empty / running / complete</b> states.</p>
-  <p class="how">What is being finalized: layout, placeholder positions, interaction patterns, identity. Nothing here talks to a backend.</p>
+  <div class="kicker">Screenplay Studio · Design Lab · v5</div>
+  <h1>Six ways to run the studio</h1>
+  <p class="how">These are not mockups — every world runs on <b>your real projects</b> through the live studio: real parses, real analysis reports, <b>real Sameer turns</b> (demo model or your llama-server), and a fix queue whose <b>Dismiss</b> button persists through the app's own storage.</p>
+  <p class="how">What varies is the <b>information architecture</b>: what each world opens on, how you navigate, where the verdict lives. What stays in all six is the workbench you asked for: <b>script docked center, feedback LEFT, Sameer RIGHT</b> — fold either, or fold both at once.</p>
   <div class="rule"></div>
 
   <div class="grid">
-    <a class="card" href="ledger.html">
-      <div class="swatch"><span style="background:#f7f3e8"></span><span style="background:#221d14"></span><span style="background:#b3372c"></span><span style="background:#6b6355"></span></div>
+    <a class="card" href="report-first.html">
       <div class="num">01</div>
-      <h2>The Ledger</h2>
-      <div class="meta">light editorial</div>
-      <p>The report as a typeset craftsman’s letter — findings as margin annotations, evidence as pull-quotes, severities in red pencil.</p>
-      <div class="nav">Nav: <b>masthead sections</b></div>
-      <span class="open">Open the Ledger →</span>
+      <h2>Report-first</h2>
+      <div class="meta">the verdict is the home screen</div>
+      <p>You uploaded the script for the feedback — so the report opens first. Findings drive; the script and Sameer are one click away.</p>
+      <div class="nav">Best when: <b>you want the notes, now</b></div>
+      <span class="open">Open →</span>
     </a>
-
-    <a class="card" href="midnight.html">
-      <div class="swatch"><span style="background:#14110e"></span><span style="background:#e8a24f"></span><span style="background:#f2e9d4"></span><span style="background:#2e2820"></span></div>
+    <a class="card" href="chat-first.html">
       <div class="num">02</div>
-      <h2>The Midnight Desk</h2>
-      <div class="meta">dark cinematic</div>
-      <p>The verdict read at the desk, under the lamp — pages glowing on the void, the doctor’s notes as a typed case file.</p>
-      <div class="nav">Nav: <b>brass tabs</b></div>
-      <span class="open">Open the Midnight Desk →</span>
+      <h2>Chat-first</h2>
+      <div class="meta">Sameer is the home screen</div>
+      <p>The conversation is the spine. Script pages and verdict cards surface as artifacts inside the thread; a rail holds the findings.</p>
+      <div class="nav">Best when: <b>you think by talking</b></div>
+      <span class="open">Open →</span>
     </a>
-
-    <a class="card" href="screening.html">
-      <div class="swatch"><span style="background:#0c0d10"></span><span style="background:#f5a623"></span><span style="background:#e05252"></span><span style="background:#c9cdd6"></span></div>
+    <a class="card" href="canvas-first.html">
       <div class="num">03</div>
-      <h2>The Screening Room</h2>
-      <div class="meta">dark cinema</div>
-      <p>The report plays like a screening — verdict title card, findings as consecutive slides, pacing as a waveform.</p>
-      <div class="nav">Nav: <b>film-strip scrubber</b></div>
-      <span class="open">Enter the Screening Room →</span>
+      <h2>Canvas-first</h2>
+      <div class="meta">spatial board · drag to pan</div>
+      <p>Scenes as cards along a spine, findings as severity pins on the board. Drag anywhere, click anything, work on it.</p>
+      <div class="nav">Best when: <b>you think in space</b></div>
+      <span class="open">Open →</span>
     </a>
-
-    <a class="card" href="quarterly.html">
-      <div class="swatch"><span style="background:#fbfaf5"></span><span style="background:#1a1a18"></span><span style="background:#7d2a2a"></span><span style="background:#5f7464"></span></div>
+    <a class="card" href="stream-first.html">
       <div class="num">04</div>
-      <h2>The Quarterly</h2>
-      <div class="meta">light magazine</div>
-      <p>Findings as magazine items — kicker, headline, pull-quote. The report you would subscribe to.</p>
-      <div class="nav">Nav: <b>contents spine</b></div>
-      <span class="open">Read the Quarterly →</span>
+      <h2>Stream-first</h2>
+      <div class="meta">one chronological feed</div>
+      <p>Scene beats and findings interleaved in the order the story unfolds. Scroll the script and its critique together.</p>
+      <div class="nav">Best when: <b>you read linearly</b></div>
+      <span class="open">Open →</span>
     </a>
-
-    <a class="card" href="terminal.html">
-      <div class="swatch"><span style="background:#0a0f0a"></span><span style="background:#7ee787"></span><span style="background:#67d6e8"></span><span style="background:#e3c567"></span></div>
+    <a class="card" href="inspector-first.html">
       <div class="num">05</div>
-      <h2>The Terminal</h2>
-      <div class="meta">wildcard · monospace</div>
-      <p>The report as a lint stream — flagged lines, ASCII gauges, <code style="font-family:inherit">:verdict</code> one keystroke away. Keyboard-first.</p>
-      <div class="nav">Nav: <b>buffer tabs + :commands</b></div>
-      <span class="open">Open the Terminal →</span>
+      <h2>Inspector-first</h2>
+      <div class="meta">script + context-aware inspector</div>
+      <p>The script is the screen. Click any scene and the inspector swaps to that scene's findings, characters, and evidence — no separate report room.</p>
+      <div class="nav">Best when: <b>you edit in place</b></div>
+      <span class="open">Open →</span>
     </a>
-
-    <a class="card" href="studio-wall.html">
-      <div class="swatch"><span style="background:#c9a876"></span><span style="background:#c96f4a"></span><span style="background:#7d8f6b"></span><span style="background:#fbf6ea"></span></div>
+    <a class="card" href="command-first.html">
       <div class="num">06</div>
-      <h2>The Studio Wall</h2>
-      <div class="meta">warm craft wildcard</div>
-      <p>Findings pinned to the board in red string — a corkboard studio you pan between three walls.</p>
-      <div class="nav">Nav: <b>wall panning</b></div>
-      <span class="open">Walk the Studio Wall →</span>
+      <h2>Command-first</h2>
+      <div class="meta">⌘K · the empty desk</div>
+      <p>Almost nothing on screen. Every surface — scenes, findings, Sameer — is one typed command away. The fastest keyboard workflow.</p>
+      <div class="nav">Best when: <b>you type faster than you click</b></div>
+      <span class="open">Open →</span>
     </a>
   </div>
 
-  <div class="foot">Shared demo payload: “The Second Shift” (4 scenes · 9 findings · MEERA / VIKRAM / AMMA / RAO GARU) · static design artifacts — pick one, port later · old previews untouched at <b>/preview-redesigns/</b></div>
+  <div class="foot">Data: served live from studio_projects/ via /api/preview/data (static fallback for file://) · chat: isolated preview-lab session per project (your real threads untouched) · dismiss: persists through the app's real findings storage · pick one, port it.</div>
 </div>
 </body>
 </html>

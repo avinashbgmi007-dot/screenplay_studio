@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas-first — Design Lab</title>
+<link rel="stylesheet" href="_lab.css">
+<style>
+.canvas-hero{position:fixed;inset:46px 0 0;overflow:hidden;background:
+  radial-gradient(1200px 600px at 30% 20%, rgba(38,47,82,.35), transparent),
+  var(--lab-void)}
+.canvas-hero .cv-hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:10;
+  font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.2em;color:var(--lab-muted);text-transform:uppercase}
+#board{position:absolute;inset:0;cursor:grab;transition:none}
+#board.dragging{cursor:grabbing}
+.cv-scene{position:absolute;width:220px;background:var(--lab-paper);color:var(--lab-paper-ink);
+  padding:14px 16px 12px;border-radius:3px;box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer}
+.cv-scene .no{font-family:Consolas,monospace;font-size:10px;letter-spacing:.16em;color:#a3906d;text-transform:uppercase}
+.cv-scene .slug{font-family:Consolas,monospace;font-size:11.5px;margin-top:4px;line-height:1.4;text-transform:uppercase}
+.cv-scene:hover{outline:2px solid var(--lab-accent)}
+.cv-pin{position:absolute;width:230px;background:var(--lab-panel);border:1px solid var(--lab-line);border-radius:8px;padding:11px 13px;cursor:pointer}
+.cv-pin .sev{font-family:Consolas,monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase}
+.cv-pin .sev-high{color:var(--lab-red)}.cv-pin .sev-medium{color:var(--lab-accent)}.cv-pin .sev-low{color:var(--lab-muted)}
+.cv-pin .iss{font-size:12px;margin-top:4px;line-height:1.4}
+.cv-pin:hover{border-color:var(--lab-accent)}
+[data-desk]{position:fixed;inset:46px 0 84px;display:none;z-index:600}
+.desk-ctl{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);z-index:930;display:flex;gap:6px;background:var(--lab-raised);border:1px solid var(--lab-line);padding:6px;border-radius:99px}
+.desk-ctl button{color:var(--lab-muted);border:1px solid var(--lab-line);padding:8px 13px;min-height:36px;border-radius:99px;font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="canvas-hero" data-ia-landing>
+  <div class="cv-hint">Design Lab · IA 3 of 6 · canvas-first — drag the board. Scenes are cards; findings are pins. Click anything to work on it.</div>
+  <div id="board"></div>
+</div>
+
+<button data-open-desk style="position:fixed;left:18px;bottom:18px;z-index:520;background:var(--lab-accent);color:#14110e;padding:11px 16px;min-height:44px;font-weight:600;font-size:12.5px;border-radius:99px">Workbench →</button>
+
+<script>window.LAB_IA = "canvas"; window.LAB_PROJECT = null;</script>
+<script src="_payload.js"></script>
+<script src="_lab.js"></script>
+<script>
+(function(){
+  const $ = Lab.$, $$ = Lab.$$;
+  Lab.onLocate = () => Lab.showDesk(true);
+  Lab.onDiscuss = () => Lab.showDesk(true);
+
+  function layout(){
+    const board = $("#board");
+    const scenes = (Lab.data.parsed || {}).scenes || [];
+    // scenes along a spine
+    scenes.forEach((sc, i) => {
+      board.insertAdjacentHTML("beforeend", `
+        <div class="cv-scene" data-scene="${sc.scene_number}" data-open-desk
+             style="left:${80 + i * 260}px;top:${60 + (i % 2) * 190}px">
+          <div class="no">Scene ${sc.scene_number}</div>
+          <div class="slug">${Lab.esc(sc.heading_raw || "")}</div>
+        </div>`);
+    });
+    // findings as severity pins above the spine
+    Lab.fixItems().forEach((f, i) => {
+      const col = i % 4, row = Math.floor(i / 4);
+      board.insertAdjacentHTML("beforeend", `
+        <div class="cv-pin" data-finding="${f.index}" data-verb-jump
+             style="left:${100 + col * 265}px;top:${420 + row * 130}px">
+          <div class="sev sev-${f.severity}">${f.severity || "?"} · ${Lab.esc(f.category || "")}</div>
+          <div class="iss">${Lab.esc((f.issue || "").split(". ")[0])}.</div>
+        </div>`);
+    });
+  }
+
+  function wirePan(){
+    const board = $("#board");
+    let drag = null;
+    board.addEventListener("mousedown", e => {
+      if (e.target.closest(".cv-scene, .cv-pin")) return;
+      drag = { x: e.clientX, y: e.clientY, ox: _pan.x, oy: _pan.y };
+      board.classList.add("dragging");
+    });
+    addEventListener("mousemove", e => {
+      if (!drag) return;
+      _pan.x = drag.ox + (e.clientX - drag.x);
+      _pan.y = drag.oy + (e.clientY - drag.y);
+      board.style.transform = `translate(${_pan.x}px, ${_pan.y}px)`;
+    });
+    addEventListener("mouseup", () => { drag = null; board.classList.remove("dragging"); });
+  }
+  const _pan = { x: 0, y: 0 };
+
+  Lab.mountChrome();
+  Lab.mountDesk(true);
+  Lab.boot({
+    render(){
+      layout();
+      wirePan();
+      Lab.wireFindingVerbs(".canvas-hero", () => {});
+      // pin click → locate (opens the desk at the scene)
+      $("#board").addEventListener("click", e => {
+        const pin = e.target.closest("[data-verb-jump]");
+        if (!pin) return;
+        const f = Lab.fixItems().find(x => x.index === +pin.dataset.finding);
+        if (f) Lab.locateFinding(f);
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>
