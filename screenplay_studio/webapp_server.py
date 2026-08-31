@@ -1263,6 +1263,7 @@ def preview_data(name):
                     "status": status_by_index.get(idx, "unknown"),
                     "verified": f.get("verified", True),
                     "quote": f.get("quote"),
+                    "dismissed": (idx, (f.get("issue") or "")) in dismissed_keys,
                 })
             items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
             fixqueue = {"items": items, "acts": acts, "dismissed_keys": sorted(list(dismissed_keys))}

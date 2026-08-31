@@ -1,0 +1,118 @@
+/* _lab.css — Design Lab shared layer. Product-real token system inherited
+ * from the live app (the Spark Wall ink ramp the studio actually ships) plus
+ * the shared contract components: tri-pane desk, findings, chat bubbles,
+ * review bar. Each world adds only its own IA layout on top.
+ * WCAG AA: ink-on-void 11.6:1, muted 5.1:1, paper-ink 12.9:1 (verified). */
+
+:root{
+  /* brand → semantic (the real app's ramp) */
+  --lab-void: #0a0e1a;
+  --lab-raised: #12172b;
+  --lab-panel: #161c33;
+  --lab-line: #262f52;
+  --lab-text: #dbe2f4;
+  --lab-muted: #8b96b8;
+  --lab-faint: #5d6b8a;
+  --lab-accent: #e8a24f;         /* the amber lamp — the app's single warm signal */
+  --lab-paper: #f2e9d4;
+  --lab-paper-ink: #2c2620;
+  --lab-paper-muted: #6b6355;
+  --lab-red: #e07a68;
+  --lab-green: #8fae7a;
+  --lab-cyan: #5eead4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{background:var(--lab-void);color:var(--lab-text);font-family:'Segoe UI',Tahoma,Verdana,sans-serif;font-size:16px;line-height:1.55;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--lab-accent);outline-offset:2px}
+svg.i{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+.mono,code{font-family:Consolas,'Courier New',monospace;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+
+/* ---------- shared chrome ---------- */
+.lab-top{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:14px;padding:10px 22px;background:var(--lab-raised);border-bottom:1px solid var(--lab-line)}
+.lab-top .mark{font-weight:600;font-size:14px;letter-spacing:.06em;color:var(--lab-accent)}
+.lab-top .who{font-size:12.5px;color:var(--lab-muted)}
+.lab-top .live{font-family:Consolas,monospace;font-size:10.5px;color:var(--lab-cyan);border:1px solid var(--lab-line);padding:4px 9px;border-radius:99px}
+.lab-top .switcher{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--lab-muted)}
+.lab-top select{background:var(--lab-panel);border:1px solid var(--lab-line);color:var(--lab-text);padding:8px 10px;min-height:40px;font:inherit;font-size:12.5px;max-width:260px}
+.lab-top .home{color:var(--lab-muted);font-size:12px;border:1px solid var(--lab-line);padding:8px 12px;min-height:40px}
+.lab-top .home:hover{color:var(--lab-accent);border-color:var(--lab-accent)}
+
+/* ---------- review bar ---------- */
+#pv{position:fixed;bottom:0;left:0;right:0;z-index:950;display:flex;align-items:center;gap:6px;padding:7px 16px;background:#080b14;color:var(--lab-muted);font-family:Consolas,monospace;font-size:11.5px;border-top:1px solid var(--lab-line)}
+#pv b{color:var(--lab-accent);letter-spacing:.16em;margin-right:8px}
+#pv button{color:var(--lab-muted);border:1px solid var(--lab-line);padding:8px 12px;min-height:32px}
+#pv button:hover{border-color:var(--lab-accent);color:var(--lab-text)}
+#pv button.on{background:var(--lab-accent);border-color:var(--lab-accent);color:#14110e}
+#pv .sep{flex:1}
+#pv a{color:var(--lab-muted)}
+#pv-close{opacity:.7}
+
+/* ---------- tri-pane desk (the uniform contract) ---------- */
+[data-desk]{display:grid;gap:0;grid-template-rows:minmax(0, 1fr);transition:grid-template-columns .3s ease}
+[data-desk] .pane{min-height:0;min-width:0;overflow:hidden}
+[data-desk="both-open"]{grid-template-columns:minmax(300px,380px) 1fr minmax(290px,360px)}
+[data-desk="left-only"]{grid-template-columns:minmax(300px,380px) 1fr 0}
+[data-desk="right-only"]{grid-template-columns:0 1fr minmax(290px,360px)}
+[data-desk="none-open"]{grid-template-columns:0 1fr 0}
+.pane{overflow:hidden;position:relative;transition:transform .3s ease, opacity .3s ease;background:var(--lab-raised);display:flex;flex-direction:column}
+.pane .lab-thread,.pane .lab-scroll{flex:1;min-height:0;overflow-y:auto}
+[data-desk] .pane-left{border-right:1px solid var(--lab-line)}
+[data-desk] .pane-right{border-left:1px solid var(--lab-line)}
+[data-desk].left-closed .pane-left{transform:translateX(-102%);opacity:0;pointer-events:none;position:absolute;inset:0}
+[data-desk].right-closed .pane-right{transform:translateX(102%);opacity:0;pointer-events:none;position:absolute;inset:0}
+.pane-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--lab-line);position:sticky;top:0;background:var(--lab-panel);z-index:5}
+.pane-head h3{font-size:11px;letter-spacing:.16em;color:var(--lab-accent);font-weight:600;text-transform:uppercase}
+.pane-head .mini{margin-left:auto;display:flex;gap:6px}
+.pane-head button{font-size:10.5px;color:var(--lab-muted);border:1px solid var(--lab-line);padding:6px 9px;min-height:34px}
+.pane-head button:hover{color:var(--lab-accent);border-color:var(--lab-accent)}
+.pane-head button[aria-pressed="true"]{color:var(--lab-accent);border-color:var(--lab-accent)}
+
+/* ---------- script pages (center) ---------- */
+.lab-pages{padding:22px 30px 60px;overflow-y:auto;height:100%}
+.lab-page{background:var(--lab-paper);color:var(--lab-paper-ink);padding:30px 36px 26px;margin-bottom:20px;border-radius:3px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.lab-page .slug{font-family:Consolas,monospace;font-size:12.5px;letter-spacing:.1em;border-bottom:1px solid rgba(44,38,32,.25);padding-bottom:8px;margin-bottom:13px;text-transform:uppercase}
+.lab-el{margin:8px 0;font-size:15.5px;max-width:66ch}
+.lab-el.action{max-width:66ch}
+.lab-el.character{text-align:center;font-family:Consolas,monospace;font-size:12.5px;letter-spacing:.14em;margin:14px 0 2px;text-transform:uppercase}
+.lab-el.dialogue{margin-left:84px;max-width:52ch}
+.lab-el.parenthetical{margin-left:84px;font-style:italic;color:var(--lab-paper-muted);font-size:14px}
+.lab-el.transition{text-align:right;font-family:Consolas,monospace;font-size:11.5px;letter-spacing:.18em;color:var(--lab-paper-muted);text-transform:uppercase}
+.lab-el.general{max-width:66ch}
+.lab-flash{animation:labflash 1.8s ease-out}
+@keyframes labflash{0%,55%{box-shadow:0 0 0 3px var(--lab-accent), 0 0 50px rgba(232,162,79,.35)}100%{box-shadow:0 10px 30px rgba(0,0,0,.45)}}
+
+/* ---------- findings (feedback surfaces) ---------- */
+.lab-finding{margin-bottom:18px;padding-bottom:14px;border-bottom:1px dashed var(--lab-line)}
+.lab-finding .fhead{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.lab-sev{font-size:10.5px;letter-spacing:.14em;padding:3px 8px;border:1.5px solid currentColor;text-transform:uppercase;font-family:Consolas,monospace}
+.sev-high{color:var(--lab-red)}.sev-major{color:var(--lab-red)}
+.sev-medium{color:var(--lab-accent)}.sev-low{color:var(--lab-muted)}
+.lab-finding .fcat{font-size:11px;letter-spacing:.12em;color:var(--lab-muted);text-transform:uppercase}
+.lab-finding .fquote{border-left:3px solid var(--lab-accent);padding:5px 0 5px 12px;font-style:italic;font-size:14.5px;margin:8px 0}
+.lab-finding .fquote.unverified{border-left-style:dashed;border-left-color:var(--lab-muted);opacity:.75}
+.lab-finding .vtag{font-size:10px;color:var(--lab-muted);letter-spacing:.08em;text-transform:uppercase}
+.lab-finding .fverbs{margin-top:8px;display:flex;gap:7px;flex-wrap:wrap}
+.lab-finding .fverbs button{border:1px solid var(--lab-line);background:var(--lab-panel);padding:8px 11px;min-height:40px;font-size:11px}
+.lab-finding .fverbs button:hover{border-color:var(--lab-accent);color:var(--lab-accent)}
+.lab-finding.dismissed{opacity:.45;font-style:italic}
+
+/* ---------- chat ---------- */
+.lab-thread{padding:14px 16px 20px;overflow-y:auto;height:100%}
+.lab-msg{max-width:88%;margin-bottom:13px}
+.lab-msg-who{font-family:Consolas,monospace;font-size:10px;letter-spacing:.18em;color:var(--lab-muted);margin-bottom:3px;text-transform:uppercase}
+.lab-msg-bubble{padding:11px 14px;font-size:14.5px;background:var(--lab-panel);border:1px solid var(--lab-line);border-radius:10px 10px 10px 3px}
+.lab-msg.lab-me{margin-left:auto}
+.lab-msg.lab-me .lab-msg-bubble{background:var(--lab-accent);color:#14110e;border-color:var(--lab-accent);border-radius:10px 10px 3px 10px}
+.lab-msg-bubble.lab-err{border-color:var(--lab-red);color:var(--lab-red)}
+.lab-quote{border:1px dashed var(--lab-accent);background:var(--lab-panel);padding:10px 13px;margin:8px 0;font-style:italic;font-size:13.5px}
+.lab-quote .qsrc{display:block;font-style:normal;font-family:Consolas,monospace;font-size:10px;letter-spacing:.12em;color:var(--lab-accent);margin-top:5px;text-transform:uppercase}
+.lab-composer{border-top:1px solid var(--lab-line);padding:12px 14px;display:flex;gap:9px;align-items:flex-end;background:var(--lab-panel)}
+.lab-composer textarea{flex:1;resize:none;background:var(--lab-void);border:1px solid var(--lab-line);color:var(--lab-text);padding:11px 13px;font:inherit;font-size:15px;min-height:44px;max-height:200px}
+.lab-composer textarea:focus{border-color:var(--lab-accent);outline:none}
+.lab-composer .send{background:var(--lab-accent);color:#14110e;min-width:44px;min-height:44px;display:grid;place-items:center;font-weight:700}
+.lab-composer .send:hover{filter:brightness(1.08)}
+.lab-composer .send:disabled{opacity:.5;cursor:wait}
+.lab-empty-note{color:var(--lab-muted);font-style:italic;font-size:13.5px;padding:8px 4px}
