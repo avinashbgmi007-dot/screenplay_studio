@@ -31,7 +31,8 @@ REFRESH_INTERVAL = 10      # new observed turns between refreshes
 # Neutral value per dimension (the "nothing set" state — never gates).
 NEUTRAL = {"detail_level": "balanced", "directness": "balanced",
            "probe_appetite": "medium", "pushback_appetite": "medium",
-           "support_style": "balanced"}
+           "support_style": "balanced", "feedback_tolerance": "medium",
+           "mentor_style": "balanced", "energy_level": "balanced"}
 
 # Learnable poles per dimension. support_style captures HOW the writer wants
 # Sameer to work beside them: concrete options to react to (generate) vs. a
@@ -42,6 +43,9 @@ DIMENSION_POLES = {
     "probe_appetite": ("low", "high"),
     "pushback_appetite": ("low", "high"),
     "support_style": ("generate", "discuss"),
+    "feedback_tolerance": ("low", "high"),     # how much hard truth they can take
+    "mentor_style": ("hands_off", "hands_on"), # do they want guidance or freedom
+    "energy_level": ("calm", "high"),          # matched writer energy
 }
 
 TOPIC_CATEGORIES = ("character", "structure", "dialogue", "craft")
@@ -63,6 +67,13 @@ TONE_RULES = [
     (re.compile(r"\b(?:push back|argue with me|disagree with me|challenge me|fight me on)\b", re.I), "pushback_appetite", "high"),
     (re.compile(r"\b(?:give me|gimme|offer(?: me)?|come up with|sketch|draft|throw out)\b", re.I), "support_style", "generate"),
     (re.compile(r"\b(?:what do you think|which one|help me think|your take|weigh in|talk it through|let'?s discuss)\b", re.I), "support_style", "discuss"),
+    # New dimensions for mentor voice
+    (re.compile(r"\b(?:don'?t (?:hold back|soften)|I can take it|hard truth|tough love|don'?t be nice)\b", re.I), "feedback_tolerance", "high"),
+    (re.compile(r"\b(?:be gentle|easy does it|soft approach|don'?t overwhelm)\b", re.I), "feedback_tolerance", "low"),
+    (re.compile(r"\b(?:show me|guide me|tell me what to do|lead me|give me direction)\b", re.I), "mentor_style", "hands_on"),
+    (re.compile(r"\b(?:let me figure|I want to discover|don'?t spoil|figure it out myself)\b", re.I), "mentor_style", "hands_off"),
+    (re.compile(r"\b(?:excited|pumped|let'?s go|hell yeah|awesome|love it)\b", re.I), "energy_level", "high"),
+    (re.compile(r"\b(?:calm down|take it easy|slow|relax|chill)\b", re.I), "energy_level", "calm"),
 ]
 
 PUSHBACK_ARGUE = re.compile(r"\b(?:i disagree\b|no,|but |that won'?t work\b|that doesn'?t work\b|that loses\b|keep it anyway\b|actually no\b)", re.I)
@@ -214,6 +225,9 @@ DIM_LABELS = {
     "probe_appetite": ("dislikes being probed before answers", "engages well with probing questions"),
     "pushback_appetite": ("prefers Sameer to defer", "enjoys Sameer pushing back on choices"),
     "support_style": ("likes concrete options to react to", "prefers talking it through before committing"),
+    "feedback_tolerance": ("prefers softer approach to hard notes", "can take hard truth without softening"),
+    "mentor_style": ("wants freedom to figure it out", "wants Sameer to guide and direct"),
+    "energy_level": ("responds better to calm, measured tone", "matches high energy and enthusiasm"),
 }
 
 # Human-readable observations auto-created the moment a dimension first gates.
@@ -228,6 +242,12 @@ OBS_TEMPLATES = {
     ("pushback_appetite", "high"): "You enjoy sparring over choices — you argue for what you believe.",
     ("support_style", "generate"): "You like concrete options to react to.",
     ("support_style", "discuss"): "You prefer talking things through before committing.",
+    ("feedback_tolerance", "low"): "You prefer a softer approach to hard notes.",
+    ("feedback_tolerance", "high"): "You can take hard truth without softening.",
+    ("mentor_style", "hands_off"): "You want freedom to figure it out yourself.",
+    ("mentor_style", "hands_on"): "You want Sameer to guide and direct.",
+    ("energy_level", "calm"): "You respond better to calm, measured tone.",
+    ("energy_level", "high"): "You match high energy and enthusiasm.",
 }
 
 CARD_RULES = (
@@ -405,12 +425,13 @@ def refresh_prompt(recent_messages):
         "RELATIONSHIP MEMORY REFRESH — read the conversation below between a writer and "
         "their co-writer. Based ONLY on explicit evidence in it, what does this writer "
         "prefer? Output STRICT JSON object with keys detail_level, directness, "
-        "probe_appetite, pushback_appetite, support_style — each {\"value\": "
-        "\"short|deep|balanced|gentle|direct|low|high|medium|generate|discuss|no_evidence\", "
+        "probe_appetite, pushback_appetite, support_style, feedback_tolerance, "
+        "mentor_style, energy_level — each {\"value\": "
+        "\"short|deep|balanced|gentle|direct|low|high|medium|generate|discuss|hands_off|hands_on|calm|no_evidence\", "
         "\"confidence\": 0.0-1.0} — plus \"observations\": a list of 0-3 objects "
         "{\"text\": \"plain language, what the writer expects/accepts/argues about\", "
         "\"dimension\": \"detail_level|directness|probe_appetite|pushback_appetite|"
-        "topic_gravity|general\"}. Do NOT invent. If unclear, use \"no_evidence\".\n\n"
+        "feedback_tolerance|mentor_style|energy_level|topic_gravity|general\"}. Do NOT invent. If unclear, use \"no_evidence\".\n\n"
         "CRITICAL: observations must describe HOW THE WRITER LIKES TO WORK — their "
         "preferences, patterns, and reactions (\"wants notes straight, no softening\"). "
         "NEVER record facts about the script itself — no character names, scene numbers, "
@@ -597,10 +618,20 @@ class WriterMemory:
         t.start()
 
     def _refresh_worker(self, client, recent_messages, scope=None, entities=()):
+        import logging as _log
         try:
-            if not self.refresh_due():
-                return
-            self._refresh_sync(client, recent_messages, scope=scope, entities=entities)
+            for attempt in range(2):
+                try:
+                    if not self.refresh_due():
+                        return
+                    self._refresh_sync(client, recent_messages, scope=scope, entities=entities)
+                    return
+                except Exception:
+                    if attempt == 0:
+                        import time as _time
+                        _time.sleep(2)
+                        continue
+                    _log.getLogger(__name__).warning("Memory refresh failed after retry", exc_info=True)
         finally:
             self._refresh_in_flight = False
 

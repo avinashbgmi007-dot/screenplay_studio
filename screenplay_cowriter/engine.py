@@ -14,6 +14,7 @@ from .context import (
 from .language_meta import (
     strip_language_meta, strip_json_wrap, strip_repetition_lines, strip_repeated_blocks,
 )
+from .persona_specs import strip_banned_phrases
 
 # Generation budget for chat turns. Local models that fall into a repetition
 # loop would otherwise burn the full budget on garbage (minutes of waiting);
@@ -27,6 +28,47 @@ from .language_meta import (
 REPEAT_PENALTY = 1.3
 
 HISTORY_WINDOW = 16  # most recent messages kept verbatim; older context relies on the standing report summary
+
+# Voice drift detection: track AI tells per persona to catch slow drift
+_VOICE_DRIFT_HISTORY = {}  # persona -> list of tell counts per reply
+
+def _detect_voice_drift(reply: str, persona: str) -> str:
+    """Detect and log voice drift by counting AI tells in each reply.
+    Returns the reply unchanged but logs drift metrics for monitoring."""
+    import re
+    # Count common AI tells
+    tells = 0
+    # Hedging phrases
+    if re.search(r"\b(?:I think|I feel|maybe|perhaps|it seems like)\b", reply, re.IGNORECASE):
+        tells += 1
+    # Filler words
+    if re.search(r"\b(?:actually|basically|honestly|frankly)\b", reply, re.IGNORECASE):
+        tells += 1
+    # Canned openings
+    if re.search(r"^(?:Great question|Absolutely|I'?d be happy to)", reply, re.IGNORECASE):
+        tells += 2  # weight these heavier
+    # Canned closings
+    if re.search(r"(?:let me know if you need anything else|I hope this helps)\s*$", reply, re.IGNORECASE):
+        tells += 2
+    # Track history
+    if persona not in _VOICE_DRIFT_HISTORY:
+        _VOICE_DRIFT_HISTORY[persona] = []
+    _VOICE_DRIFT_HISTORY[persona].append(tells)
+    # Keep only last 20 replies
+    if len(_VOICE_DRIFT_HISTORY[persona]) > 20:
+        _VOICE_DRIFT_HISTORY[persona] = _VOICE_DRIFT_HISTORY[persona][-20:]
+    # Log warning if drift detected (last 5 replies have higher tell count than first 5)
+    history = _VOICE_DRIFT_HISTORY[persona]
+    if len(history) >= 10:
+        recent_avg = sum(history[-5:]) / 5
+        early_avg = sum(history[:5]) / 5
+        if recent_avg > early_avg + 1.0:
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                f"Voice drift detected for {persona}: recent avg={recent_avg:.1f}, "
+                f"early avg={early_avg:.1f}. Consider reviewing persona prompt."
+            )
+    return reply
 
 
 def clean_reply(raw: str) -> str:
@@ -56,14 +98,89 @@ def _ground_reply(reply: str, script_ctx: ScriptContext) -> str:
     )
 
 
+def _strip_anti_ai_tells(reply: str) -> str:
+    """Strip common AI tells that break the fiction of a human collaborator.
+    Based on 2026 research into AI voice drift and anti-patterns. These are
+    the phrases that immediately mark text as machine-written."""
+    import re
+    # Banned openings — the model loves to start with these
+    OPENINGS = [
+        r"^(?:Great question[!.]|Absolutely[!.]|I'?d be happy to|"
+        r"That'?s a (?:really )?(?:good|great|excellent|interesting) point[!.]|"
+        r"Let me (?:help|think|consider|address)|"
+        r"I (?:appreciate|understand) (?:your|the)|"
+        r"Thank you for (?:sharing|asking|bringing))\s*",
+    ]
+    for pat in OPENINGS:
+        reply = re.sub(pat, "", reply, count=1, flags=re.IGNORECASE)
+    # Banned hedging phrases — AI loves to hedge; humans commit
+    HEDGE = [
+        r"\b(?:it'?s (?:worth|important) (?:noting|mentioning|pointing out) that)\b",
+        r"\b(?:in (?:order to|terms of))\b",
+        r"\b(?:due to the fact that)\b",
+        r"\b(?:with (?:regard to|respect to))\b",
+        r"\b(?:at the (?:end of the day|end of the day))\b",
+        r"\b(?:it goes without saying)\b",
+        r"\b(?:needless to say)\b",
+    ]
+    for pat in HEDGE:
+        reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
+    # Banned closings
+    CLOSERS = [
+        r"\s*(?:let me know if you need anything else|"
+        r"I (?:hope|hope this) (?:helps|was helpful)|"
+        r"don'?t hesitate to (?:reach out|ask)|"
+        r"feel free to (?:ask|reach out|let me know))\.?\s*$",
+    ]
+    for pat in CLOSERS:
+        reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
+    return reply.strip()
+
+
 def _persona_register(reply: str, persona: str) -> str:
     """Deterministic register guard, per persona. The doctor's card forbids
     exclamation marks; a local model excited by a good beat can still emit one,
     so the register is enforced here — the character never breaks voice at the
     mechanical level, no matter what the model feels like. (Sameer keeps his
-    natural register; HUMAN_VOICE_RULES already caps his exclamations.)"""
+    natural register; HUMAN_VOICE_RULES already caps his exclamations.)
+
+    Also enforces persona-specific anti-AI patterns and voice consistency."""
+    import re
     if persona == "script_consultant":
         reply = reply.replace("!", ".")
+        # Doctor never hedges — verdict first, no softeners
+        HEDGE_DOCTOR = [
+            r"\b(?:I think|I feel|maybe|perhaps|it seems like|"
+            r"it (?:appears|looks) (?:like|as if)|"
+            r"this (?:might|could|may) be)\b",
+        ]
+        for pat in HEDGE_DOCTOR:
+            reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
+        # Doctor never uses filler phrases
+        FILLER_DOCTOR = [
+            r"\b(?:actually|basically|honestly|frankly|to be honest)\b",
+        ]
+        for pat in FILLER_DOCTOR:
+            reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
+    elif persona == "writing_partner":
+        # Sameer: max one exclamation per reply (already in HUMAN_VOICE_RULES,
+        # but enforce mechanically — keep only the first)
+        excl_count = reply.count("!")
+        if excl_count > 1:
+            first = reply.index("!")
+            reply = reply[:first+1] + reply[first+1:].replace("!", ".")
+        # Sameer never uses AI assistant phrases
+        SAMEER_BANNED = [
+            r"\b(?:I'?d be happy to|Let me (?:help|assist)|"
+            r"That'?s a (?:great|good|interesting) question|"
+            r"I (?:understand|appreciate) your)\b",
+        ]
+        for pat in SAMEER_BANNED:
+            reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
+    # Strip common AI tells from all personas
+    reply = _strip_anti_ai_tells(reply)
+    # Apply persona-specific banned phrases
+    reply = strip_banned_phrases(reply, persona)
     return reply
 
 
@@ -328,6 +445,7 @@ class CoWriterEngine:
             reply = cap_suggestions(reply)
 
         reply = _persona_register(reply, branch.active_persona)
+        reply = _detect_voice_drift(reply, branch.active_persona)
 
         reply = ensure_forward_momentum(reply, turn_kind)
 
