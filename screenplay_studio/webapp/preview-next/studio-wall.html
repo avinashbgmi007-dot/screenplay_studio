@@ -174,6 +174,10 @@ body.sam-folded #sam-region{transform:translateX(120%) rotate(3deg);opacity:0;po
 
 /* quote float */
 #quote-float{position:fixed;inset:0;z-index:800;display:none}
+#doodles .chips.tucked{flex-direction:column;align-items:flex-end;position:absolute;right:20px;bottom:70px}
+#doodles .chips.tucked .chip{width:44px;padding:9px;text-indent:-9999px}
+#doodles .chips.tucked.peeking .chip:hover{width:auto;text-indent:0}
+#doodles{position:relative}
 #quote-float.open{display:flex;align-items:flex-end;justify-content:center;padding-bottom:110px}
 #quote-card{background:var(--surface-raised);border:1px solid var(--line);box-shadow:3px 6px 16px rgba(58,50,38,.22);padding:15px 19px;max-width:560px;width:92%;position:relative;transform:rotate(-.5deg)}
 #quote-card::before{content:"";position:absolute;top:-11px;left:30px;width:90px;height:22px;transform:rotate(-2deg)}
@@ -210,7 +214,27 @@ body.sam-folded #sam-region{transform:translateX(120%) rotate(3deg);opacity:0;po
     <!-- VERDICT BOARD -->
     <div data-region="board" id="board-region">
       <div class="region-lbl">the verdict board<small>findings, pinned by severity</small></div>
-      <div class="pinfield" id="pinfield"></div>
+      <div id="board-states">
+        <div data-state="empty" style="display:none">
+          <div class="cardpin" style="margin-top:26px;transform:rotate(-1deg)">
+            <p class="note" style="font-style:italic">the board is bare — nothing has been read yet. run the analysis and the findings come back as index cards, pin colour = severity, string to the scene.</p>
+            <div class="verbs"><button style="background:var(--accent);color:#fff7ec;border-color:var(--accent)">Run Analysis</button></div>
+          </div>
+        </div>
+        <div data-state="running" style="display:none">
+          <div class="cardpin" style="margin-top:26px">
+            <p class="note" style="font-style:italic">developing the polaroids — findings print in a few minutes…</p>
+            <div class="verbs" style="gap:10px">
+              <span style="width:54px;height:64px;background:#fff;border:4px solid #fff;box-shadow:1px 3px 8px rgba(58,50,38,.2);display:inline-block"></span>
+              <span style="width:54px;height:64px;background:#fff;border:4px solid #fff;box-shadow:1px 3px 8px rgba(58,50,38,.2);display:inline-block;opacity:.6"></span>
+              <span style="width:54px;height:64px;background:#fff;border:4px solid #fff;box-shadow:1px 3px 8px rgba(58,50,38,.2);display:inline-block;opacity:.3"></span>
+            </div>
+          </div>
+        </div>
+        <div data-state="complete">
+          <div class="pinfield" id="pinfield"></div>
+        </div>
+      </div>
     </div>
 
     <!-- PAGES -->
@@ -297,9 +321,10 @@ body.sam-folded #sam-region{transform:translateX(120%) rotate(3deg);opacity:0;po
 <div id="pv">
   <b>WALL</b>
   <button data-jump="door">Door</button>
-  <button data-jump="board">Board</button>
+  <button data-go="feedback">Board</button>
   <button data-jump="pages">Pages</button>
   <button data-jump="sam">Sameer</button>
+  <button data-go="idea">Ideas</button>
   <span class="sep"></span>
   <button data-fb="empty">Empty</button>
   <button data-fb="running">Running</button>
@@ -307,6 +332,23 @@ body.sam-folded #sam-region{transform:translateX(120%) rotate(3deg);opacity:0;po
   <span class="sep"></span>
   <a href="index.html">Gallery</a>
   <button id="pv-close" aria-label="Dismiss wall bar">✕</button>
+</div>
+
+<!-- doodles overlay (ideas) -->
+<div id="doodles" style="position:fixed;inset:0;z-index:890;display:none;background:rgba(58,50,38,.5)">
+  <div style="max-width:760px;margin:70px auto 0;background:var(--surface-raised);border:1px solid var(--line);padding:20px 24px;box-shadow:3px 6px 16px rgba(58,50,38,.24);display:flex;flex-direction:column;height:calc(100% - 160px)">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px">
+      <span class="hand" style="color:var(--accent);font-size:16px">the doodle pad</span>
+      <span style="color:var(--text-muted);font-size:12px">autosaved · ideas before they're scripts</span>
+      <button data-close-doodles style="margin-left:auto;border:1px solid var(--line);padding:6px 11px;min-height:36px;color:var(--text-muted)">pin it shut ✕</button>
+    </div>
+    <textarea id="idea-content" spellcheck="false" placeholder="Whatever comes. A line, a scene, a worry…" style="flex:1;resize:none;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:18px 20px;font:inherit;font-size:16px;line-height:1.7;outline:none"></textarea>
+    <div class="chips" id="idea-chips" aria-label="Explore paths" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">
+      <button class="chip" style="border:1px dashed var(--line);background:var(--surface);padding:9px 13px;min-height:42px;font-size:12.5px;font-style:italic;color:var(--text)">What if the mother knew?</button>
+      <button class="chip" style="border:1px dashed var(--line);background:var(--surface);padding:9px 13px;min-height:42px;font-size:12.5px;font-style:italic;color:var(--text)">Make the ward a character</button>
+      <button class="chip" style="border:1px dashed var(--line);background:var(--surface);padding:9px 13px;min-height:42px;font-size:12.5px;font-style:italic;color:var(--text)">End on the empty tiffin</button>
+    </div>
+  </div>
 </div>
 
 <script src="_payload.js"></script>
@@ -395,6 +437,12 @@ function renderWall(){
     </article>`).join("");
 }
 
+function renderFeedback(){
+  $$("#board-states [data-state]").forEach(el => el.style.display = "none");
+  const el = $(`#board-states [data-state="${FEEDBACK_STATE}"]`);
+  if (el) el.style.display = "";
+}
+
 function wire(){
   /* dragging the wall */
   const vp = $("#viewport"), wall = $("#thewall");
@@ -414,6 +462,23 @@ function wire(){
 
   $$("[data-jump]").forEach(b => b.addEventListener("click", () => jump(b.dataset.jump)));
   $$("#pv [data-jump]").forEach(b => b.addEventListener("click", () => jump(b.dataset.jump)));
+  $$("#pv [data-fb]").forEach(b => b.addEventListener("click", () => {
+    FEEDBACK_STATE = b.dataset.fb; renderFeedback();
+    $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x === b));
+  }));
+  $("#pv-close").addEventListener("click", () => $("#pv").remove());
+
+  /* data-go hooks: board lifecycle (jump to it) + doodles overlay */
+  $$("[data-go='feedback']").forEach(b => b.addEventListener("click", () => { jump("board"); }));
+  $$("[data-go='idea']").forEach(b => b.addEventListener("click", () => {
+    $("#doodles").style.display = "block";
+    const ta = $("#idea-content");
+    ta.addEventListener("input", () => {
+      const chips = $("#idea-chips");
+      chips.classList.toggle("tucked", ta.value.length > 0);
+    });
+  }));
+  $$("[data-close-doodles]").forEach(b => b.addEventListener("click", () => $("#doodles").style.display = "none"));
 
   /* pane toggles (hinge + strip + master) */
   $$("[data-pane-left-toggle],[data-pane-left-toggle2]").forEach(b => b.addEventListener("click", () => { desk.left = !desk.left; renderPanes(); }));

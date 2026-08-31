@@ -578,7 +578,7 @@ function wire(){
   $$("[data-go]").forEach(b => { if (!b.closest("#pv") && !b.closest("#tmux")) b.addEventListener("click", () => show(b.dataset.go)); });
   $$("#pv [data-fb]").forEach(b => b.addEventListener("click", () => {
     FEEDBACK_STATE = b.dataset.fb; renderFeedback();
-    show("cowrite");
+    show("desk");
     $$("#pv [data-fb]").forEach(x => x.classList.toggle("on", x === b));
   }));
   $("#pv-close").addEventListener("click", () => $("#pv").remove());
