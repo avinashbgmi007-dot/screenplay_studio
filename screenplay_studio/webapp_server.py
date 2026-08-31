@@ -1177,6 +1177,190 @@ def undismiss_finding_route(name, index):
     return jsonify({"ok": True, "index": index})
 
 
+# ---------- Design Lab (preview-next) ----------
+# Read-only real-data feed + an isolated chat channel for the six IA
+# prototypes at /preview-next/. The writer's real session (manifest
+# cowriter_session_id) is never touched: lab conversations live in a
+# dedicated "preview-lab" session file per project, deletable, inert to
+# the main app (which only ever reads the manifest-pinned session).
+
+
+def _preview_shelf():
+    """Every real project on the shelf with what the Lab can show for it."""
+    shelf = []
+    if not os.path.isdir(PROJECTS_DIR):
+        return shelf
+    for name in sorted(os.listdir(PROJECTS_DIR)):
+        try:
+            m = ProjectManifest.load(_project_dir(name))
+            shelf.append({
+                "name": name,
+                "title": m.title or name,
+                "format": m.source_format,
+                "stage_parse": m.stage("parse").status,
+                "stage_analyze": m.stage("analyze").status,
+                "has_findings": os.path.exists(m.report_findings_path),
+            })
+        except FileNotFoundError:
+            continue  # not a project (stray file / the ideas store)
+        except Exception:
+            continue  # flagged unreadable on the real shelf; not the Lab's problem
+    return shelf
+
+
+@app.route("/api/preview/projects", methods=["GET"])
+def preview_projects():
+    return jsonify({"projects": _preview_shelf()})
+
+
+@app.route("/api/preview/data/<name>", methods=["GET"])
+def preview_data(name):
+    """Real product data for one project: the actual parse and the actual
+    analysis report (sanitized exactly like the main app serves them)."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+
+    parsed = None
+    if os.path.exists(m.parsed_path):
+        try:
+            with open(m.parsed_path, "r", encoding="utf-8") as f:
+                parsed = json.load(f)
+        except (OSError, ValueError):
+            parsed = None
+
+    report = None
+    if os.path.exists(m.report_findings_path):
+        report = _load_report_sanitized(m)
+
+    fixqueue = None
+    if report:
+        try:
+            from .revision import dismissed_issues as _dismissed, finding_statuses, load_working
+            from screenplay_parser.structure import assign_acts, act_for_scene
+            doc = load_working(m)
+            acts = assign_acts(doc)
+            act_names = {a["act"]: a["name"] for a in acts}
+            scene_heading = {s.scene_number: s.heading_raw for s in doc.scenes}
+            status_by_index = {s["index"]: s["status"] for s in finding_statuses(m)["findings"]}
+            dismissed_keys = _dismissed(m)
+            items = []
+            for idx, f in enumerate(report.get("findings", [])):
+                refs = f.get("scene_refs") or []
+                scene = refs[0] if refs else None
+                act = act_for_scene(acts, scene) if scene else None
+                items.append({
+                    "index": idx,
+                    "category": f.get("category"),
+                    "severity": f.get("severity"),
+                    "issue": f.get("issue"),
+                    "why_it_matters": f.get("why_it_matters"),
+                    "scene_refs": refs,
+                    "scene_heading": scene_heading.get(scene) if scene else None,
+                    "act": act,
+                    "act_name": (act_names.get(act) if act else "Script-level"),
+                    "status": status_by_index.get(idx, "unknown"),
+                    "verified": f.get("verified", True),
+                    "quote": f.get("quote"),
+                })
+            items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
+            fixqueue = {"items": items, "acts": acts, "dismissed_keys": sorted(list(dismissed_keys))}
+        except Exception:
+            fixqueue = None
+
+    return jsonify({
+        "name": name,
+        "title": m.title or name,
+        "format": m.source_format,
+        "stages": {s: m.stage(s).status for s in ("parse", "analyze", "chat")},
+        "parsed": parsed,
+        "report": report,
+        "fixqueue": fixqueue,
+        "shelf": _preview_shelf(),
+    })
+
+
+def _preview_lab_session(name):
+    """Load (or lazily create) the project's isolated Design Lab session."""
+    m = _load_manifest(name)
+    store_mod = _import_cowriter("store")
+    models_mod = _import_cowriter("models")
+    SessionStore = store_mod.SessionStore
+    Session = models_mod.Session
+    store = SessionStore(m.sessions_dir)
+    sid = "preview-lab"
+    try:
+        session = store.load(sid)
+    except FileNotFoundError:
+        session = Session(session_id=sid, title="Design Lab",
+                          server_url=CONFIG["server_url"])
+        store.save(session)
+    return session
+
+
+@app.route("/api/preview/chat/<name>", methods=["GET"])
+def preview_chat_get(name):
+    try:
+        session = _preview_lab_session(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return jsonify({
+        "session_id": session.session_id,
+        "messages": [msg.to_dict() for msg in session.branch.messages],
+    })
+
+
+@app.route("/api/preview/chat/<name>", methods=["POST"])
+def preview_chat_send(name):
+    """A REAL Sameer turn on the project's real script/report — stored in
+    the isolated preview-lab session, never the writer's own thread."""
+    body = request.get_json() or {}
+    text = (body.get("message") or "").strip()
+    if not text:
+        return _error("Message text is required.")
+    try:
+        _preview_lab_session(name)  # ensure the lab session exists
+        session, engine, store = _load_session_and_engine(name, "preview-lab")
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    quote = body.get("quote")
+    try:
+        reply = engine.send_message(session, text, quote=quote)
+    except Exception as e:
+        if type(e).__name__ == "WatchdogTimeoutError" or "didn't respond within" in str(e):
+            return jsonify({"error": "Still working when the per-turn cap was hit.",
+                            "still_working": True}), 408
+        return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
+    store.save(session)
+    return jsonify({
+        "reply": reply,
+        "messages": [msg.to_dict() for msg in session.branch.messages],
+    })
+
+
+@app.route("/api/preview/chat/<name>", methods=["DELETE"])
+def preview_chat_clear(name):
+    """Start the lab thread over. The writer's real sessions are untouched."""
+    try:
+        m = _load_manifest(name)
+        store_mod = _import_cowriter("store")
+        store = store_mod.SessionStore(m.sessions_dir)
+        try:
+            store.delete("preview-lab")
+        except FileNotFoundError:
+            pass  # nothing to clear — already fresh
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return jsonify({"cleared": True})
+
+
 # ---------- streaming chat (SSE) ----------
 
 
