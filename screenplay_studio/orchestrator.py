@@ -34,7 +34,6 @@ def _merge_analysis(m, result):
     except (FileNotFoundError, _json.JSONDecodeError):
         return  # nothing to merge into — fresh report is fine
 
-    rerun = set(result.category_outcomes.keys())
     # Deterministic passes (voice, subtext, idiolect, continuity, pacing drags)
     # regenerate on EVERY analyze run and never appear in category_outcomes —
     # dropping the old copies avoids duplicating them in the merged report.
@@ -45,10 +44,15 @@ def _merge_analysis(m, result):
         "voice_bleed", "on_the_nose", "idiolect_consistency",
         "unmarked_time_flip", "character_name_variant", "pacing_drag",
     }
-    # keep previous findings whose category wasn't part of this re-run
+    # keep previous findings unless the exact (category, issue) pair was
+    # regenerated in this re-run.  This preserves findings that survived the
+    # original pass but weren't re-emitted by a partial retry (e.g. retrying
+    # "dialogue" after a transient error that only reproduced 2 of 5 findings).
+    fresh_keys = {(f.get("category"), f.get("issue")) for f in result.findings}
     prev_findings = [
         f for f in (prev.get("findings") or [])
-        if f.get("category") not in rerun and f.get("rule_id") not in deterministic_rule_ids
+        if ((f.get("category"), f.get("issue")) not in fresh_keys
+            and f.get("rule_id") not in deterministic_rule_ids)
     ]
     result.findings = prev_findings + list(result.findings)
 
@@ -83,6 +87,10 @@ class Orchestrator:
 
         m.mark_running("parse")
         try:
+            import os
+            if not os.path.exists(m.source_path):
+                raise OrchestratorError(f"Source file not found: {m.source_path}")
+
             from screenplay_parser import parse_screenplay, build_knowledge_graph
 
             doc = parse_screenplay(m.source_path)

@@ -36,6 +36,8 @@ Thumbs.db
 # Runtime data (never versioned)
 .freebuff/
 studio_projects/
+preview_shots/
+preview-redesigns/shots/
 
 # Scratch artifacts at repo root
 /_*.png

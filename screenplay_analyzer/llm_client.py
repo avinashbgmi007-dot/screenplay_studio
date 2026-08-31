@@ -14,13 +14,7 @@ import time
 
 import requests
 
-
-class LlamaServerError(Exception):
-    pass
-
-
-class ModelNotFoundError(LlamaServerError):
-    pass
+from .llm_client_base import BaseLlamaClient, LlamaServerError, ModelNotFoundError
 
 
 def _extract_json(text: str):
@@ -85,9 +79,7 @@ def _diagnose_parse_failure(error: Exception, choice: dict, data: dict, content:
     token usage, if present. completion_tokens == 0 (or finish_reason ==
     'length' with empty content) is the specific signature of a prompt
     that filled or exceeded the server's context window, leaving no room
-    left to generate a response — this is the single most common real-world
-    cause of "successful" requests that come back with nothing in them,
-    and previously produced a generic, undiagnosable error message.
+    left to generate a response.
     """
     parts = [str(error)]
     finish_reason = choice.get("finish_reason")
@@ -118,73 +110,15 @@ def _diagnose_parse_failure(error: Exception, choice: dict, data: dict, content:
     return " ".join(parts)
 
 
-class LlamaServerClient:
+class LlamaServerClient(BaseLlamaClient):
     def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None,
                  fallback_to_loaded: bool = False, fast_model: str | None = None):
-        self.base_url = base_url.rstrip("/")
-        self.model = model
+        super().__init__(base_url, model=model, timeout=timeout, extra_headers=extra_headers,
+                         fallback_to_loaded=fallback_to_loaded)
         self.fast_model = fast_model or None
-        self.timeout = timeout
-        self.extra_headers = extra_headers or {}
-        # When True, a pinned-but-unloaded model id falls back to whatever the
-        # server has loaded instead of raising. Used where the model id is a
-        # *remembered preference* (manifest pins) rather than an explicit
-        # choice — swapping the loaded model must not brick an analysis run
-        # that's minutes in. The CLI stays strict: an explicit --model must
-        # be loaded.
-        self.fallback_to_loaded = fallback_to_loaded
-        self._resolved_model: str | None = None
-        self._available_ids: list[str] | None = None
-
-    def _available(self) -> list[str]:
-        """Loaded model ids, cached per client (the server's model list only
-        changes when someone swaps the loaded GGUF — mid-analysis that's a
-        manual act worth re-probing, but the list itself is cheap to cache)."""
-        if self._available_ids is None:
-            available = self.list_models()
-            ids = [m.get("id") or m.get("name") for m in available]
-            self._available_ids = [a for a in ids if a]
-        return self._available_ids
-
-    def resolve_model_id(self, model_id: str | None) -> str:
-        """Resolve a specific model id against what's loaded, applying the
-        fallback policy. Never mutates self.model — used for the optional
-        fast (cheap) tier so one analysis can mix two models safely."""
-        available_ids = self._available()
-        if not available_ids:
-            raise LlamaServerError(f"llama-server at {self.base_url} reports no loaded models.")
-        if model_id:
-            if model_id in available_ids:
-                return model_id
-            if self.fallback_to_loaded:
-                return available_ids[0]
-            raise ModelNotFoundError(
-                f"Requested model '{model_id}' is not loaded at {self.base_url}. "
-                f"Available: {available_ids}"
-            )
-        return available_ids[0]
 
     def list_models(self) -> list[dict]:
-        try:
-            resp = requests.get(f"{self.base_url}/v1/models", timeout=15, headers=self.extra_headers)
-            resp.raise_for_status()
-        except requests.exceptions.ConnectionError as e:
-            raise LlamaServerError(
-                f"Could not connect to llama-server at {self.base_url}. "
-                f"Is it running? (launch with `llama-server -m <model.gguf> --port ...`)"
-            ) from e
-        except requests.exceptions.Timeout as e:
-            raise LlamaServerError(f"Timed out connecting to {self.base_url}") from e
-        except requests.exceptions.HTTPError as e:
-            raise LlamaServerError(f"llama-server at {self.base_url} returned an error: {e}") from e
-
-        data = resp.json()
-        return data.get("data", []) or data.get("models", [])
-
-    def resolve_model(self) -> str:
-        if not self._resolved_model:
-            self._resolved_model = self.resolve_model_id(self.model)
-        return self._resolved_model
+        return self.list_models_raw()
 
     def chat_json(
         self,
@@ -203,10 +137,7 @@ class LlamaServerClient:
         that honor that instead.
 
         fast=True routes the call to the optional cheap tier (fast_model):
-        summaries/refresh-style calls where a lighter model is fine. If no
-        fast model is configured or it isn't loaded, resolve_model_id falls
-        back to whatever is loaded — one-model boxes just use that model for
-        everything, which is exactly the auto-fallback the audit asks for.
+        summaries/refresh-style calls where a lighter model is fine.
         """
         if fast and self.fast_model:
             model = self.resolve_model_id(self.fast_model)
@@ -224,58 +155,15 @@ class LlamaServerClient:
         }
         if grammar:
             payload["grammar"] = grammar
-            # Reasoning models split output into a free-form `reasoning_content`
-            # phase followed by `content`. Under a grammar, the constrained
-            # generation gets routed into the reasoning block and `content`
-            # comes back empty or as unconstrained prose — so the schema
-            # constraint never reaches what this client parses. Disabling
-            # thinking for grammar-constrained calls makes the constrained
-            # JSON land in `content` where it belongs. (Harmless no-op on
-            # non-reasoning templates.)
             payload.setdefault("chat_template_kwargs", {})
             payload["chat_template_kwargs"]["enable_thinking"] = False
 
         last_error = None
-        # llama-server is single-occupancy: a request arriving while another
-        # generation is in flight (e.g. the writer chats while this analysis
-        # grinds) gets a busy error instead of queueing. Bounded retry with
-        # linear backoff lets the losing side wait and go again instead of
-        # failing the category. 400 is also used for genuine bad requests, so
-        # only retry when the body actually sounds busy; 429/503 are busy by
-        # definition.
-        _BUSY_STATUS = (400, 429, 503)
-        _BUSY_BODY = re.compile(r"(busy|in progress|already running|another request)", re.IGNORECASE)
-        _MAX_BUSY = 6
-        _busy = 0
         for attempt in range(retries + 1):
             try:
-                resp = requests.post(
-                    f"{self.base_url}/v1/chat/completions",
-                    json=payload,
-                    timeout=self.timeout,
-                    headers=self.extra_headers,
-                )
-                status = getattr(resp, "status_code", 200)
-                if status in _BUSY_STATUS and _busy < _MAX_BUSY:
-                    if status in (429, 503) or _BUSY_BODY.search(getattr(resp, "text", "") or ""):
-                        _busy += 1
-                        time.sleep(1.5 * _busy)
-                        continue
-                resp.raise_for_status()
-                data = resp.json()
-            except requests.exceptions.Timeout as e:
-                raise LlamaServerError(
-                    f"Request to {self.base_url} timed out after {self.timeout}s. "
-                    f"For a large/slow local model, consider raising the client timeout."
-                ) from e
-            except requests.exceptions.ConnectionError as e:
-                raise LlamaServerError(
-                    f"Could not connect to llama-server at {self.base_url}."
-                ) from e
-            except requests.exceptions.HTTPError as e:
-                raise LlamaServerError(f"llama-server request failed: {e}") from e
-            except (ValueError, json.JSONDecodeError) as e:
-                last_error = f"llama-server's response body wasn't valid JSON: {e}"
+                data = self._post_chat(payload, busy_retries=6)
+            except LlamaServerError as e:
+                last_error = str(e)
                 if attempt < retries:
                     time.sleep(1)
                     continue

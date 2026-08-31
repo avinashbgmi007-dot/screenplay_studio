@@ -264,6 +264,12 @@ def real_server_check():
         return jsonify({"demo": True, "available": False, "url": url})
 
 
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "server_url": CONFIG.get("server_url"),
+                     "demo_model": _DEMO_MODEL_ACTIVE})
+
+
 @app.route("/api/config", methods=["GET"])
 def get_config():
     cfg = CONFIG.to_dict()

@@ -527,6 +527,12 @@ def analyze(
                 result.errors.append(f"{cat} analysis failed: {e}")
                 emit(cat, "complete", f"failed: {e}")
 
+    # Pre-build the knowledge graph once for consumers that need it
+    # (principles engine and setup/payoff ledger). Avoids redundant rebuilds.
+    _kg = None
+    if "principles" in run_categories or "setup_payoff" in run_categories:
+        _kg = build_knowledge_graph(doc)
+
     # 4b. Principles Engine — Chekhov's Gun / promise-payoff, using Piece 1's
     # knowledge graph as the candidate source. Runs independent of the
     # summary-based overview (it works directly off the knowledge graph),
@@ -534,8 +540,7 @@ def analyze(
     if "principles" in run_categories:
         try:
             emit("principles", "running", "Checking setups & payoffs")
-            kg = build_knowledge_graph(doc)
-            principle_findings, principle_errors = run_principles_engine(kg, client, rules_ctx, doc.scene_count, language=report_language)
+            principle_findings, principle_errors = run_principles_engine(_kg, client, rules_ctx, doc.scene_count, language=report_language)
             all_findings.extend(principle_findings)
             result.errors.extend(principle_errors)
             result.category_outcomes["principles"] = "failed" if principle_errors else "ok"
@@ -577,9 +582,8 @@ def analyze(
     if "setup_payoff" in run_categories and overview:
         try:
             emit("setup_payoff", "running", "Auditing setups & payoffs across the whole script")
-            kg = build_knowledge_graph(doc)
             ledger, ledger_errors = run_setup_payoff_ledger(
-                overview, kg, client, rules_ctx.prompt_fragment_for_category("plot_thread"),
+                overview, _kg, client, rules_ctx.prompt_fragment_for_category("plot_thread"),
                 doc.scene_count, language=report_language,
             )
             result.setup_payoff = ledger
@@ -662,9 +666,13 @@ def analyze(
             from .genre import run_genre_check
             genre_findings = _normalize_findings(run_genre_check(result.coverage, overview, client, language=report_language), "genre")
             # genre findings get the same quote-verification as every other finding
-            all_findings = verify_findings(all_findings + genre_findings, doc)
+            genre_findings = verify_findings(genre_findings, doc)
+            all_findings.extend(genre_findings)
             result.findings = all_findings
-            result.verification = verification_summary(all_findings)
+            # update verification summary incrementally (only new findings)
+            prev = result.verification or {"verified": 0, "not_found": 0, "no_quote": 0, "scene_not_found": 0}
+            new_counts = verification_summary(genre_findings)
+            result.verification = {k: prev.get(k, 0) + new_counts.get(k, 0) for k in set(list(prev) + list(new_counts))}
             result.category_outcomes["genre"] = "ok"
             emit("genre", "complete")
         except LlamaServerError as e:
