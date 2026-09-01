@@ -120,6 +120,58 @@ class AnalysisResult:
     analyze (some categories OK, some not) can be resumed category-by-
     category instead of re-running everything."""
 
+    # Deterministic passes that regenerate on EVERY analyze run and must
+    # never be carried forward from a previous report during a merge.
+    _DETERMINISTIC_RULE_IDS = frozenset({
+        "voice_bleed", "on_the_nose", "idiolect_consistency",
+        "unmarked_time_flip", "character_name_variant", "pacing_drag",
+    })
+
+    def merge(self, prev_findings_path: str) -> None:
+        """Merge a retry-failed re-run into the previous report.
+
+        The retry run's AnalysisResult only contains findings for the categories
+        that were re-run (plus the deterministic passes). The previous report
+        holds findings for the categories that succeeded before. This overlays
+        the new findings onto the previous ones (keeping the old findings for
+        categories NOT re-run) and recomputes the verification summary over
+        the combined set."""
+        import json as _json
+        try:
+            with open(prev_findings_path, "r", encoding="utf-8") as f:
+                prev = _json.load(f)
+        except (FileNotFoundError, _json.JSONDecodeError):
+            return  # nothing to merge into — fresh report is fine
+
+        # keep previous findings unless the exact (category, issue) pair was
+        # regenerated in this re-run.  This preserves findings that survived
+        # the original pass but weren't re-emitted by a partial retry.
+        fresh_keys = {(f.get("category"), f.get("issue")) for f in self.findings}
+        prev_findings = [
+            f for f in (prev.get("findings") or [])
+            if ((f.get("category"), f.get("issue")) not in fresh_keys
+                and f.get("rule_id") not in self._DETERMINISTIC_RULE_IDS)
+        ]
+        self.findings = prev_findings + list(self.findings)
+
+        # deterministic passes & non-category extras: keep previous values
+        # where this re-run didn't regenerate them
+        if not self.coverage:
+            self.coverage = prev.get("coverage")
+        if not self.character_reads:
+            self.character_reads = prev.get("character_reads") or []
+        if not self.logline_test:
+            self.logline_test = prev.get("logline_test")
+        if not self.formatting_findings:
+            self.formatting_findings = prev.get("formatting_findings") or []
+        if not self.stats:
+            self.stats = prev.get("stats") or {}
+        if not self.model_used:
+            self.model_used = prev.get("model_used")
+
+        from .verifier import verification_summary
+        self.verification = verification_summary(self.findings)
+
 
 def _normalize_findings(findings: list, category: str, default_severity: str = "low") -> list[dict]:
     """Fill in the fields real local models sometimes leave null (seen live:

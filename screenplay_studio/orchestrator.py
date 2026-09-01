@@ -18,63 +18,6 @@ class OrchestratorError(Exception):
     pass
 
 
-def _merge_analysis(m, result):
-    """Merge a retry-failed re-run into the existing report.
-
-    The retry run's AnalysisResult only contains findings for the categories
-    that were re-run (plus the deterministic passes). The previous report
-    holds findings for the categories that succeeded before. This overlays
-    the new findings onto the previous ones (keeping the old findings for
-    categories NOT re-run) and recomputes the verification summary over the
-    combined set, so the merged report reflects the full picture."""
-    import json as _json
-    try:
-        with open(m.report_findings_path, "r", encoding="utf-8") as f:
-            prev = _json.load(f)
-    except (FileNotFoundError, _json.JSONDecodeError):
-        return  # nothing to merge into — fresh report is fine
-
-    # Deterministic passes (voice, subtext, idiolect, continuity, pacing drags)
-    # regenerate on EVERY analyze run and never appear in category_outcomes —
-    # dropping the old copies avoids duplicating them in the merged report.
-    # Matched by rule_id rather than category: every deterministic finding tags
-    # its rule id, and two of them (pace drags) share the "structure" category
-    # with model-judged findings that must be KEPT when structure wasn't re-run.
-    deterministic_rule_ids = {
-        "voice_bleed", "on_the_nose", "idiolect_consistency",
-        "unmarked_time_flip", "character_name_variant", "pacing_drag",
-    }
-    # keep previous findings unless the exact (category, issue) pair was
-    # regenerated in this re-run.  This preserves findings that survived the
-    # original pass but weren't re-emitted by a partial retry (e.g. retrying
-    # "dialogue" after a transient error that only reproduced 2 of 5 findings).
-    fresh_keys = {(f.get("category"), f.get("issue")) for f in result.findings}
-    prev_findings = [
-        f for f in (prev.get("findings") or [])
-        if ((f.get("category"), f.get("issue")) not in fresh_keys
-            and f.get("rule_id") not in deterministic_rule_ids)
-    ]
-    result.findings = prev_findings + list(result.findings)
-
-    # deterministic passes & non-category extras: keep previous values where
-    # this re-run didn't regenerate them
-    if not result.coverage:
-        result.coverage = prev.get("coverage")
-    if not result.character_reads:
-        result.character_reads = prev.get("character_reads") or []
-    if not result.logline_test:
-        result.logline_test = prev.get("logline_test")
-    if not result.formatting_findings:
-        result.formatting_findings = prev.get("formatting_findings") or []
-    if not result.stats:
-        result.stats = prev.get("stats") or {}
-    if not result.model_used:
-        result.model_used = prev.get("model_used")
-
-    from screenplay_analyzer.verifier import verification_summary
-    result.verification = verification_summary(result.findings)
-
-
 class Orchestrator:
     def __init__(self, manifest: ProjectManifest):
         self.manifest = manifest
@@ -190,7 +133,7 @@ class Orchestrator:
                 # Merge: keep the previously-successful findings, overlay this
                 # re-run's fresh findings for the retried categories, and
                 # recompute the verification summary over the combined set.
-                _merge_analysis(m, result)
+                result.merge(m.report_findings_path)
 
             save_report(result, m.report_md_path, m.report_findings_path)
             import time as _t
