@@ -529,6 +529,18 @@ def analyze(
                     visual_rules = rules_ctx.kb.for_file("visual_storytelling.json")
                     if visual_rules:
                         rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(visual_rules)
+                    # Also inject revision rules into scene_function pass
+                    revision_rules = rules_ctx.kb.for_file("revision.json")
+                    if revision_rules:
+                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(revision_rules)
+                # Inject psychology and nonverbal rules into character pass
+                if cat == "character" and hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
+                    psych_rules = rules_ctx.kb.for_file("psychology.json")
+                    if psych_rules:
+                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(psych_rules)
+                    nonverbal_rules = rules_ctx.kb.for_file("body_language.json")
+                    if nonverbal_rules:
+                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(nonverbal_rules)
                 all_findings.extend(run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language))
                 emit(cat, "complete")
                 result.category_outcomes[cat] = "ok"
@@ -654,6 +666,12 @@ def analyze(
     if "logline_test" in run_categories and overview and result.coverage and result.coverage.get("logline"):
         try:
             emit("logline_test", "running", "Testing the logline")
+            # Inject pitch rules into logline test
+            pitch_rules_fragment = ""
+            if hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
+                pitch_rules = rules_ctx.kb.for_file("pitch.json")
+                if pitch_rules:
+                    pitch_rules_fragment = rules_ctx.kb.render_for_prompt(pitch_rules)
             result.logline_test = run_logline_test(
                 result.coverage["logline"], overview, doc.title, client, language=report_language
             )

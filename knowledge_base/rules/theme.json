@@ -1,0 +1,50 @@
+[
+  {
+    "id": "martell_theme_through_characters",
+    "name": "Theme Expressed Through Character Choices",
+    "taxonomy_level": "theme",
+    "category": "theme",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Outlining and Theme"
+    },
+    "definition": "Theme is not stated \u00e2\u20ac\u201d it's demonstrated through the choices characters make under pressure. Every major decision point is a thematic statement. When the hero chooses sacrifice over selfishness, the audience experiences the theme rather than being told it. The most powerful thematic moments come from dramatic choices, not speeches.",
+    "detection_signal": "Scripts where theme is delivered through dialogue monologues, narrator statements, or on-the-nose declarations rather than through character action and choice.",
+    "counter_considerations": "Some films deliberately use voiceover or direct address for thematic effect. The rule targets lazy thematic delivery.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "controlling_idea",
+      "egri_central_thesis"
+    ]
+  },
+  {
+    "id": "weiland_theme_from_arc",
+    "name": "Theme Emerges from the Character's Arc",
+    "taxonomy_level": "theme",
+    "category": "theme_construction",
+    "source": {
+      "type": "framework",
+      "originator": "K.M. Weiland",
+      "work": "Creating Character Arcs"
+    },
+    "definition": "Theme is not imposed on a story from outside. It arises directly from the character's arc\u00e2\u20ac\u201dwhat the character wants, how they change, and what they ultimately prove about the human condition through their journey.",
+    "detection_signal": "Stories where the theme feels preachy or disconnected from the protagonist's personal journey. Themes stated in dialogue but not dramatized through the character's choices and consequences.",
+    "counter_considerations": "Theme can also emerge through subplot resonance or antagonist contrast. Do not flag stories where theme is demonstrated through multiple character arcs.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "controlling_idea",
+      "theme_contradiction"
+    ]
+  }
+]

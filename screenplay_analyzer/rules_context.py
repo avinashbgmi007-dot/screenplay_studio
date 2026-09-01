@@ -15,13 +15,15 @@ from __future__ import annotations
 # category name (as used throughout pipeline.py/prompts.py) -> which
 # knowledge-base taxonomy level(s) that category should pull rules from.
 CATEGORY_TO_TAXONOMY_LEVELS = {
-    "theme": ["story_macro"],
-    "character": ["character", "relationship"],
+    "theme": ["story_macro", "theme"],
+    "character": ["character", "relationship", "psychology", "nonverbal"],
     "structure": ["structure_pacing"],
     "scene_function": ["scene"],
     "dialogue": ["dialogue"],
     "plot": ["plot_thread"],
     "continuity": ["continuity"],
+    "pitch": ["pitch"],
+    "revision": ["revision"],
 }
 
 

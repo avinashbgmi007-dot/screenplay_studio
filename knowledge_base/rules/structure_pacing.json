@@ -12,11 +12,17 @@
     },
     "definition": "A story divides into a Setup (introduces protagonist, world, and dramatic premise), a Confrontation (protagonist pursues a goal against escalating obstacles), and a Resolution (the goal is won, lost, or transformed, and the story's tensions resolve). Two Plot Points mark the transitions: Plot Point 1 (~20-27% mark) ends Act One by radically redirecting the protagonist into Act Two's central conflict; Plot Point 2 (~75-80% mark) ends Act Two, usually at a low point, launching the final confrontation.",
     "detection_signal": "Identify which scene functions as Plot Point 1 (the scene after which the protagonist's central pursuit becomes irreversible) and Plot Point 2 (the scene that triggers the final act's confrontation/resolution sequence). Check their position against the expected page/scene-percentage range.",
-    "counter_considerations": "Ensemble pieces, anthology structures, and some literary/arthouse scripts deliberately subvert or omit clean act breaks. Field himself stressed page numbers are guides, not requirements — flag deviation as a discussion point, not an error.",
+    "counter_considerations": "Ensemble pieces, anthology structures, and some literary/arthouse scripts deliberately subvert or omit clean act breaks. Field himself stressed page numbers are guides, not requirements \u00e2\u20ac\u201d flag deviation as a discussion point, not an error.",
     "severity_default": "low",
     "confidence_tier": "medium",
-    "requires": ["scene_summaries", "page_estimates"],
-    "related_rules": ["save_the_cat_15_beats", "mckee_five_part_design"]
+    "requires": [
+      "scene_summaries",
+      "page_estimates"
+    ],
+    "related_rules": [
+      "save_the_cat_15_beats",
+      "mckee_five_part_design"
+    ]
   },
   {
     "id": "save_the_cat_15_beats",
@@ -31,11 +37,17 @@
     },
     "definition": "A 15-beat elaboration of the three-act structure, designed to keep the large, easy-to-sag second act on track. In order: Opening Image (0-1%) sets tone via a 'before' snapshot; Theme Stated (~5%) has a supporting character voice the story's thematic question; Setup (1-10%) establishes the hero's flawed status quo; Catalyst (~10%) is the inciting event; Debate (10-20%) shows the hero hesitating before committing; Break into Two (20%) is the hero's active choice to enter the new world/plan; B Story (~22%) introduces a secondary relationship that carries the theme; Fun and Games (20-50%) delivers on the story's core premise/promise; Midpoint (50%) raises stakes via a false victory or false defeat; Bad Guys Close In (50-75%) escalates both external and internal pressure; All Is Lost (75%) is the hero's lowest point, often marked by a 'whiff of death'; Dark Night of the Soul (75-80%) is the hero's despair before finding new resolve; Break into Three (80%) is the hero's renewed plan combining lessons from A and B stories; Finale (80-99%) executes the final confrontation; Final Image (99-100%) mirrors the Opening Image to show transformation.",
     "detection_signal": "For each beat, identify the scene(s) that most plausibly fulfill its narrative function, and compare its position (as a percentage of total scene count or page count) against the target range. Flag beats that are missing entirely, or land far outside their expected range without clear narrative justification.",
-    "counter_considerations": "This is one structural lens among several (compare Syd Field's simpler two-plot-point paradigm, Vogler's Hero's Journey) — a script that doesn't match Save the Cat's specific rhythm isn't necessarily broken, especially outside mainstream genre filmmaking. Snyder's percentages assume a ~110-page feature; adjust proportionally for shorts, pilots, or unusually long scripts.",
+    "counter_considerations": "This is one structural lens among several (compare Syd Field's simpler two-plot-point paradigm, Vogler's Hero's Journey) \u00e2\u20ac\u201d a script that doesn't match Save the Cat's specific rhythm isn't necessarily broken, especially outside mainstream genre filmmaking. Snyder's percentages assume a ~110-page feature; adjust proportionally for shorts, pilots, or unusually long scripts.",
     "severity_default": "low",
     "confidence_tier": "medium",
-    "requires": ["scene_summaries", "page_estimates"],
-    "related_rules": ["three_act_structure", "pacing_escalation"]
+    "requires": [
+      "scene_summaries",
+      "page_estimates"
+    ],
+    "related_rules": [
+      "three_act_structure",
+      "pacing_escalation"
+    ]
   },
   {
     "id": "heros_journey_12_stages",
@@ -50,11 +62,15 @@
     },
     "definition": "Ordinary World (protagonist's status quo, hinting at what's missing); Call to Adventure (a problem or opportunity disrupts the status quo); Refusal of the Call (hesitation, fear, or reluctance); Meeting the Mentor (guidance or a tool is provided); Crossing the Threshold (commitment to the new world/journey, no return to the old status quo); Tests, Allies, Enemies (the protagonist learns the new world's rules through smaller conflicts); Approach to the Inmost Cave (preparation before the central ordeal); The Ordeal (a life-or-death crisis, the central crisis of the story); Reward/Seizing the Sword (the protagonist claims what they sought, but the story isn't over); The Road Back (recommitment to finishing the journey, often with new complications); Resurrection (a final, climactic test that proves the protagonist's transformation is real); Return with the Elixir (the protagonist returns changed, bringing benefit to their world).",
     "detection_signal": "Identify which scene(s) fulfill each of the 12 stages. Particularly check that Crossing the Threshold represents a genuine point of no return (not merely a change of location), and that Resurrection is a distinct, climactic test separate from The Ordeal.",
-    "counter_considerations": "This is a mythological/archetypal lens best suited to journey- and transformation-driven stories (action, fantasy, adventure, many dramas). It fits less naturally onto ensemble pieces, procedurals, or stories without a single clear protagonist — don't force-fit it onto scripts where it doesn't apply.",
+    "counter_considerations": "This is a mythological/archetypal lens best suited to journey- and transformation-driven stories (action, fantasy, adventure, many dramas). It fits less naturally onto ensemble pieces, procedurals, or stories without a single clear protagonist \u00e2\u20ac\u201d don't force-fit it onto scripts where it doesn't apply.",
     "severity_default": "low",
     "confidence_tier": "low",
-    "requires": ["scene_summaries"],
-    "related_rules": ["three_act_structure"]
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "three_act_structure"
+    ]
   },
   {
     "id": "mckee_five_part_design",
@@ -68,11 +84,16 @@
     },
     "definition": "A story's macro-structure runs: Inciting Incident (a disruptive event launches the protagonist toward an Object of Desire) -> Progressive Complications (escalating antagonism forces harder and harder choices, each crossing a point of no return) -> Crisis (the protagonist faces a true dilemma between two significant, irreconcilable goods, or the lesser of two evils, on the way to the climax) -> Climax (the final action that resolves the story's central question) -> Resolution (loose ends, if any, are tied off after the climax).",
     "detection_signal": "Verify progressive complications actually escalate in stakes/difficulty rather than repeating similar-magnitude obstacles, and confirm the Crisis presents a genuine dilemma (not an obvious choice) immediately before the Climax.",
-    "counter_considerations": "Some scripts (especially slice-of-life, ensemble, or literary work) deliberately resist a single unifying crisis/climax — treat absence as worth flagging for discussion, not as an automatic defect.",
+    "counter_considerations": "Some scripts (especially slice-of-life, ensemble, or literary work) deliberately resist a single unifying crisis/climax \u00e2\u20ac\u201d treat absence as worth flagging for discussion, not as an automatic defect.",
     "severity_default": "medium",
     "confidence_tier": "medium",
-    "requires": ["scene_summaries"],
-    "related_rules": ["pacing_escalation", "three_act_structure"]
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "pacing_escalation",
+      "three_act_structure"
+    ]
   },
   {
     "id": "pacing_escalation",
@@ -87,11 +108,16 @@
     },
     "definition": "Conflict and stakes should escalate across the story rather than plateau or repeat at the same intensity. Each complication should be harder to overcome than the last, forcing the protagonist to use more of themselves (skill, will, resources, moral compromise) as the story progresses.",
     "detection_signal": "Track the apparent stakes/difficulty of major obstacles scene-by-scene or act-by-act. Flag a sustained middle section where conflicts feel same-magnitude rather than escalating (this often manifests as the commonly-cited 'sagging second act').",
-    "counter_considerations": "Escalation doesn't have to be constant/linear — a deliberate lull before a final escalation (the 'calm before the storm') is a legitimate rhythm device, not automatically a pacing failure.",
+    "counter_considerations": "Escalation doesn't have to be constant/linear \u00e2\u20ac\u201d a deliberate lull before a final escalation (the 'calm before the storm') is a legitimate rhythm device, not automatically a pacing failure.",
     "severity_default": "medium",
     "confidence_tier": "low",
-    "requires": ["scene_summaries"],
-    "related_rules": ["mckee_five_part_design", "save_the_cat_15_beats"]
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "mckee_five_part_design",
+      "save_the_cat_15_beats"
+    ]
   },
   {
     "id": "opening_closing_bookend",
@@ -103,12 +129,198 @@
       "originator": "Blake Snyder",
       "work": "Save the Cat! The Last Book on Screenwriting You'll Ever Need (2005)"
     },
-    "definition": "The story's opening and closing images/scenes are designed as a matched 'before and after' pair — visually or thematically echoing each other, but with the difference between them making the protagonist's transformation legible without dialogue explaining it.",
+    "definition": "The story's opening and closing images/scenes are designed as a matched 'before and after' pair \u00e2\u20ac\u201d visually or thematically echoing each other, but with the difference between them making the protagonist's transformation legible without dialogue explaining it.",
     "detection_signal": "Compare the opening scene and closing scene/image: is there a deliberate echo (setting, framing, an object, a line of dialogue mirrored and inverted) that makes the change visible?",
-    "counter_considerations": "Not every genre or story needs an explicit visual bookend — this is most load-bearing in visually-driven, transformation-centered narratives; less relevant for ensemble or plot-driven procedurals.",
+    "counter_considerations": "Not every genre or story needs an explicit visual bookend \u00e2\u20ac\u201d this is most load-bearing in visually-driven, transformation-centered narratives; less relevant for ensemble or plot-driven procedurals.",
     "severity_default": "low",
     "confidence_tier": "low",
-    "requires": ["scene_summaries"],
-    "related_rules": ["save_the_cat_15_beats", "character_arc_change"]
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "save_the_cat_15_beats",
+      "character_arc_change"
+    ]
+  },
+  {
+    "id": "gulino_sequence_climax",
+    "name": "Sequence Approach: Each Sequence Has Its Own Mini-Climax",
+    "taxonomy_level": "structure_pacing",
+    "category": "act_structure",
+    "source": {
+      "type": "framework",
+      "originator": "Paul Gulino",
+      "work": "Screenwriting the Sequence Approach"
+    },
+    "definition": "A screenplay is divided into roughly eight sequences (10-15 pages each), each with its own setup, escalation, and climax. Each sequence climax answers the dramatic question raised at its beginning while raising a new question for the next sequence. This creates a rhythm of question-and-answer that sustains momentum across the full script.",
+    "detection_signal": "Scripts where the middle acts feel flat or aimless, where there are no discernible mini-climaxes within act structures, or where dramatic questions are raised but never answered until the final act.",
+    "counter_considerations": "Some art-house or experimental scripts deliberately subvert sequence structure. The approach is a screenwriting tool, not an aesthetic mandate.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries",
+      "page_estimates"
+    ],
+    "related_rules": [
+      "three_act_structure",
+      "mckee_five_part_design"
+    ]
+  },
+  {
+    "id": "gulino_dramatic_question",
+    "name": "Each Sequence Must Raise and Answer a Dramatic Question",
+    "taxonomy_level": "structure_pacing",
+    "category": "structure",
+    "source": {
+      "type": "framework",
+      "originator": "Paul Gulino",
+      "work": "Screenwriting the Sequence Approach"
+    },
+    "definition": "Every sequence begins with a dramatic question (Will the hero achieve this goal? Will the couple get together? Will the mystery be solved?) and ends with a partial answer that raises a new, more urgent question. This chain of questions drives the audience through the script.",
+    "detection_signal": "Sequences that begin without a clear dramatic question, or end without providing at least a partial answer while raising a new one.",
+    "counter_considerations": "Some sequences may function as transitions or character development without explicit dramatic questions. The rule targets narrative momentum.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "scene_must_turn"
+    ]
+  },
+  {
+    "id": "martell_act_two_conflict",
+    "name": "Act Two Is the Conflict Act",
+    "taxonomy_level": "structure_pacing",
+    "category": "act_structure",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Act Two Secrets"
+    },
+    "definition": "Act Two is where all the conflict lives \u00e2\u20ac\u201d it's the protagonist struggling against the antagonist and escalating complications. If Act Two feels like padding, the real problem is insufficient conflict. Act Two begins when the protagonist is locked into the struggle and cannot escape, not when the conflict is merely introduced.",
+    "detection_signal": "Scripts where Act Two feels like a stall, where the protagonist is passive, where conflict is repetitive rather than escalating, or where Act Two consists of subplots disconnected from the central struggle.",
+    "counter_considerations": "Some scripts deliberately use slow-burn or contemplative pacing. The rule targets common commercial screenplay problems.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "three_act_structure",
+      "pacing_escalation"
+    ]
+  },
+  {
+    "id": "martell_deadlines_drive_momentum",
+    "name": "Deadlines Drive Act Two Momentum",
+    "taxonomy_level": "structure_pacing",
+    "category": "pacing",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Act Two Secrets"
+    },
+    "definition": "Act Two stalls when there's no ticking clock or deadline pressing against the protagonist. Deadlines create urgency \u00e2\u20ac\u201d the hero must act now or face consequences. Whether a literal deadline (the bomb goes off in 12 hours) or an implied one (the wedding is next week), time pressure keeps the story moving.",
+    "detection_signal": "Scripts where the protagonist has unlimited time to pursue goals, where there's no consequence for delay, or where Act Two feels like the story is treading water.",
+    "counter_considerations": "Some stories use internal deadlines or emotional urgency rather than literal clocks. The rule targets aimless middles.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "thriller_ticking_clock"
+    ]
+  },
+  {
+    "id": "martell_know_your_destination",
+    "name": "Know Your Ending Before You Write",
+    "taxonomy_level": "structure_pacing",
+    "category": "ending",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Grand Finales"
+    },
+    "definition": "The ending is the destination every scene leads toward. If you don't know your ending, every scene is a guess \u00e2\u20ac\u201d and many will head in the wrong direction. Knowing the ending first allows you to ensure every scene serves the destination. If you discover the ending during drafting, you must rewrite from page one to head toward it.",
+    "detection_signal": "Scripts where scenes feel aimless, where the ending comes from nowhere, or where the middle seems to be heading in a different direction than the climax.",
+    "counter_considerations": "Some writers discover endings organically and rewrite effectively. The rule targets the common problem of aimless middles.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "opening_closing_bookend"
+    ]
+  },
+  {
+    "id": "bell_lock_system",
+    "name": "LOCK System: Lead, Objective, Confrontation, Knockout",
+    "taxonomy_level": "structure_pacing",
+    "category": "plot_foundation",
+    "source": {
+      "type": "framework",
+      "originator": "James Scott Bell",
+      "work": "Plot & Structure"
+    },
+    "definition": "A strong plot requires four elements: a compelling Lead character, a clear Objective (something the lead wants or needs to get/escape/win/deliver), ongoing Confrontation that escalates, and a Knockout ending that satisfies. Missing any element weakens the story.",
+    "detection_signal": "Stories where the protagonist lacks a clear objective, where confrontation plateaus rather than escalates, where the ending feels unearned or arbitrary, or where the Lead is not interesting enough to sustain a novel.",
+    "counter_considerations": "Literary fiction may intentionally de-emphasize plot objectives. Do not flag character studies that deliberately subordinate external goals to internal exploration.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "three_act_structure",
+      "pacing_escalation"
+    ]
+  },
+  {
+    "id": "bell_midpoint_shift",
+    "name": "The Midpoint Shifts the Story from Reaction to Action",
+    "taxonomy_level": "structure_pacing",
+    "category": "midpoint",
+    "source": {
+      "type": "framework",
+      "originator": "James Scott Bell",
+      "work": "Plot & Structure"
+    },
+    "definition": "At the midpoint, the protagonist shifts from reacting to events to proactively pursuing the goal. The stakes intensify and the protagonist commits fully. Before the midpoint, the character is often\u00e8\u00a2\u00ab\u00e5\u0160\u00a8 (passive); after, they become\u00e4\u00b8\u00bb\u00e5\u0160\u00a8 (active).",
+    "detection_signal": "Stories where the protagonist remains passive throughout the second act. A midpoint that merely continues existing patterns rather than shifting the dynamic.",
+    "counter_considerations": "In some stories, the midpoint is a revelation that forces the character into action rather than a conscious decision. Do not flag midpoints that catalyze proactivity even if it is not the character's choice.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "thriller_active_protagonist"
+    ]
+  },
+  {
+    "id": "alderson_false_summit",
+    "name": "The False Summit Before the True Climax",
+    "taxonomy_level": "structure_pacing",
+    "category": "climax_structure",
+    "source": {
+      "type": "framework",
+      "originator": "Martha Alderson",
+      "work": "Writing Blockbuster Plots"
+    },
+    "definition": "Before the true climax, the protagonist often reaches what appears to be the peak\u00e2\u20ac\u201da false summit where they think they have won or lost. This false resolution is then overturned, raising stakes to their highest point and forcing the character into their final, most difficult choice.",
+    "detection_signal": "Stories where the climax arrives without a preceding false resolution. A protagonist who reaches the goal without a final test or reversal. Climaxes that lack the emotional weight of a prior near-miss.",
+    "counter_considerations": "Not all stories require a false summit, particularly in shorter forms. Do not flag stories where the escalation itself provides sufficient tension without a false resolution.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "thriller_reversals_escalate"
+    ]
   }
 ]

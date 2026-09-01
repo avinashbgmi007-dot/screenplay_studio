@@ -1,0 +1,1096 @@
+[
+  {
+    "id": "cron_story_is_internal_struggle",
+    "name": "Story Is the Internal Struggle, Not the External Plot",
+    "taxonomy_level": "psychology",
+    "category": "story_foundation",
+    "source": {
+      "type": "framework",
+      "originator": "Lisa Cron",
+      "work": "Story Genius"
+    },
+    "definition": "The story is not about what happens in the plot. It is about how the things that happen affect the protagonist internally, and how she changes as a result. The internal change is what readers are wired to respond to.",
+    "detection_signal": "Scenes where external events do not connect to the protagonist's internal misbelief, desire, or fear. Plot events that do not force the protagonist to re-evaluate a deep assumption.",
+    "counter_considerations": "In purely plot-driven genres (e.g. hard sci-fi concepts), the internal layer may be thinner but should still exist. Do not flag stories that have an internal layer even if it is subtle.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "want_vs_need",
+      "character_arc_change"
+    ]
+  },
+  {
+    "id": "cron_before_story_starts",
+    "name": "Every Story Begins In Medias Res of the Inner Story",
+    "taxonomy_level": "psychology",
+    "category": "backstory",
+    "source": {
+      "type": "framework",
+      "originator": "Lisa Cron",
+      "work": "Story Genius"
+    },
+    "definition": "The story does not begin on page one. It started long before the novel opens, when the protagonist developed the misbelief (Lie) that will be challenged. The novel begins in the middle of this ongoing internal struggle.",
+    "detection_signal": "Protagonists whose internal conflicts appear to arise from the plot events rather than from pre-existing beliefs shaped by past experience. Characters with no visible wound or ghost.",
+    "counter_considerations": "Some stories reveal the ghost gradually. Do not flag a story simply because the ghost is not explicit in Act One, if clues are seeded.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_arc_change"
+    ]
+  },
+  {
+    "id": "bell_fictive_dream",
+    "name": "The Goal Is the Fictive Dream\u00e2\u20ac\u201dTransport the Reader",
+    "taxonomy_level": "psychology",
+    "category": "reader_experience",
+    "source": {
+      "type": "framework",
+      "originator": "James Scott Bell",
+      "work": "Plot & Structure"
+    },
+    "definition": "The purpose of fiction is to create a 'fictive dream'\u00e2\u20ac\u201dthe illusion that life is taking place on the page. When readers are under the spell of a story, they experience events as if they were real. The writer's job is to sustain this dream, not to showcase prose or technique.",
+    "detection_signal": "Moments where the author's presence becomes visible\u00e2\u20ac\u201dstylistic flourishes, authorial commentary, or meta-awareness that reminds the reader they are reading a constructed text.",
+    "counter_considerations": "Certain literary styles intentionally break the fictive dream for thematic effect. Do not flag deliberate fourth-wall breaks or experimental narrative techniques.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "cron_dopamine_hook"
+    ]
+  },
+  {
+    "id": "cognitive_bias_anchoring",
+    "name": "Anchoring Effect",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "Daniel Kahneman",
+      "work": "Thinking, Fast and Slow"
+    },
+    "definition": "The tendency to rely too heavily on the first piece of information encountered (the anchor) when making subsequent judgments. Once an anchor is set, adjustments are insufficient.",
+    "detection_signal": "A character makes a decision that seems disproportionately influenced by an initial number, offer, or piece of information presented to them.",
+    "counter_considerations": "Do not flag when the anchor is obviously irrelevant to the character's reasoning or when the character explicitly rejects the anchor.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "contrast_effect_in_scene"
+    ]
+  },
+  {
+    "id": "cognitive_bias_confirmation",
+    "name": "Confirmation Bias",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "Daniel Kahneman",
+      "work": "Thinking, Fast and Slow"
+    },
+    "definition": "The tendency to search for, interpret, favor, and recall information in a way that confirms or supports one's prior beliefs or values. People filter evidence to fit what they already believe.",
+    "detection_signal": "A character selectively notices or remembers details that support their existing belief while ignoring contradictory evidence.",
+    "counter_considerations": "Do not flag when a character is genuinely open to changing their mind or when the narrative explicitly shows them considering opposing evidence.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "fundamental_attribution_error"
+    ]
+  },
+  {
+    "id": "cognitive_bias_availability",
+    "name": "Availability Heuristic",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "Daniel Kahneman",
+      "work": "Thinking, Fast and Slow"
+    },
+    "definition": "The tendency to overestimate the likelihood of events based on how easily examples come to mind. Vivid, recent, or emotionally charged events feel more probable than they actually are.",
+    "detection_signal": "A character dramatically overestimates a rare danger (plane crash, shark attack) because of recent news or a vivid story, while underestimating a common risk.",
+    "counter_considerations": "Do not flag when the character's assessment of probability is actually accurate or when the availability bias is the comedic/dramatic point.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "anchoring_effect"
+    ]
+  },
+  {
+    "id": "cognitive_bias_loss_aversion",
+    "name": "Loss Aversion",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "Daniel Kahneman",
+      "work": "Thinking, Fast and Slow"
+    },
+    "definition": "People feel the pain of losing something roughly twice as strongly as the pleasure of gaining the same thing. Losses loom larger than gains, making people irrationally risk-averse.",
+    "detection_signal": "A character clings to a failing relationship, job, or plan far past the point of reason, unable to let go even when staying guarantees worse outcomes.",
+    "counter_considerations": "Do not flag when the character's attachment to what they have is genuinely rational or when letting go would cause real, concrete harm.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "sunk_cost_fallacy"
+    ]
+  },
+  {
+    "id": "cognitive_bias_sunk_cost",
+    "name": "Sunk Cost Fallacy",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "Daniel Kahneman",
+      "work": "Thinking, Fast and Slow"
+    },
+    "definition": "The tendency to continue an endeavor because of previously invested resources (time, money, effort) rather than future value. Past investment is irrelevant to future decisions.",
+    "detection_signal": "A character says or implies they cannot quit because they have already invested so much, despite clear evidence that continuing is destructive.",
+    "counter_considerations": "Do not flag when the prior investment genuinely creates future value or when the character is about to break free of the fallacy.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "loss_aversion"
+    ]
+  },
+  {
+    "id": "cognitive_bias_fundamental_attribution",
+    "name": "Fundamental Attribution Error",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "Daniel Kahneman",
+      "work": "Thinking, Fast and Slow"
+    },
+    "definition": "The tendency to attribute others' behavior to their character or personality while attributing one's own behavior to situational factors. We judge others by who they are but ourselves by our circumstances.",
+    "detection_signal": "A character harshly judges another person's failure as a character flaw while excusing their own identical failure as bad luck or external pressure.",
+    "counter_considerations": "Do not flag when the character's assessment of the other person is genuinely accurate or when the character is self-aware about the double standard.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "confirmation_bias"
+    ]
+  },
+  {
+    "id": "cognitive_bias_halo_effect",
+    "name": "Halo Effect",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "Daniel Kahneman",
+      "work": "Thinking, Fast and Slow"
+    },
+    "definition": "The tendency for an impression formed in one domain to influence opinion in another domain. Attractive people are assumed to be smarter, kinder, and more competent.",
+    "detection_signal": "A character is treated as more trustworthy, competent, or moral because of one positive attribute (looks, charm, wealth) that has no logical connection.",
+    "counter_considerations": "Do not flag when the positive impression is supported by evidence across multiple domains or when the halo effect is being deconstructed by the narrative.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "anchoring_effect"
+    ]
+  },
+  {
+    "id": "manipulation_anchoring_persuasion",
+    "name": "Anchoring in Persuasion",
+    "taxonomy_level": "psychology",
+    "category": "manipulation_pattern",
+    "source": {
+      "type": "framework",
+      "originator": "Anonymous",
+      "work": "Dark Psychology"
+    },
+    "definition": "Setting an extreme initial position (price, demand, expectation) to make any subsequent offer seem reasonable by comparison. The anchor distorts all following judgments.",
+    "detection_signal": "A character opens negotiations with an outrageous demand, then makes a 'concession' that is still more than they originally wanted.",
+    "counter_considerations": "Do not flag when the initial position is genuinely held and not a negotiating tactic, or when the character explicitly rejects the anchoring strategy.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "cognitive_bias_anchoring"
+    ]
+  },
+  {
+    "id": "manipulation_gaslighting",
+    "name": "Gaslighting",
+    "taxonomy_level": "psychology",
+    "category": "manipulation_pattern",
+    "source": {
+      "type": "framework",
+      "originator": "Anonymous",
+      "work": "Dark Psychology"
+    },
+    "definition": "Making someone question their own reality, memory, or perceptions through persistent denial, misdirection, and contradiction. The victim begins to distrust their own senses.",
+    "detection_signal": "A character repeatedly denies things that happened, claims the other person is imagining or remembering wrong, or says 'that never happened' when it did.",
+    "counter_considerations": "Do not flag when the gaslighting is obvious to the audience and being used as a clear antagonist trait, or when genuine miscommunication is occurring.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "manipulation_isolation"
+    ]
+  },
+  {
+    "id": "manipulation_isolation",
+    "name": "Isolation as Control",
+    "taxonomy_level": "psychology",
+    "category": "manipulation_pattern",
+    "source": {
+      "type": "framework",
+      "originator": "Anonymous",
+      "work": "Dark Psychology"
+    },
+    "definition": "Cutting a target off from support systems (friends, family, outside information) makes them dependent on the manipulator. Isolation removes reality checks and alternative perspectives.",
+    "detection_signal": "A character systematically discourages another from seeing friends, family, or outside help, framing it as love, protection, or 'us against the world.'",
+    "counter_considerations": "Do not flag when isolation is situational (remote location, quarantine) rather than strategic, or when the character is genuinely protecting someone from a real external threat.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "manipulation_gaslighting"
+    ]
+  },
+  {
+    "id": "manipulation_love_bombing",
+    "name": "Love Bombing",
+    "taxonomy_level": "psychology",
+    "category": "manipulation_pattern",
+    "source": {
+      "type": "framework",
+      "originator": "Anonymous",
+      "work": "Dark Psychology"
+    },
+    "definition": "Overwhelming a target with affection, attention, flattery, and gifts early in a relationship to create a sense of obligation and emotional dependency before the control begins.",
+    "detection_signal": "A character showers another with intense attention, grand gestures, and declarations of deep connection very early, creating a sense of inevitable destiny.",
+    "counter_considerations": "Do not flag when the intensity is genuine and mutual, or when the narrative shows the love bombing as clearly performative and the target sees through it.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "power_selective_honesty"
+    ]
+  },
+  {
+    "id": "manipulation_foot_in_door",
+    "name": "Foot-in-the-Door Technique",
+    "taxonomy_level": "psychology",
+    "category": "manipulation_pattern",
+    "source": {
+      "type": "framework",
+      "originator": "Anonymous",
+      "work": "Dark Psychology"
+    },
+    "definition": "Getting someone to agree to a small request first, making them more likely to agree to a larger request later. Compliance with the first request creates psychological commitment.",
+    "detection_signal": "A character starts with small asks that seem harmless, then escalates demands incrementally, each building on the previous agreement.",
+    "counter_considerations": "Do not flag when the escalation is natural and appropriate, or when the character explicitly pushes back on the larger request.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "manipulation_anchoring_persuasion"
+    ]
+  },
+  {
+    "id": "manipulation_scarcity",
+    "name": "Scarcity Principle",
+    "taxonomy_level": "psychology",
+    "category": "manipulation_pattern",
+    "source": {
+      "type": "framework",
+      "originator": "Anonymous",
+      "work": "Dark Psychology"
+    },
+    "definition": "People assign more value to things that are scarce or limited. Artificially creating urgency ('only one left,' 'limited time') bypasses rational evaluation and triggers impulsive action.",
+    "detection_signal": "A character creates artificial urgency or exclusivity to pressure another into a quick decision, often removing time for reflection.",
+    "counter_considerations": "Do not flag when the scarcity is genuine, or when the character is honestly communicating real limitations rather than manufacturing urgency.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "manipulation_foot_in_door"
+    ]
+  },
+  {
+    "id": "profiling_baseline_shift",
+    "name": "Baseline-to-Shift Detection",
+    "taxonomy_level": "psychology",
+    "category": "behavior_profiling",
+    "source": {
+      "type": "framework",
+      "originator": "Chase Hughes",
+      "work": "Six-Minute X-Ray"
+    },
+    "definition": "Establish a person's normal behavior pattern (baseline), then watch for deviations. A shift from baseline \u2014 in posture, voice, gestures, or tempo \u2014 signals that something has changed internally.",
+    "detection_signal": "A character who is normally loud becomes suddenly quiet, or a fidgety character goes still, or someone's speech pace changes dramatically at a specific topic.",
+    "counter_considerations": "Do not flag behavioral shifts caused by obvious external factors (fatigue, illness, intoxication) or when the shift is part of a deliberate performance.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "nonverbal_cluster_reading"
+    ]
+  },
+  {
+    "id": "profiling_deception_indicators",
+    "name": "Deception Indicator Clusters",
+    "taxonomy_level": "psychology",
+    "category": "behavior_profiling",
+    "source": {
+      "type": "framework",
+      "originator": "Chase Hughes",
+      "work": "Six-Minute X-Ray"
+    },
+    "definition": "No single behavior proves deception. Look for clusters: increased self-touching, gaze aversion at key moments, speech hesitations, and incongruent facial expressions occurring together.",
+    "detection_signal": "A character exhibits multiple deceptive signals simultaneously when asked a specific question: looking away, touching face, pausing, and giving an overly detailed answer.",
+    "counter_considerations": "Do not flag any single indicator in isolation, or when the character has a neurological or cultural reason for the behavior pattern.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "nonverbal_incongruence"
+    ]
+  },
+  {
+    "id": "profiling_dominance_posture",
+    "name": "Dominance and Submission Postures",
+    "taxonomy_level": "psychology",
+    "category": "behavior_profiling",
+    "source": {
+      "type": "framework",
+      "originator": "Chase Hughes",
+      "work": "Six-Minute X-Ray"
+    },
+    "definition": "Dominant postures: expanded body, hands on hips, fingers steepled, leaning forward, chin up. Submissive postures: compressed body, arms at sides, palms up, chin down, eye contact avoidance.",
+    "detection_signal": "A character's posture shifts between dominance and submission during a scene, revealing their internal power assessment relative to others in the room.",
+    "counter_considerations": "Do not flag postures dictated by physical constraints (sitting in a small chair, standing in a crowd) or when the character is deliberately performing a role.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "body_language_territorial"
+    ]
+  },
+  {
+    "id": "profiling_emotional_triggers",
+    "name": "Emotional Trigger Mapping",
+    "taxonomy_level": "psychology",
+    "category": "behavior_profiling",
+    "source": {
+      "type": "framework",
+      "originator": "Chase Hughes",
+      "work": "Six-Minute X-Ray"
+    },
+    "definition": "Every person has specific topics, words, or situations that cause disproportionate emotional reactions. Identifying these reveals core wounds, values, and vulnerabilities.",
+    "detection_signal": "A character has an outsized emotional reaction to a seemingly minor comment or situation, suggesting a deeper trigger connected to backstory or identity.",
+    "counter_considerations": "Do not flag when the reaction is proportionate to the situation, or when the trigger is so obvious it needs no analysis.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "profiling_baseline_shift"
+    ]
+  },
+  {
+    "id": "psych_big_five_trait",
+    "name": "Big Five Personality Traits",
+    "taxonomy_level": "psychology",
+    "category": "personality_framework",
+    "source": {
+      "type": "framework",
+      "originator": "DK Publishing",
+      "work": "The Psychology Book"
+    },
+    "definition": "Personality across five dimensions: Openness, Conscientiousness, Extraversion, Agreeableness, and Neuroticism (OCEAN). Each person has a unique profile across these traits that predicts behavior patterns.",
+    "detection_signal": "A character consistently exhibits a specific pattern across the five dimensions: high openness but low conscientiousness, or high neuroticism with high extraversion.",
+    "counter_considerations": "Do not flag when a character is clearly one-dimensional or when personality traits are not expressed through consistent behavioral patterns.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "enneagram_core_motivation"
+    ]
+  },
+  {
+    "id": "psych_social_learning",
+    "name": "Social Learning Theory",
+    "taxonomy_level": "psychology",
+    "category": "learning_theory",
+    "source": {
+      "type": "framework",
+      "originator": "DK Publishing",
+      "work": "The Psychology Book"
+    },
+    "definition": "People learn behavior by observing and imitating others, especially models they admire or identify with. Vicarious reinforcement (seeing others rewarded) and punishment shape learning without direct experience.",
+    "detection_signal": "A character imitates the behavior, speech patterns, or attitudes of a parent, mentor, or admired figure, sometimes without realizing it.",
+    "counter_considerations": "Do not flag when the imitation is deliberate mimicry rather than internalized learning, or when the character actively resists the model's influence.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "psych_classical_conditioning"
+    ]
+  },
+  {
+    "id": "psych_maslow_hierarchy",
+    "name": "Maslow's Hierarchy of Needs",
+    "taxonomy_level": "psychology",
+    "category": "motivation_theory",
+    "source": {
+      "type": "framework",
+      "originator": "DK Publishing",
+      "work": "The Psychology Book"
+    },
+    "definition": "Human needs form a pyramid: physiological (food, shelter) \u2192 safety \u2192 belonging \u2192 esteem \u2192 self-actualization. Lower needs must be met before higher ones become motivating. A starving person doesn't care about status.",
+    "detection_signal": "A character's behavior shifts when a lower need is threatened (safety, food, shelter), suddenly abandoning higher pursuits to address the more fundamental want.",
+    "counter_considerations": "Do not flag when the hierarchy is clearly violated by the narrative for dramatic effect, or when the character defies it as an act of exceptional will.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "psych_social_learning"
+    ]
+  },
+  {
+    "id": "psych_cognitive_dissonance",
+    "name": "Cognitive Dissonance",
+    "taxonomy_level": "psychology",
+    "category": "cognitive_bias",
+    "source": {
+      "type": "framework",
+      "originator": "DK Publishing",
+      "work": "The Psychology Book"
+    },
+    "definition": "The mental discomfort of holding two contradictory beliefs or acting against one's values. People resolve it by changing beliefs, justifying behavior, or avoiding conflicting information.",
+    "detection_signal": "A character rationalizes a choice they know is wrong, avoids information that contradicts their decision, or becomes irrationally defensive when their values are questioned.",
+    "counter_considerations": "Do not flag when the character is genuinely conflicted and openly wrestling with the dissonance rather than avoiding it.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "cognitive_bias_confirmation"
+    ]
+  },
+  {
+    "id": "psych_classical_conditioning",
+    "name": "Classical Conditioning",
+    "taxonomy_level": "psychology",
+    "category": "learning_theory",
+    "source": {
+      "type": "framework",
+      "originator": "DK Publishing",
+      "work": "How Psychology Works"
+    },
+    "definition": "Associating a neutral stimulus with a meaningful one creates an automatic response. After repeated pairing, the neutral stimulus alone triggers the response (Pavlov's dogs salivating at a bell).",
+    "detection_signal": "A character has an automatic emotional or physical response to a stimulus that was previously neutral \u2014 a song triggers tears, a smell triggers rage, a phrase triggers panic.",
+    "counter_considerations": "Do not flag when the conditioned response is explicitly explained by the narrative as a plot device rather than shown organically.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "psych_social_learning"
+    ]
+  },
+  {
+    "id": "psych_operant_conditioning",
+    "name": "Operant Conditioning and Reinforcement Schedules",
+    "taxonomy_level": "psychology",
+    "category": "learning_theory",
+    "source": {
+      "type": "framework",
+      "originator": "DK Publishing",
+      "work": "How Psychology Works"
+    },
+    "definition": "Behavior shaped by consequences: positive reinforcement (reward), negative reinforcement (removing discomfort), punishment, and extinction. Variable reinforcement schedules are the most resistant to extinction.",
+    "detection_signal": "A character's behavior is clearly being shaped by inconsistent rewards \u2014 sometimes praised, sometimes ignored \u2014 creating an addictive pattern of trying harder.",
+    "counter_considerations": "Do not flag when the reinforcement is natural consequence rather than deliberate manipulation, or when the character is aware of and resisting the conditioning.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "psych_classical_conditioning"
+    ]
+  },
+  {
+    "id": "psych_eros Thanatos",
+    "name": "Eros vs. Thanatos (Life and Death Drives)",
+    "taxonomy_level": "psychology",
+    "category": "psychoanalytic_theory",
+    "source": {
+      "type": "framework",
+      "originator": "DK Publishing",
+      "work": "How Psychology Works"
+    },
+    "definition": "Freud's dualistic model: Eros (life drive) pulls toward creation, connection, and survival. Thanatos (death drive) pulls toward destruction, repetition of trauma, and self-sabotage. Human behavior oscillates between them.",
+    "detection_signal": "A character simultaneously builds something meaningful and self-destructs it, or oscillates between creative passion and nihilistic recklessness.",
+    "counter_considerations": "Do not flag when the behavior is purely self-destructive without a creative/constructive counterpart, or when the Freudian framework doesn't fit the character's worldview.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "shadow_integration"
+    ]
+  },
+  {
+    "id": "criminal_psychopathy_traits",
+    "name": "Psychopathic Personality Traits",
+    "taxonomy_level": "psychology",
+    "category": "criminal_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Curt R. Bartol & Anne M. Bartol",
+      "work": "Criminal Behavior"
+    },
+    "definition": "Characterized by grandiosity, lack of empathy, superficial charm, manipulativeness, impulsivity, and absence of remorse. Psychopaths understand emotions intellectually but do not feel them viscerally.",
+    "detection_signal": "A character displays effortless charm combined with a complete lack of guilt, exploits others with precision, and shows no genuine emotional response to others' suffering.",
+    "counter_considerations": "Do not flag when the character's 'psychopathic' traits are situational stress responses rather than enduring personality patterns, or when they are learning empathy.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "criminal_psychopathy_mask"
+    ]
+  },
+  {
+    "id": "criminal_psychopathy_mask",
+    "name": "The Psychopathic Mask of Sanity",
+    "taxonomy_level": "psychology",
+    "category": "criminal_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Curt R. Bartol & Anne M. Bartol",
+      "work": "Criminal Behavior"
+    },
+    "definition": "High-functioning psychopaths construct a convincing facade of normalcy \u2014 warm, charming, even heroic \u2014 to exploit trust. The mask slips only under extreme stress or when they feel unobserved.",
+    "detection_signal": "A character is universally liked and admired but occasionally shows cold, calculating behavior in private moments or when they believe no one is watching.",
+    "counter_considerations": "Do not flag when the mask-slipping is too obvious for other characters to miss, or when the character is presented as a villain from the start.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "criminal_psychopathy_traits"
+    ]
+  },
+  {
+    "id": "criminal_antisocial_pattern",
+    "name": "Antisocial Behavior Pattern",
+    "taxonomy_level": "psychology",
+    "category": "criminal_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Curt R. Bartol & Anne M. Bartol",
+      "work": "Criminal Behavior"
+    },
+    "definition": "A persistent pattern of disregard for others' rights: repeated lawbreaking, deceitfulness, impulsivity, irritability, reckless disregard for safety, and consistent irresponsibility across multiple contexts.",
+    "detection_signal": "A character has a documented history of rule-breaking, broken promises, and harm to others that they attribute to circumstances rather than accepting responsibility.",
+    "counter_considerations": "Do not flag when the antisocial behavior is situational (war, survival) rather than a lifelong pattern, or when the character is genuinely reforming.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "criminal_psychopathy_traits"
+    ]
+  },
+  {
+    "id": "criminal_offender_profiling",
+    "name": "Crime Scene Personality Indicators",
+    "taxonomy_level": "psychology",
+    "category": "criminal_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Curt R. Bartol & Anne M. Bartol",
+      "work": "Criminal Behavior"
+    },
+    "definition": "The way a crime is committed reveals personality: overkill suggests emotion, neatness suggests planning, staging suggests intelligence, and chaos suggests impulsivity or psychosis.",
+    "detection_signal": "A crime scene or conflict aftermath is described with details that reveal the perpetrator's emotional state: excessive violence (rage), careful arrangement (control), or random destruction (breakdown).",
+    "counter_considerations": "Do not flag when the crime scene evidence is ambiguous or when the perpetrator's method is deliberately designed to mislead profiling.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "criminal_psychopathy_traits"
+    ]
+  },
+  {
+    "id": "shadow_concept",
+    "name": "The Shadow Self",
+    "taxonomy_level": "psychology",
+    "category": "shadow",
+    "source": {
+      "type": "framework",
+      "originator": "Connie Zweig & Jeremiah Abrams",
+      "work": "Meeting the Shadow"
+    },
+    "definition": "The Shadow is the hidden, rejected part of the self \u2014 traits, desires, and impulses that the conscious ego refuses to acknowledge. It contains both primitive darkness and untapped creative potential.",
+    "detection_signal": "A character is confronted with a quality in another person that they vehemently deny in themselves, or has an extreme reaction to a minor provocation that seems disproportionate.",
+    "counter_considerations": "Do not flag when the character is genuinely different from the person they are reacting to, or when the extreme reaction is proportionate to the situation.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "shadow_projection"
+    ]
+  },
+  {
+    "id": "shadow_projection",
+    "name": "Shadow Projection",
+    "taxonomy_level": "psychology",
+    "category": "shadow",
+    "source": {
+      "type": "framework",
+      "originator": "Connie Zweig & Jeremiah Abrams",
+      "work": "Meeting the Shadow"
+    },
+    "definition": "Unacknowledged Shadow traits are projected onto others. We see in others what we cannot see in ourselves. The villain often embodies the hero's disowned qualities.",
+    "detection_signal": "A character's enemy or rival displays exactly the traits the character most despises and denies in themselves, creating an irrational hatred or obsession.",
+    "counter_considerations": "Do not flag when the antagonist genuinely possesses those traits independently, or when the narrative explicitly explores the projection as a theme.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "shadow_concept"
+    ]
+  },
+  {
+    "id": "shadow_denial_destruction",
+    "name": "Shadow Denial Leads to Destruction",
+    "taxonomy_level": "psychology",
+    "category": "shadow",
+    "source": {
+      "type": "framework",
+      "originator": "Connie Zweig & Jeremiah Abrams",
+      "work": "Meeting the Shadow"
+    },
+    "definition": "Refusing to acknowledge the Shadow causes it to erupt uncontrollably. The more rigidly a person suppresses their darker impulses, the more violently they eventually surface.",
+    "detection_signal": "A character who has been repressing a specific trait or desire suddenly acts on it with explosive intensity, as if a dam has broken.",
+    "counter_considerations": "Do not flag when the eruption is a natural, proportionate response to genuine provocation rather than a buildup of suppressed material.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "shadow_concept"
+    ]
+  },
+  {
+    "id": "shadow_integration",
+    "name": "Shadow Integration",
+    "taxonomy_level": "psychology",
+    "category": "shadow",
+    "source": {
+      "type": "framework",
+      "originator": "Connie Zweig & Jeremiah Abrams",
+      "work": "Meeting the Shadow"
+    },
+    "definition": "Conscious acknowledgment and integration of Shadow material leads to wholeness. The goal is not to eliminate darkness but to bring it into awareness where it can be chosen rather than compulsive.",
+    "detection_signal": "A character acknowledges and accepts a previously denied part of themselves, transforming a compulsive behavior into a conscious choice.",
+    "counter_considerations": "Do not flag when the integration is superficial or occurs without real struggle, or when the character represses the Shadow again after 'integrating' it.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "shadow_concept"
+    ]
+  },
+  {
+    "id": "enneagram_core_motivation",
+    "name": "Enneagram Core Motivation and Fear",
+    "taxonomy_level": "psychology",
+    "category": "enneagram",
+    "source": {
+      "type": "framework",
+      "originator": "Ian Cron",
+      "work": "The Road Back to You"
+    },
+    "definition": "Each of the nine Enneagram types is driven by a core motivation and a core fear. Behavior is a strategy to avoid the fear and satisfy the motivation. Types are not about what you do but why you do it.",
+    "detection_signal": "A character's seemingly contradictory behaviors become consistent when viewed through a single underlying fear (e.g., fear of being worthless drives both ambition and self-sabotage).",
+    "counter_considerations": "Do not flag when the character's behavior has no consistent underlying motivation, or when they are genuinely multifaceted rather than type-driven.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "enneagram_stress_direction"
+    ]
+  },
+  {
+    "id": "enneagram_stress_direction",
+    "name": "Enneagram Stress and Growth Directions",
+    "taxonomy_level": "psychology",
+    "category": "enneagram",
+    "source": {
+      "type": "framework",
+      "originator": "Ian Cron",
+      "work": "The Road Back to You"
+    },
+    "definition": "Under stress, each type disintegrates toward the behaviors of another type. Under growth, each type integrates toward the strengths of a different type. Stress reveals the shadow version of the type.",
+    "detection_signal": "A character who normally behaves one way shifts dramatically under pressure, adopting behaviors characteristic of a different personality pattern (e.g., a Type 1 becomes critical and rigid like a Type 4).",
+    "counter_considerations": "Do not flag stress responses that are clearly situational rather than pattern-based, or when the shift is gradual rather than triggered by specific pressure.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "enneagram_core_motivation"
+    ]
+  },
+  {
+    "id": "enneagram_wing_influence",
+    "name": "Enneagram Wing Influence",
+    "taxonomy_level": "psychology",
+    "category": "enneagram",
+    "source": {
+      "type": "framework",
+      "originator": "Ian Cron",
+      "work": "The Road Back to You"
+    },
+    "definition": "Each type is influenced by one or both adjacent types (wings), adding flavor and variation. A Type 2 with a Type 1 wing is different from a Type 2 with a Type 3 wing.",
+    "detection_signal": "A character who is primarily one type shows secondary characteristics of an adjacent type that add nuance to their behavior pattern.",
+    "counter_considerations": "Do not flag wing characteristics when they are so subtle they require expert knowledge to identify, or when the character is clearly multiple types rather than one type with wing influence.",
+    "severity_default": "low",
+    "confidence_tier": "low",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "enneagram_core_motivation"
+    ]
+  },
+  {
+    "id": "enneagram_vice_passion",
+    "name": "Enneagram Vice and Passion",
+    "taxonomy_level": "psychology",
+    "category": "enneagram",
+    "source": {
+      "type": "framework",
+      "originator": "Ian Cron",
+      "work": "The Road Back to You"
+    },
+    "definition": "Each type has a 'vice' (the chronic emotional pattern) and a 'passion' (the deeper, often unconscious drive). The vice is the ego's default mode of distortion: anger, pride, deceit, envy, etc.",
+    "detection_signal": "A character consistently distorts reality through a specific emotional lens \u2014 always seeing threats, always seeking approval, always feeling inadequate \u2014 regardless of circumstances.",
+    "counter_considerations": "Do not flag emotional patterns that are clearly situational or that change appropriately with circumstances.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "enneagram_core_motivation"
+    ]
+  },
+  {
+    "id": "enneagram_blind_spot",
+    "name": "Enneagram Blind Spot",
+    "taxonomy_level": "psychology",
+    "category": "enneagram",
+    "source": {
+      "type": "framework",
+      "originator": "Ian Cron",
+      "work": "The Road Back to You"
+    },
+    "definition": "Each type has a characteristic blind spot \u2014 something they literally cannot see about themselves. The blind spot is the ego's defense mechanism that prevents self-awareness in a specific domain.",
+    "detection_signal": "A character consistently fails to notice a specific pattern in their behavior that is obvious to everyone around them, or becomes defensive when it is pointed out.",
+    "counter_considerations": "Do not flag when the blind spot is recognized by the character, or when the narrative treats it as a mystery rather than a type-specific pattern.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "enneagram_core_motivation"
+    ]
+  },
+  {
+    "id": "jung_introversion_extraversion",
+    "name": "Introversion-Extraversion Spectrum",
+    "taxonomy_level": "psychology",
+    "category": "personality_type",
+    "source": {
+      "type": "framework",
+      "originator": "Carl Jung",
+      "work": "Psychological Types"
+    },
+    "definition": "Introverts direct energy inward toward thoughts and reflections; extraverts direct energy outward toward people and action. This is about energy source, not social skill. Introverts are not shy; they are self-charged.",
+    "detection_signal": "A character is drained by social interaction and needs solitude to recharge, or is energized by social interaction and becomes restless when alone.",
+    "counter_considerations": "Do not flag social anxiety as introversion, or social confidence as extraversion. The distinction is about energy direction, not skill or comfort.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "jung_four_functions"
+    ]
+  },
+  {
+    "id": "jung_four_functions",
+    "name": "Four Psychological Functions",
+    "taxonomy_level": "psychology",
+    "category": "personality_type",
+    "source": {
+      "type": "framework",
+      "originator": "Carl Jung",
+      "work": "Psychological Types"
+    },
+    "definition": "Four cognitive functions: Thinking (logic-based decisions), Feeling (value-based decisions), Sensing (concrete data), and Intuiting (pattern recognition). Everyone uses all four but develops one or two preferentially.",
+    "detection_signal": "A character consistently makes decisions through one dominant lens \u2014 always logical analysis, always gut feeling, always concrete facts, or always reading between the lines.",
+    "counter_considerations": "Do not flag when a character uses multiple functions appropriately, or when the function preference is so subtle it requires expert analysis to detect.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "jung_introversion_extraversion"
+    ]
+  },
+  {
+    "id": "jung_persona_shadow",
+    "name": "Persona vs. Shadow",
+    "taxonomy_level": "psychology",
+    "category": "depth_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Carl Jung",
+      "work": "Modern Man in Search of a Soul"
+    },
+    "definition": "The Persona is the social mask presented to the world. The Shadow is everything the Persona excludes. Individuation requires integrating both \u2014 neither destroying the mask nor being consumed by what's behind it.",
+    "detection_signal": "A character maintains a polished public image that cracks under pressure, revealing hidden desires, resentments, or capacities they had suppressed.",
+    "counter_considerations": "Do not flag when the character's public persona and private self are genuinely aligned, or when the Shadow material is so mild it doesn't create real tension.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "shadow_concept"
+    ]
+  },
+  {
+    "id": "jung_individuation",
+    "name": "Individuation as Character Arc",
+    "taxonomy_level": "psychology",
+    "category": "depth_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Carl Jung",
+      "work": "Modern Man in Search of a Soul"
+    },
+    "definition": "The lifelong process of becoming who you truly are \u2014 integrating conscious and unconscious, persona and shadow, thinking and feeling. It is not becoming perfect but becoming whole.",
+    "detection_signal": "A character's arc moves from one-sidedness (pure logic, pure emotion, pure action) toward integration, acknowledging parts of themselves they had rejected.",
+    "counter_considerations": "Do not flag when the character's growth is purely skill-based rather than psychological integration, or when they simply add a new trait without integrating it.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "jung_persona_shadow"
+    ]
+  },
+  {
+    "id": "jung_compensation",
+    "name": "Psychic Compensation",
+    "taxonomy_level": "psychology",
+    "category": "depth_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Carl Jung",
+      "work": "Modern Man in Search of a Soul"
+    },
+    "definition": "The unconscious compensates for one-sided conscious attitudes. An overly rigid person develops chaotic dreams. An overly intellectual person is drawn to irrational art. The psyche seeks balance whether we want it or not.",
+    "detection_signal": "A character who is excessively controlled begins having chaotic dreams, impulse purchases, or outbursts that contradict their conscious personality.",
+    "counter_considerations": "Do not flag when the compensatory behavior has an obvious external cause rather than an unconscious psychic origin.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "jung_individuation"
+    ]
+  },
+  {
+    "id": "jung_collective_unconscious",
+    "name": "Collective Unconscious and Archetypes",
+    "taxonomy_level": "psychology",
+    "category": "depth_psychology",
+    "source": {
+      "type": "framework",
+      "originator": "Carl Jung",
+      "work": "Modern Man in Search of a Soul"
+    },
+    "definition": "Beneath the personal unconscious lies a shared layer containing universal patterns (archetypes): the Mother, the Trickster, the Wise Old Man, the Shadow, the Anima/Animus. These appear in myths, dreams, and stories across all cultures.",
+    "detection_signal": "A character embodies or encounters a recognizable archetypal pattern that resonates across cultures and time periods, rather than being a unique individual invention.",
+    "counter_considerations": "Do not flag when the archetypal quality is generic and not integrated into the character's specific psychology, or when the character is a stereotype rather than an archetype.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "jung_persona_shadow"
+    ]
+  },
+  {
+    "id": "stress_personality_default",
+    "name": "Default Stress Response Pattern",
+    "taxonomy_level": "psychology",
+    "category": "stress_personality",
+    "source": {
+      "type": "framework",
+      "originator": "Naomi Quenk",
+      "work": "Was That Really Me?"
+    },
+    "definition": "Under extreme stress, people regress to less mature versions of their personality type. The behavior under stress reveals core vulnerabilities that are normally managed by the ego's defenses.",
+    "detection_signal": "A character who is normally composed, competent, or charming suddenly regresses \u2014 becoming irrational, petty, controlling, or helpless under extreme pressure.",
+    "counter_considerations": "Do not flag stress regression that is clearly proportional to the situation, or when the character is aware of and managing their stress response.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "enneagram_stress_direction"
+    ]
+  },
+  {
+    "id": "stress_understress_behavior",
+    "name": "Uncharacteristic Under-Stress Behavior",
+    "taxonomy_level": "psychology",
+    "category": "stress_personality",
+    "source": {
+      "type": "framework",
+      "originator": "Naomi Quenk",
+      "work": "Was That Really Me?"
+    },
+    "definition": "The most revealing personality data comes from how people behave under extreme stress \u2014 when their normal coping mechanisms fail. The 'under-stress' behavior is the shadow of their usual type.",
+    "detection_signal": "A character does something that surprises everyone (including themselves) under pressure \u2014 an introvert erupts in rage, a thinker becomes emotional, a controller becomes helpless.",
+    "counter_considerations": "Do not flag when the stress response is consistent with the character's established personality, or when the 'surprising' behavior was foreshadowed throughout the story.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "stress_personality_default"
+    ]
+  }
+]

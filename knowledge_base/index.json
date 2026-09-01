@@ -1,5 +1,5 @@
 {
-  "rule_count": 146,
+  "rule_count": 263,
   "rules": [
     {
       "id": "action_pacing_relentless",
@@ -135,6 +135,78 @@
       "file": "rules/action.json"
     },
     {
+      "id": "body_language_limbic_leak",
+      "name": "Limbic System Leakage",
+      "taxonomy_level": "nonverbal",
+      "category": "body_language",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/body_language.json"
+    },
+    {
+      "id": "body_language_pacifying",
+      "name": "Pacifying Behaviors",
+      "taxonomy_level": "nonverbal",
+      "category": "body_language",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/body_language.json"
+    },
+    {
+      "id": "body_language_feet_direction",
+      "name": "Feet Reveal True Intent",
+      "taxonomy_level": "nonverbal",
+      "category": "body_language",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/body_language.json"
+    },
+    {
+      "id": "body_language_gravity_defying",
+      "name": "Gravity-Defying Behaviors",
+      "taxonomy_level": "nonverbal",
+      "category": "body_language",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/body_language.json"
+    },
+    {
+      "id": "body_language_ventral_exposure",
+      "name": "Ventral Exposure Signals Trust",
+      "taxonomy_level": "nonverbal",
+      "category": "body_language",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/body_language.json"
+    },
+    {
+      "id": "body_language_territorial",
+      "name": "Territorial Behavior",
+      "taxonomy_level": "nonverbal",
+      "category": "body_language",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/body_language.json"
+    },
+    {
       "id": "character_arc_change",
       "name": "Character Arc as Value Change",
       "taxonomy_level": "character",
@@ -189,6 +261,152 @@
       "category": "necessity",
       "confidence_tier": "low",
       "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "stc_save_the_cat_scene",
+      "name": "Save the Cat Scene",
+      "taxonomy_level": "character",
+      "category": "hero_introduction",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "egri_character_contradiction",
+      "name": "Character Contradiction as Source of Drama",
+      "taxonomy_level": "character",
+      "category": "character_depth",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "seger_goal_spine",
+      "name": "Character Goal as Story Spine",
+      "taxonomy_level": "character",
+      "category": "motivation",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "seger_transformation_earned",
+      "name": "Character Transformation Must Be Earned",
+      "taxonomy_level": "character",
+      "category": "character_arc",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "martell_supporting_character_function",
+      "name": "Supporting Characters Must Serve the Protagonist",
+      "taxonomy_level": "character",
+      "category": "supporting_cast",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "hauge_inner_conflict_drives_outer",
+      "name": "Inner Conflict Must Drive Outer Conflict",
+      "taxonomy_level": "character",
+      "category": "character_arc",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph",
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "hauge_identity_transformation",
+      "name": "Six-Stage Character Transformation",
+      "taxonomy_level": "character",
+      "category": "character_arc",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "weiland_lie_believed",
+      "name": "Every Character Arc Is Driven by a Lie the Character Believes",
+      "taxonomy_level": "character",
+      "category": "arc_foundation",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "weiland_want_vs_need",
+      "name": "The Conflict Between What the Character Wants and What They Need",
+      "taxonomy_level": "character",
+      "category": "motivation",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "weiland_ghost_wound",
+      "name": "The Ghost Is the Origin of the Lie",
+      "taxonomy_level": "character",
+      "category": "backstory",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "weiland_five_arc_types",
+      "name": "Five Character Arc Types: Positive, Flat, Disillusionment, Fall, Corruption",
+      "taxonomy_level": "character",
+      "category": "arc_taxonomy",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/character.json"
+    },
+    {
+      "id": "alderson_character_emotional_development",
+      "name": "Track the Character's Emotional Arc Across the Entire Story",
+      "taxonomy_level": "character",
+      "category": "emotional_arc",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
         "knowledge_graph"
       ],
       "genre": null,
@@ -420,6 +638,78 @@
       "requires": [
         "scene_text",
         "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "stc_laying_pipe",
+      "name": "Laying Pipe (Exposition Through Action)",
+      "taxonomy_level": "dialogue",
+      "category": "exposition",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "martell_dialogue_is_character",
+      "name": "Dialogue Is Character",
+      "taxonomy_level": "dialogue",
+      "category": "character_voice",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "martell_say_the_opposite",
+      "name": "Say the Opposite (Subtext Through Contradiction)",
+      "taxonomy_level": "dialogue",
+      "category": "subtext",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "martell_three_line_rule",
+      "name": "Three Line Rule (Dialogue Brevity)",
+      "taxonomy_level": "dialogue",
+      "category": "dialogue_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "martell_see_and_say_rule",
+      "name": "See and Say Rule (Don't Repeat What Was Shown)",
+      "taxonomy_level": "dialogue",
+      "category": "exposition",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue.json"
+    },
+    {
+      "id": "martell_five_types_bad_exposition",
+      "name": "Five Types of Bad Exposition",
+      "taxonomy_level": "dialogue",
+      "category": "exposition",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
       ],
       "genre": null,
       "file": "rules/dialogue.json"
@@ -978,6 +1268,42 @@
       "file": "rules/mystery.json"
     },
     {
+      "id": "stc_logline_four_requirements",
+      "name": "Logline Must Meet Four Requirements",
+      "taxonomy_level": "pitch",
+      "category": "logline",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/pitch.json"
+    },
+    {
+      "id": "beaty_logline_needs_act_two",
+      "name": "Logline Must Indicate Act Two (The Journey)",
+      "taxonomy_level": "pitch",
+      "category": "logline",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/pitch.json"
+    },
+    {
+      "id": "beaty_logline_specific_detail",
+      "name": "Logline Needs Specific, Not Generic, Detail",
+      "taxonomy_level": "pitch",
+      "category": "logline",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/pitch.json"
+    },
+    {
       "id": "chekhovs_gun",
       "name": "Chekhov's Gun",
       "taxonomy_level": "plot_thread",
@@ -1038,6 +1364,807 @@
       "file": "rules/plot_thread.json"
     },
     {
+      "id": "egri_character_incontrovertible",
+      "name": "Character in Incontrovertible Confrontation",
+      "taxonomy_level": "plot_thread",
+      "category": "conflict",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "seger_subplot_resonance",
+      "name": "Subplots Must Resonate with Main Plot",
+      "taxonomy_level": "plot_thread",
+      "category": "subplot",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "martell_four_ds",
+      "name": "The Four Ds: Inside Moves (Dilemma, Denial, Decision, Drama)",
+      "taxonomy_level": "plot_thread",
+      "category": "plot_mechanics",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "martell_plants_and_payoffs",
+      "name": "Plants Must Pay Off",
+      "taxonomy_level": "plot_thread",
+      "category": "setup_payoff",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "hauge_five_stakes_levels",
+      "name": "Five Levels of Stakes",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "lyons_story_spine",
+      "name": "The Story Spine (Because of That, Not And Then)",
+      "taxonomy_level": "plot_thread",
+      "category": "causality",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "alderson_cause_and_effect_scenes",
+      "name": "Scenes Must Be Linked by Cause and Effect",
+      "taxonomy_level": "plot_thread",
+      "category": "scene_linking",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "cron_external_plot_spur",
+      "name": "The External Plot Must Spur the Internal Struggle",
+      "taxonomy_level": "plot_thread",
+      "category": "plot_character_link",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/plot_thread.json"
+    },
+    {
+      "id": "power_law_out_of_sight",
+      "name": "Out of Sight, Out of Mind",
+      "taxonomy_level": "psychology",
+      "category": "power_dynamic",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/power_dynamics.json"
+    },
+    {
+      "id": "power_conceal_intentions",
+      "name": "Conceal Your Intentions",
+      "taxonomy_level": "psychology",
+      "category": "power_dynamic",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/power_dynamics.json"
+    },
+    {
+      "id": "power_boldness_boldness",
+      "name": "Be Bold, Be Bold",
+      "taxonomy_level": "psychology",
+      "category": "power_dynamic",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/power_dynamics.json"
+    },
+    {
+      "id": "power_selective_honesty",
+      "name": "Selective Honesty and Generosity",
+      "taxonomy_level": "psychology",
+      "category": "power_dynamic",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/power_dynamics.json"
+    },
+    {
+      "id": "power_play_to_fantasies",
+      "name": "Play to People's Fantasies",
+      "taxonomy_level": "psychology",
+      "category": "power_dynamic",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/power_dynamics.json"
+    },
+    {
+      "id": "power_reputation",
+      "name": "Guard Your Reputation",
+      "taxonomy_level": "psychology",
+      "category": "power_dynamic",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/power_dynamics.json"
+    },
+    {
+      "id": "power_crush_sentimentality",
+      "name": "Crush Sentimentality",
+      "taxonomy_level": "psychology",
+      "category": "power_dynamic",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/power_dynamics.json"
+    },
+    {
+      "id": "cron_story_is_internal_struggle",
+      "name": "Story Is the Internal Struggle, Not the External Plot",
+      "taxonomy_level": "psychology",
+      "category": "story_foundation",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cron_before_story_starts",
+      "name": "Every Story Begins In Medias Res of the Inner Story",
+      "taxonomy_level": "psychology",
+      "category": "backstory",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "bell_fictive_dream",
+      "name": "The Goal Is the Fictive Dream\u00e2\u20ac\u201dTransport the Reader",
+      "taxonomy_level": "psychology",
+      "category": "reader_experience",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cognitive_bias_anchoring",
+      "name": "Anchoring Effect",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cognitive_bias_confirmation",
+      "name": "Confirmation Bias",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cognitive_bias_availability",
+      "name": "Availability Heuristic",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cognitive_bias_loss_aversion",
+      "name": "Loss Aversion",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cognitive_bias_sunk_cost",
+      "name": "Sunk Cost Fallacy",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cognitive_bias_fundamental_attribution",
+      "name": "Fundamental Attribution Error",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "cognitive_bias_halo_effect",
+      "name": "Halo Effect",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "manipulation_anchoring_persuasion",
+      "name": "Anchoring in Persuasion",
+      "taxonomy_level": "psychology",
+      "category": "manipulation_pattern",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "manipulation_gaslighting",
+      "name": "Gaslighting",
+      "taxonomy_level": "psychology",
+      "category": "manipulation_pattern",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "manipulation_isolation",
+      "name": "Isolation as Control",
+      "taxonomy_level": "psychology",
+      "category": "manipulation_pattern",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "manipulation_love_bombing",
+      "name": "Love Bombing",
+      "taxonomy_level": "psychology",
+      "category": "manipulation_pattern",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "manipulation_foot_in_door",
+      "name": "Foot-in-the-Door Technique",
+      "taxonomy_level": "psychology",
+      "category": "manipulation_pattern",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "manipulation_scarcity",
+      "name": "Scarcity Principle",
+      "taxonomy_level": "psychology",
+      "category": "manipulation_pattern",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "profiling_baseline_shift",
+      "name": "Baseline-to-Shift Detection",
+      "taxonomy_level": "psychology",
+      "category": "behavior_profiling",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "profiling_deception_indicators",
+      "name": "Deception Indicator Clusters",
+      "taxonomy_level": "psychology",
+      "category": "behavior_profiling",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "profiling_dominance_posture",
+      "name": "Dominance and Submission Postures",
+      "taxonomy_level": "psychology",
+      "category": "behavior_profiling",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "profiling_emotional_triggers",
+      "name": "Emotional Trigger Mapping",
+      "taxonomy_level": "psychology",
+      "category": "behavior_profiling",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "psych_big_five_trait",
+      "name": "Big Five Personality Traits",
+      "taxonomy_level": "psychology",
+      "category": "personality_framework",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "psych_social_learning",
+      "name": "Social Learning Theory",
+      "taxonomy_level": "psychology",
+      "category": "learning_theory",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "psych_maslow_hierarchy",
+      "name": "Maslow's Hierarchy of Needs",
+      "taxonomy_level": "psychology",
+      "category": "motivation_theory",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "psych_cognitive_dissonance",
+      "name": "Cognitive Dissonance",
+      "taxonomy_level": "psychology",
+      "category": "cognitive_bias",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "psych_classical_conditioning",
+      "name": "Classical Conditioning",
+      "taxonomy_level": "psychology",
+      "category": "learning_theory",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "psych_operant_conditioning",
+      "name": "Operant Conditioning and Reinforcement Schedules",
+      "taxonomy_level": "psychology",
+      "category": "learning_theory",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "psych_eros Thanatos",
+      "name": "Eros vs. Thanatos (Life and Death Drives)",
+      "taxonomy_level": "psychology",
+      "category": "psychoanalytic_theory",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "criminal_psychopathy_traits",
+      "name": "Psychopathic Personality Traits",
+      "taxonomy_level": "psychology",
+      "category": "criminal_psychology",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "criminal_psychopathy_mask",
+      "name": "The Psychopathic Mask of Sanity",
+      "taxonomy_level": "psychology",
+      "category": "criminal_psychology",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "criminal_antisocial_pattern",
+      "name": "Antisocial Behavior Pattern",
+      "taxonomy_level": "psychology",
+      "category": "criminal_psychology",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "criminal_offender_profiling",
+      "name": "Crime Scene Personality Indicators",
+      "taxonomy_level": "psychology",
+      "category": "criminal_psychology",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "shadow_concept",
+      "name": "The Shadow Self",
+      "taxonomy_level": "psychology",
+      "category": "shadow",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "shadow_projection",
+      "name": "Shadow Projection",
+      "taxonomy_level": "psychology",
+      "category": "shadow",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "shadow_denial_destruction",
+      "name": "Shadow Denial Leads to Destruction",
+      "taxonomy_level": "psychology",
+      "category": "shadow",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "shadow_integration",
+      "name": "Shadow Integration",
+      "taxonomy_level": "psychology",
+      "category": "shadow",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "enneagram_core_motivation",
+      "name": "Enneagram Core Motivation and Fear",
+      "taxonomy_level": "psychology",
+      "category": "enneagram",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "enneagram_stress_direction",
+      "name": "Enneagram Stress and Growth Directions",
+      "taxonomy_level": "psychology",
+      "category": "enneagram",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "enneagram_wing_influence",
+      "name": "Enneagram Wing Influence",
+      "taxonomy_level": "psychology",
+      "category": "enneagram",
+      "confidence_tier": "low",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "enneagram_vice_passion",
+      "name": "Enneagram Vice and Passion",
+      "taxonomy_level": "psychology",
+      "category": "enneagram",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "enneagram_blind_spot",
+      "name": "Enneagram Blind Spot",
+      "taxonomy_level": "psychology",
+      "category": "enneagram",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "jung_introversion_extraversion",
+      "name": "Introversion-Extraversion Spectrum",
+      "taxonomy_level": "psychology",
+      "category": "personality_type",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "jung_four_functions",
+      "name": "Four Psychological Functions",
+      "taxonomy_level": "psychology",
+      "category": "personality_type",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "jung_persona_shadow",
+      "name": "Persona vs. Shadow",
+      "taxonomy_level": "psychology",
+      "category": "depth_psychology",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "jung_individuation",
+      "name": "Individuation as Character Arc",
+      "taxonomy_level": "psychology",
+      "category": "depth_psychology",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "jung_compensation",
+      "name": "Psychic Compensation",
+      "taxonomy_level": "psychology",
+      "category": "depth_psychology",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "jung_collective_unconscious",
+      "name": "Collective Unconscious and Archetypes",
+      "taxonomy_level": "psychology",
+      "category": "depth_psychology",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "stress_personality_default",
+      "name": "Default Stress Response Pattern",
+      "taxonomy_level": "psychology",
+      "category": "stress_personality",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
+      "id": "stress_understress_behavior",
+      "name": "Uncharacteristic Under-Stress Behavior",
+      "taxonomy_level": "psychology",
+      "category": "stress_personality",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/psychology.json"
+    },
+    {
       "id": "antagonist_force_balance",
       "name": "Antagonistic Force of Comparable Power",
       "taxonomy_level": "relationship",
@@ -1060,6 +2187,54 @@
       ],
       "genre": null,
       "file": "rules/relationship.json"
+    },
+    {
+      "id": "epps_revision_first_draft",
+      "name": "First Draft Is Discovery, Not Perfection",
+      "taxonomy_level": "revision",
+      "category": "revision",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/revision.json"
+    },
+    {
+      "id": "epps_rewrite_distance",
+      "name": "Rewriting Requires Emotional Distance",
+      "taxonomy_level": "revision",
+      "category": "revision",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/revision.json"
+    },
+    {
+      "id": "stein_four_dangers_of_telling",
+      "name": "Four Danger Areas of Telling: Backstory, Description, Setting, Emotion",
+      "taxonomy_level": "revision",
+      "category": "show_vs_tell",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/revision.json"
+    },
+    {
+      "id": "zinsser_dump_the_clutter",
+      "name": "Dump the Clutter\u00e2\u20ac\u201dEvery Word Must Earn Its Place",
+      "taxonomy_level": "revision",
+      "category": "prose_economy",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/revision.json"
     },
     {
       "id": "romance_adult_children_opening",
@@ -1252,6 +2427,128 @@
       ],
       "genre": null,
       "file": "rules/scene.json"
+    },
+    {
+      "id": "lakin_scene_hook",
+      "name": "Scene Must Hook at Start and Leave with Tension",
+      "taxonomy_level": "scene",
+      "category": "scene_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "bell_opening_cromise",
+      "name": "The Opening Must Make a Promise to the Reader",
+      "taxonomy_level": "scene",
+      "category": "opening",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "alderson_scene_tracker_elements",
+      "name": "Every Scene Must Track Seven Essential Elements",
+      "taxonomy_level": "scene",
+      "category": "scene_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "alderson_dramatic_vs_passive",
+      "name": "Prefer Dramatic Action Over Passive Action",
+      "taxonomy_level": "scene",
+      "category": "scene_energy",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "stein_dynamic_description",
+      "name": "Descriptions Should Be Dynamic, Not Static",
+      "taxonomy_level": "scene",
+      "category": "description_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "weiland_characteristic_moment",
+      "name": "The Characteristic Moment Must Establish the Protagonist Immediately",
+      "taxonomy_level": "scene",
+      "category": "opening",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "weiland_normal_world",
+      "name": "The Normal World Must Demonstrate the Lie in Action",
+      "taxonomy_level": "scene",
+      "category": "setup",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/scene.json"
+    },
+    {
+      "id": "lyons_scene_is_story",
+      "name": "Each Scene Is a Mini-Story",
+      "taxonomy_level": "scene",
+      "category": "scene_design",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene_design.json"
+    },
+    {
+      "id": "dunne_scene_objective",
+      "name": "Every Scene Has a Clear Objective and Obstacle",
+      "taxonomy_level": "scene",
+      "category": "scene_design",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/scene_design.json"
+    },
+    {
+      "id": "lakin_five_layers",
+      "name": "Five Layers of Scene Construction",
+      "taxonomy_level": "scene",
+      "category": "scene_design",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text",
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/scene_design.json"
     },
     {
       "id": "scifi_concept_simplicity",
@@ -1494,6 +2791,130 @@
       ],
       "genre": null,
       "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "gulino_sequence_climax",
+      "name": "Sequence Approach: Each Sequence Has Its Own Mini-Climax",
+      "taxonomy_level": "structure_pacing",
+      "category": "act_structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
+        "page_estimates"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "gulino_dramatic_question",
+      "name": "Each Sequence Must Raise and Answer a Dramatic Question",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "martell_act_two_conflict",
+      "name": "Act Two Is the Conflict Act",
+      "taxonomy_level": "structure_pacing",
+      "category": "act_structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "martell_deadlines_drive_momentum",
+      "name": "Deadlines Drive Act Two Momentum",
+      "taxonomy_level": "structure_pacing",
+      "category": "pacing",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "martell_know_your_destination",
+      "name": "Know Your Ending Before You Write",
+      "taxonomy_level": "structure_pacing",
+      "category": "ending",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "bell_lock_system",
+      "name": "LOCK System: Lead, Objective, Confrontation, Knockout",
+      "taxonomy_level": "structure_pacing",
+      "category": "plot_foundation",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "bell_midpoint_shift",
+      "name": "The Midpoint Shifts the Story from Reaction to Action",
+      "taxonomy_level": "structure_pacing",
+      "category": "midpoint",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "alderson_false_summit",
+      "name": "The False Summit Before the True Climax",
+      "taxonomy_level": "structure_pacing",
+      "category": "climax_structure",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "martell_theme_through_characters",
+      "name": "Theme Expressed Through Character Choices",
+      "taxonomy_level": "theme",
+      "category": "theme",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/theme.json"
+    },
+    {
+      "id": "weiland_theme_from_arc",
+      "name": "Theme Emerges from the Character's Arc",
+      "taxonomy_level": "theme",
+      "category": "theme_construction",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/theme.json"
     },
     {
       "id": "thriller_contained_premise",
@@ -1758,6 +3179,43 @@
       ],
       "genre": null,
       "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "cron_story_genius_before_plot",
+      "name": "Know the Protagonist's Inner Problem Before Creating the Plot",
+      "taxonomy_level": "psychology",
+      "category": "planning",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries",
+        "knowledge_graph"
+      ],
+      "genre": null,
+      "file": "rules/writing_habits.json"
+    },
+    {
+      "id": "cron_dopamine_hook",
+      "name": "Effective Stories Trigger Curiosity-Driven Dopamine Response",
+      "taxonomy_level": "psychology",
+      "category": "reader_engagement",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/writing_habits.json"
+    },
+    {
+      "id": "cron_pantsing_myth",
+      "name": "Writing Without a Blueprint Leads to Meandering, Aimless Stories",
+      "taxonomy_level": "psychology",
+      "category": "writing_process",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": null,
+      "file": "rules/writing_habits.json"
     }
   ]
 }

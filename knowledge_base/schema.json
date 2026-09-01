@@ -18,7 +18,8 @@
       "type": "string",
       "enum": [
         "story_macro", "structure_pacing", "plot_thread", "character",
-        "relationship", "scene", "dialogue", "continuity", "formatting"
+        "relationship", "scene", "dialogue", "continuity", "formatting",
+        "psychology", "nonverbal", "pitch", "revision", "theme"
       ]
     },
     "category": {"type": "string"},
