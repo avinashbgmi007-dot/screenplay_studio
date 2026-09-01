@@ -31,6 +31,8 @@ from collections import Counter
 
 from screenplay_parser.models import ScriptDocument, ElementType
 
+from .deterministic_utils import dialogue_lines_by_character
+
 MIN_DIALOGUE_LINES = 3        # characters below this never get a fingerprint
 VOICE_SIMILARITY_THRESHOLD = 0.72
 _MAX_VOICE_PAIRS = 6          # cap findings — don't spam the writer
@@ -46,19 +48,6 @@ _STOPWORDS = set(
     "this that these those do does did have has had will would can could should shall "
     "not no yes yeah okay well so just really very what who when where why how".split()
 )
-
-
-def _dialogue_lines_by_character(doc: ScriptDocument) -> dict[str, list[str]]:
-    lines: dict[str, list[str]] = {}
-    for scene in doc.scenes:
-        current = None
-        for e in scene.elements:
-            if e.type == ElementType.CHARACTER:
-                current = e.text.strip()
-            elif e.type == ElementType.DIALOGUE and current:
-                lines.setdefault(current, []).append(e.text.strip())
-                current = None  # one line per cue; parentheticals attach to it
-    return lines
 
 
 def _words(text: str) -> list[str]:
@@ -115,7 +104,7 @@ def _scenes_shared(doc: ScriptDocument, a: str, b: str) -> list[int]:
 
 
 def run_voice_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
-    by_char = _dialogue_lines_by_character(doc)
+    by_char = dialogue_lines_by_character(doc)
     profiles = {
         name: _fingerprint(lines)
         for name, lines in by_char.items()

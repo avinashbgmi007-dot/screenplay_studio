@@ -48,6 +48,9 @@ class _NullRulesContext:
     def prompt_fragment_for_rule(self, rule_id: str) -> str:
         return ""
 
+    def fragment_for_pass(self, pass_name: str) -> str:
+        return ""
+
 
 def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
@@ -261,12 +264,7 @@ def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_
     findings = []
     errors: list[str] = []
     grammar = findings_grammar()
-    rules_fragment = rules_ctx.prompt_fragment_for_category("dialogue")
-    # Also inject advanced dialogue rules (subtext layers, rhythm, voice, etc.)
-    if hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
-        advanced_rules = rules_ctx.kb.for_file("dialogue_advanced.json")
-        if advanced_rules:
-            rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(advanced_rules)
+    rules_fragment = rules_ctx.fragment_for_pass("dialogue")
     chekhov_fragment = rules_ctx.prompt_fragment_for_rule("chekhovs_gun")
     scene_dicts = [
         {"scene_number": s.scene_number, "heading_raw": s.heading_raw, "full_text": _scene_full_text(s)}
@@ -523,24 +521,7 @@ def analyze(
         if cat in run_categories and overview:
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
-                rules_fragment = rules_ctx.prompt_fragment_for_category(cat)
-                # Inject visual_storytelling rules into scene_function pass
-                if cat == "scene_function" and hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
-                    visual_rules = rules_ctx.kb.for_file("visual_storytelling.json")
-                    if visual_rules:
-                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(visual_rules)
-                    # Also inject revision rules into scene_function pass
-                    revision_rules = rules_ctx.kb.for_file("revision.json")
-                    if revision_rules:
-                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(revision_rules)
-                # Inject psychology and nonverbal rules into character pass
-                if cat == "character" and hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
-                    psych_rules = rules_ctx.kb.for_file("psychology.json")
-                    if psych_rules:
-                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(psych_rules)
-                    nonverbal_rules = rules_ctx.kb.for_file("body_language.json")
-                    if nonverbal_rules:
-                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(nonverbal_rules)
+                rules_fragment = rules_ctx.fragment_for_pass(cat)
                 all_findings.extend(run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language))
                 emit(cat, "complete")
                 result.category_outcomes[cat] = "ok"
@@ -666,12 +647,6 @@ def analyze(
     if "logline_test" in run_categories and overview and result.coverage and result.coverage.get("logline"):
         try:
             emit("logline_test", "running", "Testing the logline")
-            # Inject pitch rules into logline test
-            pitch_rules_fragment = ""
-            if hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
-                pitch_rules = rules_ctx.kb.for_file("pitch.json")
-                if pitch_rules:
-                    pitch_rules_fragment = rules_ctx.kb.render_for_prompt(pitch_rules)
             result.logline_test = run_logline_test(
                 result.coverage["logline"], overview, doc.title, client, language=report_language
             )

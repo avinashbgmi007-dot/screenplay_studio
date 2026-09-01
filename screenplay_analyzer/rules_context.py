@@ -26,6 +26,15 @@ CATEGORY_TO_TAXONOMY_LEVELS = {
     "revision": ["revision"],
 }
 
+# Extra rule files to inject into specific pipeline passes.
+# Key: pass name (as used in pipeline.py), Value: list of filenames
+PASS_EXTRAS = {
+    "dialogue": ["dialogue_advanced.json"],
+    "scene_function": ["visual_storytelling.json", "revision.json"],
+    "character": ["psychology.json", "body_language.json"],
+    "logline_test": ["pitch.json"],
+}
+
 
 class RulesContext:
     def __init__(self, kb=None):
@@ -103,3 +112,31 @@ class RulesContext:
             + ":\n"
         )
         return header + self.kb.render_for_prompt(unique)
+
+    def fragment_for_pass(self, pass_name: str) -> str:
+        """Get the complete prompt fragment for a pipeline pass.
+        Combines category rules with any extra files defined in PASS_EXTRAS."""
+        # Start with category rules if the pass maps to a category
+        category = pass_name if pass_name in CATEGORY_TO_TAXONOMY_LEVELS else None
+        if category:
+            fragment = self.prompt_fragment_for_category(category)
+        else:
+            fragment = ""
+
+        # Add any extra files for this pass
+        extras = PASS_EXTRAS.get(pass_name, [])
+        if extras:
+            extra_rules = []
+            for filename in extras:
+                if hasattr(self.kb, 'for_file'):
+                    rules = self.kb.for_file(filename)
+                    if rules:
+                        extra_rules.extend(rules)
+            if extra_rules:
+                extra_fragment = self.kb.render_for_prompt(extra_rules)
+                if fragment:
+                    fragment = fragment + "\n\n" + extra_fragment
+                else:
+                    fragment = extra_fragment
+
+        return fragment

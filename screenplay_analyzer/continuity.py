@@ -32,6 +32,8 @@ from __future__ import annotations
 from screenplay_parser.models import ElementType, ScriptDocument
 from screenplay_parser.knowledge_graph import TIME_SKIP_RE
 
+from .deterministic_utils import dialogue_lines_by_character
+
 CATEGORY = "continuity"
 
 # Opposites only — a MORNING->EVENING drift is normal pacing; a full
@@ -43,19 +45,6 @@ _OPPOSITE = {
 }
 
 _HEADING_STOPWORDS = {"INT", "EXT", "INT/EXT", "EST", "CONTINUOUS"}
-
-
-def _dialogue_lines_by_character(doc: ScriptDocument) -> dict[str, list[str]]:
-    lines: dict[str, list[str]] = {}
-    for scene in doc.scenes:
-        current = None
-        for e in scene.elements:
-            if e.type == ElementType.CHARACTER:
-                current = e.text.strip()
-            elif e.type == ElementType.DIALOGUE and current:
-                lines.setdefault(current, []).append(e.text.strip())
-                current = None
-    return lines
 
 
 def _scene_has_time_marker(scene) -> bool:
@@ -157,6 +146,6 @@ def _name_variant_findings(doc: ScriptDocument, by_char: dict) -> list[dict]:
 
 
 def run_continuity_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
-    by_char = _dialogue_lines_by_character(doc)
+    by_char = dialogue_lines_by_character(doc)
     findings = _time_flip_findings(doc) + _name_variant_findings(doc, by_char)
     return findings, []

@@ -215,6 +215,9 @@ class _StubRules:
     def prompt_fragment_for_rule(self, rule):
         return ""
 
+    def fragment_for_pass(self, pass_name):
+        return ""
+
 
 class _StubClient:
     def __init__(self, items):
