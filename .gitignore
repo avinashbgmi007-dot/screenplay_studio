@@ -39,6 +39,12 @@ studio_projects/
 preview_shots/
 preview-redesigns/shots/
 
+# Extracted text / book sources (large, not versioned)
+extracted_text/
+film_books/
+Cursors/
+.opencode/
+
 # Scratch artifacts at repo root
 /_*.png
 /_*.log
