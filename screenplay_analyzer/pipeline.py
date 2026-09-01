@@ -262,6 +262,11 @@ def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_
     errors: list[str] = []
     grammar = findings_grammar()
     rules_fragment = rules_ctx.prompt_fragment_for_category("dialogue")
+    # Also inject advanced dialogue rules (subtext layers, rhythm, voice, etc.)
+    if hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
+        advanced_rules = rules_ctx.kb.for_file("dialogue_advanced.json")
+        if advanced_rules:
+            rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(advanced_rules)
     chekhov_fragment = rules_ctx.prompt_fragment_for_rule("chekhovs_gun")
     scene_dicts = [
         {"scene_number": s.scene_number, "heading_raw": s.heading_raw, "full_text": _scene_full_text(s)}
@@ -519,6 +524,11 @@ def analyze(
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.prompt_fragment_for_category(cat)
+                # Inject visual_storytelling rules into scene_function pass
+                if cat == "scene_function" and hasattr(rules_ctx, 'kb') and hasattr(rules_ctx.kb, 'for_file'):
+                    visual_rules = rules_ctx.kb.for_file("visual_storytelling.json")
+                    if visual_rules:
+                        rules_fragment = rules_fragment + "\n\n" + rules_ctx.kb.render_for_prompt(visual_rules)
                 all_findings.extend(run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language))
                 emit(cat, "complete")
                 result.category_outcomes[cat] = "ok"

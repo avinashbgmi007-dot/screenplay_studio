@@ -41,6 +41,7 @@ class Rule:
     confidence_tier: str
     requires: list = field(default_factory=list)
     related_rules: list = field(default_factory=list)
+    genre: str | None = None
 
     @property
     def attribution(self) -> str:
@@ -69,10 +70,13 @@ class KnowledgeBase:
     def __init__(self, rules_dir: str = None):
         self.rules_dir = rules_dir or os.path.join(_KB_DIR, "rules")
         self._rules: dict[str, Rule] = {}
+        self._files: dict[str, list[str]] = {}  # filename -> list of rule ids
         self._load()
 
     def _load(self):
         for path in sorted(glob.glob(os.path.join(self.rules_dir, "*.json"))):
+            fname = os.path.basename(path)
+            rule_ids = []
             with open(path, "r", encoding="utf-8") as f:
                 entries = json.load(f)
             for e in entries:
@@ -80,6 +84,8 @@ class KnowledgeBase:
                 if rule.id in self._rules:
                     raise ValueError(f"Duplicate rule id '{rule.id}' found in {path}")
                 self._rules[rule.id] = rule
+                rule_ids.append(rule.id)
+            self._files[fname] = rule_ids
 
     def get(self, rule_id: str) -> Rule:
         if rule_id not in self._rules:
@@ -91,6 +97,24 @@ class KnowledgeBase:
 
     def for_taxonomy_level(self, level: str) -> list:
         return [r for r in self._rules.values() if r.taxonomy_level == level]
+
+    def for_genre(self, genre: str) -> list:
+        """Return rules tagged with this genre (genre-specific rules only).
+        Falls back to filename-based lookup if genre field is not set."""
+        if not genre:
+            return []
+        genre_lower = genre.strip().lower()
+        # Primary: rules with explicit genre field
+        tagged = [r for r in self._rules.values() if r.genre == genre_lower]
+        if tagged:
+            return tagged
+        # Fallback: rules from genre-named files (e.g., horror.json -> horror)
+        return self.for_file(f"{genre_lower}.json")
+
+    def for_file(self, filename: str) -> list:
+        """Return all rules from a specific JSON file."""
+        rule_ids = self._files.get(filename, [])
+        return [self._rules[rid] for rid in rule_ids if rid in self._rules]
 
     def for_category(self, category: str) -> list:
         """Public query API — reserved for per-category prompt building."""

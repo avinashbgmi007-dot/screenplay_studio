@@ -69,6 +69,11 @@
       "type": "array",
       "items": {"type": "string"},
       "description": "IDs of other rules in this knowledge base this one relates to or builds on."
+    },
+    "genre": {
+      "type": ["string", "null"],
+      "enum": ["horror", "thriller", "comedy", "drama", "romance", "action", "scifi", "mystery", null],
+      "description": "Genre this rule applies to. Null means cross-genre (applies to all). Genre-specific rules are only injected when the script's detected genre matches."
     }
   }
 }

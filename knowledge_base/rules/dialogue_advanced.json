@@ -1,0 +1,287 @@
+[
+  {
+    "id": "dialogue_subtext_layers",
+    "name": "Dialogue Contains Multiple Subtext Layers",
+    "taxonomy_level": "dialogue",
+    "category": "subtext",
+    "source": {
+      "type": "general_craft",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "The best dialogue operates on multiple levels simultaneously \u00e2\u20ac\u201d what characters say, what they mean, what they hide, and what the audience understands. Each line should have at least two layers of meaning.",
+    "detection_signal": "Check if dialogue contains layers of meaning. Verify that characters rarely say exactly what they mean, especially in emotionally charged scenes.",
+    "counter_considerations": "Some dialogue is intentionally direct for effect. The key is that subtext should be present in important scenes.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_rhythm_pacing"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_rhythm_pacing",
+    "name": "Dialogue Rhythm Affects Pacing",
+    "taxonomy_level": "dialogue",
+    "category": "rhythm",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Dialogue rhythm \u00e2\u20ac\u201d sentence length, punctuation, pauses \u00e2\u20ac\u201d controls scene pacing. Short, clipped sentences create tension; long, flowing sentences create intimacy or reflection.",
+    "detection_signal": "Check if dialogue rhythm matches the scene's emotional intent. Verify that sentence structure supports pacing goals.",
+    "counter_considerations": "Some scenes use inconsistent rhythm intentionally. The key is that rhythm choices should be purposeful.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_subtext_layers"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_voice_distinct",
+    "name": "Each Character Has Distinct Voice",
+    "taxonomy_level": "dialogue",
+    "category": "character_voice",
+    "source": {
+      "type": "general_craft",
+      "originator": "James Scott Bell",
+      "work": "Plot & Structure"
+    },
+    "definition": "Each character must have a distinct way of speaking that reveals their background, personality, and education level. Different vocabulary, sentence length, speech patterns, and verbal tics per character.",
+    "detection_signal": "Check if characters have distinct speech patterns. Verify that dialogue could only come from that specific character.",
+    "counter_considerations": "Characters from similar backgrounds may share speech patterns. The key is that main characters should be distinguishable.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_subtext_layers"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_conflict_essential",
+    "name": "Every Dialogue Scene Needs Conflict",
+    "taxonomy_level": "dialogue",
+    "category": "conflict",
+    "source": {
+      "type": "general_craft",
+      "originator": "James Scott Bell",
+      "work": "Conflict & Suspense"
+    },
+    "definition": "Every dialogue scene must contain conflict \u00e2\u20ac\u201d characters want different things, have different perspectives, or are working at cross-purposes. Dialogue without conflict is just conversation.",
+    "detection_signal": "Check if dialogue scenes contain conflict. Verify that characters have competing goals or perspectives.",
+    "counter_considerations": "Some dialogue scenes establish relationships before introducing conflict. The key is that conflict should be present in important scenes.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_subtext_layers"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_purpose_driven",
+    "name": "Every Line Must Have Purpose",
+    "taxonomy_level": "dialogue",
+    "category": "purpose",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Every line of dialogue must serve a purpose \u00e2\u20ac\u201d advancing plot, revealing character, creating conflict, or establishing atmosphere. Lines without purpose should be cut.",
+    "detection_signal": "Check if every line of dialogue serves a clear purpose. Verify that no lines are purely filler or exposition without dramatic value.",
+    "counter_considerations": "Some dialogue establishes atmosphere or character voice. The key is that the purpose should be clear.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_conflict_essential"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_exposition_disguised",
+    "name": "Exposition Must Be Disguised",
+    "taxonomy_level": "dialogue",
+    "category": "exposition",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Exposition in dialogue must be disguised as natural conversation. Characters shouldn't explain things they already know to each other for the audience's benefit.",
+    "detection_signal": "Check if exposition feels natural or forced. Verify that characters don't explain things they already know to each other.",
+    "counter_considerations": "Some exposition requires characters to share information. The key is that it should feel natural, not forced.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_purpose_driven"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_emotional_leakage",
+    "name": "Emotions Leak Through Dialogue",
+    "taxonomy_level": "dialogue",
+    "category": "emotion",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Characters may try to hide their emotions, but emotions leak through dialogue \u00e2\u20ac\u201d in word choice, sentence structure, pauses, and what's left unsaid.",
+    "detection_signal": "Check if characters' emotional states are revealed through dialogue mechanics, not just content. Verify that emotions leak through word choice, pauses, and omissions.",
+    "counter_considerations": "Some characters are skilled at hiding emotions. The key is that emotional leakage should be present when appropriate.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_subtext_layers"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_interrupts_overlaps",
+    "name": "Interruptions and Overlaps Create Realism",
+    "taxonomy_level": "dialogue",
+    "category": "realism",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Real conversations feature interruptions, overlaps, and incomplete thoughts. Using these techniques makes dialogue feel authentic and dynamic.",
+    "detection_signal": "Check if dialogue includes interruptions, overlaps, or incomplete thoughts. Verify that conversations feel natural and dynamic.",
+    "counter_considerations": "Some dialogue is intentionally polished for effect. The key is that naturalistic dialogue should be present when appropriate.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_rhythm_pacing"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_silence_powerful",
+    "name": "Silence Can Be Most Powerful Dialogue",
+    "taxonomy_level": "dialogue",
+    "category": "silence",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "What characters don't say can be more powerful than what they do say. Silence, pauses, and deliberate omissions communicate volumes.",
+    "detection_signal": "Check if silence or pauses are used meaningfully. Verify that what's left unsaid communicates as much as what's said.",
+    "counter_considerations": "Some scenes require constant dialogue. The key is that silence should be used purposefully when appropriate.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_subtext_layers"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_callbacks_payoffs",
+    "name": "Dialogue Callbacks Create Cohesion",
+    "taxonomy_level": "dialogue",
+    "category": "cohesion",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Returning to earlier dialogue \u00e2\u20ac\u201d phrases, arguments, promises \u00e2\u20ac\u201d creates cohesion and shows character development. Callbacks reward attentive audiences.",
+    "detection_signal": "Check if dialogue callbacks are used effectively. Verify that returning to earlier dialogue creates meaning and shows development.",
+    "counter_considerations": "Some stories don't use callbacks. The key is that if callbacks are used, they should be purposeful.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_purpose_driven"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogue_power_dynamics",
+    "name": "Dialogue Reveals Power Dynamics",
+    "taxonomy_level": "dialogue",
+    "category": "power",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Dialogue reveals power dynamics between characters. Who speaks first, who interrupts, who controls the conversation \u00e2\u20ac\u201d all communicate relative status and power.",
+    "detection_signal": "Check if dialogue mechanics reveal power dynamics. Verify that conversation patterns communicate status and power relationships.",
+    "counter_considerations": "Some scenes feature equal power dynamics. The key is that power relationships should be present when relevant.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_conflict_essential"
+    ],
+    "genre": null
+  },
+  {
+    "id": "dialogueGMEMATICultural",
+    "name": "Dialogue Reflects Cultural Context",
+    "taxonomy_level": "dialogue",
+    "category": "cultural",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dialogue writing principle found across multiple sources."
+    },
+    "definition": "Dialogue should reflect characters' cultural backgrounds, education, and social context. Word choice, references, and speech patterns should be authentic to who the characters are.",
+    "detection_signal": "Check if dialogue reflects characters' cultural backgrounds and social context. Verify that speech patterns are authentic to who the characters are.",
+    "counter_considerations": "Some characters transcend their backgrounds. The key is that dialogue should be authentic to the character's established identity.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_voice_distinct"
+    ],
+    "genre": null
+  }
+]

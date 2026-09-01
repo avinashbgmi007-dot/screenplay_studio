@@ -20,6 +20,8 @@ CATEGORY_TO_TAXONOMY_LEVELS = {
     "structure": ["structure_pacing"],
     "scene_function": ["scene"],
     "dialogue": ["dialogue"],
+    "plot": ["plot_thread"],
+    "continuity": ["continuity"],
 }
 
 
@@ -57,3 +59,45 @@ class RulesContext:
             return self.kb.get(rule_id).to_prompt_fragment()
         except KeyError:
             return ""
+
+    def rules_for_genre(self, genre: str) -> list:
+        """Get rules specific to a genre from the knowledge base.
+        Uses the new for_genre() API which queries by genre field first,
+        then falls back to filename-based lookup."""
+        return self.kb.for_genre(genre)
+
+    def prompt_fragment_for_genre(self, genre: str) -> str:
+        """Get a prompt fragment for genre-specific rules."""
+        rules = self.rules_for_genre(genre)
+        if not rules:
+            return ""
+        header = (
+            "Genre-Specific Craft Principles:\n"
+            "Apply these principles specific to the identified genre. "
+            "Each includes what to look for and when NOT to flag:\n\n"
+        )
+        return header + self.kb.render_for_prompt(rules)
+
+    def dialogue_rules_for_genre(self, genre: str) -> str:
+        """Get dialogue rules scoped by genre: genre-specific dialogue rules
+        + cross-genre dialogue rules from dialogue_advanced.json."""
+        genre_rules = self.kb.for_genre(genre) if genre else []
+        dialogue_rules = [r for r in genre_rules if r.taxonomy_level == "dialogue"]
+        # Also include cross-genge dialogue_advanced rules
+        advanced_rules = self.kb.for_file("dialogue_advanced.json")
+        dialogue_rules.extend(advanced_rules)
+        # Deduplicate by id
+        seen = set()
+        unique = []
+        for r in dialogue_rules:
+            if r.id not in seen:
+                seen.add(r.id)
+                unique.append(r)
+        if not unique:
+            return ""
+        header = (
+            "Dialogue Craft Principles"
+            + (f" (genre-aware for {genre})" if genre else "")
+            + ":\n"
+        )
+        return header + self.kb.render_for_prompt(unique)

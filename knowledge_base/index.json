@@ -1,6 +1,139 @@
 {
-  "rule_count": 34,
+  "rule_count": 146,
   "rules": [
+    {
+      "id": "action_pacing_relentless",
+      "name": "Action Pacing Is Relentless",
+      "taxonomy_level": "structure_pacing",
+      "category": "pacing",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
+        "page_estimates"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_hero_must_be_active",
+      "name": "Hero Must Be Active",
+      "taxonomy_level": "character",
+      "category": "protagonist",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_villain_strength",
+      "name": "Villain Must Be Formidable",
+      "taxonomy_level": "character",
+      "category": "antagonist",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_stakes_physical_death",
+      "name": "Physical Death at Stake",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_escalation_constant",
+      "name": "Action Escalates Constantly",
+      "taxonomy_level": "plot_thread",
+      "category": "escalation",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_hero_villain_flipside",
+      "name": "Hero and Villain Are Flip Sides",
+      "taxonomy_level": "character",
+      "category": "character_relationship",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_hero_underdog",
+      "name": "Hero Must Be Underdog",
+      "taxonomy_level": "character",
+      "category": "protagonist",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_set_pieces_varied",
+      "name": "Action Set Pieces Must Be Varied",
+      "taxonomy_level": "scene",
+      "category": "scene_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_physical_consequences",
+      "name": "Action Has Physical Consequences",
+      "taxonomy_level": "character",
+      "category": "realism",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_villain_plan_clear",
+      "name": "Villain's Plan Must Be Clear",
+      "taxonomy_level": "plot_thread",
+      "category": "antagonist_structure",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
+    {
+      "id": "action_hero_competence",
+      "name": "Hero Must Demonstrate Competence",
+      "taxonomy_level": "character",
+      "category": "protagonist",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "action",
+      "file": "rules/action.json"
+    },
     {
       "id": "character_arc_change",
       "name": "Character Arc as Value Change",
@@ -10,6 +143,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/character.json"
     },
     {
@@ -21,6 +155,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/character.json"
     },
     {
@@ -32,6 +167,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/character.json"
     },
     {
@@ -43,6 +179,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/character.json"
     },
     {
@@ -54,7 +191,153 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/character.json"
+    },
+    {
+      "id": "comedy_reel_laugh",
+      "name": "Every Reel Needs a Big Laugh",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
+        "page_estimates"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_start_late_leave_early",
+      "name": "Start Scenes Late, Leave Early",
+      "taxonomy_level": "scene",
+      "category": "scene_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_midpoint_physical_intimacy",
+      "name": "Rom-Com Midpoint Physical Intimacy",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_trivial_taken_seriously",
+      "name": "Comedy Characters in Tragedy",
+      "taxonomy_level": "character",
+      "category": "tone",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_subtext_not_literal",
+      "name": "Dialogue Must Have Subtext",
+      "taxonomy_level": "dialogue",
+      "category": "dialogue",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_contradictory_characters",
+      "name": "Contradictory Character Placements",
+      "taxonomy_level": "character",
+      "category": "concept",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_relationship_difficulty",
+      "name": "If Boy Can Easily Get Girl, No Story",
+      "taxonomy_level": "plot_thread",
+      "category": "premise",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_death_stakes",
+      "name": "Comedy Stakes Are Psychological Death",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_exaggeration_mechanism",
+      "name": "Exaggeration as Comedic Mechanism",
+      "taxonomy_level": "scene",
+      "category": "scene_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_timing_is_everything",
+      "name": "Comedic Timing in Scene Length",
+      "taxonomy_level": "structure_pacing",
+      "category": "pacing",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_escalation_pattern",
+      "name": "Comedy Escalates Through Pattern Breaking",
+      "taxonomy_level": "plot_thread",
+      "category": "escalation",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
+    },
+    {
+      "id": "comedy_character_flaws_funny",
+      "name": "Character Flaws Create Comedy",
+      "taxonomy_level": "character",
+      "category": "character_design",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "comedy",
+      "file": "rules/comedy.json"
     },
     {
       "id": "prop_continuity",
@@ -65,6 +348,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/continuity.json"
     },
     {
@@ -76,6 +360,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/continuity.json"
     },
     {
@@ -87,6 +372,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/continuity.json"
     },
     {
@@ -98,6 +384,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/continuity.json"
     },
     {
@@ -109,6 +396,7 @@
       "requires": [
         "scene_text"
       ],
+      "genre": null,
       "file": "rules/dialogue.json"
     },
     {
@@ -120,6 +408,7 @@
       "requires": [
         "scene_text"
       ],
+      "genre": null,
       "file": "rules/dialogue.json"
     },
     {
@@ -132,7 +421,561 @@
         "scene_text",
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/dialogue.json"
+    },
+    {
+      "id": "dialogue_subtext_layers",
+      "name": "Dialogue Contains Multiple Subtext Layers",
+      "taxonomy_level": "dialogue",
+      "category": "subtext",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_rhythm_pacing",
+      "name": "Dialogue Rhythm Affects Pacing",
+      "taxonomy_level": "dialogue",
+      "category": "rhythm",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_voice_distinct",
+      "name": "Each Character Has Distinct Voice",
+      "taxonomy_level": "dialogue",
+      "category": "character_voice",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_conflict_essential",
+      "name": "Every Dialogue Scene Needs Conflict",
+      "taxonomy_level": "dialogue",
+      "category": "conflict",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_purpose_driven",
+      "name": "Every Line Must Have Purpose",
+      "taxonomy_level": "dialogue",
+      "category": "purpose",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_exposition_disguised",
+      "name": "Exposition Must Be Disguised",
+      "taxonomy_level": "dialogue",
+      "category": "exposition",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_emotional_leakage",
+      "name": "Emotions Leak Through Dialogue",
+      "taxonomy_level": "dialogue",
+      "category": "emotion",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_interrupts_overlaps",
+      "name": "Interruptions and Overlaps Create Realism",
+      "taxonomy_level": "dialogue",
+      "category": "realism",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_silence_powerful",
+      "name": "Silence Can Be Most Powerful Dialogue",
+      "taxonomy_level": "dialogue",
+      "category": "silence",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_callbacks_payoffs",
+      "name": "Dialogue Callbacks Create Cohesion",
+      "taxonomy_level": "dialogue",
+      "category": "cohesion",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogue_power_dynamics",
+      "name": "Dialogue Reveals Power Dynamics",
+      "taxonomy_level": "dialogue",
+      "category": "power",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "dialogueGMEMATICultural",
+      "name": "Dialogue Reflects Cultural Context",
+      "taxonomy_level": "dialogue",
+      "category": "cultural",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/dialogue_advanced.json"
+    },
+    {
+      "id": "drama_emotional_authenticity",
+      "name": "Emotional Authenticity Over Plot Mechanics",
+      "taxonomy_level": "story_macro",
+      "category": "tone",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_moral_complexity",
+      "name": "Moral Complexity in Character Choices",
+      "taxonomy_level": "character",
+      "category": "moral_dimension",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_internal_conflict_primary",
+      "name": "Internal Conflict Drives Drama",
+      "taxonomy_level": "plot_thread",
+      "category": "conflict_type",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_dialogue_subtext",
+      "name": "Dramatic Dialogue Contains Subtext",
+      "taxonomy_level": "dialogue",
+      "category": "dialogue_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_relationships_drive_plot",
+      "name": "Relationships Drive Plot in Drama",
+      "taxonomy_level": "plot_thread",
+      "category": "plot_mechanics",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_stakes_personal",
+      "name": "Drama Stakes Are Personal",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_pacing_meditative",
+      "name": "Drama Allows Meditative Pacing",
+      "taxonomy_level": "structure_pacing",
+      "category": "pacing",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_transformation_earned",
+      "name": "Character Transformation Must Be Earned",
+      "taxonomy_level": "character",
+      "category": "character_arc",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_ambiguity_preserved",
+      "name": "Drama Preserves Ambiguity",
+      "taxonomy_level": "story_macro",
+      "category": "resolution",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_ensemble_depth",
+      "name": "Ensemble Characters Have Depth",
+      "taxonomy_level": "character",
+      "category": "ensemble",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "drama_consequences_real",
+      "name": "Drama Has Real Consequences",
+      "taxonomy_level": "plot_thread",
+      "category": "consequences",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "drama",
+      "file": "rules/drama.json"
+    },
+    {
+      "id": "horror_discovery_phase_no_urgency",
+      "name": "Discovery Phase Needs Time to Breathe",
+      "taxonomy_level": "scene",
+      "category": "pacing",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_tone_set_immediately",
+      "name": "First Page Sets Horror Tone",
+      "taxonomy_level": "story_macro",
+      "category": "tone",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_reel_event_requirement",
+      "name": "Every Reel Must Have a Horror Payoff",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries",
+        "page_estimates"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_virgin_archetype",
+      "name": "The Virgin Survivor Archetype",
+      "taxonomy_level": "character",
+      "category": "archetype",
+      "confidence_tier": "medium",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_monster_defeat",
+      "name": "Central Struggle Against Monster",
+      "taxonomy_level": "plot_thread",
+      "category": "conflict",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_stakes_physical_death",
+      "name": "Physical Death at Stake",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_rules_established_early",
+      "name": "Horror World Rules Established Early",
+      "taxonomy_level": "story_macro",
+      "category": "worldbuilding",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_tension_building",
+      "name": "Tension Builds Through Unanswered Questions",
+      "taxonomy_level": "structure_pacing",
+      "category": "tension",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_atmosphere_over_dialogue",
+      "name": "Atmosphere Over Dialogue",
+      "taxonomy_level": "scene",
+      "category": "scene_craft",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_vulnerability_escalation",
+      "name": "Vulnerability Escalates Through Isolation",
+      "taxonomy_level": "plot_thread",
+      "category": "escalation",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_final_girl_strength",
+      "name": "Final Girl Must Earn Survival",
+      "taxonomy_level": "character",
+      "category": "character_arc",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "horror_ordinary_world_horror",
+      "name": "Ordinary World Must Contrast Horror",
+      "taxonomy_level": "story_macro",
+      "category": "contrast",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "horror",
+      "file": "rules/horror.json"
+    },
+    {
+      "id": "mystery_clue_game",
+      "name": "Riddle as Game Between Writer and Audience",
+      "taxonomy_level": "story_macro",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_foreshadowed_surprises",
+      "name": "Surprises Must Be Foreshadowed",
+      "taxonomy_level": "plot_thread",
+      "category": "plot",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_logline_clarity",
+      "name": "Mystery Logline Must Be Clear",
+      "taxonomy_level": "story_macro",
+      "category": "concept",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_reveal_timing",
+      "name": "Explanation Before Climax",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_red_herrings",
+      "name": "Red Herrings Must Be Fair",
+      "taxonomy_level": "plot_thread",
+      "category": "misdirection",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_detective_competence",
+      "name": "Detective Must Be Competent",
+      "taxonomy_level": "character",
+      "category": "protagonist",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_stakes_personal",
+      "name": "Mystery Stakes Must Be Personal",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_atmosphere_tension",
+      "name": "Mystery Atmosphere Creates Tension",
+      "taxonomy_level": "scene",
+      "category": "atmosphere",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_solution_satisfying",
+      "name": "Mystery Solution Must Be Satisfying",
+      "taxonomy_level": "story_macro",
+      "category": "resolution",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_pacing_controlled",
+      "name": "Mystery Pacing Is Controlled",
+      "taxonomy_level": "structure_pacing",
+      "category": "pacing",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
+    },
+    {
+      "id": "mystery_multiple_suspects",
+      "name": "Multiple Suspects Create Depth",
+      "taxonomy_level": "character",
+      "category": "cast_design",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "mystery",
+      "file": "rules/mystery.json"
     },
     {
       "id": "chekhovs_gun",
@@ -143,6 +986,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/plot_thread.json"
     },
     {
@@ -154,6 +998,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/plot_thread.json"
     },
     {
@@ -165,6 +1010,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/plot_thread.json"
     },
     {
@@ -176,6 +1022,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/plot_thread.json"
     },
     {
@@ -187,6 +1034,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/plot_thread.json"
     },
     {
@@ -198,6 +1046,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/relationship.json"
     },
     {
@@ -209,7 +1058,140 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/relationship.json"
+    },
+    {
+      "id": "romance_adult_children_opening",
+      "name": "Lovers Introduced as Adult Children",
+      "taxonomy_level": "story_macro",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_theme_love",
+      "name": "Theme Must Be Love-Related",
+      "taxonomy_level": "story_macro",
+      "category": "theme",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_midpoint_no_return",
+      "name": "Midpoint as Point of No Return",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_trivial_stakes_comedy",
+      "name": "Romance Stakes Must Feel Life-or-Death",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_psychological_death_stakes",
+      "name": "Psychological Death as Romance Stakes",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_enemies_to_lovers",
+      "name": "Enemies-to-Lovers Requires Genuine Friction",
+      "taxonomy_level": "plot_thread",
+      "category": "subgenre",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_third_act_breakup",
+      "name": "Third Act Breakup Must Be Earned",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_grand_gesture",
+      "name": "Grand Gesture Must Be Personal",
+      "taxonomy_level": "scene",
+      "category": "climax",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_complementary_flaws",
+      "name": "Romantic Leads Have Complementary Flaws",
+      "taxonomy_level": "character",
+      "category": "character_design",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_emotional_vulnerability",
+      "name": "Emotional Vulnerability Required",
+      "taxonomy_level": "character",
+      "category": "character_depth",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
+    },
+    {
+      "id": "romance_satisfying_resolution",
+      "name": "Romance Resolution Must Be Satisfying",
+      "taxonomy_level": "story_macro",
+      "category": "resolution",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "romance",
+      "file": "rules/romance.json"
     },
     {
       "id": "scene_must_turn",
@@ -220,6 +1202,7 @@
       "requires": [
         "scene_text"
       ],
+      "genre": null,
       "file": "rules/scene.json"
     },
     {
@@ -231,6 +1214,7 @@
       "requires": [
         "scene_text"
       ],
+      "genre": null,
       "file": "rules/scene.json"
     },
     {
@@ -242,6 +1226,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/scene.json"
     },
     {
@@ -253,6 +1238,7 @@
       "requires": [
         "scene_text"
       ],
+      "genre": null,
       "file": "rules/scene.json"
     },
     {
@@ -264,7 +1250,128 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/scene.json"
+    },
+    {
+      "id": "scifi_concept_simplicity",
+      "name": "Keep Sci-Fi Concepts Simple",
+      "taxonomy_level": "story_macro",
+      "category": "concept",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_rules_established_early",
+      "name": "World Rules Must Be Established Early",
+      "taxonomy_level": "story_macro",
+      "category": "worldbuilding",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_simple_logline",
+      "name": "Sci-Fi Logline Must Be Understandable",
+      "taxonomy_level": "story_macro",
+      "category": "concept",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_relationship_to_technology",
+      "name": "Sci-Fi Themes Explore Man vs Technology",
+      "taxonomy_level": "story_macro",
+      "category": "theme",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_man_vs_nature",
+      "name": "Sci-Fi Can Be Man vs Nature",
+      "taxonomy_level": "plot_thread",
+      "category": "conflict_type",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_grounding_reality",
+      "name": "Sci-Fi Must Ground in Human Reality",
+      "taxonomy_level": "character",
+      "category": "character_depth",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_exposition_through_action",
+      "name": "Sci-Fi Exposition Through Action",
+      "taxonomy_level": "scene",
+      "category": "exposition",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_visual_storytelling",
+      "name": "Sci-Fi Requires Strong Visual Storytelling",
+      "taxonomy_level": "scene",
+      "category": "visual_narrative",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_emotional_core",
+      "name": "Sci-Fi Must Have Emotional Core",
+      "taxonomy_level": "story_macro",
+      "category": "theme",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
+    },
+    {
+      "id": "scifi_consequences_realistic",
+      "name": "Sci-Fi Consequences Must Feel Real",
+      "taxonomy_level": "plot_thread",
+      "category": "consequences",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "scifi",
+      "file": "rules/scifi.json"
     },
     {
       "id": "controlling_idea",
@@ -275,6 +1382,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/story_macro.json"
     },
     {
@@ -286,6 +1394,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/story_macro.json"
     },
     {
@@ -297,6 +1406,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/story_macro.json"
     },
     {
@@ -308,6 +1418,7 @@
       "requires": [
         "knowledge_graph"
       ],
+      "genre": null,
       "file": "rules/story_macro.json"
     },
     {
@@ -320,6 +1431,7 @@
         "scene_summaries",
         "page_estimates"
       ],
+      "genre": null,
       "file": "rules/structure_pacing.json"
     },
     {
@@ -332,6 +1444,7 @@
         "scene_summaries",
         "page_estimates"
       ],
+      "genre": null,
       "file": "rules/structure_pacing.json"
     },
     {
@@ -343,6 +1456,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/structure_pacing.json"
     },
     {
@@ -354,6 +1468,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/structure_pacing.json"
     },
     {
@@ -365,6 +1480,7 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/structure_pacing.json"
     },
     {
@@ -376,7 +1492,272 @@
       "requires": [
         "scene_summaries"
       ],
+      "genre": null,
       "file": "rules/structure_pacing.json"
+    },
+    {
+      "id": "thriller_contained_premise",
+      "name": "Contained Thriller Structure",
+      "taxonomy_level": "story_macro",
+      "category": "concept",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_characters_active",
+      "name": "Characters Must Be Active in Contained Thrillers",
+      "taxonomy_level": "character",
+      "category": "character_behavior",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_active_protagonist",
+      "name": "Protagonist Must Be Active",
+      "taxonomy_level": "character",
+      "category": "protagonist",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_things_go_wrong",
+      "name": "Escalating Things Going Wrong",
+      "taxonomy_level": "plot_thread",
+      "category": "escalation",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_villain_strength",
+      "name": "Strong Villain Required",
+      "taxonomy_level": "character",
+      "category": "antagonist",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_bonding_moment",
+      "name": "Ensemble Bonding Scene",
+      "taxonomy_level": "scene",
+      "category": "ensemble_dynamics",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_locked_in_by_act_end",
+      "name": "Protagonist Must Be Locked In by Act I End",
+      "taxonomy_level": "structure_pacing",
+      "category": "structure",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_physical_death_stakes",
+      "name": "Physical Death at Stake",
+      "taxonomy_level": "plot_thread",
+      "category": "stakes",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_villain_drives_plot",
+      "name": "Villain Drives the Plot",
+      "taxonomy_level": "plot_thread",
+      "category": "antagonist_structure",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_unexpected_complications",
+      "name": "Every Plan Must Have Unexpected Complications",
+      "taxonomy_level": "plot_thread",
+      "category": "plot_mechanics",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_ticking_clock",
+      "name": "Ticking Clock Creates Urgency",
+      "taxonomy_level": "structure_pacing",
+      "category": "urgency",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_summaries"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "thriller_reversals_escalate",
+      "name": "Reversals Must Escalate Stakes",
+      "taxonomy_level": "plot_thread",
+      "category": "reversals",
+      "confidence_tier": "high",
+      "requires": [
+        "knowledge_graph"
+      ],
+      "genre": "thriller",
+      "file": "rules/thriller.json"
+    },
+    {
+      "id": "visual_show_dont_tell",
+      "name": "Show Don't Tell Through Visuals",
+      "taxonomy_level": "scene",
+      "category": "visual_narrative",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_camera_angles_convey_perspective",
+      "name": "Camera Angles Convey Perspective",
+      "taxonomy_level": "scene",
+      "category": "cinematography",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_shot_size_emphasis",
+      "name": "Shot Size Controls Emphasis",
+      "taxonomy_level": "scene",
+      "category": "cinematography",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_lighting_mood",
+      "name": "Lighting Establishes Mood",
+      "taxonomy_level": "scene",
+      "category": "atmosphere",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_composition_framing",
+      "name": "Composition Frames Character Relationships",
+      "taxonomy_level": "scene",
+      "category": "composition",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_color_symbolism",
+      "name": "Color Can Symbolize Theme",
+      "taxonomy_level": "scene",
+      "category": "symbolism",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_movement_choreography",
+      "name": "Movement Conveys Character State",
+      "taxonomy_level": "scene",
+      "category": "choreography",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_ellipsis_time_passage",
+      "name": "Visual Ellipsis for Time Passage",
+      "taxonomy_level": "structure_pacing",
+      "category": "editing",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_sound_design_atmosphere",
+      "name": "Sound Design Creates Atmosphere",
+      "taxonomy_level": "scene",
+      "category": "sound",
+      "confidence_tier": "high",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
+    },
+    {
+      "id": "visual_props_meaningful",
+      "name": "Props Can Carry Meaning",
+      "taxonomy_level": "scene",
+      "category": "props",
+      "confidence_tier": "medium",
+      "requires": [
+        "scene_text"
+      ],
+      "genre": null,
+      "file": "rules/visual_storytelling.json"
     }
   ]
 }

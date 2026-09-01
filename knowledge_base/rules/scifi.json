@@ -1,0 +1,237 @@
+[
+  {
+    "id": "scifi_concept_simplicity",
+    "name": "Keep Sci-Fi Concepts Simple",
+    "taxonomy_level": "story_macro",
+    "category": "concept",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Scriptshadow/Amber",
+      "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
+    },
+    "definition": "If writing sci-fi, keep the concept easy to understand. Readers dread sprawling, unfocused sci-fi opuses with complex planetary systems, alien names, and invented technologies. A simple, clear premise sells better than an elaborate one.",
+    "detection_signal": "Check if the script's core concept can be explained in one sentence. Verify that world-building rules are established quickly and simply. Flag scripts that introduce multiple alien species, complex technology, or elaborate political systems before the story begins.",
+    "counter_considerations": "Some successful sci-fi films are complex (Inception, Interstellar). The key is that complexity should emerge from a simple core premise, not be front-loaded.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scifi_rules_established_early"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_rules_established_early",
+    "name": "World Rules Must Be Established Early",
+    "taxonomy_level": "story_macro",
+    "category": "worldbuilding",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Angus Fletcher",
+      "work": "Screenwriting 101"
+    },
+    "definition": "The rules of a sci-fi story world must be established crisply and clearly at the beginning. These rules provide the context for the audience to appreciate what follows. Once established, audiences will accept even implausible events if they are consistent with the established rules.",
+    "detection_signal": "Check if the first 10-15 pages establish the basic rules of the world (technology, physics, social structure). Verify that these rules are demonstrated through action, not exposition.",
+    "counter_considerations": "Some sci-fi films gradually reveal world rules for dramatic effect. The key is that the basic rules should be clear early, with advanced rules revealed as the story progresses.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scifi_concept_simplicity"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_simple_logline",
+    "name": "Sci-Fi Logline Must Be Understandable",
+    "taxonomy_level": "story_macro",
+    "category": "concept",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Scriptshadow/Amber",
+      "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
+    },
+    "definition": "A sci-fi script's logline must be immediately understandable to a non-genre reader. If the logline requires explanation, the concept may be too complex. The best sci-fi concepts can be pitched in one clear sentence.",
+    "detection_signal": "Check if the script can be summarized in one sentence that a non-sci-fi reader would understand. Verify that the core conflict is human, not technological.",
+    "counter_considerations": "Some successful sci-fi concepts are inherently complex. The key is that the emotional core should be simple even if the world is complex.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scifi_concept_simplicity"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_relationship_to_technology",
+    "name": "Sci-Fi Themes Explore Man vs Technology",
+    "taxonomy_level": "story_macro",
+    "category": "theme",
+    "source": {
+      "type": "general_craft",
+      "originator": "Randy Ingermanson",
+      "work": "Writing Fiction for Dummies"
+    },
+    "definition": "Science fiction often examines man's relationship to technology. The thematic backbone should explore how technology changes human nature, relationships, or society. Technology should be a mirror for human concerns, not an end in itself.",
+    "detection_signal": "Check if the script's themes relate to humanity's relationship with technology. Verify that technology serves the story's emotional core rather than being the sole focus.",
+    "counter_considerations": "Some sci-fi focuses on world-building rather than technology themes. The key is that the human element must be central.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "scifi_concept_simplicity"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_man_vs_nature",
+    "name": "Sci-Fi Can Be Man vs Nature",
+    "taxonomy_level": "plot_thread",
+    "category": "conflict_type",
+    "source": {
+      "type": "general_craft",
+      "originator": "Randy Ingermanson",
+      "work": "Writing Fiction for Dummies"
+    },
+    "definition": "Science fiction can also explore man's relationship to nature \u00e2\u20ac\u201d survival against alien environments, cosmic threats, or hostile ecosystems. The protagonist must face forces of nature that are indifferent or actively hostile to human survival.",
+    "detection_signal": "Check if the script features a protagonist struggling against natural or alien forces. Verify that the conflict involves survival against an indifferent or hostile environment.",
+    "counter_considerations": "Not all sci-fi is man vs nature. The key is that if this theme is present, it must be central to the conflict.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "scifi_relationship_to_technology"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_grounding_reality",
+    "name": "Sci-Fi Must Ground in Human Reality",
+    "taxonomy_level": "character",
+    "category": "character_depth",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard sci-fi writing principle found across multiple sources."
+    },
+    "definition": "Despite speculative elements, sci-fi characters must be grounded in recognizable human emotions and relationships. The audience connects with characters, not concepts.",
+    "detection_signal": "Check if sci-fi characters have recognizable human emotions and relationships. Verify that the audience can connect with the characters despite the speculative setting.",
+    "counter_considerations": "Some sci-fi features alien or non-human protagonists. The key is that the emotional core must be relatable.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "scifi_relationship_to_technology"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_exposition_through_action",
+    "name": "Sci-Fi Exposition Through Action",
+    "taxonomy_level": "scene",
+    "category": "exposition",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard sci-fi writing principle found across multiple sources."
+    },
+    "definition": "Sci-fi world-building should be revealed through action and demonstration, not exposition dumps. The audience should learn the rules by seeing them in action.",
+    "detection_signal": "Check if sci-fi world-building is revealed through action rather than exposition. Verify that the audience learns the rules by seeing them demonstrated.",
+    "counter_considerations": "Some sci-fi uses exposition effectively. The key is that exposition should be minimal and integrated into action.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scifi_rules_established_early"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_visual_storytelling",
+    "name": "Sci-Fi Requires Strong Visual Storytelling",
+    "taxonomy_level": "scene",
+    "category": "visual_narrative",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard sci-fi writing principle found across multiple sources."
+    },
+    "definition": "Sci-fi scripts must demonstrate their world visually. The audience should see the world in action rather than having it explained through dialogue.",
+    "detection_signal": "Check if sci-fi scripts use visual storytelling to establish world. Verify that the world is shown, not just told.",
+    "counter_considerations": "Some sci-fi relies on dialogue for world-building. The key is that visual storytelling should be primary.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scifi_exposition_through_action"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_emotional_core",
+    "name": "Sci-Fi Must Have Emotional Core",
+    "taxonomy_level": "story_macro",
+    "category": "theme",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard sci-fi writing principle found across multiple sources."
+    },
+    "definition": "Despite speculative elements, sci-fi must have a recognizable emotional core \u00e2\u20ac\u201d love, loss, identity, survival. The technology and world-building serve the emotional story, not the other way around.",
+    "detection_signal": "Check if the script has a recognizable emotional core. Verify that the sci-fi elements serve the emotional story rather than dominating it.",
+    "counter_considerations": "Some sci-fi prioritizes ideas over emotion. The key is that the emotional core should be present and significant.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "scifi_relationship_to_technology"
+    ],
+    "genre": "scifi"
+  },
+  {
+    "id": "scifi_consequences_realistic",
+    "name": "Sci-Fi Consequences Must Feel Real",
+    "taxonomy_level": "plot_thread",
+    "category": "consequences",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard sci-fi writing principle found across multiple sources."
+    },
+    "definition": "In sci-fi, technological or scientific developments must have realistic consequences. If a technology has benefits, it should also have costs or risks.",
+    "detection_signal": "Check if technological developments have realistic consequences. Verify that benefits come with costs or risks.",
+    "counter_considerations": "Some sci-fi presents technology as purely beneficial. The key is that the level of consequence should be consistent with the film's approach.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "scifi_relationship_to_technology"
+    ],
+    "genre": "scifi"
+  }
+]

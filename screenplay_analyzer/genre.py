@@ -107,7 +107,16 @@ def run_genre_check(coverage: dict, scene_overview: str, client, rules_ctx=None,
 
     genre = (coverage or {}).get("genre") or ""
     conventions = conventions_for(genre)
+
+    # Build genre-specific rules fragment from knowledge base
+    genre_rules_fragment = ""
+    if rules_ctx and hasattr(rules_ctx, 'prompt_fragment_for_genre'):
+        genre_rules_fragment = rules_ctx.prompt_fragment_for_genre(genre)
+
     system, user = genre_check_prompt(genre, conventions, scene_overview, language=language)
+    # Append genre rules to the user prompt if available
+    if genre_rules_fragment:
+        user = user + genre_rules_fragment
     result = client.chat_json(system, user, grammar=findings_grammar(), max_tokens=1200)
     # tolerate models that emit the findings as a bare JSON array
     if isinstance(result, list):
