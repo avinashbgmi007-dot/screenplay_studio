@@ -3,270 +3,283 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Brutal Print — Screenplay Studio redesign preview ③</title>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<title>③ Spark Wall — Chosen Spine (hybrid: dawn verdict + river read)</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#f4f1ea; --ink:#111111; --card:#ffffff;
-  --or:#ff5a1f; --cob:#2545d9; --muted:#6b6b6b; --line:#111111;
-  --red:#d31c1c; --amber:#e09a00;
+  --void:#0a0e1a; --glass:rgba(255,255,255,.055); --edge:rgba(160,180,255,.16);
+  --txt:#dbe2f4; --dim:#77809c; --cyan:#6ee7ff; --violet:#a78bfa; --warm:#ffd58a;
+  --red:#ff7b7b; --amber:#ffcf6b; --gold:#e8a54b;
+  --dawn:0;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font-family:"Space Grotesk",Arial,sans-serif;font-size:15px;line-height:1.55;overflow-x:hidden}
-h1,h2,h3,.display{font-family:"Archivo Black","Arial Black",sans-serif;font-weight:400;text-transform:uppercase;letter-spacing:-.01em}
-.mono{font-family:"Courier New",monospace}
+body{background:var(--void);color:var(--txt);font-family:"Space Grotesk",system-ui,sans-serif;font-size:14px;line-height:1.55;overflow:hidden}
+svg.i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
 
-#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--ink);color:#fff;font-size:12px;border-bottom:3px solid var(--ink)}
-#pv b{font-family:"Archivo Black",sans-serif;color:var(--or);margin-right:10px}
-#pv button{background:none;border:2px solid #444;color:#bbb;padding:4px 12px;cursor:pointer;font:inherit}
-#pv button:hover{border-color:var(--or);color:#fff}
-#pv button.on{background:var(--or);border-color:var(--or);color:var(--ink);font-weight:700}
-main{padding-top:46px}
-[data-screen]{display:none;height:calc(100vh - 46px);position:relative;overflow:hidden}
+#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#05070f;border-bottom:1px solid var(--edge);font-size:12px}
+#pv b{color:var(--cyan);margin-right:10px;font-weight:700}
+#pv button{background:none;border:1px solid var(--edge);color:var(--dim);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
+#pv button.on{background:var(--cyan);border-color:var(--cyan);color:#04121a;font-weight:700}
+main{padding-top:42px;height:calc(100vh - 42px)}
+[data-screen]{display:none;height:100%;position:relative;overflow:hidden}
 [data-screen].active{display:block}
+.starfield{position:absolute;inset:0;pointer-events:none;background-image:
+ radial-gradient(1px 1px at 12% 22%,rgba(255,255,255,.35),transparent),
+ radial-gradient(1px 1px at 68% 12%,rgba(255,255,255,.28),transparent),
+ radial-gradient(1.5px 1.5px at 84% 64%,rgba(255,255,255,.3),transparent),
+ radial-gradient(1px 1px at 32% 78%,rgba(255,255,255,.25),transparent),
+ radial-gradient(1px 1px at 52% 40%,rgba(255,255,255,.2),transparent)}
+.status-float{position:absolute;left:18px;top:14px;z-index:40;font:10.5px "Space Grotesk";color:var(--dim);display:flex;gap:14px}
+.status-float .g{width:6px;height:6px;border-radius:50%;background:#79f7b7;display:inline-block;margin-right:5px}
 
-/* welcome */
-.s-welcome{display:flex;flex-direction:column;justify-content:center;padding:0 max(6vw,48px);background:
- linear-gradient(var(--bg) 96%, var(--ink) 96% 100%)}
-.s-welcome h1{font-size:min(7vw,84px);line-height:.95}
-.s-welcome h1 span{background:var(--or);padding:0 14px;color:var(--ink)}
-.ticker{margin-top:22px;background:var(--ink);color:var(--bg);overflow:hidden;white-space:nowrap;padding:8px 0;font-size:13px;font-weight:700;text-transform:uppercase}
-@media (prefers-reduced-motion: no-preference){.ticker div{animation:tick 18s linear infinite}@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}}
-.actions{display:flex;gap:16px;margin-top:30px}
-.btn{cursor:pointer;padding:14px 26px;font-weight:700;border:2px solid var(--line);font-size:14px;text-transform:uppercase;background:var(--card)}
-.btn-primary{background:var(--cob);color:#fff;border-color:var(--cob)}
-.btn-primary:hover{transform:translate(-3px,-3px);box-shadow:5px 5px 0 var(--ink)}
-.btn-ghost:hover{background:var(--or)}
-.shelf{display:flex;gap:24px;margin-top:52px}
-.card3d{width:210px;background:var(--card);border:2px solid var(--ink);box-shadow:8px 8px 0 var(--ink);padding:20px;cursor:pointer;transition:transform .12s linear, box-shadow .12s linear}
-.card3d:hover{transform:translate(-4px,-4px);box-shadow:12px 12px 0 var(--ink)}
-.card3d .t{font-family:"Archivo Black",sans-serif;font-size:22px;text-transform:uppercase}
-.card3d .s{color:var(--muted);font-size:12px;margin-top:10px;border-top:2px solid var(--ink);padding-top:10px}
-.stamp{display:inline-block;background:var(--cob);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;letter-spacing:.1em}
-.card3d.idea .stamp{background:var(--or)}
+/* ====== THE WALL ====== */
+.threads{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.threads path{fill:none;stroke:url(#tg);stroke-width:1.4;opacity:.55}
+@media (prefers-reduced-motion: no-preference){.threads path{stroke-dasharray:6 10;animation:flow 22s linear infinite}}
+@keyframes flow{to{stroke-dashoffset:-320}}
+.sparkcard{position:absolute;width:225px;background:var(--glass);border:1px solid var(--edge);border-radius:14px;padding:14px 16px;backdrop-filter:blur(8px);cursor:pointer;z-index:2;transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease}
+@media (prefers-reduced-motion: reduce){.sparkcard{transition:none}}
+.sparkcard:hover{transform:translateY(-5px) scale(1.02);border-color:rgba(110,231,255,.5);box-shadow:0 18px 50px rgba(0,0,0,.5),0 0 40px rgba(110,231,255,.08)}
+.sparkcard b{display:block;font-size:13.5px;margin-bottom:4px}
+.sparkcard span{font-size:11.5px;color:var(--dim)}
+.sparkcard .tag{display:inline-flex;align-items:center;gap:5px;font:600 9.5px "Space Grotesk";letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);margin-bottom:7px}
+.sparkcard.q{border-color:rgba(167,139,250,.45);z-index:3}
+.sparkcard.q .tag{color:var(--violet)}
+.sev-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.sev-dot.high{background:var(--red)}.sev-dot.med{background:var(--amber)}.sev-dot.low{background:#5d6b8a}
+/* Sameer's single question — bottom glass bar */
+.askbar{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;width:min(680px,92vw);z-index:50;background:rgba(13,17,32,.85);border:1px solid var(--edge);border-radius:16px;backdrop-filter:blur(12px);padding:14px 18px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.askbar .qline{display:flex;gap:10px;align-items:flex-start;margin-bottom:11px}
+.askbar .face{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--violet),var(--cyan));display:grid;place-items:center;font-weight:700;color:#0a0e1a;flex:0 0 auto}
+.askbar .qtext{font-size:13.5px;padding-top:6px}
+.askbar .qtext small{display:block;color:var(--dim);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;transition:.2s ease}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--edge);background:rgba(255,255,255,.04);border-radius:99px;padding:4px 11px;font-size:11px;color:var(--cyan);cursor:pointer;white-space:nowrap}
+.chip:hover{border-color:var(--cyan)}
+.chips.collapsed{flex-direction:column;align-items:flex-start}
+.chips.collapsed .chip .lbl{display:none}
+.chips.collapsed:hover .chip .lbl{display:inline}
+.askbar .composer{width:100%;min-height:38px;max-height:130px;resize:none;background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:10px;color:var(--txt);padding:9px 12px;font:13px "Space Grotesk";outline:none}
+.askbar .composer:focus{border-color:var(--cyan)}
 
-/* desk */
-.desk-top{height:60px;display:flex;align-items:center;gap:16px;padding:0 22px;border-bottom:3px solid var(--ink);background:var(--card)}
-.proj{font-family:"Archivo Black",sans-serif;font-size:19px;text-transform:uppercase}
-.room-pills{margin-left:auto;display:flex;gap:10px}
-.pill{border:2px solid var(--ink);padding:6px 15px;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer;background:var(--bg)}
-.pill:hover{background:var(--ink);color:#fff}
-.pill.hot{background:var(--cob);color:#fff;border-color:var(--cob)}
-.pages{height:calc(100% - 60px);overflow-y:auto;padding:46px 0 100px;background:repeating-linear-gradient(90deg,var(--bg) 0 120px,#efebdf 120px 121px)}
-.page-wrap{max-width:750px;margin:0 auto;padding:0 32px}
-.scene-page{background:var(--card);border:3px solid var(--ink);box-shadow:9px 9px 0 var(--ink);padding:80px 88px;margin-bottom:38px;font-family:"Courier New",monospace;font-size:15px;line-height:1.62;position:relative}
-.scene-page::before{content:attr(data-scene);position:absolute;top:-17px;left:26px;background:var(--or);color:var(--ink);font:900 11px "Space Grotesk";text-transform:uppercase;letter-spacing:.1em;padding:4px 12px;border:2px solid var(--ink)}
-.slug{font-weight:700;margin-bottom:14px}
-.char-cue{text-transform:uppercase;margin:18px 0 2px 140px}
-.dialogue{margin-left:70px;max-width:420px}
-.action{margin:12px 0}
-.el-anchored{background:#ffe9bf;cursor:pointer}
-.fn-note{position:absolute;right:-58px;top:165px;width:236px;background:var(--cob);color:#fff;padding:12px 14px;font-family:"Space Grotesk";font-size:12.5px;box-shadow:5px 5px 0 var(--ink)}
-.fn-note b{display:block;margin-bottom:4px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
-.edge-tabs{position:absolute;right:0;top:110px;display:flex;flex-direction:column;z-index:50}
-.edge-tab{background:var(--or);border:2px solid var(--ink);border-right:0;color:var(--ink);font:900 11.5px "Space Grotesk";text-transform:uppercase;padding:16px 12px;writing-mode:vertical-rl;cursor:pointer;transition:transform .1s linear}
-.edge-tab+.edge-tab{margin-top:6px}
-.edge-tab.doc{background:var(--cob);color:#fff}
-.edge-tab:hover{transform:translateX(-8px)}
-.pane-pop{position:absolute;right:64px;top:80px;width:400px;height:500px;background:var(--card);border:3px solid var(--ink);box-shadow:12px 12px 0 var(--ink);z-index:60;display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(10px)}
-.pane-pop.open{opacity:1;pointer-events:auto;transform:none}
-.pane-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:3px solid var(--ink);background:var(--or)}
-.pane-head.doc-h{background:var(--cob);color:#fff}
-.avatar{width:34px;height:34px;border:2px solid var(--ink);display:grid;place-items:center;font-family:"Archivo Black",sans-serif;background:#fff}
-.nm{font-weight:700;font-size:14px}.rl{font-size:11px}
-.pane-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
-.msg.them .bubble{border:2px solid var(--ink);padding:11px 14px;font-size:13.5px;background:var(--bg)}
-.msg.me{align-self:flex-end}.msg.me .bubble{border:2px solid var(--ink);background:var(--cob);color:#fff;padding:11px 14px;font-size:13.5px}
-.msg.them .who{font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px}
-.explore-chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 10px;transition:.2s ease}
-.chip{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--ink);background:var(--bg);padding:5px 11px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
-.chip:hover{background:var(--or)}
-.explore-chips.collapsed{flex-direction:column;align-items:center}
-.explore-chips.collapsed .chip span.lbl{display:none}
-.explore-chips.collapsed:hover .chip span.lbl{display:inline}
-.composer-zone{position:relative;padding:0 16px 16px}
-.composer{width:100%;min-height:46px;max-height:175px;resize:none;border:2px solid var(--ink);background:#fff;padding:12px 44px 12px 14px;font:inherit;font-size:13.5px;outline:none}
-.composer:focus{box-shadow:inset 0 0 0 2px var(--or)}
-.send{position:absolute;right:24px;bottom:24px;width:32px;height:32px;background:var(--ink);color:#fff;border:0;cursor:pointer;font-weight:900}
-.status-strip{position:absolute;left:0;right:0;bottom:0;height:34px;display:flex;align-items:center;gap:16px;padding:0 20px;background:var(--ink);color:#ddd;font-size:11px;font-weight:700;text-transform:uppercase;z-index:40}
-.dot{width:8px;height:8px;display:inline-block;margin-right:5px}
-.dot.g{background:#57d957}.dot.a{background:var(--amber)}
-.st-sprint{margin-left:auto;color:var(--or)}
+/* ====== VERDICT: cluster + THE DAWN METER (borrowed from First Light) ====== */
+.cluster-stage{height:100%;overflow-y:auto;position:relative;z-index:2;padding:30px 0 60px}
+.skyline{position:absolute;inset:0;pointer-events:none;z-index:0;opacity:var(--dawn);transition:opacity .5s ease;
+ background:linear-gradient(180deg, rgba(255,169,77,.10), rgba(242,165,107,.05) 60%, transparent)}
+@media (prefers-reduced-motion: reduce){.skyline{transition:none}}
+.cluster{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:min(800px,92vw);margin:0 auto;padding:0 16px}
+.cluster .sparkcard{position:relative;width:auto}
+.vhead{grid-column:1/-1;text-align:center;margin-bottom:6px}
+.vhead h2{font-size:26px;font-weight:500}
+.vhead .score{font-size:38px;color:var(--cyan);font-weight:700}
+.vhead small{color:var(--dim);letter-spacing:.16em;text-transform:uppercase;font-size:10px;display:block}
+.dawnmeter{grid-column:1/-1;display:flex;align-items:center;gap:12px;justify-content:center;margin:10px 0 6px}
+.dawnmeter .track{width:min(320px,46vw);height:6px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}
+.dawnmeter .fill{height:100%;width:calc(var(--dawn) * 100%);background:linear-gradient(90deg,#5a4a8a,var(--gold));transition:width .5s ease}
+@media (prefers-reduced-motion: reduce){.dawnmeter .fill{transition:none}}
+.dawnmeter .pct{font:600 12px "Space Grotesk";color:var(--gold);min-width:40px}
+.dawnhint{grid-column:1/-1;text-align:center;color:var(--dim);font-size:11.5px;margin-bottom:4px}
+.frow{grid-column:span 1;display:flex;align-items:flex-start;gap:11px;background:var(--glass);border:1px solid var(--edge);border-radius:14px;padding:14px 16px;backdrop-filter:blur(8px);cursor:pointer;transition:border-color .25s ease, opacity .25s ease}
+.frow:hover{border-color:rgba(232,165,75,.45)}
+.frow.resolved{opacity:.55;border-color:rgba(232,165,75,.5)}
+.frow .tick{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--edge);flex:0 0 auto;margin-top:2px;display:grid;place-items:center;color:transparent;transition:.2s ease}
+.frow.resolved .tick{background:var(--gold);border-color:var(--gold);color:#221505}
+.frow .t{font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px}
+.frow p{font-size:11.5px;color:var(--dim);margin-top:4px}
 
-/* co-writer */
-.s-cowrite{display:flex;flex-direction:column;background:repeating-linear-gradient(90deg,var(--bg) 0 160px,#efebdf 160px 161px)}
-.cw-head{display:flex;align-items:center;gap:16px;padding:16px 26px;border-bottom:3px solid var(--ink);background:var(--card)}
-.cw-head h2{font-size:24px}
-.sub{color:var(--muted);font-size:12px;text-transform:uppercase;font-weight:700}
-.memory-card{margin:14px 26px 0;border:2px solid var(--ink);background:#fffbe8;padding:10px 14px;font-size:12.5px;font-weight:500}
-.memory-card b{color:var(--cob)}
-.cw-chat{flex:1;overflow-y:auto;padding:24px 28px;display:flex;flex-direction:column;gap:14px;max-width:860px;width:100%;margin:0 auto}
-.cw-chat .msg{max-width:80%}
-.cw-composer{position:relative;max-width:860px;width:100%;margin:0 auto 20px;padding:0 28px}
-.cw-explore{padding:10px 28px 0;max-width:860px;margin:0 auto;width:100%}
-.cw-status{height:32px;border-top:3px solid var(--ink);display:flex;align-items:center;gap:16px;padding:0 26px;font-size:11px;font-weight:700;text-transform:uppercase;background:var(--card)}
+/* ====== GRADUATED PAGES ====== */
+.grad{position:relative;z-index:2;height:100%;overflow-y:auto;padding:54px 0 100px}
+.grad-col{max-width:680px;margin:0 auto;padding:0 30px}
+.grad-note{text-align:center;color:var(--dim);font-size:12.5px;margin-bottom:24px}
+.readlike{display:block;margin:0 auto 26px;width:fit-content;border:1px solid var(--edge);background:rgba(94,234,212,.06);color:var(--cyan);border-radius:99px;padding:8px 18px;font:600 12px "Space Grotesk";cursor:pointer}
+.readlike:hover{background:rgba(94,234,212,.12)}
+.pagecard{background:rgba(255,255,255,.045);border:1px solid var(--edge);border-radius:14px;padding:30px 36px;margin-bottom:20px;font-family:Consolas,monospace;font-size:13.5px;line-height:1.7;position:relative}
+.pagecard .sc{position:absolute;top:-11px;left:22px;background:var(--void);border:1px solid var(--edge);color:var(--cyan);border-radius:99px;font:600 10px "Space Grotesk";padding:3px 12px;letter-spacing:.08em}
+.pagecard .hot{background:rgba(110,231,255,.1);border-bottom:1px dashed var(--cyan);cursor:pointer}
+.pagecard .from-spark{margin-top:12px;font:11.5px "Space Grotesk";color:var(--violet)}
+.pagecard .from-spark::before{content:"↳ grown from spark: ";color:var(--dim)}
 
-/* feedback */
-.s-feedback{display:flex;background:var(--bg)}
-.fb-nav{width:250px;border-right:3px solid var(--ink);background:var(--card);padding:22px 16px;overflow-y:auto}
-.fb-nav h3{font-size:12px;margin-bottom:12px;border-bottom:3px solid var(--ink)}
-.fb-nav a{display:block;color:var(--ink);text-decoration:none;padding:8px 10px;font-size:13px;font-weight:700;text-transform:uppercase;border-left:6px solid transparent}
-.fb-nav a.on{border-left-color:var(--or);background:#fff2ea}
-.fb-score{margin-top:22px;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);padding:14px;text-align:center;background:var(--or)}
-.fb-score .n{font-family:"Archivo Black",sans-serif;font-size:42px}
-.cap{font-size:10.5px;font-weight:900;text-transform:uppercase}
-.fb-read{flex:1;overflow-y:auto}
-.fb-doc{max-width:720px;margin:0 auto;padding:48px 40px 100px}
-.kicker{display:inline-block;background:var(--cob);color:#fff;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:.14em;padding:5px 12px;margin-bottom:14px}
-.fb-doc h1{font-size:min(5vw,44px);line-height:1}
-.verdict{margin:20px 0 32px;border-left:8px solid var(--or);padding:8px 0 8px 18px;font-size:17px;font-weight:500}
-.cat-h{display:flex;align-items:center;gap:10px;margin:36px 0 14px;background:var(--ink);color:#fff;padding:9px 14px;font-family:"Archivo Black",sans-serif;font-size:15px;text-transform:uppercase}
-.finding{border:2px solid var(--ink);background:var(--card);padding:14px 16px;margin-bottom:14px}
-.f-h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;margin-bottom:6px;text-transform:uppercase}
-.sev-dot{width:11px;height:11px;border:2px solid var(--ink);flex:0 0 auto}
-.sev.high{background:var(--red)}.sev.med{background:var(--amber)}.sev.low{background:#bdbdbd}
-.finding blockquote{border-left:3px solid var(--ink);margin:8px 0;padding:2px 12px;font-family:"Courier New",monospace;font-size:12.5px;background:var(--bg)}
-.jtsc{float:right;font-size:10.5px;font-weight:900;color:var(--cob);text-decoration:none;border:2px solid var(--ink);padding:2px 10px;text-transform:uppercase}
+/* ====== RIVER READ — one continuous glass scroll ====== */
+.river{height:100%;overflow-y:auto;scroll-behavior:smooth;position:relative;z-index:2}
+.mov{position:relative;padding:56px 0 60px}
+.mov-inner{max-width:640px;margin:0 auto;padding:0 30px}
+.mov-head{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.mov-head .nm{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:20px;color:var(--cyan)}
+.mov-head .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--edge),transparent)}
+.mov-kick{font:600 10px "Space Grotesk";letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+.wave{display:block;width:100%;height:40px;color:var(--edge)}
+.rpage{background:rgba(255,255,255,.045);border:1px solid var(--edge);border-radius:22px 22px 22px 6px;padding:36px 42px;font-family:Consolas,monospace;font-size:13.5px;line-height:1.7;position:relative;margin-bottom:20px;backdrop-filter:blur(6px)}
+.rpage .sc{position:absolute;top:-11px;left:20px;background:var(--void);border:1px solid var(--edge);color:var(--cyan);border-radius:99px;font:600 10px "Space Grotesk";padding:3px 12px}
+.rpage .hot{background:rgba(110,231,255,.1);border-bottom:1px dashed var(--cyan)}
+.rsam{display:flex;gap:12px;margin:14px 0}
+.rsam .face{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--violet),var(--cyan));color:#0a0e1a;display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+.rsam .line{background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:14px 14px 14px 4px;padding:11px 15px;font-size:13px}
+.rsed{border-left:3px solid var(--edge);border-radius:0 12px 12px 0;padding:11px 16px;margin-bottom:11px;background:rgba(255,255,255,.035)}
+.rsed.high{border-left-color:var(--red)}.rsed.med{border-left-color:var(--amber)}
+.rsed .t{font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px}
+.rsed p{font-size:11.5px;color:var(--dim);margin-top:3px}
+.current{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:80;display:flex;flex-direction:column;gap:11px}
+.current i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;transition:.2s ease}
+.current i.on{background:var(--cyan);box-shadow:0 0 12px 3px rgba(110,231,255,.25);transform:scale(1.25)}
+
+/* ====== DROP-IN ====== */
+.dropzone{position:relative;z-index:2;height:100%;display:grid;place-items:center}
+.dz{width:min(560px,88vw);border:1.5px dashed rgba(110,231,255,.4);border-radius:20px;padding:56px 40px;text-align:center;background:rgba(110,231,255,.03);transition:.25s ease}
+.dz:hover{background:rgba(110,231,255,.06);border-color:var(--cyan)}
+.dz .big{font-size:20px;font-weight:500;margin:14px 0 6px}
+.dz p{color:var(--dim);font-size:13px}
+.dz .becomes{margin-top:22px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--cyan);border:1px solid var(--edge);border-radius:99px;padding:6px 14px}
 </style>
 </head>
 <body>
 
-<nav id="pv"><b>③ Brutal Print</b>
-<button data-go="welcome" class="on">Welcome/Shelf</button><button data-go="desk">Desk · script</button><button data-go="cowrite">Co-Writer</button><button data-go="feedback">Feedback Report</button>
-<span style="margin-left:auto;color:#888">screenplay-studio redesign mockup</span></nav>
+<nav id="pv"><b>③ Spark Wall — chosen spine</b>
+<button data-go="wall" class="on">The Wall</button><button data-go="verdict">Verdict · Dawn</button><button data-go="debate">Sameer's Question</button><button data-go="grad">Graduated Pages</button><button data-go="river">River Read</button><button data-go="drop">Drop-in</button>
+<span style="margin-left:auto;color:var(--dim)">chosen world — wall as home · dawn in the verdict · river as read mode</span></nav>
 
 <main>
 
-<section data-screen="welcome" class="active s-welcome">
-  <h1>Write.<br><span>Get Slapped.</span><br>Get Better.</h1>
-  <div class="ticker"><div>PAIN — ANALYSED ✓ &nbsp;·&nbsp; 44 FINDINGS · 12 OPEN &nbsp;·&nbsp; SAMEER IS WAITING ON SCENE 2 &nbsp;·&nbsp; 98 PAGES · SCORE 7.2 &nbsp;·&nbsp; ALL LOCAL, ZERO CLOUD &nbsp;·&nbsp; PAIN — ANALYSED ✓ &nbsp;·&nbsp; 44 FINDINGS · 12 OPEN &nbsp;·&nbsp; SAMEER IS WAITING ON SCENE 2 &nbsp;·&nbsp; 98 PAGES · SCORE 7.2 &nbsp;·&nbsp; ALL LOCAL, ZERO CLOUD &nbsp;</div></div>
-  <div class="actions">
-    <button class="btn btn-primary" data-go="desk">Open Pain ↦ pages first</button>
-    <button class="btn">＋ Upload .fdx/.pdf</button>
-  </div>
-  <div class="shelf">
-    <div class="card3d" data-go="desk"><span class="stamp">draft v3</span><div class="t" style="margin-top:10px">Pain</div><div class="s">98 pp · 22 scenes<br>✓ analysed yesterday</div></div>
-    <div class="card3d"><span class="stamp" style="background:var(--amber)">pending</span><div class="t" style="margin-top:10px">Gun Pen</div><div class="s">short · 3 scenes<br>run the analysis →</div></div>
-    <div class="card3d idea"><span class="stamp">idea</span><div class="t" style="margin-top:10px">Blank page</div><div class="s">start loose.<br>sam joins when called.</div></div>
+<!-- THE WALL -->
+<section data-screen="wall" class="active">
+  <div class="starfield"></div>
+  <div class="status-float"><span><span class="g"></span>qwen3-14B @ :8080</span><span>3 sparks growing · 1 question open</span></div>
+  <svg class="threads" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ee7ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+    <path vector-effect="non-scaling-stroke" d="M14 26 L 38 20 M14 26 L 30 62 M38 20 L 66 30 M66 30 L 84 22 M30 62 L 60 70 M60 70 L 82 58 M66 30 L 60 70"/>
+  </svg>
+  <div class="sparkcard" style="left:6%;top:20%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Spark</span><b>What if the call comes too late?</b><span>Open Pain backwards — start from the missed call.</span></div>
+  <div class="sparkcard" style="left:32%;top:13%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Motif</span><b>A hero who counts everything</b><span>Coin-counting as scarcity made visible.</span></div>
+  <div class="sparkcard q" style="left:58%;top:24%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Sameer asks</span><b>Who is Arjun when nobody's watching?</b><span>One question at a time — answer in pieces, sparks grow.</span></div>
+  <div class="sparkcard" style="left:20%;top:56%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Character</span><b>The stall owner's story</b><span>Who pretends not to see — and why?</span></div>
+  <div class="sparkcard" style="left:52%;top:63%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Spark</span><b>The last bus route</b><span>Night bus as the geography of going under.</span></div>
+  <div class="sparkcard" style="left:76%;top:52%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/></svg>Grown</span><b>SC 9 draft exists now</b><span>This spark graduated into a page — see Graduated.</span></div>
+
+  <div class="askbar" id="ask">
+    <div class="qline"><span class="face">S</span><div class="qtext"><small>Sameer · one question at a time</small>What does Arjun <b>want</b> in this draft — to know the truth, or to survive the month?</div></div>
+    <div class="chips explore-chips">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12h16M13 5l7 7-7 7"/></svg><span class="lbl">Pin my answer as a spark</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Grow this wall into pages</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 4h16v12H8l-4 4z"/></svg><span class="lbl">Ask a different question</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M3 12c3-6 6 6 9 0s6 6 9 0"/></svg><span class="lbl">Read the script like water</span></button>
+    </div>
+    <textarea class="composer" placeholder="Answer in pieces — Sameer keeps up…" rows="1"></textarea>
   </div>
 </section>
 
-<section data-screen="desk" class="s-desk">
-  <div class="desk-top">
-    <span class="proj">Pain</span>
-    <div class="room-pills">
-      <span class="pill hot">Pages</span><span class="pill" data-go="cowrite">Sameer</span><span class="pill" data-go="feedback">Report</span><span class="pill">Beats ▦</span>
-    </div>
-  </div>
-  <div class="pages"><div class="page-wrap">
-      <article class="scene-page" data-scene="Scene 1 / 22">
-        <p class="slug">INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
-        <p class="action">A ceiling fan turns slow. On a cot, <span class="el-anchored">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
-        <p class="char-cue">Arjun</p>
-        <p class="dialogue">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
-        <aside class="fn-note"><b>MARGIN NOTE 📌</b>The phone glow does the lamp's job here — his face half-lit. Nice mirror for Act II when the calls stop coming.</aside>
-      </article>
-      <article class="scene-page" data-scene="Scene 2 / 22">
-        <p class="slug">EXT. ROAD-SIDE TEA STALL — DAY</p>
-        <p class="action">Steam. Tumbling glasses. <span class="el-anchored">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
-        <p class="char-cue">Stall Owner</p>
-        <p class="dialogue">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
-        <p class="action">Arjun laughs. It dies in the steam.</p>
-      </article>
+<!-- VERDICT + DAWN -->
+<section data-screen="verdict">
+  <div class="starfield"></div>
+  <div class="skyline" id="skyline"></div>
+  <div class="cluster-stage"><div class="cluster">
+    <div class="vhead"><h2>The verdict, as sparks</h2><div class="score">7.2</div><small>12 of 44 findings open · Pain v3 · resolve them and watch the wall warm</small></div>
+    <div class="dawnmeter"><span style="font:600 10px 'Space Grotesk';color:var(--dim)">NIGHT</span><div class="track"><div class="fill" id="fill"></div></div><span style="font:600 10px 'Space Grotesk';color:var(--dim)">DAWN</span><span class="pct" id="pct">0%</span></div>
+    <p class="dawnhint">tick a finding resolved — the glass warms with you</p>
+    <div class="frow" data-dawn="20"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot high"></span>The gun never fires</div><p>“cheppalekha ante…” promises a call — payoff owed by p. 88.</p></div></div>
+    <div class="frow" data-dawn="40"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot med"></span>Stall owner vanishes</div><p>Best early antagonist beat — then zero mentions for twenty scenes.</p></div></div>
+    <div class="frow" data-dawn="60"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot med"></span>Duplicate pressure beats</div><p>SC 9 · 11 · 13 — the same promise three times.</p></div></div>
+    <div class="frow" data-dawn="80"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot low"></span>Voice bleed</div><p>Two scenes drift school-Telugu on a street-Tenglish tongue.</p></div></div>
+    <div class="frow" data-dawn="100"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot low"></span>Act II pacing drag</div><p>Three consecutive low-beat scenes around page 54.</p></div></div>
+    <div class="sparkcard q" style="grid-column:1/-1;position:relative;width:auto"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Sameer asks</span><b>Which finding do we kill first?</b><span>Pick one — I'll draft the fix with you.</span></div>
   </div></div>
+</section>
 
-  <div class="edge-tabs">
-    <button class="edge-tab sam" id="tab-sam" title="Summon Sameer">Sameer ✱</button>
-    <button class="edge-tab doc" id="tab-doc" title="Premise Doctor">Doctor</button>
+<!-- SAMEER'S QUESTION -->
+<section data-screen="debate">
+  <div class="starfield"></div>
+  <div style="position:relative;z-index:2;height:100%;display:grid;place-items:center;padding-bottom:150px">
+    <div class="sparkcard q" style="position:relative;width:min(560px,90vw);padding:26px 30px">
+      <span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>The debate · 1:47 AM</span>
+      <b style="font-size:18px;margin-bottom:10px">Scenes 8–14 ek hi beat teen baar dikhate hain.</b>
+      <span style="font-size:13.5px;color:var(--txt);display:block;margin-bottom:10px">Pressure dikhata hai, badhta nahi. Audience ko washroom break milega — humein dena nahi hai. To sawaal: in teeno me se kis ek scene me Arjun <b>CHOOSE</b> karta hai? Wohi rakho — baaki do ko 1.5 page me collapse kar do. Likh dikhau?</span>
+      <span style="font-size:11.5px;color:var(--dim)">— Sameer · peer mode · past work loaded, tonight's script isolated</span>
+    </div>
   </div>
-
-  <aside class="pane-pop" id="pane-sam">
-    <div class="pane-head"><span class="avatar">S</span><div><div class="nm">SAMEER</div><div class="rl">writing partner · pushback welcome</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="who">Sameer · now</div><div class="bubble">Scene 2 ka double coin-count — mast. Bina dialogue ke "shortage" bol gaya. Scene 1 ke saath milke Act I setup done.</div></div>
-      <div class="msg me"><div class="bubble">stall owner ko zyada do?</div></div>
-      <div class="msg them"><div class="bubble">Nahi. Ek line kaafi hai. Aur diya to character gayab, plot ban jayega. Cheap steering mat karo.</div></div>
+  <div class="askbar" style="bottom:18px">
+    <div class="chips explore-chips">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Show the collapsed scene</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span class="lbl">Raise stakes instead</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/></svg><span class="lbl">Compare with Gun Pen's mid</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M9 5h11v10H12l-4 4zM4 8v7"/></svg><span class="lbl">Read it in Tenglish voice</span></button>
     </div>
-    <div class="explore-chips">
-      <button class="chip">✂ <span class="lbl">Tighten scene 1</span></button>
-      <button class="chip">🎭 <span class="lbl">Push Arjun's want</span></button>
-      <button class="chip">⚖ <span class="lbl">Is act I earning it?</span></button>
-    </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="Talk to Sameer…" rows="1"></textarea><button class="send">↑</button></div>
-  </aside>
-
-  <aside class="pane-pop" id="pane-doc">
-    <div class="pane-head doc-h"><span class="avatar">D</span><div><div class="nm">PREMISE DOCTOR</div><div class="rl">diagnosis without sugar</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="bubble">Why THIS week? Rent trouble is generic. Arjun's inability to walk away today is the actual premise — and it isn't on the page yet. Finding #3, severity high.</div></div>
-    </div>
-    <div class="explore-chips">
-      <button class="chip">🩺 <span class="lbl">Diagnose premise</span></button>
-      <button class="chip">🔓 <span class="lbl">Escalate stakes</span></button>
-    </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="Ask the doctor…" rows="1"></textarea></div>
-  </aside>
-
-  <div class="status-strip">
-    <span><span class="dot g"></span>qwen3-14B @ :8080</span><span>SC 2 · 214 W</span><span>FINDINGS 12/44 OPEN</span>
-    <span class="st-sprint">⏱ SPRINT 18:42</span><span>⚡ LOOP OK</span>
+    <textarea class="composer" placeholder="Argue with Sameer…" rows="1"></textarea>
   </div>
 </section>
 
-<section data-screen="cowrite" class="s-cowrite">
-  <div class="cw-head">
-    <span class="avatar" style="width:44px;height:44px;font-size:19px">S</span>
-    <div><h2>Sameer — Partner Room</h2><div class="sub">full conversation · memory · your writer library</div></div>
-    <div class="room-pills" style="margin-left:auto"><span class="pill" data-go="desk">← pages</span><span class="pill" data-go="feedback">Report</span></div>
-  </div>
-  <div class="memory-card"><b>PAST WORK:</b> Gun Pen (family-pressure core) · honored note: "no cheap steering." <b>RELATIONSHIP:</b> 41 sessions · pushback welcomed · Tenglish. <b>TONIGHT:</b> Pain v3 — separated from past work.</div>
-  <div class="cw-chat">
-    <div class="msg them"><div class="who">Sameer</div><div class="bubble">Pehle acchi khabar: Arjun ka want ab Scene 1 se crystal clear. Ab kadwi baat — second act ki beech ke scenes 8–14 ek hi beat teen baar. Pressure dikhata hai, badhta nahi.</div></div>
-    <div class="msg me"><div class="bubble">to kya hatayein?</div></div>
-    <div class="msg them"><div class="bubble">Pehle sawaal: in teeno me se kis ek me Arjun CHOOSE karta hai? Wohi rakho, baaki do ko 1.5 page me collapse kar. Likh dikhau?</div></div>
-  </div>
-  <div class="cw-explore explore-chips">
-    <button class="chip">📄 <span class="lbl">Show the collapsed scene</span></button>
-    <button class="chip">🧗 <span class="lbl">Raise stakes instead</span></button>
-    <button class="chip">🔁 <span class="lbl">Compare with Gun Pen's mid</span></button>
-    <button class="chip">🗣 <span class="lbl">Read it in Tenglish voice</span></button>
-  </div>
-  <div class="cw-composer composer-zone" style="padding:0"><textarea class="composer" rows="1" placeholder="Write to Sameer…"></textarea><button class="send">↑</button></div>
-  <div class="cw-status"><span>SAMEER · PEER MODE</span><span>BRANCHED SESSION · MAIN PATH</span><span class="st-sprint" style="margin-left:auto">⏱ 18:42</span></div>
+<!-- GRADUATED PAGES -->
+<section data-screen="grad">
+  <div class="starfield"></div>
+  <div class="grad"><div class="grad-col">
+    <p class="grad-note">the wall, grown up — sparks became pages · structure arrived when it was earned</p>
+    <span class="readlike" data-go="river">Read the whole script like water ↘</span>
+    <div class="pagecard"><span class="sc">SC 01 · INT. RENTED ROOM — NIGHT</span>
+      A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest.<br><br>ARJUN: Naana… cheppu. Cheppalekha ante nenu intlo unna leda?
+      <div class="from-spark">the phone glow does the lamp's job — a quiet mirror for Act II</div></div>
+    <div class="pagecard"><span class="sc">SC 02 · EXT. ROAD-SIDE TEA STALL — DAY</span>
+      Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.
+      <div class="from-spark">a hero who counts everything — scarcity made visible</div></div>
+    <div class="pagecard" style="border-style:dashed;text-align:center;color:var(--dim);font-family:'Space Grotesk';font-size:12.5px">＋ the wall still holds 3 growing sparks — drag one here when it's ready</div>
+  </div></div>
 </section>
 
-<section data-screen="feedback" class="s-feedback">
-  <nav class="fb-nav">
-    <h3>THE REPORT</h3>
-    <a class="on" href="#fb-v">Verdict</a><a href="#fb-plot">Plot Economy · 5</a><a href="#fb-char">Character · 4</a><a href="#fb-dialogue">Dialogue · 2</a><a href="#fb-pacing">Pacing</a>
-    <div class="fb-score"><div class="n">7.2</div><div class="cap">script score</div></div>
-    <div style="margin-top:12px;border:2px solid var(--ink);padding:10px;text-align:center"><div class="mono" style="font-size:20px;font-weight:700">12/44</div><div class="cap">open findings</div></div>
-  </nav>
-  <div class="fb-read"><div class="fb-doc">
-    <span class="kicker">Analysis · Pain v3 · verified quotes only</span>
-    <h1 id="fb-v">A tight first act carrying an unaired second.</h1>
-    <div class="verdict">Arjun's need to know — “cheppalekha ante nenu intlo unna leda?” — is a real engine. The premise earns itself by page 12. What hasn't been earned yet is forty pages of pressure without escalation.</div>
+<!-- RIVER READ -->
+<section data-screen="river">
+  <div class="starfield"></div>
+  <div class="river" id="riverScroll">
+    <div class="mov" id="r-source">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The source</span><span class="rule"></span><span class="mov-kick">where the current starts</span></div>
+        <p style="color:var(--dim);font-size:13px">Reading a script should feel like floating downstream — pages carry you, arguments join, truth settles. Esc returns you to the wall.</p>
+      </div>
+    </div>
+    <svg class="wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 20 C 150 0 300 40 450 20 C 600 0 750 40 900 20 C 1050 0 1150 28 1200 20" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="mov" id="r-flow">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The flow</span><span class="rule"></span><span class="mov-kick">the pages themselves</span></div>
+        <div class="rpage"><span class="sc">SC 01 · INT. RENTED ROOM — NIGHT</span>
+          A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.<br><br>ARJUN: Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</div>
+        <div class="rpage"><span class="sc">SC 02 · EXT. ROAD-SIDE TEA STALL — DAY</span>
+          Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.<br><br>STALL OWNER: Nee account tho guddi pattuko ra. Idi naadi kaadu.</div>
+        <div class="rsam"><span class="face">S</span><div class="line">Coin-count noted — scarcity made visible. Keep floating; I'll only speak when the current slows.</div></div>
+      </div>
+    </div>
+    <svg class="wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 20 C 200 40 350 0 550 20 C 750 40 900 0 1100 20 L 1200 16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="mov" id="r-confluence">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The confluence</span><span class="rule"></span><span class="mov-kick">the argument joins the current</span></div>
+        <div class="rsam"><span class="face">S</span><div class="line">Here's where the beat repeats — SC 9, 11, 13. Kis ek me Arjun CHOOSE karta hai? Answer on the wall, and this stretch of water changes shape.</div></div>
+      </div>
+    </div>
+    <svg class="wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 18 C 180 0 360 40 560 20 C 760 0 940 40 1200 18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="mov" id="r-estuary" style="padding-bottom:110px">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The estuary</span><span class="rule"></span><span class="mov-kick">what settled</span></div>
+        <div class="rsed high"><div class="t"><span class="sev-dot high"></span>The gun never fires</div><p>Payoff owed by p. 88 — resolve it in the verdict room.</p></div>
+        <div class="rsed med"><div class="t"><span class="sev-dot med"></span>Stall owner vanishes</div><p>Bring him back or let the absence speak.</p></div>
+        <div class="rsed med"><div class="t"><span class="sev-dot med"></span>Duplicate pressure beats</div><p>Keep the scene where Arjun chooses.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="current" id="riverCur">
+    <i data-goto="r-source" class="on" title="Source"></i>
+    <i data-goto="r-flow" title="The Flow"></i>
+    <i data-goto="r-confluence" title="The Confluence"></i>
+    <i data-goto="r-estuary" title="The Estuary"></i>
+  </div>
+</section>
 
-    <div class="cat-h" id="fb-plot">Plot Economy<span style="font:700 11px 'Space Grotesk';margin-left:auto">5 FINDINGS</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev high"></span>Chekhov's gun never fires <a class="jtsc" href="#fb-v" onclick="go('desk')">↦ TO SCENE</a></div>
-    <blockquote>“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — INT. RENTED ROOM (Sc 1)</blockquote>
-    The father-call promise pays off only as mood, never as event. Land the call by Act III midpoint — or cut the specificity.</div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Duplicate pressure beats</div>
-    Scenes 9, 11 and 13 stage identical money-shortage confrontations with flat intensity. Ledger flags all three as setups paying into nothing.</div>
-
-    <div class="cat-h" id="fb-char">Character<span style="font:700 11px 'Space Grotesk';margin-left:auto">4 FINDINGS</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Stall owner vanishes after peak</div>
-    <blockquote>“Nee account tho guddi pattuko ra.” — EXT. TEA STALL (Sc 2)</blockquote>
-    Best early antagonist beat — then zero mentions across the remaining twenty scenes.</div>
-
-    <div class="cat-h" id="fb-dialogue">Dialogue<span style="font:700 11px 'Space Grotesk';margin-left:auto">2 FINDINGS</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev low"></span>Voice bleed: Arjun edging formal</div>
-    Two scenes slip into school-Telugu constructions while the idiolect otherwise runs street-Tenglish.</div>
-
-    <div class="cat-h" id="fb-pacing">Pacing<span style="font:700 11px 'Space Grotesk';margin-left:auto">AMBER = DRAG</span></div>
-    <div class="finding" style="display:flex;align-items:flex-end;gap:6px;height:118px;padding:16px 18px 12px"><span class="mono" style="font-size:10px;color:var(--muted)">PACE ▸</span>
-    <div style="flex:1;display:flex;align-items:flex-end;gap:5px;height:82px"><i style="flex:1;background:#ccc7bb;height:46%;border:2px solid var(--ink)"></i><i style="flex:1;background:#ccc7bb;height:62%;border:2px solid var(--ink)"></i><i style="flex:1;background:var(--amber);height:90%;border:2px solid var(--ink)"></i><i style="flex:1;background:#ccc7bb;height:55%;border:2px solid var(--ink)"></i><i style="flex:1;background:var(--amber);height:84%;border:2px solid var(--ink)"></i><i style="flex:1;background:#ccc7bb;height:40%;border:2px solid var(--ink)"></i><i style="flex:1;background:var(--amber);height:76%;border:2px solid var(--ink)"></i><i style="flex:1;background:#ccc7bb;height:66%;border:2px solid var(--ink)"></i></div>
-    <span class="mono" style="font-size:10px;color:var(--muted)">SC 1–8</span></div>
+<!-- DROP-IN -->
+<section data-screen="drop">
+  <div class="starfield"></div>
+  <div class="dropzone"><div class="dz">
+    <svg width="44" height="44" viewBox="0 0 24 24" style="stroke:var(--cyan);fill:none;stroke-width:1.6"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+    <div class="big">Drop a script. Get sparks.</div>
+    <p>Pain_v3.fountain lands as new glowing cards on the wall — parsed, sequenced, waiting to connect. Analysis runs quiet in the background; the verdict arrives as its own cluster.</p>
+    <span class="becomes" data-go="wall">watch it become sparks →</span>
   </div></div>
 </section>
 
@@ -276,30 +289,52 @@ main{padding-top:46px}
 function go(name){
   document.querySelectorAll('[data-screen]').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
   document.querySelectorAll('#pv [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===name));
-  closePanes();
 }
-document.addEventListener('click',function(e){
-  const goBtn=e.target.closest('[data-go]');
-  if(goBtn){go(goBtn.dataset.go);return;}
-  const opener=e.target.closest('.edge-tab');
-  if(opener){
-    const pane=opener.id==='tab-sam'?document.getElementById('pane-sam'):document.getElementById('pane-doc');
-    const was=pane.classList.contains('open');
-    closePanes();
-    if(!was)pane.classList.add('open');
-    e.stopPropagation();return;
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');
+  if(g){go(g.dataset.go);return;}
+  const dot=e.target.closest('.current i[data-goto]');
+  if(dot){
+    const t=document.getElementById(dot.dataset.goto);
+    if(t)document.getElementById('riverScroll').scrollTo({top:t.offsetTop-8,behavior:'smooth'});
+    document.querySelectorAll('.current i').forEach(i=>i.classList.toggle('on',i===dot));
+    return;
   }
-  if(!e.target.closest('.pane-pop'))closePanes();
+  const f=e.target.closest('.frow');
+  if(f){
+    f.classList.toggle('resolved');
+    let dawn=0;
+    document.querySelectorAll('.frow.resolved').forEach(r=>{dawn=Math.max(dawn,parseInt(r.dataset.dawn,10));});
+    document.documentElement.style.setProperty('--dawn',(dawn/100).toFixed(3));
+    const pct=document.getElementById('pct');if(pct)pct.textContent=dawn+'%';
+  }
 });
-function closePanes(){document.querySelectorAll('.pane-pop.open').forEach(p=>p.classList.remove('open'));}
+// river current follows manual scroll
+const rs=document.getElementById('riverScroll');
+const movs=[...document.querySelectorAll('#riverScroll .mov')];
+let ticking=false;
+if(rs)rs.addEventListener('scroll',()=>{
+  if(ticking)return;ticking=true;
+  requestAnimationFrame(()=>{
+    const mid=rs.scrollTop+rs.clientHeight*0.4;
+    let act=movs[0].id;
+    movs.forEach(m=>{if(m.offsetTop<=mid)act=m.id;});
+    document.querySelectorAll('.current i').forEach(i=>i.classList.toggle('on',i.dataset.goto===act));
+    ticking=false;
+  });
+},{passive:true});
 document.querySelectorAll('.composer').forEach(t=>{
   t.addEventListener('input',()=>{
-    t.style.height='auto';
-    t.style.height=Math.min(t.scrollHeight,175)+'px';
-    if(t.value.trim())document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
+    t.style.height='auto';t.style.height=Math.min(t.scrollHeight,130)+'px';
+    if(t.value.trim())document.querySelectorAll('.chips').forEach(c=>c.classList.add('collapsed'));
   });
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanes();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+    go('wall');
+  }
+});
 </script>
 </body>
 </html>

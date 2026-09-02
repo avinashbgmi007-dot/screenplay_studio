@@ -1006,9 +1006,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   flex: 1;
   min-height: 0;
   position: relative;
-  /* the drawer and the structure rail slide over the page — clip them at the
-     workspace bounds so a closed drawer never scrolls the body sideways */
-  overflow: hidden;
+  /* the drawer and the structure rail slide over the page — use overflow-x:
+     clip to prevent horizontal scroll while allowing dropdowns to overflow */
+  overflow-x: clip;
+  overflow-y: visible;
   /* the desk at night: a faint wood-grain field so the manuscript floats on
      something, not on void. Purely decorative — pointer-events: none. */
   background:
@@ -2608,6 +2609,8 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   line-height: 1.35;
 }
 .revision-nav-row:hover { background: rgba(232, 162, 79, 0.08); border-color: rgba(232, 162, 79, 0.22); }
+.revision-nav-row.active { background: rgba(232, 162, 79, 0.14); border-color: rgba(232, 162, 79, 0.45); }
+.revision-nav-row.active .rn-num { color: var(--accent); }
 .revision-nav-row .rn-num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -2890,8 +2893,8 @@ body.dawn {
 
   --accent2: #3ab8d8;
 
-  --danger: #c94a5a;
-  --danger-bg: rgba(201, 74, 90, 0.12);
+  --danger: #9c3527; /* was #c94a5a (Nocta dawn) — fails WCAG AA on dawn's light surfaces (3.43–4.48); zAI's a11y bump passes (5.23+) */
+  --danger-bg: rgba(156, 53, 39, 0.12);
   --ok: #2eb87a;
   --ok-bg: rgba(90, 122, 73, 0.12);
 }
@@ -3436,11 +3439,9 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   .scene-page.flash { animation: none; box-shadow: 0 0 0 3px rgba(232, 162, 79, 0.6), 0 18px 44px -18px rgba(0, 0, 0, 0.6); }
 }
 
-/* resizable script pane — the divider is retired in the Manuscript Stage
-   (the script owns the row; the room is a drawer), kept in the DOM only
-   because the resize code still reads it. */
+/* resizable script pane — drag the divider to resize the script pane */
 .pane-divider {
-  display: flex;
+  display: block;
   flex: 0 0 5px;
   cursor: col-resize;
   background: var(--line-soft);
@@ -4834,4 +4835,264 @@ body::before {
   .w { animation: none; opacity: 1; }
   .caret { animation: none; }
   .cursor-spotlight { display: none; }
+
+/* ==================================================================
+   SPARK WALL — the chosen world, wired into the real desk
+   ① idea room  = the wall (void + glass page + threads + star drift)
+   ② verdict    = the dawn meter (resolve findings, the room warms)
+   ③ river read = the draft as one continuous flow, current nav
+   All motion sits behind prefers-reduced-motion guards.
+   ================================================================== */
+
+:root { --spark-dawn: 0; }
+
+/* ---- ① the wall: ambience behind the idea page ---- */
+.spark-ambience {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 16px;
+  display: none;
+  z-index: 0;
+}
+body.idea-mode .spark-ambience { display: block; }
+.idea-canvas > *:not(.spark-ambience) { position: relative; z-index: 1; }
+.spark-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 18%, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1.4px 1.4px at 67% 9%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(2px 2px at 85% 62%, rgba(178, 225, 255, 0.6), transparent),
+    radial-gradient(1.4px 1.4px at 30% 76%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1.6px 1.6px at 52% 38%, rgba(215, 200, 255, 0.5), transparent),
+    radial-gradient(1.4px 1.4px at 44% 88%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.2px 1.2px at 22% 48%, rgba(178, 225, 255, 0.45), transparent),
+    radial-gradient(1.2px 1.2px at 74% 30%, rgba(255, 255, 255, 0.4), transparent);
+}
+.spark-threads { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.75; }
+.spark-threads path { stroke-width: 1.6; }
+@media (prefers-reduced-motion: no-preference) {
+  .spark-threads path {
+    stroke-dasharray: 5 11;
+    animation: sparkThreadFlow 26s linear infinite;
+  }
+  .spark-stars { animation: sparkStarDrift 60s ease-in-out infinite alternate; }
+}
+@keyframes sparkThreadFlow { to { stroke-dashoffset: -320; } }
+@keyframes sparkStarDrift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-14px, 10px); }
+}
+/* the void itself — the idea room leaves the app theme behind and enters
+   the Spark Wall world: deep space, cyan-violet breath, glass page */
+body.idea-mode,
+body.idea-mode #script-pane,
+body.idea-mode .idea-canvas {
+  background:
+    radial-gradient(900px 480px at 50% -8%, rgba(110, 231, 255, 0.10), transparent 62%),
+    radial-gradient(700px 420px at 85% 95%, rgba(167, 139, 250, 0.09), transparent 70%),
+    #0a0e1a;
+}
+body.idea-mode .idea-head { border-bottom-color: rgba(160, 180, 255, 0.22); }
+body.idea-mode .idea-title-input { color: #dbe2f4; }
+body.idea-mode .idea-save-state { color: #77809c; }
+body.idea-mode .idea-structure-btn { color: #77809c; }
+body.idea-mode .idea-structure-btn:hover { color: #dbe2f4; background: rgba(110, 231, 255, 0.08); }
+body.idea-mode .idea-content {
+  background: rgba(13, 17, 32, 0.78);
+  border: 1px solid rgba(160, 180, 255, 0.28);
+  border-radius: 16px;
+  padding: 26px 30px;
+  margin-top: 16px;
+  color: #dbe2f4;
+  backdrop-filter: blur(10px);
+  caret-color: #6ee7ff;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+body.idea-mode .idea-content::placeholder { color: #5d6b8a; }
+body.idea-mode .idea-content:focus {
+  border-color: rgba(110, 231, 255, 0.55);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(110, 231, 255, 0.12);
+}
+body.idea-mode .idea-structure-panel {
+  background: rgba(13, 17, 32, 0.7);
+  border: 1px dashed rgba(160, 180, 255, 0.3);
+}
+body.idea-mode .idea-structure-panel .premise-field { color: #77809c; }
+body.idea-mode .idea-structure-panel textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(160, 180, 255, 0.22);
+  color: #dbe2f4;
+}
+body.idea-mode .idea-sam-pill {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.9), rgba(110, 231, 255, 0.9));
+  color: #0a0e1a;
+  font-weight: 600;
+  box-shadow: 0 8px 26px -8px rgba(110, 231, 255, 0.45);
+}
+body.idea-mode .idea-graduate-btn { background: linear-gradient(135deg, #a78bfa, #6ee7ff); border: 0; color: #0a0e1a; }
+
+/* ---- explore chips: icon + label, collapse to icons after first input ----
+   The mockup contract: expanded on open, .collapsed on first composer input,
+   hover on a lone icon reveals its label again. */
+.explore-chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.explore-chip .chip-ic { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.explore-chips.collapsed { flex-direction: column; align-items: flex-start; }
+.explore-chips.collapsed .explore-chip .lbl { display: none; }
+.explore-chips.collapsed:hover .explore-chip .lbl { display: inline; }
+@media (prefers-reduced-motion: no-preference) {
+  .explore-chips { transition: flex-direction 0s, padding 0.2s ease; }
+}
+
+/* ---- ② the dawn meter: resolve findings, the room warms ---- */
+.dawn-wash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: calc(var(--spark-dawn) * 0.85);
+  background: linear-gradient(180deg, rgba(255, 169, 77, 0.2), rgba(242, 165, 107, 0.09) 55%, transparent);
+  transition: opacity 0.6s ease;
+}
+@media (prefers-reduced-motion: reduce) { .dawn-wash { transition: none; } }
+.dawn-meter { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.dawn-cap { font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-faint); }
+.dawn-track { width: 110px; height: 5px; border-radius: 3px; background: var(--line, rgba(255, 255, 255, 0.16)); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18); }
+.dawn-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5a4a8a, #e8a54b); transition: width 0.5s ease; box-shadow: 0 0 8px rgba(232, 165, 75, 0.45); }
+@media (prefers-reduced-motion: reduce) { .dawn-fill { transition: none; } }
+.dawn-pct { font-size: 10.5px; color: var(--text-muted); min-width: 30px; text-align: right; font-weight: 600; }
+
+/* ---- ③ river read: the draft as one continuous dark-glass stream ----
+   The pages leave their paper behind and become glass on the void, exactly
+   as the approved Spark Wall mockup read — every script element gets an
+   explicit light color so nothing disappears on the dark surface. */
+body.river-read .scene-page {
+  background: rgba(10, 14, 26, 0.82);
+  color: #cfe0da;
+  border: 1px solid rgba(94, 234, 212, 0.22);
+  border-radius: 22px 22px 22px 6px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+  transform: none;
+}
+body.river-read .scene-page::before { border-color: rgba(94, 234, 212, 0.12); }
+body.river-read .scene-page .scene-page-head { border-bottom-color: rgba(94, 234, 212, 0.18); }
+body.river-read .scene-page .scene-page-num,
+body.river-read .scene-page .scene-page-est { color: #7f958d; border-color: rgba(94, 234, 212, 0.2); }
+body.river-read .scene-page .scene-heading-line { color: #5eead4; }
+body.river-read .scene-page .el-action,
+body.river-read .scene-page .el-dialogue { color: #cfe0da; }
+body.river-read .scene-page .el-character { color: #ffd58a; }
+body.river-read .scene-page .el-parenthetical { color: #9db3ab; }
+body.river-read .scene-page .el-transition { color: #8fd3c7; }
+body.river-read .scene-page .el-shot { color: #7f958d; }
+body.river-read .scene-page .el-dialogue mark,
+body.river-read .scene-page .el-action mark,
+body.river-read .scene-page .el-character mark,
+body.river-read .scene-page .scene-heading-line mark { background: rgba(94, 234, 212, 0.18); color: #eafff9; }
+/* paper-theme leftovers that vanish on dark glass: anchored findings,
+   margin-note pins and change stars all shift to the teal river palette */
+body.river-read .scene-page .el-anchored {
+  background: rgba(94, 234, 212, 0.12);
+  border-bottom: 1px dashed #5eead4;
+}
+body.river-read .scene-page .el-anchored:hover { background: rgba(94, 234, 212, 0.2); }
+body.river-read .scene-page .el-noted { background: rgba(255, 213, 138, 0.1); }
+body.river-read .scene-page .el-noted:hover { background: rgba(255, 213, 138, 0.18); }
+body.river-read .scene-page .el-noted::after { color: #ffd58a; }
+body.river-read .scene-page .el-changed::before { color: #ffd58a; }
+body.river-read .scene-page + .scene-page { margin-top: -6px; }
+body.river-read .scene-page::after {
+  content: "";
+  display: block;
+  height: 30px;
+  margin: 24px auto 0;
+  width: 84%;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 22' preserveAspectRatio='none'><path d='M0 11 C 20 2 40 20 60 11 C 80 2 100 20 120 11' fill='none' stroke='%235eead4' stroke-width='1.6'/></svg>") no-repeat center / 100% 100%;
+  opacity: 0.75;
+}
+body.river-read .finding-note,
+body.river-read .note-mine,
+body.river-read .scene-notes,
+body.river-read .finding-summary { display: none !important; }
+body.river-read #flow-btn.active {
+  color: #7fe3ff;
+  border-color: rgba(110, 231, 255, 0.55);
+  background: rgba(110, 231, 255, 0.12);
+  box-shadow: 0 0 16px rgba(110, 231, 255, 0.25);
+}
+/* the current nav: a glowing river line the dots ride */
+#river-current {
+  position: fixed;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 60;
+  padding: 14px 6px;
+}
+/* the partner gutter owns the right edge — the current nav lives beside it,
+   not under it (the gutter otherwise intercepts the dot clicks) */
+body.river-read #river-current { right: 68px; display: flex; }
+#river-current::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, rgba(110, 231, 255, 0.45), transparent);
+}
+#river-current i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(160, 190, 220, 0.35);
+  border: 1px solid rgba(110, 231, 255, 0.35);
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) { #river-current i { transition: none; } }
+#river-current i:hover { background: rgba(110, 231, 255, 0.55); }
+#river-current i.on {
+  background: #6ee7ff;
+  border-color: #6ee7ff;
+  box-shadow: 0 0 14px 3px rgba(110, 231, 255, 0.4);
+  transform: scale(1.35);
+}
+
+/* ==================================================================
+   SPARK SHELL — the whole night app wears the void now
+   The ink ramp above is the Spark Wall palette (deep blue-black,
+   cool light text, blue-tinted lines); the amber lamp stays as the
+   single warm signal — desk lamp, findings, CTAs. Dawn is untouched:
+   it re-overrides every var it needs.
+   ================================================================== */
+body:not(.dawn) {
+  background:
+    radial-gradient(1000px 520px at 12% -10%, rgba(110, 231, 255, 0.06), transparent 60%),
+    radial-gradient(900px 560px at 92% 104%, rgba(167, 139, 250, 0.07), transparent 65%),
+    var(--ink-950);
+}
+/* glass edges: panels get a faint cool rim so surfaces read as glass on void */
+body:not(.dawn) #sidebar,
+body:not(.dawn) .room-panel,
+body:not(.dawn) .drawer,
+body:not(.dawn) .modal,
+body:not(.dawn) .craft-panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+body:not(.dawn) #project-bar,
+body:not(.dawn) #script-toolbar,
+body:not(.dawn) .status-strip {
+  border-color: var(--line-soft);
 }

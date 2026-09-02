@@ -10,13 +10,18 @@
       "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)",
       "note": "McKee's own framing: 'No scene that doesn't turn.'"
     },
-    "definition": "A well-built scene shifts the value at stake in a character's life from positive to negative or negative to positive by its end (their situation, understanding, or relationship is meaningfully different at the end of the scene than at the start). A scene that ends in the same state it began — informationally, emotionally, or dramatically — is static and likely a candidate for cutting or combining with another scene.",
-    "detection_signal": "For each scene, identify the value/stake in play at the start and compare it to the end. Flag scenes with no discernible shift — where the scene reads as a flat delivery of information or mood with no dramatic turn.",
-    "counter_considerations": "Brief transitional or atmospheric scenes (a few seconds of visual establishing, a montage beat) aren't held to the same standard as full dramatic scenes — apply this most strictly to scenes with dialogue/significant screen time.",
+    "definition": "A well-built scene shifts the value at stake in a character's life from positive to negative or negative to positive by its end (their situation, understanding, or relationship is meaningfully different at the end of the scene than at the start). A scene that ends in the same state it began \u00e2\u20ac\u201d informationally, emotionally, or dramatically \u00e2\u20ac\u201d is static and likely a candidate for cutting or combining with another scene.",
+    "detection_signal": "For each scene, identify the value/stake in play at the start and compare it to the end. Flag scenes with no discernible shift \u00e2\u20ac\u201d where the scene reads as a flat delivery of information or mood with no dramatic turn.",
+    "counter_considerations": "Brief transitional or atmospheric scenes (a few seconds of visual establishing, a montage beat) aren't held to the same standard as full dramatic scenes \u00e2\u20ac\u201d apply this most strictly to scenes with dialogue/significant screen time.",
     "severity_default": "medium",
     "confidence_tier": "medium",
-    "requires": ["scene_text"],
-    "related_rules": ["goal_conflict_disaster", "scene_necessity_test"]
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "goal_conflict_disaster",
+      "scene_necessity_test"
+    ]
   },
   {
     "id": "goal_conflict_disaster",
@@ -28,13 +33,17 @@
       "originator": "Dwight V. Swain",
       "work": "Techniques of the Selling Writer (1965)"
     },
-    "definition": "A well-built scene has: a Goal (what the point-of-view character wants to achieve in this specific scene, ideally clear to the audience), Conflict (opposition that tests how much the character wants the goal), and a Disaster (an outcome that leaves the character worse off or with a new problem — a flat 'no', a complicating 'yes, but', or a 'no, and furthermore'). An uncomplicated 'yes' at the end of a scene tends to deflate momentum.",
+    "definition": "A well-built scene has: a Goal (what the point-of-view character wants to achieve in this specific scene, ideally clear to the audience), Conflict (opposition that tests how much the character wants the goal), and a Disaster (an outcome that leaves the character worse off or with a new problem \u00e2\u20ac\u201d a flat 'no', a complicating 'yes, but', or a 'no, and furthermore'). An uncomplicated 'yes' at the end of a scene tends to deflate momentum.",
     "detection_signal": "For each scene involving the protagonist or a POV character, identify the scene-level goal, the opposition encountered, and the outcome. Flag scenes where the outcome is an uncomplicated success with no new problem or cost introduced.",
-    "counter_considerations": "Not every scene needs a full Goal-Conflict-Disaster unit — brief connective or 'sequel' scenes (per Swain's own framework) exist specifically to let characters process a prior disaster before the next scene's goal forms, and are legitimately quieter.",
+    "counter_considerations": "Not every scene needs a full Goal-Conflict-Disaster unit \u00e2\u20ac\u201d brief connective or 'sequel' scenes (per Swain's own framework) exist specifically to let characters process a prior disaster before the next scene's goal forms, and are legitimately quieter.",
     "severity_default": "medium",
     "confidence_tier": "medium",
-    "requires": ["scene_text"],
-    "related_rules": ["scene_must_turn"]
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scene_must_turn"
+    ]
   },
   {
     "id": "obligatory_scene",
@@ -46,13 +55,17 @@
       "originator": "Robert McKee",
       "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
     },
-    "definition": "Once a story raises a specific dramatic question (will they confront their rival? will the truth come out?), the audience anticipates a scene that directly answers it. Skipping or only glancingly addressing this anticipated confrontation — cutting away, resolving it offscreen, or substituting a lesser scene — tends to feel like an unfulfilled promise.",
+    "definition": "Once a story raises a specific dramatic question (will they confront their rival? will the truth come out?), the audience anticipates a scene that directly answers it. Skipping or only glancingly addressing this anticipated confrontation \u00e2\u20ac\u201d cutting away, resolving it offscreen, or substituting a lesser scene \u00e2\u20ac\u201d tends to feel like an unfulfilled promise.",
     "detection_signal": "Identify dramatic questions the script explicitly raises (usually via a stated goal, threat, or unresolved conflict between two characters/forces). Check whether a scene directly stages the confrontation/answer the audience was primed to expect, or whether it's handled offscreen/skipped.",
-    "counter_considerations": "Deliberately withholding an obligatory scene (cutting away from an expected confrontation) can be a powerful, intentional choice in some stories — but it's a high-risk one that should read as a clear authorial choice, not an accidental gap. Flag for discussion rather than as an automatic defect.",
+    "counter_considerations": "Deliberately withholding an obligatory scene (cutting away from an expected confrontation) can be a powerful, intentional choice in some stories \u00e2\u20ac\u201d but it's a high-risk one that should read as a clear authorial choice, not an accidental gap. Flag for discussion rather than as an automatic defect.",
     "severity_default": "medium",
     "confidence_tier": "low",
-    "requires": ["scene_summaries"],
-    "related_rules": ["setup_payoff_general"]
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "setup_payoff_general"
+    ]
   },
   {
     "id": "enter_late_leave_early",
@@ -65,13 +78,17 @@
       "work": null,
       "note": "Widely-taught screenwriting convention, echoed across many craft sources (including McKee's note that most directors' cameras run out of visually fresh material after 2-3 minutes in one location); not attributable to a single originator."
     },
-    "definition": "A scene should begin as close as possible to the moment its central conflict/purpose becomes active, and end as soon as possible after its turning point lands — skipping the arrival small talk and the lingering aftermath that don't carry new dramatic information.",
+    "definition": "A scene should begin as close as possible to the moment its central conflict/purpose becomes active, and end as soon as possible after its turning point lands \u00e2\u20ac\u201d skipping the arrival small talk and the lingering aftermath that don't carry new dramatic information.",
     "detection_signal": "For each scene, check whether the opening beats before the scene's central conflict emerges, and the closing beats after its turning point, contain necessary information/character work or are skippable padding.",
-    "counter_considerations": "Slower, character-driven or atmosphere-focused scripts may deliberately linger for tone/rhythm reasons — this is a stronger rule for plot-forward genre material than for deliberately slow-paced literary work.",
+    "counter_considerations": "Slower, character-driven or atmosphere-focused scripts may deliberately linger for tone/rhythm reasons \u00e2\u20ac\u201d this is a stronger rule for plot-forward genre material than for deliberately slow-paced literary work.",
     "severity_default": "low",
     "confidence_tier": "low",
-    "requires": ["scene_text"],
-    "related_rules": ["scene_necessity_test"]
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scene_necessity_test"
+    ]
   },
   {
     "id": "scene_necessity_test",
@@ -86,10 +103,174 @@
     },
     "definition": "A scene earns its place in the script by doing at least one of: advancing the plot (something changes that affects what happens next), revealing character (we learn something about who someone is, especially under pressure), or building theme (the scene dramatizes an aspect of the story's controlling idea). A scene doing none of these is a filler/redundant candidate.",
     "detection_signal": "For each scene, using its summary and function in context, assess whether it demonstrably advances plot, reveals character, or builds theme. Flag scenes where none of the three is clearly present, or where the scene repeats work already done by an earlier scene (redundancy).",
-    "counter_considerations": "Pure tone/atmosphere scenes can be legitimate in some genres (horror, arthouse) even without hitting this test cleanly — weigh genre expectations. A scene that's borderline on all three (a little bit of each) may still collectively earn its place even if no single function is strong.",
+    "counter_considerations": "Pure tone/atmosphere scenes can be legitimate in some genres (horror, arthouse) even without hitting this test cleanly \u00e2\u20ac\u201d weigh genre expectations. A scene that's borderline on all three (a little bit of each) may still collectively earn its place even if no single function is strong.",
     "severity_default": "medium",
     "confidence_tier": "low",
-    "requires": ["scene_summaries"],
-    "related_rules": ["scene_must_turn", "enter_late_leave_early"]
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "scene_must_turn",
+      "enter_late_leave_early"
+    ]
+  },
+  {
+    "id": "lakin_scene_hook",
+    "name": "Scene Must Hook at Start and Leave with Tension",
+    "taxonomy_level": "scene",
+    "category": "scene_craft",
+    "source": {
+      "type": "framework",
+      "originator": "C.S. Lakin",
+      "work": "Layer Your Novel"
+    },
+    "definition": "Every scene should open with something that grabs attention \u00e2\u20ac\u201d a question, a conflict, an intriguing image \u00e2\u20ac\u201d and close with unresolved tension that pulls the reader forward. Scenes that begin with pleasantries and end with neat resolution kill momentum. Enter late, leave early, and always leave something dangling.",
+    "detection_signal": "Scenes that begin with small talk, greetings, or travel, or that resolve completely before ending, leaving no reason to turn the page.",
+    "counter_considerations": "Some scenes deliberately use calm openings for contrast or pacing. The rule targets habitual soft openings and full resolutions.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "enter_late_leave_early",
+      "comedy_start_late_leave_early"
+    ]
+  },
+  {
+    "id": "bell_opening_cromise",
+    "name": "The Opening Must Make a Promise to the Reader",
+    "taxonomy_level": "scene",
+    "category": "opening",
+    "source": {
+      "type": "framework",
+      "originator": "James Scott Bell",
+      "work": "Plot & Structure"
+    },
+    "definition": "The first page must create a sense of conflict, danger, emotion, mystery, or intrigue. It must give the reader a reason to turn the page by implying that something is at stake and something will happen.",
+    "detection_signal": "Opening scenes that begin with extensive backstory, setting description, or character rumination without any tension, question, or sense of forward motion.",
+    "counter_considerations": "Atmospheric openings can work if they seed a specific question or unease. Do not flag slow openings that establish a palpable mood of dread or anticipation.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "horror_tone_set_immediately"
+    ]
+  },
+  {
+    "id": "alderson_scene_tracker_elements",
+    "name": "Every Scene Must Track Seven Essential Elements",
+    "taxonomy_level": "scene",
+    "category": "scene_craft",
+    "source": {
+      "type": "framework",
+      "originator": "Martha Alderson",
+      "work": "Writing Blockbuster Plots"
+    },
+    "definition": "A complete scene includes: (1) scene type (scene vs. summary), (2) time and setting, (3) character emotional development, (4) character goal, (5) dramatic action, (6) conflict, and (7) thematic details. A great scene accomplishes all seven at once.",
+    "detection_signal": "Scenes where the character has no goal. Scenes that do not advance the plot or develop the character. Scenes where the emotional state is static from beginning to end.",
+    "counter_considerations": "Transitional scenes or breathing moments may intentionally lack all seven elements. Do not flag brief connecting scenes that serve pacing purposes.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scene_must_turn",
+      "goal_conflict_disaster"
+    ]
+  },
+  {
+    "id": "alderson_dramatic_vs_passive",
+    "name": "Prefer Dramatic Action Over Passive Action",
+    "taxonomy_level": "scene",
+    "category": "scene_energy",
+    "source": {
+      "type": "framework",
+      "originator": "Martha Alderson",
+      "work": "Writing Blockbuster Plots"
+    },
+    "definition": "Dramatic action shows characters in conflict, making choices, and facing consequences. Passive action has characters observing, thinking, or reacting without engaging. Scenes dominated by passive action lose momentum.",
+    "detection_signal": "Scenes where the protagonist watches things happen rather than participating. Long passages of internal reflection without external action. Characters being acted upon rather than acting.",
+    "counter_considerations": "Contemplative scenes can be dramatically active if the character is wrestling with a decision. Do not flag internal scenes that show genuine psychological tension.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "drama_internal_conflict_primary"
+    ]
+  },
+  {
+    "id": "stein_dynamic_description",
+    "name": "Descriptions Should Be Dynamic, Not Static",
+    "taxonomy_level": "scene",
+    "category": "description_craft",
+    "source": {
+      "type": "framework",
+      "originator": "Sol Stein",
+      "work": "Stein on Writing"
+    },
+    "definition": "Instead of stopping the story to describe a setting or character, let the character interact with and move through the environment. Dynamic description uses strong verbs and shows the character's relationship to the space, revealing personality alongside geography.",
+    "detection_signal": "Static description blocks: 'The room was large. The walls were blue. There was a table in the center.' Characters standing still while the author describes their surroundings.",
+    "counter_considerations": "A brief establishing line can orient the reader before action begins. Do not flag one-line setting anchors that immediately precede character interaction.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_show_dont_tell",
+      "scifi_exposition_through_action"
+    ]
+  },
+  {
+    "id": "weiland_characteristic_moment",
+    "name": "The Characteristic Moment Must Establish the Protagonist Immediately",
+    "taxonomy_level": "scene",
+    "category": "opening",
+    "source": {
+      "type": "framework",
+      "originator": "K.M. Weiland",
+      "work": "Creating Character Arcs"
+    },
+    "definition": "The protagonist's first appearance\u00e2\u20ac\u201dthe Characteristic Moment\u00e2\u20ac\u201dmust accomplish several tasks simultaneously: introduce the character, establish their personality, hint at the Lie they believe, create interest, and make the reader want to follow this person. A failed Characteristic Moment can mean a failed story.",
+    "detection_signal": "Opening scenes where the protagonist appears without a clear personality, action, or stance. First chapters where the character is described rather than demonstrated. Protagonists who blend into the background of their own story.",
+    "counter_considerations": "Ensemble stories may introduce the protagonist later. Do not flag stories that delay the protagonist's entrance if the setup is compelling and purposeful.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "bell_opening_cromise",
+      "horror_tone_set_immediately"
+    ]
+  },
+  {
+    "id": "weiland_normal_world",
+    "name": "The Normal World Must Demonstrate the Lie in Action",
+    "taxonomy_level": "scene",
+    "category": "setup",
+    "source": {
+      "type": "framework",
+      "originator": "K.M. Weiland",
+      "work": "Creating Character Arcs"
+    },
+    "definition": "The Normal World is not just the protagonist's everyday life\u00e2\u20ac\u201dit is the environment that reinforces and reflects the Lie the character believes. The Normal World should show how the Lie shapes the character's choices, relationships, and limitations.",
+    "detection_signal": "Opening acts where the character's ordinary life has no connection to their internal conflict. Normal worlds that are generic or purely expository rather than demonstrating the Lie's effects.",
+    "counter_considerations": "The Normal World may be happy or unhappy\u00e2\u20ac\u201dwhat matters is that it reflects the Lie. Do not flag Normal Worlds that clearly demonstrate the Lie even if the character seems content.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "cron_before_story_starts"
+    ]
   }
 ]

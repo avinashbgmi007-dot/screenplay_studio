@@ -3,327 +3,285 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Organic Magazine — Screenplay Studio redesign preview ⑥</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400&family=Nunito+Sans:wght@400;600&display=swap" rel="stylesheet">
+<title>⑤ First Light — Night to Dawn</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --cream:#f4ecdd; --paper:#fbf6ea; --terra:#c65b3f; --olive:#6d7a4e;
-  --ink:#33302a; --muted:#8d8577; --line:#ddd2bd;
-  --red:#b3523e; --amber:#b07d2e;
+  /* the sky, mixed by --dawn (0 = deep night, 1 = morning) */
+  --dawn:0;
+  --sky-top:color-mix(in oklab, #0e1220 calc((1 - var(--dawn)) * 100%), #ffd9a3 calc(var(--dawn) * 100%));
+  --sky-mid:color-mix(in oklab, #232842 calc((1 - var(--dawn)) * 100%), #f2a56b calc(var(--dawn) * 100%));
+  --sky-low:color-mix(in oklab, #3a3a5e calc((1 - var(--dawn)) * 100%), #ffe3b8 calc(var(--dawn) * 100%));
+  --txt:#e6e2d6; --dim:#9a97a8; --panel:rgba(255,255,255,.055); --edge:rgba(255,255,255,.14);
+  --red:#e07070; --amber:#eab968; --gold:#e8a54b;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--cream);color:var(--ink);font-family:"Nunito Sans",system-ui,sans-serif;font-size:15px;line-height:1.62;overflow-x:hidden}
-h1,h2,h3,.serif{font-family:"Fraunces",Georgia,serif;font-weight:500}
-.mono{font-family:Consolas,monospace}
+body{background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 55%,var(--sky-low) 100%);
+ color:var(--txt);font-family:"Inter",system-ui,sans-serif;font-size:14.5px;line-height:1.6;overflow:hidden;
+ transition:background .4s ease}
+@media (prefers-reduced-motion: reduce){body{transition:none}}
+h1,h2,h3,.serif{font-family:"Fraunces",Georgia,serif}
+svg.i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
 
-#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#efe5d2;border-bottom:1px solid var(--line);font-size:12px}
-#pv b{font-family:"Fraunces",serif;color:var(--terra);margin-right:10px;font-size:14px}
-#pv button{background:none;border:1px solid var(--line);color:var(--muted);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
-#pv button:hover{border-color:var(--terra);color:var(--ink)}
-#pv button.on{background:var(--terra);border-color:var(--terra);color:#fff}
-main{padding-top:44px}
-[data-screen]{display:none;height:calc(100vh - 44px);position:relative;overflow:hidden}
+#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(6,8,16,.8);border-bottom:1px solid var(--edge);font-size:12px;backdrop-filter:blur(8px)}
+#pv b{font-family:"Fraunces",serif;color:var(--gold);margin-right:10px}
+#pv button{background:none;border:1px solid var(--edge);color:#b9b4c4;padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
+#pv button.on{background:var(--gold);border-color:var(--gold);color:#221505;font-weight:600}
+main{padding-top:42px;height:calc(100vh - 42px)}
+[data-screen]{display:none;height:100%;position:relative;overflow:hidden}
 [data-screen].active{display:block}
+.stars{position:absolute;inset:0;pointer-events:none;opacity:calc(1 - var(--dawn));transition:opacity .4s ease;
+ background-image:radial-gradient(1px 1px at 18% 18%,rgba(255,255,255,.5),transparent),radial-gradient(1px 1px at 70% 10%,rgba(255,255,255,.4),transparent),radial-gradient(1.4px 1.4px at 85% 30%,rgba(255,255,255,.45),transparent),radial-gradient(1px 1px at 40% 34%,rgba(255,255,255,.3),transparent)}
+/* the horizon status strip — the sun position IS progress */
+.horizon{position:absolute;left:0;right:0;bottom:0;height:44px;z-index:80;display:flex;align-items:center;gap:16px;padding:0 20px;
+ background:linear-gradient(180deg,rgba(6,8,16,.25),rgba(6,8,16,.55));border-top:1px solid var(--edge);font:11px "Inter";color:#cfcabf;backdrop-filter:blur(6px)}
+.horizon .g{width:6px;height:6px;border-radius:50%;background:#79f7b7;display:inline-block;margin-right:5px}
+.horizon .suntrack{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.18);position:relative;max-width:340px;margin:0 8px}
+.horizon .sun{position:absolute;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;
+ background:radial-gradient(circle at 36% 32%,#ffe9bd,var(--gold));box-shadow:0 0 18px 5px rgba(232,165,75,.55);transition:left .5s ease}
+@media (prefers-reduced-motion: reduce){.horizon .sun{transition:none}}
 
-/* welcome — magazine cover */
-.s-welcome{display:flex;align-items:center;justify-content:center;background:
- radial-gradient(700px 300px at 80% 0%, rgba(198,91,63,.07), transparent),var(--cream)}
-.cover{width:min(860px,88vw);background:var(--paper);box-shadow:0 24px 60px rgba(90,70,40,.16);padding:54px 64px 44px;position:relative}
-.masthead{text-align:center;border-bottom:3px double var(--ink);padding-bottom:14px}
-.masthead h1{font-size:min(6vw,46px);letter-spacing:.02em}
-.masthead .issue{font-size:11.5px;text-transform:uppercase;letter-spacing:.28em;color:var(--terra);margin-top:6px}
-.cover-cols{display:flex;gap:36px;margin-top:30px}
-.cover-left{flex:1.2}
-.cover-left h2{font-size:31px;line-height:1.15}
-.cover-left h2 i{color:var(--terra)}
-.cover-left p{color:var(--muted);margin-top:14px;font-size:14px}
-.actions{display:flex;gap:12px;margin-top:22px}
-.btn{cursor:pointer;padding:11px 22px;border-radius:99px;font-weight:600;font-size:13.5px;border:1px solid transparent}
-.btn-primary{background:var(--olive);color:#fff}
-.btn-primary:hover{filter:brightness(1.08)}
-.btn-ghost{background:none;border-color:var(--line);color:var(--ink)}
-.btn-ghost:hover{border-color:var(--olive)}
-.contents{flex:1;border-left:1px solid var(--line);padding-left:32px}
-.contents h3{font-size:12px;text-transform:uppercase;letter-spacing:.2em;color:var(--terra);margin-bottom:12px}
-.c-item{padding:9px 0;border-bottom:1px dotted var(--line);cursor:pointer}
-.c-item:hover{color:var(--olive)}
-.c-item .t{font-family:"Fraunces",serif;font-size:17px}
-.c-item .s{font-size:12px;color:var(--muted)}
+/* ====== NIGHT (upload) ====== */
+.center{position:relative;z-index:2;height:100%;display:grid;place-items:center;text-align:center;padding:0 24px}
+.night-inner h1{font-size:clamp(30px,4.5vw,46px);font-weight:600;line-height:1.12}
+.night-inner h1 em{font-style:italic;color:var(--gold)}
+.night-inner p{color:var(--dim);max-width:460px;margin:14px auto 28px}
+.btn{cursor:pointer;border-radius:99px;padding:11px 24px;font-weight:600;font-size:13.5px;border:1px solid transparent;display:inline-block}
+.btn-primary{background:var(--gold);color:#221505}
+.btn-ghost{background:rgba(255,255,255,.06);border-color:var(--edge);color:var(--txt);margin-left:8px}
+.moons{display:flex;justify-content:center;gap:14px;margin-top:44px}
+.moon{width:150px;background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:16px;cursor:pointer;text-align:left;transition:transform .25s ease, border-color .25s ease;backdrop-filter:blur(6px)}
+@media (prefers-reduced-motion: reduce){.moon{transition:none}}
+.moon:hover{transform:translateY(-6px);border-color:var(--gold)}
+.moon b{font-family:"Fraunces",serif;font-weight:600;display:block;font-size:15px}
+.moon span{font-size:11.5px;color:var(--dim);display:block;margin-top:4px}
 
-/* desk */
-.desk-top{height:58px;display:flex;align-items:center;gap:14px;padding:0 26px;background:var(--paper);border-bottom:1px solid var(--line)}
-.proj{font-family:"Fraunces",serif;font-size:20px}
-.room-pills{margin-left:auto;display:flex;gap:8px}
-.pill{border:1px solid var(--line);border-radius:99px;padding:5px 14px;font-size:12.5px;color:var(--muted);cursor:pointer;background:var(--cream)}
-.pill:hover{color:var(--olive);border-color:var(--olive)}
-.pages{height:calc(100% - 58px);overflow-y:auto;padding:50px 0 110px;background:linear-gradient(to right,var(--cream) 0 calc(50% - 480px),#efe6d3 calc(50% - 480px) calc(50% + 480px),var(--cream) calc(50% + 480px))}
-.page-wrap{max-width:720px;margin:0 auto;padding:0 32px}
-.scene-page{background:var(--paper);padding:82px 88px;margin-bottom:34px;font-family:Consolas,"Courier New",monospace;font-size:15px;line-height:1.66;box-shadow:0 10px 30px rgba(90,70,40,.12);position:relative;border-radius:2px}
-.scene-page::before{content:attr(data-scene);position:absolute;top:22px;left:38px;font:600 10.5px "Nunito Sans";letter-spacing:.18em;text-transform:uppercase;color:var(--olive)}
-.slug{font-weight:700;margin-bottom:15px}
-.char-cue{text-transform:uppercase;margin:18px 0 2px 140px}
-.dialogue{margin-left:72px;max-width:430px}
-.action{margin:12px 0}
-.el-anchored{border-bottom:2px dotted var(--terra);cursor:pointer;background:rgba(198,91,63,.05)}
-.fn-note{position:absolute;right:-54px;top:168px;width:238px;background:#fffdf6;border:1px solid var(--line);border-radius:10px 10px 10px 2px;padding:13px 15px;font-family:"Nunito Sans";font-size:12.5px;box-shadow:0 6px 16px rgba(90,70,40,.1)}
-.fn-note b{color:var(--terra);display:block;margin-bottom:4px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
-.edge-tabs{position:absolute;left:22px;bottom:92px;display:flex;flex-direction:column;gap:9px;z-index:50}
-.edge-tab{height:46px;width:46px;border-radius:50%;background:var(--paper);border:1px solid var(--line);font-size:19px;cursor:pointer;box-shadow:0 8px 20px rgba(90,70,40,.14);transition:transform .2s ease}
-.edge-tab:hover{transform:scale(1.09)}
-@media (prefers-reduced-motion: reduce){.edge-tab{transition:none!important}}
-.pane-pop{position:absolute;left:84px;bottom:64px;width:396px;height:500px;background:var(--paper);border:1px solid var(--line);border-radius:16px 16px 16px 4px;box-shadow:0 26px 66px rgba(90,70,40,.2);z-index:60;display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(12px)}
-.pane-pop.open{opacity:1;pointer-events:auto;transform:none}
-.pane-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px dashed var(--line)}
-.avatar{width:34px;height:34px;border-radius:50%;background:var(--olive);color:#fff;display:grid;place-items:center;font-family:"Fraunces",serif;font-size:16px}
-.avatar.doc{background:var(--terra)}
-.nm{font-weight:700}.rl{font-size:11px;color:var(--muted)}
-.pane-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
-.msg.them .bubble{background:#efe7d5;border-radius:14px 14px 14px 3px;padding:11px 14px;font-size:13.5px}
-.msg.me{align-self:flex-end}.msg.me .bubble{background:var(--olive);color:#fff;padding:11px 14px;border-radius:14px 14px 3px 14px;font-size:13.5px}
-.msg.them .who{font-size:10.5px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.1em}
-.explore-chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 10px;transition:.25s ease}
-.chip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--olive);color:var(--olive);background:var(--paper);border-radius:99px;padding:5px 12px;font-size:12px;cursor:pointer;white-space:nowrap}
-.chip:hover{background:rgba(109,122,78,.08)}
-.explore-chips.collapsed{flex-direction:column;align-items:flex-start}
-.explore-chips.collapsed .chip span.lbl{display:none}
-.explore-chips.collapsed:hover .chip span.lbl{display:inline}
-.explore-chips.collapsed .chip:hover{border-radius:99px}
-.composer-zone{position:relative;padding:0 16px 16px}
-.composer{width:100%;min-height:44px;max-height:174px;resize:none;background:#fffdf6;border:1px solid var(--line);border-radius:12px 12px 12px 3px;padding:11px 42px 11px 13px;font:inherit;font-size:13.5px;outline:none}
-.composer:focus{border-color:var(--olive)}
-.send{position:absolute;right:23px;bottom:23px;width:31px;height:31px;border-radius:50%;background:var(--olive);color:#fff;border:0;cursor:pointer;font-weight:700}
-.status-strip{position:absolute;left:0;right:0;bottom:0;height:31px;display:flex;align-items:center;gap:17px;padding:0 21px;background:var(--paper);border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);z-index:40}
-.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
-.dot.g{background:var(--olive)}.dot.a{background:var(--amber)}
-.st-sprint{margin-left:auto;color:var(--terra)}
+/* ====== MOONLIT PAGES ====== */
+.moon-pages{position:relative;z-index:2;height:100%;overflow-y:auto;padding:44px 0 100px}
+.mp-col{max-width:700px;margin:0 auto;padding:0 28px}
+.moonlight-note{position:absolute;top:20px;left:50%;transform:translateX(-50%);font:11px "Inter";letter-spacing:.24em;text-transform:uppercase;color:var(--dim);z-index:5}
+.mpage{background:rgba(10,12,22,.72);border:1px solid var(--edge);border-radius:14px;padding:52px 56px;margin-bottom:28px;backdrop-filter:blur(8px);font-family:Consolas,monospace;font-size:14px;line-height:1.7;box-shadow:0 30px 80px rgba(0,0,0,.4)}
+.mpage .slug{color:var(--gold);margin-bottom:13px}
+.mpage .cue{color:#e8c98f;text-transform:uppercase;margin:15px 0 2px 120px}
+.mpage .dl{margin-left:58px;max-width:400px}
+.mpage .ac{color:#b9b4c4;margin:10px 0}
+.mpage .hot{border-bottom:2px dotted var(--gold);color:#f0ead8;cursor:pointer}
+.day-note{margin:12px 0 12px 40px;border-left:3px solid var(--gold);background:rgba(232,165,75,.08);border-radius:0 10px 10px 0;padding:9px 13px;font:12.5px "Inter";color:#d9cfb8}
 
-/* co-writer */
-.s-cowrite{display:flex;flex-direction:column}
-.cw-head{display:flex;align-items:center;gap:14px;padding:16px 28px;background:var(--paper);border-bottom:1px solid var(--line)}
-.cw-head h2{font-size:22px}
-.sub{color:var(--muted);font-size:12.5px}
-.memory-card{margin:14px 28px 0;background:#fffdf6;border:1px dashed var(--olive);border-radius:12px 12px 12px 3px;padding:10px 14px;font-size:12.5px;color:var(--muted)}
-.memory-card b{color:var(--olive)}
-.cw-chat{flex:1;overflow-y:auto;padding:24px 28px;display:flex;flex-direction:column;gap:14px;max-width:860px;width:100%;margin:0 auto}
-.cw-chat .msg{max-width:80%}
-.cw-composer{position:relative;max-width:860px;width:100%;margin:0 auto 20px;padding:0 28px}
-.cw-explore{padding:10px 28px 0;max-width:860px;margin:0 auto;width:100%}
-.cw-status{height:31px;border-top:1px solid var(--line);display:flex;align-items:center;gap:17px;padding:0 28px;font-size:11.5px;color:var(--muted);background:var(--paper)}
+/* ====== THE LONG NIGHT (verdict: resolve findings, light returns) ====== */
+.resolve-wrap{position:relative;z-index:2;height:100%;overflow-y:auto;padding:40px 0 110px}
+.resolve-col{max-width:660px;margin:0 auto;padding:0 28px}
+.resolve-head{text-align:center;margin-bottom:20px}
+.resolve-head h2{font-size:29px}
+.resolve-head p{color:var(--dim);font-size:13px;margin-top:6px}
+.dawnmeter{display:flex;align-items:center;gap:12px;justify-content:center;margin:14px 0 30px}
+.dawnmeter .track{width:min(320px,50vw);height:6px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden}
+.dawnmeter .fill{height:100%;width:calc(var(--dawn) * 100%);background:linear-gradient(90deg,#5a4a8a,var(--gold));transition:width .5s ease}
+@media (prefers-reduced-motion: reduce){.dawnmeter .fill{transition:none}}
+.dawnmeter .pct{font:600 12px "Inter";color:var(--gold);min-width:38px}
+.frow{display:flex;align-items:flex-start;gap:12px;background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:14px 16px;margin-bottom:12px;backdrop-filter:blur(6px)}
+.frow .tick{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--edge);flex:0 0 auto;margin-top:2px;cursor:pointer;display:grid;place-items:center;color:transparent;transition:.2s ease}
+.frow.resolved .tick{background:var(--gold);border-color:var(--gold);color:#221505}
+.frow.resolved{opacity:.62}
+.frow .t{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:7px}
+.frow p{font-size:12.5px;color:var(--dim);margin-top:3px}
+.sev-dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+.sev-dot.high{background:var(--red)}.sev-dot.med{background:var(--amber)}.sev-dot.low{background:#6d6a80}
 
-/* feedback — feature article */
-.s-feedback{display:flex;background:var(--cream)}
-.fb-toc{width:250px;background:var(--paper);border-right:1px solid var(--line);padding:24px 18px;overflow-y:auto}
-.fb-toc h3{font-size:12px;text-transform:uppercase;letter-spacing:.2em;color:var(--terra);margin-bottom:14px}
-.fb-toc a{display:block;font-family:"Fraunces",serif;font-size:15px;color:var(--ink);text-decoration:none;padding:8px 4px;border-bottom:1px dotted var(--line)}
-.fb-toc a:hover,.fb-toc a.on{color:var(--olive)}
-.score-round{margin-top:26px;width:118px;height:118px;border-radius:50%;border:2px solid var(--terra);display:grid;place-content:center;text-align:center;margin-left:auto;margin-right:auto;background:var(--paper)}
-.score-round .n{font-family:"Fraunces",serif;font-size:38px;color:var(--terra)}
-.cap{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
-.fb-read{flex:1;overflow-y:auto}
-.article{max-width:760px;margin:0 auto;padding:52px 42px 100px;background:var(--paper);box-shadow:0 0 60px rgba(90,70,40,.1);min-height:100%}
-.kicker{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.3em;color:var(--terra);margin-bottom:14px}
-.article h1{text-align:center;font-size:min(4.5vw,38px);font-style:italic;line-height:1.2;font-weight:400}
-.byline{text-align:center;color:var(--muted);font-size:12px;margin:14px 0 0;letter-spacing:.06em}
-.dropcap::first-letter{font-family:"Fraunces",serif;font-size:56px;float:left;line-height:.82;padding:6px 10px 0 0;color:var(--olive)}
-.lede{font-size:16.5px;margin:30px 0 10px;font-family:"Fraunces",serif}
-.pull{margin:34px auto;text-align:center;font-family:"Fraunces",serif;font-size:22px;font-style:italic;color:var(--terra);max-width:520px}
-.cat-h{display:flex;align-items:baseline;gap:10px;margin:40px 0 14px}
-.cat-h .serif{font-size:24px}
-.cat-h .rule{flex:1;border-bottom:1px solid var(--line)}
-.finding{border-left:3px solid var(--line);padding:10px 18px;margin-bottom:16px;background:#fbf8ef}
-.f-h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:5px}
-.sev-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-.sev.high{background:var(--red)}.sev.med{background:var(--amber)}.sev.low{background:#c1b79f}
-.finding blockquote{border-left:2px solid var(--line);margin:8px 0;padding:2px 12px;color:var(--muted);font-family:Consolas,monospace;font-size:12.5px}
-.jtsc{float:right;font-size:11px;color:var(--olive);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+/* ====== CAMPFIRE (debate) ====== */
+.camp{position:relative;z-index:2;height:100%;overflow-y:auto;padding:56px 0 120px}
+.camp-col{max-width:640px;margin:0 auto;padding:0 28px}
+.camp-kick{text-align:center;font:11px "Inter";letter-spacing:.26em;text-transform:uppercase;color:var(--gold);margin-bottom:22px}
+.fire{background:rgba(10,12,22,.66);border:1px solid var(--edge);border-radius:16px;padding:24px 26px;backdrop-filter:blur(8px);margin-bottom:18px}
+.fire .fl{margin-bottom:12px;font-size:13.5px;max-width:92%}
+.fire .fl.sam{color:#f0e6cf}
+.fire .fl.me{margin-left:15%;color:#e8caa0}
+.fire .fl .who{font:9.5px "Inter";letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin:16px 0 12px;transition:.2s ease}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px dashed var(--edge);color:var(--gold);background:none;border-radius:99px;padding:4px 11px;font:11.5px "Inter";cursor:pointer;white-space:nowrap}
+.chip:hover{background:rgba(232,165,75,.1)}
+.chips.collapsed{flex-direction:column;align-items:flex-start}
+.chips.collapsed .chip .lbl{display:none}
+.chips.collapsed:hover .chip .lbl{display:inline}
+.composer{width:100%;min-height:42px;max-height:140px;resize:none;background:rgba(10,12,22,.7);border:1px solid var(--edge);border-radius:11px;color:var(--txt);padding:11px 13px;font:13px "Inter";outline:none}
+.composer:focus{border-color:var(--gold)}
+
+/* ====== FIRST SUN (spark) ====== */
+.sun-card{position:relative;z-index:2;max-width:620px;margin:0 auto;padding:80px 28px;text-align:center}
+.rays{width:120px;height:120px;margin:0 auto 20px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#fff3cf,var(--gold) 60%,transparent 72%);box-shadow:0 0 80px 30px rgba(232,165,75,.35)}
+.sun-card h2{font-size:31px;font-style:italic;font-weight:400}
+.sun-card .sub{color:var(--dim);margin:10px 0 30px}
+.risecards{display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:left}
+.rcard{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:16px 18px;cursor:pointer;transition:transform .25s ease,border-color .25s ease;backdrop-filter:blur(6px)}
+@media (prefers-reduced-motion: reduce){.rcard{transition:none}}
+.rcard:hover{transform:translateY(-5px);border-color:var(--gold)}
+.rcard b{font-family:"Fraunces",serif;font-weight:600;display:block;margin-bottom:4px}
+.rcard span{font-size:12px;color:var(--dim)}
 </style>
 </head>
 <body>
 
-<nav id="pv"><b>⑥ Organic Magazine</b>
-<button data-go="welcome" class="on">Cover/Shelf</button><button data-go="desk">The Pages</button><button data-go="cowrite">Sameer's Study</button><button data-go="feedback">Feature Report</button>
-<span style="margin-left:auto;color:var(--muted)">screenplay-studio redesign mockup</span></nav>
+<nav id="pv"><b>⑤ First Light</b>
+<button data-go="upload" class="on">The Long Night</button><button data-go="pages">Moonlit Pages</button><button data-go="verdict">Dawn Work</button><button data-go="debate">The Campfire</button><button data-go="spark">First Sun</button>
+<span style="margin-left:auto;color:#b9b4c4">concept world 5 of 6 — resolve findings, watch the sun come up</span></nav>
 
 <main>
 
-<section data-screen="welcome" class="active s-welcome">
-  <div class="cover">
-    <div class="masthead"><h1>Screenplay Studio</h1><div class="issue">local · private · yours — no cloud ever</div></div>
-    <div class="cover-cols">
-      <div class="cover-left">
-        <h2>The desk holds your script,<br><i>the room holds your people.</i></h2>
-        <p>Analysis that quotes you back honestly. A partner who argues with the story, never with you. Everything runs on this machine alone.</p>
-        <div class="actions">
-          <button class="btn btn-primary" data-go="desk">Open “Pain” ↦ pages first</button>
-          <button class="btn btn-ghost">＋ Upload a script</button>
-        </div>
-      </div>
-      <div class="contents">
-        <h3>On this shelf tonight</h3>
-        <div class="c-item" data-go="desk"><div class="t">Pain — draft three</div><div class="s">98 pp · reviewed yesterday · score 7.2 · 12 findings open</div></div>
-        <div class="c-item"><div class="t">Gun Pen</div><div class="s">a short awaiting its first read</div></div>
-        <div class="c-item"><div class="t">A blank leaf ✎</div><div class="s">for ideas too early to name</div></div>
-      </div>
+<!-- LONG NIGHT -->
+<section data-screen="upload" class="active">
+  <div class="stars"></div>
+  <div class="center"><div class="night-inner">
+    <h1>It's 11 PM.<br>The draft is done. <em>The night isn't.</em></h1>
+    <p>Upload the script. The analysis reads through while you stretch. Every finding you resolve brings the sun a little closer.</p>
+    <div>
+      <span class="btn btn-primary" data-go="verdict">Begin the read ↦</span>
+      <span class="btn btn-ghost" data-go="pages">Peek at the pages</span>
     </div>
-  </div>
-</section>
-
-<section data-screen="desk" class="s-desk">
-  <div class="desk-top">
-    <span class="proj serif">Pain</span>
-    <div class="room-pills">
-      <span class="pill on">The Pages</span><span class="pill" data-go="cowrite">Sameer's Study</span><span class="pill" data-go="feedback">Feature Report</span><span class="pill">Beat Cards ▦</span>
+    <div class="moons">
+      <div class="moon" data-go="pages"><b>Pain · v3</b><span>98 pp · the long night begins</span></div>
+      <div class="moon"><b>Gun Pen</b><span>short · awaiting its night</span></div>
+      <div class="moon" data-go="spark"><b>✎ First light</b><span>an idea for tomorrow</span></div>
     </div>
-  </div>
-  <div class="pages"><div class="page-wrap">
-      <article class="scene-page" data-scene="Scene 1 of 22">
-        <p class="slug">INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
-        <p class="action">A ceiling fan turns slow. On a cot, <span class="el-anchored">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
-        <p class="char-cue">Arjun</p>
-        <p class="dialogue">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
-        <aside class="fn-note"><b>Margin note 📌</b>The phone glow does the lamp's job here — his face half-lit. A quiet mirror for Act II when the calls stop coming.</aside>
-      </article>
-      <article class="scene-page" data-scene="Scene 2 of 22">
-        <p class="slug">EXT. ROAD-SIDE TEA STALL — DAY</p>
-        <p class="action">Steam. Tumbling glasses. <span class="el-anchored">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
-        <p class="char-cue">Stall Owner</p>
-        <p class="dialogue">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
-        <p class="action">Arjun laughs. It dies in the steam.</p>
-      </article>
   </div></div>
-
-  <div class="edge-tabs">
-    <button class="edge-tab" id="tab-sam" title="Summon Sameer — writing partner">S</button>
-    <button class="edge-tab doc" id="tab-doc" title="Summon the Premise Doctor" style="color:var(--terra)">D</button>
-    <button class="edge-tab" title="The Stash">📥</button>
-  </div>
-
-  <aside class="pane-pop" id="pane-sam">
-    <div class="pane-head"><span class="avatar">S</span><div><div class="nm serif">Sameer</div><div class="rl">writing partner · knows your past work</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="who">Sameer · just now</div><div class="bubble">Scene 2 ka double coin-count — wah. Bina ek word bole "shortage" bol gaya. Scene 1 ke phone-glow ke saath Act I ka setup complete ho gaya.</div></div>
-      <div class="msg me"><div class="bubble">stall owner ko zyada do?</div></div>
-      <div class="msg them"><div class="bubble">Ek line kaafi hai. Aur diya to character gayab ho jayega, plot ban jayega. Subtle chhodo.</div></div>
-    </div>
-    <div class="explore-chips">
-      <button class="chip">✂ <span class="lbl">Tighten scene 1</span></button>
-      <button class="chip">🎭 <span class="lbl">Push Arjun's want</span></button>
-      <button class="chip">⚖ <span class="lbl">Is act I earning it?</span></button>
-    </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="Talk to Sameer…" rows="1"></textarea><button class="send">↑</button></div>
-  </aside>
-
-  <aside class="pane-pop" id="pane-doc">
-    <div class="pane-head"><span class="avatar doc">D</span><div><div class="nm serif">Premise Doctor</div><div class="rl">diagnosis without sugar</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="bubble">Why this week? Rent trouble is common ground in every middle-class film. What makes Arjun unable to walk away TODAY is your actual premise — and it isn't on the page yet. Finding #3, high severity.</div></div>
-    </div>
-    <div class="explore-chips">
-      <button class="chip">🩺 <span class="lbl">Diagnose premise</span></button>
-      <button class="chip">🔓 <span class="lbl">Escalate stakes</span></button>
-    </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="Ask the doctor…" rows="1"></textarea></div>
-  </aside>
-
-  <div class="status-strip">
-    <span><span class="dot g"></span>qwen3-14B @ localhost:8080</span><span>Scene 2 · 214 words</span><span>Findings open: <b style="color:var(--amber)">12</b>/44</span>
-    <span class="st-sprint">⏱ 18:42 sprint</span>
+  <div class="horizon">
+    <span><span class="g"></span>qwen3-14B @ :8080</span><span style="opacity:.7">dawn at —</span>
+    <div class="suntrack"><div class="sun" id="sun" style="left:6%"></div></div>
+    <span id="sunPct" style="color:var(--gold);font-weight:600;min-width:36px">6%</span>
+    <span style="margin-left:auto;opacity:.7">⏱ 18:42</span>
   </div>
 </section>
 
-<section data-screen="cowrite" class="s-cowrite">
-  <div class="cw-head">
-    <span class="avatar" style="width:44px;height:44px;font-size:19px">S</span>
-    <div><h2>Sameer's Study</h2><div class="sub">the long conversation · memory &amp; your writer library live here</div></div>
-    <div class="room-pills" style="margin-left:auto"><span class="pill" data-go="desk">← the pages</span><span class="pill" data-go="feedback">Feature Report</span></div>
+<!-- MOONLIT PAGES -->
+<section data-screen="pages">
+  <div class="stars"></div>
+  <div class="moon-pages">
+    <div class="moonlight-note">the pages, by moonlight</div>
+    <div class="mp-col">
+      <article class="mpage">
+        <p class="slug">SC 01 — INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
+        <p class="ac">A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
+        <p class="cue">ARJUN</p>
+        <p class="dl">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
+        <div class="day-note">The phone glow does the lamp's job — half-lit face. A mirror for Act II.</div>
+      </article>
+      <article class="mpage">
+        <p class="slug">SC 02 — EXT. ROAD-SIDE TEA STALL — DAY</p>
+        <p class="ac">Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
+        <p class="cue">STALL OWNER</p>
+        <p class="dl">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
+        <div class="day-note">A promise made to the audience — the dawn work will come collecting.</div>
+      </article>
+    </div>
   </div>
-  <div class="memory-card"><b>Past work:</b> Gun Pen (family-pressure core) · honored note: "no cheap steering." <b>Relationship:</b> 41 sessions · pushback welcomed · Tenglish register preferred. <b>Tonight:</b> Pain v3 — kept separate from past work.</div>
-  <div class="cw-chat">
-    <div class="msg them"><div class="who">Sameer</div><div class="bubble">Pehle acchi khabar — Arjun ka want ab Scene 1 se hi saaf hai. Yeh v3 pehle se behtar khadi hai.</div></div>
-    <div class="msg them"><div class="bubble">Ab kadwi baat: second act ki beech me scenes 8–14 ek hi beat ko teen baar dikhate hain. Pressure badhta nahi, sirf badal jaata hai. Audience ko break mil jayega — humein nahi dena.</div></div>
-    <div class="msg me"><div class="bubble">to kya hatayein?</div></div>
-    <div class="msg them"><div class="bubble">Pehle yeh batao: in teeno me se kis ek me Arjun CHOOSE karta hai? Wohi rakho. Baaki do ko 1.5 page me collapse kar do. Chaho to main likh dikhata hoon.</div></div>
+  <div class="horizon">
+    <span><span class="g"></span>sc 2 · 214 words</span><span>12/44 findings open</span>
+    <div class="suntrack"><div class="sun" style="left:6%"></div></div><span style="color:var(--gold);font-weight:600">6%</span>
+    <span style="margin-left:auto;opacity:.7">⏱ 18:42</span>
   </div>
-  <div class="cw-explore explore-chips">
-    <button class="chip">📄 <span class="lbl">Show the collapsed scene</span></button>
-    <button class="chip">🧗 <span class="lbl">Raise stakes instead</span></button>
-    <button class="chip">🔁 <span class="lbl">Compare with Gun Pen's mid</span></button>
-    <button class="chip">🗣 <span class="lbl">Read it in Tenglish voice</span></button>
-  </div>
-  <div class="cw-composer composer-zone" style="padding:0"><textarea class="composer" rows="1" placeholder="Write to Sameer… (Shift+Enter for a new line)"></textarea><button class="send">↑</button></div>
-  <div class="cw-status"><span><span class="dot g"></span>sameer · peer mode</span><span>branched session · main path active</span><span class="st-sprint">⏱ 18:42</span></div>
 </section>
 
-<section data-screen="feedback" class="s-feedback">
-  <nav class="fb-toc">
-    <h3>In this issue</h3>
-    <a class="on" href="#fb-v">The Verdict</a>
-    <a href="#fb-plot">Plot Economy — 5 notes</a>
-    <a href="#fb-char">Character — 4 notes</a>
-    <a href="#fb-dialogue">Dialogue — 2 notes</a>
-    <a href="#fb-pacing">Pacing in pictures</a>
-    <div class="score-round"><div class="n">7.2</div><div class="cap">script score<br><span style="color:var(--olive)">12/44 open</span></div></div>
-  </nav>
-  <div class="fb-read"><div class="article">
-    <p class="kicker">Feature Review · Pain v3 · verified quotes only</p>
-    <h1 id="fb-v">“A tight first act carrying an unaired second.”</h1>
-    <p class="byline">— the analysis desk · every quote checked against your pages</p>
-    <p class="lede dropcap" id="vq">Arjun's need to know — “cheppalekha ante nenu intlo unna leda?” — is a real engine. The premise earns itself by page twelve. What hasn't been earned yet is forty pages of pressure without escalation.</p>
-    <div class="pull">“Either the call must land by Act III's midpoint — or cut the specificity.”</div>
-
-    <div class="cat-h" id="fb-plot"><span class="serif">Plot Economy</span><span class="rule"></span><span style="color:var(--muted);font-size:12px">5 findings</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev high"></span>Chekhov's gun never fires <a class="jtsc" href="#fb-v" onclick="go('desk')">↦ to the scene</a></div>
-    <blockquote>“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — INT. RENTED ROOM (Sc 1)</blockquote>
-    The father-call promise setup pays off only as mood, never as event. Land the call by Act III's midpoint — or cut the specificity entirely.</div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Duplicate pressure beats</div>
-    Scenes 9, 11 and 13 stage identical money-shortage confrontations with flat intensity. The setup/payoff ledger flags all three as setups paying into nothing.</div>
-
-    <div class="cat-h" id="fb-char"><span class="serif">Character</span><span class="rule"></span><span style="color:var(--muted);font-size:12px">4 findings</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Stall owner vanishes after peak</div>
-    <blockquote>“Nee account tho guddi pattuko ra.” — EXT. TEA STALL (Sc 2)</blockquote>
-    The best early antagonist beat in the draft — and then zero mentions across the remaining twenty scenes.</div>
-
-    <div class="cat-h" id="fb-dialogue"><span class="serif">Dialogue</span><span class="rule"></span><span style="color:var(--muted);font-size:12px">2 findings</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev low"></span>Voice bleed: Arjun edging formal</div>
-    Two scenes slip into school-Telugu constructions while the idiolect otherwise runs street-Tenglish. A reader notices; so will an audience.</div>
-
-    <div class="cat-h" id="fb-pacing"><span class="serif">Pacing</span><span class="rule"></span><span style="color:var(--muted);font-size:12px">terracotta bars = drag</span></div>
-    <div class="finding" style="display:flex;align-items:flex-end;gap:5px;height:116px;padding:16px 18px 12px;border-left:0"><span class="mono" style="font-size:10px;color:var(--muted)">pace ▸</span>
-    <div style="flex:1;display:flex;align-items:flex-end;gap:6px;height:82px"><i style="flex:1;background:var(--line);height:46%;border-radius:2px"></i><i style="flex:1;background:var(--line);height:62%;border-radius:2px"></i><i style="flex:1;background:var(--terra);height:90%;border-radius:2px"></i><i style="flex:1;background:var(--line);height:55%;border-radius:2px"></i><i style="flex:1;background:var(--terra);height:84%;border-radius:2px"></i><i style="flex:1;background:var(--line);height:40%;border-radius:2px"></i><i style="flex:1;background:var(--terra);height:76%;border-radius:2px"></i><i style="flex:1;background:var(--line);height:66%;border-radius:2px"></i></div>
-    <span class="mono" style="font-size:10px;color:var(--muted)">sc 1–8</span></div>
+<!-- DAWN WORK -->
+<section data-screen="verdict">
+  <div class="stars"></div>
+  <div class="resolve-wrap"><div class="resolve-col">
+    <div class="resolve-head">
+      <h2>The long night's work.</h2>
+      <p>Resolve a finding — watch the sky answer. This is the whole deal.</p>
+      <div class="dawnmeter"><span style="font:11px 'Inter';color:var(--dim)">NIGHT</span><div class="track"><div class="fill" id="fill"></div></div><span style="font:11px 'Inter';color:var(--dim)">DAWN</span><span class="pct" id="pct">6%</span></div>
+    </div>
+    <div class="frow" data-dawn="18"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot high"></span>The gun never fires</div><p>The father-call from Scene 1 lands only as mood — pay it off by Act III's midpoint.</p></div></div>
+    <div class="frow" data-dawn="34"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot med"></span>The stall owner vanishes</div><p>Best early antagonist — gone for twenty scenes. Bring him back or let the absence speak.</p></div></div>
+    <div class="frow" data-dawn="52"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot med"></span>Duplicate pressure beats</div><p>Scenes 9 · 11 · 13 — keep the one where Arjun chooses; collapse the rest.</p></div></div>
+    <div class="frow" data-dawn="68"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot low"></span>Voice bleed</div><p>Two scenes drift school-Telugu on a street-Tenglish tongue.</p></div></div>
+    <div class="frow" data-dawn="86"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot low"></span>Pacing drag in Act II</div><p>Three consecutive low-beat scenes around page 54.</p></div></div>
   </div></div>
+  <div class="horizon">
+    <span><span class="g"></span>dawn work</span><span>every resolved finding raises the sun</span>
+    <div class="suntrack"><div class="sun" id="sun2" style="left:6%"></div></div><span style="color:var(--gold);font-weight:600" id="sunPct2">6%</span>
+    <span style="margin-left:auto;opacity:.7">⏱ 18:42</span>
+  </div>
+</section>
+
+<!-- CAMPFIRE -->
+<section data-screen="debate">
+  <div class="stars"></div>
+  <div class="camp"><div class="camp-col">
+    <p class="camp-kick">1:47 AM · the campfire — sameer stays up with you</p>
+    <div class="fire">
+      <div class="fl sam"><div class="who">Sameer</div>Achhi khabar pehle: Arjun ka want ab Scene 1 se crystal clear hai.</div>
+      <div class="fl sam"><div class="who">Sameer</div>Ab kadwi baat — scenes 8–14 ek hi beat teen baar. Pressure dikhata hai, badhta nahi. Kis ek me Arjun CHOOSE karta hai? Wohi rakho, baaki do collapse. Likh dikhau?</div>
+      <div class="fl me">to kya hatayein?</div>
+    </div>
+    <div class="chips explore-chips">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Show the collapsed scene</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg><span class="lbl">Raise stakes instead</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/></svg><span class="lbl">Compare with Gun Pen's mid</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M9 5h11v10H12l-4 4zM4 8v7"/></svg><span class="lbl">Read it in Tenglish voice</span></button>
+    </div>
+    <textarea class="composer" rows="1" placeholder="Feed the fire…"></textarea>
+  </div></div>
+  <div class="horizon"><span><span class="g"></span>sameer · peer mode</span><span>branched session · main path</span>
+    <div class="suntrack"><div class="sun" style="left:6%"></div></div><span style="color:var(--gold)">6%</span>
+    <span style="margin-left:auto;opacity:.7">⏱ 18:42</span></div>
+</section>
+
+<!-- FIRST SUN -->
+<section data-screen="spark">
+  <div class="sun-card">
+    <div class="rays"></div>
+    <h2>The night ends.<br>Something survived it.</h2>
+    <p class="sub">Ideas that make it to morning become tomorrow's pages.</p>
+    <div class="risecards">
+      <div class="rcard"><b>What if the call comes too late?</b><span>Open the premise backwards.</span></div>
+      <div class="rcard"><b>A hero who counts everything</b><span>Scarcity made visible.</span></div>
+      <div class="rcard"><b>The stall owner's story</b><span>Who pretends not to see?</span></div>
+      <div class="rcard" style="border-style:dashed"><b>Tomorrow's blank page</b><span>Sameer hands you the first line.</span></div>
+    </div>
+  </div>
+  <div class="horizon"><span><span class="g"></span>morning · Pain v3 survived the night</span>
+    <div class="suntrack"><div class="sun" style="left:100%"></div></div><span style="color:var(--gold)">100%</span>
+    <span style="margin-left:auto;opacity:.7">⏱ 06:12</span></div>
 </section>
 
 </main>
 
 <script>
+const root=document.documentElement;
+let dawn=6; // percent
+function applyDawn(){
+  root.style.setProperty('--dawn',(dawn/100).toFixed(3));
+  const p=Math.max(6,Math.min(100,dawn));
+  document.querySelectorAll('.sun').forEach(s=>s.style.left=p+'%');
+  const ids=['sunPct','sunPct2'];ids.forEach(i=>{const el=document.getElementById(i);if(el)el.textContent=Math.round(p)+'%';});
+  const fill=document.getElementById('fill');if(fill)fill.style.width=p+'%';
+}
+applyDawn();
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');
+  if(g){go(g.dataset.go);return;}
+  const f=e.target.closest('.frow');
+  if(f){
+    f.classList.toggle('resolved');
+    if(f.classList.contains('resolved'))dawn=Math.max(dawn,parseInt(f.dataset.dawn,10));
+    applyDawn();
+  }
+});
 function go(name){
   document.querySelectorAll('[data-screen]').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
   document.querySelectorAll('#pv [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===name));
-  closePanes();
 }
-document.addEventListener('click',function(e){
-  const goBtn=e.target.closest('[data-go]');
-  if(goBtn){go(goBtn.dataset.go);return;}
-  const opener=e.target.closest('.edge-tab');
-  if(opener && (opener.id==='tab-sam'||opener.id==='tab-doc')){
-    const pane=document.getElementById(opener.id);
-    const was=pane.classList.contains('open');
-    closePanes();
-    if(!was)pane.classList.add('open');
-    e.stopPropagation();return;
-  }
-  if(!e.target.closest('.pane-pop'))closePanes();
-});
-function closePanes(){document.querySelectorAll('.pane-pop.open').forEach(p=>p.classList.remove('open'));}
 document.querySelectorAll('.composer').forEach(t=>{
   t.addEventListener('input',()=>{
-    t.style.height='auto';
-    t.style.height=Math.min(t.scrollHeight,174)+'px';
-    if(t.value.trim())document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
+    t.style.height='auto';t.style.height=Math.min(t.scrollHeight,140)+'px';
+    if(t.value.trim())document.querySelectorAll('.chips').forEach(c=>c.classList.add('collapsed'));
   });
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanes();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.activeElement)document.activeElement.blur();});
 </script>
 </body>
 </html>

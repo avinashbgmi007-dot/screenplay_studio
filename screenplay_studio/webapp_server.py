@@ -181,6 +181,41 @@ def _make_client(m: ProjectManifest):
                              fast_model=m.fast_model)
 
 
+# sentinel: "model not provided in this request" (None is a real value = clear it)
+_UNSET = object()
+
+
+def _sync_server_url_to_projects(server_url: str, model=_UNSET) -> None:
+    """Carry a settings change to every existing project manifest.
+
+    Projects snapshot server_url at creation time. Without this sync, a project
+    analyzed against an old server keeps pointing there forever — chat, rewrite
+    and analyze all hit the dead URL while the connection strip shows green
+    (it tests the global config, not the manifest). Called when settings save.
+    """
+    if not os.path.isdir(PROJECTS_DIR):
+        return
+    for name in os.listdir(PROJECTS_DIR):
+        manifest_path = os.path.join(PROJECTS_DIR, name, "project.json")
+        if not os.path.isfile(manifest_path):
+            continue
+        try:
+            m = ProjectManifest.load(os.path.join(PROJECTS_DIR, name))
+            changed = False
+            if m.server_url != server_url:
+                m.server_url = server_url
+                changed = True
+            if model is not _UNSET:
+                new_model = model or None
+                if m.model_id != new_model:
+                    m.model_id = new_model
+                    changed = True
+            if changed:
+                m.save()
+        except Exception:
+            continue  # unreadable project dir — never let one bad manifest break the settings save
+
+
 def _sanitize_report(report: dict) -> dict:
     """Drop non-writing feedback (dialect identification, subtitle meta-
     commentary) from a stored report before it reaches the writer. Applied at
@@ -264,6 +299,12 @@ def real_server_check():
         return jsonify({"demo": True, "available": False, "url": url})
 
 
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "server_url": CONFIG.get("server_url"),
+                     "demo_model": _DEMO_MODEL_ACTIVE})
+
+
 @app.route("/api/config", methods=["GET"])
 def get_config():
     cfg = CONFIG.to_dict()
@@ -297,6 +338,12 @@ def set_config():
         # the demo thread keeps running but stops answering the desk
         if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
             _DEMO_MODEL_ACTIVE = False
+        # the writer changed where the model lives — carry that to every
+        # existing project too. Without this, projects keep a stale per-project
+        # server_url (e.g. an old port) and every LLM call (chat, rewrite,
+        # analyze) silently hits a dead server while the status strip shows
+        # green (it tests the global URL, not the manifest's).
+        _sync_server_url_to_projects(CONFIG["server_url"], body["model"] if "model" in body else _UNSET)
     if "model" in body:
         CONFIG["model"] = body["model"] or None
     if "fast_model" in body:
@@ -1177,6 +1224,191 @@ def undismiss_finding_route(name, index):
     return jsonify({"ok": True, "index": index})
 
 
+# ---------- Design Lab (preview-next) ----------
+# Read-only real-data feed + an isolated chat channel for the six IA
+# prototypes at /preview-next/. The writer's real session (manifest
+# cowriter_session_id) is never touched: lab conversations live in a
+# dedicated "preview-lab" session file per project, deletable, inert to
+# the main app (which only ever reads the manifest-pinned session).
+
+
+def _preview_shelf():
+    """Every real project on the shelf with what the Lab can show for it."""
+    shelf = []
+    if not os.path.isdir(PROJECTS_DIR):
+        return shelf
+    for name in sorted(os.listdir(PROJECTS_DIR)):
+        try:
+            m = ProjectManifest.load(_project_dir(name))
+            shelf.append({
+                "name": name,
+                "title": m.title or name,
+                "format": m.source_format,
+                "stage_parse": m.stage("parse").status,
+                "stage_analyze": m.stage("analyze").status,
+                "has_findings": os.path.exists(m.report_findings_path),
+            })
+        except FileNotFoundError:
+            continue  # not a project (stray file / the ideas store)
+        except Exception:
+            continue  # flagged unreadable on the real shelf; not the Lab's problem
+    return shelf
+
+
+@app.route("/api/preview/projects", methods=["GET"])
+def preview_projects():
+    return jsonify({"projects": _preview_shelf()})
+
+
+@app.route("/api/preview/data/<name>", methods=["GET"])
+def preview_data(name):
+    """Real product data for one project: the actual parse and the actual
+    analysis report (sanitized exactly like the main app serves them)."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+
+    parsed = None
+    if os.path.exists(m.parsed_path):
+        try:
+            with open(m.parsed_path, "r", encoding="utf-8") as f:
+                parsed = json.load(f)
+        except (OSError, ValueError):
+            parsed = None
+
+    report = None
+    if os.path.exists(m.report_findings_path):
+        report = _load_report_sanitized(m)
+
+    fixqueue = None
+    if report:
+        try:
+            from .revision import dismissed_issues as _dismissed, finding_statuses, load_working
+            from screenplay_parser.structure import assign_acts, act_for_scene
+            doc = load_working(m)
+            acts = assign_acts(doc)
+            act_names = {a["act"]: a["name"] for a in acts}
+            scene_heading = {s.scene_number: s.heading_raw for s in doc.scenes}
+            status_by_index = {s["index"]: s["status"] for s in finding_statuses(m)["findings"]}
+            dismissed_keys = _dismissed(m)
+            items = []
+            for idx, f in enumerate(report.get("findings", [])):
+                refs = f.get("scene_refs") or []
+                scene = refs[0] if refs else None
+                act = act_for_scene(acts, scene) if scene else None
+                items.append({
+                    "index": idx,
+                    "category": f.get("category"),
+                    "severity": f.get("severity"),
+                    "issue": f.get("issue"),
+                    "why_it_matters": f.get("why_it_matters"),
+                    "scene_refs": refs,
+                    "scene_heading": scene_heading.get(scene) if scene else None,
+                    "act": act,
+                    "act_name": (act_names.get(act) if act else "Script-level"),
+                    "status": status_by_index.get(idx, "unknown"),
+                    "verified": f.get("verified", True),
+                    "quote": f.get("quote"),
+                    "dismissed": (idx, (f.get("issue") or "")) in dismissed_keys,
+                })
+            items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
+            fixqueue = {"items": items, "acts": acts, "dismissed_keys": sorted(list(dismissed_keys))}
+        except Exception:
+            fixqueue = None
+
+    return jsonify({
+        "name": name,
+        "title": m.title or name,
+        "format": m.source_format,
+        "stages": {s: m.stage(s).status for s in ("parse", "analyze", "chat")},
+        "parsed": parsed,
+        "report": report,
+        "fixqueue": fixqueue,
+        "shelf": _preview_shelf(),
+    })
+
+
+def _preview_lab_session(name):
+    """Load (or lazily create) the project's isolated Design Lab session."""
+    m = _load_manifest(name)
+    store_mod = _import_cowriter("store")
+    models_mod = _import_cowriter("models")
+    SessionStore = store_mod.SessionStore
+    Session = models_mod.Session
+    store = SessionStore(m.sessions_dir)
+    sid = "preview-lab"
+    try:
+        session = store.load(sid)
+    except FileNotFoundError:
+        session = Session(session_id=sid, title="Design Lab",
+                          server_url=CONFIG["server_url"])
+        store.save(session)
+    return session
+
+
+@app.route("/api/preview/chat/<name>", methods=["GET"])
+def preview_chat_get(name):
+    try:
+        session = _preview_lab_session(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return jsonify({
+        "session_id": session.session_id,
+        "messages": [msg.to_dict() for msg in session.branch.messages],
+    })
+
+
+@app.route("/api/preview/chat/<name>", methods=["POST"])
+def preview_chat_send(name):
+    """A REAL Sameer turn on the project's real script/report — stored in
+    the isolated preview-lab session, never the writer's own thread."""
+    body = request.get_json() or {}
+    text = (body.get("message") or "").strip()
+    if not text:
+        return _error("Message text is required.")
+    try:
+        _preview_lab_session(name)  # ensure the lab session exists
+        session, engine, store = _load_session_and_engine(name, "preview-lab")
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    quote = body.get("quote")
+    try:
+        reply = engine.send_message(session, text, quote=quote)
+    except Exception as e:
+        if type(e).__name__ == "WatchdogTimeoutError" or "didn't respond within" in str(e):
+            return jsonify({"error": "Still working when the per-turn cap was hit.",
+                            "still_working": True}), 408
+        return _error(f"The model server couldn't be reached or returned an error: {e}", 502)
+    store.save(session)
+    return jsonify({
+        "reply": reply,
+        "messages": [msg.to_dict() for msg in session.branch.messages],
+    })
+
+
+@app.route("/api/preview/chat/<name>", methods=["DELETE"])
+def preview_chat_clear(name):
+    """Start the lab thread over. The writer's real sessions are untouched."""
+    try:
+        m = _load_manifest(name)
+        store_mod = _import_cowriter("store")
+        store = store_mod.SessionStore(m.sessions_dir)
+        try:
+            store.delete("preview-lab")
+        except FileNotFoundError:
+            pass  # nothing to clear — already fresh
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    except CowriterUnavailableError as e:
+        return _error(str(e), 503)
+    return jsonify({"cleared": True})
+
+
 # ---------- streaming chat (SSE) ----------
 
 
@@ -1532,18 +1764,25 @@ def start_chat(name):
     return jsonify({"session_id": session.session_id, "model_id": session.model_id, "branch": session.current_branch})
 
 
-def _engine_base_url(session):
+def _engine_base_url(session, manifest=None):
     """Base URL for a chat engine. Sessions remember the server they were
-    created with (a remembered preference), but in DEMO mode there is exactly
-    one server — the in-process one — and its port changes every restart, so
-    a stale pin would 502 forever. Live config wins in demo mode."""
+    created with (a remembered preference), but three things outrank the pin:
+    DEMO mode (its port changes every restart), a demo-era pin (switching back
+    to the real server must win), and the project manifest's URL — the manifest
+    is synced whenever settings change, so a session pinned to a retired
+    server/port never keeps pointing at a dead URL while the desk shows green.
+    """
     if _DEMO_MODEL_ACTIVE:
         return CONFIG["server_url"]
     # a session created during demo mode pins the demo port; once the writer
     # switches back to their real server, that pin must not win
     if session.server_url and _DEMO_URL and session.server_url == _DEMO_URL:
         return CONFIG["server_url"]
-    return session.server_url or CONFIG["server_url"]
+    if manifest is not None and session.server_url and manifest.server_url != session.server_url:
+        # the project moved servers since this session was created (settings
+        # sync rewrote the manifest) — follow the project
+        return manifest.server_url
+    return session.server_url or (CONFIG["server_url"] if manifest is None else manifest.server_url)
 
 
 def _load_session_and_engine(project: str, session_id: str):
@@ -1574,7 +1813,7 @@ def _load_session_and_engine(project: str, session_id: str):
     # slow reply surfaces a "still working?" prompt instead of a silent
     # multi-minute hang. Analysis calls keep the long timeout; only chat
     # turns use turn_timeout.
-    client = LlamaServerClient(base_url=_engine_base_url(session), model=session.model_id,
+    client = LlamaServerClient(base_url=_engine_base_url(session, m), model=session.model_id,
                                timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
     memory = None
     try:

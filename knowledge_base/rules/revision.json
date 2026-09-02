@@ -1,0 +1,91 @@
+[
+  {
+    "id": "epps_revision_first_draft",
+    "name": "First Draft Is Discovery, Not Perfection",
+    "taxonomy_level": "revision",
+    "category": "revision",
+    "source": {
+      "type": "framework",
+      "originator": "Jack Epps Jr.",
+      "work": "Screenwriting is Rewriting"
+    },
+    "definition": "The first draft's purpose is to discover the story \u00e2\u20ac\u201d to find the characters, locate the themes, and map the emotional journey. Writers should not polish prose or perfect dialogue in the first draft. The job is to get the story on paper so it can be analyzed and improved.",
+    "detection_signal": "Scripts that read as beautifully polished but feel structurally empty, or writers who spend excessive time on first-draft prose rather than story discovery.",
+    "counter_considerations": "Some writers naturally produce polished first drafts. The rule targets the common trap of perfecting sentences before finding the story.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_callbacks_payoffs"
+    ]
+  },
+  {
+    "id": "epps_rewrite_distance",
+    "name": "Rewriting Requires Emotional Distance",
+    "taxonomy_level": "revision",
+    "category": "revision",
+    "source": {
+      "type": "framework",
+      "originator": "Jack Epps Jr.",
+      "work": "Screenwriting is Rewriting"
+    },
+    "definition": "Effective rewriting requires stepping away from the draft long enough to see it with fresh eyes. Writers who immediately begin revising after finishing a draft are too close to their work to identify structural problems, overwritten passages, or missing elements. Time creates the objectivity needed for critical evaluation.",
+    "detection_signal": "Scripts where the writer has made dozens of passes without improvement, or where problems persist because the writer is too attached to specific scenes or lines.",
+    "counter_considerations": "Professional writers on tight deadlines may not have the luxury of time. The rule targets the ideal revision process.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_callbacks_payoffs"
+    ]
+  },
+  {
+    "id": "stein_four_dangers_of_telling",
+    "name": "Four Danger Areas of Telling: Backstory, Description, Setting, Emotion",
+    "taxonomy_level": "revision",
+    "category": "show_vs_tell",
+    "source": {
+      "type": "framework",
+      "originator": "Sol Stein",
+      "work": "Stein on Writing"
+    },
+    "definition": "The four main areas where writers slip into telling instead of showing are: (1) backstory\u00e2\u20ac\u201ddumping past events, (2) character descriptions\u00e2\u20ac\u201dlisting physical traits, (3) setting descriptions\u00e2\u20ac\u201dblocking action for scenery, and (4) emotions\u00e2\u20ac\u201dnaming feelings instead of dramatizing them.",
+    "detection_signal": "Passages that begin with 'She felt...' or 'He remembered...' followed by exposition. Long character descriptions in the first chapter. Setting paragraphs that stop the action. Direct statements of emotion.",
+    "counter_considerations": "Some telling is efficient and appropriate for pacing. Brief backstory in dialogue, targeted emotional labels, and transitional summaries are acceptable. Do not flag intentional stylistic choices.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_show_dont_tell",
+      "on_the_nose_vs_subtext"
+    ]
+  },
+  {
+    "id": "zinsser_dump_the_clutter",
+    "name": "Dump the Clutter\u00e2\u20ac\u201dEvery Word Must Earn Its Place",
+    "taxonomy_level": "revision",
+    "category": "prose_economy",
+    "source": {
+      "type": "framework",
+      "originator": "William Zinsser",
+      "work": "Writing Tools / On Writing Well"
+    },
+    "definition": "Every word that does not serve the meaning, the clarity, or the momentum of the sentence should be cut. Clutter includes unnecessary adverbs, redundant phrases, jargon, and filler words that pad without adding substance.",
+    "detection_signal": "Sentences with unnecessary qualifiers ('really', 'very', 'quite'). Redundant phrases ('absolutely essential', 'past history'). Passages that could be halved without losing meaning.",
+    "counter_considerations": "Voice-driven prose may intentionally use repetition or padding for rhythm. Do not flag stylistic choices that serve the narrative voice.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "on_the_nose_vs_subtext"
+    ]
+  }
+]

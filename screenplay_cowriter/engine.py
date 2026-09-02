@@ -9,10 +9,10 @@ from .models import Session, Message
 from .llm_client import LlamaServerClient
 from .context import (
     ScriptContext, ReportContext, build_system_prompt, build_scene_context_block,
-    resolve_referenced_scenes, SCENE_REF_RE,
+    resolve_referenced_scenes,
 )
-from .language_meta import (
-    strip_language_meta, strip_json_wrap, strip_repetition_lines, strip_repeated_blocks,
+from .reply_transforms import (
+    clean_reply, ground_reply, strip_anti_ai_tells, persona_register, normalize_quote,
 )
 
 # Generation budget for chat turns. Local models that fall into a repetition
@@ -28,62 +28,46 @@ REPEAT_PENALTY = 1.3
 
 HISTORY_WINDOW = 16  # most recent messages kept verbatim; older context relies on the standing report summary
 
+# Voice drift detection: track AI tells per persona to catch slow drift
+_VOICE_DRIFT_HISTORY = {}  # persona -> list of tell counts per reply
 
-def clean_reply(raw: str) -> str:
-    """Reply hygiene pipeline, outermost-raw to innermost-clean:
-    unwrap accidental JSON wrappers, drop separator/tag garbage, collapse
-    semantic repetition blocks, then strip language meta-commentary."""
-    return strip_language_meta(
-        strip_repeated_blocks(strip_repetition_lines(strip_json_wrap(raw)))
-    )
-
-
-def _ground_reply(reply: str, script_ctx: ScriptContext) -> str:
-    """Reply-side hallucination guard. If the reply references a scene number
-    that doesn't exist in the script, own it honestly instead of letting the
-    invented scene stand — a real co-writer caught reaching for a page they
-    don't have would say so. Cheap and safe: only flags numbers outside the
-    script's actual scene set, so genuine references pass untouched."""
-    refs = sorted({int(n) for n in SCENE_REF_RE.findall(reply)})
-    unknown = [n for n in refs if not script_ctx.has_scene(n)]
-    if not unknown:
-        return reply
-    reply = reply.rstrip()
-    return (
-        f"{reply}\n\n(One honest flag: I said \"scene {unknown[0]}\" — I don't "
-        "actually see that scene in the script I'm holding. Point me at the right "
-        "one and I'll dig in properly.)"
-    )
-
-
-def _persona_register(reply: str, persona: str) -> str:
-    """Deterministic register guard, per persona. The doctor's card forbids
-    exclamation marks; a local model excited by a good beat can still emit one,
-    so the register is enforced here — the character never breaks voice at the
-    mechanical level, no matter what the model feels like. (Sameer keeps his
-    natural register; HUMAN_VOICE_RULES already caps his exclamations.)"""
-    if persona == "script_consultant":
-        reply = reply.replace("!", ".")
+def _detect_voice_drift(reply: str, persona: str) -> str:
+    """Detect and log voice drift by counting AI tells in each reply.
+    Returns the reply unchanged but logs drift metrics for monitoring."""
+    import re
+    # Count common AI tells
+    tells = 0
+    # Hedging phrases
+    if re.search(r"\b(?:I think|I feel|maybe|perhaps|it seems like)\b", reply, re.IGNORECASE):
+        tells += 1
+    # Filler words
+    if re.search(r"\b(?:actually|basically|honestly|frankly)\b", reply, re.IGNORECASE):
+        tells += 1
+    # Canned openings
+    if re.search(r"^(?:Great question|Absolutely|I'?d be happy to)", reply, re.IGNORECASE):
+        tells += 2  # weight these heavier
+    # Canned closings
+    if re.search(r"(?:let me know if you need anything else|I hope this helps)\s*$", reply, re.IGNORECASE):
+        tells += 2
+    # Track history
+    if persona not in _VOICE_DRIFT_HISTORY:
+        _VOICE_DRIFT_HISTORY[persona] = []
+    _VOICE_DRIFT_HISTORY[persona].append(tells)
+    # Keep only last 20 replies
+    if len(_VOICE_DRIFT_HISTORY[persona]) > 20:
+        _VOICE_DRIFT_HISTORY[persona] = _VOICE_DRIFT_HISTORY[persona][-20:]
+    # Log warning if drift detected (last 5 replies have higher tell count than first 5)
+    history = _VOICE_DRIFT_HISTORY[persona]
+    if len(history) >= 10:
+        recent_avg = sum(history[-5:]) / 5
+        early_avg = sum(history[:5]) / 5
+        if recent_avg > early_avg + 1.0:
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                f"Voice drift detected for {persona}: recent avg={recent_avg:.1f}, "
+                f"early avg={early_avg:.1f}. Consider reviewing persona prompt."
+            )
     return reply
-
-
-def _normalize_quote(quote):
-    """Select-to-reply passage from the webapp: {'scene_number': int|None, 'text': str}.
-    scene_number None means "general" (e.g. a script-level finding with no scene
-    ref). Callers (CLI, server) pass nothing — None stays None. Anything malformed
-    is dropped rather than crashing the turn."""
-    if not isinstance(quote, dict):
-        return None
-    scene_number = quote.get("scene_number")
-    text = (quote.get("text") or "").strip()
-    if not text:
-        return None
-    if scene_number is not None and not isinstance(scene_number, int):
-        return None
-    if scene_number is not None:
-        scene_number = max(1, scene_number)
-    text = text[:4000]  # a quoted passage is a snapshot; cap it defensively
-    return {"scene_number": scene_number, "text": text}
 
 
 class CoWriterEngine:
@@ -131,7 +115,7 @@ class CoWriterEngine:
         a speculative scene number gets falsely flagged as a hallucination."""
         if self.premise is not None:
             return reply
-        return _ground_reply(reply, self.script_ctx)
+        return ground_reply(reply, self.script_ctx)
 
     def _memory_entities(self) -> list:
         """Character names from the current script, used to classify refresh
@@ -211,7 +195,7 @@ class CoWriterEngine:
         # asked about it. Normalize the shape so callers can't inject junk, and
         # make sure the quoted scene is pulled into context even if the free
         # text doesn't mention it by number.
-        quote = _normalize_quote(quote)
+        quote = normalize_quote(quote)
 
         # A pending probe is resolved by whatever comes next: an idea is the
         # answer to it, a question/directive is a topic change. Either way the
@@ -327,7 +311,8 @@ class CoWriterEngine:
             reply = self._ground_reply_for_room(reply)
             reply = cap_suggestions(reply)
 
-        reply = _persona_register(reply, branch.active_persona)
+        reply = persona_register(reply, branch.active_persona)
+        reply = _detect_voice_drift(reply, branch.active_persona)
 
         reply = ensure_forward_momentum(reply, turn_kind)
 

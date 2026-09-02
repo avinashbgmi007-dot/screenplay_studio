@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from . import prompts
 from .grammar import setup_payoff_ledger_grammar
+from .deterministic_utils import int_list
 
 # Cap total ledger entries so a long script's overview + a greedy model can't
 # blow the output budget or the grammar's patience.
@@ -98,25 +99,13 @@ def run_setup_payoff_ledger(
         cleaned.append({
             "setup": setup[:200],
             "kind": e.get("kind") or "other",
-            "setup_scenes": _int_list(e.get("setup_scenes")),
-            "payoff_scenes": _int_list(e.get("payoff_scenes")) or None,
+            "setup_scenes": int_list(e.get("setup_scenes")),
+            "payoff_scenes": int_list(e.get("payoff_scenes")) or None,
             "status": status,
             "note": (e.get("note") or "").strip()[:400],
         })
     cleaned.sort(key=lambda e: _STATUS_ORDER.get(e["status"], 9))
     return cleaned[:MAX_LEDGER_ENTRIES], []
-
-
-def _int_list(value) -> list[int]:
-    if not isinstance(value, list):
-        return []
-    out = []
-    for v in value:
-        try:
-            out.append(int(v))
-        except (TypeError, ValueError):
-            continue
-    return out
 
 
 def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict]) -> list[dict]:

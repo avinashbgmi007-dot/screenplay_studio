@@ -1,0 +1,261 @@
+[
+  {
+    "id": "romance_adult_children_opening",
+    "name": "Lovers Introduced as Adult Children",
+    "taxonomy_level": "story_macro",
+    "category": "structure",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Angus Fletcher",
+      "work": "Screenwriting 101 (The Great Courses)"
+    },
+    "definition": "Romantic comedies almost always begin by introducing the lovers as adult children \u00e2\u20ac\u201d the explicit offspring of a previous marriage. This opening establishes marriage as the deep rule that brought the lovers into being and that will allow them to bring forth children of their own, creating a story world where love triumphs generation after generation.",
+    "detection_signal": "Check if the opening scenes establish the romantic leads' family backgrounds or parental relationships. Verify that marriage/love is presented as a generational tradition.",
+    "counter_considerations": "Modern romantic comedies sometimes skip the family opening. The rule is a deep structural convention, not a surface requirement.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "romance_theme_love"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_theme_love",
+    "name": "Theme Must Be Love-Related",
+    "taxonomy_level": "story_macro",
+    "category": "theme",
+    "source": {
+      "type": "general_craft",
+      "originator": "K.M. Weiland",
+      "work": "5 Secrets of Story Structure"
+    },
+    "definition": "If it is a romance, the themes will be related to love \u00e2\u20ac\u201d true love, soul mates, broken hearts, second chances, etc. The thematic backbone must be about the emotional journey of the relationship, not about external plot events.",
+    "detection_signal": "Check if the script's thematic statements relate to love, connection, vulnerability, or emotional risk. Verify that the protagonist's internal arc is about their capacity for love.",
+    "counter_considerations": "Some films blend romance with other genres (action-romance, horror-romance). The key is that the romance must be thematically central, not just a subplot.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "romance_adult_children_opening"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_midpoint_no_return",
+    "name": "Midpoint as Point of No Return",
+    "taxonomy_level": "structure_pacing",
+    "category": "structure",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "The midpoint of a romance typically represents the point of no return \u00e2\u20ac\u201d the moment when the relationship becomes irreversible (physical intimacy, declaration of love, or equivalent milestone). After this point, separation becomes exponentially more painful and stakes escalate.",
+    "detection_signal": "Locate the midpoint. Check if the romantic leads reach a significant emotional or physical milestone. Verify that after this point, the relationship cannot simply be forgotten or walked away from.",
+    "counter_considerations": "Some romances delay the midpoint milestone. The key is that the relationship must reach a point of no return before the final act.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "romance_theme_love"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_trivial_stakes_comedy",
+    "name": "Romance Stakes Must Feel Life-or-Death",
+    "taxonomy_level": "plot_thread",
+    "category": "stakes",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Scriptshadow/Amber",
+      "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
+    },
+    "definition": "In romantic comedy, the characters need to believe the relationship stakes are life-or-death, even when the external situation is trivial. The comedy arises from the gap between the actual stakes and the characters' perceived stakes. If the characters don't care, the audience won't either.",
+    "detection_signal": "Check if characters treat romantic setbacks with disproportionate gravity. Look for emotional intensity that exceeds the external situation.",
+    "counter_considerations": "Some romantic comedies use deadpan or understated characters. The key is that even understated characters must have internal stakes that matter to them.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "romance_psychological_death_stakes"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_psychological_death_stakes",
+    "name": "Psychological Death as Romance Stakes",
+    "taxonomy_level": "plot_thread",
+    "category": "stakes",
+    "source": {
+      "type": "general_craft",
+      "originator": "Randy Ingermanson",
+      "work": "Writing Fiction for Dummies"
+    },
+    "definition": "This is the key to all romances: If the two lovers don't get together, they will each miss out on their soul mate. Their lives will be incurably damaged. Since readers of most romances know they're going to end up together, it's all the more important to create this illusion of imminent psychological death.",
+    "detection_signal": "Check if the protagonist faces psychological death (loss of identity, purpose, or wholeness) if they fail to achieve the relationship. Verify that the stakes feel genuinely life-altering.",
+    "counter_considerations": "Some romances end in separation. The key is that the psychological stakes must be established even if the outcome is uncertain.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "romance_trivial_stakes_comedy"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_enemies_to_lovers",
+    "name": "Enemies-to-Lovers Requires Genuine Friction",
+    "taxonomy_level": "plot_thread",
+    "category": "subgenre",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard romance writing principle found across multiple sources."
+    },
+    "definition": "In enemies-to-lovers romance, the initial antagonism must be genuine and rooted in real conflict. The characters must have legitimate reasons to dislike each other before they can fall in love.",
+    "detection_signal": "Check if the romantic leads have genuine reasons for antagonism. Verify that their conflict is rooted in real differences or past events, not contrived misunderstandings.",
+    "counter_considerations": "Some enemies-to-lovers romances use lighter conflict. The key is that the initial friction must be sufficient to create tension.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "romance_midpoint_no_return"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_third_act_breakup",
+    "name": "Third Act Breakup Must Be Earned",
+    "taxonomy_level": "structure_pacing",
+    "category": "structure",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard romance writing principle found across multiple sources."
+    },
+    "definition": "The third-act breakup or separation must be caused by the protagonist's internal flaw, not external misunderstanding. The conflict must feel inevitable given who the characters are.",
+    "detection_signal": "Check if the third-act separation is caused by internal character flaws rather than external misunderstandings. Verify that the breakup feels inevitable given the characters' established psychology.",
+    "counter_considerations": "Some romances use external obstacles for the third-act conflict. The key is that the conflict should feel organic to the characters.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "romance_midpoint_no_return"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_grand_gesture",
+    "name": "Grand Gesture Must Be Personal",
+    "taxonomy_level": "scene",
+    "category": "climax",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard romance writing principle found across multiple sources."
+    },
+    "definition": "The romantic grand gesture must be personal to the specific characters and their journey. Generic gestures (running through rain) are less effective than gestures that reflect what the characters have learned about each other.",
+    "detection_signal": "Check if the romantic climax involves a gesture that is specific to the characters' journey. Verify that the gesture reflects what the characters have learned about each other.",
+    "counter_considerations": "Some romances use classic gestures effectively. The key is that the gesture should feel earned and personal, not generic.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "romance_third_act_breakup"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_complementary_flaws",
+    "name": "Romantic Leads Have Complementary Flaws",
+    "taxonomy_level": "character",
+    "category": "character_design",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard romance writing principle found across multiple sources."
+    },
+    "definition": "Romantic leads should have complementary flaws \u00e2\u20ac\u201d each character's weakness addresses the other's need. This creates natural chemistry and makes the relationship feel necessary rather than arbitrary.",
+    "detection_signal": "Check if the romantic leads have flaws that complement each other. Verify that each character's weakness is addressed by the other's strength.",
+    "counter_considerations": "Some romances feature similar flaws. The key is that the flaws should create chemistry and connection, not just conflict.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "romance_theme_love"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_emotional_vulnerability",
+    "name": "Emotional Vulnerability Required",
+    "taxonomy_level": "character",
+    "category": "character_depth",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard romance writing principle found across multiple sources."
+    },
+    "definition": "Romantic leads must show emotional vulnerability. Readers connect with characters who risk emotional exposure. The willingness to be hurt is what makes romance compelling.",
+    "detection_signal": "Check if romantic leads show emotional vulnerability. Verify that they risk emotional exposure and that this vulnerability drives the relationship.",
+    "counter_considerations": "Some romances feature guarded characters who gradually open up. The key is that vulnerability must be present at some point.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "romance_complementary_flaws"
+    ],
+    "genre": "romance"
+  },
+  {
+    "id": "romance_satisfying_resolution",
+    "name": "Romance Resolution Must Be Satisfying",
+    "taxonomy_level": "story_macro",
+    "category": "resolution",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard romance writing principle found across multiple sources."
+    },
+    "definition": "Romance readers expect a satisfying resolution \u00e2\u20ac\u201d the couple must end up together (Happy Ever After or Happy For Now). Denying this expectation violates the genre contract.",
+    "detection_signal": "Check if the romance ends with the couple together. Verify that the resolution satisfies the genre expectation for emotional closure.",
+    "counter_considerations": "Some romances end tragically (like in literary fiction). The key is that the resolution must be appropriate to the genre and subgenre.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "romance_third_act_breakup"
+    ],
+    "genre": "romance"
+  }
+]

@@ -1,0 +1,242 @@
+[
+  {
+    "id": "visual_show_dont_tell",
+    "name": "Show Don't Tell Through Visuals",
+    "taxonomy_level": "scene",
+    "category": "visual_narrative",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard visual storytelling principle found across multiple sources."
+    },
+    "definition": "Screenplays should show story through visuals rather than telling through dialogue or narration. The audience should understand character, plot, and theme through what they see, not what they're told.",
+    "detection_signal": "Check if the script relies on dialogue or narration to convey information that could be shown visually. Verify that the audience learns through observation, not exposition.",
+    "counter_considerations": "Some information requires dialogue for clarity. The key is that visual storytelling should be the primary mode.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_camera_angles_convey_perspective"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_camera_angles_convey_perspective",
+    "name": "Camera Angles Convey Perspective",
+    "taxonomy_level": "scene",
+    "category": "cinematography",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard cinematography principle found across multiple sources."
+    },
+    "definition": "Camera angles communicate character perspective and emotional state. High angles make characters look vulnerable, low angles make them look powerful, eye-level creates neutrality.",
+    "detection_signal": "Check if camera angle descriptions match the emotional intent of scenes. Verify that visual perspective supports character and story.",
+    "counter_considerations": "Some scenes use neutral angles intentionally. The key is that camera choices should be purposeful.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_show_dont_tell"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_shot_size_emphasis",
+    "name": "Shot Size Controls Emphasis",
+    "taxonomy_level": "scene",
+    "category": "cinematography",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard cinematography principle found across multiple sources."
+    },
+    "definition": "Shot size controls what the audience focuses on. Close-ups emphasize emotion and detail, wide shots establish context and scale, medium shots balance character and environment.",
+    "detection_signal": "Check if shot size descriptions support the scene's emotional and narrative goals. Verify that the audience's attention is directed appropriately.",
+    "counter_considerations": "Some scenes use unconventional shot sizes. The key is that shot choices should be purposeful.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_camera_angles_convey_perspective"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_lighting_mood",
+    "name": "Lighting Establishes Mood",
+    "taxonomy_level": "scene",
+    "category": "atmosphere",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard visual storytelling principle found across multiple sources."
+    },
+    "definition": "Lighting descriptions establish mood and emotional tone. Harsh lighting creates tension, soft lighting creates intimacy, shadows create mystery.",
+    "detection_signal": "Check if lighting descriptions match the scene's emotional intent. Verify that lighting supports the mood and tone.",
+    "counter_considerations": "Some scenes use neutral lighting. The key is that lighting choices should be purposeful when specified.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_camera_angles_convey_perspective"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_composition_framing",
+    "name": "Composition Frames Character Relationships",
+    "taxonomy_level": "scene",
+    "category": "composition",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard visual storytelling principle found across multiple sources."
+    },
+    "definition": "Visual composition \u00e2\u20ac\u201d how characters and objects are arranged in the frame \u00e2\u20ac\u201d communicates relationships, power dynamics, and emotional states. Characters framed together suggest connection; characters framed apart suggest isolation.",
+    "detection_signal": "Check if visual composition supports character relationships and emotional dynamics. Verify that framing communicates what dialogue doesn't.",
+    "counter_considerations": "Some scenes use neutral composition. The key is that composition choices should be purposeful when specified.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_camera_angles_convey_perspective"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_color_symbolism",
+    "name": "Color Can Symbolize Theme",
+    "taxonomy_level": "scene",
+    "category": "symbolism",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard visual storytelling principle found across multiple sources."
+    },
+    "definition": "Color choices can reinforce theme and character. Recurring colors can create visual motifs that echo the story's themes without dialogue.",
+    "detection_signal": "Check if color descriptions support thematic elements. Verify that visual motifs reinforce story themes.",
+    "counter_considerations": "Not all stories use color symbolism. The key is that if color is specified, it should be purposeful.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_composition_framing"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_movement_choreography",
+    "name": "Movement Conveys Character State",
+    "taxonomy_level": "scene",
+    "category": "choreography",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard visual storytelling principle found across multiple sources."
+    },
+    "definition": "Character movement \u00e2\u20ac\u201d how they enter, exit, and move through space \u00e2\u20ac\u201d communicates emotional state and intention. Hurried movement suggests anxiety, deliberate movement suggests confidence, stillness suggests tension.",
+    "detection_signal": "Check if character movement descriptions match emotional intent. Verify that physical movement communicates what dialogue doesn't.",
+    "counter_considerations": "Some scenes use minimal movement descriptions. The key is that movement choices should be purposeful when specified.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_composition_framing"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_ellipsis_time_passage",
+    "name": "Visual Ellipsis for Time Passage",
+    "taxonomy_level": "structure_pacing",
+    "category": "editing",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard film editing principle found across multiple sources."
+    },
+    "definition": "Film can compress or expand time through visual techniques. Montages, dissolves, and cuts can show time passing without dialogue explanation.",
+    "detection_signal": "Check if time passage is communicated visually rather than through dialogue. Verify that visual techniques effectively compress or expand time.",
+    "counter_considerations": "Some time passage requires dialogue for clarity. The key is that visual techniques should be primary when possible.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_show_dont_tell"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_sound_design_atmosphere",
+    "name": "Sound Design Creates Atmosphere",
+    "taxonomy_level": "scene",
+    "category": "sound",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard film sound design principle found across multiple sources."
+    },
+    "definition": "Sound descriptions \u00e2\u20ac\u201d ambient noise, music cues, silence \u00e2\u20ac\u201d create atmosphere and emotional tone. Sound can foreshadow events, create tension, or release it.",
+    "detection_signal": "Check if sound descriptions support the scene's emotional intent. Verify that sound design enhances atmosphere and tone.",
+    "counter_considerations": "Some scenes use minimal sound descriptions. The key is that sound choices should be purposeful when specified.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_lighting_mood"
+    ],
+    "genre": null
+  },
+  {
+    "id": "visual_props_meaningful",
+    "name": "Props Can Carry Meaning",
+    "taxonomy_level": "scene",
+    "category": "props",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard visual storytelling principle found across multiple sources."
+    },
+    "definition": "Objects in the frame can carry symbolic or narrative weight. A character's interaction with props reveals personality, intention, and emotional state.",
+    "detection_signal": "Check if prop descriptions support character or narrative elements. Verify that objects in the frame carry meaningful weight.",
+    "counter_considerations": "Not all props need symbolic meaning. The key is that when props are specified, they should be purposeful.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "visual_composition_framing"
+    ],
+    "genre": null
+  }
+]

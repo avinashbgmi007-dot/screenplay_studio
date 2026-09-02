@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inspector-first — Design Lab</title>
+<link rel="stylesheet" href="_lab.css">
+<style>
+.ins-hero{position:fixed;inset:46px 0 0;display:grid;grid-template-columns:1fr minmax(320px,400px)}
+.ins-script{overflow-y:auto;padding:26px 34px 80px}
+.ins-script .kick{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.22em;color:var(--lab-muted);text-transform:uppercase;margin-bottom:18px}
+.ins-script .lab-page{cursor:pointer}
+.ins-script .lab-page:hover{outline:2px solid var(--lab-accent)}
+.ins-script .lab-page.current{outline:2px solid var(--lab-accent)}
+.inspector{border-left:1px solid var(--lab-line);background:var(--lab-raised);overflow-y:auto;padding:18px 20px 80px}
+.inspector .ik{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.2em;color:var(--lab-accent);text-transform:uppercase;margin-bottom:12px}
+.inspector .sect{margin-bottom:22px}
+.inspector .sect h4{font-size:10.5px;letter-spacing:.16em;color:var(--lab-muted);text-transform:uppercase;font-family:Consolas,monospace;font-weight:400;margin-bottom:8px}
+.inspector .sect .body{font-size:14px;color:var(--lab-text)}
+.inspector .chars{display:flex;flex-wrap:wrap;gap:6px}
+.inspector .chars span{border:1px solid var(--lab-line);padding:5px 10px;font-size:12px;border-radius:99px;color:var(--lab-muted)}
+[data-desk]{position:fixed;inset:46px 0 84px;display:none;z-index:600}
+.desk-ctl{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);z-index:930;display:flex;gap:6px;background:var(--lab-raised);border:1px solid var(--lab-line);padding:6px;border-radius:99px}
+.desk-ctl button{color:var(--lab-muted);border:1px solid var(--lab-line);padding:8px 13px;min-height:36px;border-radius:99px;font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="ins-hero" data-ia-landing>
+  <div class="ins-script" id="ins-script">
+    <div class="kick">Design Lab · IA 5 of 6 · inspector-first — read the script; click any scene and the inspector tells you what the verdict said about it.</div>
+    <div id="ins-pages"></div>
+  </div>
+  <aside class="inspector" id="inspector">
+    <div class="ik" id="ins-title">Inspector</div>
+    <div id="ins-body">
+      <div class="sect"><h4>How this works</h4>
+        <div class="body" style="color:var(--lab-muted)">Click a scene on the left. The inspector swaps to that scene's findings, its characters, and its evidence. The whole report is one selection away — no separate room.</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<button data-open-desk style="position:fixed;left:18px;bottom:18px;z-index:520;background:var(--lab-accent);color:#14110e;padding:11px 16px;min-height:44px;font-weight:600;font-size:12.5px;border-radius:99px">Workbench →</button>
+
+<script>window.LAB_IA = "inspector"; window.LAB_PROJECT = null;</script>
+<script src="_payload.js"></script>
+<script src="_lab.js"></script>
+<script>
+(function(){
+  const $ = Lab.$, $$ = Lab.$$;
+  Lab.onLocate = () => Lab.showDesk(true);
+  Lab.onDiscuss = () => Lab.showDesk(true);
+
+  function renderInspector(n){
+    const scenes = (Lab.data.parsed || {}).scenes || [];
+    const sc = scenes.find(s => s.scene_number === n);
+    const fs = Lab.fixItems().filter(f => (f.scene_refs || [])[0] === n);
+    const chars = sc ? (sc.elements || []).filter(e => e.type === "character").map(e => e.text) : [];
+    $("#ins-title").textContent = `Inspector — Scene ${n}`;
+    const body = [];
+    if (sc) body.push(`<div class="sect"><h4>Scene</h4><div class="body">${Lab.esc(sc.heading_raw || "")}</div></div>`);
+    if (chars.length) body.push(`<div class="sect"><h4>Characters present</h4><div class="chars">${chars.map(c => `<span>${Lab.esc(c)}</span>`).join("")}</div></div>`);
+    if (fs.length) {
+      body.push(`<div class="sect"><h4>Verdict on this scene (${fs.length})</h4>${fs.map(f => `
+        <div class="lab-finding" data-finding="${f.index}">
+          <div class="fhead"><span class="lab-sev sev-${f.severity}">${f.severity || "?"}</span>
+          <span class="fcat">${Lab.esc(f.category || "")}</span></div>
+          <div style="font-size:13.5px">${Lab.esc((f.issue || "").split(". ")[0])}.</div>
+          ${f.quote ? `<div class="fquote">“${Lab.esc(f.quote)}”</div>` : ""}
+          <div class="fverbs">
+            <button data-verb="locate">locate</button>
+            <button data-verb="discuss">discuss</button>
+            <button data-verb="${f.dismissed ? "undismiss" : "dismiss"}">${f.dismissed ? "restore" : "dismiss"}</button>
+          </div>
+        </div>`).join("")}</div>`);
+    } else {
+      body.push(`<div class="sect"><h4>Verdict on this scene</h4><div class="body" style="color:var(--lab-muted)">No findings here — the doctor read it clean.</div></div>`);
+    }
+    $("#ins-body").innerHTML = body.join("");
+  }
+
+  function renderScript(){
+    const scenes = (Lab.data.parsed || {}).scenes || [];
+    $("#ins-pages").innerHTML = scenes.map(sc => `
+      <article class="lab-page" data-scene="${sc.scene_number}">
+        <div class="slug">SCENE ${sc.scene_number} — ${Lab.esc(sc.heading_raw || "")}</div>
+        ${(sc.elements || []).map(el => {
+          const t = el.type || "general";
+          if (t === "character") return `<div class="lab-el character">${Lab.esc(el.text)}</div>`;
+          if (t === "dialogue") return `<div class="lab-el dialogue">${Lab.esc(el.text)}</div>`;
+          if (t === "parenthetical") return `<div class="lab-el parenthetical">${Lab.esc(el.text)}</div>`;
+          if (t === "transition") return `<div class="lab-el transition">${Lab.esc(el.text)}</div>`;
+          return `<div class="lab-el action">${Lab.esc(el.text)}</div>`;
+        }).join("")}
+      </article>`).join("");
+    $("#ins-script").addEventListener("click", e => {
+      const pg = e.target.closest(".lab-page");
+      if (!pg) return;
+      $$(".lab-page").forEach(p => p.classList.remove("current"));
+      pg.classList.add("current");
+      renderInspector(+pg.dataset.scene);
+    });
+  }
+
+  Lab.mountChrome();
+  Lab.mountDesk(true);
+  Lab.boot({
+    render(){
+      renderScript();
+      // findings must exist as [data-finding] on the landing for the walk —
+      // the inspector shows them per-scene; pre-render scene 1's findings
+      const first = ((Lab.data.parsed || {}).scenes || [])[0];
+      if (first) renderInspector(first.scene_number);
+      Lab.wireFindingVerbs(".ins-hero", () => {});
+    }
+  });
+})();
+</script>
+</body>
+</html>

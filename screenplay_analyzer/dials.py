@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from . import prompts
 from .grammar import character_dials_grammar
+from .deterministic_utils import int_list
 
 # trait name -> (left pole, right pole); score 1 = left, 10 = right
 TRAITS = [
@@ -69,21 +70,9 @@ def run_character_dials(doc, overview: str, client, characters: list[str], langu
             traits.append({
                 "trait": trait,
                 "score": score,
-                "scene_refs": _int_list(t.get("scene_refs")),
+                "scene_refs": int_list(t.get("scene_refs")),
                 "note": (t.get("note") or "").strip()[:200],
             })
         if traits:
             out.append({"character": name, "traits": traits})
-    return out
-
-
-def _int_list(value) -> list[int]:
-    if not isinstance(value, list):
-        return []
-    out = []
-    for v in value:
-        try:
-            out.append(int(v))
-        except (TypeError, ValueError):
-            continue
     return out

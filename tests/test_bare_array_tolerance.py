@@ -53,6 +53,9 @@ class StubRules:
     def prompt_fragment_for_rule(self, rule):
         return ""
 
+    def fragment_for_pass(self, pass_name):
+        return ""
+
 
 def _doc():
     with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as f:

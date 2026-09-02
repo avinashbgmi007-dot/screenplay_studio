@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b206">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b301">
 </head>
 <body data-room="cowrite">
 
@@ -234,11 +234,18 @@
              Structure toggle, out of the way. No doctor, no scripts, no shelf
              here. -->
         <div id="idea-canvas" class="idea-canvas" style="display:none;">
+          <div class="spark-ambience" aria-hidden="true">
+            <div class="spark-stars"></div>
+            <svg class="spark-threads" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <defs><linearGradient id="sparkTg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ee7ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+              <path d="M10 24 L36 14 M10 24 L24 60 M36 14 L66 28 M66 28 L90 18 M24 60 L56 68 M56 68 L86 56" fill="none" stroke="url(#sparkTg)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+            </svg>
+          </div>
           <div class="idea-head">
             <input id="idea-title-input" class="idea-title-input" type="text" value="" maxlength="80" spellcheck="false" aria-label="Idea title" title="Click to rename">
             <span id="idea-save-state" class="idea-save-state" aria-live="polite"></span>
             <button id="idea-structure-btn" class="idea-structure-btn" type="button" title="The structured logline / open-questions view — kept out of the way">▸ Structure</button>
-            <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script">📄 First pages</button>
+            <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script — the wall grows up">✦ Grow into pages</button>
             <input type="file" id="idea-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
           </div>
           <textarea id="idea-content" class="idea-content" spellcheck="false" aria-label="The idea page"></textarea>
@@ -265,6 +272,7 @@
               <button id="overflow-toggle" class="btn-secondary overflow-toggle" title="More actions" type="button">⋯</button>
               <div id="overflow-dropdown" class="overflow-dropdown" style="display:none;">
                 <button id="reader-btn" class="overflow-item" type="button">Reader</button>
+                <button id="flow-btn" class="overflow-item" title="River read — the draft as one continuous flow; a current nav tracks your drift (Esc leaves)" type="button">≋ Flow</button>
                 <button id="bb-icon" class="overflow-item" type="button">📋 Beat Board</button>
                 <button id="compare-icon" class="overflow-item" type="button">🗂 Compare</button>
                 <div class="overflow-sep"></div>
@@ -409,6 +417,7 @@
     <!-- Beat Board: the corkboard -->
     <section id="beatboard-view" class="view" style="display:none;">
       <div class="beatboard-toolbar">
+        <button id="bb-back-btn" class="btn-secondary" type="button" title="Back to the page">← Back to the page</button>
         <div class="beatboard-toolbar-title">Beat Board</div>
         <span class="beatboard-hint">Re-order the scenes (drag a card, or use ↑↓) to try a new arrangement. Your draft isn't touched until you export.</span>
         <div class="beatboard-actions">
@@ -424,6 +433,7 @@
     <!-- Compare -->
     <section id="compare-view" class="view" style="display:none;">
       <div class="compare-toolbar">
+        <button id="compare-back-btn" class="btn-secondary" type="button" title="Back to the page">← Back to the page</button>
         <div class="compare-toolbar-title">Compare drafts</div>
         <label class="control-label">Showing
           <select id="compare-from-select" title="Older draft"></select>
@@ -647,7 +657,9 @@
   <button class="text-popup-item" data-action="locate" style="display:none;"><span class="tp-icon">📍</span> Locate finding</button>
 </div>
 
-<script src="core.js?v=hx1a102"></script>
-<script src="app.js?v=hx1b207"></script>
+<script src="core.js?v=hx1b112"></script>
+<script src="app.js?v=hx1b302"></script>
+<div id="river-current" aria-hidden="true"></div>
+<div class="dawn-wash" aria-hidden="true"></div>
 </body>
 </html>

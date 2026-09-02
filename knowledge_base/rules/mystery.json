@@ -1,0 +1,262 @@
+[
+  {
+    "id": "mystery_clue_game",
+    "name": "Riddle as Game Between Writer and Audience",
+    "taxonomy_level": "story_macro",
+    "category": "structure",
+    "source": {
+      "type": "framework",
+      "originator": "Ronald Tobias",
+      "work": "20 Master Plots (And How to Build Them)"
+    },
+    "definition": "A mystery is a game played between audience and writer. The writer gives clues (preferably challenging ones), and the audience tries to solve the riddle before the explanation arrives. The riddle has three movements: setup (mystery introduced), complication (danger/clues deepen), and resolution (explanation).",
+    "detection_signal": "Check if the script provides identifiable clues at regular intervals. Verify that clues are fair but challenging. Check if the audience has enough information to potentially solve the mystery before the reveal.",
+    "counter_considerations": "Some mysteries deliberately withhold clues for a surprise twist. The key fairness criterion is that in retrospect, the clues should be visible.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "mystery_foreshadowed_surprises"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_foreshadowed_surprises",
+    "name": "Surprises Must Be Foreshadowed",
+    "taxonomy_level": "plot_thread",
+    "category": "plot",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "Surprises in mystery scripts cannot be so shocking that the audience says 'WTF' \u00e2\u20ac\u201d they must be foreshadowed. The audience should be able to look back and see the signs they missed. Chekhov's gun principle applies: if you introduce an element, it must pay off.",
+    "detection_signal": "Check if major plot twists and reveals have earlier setup or hints. Look for objects, lines of dialogue, or character behaviors that gain new meaning after the reveal.",
+    "counter_considerations": "Some mysteries use red herrings to misdirect. The key is that the actual solution should be foreshadowed, even if other elements suggest false solutions.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "mystery_clue_game"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_logline_clarity",
+    "name": "Mystery Logline Must Be Clear",
+    "taxonomy_level": "story_macro",
+    "category": "concept",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "If a mystery's logline is unclear, the script will be too. The central question of the mystery must be articulable in one sentence. The audience needs to understand what is being investigated or solved from the premise.",
+    "detection_signal": "Check if the script's central mystery can be stated in a single clear sentence. Verify that the inciting incident establishes the mystery clearly.",
+    "counter_considerations": "Some mysteries deliberately obscure the central question to create surprise. Layered mysteries with multiple threads are acceptable if they converge.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "mystery_clue_game"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_reveal_timing",
+    "name": "Explanation Before Climax",
+    "taxonomy_level": "structure_pacing",
+    "category": "structure",
+    "source": {
+      "type": "framework",
+      "originator": "Ronald Tobias",
+      "work": "20 Master Plots (And How to Build Them)"
+    },
+    "definition": "In mystery structure, the explanation/reveal typically comes just before or during the climax \u00e2\u20ac\u201d the third movement of the riddle. The audience should have enough time to process the revelation before the story resolves. The reveal is the emotional and intellectual payoff.",
+    "detection_signal": "Check where the mystery's solution is revealed in the script. Verify that the reveal occurs before the final resolution, giving the audience time to process.",
+    "counter_considerations": "Some mysteries delay the reveal until the very last moment for maximum impact. The key is that the reveal should feel like a culmination, not an afterthought.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "mystery_clue_game"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_red_herrings",
+    "name": "Red Herrings Must Be Fair",
+    "taxonomy_level": "plot_thread",
+    "category": "misdirection",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard mystery writing principle found across multiple sources."
+    },
+    "definition": "Red herrings (misleading clues) must be fair \u00e2\u20ac\u201d they should suggest plausible alternative solutions without being outright deceptive. The audience should feel tricked but not cheated.",
+    "detection_signal": "Check if red herrings suggest plausible alternative solutions. Verify that they are fair misdirection, not outright deception.",
+    "counter_considerations": "Some mysteries use aggressive misdirection. The key is that the misdirection should be fair and the solution should be satisfying.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "mystery_foreshadowed_surprises"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_detective_competence",
+    "name": "Detective Must Be Competent",
+    "taxonomy_level": "character",
+    "category": "protagonist",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard mystery writing principle found across multiple sources."
+    },
+    "definition": "The detective or protagonist must demonstrate competence through observation, deduction, and action. A passive or incompetent detective makes the mystery less engaging.",
+    "detection_signal": "Check if the detective demonstrates competence through observation, deduction, and action. Verify that the detective actively investigates and makes meaningful progress.",
+    "counter_considerations": "Some mysteries feature amateur detectives. The key is that the detective must be engaged and competent in their approach.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "mystery_clue_game"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_stakes_personal",
+    "name": "Mystery Stakes Must Be Personal",
+    "taxonomy_level": "plot_thread",
+    "category": "stakes",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard mystery writing principle found across multiple sources."
+    },
+    "definition": "The mystery's resolution must matter personally to the detective or protagonist. If the stakes are purely intellectual, the audience's emotional investment diminishes.",
+    "detection_signal": "Check if the mystery's resolution matters personally to the detective. Verify that there are emotional or personal stakes beyond solving the puzzle.",
+    "counter_considerations": "Some mysteries focus on intellectual puzzle-solving. The key is that personal stakes should be present to increase engagement.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "mystery_detective_competence"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_atmosphere_tension",
+    "name": "Mystery Atmosphere Creates Tension",
+    "taxonomy_level": "scene",
+    "category": "atmosphere",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard mystery writing principle found across multiple sources."
+    },
+    "definition": "Mystery scripts should create atmosphere that enhances tension. The setting, mood, and tone should contribute to the sense of unease and anticipation.",
+    "detection_signal": "Check if the mystery's atmosphere enhances tension. Verify that setting, mood, and tone contribute to the sense of unease.",
+    "counter_considerations": "Some mysteries use lighter tones. The key is that the atmosphere should be appropriate to the mystery's tone.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "mystery_clue_game"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_solution_satisfying",
+    "name": "Mystery Solution Must Be Satisfying",
+    "taxonomy_level": "story_macro",
+    "category": "resolution",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard mystery writing principle found across multiple sources."
+    },
+    "definition": "The mystery's solution must be satisfying \u00e2\u20ac\u201d it should feel both surprising and inevitable. The audience should be able to look back and see how the clues pointed to the solution.",
+    "detection_signal": "Check if the mystery's solution feels both surprising and inevitable. Verify that the clues point to the solution in retrospect.",
+    "counter_considerations": "Some mysteries provide ambiguous solutions. The key is that the solution should be appropriate to the mystery's structure.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "mystery_reveal_timing"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_pacing_controlled",
+    "name": "Mystery Pacing Is Controlled",
+    "taxonomy_level": "structure_pacing",
+    "category": "pacing",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard mystery writing principle found across multiple sources."
+    },
+    "definition": "Mystery pacing is controlled and deliberate. Information is released at specific intervals to maintain tension and engagement. Rushing the reveal or dragging the investigation both undermine the mystery.",
+    "detection_signal": "Check if information is released at controlled intervals. Verify that the pacing maintains tension throughout the investigation.",
+    "counter_considerations": "Some mysteries use faster pacing. The key is that the pacing should be controlled and appropriate to the mystery's structure.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "mystery_clue_game"
+    ],
+    "genre": "mystery"
+  },
+  {
+    "id": "mystery_multiple_suspects",
+    "name": "Multiple Suspects Create Depth",
+    "taxonomy_level": "character",
+    "category": "cast_design",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard mystery writing principle found across multiple sources."
+    },
+    "definition": "Mystery scripts benefit from multiple suspects, each with motives and opportunities. This creates depth and gives the audience multiple possible solutions to consider.",
+    "detection_signal": "Check if the script presents multiple suspects with motives and opportunities. Verify that each suspect is a plausible candidate for the solution.",
+    "counter_considerations": "Some mysteries focus on a single suspect. The key is that if multiple suspects are present, each should be plausible.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "mystery_clue_game"
+    ],
+    "genre": "mystery"
+  }
+]

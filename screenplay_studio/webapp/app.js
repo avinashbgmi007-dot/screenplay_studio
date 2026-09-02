@@ -127,6 +127,21 @@ async function reloadFixQueue() {
   try {
     state.fixQueue = await api(`/projects/${encodeURIComponent(state.currentProject)}/fixqueue${state.fixQueueShowDismissed ? "?include_dismissed=1" : ""}`);
   } catch (_) { /* keep whatever we had */ }
+  updateDawnMeter();
+}
+
+// ---- the dawn meter (Spark Wall / First Light) ----
+// The share of findings you've resolved IS the dawn: the whole room warms as
+// the number climbs. Quiet, ambient, honest — derived only from fix-queue state.
+function updateDawnMeter() {
+  const items = (state.fixQueue && state.fixQueue.items) || [];
+  const open = items.filter((i) => i.status !== "addressed" && !i.dismissed).length;
+  const done = items.filter((i) => i.status === "addressed").length;
+  const total = open + done;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.documentElement.style.setProperty("--spark-dawn", String(pct / 100));
+  document.querySelectorAll(".dawn-fill").forEach((f) => { f.style.width = pct + "%"; });
+  document.querySelectorAll(".dawn-pct").forEach((p) => { p.textContent = pct + "%"; });
 }
 
 // ---- retry only the failed analysis categories (partial-report recovery) ----
@@ -1421,6 +1436,60 @@ function applyReaderMode(on) {
   document.body.classList.toggle("reader-mode", !!on);
   const btn = $("#reader-btn");
   if (btn) btn.classList.toggle("active", !!on);
+}
+
+// ---- river read (Spark Wall): the draft as one continuous flow ----
+// Pages become glass cards in a stream; a current nav on the right edge
+// tracks your drift and jumps scenes on click. Esc leaves the river.
+let flowRAF = null;
+
+function applyFlowMode(on) {
+  document.body.classList.toggle("river-read", !!on);
+  const btn = $("#flow-btn");
+  if (btn) btn.classList.toggle("active", !!on);
+  buildRiverDots();
+}
+
+function buildRiverDots() {
+  const holder = document.getElementById("river-current");
+  if (!holder) return;
+  holder.innerHTML = "";
+  if (!document.body.classList.contains("river-read")) return;
+  const container = document.getElementById("script-scenes");
+  const pages = [...(container ? container.querySelectorAll(".scene-page") : [])];
+  pages.forEach((pg, i) => {
+    const d = document.createElement("i");
+    const headEl = pg.querySelector(".scene-page-head");
+    d.title = (headEl ? headEl.textContent : `Scene ${i + 1}`).trim().slice(0, 80);
+    if (i === 0) d.classList.add("on");
+    d.addEventListener("click", () => {
+      const c = document.getElementById("script-scenes");
+      if (c) c.scrollTo({ top: pg.offsetTop - c.offsetTop - 12, behavior: "smooth" });
+    });
+    holder.appendChild(d);
+  });
+}
+
+function onRiverScroll() {
+  if (flowRAF) return;
+  flowRAF = requestAnimationFrame(() => {
+    flowRAF = null;
+    const holder = document.getElementById("river-current");
+    const c = document.getElementById("script-scenes");
+    if (!holder || !c || !holder.children.length) return;
+    const mid = c.scrollTop + c.clientHeight * 0.45;
+    const pages = [...c.querySelectorAll(".scene-page")];
+    let act = 0;
+    pages.forEach((pg, i) => { if (pg.offsetTop - c.offsetTop <= mid) act = i; });
+    [...holder.children].forEach((d, i) => d.classList.toggle("on", i === act));
+  });
+}
+
+// ---- explore chips: collapse to icons on first input, hover reveals ----
+// The mockup contract, applied to the real drawer: expanded on open,
+// .collapsed once the writer types, hover on a lone icon restores its label.
+function setExploreChipsCollapsed(on) {
+  document.querySelectorAll(".explore-chips").forEach((c) => c.classList.toggle("collapsed", on));
 }
 
 // ---- Focus mode: the page dims to the line you're on ----
@@ -3009,21 +3078,22 @@ function sendPrefilled(text) {
 // .explore-chips container at init so the premise pane and the idea drawer
 // can never drift apart again (they had quietly diverged, 6 vs 5).
 const EXPLORE_CHIPS = [
-  { icon: "🔮", label: "What if…?", prompt: "Give me 3 unexpected 'what if' twists on this idea — each one pushing it in a different genre direction. Keep each to a sentence." },
-  { icon: "🎭", label: "Who's the heart?", prompt: "Who is this really about? Name the protagonist, what they want more than anything, and what they're afraid of losing. Then tell me why I should care in one line." },
-  { icon: "⚔️", label: "Where's the heat?", prompt: "Where is the conflict hiding in this idea? Show me 3 pressure points that could drive whole scenes, and which one is the strongest." },
-  { icon: "📽️", label: "Cold open", prompt: "How could this open on screen in the first 60 seconds? Give me 2-3 cold open options that hook without exposition." },
-  { icon: "🧨", label: "Push it further", prompt: "What's the riskiest, boldest version of this idea? Push past the safe version and show me what it becomes." },
-  { icon: "👥", label: "Who's it for?", prompt: "Who is this story for, and what would make them lean in? Give me the genre positioning and the audience hook." },
+  { icon: '<svg viewBox="0 0 24 24" class="chip-ic"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>', label: "What if…?", prompt: "Give me 3 unexpected 'what if' twists on this idea — each one pushing it in a different genre direction. Keep each to a sentence." },
+  { icon: '<svg viewBox="0 0 24 24" class="chip-ic"><path d="M12 20s-7-4.5-9-9c-1.5-3.5 1-7 4.5-7C9.5 4 12 6 12 6s2.5-2 4.5-2c3.5 0 6 3.5 4.5 7-2 4.5-9 9-9 9z"/></svg>', label: "Who's the heart?", prompt: "Who is this really about? Name the protagonist, what they want more than anything, and what they're afraid of losing. Then tell me why I should care in one line." },
+  { icon: '<svg viewBox="0 0 24 24" class="chip-ic"><path d="M12 3c3 4 5.5 6 5.5 9.5A5.5 5.5 0 1 1 6.5 12.5C6.5 10 8 8.5 9 7c.3 1.6 1.6 2.6 1.6 2.6S9.5 5.5 12 3z"/></svg>', label: "Where's the heat?", prompt: "Where is the conflict hiding in this idea? Show me 3 pressure points that could drive whole scenes, and which one is the strongest." },
+  { icon: '<svg viewBox="0 0 24 24" class="chip-ic"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/></svg>', label: "Cold open", prompt: "How could this open on screen in the first 60 seconds? Give me 2-3 cold open options that hook without exposition." },
+  { icon: '<svg viewBox="0 0 24 24" class="chip-ic"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>', label: "Push it further", prompt: "What's the riskiest, boldest version of this idea? Push past the safe version and show me what it becomes." },
+  { icon: '<svg viewBox="0 0 24 24" class="chip-ic"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 3-5 6-5s6 2 6 5M14 20c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4"/></svg>', label: "Who's it for?", prompt: "Who is this story for, and what would make them lean in? Give me the genre positioning and the audience hook." },
 ];
 
 function renderExploreChips() {
   document.querySelectorAll(".explore-chips").forEach((wrap) => {
     wrap.innerHTML = "";
     for (const chip of EXPLORE_CHIPS) {
-      const b = el("button", "explore-chip", `${chip.icon} ${chip.label}`);
+      const b = el("button", "explore-chip");
       b.type = "button";
       b.dataset.prompt = chip.prompt;
+      b.innerHTML = `${chip.icon}<span class="lbl">${chip.label}</span>`;
       wrap.appendChild(b);
     }
   });
@@ -3224,6 +3294,11 @@ function renderFixQueuePanel(container) {
   const panel = el("div", "craft-panel fix-queue");
   const head = el("div", "craft-panel-head");
   head.appendChild(el("span", "craft-panel-title", `Fix queue — ${open.length} open / ${total} total`));
+  // dawn meter: night → dawn as findings get resolved (the room literally warms)
+  const dm = el("div", "dawn-meter");
+  dm.title = "The dawn meter — the share of findings you've resolved. The room warms as it climbs.";
+  dm.innerHTML = '<span class="dawn-cap">night</span><span class="dawn-track"><span class="dawn-fill"></span></span><span class="dawn-pct">0%</span>';
+  head.appendChild(dm);
   // triage: dismissed findings stay in the report but out of the writer's way
   const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
   if (dismissedCount) {
@@ -3290,6 +3365,7 @@ function renderFixQueuePanel(container) {
     panel.appendChild(row);
   }
   addPanel(container, panel);
+  updateDawnMeter();
 }
 
 function renderPacingPanel(container) {
@@ -3980,6 +4056,7 @@ function renderScriptView() {
   summaryEl.innerHTML = "";
   summaryEl.appendChild(el("span", "fs-chip open", `${summary.open} open`));
   summaryEl.appendChild(el("span", "fs-chip addressed", `${summary.addressed} addressed`));
+  buildRiverDots();
 
   // undo/redo + reset + export targets
   const hasEdits = state.editsData && state.editsData.edits && state.editsData.edits.length > 0;
@@ -4092,6 +4169,12 @@ function switchFeedbackTab(tab) {
   if (fqBtn) fqBtn.classList.toggle("active", tab === "fixqueue");
   if (report) report.style.display = tab === "report" ? "block" : "none";
   if (fq) fq.style.display = tab === "fixqueue" ? "block" : "none";
+  // self-heal: a tab should never show a blank pane — if the target is empty
+  // but data exists in memory, render it now (e.g. a render was skipped when
+  // the room opened before the report fetch landed)
+  if (tab === "fixqueue" && fq && !fq.children.length && state.fixQueue) {
+    renderFixQueuePanel(fq);
+  }
 }
 
 function renderReportPanel() {
@@ -4227,10 +4310,12 @@ function renderReportPanel() {
 // ---- compare (side-by-side drafts) ----
 
 let compareFrom = "original";
+let comparePrevRoom = "cowrite";
 
 async function openCompareView() {
   if (state.view === "compare") return;
   exitSpotlight();
+  comparePrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
   state.view = "compare";
   hideAllViews();
   $("#compare-view").style.display = "flex";
@@ -4240,6 +4325,10 @@ async function openCompareView() {
     showError("Couldn't load the comparison: " + e.message);
   }
   saveSession();
+}
+
+function closeCompareView() {
+  setRoom(comparePrevRoom);
 }
 
 async function loadCompare() {
@@ -4258,8 +4347,25 @@ async function loadCompare() {
   sel.value = compareFrom;
   $("#compare-to-label").textContent = active;
 
-  const data = await api(`${base}/compare?from=${encodeURIComponent(compareFrom)}&to=active`);
-  renderCompare(data);
+  // nothing to compare against — one draft and no snapshots of the original.
+  // Say so in the pane instead of a bare 400 toast over an empty screen.
+  if (!(drafts.drafts || []).length && compareFrom === "original" && active === "original") {
+    const pane = $("#compare-panes");
+    pane.innerHTML = "";
+    pane.appendChild(el("p", "script-empty-hint",
+      "Nothing to compare yet — this project has a single draft. Upload a new draft (Draft bar → \u201c+ Upload new draft\u201d) and the side-by-side diff will appear here."));
+    return;
+  }
+
+  try {
+    const data = await api(`${base}/compare?from=${encodeURIComponent(compareFrom)}&to=active`);
+    renderCompare(data);
+  } catch (e) {
+    const pane = $("#compare-panes");
+    pane.innerHTML = "";
+    pane.appendChild(el("p", "script-empty-hint",
+      `Couldn't build the comparison: ${e.message}`));
+  }
 }
 
 function compareLineClass(kind) {
@@ -4753,6 +4859,12 @@ function jumpRevisionScene(num) {
   void page.offsetWidth;
   page.classList.add("flash");
   setTimeout(() => page.classList.remove("flash"), 1600);
+  // mark the nav row that points at the scene the writer is looking at
+  document.querySelectorAll(".revision-nav-row").forEach((r) => {
+    const rn = r.querySelector(".rn-num");
+    if (rn && rn.textContent.trim() === `S${num}`) r.classList.add("active");
+    else r.classList.remove("active");
+  });
 }
 
 function flashFindingRow(index) {
@@ -4894,6 +5006,12 @@ function updateRevisionStatus() {
   for (let i = 0; i < pages.length; i++) {
     if (pages[i].offsetTop <= mid) cur = i + 1;
   }
+  // keep the nav row pointing at the scene the writer is actually reading
+  // (fires on scroll as well as on nav clicks — one source of truth)
+  document.querySelectorAll(".revision-nav-row").forEach((r) => {
+    const rn = r.querySelector(".rn-num");
+    if (rn) r.classList.toggle("active", rn.textContent.trim() === `S${cur}`);
+  });
   const scenes = (state.script && state.script.scenes) || [];
   const words = scenes.reduce((a, s) => a + (s.word_count || 0), 0);
   const sum = findingStatusSummary();
@@ -4913,9 +5031,12 @@ let bbOrder = [];       // the working (possibly unsaved) order
 let bbCards = [];       // card data keyed by scene_number
 let bbDirty = false;
 
+let bbPrevRoom = "cowrite";
+
 async function openBeatboardView() {
   if (state.view === "beatboard") return;
   exitSpotlight();
+  bbPrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
   state.view = "beatboard";
   hideAllViews();
   $("#beatboard-view").style.display = "flex";
@@ -4925,6 +5046,10 @@ async function openBeatboardView() {
     showError("Couldn't load the beat board: " + e.message);
   }
   saveSession();
+}
+
+function closeBeatboardView() {
+  setRoom(bbPrevRoom);
 }
 
 async function loadBeatboard() {
@@ -5397,6 +5522,12 @@ function bindGlobalShortcuts() {
         closeModal("#" + overlays[overlays.length - 1].id);
         return;
       }
+      // river read: the page wins — Esc drifts you back to the wall (desk)
+      if (document.body.classList.contains("river-read")) {
+        applyFlowMode(false);
+        savePrefs({ flow: false });
+        return;
+      }
     }
 
     // palette navigation while it's open
@@ -5424,6 +5555,8 @@ function bindGlobalShortcuts() {
       if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
       if (state.view === "revision") { closeRevisionView(); return; }
       if (state.view === "fv") { closeFeedbackView(); return; }
+      if (state.view === "compare") { closeCompareView(); return; }
+      if (state.view === "beatboard") { closeBeatboardView(); return; }
       // (open modals already returned above — drawer/shelf/rail are safe)
       {
         const drawer = $("#room-drawer");
@@ -5794,7 +5927,6 @@ function init() {
   wireMics();
   const projectsPromise = Promise.all([loadProjects(), loadIdeas()]);
   loadLibrary();
-  setInterval(checkConnection, 30000);
 
   // the den greets the writer by the hour
   const greeting = $("#welcome-greeting");
@@ -6006,6 +6138,24 @@ function init() {
       if (!overflowDropdown.contains(e.target) && e.target !== overflowToggle) closeOverflow();
     });
   }
+  // river read (Spark Wall): one continuous flow + current nav; Esc leaves
+  applyFlowMode(!!prefs.flow);
+  $("#flow-btn").addEventListener("click", () => {
+    const on = !document.body.classList.contains("river-read");
+    applyFlowMode(on);
+    savePrefs({ flow: on });
+  });
+  $("#script-scenes").addEventListener("scroll", () => {
+    if (document.body.classList.contains("river-read")) onRiverScroll();
+  }, { passive: true });
+  // explore chips collapse: first real input anywhere (idea page or composer)
+  // tucks the chips away to icons; clearing the box brings them back
+  const chipInputHook = (elx) => {
+    if (!elx) return;
+    elx.addEventListener("input", () => setExploreChipsCollapsed(!!elx.value.trim()));
+  };
+  chipInputHook($("#idea-content"));
+  chipInputHook($("#input"));
   $("#focus-btn").addEventListener("click", () => {
     const on = !document.body.classList.contains("focus-mode");
     applyFocusMode(on);
@@ -6057,6 +6207,7 @@ function init() {
       else if (s.view === "compare") openCompareView();
       else if (s.view === "revision") openRevisionView();
       else if (s.view === "fv") openFeedbackView();
+      else if (s.view === "feedback") openFeedbackRoom();
     }).catch(() => { /* project vanished — stay on the welcome scene */ });
   });
 
@@ -6353,6 +6504,8 @@ function init() {
   // beat board
   $("#bb-save-btn").addEventListener("click", saveBeatboard);
   $("#bb-restore-btn").addEventListener("click", restoreBeatboard);
+  $("#bb-back-btn").addEventListener("click", closeBeatboardView);
+  $("#compare-back-btn").addEventListener("click", closeCompareView);
   $("#bb-print-btn").addEventListener("click", () => {
     document.body.classList.add("print-cards");
     window.print();

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report-first — Design Lab</title>
+<link rel="stylesheet" href="_lab.css">
+<style>
+.report-hero{max-width:880px;margin:0 auto;padding:64px 34px 90px;overflow-y:auto;height:100vh}
+.report-head{margin-bottom:22px}
+.report-head .kick{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.22em;color:var(--lab-muted);text-transform:uppercase}
+.report-head h1{font-size:26px;font-weight:600;margin:8px 0 4px}
+.report-head .sub{color:var(--lab-muted);font-size:13.5px}
+.verdict-card{background:var(--lab-panel);border:1px solid var(--lab-line);border-left:4px solid var(--lab-accent);padding:18px 22px;margin-bottom:20px}
+.verdict-card .ll{font-style:italic;font-size:16.5px;margin-bottom:8px}
+.verdict-card .meta{font-size:12.5px;color:var(--lab-muted)}
+.report-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+.rcard{background:var(--lab-panel);border:1px solid var(--lab-line);padding:14px 16px}
+.rcard h3{font-size:10.5px;letter-spacing:.18em;color:var(--lab-muted);text-transform:uppercase;margin-bottom:10px;font-family:Consolas,monospace;font-weight:400}
+.rcard.pace .prow{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--lab-muted);margin:5px 0}
+.rcard.pace .pbar{height:6px;background:var(--lab-accent);flex:0 0 auto}
+.rcard.pace .pbar.drag{background:var(--lab-red)}
+.findings-list{margin-bottom:26px}
+.findings-list .lab-finding{background:var(--lab-panel);border:1px solid var(--lab-line);border-bottom:none;padding:14px 18px;margin:0}
+.findings-list .lab-finding:last-child{border-bottom:1px solid var(--lab-line)}
+.workbench-cta{display:flex;gap:10px;margin-top:8px}
+.workbench-cta button{background:var(--lab-accent);color:#14110e;padding:11px 18px;min-height:44px;font-weight:600;font-size:13px}
+.workbench-cta button:hover{filter:brightness(1.08)}
+[data-desk]{position:fixed;inset:46px 0 84px;display:none}
+.desk-ctl{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);z-index:930;display:flex;gap:6px;background:var(--lab-raised);border:1px solid var(--lab-line);padding:6px;border-radius:99px}
+.desk-ctl[style*="flex"]{display:flex!important}
+.desk-ctl button{color:var(--lab-muted);border:1px solid var(--lab-line);padding:8px 13px;min-height:36px;border-radius:99px;font-size:11px}
+.desk-ctl button:hover{color:var(--lab-accent);border-color:var(--lab-accent)}
+[data-state] .fblife{max-width:520px;margin:60px auto;text-align:center;color:var(--lab-muted)}
+[data-state] .fblife .big{font-size:20px;color:var(--lab-text);margin-bottom:8px;font-weight:600}
+.stages{list-style:none;text-align:left;max-width:400px;margin:16px auto 0;font-family:Consolas,monospace;font-size:12px}
+.stages li{display:flex;justify-content:space-between;padding:7px 4px;border-bottom:1px dashed var(--lab-line)}
+.stages li.now{color:var(--lab-accent)}
+</style>
+</head>
+<body>
+
+<!-- THE LANDING: the verdict IS the app -->
+<div class="report-hero" id="report-hero" data-ia-landing>
+  <div class="report-head">
+    <div class="kick">Design Lab · IA 1 of 6 · report-first</div>
+    <h1>The Verdict</h1>
+    <div class="sub">The report is the home screen — the script and Sameer are one click away from any finding.</div>
+  </div>
+
+  <div data-state="empty" style="display:none">
+    <div class="fblife">
+      <div class="big">No verdict yet</div>
+      <p>This project hasn't been analyzed. Run Analysis from the main studio, and this screen becomes the report.</p>
+    </div>
+  </div>
+  <div data-state="running" style="display:none">
+    <div class="fblife">
+      <div class="big">Reading the script…</div>
+      <ul class="stages" id="stage-list"></ul>
+    </div>
+  </div>
+  <div data-state="complete">
+    <div class="verdict-card">
+      <div class="ll" data-ll></div>
+      <div class="meta" data-rec></div>
+    </div>
+    <div class="report-grid">
+      <div class="rcard"><h3>Coverage</h3><div style="font-size:13.5px" data-synopsis></div></div>
+      <div class="rcard pace"><h3>Pacing</h3><div id="pace-rows"></div></div>
+    </div>
+    <h2 style="font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--lab-muted);margin-bottom:12px">Findings</h2>
+    <div class="findings-list" id="findings" data-findings-surface></div>
+    <div class="workbench-cta">
+      <button data-open-desk>Open the workbench — script + Sameer alongside →</button>
+    </div>
+  </div>
+</div>
+
+<script>window.LAB_IA = "report"; window.LAB_PROJECT = null;</script>
+<script src="_payload.js"></script>
+<script src="_lab.js"></script>
+<script>
+(function(){
+  const $ = Lab.$, $$ = Lab.$$;
+  Lab.onLocate = () => Lab.showDesk(true);
+  Lab.onDiscuss = () => Lab.showDesk(true);
+  Lab.onHome = () => Lab.showDesk(false);
+
+  function renderLanding(){
+    const R = Lab.data.report;
+    if (!R) return;
+    $$("[data-ll]").forEach(el => el.textContent = R.logline || "");
+    $$("[data-rec]").forEach(el => el.textContent = "Recommendation: " + (R.recommendation || "—"));
+    $$("[data-synopsis]").forEach(el => el.textContent = R.synopsis || "");
+    const pr = $("#pace-rows");
+    if (pr && (R.pacing || []).length) {
+      const max = Math.max(...R.pacing.map(p => p.pace || 0)) || 1;
+      pr.innerHTML = R.pacing.map(p => `
+        <div class="prow"><span style="width:60px">Scene ${p.scene_number ?? p.scene}</span>
+        <span class="pbar ${p.drag ? "drag" : ""}" style="width:${Math.round((p.pace||0)/max*140)}px"></span>
+        ${p.drag ? '<span style="color:var(--lab-red)">drag</span>' : ""}</div>`).join("");
+    }
+    Lab.renderFindingsInto("#findings");
+    const sl = $("#stage-list");
+    if (sl) sl.innerHTML = Lab.STAGE_NAMES.map((n, i) =>
+      `<li class="${i < 2 ? "" : i === 2 ? "now" : ""}"><span>${n}</span><span>${i < 2 ? "done" : i === 2 ? "…" : ""}</span></li>`).join("");
+    Lab.wireFindingVerbs("#report-hero", renderLanding);
+  }
+
+  Lab.mountChrome();
+  Lab.mountDesk(true); // hidden on load — the report is the landing
+  Lab.boot({
+    render(){
+      renderLanding();
+      Lab.wireFindingVerbs("[data-desk]", () => Lab.renderFindingsInto("#lab-desk-findings"));
+      Lab.chatHistory().then(h => Lab.renderThread($("#lab-thread"), h.messages)).catch(() => {});
+      $$("[data-open-desk]").forEach(b => b.addEventListener("click", () => Lab.showDesk(true)));
+    }
+  });
+})();
+</script>
+</body>
+</html>

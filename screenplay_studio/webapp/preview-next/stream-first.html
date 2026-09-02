@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stream-first — Design Lab</title>
+<link rel="stylesheet" href="_lab.css">
+<style>
+.stream-hero{max-width:720px;margin:0 auto;padding:64px 24px 90px;height:100vh;overflow-y:auto}
+.stream-hero .kick{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.22em;color:var(--lab-muted);text-transform:uppercase;margin-bottom:18px}
+.s-item{border-left:3px solid var(--lab-line);padding:12px 0 12px 18px;margin-bottom:4px;position:relative}
+.s-item::before{content:"";position:absolute;left:-7px;top:16px;width:11px;height:11px;border-radius:50%;background:var(--lab-panel);border:2px solid var(--lab-muted)}
+.s-item.t-find{border-left-color:var(--lab-accent)}
+.s-item.t-find::before{background:var(--lab-accent);border-color:var(--lab-accent)}
+.s-item.t-scene{border-left-color:var(--lab-cyan)}
+.s-item.t-scene::before{background:var(--lab-cyan);border-color:var(--lab-cyan)}
+.s-item.t-chat{border-left-color:var(--lab-green)}
+.s-item.t-chat::before{background:var(--lab-green);border-color:var(--lab-green)}
+.s-item .sk{font-family:Consolas,monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--lab-muted);margin-bottom:4px}
+.s-item .sb{font-size:14.5px;line-height:1.5}
+.s-item .sq{font-style:italic;color:var(--lab-muted);font-size:13px;margin-top:4px}
+.s-item .fverbs{margin-top:7px;display:flex;gap:7px;flex-wrap:wrap}
+.s-item .fverbs button{border:1px solid var(--lab-line);background:var(--lab-panel);padding:6px 10px;min-height:36px;font-size:10.5px}
+.s-item .fverbs button:hover{border-color:var(--lab-accent);color:var(--lab-accent)}
+[data-desk]{position:fixed;inset:46px 0 84px;display:none;z-index:600}
+.desk-ctl{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);z-index:930;display:flex;gap:6px;background:var(--lab-raised);border:1px solid var(--lab-line);padding:6px;border-radius:99px}
+.desk-ctl button{color:var(--lab-muted);border:1px solid var(--lab-line);padding:8px 13px;min-height:36px;border-radius:99px;font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="stream-hero" data-ia-landing>
+  <div class="kick">Design Lab · IA 4 of 6 · stream-first — everything in one chronological feed: the script's beats, the verdict's findings, the conversation. Scroll to work.</div>
+  <div id="stream" data-findings-surface></div>
+</div>
+
+<button data-open-desk style="position:fixed;left:18px;bottom:18px;z-index:520;background:var(--lab-accent);color:#14110e;padding:11px 16px;min-height:44px;font-weight:600;font-size:12.5px;border-radius:99px">Workbench →</button>
+
+<script>window.LAB_IA = "stream"; window.LAB_PROJECT = null;</script>
+<script src="_payload.js"></script>
+<script src="_lab.js"></script>
+<script>
+(function(){
+  const $ = Lab.$, $$ = Lab.$$;
+  Lab.onLocate = () => Lab.showDesk(true);
+  Lab.onDiscuss = () => Lab.showDesk(true);
+
+  function renderStream(){
+    const box = $("#stream");
+    if (!box) return;
+    const scenes = (Lab.data.parsed || {}).scenes || [];
+    const items = [];
+    // interleave: scene beats then findings, by scene order
+    scenes.forEach(sc => {
+      items.push({ t: "scene", n: sc.scene_number, k: `Scene ${sc.scene_number}`, b: Lab.esc(sc.heading_raw || ""), q: null, f: null });
+      const fs = Lab.fixItems().filter(f => (f.scene_refs || [])[0] === sc.scene_number);
+      fs.forEach(f => items.push({
+        t: "find", n: f.index, k: `Finding · ${f.category} · ${f.severity}`,
+        b: Lab.esc(f.issue || ""), q: f.quote ? `“${f.quote}”` : null, f,
+      }));
+    });
+    // chat tail as a stream item
+    items.push({ t: "chat", n: -1, k: "The conversation", b: "Sameer is in the workbench — the thread continues there.", q: null, f: null });
+    // findings with no scene refs go last
+    Lab.fixItems().filter(f => !(f.scene_refs || []).length).forEach(f => items.push({
+      t: "find", n: f.index, k: `Finding · ${f.category} · ${f.severity}`, b: Lab.esc(f.issue || ""), q: f.quote ? `“${f.quote}”` : null, f,
+    }));
+
+    box.innerHTML = items.map((it, i) => `
+      <div class="s-item t-${it.t}" ${it.f ? `data-finding="${it.f.index}"` : ""} ${it.t === "scene" ? `data-scene="${it.n}"` : ""}>
+        <div class="sk">${it.k}</div>
+        <div class="sb">${it.b}</div>
+        ${it.q ? `<div class="sq">${Lab.esc(it.q)}</div>` : ""}
+        ${it.f ? `<div class="fverbs">
+          <button data-verb="locate">📍 Locate</button>
+          <button data-verb="discuss">💬 Discuss</button>
+          <button data-verb="${it.f.dismissed ? "undismiss" : "dismiss"}">${it.f.dismissed ? "Restore" : "Dismiss"}</button>
+        </div>` : ""}
+      </div>`).join("");
+  }
+
+  Lab.mountChrome();
+  Lab.mountDesk(true);
+  Lab.boot({
+    render(){
+      renderStream();
+      Lab.wireFindingVerbs(".stream-hero", renderStream);
+      Lab.chatHistory().then(h => Lab.renderThread($("#lab-thread"), h.messages)).catch(() => {});
+    }
+  });
+})();
+</script>
+</body>
+</html>

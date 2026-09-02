@@ -19,7 +19,8 @@ import pytest
 
 from screenplay_analyzer.report import save_report
 from screenplay_cowriter.context import ReportContext, ScriptContext, build_system_prompt
-from screenplay_cowriter.engine import CoWriterEngine, _persona_register
+from screenplay_cowriter.engine import CoWriterEngine
+from screenplay_cowriter.reply_transforms import persona_register as _persona_register
 from screenplay_parser import parse_screenplay
 from screenplay_parser.models import Scene, ScriptDocument
 from screenplay_studio.manifest import ProjectManifest

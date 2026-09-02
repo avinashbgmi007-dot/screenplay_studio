@@ -62,6 +62,12 @@ class StubRules:
     def prompt_fragment_for_category(self, category):
         return ""
 
+    def prompt_fragment_for_rule(self, rule):
+        return ""
+
+    def fragment_for_pass(self, pass_name):
+        return ""
+
 
 def test_seed_candidates_from_kg():
     kg = _kg()

@@ -1,0 +1,262 @@
+[
+  {
+    "id": "drama_emotional_authenticity",
+    "name": "Emotional Authenticity Over Plot Mechanics",
+    "taxonomy_level": "story_macro",
+    "category": "tone",
+    "source": {
+      "type": "general_craft",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "Drama prioritizes emotional truth over plot convenience. Characters must react authentically to their circumstances, even when those reactions complicate the plot. Forced reactions that serve plot over character undermine dramatic integrity.",
+    "detection_signal": "Check if character reactions feel authentic to their established psychology. Flag moments where characters act against their nature solely to advance plot.",
+    "counter_considerations": "Some dramas use plot-driven characters intentionally. The key is that the dominant mode should prioritize emotional authenticity.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "drama_moral_complexity"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_moral_complexity",
+    "name": "Moral Complexity in Character Choices",
+    "taxonomy_level": "character",
+    "category": "moral_dimension",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "In drama, characters face genuine moral dilemmas where every choice has consequences. There are no easy answers \u00e2\u20ac\u201d the audience should understand and sympathize with multiple perspectives.",
+    "detection_signal": "Check if the protagonist faces genuine moral dilemmas. Verify that choices have real consequences and that multiple perspectives are presented sympathetically.",
+    "counter_considerations": "Some dramas present clear moral frameworks. The key is that the moral complexity should be appropriate to the story's themes.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "drama_emotional_authenticity"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_internal_conflict_primary",
+    "name": "Internal Conflict Drives Drama",
+    "taxonomy_level": "plot_thread",
+    "category": "conflict_type",
+    "source": {
+      "type": "general_craft",
+      "originator": "James Scott Bell",
+      "work": "Conflict & Suspense"
+    },
+    "definition": "Drama derives its power from internal conflict \u00e2\u20ac\u201d the protagonist's struggle with themselves, their values, their relationships. External events are secondary to the internal journey.",
+    "detection_signal": "Check if the protagonist's internal struggle is the primary source of dramatic tension. Verify that external events serve the internal journey rather than overshadowing it.",
+    "counter_considerations": "Some dramas balance internal and external conflict. The key is that internal conflict should be present and significant.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "drama_emotional_authenticity"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_dialogue_subtext",
+    "name": "Dramatic Dialogue Contains Subtext",
+    "taxonomy_level": "dialogue",
+    "category": "dialogue_craft",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dramatic writing principle found across multiple sources."
+    },
+    "definition": "In drama, what characters say is less important than what they mean. Subtext \u00e2\u20ac\u201d the gap between dialogue and intent \u00e2\u20ac\u201d reveals true emotional states and creates dramatic irony.",
+    "detection_signal": "Check if dramatic dialogue contains layers of meaning. Verify that characters rarely say exactly what they mean, especially in emotionally charged scenes.",
+    "counter_considerations": "Some dramas use direct dialogue for specific effects. The key is that subtext should be present in the most important scenes.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "drama_emotional_authenticity"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_relationships_drive_plot",
+    "name": "Relationships Drive Plot in Drama",
+    "taxonomy_level": "plot_thread",
+    "category": "plot_mechanics",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dramatic writing principle found across multiple sources."
+    },
+    "definition": "In drama, plot events should arise from character relationships and choices, not external coincidences. The story should feel inevitable because it grows organically from who these characters are.",
+    "detection_signal": "Check if plot events arise from character relationships and choices. Verify that the story feels organic rather than contrived by external forces.",
+    "counter_considerations": "Some dramas use external events to test relationships. The key is that relationships should be central to the story's progression.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "drama_internal_conflict_primary"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_stakes_personal",
+    "name": "Drama Stakes Are Personal",
+    "taxonomy_level": "plot_thread",
+    "category": "stakes",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dramatic writing principle found across multiple sources."
+    },
+    "definition": "Drama derives its power from personal stakes \u00e2\u20ac\u201d relationships, identity, self-worth, family. The protagonist faces loss that matters emotionally, not just physically or professionally.",
+    "detection_signal": "Check if the protagonist faces personal loss (relationships, identity, family) as the primary stake. Verify that emotional consequences are more significant than physical or professional ones.",
+    "counter_considerations": "Some dramas combine personal and professional stakes. The key is that personal stakes should be present and significant.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "drama_internal_conflict_primary"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_pacing_meditative",
+    "name": "Drama Allows Meditative Pacing",
+    "taxonomy_level": "structure_pacing",
+    "category": "pacing",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dramatic writing principle found across multiple sources."
+    },
+    "definition": "Drama can afford slower, more meditative pacing than other genres. Scenes can breathe, allowing characters and audience to process emotional moments. Rushing undermines dramatic impact.",
+    "detection_signal": "Check if dramatic scenes are given adequate time to develop. Verify that emotional moments are not rushed and that the pacing allows for reflection.",
+    "counter_considerations": "Some dramas use faster pacing for specific effects. The key is that the pacing should serve the emotional needs of the story.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "drama_emotional_authenticity"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_transformation_earned",
+    "name": "Character Transformation Must Be Earned",
+    "taxonomy_level": "character",
+    "category": "character_arc",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "In drama, character transformation must be earned through struggle, failure, and growth. Sudden, unearned change feels false. The audience must see the journey, not just the destination.",
+    "detection_signal": "Check if character transformation is supported by preceding events. Verify that the character's growth is earned through struggle and failure, not just asserted in dialogue.",
+    "counter_considerations": "Some dramas feature sudden epiphanies. The key is that the epiphany should feel earned by what came before.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "drama_emotional_authenticity"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_ambiguity_preserved",
+    "name": "Drama Preserves Ambiguity",
+    "taxonomy_level": "story_macro",
+    "category": "resolution",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dramatic writing principle found across multiple sources."
+    },
+    "definition": "Drama often preserves ambiguity in resolution. Not all questions need answers, not all conflicts need resolution. The audience should be left with something to think about.",
+    "detection_signal": "Check if the resolution preserves appropriate ambiguity. Verify that not everything is neatly tied up and that the audience has room for interpretation.",
+    "counter_considerations": "Some dramas provide clear resolution. The key is that the resolution style should be appropriate to the story's themes.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "drama_emotional_authenticity"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_ensemble_depth",
+    "name": "Ensemble Characters Have Depth",
+    "taxonomy_level": "character",
+    "category": "ensemble",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dramatic writing principle found across multiple sources."
+    },
+    "definition": "In drama, supporting characters should have their own desires, flaws, and arcs. They exist as complete people, not just functions to serve the protagonist's story.",
+    "detection_signal": "Check if supporting characters have clear motivations and arcs. Verify that they exist as complete people rather than just plot functions.",
+    "counter_considerations": "Some dramas focus narrowly on the protagonist. The key is that supporting characters should have depth appropriate to their screen time.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "drama_relationships_drive_plot"
+    ],
+    "genre": "drama"
+  },
+  {
+    "id": "drama_consequences_real",
+    "name": "Drama Has Real Consequences",
+    "taxonomy_level": "plot_thread",
+    "category": "consequences",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard dramatic writing principle found across multiple sources."
+    },
+    "definition": "In drama, choices have real, lasting consequences. Characters cannot make significant decisions without facing the repercussions. Resetting the status quo undermines dramatic weight.",
+    "detection_signal": "Check if character choices have lasting consequences. Verify that significant decisions cannot be undone without meaningful cost.",
+    "counter_considerations": "Some dramas reset status quo for sequel potential. The key is that within the story, consequences should be real.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "drama_moral_complexity"
+    ],
+    "genre": "drama"
+  }
+]

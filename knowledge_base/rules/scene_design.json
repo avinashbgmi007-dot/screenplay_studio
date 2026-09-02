@@ -1,0 +1,72 @@
+[
+  {
+    "id": "lyons_scene_is_story",
+    "name": "Each Scene Is a Mini-Story",
+    "taxonomy_level": "scene",
+    "category": "scene_design",
+    "source": {
+      "type": "framework",
+      "originator": "Jeff Lyons",
+      "work": "Rapid Story Development"
+    },
+    "definition": "Every scene must have its own beginning, middle, and end \u00e2\u20ac\u201d its own mini-arc. A scene that merely exists to deliver information or connect two plot points is a wasted opportunity. Each scene should have a clear objective, an obstacle, and a resolution that changes the situation.",
+    "detection_signal": "Scenes that feel static, that have no clear beginning or end, that exist solely to deliver exposition, or where the situation at the end of the scene is identical to the beginning.",
+    "counter_considerations": "Some scenes function as transitions or breathing room. The rule targets habitual scene-padding.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scene_must_turn",
+      "goal_conflict_disaster"
+    ]
+  },
+  {
+    "id": "dunne_scene_objective",
+    "name": "Every Scene Has a Clear Objective and Obstacle",
+    "taxonomy_level": "scene",
+    "category": "scene_design",
+    "source": {
+      "type": "framework",
+      "originator": "Will Dunne",
+      "work": "The Dramatic Writers Companion"
+    },
+    "definition": "Before writing a scene, define what the viewpoint character wants in that scene (objective) and what stands in their way (obstacle). If either is missing, the scene has no dramatic tension. The objective should be specific and concrete, and the obstacle should be formidable enough to create genuine conflict.",
+    "detection_signal": "Scenes where characters drift without purpose, where there's no visible obstacle to what the character wants, or where the scene's purpose is unclear.",
+    "counter_considerations": "Some scenes deliberately subvert objective-obstacle structure for thematic effect. The rule targets aimless scenes.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scene_must_turn",
+      "goal_conflict_disaster"
+    ]
+  },
+  {
+    "id": "lakin_five_layers",
+    "name": "Five Layers of Scene Construction",
+    "taxonomy_level": "scene",
+    "category": "scene_design",
+    "source": {
+      "type": "framework",
+      "originator": "C.S. Lakin",
+      "work": "Layer Your Novel"
+    },
+    "definition": "Effective scenes are built in layers: (1) plot layer \u00e2\u20ac\u201d what happens, (2) character layer \u00e2\u20ac\u201d who changes and how, (3) thematic layer \u00e2\u20ac\u201d what the scene means in context of the story's argument, (4) emotional layer \u00e2\u20ac\u201d what the reader feels, (5) relational layer \u00e2\u20ac\u201d how relationships shift. Weak scenes address only one or two layers.",
+    "detection_signal": "Scenes that advance plot but don't develop character, that have emotional moments without plot function, or that feel thematically disconnected from the story.",
+    "counter_considerations": "Some scenes naturally emphasize one layer more than others. The rule targets scenes that are genuinely thin.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "scene_necessity_test",
+      "dunne_scene_objective"
+    ]
+  }
+]

@@ -48,6 +48,9 @@ class _NullRulesContext:
     def prompt_fragment_for_rule(self, rule_id: str) -> str:
         return ""
 
+    def fragment_for_pass(self, pass_name: str) -> str:
+        return ""
+
 
 def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
@@ -116,6 +119,58 @@ class AnalysisResult:
     orchestrator record exactly which categories succeeded so a partial
     analyze (some categories OK, some not) can be resumed category-by-
     category instead of re-running everything."""
+
+    # Deterministic passes that regenerate on EVERY analyze run and must
+    # never be carried forward from a previous report during a merge.
+    _DETERMINISTIC_RULE_IDS = frozenset({
+        "voice_bleed", "on_the_nose", "idiolect_consistency",
+        "unmarked_time_flip", "character_name_variant", "pacing_drag",
+    })
+
+    def merge(self, prev_findings_path: str) -> None:
+        """Merge a retry-failed re-run into the previous report.
+
+        The retry run's AnalysisResult only contains findings for the categories
+        that were re-run (plus the deterministic passes). The previous report
+        holds findings for the categories that succeeded before. This overlays
+        the new findings onto the previous ones (keeping the old findings for
+        categories NOT re-run) and recomputes the verification summary over
+        the combined set."""
+        import json as _json
+        try:
+            with open(prev_findings_path, "r", encoding="utf-8") as f:
+                prev = _json.load(f)
+        except (FileNotFoundError, _json.JSONDecodeError):
+            return  # nothing to merge into — fresh report is fine
+
+        # keep previous findings unless the exact (category, issue) pair was
+        # regenerated in this re-run.  This preserves findings that survived
+        # the original pass but weren't re-emitted by a partial retry.
+        fresh_keys = {(f.get("category"), f.get("issue")) for f in self.findings}
+        prev_findings = [
+            f for f in (prev.get("findings") or [])
+            if ((f.get("category"), f.get("issue")) not in fresh_keys
+                and f.get("rule_id") not in self._DETERMINISTIC_RULE_IDS)
+        ]
+        self.findings = prev_findings + list(self.findings)
+
+        # deterministic passes & non-category extras: keep previous values
+        # where this re-run didn't regenerate them
+        if not self.coverage:
+            self.coverage = prev.get("coverage")
+        if not self.character_reads:
+            self.character_reads = prev.get("character_reads") or []
+        if not self.logline_test:
+            self.logline_test = prev.get("logline_test")
+        if not self.formatting_findings:
+            self.formatting_findings = prev.get("formatting_findings") or []
+        if not self.stats:
+            self.stats = prev.get("stats") or {}
+        if not self.model_used:
+            self.model_used = prev.get("model_used")
+
+        from .verifier import verification_summary
+        self.verification = verification_summary(self.findings)
 
 
 def _normalize_findings(findings: list, category: str, default_severity: str = "low") -> list[dict]:
@@ -261,7 +316,7 @@ def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_
     findings = []
     errors: list[str] = []
     grammar = findings_grammar()
-    rules_fragment = rules_ctx.prompt_fragment_for_category("dialogue")
+    rules_fragment = rules_ctx.fragment_for_pass("dialogue")
     chekhov_fragment = rules_ctx.prompt_fragment_for_rule("chekhovs_gun")
     scene_dicts = [
         {"scene_number": s.scene_number, "heading_raw": s.heading_raw, "full_text": _scene_full_text(s)}
@@ -518,7 +573,7 @@ def analyze(
         if cat in run_categories and overview:
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
-                rules_fragment = rules_ctx.prompt_fragment_for_category(cat)
+                rules_fragment = rules_ctx.fragment_for_pass(cat)
                 all_findings.extend(run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language))
                 emit(cat, "complete")
                 result.category_outcomes[cat] = "ok"
@@ -527,6 +582,12 @@ def analyze(
                 result.errors.append(f"{cat} analysis failed: {e}")
                 emit(cat, "complete", f"failed: {e}")
 
+    # Pre-build the knowledge graph once for consumers that need it
+    # (principles engine and setup/payoff ledger). Avoids redundant rebuilds.
+    _kg = None
+    if "principles" in run_categories or "setup_payoff" in run_categories:
+        _kg = build_knowledge_graph(doc)
+
     # 4b. Principles Engine — Chekhov's Gun / promise-payoff, using Piece 1's
     # knowledge graph as the candidate source. Runs independent of the
     # summary-based overview (it works directly off the knowledge graph),
@@ -534,8 +595,7 @@ def analyze(
     if "principles" in run_categories:
         try:
             emit("principles", "running", "Checking setups & payoffs")
-            kg = build_knowledge_graph(doc)
-            principle_findings, principle_errors = run_principles_engine(kg, client, rules_ctx, doc.scene_count, language=report_language)
+            principle_findings, principle_errors = run_principles_engine(_kg, client, rules_ctx, doc.scene_count, language=report_language)
             all_findings.extend(principle_findings)
             result.errors.extend(principle_errors)
             result.category_outcomes["principles"] = "failed" if principle_errors else "ok"
@@ -577,9 +637,8 @@ def analyze(
     if "setup_payoff" in run_categories and overview:
         try:
             emit("setup_payoff", "running", "Auditing setups & payoffs across the whole script")
-            kg = build_knowledge_graph(doc)
             ledger, ledger_errors = run_setup_payoff_ledger(
-                overview, kg, client, rules_ctx.prompt_fragment_for_category("plot_thread"),
+                overview, _kg, client, rules_ctx.prompt_fragment_for_category("plot_thread"),
                 doc.scene_count, language=report_language,
             )
             result.setup_payoff = ledger
@@ -662,9 +721,13 @@ def analyze(
             from .genre import run_genre_check
             genre_findings = _normalize_findings(run_genre_check(result.coverage, overview, client, language=report_language), "genre")
             # genre findings get the same quote-verification as every other finding
-            all_findings = verify_findings(all_findings + genre_findings, doc)
+            genre_findings = verify_findings(genre_findings, doc)
+            all_findings.extend(genre_findings)
             result.findings = all_findings
-            result.verification = verification_summary(all_findings)
+            # update verification summary incrementally (only new findings)
+            prev = result.verification or {"verified": 0, "not_found": 0, "no_quote": 0, "scene_not_found": 0}
+            new_counts = verification_summary(genre_findings)
+            result.verification = {k: prev.get(k, 0) + new_counts.get(k, 0) for k in set(list(prev) + list(new_counts))}
             result.category_outcomes["genre"] = "ok"
             emit("genre", "complete")
         except LlamaServerError as e:

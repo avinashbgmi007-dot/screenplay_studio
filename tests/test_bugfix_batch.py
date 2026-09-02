@@ -26,7 +26,7 @@ from screenplay_cowriter.engine import CoWriterEngine
 from screenplay_parser.models import Scene, ScriptDocument
 from screenplay_studio.diff import upload_new_draft
 from screenplay_studio.manifest import ProjectManifest
-from screenplay_studio.orchestrator import _merge_analysis
+from screenplay_studio.orchestrator import Orchestrator
 
 
 # ---------------------------------------------------------------- H1
@@ -103,7 +103,7 @@ def test_merge_drops_deterministic_findings_keeps_model_findings(tmp_path):
     result.findings = [{"category": "dialogue", "rule_id": None, "issue": "fresh dialogue finding"}]
     result.category_outcomes = {"dialogue": "ok"}
 
-    _merge_analysis(m, result)
+    result.merge(str(path))
 
     issues = [f["issue"] for f in result.findings]
     assert "fresh dialogue finding" in issues      # re-run category's fresh copy

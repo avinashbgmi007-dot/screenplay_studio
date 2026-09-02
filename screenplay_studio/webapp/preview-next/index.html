@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Lab — six IA prototypes on your real data</title>
+<style>
+:root{
+  --void:#0a0e1a; --raised:#12172b; --panel:#161c33; --line:#262f52;
+  --text:#dbe2f4; --muted:#8b96b8; --accent:#e8a24f; --cyan:#5eead4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{background:var(--void);color:var(--text);font-family:'Segoe UI',Tahoma,Verdana,sans-serif;font-size:16px;line-height:1.55;padding:48px 40px 64px}
+.wrap{max-width:1060px;margin:0 auto}
+.kicker{font-family:Consolas,monospace;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:32px;font-weight:600;margin-bottom:12px}
+.how{max-width:76ch;color:var(--muted);margin-bottom:6px}
+.how b{color:var(--text)}
+.rule{height:1px;background:var(--line);margin:26px 0 34px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:20px}
+.card{display:flex;flex-direction:column;text-decoration:none;color:inherit;border:1px solid var(--line);background:var(--raised);padding:22px;min-height:210px;position:relative;transition:transform .18s ease, border-color .18s ease}
+.card:hover{transform:translateY(-3px);border-color:var(--accent)}
+.card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.card .num{position:absolute;top:16px;right:20px;font-family:Consolas,monospace;font-size:12px;color:var(--muted)}
+.card h2{font-size:19px;font-weight:600;margin-bottom:6px}
+.card .meta{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.card p{color:var(--muted);font-size:14px;flex:1}
+.card .nav{margin-top:14px;padding-top:11px;border-top:1px dashed var(--line);font-family:Consolas,monospace;font-size:11px;color:var(--muted)}
+.card .nav b{color:var(--text);font-weight:600}
+.card .open{display:inline-block;margin-top:10px;font-size:12px;color:var(--accent)}
+.card:hover .open{text-decoration:underline}
+.foot{margin-top:34px;font-family:Consolas,monospace;font-size:11.5px;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.card{transition:none}.card:hover{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">Screenplay Studio · Design Lab · v5</div>
+  <h1>Six ways to run the studio</h1>
+  <p class="how">These are not mockups — every world runs on <b>your real projects</b> through the live studio: real parses, real analysis reports, <b>real Sameer turns</b> (demo model or your llama-server), and a fix queue whose <b>Dismiss</b> button persists through the app's own storage.</p>
+  <p class="how">What varies is the <b>information architecture</b>: what each world opens on, how you navigate, where the verdict lives. What stays in all six is the workbench you asked for: <b>script docked center, feedback LEFT, Sameer RIGHT</b> — fold either, or fold both at once.</p>
+  <div class="rule"></div>
+
+  <div class="grid">
+    <a class="card" href="report-first.html">
+      <div class="num">01</div>
+      <h2>Report-first</h2>
+      <div class="meta">the verdict is the home screen</div>
+      <p>You uploaded the script for the feedback — so the report opens first. Findings drive; the script and Sameer are one click away.</p>
+      <div class="nav">Best when: <b>you want the notes, now</b></div>
+      <span class="open">Open →</span>
+    </a>
+    <a class="card" href="chat-first.html">
+      <div class="num">02</div>
+      <h2>Chat-first</h2>
+      <div class="meta">Sameer is the home screen</div>
+      <p>The conversation is the spine. Script pages and verdict cards surface as artifacts inside the thread; a rail holds the findings.</p>
+      <div class="nav">Best when: <b>you think by talking</b></div>
+      <span class="open">Open →</span>
+    </a>
+    <a class="card" href="canvas-first.html">
+      <div class="num">03</div>
+      <h2>Canvas-first</h2>
+      <div class="meta">spatial board · drag to pan</div>
+      <p>Scenes as cards along a spine, findings as severity pins on the board. Drag anywhere, click anything, work on it.</p>
+      <div class="nav">Best when: <b>you think in space</b></div>
+      <span class="open">Open →</span>
+    </a>
+    <a class="card" href="stream-first.html">
+      <div class="num">04</div>
+      <h2>Stream-first</h2>
+      <div class="meta">one chronological feed</div>
+      <p>Scene beats and findings interleaved in the order the story unfolds. Scroll the script and its critique together.</p>
+      <div class="nav">Best when: <b>you read linearly</b></div>
+      <span class="open">Open →</span>
+    </a>
+    <a class="card" href="inspector-first.html">
+      <div class="num">05</div>
+      <h2>Inspector-first</h2>
+      <div class="meta">script + context-aware inspector</div>
+      <p>The script is the screen. Click any scene and the inspector swaps to that scene's findings, characters, and evidence — no separate report room.</p>
+      <div class="nav">Best when: <b>you edit in place</b></div>
+      <span class="open">Open →</span>
+    </a>
+    <a class="card" href="command-first.html">
+      <div class="num">06</div>
+      <h2>Command-first</h2>
+      <div class="meta">⌘K · the empty desk</div>
+      <p>Almost nothing on screen. Every surface — scenes, findings, Sameer — is one typed command away. The fastest keyboard workflow.</p>
+      <div class="nav">Best when: <b>you type faster than you click</b></div>
+      <span class="open">Open →</span>
+    </a>
+  </div>
+
+  <div class="foot">Data: served live from studio_projects/ via /api/preview/data (static fallback for file://) · chat: isolated preview-lab session per project (your real threads untouched) · dismiss: persists through the app's real findings storage · pick one, port it.</div>
+</div>
+</body>
+</html>

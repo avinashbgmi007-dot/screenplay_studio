@@ -22,7 +22,8 @@ from screenplay_cowriter.context import (
     LANGUAGE_META_INSTRUCTION, PLAIN_TEXT_INSTRUCTION, GROUNDING_INSTRUCTION,
     resolve_referenced_scenes,
 )
-from screenplay_cowriter.engine import CoWriterEngine, clean_reply, _ground_reply, REPEAT_PENALTY
+from screenplay_cowriter.engine import CoWriterEngine, clean_reply, REPEAT_PENALTY
+from screenplay_cowriter.reply_transforms import ground_reply as _ground_reply
 from screenplay_cowriter.llm_client import LlamaServerClient, ModelNotFoundError
 from screenplay_cowriter.models import Session, Message
 

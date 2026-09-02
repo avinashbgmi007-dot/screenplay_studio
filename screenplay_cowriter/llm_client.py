@@ -13,13 +13,7 @@ import time
 
 import requests
 
-
-class LlamaServerError(Exception):
-    pass
-
-
-class ModelNotFoundError(LlamaServerError):
-    pass
+from screenplay_analyzer.llm_client_base import BaseLlamaClient, LlamaServerError, ModelNotFoundError
 
 
 class WatchdogTimeoutError(LlamaServerError):
@@ -30,50 +24,19 @@ class WatchdogTimeoutError(LlamaServerError):
     pass
 
 
-class LlamaServerClient:
+class LlamaServerClient(BaseLlamaClient):
     def __init__(self, base_url: str, model: str | None = None, timeout: int = 600, extra_headers: dict | None = None,
                  fallback_to_loaded: bool = False):
-        self.base_url = base_url.rstrip("/")
-        self.model = model
-        self.timeout = timeout
-        self.extra_headers = extra_headers or {}
-        # When True, a model id that isn't currently loaded falls back to
-        # whatever the server has loaded instead of raising. Used where the
-        # model id is a *remembered preference* (session/manifest pins in the
-        # webapp) rather than an explicit user choice — swapping the loaded
-        # model must not brick existing conversations. The cowriter CLI keeps
-        # the strict default: an explicit --model must be loaded.
-        self.fallback_to_loaded = fallback_to_loaded
-        self._resolved_model: str | None = None
+        super().__init__(base_url, model=model, timeout=timeout, extra_headers=extra_headers,
+                         fallback_to_loaded=fallback_to_loaded)
 
     def list_models(self) -> list[str]:
-        try:
-            resp = requests.get(f"{self.base_url}/v1/models", timeout=15, headers=self.extra_headers)
-            resp.raise_for_status()
-            data = resp.json()
-        except requests.exceptions.ConnectionError as e:
-            raise LlamaServerError(
-                f"Could not connect to llama-server at {self.base_url}. Is it running?"
-            ) from e
-        except requests.exceptions.Timeout as e:
-            raise LlamaServerError(f"Timed out connecting to {self.base_url}") from e
-        except requests.exceptions.HTTPError as e:
-            raise LlamaServerError(f"llama-server at {self.base_url} returned an error: {e}") from e
-        except (ValueError, requests.exceptions.JSONDecodeError) as e:
-            raise LlamaServerError(f"llama-server at {self.base_url} returned a non-JSON response: {e}") from e
-
-        entries = data.get("data", []) or data.get("models", [])
+        entries = self.list_models_raw()
         ids = [e.get("id") or e.get("name") for e in entries]
         return [i for i in ids if i]
 
-    def is_reachable(self) -> bool:
-        try:
-            self.list_models()
-            return True
-        except LlamaServerError:
-            return False
-
-    def resolve_model(self) -> str:
+    def _resolve_model_local(self) -> str:
+        """Cowriter-specific resolve that mutates self.model on fallback (preserves legacy behavior)."""
         if self._resolved_model:
             return self._resolved_model
         available = self.list_models()
@@ -92,6 +55,9 @@ class LlamaServerClient:
             self._resolved_model = available[0]
         return self._resolved_model
 
+    def resolve_model(self) -> str:
+        return self._resolve_model_local()
+
     def chat(self, messages: list[dict], max_tokens: int = 900, temperature: float = 0.7,
              repeat_penalty: float | None = None, busy_retries: int = 6,
              presence_penalty: float | None = None, frequency_penalty: float | None = None) -> str:
@@ -102,44 +68,22 @@ class LlamaServerClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        # llama.cpp's default repeat_penalty is 1.1, which some local models
-        # ("experts"/reasoning quants especially) find too lax — they loop,
-        # re-answering the same point several times in one reply. Pass an
-        # explicit penalty where the caller wants loop suppression; None keeps
-        # the server default (used by paths that must not change sampling,
-        # like the memory refresh).
         if repeat_penalty is not None:
             payload["repeat_penalty"] = repeat_penalty
-        # Presence/frequency penalties (OpenAI-compat, supported by llama-server)
-        # fight the runaway-synonym cascade some reasoning quants fall into (a
-        # chain of "enduringness perpetuity immortality..."): presence_penalty
-        # discourages re-using any token already emitted, frequency_penalty
-        # damps repeated tokens harder the more often they appear. Default None
-        # keeps every existing caller's sampling untouched.
         if presence_penalty is not None:
             payload["presence_penalty"] = presence_penalty
         if frequency_penalty is not None:
             payload["frequency_penalty"] = frequency_penalty
-        # llama-server is single-occupancy: a request that arrives while another
-        # generation is in flight (e.g. the user chats while a long analysis is
-        # grinding) gets a busy error instead of queueing. A bounded retry with
-        # linear backoff smooths that overlap out — the losing request waits a
-        # few seconds and goes again instead of failing the user's turn.
-        _BUSY_STATUS = (400, 429, 503)
-        _BUSY_BODY = re.compile(r"(busy|in progress|already running|another request)", re.IGNORECASE)
+
         attempt = 0
         while True:
             try:
                 resp = requests.post(f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout, headers=self.extra_headers)
                 status = getattr(resp, "status_code", 200)
-                if status in _BUSY_STATUS and attempt < busy_retries:
-                    # 400 is also used for genuinely bad requests, so only retry
-                    # when the body actually sounds busy. 429/503 are busy by
-                    # definition.
-                    if status in (429, 503) or _BUSY_BODY.search(getattr(resp, "text", "") or ""):
-                        attempt += 1
-                        time.sleep(1.5 * attempt)
-                        continue
+                if self._check_busy(status, getattr(resp, "text", "") or "") and attempt < busy_retries:
+                    attempt += 1
+                    time.sleep(1.5 * attempt)
+                    continue
                 resp.raise_for_status()
                 data = resp.json()
                 break
@@ -169,11 +113,8 @@ class LlamaServerClient:
         chunk as it arrives (SSE from llama-server's OpenAI-compat endpoint)
         and returns the FULL raw text once the stream completes.
 
-        The streamed pieces are RAW model output — the caller's reply-hygiene
-        pipeline still runs on the returned full text before anything is
-        stored. Sampling matches chat() exactly; no busy-retry loop here (a
-        stream that starts has committed — a busy server fails fast and the
-        caller can retry the turn)."""
+        No busy-retry loop here (a stream that starts has committed — a busy
+        server fails fast and the caller can retry the turn)."""
         model = self.resolve_model()
         payload = {
             "model": model,

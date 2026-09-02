@@ -3,304 +3,264 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Swiss Signal — Screenplay Studio redesign preview ④</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+<title>④ The Theatre — Scenes Under the Spotlight</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=IBM+Plex+Mono:wght@400&family=Karla:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#fafafa; --card:#ffffff; --ink:#16181d; --muted:#71767f;
-  --cob:#2545d9; --line:#e6e8ec; --hair:#d4d7dd;
-  --red:#e04040; --amber:#e09a00;
+  --stage:#0b0a0c; --velvet:#7a1f2b; --velvet-dark:#521319;
+  --spot:rgba(255,240,214,.13); --gold:#d8b26a; --cream:#efe6d4; --dim:#8d8477;
+  --red:#c94b4b; --amber:#d9a441;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font-family:"Inter",system-ui,sans-serif;font-size:14.5px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-h1,h2,h3,.serif{font-weight:800;letter-spacing:-.03em}
-.mono{font-family:Consolas,monospace}
+body{background:var(--stage);color:var(--cream);font-family:"Karla",system-ui,sans-serif;font-size:14.5px;line-height:1.6;overflow:hidden}
+h1,h2,h3,.serif{font-family:"Playfair Display",Georgia,serif}
+.mono{font-family:"IBM Plex Mono",monospace}
+svg.i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
 
-#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:4px;padding:8px 16px;background:#fff;border-bottom:1px solid var(--line);font-size:12px}
-#pv b{color:var(--cob);margin-right:10px;font-weight:800}
-#pv button{background:none;border:1px solid var(--line);color:var(--muted);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
-#pv button:hover{border-color:var(--cob);color:var(--ink)}
-#pv button.on{background:var(--cob);border-color:var(--cob);color:#fff;font-weight:600}
-main{padding-top:44px}
-[data-screen]{display:none;height:calc(100vh - 44px);position:relative;overflow:hidden}
+#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#060509;border-bottom:1px solid #241f28;font-size:12px}
+#pv b{font-family:"Playfair Display",serif;color:var(--gold);margin-right:10px}
+#pv button{background:none;border:1px solid #241f28;color:var(--dim);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
+#pv button.on{background:var(--gold);border-color:var(--gold);color:#241a08;font-weight:600}
+main{padding-top:42px;height:calc(100vh - 42px)}
+[data-screen]{display:none;height:100%;position:relative;overflow:hidden}
 [data-screen].active{display:block}
 
-/* welcome */
-.s-welcome{display:flex;flex-direction:column;padding:0 max(7vw,56px);justify-content:center;background:
- linear-gradient(to right, transparent calc(50% - .5px), var(--line) calc(50% - .5px), var(--line) calc(50% + .5px), transparent calc(50% + .5px))}
-.s-welcome h1{font-size:min(6vw,64px);line-height:1.02}
-.s-welcome h1 b{color:var(--cob)}
-.s-welcome p{color:var(--muted);max-width:400px;margin-top:14px}
-.actions{display:flex;gap:12px;margin-top:30px}
-.btn{cursor:pointer;padding:12px 24px;border-radius:99px;font-weight:600;font-size:13.5px;border:1px solid transparent}
-.btn-primary{background:var(--cob);color:#fff}
-.btn-primary:hover{filter:brightness(1.1)}
-.btn-ghost{background:#fff;border-color:var(--line)}
-.btn-ghost:hover{border-color:var(--cob)}
-.grid-cards{position:absolute;right:max(7vw,56px);top:50%;transform:translateY(-50%);width:min(420px,36vw);display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.gc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;cursor:pointer;transition:border-color .15s ease, transform .15s ease}
-.gc:hover{border-color:var(--cob);transform:translateY(-3px)}
-.gc .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
-.gc .t{font-weight:700;font-size:16px}
-.gc .s{color:var(--muted);font-size:12px;margin-top:6px}
-@media (prefers-reduced-motion: reduce){.gc,.pane-pop{transition:none!important}}
+/* ====== CURTAINS (upload) ====== */
+.curtain-l,.curtain-r{position:absolute;top:0;bottom:0;width:50%;z-index:5;transition:transform 1.1s cubic-bezier(.7,0,.3,1);
+ background:repeating-linear-gradient(90deg,var(--velvet) 0 26px,var(--velvet-dark) 26px 44px)}
+@media (prefers-reduced-motion: reduce){.curtain-l,.curtain-r{transition:none}}
+.curtain-l{left:0;border-right:6px solid #3a0e13}
+.curtain-r{right:0;border-left:6px solid #3a0e13}
+.stage-open .curtain-l{transform:translateX(-92%)}
+.stage-open .curtain-r{transform:translateX(92%)}
+.curtain-face{position:absolute;inset:0;display:grid;place-items:center;text-align:center;z-index:6;transition:opacity .5s ease}
+.stage-open .curtain-face{opacity:0;pointer-events:none}
+.curtain-face h1{font-size:34px;font-style:italic;font-weight:500}
+.curtain-face p{color:var(--dim);margin:10px 0 22px}
+.raise{cursor:pointer;border:1px solid var(--gold);background:none;color:var(--gold);border-radius:99px;padding:10px 26px;font:600 13px "Karla"}
+.raise:hover{background:rgba(216,178,106,.12)}
+.house-lights{position:absolute;inset:0;background:radial-gradient(600px 400px at 50% 30%,rgba(216,178,106,.1),transparent);z-index:4;pointer-events:none}
 
-/* desk */
-.desk-top{height:56px;display:flex;align-items:center;gap:16px;padding:0 22px;background:#fff;border-bottom:1px solid var(--line)}
-.proj{font-weight:800;font-size:16px;letter-spacing:-.01em}
-.seg{margin-left:auto;display:flex;background:#f0f1f3;border-radius:8px;padding:3px}
-.seg button{border:0;background:none;padding:6px 16px;border-radius:6px;font:600 12.5px "Inter";color:var(--muted);cursor:pointer}
-.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.pages{height:calc(100% - 56px);overflow-y:auto;padding:48px 0 110px;background:
- repeating-linear-gradient(0deg,#fafafa 0 23px,#fafbfc 23px 24px)}
-.page-wrap{max-width:760px;margin:0 auto;padding:0 32px}
-.scene-page{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:78px 86px;margin-bottom:26px;font-family:Consolas,"Courier New",monospace;font-size:15px;line-height:1.65;box-shadow:0 2px 10px rgba(20,25,35,.05);position:relative}
-.scene-page::before{content:attr(data-scene);position:absolute;top:-11px;left:30px;background:var(--cob);color:#fff;font:700 10.5px "Inter";padding:3px 12px;border-radius:99px;letter-spacing:.06em}
-.slug{font-weight:700;margin-bottom:14px}
-.char-cue{text-transform:uppercase;margin:18px 0 2px 140px}
-.dialogue{margin-left:70px;max-width:430px}
-.action{margin:12px 0}
-.el-anchored{background:#eef2ff;border-bottom:2px solid var(--cob);cursor:pointer}
-.fn-note{position:absolute;right:-52px;top:170px;width:232px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:"Inter";font-size:12.5px;box-shadow:0 6px 16px rgba(20,25,35,.07)}
-.fn-note b{color:var(--cob);display:block;margin-bottom:4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em}
-.edge-tabs{position:absolute;right:18px;bottom:90px;display:flex;flex-direction:column;gap:8px;z-index:50}
-.edge-tab{height:42px;padding:0 15px;border-radius:21px;border:1px solid var(--line);background:#fff;color:var(--ink);font:600 12.5px "Inter";cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 6px 18px rgba(20,25,35,.1);transition:border-color .15s ease, color .15s ease}
-.edge-tab:hover{border-color:var(--cob);color:var(--cob)}
-.pane-pop{position:absolute;right:84px;bottom:66px;width:392px;height:498px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 28px 70px rgba(20,25,35,.18);z-index:60;display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(10px) scale(.985)}
-.pane-pop.open{opacity:1;pointer-events:auto;transform:none}
-.pane-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
-.avatar{width:32px;height:32px;border-radius:9px;background:var(--cob);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
-.avatar.doc{background:#384250}
-.nm{font-weight:700;font-size:13.5px}.rl{font-size:11px;color:var(--muted)}
-.pane-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;background:#f7f8fa}
-.msg.them .bubble{background:#fff;border:1px solid var(--line);padding:10px 13px;border-radius:4px 14px 14px 14px;font-size:13.5px}
-.msg.me{align-self:flex-end}.msg.me .bubble{background:var(--cob);color:#fff;padding:10px 13px;border-radius:14px 4px 14px 14px;font-size:13.5px}
-.msg.them .who{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
-.explore-chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 10px;transition:.2s ease}
-.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:99px;padding:5px 11px;font-size:11.5px;font-weight:600;color:var(--cob);cursor:pointer;white-space:nowrap}
-.chip:hover{border-color:var(--cob)}
-.explore-chips.collapsed{flex-direction:column;align-items:center}
-.explore-chips.collapsed .chip span.lbl{display:none}
-.explore-chips.collapsed:hover .chip span.lbl{display:inline}
-.composer-zone{position:relative;padding:0 16px 16px}
-.composer{width:100%;min-height:44px;max-height:172px;resize:none;border:1px solid var(--line);border-radius:10px;padding:11px 42px 11px 13px;font:inherit;font-size:13.5px;outline:none;background:#fff}
-.composer:focus{border-color:var(--cob);box-shadow:0 0 0 3px rgba(37,69,217,.12)}
-.send{position:absolute;right:24px;bottom:24px;width:30px;height:30px;border-radius:50%;background:var(--cob);color:#fff;border:0;cursor:pointer;font-weight:700}
-.status-strip{position:absolute;left:0;right:0;bottom:0;height:32px;display:flex;align-items:center;gap:16px;padding:0 20px;background:#fff;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);z-index:40}
-.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
-.dot.g{background:#2fa54a}.dot.a{background:var(--amber)}
-.st-sprint{margin-left:auto;color:var(--cob);font-weight:600}
+/* ====== THE STAGE (pages) — spotlight follows scroll ====== */
+.stage-scroll{height:100%;overflow-y:auto;position:relative;z-index:2;padding:40px 0 120px}
+.beams{position:absolute;inset:0;pointer-events:none;z-index:1;
+ background:radial-gradient(340px 480px at 50% var(--spotY,120px), var(--spot), transparent 70%)}
+@media (prefers-reduced-motion: no-preference){.beams{transition:--spotY .2s}}
+.beat{max-width:680px;margin:0 auto 60px;padding:0 30px;position:relative}
+.marquee{display:inline-block;background:#1a141d;border:1px solid #322a38;border-bottom:3px solid var(--gold);border-radius:6px;padding:7px 18px;font:600 11px "Karla";letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin-bottom:20px}
+.script{background:#171219;border:1px solid #2c2431;border-radius:8px;padding:38px 44px;font-family:"IBM Plex Mono",monospace;font-size:14px;line-height:1.7;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.script .slug{color:var(--gold);margin-bottom:14px}
+.script .cue{color:#e8c98f;text-transform:uppercase;margin:16px 0 2px 120px}
+.script .dl{margin-left:60px;max-width:400px}
+.script .ac{color:#b7ab93;margin:11px 0}
+.script .hot{border-bottom:2px dotted var(--gold);cursor:pointer;color:var(--cream)}
+/* balcony notes pinned beside the lit beat */
+.balcony{position:absolute;right:-218px;top:8px;width:196px;background:#201824;border:1px solid #3a2f42;border-left:3px solid var(--gold);border-radius:8px;padding:12px 14px;font:12.5px "Karla";color:#cfc2ab;box-shadow:0 16px 44px rgba(0,0,0,.5)}
+.balcony b{display:flex;align-items:center;gap:6px;color:var(--gold);font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+.sev-dot{display:inline-block;width:7px;height:7px;border-radius:50%}
+.sev-dot.high{background:var(--red)}.sev-dot.med{background:var(--amber)}.sev-dot.low{background:#5d5766}
+/* wings whisper (debate) */
+.wings{position:absolute;left:0;top:0;bottom:0;width:min(420px,86vw);background:linear-gradient(90deg,#141017,#171219 70%,transparent);z-index:60;transform:translateX(-102%);transition:transform .3s ease;padding:34px 30px;display:flex;flex-direction:column;gap:13px;border-right:1px solid #2c2431}
+@media (prefers-reduced-motion: reduce){.wings{transition:none}}
+.wings.open{transform:none}
+.wings h3{font-style:italic;font-size:19px;color:var(--gold)}
+.wings .whisper{background:#1d1622;border:1px solid #322a38;border-radius:10px 10px 10px 3px;padding:11px 14px;font-size:13px;max-width:92%}
+.wings .whisper.me{align-self:flex-end;background:var(--gold);color:#241a08;border-radius:10px 10px 3px 10px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;transition:.2s ease}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px dashed #3f3648;color:var(--gold);background:none;border-radius:99px;padding:4px 11px;font:11.5px "Karla";cursor:pointer;white-space:nowrap}
+.chip:hover{background:rgba(216,178,106,.08)}
+.chips.collapsed{flex-direction:column;align-items:flex-start}
+.chips.collapsed .chip .lbl{display:none}
+.chips.collapsed:hover .chip .lbl{display:inline}
+.composer{width:100%;min-height:40px;max-height:130px;resize:none;background:#120e16;border:1px solid #322a38;border-radius:9px;color:var(--cream);padding:10px 12px;font:13px "Karla";outline:none}
+.composer:focus{border-color:var(--gold)}
+.wings-tag{position:absolute;left:0;top:38%;z-index:59;writing-mode:vertical-rl;background:#1d1622;border:1px solid #322a38;border-left:0;color:var(--gold);font:600 11px "Karla";letter-spacing:.2em;padding:16px 8px;cursor:pointer;text-transform:uppercase}
+/* status strip like stage manager's clipboard */
+.clipboard{position:absolute;left:0;right:0;bottom:0;height:28px;background:#08070a;border-top:1px solid #241f28;display:flex;align-items:center;gap:15px;padding:0 18px;font:10.5px "Karla";color:var(--dim);z-index:40}
+.clipboard .g{width:6px;height:6px;border-radius:50%;background:#79b779;display:inline-block;margin-right:5px}
+.clipboard .sp{margin-left:auto;color:var(--gold)}
 
-/* co-writer */
-.s-cowrite{display:flex;flex-direction:column}
-.cw-head{display:flex;align-items:center;gap:14px;padding:15px 26px;background:#fff;border-bottom:1px solid var(--line)}
-.cw-head h2{font-size:19px}
-.sub{color:var(--muted);font-size:12px}
-.memory-card{margin:12px 26px 0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--muted)}
-.memory-card b{color:var(--cob)}
-.cw-chat{flex:1;overflow-y:auto;padding:24px 28px;display:flex;flex-direction:column;gap:13px;max-width:860px;width:100%;margin:0 auto}
-.cw-chat .msg{max-width:80%}
-.cw-composer{position:relative;max-width:860px;width:100%;margin:0 auto 18px;padding:0 28px}
-.cw-explore{padding:8px 28px 0;max-width:860px;margin:0 auto;width:100%}
-.cw-status{height:32px;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 26px;font-size:11.5px;color:var(--muted)}
+/* ====== DIRECTOR'S NOTES (verdict) ====== */
+.notes-desk{height:100%;overflow-y:auto;padding:44px 0 100px;position:relative;z-index:2}
+.notes-col{max-width:640px;margin:0 auto;padding:0 30px}
+.notes-head{text-align:center;margin-bottom:30px}
+.notes-head h2{font-size:30px;font-style:italic}
+.notes-head .score{font-family:"Playfair Display",serif;font-size:44px;color:var(--gold);margin-top:6px}
+.notes-head small{display:block;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-size:10px}
+.dnote{background:#171219;border:1px solid #2c2431;border-radius:8px;padding:20px 24px;margin-bottom:16px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.dnote .nh{display:flex;align-items:center;gap:8px;font:600 13px "Karla";margin-bottom:7px}
+.dnote .quote{border-left:2px solid #3f3648;padding:2px 12px;margin:8px 0;font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:#b7ab93}
+.dnote p{font-size:13.5px;color:#cfc2ab}
 
-/* feedback */
-.s-feedback{display:flex;background:#fff}
-.fb-nav{width:252px;border-right:1px solid var(--line);padding:22px 16px;overflow-y:auto;background:var(--bg)}
-.fb-nav h3{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px}
-.fb-nav a{display:block;color:var(--muted);text-decoration:none;padding:7px 10px;border-radius:7px;font-size:13px;font-weight:500}
-.fb-nav a.on{background:#eef2ff;color:var(--cob)}
-.score-card{margin-top:22px;border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;background:#fff}
-.score-card .n{font-size:42px;font-weight:800;letter-spacing:-.04em;color:var(--cob)}
-.cap{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
-.fb-read{flex:1;overflow-y:auto}
-.fb-doc{max-width:720px;margin:0 auto;padding:50px 40px 100px}
-.kicker{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:var(--cob);font-weight:700;margin-bottom:12px}
-.fb-doc h1{font-size:min(4.4vw,40px);line-height:1.1}
-.verdict{margin:18px 0 34px;padding-left:16px;border-left:3px solid var(--cob);color:#33373e;font-size:15.5px}
-.cat-h{display:flex;align-items:center;gap:9px;margin:38px 0 14px;font-weight:800;font-size:16px;letter-spacing:-.01em}
-.finding{border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:11px;background:#fff}
-.f-h{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;margin-bottom:6px}
-.sev-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-.sev.high{background:var(--red)}.sev.med{background:var(--amber)}.sev.low{background:#c4c8cf}
-.finding blockquote{border-left:2px solid var(--line);margin:8px 0;padding:2px 12px;color:var(--muted);font-family:Consolas,monospace;font-size:12px}
-.jtsc{float:right;font-size:11px;font-weight:600;color:var(--cob);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+/* ====== IMPROV NIGHT (spark) ====== */
+.improv{height:100%;display:grid;place-items:center;position:relative;z-index:2}
+.improv-inner{max-width:620px;width:90vw;text-align:center}
+.improv-inner h2{font-size:30px;font-style:italic;margin-bottom:8px}
+.improv-inner .sub{color:var(--dim);margin-bottom:28px}
+.improv-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:left}
+.icard{background:#171219;border:1px solid #2c2431;border-radius:10px;padding:16px 18px;cursor:pointer;transition:transform .25s ease,border-color .25s ease}
+@media (prefers-reduced-motion: reduce){.icard{transition:none}}
+.icard:hover{transform:translateY(-5px);border-color:var(--gold)}
+.icard b{font-family:"Playfair Display",serif;font-weight:500;display:block;margin-bottom:5px}
+.icard span{font-size:12.5px;color:var(--dim)}
 </style>
 </head>
 <body>
 
-<nav id="pv"><b>④ Swiss Signal</b>
-<button data-go="welcome" class="on">Welcome/Shelf</button><button data-go="desk">Desk · script</button><button data-go="cowrite">Co-Writer</button><button data-go="feedback">Feedback Report</button>
-<span style="margin-left:auto;color:var(--muted)">screenplay-studio redesign mockup</span></nav>
+<nav id="pv"><b>④ The Theatre</b>
+<button data-go="upload" class="on">House</button><button data-go="stage">The Stage</button><button data-go="verdict">Director's Notes</button><button data-go="debate">From the Wings</button><button data-go="spark">Improv Night</button>
+<span style="margin-left:auto;color:var(--dim)">concept world 4 of 6 — your script, performed</span></nav>
 
 <main>
 
-<section data-screen="welcome" class="active s-welcome">
-  <div>
-    <h1>Structure first.<br><b>Feeling always.</b></h1>
-    <p>Local screenplay analysis and a co-writer who argues with the script, never with you. One workspace per draft — pick up below.</p>
-    <div class="actions">
-      <button class="btn btn-primary" data-go="desk">Open Pain ↦ Pages</button>
-      <button class="btn btn-ghost">＋ Upload script</button>
-    </div>
-  </div>
-  <div class="grid-cards">
-    <div class="gc" style="grid-column:span 2" data-go="desk"><div class="lab">Feature · analysed ✓</div><div class="t">Pain — draft v3</div><div class="s">98 pp · score 7.2 · 12 of 44 findings open · last opened yesterday</div></div>
-    <div class="gc"><div class="lab">Short · pending</div><div class="t">Gun Pen</div><div class="s">3 scenes → run analysis</div></div>
-    <div class="gc" style="background:var(--cob);color:#fff"><div class="lab" style="color:#c8d1ff">New idea</div><div class="t">Blank page ✎</div><div class="s" style="color:#dbe2ff">loose thoughts first — structure later</div></div>
+<!-- HOUSE -->
+<section data-screen="upload" class="active" id="house">
+  <div class="house-lights"></div>
+  <div class="curtain-l"></div>
+  <div class="curtain-r"></div>
+  <div class="curtain-face">
+    <h1>Tonight's programme</h1>
+    <p>One house. Two shows. Your script takes the stage the moment you're seated.</p>
+    <button class="raise" data-raise>☰ &nbsp;Raise the curtain</button>
+    <p style="margin-top:16px;font-size:12px">PAIN — draft three · 98 pp · second performance</p>
   </div>
 </section>
 
-<section data-screen="desk" class="s-desk">
-  <div class="desk-top">
-    <span class="proj">Pain</span>
-    <div class="seg">
-      <button class="on">Pages</button><button data-go="cowrite">Co-Writer</button><button data-go="feedback">Report</button><button>Beats</button>
+<!-- THE STAGE -->
+<section data-screen="stage">
+  <div class="beams" id="beams"></div>
+  <div class="stage-scroll" id="stageScroll">
+    <div class="beat">
+      <span class="marquee">SC 01 · INT. RENTED ROOM — NIGHT</span>
+      <div class="script">
+        <p class="ac">A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
+        <p class="cue">ARJUN</p>
+        <p class="dl">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
+      </div>
+      <aside class="balcony"><b><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg> Balcony note</b>The phone glow does the lamp's job — half-lit face. A mirror for Act II.</aside>
+    </div>
+    <div class="beat">
+      <span class="marquee">SC 02 · EXT. TEA STALL — DAY</span>
+      <div class="script">
+        <p class="ac">Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
+        <p class="cue">STALL OWNER</p>
+        <p class="dl">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
+      </div>
+      <aside class="balcony"><b><span class="sev-dot high"></span> Finding · high</b>This coin-count is a promise to the audience. The ledger will come collecting — pay it off by Act III.</aside>
+    </div>
+    <div class="beat">
+      <span class="marquee">SC 09 · THE REPEATED BEAT</span>
+      <div class="script">
+        <p class="ac">The same confrontation, staged a third time. The room knows the lines before they're said.</p>
+      </div>
+      <aside class="balcony"><b><span class="sev-dot med"></span> Finding · med</b>Scenes 9 · 11 · 13 — the same promise, three times. Keep the one where Arjun chooses.</aside>
     </div>
   </div>
-  <div class="pages"><div class="page-wrap">
-      <article class="scene-page" data-scene="Scene 1 / 22">
-        <p class="slug">INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
-        <p class="action">A ceiling fan turns slow. On a cot, <span class="el-anchored">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
-        <p class="char-cue">Arjun</p>
-        <p class="dialogue">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
-        <aside class="fn-note"><b>Margin note 📌</b>The phone glow does the lamp's job here — his face half-lit. A quiet mirror for Act II when the calls stop coming.</aside>
-      </article>
-      <article class="scene-page" data-scene="Scene 2 / 22">
-        <p class="slug">EXT. ROAD-SIDE TEA STALL — DAY</p>
-        <p class="action">Steam. Tumbling glasses. <span class="el-anchored">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
-        <p class="char-cue">Stall Owner</p>
-        <p class="dialogue">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
-        <p class="action">Arjun laughs. It dies in the steam.</p>
-      </article>
+  <span class="wings-tag" id="wingsTag" data-wings>Sameer — from the wings</span>
+  <aside class="wings" id="wings">
+    <h3>Sameer, stage-left</h3>
+    <div class="whisper">Scene 2 ka double coin-count — badhiya. Bina ek word bole "shortage".</div>
+    <div class="whisper me">stall owner ko zyada do?</div>
+    <div class="whisper">Ek line kaafi hai. Aur diya to character gayab, plot ban jayega.</div>
+    <div class="chips explore-chips">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Tighten scene 1</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span class="lbl">Push Arjun's want</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v16M5 8h14"/></svg><span class="lbl">Is act I earning it?</span></button>
+    </div>
+    <textarea class="composer" placeholder="Whisper from the wings…" rows="1"></textarea>
+  </aside>
+  <div class="clipboard"><span><span class="g"></span>qwen3-14B @ :8080</span><span>spotlight on sc 2 · 214 words</span><span>12/44 findings open</span><span class="sp">⏱ 18:42 · curtain 11 PM</span></div>
+</section>
+
+<!-- DIRECTOR'S NOTES -->
+<section data-screen="verdict">
+  <div class="notes-desk"><div class="notes-col">
+    <div class="notes-head">
+      <h2>The director's notes</h2>
+      <div class="score">7.2</div>
+      <small>Pain v3 · 12 of 44 open · every quote verified</small>
+    </div>
+    <div class="dnote"><div class="nh"><span class="sev-dot high"></span>Act III owes a payoff</div>
+      <div class="quote">“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — SC 01</div>
+      <p>The father-call is promised here and delivered only as mood. Land the call by the midpoint of Act III — or cut the specificity and let silence do it.</p></div>
+    <div class="dnote"><div class="nh"><span class="sev-dot med"></span>A good actor is standing offstage</div>
+      <div class="quote">“Nee account tho guddi pattuko ra.” — SC 02</div>
+      <p>The stall owner is your best early antagonist — then gone for twenty scenes. Bring him back, or let his absence mean something.</p></div>
+    <div class="dnote"><div class="nh"><span class="sev-dot med"></span>One beat, three encores</div>
+      <p>Scenes 9, 11 and 13 play the same confrontation at the same volume. Keep the one where Arjun chooses; collapse the rest to a page and a half.</p></div>
+    <div class="dnote"><div class="nh"><span class="sev-dot low"></span>Accent drift</div>
+      <p>Two scenes slip into school-Telugu on a street-Tenglish tongue. The ear notices before the eye does.</p></div>
   </div></div>
-
-  <div class="edge-tabs">
-    <button class="edge-tab" id="tab-sam" title="Summon Sameer">S · Sameer</button>
-    <button class="edge-tab" id="tab-doc" title="Premise Doctor">D · Doctor</button>
-    <button class="edge-tab" title="Stash">📥 Stash</button>
-  </div>
-
-  <aside class="pane-pop" id="pane-sam">
-    <div class="pane-head"><span class="avatar">S</span><div><div class="nm">Sameer</div><div class="rl">writing partner · knows your past work</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="who">Sameer · now</div><div class="bubble">Scene 2 ka double coin-count — great instinct. Bina dialogue ke shortage bol gaya. Scene 1 ke phone-glow ke saath Act I setup complete.</div></div>
-      <div class="msg me"><div class="bubble">stall owner ko zyada do?</div></div>
-      <div class="msg them"><div class="bubble">Ek line kaafi hai. Aage badhaya to character se plot ban jayega. Subtle chhodo.</div></div>
-    </div>
-    <div class="explore-chips">
-      <button class="chip">✂ <span class="lbl">Tighten scene 1</span></button>
-      <button class="chip">🎭 <span class="lbl">Push Arjun's want</span></button>
-      <button class="chip">⚖ <span class="lbl">Is act I earning it?</span></button>
-    </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="Talk to Sameer…" rows="1"></textarea><button class="send">↑</button></div>
-  </aside>
-
-  <aside class="pane-pop" id="pane-doc">
-    <div class="pane-head"><span class="avatar doc">D</span><div><div class="nm">Premise Doctor</div><div class="rl">diagnosis without sugar</div></div></div>
-    <div class="pane-body">
-      <div class="msg them"><div class="bubble">Why this week? Rent trouble is common ground. What makes Arjun unable to walk away TODAY is your real premise — and it's not on the page yet. Finding #3, high severity.</div></div>
-    </div>
-    <div class="explore-chips">
-      <button class="chip">🩺 <span class="lbl">Diagnose premise</span></button>
-      <button class="chip">🔓 <span class="lbl">Escalate stakes</span></button>
-    </div>
-    <div class="composer-zone"><textarea class="composer" placeholder="Ask the doctor…" rows="1"></textarea></div>
-  </aside>
-
-  <div class="status-strip">
-    <span><span class="dot g"></span>qwen3-14B @ localhost:8080</span><span>Scene 2 · 214 words</span><span>12/44 findings open</span>
-    <span class="st-sprint">⏱ 18:42</span>
-  </div>
 </section>
 
-<section data-screen="cowrite" class="s-cowrite">
-  <div class="cw-head">
-    <span class="avatar" style="width:42px;height:42px;font-size:17px">S</span>
-    <div><h2>Sameer — Writing Room</h2><div class="sub">the long conversation · memory & library live here</div></div>
-    <div class="seg" style="margin-left:auto"><button data-go="desk">← Pages</button><button data-go="feedback" class="on">Report</button></div>
+<!-- FROM THE WINGS (debate) -->
+<section data-screen="debate">
+  <div class="beams" style="--spotY:200px"></div>
+  <div class="stage-scroll" style="opacity:.35">
+    <div class="beat"><span class="marquee">SC 02 · UNDER DISCUSSION</span>
+      <div class="script"><p class="ac">Arjun counts coins twice before ordering one. The stall owner pretends not to see.</p></div></div>
   </div>
-  <div class="memory-card"><b>Past work:</b> Gun Pen (family-pressure core) · honored note: "no cheap steering." <b>Relationship:</b> 41 sessions · pushback welcomed · Tenglish register. <b>Tonight:</b> Pain v3 — kept separate from past work.</div>
-  <div class="cw-chat">
-    <div class="msg them"><div class="who">Sameer</div><div class="bubble">Achhi khabar pehle: Arjun ka want ab Scene 1 se crystal clear hai. Ab kadwi baat — second act ki beech me (scenes 8–14) ek hi beat teen baar repeat ho raha hai. Pressure dikhata hai, badhta nahi.</div></div>
-    <div class="msg me"><div class="bubble">to kya hatayein?</div></div>
-    <div class="msg them"><div class="bubble">Pehle yeh batao — in teeno me se kis ek scene me Arjun CHOOSE karta hai? Wohi rakhne layak hai. Baaki do ko 1.5 page me collapse kar do. Chaho to main likh dikhata hoon.</div></div>
-  </div>
-  <div class="cw-explore explore-chips">
-    <button class="chip">📄 <span class="lbl">Show the collapsed scene</span></button>
-    <button class="chip">🧗 <span class="lbl">Raise stakes instead</span></button>
-    <button class="chip">🔁 <span class="lbl">Compare with Gun Pen's mid</span></button>
-    <button class="chip">🗣 <span class="lbl">Read it in Tenglish voice</span></button>
-  </div>
-  <div class="cw-composer composer-zone" style="padding:0"><textarea class="composer" rows="1" placeholder="Write to Sameer… (Shift+Enter for new line)"></textarea><button class="send">↑</button></div>
-  <div class="cw-status"><span><span class="dot g"></span>sameer · peer mode</span><span>branched session · main path</span><span class="st-sprint">⏱ 18:42</span></div>
+  <aside class="wings open" style="transform:none;width:min(480px,92vw)">
+    <h3>The late-night debate — 1:47 AM</h3>
+    <div class="whisper">Achhi khabar pehle: Arjun ka want ab Scene 1 se crystal clear hai.</div>
+    <div class="whisper">Ab kadwi baat — scenes 8–14 ek hi beat teen baar. Pressure dikhata hai, badhta nahi. Kis ek me Arjun CHOOSE karta hai? Wohi rakho, baaki do collapse. Likh dikhau?</div>
+    <div class="chips explore-chips">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Show the collapsed scene</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg><span class="lbl">Raise stakes instead</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/></svg><span class="lbl">Compare with Gun Pen's mid</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M9 5h11v10H12l-4 4zM4 8v7"/></svg><span class="lbl">Read it in Tenglish voice</span></button>
+    </div>
+    <textarea class="composer" placeholder="Answer from the house…" rows="1"></textarea>
+  </aside>
+  <div class="clipboard"><span><span class="g"></span>sameer · peer mode</span><span>branched session · main path</span><span class="sp">⏱ 18:42</span></div>
 </section>
 
-<section data-screen="feedback" class="s-feedback">
-  <nav class="fb-nav">
-    <h3>The Report</h3>
-    <a class="on" href="#fb-v">Verdict</a><a href="#fb-plot">Plot Economy · 5</a><a href="#fb-char">Character · 4</a><a href="#fb-dialogue">Dialogue · 2</a><a href="#fb-pacing">Pacing</a>
-    <div class="score-card"><div class="n">7.2</div><div class="cap">script score</div></div>
-    <div class="score-card" style="margin-top:10px;padding:12px"><div class="mono" style="font-size:21px;font-weight:700">12 / 44</div><div class="cap">findings open</div></div>
-  </nav>
-  <div class="fb-read"><div class="fb-doc">
-    <p class="kicker">Analysis · Pain v3 · verified quotes only</p>
-    <h1 id="fb-v">A tight first act carrying an unaired second.</h1>
-    <div class="verdict">Arjun's need to know — “cheppalekha ante nenu intlo unna leda?” — is a real engine. The premise earns itself by page 12. What hasn't been earned yet is forty pages of pressure without escalation.</div>
-
-    <div class="cat-h" id="fb-plot"><span class="sev-dot sev med"></span>Plot Economy<span style="color:var(--muted);font-size:12px;font-weight:500;margin-left:auto">5 findings</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev high"></span>Chekhov's gun never fires <a class="jtsc" href="#fb-v" onclick="go('desk')">↦ jump to scene</a></div>
-    <blockquote>“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — INT. RENTED ROOM (Sc 1)</blockquote>
-    The father-call promise setup in Sc 1 pays off only as mood, never as event. Land the call by Act III midpoint — or cut the specificity.</div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Duplicate pressure beats</div>
-    Scenes 9, 11 and 13 stage identical money-shortage confrontations with flat intensity. The ledger flags all three as setups paying into nothing.</div>
-
-    <div class="cat-h" id="fb-char"><span class="sev-dot sev low"></span>Character<span style="color:var(--muted);font-size:12px;font-weight:500;margin-left:auto">4 findings</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev med"></span>Stall owner vanishes after peak</div>
-    <blockquote>“Nee account tho guddi pattuko ra.” — EXT. TEA STALL (Sc 2)</blockquote>
-    The best early antagonist beat — then zero mentions across the remaining twenty scenes.</div>
-
-    <div class="cat-h" id="fb-dialogue"><span class="sev-dot sev low"></span>Dialogue<span style="color:var(--muted);font-size:12px;font-weight:500;margin-left:auto">2 findings</span></div>
-    <div class="finding"><div class="f-h"><span class="sev-dot sev low"></span>Voice bleed: Arjun edging formal</div>
-    Two scenes slip into school-Telugu constructions while the idiolect otherwise runs street-Tenglish.</div>
-
-    <div class="cat-h" id="fb-pacing">Pacing<span style="color:var(--muted);font-size:12px;font-weight:500;margin-left:auto">amber bars = drag</span></div>
-    <div class="finding" style="display:flex;align-items:flex-end;gap:5px;height:114px;padding:16px 18px 12px"><span class="mono" style="font-size:10px;color:var(--muted)">pace ▸</span>
-    <div style="flex:1;display:flex;align-items:flex-end;gap:5px;height:80px"><i style="flex:1;background:#e2e5ea;height:46%;border-radius:2px"></i><i style="flex:1;background:#e2e5ea;height:62%;border-radius:2px"></i><i style="flex:1;background:var(--amber);height:90%;border-radius:2px"></i><i style="flex:1;background:#e2e5ea;height:55%;border-radius:2px"></i><i style="flex:1;background:var(--amber);height:84%;border-radius:2px"></i><i style="flex:1;background:#e2e5ea;height:40%;border-radius:2px"></i><i style="flex:1;background:var(--amber);height:76%;border-radius:2px"></i><i style="flex:1;background:#e2e5ea;height:66%;border-radius:2px"></i></div>
-    <span class="mono" style="font-size:10px;color:var(--muted)">sc 1–8</span></div>
+<!-- IMPROV NIGHT -->
+<section data-screen="spark">
+  <div class="house-lights"></div>
+  <div class="improv"><div class="improv-inner">
+    <h2>Improv night.</h2>
+    <p class="sub">No structure, no judgment — throw anything on stage. Sameer asks the next question.</p>
+    <div class="improv-cards">
+      <div class="icard"><b>What if the call comes too late?</b><span>Open the premise backwards, earn the rest as memory.</span></div>
+      <div class="icard"><b>A hero who counts everything</b><span>Coin-counting as a recurring motif.</span></div>
+      <div class="icard"><b>The stall owner's story</b><span>Who pretends not to see — and why?</span></div>
+      <div class="icard" style="border-style:dashed"><b>Blank stage</b><span>Sameer hands you the first line.</span></div>
+    </div>
   </div></div>
 </section>
 
 </main>
 
 <script>
+const house=document.getElementById('house');
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');
+  if(g){go(g.dataset.go);return;}
+  if(e.target.closest('[data-raise]')){house.classList.add('stage-open');setTimeout(()=>go('stage'),900);return;}
+  const w=e.target.closest('[data-wings]');
+  if(w){document.getElementById('wings').classList.toggle('open');e.stopPropagation();return;}
+  if(!e.target.closest('.wings')&&!e.target.closest('[data-wings]'))document.getElementById('wings')?.classList.remove('open');
+});
 function go(name){
   document.querySelectorAll('[data-screen]').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
   document.querySelectorAll('#pv [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===name));
-  closePanes();
+  document.getElementById('wings')?.classList.remove('open');
 }
-document.addEventListener('click',function(e){
-  const goBtn=e.target.closest('[data-go]');
-  if(goBtn){go(goBtn.dataset.go);return;}
-  const opener=e.target.closest('.edge-tab');
-  if(opener && (opener.id==='tab-sam'||opener.id==='tab-doc')){
-    const pane=opener.id==='tab-sam'?document.getElementById('pane-sam'):document.getElementById('pane-doc');
-    const was=pane.classList.contains('open');
-    closePanes();
-    if(!was)pane.classList.add('open');
-    e.stopPropagation();return;
-  }
-  if(!e.target.closest('.pane-pop'))closePanes();
-});
-function closePanes(){document.querySelectorAll('.pane-pop.open').forEach(p=>p.classList.remove('open'));}
+// spotlight follows scroll
+const scrollEl=document.getElementById('stageScroll');
+const beams=document.getElementById('beams');
+if(scrollEl)scrollEl.addEventListener('scroll',()=>{
+  const y=Math.min(Math.max(scrollEl.scrollTop*0.9+120,120),scrollEl.scrollHeight);
+  beams.style.setProperty('--spotY',y+'px');
+},{passive:true});
 document.querySelectorAll('.composer').forEach(t=>{
   t.addEventListener('input',()=>{
-    t.style.height='auto';
-    t.style.height=Math.min(t.scrollHeight,172)+'px';
-    if(t.value.trim())document.querySelectorAll('.explore-chips').forEach(c=>c.classList.add('collapsed'));
+    t.style.height='auto';t.style.height=Math.min(t.scrollHeight,130)+'px';
+    if(t.value.trim())document.querySelectorAll('.chips').forEach(c=>c.classList.add('collapsed'));
   });
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanes();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('wings')?.classList.remove('open');});
 </script>
 </body>
 </html>

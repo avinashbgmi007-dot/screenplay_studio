@@ -10,13 +10,17 @@
       "work": null,
       "note": "Standard, widely-taught screenwriting principle echoed across nearly every major craft source (McKee, Field, Snyder, and general script-consulting practice) in similar terms; not attributable to one originator."
     },
-    "definition": "Dialogue is 'on-the-nose' when a character states their feelings, intentions, or the scene's meaning directly and explicitly, rather than the audience inferring it from what's said around the point, from subtext, or from behavior. Real people rarely announce their exact emotional state; effective dialogue usually operates on two levels — what's said, and what's actually meant/felt underneath.",
+    "definition": "Dialogue is 'on-the-nose' when a character states their feelings, intentions, or the scene's meaning directly and explicitly, rather than the audience inferring it from what's said around the point, from subtext, or from behavior. Real people rarely announce their exact emotional state; effective dialogue usually operates on two levels \u00e2\u20ac\u201d what's said, and what's actually meant/felt underneath.",
     "detection_signal": "For emotionally significant dialogue exchanges, check whether characters state their feelings/intentions directly and explicitly ('I'm furious that you lied to me') versus expressing them indirectly through word choice, deflection, subject-changing, or action ('You know what? Forget it. I'll take the bus.').",
     "counter_considerations": "Direct emotional statements are appropriate and even necessary at certain high points (a genuine, earned confession scene) or for certain character types (a character established as blunt/socially direct). Flag patterns of on-the-nose dialogue throughout a script, not isolated instances at climactic moments.",
     "severity_default": "medium",
     "confidence_tier": "medium",
-    "requires": ["scene_text"],
-    "related_rules": ["exposition_as_ammunition"]
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "exposition_as_ammunition"
+    ]
   },
   {
     "id": "exposition_as_ammunition",
@@ -31,11 +35,15 @@
     },
     "definition": "Background/world/plot information a character states should serve that character's immediate scene goal (persuading, threatening, confessing, deflecting) rather than existing purely to inform the audience. Dialogue that exists only because the audience needs to know something, with no in-scene dramatic purpose for the character saying it, reads as an exposition dump.",
     "detection_signal": "For dialogue passages containing significant background/plot information, check whether the speaking character has an in-scene motivation for saying it at that moment (are they trying to accomplish something by telling this to this specific listener, right now), or whether the information's only function is audience clarity.",
-    "counter_considerations": "Some genres/formats (procedurals with a 'explain the case' convention, certain comedic or meta styles) intentionally lean into direct exposition as a stylistic choice — weigh genre/tone.",
+    "counter_considerations": "Some genres/formats (procedurals with a 'explain the case' convention, certain comedic or meta styles) intentionally lean into direct exposition as a stylistic choice \u00e2\u20ac\u201d weigh genre/tone.",
     "severity_default": "medium",
     "confidence_tier": "medium",
-    "requires": ["scene_text"],
-    "related_rules": ["on_the_nose_vs_subtext"]
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "on_the_nose_vs_subtext"
+    ]
   },
   {
     "id": "distinct_character_voice",
@@ -48,12 +56,155 @@
       "work": null,
       "note": "Widely-taught principle, closely related to McKee's cast polarization (characters should hold contrasting attitudes) but applied specifically to how characters speak rather than what they believe."
     },
-    "definition": "Different characters should be identifiable by dialogue alone, without speaker tags — through consistent differences in vocabulary, sentence rhythm, formality, verbal tics, or subject fixation, reflecting differences in background, education, temperament, or worldview.",
-    "detection_signal": "Compare dialogue samples from different major characters for surface-level distinguishability (vocabulary complexity, sentence length, characteristic phrases). This is flagged here as a genuinely lower-confidence check than most others in this knowledge base — true stylometric distinctiveness is hard to assess reliably, especially for a local model, and false positives/negatives are both likely.",
-    "counter_considerations": "Characters from similar backgrounds who are meant to sound similar (e.g. members of a close-knit group with shared slang) may legitimately share vocal qualities — the check should focus on characters expected to contrast, not flag similarity as inherently wrong.",
+    "definition": "Different characters should be identifiable by dialogue alone, without speaker tags \u00e2\u20ac\u201d through consistent differences in vocabulary, sentence rhythm, formality, verbal tics, or subject fixation, reflecting differences in background, education, temperament, or worldview.",
+    "detection_signal": "Compare dialogue samples from different major characters for surface-level distinguishability (vocabulary complexity, sentence length, characteristic phrases). This is flagged here as a genuinely lower-confidence check than most others in this knowledge base \u00e2\u20ac\u201d true stylometric distinctiveness is hard to assess reliably, especially for a local model, and false positives/negatives are both likely.",
+    "counter_considerations": "Characters from similar backgrounds who are meant to sound similar (e.g. members of a close-knit group with shared slang) may legitimately share vocal qualities \u00e2\u20ac\u201d the check should focus on characters expected to contrast, not flag similarity as inherently wrong.",
     "severity_default": "low",
     "confidence_tier": "low",
-    "requires": ["scene_text", "knowledge_graph"],
-    "related_rules": ["cast_polarization"]
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "cast_polarization"
+    ]
+  },
+  {
+    "id": "stc_laying_pipe",
+    "name": "Laying Pipe (Exposition Through Action)",
+    "taxonomy_level": "dialogue",
+    "category": "exposition",
+    "source": {
+      "type": "framework",
+      "originator": "Blake Snyder",
+      "work": "Save the Cat"
+    },
+    "definition": "Information must be delivered through action and visual storytelling rather than dialogue exposition. Characters should demonstrate facts through behavior, conflict, or environmental detail rather than telling each other what the audience needs to know.",
+    "detection_signal": "Scenes where characters explain plot points, backstory, or world-building to each other in ways that feel unnatural or redundant with what was already shown.",
+    "counter_considerations": "Some exposition through dialogue is inevitable, especially for emotional or internal information. The key is disguise and dramatic context.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "exposition_as_ammunition",
+      "on_the_nose_vs_subtext"
+    ]
+  },
+  {
+    "id": "martell_dialogue_is_character",
+    "name": "Dialogue Is Character",
+    "taxonomy_level": "dialogue",
+    "category": "character_voice",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Dialogue Secrets"
+    },
+    "definition": "Every line of dialogue must reflect who is speaking \u00e2\u20ac\u201d their vocabulary, sentence rhythm, education, emotional state, and worldview. A reader should be able to cover character names and still know exactly who is speaking. If all characters sound alike, the dialogue has failed its primary function.",
+    "detection_signal": "Scenes where multiple characters speak in the same cadence, use similar vocabulary, or where dialogue could be swapped between characters without the reader noticing.",
+    "counter_considerations": "Some characters may deliberately adopt a shared register (military, professional) for functional reasons. The rule targets generic, undifferentiated voices.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "distinct_character_voice",
+      "dialogue_voice_distinct"
+    ]
+  },
+  {
+    "id": "martell_say_the_opposite",
+    "name": "Say the Opposite (Subtext Through Contradiction)",
+    "taxonomy_level": "dialogue",
+    "category": "subtext",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Dialogue Secrets"
+    },
+    "definition": "When a character says the opposite of what they feel, it creates subtext. A character who says 'I'm fine' when they're clearly furious creates dramatic tension. This technique transforms flat, on-the-nose dialogue into layered, human conversation where meaning lives beneath the surface.",
+    "detection_signal": "Dialogue where characters state their feelings directly and explicitly ('I hate you,' 'I'm scared,' 'I love you') without dramatic context or contradiction.",
+    "counter_considerations": "Direct emotional statements can be powerful at climactic moments or when characters are at their breaking point. The rule targets overuse.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "on_the_nose_vs_subtext",
+      "dialogue_subtext_layers"
+    ]
+  },
+  {
+    "id": "martell_three_line_rule",
+    "name": "Three Line Rule (Dialogue Brevity)",
+    "taxonomy_level": "dialogue",
+    "category": "dialogue_craft",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Dialogue Secrets"
+    },
+    "definition": "In most dialogue exchanges, no character should speak more than three lines before the other character responds. Long speeches break the conversational rhythm and turn dialogue into monologue. Keep exchanges tight, with frequent turn-taking, to maintain energy and realism.",
+    "detection_signal": "Extended dialogue speeches of four or more lines without interruption, action beats, or response from another character.",
+    "counter_considerations": "Monologues can be dramatically powerful when used deliberately (confession, interrogation, rant). The rule targets habitual overwriting.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "dialogue_rhythm_pacing",
+      "dialogue_conflict_essential"
+    ]
+  },
+  {
+    "id": "martell_see_and_say_rule",
+    "name": "See and Say Rule (Don't Repeat What Was Shown)",
+    "taxonomy_level": "dialogue",
+    "category": "exposition",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Dialogue Secrets"
+    },
+    "definition": "If the audience saw it happen, don't have a character talk about it. If we watched someone fall in a mud puddle, don't open the next scene with them explaining what happened. Scenes should begin after the explanation, or the event should never be discussed at all.",
+    "detection_signal": "Scenes that begin with characters recounting events the audience just witnessed, or dialogue that describes actions already shown visually.",
+    "counter_considerations": "Retelling can create dramatic irony if the character's version differs from what we saw. The rule targets pure redundancy.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "exposition_as_ammunition",
+      "visual_show_dont_tell"
+    ]
+  },
+  {
+    "id": "martell_five_types_bad_exposition",
+    "name": "Five Types of Bad Exposition",
+    "taxonomy_level": "dialogue",
+    "category": "exposition",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Dialogue Secrets"
+    },
+    "definition": "Bad exposition manifests as: (1) characters telling what we just saw (redundancy), (2) plot catch-up or retroactive plotting, (3) characters stating their feelings ('Let me tell you what I'm thinking'), (4) expert-to-expert information dumps ('Look, mom, research'), (5) talking about events instead of showing them. Each type robs the scene of drama.",
+    "detection_signal": "Any of the five patterns: characters narrating past events, explaining plot mechanics, stating emotions, lecturing about technical details, or discussing conflicts rather than enacting them.",
+    "counter_considerations": "Some exposition is necessary for complex plots or unfamiliar worlds. The rule targets lazy or unconscious exposition habits.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "exposition_as_ammunition",
+      "dialogue_exposition_disguised"
+    ]
   }
 ]

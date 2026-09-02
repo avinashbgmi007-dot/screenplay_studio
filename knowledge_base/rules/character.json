@@ -9,13 +9,18 @@
       "originator": "Robert McKee",
       "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
     },
-    "definition": "A character arc is a measurable change in some value at stake in the character's life (their capacity to love, their moral courage, their self-knowledge) from the story's beginning to its end — not just a change in circumstances. A character whose external situation changes but whose internal values/behavior end where they started has not arced, regardless of plot events around them.",
+    "definition": "A character arc is a measurable change in some value at stake in the character's life (their capacity to love, their moral courage, their self-knowledge) from the story's beginning to its end \u00e2\u20ac\u201d not just a change in circumstances. A character whose external situation changes but whose internal values/behavior end where they started has not arced, regardless of plot events around them.",
     "detection_signal": "For a given character, compare their established starting traits/beliefs/behavior against their state in the final act. Identify what specific internal value changed, and which scene(s) demonstrate the change was earned (not just asserted in a line of dialogue).",
     "counter_considerations": "Flat arcs (a character who resists change and instead changes the world/other characters around them) are a deliberate, legitimate structure, especially for certain genre protagonists (e.g. many detective/procedural leads). Distinguish 'no arc because it's not needed for this role' from 'arc was intended but not delivered'.",
     "severity_default": "medium",
     "confidence_tier": "low",
-    "requires": ["knowledge_graph"],
-    "related_rules": ["true_character_vs_characterization", "opening_closing_bookend"]
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "true_character_vs_characterization",
+      "opening_closing_bookend"
+    ]
   },
   {
     "id": "true_character_vs_characterization",
@@ -29,11 +34,15 @@
     },
     "definition": "McKee distinguishes 'characterization' (surface traits: appearance, mannerisms, job, style of speech) from 'true character' (what a person actually values and will do, revealed specifically through choices made under pressure). A character's true character should be consistent; their choices under pressure should follow from established values, even when those choices surprise the audience.",
     "detection_signal": "Identify moments where a character makes a significant choice under pressure (a dilemma, a sacrifice, a betrayal). Check whether that choice is consistent with what's been established about the character's values elsewhere, or represents an unexplained swing.",
-    "counter_considerations": "A choice that seems to contradict established character can be a legitimate, powerful moment IF the story has laid groundwork for a hidden value or a breaking point — the distinction is whether the deviation is earned by prior setup or arrives without support.",
+    "counter_considerations": "A choice that seems to contradict established character can be a legitimate, powerful moment IF the story has laid groundwork for a hidden value or a breaking point \u00e2\u20ac\u201d the distinction is whether the deviation is earned by prior setup or arrives without support.",
     "severity_default": "high",
     "confidence_tier": "low",
-    "requires": ["knowledge_graph"],
-    "related_rules": ["character_arc_change"]
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_arc_change"
+    ]
   },
   {
     "id": "want_vs_need",
@@ -47,12 +56,16 @@
       "note": "The specific want/need distinction is broadly taught across multiple character-theory schools (McKee's conscious/unconscious desire, and John Truby's want/need distinction in The Anatomy of Story, 2007) rather than a single originating source."
     },
     "definition": "Protagonists are often strongest when they pursue a conscious, statable Want (the plot-level goal driving the story's action) that is different from, and sometimes in tension with, an unconscious Need (the deeper psychological or moral truth the character must learn). The most satisfying arcs resolve the Need even when the Want is not achieved, or complicate the achievement of the Want by forcing a confrontation with the Need.",
-    "detection_signal": "Identify the protagonist's stated/plot-level goal (Want) and check whether the story also establishes a distinct psychological/emotional gap (Need). Flag cases where only a Want is present with no discernible Need — this often correlates with a plot-mechanical but emotionally flat character arc.",
-    "counter_considerations": "Not every protagonist requires this duality — some genre structures (procedurals, some ensemble pieces) intentionally keep protagonists want-driven without a deep internal arc. Flag as a discussion point, not a universal requirement.",
+    "detection_signal": "Identify the protagonist's stated/plot-level goal (Want) and check whether the story also establishes a distinct psychological/emotional gap (Need). Flag cases where only a Want is present with no discernible Need \u00e2\u20ac\u201d this often correlates with a plot-mechanical but emotionally flat character arc.",
+    "counter_considerations": "Not every protagonist requires this duality \u00e2\u20ac\u201d some genre structures (procedurals, some ensemble pieces) intentionally keep protagonists want-driven without a deep internal arc. Flag as a discussion point, not a universal requirement.",
     "severity_default": "medium",
     "confidence_tier": "low",
-    "requires": ["scene_summaries"],
-    "related_rules": ["character_arc_change"]
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "character_arc_change"
+    ]
   },
   {
     "id": "cast_polarization",
@@ -64,13 +77,17 @@
       "originator": "Robert McKee",
       "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
     },
-    "definition": "McKee's first principle of cast design: characters should hold contrasting or contradictory attitudes toward the same events/values. If two characters consistently share the same attitude and react identically to events, the cast has redundancy — one of them isn't earning their place, or the two should be merged.",
+    "definition": "McKee's first principle of cast design: characters should hold contrasting or contradictory attitudes toward the same events/values. If two characters consistently share the same attitude and react identically to events, the cast has redundancy \u00e2\u20ac\u201d one of them isn't earning their place, or the two should be merged.",
     "detection_signal": "For each pair of characters with significant scene overlap, compare their reactions/attitudes toward shared story events. Flag pairs whose function and perspective appear interchangeable throughout.",
-    "counter_considerations": "Minor/background characters aren't held to this standard — this applies most to characters with meaningful scene presence and narrative function, not incidental figures.",
+    "counter_considerations": "Minor/background characters aren't held to this standard \u00e2\u20ac\u201d this applies most to characters with meaningful scene presence and narrative function, not incidental figures.",
     "severity_default": "low",
     "confidence_tier": "low",
-    "requires": ["knowledge_graph"],
-    "related_rules": ["character_necessity"]
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_necessity"
+    ]
   },
   {
     "id": "character_necessity",
@@ -85,10 +102,287 @@
     },
     "definition": "Every named, recurring character should serve a distinct function: advancing plot, revealing another character (often the protagonist) through contrast or relationship, or carrying a piece of the theme. A character who does none of these across their scenes is a candidate for removal or merging with another character.",
     "detection_signal": "For each named character, using the knowledge graph's scene-presence index: summarize what plot/character/theme function they serve across all their scenes. Flag characters whose presence seems removable without loss to the story.",
-    "counter_considerations": "Comic relief, atmosphere, and world-building characters can be legitimate even with a thin plot function — weigh genre and tone before flagging.",
+    "counter_considerations": "Comic relief, atmosphere, and world-building characters can be legitimate even with a thin plot function \u00e2\u20ac\u201d weigh genre and tone before flagging.",
     "severity_default": "low",
     "confidence_tier": "low",
-    "requires": ["knowledge_graph"],
-    "related_rules": ["cast_polarization"]
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "cast_polarization"
+    ]
+  },
+  {
+    "id": "stc_save_the_cat_scene",
+    "name": "Save the Cat Scene",
+    "taxonomy_level": "character",
+    "category": "hero_introduction",
+    "source": {
+      "type": "framework",
+      "originator": "Blake Snyder",
+      "work": "Save the Cat"
+    },
+    "definition": "The hero must do something in their introduction scene that makes the audience like them \u00e2\u20ac\u201d a small act of kindness, competence, or warmth. This moment earns audience investment and makes viewers willing to follow the character through the entire story.",
+    "detection_signal": "Early scene where the protagonist demonstrates a likeable quality through action (helping someone, showing humor, displaying vulnerability).",
+    "counter_considerations": "Anti-hero protagonists or morally ambiguous leads may deliberately subvert this. Some genres (horror, thriller) may delay or invert the likeability moment.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "hero_must_be_active"
+    ]
+  },
+  {
+    "id": "egri_character_contradiction",
+    "name": "Character Contradiction as Source of Drama",
+    "taxonomy_level": "character",
+    "category": "character_depth",
+    "source": {
+      "type": "framework",
+      "originator": "Lajos Egri",
+      "work": "The Art of Dramatic Writing"
+    },
+    "definition": "Real people are contradictory \u00e2\u20ac\u201d they hold opposing beliefs, act against their own interests, and contain internal tensions. A character who is entirely consistent is a type, not a person. The most compelling characters embody contradictions that create internal and external conflict.",
+    "detection_signal": "Characters who are perfectly consistent in their values, behavior, and goals with no internal tension or self-contradiction.",
+    "counter_considerations": "Some character types (archetypes, villains) may be deliberately one-dimensional for functional reasons.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_arc_change",
+      "true_character_vs_characterization"
+    ]
+  },
+  {
+    "id": "seger_goal_spine",
+    "name": "Character Goal as Story Spine",
+    "taxonomy_level": "character",
+    "category": "motivation",
+    "source": {
+      "type": "framework",
+      "originator": "Linda Seger",
+      "work": "Making a Good Script Great"
+    },
+    "definition": "Every scene must connect to the protagonist's primary goal. The goal is not just a plot device but the character's driving obsession \u00e2\u20ac\u201d it reveals who they are and what they want most deeply. Scenes that don't advance, complicate, or threaten the goal weaken the script's momentum.",
+    "detection_signal": "Scenes where the protagonist's goal is unclear, where scenes feel disconnected from any character objective, or where the goal changes without clear motivation.",
+    "counter_considerations": "Some scripts deliberately use ambiguous or shifting goals for artistic effect. The rule targets commercial narrative structure.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "goal_conflict_disaster"
+    ]
+  },
+  {
+    "id": "seger_transformation_earned",
+    "name": "Character Transformation Must Be Earned",
+    "taxonomy_level": "character",
+    "category": "character_arc",
+    "source": {
+      "type": "framework",
+      "originator": "Linda Seger",
+      "work": "Making a Good Script Great"
+    },
+    "definition": "A character's change at the story's climax must be the result of everything they've experienced \u00e2\u20ac\u201d not a sudden epiphany but a gradual, pressured evolution. The audience must feel that this transformation was inevitable given the character's journey, even if it surprises them.",
+    "detection_signal": "Character undergoes a sudden transformation in the climax without sufficient setup, or changes in ways that contradict their established nature without adequate motivation.",
+    "counter_considerations": "Some stories deliberately resist character change. The rule applies to transformation arcs that claim to exist.",
+    "severity_default": "high",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "character_arc_change",
+      "drama_transformation_earned"
+    ]
+  },
+  {
+    "id": "martell_supporting_character_function",
+    "name": "Supporting Characters Must Serve the Protagonist",
+    "taxonomy_level": "character",
+    "category": "supporting_cast",
+    "source": {
+      "type": "framework",
+      "originator": "William Martell",
+      "work": "Supporting Character Secrets"
+    },
+    "definition": "Every supporting character exists to challenge, reveal, or transform the protagonist. They are mirrors, foils, mentors, or obstacles \u00e2\u20ac\u201d not independent agents with their own complete stories. If a supporting character's arc could be removed without affecting the protagonist, they don't belong in the script.",
+    "detection_signal": "Supporting characters with their own fully developed arcs that don't connect to the protagonist's journey, or characters who appear in scenes without affecting the protagonist's decisions or development.",
+    "counter_considerations": "Ensemble casts may distribute the protagonist's function across multiple characters. The rule targets commercial narrative structure.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_necessity",
+      "cast_polarization"
+    ]
+  },
+  {
+    "id": "hauge_inner_conflict_drives_outer",
+    "name": "Inner Conflict Must Drive Outer Conflict",
+    "taxonomy_level": "character",
+    "category": "character_arc",
+    "source": {
+      "type": "framework",
+      "originator": "Michael Hauge",
+      "work": "Michael Hauge's Story Mastery"
+    },
+    "definition": "The protagonist's inner fear, wound, or false belief is the engine of the outer plot. The external conflict exists to force the character to confront what they've been avoiding internally. Without inner conflict, the outer plot feels mechanical. Without outer conflict, the inner journey has no dramatic expression.",
+    "detection_signal": "Scripts where the protagonist's external actions seem disconnected from any internal need, where the inner arc is told but not shown, or where the character's fear/wound has no relevance to the plot.",
+    "counter_considerations": "Some action-driven stories minimize inner conflict deliberately. The rule targets commercially structured narratives with claimed character arcs.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph",
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "want_vs_need",
+      "drama_internal_conflict_primary"
+    ]
+  },
+  {
+    "id": "hauge_identity_transformation",
+    "name": "Six-Stage Character Transformation",
+    "taxonomy_level": "character",
+    "category": "character_arc",
+    "source": {
+      "type": "framework",
+      "originator": "Michael Hauge",
+      "work": "Michael Hauge's Story Mastery"
+    },
+    "definition": "Character transformation follows six stages: (1) Living within a zone of comfort, (2) Wanting something, (3) Entering an unfamiliar situation, (4) Adapting to it, (5) Getting what they wanted, (6) Paying a heavy price, (7) Returning to their familiar situation, (8) Having changed. The character begins and ends in the same world but is fundamentally different.",
+    "detection_signal": "Characters who change without paying a price, who return to their old life unchanged, or whose transformation arc is incomplete.",
+    "counter_considerations": "Some stories deliberately resist the full transformation cycle. The rule targets incomplete arcs in stories that claim transformation.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "character_arc_change",
+      "drama_transformation_earned"
+    ]
+  },
+  {
+    "id": "weiland_lie_believed",
+    "name": "Every Character Arc Is Driven by a Lie the Character Believes",
+    "taxonomy_level": "character",
+    "category": "arc_foundation",
+    "source": {
+      "type": "framework",
+      "originator": "K.M. Weiland",
+      "work": "Creating Character Arcs"
+    },
+    "definition": "A character's arc begins with a deeply held misconception about themselves, the world, or both\u00e2\u20ac\u201da Lie that creates an internal deficiency. The story's arc is the process of the character either overcoming this Lie (positive arc) or succumbing to it further (negative arc).",
+    "detection_signal": "Protagonists who appear to have no internal misconception, or whose external problems are not connected to an inner belief. Characters who change without a clear internal cause.",
+    "counter_considerations": "Flat-arc characters already believe the Truth and do not need to overcome a Lie\u00e2\u20ac\u201dthey challenge the world's Lies instead. Do not flag flat-arc protagonists.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "want_vs_need",
+      "character_arc_change"
+    ]
+  },
+  {
+    "id": "weiland_want_vs_need",
+    "name": "The Conflict Between What the Character Wants and What They Need",
+    "taxonomy_level": "character",
+    "category": "motivation",
+    "source": {
+      "type": "framework",
+      "originator": "K.M. Weiland",
+      "work": "Creating Character Arcs"
+    },
+    "definition": "The protagonist pursues an external goal (the Thing They Want) that is actually a symptom of the Lie. What they truly need is the Truth\u00e2\u20ac\u201dan internal realization that will heal the wound. The tension between Want and Need drives both character and plot.",
+    "detection_signal": "A protagonist whose external goal has no connection to an internal need. A character who achieves their Want without any internal cost or transformation.",
+    "counter_considerations": "In some stories, achieving the Want requires first embracing the Need. The two are not always opposed\u00e2\u20ac\u201dthey may be sequential. Do not flag stories where Want and Need converge at the climax.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "want_vs_need"
+    ]
+  },
+  {
+    "id": "weiland_ghost_wound",
+    "name": "The Ghost Is the Origin of the Lie",
+    "taxonomy_level": "character",
+    "category": "backstory",
+    "source": {
+      "type": "framework",
+      "originator": "K.M. Weiland",
+      "work": "Creating Character Arcs"
+    },
+    "definition": "The Ghost (or wound) is a past event that caused the character to embrace the Lie. It may be a trauma, an ingrained belief from childhood, something the character did, or something done to them. The bigger the Ghost, the bigger the Lie, and the bigger the arc.",
+    "detection_signal": "Protagonists whose Lie has no apparent origin. Characters whose emotional reactions seem disconnected from any past experience. No clues about why the character believes what they believe.",
+    "counter_considerations": "The Ghost may be revealed gradually or remain partially hidden. Some stories intentionally keep the Ghost mysterious. Do not flag if the Ghost is being seeded across the narrative.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_arc_change"
+    ]
+  },
+  {
+    "id": "weiland_five_arc_types",
+    "name": "Five Character Arc Types: Positive, Flat, Disillusionment, Fall, Corruption",
+    "taxonomy_level": "character",
+    "category": "arc_taxonomy",
+    "source": {
+      "type": "framework",
+      "originator": "K.M. Weiland",
+      "work": "Creating Character Arcs"
+    },
+    "definition": "Character arcs fall into five types. Positive Change: character overcomes the Lie and finds Truth. Flat: character already knows the Truth and changes the world. Disillusionment: character overcomes a Lie but arrives at a darker Truth. Fall: character never embraces the Truth and sinks deeper into a Lie. Corruption: character falls away from an initial Truth into a Lie.",
+    "detection_signal": "A character whose arc does not match any of these five patterns, or whose arc shifts type mid-story without thematic justification.",
+    "counter_considerations": "Some stories intentionally subvert arc expectations. Do not flag stories with a clear internal logic that produces a non-standard arc.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_arc_change"
+    ]
+  },
+  {
+    "id": "alderson_character_emotional_development",
+    "name": "Track the Character's Emotional Arc Across the Entire Story",
+    "taxonomy_level": "character",
+    "category": "emotional_arc",
+    "source": {
+      "type": "framework",
+      "originator": "Martha Alderson",
+      "work": "Writing Blockbuster Plots"
+    },
+    "definition": "The protagonist's emotional state must change over the course of the story in a deliberate, paced way. The emotional arc should be plotted separately from the action arc, ensuring that the character's inner life evolves alongside the external events.",
+    "detection_signal": "Protagonists whose emotional state at the climax is the same as at the beginning. Emotional shifts that happen off-screen or between scenes. Characters who react the same way to escalating pressures.",
+    "counter_considerations": "Flat-arc characters intentionally do not change emotionally\u00e2\u20ac\u201dthey change the world around them. Do not flag protagonists whose arc is deliberately static.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "character_arc_change",
+      "drama_transformation_earned"
+    ]
   }
 ]

@@ -1,0 +1,69 @@
+[
+  {
+    "id": "stc_logline_four_requirements",
+    "name": "Logline Must Meet Four Requirements",
+    "taxonomy_level": "pitch",
+    "category": "logline",
+    "source": {
+      "type": "framework",
+      "originator": "Blake Snyder",
+      "work": "Save the Cat"
+    },
+    "definition": "A strong logline must contain: (1) a hero with a likeable quality, (2) a goal, (3) an opposing force or obstacle, and (4) a sense of what is at stake. All four elements must be present to create a compelling one-sentence pitch.",
+    "detection_signal": "Logline that omits the protagonist's likeability, stakes, or the antagonist/opposition force.",
+    "counter_considerations": "Some loglines may imply stakes or opposition through genre. Not every logline needs all four to be explicit.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "scene_necessity_test"
+    ]
+  },
+  {
+    "id": "beaty_logline_needs_act_two",
+    "name": "Logline Must Indicate Act Two (The Journey)",
+    "taxonomy_level": "pitch",
+    "category": "logline",
+    "source": {
+      "type": "framework",
+      "originator": "Naomi Beaty",
+      "work": "Logline Shortcuts"
+    },
+    "definition": "A logline that only describes the setup (who the character is and what happens to them) fails. It must also convey what the character does \u00e2\u20ac\u201d the method or journey of pursuing the goal. Without the Act Two element, the logline describes a premise, not a story.",
+    "detection_signal": "Loglines that end at the inciting incident, describe only the character's situation without their active pursuit, or omit the method of achieving the goal.",
+    "counter_considerations": "Some loglines imply the journey through genre conventions. The rule targets the common pitfall of stopping at the setup.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "stc_logline_four_requirements"
+    ]
+  },
+  {
+    "id": "beaty_logline_specific_detail",
+    "name": "Logline Needs Specific, Not Generic, Detail",
+    "taxonomy_level": "pitch",
+    "category": "logline",
+    "source": {
+      "type": "framework",
+      "originator": "Naomi Beaty",
+      "work": "Logline Shortcuts"
+    },
+    "definition": "Vague loglines ('a man must overcome his past') tell us nothing. Specific details ('a retired boxer must fight one last match to save his gym from demolition') create vivid mental images and convey genre, tone, and stakes simultaneously. Specificity is the engine of a compelling logline.",
+    "detection_signal": "Loglines that use generic descriptors ('a man,' 'a woman,' 'a challenge'), that could describe any number of films, or that lack concrete nouns and active verbs.",
+    "counter_considerations": "Some loglines use controlled vagueness to preserve surprise. The rule targets laziness, not strategic ambiguity.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "stc_logline_four_requirements",
+      "mystery_logline_clarity"
+    ]
+  }
+]
