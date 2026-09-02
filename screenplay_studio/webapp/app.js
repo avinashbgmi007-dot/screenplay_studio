@@ -4275,10 +4275,12 @@ function renderReportPanel() {
 // ---- compare (side-by-side drafts) ----
 
 let compareFrom = "original";
+let comparePrevRoom = "cowrite";
 
 async function openCompareView() {
   if (state.view === "compare") return;
   exitSpotlight();
+  comparePrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
   state.view = "compare";
   hideAllViews();
   $("#compare-view").style.display = "flex";
@@ -5986,6 +5988,8 @@ function init() {
   // beat board
   $("#bb-save-btn").addEventListener("click", saveBeatboard);
   $("#bb-restore-btn").addEventListener("click", restoreBeatboard);
+  $("#bb-back-btn").addEventListener("click", closeBeatboardView);
+  $("#compare-back-btn").addEventListener("click", closeCompareView);
   $("#bb-print-btn").addEventListener("click", () => {
     document.body.classList.add("print-cards");
     window.print();
