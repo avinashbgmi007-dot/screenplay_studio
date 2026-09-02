@@ -252,7 +252,60 @@ body::after {
   flex-direction: column;
   padding: 18px 14px 14px;
   gap: 14px;
+  position: relative;
+  transition: width 0.25s ease;
 }
+
+.sidebar-toggle {
+  position: absolute;
+  top: 12px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  background: var(--ink-800);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  z-index: 10;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.sidebar-toggle:hover { color: var(--text); border-color: var(--accent); }
+
+#sidebar.sidebar-collapsed {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+#sidebar.sidebar-collapsed > * { display: none; }
+#sidebar.sidebar-collapsed .sidebar-toggle { display: none; }
+
+.sidebar-edge-tab {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: var(--ink-800);
+  border: 1px solid var(--line-soft);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  padding: 12px 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  writing-mode: vertical-rl;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.sidebar-edge-tab:hover { color: var(--text); background: var(--ink-700); }
+.sidebar-edge-tab.visible { display: block; }
 
 .brand { display: flex; align-items: center; gap: 10px; padding: 2px 4px 14px; border-bottom: 1px solid var(--line-soft); }
 
@@ -931,9 +984,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   flex: 1;
   min-height: 0;
   position: relative;
-  /* the drawer and the structure rail slide over the page — clip them at the
-     workspace bounds so a closed drawer never scrolls the body sideways */
-  overflow: hidden;
+  /* the drawer and the structure rail slide over the page — use overflow-x:
+     clip to prevent horizontal scroll while allowing dropdowns to overflow */
+  overflow-x: clip;
+  overflow-y: visible;
   /* the desk at night: a faint wood-grain field so the manuscript floats on
      something, not on void. Purely decorative — pointer-events: none. */
   background:
@@ -3139,11 +3193,9 @@ body.reader-mode #script-scenes { padding: 26px 0 60px; }
   .scene-page.flash { animation: none; box-shadow: 0 0 0 3px rgba(232, 162, 79, 0.6), 0 18px 44px -18px rgba(0, 0, 0, 0.6); }
 }
 
-/* resizable script pane — the divider is retired in the Manuscript Stage
-   (the script owns the row; the room is a drawer), kept in the DOM only
-   because the resize code still reads it. */
+/* resizable script pane — drag the divider to resize the script pane */
 .pane-divider {
-  display: none;
+  display: block;
   flex: 0 0 5px;
   cursor: col-resize;
   background: var(--line-soft);

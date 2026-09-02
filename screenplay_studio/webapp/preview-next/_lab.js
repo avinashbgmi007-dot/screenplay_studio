@@ -371,14 +371,17 @@
     wirePaneControls();
     wireFeedbackToggle();
     wireComposer("[data-lab-composer-input]", "[data-lab-composer-send]", "[data-lab-thread]");
+    // any [data-open-desk] affordance the world declares opens the desk
+    $$("[data-open-desk]").forEach(b => b.addEventListener("click", () => Lab.showDesk(true)));
   }
 
   function showDesk(show) {
     const d = $("[data-desk]"), ctl = $(".desk-ctl");
     if (!d) return;
-    if (d.style.display === "none" || d.style.display === "") d.style.display = show ? "grid" : "none";
-    else d.style.display = show ? "grid" : "none";
+    d.style.display = show ? "grid" : "none";
     if (ctl) ctl.style.display = show ? "flex" : "none";
+    // the IA landing yields to the desk when the desk is up
+    $$("[data-ia-landing]").forEach(el => { el.style.display = show ? "none" : ""; });
   }
   function deskVisible() {
     const d = $("[data-desk]");

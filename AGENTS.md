@@ -70,6 +70,7 @@ Key flows:
 
 - `docs/CODEBASE_MAP.md` — **read this first**: symbol-level index of every module and its public API (no full-repo scan needed)
 - `docs/ARCHITECTURE.md` — system architecture (tree, API endpoints, pipeline, known issues)
+- `docs/UI_UX_SPECIFICATION.md` — **shareable UI/UX build spec**: every screen, component, state, interaction, keyboard shortcut, API contract, and an acceptance checklist (what "built & integrated" means)
 - `docs/PROJECT_OVERVIEW.md` — product overview and design principles
 - `docs/CLI_REFERENCE.md` — every CLI command across the four packages
 - `docs/DATA_FORMATS.md` — JSON bridge schemas (parsed/kg/report/manifest/session/progress)

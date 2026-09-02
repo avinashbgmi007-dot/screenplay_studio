@@ -81,7 +81,8 @@ def walk_world(checks, page, errors, base, w):
         page.locator("[data-open-desk]").first.click()
         page.wait_for_timeout(400)
     checks.check(f"{tag}: desk reachable + both-open",
-                 page.locator('[data-desk][data-desk-state="both-open"]').count() == 1)
+                 desk.is_visible()
+                 and page.locator('[data-desk][data-desk-state="both-open"]').count() == 1)
     checks.check(f"{tag}: real script pages in center",
                  page.locator("[data-scene]").count() >= 3)
 

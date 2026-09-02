@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b111">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b113">
 </head>
 <body data-room="cowrite">
 
@@ -22,6 +22,7 @@
 
   <!-- Left: the shelf -->
   <aside id="sidebar">
+    <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="Collapse the sidebar">«</button>
     <div class="brand">
       <div class="brand-mark">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -71,6 +72,8 @@
       <button id="settings-btn" class="sidebar-footer-btn" title="Study settings">⚙ Settings</button>
     </div>
   </aside>
+
+  <button id="sidebar-edge-tab" class="sidebar-edge-tab" type="button" title="Open the sidebar">☰ Shelf</button>
 
   <!-- Center -->
   <main id="main">

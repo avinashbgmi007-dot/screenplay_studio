@@ -12,6 +12,7 @@ screenplay-studio_1/
 │   ├── ARCHITECTURE.md         # this document — system architecture
 │   ├── PROJECT_OVERVIEW.md     # high-level product overview
 │   ├── CODEBASE_MAP.md         # symbol-level module index (read first)
+│   ├── UI_UX_SPECIFICATION.md  # complete UI/UX spec — screens, components, states, interactions, API contracts, acceptance checklist (shareable)
 │   ├── CLI_REFERENCE.md        # all CLI commands for the four packages
 │   ├── DATA_FORMATS.md         # JSON bridge schemas (parsed/kg/report/manifest/session)
 │   ├── DEVELOPMENT.md          # setup, conventions, how to extend
@@ -93,74 +94,111 @@ screenplay-studio_1/
 
 ## 2. Frontend Inventory
 
+> **Complete UI/UX specification:** `docs/UI_UX_SPECIFICATION.md` is the authoritative,
+> shareable spec for rebuilding the frontend — every screen, component, state, interaction,
+> keyboard shortcut, and API contract, with an acceptance checklist. This section is the
+> architecture-level summary.
+
 ### Layout & Structure
 - **Single-page app** — `screenplay_studio/webapp/index.html` serves as the SPA shell.
-- **No build step** — vanilla JS, no framework, no bundler.
-- **Dark ink-blue palette** with serif fonts throughout.
-- **Two rooms, one script.** The workspace is a shared script pane (always visible) plus a right-hand panel switched by the top-bar room toggle: **Co-write** (the writer's desk — one consistent partner "Sameer", warm brass accent) and **Feedback** (the consultant's desk — Dr. Sushruta's Report + Fix Queue tabs, cool slate accent). `body[data-room]` drives the room theming. Beat Board and Compare are full-screen tools opened from the script-pane toolbar icons.
-- **Three-zone shell.** Collapsible left structural rail (`#struct-rail`) holds the scene outline (click → jump + flash), the **character track layer** (`#rail-characters` — per-character presence strip, dials, trait chips, interactions, reads; mains expandable, rest behind "+ N more"), the Stash, and margin notes. The script pane never shrinks below 50%. A thin status strip shows model · connection · sprint timer · dawn toggle.
-- **Phase 1-2 mood features.** Focus mode (`✳ Focus`, persisted) dims chrome + non-current scenes and typewriter-scrolls with the page; a 25-min **sprint timer** lives in the status strip (click start/pause, double-click reset); the composer placeholder becomes "Reply to the highlighted passage…" while text is selected; ambient motion (breathing lamp glow, room/paper/welcome entrance animations) is `prefers-reduced-motion`-safe.
-- **The idea room (scriptless development).** An idea is a small sibling of a project under `studio_projects/ideas/<id>/` (`screenplay_studio/ideas.py` — a premise card in `idea.json` + a SessionStore `sessions/` dir). The welcome screen's "Talk to Sam about an idea" door creates one; the shelf has a separate **Ideas** row. Inside, the premise card replaces the script pane (editable: working title, logline, premise, open questions), and the two rooms become two *lenses on one conversation*: Co-write = Sam (writing_partner/peer, explore) and Feedback = the **premise doctor** (premise_doctor/concept_validation — a development-exec persona that stress-tests the concept). The room toggle swaps the lens via `/api/ideas/<id>/chat/sessions/<sid>/settings`. The engine runs scriptless (empty Script/Report contexts) with the premise card injected every turn (`build_system_prompt(..., premise=...)` → idea framing + `IDEA_GROUNDING_INSTRUCTION` — never pretend pages exist). The same global `writer_profile.json` memory powers both desks. **Graduation:** upload the first pages via `/api/ideas/<id>/graduate` — a real project is created, the premise card is copied to `premise.json`, and the idea's session files are carried into the project's sessions dir (manifest re-pinned), so the thread, Sam, and the memory continue on the script desk; the carried card is surfaced via the script toolbar's 📌 Premise toggle (`/api/projects/<name>/premise` saves edits).
+- **No build step** — vanilla JS, no framework, no bundler, zero external requests (fonts
+  are self-hosted `.woff2`; the only HTTP the page makes is to the Flask API).
+- **"A warm room at night."** Deep ink-blue void palette (`:root` CSS variables), the
+  manuscript as bright cream paper under a lamp. The **room lighting is the signature**:
+  Co-write is warm amber (`--lamp`), Feedback is cool slate (`--consult`), swapped by
+  `body[data-room]`. Dawn (light) theme via `body.dawn`.
+- **Two rooms, one script.** The workspace is a shared script pane (always visible) plus a
+  right-hand **room drawer** summoned from the edge gutter tabs: **Co-write** (the writer's
+  desk — Sameer) and **Feedback** (the consultant's desk — Dr. Sushruta's Report + Fix Queue
+  tabs). `body[data-room]` drives the room theming. Beat Board, Compare, and Revision are
+  full-screen tools opened from the script-pane toolbar (keys `b`/`d`/`v`).
+- **Three-zone shell.** Collapsible left structural rail (`#struct-rail`) holds the scene
+  outline (click → jump + flash), the **character track layer** (`#rail-characters` —
+  presence strip, dials, trait chips, interactions, reads), the Stash, and margin notes
+  (newest-first, pinned to scenes or lines). The script pane never shrinks below 50%. A thin
+  status strip shows project · model · connection · loop metrics · sprint timer · desk
+  elapsed · dawn toggle.
+- **Mood & reading modes.** Focus mode (`✳`, typewriter scroll, dims everything but the live
+  line), Reader mode (clean draft, print-friendly), River read (`≋`, dark-glass continuous
+  flow with a current-dot nav), Spotlight (`z`, total chrome removal). All persisted prefs.
+- **The idea room (scriptless development).** An idea is a small sibling of a project under
+  `studio_projects/ideas/<id>/` (`screenplay_studio/ideas.py` — a free-form page in
+  `idea.json` + a SessionStore `sessions/` dir). The welcome screen's "Talk to Sameer about
+  an idea" door creates one; the shelf has a separate **Ideas** row. Inside, a **blank
+  autosaving canvas** on the void (Spark Wall starfield ambience); Sameer is OPTIONAL via a
+  floating pill (one idea = one session, lazy). The room toggle swaps the *lens* on one
+  conversation: Co-write = Sameer (explore), Feedback = the **premise doctor**
+  (`premise_doctor`/`concept_validation` — stress-tests the concept). **Graduation:** upload
+  the first pages via `/api/ideas/<id>/graduate` — a real project is created, the premise
+  card + idea conversation carry over so the same thread, Sam, and memory continue on the
+  script desk. Strict isolation: the idea engine gets no past-scripts digest.
+- **Selection interactions.** Select text in the manuscript/idea page → floating
+  "Ask Sameer about this" (prefills a quote card), "Stash this" (saves to the Stash), and
+  "Note this line" (inline margin note pinned to that line). Double-click any line to edit it
+  in place (rides the edits/apply path — undoable, change-starred).
 
-### Client-Side JavaScript (`screenplay_studio/webapp/app.js`)
-- ~2,400 lines of vanilla JS handling all client logic.
-- **Rooms** — `setRoom("cowrite"|"feedback")` swaps the panel + `body[data-room]` identity; `openCowriteRoom`/`openFeedbackRoom` are the entry points; legacy saved views (`chat`/`script`) map to the Co-write room on restore.
-- **Server-driven persona list** — `app.js` reads `personas`/`modes` from `GET /api/config`; personas are now *conversational lenses* (no dropdowns) — the writer asks "what would a producer say?" and Sam adopts the lens in-voice. A "back to Sam" reset button restores the `writing_partner`/`peer` default.
-- **Feedback panels** — `loadFeedbackPanels()` renders the existing `/report` and `/fixqueue` payloads into Report/Fix Queue tabs with an empty state; each finding card reuses the existing `renderFixQueuePanel` (severity badge, scene, status) and its "Discuss" button is the prefill-only bridge to Co-write.
-- AJAX calls to Flask API endpoints for: project management, analysis, revision loop, drafts/diff, beat board, notes, chat (start/send/fork/switch/settings).
-- Branch-based session management UI (fork, switch, delete conversations).
-- Report rendering with verification badges.
+### Client-Side JavaScript (`screenplay_studio/webapp/app.js` + `core.js`)
+- `app.js` is ~5,900 lines of vanilla JS handling all client logic; `core.js` holds the
+  DOM-free pure helpers (`fuzzyScore`, `formatMessageContent`, `truncate`, `formatElapsed`,
+  `fmtDuration`, `shortModelId`) — unit-tested in `node --test tests/js/`.
+- **Rooms** — `setRoom("cowrite"|"feedback")` swaps panel + `body[data-room]` identity;
+  `openRoomDrawer`/`closeRoomDrawer` manage the summoned partner drawer; legacy saved views
+  (`chat`/`script`) map to the Co-write room on restore.
+- **Server-driven persona list** — `app.js` reads `personas`/`modes` from `GET /api/config`
+  (fallback constants kept in sync manually); personas are *conversational lenses* (no
+  dropdowns) — a "back to Sameer" reset button restores the default.
+- **Streaming chat (SSE)** — `streamChatTurn()` renders raw tokens into the pending bubble
+  as they arrive; the final SSE event carries the cleaned, stored reply + history. Falls
+  back to the blocking endpoint on 404. A 408 watchdog ("still working — keep waiting?")
+  avoids silent hangs on slow local models.
+- **Report + fix queue rendering** — `loadFeedbackPanels()` renders `/report` and
+  `/fixqueue` into Report/Fix Queue tabs with an empty state; the same `renderFixQueuePanel`
+  is reused in the manuscript's Craft shelf, the Feedback tab, and the Revision view.
+- **Command palette** — `Ctrl/⌘ K`, fuzzy-ranked (commands · scenes · help), `?` shows all
+  shortcuts.
+- **Dawn meter** — a night→dawn fill in the fix-queue head driven by
+  addressed/(open+addressed); the room literally warms as findings resolve.
+- **Inline editing, margin notes, stash, selection floats, translate globe, dictation
+  (mic chips), sprint timer, session/prefs restore, error banner** — see
+  `docs/UI_UX_SPECIFICATION.md` §7 for the full interaction catalog.
 
 ### CSS (`screenplay_studio/webapp/style.css`)
-- ~2,400 lines of custom CSS.
-- Dark ink-blue color scheme; room accents via `--room-accent` CSS variables (brass for Co-write, slate for Feedback).
-- Serif typography for readability.
-- Responsive layout for the shared script pane + room panels.
+- ~4,300 lines of custom CSS.
+- Full design-token system via CSS variables: void ink ramp, paper, lamp/consult room
+  accents, type scale (`--font-typewriter/script/serif/mono/hand`), radius, glow.
+- Room theming via `body[data-room]`; Dawn theme via `body.dawn`; river-read dark-glass
+  block; focus/spotlight/reader mode overrides; print styles for the draft and beat cards.
+- `prefers-reduced-motion` kill-switch, `:focus-visible` rings, amber `::selection`.
 
 ### HTML (`screenplay_studio/webapp/index.html`)
-- ~300 lines. Minimal SPA shell that loads `app.js` and `style.css`.
+- ~530 lines. SPA shell: sidebar (brand · new-page · Ideas/shelf/library flyouts · Dawn/
+  Settings footer), welcome scene + dashboard, project bar, workspace (structural rail ·
+  desk · gutter · room drawer), status strip, Beat Board / Compare / Revision full-screen
+  views, premise pane + idea canvas, five modals (Settings, Rewrite, Palette, Fork, Sam's
+  notes). References cache-busted `style.css`/`core.js`/`app.js` (`?v=<hash>`).
 
 ---
 
 ## 3. Backend Control Engine
 
 ### Server Endpoints (Flask, port 8500)
-`webapp_server.py` exposes these JSON API endpoints (projects keyed by `<name>`):
+`webapp_server.py` exposes the JSON API (projects keyed by `<name>`). **The authoritative
+reference — including every request/response shape, error code, and the SSE stream
+contract — is `docs/UI_UX_SPECIFICATION.md` §9.** The table below is the route map:
 
-| Endpoint | Methods | Purpose |
-|----------|---------|---------|
-| `/api/config` | GET, POST | Server configuration (llama-server URL, model, timeout) |
-| `/api/test-connection` | POST | Ping the llama-server |
-| `/api/sample` | POST | Create project from bundled sample |
-| `/api/projects` | GET, POST | List / create projects |
-| `/api/projects/<name>` | GET, DELETE | Project details / delete |
-| `/api/projects/<name>/analyze` | POST | Run analysis pipeline |
-| `/api/projects/<name>/progress` | GET | Live per-stage progress |
-| `/api/projects/<name>/report` | GET | Get analysis report |
-| `/api/projects/<name>/report/export` | GET | Export report file |
-| `/api/projects/<name>/fixqueue` | GET | Prioritized fix queue |
-| `/api/projects/<name>/script` | GET | Source screenplay |
-| `/api/projects/<name>/rewrite` | POST | Generate rewrite suggestions |
-| `/api/projects/<name>/edits` | GET | List pending edits |
-| `/api/projects/<name>/edits/{apply,undo,redo,reset}` | POST | Revision-loop apply/undo/redo/reset |
-| `/api/projects/<name>/export` | GET | Export working copy (fountain/fdx/txt) |
-| `/api/projects/<name>/beatboard` | GET, PUT | Read / update scene order |
-| `/api/projects/<name>/beatboard/reset` | POST | Reset beat-board order |
-| `/api/projects/<name>/beatboard/export` | GET | Export reordered draft |
-| `/api/projects/<name>/drafts` | GET, POST | Draft snapshots |
-| `/api/projects/<name>/drafts/activate` | POST | Activate a draft |
-| `/api/projects/<name>/diff` | GET | Diff active vs. draft |
-| `/api/projects/<name>/compare` | GET | Compare two drafts |
-| `/api/projects/<name>/notes` | GET, POST, PATCH, DELETE | Per-project notes |
-| `/api/projects/<name>/chat/start` | POST | Start chat session |
-| `/api/projects/<name>/chat/sessions/<sid>` | GET | Session details |
-| `/api/projects/<name>/chat/sessions/<sid>/messages` | POST | Send message to co-writer |
-| `/api/projects/<name>/chat/sessions/<sid>/fork` | POST | Fork conversation branch |
-| `/api/projects/<name>/chat/sessions/<sid>/switch` | POST | Switch to different branch |
-| `/api/projects/<name>/chat/sessions/<sid>/settings` | POST | Update chat settings |
-| `/api/writer-memory` | GET | Writer relationship memory (profile + card) |
-| `/api/writer-memory/observations/<id>/suppress` | POST | Forget an inferred observation |
-| `/api/writer-memory/refresh` | POST | Run the LLM refresh now (project + session_id in body) |
+| Area | Endpoint | Methods |
+|------|----------|---------|
+| Config/conn | `/api/config`, `/api/test-connection`, `/api/health`, `/api/real-server-check` | GET/POST |
+| Projects | `/api/projects`, `/api/projects/<name>`, `/api/sample`, `/api/projects/<name>/backup`, `/api/projects/<name>/reparse` | GET/POST/DELETE |
+| Analysis | `/api/projects/<name>/analyze`, `/analyze/retry-failed`, `/progress`, `/report`, `/report/export`, `/fixqueue`, `/findings/<index>/dismiss`, `/findings/<index>/undismiss`, `/characters` | GET/POST |
+| Manuscript | `/script`, `/rewrite`, `/edits`, `/edits/apply`, `/edits/undo`, `/edits/redo`, `/edits/reset`, `/export`, `/metrics` | GET/POST |
+| Notes/Stash | `/notes`, `/notes/<id>`, `/stash`, `/stash/<id>`, `/premise` | GET/POST/PATCH/DELETE |
+| Beat board/Drafts | `/beatboard`, `/beatboard/reset`, `/beatboard/export`, `/drafts`, `/drafts/activate`, `/diff`, `/compare` | GET/POST/PUT |
+| Chat (project) | `/chat/start`, `/chat/sessions/<sid>`, `/chat/sessions/<sid>/messages`, `/messages/stream` (SSE), `/fork`, `/switch`, `/settings`, `/translate` | GET/POST/DELETE |
+| Ideas | `/ideas`, `/ideas/<id>`, `/ideas/<id>/content`, `/rename`, `/card`, `/graduate`, `/chat/start`, `/chat/sessions/<sid>` (+ messages/stream/settings/translate) | GET/POST/DELETE |
+| Writer memory | `/writer-memory`, `/writer-memory/observations/<id>/suppress`, `/writer-memory/refresh`, `/writer-library` | GET/POST |
+| Dictation | `/stt`, `/stt/languages` | GET/POST |
+| Design Lab | `/preview/projects`, `/preview/data/<name>`, `/preview/chat/<name>` | GET/POST/DELETE |
 
 ### Data Models
 
