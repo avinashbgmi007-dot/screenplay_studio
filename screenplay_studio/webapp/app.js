@@ -4310,8 +4310,25 @@ async function loadCompare() {
   sel.value = compareFrom;
   $("#compare-to-label").textContent = active;
 
-  const data = await api(`${base}/compare?from=${encodeURIComponent(compareFrom)}&to=active`);
-  renderCompare(data);
+  // nothing to compare against — one draft and no snapshots of the original.
+  // Say so in the pane instead of a bare 400 toast over an empty screen.
+  if (!(drafts.drafts || []).length && compareFrom === "original" && active === "original") {
+    const pane = $("#compare-panes");
+    pane.innerHTML = "";
+    pane.appendChild(el("p", "script-empty-hint",
+      "Nothing to compare yet — this project has a single draft. Upload a new draft (Draft bar → \u201c+ Upload new draft\u201d) and the side-by-side diff will appear here."));
+    return;
+  }
+
+  try {
+    const data = await api(`${base}/compare?from=${encodeURIComponent(compareFrom)}&to=active`);
+    renderCompare(data);
+  } catch (e) {
+    const pane = $("#compare-panes");
+    pane.innerHTML = "";
+    pane.appendChild(el("p", "script-empty-hint",
+      `Couldn't build the comparison: ${e.message}`));
+  }
 }
 
 function compareLineClass(kind) {
