@@ -860,6 +860,16 @@ function toggleRail(collapsed) {
   savePrefs({ rail_collapsed: collapsed });
 }
 
+// collapsible left sidebar (the shelf) — same pattern as the structure rail
+function toggleSidebar(collapsed) {
+  const sidebar = $("#sidebar");
+  const edgeTab = $("#sidebar-edge-tab");
+  if (!sidebar) return;
+  sidebar.classList.toggle("sidebar-collapsed", collapsed);
+  if (edgeTab) edgeTab.classList.toggle("visible", collapsed);
+  savePrefs({ sidebar_collapsed: collapsed });
+}
+
 // ---------- writer's library (past work the personas can draw on) ----------
 
 async function loadLibrary() {
@@ -5816,6 +5826,11 @@ function init() {
   $("#new-idea-btn").addEventListener("click", createIdea);
   // Phase 0: structural rail
   $("#rail-toggle").addEventListener("click", () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")));
+  // collapsible sidebar (the shelf)
+  const sidebarToggle = $("#sidebar-toggle");
+  if (sidebarToggle) sidebarToggle.addEventListener("click", () => toggleSidebar(!$("#sidebar").classList.contains("sidebar-collapsed")));
+  const sidebarEdge = $("#sidebar-edge-tab");
+  if (sidebarEdge) sidebarEdge.addEventListener("click", () => toggleSidebar(false));
   $("#rail-beats-btn").addEventListener("click", openBeatboardView);
   $("#rail-compare-btn").addEventListener("click", openCompareView);
   $("#rail-note-form").addEventListener("submit", async (e) => {
@@ -5962,6 +5977,8 @@ function init() {
   // room. Only an explicit "open" preference keeps it out; anything else (or
   // nothing) collapses it.
   if (prefs.rail_collapsed !== false) toggleRail(true);
+  // sidebar: honor saved collapse preference (default open — unlike the rail)
+  if (prefs.sidebar_collapsed) toggleSidebar(true);
   applyReaderMode(prefs.reader);
   applyFocusMode(prefs.focus);
   wireSprint();
