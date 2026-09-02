@@ -4409,6 +4409,12 @@ function jumpRevisionScene(num) {
   void page.offsetWidth;
   page.classList.add("flash");
   setTimeout(() => page.classList.remove("flash"), 1600);
+  // mark the nav row that points at the scene the writer is looking at
+  document.querySelectorAll(".revision-nav-row").forEach((r) => {
+    const rn = r.querySelector(".rn-num");
+    if (rn && rn.textContent.trim() === `S${num}`) r.classList.add("active");
+    else r.classList.remove("active");
+  });
 }
 
 function flashFindingRow(index) {
@@ -4549,6 +4555,12 @@ function updateRevisionStatus() {
   for (let i = 0; i < pages.length; i++) {
     if (pages[i].offsetTop <= mid) cur = i + 1;
   }
+  // keep the nav row pointing at the scene the writer is actually reading
+  // (fires on scroll as well as on nav clicks — one source of truth)
+  document.querySelectorAll(".revision-nav-row").forEach((r) => {
+    const rn = r.querySelector(".rn-num");
+    if (rn) r.classList.toggle("active", rn.textContent.trim() === `S${cur}`);
+  });
   const scenes = (state.script && state.script.scenes) || [];
   const words = scenes.reduce((a, s) => a + (s.word_count || 0), 0);
   const sum = findingStatusSummary();

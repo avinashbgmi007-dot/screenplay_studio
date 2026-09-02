@@ -2542,6 +2542,8 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   line-height: 1.35;
 }
 .revision-nav-row:hover { background: rgba(232, 162, 79, 0.08); border-color: rgba(232, 162, 79, 0.22); }
+.revision-nav-row.active { background: rgba(232, 162, 79, 0.14); border-color: rgba(232, 162, 79, 0.45); }
+.revision-nav-row.active .rn-num { color: var(--accent); }
 .revision-nav-row .rn-num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
