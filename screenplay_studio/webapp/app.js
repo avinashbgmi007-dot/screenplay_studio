@@ -5688,6 +5688,7 @@ function init() {
       } else if (s.view === "beatboard") openBeatboardView();
       else if (s.view === "compare") openCompareView();
       else if (s.view === "revision") openRevisionView();
+      else if (s.view === "feedback") openFeedbackRoom();
     }).catch(() => { /* project vanished — stay on the welcome scene */ });
   });
 
