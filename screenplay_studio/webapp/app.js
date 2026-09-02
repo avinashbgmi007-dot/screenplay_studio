@@ -1879,7 +1879,6 @@ function setRoom(room) {
     $("#beatboard-view").style.display = "none";
     $("#compare-view").style.display = "none";
     $("#revision-view").style.display = "none";
-    $("#feedback-view").style.display = "none";
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "flex";
     saveSession();
@@ -1898,7 +1897,6 @@ function setRoom(room) {
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
   $("#revision-view").style.display = "none";
-  $("#feedback-view").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "flex";
   saveSession();
@@ -4136,6 +4134,12 @@ function switchFeedbackTab(tab) {
   if (fqBtn) fqBtn.classList.toggle("active", tab === "fixqueue");
   if (report) report.style.display = tab === "report" ? "block" : "none";
   if (fq) fq.style.display = tab === "fixqueue" ? "block" : "none";
+  // self-heal: a tab should never show a blank pane — if the target is empty
+  // but data exists in memory, render it now (e.g. a render was skipped when
+  // the room opened before the report fetch landed)
+  if (tab === "fixqueue" && fq && !fq.children.length && state.fixQueue) {
+    renderFixQueuePanel(fq);
+  }
 }
 
 function renderReportPanel() {
