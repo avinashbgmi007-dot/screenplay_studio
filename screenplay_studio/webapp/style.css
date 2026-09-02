@@ -139,8 +139,8 @@
   --text: #dbe2f4;
   --text-muted: #8b96b8;
   --text-faint: #5d6b8a;
-  --danger: #c96a5a;
-  --danger-bg: rgba(201, 106, 90, 0.14);
+  --danger: #d98273; /* was #c96a5a — bumped for WCAG AA on all badge surfaces (4.76 → 6.17 worst case) */
+  --danger-bg: rgba(217, 130, 115, 0.14);
   --ok: #8fae7e;
   --ok-bg: rgba(143, 174, 126, 0.14);
 
@@ -2820,8 +2820,8 @@ body.dawn {
   --consult: #64849b;
   --consult-deep: #4a6880;
 
-  --danger: #a83f30;
-  --danger-bg: rgba(168, 63, 48, 0.12);
+  --danger: #9c3527; /* was #a83f30 — bumped for WCAG AA on dawn's light surfaces (4.60 → 5.23 worst case) */
+  --danger-bg: rgba(156, 53, 39, 0.12);
   --ok: #5a7a49;
   --ok-bg: rgba(90, 122, 73, 0.12);
 }
