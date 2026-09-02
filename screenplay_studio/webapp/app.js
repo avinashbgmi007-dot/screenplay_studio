@@ -853,7 +853,10 @@ function toggleRail(collapsed) {
   if (!rail) return;
   const btn = $("#rail-toggle");
   rail.classList.toggle("rail-collapsed", collapsed);
-  if (btn) btn.textContent = collapsed ? "»" : "«";
+  if (btn) {
+    btn.textContent = collapsed ? "»" : "«";
+    btn.setAttribute("aria-expanded", String(!collapsed));
+  }
   savePrefs({ rail_collapsed: collapsed });
 }
 
@@ -1306,8 +1309,12 @@ function setIdeaLens(room) {
   }
   const chip = $("#room-chip");
   if (chip) chip.textContent = room === "feedback" ? "📋 Concept Validation" : "✍️ Idea Room";
-  $("#room-cowrite-btn").classList.toggle("active", room === "cowrite");
-  $("#room-feedback-btn").classList.toggle("active", room === "feedback");
+  const cowriteBtnEl = $("#room-cowrite-btn");
+  const feedbackBtnEl = $("#room-feedback-btn");
+  cowriteBtnEl.classList.toggle("active", room === "cowrite");
+  feedbackBtnEl.classList.toggle("active", room === "feedback");
+  cowriteBtnEl.setAttribute("aria-selected", room === "cowrite" ? "true" : "false");
+  feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
   setDrawerIdentity(room, true);
   syncGutter();
 }
@@ -1419,9 +1426,9 @@ function applyFocusMode(on) {
   if (on) {
     markCurrentScene();
     markCurrentLine();
-    document.getElementById("script-scenes")?.addEventListener("scroll", onFocusScroll, { passive: true });
+    var _ss = document.getElementById("script-scenes"); if (_ss) _ss.addEventListener("scroll", onFocusScroll, { passive: true });
   } else {
-    document.getElementById("script-scenes")?.removeEventListener("scroll", onFocusScroll);
+    var _ss2 = document.getElementById("script-scenes"); if (_ss2) _ss2.removeEventListener("scroll", onFocusScroll);
     document.querySelectorAll(".focus-line").forEach((l) => l.classList.remove("focus-line"));
   }
 }
@@ -1643,6 +1650,24 @@ function restoreSession() {
 // inside the script.
 
 function goHome() {
+
+  // Clean up the feedback view if we were in it -- otherwise state.view stays
+  // "fv" and the scroll observer leaks, causing screen overlap on next open.
+  if (state.view === "fv") {
+    var fvEl = document.getElementById("feedback-view");
+    if (fvEl) fvEl.style.display = "none";
+    if (typeof fvScrollObserver !== "undefined" && fvScrollObserver) {
+      fvScrollObserver.disconnect(); fvScrollObserver = null;
+    }
+    fvCurrentScene = -1;
+    var cowriteBtn = document.getElementById("room-cowrite-btn");
+    var feedbackBtn = document.getElementById("room-feedback-btn");
+    if (cowriteBtn) { cowriteBtn.classList.add("active"); cowriteBtn.setAttribute("aria-selected", "true"); }
+    if (feedbackBtn) { feedbackBtn.classList.remove("active"); feedbackBtn.setAttribute("aria-selected", "false"); }
+  }
+  // Hide the problem board -- it belongs to a project that's going away
+  hideProblemBoard();
+  state.view = "cowrite";
   state.currentProject = null;
   state.currentSession = null;
   state.currentIdea = null;
@@ -1740,6 +1765,10 @@ async function openProject(name) {
     try { await loadScriptData(); } catch (_) { /* no parse yet — pane shows its hint */ }
     renderScriptView();
     maybeShowWelcome();
+    // Show Problem Board if analysis exists
+    if (state.findings && state.findings.length > 0) {
+      showProblemBoard();
+    }
 
     setRoom("cowrite");
     // a project opens with the manuscript center stage — the partner drawer
@@ -1811,8 +1840,12 @@ function setRoom(room) {
   syncGutter();
   const chip = $("#room-chip");
   if (chip) chip.textContent = room === "feedback" ? "📋 Consultant's Desk" : "✍️ Writer's Desk";
-  $("#room-cowrite-btn").classList.toggle("active", room === "cowrite");
-  $("#room-feedback-btn").classList.toggle("active", room === "feedback");
+  const cowriteBtnEl = $("#room-cowrite-btn");
+  const feedbackBtnEl = $("#room-feedback-btn");
+  cowriteBtnEl.classList.toggle("active", room === "cowrite");
+  feedbackBtnEl.classList.toggle("active", room === "feedback");
+  cowriteBtnEl.setAttribute("aria-selected", room === "cowrite" ? "true" : "false");
+  feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
   $("#cowrite-panel").style.display = room === "cowrite" ? "flex" : "none";
   $("#feedback-panel").style.display = room === "feedback" ? "flex" : "none";
   // closing a full-screen tool returns to the active room
@@ -2304,7 +2337,7 @@ function renderMessage(m, index) {
     };
     tr.addEventListener("mouseenter", openMenu);
     tr.addEventListener("mouseleave", () => {
-      hideMenuTimer = setTimeout(() => { if (!menu?.matches(":hover")) closeMenu(); }, 260);
+      hideMenuTimer = setTimeout(() => { if (!menu || !menu.matches(":hover")) closeMenu(); }, 260);
     });
     tr.addEventListener("click", (e) => { e.stopPropagation(); if (menu) closeMenu(); else openMenu(); });
     head.appendChild(tr);
@@ -2447,8 +2480,8 @@ function locateFinding(f, index) {
   if (scene == null) { showError("This finding isn't tied to a specific scene."); return; }
   // in the revision view, stay inside it — jump the revision column instead
   // of yanking the writer back to the workspace
-  if (state.view === "revision") {
-    jumpRevisionScene(scene);
+  if (state.view === "revision" || state.view === "fv") {
+    if (state.view === "revision") jumpRevisionScene(scene);
     const quote = (f.evidence_quote || "").trim();
     if (quote) {
       const q = normText(quote);
@@ -2806,7 +2839,7 @@ function renderSamNotes(data) {
     chip.textContent = `${name.replace(/_/g, " ")}: ${entry.value} (${Math.round(entry.confidence * 100)}%)`;
     dims.appendChild(chip);
   });
-  const observations = (data.profile?.observations || []).filter((o) => !o.suppressed);
+  const observations = (data.profile && data.profile.observations || []).filter((o) => !o.suppressed);
   observations.forEach((o) => {
     const li = document.createElement("li");
     li.className = "sam-notes-obs";
@@ -3176,7 +3209,7 @@ function renderFixQueuePanel(container) {
   const items = (state.fixQueue && state.fixQueue.items) || [];
   const open = items.filter((i) => i.status !== "addressed" && !i.dismissed);
   if (!items.length && !state.fixQueueShowDismissed) return;
-  const total = (state.fixQueue && (state.fixQueue.total_count ?? items.length)) || items.length;
+  const total = (state.fixQueue && (state.fixQueue.total_count != null ? state.fixQueue.total_count : items.length)) || items.length;
 
   const panel = el("div", "craft-panel fix-queue");
   const head = el("div", "craft-panel-head");
@@ -3737,9 +3770,9 @@ function writerNoteEl(note) {
   return wrap;
 }
 
-function renderScenePage(scene, findings, searchQuery, notes = [], discussed = false, changedTexts = []) {
+function renderScenePage(scene, findings, searchQuery, notes = [], discussed = false, changedTexts = [], idPrefix = "") {
   const page = el("article", "scene-page");
-  page.id = `scene-page-${scene.scene_number}`;
+  page.id = `${idPrefix}scene-page-${scene.scene_number}`;
   page.dataset.sceneNumber = String(scene.scene_number);
 
   const head = el("div", "scene-page-head");
@@ -3964,6 +3997,7 @@ async function hideAllViews() {
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
   $("#revision-view").style.display = "none";
+  $("#feedback-view").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "none";
 }
@@ -4278,6 +4312,9 @@ async function openRevisionView() {
   } catch (e) {
     showError("Couldn't load the script: " + e.message);
   }
+  // Re-hide workspace — loadScriptData may restore it via setRoom/renderScriptView
+  const wsRev = document.querySelector(".workspace");
+  if (wsRev) wsRev.style.display = "none";
   renderRevisionView();
   saveSession();
 }
@@ -4286,10 +4323,343 @@ function closeRevisionView() {
   setRoom(revisionPrevRoom);
 }
 
+// Feedback View - 3-panel layout: Sushruta left, script center, Problem Board/Sameer right
+var fvPrevRoom = "cowrite";
+var fvCurrentScene = -1;
+var fvBoardFilter = "all";
+
+async function openFeedbackView() {
+  if (state.view === "fv") return;
+  exitSpotlight();
+  fvPrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
+  state.view = "fv";
+  hideAllViews();
+  closeRoomDrawer();
+  var cowriteBtn = document.getElementById("room-cowrite-btn");
+  var feedbackBtn = document.getElementById("room-feedback-btn");
+  cowriteBtn.classList.remove("active");
+  cowriteBtn.setAttribute("aria-selected", "false");
+  feedbackBtn.classList.add("active");
+  feedbackBtn.setAttribute("aria-selected", "true");
+  document.getElementById("room-chip").textContent = "\u{1F4CB} Feedback";
+  document.getElementById("feedback-view").style.display = "flex";
+  try { await loadScriptData(); } catch (e) { showError("Could not load the script: " + e.message); }
+  var ws2 = document.querySelector(".workspace");
+  if (ws2) ws2.style.display = "none";
+  renderFeedbackView();
+  initFvScrollSync();
+  // Reset the right panel to expanded state on open
+  var fvRight = document.querySelector("#feedback-view .fv-right");
+  if (fvRight) fvRight.classList.remove("fv-right-collapsed");
+  var fvEdgeTab = document.getElementById("fv-right-edge-tab");
+  if (fvEdgeTab) fvEdgeTab.style.display = "none";
+  saveSession();
+}
+
+function closeFeedbackView() {
+  var fv = document.getElementById("feedback-view");
+  if (fv) fv.style.display = "none";
+  if (fvScrollObserver) { fvScrollObserver.disconnect(); fvScrollObserver = null; }
+  fvCurrentScene = -1;
+  // Hide the Problem Board — it will re-show via scroll sync when the
+  // workspace re-renders, starting from the top scene cleanly.
+  hideProblemBoard();
+  var cowriteBtn = document.getElementById("room-cowrite-btn");
+  var feedbackBtn = document.getElementById("room-feedback-btn");
+  if (cowriteBtn) { cowriteBtn.classList.add("active"); cowriteBtn.setAttribute("aria-selected", "true"); }
+  if (feedbackBtn) { feedbackBtn.classList.remove("active"); feedbackBtn.setAttribute("aria-selected", "false"); }
+  // Restore project bar and workspace visibility
+  if (state.currentProject) {
+    document.getElementById("project-bar").style.display = "flex";
+    document.getElementById("welcome-view").style.display = "none";
+    var ws = document.querySelector(".workspace");
+    if (ws) ws.style.display = "flex";
+  }
+  setRoom(fvPrevRoom);
+}
+
+function renderFeedbackView() {
+  var box = document.getElementById("fv-script");
+  if (!box) return;
+  var script = state.script;
+  var findings = state.findings || [];
+  if (!script || !script.scenes) {
+    box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">No script loaded.</div>';
+    return;
+  }
+  var html = '<div class="fv-script-inner">';
+  script.scenes.forEach(function(scene, idx) {
+    var sceneNum = idx + 1;
+    html += '<div class="fv-scene" data-scene="' + sceneNum + '">';
+    html += '<div class="paper">';
+    html += '<div style="font-weight:bold;text-transform:uppercase;margin-bottom:8px;">' + (scene.heading || 'Scene ' + sceneNum) + '</div>';
+    if (scene.action) html += '<div style="margin-bottom:8px;">' + scene.action + '</div>';
+    if (scene.dialogue) {
+      scene.dialogue.forEach(function(d) {
+        if (d.character) html += '<div style="text-align:center;font-weight:bold;margin-top:12px;">' + d.character + '</div>';
+        if (d.parenthetical) html += '<div style="text-align:center;font-style:italic;color:var(--paper-muted);">' + d.parenthetical + '</div>';
+        if (d.text) html += '<div style="text-align:center;padding:0 40px;">' + d.text + '</div>';
+      });
+    }
+    html += '</div>';
+    var sceneFindings = findings.filter(function(f) {
+      if (f.scene_refs && f.scene_refs.indexOf(sceneNum) !== -1) return true;
+      if (f.scene === sceneNum) return true;
+      return false;
+    });
+    if (sceneFindings.length > 0) {
+      var sevCounts = { high: 0, medium: 0, low: 0 };
+      sceneFindings.forEach(function(f) { var s = (f.severity || 'medium').toLowerCase(); sevCounts[s] = (sevCounts[s] || 0) + 1; });
+      html += '<div class="fv-finding-dots">';
+      if (sevCounts.high) html += '<span class="sev-dot high" title="' + sevCounts.high + ' high"></span>';
+      if (sevCounts.medium) html += '<span class="sev-dot medium" title="' + sevCounts.medium + ' medium"></span>';
+      if (sevCounts.low) html += '<span class="sev-dot low" title="' + sevCounts.low + ' low"></span>';
+      html += '<span class="fv-dot-count">' + sceneFindings.length + ' finding' + (sceneFindings.length > 1 ? 's' : '') + '</span>';
+      html += '<button class="fv-dot-expand" onclick="scrollFvBoardToScene(' + sceneNum + ')">view \u2192</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+  renderFvChat('fv-consult-messages', 'consult');
+  renderFvBoard();
+  if (findings.length > 0) { switchFvTab('board'); } else { switchFvTab('sameer'); }
+  var statusEl = document.getElementById('fv-status');
+  if (statusEl) {
+    if (findings.length > 0) {
+      statusEl.textContent = findings.length + ' finding' + (findings.length > 1 ? 's' : '') + ' across ' + script.scenes.length + ' scenes';
+    } else {
+      statusEl.textContent = 'No findings yet \u2014 Run Analysis...';
+    }
+  }
+}
+
+function renderFvBoard() {
+  var list = document.getElementById('fv-board-list');
+  if (!list) return;
+  var findings = state.findings || [];
+  var filtered = fvBoardFilter === 'all' ? findings : findings.filter(function(f) { return (f.severity || 'medium').toLowerCase() === fvBoardFilter; });
+  var title = document.getElementById('fv-board-title');
+  if (title) title.textContent = 'Problem Board \u2014 ' + filtered.length + ' finding' + (filtered.length !== 1 ? 's' : '');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="fv-board-empty">No findings to show.<br>Run Analysis to generate findings.</div>';
+    return;
+  }
+  var html = '';
+  filtered.forEach(function(f) {
+    var sev = (f.severity || 'medium').toLowerCase();
+    var sceneNum = (f.scene_refs && f.scene_refs[0]) || f.scene || '?';
+    var idx = f.index !== undefined ? f.index : 0;
+    html += '<div class="fv-board-row" data-findex="' + idx + '" data-scene="' + sceneNum + '" onclick="fvBoardClick(' + idx + ', ' + sceneNum + ')">';
+    html += '<span class="fv-board-sev ' + sev + '"></span>';
+    html += '<span class="fv-board-scene">Sc ' + sceneNum + '</span>';
+    html += '<div class="fv-board-body">';
+    html += '<div class="fv-board-cat">' + (f.category || 'General') + '</div>';
+    html += '<div class="fv-board-issue">' + (f.description || f.issue || '') + '</div>';
+    html += '<div class="fv-board-actions">';
+    html += '<button class="btn-secondary" onclick="event.stopPropagation(); fvBoardDiscuss(' + idx + ')">Discuss</button>';
+    html += '<button class="btn-secondary" onclick="event.stopPropagation(); fvBoardLocate(' + idx + ', ' + sceneNum + ')">Locate</button>';
+    html += '</div></div></div>';
+  });
+  list.innerHTML = html;
+  updateFvBoardHighlight();
+}
+
+function fvBoardClick(findex, sceneNum) {
+  var box = document.getElementById('fv-script');
+  if (!box) return;
+  var scene = box.querySelector('.fv-scene[data-scene="' + sceneNum + '"]');
+  if (scene) scene.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function fvBoardLocate(findex, sceneNum) { fvBoardClick(findex, sceneNum); }
+
+function fvBoardDiscuss(findex) {
+  var finding = (state.findings || [])[findex];
+  if (!finding) return;
+  switchFvTab('sameer');
+  var input = document.getElementById('fv-cowrite-input');
+  if (input) {
+    var refs = (finding.scene_refs || []).map(function(n) { return 'Scene ' + n; }).join(', ') || 'the whole script';
+    input.value = 'About the note on ' + refs + ': ' + (finding.description || finding.issue || '').substring(0, 180);
+    input.focus();
+  }
+}
+
+function scrollFvBoardToScene(sceneNum) {
+  switchFvTab('board');
+  var list = document.getElementById('fv-board-list');
+  if (!list) return;
+  var firstRow = list.querySelector('.fv-board-row[data-scene="' + sceneNum + '"]');
+  if (firstRow) firstRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function switchFvTab(tab) {
+  var boardTab = document.getElementById('fv-tab-board');
+  var sameerTab = document.getElementById('fv-tab-sameer');
+  var boardPane = document.getElementById('fv-board-pane');
+  var sameerPane = document.getElementById('fv-sameer-pane');
+  if (tab === 'board') {
+    if (boardTab) boardTab.classList.add('active');
+    if (sameerTab) sameerTab.classList.remove('active');
+    if (boardPane) boardPane.style.display = 'flex';
+    if (sameerPane) sameerPane.style.display = 'none';
+    renderFvBoard();
+  } else {
+    if (sameerTab) sameerTab.classList.add('active');
+    if (boardTab) boardTab.classList.remove('active');
+    if (sameerPane) sameerPane.style.display = 'flex';
+    if (boardPane) boardPane.style.display = 'none';
+    renderFvChat('fv-cowrite-messages', 'sameer');
+  }
+}
+
+function toggleFvRight() {
+  var right = document.querySelector('#feedback-view .fv-right');
+  var edgeTab = document.getElementById('fv-right-edge-tab');
+  if (!right) return;
+  if (right.classList.contains('fv-right-collapsed')) {
+    right.classList.remove('fv-right-collapsed');
+    if (edgeTab) edgeTab.style.display = 'none';
+  } else {
+    right.classList.add('fv-right-collapsed');
+    if (edgeTab) edgeTab.style.display = '';
+  }
+}
+
+var fvScrollObserver = null;
+
+function initFvScrollSync() {
+  if (fvScrollObserver) fvScrollObserver.disconnect();
+  var box = document.getElementById('fv-script');
+  if (!box) return;
+  fvScrollObserver = new IntersectionObserver(function(entries) {
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isIntersecting) {
+        var sceneNum = parseInt(entries[i].target.dataset.scene);
+        if (sceneNum && sceneNum !== fvCurrentScene) {
+          fvCurrentScene = sceneNum;
+          updateFvSceneHighlight();
+          updateFvBoardHighlight();
+          updateFvStatus(sceneNum);
+        }
+        break;
+      }
+    }
+  }, { root: box, threshold: 0.3 });
+  var scenes = box.querySelectorAll('.fv-scene');
+  for (var j = 0; j < scenes.length; j++) { fvScrollObserver.observe(scenes[j]); }
+}
+
+function updateFvSceneHighlight() {
+  var box = document.getElementById('fv-script');
+  if (!box) return;
+  var scenes = box.querySelectorAll('.fv-scene');
+  for (var i = 0; i < scenes.length; i++) {
+    scenes[i].classList.toggle('active', parseInt(scenes[i].dataset.scene) === fvCurrentScene);
+  }
+}
+
+function updateFvBoardHighlight() {
+  var list = document.getElementById('fv-board-list');
+  if (!list) return;
+  var rows = list.querySelectorAll('.fv-board-row');
+  for (var i = 0; i < rows.length; i++) {
+    var sceneNum = parseInt(rows[i].dataset.scene);
+    rows[i].classList.toggle('highlighted', sceneNum === fvCurrentScene);
+    rows[i].classList.toggle('dimmed', fvCurrentScene > 0 && sceneNum !== fvCurrentScene);
+  }
+  var highlighted = list.querySelector('.fv-board-row.highlighted');
+  if (highlighted) highlighted.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function updateFvStatus(sceneNum) {
+  var status = document.getElementById('fv-status');
+  if (!status) return;
+  var script = state.script;
+  if (!script || !script.scenes) return;
+  var scene = script.scenes[sceneNum - 1];
+  var heading = scene ? (scene.heading || 'Scene ' + sceneNum) : 'Scene ' + sceneNum;
+  var findings = (state.findings || []).filter(function(f) {
+    if (f.scene_refs && f.scene_refs.indexOf(sceneNum) !== -1) return true;
+    if (f.scene === sceneNum) return true;
+    return false;
+  });
+  status.textContent = 'Scene ' + sceneNum + ' of ' + script.scenes.length + ' \u2014 ' + heading;
+  if (findings.length) status.textContent += ' \u2014 ' + findings.length + ' finding' + (findings.length > 1 ? 's' : '');
+}
+
+function renderFvChat(containerId, room) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var branchData = currentBranchData();
+  if (!branchData || !branchData.messages || !branchData.messages.length) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">Start a conversation...</div>';
+    return;
+  }
+  var msgs = branchData.messages;
+  if (room === 'consult') {
+    msgs = msgs.filter(function(m) { return m.role === 'assistant' && (!m.partner || m.partner === 'consultant'); });
+  } else {
+    msgs = msgs.filter(function(m) { return m.role === 'user' || (m.role === 'assistant' && (!m.partner || m.partner === 'sameer')); });
+  }
+  var html = '';
+  msgs.forEach(function(m) {
+    var cls = m.role === 'user' ? 'user' : 'ai';
+    html += '<div class="fv-msg ' + cls + '">' + (m.content || m.text || '') + '</div>';
+  });
+  container.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">Start a conversation...</div>';
+  container.scrollTop = container.scrollHeight;
+}
+
+function discussFvFinding(findex) {
+  var finding = (state.findings || [])[findex];
+  if (!finding) return;
+  switchFvTab('sameer');
+  var input = document.getElementById('fv-cowrite-input');
+  if (input) {
+    var refs = (finding.scene_refs || []).map(function(n) { return 'Scene ' + n; }).join(', ') || 'the whole script';
+    input.value = 'About the note on ' + refs + ': ' + (finding.description || finding.issue || '').substring(0, 180);
+    input.focus();
+  }
+}
+
+async function sendFvMessage(partner) {
+  var inputId = partner === 'consultant' ? 'fv-consult-input' : 'fv-cowrite-input';
+  var containerId = partner === 'consultant' ? 'fv-consult-messages' : 'fv-cowrite-messages';
+  var input = document.getElementById(inputId);
+  var container = document.getElementById(containerId);
+  if (!input || !container) return;
+  var text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  var userDiv = document.createElement('div');
+  userDiv.className = 'fv-msg user';
+  userDiv.textContent = text;
+  container.appendChild(userDiv);
+  container.scrollTop = container.scrollHeight;
+  var typingDiv = document.createElement('div');
+  typingDiv.className = 'fv-msg ai';
+  typingDiv.textContent = partner === 'consultant' ? 'Dr. Sushruta is reading...' : 'Sameer is thinking...';
+  container.appendChild(typingDiv);
+  container.scrollTop = container.scrollHeight;
+  try {
+    var sessionId = await ensureSession();
+    var base = '/projects/' + encodeURIComponent(state.currentProject);
+    var res = await streamChatTurn(base + '/chat/sessions/' + sessionId, text, null, typingDiv, container);
+    state.branches[state.currentBranch] = Object.assign({}, currentBranchData(), { messages: res.messages });
+    renderFvChat(containerId, partner === 'consultant' ? 'consult' : 'cowrite');
+  } catch (err) {
+    typingDiv.textContent = 'Error: ' + err.message;
+    typingDiv.style.color = 'var(--danger)';
+  }
+}
+
 function jumpRevisionScene(num) {
   const box = $("#revision-script");
   if (!box) return;
-  const page = box.querySelector(`#scene-page-${num}`);
+  const page = box.querySelector(`#revision-scene-page-${num}`);
   if (!page) return;
   page.scrollIntoView({ behavior: "smooth", block: "start" });
   page.classList.remove("flash");
@@ -4383,7 +4753,8 @@ function renderRevisionView() {
       "",
       bySceneNotes[scene.scene_number] || [],
       discussedScenes.has(scene.scene_number),
-      changedByScene[scene.scene_number] || []
+      changedByScene[scene.scene_number] || [],
+      "revision-"
     );
     // anchored findings: clicking the quoted line flashes its queue row
     for (const { f, index } of byScene[scene.scene_number] || []) {
@@ -4610,7 +4981,7 @@ function bindBeatboardDrag() {
 let rewriteState = null;
 
 function openRewriteModal(sceneNumber, f, findingIndex) {
-  rewriteState = { sceneNumber, findingIndex: findingIndex ?? null };
+  rewriteState = { sceneNumber, findingIndex: findingIndex != null ? findingIndex : null };
   $("#rewrite-scene-title").textContent = `Scene ${sceneNumber}`;
   const sev = (f && f.severity) ? f.severity.toUpperCase() : "LOW";
   $("#rewrite-finding").textContent = f ? `${sev} — ${f.issue} ${f.why_it_matters ? "(" + f.why_it_matters + ")" : ""}` : "";
@@ -4774,7 +5145,7 @@ const SHORTCUTS = [
 function paletteCommands() {
   return [
     { type: "command", label: "Switch to Co-write", keys: "c", run: () => { openCowriteRoom(); } },
-    { type: "command", label: "Switch to Feedback", keys: "f", run: () => { openFeedbackRoom(); } },
+    { type: "command", label: "Switch to Feedback", keys: "f", run: () => { if (state.currentProject) openFeedbackView(); else openFeedbackRoom(); } },
     { type: "command", label: "Open the Beat Board", keys: "b", run: () => openBeatboardView() },
     { type: "command", label: "Compare drafts side by side", keys: "d", run: () => { if (state.currentProject) openCompareView(); } },
     { type: "command", label: "Open the Revision view", keys: "v", run: () => { if (state.currentProject) openRevisionView(); } },
@@ -4784,9 +5155,18 @@ function paletteCommands() {
     { type: "command", label: "Focus the conversation", keys: "", run: () => { openCowriteRoom(); setTimeout(() => $("#input").focus(), 60); } },
     { type: "command", label: "Toggle the Craft shelf (analysis panels)", keys: "a", run: toggleCraftShelf },
     { type: "command", label: "Toggle the Structure rail", keys: "r", run: () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")) },
+    { type: "command", label: "Toggle the Problem Board", keys: "b", run: toggleProblemBoard },
     { type: "command", label: "Search the script", keys: "/", run: () => { if (state.view !== "cowrite" && state.view !== "feedback") openCowriteRoom(); setTimeout(() => $("#script-search").focus(), 80); } },
     { type: "command", label: "Export working draft (.fountain)", keys: "", run: () => $("#export-fountain").click() },
     { type: "command", label: "Study settings", keys: "", run: () => $("#settings-btn").click() },
+    // Nocta craft-first questions — surface craft intelligence first
+    { type: "craft", label: "Why doesn't my dialogue land?", hint: "McKee — Gap Analysis", keys: "", run: () => openSameerWith("Analyze my dialogue for subtext gaps. Where am I telling instead of showing?") },
+    { type: "craft", label: "Is my Act II sagging?", hint: "Snyder — Midpoint", keys: "", run: () => openSameerWith("Check my Act II pacing. Does the midpoint land with enough force to redirect the story?") },
+    { type: "craft", label: "Am I violating setup/payoff?", hint: "McKee — Setup/Payoff", keys: "", run: () => openSameerWith("Audit my setup/payoff balance. What have I planted that never pays off, or what pays off without a plant?") },
+    { type: "craft", label: "What does each scene accomplish?", hint: "Field — Scene Function", keys: "", run: () => openSameerWith("For every scene: what changes? Value shift, character decision, new information — name it.") },
+    { type: "craft", label: "Are my characters distinct?", hint: "Vogler — Character Arc", keys: "", run: () => openSameerWith("Check character distinctiveness. Could I remove a name and still tell who's speaking?") },
+    { type: "craft", label: "Is my theme coming through?", hint: "Swain — Story Promise", keys: "", run: () => openSameerWith("What is this script about — not what happens, but what it SAYS? Is the theme alive in the scenes?") },
+    { type: "craft", label: "Am I using visual storytelling?", hint: "Snyder — Show Don't Tell", keys: "", run: () => openSameerWith("Find every moment where dialogue explains what should be shown. Mark them with alternatives.") },
   ];
 }
 
@@ -4956,6 +5336,7 @@ function bindGlobalShortcuts() {
     if (e.key === "Escape") {
       if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
       if (state.view === "revision") { closeRevisionView(); return; }
+      if (state.view === "fv") { closeFeedbackView(); return; }
       // (open modals already returned above — drawer/shelf/rail are safe)
       {
         const drawer = $("#room-drawer");
@@ -4975,7 +5356,10 @@ function bindGlobalShortcuts() {
     if (e.key === "?") { e.preventDefault(); openPalette(true); }
     else if (e.key === "/") { e.preventDefault(); paletteCommands().find((c) => c.keys === "/").run(); }
     else if (e.key === "c") { openCowriteRoom(); }
-    else if (e.key === "f") { openFeedbackRoom(); }
+    else if (e.key === "f") {
+      if (state.currentProject) openFeedbackView();
+      else openFeedbackRoom();
+    }
     else if (e.key === "a") { toggleCraftShelf(); }
     else if (e.key === "r") { toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")); }
     else if (e.key === "s") { closeRoomDrawer(); const sc = $("#script-scenes"); if (sc) sc.focus(); }
@@ -5176,8 +5560,8 @@ async function refreshSttLanguages() {
 }
 
 function insertAtCaret(input, text) {
-  const start = input.selectionStart ?? input.value.length;
-  const end = input.selectionEnd ?? start;
+  const start = input.selectionStart != null ? input.selectionStart : input.value.length;
+  const end = input.selectionEnd != null ? input.selectionEnd : start;
   const before = input.value.slice(0, start);
   const after = input.value.slice(end);
   const glue = before && !/\s$/.test(before) && !/^\s/.test(text) ? " " : "";
@@ -5410,7 +5794,6 @@ function init() {
 
   // the strip never lies quietly: re-check every 30s so a llama-server that
   // comes up AFTER the studio gets noticed (demo mode offers the switch)
-  setInterval(checkConnection, 30000);
   $("#status-conn").addEventListener("click", async () => {
     if (!(state.realServer && state.realServer.available)) return;
     try {
@@ -5514,7 +5897,21 @@ function init() {
     const on = !document.body.classList.contains("reader-mode");
     applyReaderMode(on);
     savePrefs({ reader: on });
+    closeOverflow();
   });
+  // Overflow menu toggle
+  const overflowToggle = $("#overflow-toggle");
+  const overflowDropdown = $("#overflow-dropdown");
+  function closeOverflow() { if (overflowDropdown) overflowDropdown.style.display = "none"; }
+  if (overflowToggle && overflowDropdown) {
+    overflowToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      overflowDropdown.style.display = overflowDropdown.style.display === "none" ? "block" : "none";
+    });
+    document.addEventListener("click", (e) => {
+      if (!overflowDropdown.contains(e.target) && e.target !== overflowToggle) closeOverflow();
+    });
+  }
   $("#focus-btn").addEventListener("click", () => {
     const on = !document.body.classList.contains("focus-mode");
     applyFocusMode(on);
@@ -5565,6 +5962,7 @@ function init() {
       } else if (s.view === "beatboard") openBeatboardView();
       else if (s.view === "compare") openCompareView();
       else if (s.view === "revision") openRevisionView();
+      else if (s.view === "fv") openFeedbackView();
     }).catch(() => { /* project vanished — stay on the welcome scene */ });
   });
 
@@ -5776,16 +6174,53 @@ function init() {
 
   // rooms
   $("#room-cowrite-btn").addEventListener("click", openCowriteRoom);
-  $("#room-feedback-btn").addEventListener("click", openFeedbackRoom);
+  $("#room-feedback-btn").addEventListener("click", () => {
+    if (state.currentProject) openFeedbackView();
+    else openFeedbackRoom();
+  });
   // Manuscript Stage: the gutter tabs summon the partner drawer
   $("#gutter-sam").addEventListener("click", openCowriteRoom);
-  $("#gutter-doc").addEventListener("click", openFeedbackRoom);
+  $("#gutter-doc").addEventListener("click", () => {
+    if (state.currentProject) openFeedbackView();
+    else openFeedbackRoom();
+  });
   $("#drawer-close").addEventListener("click", closeRoomDrawer);
   $("#rail-edge-tab").addEventListener("click", () => toggleRail(false));
-  $("#bb-icon").addEventListener("click", openBeatboardView);
-  $("#compare-icon").addEventListener("click", openCompareView);
+  $("#bb-icon").addEventListener("click", () => { closeOverflow(); openBeatboardView(); });
+  $("#compare-icon").addEventListener("click", () => { closeOverflow(); openCompareView(); });
   $("#revise-btn").addEventListener("click", openRevisionView);
   $("#revision-close").addEventListener("click", closeRevisionView);
+  $("#fv-close").addEventListener("click", closeFeedbackView);
+  // Feedback View: right panel toggle
+  var fvRightEdgeTab = document.getElementById("fv-right-edge-tab");
+  if (fvRightEdgeTab) fvRightEdgeTab.addEventListener("click", toggleFvRight);
+  // Feedback View: chat form submission
+  $("#fv-consult-composer").addEventListener("submit", function(e) { e.preventDefault(); sendFvMessage("consultant"); });
+  $("#fv-cowrite-composer").addEventListener("submit", function(e) { e.preventDefault(); sendFvMessage("sameer"); });
+  // Feedback View: tab switching
+  $("#fv-tab-board").addEventListener("click", function() { switchFvTab("board"); });
+  $("#fv-tab-sameer").addEventListener("click", function() { switchFvTab("sameer"); });
+  // Feedback View: board severity filter
+  // Problem Board collapse/expand toggle
+  var fvBoardToggle = document.getElementById('fv-board-toggle');
+  var fvBoardList = document.getElementById('fv-board-list');
+  if (fvBoardToggle && fvBoardList) {
+    fvBoardToggle.addEventListener('click', function() {
+      var collapsed = fvBoardList.style.display === 'none';
+      fvBoardList.style.display = collapsed ? '' : 'none';
+      fvBoardToggle.textContent = collapsed ? '▾' : '▸';
+      fvBoardToggle.title = collapsed ? 'Collapse the Problem Board' : 'Expand the Problem Board';
+    });
+  }
+  // Problem Board toggle and filter
+  var pbToggle = document.getElementById('pb-toggle');
+  if (pbToggle) pbToggle.addEventListener('click', toggleProblemBoard);
+  var pbEdgeTab = document.getElementById('pb-edge-tab');
+  if (pbEdgeTab) pbEdgeTab.addEventListener('click', function() { toggleProblemBoard(); });
+  var pbFilter = document.getElementById('pb-filter');
+  if (pbFilter) pbFilter.addEventListener('change', function() { renderProblemBoard(); });
+  
+  $("#fv-board-filter").addEventListener("change", function(e) { fvBoardFilter = e.target.value; renderFvBoard(); });
   $("#revision-script").addEventListener("scroll", updateRevisionStatus);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
   $("#clear-chat-btn").addEventListener("click", clearChat);
@@ -5810,7 +6245,7 @@ function init() {
   });
   $("#tab-report-btn").addEventListener("click", () => switchFeedbackTab("report"));
   $("#tab-fixqueue-btn").addEventListener("click", () => switchFeedbackTab("fixqueue"));
-  $("#print-btn").addEventListener("click", () => {
+  $("#print-btn").addEventListener("click", () => { closeOverflow();
     if (state.view === "cowrite" || state.view === "feedback") window.print();
   });
   $("#compare-from-select").addEventListener("change", (e) => {
@@ -5853,4 +6288,412 @@ function init() {
   window.addEventListener("unhandledrejection", (e) => showError("Something went wrong: " + (e.reason && e.reason.message ? e.reason.message : e.reason)));
 }
 
+
+
+// ============================================================
+// Problem Board: findings panel synced with script scroll
+// ============================================================
+
+let pbCurrentScene = -1;
+let pbScrollObserver = null;
+
+function renderProblemBoard() {
+  var list = document.getElementById('pb-list');
+  if (!list) return;
+  var findings = state.findings || [];
+  var filter = (document.getElementById('pb-filter') || {}).value || 'all';
+  var filtered = filter === 'all' ? findings : findings.filter(function(f) { return (f.severity || 'medium').toLowerCase() === filter; });
+  
+  if (!filtered.length) {
+    list.innerHTML = '<div class="pb-empty">No findings to show.<br>Run Analysis to generate findings.</div>';
+    return;
+  }
+  
+  var html = '';
+  filtered.forEach(function(f, idx) {
+    var sev = (f.severity || 'medium').toLowerCase();
+    var sceneNum = (f.scene_refs && f.scene_refs[0]) || f.scene || '?';
+    var realIdx = findings.indexOf(f);
+    html += '<div class="pb-item" data-findex="' + realIdx + '" data-scene="' + sceneNum + '" onclick="pbItemClick(' + realIdx + ', ' + sceneNum + ')">';
+    html += '<span class="pb-sev ' + sev + '"></span>';
+    html += '<span class="pb-scene">Sc ' + sceneNum + '</span>';
+    html += '<div class="pb-body">';
+    html += '<div class="pb-cat">' + (f.category || 'General') + '</div>';
+    html += '<div class="pb-issue">' + (f.description || f.issue || '') + '</div>';
+    html += '</div></div>';
+  });
+  list.innerHTML = html;
+  update_pb_highlight();
+}
+
+function pbItemClick(findex, sceneNum) {
+  // Scroll the script pane to the scene
+  var page = document.getElementById('scene-page-' + sceneNum);
+  if (page) {
+    page.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    page.classList.remove('flash');
+    void page.offsetWidth;
+    page.classList.add('flash');
+    setTimeout(function() { page.classList.remove('flash'); }, 1600);
+  }
+}
+
+function update_pb_highlight() {
+  var list = document.getElementById('pb-list');
+  if (!list) return;
+  var items = list.querySelectorAll('.pb-item');
+  for (var i = 0; i < items.length; i++) {
+    var sceneNum = parseInt(items[i].dataset.scene);
+    items[i].classList.toggle('active', sceneNum === pbCurrentScene);
+  }
+}
+
+function initProblemBoardScrollSync() {
+  if (pbScrollObserver) pbScrollObserver.disconnect();
+  var container = document.getElementById('script-scenes');
+  if (!container) return;
+
+  // Build a set of scene numbers that have findings for auto-hide/show
+  var scenesWithFindings = {};
+  (state.findings || []).forEach(function(f) {
+    var refs = f.scene_refs || [];
+    if (f.scene) refs = refs.concat([f.scene]);
+    refs.forEach(function(n) { scenesWithFindings[n] = true; });
+  });
+
+  pbScrollObserver = new IntersectionObserver(function(entries) {
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isIntersecting) {
+        var sceneNum = parseInt(entries[i].target.dataset.sceneNumber);
+        if (sceneNum && sceneNum !== pbCurrentScene) {
+          pbCurrentScene = sceneNum;
+          update_pb_highlight();
+          // Auto-scroll the Problem Board to show the active finding
+          var activeItem = document.querySelector('.pb-item[data-scene="' + sceneNum + '"]');
+          if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          // Auto-expand/collapse: the board slides in when the active scene
+          // has findings, and slides away when it doesn’t.
+          var board = document.getElementById('problem-board');
+          if (board && board.classList.contains('visible')) {
+            if (scenesWithFindings[sceneNum]) {
+              expandProblemBoard();
+            } else {
+              collapseProblemBoard();
+            }
+          }
+        }
+        break;
+      }
+    }
+  }, { root: container, threshold: 0.3 });
+
+  var scenes = container.querySelectorAll('.scene-page');
+  for (var j = 0; j < scenes.length; j++) {
+    pbScrollObserver.observe(scenes[j]);
+  }
+}
+
+function showProblemBoard() {
+  var board = document.getElementById('problem-board');
+  if (board) {
+    board.style.display = 'flex';
+    board.classList.add('visible');
+    board.classList.remove('pb-collapsed');
+    var edgeTab = document.getElementById('pb-edge-tab');
+    if (edgeTab) edgeTab.style.display = 'none';
+    renderProblemBoard();
+    initProblemBoardScrollSync();
+  }
+}
+
+function hideProblemBoard() {
+  var board = document.getElementById('problem-board');
+  if (board) {
+    board.classList.remove('visible');
+    board.classList.remove('pb-collapsed');
+    board.style.display = 'none';
+  }
+  if (pbScrollObserver) { pbScrollObserver.disconnect(); pbScrollObserver = null; }
+  pbCurrentScene = -1;
+}
+
+function toggleProblemBoard() {
+  var board = document.getElementById('problem-board');
+  if (!board) return;
+  if (!board.classList.contains('visible')) {
+    // Board not shown at all yet -- show it expanded
+    showProblemBoard();
+  } else if (board.classList.contains('pb-collapsed')) {
+    // Board is collapsed -- expand it (slide in from right)
+    board.classList.remove('pb-collapsed');
+    var edgeTab = document.getElementById('pb-edge-tab');
+    if (edgeTab) edgeTab.style.display = 'none';
+  } else {
+    // Board is visible and expanded -- collapse it (slide out to right)
+    board.classList.add('pb-collapsed');
+    var edgeTab2 = document.getElementById('pb-edge-tab');
+    if (edgeTab2) edgeTab2.style.display = '';
+  }
+}
+
+function collapseProblemBoard() {
+  var board = document.getElementById('problem-board');
+  if (!board || !board.classList.contains('visible')) return;
+  board.classList.add('pb-collapsed');
+  var edgeTab = document.getElementById('pb-edge-tab');
+  if (edgeTab) edgeTab.style.display = '';
+}
+
+function expandProblemBoard() {
+  var board = document.getElementById('problem-board');
+  if (!board) return;
+  board.classList.remove('pb-collapsed');
+  var edgeTab = document.getElementById('pb-edge-tab');
+  if (edgeTab) edgeTab.style.display = 'none';
+}
+
+// ============================================================
+// NOCTA DESIGN SYSTEM — Craft Precision
+// Auto-hide chrome, Sameer panel, level badge, cursor spotlight
+// ============================================================
+
+// ---- Craft palette helper: open Sameer with a pre-filled question ----
+function openSameerWith(question) {
+  // Switch to cowrite room if not there, then open Sameer panel
+  if (state.view !== "cowrite") openCowriteRoom();
+  toggleSameerPanel(true);
+  const ta = $("#sameer-ta");
+  if (ta) { ta.value = question; ta.focus(); }
+}
+
+// ---- Sameer panel toggle ----
+let sameerPanelOpen = false;
+
+function toggleSameerPanel(forceOpen) {
+  const panel = $("#sameer-panel");
+  if (!panel) return;
+  sameerPanelOpen = forceOpen !== undefined ? forceOpen : !sameerPanelOpen;
+  panel.classList.toggle("open", sameerPanelOpen);
+}
+
+// ---- Level badge (progressive revelation) ----
+let craftLevel = 1;
+const levelNames = {
+  1: "Level 1 \u00b7 Upload & Discover",
+  2: "Level 2 \u00b7 Explore Findings",
+  3: "Level 3 \u00b7 Deep Dive",
+  4: "Level 4 \u00b7 Master View",
+};
+
+function setCraftLevel(n) {
+  craftLevel = Math.max(1, Math.min(4, n));
+  document.body.className = document.body.className.replace(/level-\d/g, "") + " level-" + craftLevel;
+  const text = $("#level-text");
+  if (text) text.textContent = levelNames[craftLevel];
+}
+
+// ---- Auto-hide chrome ----
+let chromeHideTimer = null;
+const CHROME_HIDE_DELAY = 4000; // 4s idle
+
+function showChrome() {
+  document.body.classList.add("chrome-visible");
+  clearTimeout(chromeHideTimer);
+  chromeHideTimer = setTimeout(hideChrome, CHROME_HIDE_DELAY);
+}
+
+function hideChrome() {
+  document.body.classList.remove("chrome-visible");
+}
+
+// ---- Cursor spotlight ----
+function initSpotlight() {
+  const spot = $("#cursor-spotlight");
+  if (!spot) return;
+  document.addEventListener("mousemove", (e) => {
+    spot.style.setProperty("--gx", e.clientX + "px");
+    spot.style.setProperty("--gy", e.clientY + "px");
+  });
+}
+
+// ---- Wire everything on DOMContentLoaded ----
+function initNoctaDesign() {
+  // Auto-hide chrome
+  document.body.classList.add("auto-hide-chrome");
+  // Show chrome once on load so the writer sees the toolbar immediately.
+  // The existing 4s idle timer hides it after that.
+  showChrome();
+  document.addEventListener("mousemove", (e) => {
+    if (e.clientY < 120) showChrome();
+  });
+  // Always show chrome when hovering over sidebar or modals
+  $("#sidebar").addEventListener("mouseenter", showChrome);
+  document.querySelectorAll(".modal-overlay").forEach((m) => {
+    m.addEventListener("mouseenter", showChrome);
+  });
+
+  // Sameer panel
+  const sameerClose = $("#sameer-close");
+  if (sameerClose) sameerClose.addEventListener("click", () => toggleSameerPanel(false));
+  const sameerSend = $("#sameer-send");
+  if (sameerSend) sameerSend.addEventListener("click", () => {
+    const ta = $("#sameer-ta");
+    const text = ta ? ta.value.trim() : "";
+    if (!text) return;
+    const thread = $("#sameer-thread");
+    const msg = document.createElement("div");
+    msg.className = "sp-msg user";
+    msg.textContent = text;
+    thread.appendChild(msg);
+    ta.value = "";
+    thread.scrollTop = thread.scrollHeight;
+  });
+  const sameerTa = $("#sameer-ta");
+  if (sameerTa) sameerTa.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      $("#sameer-send").click();
+    }
+  });
+
+  // Level badge — auto-advance on finding interaction
+  document.addEventListener("click", (e) => {
+    const card = e.target.closest(".finding-card, .fix-row, .cat");
+    if (card && craftLevel < 2) setCraftLevel(2);
+    if (card && craftLevel < 3) setTimeout(() => setCraftLevel(3), 2000);
+  });
+  setCraftLevel(1);
+
+  // Cursor spotlight
+  initSpotlight();
+}
+
+document.addEventListener("DOMContentLoaded", initNoctaDesign);
+
 document.addEventListener("DOMContentLoaded", init);
+
+// Text selection popup — context-aware actions on highlight
+(function initTextPopup() {
+  const popup = $("#text-popup");
+  if (!popup) return;
+  let activeSelection = null;
+  let hideTimeout = null;
+
+  function showPopup(x, y, context) {
+    // Hide all items first
+    popup.querySelectorAll(".text-popup-item").forEach(el => el.style.display = "none");
+    // Show context-appropriate items
+    const askSameer = popup.querySelector('[data-action="ask-sameer"]');
+    const askConsultant = popup.querySelector('[data-action="ask-consultant"]');
+    const marginNote = popup.querySelector('[data-action="margin-note"]');
+    const stash = popup.querySelector('[data-action="stash"]');
+    const addLogline = popup.querySelector('[data-action="add-logline"]');
+    const rewrite = popup.querySelector('[data-action="rewrite"]');
+    const locate = popup.querySelector('[data-action="locate"]');
+
+    if (context === "idea") {
+      askSameer.style.display = "";
+      addLogline.style.display = "";
+      marginNote.style.display = "";
+      stash.style.display = "";
+    } else if (context === "script") {
+      askSameer.style.display = "";
+      askConsultant.style.display = "";
+      marginNote.style.display = "";
+      stash.style.display = "";
+    } else if (context === "revision") {
+      askSameer.style.display = "";
+      askConsultant.style.display = "";
+      rewrite.style.display = "";
+      locate.style.display = "";
+    }
+
+    // Position popup near cursor, keep in viewport
+    popup.style.left = Math.min(x, window.innerWidth - 200) + "px";
+    popup.style.top = Math.min(y, window.innerHeight - 200) + "px";
+    popup.style.display = "block";
+  }
+
+  function hidePopup() {
+    popup.style.display = "none";
+    activeSelection = null;
+  }
+
+  function getSelectionContext() {
+    if (state.inIdea) return "idea";
+    if (document.getElementById("revision-view") && !document.getElementById("revision-view").style.display.includes("none")) return "revision";
+    return "script";
+  }
+
+  // Listen for mouseup (text selection end)
+  document.addEventListener("mouseup", (e) => {
+    clearTimeout(hideTimeout);
+    // Don't show popup if clicking inside the popup itself or a chat composer
+    if (popup.contains(e.target)) return;
+    if (e.target.closest(".composer") || e.target.closest("#sameer-ta") || e.target.closest("#input")) {
+      hidePopup();
+      return;
+    }
+    // Check if there's a selection
+    const sel = window.getSelection();
+    if (sel && sel.toString().trim().length > 2) {
+      activeSelection = sel.toString().trim();
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      showPopup(rect.left + rect.width / 2, rect.bottom + 8, getSelectionContext());
+    } else {
+      // Delay hide to allow clicking popup items
+      hideTimeout = setTimeout(hidePopup, 200);
+    }
+  });
+
+  // Hide on Esc
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") hidePopup();
+  });
+
+  // Handle popup item clicks
+  popup.addEventListener("click", (e) => {
+    const item = e.target.closest(".text-popup-item");
+    if (!item) return;
+    const action = item.dataset.action;
+    const text = activeSelection || "";
+    if (action === "ask-sameer") {
+      // Open Sameer drawer with the selected text quoted
+      openCowriteRoom();
+      const input = $("#input");
+      if (input) {
+        input.value = '/sameer "' + text.substring(0, 200) + '"';
+        input.focus();
+      }
+    } else if (action === "ask-consultant") {
+      openFeedbackRoom();
+      const input = $("#input");
+      if (input) {
+        input.value = '"' + text.substring(0, 200) + '"';
+        input.focus();
+      }
+    } else if (action === "margin-note") {
+      // Pin a note to the current line
+      const noteInput = $("#rail-note-input");
+      if (noteInput) {
+        noteInput.value = text.substring(0, 200);
+        noteInput.focus();
+        // Toggle rail open if closed
+        const rail = $("#struct-rail");
+        if (rail && rail.classList.contains("rail-collapsed")) {
+          rail.classList.remove("rail-collapsed");
+          $("#rail-edge-tab").style.display = "none";
+        }
+      }
+    } else if (action === "stash") {
+      // Stash the selected text
+      const stashInput = $("#rail-note-input");
+      if (stashInput) {
+        stashInput.value = "[STASH] " + text.substring(0, 200);
+        stashInput.focus();
+      }
+    }
+    hidePopup();
+  });
+})();

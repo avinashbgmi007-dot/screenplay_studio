@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1a101">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1a107">
 </head>
 <body data-room="cowrite">
 
@@ -165,7 +165,7 @@
       <aside id="struct-rail" class="struct-rail">
         <div class="rail-head">
           <span class="rail-title">Structure</span>
-          <button id="rail-toggle" class="rail-toggle" type="button" title="Collapse the structure rail">«</button>
+          <button id="rail-toggle" class="rail-toggle" type="button" title="Collapse the structure rail" aria-expanded="false">«</button>
         </div>
         <div class="rail-body">
           <div class="rail-section-label">Scenes</div>
@@ -257,18 +257,26 @@
           <div class="script-actions">
             <button id="premise-btn" class="btn-secondary" title="The premise card that grew into this script" type="button" style="display:none;">📌 Premise</button>
             <button id="focus-btn" class="btn-secondary" title="Focus mode — the page dims to the line you're on, and the script follows you (typewriter scroll)" type="button">✳ Focus</button>
-            <button id="reader-btn" class="btn-secondary" title="Reader mode — the draft clean, no margin machinery" type="button">Reader</button>
-            <button id="undo-btn" class="btn-secondary" title="Undo the last applied edit (Ctrl+Z)" disabled>↶ Undo</button>
-            <button id="redo-btn" class="btn-secondary" title="Re-apply the undone edit (Ctrl+Shift+Z)" disabled>↷ Redo</button>
             <button id="revise-btn" class="btn-secondary" title="Revision view — the doctor's findings beside the draft, with a scene navigator" type="button">✎ Revise</button>
-            <button id="bb-icon" class="btn-secondary icon-btn" title="Beat Board — try a new scene order" type="button">📋</button>
-            <button id="compare-icon" class="btn-secondary icon-btn" title="Compare drafts side by side" type="button">🗂</button>
-            <a id="export-backup" class="btn-secondary" title="Download the whole project — source, parse, report, chats, edits — as one .zip" download>⬇ Backup .zip</a>
-            <a id="export-fountain" class="btn-secondary" download>Export .fountain</a>
-            <a id="export-fdx" class="btn-secondary" download>Export .fdx</a>
-            <a id="export-txt" class="btn-secondary" download>Export .txt</a>
-            <button id="print-btn" class="btn-secondary" title="Print the working draft, or save it as PDF (Ctrl+P)">Print / Save PDF</button>
-            <button id="reset-edits-btn" class="btn-secondary danger" style="display:none;">Discard edits</button>
+            <div class="overflow-menu-wrap">
+              <button id="overflow-toggle" class="btn-secondary overflow-toggle" title="More actions" type="button">⋯</button>
+              <div id="overflow-dropdown" class="overflow-dropdown" style="display:none;">
+                <button id="reader-btn" class="overflow-item" type="button">Reader</button>
+                <button id="bb-icon" class="overflow-item" type="button">📋 Beat Board</button>
+                <button id="compare-icon" class="overflow-item" type="button">🗂 Compare</button>
+                <div class="overflow-sep"></div>
+                <a id="export-backup" class="overflow-item" download>⬇ Backup .zip</a>
+                <a id="export-fountain" class="overflow-item" download>Export .fountain</a>
+                <a id="export-fdx" class="overflow-item" download>Export .fdx</a>
+                <a id="export-txt" class="overflow-item" download>Export .txt</a>
+                <div class="overflow-sep"></div>
+                <button id="print-btn" class="overflow-item" title="Print the working draft, or save it as PDF (Ctrl+P)" type="button">Print / Save PDF</button>
+                <button id="reset-edits-btn" class="overflow-item danger" style="display:none;" type="button">Discard edits</button>
+              </div>
+            </div>
+            <!-- Hidden: Undo/Redo still work via keyboard shortcuts Ctrl+Z / Ctrl+Shift+Z -->
+            <button id="undo-btn" class="btn-secondary" style="display:none;" disabled>↶ Undo</button>
+            <button id="redo-btn" class="btn-secondary" style="display:none;" disabled>↷ Redo</button>
           </div>
         </div>
         <div id="draft-bar" class="draft-bar" style="display:none;">
@@ -287,6 +295,22 @@
       </section>
 
       <div id="pane-divider" class="pane-divider" role="separator" aria-orientation="vertical" title="Drag to resize the script pane — double-click to reset"></div>
+
+      <!-- Problem Board: findings panel on the right side of the workspace -->
+      <aside id="problem-board" class="problem-board" style="display:none;">
+        <div class="pb-head">
+          <button id="pb-toggle" class="pb-toggle" type="button" title="Collapse/expand the Problem Board">▾</button>
+          <span class="pb-title">Problem Board</span>
+          <select id="pb-filter" class="pb-filter">
+            <option value="all">All</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div id="pb-list" class="pb-list"></div>
+      </aside>
+      <button id="pb-edge-tab" class="pb-edge-tab" type="button" title="Open the Problem Board — findings for the current scene">☰ Board</button>
       </div>
 
       <!-- Manuscript Stage: the partner drawer — summoned from the gutter, gone
@@ -367,12 +391,12 @@
     <!-- Status strip: model · connection · loop metrics · sprint · room light -->
     <footer id="status-strip" class="status-strip">
       <span id="status-project" class="status-item status-project" style="display:none;"></span>
+      <span id="status-conn" class="status-item" title="Model connection status — hover for details">—</span>
       <span id="status-model" class="status-item status-model-wrap">
         <span id="status-model-label">…</span>
         <div id="conn-card" class="conn-card" role="tooltip" hidden></div>
       </span>
-      <span id="status-conn" class="status-item">—</span>
-      <span id="status-metrics" class="status-item status-metrics" title="Your writing loop, measured quietly on this machine">⚡ —</span>
+      <span id="status-metrics" class="status-item status-metrics" title="Your writing loop, measured quietly on this machine" style="display:none;">⚡ —</span>
       <span class="status-spacer"></span>
       <span id="sprint-timer" class="status-item status-btn" title="A 25-minute writing sprint. Click to start or pause, double-click to reset." role="button" tabindex="0">⏱ 25:00</span>
       <span id="status-elapsed" class="status-item"></span>
@@ -421,6 +445,65 @@
         <aside id="revision-findings" class="revision-findings" aria-label="Findings queue"></aside>
       </div>
       <footer id="revision-status" class="revision-status"></footer>
+    </section>
+
+    <!-- Feedback View: 3-panel layout: Sushruta left, script center, Problem Board/Sameer right -->
+    <section id="feedback-view" class="view" style="display:none;">
+      <div class="fv-header">
+        <span class="fv-title">Feedback View</span>
+        <span class="fv-sub" id="fv-status">Findings on the page, both partners at hand.</span>
+        <button id="fv-close" class="btn-secondary" type="button">&larr; Back to the page</button>
+      </div>
+      <div class="fv-body">
+        <!-- Left: Sushruta (consultant) chat -->
+        <div class="fv-panel fv-consult">
+          <div class="fv-panel-head">
+            <div class="fv-avatar consult">D</div>
+            <div><div class="fv-name">Dr. Sushruta</div><div class="fv-role">script consultant</div></div>
+          </div>
+          <div id="fv-consult-messages" class="fv-messages"></div>
+          <form id="fv-consult-composer" class="fv-composer">
+            <input id="fv-consult-input" type="text" placeholder="Ask Dr. Sushruta..." class="inp">
+            <button type="submit" class="btn-primary btn-small">&raquo;</button>
+          </form>
+        </div>
+        <!-- Center: Script with compact finding dots -->
+        <div class="fv-script" id="fv-script"></div>
+        <!-- Right: Problem Board / Sameer toggle -->
+        <div class="fv-panel fv-right">
+          <div class="fv-right-tabs">
+            <button class="fv-tab active" data-tab="board" id="fv-tab-board">&#128203; Board</button>
+            <button class="fv-tab" data-tab="sameer" id="fv-tab-sameer">&#128172; Sameer</button>
+          </div>
+          <!-- Problem Board -->
+          <div class="fv-right-pane" id="fv-board-pane">
+            <div class="fv-board-head">
+              <button id="fv-board-toggle" class="fv-board-toggle" type="button" title="Collapse/expand the Problem Board">▾</button>
+              <span class="fv-board-title" id="fv-board-title">Problem Board</span>
+              <select id="fv-board-filter" class="fv-board-filter">
+                <option value="all">All</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div id="fv-board-list" class="fv-board-list"></div>
+          </div>
+          <!-- Sameer chat (hidden by default when findings exist) -->
+          <div class="fv-right-pane" id="fv-sameer-pane" style="display:none;">
+            <div class="fv-panel-head">
+              <div class="fv-avatar cowrite">S</div>
+              <div><div class="fv-name">Sameer</div><div class="fv-role">co-writer</div></div>
+            </div>
+            <div id="fv-cowrite-messages" class="fv-messages"></div>
+            <form id="fv-cowrite-composer" class="fv-composer">
+              <input id="fv-cowrite-input" type="text" placeholder="Rewrite suggestion..." class="inp">
+              <button type="submit" class="btn-primary btn-small">&raquo;</button>
+            </form>
+          </div>
+        </div>
+        <button id="fv-right-edge-tab" class="fv-right-edge-tab" type="button" title="Open the Problem Board">☰ Board</button>
+      </div>
     </section>
 
   </main>
@@ -516,7 +599,49 @@
       <button id="fork-save" class="btn-primary">Create fork</button>
     </div>
   </div>
-</div>  <script src="core.js?v=hx1a102"></script>
-<script src="app.js?v=hx1a103"></script>
+</div>
+
+<!-- Sameer contextual slide-in panel -->
+<div class="sameer-panel" id="sameer-panel">
+  <div class="sp-head">
+    <div class="sp-avatar">S</div>
+    <div><div class="sp-name">Sameer</div><div class="sp-sub">co-writer · craft mentor</div></div>
+    <button class="sp-close" id="sameer-close" aria-label="Close Sameer panel">✕</button>
+  </div>
+  <div class="sp-thread" id="sameer-thread">
+    <div class="sp-msg ai">Read Draft 3 overnight. The stairwell scene sings.<div class="craft-ref">McKee — Gap Analysis</div></div>
+    <div class="sp-msg ai">Act II midpoint arrives 12 pages late. Promote the stairwell.<div class="craft-ref">Snyder — Midpoint</div></div>
+    <div class="sp-msg ai">Mara exit line works as subtext. Cut the repeat.<div class="craft-ref">McKee — Setup/Payoff</div></div>
+  </div>
+  <div class="sp-composer">
+    <textarea id="sameer-ta" rows="1" placeholder="Ask Sameer..."></textarea>
+    <button class="send-btn" id="sameer-send" aria-label="Send to Sameer">→</button>
+  </div>
+</div>
+
+<!-- Level badge (progressive revelation) -->
+<div class="level-badge" id="level-badge">
+  <span class="lv-dot"></span>
+  <span id="level-text">Level 1 · Upload & Discover</span>
+</div>
+
+<!-- Cursor spotlight -->
+<div class="cursor-spotlight" id="cursor-spotlight"></div>
+
+<!-- Contextual text selection popup -->
+<div id="text-popup" class="text-popup" style="display:none;">
+  <button class="text-popup-item" data-action="ask-sameer"><span class="tp-icon accent">✎</span> Ask Sameer about this</button>
+  <button class="text-popup-item" data-action="ask-consultant" style="display:none;"><span class="tp-icon accent2">✎</span> Ask Consultant</button>
+  <div class="text-popup-sep"></div>
+  <button class="text-popup-item" data-action="margin-note"><span class="tp-icon">📝</span> Add margin note</button>
+  <button class="text-popup-item" data-action="stash"><span class="tp-icon">📥</span> Stash this</button>
+  <div class="text-popup-sep"></div>
+  <button class="text-popup-item" data-action="add-logline" style="display:none;"><span class="tp-icon">✦</span> Add to logline</button>
+  <button class="text-popup-item" data-action="rewrite" style="display:none;"><span class="tp-icon">⚙</span> Rewrite passage</button>
+  <button class="text-popup-item" data-action="locate" style="display:none;"><span class="tp-icon">📍</span> Locate finding</button>
+</div>
+
+<script src="core.js?v=hx1a102"></script>
+<script src="app.js?v=hx1a108"></script>
 </body>
 </html>
