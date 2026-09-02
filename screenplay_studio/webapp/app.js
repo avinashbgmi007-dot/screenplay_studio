@@ -4290,6 +4290,10 @@ async function openCompareView() {
   saveSession();
 }
 
+function closeCompareView() {
+  setRoom(comparePrevRoom);
+}
+
 async function loadCompare() {
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   try { state.drafts = await api(`${base}/drafts`); } catch (_) { state.drafts = { drafts: [], active_draft: null }; }
@@ -4547,9 +4551,12 @@ let bbOrder = [];       // the working (possibly unsaved) order
 let bbCards = [];       // card data keyed by scene_number
 let bbDirty = false;
 
+let bbPrevRoom = "cowrite";
+
 async function openBeatboardView() {
   if (state.view === "beatboard") return;
   exitSpotlight();
+  bbPrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
   state.view = "beatboard";
   hideAllViews();
   $("#beatboard-view").style.display = "flex";
@@ -4559,6 +4566,10 @@ async function openBeatboardView() {
     showError("Couldn't load the beat board: " + e.message);
   }
   saveSession();
+}
+
+function closeBeatboardView() {
+  setRoom(bbPrevRoom);
 }
 
 async function loadBeatboard() {
@@ -5054,6 +5065,8 @@ function bindGlobalShortcuts() {
     if (e.key === "Escape") {
       if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
       if (state.view === "revision") { closeRevisionView(); return; }
+      if (state.view === "compare") { closeCompareView(); return; }
+      if (state.view === "beatboard") { closeBeatboardView(); return; }
       // (open modals already returned above — drawer/shelf/rail are safe)
       {
         const drawer = $("#room-drawer");
