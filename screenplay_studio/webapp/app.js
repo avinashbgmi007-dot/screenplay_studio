@@ -5463,7 +5463,6 @@ function init() {
   wireMics();
   const projectsPromise = Promise.all([loadProjects(), loadIdeas()]);
   loadLibrary();
-  setInterval(checkConnection, 30000);
 
   // the den greets the writer by the hour
   const greeting = $("#welcome-greeting");
