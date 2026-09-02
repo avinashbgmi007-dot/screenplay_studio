@@ -995,6 +995,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 }
 #script-pane > .script-toolbar, #script-pane > .draft-bar, #script-pane > .diff-banner,
 #script-pane > .script-scenes, #script-pane > .premise-pane { position: relative; z-index: 1; }
+/* the toolbar outranks the docked Problem Board (z 510) so its buttons stay
+   clickable and the overflow dropdown (absolute, inside this context) opens
+   ABOVE the board instead of underneath it */
+#script-pane > .script-toolbar { z-index: 520; }
 
 .script-toolbar {
   display: flex;
