@@ -181,6 +181,41 @@ def _make_client(m: ProjectManifest):
                              fast_model=m.fast_model)
 
 
+# sentinel: "model not provided in this request" (None is a real value = clear it)
+_UNSET = object()
+
+
+def _sync_server_url_to_projects(server_url: str, model=_UNSET) -> None:
+    """Carry a settings change to every existing project manifest.
+
+    Projects snapshot server_url at creation time. Without this sync, a project
+    analyzed against an old server keeps pointing there forever — chat, rewrite
+    and analyze all hit the dead URL while the connection strip shows green
+    (it tests the global config, not the manifest). Called when settings save.
+    """
+    if not os.path.isdir(PROJECTS_DIR):
+        return
+    for name in os.listdir(PROJECTS_DIR):
+        manifest_path = os.path.join(PROJECTS_DIR, name, "project.json")
+        if not os.path.isfile(manifest_path):
+            continue
+        try:
+            m = ProjectManifest.load(os.path.join(PROJECTS_DIR, name))
+            changed = False
+            if m.server_url != server_url:
+                m.server_url = server_url
+                changed = True
+            if model is not _UNSET:
+                new_model = model or None
+                if m.model_id != new_model:
+                    m.model_id = new_model
+                    changed = True
+            if changed:
+                m.save()
+        except Exception:
+            continue  # unreadable project dir — never let one bad manifest break the settings save
+
+
 def _sanitize_report(report: dict) -> dict:
     """Drop non-writing feedback (dialect identification, subtitle meta-
     commentary) from a stored report before it reaches the writer. Applied at
@@ -303,6 +338,12 @@ def set_config():
         # the demo thread keeps running but stops answering the desk
         if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
             _DEMO_MODEL_ACTIVE = False
+        # the writer changed where the model lives — carry that to every
+        # existing project too. Without this, projects keep a stale per-project
+        # server_url (e.g. an old port) and every LLM call (chat, rewrite,
+        # analyze) silently hits a dead server while the status strip shows
+        # green (it tests the global URL, not the manifest's).
+        _sync_server_url_to_projects(CONFIG["server_url"], body["model"] if "model" in body else _UNSET)
     if "model" in body:
         CONFIG["model"] = body["model"] or None
     if "fast_model" in body:
@@ -1723,18 +1764,25 @@ def start_chat(name):
     return jsonify({"session_id": session.session_id, "model_id": session.model_id, "branch": session.current_branch})
 
 
-def _engine_base_url(session):
+def _engine_base_url(session, manifest=None):
     """Base URL for a chat engine. Sessions remember the server they were
-    created with (a remembered preference), but in DEMO mode there is exactly
-    one server — the in-process one — and its port changes every restart, so
-    a stale pin would 502 forever. Live config wins in demo mode."""
+    created with (a remembered preference), but three things outrank the pin:
+    DEMO mode (its port changes every restart), a demo-era pin (switching back
+    to the real server must win), and the project manifest's URL — the manifest
+    is synced whenever settings change, so a session pinned to a retired
+    server/port never keeps pointing at a dead URL while the desk shows green.
+    """
     if _DEMO_MODEL_ACTIVE:
         return CONFIG["server_url"]
     # a session created during demo mode pins the demo port; once the writer
     # switches back to their real server, that pin must not win
     if session.server_url and _DEMO_URL and session.server_url == _DEMO_URL:
         return CONFIG["server_url"]
-    return session.server_url or CONFIG["server_url"]
+    if manifest is not None and session.server_url and manifest.server_url != session.server_url:
+        # the project moved servers since this session was created (settings
+        # sync rewrote the manifest) — follow the project
+        return manifest.server_url
+    return session.server_url or (CONFIG["server_url"] if manifest is None else manifest.server_url)
 
 
 def _load_session_and_engine(project: str, session_id: str):
@@ -1765,7 +1813,7 @@ def _load_session_and_engine(project: str, session_id: str):
     # slow reply surfaces a "still working?" prompt instead of a silent
     # multi-minute hang. Analysis calls keep the long timeout; only chat
     # turns use turn_timeout.
-    client = LlamaServerClient(base_url=_engine_base_url(session), model=session.model_id,
+    client = LlamaServerClient(base_url=_engine_base_url(session, m), model=session.model_id,
                                timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
     memory = None
     try:
