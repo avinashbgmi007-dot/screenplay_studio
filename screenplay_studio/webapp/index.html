@@ -452,6 +452,7 @@
       <div class="fv-header">
         <span class="fv-title">Feedback View</span>
         <span class="fv-sub" id="fv-status">Findings on the page, both partners at hand.</span>
+        <button id="fv-maximize" class="btn-secondary" type="button" title="Give the script the whole room — hide both side panels (click again to restore)">⤢ Maximize script</button>
         <button id="fv-close" class="btn-secondary" type="button">&larr; Back to the page</button>
       </div>
       <div class="fv-body">
@@ -467,8 +468,10 @@
             <button type="submit" class="btn-primary btn-small">&raquo;</button>
           </form>
         </div>
+        <div id="fv-divider-left" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the consultant panel — double-click to reset"></div>
         <!-- Center: Script with compact finding dots -->
         <div class="fv-script" id="fv-script"></div>
+        <div id="fv-divider-right" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the board panel — double-click to reset"></div>
         <!-- Right: Problem Board / Sameer toggle -->
         <div class="fv-panel fv-right">
           <div class="fv-right-tabs">

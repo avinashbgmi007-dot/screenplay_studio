@@ -3847,8 +3847,27 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .fv-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
 .fv-body { flex: 1; display: flex; min-height: 0; }
 .fv-panel { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; }
-.fv-consult { border-right: 1px solid var(--line-soft); }
+.fv-consult { border-right: none; }
 .fv-cowrite { border-left: 1px solid var(--line-soft); }
+
+/* resizable FV panes: drag dividers set flex-basis on the side panels;
+   double-click resets to the 300px default */
+.fv-divider {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: var(--line-soft);
+  border-radius: 3px;
+  margin: 8px 1px;
+  transition: background 0.12s ease;
+  z-index: 5;
+}
+.fv-divider:hover { background: var(--accent); }
+body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-select: none !important; }
+
+/* maximize: the script takes the whole body, both side panels tuck away */
+#feedback-view.fv-maximized .fv-panel { display: none; }
+#feedback-view.fv-maximized .fv-divider { display: none; }
+#feedback-view.fv-maximized .fv-script-inner { max-width: 900px; }
 .fv-panel-head {
   display: flex;
   align-items: center;

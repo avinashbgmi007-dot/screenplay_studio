@@ -4348,6 +4348,7 @@ async function openFeedbackView() {
   if (ws2) ws2.style.display = "none";
   renderFeedbackView();
   initFvScrollSync();
+  initFvDividers();
   // Reset the right panel to expanded state on open
   var fvRight = document.querySelector("#feedback-view .fv-right");
   if (fvRight) fvRight.classList.remove("fv-right-collapsed");
@@ -4358,7 +4359,12 @@ async function openFeedbackView() {
 
 function closeFeedbackView() {
   var fv = document.getElementById("feedback-view");
-  if (fv) fv.style.display = "none";
+  if (fv) {
+    fv.style.display = "none";
+    fv.classList.remove("fv-maximized");
+  }
+  var maxBtn = document.getElementById("fv-maximize");
+  if (maxBtn) { maxBtn.textContent = "\u29A2 Maximize script"; maxBtn.title = "Give the script the whole room \u2014 hide both side panels"; }
   if (fvScrollObserver) { fvScrollObserver.disconnect(); fvScrollObserver = null; }
   fvCurrentScene = -1;
   // Hide the Problem Board — it will re-show via scroll sync when the
@@ -4525,6 +4531,77 @@ function toggleFvRight() {
   } else {
     right.classList.add('fv-right-collapsed');
     if (edgeTab) edgeTab.style.display = '';
+  }
+}
+
+// ---- FV pane resizing: draggable dividers + maximize (breathing room) ----
+// Dividers set flex-basis on the side panels (Sushruta left, board right);
+// the script pane flexes to fill the rest. Double-click resets to default.
+function fvApplyPanelWidth(panel, px) {
+  var body = document.querySelector('#feedback-view .fv-body');
+  if (!body) return;
+  var min = 220;
+  var max = Math.round(body.clientWidth * 0.42);
+  px = Math.max(min, Math.min(px, max));
+  panel.style.flex = '0 0 ' + px + 'px';
+  panel.style.width = px + 'px';
+  return px;
+}
+function fvPanelWidth(panel) {
+  return panel.getBoundingClientRect().width;
+}
+function initFvDividers() {
+  var body = document.querySelector('#feedback-view .fv-body');
+  var consult = document.querySelector('#feedback-view .fv-consult');
+  var right = document.querySelector('#feedback-view .fv-right');
+  var dLeft = document.getElementById('fv-divider-left');
+  var dRight = document.getElementById('fv-divider-right');
+  if (!body || !dLeft || !dRight) return;
+
+  function wire(divider, panel, direction) {
+    var dragging = false;
+    divider.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      dragging = true;
+      document.body.classList.add('fv-resizing');
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging || !panel) return;
+      var bodyRect = body.getBoundingClientRect();
+      var px;
+      if (direction === 'left') {
+        // left panel: width = pointer - body left edge
+        px = e.clientX - bodyRect.left;
+      } else {
+        // right panel: width = body right edge - pointer
+        px = bodyRect.right - e.clientX;
+      }
+      fvApplyPanelWidth(panel, px);
+    });
+    window.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      document.body.classList.remove('fv-resizing');
+    });
+    divider.addEventListener('dblclick', function() {
+      if (!panel) return;
+      panel.style.flex = '';
+      panel.style.width = '';
+    });
+  }
+  wire(dLeft, consult, 'left');
+  wire(dRight, right, 'right');
+}
+
+function toggleFvMaximize() {
+  var fv = document.getElementById('feedback-view');
+  if (!fv) return;
+  fv.classList.toggle('fv-maximized');
+  var btn = document.getElementById('fv-maximize');
+  var on = fv.classList.contains('fv-maximized');
+  if (btn) {
+    btn.textContent = on ? '\u21C4 Restore panels' : '\u29A2 Maximize script';
+    btn.title = on ? 'Bring the consultant and the board back' : 'Give the script the whole room \u2014 hide both side panels';
   }
 }
 
@@ -6197,6 +6274,9 @@ function init() {
   // Feedback View: chat form submission
   $("#fv-consult-composer").addEventListener("submit", function(e) { e.preventDefault(); sendFvMessage("consultant"); });
   $("#fv-cowrite-composer").addEventListener("submit", function(e) { e.preventDefault(); sendFvMessage("sameer"); });
+  // Feedback View: maximize toggle (script gets the whole room)
+  var fvMaxBtn = document.getElementById("fv-maximize");
+  if (fvMaxBtn) fvMaxBtn.addEventListener("click", toggleFvMaximize);
   // Feedback View: tab switching
   $("#fv-tab-board").addEventListener("click", function() { switchFvTab("board"); });
   $("#fv-tab-sameer").addEventListener("click", function() { switchFvTab("sameer"); });
