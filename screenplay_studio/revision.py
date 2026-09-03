@@ -317,7 +317,10 @@ def rewrite_scene(client, doc: ScriptDocument, scene_number: int, finding_text: 
         user += f"\nWRITER'S INSTRUCTION:\n{instruction}\n"
     user += f"\nSCENE TEXT:\n{scene}\n"
 
-    return client.chat_json(system, user, grammar=replacements_grammar(), max_tokens=1500)
+    # 1500 tokens was truncating long replacement JSON mid-emit (finish_reason=
+    # 'length'), which the parser then rejected and the model degraded into
+    # trailing comma noise. 4000 gives the replacements list room to close.
+    return client.chat_json(system, user, grammar=replacements_grammar(), max_tokens=4000)
 
 
 # ---------- finding triage (dismiss / restore) ----------

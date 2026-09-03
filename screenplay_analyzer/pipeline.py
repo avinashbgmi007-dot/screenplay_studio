@@ -339,7 +339,10 @@ def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_
 def run_script_level_category(prompt_fn, client: LlamaServerClient, rules_fragment: str, *args, category: str = "theme", default_severity: str = "low", language: str = "eng") -> list[dict]:
     grammar = findings_grammar()
     system, user = prompt_fn(*args, rules_fragment=rules_fragment, language=language)
-    result = client.chat_json(system, user, grammar=grammar, max_tokens=1500)
+    # 1500 truncated the findings JSON mid-emit on every script-level category
+    # (character/scene_function died at finish_reason='length' in the wild);
+    # grammar-constrained JSON needs headroom to close the array + object.
+    result = client.chat_json(system, user, grammar=grammar, max_tokens=4000)
     items = _extract_items(result, "findings")
     return _normalize_findings(items, category, default_severity=default_severity)
 
