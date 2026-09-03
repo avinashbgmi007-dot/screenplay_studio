@@ -157,6 +157,12 @@ class LlamaServerClient(BaseLlamaClient):
             payload["grammar"] = grammar
             payload.setdefault("chat_template_kwargs", {})
             payload["chat_template_kwargs"]["enable_thinking"] = False
+            # Grammar-constrained calls degenerate into token loops ('",",",')
+            # when repetition is unsuppressed — llama-server ships with
+            # repeat_penalty 1.0 (off). A light penalty breaks the loop
+            # without distorting normal prose.
+            payload["repeat_penalty"] = 1.1
+            payload["presence_penalty"] = 0.3
 
         last_error = None
         for attempt in range(retries + 1):
