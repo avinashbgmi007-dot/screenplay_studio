@@ -1931,6 +1931,10 @@ function setRoom(room) {
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
   $("#revision-view").style.display = "none";
+  // the Feedback View is also a full-screen surface: leaving it via a room
+  // switch (cowrite btn, gutter tab, palette) must hide it too, or it stacks
+  // on top of the workspace and both render at half height
+  $("#feedback-view").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "flex";
   saveSession();
@@ -4129,7 +4133,9 @@ function maybeShowWelcome() {
 }
 
 async function loadFeedbackPanels() {
-  const base = `/api/projects/${encodeURIComponent(state.currentProject)}`;
+  // NOTE: no leading /api here — the api() wrapper already prefixes API = "/api";
+  // a doubled prefix 404s and the room shows "No analysis yet" after a good run
+  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   try {
     if (!state.report) state.report = await api(`${base}/report`);
   } catch (_) { /* no analysis yet */ }
