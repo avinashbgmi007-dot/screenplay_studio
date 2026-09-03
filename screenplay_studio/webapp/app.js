@@ -3281,10 +3281,17 @@ async function loadScriptData() {
   state.notes = (notes && notes.notes) || [];
   let findings = [];
   let report = null;
-  try {
-    report = await api(`${base}/report`);
-    findings = report.findings || [];
-  } catch (_) { /* analysis not complete — script-only mode */ }
+  // Skip the report fetch when the manifest says analysis hasn't completed —
+  // the endpoint would 400 and every fresh project would land a console error
+  // for a perfectly normal "no analysis yet" state.
+  const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
+  const analyzeState = projSummary && projSummary.stages && projSummary.stages.analyze;
+  if (!projSummary || analyzeState === "complete" || analyzeState === "failed") {
+    try {
+      report = await api(`${base}/report`);
+      findings = report.findings || [];
+    } catch (_) { /* failed analysis may still have no report file — script-only mode */ }
+  }
   state.findings = findings;
   state.report = report;
   state.reportStats = (report && report.stats) || null;
