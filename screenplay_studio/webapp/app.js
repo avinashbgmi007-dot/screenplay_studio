@@ -4569,6 +4569,10 @@ function renderFeedbackView() {
     }
     html += '</div>';
   });
+  // the fin: an explicit end-of-script marker so the script column reads as a
+  // finished document — the board beside it is a panel with its own scroll,
+  // and this cap makes that relationship visually honest
+  html += '<div class="fv-fin" aria-hidden="true"><span class="fv-fin-rule"></span><span class="fv-fin-mark">fin</span><span class="fv-fin-rule"></span></div>';
   html += '</div>';
   box.innerHTML = html;
   renderFvChat('fv-consult-messages', 'consult');

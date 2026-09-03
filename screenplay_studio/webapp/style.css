@@ -1227,16 +1227,23 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   padding: 0 1px;
 }
 
-/* margin notes — the marginalia */
+/* margin notes — the marginalia. The column is capped to its scene's height:
+   a scene with many findings gets an internally-scrollable rail instead of a
+   stack that pours 1700px past the scene (and past the script's end) onto the
+   following pages. Top-anchored; widest note defines the column width. */
 .scene-notes {
   position: absolute;
   right: -18px;
   top: 46px;
+  max-height: calc(100% - 52px);
   width: 214px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 2;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .finding-note {
@@ -3966,6 +3973,21 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   min-width: 0;
 }
 .fv-script-inner { max-width: 720px; margin: 0 auto; }
+
+/* the fin — explicit end-of-script cap. Below it the script column rests;
+   findings continue only in the board panel, which owns its own scroll. */
+.fv-fin {
+  display: flex; align-items: center; gap: 14px;
+  padding: 26px 0 34px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.fv-fin-rule { flex: 1; height: 1px; background: var(--line-soft); }
+.fv-fin-mark {
+  font-family: var(--font-typewriter);
+  font-size: 13px; letter-spacing: 0.3em; text-transform: lowercase;
+  color: var(--text-muted); opacity: 0.8;
+}
 .fv-scene { margin-bottom: 20px; }
 .fv-scene .paper {
   width: 100%;
