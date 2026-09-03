@@ -850,10 +850,17 @@ def get_edits(name):
 
 
 def _strip_rewrite_noise(line: str) -> str:
-    """Remove JSON-emit artifacts the model sometimes trails onto copied lines:
-    sequences of quotes/commas/periods at the very end that can't occur in a
-    real screenplay line ('RAVI stops walking.",",' -> 'RAVI stops walking.')."""
-    return re.sub(r'[",\']+$', "", line).rstrip()
+    """Remove JSON-emit artifacts the model leaks into copied lines. Two shapes:
+    1. trailing punctuation/quote noise ('RAVI stops walking.",",' -> 'RAVI stops walking.')
+    2. structural tokens emitted mid-string when the model breaks its own JSON
+       ('RAVI stops walking.",", "new":' -> 'RAVI stops walking.')
+    Cut at the first structural token sequence; strip trailing junk otherwise."""
+    import re as _re
+    # structural break: a quote/comma run followed by a key pattern like "new":
+    m = _re.search(r'"\s*,\s*"?\s*(new|old|note)"?\s*:', line)
+    if m:
+        line = line[:m.start()]
+    return _re.sub(r'[",\']+$', "", line.rstrip()).rstrip()
 
 
 @app.route("/api/projects/<name>/rewrite", methods=["POST"])
