@@ -366,6 +366,10 @@ def list_projects():
         return jsonify([])
     out = []
     for name in sorted(os.listdir(PROJECTS_DIR)):
+        # writer_profile.json is the co-writer's relationship-memory store —
+        # internal data, not a project. It must never appear as a shelf card.
+        if name == "writer_profile.json":
+            continue
         try:
             m = ProjectManifest.load(_project_dir(name))
             out.append(_manifest_summary(m))
@@ -845,7 +849,13 @@ def get_edits(name):
     return jsonify({"edits": edits_log(m), "findings_status": statuses, "can_undo": bool(edits_log(m)), "can_redo": bool(redo_stack(m))})
 
 
-@app.route("/api/projects/<name>/rewrite", methods=["POST"])
+def _strip_rewrite_noise(line: str) -> str:
+    """Remove JSON-emit artifacts the model sometimes trails onto copied lines:
+    sequences of quotes/commas/periods at the very end that can't occur in a
+    real screenplay line ('RAVI stops walking.",",' -> 'RAVI stops walking.')."""
+    return re.sub(r'[",\']+$', "", line).rstrip()
+
+
 def rewrite_scene_endpoint(name):
     """Model-suggested line replacements for one scene. Generates candidates
     only — nothing is applied until the writer approves via /edits/apply."""
@@ -898,7 +908,17 @@ def rewrite_scene_endpoint(name):
     except Exception as e:
         return _error(f"Rewrite failed: {e}", 502)
 
-    replacements = [r for r in result.get("replacements", []) if (r.get("old") or "").strip()]
+    replacements = []
+    for r in result.get("replacements", []):
+        old = (r.get("old") or "").strip()
+        new = (r.get("new") or "").strip()
+        # Models sometimes trail punctuation/quote-comma emit noise onto the
+        # copied line ('.",",' etc.) — it breaks both the diff display and the
+        # exact-match apply. Strip it so 'old' can match the scene verbatim.
+        old = _strip_rewrite_noise(old)
+        new = _strip_rewrite_noise(new)
+        if old and new and old != new:
+            replacements.append({"old": old, "new": new})
     return jsonify({
         "scene_number": scene_number,
         "note": result.get("note", ""),

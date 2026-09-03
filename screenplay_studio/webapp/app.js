@@ -1927,6 +1927,12 @@ function setRoom(room) {
   feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
   $("#cowrite-panel").style.display = room === "cowrite" ? "flex" : "none";
   $("#feedback-panel").style.display = room === "feedback" ? "flex" : "none";
+  // the composer speaks in the active partner's voice: Sameer at the writing
+  // desk, the doctor at the consultant's desk
+  const inputEl = $("#input");
+  if (inputEl) inputEl.placeholder = room === "feedback"
+    ? "Ask the consultant — he has read the whole report…"
+    : "Ask about a scene, a character, a note in the margins…";
   // closing a full-screen tool returns to the active room
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
@@ -1973,6 +1979,7 @@ const ANALYSIS_STAGES = [
   { key: "subtext", label: "On-the-nose scan", weight: 1 },
   { key: "idiolect", label: "Voice consistency", weight: 1 },
   { key: "continuity", label: "Continuity check", weight: 1 },
+  { key: "pacing", label: "Scene pace", weight: 1 },
   { key: "summaries", label: "Scene summaries", weight: 3 },
   { key: "dialogue", label: "Dialogue & action", weight: 5 },
   { key: "theme", label: "Theme & subtext", weight: 2 },
@@ -1980,7 +1987,9 @@ const ANALYSIS_STAGES = [
   { key: "structure", label: "Structure & pacing", weight: 2 },
   { key: "scene_function", label: "Scene functionality", weight: 2 },
   { key: "principles", label: "Setups & payoffs", weight: 3 },
+  { key: "setup_payoff", label: "Setup/payoff ledger", weight: 2 },
   { key: "char_reads", label: "Character perception", weight: 2 },
+  { key: "character_dials", label: "Character dials", weight: 1 },
   { key: "verification", label: "Verifying quotes", weight: 1 },
   { key: "coverage", label: "Writing coverage", weight: 2 },
   { key: "logline_test", label: "Logline test", weight: 1 },
@@ -2343,11 +2352,23 @@ function branchHue(name) {
   return FORK_HUE_PALETTE[h % FORK_HUE_PALETTE.length];
 }
 
+// Who is answering on the chat surface: the active branch persona, labeled
+// with the writer-facing name. In the feedback room that's the consultant
+// (Dr. Sushruta) even when the branch data still says writing_partner.
+function _assistantRoleLabel() {
+  const labels = FALLBACK_PERSONA_LABELS;
+  if (state.view === "feedback" || document.body.dataset.room === "feedback") {
+    return labels.script_consultant || "Dr. Sushruta";
+  }
+  const persona = (currentBranchData() || {}).active_persona || "writing_partner";
+  return labels[persona] || "Sameer";
+}
+
 function renderMessage(m, index) {
   const wrap = el("div", "msg " + (m.role === "user" ? "user" : "assistant"));
   wrap.id = `msg-${index}`;
   const head = el("div", "msg-head");
-  head.appendChild(el("div", "msg-role", m.role === "user" ? "You" : "Studio"));
+  head.appendChild(el("div", "msg-role", m.role === "user" ? "You" : _assistantRoleLabel()));
   if (m.role === "assistant") {
     // "what does that mean?" -- ephemeral rendering in ANY supported register,
     // display-only. Hovering the globe floats the language menu; picking one
