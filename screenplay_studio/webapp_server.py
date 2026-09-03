@@ -856,11 +856,12 @@ def _strip_rewrite_noise(line: str) -> str:
        ('RAVI stops walking.",", "new":' -> 'RAVI stops walking.')
     Cut at the first structural token sequence; strip trailing junk otherwise."""
     import re as _re
-    # structural break: a quote/comma run followed by a key pattern like "new":
-    m = _re.search(r'"\s*,\s*"?\s*(new|old|note)"?\s*:', line)
+    # structural break: quote/comma/backslash run followed by a key like "new":
+    m = _re.search(r'[",\\\s]*(new|old|note)"?\s*:\s*"?$', line)
     if m:
         line = line[:m.start()]
-    return _re.sub(r'[",\']+$', "", line.rstrip()).rstrip()
+    # residual escape/punct tails at the very end
+    return _re.sub(r'[",\'\\]+$', "", line.rstrip()).rstrip()
 
 
 @app.route("/api/projects/<name>/rewrite", methods=["POST"])
