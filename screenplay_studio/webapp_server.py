@@ -856,6 +856,7 @@ def _strip_rewrite_noise(line: str) -> str:
     return re.sub(r'[",\']+$', "", line).rstrip()
 
 
+@app.route("/api/projects/<name>/rewrite", methods=["POST"])
 def rewrite_scene_endpoint(name):
     """Model-suggested line replacements for one scene. Generates candidates
     only — nothing is applied until the writer approves via /edits/apply."""

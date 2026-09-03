@@ -1,84 +1,84 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Script Doctor Studio</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23201a14'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z' fill='none' stroke='%23e8a24f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<!-- v2e607ed — bump the version query whenever style.css/app.js/core.js change so
+<!-- v2e607ed â€” bump the version query whenever style.css/app.js/core.js change so
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
-     Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b301">
+     Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) â€” this
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b307">
 </head>
 <body data-room="cowrite">
 
 <div id="error-banner" class="error-banner" style="display:none;">
   <span id="error-banner-text"></span>
-  <button id="error-banner-dismiss" aria-label="Dismiss">✕</button>
+  <button id="error-banner-dismiss" aria-label="Dismiss">âœ•</button>
 </div>
 
 <div id="app">
 
   <!-- Left: the shelf -->
   <aside id="sidebar">
-    <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="Collapse the sidebar">«</button>
+    <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="Collapse the sidebar">Â«</button>
     <div class="brand">
       <div class="brand-mark">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
       </div>
       <span class="brand-name">Script Doctor<br><span class="brand-sub">Studio</span></span>
-      <span id="connection-dot" class="connection-dot" title="Checking connection…"></span>
+      <span id="connection-dot" class="connection-dot" title="Checking connectionâ€¦"></span>
     </div>
 
     <button id="new-project-btn">+ Lay a new page on the desk</button>
 
     <div class="sidebar-section" id="ideas-section">
       <div class="sidebar-section-head">
-        <button id="ideas-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="idea-list" title="Your idea pages — hover or click to browse">
-          <span>Ideas</span><em class="section-count" id="idea-count"></em><span class="flyout-caret">▾</span>
+        <button id="ideas-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="idea-list" title="Your idea pages â€” hover or click to browse">
+          <span>Ideas</span><em class="section-count" id="idea-count"></em><span class="flyout-caret">â–¾</span>
         </button>
         <button id="new-idea-btn" class="sidebar-new-btn" type="button" title="Start a new idea with Sameer">+ New idea</button>
       </div>
       <div id="idea-list" class="idea-list sidebar-flyout">
-        <p class="empty-hint">No ideas yet — the desk is free for one.</p>
+        <p class="empty-hint">No ideas yet â€” the desk is free for one.</p>
       </div>
     </div>
 
     <div class="sidebar-section" id="shelf-section">
       <div class="sidebar-section-head">
-        <button id="shelf-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="project-list" title="Screenplays on the desk — hover or click to browse">
-          <span>On the shelf</span><em class="section-count" id="shelf-count"></em><span class="flyout-caret">▾</span>
+        <button id="shelf-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="project-list" title="Screenplays on the desk â€” hover or click to browse">
+          <span>On the shelf</span><em class="section-count" id="shelf-count"></em><span class="flyout-caret">â–¾</span>
         </button>
       </div>
       <div id="project-list" class="project-list sidebar-flyout">
-        <p class="empty-hint">The shelf is empty — bring in a screenplay.</p>
+        <p class="empty-hint">The shelf is empty â€” bring in a screenplay.</p>
       </div>
     </div>
 
     <div class="sidebar-section" id="library-section">
       <div class="sidebar-section-head">
-        <button id="library-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="library-list" title="Everything you've written before — hover or click to browse">
-          <span>Your library</span><em class="section-count" id="library-count"></em><span class="flyout-caret">▾</span>
+        <button id="library-trigger" class="sidebar-section-trigger" type="button" aria-expanded="false" aria-controls="library-list" title="Everything you've written before â€” hover or click to browse">
+          <span>Your library</span><em class="section-count" id="library-count"></em><span class="flyout-caret">â–¾</span>
         </button>
       </div>
       <div id="library-list" class="library-list sidebar-flyout">
-        <p class="empty-hint">Past scripts gather here — Sameer and the doctor read this shelf too.</p>
+        <p class="empty-hint">Past scripts gather here â€” Sameer and the doctor read this shelf too.</p>
       </div>
     </div>
 
     <div class="sidebar-footer">
-      <button id="dawn-btn" class="sidebar-footer-btn" title="Draw the curtains — morning light for the room">☀ Dawn</button>
-      <button id="settings-btn" class="sidebar-footer-btn" title="Study settings">⚙ Settings</button>
+      <button id="dawn-btn" class="sidebar-footer-btn" title="Draw the curtains â€” morning light for the room">â˜€ Dawn</button>
+      <button id="settings-btn" class="sidebar-footer-btn" title="Study settings">âš™ Settings</button>
     </div>
   </aside>
 
-  <button id="sidebar-edge-tab" class="sidebar-edge-tab" type="button" title="Open the sidebar">☰ Shelf</button>
+  <button id="sidebar-edge-tab" class="sidebar-edge-tab" type="button" title="Open the sidebar">â˜° Shelf</button>
 
   <!-- Center -->
   <main id="main">
 
-    <!-- Welcome — the room, lamp lit -->
+    <!-- Welcome â€” the room, lamp lit -->
     <section id="welcome-view" class="view">
       <div class="scene-glow" aria-hidden="true"></div>
       <div class="scene-lamp" aria-hidden="true">
@@ -100,48 +100,48 @@
       <div class="welcome-card">
         <p class="welcome-eyebrow" id="welcome-greeting">The lamp's on.</p>
         <h1>Put the pages on the desk.</h1>
-        <p class="welcome-sub">Your story, in your language — English, Tenglish, Hindi, Telugu, Tamil.
+        <p class="welcome-sub">Your story, in your language â€” English, Tenglish, Hindi, Telugu, Tamil.
           The room reads it, marks the margins, argues with you about it, and hands it back rewritten.</p>
 
         <label id="dropzone" for="file-input">
-          <span class="dropzone-icon">✎</span>
-          <span class="dropzone-text">Lay a manuscript here — <code>.fdx</code> <code>.pdf</code> <code>.txt</code> <code>.fountain</code> <code>.md</code></span>
+          <span class="dropzone-icon">âœŽ</span>
+          <span class="dropzone-text">Lay a manuscript here â€” <code>.fdx</code> <code>.pdf</code> <code>.txt</code> <code>.fountain</code> <code>.md</code></span>
           <input type="file" id="file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
         </label>
 
         <div id="upload-status" class="upload-status"></div>
         <div class="welcome-alt">
           <span class="welcome-alt-divider">or</span>
-          <button id="idea-btn" class="btn-paper" type="button">💡 Talk to Sameer about an idea</button>
+          <button id="idea-btn" class="btn-paper" type="button">ðŸ’¡ Talk to Sameer about an idea</button>
           <button id="sample-btn" class="btn-paper" type="button">Open the sample page</button>
         </div>
         <div id="shortcut-hint" class="shortcut-hint">
-          <span>Write by keyboard: <kbd>Ctrl</kbd>+<kbd>K</kbd> commands · <kbd>j</kbd>/<kbd>k</kbd> scenes · <kbd>?</kbd> all shortcuts</span>
-          <button id="shortcut-hint-dismiss" aria-label="Dismiss" title="Don't show again">✕</button>
+          <span>Write by keyboard: <kbd>Ctrl</kbd>+<kbd>K</kbd> commands Â· <kbd>j</kbd>/<kbd>k</kbd> scenes Â· <kbd>?</kbd> all shortcuts</span>
+          <button id="shortcut-hint-dismiss" aria-label="Dismiss" title="Don't show again">âœ•</button>
         </div>
-        <p class="den-footnote">Everything stays on this machine — your pages, your model, your night.</p>
+        <p class="den-footnote">Everything stays on this machine â€” your pages, your model, your night.</p>
       </div>
 
-      <!-- The dashboard: every script on the desk as a card — status, stats,
+      <!-- The dashboard: every script on the desk as a card â€” status, stats,
            one-click actions. Nothing buried in menus. -->
       <div id="dashboard" class="dashboard" aria-label="Your scripts">
         <div class="dash-head">
           <span class="dash-title">On the desk</span>
-          <span id="dash-conn" class="dash-conn" title="Model server status">…</span>
+          <span id="dash-conn" class="dash-conn" title="Model server status">â€¦</span>
         </div>
         <div id="dash-grid" class="dash-grid"></div>
         <div class="dash-how">
-          <div class="how-step"><span class="how-num">1</span><b>Lay the pages down</b><small>Upload .fdx · .pdf · .txt · .fountain · .md — parsed on the spot.</small></div>
-          <div class="how-step"><span class="how-num">2</span><b>Run the doctor</b><small>One click: findings, fix queue, logline test — every quote verified.</small></div>
-          <div class="how-step"><span class="how-num">3</span><b>Rewrite with Sameer</b><small>Double-click any line to edit · select text to ask · export when done.</small></div>
+          <div class="how-step"><span class="how-num">1</span><b>Lay the pages down</b><small>Upload .fdx Â· .pdf Â· .txt Â· .fountain Â· .md â€” parsed on the spot.</small></div>
+          <div class="how-step"><span class="how-num">2</span><b>Run the doctor</b><small>One click: findings, fix queue, logline test â€” every quote verified.</small></div>
+          <div class="how-step"><span class="how-num">3</span><b>Rewrite with Sameer</b><small>Double-click any line to edit Â· select text to ask Â· export when done.</small></div>
         </div>
       </div>
     </section>
 
     <header id="project-bar" style="display:none;">
       <div class="project-bar-left">
-        <button id="home-btn" class="home-btn" type="button" title="Back to the desk — the shelf, your library, and the idea room">⌂</button>
-        <h2 id="project-title">—</h2>
+        <button id="home-btn" class="home-btn" type="button" title="Back to the desk â€” the shelf, your library, and the idea room">âŒ‚</button>
+        <h2 id="project-title">â€”</h2>
         <div id="branch-switcher" class="branch-switcher"></div>
       </div>
       <div class="project-bar-right">
@@ -150,12 +150,12 @@
           <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" type="button">Feedback</button>
         </div>
         <span id="room-chip" class="room-chip">Writer's Desk</span>
-        <button id="palette-btn" class="palette-btn" title="Command palette (Ctrl+K)" type="button">⌘K</button>
+        <button id="palette-btn" class="palette-btn" title="Command palette (Ctrl+K)" type="button">âŒ˜K</button>
       </div>
     </header>
 
     <!-- Hidden: persona/mode remain conversational lenses, but the JS reads
-         these elements for settings — keep them in the DOM, invisible. -->
+         these elements for settings â€” keep them in the DOM, invisible. -->
     <div hidden>
       <select id="persona-select" title="Reader perspective"></select>
       <select id="mode-select" title="Conversation mode"></select>
@@ -164,11 +164,11 @@
     <!-- The workspace: one shared script pane, two switchable room panels -->
     <div class="workspace">
 
-      <!-- Left structural rail: scenes outline · the Stash · margin notes · beats -->
+      <!-- Left structural rail: scenes outline Â· the Stash Â· margin notes Â· beats -->
       <aside id="struct-rail" class="struct-rail">
         <div class="rail-head">
           <span class="rail-title">Structure</span>
-          <button id="rail-toggle" class="rail-toggle" type="button" title="Collapse the structure rail" aria-expanded="false">«</button>
+          <button id="rail-toggle" class="rail-toggle" type="button" title="Collapse the structure rail" aria-expanded="false">Â«</button>
         </div>
         <div class="rail-body">
           <div class="rail-section-label">Scenes</div>
@@ -180,19 +180,19 @@
           <div class="rail-section-label">Margin notes</div>
           <div id="rail-notes" class="rail-notes"></div>
           <form id="rail-note-form" class="rail-note-form">
-            <input id="rail-note-input" type="text" placeholder="A note to pin beside the script…" maxlength="400" aria-label="New margin note">
-            <button type="submit" title="Pin the note">＋</button>
+            <input id="rail-note-input" type="text" placeholder="A note to pin beside the scriptâ€¦" maxlength="400" aria-label="New margin note">
+            <button type="submit" title="Pin the note">ï¼‹</button>
           </form>
         </div>
         <div class="rail-foot">
-          <button id="rail-beats-btn" class="btn-secondary btn-small" type="button">📋 Beat Board</button>
-          <button id="rail-compare-btn" class="btn-secondary btn-small" type="button">🗂 Compare</button>
+          <button id="rail-beats-btn" class="btn-secondary btn-small" type="button">ðŸ“‹ Beat Board</button>
+          <button id="rail-compare-btn" class="btn-secondary btn-small" type="button">ðŸ—‚ Compare</button>
         </div>
       </aside>
 
-      <button id="rail-edge-tab" class="rail-edge-tab" type="button" title="Open the structure rail — scenes, characters, the stash, margin notes">☰ Structure</button>
+      <button id="rail-edge-tab" class="rail-edge-tab" type="button" title="Open the structure rail â€” scenes, characters, the stash, margin notes">â˜° Structure</button>
 
-      <!-- The desk: the manuscript owns the room — full width, no divider -->
+      <!-- The desk: the manuscript owns the room â€” full width, no divider -->
       <div class="desk">
 
       <section id="script-pane" aria-label="The script">
@@ -202,7 +202,7 @@
           <div class="premise-head">
             <span class="premise-title-label">Premise card</span>
             <button id="premise-save-btn" class="btn-secondary btn-small" type="button">Save</button>
-            <button id="premise-graduate-btn" class="btn-primary btn-small" type="button">📄 Upload the first pages</button>
+            <button id="premise-graduate-btn" class="btn-primary btn-small" type="button">ðŸ“„ Upload the first pages</button>
             <input type="file" id="premise-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
           </div>
           <div class="premise-fields">
@@ -213,22 +213,22 @@
               <textarea id="premise-logline" rows="2" placeholder="One or two sentences that sell the idea."></textarea>
             </label>
             <label class="premise-field">Premise
-              <textarea id="premise-text" rows="7" placeholder="The idea as you'd pitch it — a paragraph, freeform."></textarea>
+              <textarea id="premise-text" rows="7" placeholder="The idea as you'd pitch it â€” a paragraph, freeform."></textarea>
             </label>
             <label class="premise-field">Open questions
-              <textarea id="premise-questions" rows="3" placeholder="What you're still circling — one per line."></textarea>
+              <textarea id="premise-questions" rows="3" placeholder="What you're still circling â€” one per line."></textarea>
             </label>
           </div>
-          <p class="premise-hint">The card rides with the conversation — Sameer and the premise doctor read it every turn. Save whenever it shifts.</p>
+          <p class="premise-hint">The card rides with the conversation â€” Sameer and the premise doctor read it every turn. Save whenever it shifts.</p>
           <div id="premise-explore" class="premise-explore">
-            <span class="premise-explore-label">Explore paths — one tap, Sameer (or the doctor) runs with it:</span>
+            <span class="premise-explore-label">Explore paths â€” one tap, Sameer (or the doctor) runs with it:</span>
             <div class="explore-chips"></div>
-            <p class="premise-journey">The usual path: <b>explore</b> with Sameer → <b>validate</b> with the premise doctor → <b>upload the first pages</b> and keep the same conversation.</p>
+            <p class="premise-journey">The usual path: <b>explore</b> with Sameer â†’ <b>validate</b> with the premise doctor â†’ <b>upload the first pages</b> and keep the same conversation.</p>
           </div>
         </div>
 
         <!-- Idea canvas: a blank page, not a form. The idea phase is free-form
-             — you type whatever comes; it autosaves and titles itself. Sameer is
+             â€” you type whatever comes; it autosaves and titles itself. Sameer is
              OPTIONAL: the floating pill (or /sameer) summons a chat dedicated to
              this idea alone. The structured logline/questions live behind the
              Structure toggle, out of the way. No doctor, no scripts, no shelf
@@ -244,8 +244,8 @@
           <div class="idea-head">
             <input id="idea-title-input" class="idea-title-input" type="text" value="" maxlength="80" spellcheck="false" aria-label="Idea title" title="Click to rename">
             <span id="idea-save-state" class="idea-save-state" aria-live="polite"></span>
-            <button id="idea-structure-btn" class="idea-structure-btn" type="button" title="The structured logline / open-questions view — kept out of the way">▸ Structure</button>
-            <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script — the wall grows up">✦ Grow into pages</button>
+            <button id="idea-structure-btn" class="idea-structure-btn" type="button" title="The structured logline / open-questions view â€” kept out of the way">â–¸ Structure</button>
+            <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script â€” the wall grows up">âœ¦ Grow into pages</button>
             <input type="file" id="idea-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
           </div>
           <textarea id="idea-content" class="idea-content" spellcheck="false" aria-label="The idea page"></textarea>
@@ -254,29 +254,29 @@
               <textarea id="idea-logline" rows="2" placeholder="One or two sentences that sell the idea."></textarea>
             </label>
             <label class="premise-field">Open questions
-              <textarea id="idea-questions" rows="3" placeholder="What you're still circling — one per line."></textarea>
+              <textarea id="idea-questions" rows="3" placeholder="What you're still circling â€” one per line."></textarea>
             </label>
             <button id="idea-structure-save" class="btn-secondary btn-small" type="button">Save structure</button>
           </div>
-          <button id="idea-sam-pill" class="idea-sam-pill" type="button" title="Talk to Sameer about this idea — the chat carries the whole page">Sameer</button>
+          <button id="idea-sam-pill" class="idea-sam-pill" type="button" title="Talk to Sameer about this idea â€” the chat carries the whole page">Sameer</button>
         </div>
 
         <div id="script-toolbar" class="script-toolbar">
-          <input id="script-search" type="search" placeholder="Search the script… (e.g. a character, a prop, a line)" aria-label="Search script text">
+          <input id="script-search" type="search" placeholder="Search the scriptâ€¦ (e.g. a character, a prop, a line)" aria-label="Search script text">
           <div id="finding-summary" class="finding-summary"></div>
           <div class="script-actions">
-            <button id="premise-btn" class="btn-secondary" title="The premise card that grew into this script" type="button" style="display:none;">📌 Premise</button>
-            <button id="focus-btn" class="btn-secondary" title="Focus mode — the page dims to the line you're on, and the script follows you (typewriter scroll)" type="button">✳ Focus</button>
-            <button id="revise-btn" class="btn-secondary" title="Revision view — the doctor's findings beside the draft, with a scene navigator" type="button">✎ Revise</button>
+            <button id="premise-btn" class="btn-secondary" title="The premise card that grew into this script" type="button" style="display:none;">ðŸ“Œ Premise</button>
+            <button id="focus-btn" class="btn-secondary" title="Focus mode â€” the page dims to the line you're on, and the script follows you (typewriter scroll)" type="button">âœ³ Focus</button>
+            <button id="revise-btn" class="btn-secondary" title="Revision view â€” the doctor's findings beside the draft, with a scene navigator" type="button">âœŽ Revise</button>
             <div class="overflow-menu-wrap">
-              <button id="overflow-toggle" class="btn-secondary overflow-toggle" title="More actions" type="button">⋯</button>
+              <button id="overflow-toggle" class="btn-secondary overflow-toggle" title="More actions" type="button">â‹¯</button>
               <div id="overflow-dropdown" class="overflow-dropdown" style="display:none;">
                 <button id="reader-btn" class="overflow-item" type="button">Reader</button>
-                <button id="flow-btn" class="overflow-item" title="River read — the draft as one continuous flow; a current nav tracks your drift (Esc leaves)" type="button">≋ Flow</button>
-                <button id="bb-icon" class="overflow-item" type="button">📋 Beat Board</button>
-                <button id="compare-icon" class="overflow-item" type="button">🗂 Compare</button>
+                <button id="flow-btn" class="overflow-item" title="River read â€” the draft as one continuous flow; a current nav tracks your drift (Esc leaves)" type="button">â‰‹ Flow</button>
+                <button id="bb-icon" class="overflow-item" type="button">ðŸ“‹ Beat Board</button>
+                <button id="compare-icon" class="overflow-item" type="button">ðŸ—‚ Compare</button>
                 <div class="overflow-sep"></div>
-                <a id="export-backup" class="overflow-item" download>⬇ Backup .zip</a>
+                <a id="export-backup" class="overflow-item" download>â¬‡ Backup .zip</a>
                 <a id="export-fountain" class="overflow-item" download>Export .fountain</a>
                 <a id="export-fdx" class="overflow-item" download>Export .fdx</a>
                 <a id="export-txt" class="overflow-item" download>Export .txt</a>
@@ -286,8 +286,8 @@
               </div>
             </div>
             <!-- Hidden: Undo/Redo still work via keyboard shortcuts Ctrl+Z / Ctrl+Shift+Z -->
-            <button id="undo-btn" class="btn-secondary" style="display:none;" disabled>↶ Undo</button>
-            <button id="redo-btn" class="btn-secondary" style="display:none;" disabled>↷ Redo</button>
+            <button id="undo-btn" class="btn-secondary" style="display:none;" disabled>â†¶ Undo</button>
+            <button id="redo-btn" class="btn-secondary" style="display:none;" disabled>â†· Redo</button>
           </div>
         </div>
         <div id="draft-bar" class="draft-bar" style="display:none;">
@@ -299,18 +299,18 @@
         </div>
         <div id="diff-banner" class="diff-banner" style="display:none;"></div>
         <div id="script-scenes" class="script-scenes" aria-live="polite" tabindex="-1"></div>
-        <button id="quote-float" class="quote-float" type="button" hidden>✎ Ask Sameer about this</button>
-        <button id="idea-quote-float" class="quote-float idea-quote-float" type="button" hidden>✦ Ask Sameer</button>
-        <button id="stash-float" class="quote-float stash-float" type="button" hidden title="Keep this passage in your Stash — cut material stays a click away">📥 Stash this</button>
-        <button id="note-float" class="quote-float note-float" type="button" hidden title="Pin your own margin note to this line">📝 Note this line</button>
+        <button id="quote-float" class="quote-float" type="button" hidden>âœŽ Ask Sameer about this</button>
+        <button id="idea-quote-float" class="quote-float idea-quote-float" type="button" hidden>âœ¦ Ask Sameer</button>
+        <button id="stash-float" class="quote-float stash-float" type="button" hidden title="Keep this passage in your Stash â€” cut material stays a click away">ðŸ“¥ Stash this</button>
+        <button id="note-float" class="quote-float note-float" type="button" hidden title="Pin your own margin note to this line">ðŸ“ Note this line</button>
       </section>
 
-      <div id="pane-divider" class="pane-divider" role="separator" aria-orientation="vertical" title="Drag to resize the script pane — double-click to reset"></div>
+      <div id="pane-divider" class="pane-divider" role="separator" aria-orientation="vertical" title="Drag to resize the script pane â€” double-click to reset"></div>
 
       <!-- Problem Board: findings panel on the right side of the workspace -->
       <aside id="problem-board" class="problem-board" style="display:none;">
         <div class="pb-head">
-          <button id="pb-toggle" class="pb-toggle" type="button" title="Collapse/expand the Problem Board">▾</button>
+          <button id="pb-toggle" class="pb-toggle" type="button" title="Collapse/expand the Problem Board">â–¾</button>
           <span class="pb-title">Problem Board</span>
           <select id="pb-filter" class="pb-filter">
             <option value="all">All</option>
@@ -321,37 +321,37 @@
         </div>
         <div id="pb-list" class="pb-list"></div>
       </aside>
-      <button id="pb-edge-tab" class="pb-edge-tab" type="button" title="Open the Problem Board — findings for the current scene">☰ Board</button>
+      <button id="pb-edge-tab" class="pb-edge-tab" type="button" title="Open the Problem Board â€” findings for the current scene">â˜° Board</button>
       </div>
 
-      <!-- Manuscript Stage: the partner drawer — summoned from the gutter, gone
+      <!-- Manuscript Stage: the partner drawer â€” summoned from the gutter, gone
            when you close it. The script keeps the room. -->
       <div class="drawer" id="room-drawer" aria-label="Partner">
         <div class="drawer-head">
           <div class="drawer-avatar sam" id="drawer-av">S</div>
-          <div class="drawer-name" id="drawer-name">Sameer <small>co-writer — beside you</small></div>
-          <button class="drawer-close" id="drawer-close" type="button" title="Dismiss the partner — the page stays">✕</button>
+          <div class="drawer-name" id="drawer-name">Sameer <small>co-writer â€” beside you</small></div>
+          <button class="drawer-close" id="drawer-close" type="button" title="Dismiss the partner â€” the page stays">âœ•</button>
         </div>
 
       <!-- Co-write room: the writer's desk -->
       <section id="cowrite-panel" class="room-panel" aria-label="Co-write">
         <div id="partner-card" class="partner-card">
           <span class="avatar">S</span>
-          <span class="partner-name">Sameer — AI writing partner</span>
+          <span class="partner-name">Sameer â€” AI writing partner</span>
           <button id="reset-partner-btn" class="btn-secondary btn-small" title="Back to the writing partner default" type="button">back to Sameer</button>
           <button id="sam-notes-btn" class="btn-secondary btn-small" title="What Sameer has noticed about how you work together" type="button">Sameer's notes on you</button>
-          <button id="clear-chat-btn" class="btn-secondary btn-small" title="Erase this conversation and start a fresh page — Sameer's notes on you are kept" type="button">🗑 Clear chat</button>
+          <button id="clear-chat-btn" class="btn-secondary btn-small" title="Erase this conversation and start a fresh page â€” Sameer's notes on you are kept" type="button">ðŸ—‘ Clear chat</button>
         </div>
         <div id="messages" class="messages"><div id="messages-scroll" class="messages-scroll"></div></div>
         <div id="idea-explore" class="idea-explore" style="display:none;">
-          <span class="premise-explore-label">Explore paths — one tap, Sameer runs with it:</span>
+          <span class="premise-explore-label">Explore paths â€” one tap, Sameer runs with it:</span>
           <div class="explore-chips"></div>
         </div>
         <form id="composer" class="composer">
           <div id="quote-card" class="quote-card" hidden></div>
           <div id="history-pop" class="history-pop" role="listbox" aria-label="Previous messages" hidden></div>
-          <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins — Sameer answers as he thinks…" rows="1"></textarea>
-          <button type="submit" id="send-btn" aria-label="Send">➤</button>
+          <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins â€” Sameer answers as he thinksâ€¦" rows="1"></textarea>
+          <button type="submit" id="send-btn" aria-label="Send">âž¤</button>
         </form>
       </section>
 
@@ -371,15 +371,15 @@
               <option value="tamil">Tamil</option>
             </select>
           </label>
-          <div id="analyze-progress" class="analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — hover or focus for the pipeline">
+          <div id="analyze-progress" class="analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress â€” hover or focus for the pipeline">
             <div class="ap-bar"><div class="ap-bar-fill"></div></div>
             <span class="ap-pct">0%</span>
-            <span class="ap-eta">…</span>
+            <span class="ap-eta">â€¦</span>
           </div>
-          <a id="report-export-btn" class="btn-secondary report-export" style="display:none;" title="Download the full report as markdown" download>📥 Report</a>
+          <a id="report-export-btn" class="btn-secondary report-export" style="display:none;" title="Download the full report as markdown" download>ðŸ“¥ Report</a>
           <button id="analyze-btn" class="btn-secondary">Run Analysis</button>
-          <button id="reparse-btn" class="btn-secondary" title="Re-parse the source file with the current parser — fixes mis-parsed formatting, then Run Analysis again">↻ Re-parse</button>
-          <button id="retry-failed-btn" class="btn-secondary retry-failed" style="display:none;" type="button" title="Re-run only the categories that failed last time and merge into the existing report">⚠ Retry failed</button>
+          <button id="reparse-btn" class="btn-secondary" title="Re-parse the source file with the current parser â€” fixes mis-parsed formatting, then Run Analysis again">â†» Re-parse</button>
+          <button id="retry-failed-btn" class="btn-secondary retry-failed" style="display:none;" type="button" title="Re-run only the categories that failed last time and merge into the existing report">âš  Retry failed</button>
         </div>
         <div id="feedback-tabs" class="feedback-tabs" style="display:none;">
           <button id="tab-report-btn" class="active" type="button">Report</button>
@@ -387,11 +387,11 @@
         </div>
         <div id="feedback-report" class="feedback-pane" style="display:none;"></div>
         <div id="feedback-fixqueue" class="feedback-pane" style="display:none;"></div>
-        <div id="feedback-empty" class="feedback-empty">No analysis yet — Run Analysis to get the consultant's report.</div>
+        <div id="feedback-empty" class="feedback-empty">No analysis yet â€” Run Analysis to get the consultant's report.</div>
       </section>
       </div>
 
-      <!-- the edge tabs — the only chrome on the right -->
+      <!-- the edge tabs â€” the only chrome on the right -->
       <div class="gutter">
         <button class="gutter-tab sam on" id="gutter-sam" type="button"><span class="dot"></span>Sameer</button>
         <button class="gutter-tab doc" id="gutter-doc" type="button">Consultant</button>
@@ -399,31 +399,31 @@
 
     </div>
 
-    <!-- Status strip: model · connection · loop metrics · sprint · room light -->
+    <!-- Status strip: model Â· connection Â· loop metrics Â· sprint Â· room light -->
     <footer id="status-strip" class="status-strip">
       <span id="status-project" class="status-item status-project" style="display:none;"></span>
-      <span id="status-conn" class="status-item" title="Model connection status — hover for details">—</span>
+      <span id="status-conn" class="status-item" title="Model connection status â€” hover for details">â€”</span>
       <span id="status-model" class="status-item status-model-wrap">
-        <span id="status-model-label">…</span>
+        <span id="status-model-label">â€¦</span>
         <div id="conn-card" class="conn-card" role="tooltip" hidden></div>
       </span>
-      <span id="status-metrics" class="status-item status-metrics" title="Your writing loop, measured quietly on this machine" style="display:none;">⚡ —</span>
+      <span id="status-metrics" class="status-item status-metrics" title="Your writing loop, measured quietly on this machine" style="display:none;">âš¡ â€”</span>
       <span class="status-spacer"></span>
-      <span id="sprint-timer" class="status-item status-btn" title="A 25-minute writing sprint. Click to start or pause, double-click to reset." role="button" tabindex="0">⏱ 25:00</span>
+      <span id="sprint-timer" class="status-item status-btn" title="A 25-minute writing sprint. Click to start or pause, double-click to reset." role="button" tabindex="0">â± 25:00</span>
       <span id="status-elapsed" class="status-item"></span>
-      <button id="status-dawn" class="status-item status-btn" type="button" title="Draw the curtains — morning light for the room">☀ Dawn</button>
+      <button id="status-dawn" class="status-item status-btn" type="button" title="Draw the curtains â€” morning light for the room">â˜€ Dawn</button>
     </footer>
 
     <!-- Beat Board: the corkboard -->
     <section id="beatboard-view" class="view" style="display:none;">
       <div class="beatboard-toolbar">
-        <button id="bb-back-btn" class="btn-secondary" type="button" title="Back to the page">← Back to the page</button>
+        <button id="bb-back-btn" class="btn-secondary" type="button" title="Back to the page">â† Back to the page</button>
         <div class="beatboard-toolbar-title">Beat Board</div>
-        <span class="beatboard-hint">Re-order the scenes (drag a card, or use ↑↓) to try a new arrangement. Your draft isn't touched until you export.</span>
+        <span class="beatboard-hint">Re-order the scenes (drag a card, or use â†‘â†“) to try a new arrangement. Your draft isn't touched until you export.</span>
         <div class="beatboard-actions">
           <button id="bb-restore-btn" class="btn-secondary">Restore original order</button>
           <a id="bb-export" class="btn-secondary" download>Export reordered draft</a>
-          <button id="bb-print-btn" class="btn-secondary" title="Print the cards to cut out and shuffle — your draft isn't touched">Print cards</button>
+          <button id="bb-print-btn" class="btn-secondary" title="Print the cards to cut out and shuffle â€” your draft isn't touched">Print cards</button>
           <button id="bb-save-btn" class="btn-primary">Save order</button>
         </div>
       </div>
@@ -433,12 +433,12 @@
     <!-- Compare -->
     <section id="compare-view" class="view" style="display:none;">
       <div class="compare-toolbar">
-        <button id="compare-back-btn" class="btn-secondary" type="button" title="Back to the page">← Back to the page</button>
+        <button id="compare-back-btn" class="btn-secondary" type="button" title="Back to the page">â† Back to the page</button>
         <div class="compare-toolbar-title">Compare drafts</div>
         <label class="control-label">Showing
           <select id="compare-from-select" title="Older draft"></select>
         </label>
-        <span class="compare-arrow">→</span>
+        <span class="compare-arrow">â†’</span>
         <span id="compare-to-label" class="compare-to-label">active draft</span>
         <span class="compare-hint">Read the change, side by side. Added lines are underlined, removed lines struck through.</span>
       </div>
@@ -449,8 +449,8 @@
     <section id="revision-view" class="view" style="display:none;">
       <div class="revision-head">
         <div class="revision-title">Revision desk</div>
-        <span class="revision-sub">The doctor's findings beside the draft — navigate by scene, work the queue.</span>
-        <button id="revision-close" class="btn-secondary" type="button" title="Back to the page">← Back to the page</button>
+        <span class="revision-sub">The doctor's findings beside the draft â€” navigate by scene, work the queue.</span>
+        <button id="revision-close" class="btn-secondary" type="button" title="Back to the page">â† Back to the page</button>
       </div>
       <div class="revision-body">
         <nav id="revision-nav" class="revision-nav" aria-label="Scene navigator"></nav>
@@ -465,7 +465,7 @@
       <div class="fv-header">
         <span class="fv-title">Feedback View</span>
         <span class="fv-sub" id="fv-status">Findings on the page, both partners at hand.</span>
-        <button id="fv-maximize" class="btn-secondary" type="button" title="Give the script the whole room — hide both side panels (click again to restore)">⤢ Maximize script</button>
+        <button id="fv-maximize" class="btn-secondary" type="button" title="Give the script the whole room â€” hide both side panels (click again to restore)">â¤¢ Maximize script</button>
         <button id="fv-close" class="btn-secondary" type="button">&larr; Back to the page</button>
       </div>
       <div class="fv-body">
@@ -481,10 +481,10 @@
             <button type="submit" class="btn-primary btn-small">&raquo;</button>
           </form>
         </div>
-        <div id="fv-divider-left" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the consultant panel — double-click to reset"></div>
+        <div id="fv-divider-left" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the consultant panel â€” double-click to reset"></div>
         <!-- Center: Script with compact finding dots -->
         <div class="fv-script" id="fv-script"></div>
-        <div id="fv-divider-right" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the board panel — double-click to reset"></div>
+        <div id="fv-divider-right" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the board panel â€” double-click to reset"></div>
         <!-- Right: Problem Board / Sameer toggle -->
         <div class="fv-panel fv-right">
           <div class="fv-right-tabs">
@@ -494,7 +494,7 @@
           <!-- Problem Board -->
           <div class="fv-right-pane" id="fv-board-pane">
             <div class="fv-board-head">
-              <button id="fv-board-toggle" class="fv-board-toggle" type="button" title="Collapse/expand the Problem Board">▾</button>
+              <button id="fv-board-toggle" class="fv-board-toggle" type="button" title="Collapse/expand the Problem Board">â–¾</button>
               <span class="fv-board-title" id="fv-board-title">Problem Board</span>
               <select id="fv-board-filter" class="fv-board-filter">
                 <option value="all">All</option>
@@ -518,7 +518,7 @@
             </form>
           </div>
         </div>
-        <button id="fv-right-edge-tab" class="fv-right-edge-tab" type="button" title="Open the Problem Board">☰ Board</button>
+        <button id="fv-right-edge-tab" class="fv-right-edge-tab" type="button" title="Open the Problem Board">â˜° Board</button>
       </div>
     </section>
 
@@ -529,11 +529,11 @@
 <!-- Sameer's notes on you modal -->
 <div id="sam-notes-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="sam-notes-modal-title" style="display:none;">
   <div class="modal">
-    <h3 class="modal-label" id="sam-notes-modal-title">📝 Sameer's notes on you</h3>
-    <p class="modal-hint">Inferred from how you've worked together — you stay the editor. Nothing here is final; forget anything that's wrong.</p>
+    <h3 class="modal-label" id="sam-notes-modal-title">ðŸ“ Sameer's notes on you</h3>
+    <p class="modal-hint">Inferred from how you've worked together â€” you stay the editor. Nothing here is final; forget anything that's wrong.</p>
     <div id="sam-notes-dimensions" class="sam-notes-dimensions"></div>
     <ul id="sam-notes-observations" class="sam-notes-observations"></ul>
-    <p id="sam-notes-empty" class="modal-hint" style="display:none;">Nothing yet — Sameer is still getting to know you. It grows as you talk.</p>
+    <p id="sam-notes-empty" class="modal-hint" style="display:none;">Nothing yet â€” Sameer is still getting to know you. It grows as you talk.</p>
     <div class="modal-actions">
       <button id="sam-notes-refresh" class="btn-secondary btn-small" type="button">Refresh now</button>
       <button id="sam-notes-close" class="btn-primary btn-small" type="button">Close</button>
@@ -551,18 +551,18 @@
     <label class="modal-label">Response timeout (seconds)</label>
     <input type="number" id="timeout-input" placeholder="600" min="30" max="7200" step="10">
     <p class="modal-hint">Local models can genuinely take minutes per reply, especially with
-      CPU-offloaded experts, a quantized KV cache, or a large context window — raise this if
+      CPU-offloaded experts, a quantized KV cache, or a large context window â€” raise this if
       replies are timing out rather than actually failing.</p>
 
     <label class="modal-label">Fast model (optional)</label>
-    <input type="text" id="fast-model-input" placeholder="e.g. qwen2.5-1.5b — leave blank to use one model for everything">
+    <input type="text" id="fast-model-input" placeholder="e.g. qwen2.5-1.5b â€” leave blank to use one model for everything">
     <p class="modal-hint">The cheap tier: scene summaries and quick reads route here, the deep
-      analysis stays on the main model. Leave blank on a one-model box — it auto-falls back.</p>
+      analysis stays on the main model. Leave blank on a one-model box â€” it auto-falls back.</p>
 
     <label class="modal-label">Chat turn cap (seconds)</label>
     <input type="number" id="turn-timeout-input" placeholder="120" min="15" max="1800" step="5">
     <p class="modal-hint">If a reply is still generating when this hits, you get a
-      “still working — keep waiting?” prompt instead of a silent hang.</p>
+      â€œstill working â€” keep waiting?â€ prompt instead of a silent hang.</p>
 
     <button id="test-connection-btn" class="btn-secondary" style="width:100%; margin-bottom:10px;">Test Connection</button>
     <div id="test-connection-result" class="test-connection-result"></div>
@@ -577,7 +577,7 @@
 <!-- Rewrite modal -->
 <div id="rewrite-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rewrite-modal-title" style="display:none;">
   <div class="modal modal-wide">
-    <h3 id="rewrite-modal-title">Rewrite — <span id="rewrite-scene-title"></span></h3>
+    <h3 id="rewrite-modal-title">Rewrite â€” <span id="rewrite-scene-title"></span></h3>
     <p id="rewrite-finding" class="rewrite-finding"></p>
 
     <label class="modal-label" for="rewrite-instruction">Your instruction (optional)</label>
@@ -598,9 +598,9 @@
 <!-- Command palette -->
 <div id="palette-modal" class="modal-overlay" style="display:none;">
   <div class="modal palette-modal" role="dialog" aria-label="Command palette">
-    <input type="text" id="palette-input" placeholder="Type a command, a scene, a shortcut…" aria-label="Command or scene">
+    <input type="text" id="palette-input" placeholder="Type a command, a scene, a shortcutâ€¦" aria-label="Command or scene">
     <div id="palette-results" class="palette-results"></div>
-    <p class="palette-hint">↑↓ to move · Enter to run · Esc to close · <strong>?</strong> shows all shortcuts</p>
+    <p class="palette-hint">â†‘â†“ to move Â· Enter to run Â· Esc to close Â· <strong>?</strong> shows all shortcuts</p>
   </div>
 </div>
 
@@ -621,24 +621,24 @@
 <div class="sameer-panel" id="sameer-panel">
   <div class="sp-head">
     <div class="sp-avatar">S</div>
-    <div><div class="sp-name">Sameer</div><div class="sp-sub">co-writer · craft mentor</div></div>
-    <button class="sp-close" id="sameer-close" aria-label="Close Sameer panel">✕</button>
+    <div><div class="sp-name">Sameer</div><div class="sp-sub">co-writer Â· craft mentor</div></div>
+    <button class="sp-close" id="sameer-close" aria-label="Close Sameer panel">âœ•</button>
   </div>
   <div class="sp-thread" id="sameer-thread">
-    <div class="sp-msg ai">Read Draft 3 overnight. The stairwell scene sings.<div class="craft-ref">McKee — Gap Analysis</div></div>
-    <div class="sp-msg ai">Act II midpoint arrives 12 pages late. Promote the stairwell.<div class="craft-ref">Snyder — Midpoint</div></div>
-    <div class="sp-msg ai">Mara exit line works as subtext. Cut the repeat.<div class="craft-ref">McKee — Setup/Payoff</div></div>
+    <div class="sp-msg ai">Read Draft 3 overnight. The stairwell scene sings.<div class="craft-ref">McKee â€” Gap Analysis</div></div>
+    <div class="sp-msg ai">Act II midpoint arrives 12 pages late. Promote the stairwell.<div class="craft-ref">Snyder â€” Midpoint</div></div>
+    <div class="sp-msg ai">Mara exit line works as subtext. Cut the repeat.<div class="craft-ref">McKee â€” Setup/Payoff</div></div>
   </div>
   <div class="sp-composer">
     <textarea id="sameer-ta" rows="1" placeholder="Ask Sameer..."></textarea>
-    <button class="send-btn" id="sameer-send" aria-label="Send to Sameer">→</button>
+    <button class="send-btn" id="sameer-send" aria-label="Send to Sameer">â†’</button>
   </div>
 </div>
 
 <!-- Level badge (progressive revelation) -->
 <div class="level-badge" id="level-badge">
   <span class="lv-dot"></span>
-  <span id="level-text">Level 1 · Upload & Discover</span>
+  <span id="level-text">Level 1 Â· Upload & Discover</span>
 </div>
 
 <!-- Cursor spotlight -->
@@ -646,19 +646,19 @@
 
 <!-- Contextual text selection popup -->
 <div id="text-popup" class="text-popup" style="display:none;">
-  <button class="text-popup-item" data-action="ask-sameer"><span class="tp-icon accent">✎</span> Ask Sameer about this</button>
-  <button class="text-popup-item" data-action="ask-consultant" style="display:none;"><span class="tp-icon accent2">✎</span> Ask Consultant</button>
+  <button class="text-popup-item" data-action="ask-sameer"><span class="tp-icon accent">âœŽ</span> Ask Sameer about this</button>
+  <button class="text-popup-item" data-action="ask-consultant" style="display:none;"><span class="tp-icon accent2">âœŽ</span> Ask Consultant</button>
   <div class="text-popup-sep"></div>
-  <button class="text-popup-item" data-action="margin-note"><span class="tp-icon">📝</span> Add margin note</button>
-  <button class="text-popup-item" data-action="stash"><span class="tp-icon">📥</span> Stash this</button>
+  <button class="text-popup-item" data-action="margin-note"><span class="tp-icon">ðŸ“</span> Add margin note</button>
+  <button class="text-popup-item" data-action="stash"><span class="tp-icon">ðŸ“¥</span> Stash this</button>
   <div class="text-popup-sep"></div>
-  <button class="text-popup-item" data-action="add-logline" style="display:none;"><span class="tp-icon">✦</span> Add to logline</button>
-  <button class="text-popup-item" data-action="rewrite" style="display:none;"><span class="tp-icon">⚙</span> Rewrite passage</button>
-  <button class="text-popup-item" data-action="locate" style="display:none;"><span class="tp-icon">📍</span> Locate finding</button>
+  <button class="text-popup-item" data-action="add-logline" style="display:none;"><span class="tp-icon">âœ¦</span> Add to logline</button>
+  <button class="text-popup-item" data-action="rewrite" style="display:none;"><span class="tp-icon">âš™</span> Rewrite passage</button>
+  <button class="text-popup-item" data-action="locate" style="display:none;"><span class="tp-icon">ðŸ“</span> Locate finding</button>
 </div>
 
 <script src="core.js?v=hx1b112"></script>
-<script src="app.js?v=hx1b302"></script>
+<script src="app.js?v=hx1b308"></script>
 <div id="river-current" aria-hidden="true"></div>
 <div class="dawn-wash" aria-hidden="true"></div>
 </body>
