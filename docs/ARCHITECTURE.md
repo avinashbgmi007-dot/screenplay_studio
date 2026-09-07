@@ -33,6 +33,7 @@ screenplay-studio_1/
 │   ├── cli.py                  # CLI entry point
 │   ├── pipeline.py             # Multi-pass analysis pipeline
 │   ├── llm_client.py           # llama-server HTTP client, GBNF-constrained JSON
+│   ├── llm_client_base.py      # Shared base client + LlamaServerError/ModelNotFoundError
 │   ├── grammar.py              # Hand-written GBNF grammars
 │   ├── verifier.py             # Fuzzy matching, sliding-window verification
 │   ├── principles_engine.py    # Two-stage Chekhov's Gun detection
@@ -54,7 +55,7 @@ screenplay-studio_1/
 │   ├── engine.py               # CoWriterEngine.send_message()
 │   ├── context.py              # ScriptContext, ReportContext, scene injection
 │   ├── language_meta.py        # Strips wrapper-language markers from replies
-│   ├── personas.py             # 7 personas, 4 modes (default: writing_partner/peer)
+│   ├── personas.py             # 8 personas, 5 modes (default: writing_partner/peer)
 │   ├── peer.py                 # guardrails: two-phase probe, forward-momentum, idea cap
 │   ├── memory.py               # writer relationship memory: signals, confidence gate, card, refresh
 │   ├── writer_library.py       # writer's library: deterministic digest of past projects (PAST WORK block)
@@ -75,12 +76,21 @@ screenplay-studio_1/
 │   ├── character_track.py      # Per-character track layer (presence/traits/interactions/reads)
 │   ├── watch.py                # Watch-folder auto-analysis
 │   ├── sample.py               # Sample-script generator
+│   ├── ideas.py                # Idea store (idea rooms, graduation, premise cards)
+│   ├── stt.py                  # Local dictation (faster-whisper, optional)
+│   ├── metrics.py              # Desk metrics store (reply timings, fix counts)
+│   ├── jsonio.py               # atomic_write_json / read_json helpers
+│   ├── demo_model.py           # Built-in demo craft model (fallback when no llama-server)
 │   ├── webapp_server.py        # Flask backend (port 8500)
 │   └── webapp/                 # Static frontend (no build step)
-│       ├── index.html          # Single-page app shell
-│       ├── app.js              # Client-side JS (~2,200 lines)
-│       └── style.css           # Dark ink-blue palette, serif fonts (~2,300 lines)
-├── knowledge_base/             # 34 attributed screenwriting-craft rules
+│       ├── index.html          # Single-page app shell (~665 lines)
+│       ├── app.js              # Client-side JS (~6,990 lines)
+│       ├── core.js             # DOM-free pure helpers (unit-tested via node --test)
+│       ├── style.css           # Nocta violet/cyan design system (~5,120 lines)
+│       ├── fonts/               # Self-hosted .woff2
+│       ├── preview-redesigns/  # Six visual-direction prototypes (+ screenshots)
+│       └── preview-next/       # Seven interaction-model prototypes (Design Lab)
+├── knowledge_base/             # 263 attributed screenwriting-craft rules (26 rule files)
 │   ├── knowledge_base.py       # KnowledgeBase, Rule dataclass
 │   ├── rules/                  # Per-category rule JSON
 │   └── schema.json
@@ -103,14 +113,19 @@ screenplay-studio_1/
 - **Single-page app** — `screenplay_studio/webapp/index.html` serves as the SPA shell.
 - **No build step** — vanilla JS, no framework, no bundler, zero external requests (fonts
   are self-hosted `.woff2`; the only HTTP the page makes is to the Flask API).
-- **"A warm room at night."** Deep ink-blue void palette (`:root` CSS variables), the
-  manuscript as bright cream paper under a lamp. The **room lighting is the signature**:
-  Co-write is warm amber (`--lamp`), Feedback is cool slate (`--consult`), swapped by
-  `body[data-room]`. Dawn (light) theme via `body.dawn`.
+- **"Nocta Craft Precision."** Near-black ink palette with a violet Co-write lamp (`--lamp
+  #7e6bff`) and cyan Feedback lamp (`--consult #53c7f0`), swapped by `body[data-room]`.
+  The manuscript stays bright cream paper. Dawn (light, daylight-glass) theme via
+  `body.dawn`. (Superseded the earlier amber/slate "warm room" theme.)
 - **Two rooms, one script.** The workspace is a shared script pane (always visible) plus a
   right-hand **room drawer** summoned from the edge gutter tabs: **Co-write** (the writer's
   desk — Sameer) and **Feedback** (the consultant's desk — Dr. Sushruta's Report + Fix Queue
-  tabs). `body[data-room]` drives the room theming. Beat Board, Compare, and Revision are
+  tabs). For projects, the Feedback room actually opens the **Feedback View**
+  (`#feedback-view`, `state.view="fv"`) — a full-screen 3-panel surface (chat · script
+  column with severity dots · Board/Sameer tabs) with draggable dividers and scroll sync;
+  the drawer panel remains for idea-less contexts. A docked **Problem Board**
+  (`#problem-board`) offers a severity-filtered findings panel beside the manuscript.
+  `body[data-room]` drives the room theming. Beat Board, Compare, and Revision are
   full-screen tools opened from the script-pane toolbar (keys `b`/`d`/`v`).
 - **Three-zone shell.** Collapsible left structural rail (`#struct-rail`) holds the scene
   outline (click → jump + flash), the **character track layer** (`#rail-characters` —
@@ -138,7 +153,7 @@ screenplay-studio_1/
   in place (rides the edits/apply path — undoable, change-starred).
 
 ### Client-Side JavaScript (`screenplay_studio/webapp/app.js` + `core.js`)
-- `app.js` is ~5,900 lines of vanilla JS handling all client logic; `core.js` holds the
+- `app.js` is ~6,990 lines of vanilla JS handling all client logic; `core.js` holds the
   DOM-free pure helpers (`fuzzyScore`, `formatMessageContent`, `truncate`, `formatElapsed`,
   `fmtDuration`, `shortModelId`) — unit-tested in `node --test tests/js/`.
 - **Rooms** — `setRoom("cowrite"|"feedback")` swaps panel + `body[data-room]` identity;
@@ -163,28 +178,34 @@ screenplay-studio_1/
   `docs/UI_UX_SPECIFICATION.md` §7 for the full interaction catalog.
 
 ### CSS (`screenplay_studio/webapp/style.css`)
-- ~4,300 lines of custom CSS.
-- Full design-token system via CSS variables: void ink ramp, paper, lamp/consult room
-  accents, type scale (`--font-typewriter/script/serif/mono/hand`), radius, glow.
+- ~5,120 lines of custom CSS (base design system + the NOCTA v4 layer: auto-hide chrome,
+  cursor spotlight, level badge, Sameer slide-in mock panel).
+- Full design-token system via CSS variables: void ink ramp, glass surfaces, paper,
+  violet/cyan room accents, type scale (`--font-typewriter/script/serif/display/ui/mono/hand`),
+  radius, motion curves.
 - Room theming via `body[data-room]`; Dawn theme via `body.dawn`; river-read dark-glass
   block; focus/spotlight/reader mode overrides; print styles for the draft and beat cards.
-- `prefers-reduced-motion` kill-switch, `:focus-visible` rings, amber `::selection`.
+- `prefers-reduced-motion` kill-switch, `:focus-visible` rings, accent `::selection`.
 
 ### HTML (`screenplay_studio/webapp/index.html`)
-- ~530 lines. SPA shell: sidebar (brand · new-page · Ideas/shelf/library flyouts · Dawn/
-  Settings footer), welcome scene + dashboard, project bar, workspace (structural rail ·
-  desk · gutter · room drawer), status strip, Beat Board / Compare / Revision full-screen
-  views, premise pane + idea canvas, five modals (Settings, Rewrite, Palette, Fork, Sam's
-  notes). References cache-busted `style.css`/`core.js`/`app.js` (`?v=<hash>`).
+- ~665 lines. SPA shell: collapsible sidebar (brand · new-page · Ideas/shelf/library
+  flyouts · Dawn/Settings footer), welcome scene + dashboard, project bar, workspace
+  (structural rail · desk · Problem Board · gutter · room drawer), status strip, Beat
+  Board / Compare / Revision / Feedback-View full-screen views, premise pane + idea canvas,
+  NOCTA chrome (Sameer panel mock, level badge, cursor spotlight), five modals (Settings,
+  Rewrite, Palette, Fork, Sam's notes). References cache-busted
+  `style.css`/`core.js`/`app.js` (`?v=<hash>`).
 
 ---
 
 ## 3. Backend Control Engine
 
 ### Server Endpoints (Flask, port 8500)
-`webapp_server.py` exposes the JSON API (projects keyed by `<name>`). **The authoritative
-reference — including every request/response shape, error code, and the SSE stream
-contract — is `docs/UI_UX_SPECIFICATION.md` §9.** The table below is the route map:
+`webapp_server.py` exposes the JSON API (projects keyed by `<name>`). **The complete
+enumerated route map (all 84 endpoints) is `docs/API_ROUTE_MAP.md`** — regenerate it
+after changing any `@app.route`. **The authoritative request/response shapes, error
+codes, and the SSE stream contract are in `docs/UI_UX_SPECIFICATION.md` §9.** The
+state each endpoint reads/writes is cataloged in `docs/STATE_STORES.md`. Quick index:
 
 | Area | Endpoint | Methods |
 |------|----------|---------|
@@ -258,25 +279,35 @@ Message
 ```
 
 ### Threading & Worker Protocols
-- **No threading** — the orchestrator runs synchronously.
+- **The orchestrator runs synchronously** (no threads); the webapp server itself runs
+  `threaded=True` and the writer-memory refresh is a fire-and-forget daemon thread —
+  "no threading" applies to the pieces' core design, not the Flask host.
 - **No database** — sessions stored as individual JSON files in a directory.
 - **Model discovery** — `discovery.py` resolves which model to use by checking what the llama-server reports loaded, falling back through explicit flag → inherited model from report → first available.
 
-### Analysis Pipeline (multi-pass, `pipeline.py:analyze()`)
+### Analysis Pipeline (`pipeline.py:analyze()`)
+
+The pipeline runs **12 model categories** (`ALL_CATEGORIES`: dialogue, theme, character,
+structure, scene_function, principles, setup_payoff, char_reads, character_dials, coverage,
+genre, logline_test) plus deterministic passes. Actual order in `analyze()`:
+
 1. **Formatting checks & stats** — deterministic, no model: missing INT/EXT, time-of-day, character capitalization, heavy parentheticals, long action blocks; character counts, dialogue ratios.
-2. **Craft passes** — deterministic: voice-bleed and on-the-nose subtext detection (no model call).
-3. **Scene summaries** — LLM-generated per-scene summaries (chunked, token-budgeted).
-4. **Dialogue analysis** — per-scene dialogue findings with verbatim quotes (chunked).
-5. **Script-level categories** — theme, character, structure, scene-function (one model call each, over the scene-summary overview).
-6. **Principles engine** — Two-stage Chekhov's Gun (knowledge-graph candidate generation + model significance judgment).
-7. **Character-perception reads** — how each character comes across vs. apparent intent.
-8. **Pacing** — deterministic per-scene pace index (density × inverted action-share), drags flagged over a threshold, capped at 4. Also emits `pacing_drag` findings. No model call.
-9. **Setup/payoff ledger** — the FINAL whole-script audit: one grammar-constrained call over the full scene overview + mechanically-flagged candidates, returns a ledger {setup, kind, setup_scenes, payoff_scenes, status: paid|dangling|abandoned|red_herring, note}; dangling/abandoned fold into plot_thread findings (deduped vs. the principles engine).
-10. **Character dials** — one model call scoring the main cast (≤8, by scene+dialogue share) on five 1-10 trait poles with scene_refs.
-11. **Verification** — fuzzy matching (SequenceMatcher, threshold 0.72) and sliding-window comparison; flags unverified findings.
-12. **Coverage** — logline / genre / synopsis / recommendation.
-13. **Logline test & genre check** — premise lands in one sentence; genre conventions (uses coverage output).
-14. **Feedback filter** — drops non-writing meta-commentary (dialect/subtitle noise) from the final set.
+2. **Craft passes (deterministic)** — voice-bleed, on-the-nose subtext, and **idiolect** (characters speaking with one voice) — no model calls.
+3. **Continuity pass** — deterministic: time flips, name variants (no model call).
+4. **Pacing** — deterministic per-scene pace index (density × inverted action-share), drags flagged over a threshold, capped at 4. Also emits `pacing_drag` findings. No model call.
+5. **Scene summaries** — LLM-generated per-scene summaries (chunked, token-budgeted).
+6. **Dialogue analysis** — per-scene dialogue findings with verbatim quotes (chunked).
+7. **Script-level categories** — theme, character, structure, scene-function (one model call each, over the scene-summary overview).
+8. **Principles engine** — Two-stage Chekhov's Gun (knowledge-graph candidate generation + model significance judgment).
+9. **Character-perception reads** — how each character comes across vs. apparent intent.
+10. **Setup/payoff ledger** — the end-of-pipeline whole-script audit: one grammar-constrained call over the full scene overview + mechanically-flagged candidates, returns a ledger {setup, kind, setup_scenes, payoff_scenes, status: paid|dangling|abandoned|red_herring, note}; dangling/abandoned fold into plot_thread findings (deduped vs. the principles engine).
+11. **Character dials** — one model call scoring the main cast (≤8, by scene+dialogue share) on 1-10 trait poles with scene_refs.
+12. **Verification** — fuzzy matching (SequenceMatcher, threshold 0.72) and sliding-window comparison; flags unverified findings.
+13. **Coverage** — logline / genre / synopsis / recommendation.
+14. **Logline test & genre check** — premise lands in one sentence; genre conventions (uses coverage output).
+15. **Feedback filter** — drops non-writing meta-commentary (dialect/subtitle noise) from the final set.
+
+(Progress emits 20 stage keys; the webapp's `ANALYSIS_STAGES` map matches them.)
 
 **Report surface (`report.findings.json`)** carries `pacing` (per-scene pace rows), `character_dials` (trait scores), `setup_payoff` (ledger) and `character_reads` alongside `findings` — the webapp's character-track layer (`GET /api/projects/<p>/characters`, `character_track.py`) assembles per-character presence/traits/interactions/reads from the on-disk KG + report at serve time (no model calls).
 
@@ -325,8 +356,8 @@ Message
 │  │  Piece 1        │    │  Piece 2        │    │  Piece 3    │ │
 │  │  Parser         │    │  Analyzer       │    │  Co-writer  │ │
 │  │                 │    │                 │    │             │ │
-│  │  • .fdx/.pdf/   │    │  • GBNF grammar │    │  • 7 personas│ │
-│  │    .txt/.fountain│   │  • 11 passes    │    │  • 4 modes  │ │
+│  │  • .fdx/.pdf/   │    │  • GBNF grammar │    │  • 8 personas│ │
+│  │    .txt/.fountain│   │  • 12 categories│    │  • 5 modes  │ │
 │  │  • Knowledge    │    │  • Verification │    │  • Branches │ │
 │  │    Graph (cand.)│    │  • Principles   │    │  • Sessions │ │
 │  │                 │    │                 │    │  • Guardrails│ │
@@ -357,7 +388,7 @@ The webapp is now two rooms with a shared script pane (see §2). `screenplay_cow
 - **Forward momentum** — `ensure_forward_momentum` appends a forward nudge only to *short stranded* replies (never substantial answers), from a rotating template pool.
 - **One idea at a time** — `cap_suggestions` structurally caps bulleted suggestions per turn.
 - **Informed partner** — the `peer` mode locks in "never volunteer the report"; the Feedback→Co-write bridge *prefills the composer* (never auto-sends).
-Tests: `tests/test_peer_guardrails.py` (27) + webapp room tests. Full suite: **328 passed**.
+Tests: `tests/test_peer_guardrails.py` (27) + webapp room tests. (Suite snapshot at the time; the suite has since grown past 670 tests.)
 
 ### 0b. Writer relationship memory (added 2026-08-12)
 `screenplay_cowriter/memory.py` gives Sam a writer-level memory (across all projects) at `studio_projects/writer_profile.json`:
@@ -365,10 +396,10 @@ Tests: `tests/test_peer_guardrails.py` (27) + webapp room tests. Full suite: **3
 - **Refresh** — every 10 observed turns, a fire-and-forget daemon thread asks the model to propose profile updates from the recent transcript (lenient JSON parse, merge only on higher confidence / novel observations; `force=True` for the webapp's user-initiated refresh).
 - **Injection** — `CoWriterEngine(memory=None)` observes each turn and injects the relationship card into `build_system_prompt(relationship_card=, cold_start_line=)` on both prompt paths. `memory=None` is byte-identical to before; only the webapp wires memory by default (cowriter CLI/server opt in via `--memory-path`).
 - **Writer stays the editor** — "Sam's notes on you" modal (Co-write partner card): view observations, "forget this" (suppresses permanently), "refresh now". The card text forbids quoting memory at the writer ("you always say…" is forbidden).
-Tests: `tests/test_writer_memory.py` (26) + webapp endpoints. Full suite: **358 passed**.
+Tests: `tests/test_writer_memory.py` (26) + webapp endpoints. (Suite snapshot at the time; the suite has since grown past 670 tests.)
 
 ### 1. Named category sentinel (resolved)
-`pipeline.py` now exports `ALL_CATEGORIES` and `resolve_categories()`: `None` and `("all",)` both expand to the full ten-category tuple; any other tuple is passed through unchanged. `analyze()` normalizes via `resolve_categories`, and per-category outcomes (`category_outcomes`, `"ok"`/`"failed"`) are recorded so partial analyses can be resumed.
+`pipeline.py` now exports `ALL_CATEGORIES` and `resolve_categories()`: `None` and `("all",)` both expand to the full twelve-category tuple; any other tuple is passed through unchanged. `analyze()` normalizes via `resolve_categories`, and per-category outcomes (`category_outcomes`, `"ok"`/`"failed"`) are recorded so partial analyses can be resumed.
 
 ### 2. Personas are server-driven (resolved)
 `GET /api/config` now includes `personas` and `modes` from `screenplay_cowriter.personas`; `app.js` reads them and falls back to built-in defaults only when the server doesn't supply them. New personas appear in the UI automatically.
@@ -380,7 +411,7 @@ Tests: `tests/test_writer_memory.py` (26) + webapp endpoints. Full suite: **358 
 `CoWriterEngine.send_message()` now accepts an optional `store` and saves the session itself after a successful turn; all four construction sites (webapp, orchestrator, cowriter CLI, cowriter server) pass it. Callers may still save explicitly — the double-write is idempotent.
 
 ### 5. Partial-category resume (new)
-`run_analyze(retry_failed=True)` re-runs only the categories recorded as `failed` in the manifest's `category_outcomes`, merging their fresh findings into the existing report (`_merge_analysis`). CLI: `run`/`resume --retry-failed`. Retry semantics are hardened: `genre`/`logline_test` failures automatically re-run `coverage` too (their prerequisite — otherwise the fresh run's empty coverage gates them out and they'd be re-marked failed forever); a retry that itself fails (empty outcomes) fails loudly and **preserves the previous partial record** (`failed_categories` + report paths) instead of overwriting the report; and the retry path also resumes from `status="failed"` stages that carry a partial record.
+`run_analyze(retry_failed=True)` re-runs only the categories recorded as `failed` in the manifest's `category_outcomes`, merging their fresh findings into the existing report (`AnalysisResult.merge`). CLI: `run`/`resume --retry-failed`. Retry semantics are hardened: `genre`/`logline_test` failures automatically re-run `coverage` too (their prerequisite — otherwise the fresh run's empty coverage gates them out and they'd be re-marked failed forever); a retry that itself fails (empty outcomes) fails loudly and **preserves the previous partial record** (`failed_categories` + report paths) instead of overwriting the report; and the retry path also resumes from `status="failed"` stages that carry a partial record.
 
 ### 6. Config holder (new)
 Module-level `CONFIG` is a `ServerConfig` instance: validated writes (positive int timeout), and `to_dict()` returns a copy so responses can't mutate live config by reference.
@@ -399,7 +430,7 @@ Module-level `CONFIG` is a `ServerConfig` instance: validated writes (positive i
 - **Manifest-based resume** — Stages track complete/failed/pending status, allowing partial resume.
 - **Chunk backoff pattern** — `_with_chunk_backoff()` retries with smaller context windows for context exhaustion.
 - **Two-stage Chekhov's Gun** — Deterministic candidate generation + model significance judgment.
-- **Graceful fallbacks** — `_NullRulesContext` when KB not installed.
+- **Graceful fallbacks** — `_NullRulesContext` (defined in `pipeline.py`) when KB not installed.
 - **Safe project naming** — suffix auto-increment for duplicates.
 - **Proper error handling** — specific HTTP status codes (400, 404, 500, 502).
 

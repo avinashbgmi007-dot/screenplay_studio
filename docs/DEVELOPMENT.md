@@ -23,11 +23,11 @@ There is no `pyproject.toml` — `requirements.txt` is the source of truth. No v
 
 ```
 screenplay_parser/        Piece 1 — deterministic: parse .fdx/.pdf/.txt/.fountain/.md -> ScriptDocument + knowledge graph
-screenplay_analyzer/      Piece 2 — LLM pipeline: 11 passes, GBNF-constrained JSON, quote verification
-screenplay_cowriter/      Piece 3 — branch-based chat: personas, modes, file-backed session store
-screenplay_studio/        Orchestrator (manifest resume) + Flask webapp (port 8500) + revision/beatboard/watch/sample
-knowledge_base/           34 attributed screenwriting-craft rules that ground analyzer prompts
-tests/                    pytest suite against tests/mock_unified_server.py
+screenplay_analyzer/      Piece 2 — LLM pipeline: 12 model categories + deterministic passes, GBNF-constrained JSON, quote verification
+screenplay_cowriter/      Piece 3 — branch-based chat: 8 personas x 5 modes, file-backed session store, writer memory/library
+screenplay_studio/        Orchestrator (manifest resume) + Flask webapp (port 8500) + revision/beatboard/diff/ideas/stash/notes/metrics/STT/watch/sample
+knowledge_base/           263 attributed screenwriting-craft rules (26 files) that ground analyzer prompts
+tests/                    pytest suite against tests/mock_unified_server.py (+ node tests in tests/js/, Playwright e2e in tests/e2e_browser_*.py)
 ```
 
 ## Conventions
@@ -61,7 +61,10 @@ tests/                    pytest suite against tests/mock_unified_server.py
 ### Add a co-writer persona or mode
 
 1. Add to `PERSONAS` / `MODES` in `screenplay_cowriter/personas.py`.
-2. The web UI has a **hardcoded** persona list (`screenplay_studio/webapp/app.js:799`) — update it too, or new personas won't appear in the UI (known issue).
+2. The web UI reads the persona/mode lists from `GET /api/config` (server-driven); it also
+   ships a hardcoded fallback list (`FALLBACK_PERSONAS` at the top of
+   `screenplay_studio/webapp/app.js`) — update that too so the fallback stays in sync
+   (known maintenance gotcha).
 
 ### Add a webapp endpoint
 

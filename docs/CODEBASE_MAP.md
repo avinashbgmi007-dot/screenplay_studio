@@ -22,21 +22,22 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 
 | File | Public API | Purpose |
 |---|---|---|
-| `pipeline.py` | `analyze(...)`, `AnalysisResult` (incl. `category_outcomes`), `ALL_CATEGORIES`, `resolve_categories`, `build_scene_summaries`, `build_scene_overview_text`, `run_dialogue_analysis`, `run_script_level_category`, `run_coverage`, `run_character_reads`, `run_logline_test` | The 11-pass pipeline orchestrator (see ARCHITECTURE.md) |
+| `pipeline.py` | `analyze(...)`, `AnalysisResult` (incl. `category_outcomes`, `merge`), `ALL_CATEGORIES`, `resolve_categories`, `build_scene_summaries`, `build_scene_overview_text`, `run_dialogue_analysis`, `run_script_level_category`, `run_coverage`, `run_character_reads`, `run_logline_test` | The pipeline orchestrator — 12 model categories + deterministic passes (see ARCHITECTURE.md) |
 | `llm_client.py` | `LlamaServerClient`, `LlamaServerError`, `ModelNotFoundError` | HTTP client, GBNF-constrained JSON, `_with_chunk_backoff` handles context exhaustion |
-| `grammar.py` | `findings_grammar`, `scene_summary_grammar`, `principle_judgment_grammar`, `replacements_grammar`, `logline_test_grammar`, `character_reads_grammar`, `coverage_grammar` | Hand-written GBNF grammars |
+| `llm_client_base.py` | `BaseLlamaClient`, `LlamaServerError`, `ModelNotFoundError` | Shared base client (re-exported through both packages' `llm_client`) |
+| `grammar.py` | `findings_grammar`, `scene_summary_grammar`, `principle_judgment_grammar`, `replacements_grammar`, `logline_test_grammar`, `character_reads_grammar`, `coverage_grammar`, `setup_payoff_ledger_grammar`, `character_dials_grammar` | Hand-written GBNF grammars |
 | `verifier.py` | `verify_findings`, `verification_summary` | Fuzzy matching (SequenceMatcher, 0.72), sliding-window quote verification |
 | `principles_engine.py` | `run_principles_engine` | Two-stage Chekhov's Gun (KG candidates → model significance) |
 | `formatting_check.py` | `check_formatting(doc)` | Deterministic formatting rules |
-| `voice.py` | `run_voice_analysis`, `run_subtext_analysis` | Deterministic craft passes (voice-bleed, on-the-nose) |
+| `voice.py` | `run_voice_analysis`, `run_subtext_analysis`, `run_idiolect_analysis` | Deterministic craft passes (voice-bleed, on-the-nose, idiolect) |
 | `genre.py` | `run_genre_check`, `conventions_for` | Genre-convention check against coverage genre |
 | `feedback_filter.py` | `filter_findings` | Drops non-writing meta-commentary (dialect/subtitle noise) |
 | `continuity.py` | `run_continuity_analysis` | Deterministic continuity pass: unmarked time-of-day flips, character-name variants |
 | `pacing.py` | `per_scene_pace`, `drag_findings` | Deterministic per-scene pace index + drag flags |
 | `dials.py` | `run_character_dials` | Model-scored per-character dials (grammar-constrained) |
 | `setup_payoff.py` | `run_setup_payoff_ledger`, `dangling_findings` | End-of-pipeline whole-script setup/payoff audit; dangling entries feed Plot Economy |
-| `rules_context.py` | `RulesContext` | Injects knowledge-base rules into prompts; `_NullRulesContext` fallback |
-| `prompts.py` | `scene_summary_prompt`, `dialogue_analysis_prompt`, `theme_analysis_prompt`, `character_analysis_prompt`, `structure_analysis_prompt`, `scene_function_prompt`, `logline_test_prompt`, `character_reads_prompt`, `principle_judgment_prompt`, `genre_check_prompt`, `coverage_prompt`, `language_instruction` | Two-tier citation prompts |
+| `rules_context.py` | `RulesContext` | Injects knowledge-base rules into prompts (a `_NullRulesContext` fallback lives in `pipeline.py`) |
+| `prompts.py` | `scene_summary_prompt`, `dialogue_analysis_prompt`, `theme_analysis_prompt`, `character_analysis_prompt`, `structure_analysis_prompt`, `scene_function_prompt`, `logline_test_prompt`, `character_reads_prompt`, `principle_judgment_prompt`, `genre_check_prompt`, `coverage_prompt`, `character_dials_prompt`, `setup_payoff_ledger_prompt`, `language_instruction` | Two-tier citation prompts |
 | `report.py` | `render_markdown`, `to_findings_json`, `save_report` | `.md` + `.findings.json` output |
 | `cli.py` | `main` | `analyze <parsed.json> --server ... -o report.md` |
 
@@ -48,10 +49,10 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `store.py` | `SessionStore` | File-backed session store (one JSON per session) |
 | `engine.py` | `CoWriterEngine` | `send_message()` — one grounded chat turn; saves the session itself when constructed with `store=` |
 | `context.py` | `ScriptContext`, `ReportContext`, `build_system_prompt`, `build_scene_context_block`, `extract_scene_refs`, `load_json` | Context + scene injection |
-| `personas.py` | `PERSONAS`, `PERSONAS["*_examples"]`, `MODES`, `persona_text`, `mode_text`, `DEFAULT_PERSONA` | Persona bible (writing_partner/premise_doctor/script_consultant/producer/dev_exec/teacher/audience/genre_specialist) × modes incl. peer; `_examples` keys are prompt-only, never exposed via /api/config |
+| `personas.py` | `PERSONAS`, `PERSONAS["*_examples"]`, `MODES`, `persona_text`, `mode_text`, `DEFAULT_PERSONA`, `DEFAULT_MODE`, `post_history_reminder`, `trait_reminder` | Persona bible — 8 personas (writing_partner/premise_doctor/script_consultant/producer/dev_exec/teacher/audience/genre_specialist) × 5 modes (peer/evidence_discussion/concept_validation/brainstorm/character_interview); `_examples` keys are prompt-only, never exposed via /api/config |
 | `discovery.py` | `resolve_model` | explicit > inherited > loaded |
-| `llm_client.py` | `LlamaServerClient`, `LlamaServerError`, `ModelNotFoundError` | Lightweight free-text chat client |
-| `language_meta.py` | `strip_language_meta` | Strips wrapper-language markers from replies |
+| `llm_client.py` | `LlamaServerClient`, `LlamaServerError`, `ModelNotFoundError`, `WatchdogTimeoutError` | Lightweight free-text chat client (turn watchdog) |
+| `language_meta.py` | `strip_language_meta`, `strip_repetition_lines`, `strip_repeated_blocks`, `strip_json_wrap` | Strips wrapper-language markers + repetition/JSON noise from replies |
 | `language_mirror.py` | `detect_register`, `mirror_instruction` | Mirrors the writer's register (Tenglish/Hindi/Telugu/English) in replies |
 | `peer.py` | `classify_turn`, `should_probe`, `ensure_forward_momentum`, `cap_suggestions`, `has_embedded_reasoning` | Peer-mode guardrails: probe instead of parrot, forward momentum, suggestion cap |
 | `memory.py` | `WriterMemory`, `build_relationship_card`, `merge_refresh`, `extract_signals`, `apply_signals`, `dimension_gate`, `_migrate_v2` | Writer relationship memory (scoped global/project/idea), notes-on-you card, refresh sync |
@@ -64,7 +65,7 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | File | Public API | Purpose |
 |---|---|---|
 | `manifest.py` | `ProjectManifest`, `StageStatus` | `project.json`; resume semantics (pending/running/complete/failed/skipped) |
-| `orchestrator.py` | `Orchestrator`, `OrchestratorError`, `_merge_analysis` | `run_parse` → `run_analyze` → `start_chat`; total-vs-partial failure handling; `retry_failed=True` resumes failed categories only |
+| `orchestrator.py` | `Orchestrator`, `OrchestratorError` | `run_parse` → `run_analyze` → `start_chat`; total-vs-partial failure handling; `retry_failed=True` resumes failed categories only (merge via `AnalysisResult.merge`) |
 | `revision.py` | `ensure_working`, `load_working`, `save_working`, `has_edits`, `reset_working`, `redo_stack`, `clear_redo` | Working copy rewrite/apply/undo/redo/export loop |
 | `diff.py` | `snapshot_active`, `upload_new_draft`, `activate_draft`, `diff_scenes`, `diff_findings`, `compare_drafts`, `diff_drafts` | Draft snapshots + cross-draft diffing |
 | `beatboard.py` | `get_order`, `set_order`, `reset_order`, `has_board`, `export_reordered`, `board_view` | Scene reordering / beat board |
@@ -81,19 +82,21 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `webapp_server.py` | Flask app + `main`, `ServerConfig`, `_import_cowriter`, `CowriterUnavailableError` | Web UI backend (port 8500); serves `webapp/` static + JSON API; `/api/config` exposes personas/modes |
 | `jsonio.py` | `atomic_write_json`, `check_safe_id` | Shared atomic JSON persistence (tmp + os.replace + per-path lock) and the safe-id contract that blocks path traversal at every store |
 | `cli.py` | `main`, `cmd_run`, `cmd_resume`, `cmd_status`, `cmd_watch` | `run`/`resume`/`status`/`watch` subcommands |
-| `webapp/` | `index.html`, `app.js`, `style.css` | Vanilla JS SPA (no build step) |
+| `webapp/` | `index.html`, `app.js`, `core.js`, `style.css` | Vanilla JS SPA (no build step); `core.js` holds the DOM-free pure helpers (unit-tested in `node --test tests/js/`) |
 
 ## knowledge_base — craft rules (no model)
 
 | File | Public API | Purpose |
 |---|---|---|
 | `knowledge_base.py` | `KnowledgeBase`, `Rule` | Loads `rules/*.json`; `for_taxonomy_level`/`render_for_prompt` |
-| `rules/*.json` | — | 34 attributed rules: story_macro, structure_pacing, plot_thread, character, relationship, scene, dialogue, continuity |
+| `rules/*.json` | — | 263 attributed rules across 26 files: story_macro, structure_pacing, plot_thread, character, relationship, scene, dialogue, dialogue_advanced, scene_design, continuity, genre (action/comedy/drama/horror/mystery/romance/scifi/thriller), pitch, psychology, body_language, power_dynamics, visual_storytelling, writing_habits, revision, theme, … |
 | `schema.json` | — | Rule JSON schema (confidence_tier, requires, related_rules, …) |
 
 ## tests
 
 - `conftest.py` — session-scoped mock llama-server fixture (port **8196**) + `sample_fountain` fixture
 - `mock_unified_server.py` — Flask mock handling Piece 2 (grammar JSON) + Piece 3 (chat echo) + revision-loop request shapes
-- `fixtures/pain_tenglish.fountain` — small Tenglish sample
-- `test_*.py` — one file per feature area (see TESTING.md); 660+ tests collected
+- `fixtures/` — `pain_tenglish.fountain`, `Pain_FD_4_scenes.pdf`, `Pain_FD_4_scenes_recoverable.pdf`
+- `js/` — node tests for the DOM-free `core.js` helpers (`node --test`)
+- `e2e_browser_*.py` — Playwright browser suites (share `e2e_browser_common.py`)
+- `test_*.py` — one file per feature area (see TESTING.md); 670+ tests collected

@@ -15,8 +15,18 @@ my_project/
 ├── report.md                <- Piece 2: human-readable report
 ├── report.findings.json     <- Piece 2: structured findings
 ├── progress.json            <- live per-stage analysis progress
+├── working.json             <- edit working copy (ScriptDocument schema)
+├── edits.json               <- undo log of applied edits
+├── edits.redo.json          <- redo stack
+├── dismissed_findings.json  <- finding triage (dismissed indexes)
+├── notes.json               <- margin notes (writer's)
+├── stash.json               <- saved passages (the Stash)
+├── beatboard.json           <- saved scene order
+├── metrics.json             <- desk metrics (reply/analysis timings, fix counts)
+├── premise.json             <- premise card (when graduated from an idea)
 ├── sessions/                <- Piece 3: one JSON per chat session
-└── drafts/                  <- draft snapshots (name -> files)
+└── drafts/                  <- draft snapshots (name -> {source copy, parsed.json,
+                                report.findings.json, report.md}; includes "original")
 ```
 
 > **Writer-level (outside any project):** `studio_projects/writer_profile.json` is the writer
@@ -25,28 +35,32 @@ my_project/
 ## writer_profile.json — writer relationship memory (v2)
 
 Writer-level file (sibling of the project directories, read/written by the webapp; the cowriter
-CLI/server opt in via `--memory-path`). Sam's gradually-learned sense of how the writer likes to
-work. See `docs/superpowers/specs/2026-08-12-writer-relationship-memory-design.md` for the full
+CLI/server opt in via `--memory-path`). Sam's gradually-learned sense of how the writer likes
+to work. See `docs/superpowers/specs/2026-08-12-writer-relationship-memory-design.md` for the full
 rationale.
 
 ```jsonc
 {
-  "version": 1,
-  "dimensions": {                        // one per learnable dimension
+  "version": 2,
+  "dimensions": {                        // one per learnable dimension (8 total)
     "detail_level": {
       "value": "short",                  // learnable pole ("balanced"/"medium" = neutral, never gates)
       "confidence": 0.71,                // (pos + 2) / (pos + neg + 4); gates behavior at >= 0.6 with >= 3 evidence
       "evidence": { "pos": 5, "neg": 1 },
       "last_updated": 1754980000
     },
-    "directness": { ... },
-    "probe_appetite": { ... },
-    "pushback_appetite": { ... }
+    "directness": { ... },               // full set: detail_level, directness, probe_appetite,
+    "pushback_appetite": { ... },        //   support_style, feedback_tolerance, mentor_style,
+    "support_style": { ... },            //   energy_level
+    "feedback_tolerance": { ... },
+    "mentor_style": { ... },
+    "energy_level": { ... }
   },
   "topic_gravity": { "character": 12, "structure": 6, "dialogue": 3, "craft": 1 },
   "observations": [                      // the editable trail shown in "Sam's notes on you"
     { "id": "obs_1a2b3c", "text": "You want the note straight — no softening.",
       "dimension": "directness", "confidence": 0.71, "source": "rules",
+      "scope": "global",                 // "global" | "project:<id>" | "idea:<id>"
       "contradictions": 0, "suppressed": false, "created": 1754980000, "updated": 1754980000 }
   ],
   "meta": { "total_turns_observed": 214, "turns_at_last_refresh": 204,
@@ -55,8 +69,11 @@ rationale.
 ```
 
 - `source` is `"rules"` (auto-template when a dimension first gates) or `"refresh"` (LLM session refresh).
+- `scope` is added to all older observations by the v2 migration on load; scoped observations
+  are kept per project/idea, global ones apply everywhere.
 - `suppressed: true` is the permanent "forget this" (explicit override outranks inference).
 - The relationship card injected into the system prompt is built from gated dimensions only.
+- A corrupt profile is backed up to `writer_profile.json.bak` and replaced with a fresh one.
 
 ## parsed.json — ScriptDocument (Piece 1)
 
@@ -170,7 +187,7 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
       "gap": "…",
       "scene_refs": [1],
       "evidence_quote": "…",
-      "verification": {"status": "verified", "score": 0.95, "note": null}
+      "verification": {"status": "verified", "matched_scene": 1, "confidence": 0.95, "note": null}
     }
   ],
   "logline_test": {
@@ -184,30 +201,62 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
   "findings": [
     {
       "category": "dialogue",             // theme | character | structure | dialogue |
-      "issue": "…",                       //   scene_function | plot_thread | genre
-      "why_it_matters": "…",
+      "issue": "…",                       //   scene_function | plot_thread | genre |
+      "why_it_matters": "…",              //   continuity | voice | subtext (deterministic)
       "severity": "low",                  // low | medium | high
       "scene_refs": [1],
       "evidence_quote": "I'll tell you everything when this is over.",  // null when reasoning-only
       "rule_id": null,                    // knowledge-base rule id when grounded
       "verification": {
         "status": "verified",             // verified | not_found | no_quote | scene_not_found
-        "score": 0.95,
+        "matched_scene": 1,               // scene the quote matched in (verified only)
+        "confidence": 0.95,
         "note": null
       }
+    }
+  ],
+  "setup_payoff": [                       // the ledger (end-of-pipeline whole-script audit)
+    {
+      "setup": "MARA loads the revolver in scene 1",
+      "kind": "prop",                     // prop | promise | trait | skill | information
+      "setup_scenes": [1],
+      "payoff_scenes": [9],
+      "status": "paid",                   // paid | dangling | abandoned | red_herring
+      "note": "…"                         // dangling entries fold into Plot Economy findings
+    }
+  ],
+  "character_dials": [                    // per-character trait sliders (top ≤8 characters)
+    {
+      "character": "MARA",
+      "traits": [
+        {"trait": "agency", "score": 7, "scene_refs": [1, 4], "note": "…"}  // score 1-10
+      ]
+    }
+  ],
+  "pacing": [                             // deterministic per-scene pacing
+    {
+      "scene_number": 1,
+      "words": 120, "beats": 3, "density": 0.5, "action_share": 0.7,
+      "pace_score": 0.8, "drag": false    // drag = below-threshold pace (max 4 drags flagged)
     }
   ],
   "formatting_findings": [
     {"severity": "low", "scene_refs": [2], "message": "Missing time-of-day"}
   ],
   "stats": {                              // deterministic analytics (see screenplay_parser.stats)
-    "acts": [{"name": "Act One", "scene_count": 4, "page_start": 1.0, "page_end": 10.0, "scene_numbers": [1,2,3,4]}],
-    "pacing": {"segments": [{"page_start": 1, "page_end": 10, "dialogue_words": 120, "action_words": 300, "scene_count": 4}]},
-    "character_arc": [{"character": "MARA", "first_scene": 1, "last_scene": 3, "scene_count": 3, "dialogue_lines": 4}],
-    "character_stats": {"characters": [{"character": "MARA", "dialogue_lines": 4, "dialogue_words": 40, "scenes_present": 3, "dialogue_share_pct": 66.7}]},
-    "dialogue_action_ratio": {"dialogue_pct": 40.0, "action_pct": 60.0},
-    "location_usage": {"unique_locations": 2, "usage": {}},
-    "int_ext_and_time_breakdown": {"night_scene_pct": 50.0}
+    "title": "My Script", "author": "Me", "scene_count": 12,
+    "estimated_page_count": 25.0, "character_count": 8, "parse_confidence": "high",
+    "acts": [{"name": "Act 1", "scene_count": 4, "page_start": 1.0, "page_end": 10.0, "scene_numbers": [1,2,3,4]}],
+    "pacing": {"total_pages": 25.0, "segment_pages": 10,
+               "segments": [{"page_start": 1, "page_end": 10, "dialogue_words": 120, "action_words": 300, "scene_count": 4}]},
+    "character_arc": [{"character": "MARA", "first_scene": 1, "last_scene": 3, "scene_count": 3,
+                       "dialogue_lines": 4, "scene_presence_pct": 25.0, "quiet_gaps": null,
+                       "appears_throughout": false}],
+    "character_stats": {"total_dialogue_lines": 12, "characters": [{"character": "MARA", "dialogue_lines": 4, "dialogue_words": 40, "scenes_present": 3, "dialogue_share_pct": 66.7}]},
+    "dialogue_action_ratio": {"dialogue_pct": 40.0, "action_pct": 60.0, "dialogue_words": 120, "action_words": 300},
+    "location_usage": {"unique_locations": 2, "usage": [{"location": "STUDY", "scene_count": 3}]},
+    "int_ext_and_time_breakdown": {"night_scene_pct": 50.0, "int_ext_breakdown": {...}, "time_of_day_breakdown": {...}, "night_scene_count": 6},
+    "scene_length_stats": {...}, "scene_estimates": [...], "runtime_minutes": 25.0
   },
   "verification_summary": {"verified": 3, "not_found": 0, "no_quote": 2, "scene_not_found": 0},
   "errors": []
@@ -224,16 +273,17 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
   "source_format": ".fountain",
   "server_url": "http://localhost:8080",
   "model_id": null,                       // set after first successful analyze
+  "fast_model": null,                     // optional fast model for short calls
   "timeout": 600,
   "stages": {
     "parse":   {"status": "complete", "output_paths": {"parsed": "./proj/parsed.json", "kg": "./proj/parsed.kg.json"}, "error": null, "updated_at": 0.0},
-    "analyze": {"status": "complete", "output_paths": {"report_md": "./proj/report.md", "report_findings": "./proj/report.findings.json"}, "error": null, "updated_at": 0.0},
-    "chat":    {"status": "pending", "output_paths": {}, "error": null, "updated_at": 0.0}
+    "analyze": {"status": "complete", "output_paths": {"report_md": "./proj/report.md", "report_findings": "./proj/report.findings.json", "category_outcomes": {...}, "failed_categories": []}, "error": null, "updated_at": 0.0},
+    "chat":    {"status": "complete", "output_paths": {"session_id": "abc12345"}, "error": null, "updated_at": 0.0}
   },
   "cowriter_session_id": "abc12345",
   "drafts": [{"name": "draft-1", "source_filename": "draft-1.fountain", "uploaded_at": 0.0}],
   "active_draft": null,
-  "report_language": "eng",               // eng | tenglish | hindi | tamil
+  "report_language": "eng",               // eng | tenglish | hindi | telugu | tamil
   "created_at": 0.0,
   "updated_at": 0.0
 }
@@ -244,17 +294,22 @@ Stage `status` values: `pending | running | complete | failed | skipped`.
 Resume semantics:
 - `complete` stages are never re-run.
 - A **total** analyze failure (nothing usable produced) → `failed` → rerun on next `run`/`resume`.
-- A **partial** analyze failure (some categories succeeded) → `complete` with `partial_errors` in `output_paths`; the report is still usable.
+- A **partial** analyze failure (some categories succeeded) → `complete` with `partial_errors`
+  in `output_paths`; the report is still usable. Failed categories are kept in
+  `failed_categories` so `--retry-failed` / the ⚠ Retry failed button re-runs just those
+  (merged into the existing report).
 
 ## progress.json — live analysis progress
 
-Written by the analyzer's callback during `analyze`; overwritten at each stage boundary:
+Written by the orchestrator's progress callback during `analyze`; overwritten at each stage
+boundary. Every write stamps a `ts` heartbeat (used by the webapp for stall detection):
 
 ```json
-{"stage": "dialogue", "status": "running", "detail": "Reading dialogue & action"}
+{"stage": "dialogue", "status": "running", "detail": "Reading dialogue & action", "ts": 1754980000.0}
 ```
 
-Final states: `{"stage": "done", "status": "complete", "detail": "Analysis complete"}` or `{"stage": "failed", "status": "failed", "detail": "<error>"}`.
+Final states: `{"stage": "done", "status": "complete", "detail": "Analysis complete", "ts": …}`
+or `{"stage": "failed", "status": "failed", "detail": "<error>", "ts": …}`.
 
 ## sessions/<id>.json — co-writer session (Piece 3)
 
@@ -271,22 +326,51 @@ Final states: `{"stage": "done", "status": "complete", "detail": "Analysis compl
       "name": "main",
       "parent_branch": null,
       "forked_at_index": null,
-      "active_persona": "script_consultant",
-      "active_mode": "evidence_discussion",
+      "active_persona": "writing_partner",   // default persona
+      "active_mode": "peer",                 // default mode
+      "awaiting_probe": false,             // peer-guardrail state (probes await an answer)
       "created_at": 0.0,
       "messages": [
         {
           "role": "user",                // user | assistant | system
           "content": "…",
           "timestamp": 0.0,
-          "mode": "evidence_discussion",
-          "scene_refs": [1]              // scenes injected into context this turn
+          "mode": "peer",
+          "scene_refs": [1],             // scenes injected into context this turn
+          "quote": {"scene_number": 1, "text": "…"}  // select-to-reply passage (optional)
         }
       ]
     }
   },
   "current_branch": "main",
+  "last_seen_content": "…",              // last script content this session saw (stale-session honesty)
   "created_at": 0.0,
   "updated_at": 0.0
 }
 ```
+
+## Project-level stores (webapp, all JSON arrays/dicts beside the manifest)
+
+All written atomically (`jsonio.atomic_write_json`). Schemas (top level):
+
+- **stash.json** — the Stash. Array of `{id, text (≤4000 chars), title (≤120), scene_number: int|null, created_at}`, newest first.
+- **notes.json** — margin notes. Array of `{id, scene_number: int|null, text, anchor: str|null, created_at, updated_at}`.
+- **beatboard.json** — saved scene order. `{"order": [scene numbers], "saved_at": ts}`.
+- **metrics.json** — desk metrics. `{analysis_seconds, last_analysis_ts, reply_seconds (rolling ≤40), discussed, findings_open, findings_total}`.
+- **working.json** — edit working copy; full ScriptDocument schema (same as parsed.json).
+- **edits.json** — undo log. Array of `{id, scene_number, applied: [{old, new, similarity}], skipped: [{old, new, reason}], applied_at}`.
+- **edits.redo.json** — redo stack; same record shape as edits.json.
+- **dismissed_findings.json** — triage. Array of `{index: int, issue: str}`. (The fix queue
+  itself is computed per-request from findings + dismissals + working copy — no file.)
+- **premise.json** — premise card, present when the project graduated from an idea:
+  `{title, logline, premise, questions: [str], content}` (`content` only added on graduation).
+
+## Idea store (writer-level, `<PROJECTS_DIR>/ideas/`)
+
+- **ideas/&lt;idea_id&gt;/idea.json** — `{id, title, created_at, updated_at,
+  card: {title, logline, premise, questions}, content, auto_title: bool}`.
+- **ideas/&lt;idea_id&gt;/sessions/&lt;sid&gt;.json** — idea chat sessions; same schema as
+  project `sessions/<id>.json` above.
+- Idea sessions use the same fixed-id pattern for the preview lab:
+  `<project>/sessions/preview-lab.json` is an isolated lab session (deletable; never the
+  manifest-pinned one).

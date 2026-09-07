@@ -11,21 +11,23 @@ python -m pytest tests/ -k "resume" # by keyword
 ## How the mock works
 
 - `tests/conftest.py` starts a session-scoped Flask server (`tests/mock_unified_server.py`) on port **8196** in a background thread and hands the URL to tests via the `mock_server` fixture.
-- The mock routes on distinctive phrases in the system prompt: `"Summarize each"` → scene summaries; `"on-the-note dialogue"` → dialogue findings; `"professional script coverage"` → coverage; `"script doctor proposing a targeted revision"` → revision replacements; anything else → a chat echo reply that reports the detected persona, findings count, and injected scene numbers (so grounding can be verified end-to-end).
+- The mock routes on distinctive phrases in the system prompt: `"Summarize each"` → scene summaries; `"on-the-nose dialogue"` → dialogue findings; `"professional script coverage"` → coverage; `"script doctor proposing a targeted revision"` → revision replacements; anything else → a chat echo reply that reports the detected persona, findings count, and injected scene numbers (so grounding can be verified end-to-end).
 - Because Piece 2 and Piece 3 hit the *same* server in real use, one unified mock handles both request shapes — this is what lets the full parse→analyze→chat pipeline be tested genuinely end-to-end.
-- `tests/fixtures/pain_tenglish.fountain` is a small Tenglish sample used by several tests. `tests/fixtures/Pain_FD_4_scenes.pdf` is a text-less PDF that exercises the OCR path (skipped gracefully when no OCR engine is installed).
+- `tests/fixtures/pain_tenglish.fountain` is a small Tenglish sample used by several tests. `tests/fixtures/Pain_FD_4_scenes.pdf` (+ `_recoverable.pdf`) are text-less PDFs that exercise the OCR path (skipped gracefully when no OCR engine is installed).
+- `tests/js/` holds node tests for the DOM-free frontend helpers (`node --test tests/js/`).
 
 ## Test areas
 
 | Area | Files |
 |---|---|
 | Full pipeline (positive/negative/edge/stress) | `test_positive.py`, `test_negative.py`, `test_neutral_edge.py`, `test_stress.py`, `test_runtime.py` |
-| Parser | `test_structure.py`, `test_export.py`, `test_pdf_fixture.py`, `test_pdf_ocr.py`, `test_bare_array_tolerance.py` |
-| Analyzer | `test_genre.py`, `test_character_reads_logline.py`, `test_grammar_compat.py`, `test_voice_subtext.py`, `test_feedback_filter.py`, `test_report_language.py` |
-| Co-writer | `test_chat_language_meta.py`, `test_indian_languages.py` |
-| Studio / revision loop | `test_revision.py`, `test_diff.py`, `test_compare.py`, `test_beatboard.py`, `test_notes.py`, `test_undo_redo.py`, `test_fixqueue.py`, `test_webapp_revision.py` |
-| Webapp API | `test_webapp_api.py`, `test_webapp_revision.py` |
-| Orchestrator / manifest | `test_delete_project.py`, `test_sample.py`, `test_watch.py` |
+| Parser | `test_structure.py`, `test_export.py`, `test_pdf_fixture.py`, `test_pdf_ocr.py`, `test_pdf_layout.py`, `test_bare_array_tolerance.py` |
+| Analyzer | `test_genre.py`, `test_character_reads_logline.py`, `test_grammar_compat.py`, `test_voice_subtext.py`, `test_continuity_idiolect.py`, `test_setup_payoff.py`, `test_pacing_dials_track.py`, `test_feedback_filter.py`, `test_report_language.py`, `test_prompt_extensions.py`, `test_llm_client.py` |
+| Co-writer | `test_chat_language_meta.py`, `test_indian_languages.py`, `test_peer_guardrails.py`, `test_writer_memory.py`, `test_writer_library.py`, `test_persona_humanization.py`, `test_humanization_v2.py` |
+| Studio / revision loop | `test_revision.py`, `test_diff.py`, `test_compare.py`, `test_beatboard.py`, `test_notes.py`, `test_stash.py`, `test_undo_redo.py`, `test_fixqueue.py`, `test_webapp_revision.py`, `test_metrics.py` |
+| Webapp API | `test_webapp_api.py`, `test_webapp_revision.py`, `test_ideas.py`, `test_idea_room_v2.py`, `test_idea_room_v3.py`, `test_preview_lab.py`, `test_selection_translate_sloppiness.py`, `test_sidebar_translate_stt.py`, `test_report_export_progress.py`, `test_language_and_human_levers.py`, `test_two_tier_watchdog.py` |
+| Orchestrator / manifest | `test_delete_project.py`, `test_sample.py`, `test_watch.py`, `test_fix_batch.py`, `test_bugfix_batch.py`, `test_feature_batch.py`, `test_audit_hardening.py` |
+| Browser e2e (Playwright) | `tests/e2e_browser_*.py` — smoke, selection/translate/mic, UI fixes, v3, wf (see `e2e_browser_common.py`) |
 
 ## What the key suites verify
 

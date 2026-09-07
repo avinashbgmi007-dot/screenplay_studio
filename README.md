@@ -13,19 +13,25 @@ screenplay_parser/      Piece 1 — no model dependency. Parses .fdx/.pdf/
                          .txt/.fountain into structured JSON + a knowledge
                          graph (character index, recurring-object candidates,
                          timeline, dialogue promises).
-knowledge_base/          34 attributed screenwriting-craft rules (Aristotle,
-                         McKee, Snyder, Field, Swain, Vogler, Chekhov) that
-                         ground every analyzer judgment in a named, explicit
-                         principle instead of an LLM's unaudited memory.
+knowledge_base/          263 attributed screenwriting-craft rules across
+                          26 rule files (Aristotle, McKee, Snyder, Field, Swain,
+                          Vogler, Chekhov + genre conventions, psychology,
+                          dialogue craft, revision) that ground every analyzer
+                          judgment in a named, explicit principle instead of an
+                          LLM's unaudited memory.
 screenplay_analyzer/     Piece 2 — model-dependent. Runs the full analysis
-                         pipeline (theme/character/structure/dialogue/scene-
-                         function/plot-economy/coverage), grounded in the
-                         knowledge base, with every quote verified against
-                         the actual script text.
+                          pipeline (dialogue/theme/character/structure/scene-
+                          function/principles/setup-payoff ledger/character
+                          reads/dials/coverage/genre/logline test + deterministic
+                          voice/subtext/idiolect/continuity/pacing passes),
+                          grounded in the knowledge base, with every quote
+                          verified against the actual script text.
 screenplay_cowriter/     Piece 3 — model-dependent. Persistent, forkable
-                         chat about the analysis, with multi-persona reader
-                         modes (producer/dev-exec/teacher/audience/genre
-                         specialist).
+                          chat about the analysis, with 8 personas x 5 modes
+                          (Sameer the writing partner, Dr. Sushruta the script
+                          consultant, premise doctor, producer/dev-exec/
+                          teacher/audience/genre specialist) plus writer
+                          relationship memory.
 screenplay_studio/       This orchestrator — runs the three above in
                          sequence, with a resumable project manifest so one
                          stage failing doesn't lose prior progress.
@@ -135,7 +141,7 @@ analyzed at all) is recorded as failed and must be retried.
 
 ## How this was tested before being shared
 
-The original 25 end-to-end tests (the suite has since grown — 660+ tests collected), run against a unified mock server that handles both
+The original 25 end-to-end tests (the suite has since grown — 670+ tests collected), run against a unified mock server that handles both
 Piece 2's structured analysis calls and Piece 3's conversational calls
 (since in real use it's the same `llama-server` the whole time):
 
@@ -221,10 +227,10 @@ report stay verbatim from the script so verification still works.
 - The orchestrator assumes all four component packages sit as siblings
   (this bundle's layout) — if you move pieces around independently, update
   imports accordingly.
-- `run_analyze`/`run_parse` re-run from scratch if a stage is marked
-  `failed` (not `complete`) — there's no partial-category resume within a
-  single analyze stage (e.g. 5/6 categories succeeding doesn't let you
-  retry just the 6th without re-running all 6).
 - OCR-read PDFs are best-effort: scene boundaries and speaker attribution
   come from OCR line breaks, so spot-check them (a warning marks the
   project's parse as low-confidence).
+- The webapp's frontend persona fallback list (`screenplay_studio/webapp/app.js`)
+  is kept in sync with the server's personas by hand.
+- Two UI display fonts (Instrument Serif, DM Sans) are referenced but not
+  bundled in `webapp/fonts/` — they fall back to system fonts.

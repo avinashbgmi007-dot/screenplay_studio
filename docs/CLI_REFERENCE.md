@@ -19,6 +19,10 @@ python -m screenplay_studio run my_script.fdx --project ./proj --only chat
 # Resume — reruns only stages that aren't complete
 python -m screenplay_studio resume ./proj --server http://localhost:8080
 
+# Resume, re-running only the analyze categories that failed last time
+python -m screenplay_studio resume ./proj --retry-failed
+# (also: `run ... --retry-failed`)
+
 # Show stage status
 python -m screenplay_studio status ./proj
 
@@ -28,15 +32,19 @@ python -m screenplay_studio watch ./inbox --once    # process what's there and e
 
 # Web app (Flask, port 8500) — separate module, not a studio subcommand
 python -m screenplay_studio.webapp_server --port 8500 --projects-dir ./studio_projects
+
+# Web app with the built-in demo craft model forced on (no llama-server needed)
+python -m screenplay_studio.webapp_server --demo-model
+# (or: python -m screenplay_studio.webapp_demo, or env SCREENPLAY_STUDIO_DEMO_MODEL=1)
 ```
 
 | Command | Options | Notes |
 |---|---|---|
-| `run [source] --project DIR` | `--title`, `--server`, `--model`, `--categories`, `--only {parse,analyze,chat}`, `--skip-chat`, `--lang {eng,tenglish,hindi,tamil}` | `source` only needed for a new project; existing projects resume. |
-| `resume DIR` | `--server`, `--model`, `--skip-chat`, `--lang` | Skips completed stages. |
+| `run [source] --project DIR` | `--title`, `--server`, `--model`, `--categories`, `--only {parse,analyze,chat}`, `--skip-chat`, `--retry-failed`, `--lang {eng,tenglish,hindi,tamil}` | `source` only needed for a new project; existing projects resume. |
+| `resume DIR` | `--server`, `--model`, `--skip-chat`, `--retry-failed`, `--lang` | Skips completed stages. |
 | `status DIR` | — | Prints parse/analyze/chat status + errors. |
 | `watch DIR` | `--projects-dir`, `--server`, `--model`, `--poll SECS`, `--once`, `--categories`, `--lang` | Detects supported extensions; creates one project per file. |
-| `webapp_server` (module) | `--port` (default 8500), `--projects-dir` | Serves the SPA + JSON API. Run as `python -m screenplay_studio.webapp_server`. |
+| `webapp_server` (module) | `--port` (default 8500), `--projects-dir`, `--server`, `--demo-model` | Serves the SPA + JSON API. Run as `python -m screenplay_studio.webapp_server`. |
 
 ## screenplay_parser — Piece 1 (deterministic, no model)
 
@@ -82,7 +90,7 @@ python -m screenplay_cowriter chat --resume <session_id>
 python -m screenplay_cowriter list
 
 # Standalone Flask API (port 8300)
-python -m screenplay_cowriter.server --port 8300
+python -m screenplay_cowriter.server --port 8300 --sessions-dir ./sessions --memory-path ./writer_profile.json
 ```
 
 | Option | Notes |
@@ -91,7 +99,8 @@ python -m screenplay_cowriter.server --port 8300
 | `--resume SESSION_ID` | Resume an existing session. |
 | `--report`, `--script` | Paths to Piece 2 findings / Piece 1 parsed JSON. |
 | `--server`, `--model` | llama-server URL / model override. |
-| `--sessions-dir` | Default `./sessions`. |
+| `--sessions-dir` | Default `./sessions` (also on `list` and `server`). |
+| `--memory-path` | Opt in to writer relationship memory (the webapp wires it by default). |
 
 **In-chat slash commands** (`screenplay_cowriter chat` REPL):
 
@@ -101,10 +110,10 @@ python -m screenplay_cowriter.server --port 8300
 | `/switch <name>` | Jump to another branch. |
 | `/branches` | List branches on this session. |
 | `/delete <branch>` | Discard a branch (can't delete `main`). |
-| `/persona <name>` | Switch persona: `script_consultant`, `producer`, `dev_exec`, `teacher`, `audience`, `genre_specialist`. |
-| `/mode <name>` | Switch mode: `evidence_discussion`, `brainstorm`, `character_interview`. |
+| `/persona <name>` | Switch persona: `writing_partner` (default), `premise_doctor`, `script_consultant`, `producer`, `dev_exec`, `teacher`, `audience`, `genre_specialist`. |
+| `/mode <name>` | Switch mode: `peer` (default), `evidence_discussion`, `concept_validation`, `brainstorm`, `character_interview`. |
 | `/history [n]` | Show last n messages (default 10). |
-| `/help` / `/quit` | Help / exit (session saved after every turn). |
+| `/help` / `/quit` / `/exit` | Help / exit (session saved after every turn). |
 
 ## Direct module entry points
 

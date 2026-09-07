@@ -9,7 +9,7 @@ Local, privacy-first screenplay analysis & co-writing suite. Parses `.fdx`/`.fou
 - **Runtime deps:** `requests`, `flask`, `pdfplumber` (dictation/STT is optional: pip install "faster-whisper>=1.0.0")
 - **Optional:** `pytesseract`/`easyocr` (OCR fallback for text-less PDFs) + `pypdfium2` (lazy-imported PNG rendering for OCR); tesseract lang packs for tel/hin/tam
 - **Frontend:** vanilla JS + CSS SPA in `screenplay_studio/webapp/` — no framework, no bundler, no node
-- **External service:** `llama-server` (llama.cpp, `--jinja`), any GGUF model, default `http://localhost:8080`
+- **External service:** `llama-server` (llama.cpp, `--jinja`), any GGUF model, default `http://localhost:8080`; a built-in demo craft model (`demo_model.py`) fills in when no llama-server is reachable
 
 ## Commands
 
@@ -40,9 +40,9 @@ Four sibling packages + a knowledge base, wired by an orchestrator. Pieces are i
 
 ```
 screenplay_parser/    Piece 1 — deterministic parsing -> parsed.json + knowledge graph (no model)
-knowledge_base/       34 attributed craft rules grounding analyzer judgments (no model)
+knowledge_base/       263 attributed craft rules (26 rule files) grounding analyzer judgments (no model)
 screenplay_analyzer/  Piece 2 — 12-pass LLM pipeline (incl. setup/payoff ledger), GBNF grammar-constrained JSON, quote verification
-screenplay_cowriter/  Piece 3 — branch-based chat, 6 personas x 3 modes, file-based session store, writer relationship memory, writer library (past-work digest)
+screenplay_cowriter/  Piece 3 — branch-based chat, 8 personas x 5 modes, file-based session store, writer relationship memory, writer library (past-work digest)
 screenplay_studio/    Orchestrator (manifest-driven resume) + Flask webapp server + Stash store
 .agents/skills/       Persona humanization playbooks (sameer-humanizer, script-doctor-humanizer)
 ```
@@ -68,12 +68,15 @@ Key flows:
 
 ## Docs index
 
+- `CONTEXT.md` — **domain glossary**: the official names for core entities (Project, Idea, Draft, Finding, Room, Stash, …) — use these terms exactly
 - `docs/CODEBASE_MAP.md` — **read this first**: symbol-level index of every module and its public API (no full-repo scan needed)
 - `docs/ARCHITECTURE.md` — system architecture (tree, API endpoints, pipeline, known issues)
+- `docs/PRD.md` — **product requirements**: features, user stories, acceptance criteria (epics 1–7)
+- `docs/USER_PERSONAS.md` — user archetypes (aspiring screenwriter / working rewriter / idea-stage writer) + design rules they imply
 - `docs/UI_UX_SPECIFICATION.md` — **shareable UI/UX build spec**: every screen, component, state, interaction, keyboard shortcut, API contract, and an acceptance checklist (what "built & integrated" means)
 - `docs/PROJECT_OVERVIEW.md` — product overview and design principles
 - `docs/CLI_REFERENCE.md` — every CLI command across the four packages
-- `docs/DATA_FORMATS.md` — JSON bridge schemas (parsed/kg/report/manifest/session/progress)
+- `docs/DATA_FORMATS.md` — JSON bridge schemas (parsed/kg/report/manifest/session/progress + all project stores)
 - `docs/DEVELOPMENT.md` — setup, conventions, how to extend (pipeline pass, rule, persona, endpoint)
 - `docs/TESTING.md` — test suite layout and the mock llama-server
 - `docs/debates/` — live Sameer-vs-Premise-Doctor debate transcripts (re-run with `_debate.py`)

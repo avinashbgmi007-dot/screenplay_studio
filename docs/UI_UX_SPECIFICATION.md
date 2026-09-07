@@ -33,8 +33,9 @@ stays on the machine.
 - **Honest connection status.** Green = your real model verified; amber = built-in demo
   model; red = unreachable. The UI never pretends.
 
-**Display languages:** English, Tenglish, Hindi, Telugu, Tamil (analysis reports and chat
-replies can be in these registers; UI chrome stays English).
+**Display languages:** English, Tenglish, Hindi, Telugu, Tamil, plus **Hinglish** as a
+reply-translate register (the 🌐 globe menu offers en/te/hi/Tenglish/Hinglish; report
+languages stay the five listed above). UI chrome stays English.
 
 ---
 
@@ -47,39 +48,54 @@ manuscript as bright cream paper under a lamp. The **room lighting is the signat
 Co-write room is warm amber, the Feedback room is cool slate, and the CSS `body[data-room]`
 swaps the whole accent ramp.
 
+> The current theme is **"Nocta Craft Precision"** (violet/cyan on near-black ink). The
+> original warm-amber palette was superseded; the table below is the live token set in
+> `style.css` (`:root`, lines ~114–175).
+
 | Token | Night value | Purpose |
 |---|---|---|
-| `--ink-950` | `#0a0e1a` | page void background |
-| `--ink-900` | `#0e1322` | raised surfaces (bars, panels) |
-| `--ink-850` | `#121830` | cards |
-| `--ink-800` | `#161d36` | inputs, chips, wells |
-| `--ink-700` | `#1d2544` | hover wells |
-| `--line` | `#262f52` | borders |
-| `--line-soft` | `#1c2340` | faint borders |
+| `--ink-950` | `#09090e` | page void background |
+| `--ink-900` | `#0e0e14` | raised surfaces (bars, panels) |
+| `--ink-850` | `#131319` | cards |
+| `--ink-800` | `#1a1a22` | inputs, chips, wells |
+| `--ink-700` | `#22222c` | hover wells |
+| `--line` | `rgba(255,255,255,0.085)` | borders |
+| `--line-soft` | `rgba(255,255,255,0.05)` | faint borders |
+| `--glass` | `rgba(17,17,26,0.66)` | glass surfaces |
+| `--glass-strong` | `rgba(19,19,29,0.82)` | stronger glass |
+| `--surface` | `rgba(255,255,255,0.032)` | faint surface tint |
+| `--surface2` | `rgba(255,255,255,0.06)` | hover surface tint |
 | `--paper` | `#f2e8d4` | manuscript paper |
 | `--paper-2` | `#ede1c8` | paper gradient top |
 | `--paper-ink` | `#2b241b` | text on paper |
 | `--paper-muted` | `#6d6050` | muted text on paper |
 | `--paper-line` | `#d9ccae` | rules on paper |
-| `--lamp` | `#e8a24f` | warm amber accent (Co-write) |
-| `--lamp-deep` | `#b06f27` | amber deep |
-| `--lamp-bright` | `#f3c07e` | amber bright |
-| `--consult` | `#86a6bd` | cool slate accent (Feedback) |
-| `--consult-deep` | `#5b7c95` | slate deep |
-| `--text` | `#dbe2f4` | primary text on void |
-| `--text-muted` | `#8b96b8` | secondary text |
-| `--text-faint` | `#5d6b8a` | tertiary/hints |
-| `--danger` | `#c96a5a` | errors / high severity |
-| `--danger-bg` | `rgba(201,106,90,.14)` | danger chip bg |
-| `--ok` | `#8fae7e` | success / addressed |
-| `--ok-bg` | `rgba(143,174,126,.14)` | ok chip bg |
+| `--lamp` | `#7e6bff` | violet accent (Co-write) |
+| `--lamp-deep` | `#6354cc` | violet deep |
+| `--lamp-bright` | `#9b8aff` | violet bright |
+| `--consult` | `#53c7f0` | cyan accent (Feedback) |
+| `--consult-deep` | `#3da8d4` | cyan deep |
+| `--accent2` | `#53c7f0` | secondary accent |
+| `--info` | `#60a5fa` | info accent |
+| `--text` | `#ecebf4` | primary text on void |
+| `--text-muted` | `#8b889c` | secondary text |
+| `--text-faint` | `#5a586a` | tertiary/hints |
+| `--danger` | `#fb7185` | errors / high severity |
+| `--danger-bg` | `rgba(251,113,133,0.14)` | danger chip bg |
+| `--ok` | `#34d399` | success / addressed |
+| `--ok-bg` | `rgba(52,211,153,0.14)` | ok chip bg |
+| `--sidebar-w` | `264px` | fixed sidebar width |
+| `--radius` / `--radius-sm` | `14px` / `10px` | corner radii |
+| `--ease-out` / `--spring` / `--t` | cubic-beziers / 200ms | motion curves |
 
 Room swap: `body` sets `--accent/--accent-deep/--accent-bright/--glow/--glow-strong` to the
-amber values by default; `body[data-room="feedback"]` overrides them to the slate values.
+violet values by default (`--glow: rgba(126,107,255,…)`) ; `body[data-room="feedback"]`
+overrides them to the cyan values (`--accent-bright: #6dd8f7`, `--glow: rgba(83,199,240,…)`).
 **All interactive/accented UI must read from these variables, never hardcoded colors.**
 
-Dawn (light) theme: `body.dawn` re-overrides the full ramp with warm paper tones
-(`rgb(231,223,205)` family). It must round-trip cleanly with the night theme (toggle button
+Dawn (light) theme: `body.dawn` re-overrides the ramp to a **daylight glass** palette
+(`--ink-950: #f1ede4`, `--lamp: #6b5ce6`, `--consult: #3ab8d8`, `--danger: #9c3527`,
+`--ok: #2eb87a`). It must round-trip cleanly with the night theme (toggle button
 in sidebar + status strip).
 
 River-read (Spark Wall) special surface: dark-glass stream with teal accents
@@ -95,26 +111,37 @@ to system fonts by design):
 | `--font-typewriter` | Special Elite | desk artifacts, buttons, headings of chrome |
 | `--font-script` | Courier Prime | the manuscript itself (screenplay page) |
 | `--font-serif` | Source Serif 4 | prose, body, reports |
+| `--font-display` | Instrument Serif | display headings |
+| `--font-ui` | DM Sans | default UI font (body) |
 | `--font-mono` | IBM Plex Mono | labels, meta, timestamps, chips |
 | `--font-hand` | Caveat | the writer's own margin notes |
 
-Base: 15px, line-height 1.55, serif default. `body` uses `-webkit-font-smoothing: antialiased`.
+Base: 15px, line-height 1.55, **`--font-ui` (DM Sans) is the body default** (not serif).
+`body` uses `-webkit-font-smoothing: antialiased`.
+
+> ⚠ **Known gap:** `--font-display: "Instrument Serif"` and `--font-ui: "DM Sans"` are
+> referenced in `:root` but **not bundled** — there is no `@font-face` for them and no
+> `.woff2` in `webapp/fonts/`, so both silently fall back (Georgia / system-ui). Bundling
+> them (or re-pointing the vars at bundled families) is an open code task; a rebuild must
+> either ship the woff2 files or accept the fallback.
 
 ### 2.3 Buttons & controls
 
-- `.btn-primary` — amber gradient CTA; disabled at `opacity .55`.
+- `.btn-primary` — accent gradient CTA; disabled at `opacity .55`.
 - `.btn-secondary` — ghost bordered button; `.danger` variant red; `.btn-small`; `.icon-btn`.
 - `.btn-paper` — paper-toned button on the welcome card.
-- `.explore-chip` — pill chip; collapses to lone icon on first typing (see §8.5).
+- `.explore-chip` — pill chip; collapses to lone icon on first typing (see §7.8).
 - `:focus-visible` — always a visible ring (`2px solid var(--accent-bright)`).
-- `::selection` — amber selection.
+- `::selection` — accent selection.
 
 ### 2.4 Motion & accessibility
 
 - `prefers-reduced-motion: reduce` → all animation/transition durations ≈ 0.
 - Breathing lamp glow (`lampBreath`), room panel fade-in, paper settle, welcome card rise —
   all guarded by the reduced-motion rule.
-- A full-screen vignette + film-grain overlay (`body::before/::after`, `pointer-events: none`).
+- A full-screen vignette + film-grain overlay (`body::after`, `pointer-events: none`).
+  Note: `body::before` is re-purposed by the NOCTA layer as a 1px top accent gradient line
+  (with `!important`), overriding the original `::before` vignette background.
 
 ---
 
@@ -127,7 +154,7 @@ Base: 15px, line-height 1.55, serif default. `body` uses `-webkit-font-smoothing
 │  + Lay a new page         │  │  room toggle (Co-write|Feedback) · chip · ⌘K │
 │  ───────────────────      │  ├─ WORKSPACE (flex, 3 zones) ─────────────┤ │
 │  Ideas (flyout)           │  │  [struct rail] [ DESK: script pane ]     │ │
-│  On the shelf (flyout)    │  │                            [gutter tabs] │ │
+│  On the shelf (flyout)    │  │         [Problem Board] [gutter tabs]    │ │
 │  Your library (flyout)    │  │  [room drawer — summoned from gutter]    │ │
 │  ───────────────────      │  └──────────────────────────────────────────┘ │
 │  ☀ Dawn · ⚙ Settings      │  STATUS STRIP: project · model · conn ·      │
@@ -135,7 +162,9 @@ Base: 15px, line-height 1.55, serif default. `body` uses `-webkit-font-smoothing
                                 └──────────────────────────────────────────┘
 ```
 
-- `#app` is a full-height flex row: fixed `264px` sidebar + flexible main.
+- `#app` is a full-height flex row: fixed `264px` sidebar (`--sidebar-w`) + flexible main.
+  **The sidebar collapses** (`#sidebar-toggle` + edge tab `#sidebar-edge-tab`,
+  pref `sidebar_collapsed`) — same pattern as the structure rail.
 - **The desk** (`#script-pane`) owns the room: full width, the paper centered at
   `max-width: 700px`. The manuscript never shrinks below 50% of the desk.
 - **Room drawer** (`#room-drawer`): the partner panel (Sameer / Dr. Sushruta), summoned
@@ -143,6 +172,8 @@ Base: 15px, line-height 1.55, serif default. `body` uses `-webkit-font-smoothing
   script keeps the room.
 - **Structural rail** (`#struct-rail`): collapsible left rail (scenes · characters ·
   the Stash · margin notes + Beat Board / Compare buttons). Edge tab `☰ Structure` reopens.
+- **Problem Board** (`#problem-board`): a docked right-side findings panel with its own
+  edge tab (`#pb-edge-tab`) — see §4.4b.
 - **Status strip** (`#status-strip`): thin footer with model/connection/metrics/sprint/dawn.
 
 ### 3.1 Responsive behavior
@@ -183,9 +214,11 @@ Opening a project (from shelf, dashboard card, sample, or session restore) shows
 (`Ctrl K` / `⌘K` platform-aware).
 
 **Script toolbar** (above the pages): search box, finding summary chips (N open / N addressed),
-and actions: 📌 Premise (only if a graduated idea carried a premise card), ✳ Focus, Reader,
-≋ Flow, ↶ Undo, ↷ Redo, ✎ Revise, 📋 Beat Board, 🗂 Compare, ⬇ Backup .zip, Export
-.fountain/.fdx/.txt, Print / Save PDF, Discard edits (danger, only when edits exist).
+plus visible actions: 📌 Premise (only if a graduated idea carried a premise card), ✳ Focus,
+✎ Revise, and an **overflow "⋯" menu** (`#overflow-toggle` / `#overflow-dropdown`) holding:
+Reader, ≋ Flow, 📋 Beat Board, 🗂 Compare, ⬇ Backup .zip, Export .fountain/.fdx/.txt,
+Print / Save PDF, Discard edits (danger, only when edits exist). ↶ Undo / ↷ Redo buttons
+exist but are `display:none` — undo/redo is keyboard-only (`Ctrl/⌘ Z`).
 
 **The manuscript** (`#script-scenes`): each scene renders as a **cream paper page**
 (`.scene-page`, slight alternating rotation that straightens on hover):
@@ -209,9 +242,13 @@ and actions: 📌 Premise (only if a graduated idea carried a premise card), ✳
 - **Craft shelf** (`#craft-shelf`): a collapsed-by-default header over the four analysis
   panels that live at the top of the manuscript — Fix queue · Pacing · Characters · Writer's
   Mirror. One click expands; state persisted.
+- **Draft bar** (`#draft-bar`): draft switcher + "Upload new draft" — always visible while
+  a project is open (drives Compare/diff); a diff banner (`#diff-banner`) appears after a
+  draft activation.
 - **Script-level notes bucket**: findings with no scene ref + writer's script-level notes.
 - **Select-to-ask float**: select text → floating "✎ Ask Sameer about this" button (plus
-  "📥 Stash this" and "📝 Note this line" below it). §8.2.
+  "📥 Stash this" and "📝 Note this line" below it). §7.2. A second, richer selection popup
+  (`#text-popup`) also exists — see §7.14.
 
 ### 4.3 Co-write room (`#cowrite-panel`, in the drawer)
 
@@ -224,11 +261,14 @@ and actions: 📌 Premise (only if a graduated idea carried a premise card), ✳
   never stored).
 - **Empty states**: project — "Ask about a theme, a character…"; idea — context-specific
   (see §4.6).
+- **Conversation overview rail** (`#msg-rail`): a hover rail alongside the thread with one
+  line per user message; click-to-jump, current-message tracking.
 - **Idea context card** (idea mode only): proof Sameer "has your page" — word count +
   show/hide snapshot toggle.
 - **Composer** (`#composer`): growing `<textarea>` (auto-resize to ≤160px), quote card slot
   above it, previous-message history popup (ArrowUp/Down), Send button. Enter sends,
-  Shift+Enter newline. Mic chip for dictation (§8.6).
+  Shift+Enter newline. Mic chip for dictation (§7.9). **`/sameer <ask>`** typed anywhere in
+  the idea page summons Sameer's drawer with the ask prefilled.
 - **Explore chips** (idea mode): guided prompts ("Sameer runs with it"), collapse to icons
   on typing.
 - Streaming: assistant replies **stream token-by-token** (SSE) into the bubble with an
@@ -240,7 +280,7 @@ and actions: 📌 Premise (only if a graduated idea carried a premise card), ✳
 The consultant's desk — "Dr. Sushruta's Report".
 
 - **Header**: "Report in" language select (English/Tenglish/Hindi/Telugu/Tamil), live
-  analysis progress chip (bar + % + ETA; hover opens the 17-stage pipeline map), 📥 Report
+  analysis progress chip (bar + % + ETA; hover opens the **20-stage** pipeline map), 📥 Report
   export link (when a report exists), Run Analysis / ↻ Re-parse / ⚠ Retry failed buttons.
 - **Tabs**: Report | Fix Queue.
 - **Report pane** (`#feedback-report`): Coverage card (recommendation badge, logline,
@@ -254,6 +294,33 @@ The consultant's desk — "Dr. Sushruta's Report".
   **dawn meter** (night→dawn fills as findings resolve), and a "Show/Hide dismissed" toggle
   when any finding is dismissed.
 - **Empty state**: "No analysis yet — Run Analysis to get the consultant's report."
+- **Persona/mode selects**: the DOM `<select>`s for persona and mode are kept `hidden` —
+  conversational lenses are switched via rooms/lens, not dropdowns. `/api/config` still
+  serves the full persona/mode lists and the fallback contract below stands.
+
+### 4.4b Feedback View (`#feedback-view`) — the full-screen consultant surface
+
+**This — not the drawer panel — is what the Feedback room toggle, the `f` shortcut, and the
+Consultant gutter tab open for projects.** `state.view = "fv"`; the drawer panel
+(§4.4) remains reachable in idea-less contexts via `openFeedbackRoom()`.
+
+- **Three panes**: left Dr. Sushruta chat (streaming via `sendFvMessage`), center script
+  column with per-scene finding severity dots (`renderFeedbackView`), right panel with
+  Board/Sameer tabs (`switchFvTab`).
+- **Layout machinery**: maximize toggle (`fv-maximized`), draggable pane dividers
+  (`initFvDividers`), scroll sync between script column and findings (`initFvScrollSync`),
+  and an honest `fin` end-marker at the bottom of the script column.
+- Session restore handles `view: "fv"`; Esc closes it (part of the cascade, §7.3).
+
+### 4.4c Problem Board (`#problem-board`)
+
+A docked right-side findings panel in the workspace (not a full-screen view):
+
+- Severity filter (all / high / medium / low), auto-expand/collapse per scene, and an
+  IntersectionObserver that scroll-syncs highlight with the manuscript.
+- Edge tab (`#pb-edge-tab`) reopens it; the command palette has "Toggle the Problem Board".
+  ⚠ Palette key-binding for it shows `b` — colliding with Beat Board; the actual keyboard
+  `b` opens the Beat Board.
 
 ### 4.5 Full-screen tools
 
@@ -280,11 +347,12 @@ Two sub-surfaces inside `#script-pane`:
   first pages, explore-path chips. Hint: "The card rides with the conversation…".
 - **Idea canvas** (`#idea-canvas`, the current "Spark Wall" idea surface): a **blank page
   on the void** with a starfield + light-threads ambience. Title input (click to rename,
-  autotitles from the first line), autosave state ("Saving…"/"Saved"), ▸ Structure toggle
-  (logline + open questions behind it), "✦ Grow into pages" (graduate → upload first pages),
-  a floating "Sameer" pill to summon the idea chat, and a mic chip. Typing autosaves
-  (debounced 1.2s + on blur + `sendBeacon` flush on pagehide); the idea chat is **one idea =
-  one session**, lazy-created, with the whole page in context.
+  autotitles from the first line), autosave state (lowercase "saving…" → "saved HH:MM",
+  auto-clears after 4s), ▸ Structure toggle (logline + open questions behind it), "✦ Grow
+  into pages" (graduate → upload first pages), a floating "Sameer" pill to summon the idea
+  chat, and a mic chip. Typing autosaves (debounced **300ms** + on blur + `sendBeacon`
+  flush on pagehide); the idea chat is **one idea = one session**, lazy-created, with the
+  whole page in context.
 
 The room toggle becomes two **lenses on one conversation**: Co-write = Sameer (explore),
 Feedback = Premise Doctor (validate). No doctor, no scripts, no shelf in idea mode
@@ -299,9 +367,22 @@ conversation carry over so the same Sameer/memory continues on the script desk.
 |---|---|
 | **Settings** | llama-server URL, response timeout (30–7200s), fast model (optional), chat turn cap (15–1800s), Test Connection with result, Save/Cancel |
 | **Rewrite** | per-scene: finding context, optional instruction, "Generate rewrite" → candidate list (checkbox each, old → new), "Apply changes" (applies checked via edits/apply), status + note lines |
-| **Command palette** | input + fuzzy results (commands · scenes · help); `Ctrl/⌘ K` opens, `?` shows all shortcuts; ↑↓ Enter, Esc closes |
+| **Command palette** | input + fuzzy results (commands · scenes · help · craft hints); `Ctrl/⌘ K` opens, `?` shows all shortcuts; ↑↓ Enter, Esc closes. Seven `type:"craft"` entries ("Why doesn't my dialogue land?" etc. — McKee/Snyder/Field/Vogler/Swain) route through `openSameerWith()` |
 | **Fork** | name the branch → create fork |
 | **Sam's notes on you** | writer relationship memory: dimensions, observations list (each with "forget this"), "Refresh now", empty state, Close |
+
+### 4.8 NOCTA chrome layer (v4 additions)
+
+On top of the base shell (all in `app.js` `initNoctaDesign` + `style.css` NOCTA section):
+
+- **Auto-hide chrome**: the project bar + script toolbar fade to `opacity 0` after 4s idle;
+  any mouse move within 120px (or hovering sidebar/modal) restores them.
+- **Sameer slide-in panel** (`#sameer-panel`): a contextual panel with hardcoded seed
+  messages + craft references (McKee — Gap Analysis etc.). ⚠ Currently a **visual mock** —
+  its composer only appends locally; no API call is made.
+- **Craft level badge** (`#level-badge`): "Level 1 · Upload & Discover" → Level 4;
+  auto-advances on finding-card clicks (`setCraftLevel`).
+- **Cursor spotlight** (`#cursor-spotlight`): a fixed radial gradient following the mouse.
 
 ---
 
@@ -316,8 +397,11 @@ conversation carry over so the same Sameer/memory continues on the script desk.
   Shelf rows: stage dot (complete=filled ok / failed=red), title, status line, hover-reveal
   ✕ delete (with cascade-honest confirm). **Unreadable projects** show a "⚠ unreadable"
   flag, error on open, remain deletable. Library = a live view of the shelf (deleting one
-  deletes the other); rows also carry hover-reveal ✕.
+  deletes the other); library rows render **without** a delete button (deletion happens via
+  shelf/dashboard).
 - **Footer**: ☀ Dawn · ⚙ Settings.
+- **Collapse**: the whole sidebar collapses via `#sidebar-toggle` / `#sidebar-edge-tab`
+  (pref `sidebar_collapsed`), mirroring the structure-rail pattern.
 
 ---
 
@@ -328,7 +412,7 @@ Thin footer, left→right:
 - `#status-model` — model id (not URL), hover card with full state/model/server truth.
 - `#status-conn` — "—" / "● demo craft model (built-in)" / "● your model is back — click to
   switch" (in demo mode when the real server returns, one click re-attaches) / connection
-  message. Re-checked every 30s.
+  message. Re-checked on init, settings save, and demo-switch (no fixed interval).
 - `#status-metrics` — "⚡ Ns · X/Y fixed" with hover detail (avg reply, last analysis, %
   fixed, passages discussed).
 - `#sprint-timer` — 25:00 countdown; click start/pause, double-click reset; pulsing dot
@@ -353,8 +437,9 @@ note editor pinned to that line). Selection cleared / scroll / outside-click hid
 composer placeholder becomes "Reply to the highlighted passage…" while text is selected.
 
 ### 7.3 Esc cascade ("the page wins")
-Top-most visible modal closes first; then river-read → Spotlight → Revision view → room
-drawer → craft shelf → structure rail → close flyouts.
+Top-most visible modal closes first; then river-read → Spotlight → Revision view →
+**Feedback view → Compare → Beat Board** → room drawer → craft shelf → structure rail →
+close flyouts (flyout Esc is handled separately).
 
 ### 7.4 Spotlight mode (key `z`)
 TOTAL chrome removal — project bar, toolbars, rail, drawer, gutter, craft shelf, script-level
@@ -395,11 +480,22 @@ Fork (create), switch, delete branches; per-message origin badge with stable per
 "main" is always neutral brass. Composer history recall (↑/↓).
 
 ### 7.13 Session & preference persistence
-- Session (last project/idea/view/scene) → `localStorage screenplay_studio.session.v1`; a
-  reload restores where the writer left off.
-- Prefs (dawn, reader, focus, flow, craft_open, hintDismissed, stt lang, pane width) →
-  `localStorage screenplay_studio.prefs.v1` (+ `pane-width-v2`, `studio-stt-lang`).
+- Session (last project/idea/view/scene — incl. `view: "fv"` Feedback view) → `localStorage
+  screenplay_studio.session.v1`; a reload restores where the writer left off.
+- Prefs (dawn, reader, focus, flow, craft_open, hintDismissed, stt lang, pane width,
+  rail_collapsed, sidebar_collapsed) → `localStorage screenplay_studio.prefs.v1`
+  (+ `pane-width-v2`, `studio-stt-lang`).
+- The sprint timer state survives reload (`localStorage screenplay_studio.sprint.v1`);
+  the session-elapsed start lands in **sessionStorage** (`studio.session.start`) so it
+  persists across reloads within the tab.
 - An unreadable/corrupt project stays visible (flag-don't-drop) with an actionable error.
+
+### 7.14 Contextual text-selection popup (`#text-popup`)
+A second selection surface (distinct from §7.2's float stack): a context-aware popup whose
+actions depend on the current page (idea / script / revision): **Ask Sameer, Ask Consultant,
+Add margin note, Stash, Add to logline, Rewrite passage, Locate finding**. Routes asks
+through `/sameer <ask>`. Note: its **Stash** action writes a `"[STASH] …"` line into the
+rail note input rather than calling the Stash endpoint — different from §7.2's float Stash.
 
 ---
 
@@ -415,7 +511,7 @@ Fork (create), switch, delete branches; per-message origin badge with stable per
 | `s` | Focus the manuscript — dismiss the partner, back to the page |
 | `a` | Toggle the Craft shelf (analysis panels) |
 | `r` | Toggle the Structure rail |
-| `z` | Spotlight mode — nothing but the page (Esc leaves) |
+| `z` | Spotlight mode — nothing but the page (Esc leaves; **project-gated**, like `b`/`d`/`v`) |
 | `b` | Open the Beat Board (project only) |
 | `d` | Compare drafts side by side (project only) |
 | `v` | Toggle the Revision view (project only) |
@@ -423,7 +519,7 @@ Fork (create), switch, delete branches; per-message origin badge with stable per
 | `k` / `p` | Previous scene (script view) |
 | `/` | Search the script |
 | `?` | Show all shortcuts (palette help) |
-| `Esc` | Leave spotlight → dismiss partner drawer → craft shelf → structure rail → modals → flyouts |
+| `Esc` | Leave spotlight → dismiss partner drawer → craft shelf → structure rail → modals → flyouts (full cascade in §7.3) |
 | `↑`/`↓` + `Enter` | Palette navigation / run |
 | Inline edit: `Enter` save · `Esc` cancel · `Shift+Enter` newline | |
 | Composer: `Enter` send · `Shift+Enter` newline · `↑`/`↓` history · `Esc` cancel history | |
@@ -461,7 +557,7 @@ in the frontend when absent).
 | GET | `/projects/<name>` | — | `_manifest_summary` + optional `premise` |
 | DELETE | `/projects/<name>` | — | `{ok, project}` |
 | POST | `/sample` | — | `_manifest_summary`, 201 |
-| POST | `/projects/<name>/backup` *(GET)* | — | `.zip` download |
+| GET | `/projects/<name>/backup` | — | `.zip` download |
 | POST | `/projects/<name>/reparse` | — | `_manifest_summary` |
 
 **`_manifest_summary` shape** (returned by most project routes):
@@ -558,9 +654,13 @@ unknown}}`.
 
 Idea routes mirror these under `/api/ideas/<idea_id>/chat/...` with the same shapes
 (`/chat/start`, `/chat/sessions/<sid>` GET/DELETE, `/messages` POST, `/messages/stream`,
-`/settings`, `/translate`).
+`/settings`, `/translate`). **No fork/switch for idea sessions** — branching is
+project-only.
 
 **quote** (select-to-reply): `{scene_number?: int, text: string}`.
+
+**Session payload** (GET session): includes `last_seen_content` — the last script content
+the session "saw" (used for stale-session honesty), in addition to the shape in §10.
 
 ### 9.8 Idea store & writer memory
 | Method | Path | Request | Response |
@@ -615,7 +715,8 @@ Idea routes mirror these under `/api/ideas/<idea_id>/chat/...` with the same sha
 ## 11. Acceptance checklist (what "built & integrated" means)
 
 - [ ] All screens in §4 exist and render: welcome/dashboard, project desk, manuscript,
-      co-write room, feedback room, beat board, compare, revision view, idea room, all 5 modals.
+      co-write room, feedback room, **Feedback View (§4.4b), Problem Board (§4.4c),
+      NOCTA chrome (§4.8)**, beat board, compare, revision view, idea room, all 5 modals.
 - [ ] Every interaction in §7 works: rooms, select-to-ask float, Esc cascade, spotlight,
       focus, river read, reader mode, explore chips, dictation, translation, dawn meter,
       branches, session restore.
@@ -641,11 +742,13 @@ Idea routes mirror these under `/api/ideas/<idea_id>/chat/...` with the same sha
 
 ## 12. Reference files & implementation notes
 
-- Frontend source of truth: `screenplay_studio/webapp/` — `index.html` (SPA shell),
-  `app.js` (~5,900 lines, all client logic), `style.css` (~4,300 lines, full design system),
-  `core.js` (DOM-free pure helpers: `fuzzyScore`, `formatMessageContent`, `truncate`,
-  `formatElapsed`, `fmtDuration`, `shortModelId`).
-- Backend: `screenplay_studio/webapp_server.py` (~2,700 lines) — all endpoints in §9.
+- Frontend source of truth: `screenplay_studio/webapp/` — `index.html` (~665 lines, SPA
+  shell), `app.js` (~6,990 lines, all client logic), `style.css` (~5,120 lines, full
+  design system incl. the NOCTA layer), `core.js` (~96 lines, DOM-free pure helpers:
+  `fuzzyScore`, `formatMessageContent`, `truncate`, `formatElapsed`, `fmtDuration`,
+  `shortModelId`), plus `fonts/` (self-hosted woff2) and the Design Lab preview folders
+  (`preview-redesigns/`, `preview-next/`).
+- Backend: `screenplay_studio/webapp_server.py` (~2,770 lines) — all endpoints in §9.
 - Pure helpers must stay DOM-free (unit-tested in `node --test tests/js/`).
 - Cache-busting: `index.html` references `style.css?v=<hash>` / `app.js?v=<hash>` /
   `core.js?v=<hash>` — bump the query whenever those files change (no-cache only revalidates
