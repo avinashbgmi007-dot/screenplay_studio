@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>③ Spark Wall — Chosen Spine (hybrid: dawn verdict + river read)</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#0a0e1a; --glass:rgba(255,255,255,.055); --edge:rgba(160,180,255,.16);
+  --txt:#dbe2f4; --dim:#77809c; --cyan:#6ee7ff; --violet:#a78bfa; --warm:#ffd58a;
+  --red:#ff7b7b; --amber:#ffcf6b; --gold:#e8a54b;
+  --dawn:0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--void);color:var(--txt);font-family:"Space Grotesk",system-ui,sans-serif;font-size:14px;line-height:1.55;overflow:hidden}
+svg.i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+
+#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#05070f;border-bottom:1px solid var(--edge);font-size:12px}
+#pv b{color:var(--cyan);margin-right:10px;font-weight:700}
+#pv button{background:none;border:1px solid var(--edge);color:var(--dim);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
+#pv button.on{background:var(--cyan);border-color:var(--cyan);color:#04121a;font-weight:700}
+main{padding-top:42px;height:calc(100vh - 42px)}
+[data-screen]{display:none;height:100%;position:relative;overflow:hidden}
+[data-screen].active{display:block}
+.starfield{position:absolute;inset:0;pointer-events:none;background-image:
+ radial-gradient(1px 1px at 12% 22%,rgba(255,255,255,.35),transparent),
+ radial-gradient(1px 1px at 68% 12%,rgba(255,255,255,.28),transparent),
+ radial-gradient(1.5px 1.5px at 84% 64%,rgba(255,255,255,.3),transparent),
+ radial-gradient(1px 1px at 32% 78%,rgba(255,255,255,.25),transparent),
+ radial-gradient(1px 1px at 52% 40%,rgba(255,255,255,.2),transparent)}
+.status-float{position:absolute;left:18px;top:14px;z-index:40;font:10.5px "Space Grotesk";color:var(--dim);display:flex;gap:14px}
+.status-float .g{width:6px;height:6px;border-radius:50%;background:#79f7b7;display:inline-block;margin-right:5px}
+
+/* ====== THE WALL ====== */
+.threads{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.threads path{fill:none;stroke:url(#tg);stroke-width:1.4;opacity:.55}
+@media (prefers-reduced-motion: no-preference){.threads path{stroke-dasharray:6 10;animation:flow 22s linear infinite}}
+@keyframes flow{to{stroke-dashoffset:-320}}
+.sparkcard{position:absolute;width:225px;background:var(--glass);border:1px solid var(--edge);border-radius:14px;padding:14px 16px;backdrop-filter:blur(8px);cursor:pointer;z-index:2;transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease}
+@media (prefers-reduced-motion: reduce){.sparkcard{transition:none}}
+.sparkcard:hover{transform:translateY(-5px) scale(1.02);border-color:rgba(110,231,255,.5);box-shadow:0 18px 50px rgba(0,0,0,.5),0 0 40px rgba(110,231,255,.08)}
+.sparkcard b{display:block;font-size:13.5px;margin-bottom:4px}
+.sparkcard span{font-size:11.5px;color:var(--dim)}
+.sparkcard .tag{display:inline-flex;align-items:center;gap:5px;font:600 9.5px "Space Grotesk";letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);margin-bottom:7px}
+.sparkcard.q{border-color:rgba(167,139,250,.45);z-index:3}
+.sparkcard.q .tag{color:var(--violet)}
+.sev-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.sev-dot.high{background:var(--red)}.sev-dot.med{background:var(--amber)}.sev-dot.low{background:#5d6b8a}
+/* Sameer's single question — bottom glass bar */
+.askbar{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;width:min(680px,92vw);z-index:50;background:rgba(13,17,32,.85);border:1px solid var(--edge);border-radius:16px;backdrop-filter:blur(12px);padding:14px 18px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.askbar .qline{display:flex;gap:10px;align-items:flex-start;margin-bottom:11px}
+.askbar .face{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--violet),var(--cyan));display:grid;place-items:center;font-weight:700;color:#0a0e1a;flex:0 0 auto}
+.askbar .qtext{font-size:13.5px;padding-top:6px}
+.askbar .qtext small{display:block;color:var(--dim);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;transition:.2s ease}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--edge);background:rgba(255,255,255,.04);border-radius:99px;padding:4px 11px;font-size:11px;color:var(--cyan);cursor:pointer;white-space:nowrap}
+.chip:hover{border-color:var(--cyan)}
+.chips.collapsed{flex-direction:column;align-items:flex-start}
+.chips.collapsed .chip .lbl{display:none}
+.chips.collapsed:hover .chip .lbl{display:inline}
+.askbar .composer{width:100%;min-height:38px;max-height:130px;resize:none;background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:10px;color:var(--txt);padding:9px 12px;font:13px "Space Grotesk";outline:none}
+.askbar .composer:focus{border-color:var(--cyan)}
+
+/* ====== VERDICT: cluster + THE DAWN METER (borrowed from First Light) ====== */
+.cluster-stage{height:100%;overflow-y:auto;position:relative;z-index:2;padding:30px 0 60px}
+.skyline{position:absolute;inset:0;pointer-events:none;z-index:0;opacity:var(--dawn);transition:opacity .5s ease;
+ background:linear-gradient(180deg, rgba(255,169,77,.10), rgba(242,165,107,.05) 60%, transparent)}
+@media (prefers-reduced-motion: reduce){.skyline{transition:none}}
+.cluster{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:min(800px,92vw);margin:0 auto;padding:0 16px}
+.cluster .sparkcard{position:relative;width:auto}
+.vhead{grid-column:1/-1;text-align:center;margin-bottom:6px}
+.vhead h2{font-size:26px;font-weight:500}
+.vhead .score{font-size:38px;color:var(--cyan);font-weight:700}
+.vhead small{color:var(--dim);letter-spacing:.16em;text-transform:uppercase;font-size:10px;display:block}
+.dawnmeter{grid-column:1/-1;display:flex;align-items:center;gap:12px;justify-content:center;margin:10px 0 6px}
+.dawnmeter .track{width:min(320px,46vw);height:6px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}
+.dawnmeter .fill{height:100%;width:calc(var(--dawn) * 100%);background:linear-gradient(90deg,#5a4a8a,var(--gold));transition:width .5s ease}
+@media (prefers-reduced-motion: reduce){.dawnmeter .fill{transition:none}}
+.dawnmeter .pct{font:600 12px "Space Grotesk";color:var(--gold);min-width:40px}
+.dawnhint{grid-column:1/-1;text-align:center;color:var(--dim);font-size:11.5px;margin-bottom:4px}
+.frow{grid-column:span 1;display:flex;align-items:flex-start;gap:11px;background:var(--glass);border:1px solid var(--edge);border-radius:14px;padding:14px 16px;backdrop-filter:blur(8px);cursor:pointer;transition:border-color .25s ease, opacity .25s ease}
+.frow:hover{border-color:rgba(232,165,75,.45)}
+.frow.resolved{opacity:.55;border-color:rgba(232,165,75,.5)}
+.frow .tick{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--edge);flex:0 0 auto;margin-top:2px;display:grid;place-items:center;color:transparent;transition:.2s ease}
+.frow.resolved .tick{background:var(--gold);border-color:var(--gold);color:#221505}
+.frow .t{font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px}
+.frow p{font-size:11.5px;color:var(--dim);margin-top:4px}
+
+/* ====== GRADUATED PAGES ====== */
+.grad{position:relative;z-index:2;height:100%;overflow-y:auto;padding:54px 0 100px}
+.grad-col{max-width:680px;margin:0 auto;padding:0 30px}
+.grad-note{text-align:center;color:var(--dim);font-size:12.5px;margin-bottom:24px}
+.readlike{display:block;margin:0 auto 26px;width:fit-content;border:1px solid var(--edge);background:rgba(94,234,212,.06);color:var(--cyan);border-radius:99px;padding:8px 18px;font:600 12px "Space Grotesk";cursor:pointer}
+.readlike:hover{background:rgba(94,234,212,.12)}
+.pagecard{background:rgba(255,255,255,.045);border:1px solid var(--edge);border-radius:14px;padding:30px 36px;margin-bottom:20px;font-family:Consolas,monospace;font-size:13.5px;line-height:1.7;position:relative}
+.pagecard .sc{position:absolute;top:-11px;left:22px;background:var(--void);border:1px solid var(--edge);color:var(--cyan);border-radius:99px;font:600 10px "Space Grotesk";padding:3px 12px;letter-spacing:.08em}
+.pagecard .hot{background:rgba(110,231,255,.1);border-bottom:1px dashed var(--cyan);cursor:pointer}
+.pagecard .from-spark{margin-top:12px;font:11.5px "Space Grotesk";color:var(--violet)}
+.pagecard .from-spark::before{content:"↳ grown from spark: ";color:var(--dim)}
+
+/* ====== RIVER READ — one continuous glass scroll ====== */
+.river{height:100%;overflow-y:auto;scroll-behavior:smooth;position:relative;z-index:2}
+.mov{position:relative;padding:56px 0 60px}
+.mov-inner{max-width:640px;margin:0 auto;padding:0 30px}
+.mov-head{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.mov-head .nm{font-family:"Fraunces",Georgia,serif;font-style:italic;font-size:20px;color:var(--cyan)}
+.mov-head .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--edge),transparent)}
+.mov-kick{font:600 10px "Space Grotesk";letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+.wave{display:block;width:100%;height:40px;color:var(--edge)}
+.rpage{background:rgba(255,255,255,.045);border:1px solid var(--edge);border-radius:22px 22px 22px 6px;padding:36px 42px;font-family:Consolas,monospace;font-size:13.5px;line-height:1.7;position:relative;margin-bottom:20px;backdrop-filter:blur(6px)}
+.rpage .sc{position:absolute;top:-11px;left:20px;background:var(--void);border:1px solid var(--edge);color:var(--cyan);border-radius:99px;font:600 10px "Space Grotesk";padding:3px 12px}
+.rpage .hot{background:rgba(110,231,255,.1);border-bottom:1px dashed var(--cyan)}
+.rsam{display:flex;gap:12px;margin:14px 0}
+.rsam .face{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--violet),var(--cyan));color:#0a0e1a;display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+.rsam .line{background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:14px 14px 14px 4px;padding:11px 15px;font-size:13px}
+.rsed{border-left:3px solid var(--edge);border-radius:0 12px 12px 0;padding:11px 16px;margin-bottom:11px;background:rgba(255,255,255,.035)}
+.rsed.high{border-left-color:var(--red)}.rsed.med{border-left-color:var(--amber)}
+.rsed .t{font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px}
+.rsed p{font-size:11.5px;color:var(--dim);margin-top:3px}
+.current{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:80;display:flex;flex-direction:column;gap:11px}
+.current i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;transition:.2s ease}
+.current i.on{background:var(--cyan);box-shadow:0 0 12px 3px rgba(110,231,255,.25);transform:scale(1.25)}
+
+/* ====== DROP-IN ====== */
+.dropzone{position:relative;z-index:2;height:100%;display:grid;place-items:center}
+.dz{width:min(560px,88vw);border:1.5px dashed rgba(110,231,255,.4);border-radius:20px;padding:56px 40px;text-align:center;background:rgba(110,231,255,.03);transition:.25s ease}
+.dz:hover{background:rgba(110,231,255,.06);border-color:var(--cyan)}
+.dz .big{font-size:20px;font-weight:500;margin:14px 0 6px}
+.dz p{color:var(--dim);font-size:13px}
+.dz .becomes{margin-top:22px;display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--cyan);border:1px solid var(--edge);border-radius:99px;padding:6px 14px}
+</style>
+</head>
+<body>
+
+<nav id="pv"><b>③ Spark Wall — chosen spine</b>
+<button data-go="wall" class="on">The Wall</button><button data-go="verdict">Verdict · Dawn</button><button data-go="debate">Sameer's Question</button><button data-go="grad">Graduated Pages</button><button data-go="river">River Read</button><button data-go="drop">Drop-in</button>
+<span style="margin-left:auto;color:var(--dim)">chosen world — wall as home · dawn in the verdict · river as read mode</span></nav>
+
+<main>
+
+<!-- THE WALL -->
+<section data-screen="wall" class="active">
+  <div class="starfield"></div>
+  <div class="status-float"><span><span class="g"></span>qwen3-14B @ :8080</span><span>3 sparks growing · 1 question open</span></div>
+  <svg class="threads" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ee7ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+    <path vector-effect="non-scaling-stroke" d="M14 26 L 38 20 M14 26 L 30 62 M38 20 L 66 30 M66 30 L 84 22 M30 62 L 60 70 M60 70 L 82 58 M66 30 L 60 70"/>
+  </svg>
+  <div class="sparkcard" style="left:6%;top:20%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Spark</span><b>What if the call comes too late?</b><span>Open Pain backwards — start from the missed call.</span></div>
+  <div class="sparkcard" style="left:32%;top:13%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Motif</span><b>A hero who counts everything</b><span>Coin-counting as scarcity made visible.</span></div>
+  <div class="sparkcard q" style="left:58%;top:24%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Sameer asks</span><b>Who is Arjun when nobody's watching?</b><span>One question at a time — answer in pieces, sparks grow.</span></div>
+  <div class="sparkcard" style="left:20%;top:56%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Character</span><b>The stall owner's story</b><span>Who pretends not to see — and why?</span></div>
+  <div class="sparkcard" style="left:52%;top:63%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Spark</span><b>The last bus route</b><span>Night bus as the geography of going under.</span></div>
+  <div class="sparkcard" style="left:76%;top:52%"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/></svg>Grown</span><b>SC 9 draft exists now</b><span>This spark graduated into a page — see Graduated.</span></div>
+
+  <div class="askbar" id="ask">
+    <div class="qline"><span class="face">S</span><div class="qtext"><small>Sameer · one question at a time</small>What does Arjun <b>want</b> in this draft — to know the truth, or to survive the month?</div></div>
+    <div class="chips explore-chips">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12h16M13 5l7 7-7 7"/></svg><span class="lbl">Pin my answer as a spark</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Grow this wall into pages</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 4h16v12H8l-4 4z"/></svg><span class="lbl">Ask a different question</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M3 12c3-6 6 6 9 0s6 6 9 0"/></svg><span class="lbl">Read the script like water</span></button>
+    </div>
+    <textarea class="composer" placeholder="Answer in pieces — Sameer keeps up…" rows="1"></textarea>
+  </div>
+</section>
+
+<!-- VERDICT + DAWN -->
+<section data-screen="verdict">
+  <div class="starfield"></div>
+  <div class="skyline" id="skyline"></div>
+  <div class="cluster-stage"><div class="cluster">
+    <div class="vhead"><h2>The verdict, as sparks</h2><div class="score">7.2</div><small>12 of 44 findings open · Pain v3 · resolve them and watch the wall warm</small></div>
+    <div class="dawnmeter"><span style="font:600 10px 'Space Grotesk';color:var(--dim)">NIGHT</span><div class="track"><div class="fill" id="fill"></div></div><span style="font:600 10px 'Space Grotesk';color:var(--dim)">DAWN</span><span class="pct" id="pct">0%</span></div>
+    <p class="dawnhint">tick a finding resolved — the glass warms with you</p>
+    <div class="frow" data-dawn="20"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot high"></span>The gun never fires</div><p>“cheppalekha ante…” promises a call — payoff owed by p. 88.</p></div></div>
+    <div class="frow" data-dawn="40"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot med"></span>Stall owner vanishes</div><p>Best early antagonist beat — then zero mentions for twenty scenes.</p></div></div>
+    <div class="frow" data-dawn="60"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot med"></span>Duplicate pressure beats</div><p>SC 9 · 11 · 13 — the same promise three times.</p></div></div>
+    <div class="frow" data-dawn="80"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot low"></span>Voice bleed</div><p>Two scenes drift school-Telugu on a street-Tenglish tongue.</p></div></div>
+    <div class="frow" data-dawn="100"><span class="tick"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></svg></span>
+      <div><div class="t"><span class="sev-dot low"></span>Act II pacing drag</div><p>Three consecutive low-beat scenes around page 54.</p></div></div>
+    <div class="sparkcard q" style="grid-column:1/-1;position:relative;width:auto"><span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Sameer asks</span><b>Which finding do we kill first?</b><span>Pick one — I'll draft the fix with you.</span></div>
+  </div></div>
+</section>
+
+<!-- SAMEER'S QUESTION -->
+<section data-screen="debate">
+  <div class="starfield"></div>
+  <div style="position:relative;z-index:2;height:100%;display:grid;place-items:center;padding-bottom:150px">
+    <div class="sparkcard q" style="position:relative;width:min(560px,90vw);padding:26px 30px">
+      <span class="tag"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>The debate · 1:47 AM</span>
+      <b style="font-size:18px;margin-bottom:10px">Scenes 8–14 ek hi beat teen baar dikhate hain.</b>
+      <span style="font-size:13.5px;color:var(--txt);display:block;margin-bottom:10px">Pressure dikhata hai, badhta nahi. Audience ko washroom break milega — humein dena nahi hai. To sawaal: in teeno me se kis ek scene me Arjun <b>CHOOSE</b> karta hai? Wohi rakho — baaki do ko 1.5 page me collapse kar do. Likh dikhau?</span>
+      <span style="font-size:11.5px;color:var(--dim)">— Sameer · peer mode · past work loaded, tonight's script isolated</span>
+    </div>
+  </div>
+  <div class="askbar" style="bottom:18px">
+    <div class="chips explore-chips">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Show the collapsed scene</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span class="lbl">Raise stakes instead</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/></svg><span class="lbl">Compare with Gun Pen's mid</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M9 5h11v10H12l-4 4zM4 8v7"/></svg><span class="lbl">Read it in Tenglish voice</span></button>
+    </div>
+    <textarea class="composer" placeholder="Argue with Sameer…" rows="1"></textarea>
+  </div>
+</section>
+
+<!-- GRADUATED PAGES -->
+<section data-screen="grad">
+  <div class="starfield"></div>
+  <div class="grad"><div class="grad-col">
+    <p class="grad-note">the wall, grown up — sparks became pages · structure arrived when it was earned</p>
+    <span class="readlike" data-go="river">Read the whole script like water ↘</span>
+    <div class="pagecard"><span class="sc">SC 01 · INT. RENTED ROOM — NIGHT</span>
+      A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest.<br><br>ARJUN: Naana… cheppu. Cheppalekha ante nenu intlo unna leda?
+      <div class="from-spark">the phone glow does the lamp's job — a quiet mirror for Act II</div></div>
+    <div class="pagecard"><span class="sc">SC 02 · EXT. ROAD-SIDE TEA STALL — DAY</span>
+      Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.
+      <div class="from-spark">a hero who counts everything — scarcity made visible</div></div>
+    <div class="pagecard" style="border-style:dashed;text-align:center;color:var(--dim);font-family:'Space Grotesk';font-size:12.5px">＋ the wall still holds 3 growing sparks — drag one here when it's ready</div>
+  </div></div>
+</section>
+
+<!-- RIVER READ -->
+<section data-screen="river">
+  <div class="starfield"></div>
+  <div class="river" id="riverScroll">
+    <div class="mov" id="r-source">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The source</span><span class="rule"></span><span class="mov-kick">where the current starts</span></div>
+        <p style="color:var(--dim);font-size:13px">Reading a script should feel like floating downstream — pages carry you, arguments join, truth settles. Esc returns you to the wall.</p>
+      </div>
+    </div>
+    <svg class="wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 20 C 150 0 300 40 450 20 C 600 0 750 40 900 20 C 1050 0 1150 28 1200 20" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="mov" id="r-flow">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The flow</span><span class="rule"></span><span class="mov-kick">the pages themselves</span></div>
+        <div class="rpage"><span class="sc">SC 01 · INT. RENTED ROOM — NIGHT</span>
+          A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.<br><br>ARJUN: Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</div>
+        <div class="rpage"><span class="sc">SC 02 · EXT. ROAD-SIDE TEA STALL — DAY</span>
+          Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.<br><br>STALL OWNER: Nee account tho guddi pattuko ra. Idi naadi kaadu.</div>
+        <div class="rsam"><span class="face">S</span><div class="line">Coin-count noted — scarcity made visible. Keep floating; I'll only speak when the current slows.</div></div>
+      </div>
+    </div>
+    <svg class="wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 20 C 200 40 350 0 550 20 C 750 40 900 0 1100 20 L 1200 16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="mov" id="r-confluence">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The confluence</span><span class="rule"></span><span class="mov-kick">the argument joins the current</span></div>
+        <div class="rsam"><span class="face">S</span><div class="line">Here's where the beat repeats — SC 9, 11, 13. Kis ek me Arjun CHOOSE karta hai? Answer on the wall, and this stretch of water changes shape.</div></div>
+      </div>
+    </div>
+    <svg class="wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0 18 C 180 0 360 40 560 20 C 760 0 940 40 1200 18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="mov" id="r-estuary" style="padding-bottom:110px">
+      <div class="mov-inner">
+        <div class="mov-head"><span class="nm">The estuary</span><span class="rule"></span><span class="mov-kick">what settled</span></div>
+        <div class="rsed high"><div class="t"><span class="sev-dot high"></span>The gun never fires</div><p>Payoff owed by p. 88 — resolve it in the verdict room.</p></div>
+        <div class="rsed med"><div class="t"><span class="sev-dot med"></span>Stall owner vanishes</div><p>Bring him back or let the absence speak.</p></div>
+        <div class="rsed med"><div class="t"><span class="sev-dot med"></span>Duplicate pressure beats</div><p>Keep the scene where Arjun chooses.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="current" id="riverCur">
+    <i data-goto="r-source" class="on" title="Source"></i>
+    <i data-goto="r-flow" title="The Flow"></i>
+    <i data-goto="r-confluence" title="The Confluence"></i>
+    <i data-goto="r-estuary" title="The Estuary"></i>
+  </div>
+</section>
+
+<!-- DROP-IN -->
+<section data-screen="drop">
+  <div class="starfield"></div>
+  <div class="dropzone"><div class="dz">
+    <svg width="44" height="44" viewBox="0 0 24 24" style="stroke:var(--cyan);fill:none;stroke-width:1.6"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+    <div class="big">Drop a script. Get sparks.</div>
+    <p>Pain_v3.fountain lands as new glowing cards on the wall — parsed, sequenced, waiting to connect. Analysis runs quiet in the background; the verdict arrives as its own cluster.</p>
+    <span class="becomes" data-go="wall">watch it become sparks →</span>
+  </div></div>
+</section>
+
+</main>
+
+<script>
+function go(name){
+  document.querySelectorAll('[data-screen]').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
+  document.querySelectorAll('#pv [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===name));
+}
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');
+  if(g){go(g.dataset.go);return;}
+  const dot=e.target.closest('.current i[data-goto]');
+  if(dot){
+    const t=document.getElementById(dot.dataset.goto);
+    if(t)document.getElementById('riverScroll').scrollTo({top:t.offsetTop-8,behavior:'smooth'});
+    document.querySelectorAll('.current i').forEach(i=>i.classList.toggle('on',i===dot));
+    return;
+  }
+  const f=e.target.closest('.frow');
+  if(f){
+    f.classList.toggle('resolved');
+    let dawn=0;
+    document.querySelectorAll('.frow.resolved').forEach(r=>{dawn=Math.max(dawn,parseInt(r.dataset.dawn,10));});
+    document.documentElement.style.setProperty('--dawn',(dawn/100).toFixed(3));
+    const pct=document.getElementById('pct');if(pct)pct.textContent=dawn+'%';
+  }
+});
+// river current follows manual scroll
+const rs=document.getElementById('riverScroll');
+const movs=[...document.querySelectorAll('#riverScroll .mov')];
+let ticking=false;
+if(rs)rs.addEventListener('scroll',()=>{
+  if(ticking)return;ticking=true;
+  requestAnimationFrame(()=>{
+    const mid=rs.scrollTop+rs.clientHeight*0.4;
+    let act=movs[0].id;
+    movs.forEach(m=>{if(m.offsetTop<=mid)act=m.id;});
+    document.querySelectorAll('.current i').forEach(i=>i.classList.toggle('on',i.dataset.goto===act));
+    ticking=false;
+  });
+},{passive:true});
+document.querySelectorAll('.composer').forEach(t=>{
+  t.addEventListener('input',()=>{
+    t.style.height='auto';t.style.height=Math.min(t.scrollHeight,130)+'px';
+    if(t.value.trim())document.querySelectorAll('.chips').forEach(c=>c.classList.add('collapsed'));
+  });
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+    go('wall');
+  }
+});
+</script>
+</body>
+</html>

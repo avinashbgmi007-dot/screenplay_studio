@@ -1,0 +1,77 @@
+[
+  {
+    "id": "controlling_idea",
+    "name": "Controlling Idea (Theme as Cause-and-Effect Statement)",
+    "taxonomy_level": "story_macro",
+    "category": "theme",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
+    },
+    "definition": "A story's theme is strongest when it can be stated as a specific cause-and-effect sentence describing the value change the climax brings into the protagonist's world and the means by which it was brought about (e.g. 'love prevails because of sacrifice', not the vaguer 'love wins'). A vague theme gives the writer nothing concrete to structurally build toward; a specific one clarifies which scenes belong and which don't.",
+    "detection_signal": "Attempt to state the script's theme as a specific cause-and-effect sentence derived from the climax. If only a vague or generic theme can be extracted ('good triumphs', 'love matters'), flag this as an area for sharpening.",
+    "counter_considerations": "Some deliberately ambiguous or thematically ironic/unresolved endings resist a single clean statement by design — flag as a discussion prompt, not a defect, especially for literary/arthouse work.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["scene_summaries"],
+    "related_rules": ["theme_contradiction", "subplot_resonance_or_contradiction"]
+  },
+  {
+    "id": "theme_contradiction",
+    "name": "Theme Contradiction Without Earned Justification",
+    "taxonomy_level": "story_macro",
+    "category": "theme",
+    "source": {
+      "type": "framework",
+      "originator": "Robert McKee",
+      "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)",
+      "note": "McKee describes deliberate alternation between a theme and its 'anti-theme' across scenes as a legitimate device for thematic complexity -- the distinction here is *deliberate* alternation vs. an *unintended* contradiction."
+    },
+    "definition": "A script can legitimately dramatize both a theme and its opposite across different scenes (this creates thematic tension and complexity). The problem is an *unintended* contradiction: the story asserts a value in one scene (e.g. 'trust must be earned') and then has events undercut it later (a character's trust is rewarded without any narrative work justifying why) without that shift being framed as earned character growth or deliberate irony.",
+    "detection_signal": "Identify the story's apparent central theme, then identify any scenes whose events seem to directly contradict it. For each contradiction, check whether the intervening scenes show character growth, changed circumstances, or ironic intent that would justify the shift — if not, flag it.",
+    "counter_considerations": "Deliberate irony, tragic endings, and morally complex/ambiguous storytelling all intentionally undercut an earlier-stated value — this rule is about *unjustified*, likely-unintentional contradiction, not all contradiction.",
+    "severity_default": "medium",
+    "confidence_tier": "low",
+    "requires": ["scene_summaries"],
+    "related_rules": ["controlling_idea"]
+  },
+  {
+    "id": "genre_convention_fulfillment",
+    "name": "Genre Convention Fulfillment",
+    "taxonomy_level": "story_macro",
+    "category": "genre",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Widely taught across screenwriting craft sources (e.g. Blake Snyder's 10 genre types organized around the type of transformation the story delivers, rather than surface setting)."
+    },
+    "definition": "Every genre carries audience expectations about certain beats/elements it should deliver (a thriller needs mounting suspense and a ticking clock; a romance needs escalating intimacy and a believable obstacle to the couple's union; a mystery needs fairly-clued evidence). A script can subvert genre expectations deliberately, but should do so knowingly, not by omission.",
+    "detection_signal": "Identify the script's apparent genre(s), then check for the presence of that genre's standard structural/emotional beats. Flag conspicuous absences.",
+    "counter_considerations": "Genre-blending and deliberate subversion are legitimate and common — the goal is to flag likely-unintentional gaps, not to enforce formula.",
+    "severity_default": "low",
+    "confidence_tier": "low",
+    "requires": ["scene_summaries"],
+    "related_rules": []
+  },
+  {
+    "id": "world_rule_consistency",
+    "name": "World-Building Rule Consistency",
+    "taxonomy_level": "story_macro",
+    "category": "world_building",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard genre-fiction/speculative-fiction craft principle, widely taught, not tied to one originating source."
+    },
+    "definition": "Once a script establishes a rule about how its world works (a magic system's cost, a technology's limitation, a social/political constraint), later events should not violate that rule without acknowledgment or consequence. Unlashed violations break audience trust in the story's internal logic.",
+    "detection_signal": "Using the knowledge graph: track explicit world-rule statements (dialogue or action establishing 'this is how X works' or 'X is not possible because Y'). Check later scenes for events that appear to violate an established rule without in-story acknowledgment.",
+    "counter_considerations": "A rule violation that's explicitly addressed in-story (a character notes the exception, or the violation has a narratively-justified cost) is not an error — it's the *unacknowledged* violation that breaks trust.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": ["knowledge_graph"],
+    "related_rules": []
+  }
+]

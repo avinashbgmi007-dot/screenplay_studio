@@ -1,0 +1,163 @@
+[
+  {
+    "id": "power_law_out_of_sight",
+    "name": "Out of Sight, Out of Mind",
+    "taxonomy_level": "psychology",
+    "category": "power_dynamic",
+    "source": {
+      "type": "framework",
+      "originator": "Robert Greene",
+      "work": "The 48 Laws of Power"
+    },
+    "definition": "Absence diminishes minor passions and inflames great ones. Those in power who remove themselves from daily contact increase their perceived importance and mystique.",
+    "detection_signal": "A powerful character deliberately makes themselves scarce or unavailable, causing others to fixate on them more intensely.",
+    "counter_considerations": "Do not flag when the absence is involuntary or when the character is genuinely trying to step away from power rather than weaponize absence.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "power_conceal_intentions"
+    ]
+  },
+  {
+    "id": "power_conceal_intentions",
+    "name": "Conceal Your Intentions",
+    "taxonomy_level": "psychology",
+    "category": "power_dynamic",
+    "source": {
+      "type": "framework",
+      "originator": "Robert Greene",
+      "work": "The 48 Laws of Power"
+    },
+    "definition": "Keep people off balance and in the dark by never revealing the purpose behind your actions. If they have no clue what you are up to, they cannot prepare a defense.",
+    "detection_signal": "A character acts with hidden purpose, giving vague or misleading explanations for their behavior while pursuing a secret agenda.",
+    "counter_considerations": "Do not flag when the character's secrecy is self-protective rather than manipulative or when the hidden intent is eventually revealed to the audience.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "power_boldness_boldness"
+    ]
+  },
+  {
+    "id": "power_boldness_boldness",
+    "name": "Be Bold, Be Bold",
+    "taxonomy_level": "psychology",
+    "category": "power_dynamic",
+    "source": {
+      "type": "framework",
+      "originator": "Robert Greene",
+      "work": "The 48 Laws of Power"
+    },
+    "definition": "Boldness and audacity can overwhelm hesitation and create an impression of confidence that bends others to your will. Daring action shocks opponents into submission.",
+    "detection_signal": "A character takes a dramatic, risky action that shocks others into compliance or admiration, exploiting the assumption that someone that bold must have the goods to back it up.",
+    "counter_considerations": "Do not flag when the boldness is reckless rather than strategic or when the character lacks the competence to support their audacious claims.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "power_conceal_intentions"
+    ]
+  },
+  {
+    "id": "power_selective_honesty",
+    "name": "Selective Honesty and Generosity",
+    "taxonomy_level": "psychology",
+    "category": "power_dynamic",
+    "source": {
+      "type": "framework",
+      "originator": "Robert Greene",
+      "work": "The 48 Laws of Power"
+    },
+    "definition": "The occasional display of honesty or generosity disarms the target, creating a gift that makes them lower their guard and forget the larger manipulative pattern.",
+    "detection_signal": "A character performs a seemingly genuine kind act or tells a small truth that serves to build trust before a larger betrayal or manipulation.",
+    "counter_considerations": "Do not flag when the honesty or generosity is sincere and not part of a larger strategic pattern.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "manipulation_flattery"
+    ]
+  },
+  {
+    "id": "power_play_to_fantasies",
+    "name": "Play to People's Fantasies",
+    "taxonomy_level": "psychology",
+    "category": "power_dynamic",
+    "source": {
+      "type": "framework",
+      "originator": "Robert Greene",
+      "work": "The 48 Laws of Power"
+    },
+    "definition": "The truth is often ugly or unpleasant. Appeal to powerful fantasy rather than harsh reality. People who feel deprived will believe anything that promises relief.",
+    "detection_signal": "A character sells a vision, lifestyle, or outcome that appeals to deep desires rather than offering concrete evidence or realistic plans.",
+    "counter_considerations": "Do not flag when the fantasy is aspirational and backed by real effort or when the character genuinely believes in what they are promising.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "power_reputation"
+    ]
+  },
+  {
+    "id": "power_reputation",
+    "name": "Guard Your Reputation",
+    "taxonomy_level": "psychology",
+    "category": "power_dynamic",
+    "source": {
+      "type": "framework",
+      "originator": "Robert Greene",
+      "work": "The 48 Laws of Power"
+    },
+    "definition": "Reputation is the cornerstone of power. A damaged reputation is nearly impossible to repair. Protect it ferociously and attack the reputation of your enemies ruthlessly.",
+    "detection_signal": "A character goes to extreme lengths to control how others perceive them, or destroys someone's reputation as a strategic move.",
+    "counter_considerations": "Do not flag when reputation management is genuinely warranted to correct falsehoods or when the character's concern with reputation is parodic.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "power_conceal_intentions"
+    ]
+  },
+  {
+    "id": "power_crush_sentimentality",
+    "name": "Crush Sentimentality",
+    "taxonomy_level": "psychology",
+    "category": "power_dynamic",
+    "source": {
+      "type": "framework",
+      "originator": "Robert Greene",
+      "work": "The 48 Laws of Power"
+    },
+    "definition": "Sentimentality is a weakness that clouds judgment and opens you to manipulation. Those in power must make decisions based on strategic reality, not emotional attachment.",
+    "detection_signal": "A character chooses a cold, pragmatic path over an emotionally satisfying one, or a character is exploited because of their emotional attachments.",
+    "counter_considerations": "Do not flag when the narrative treats emotional connection as a strength or when the 'cold' choice is actually the wrong one.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "power_reputation"
+    ]
+  }
+]

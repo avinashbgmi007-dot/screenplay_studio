@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+coverage/
+
+# Python
+.pytest_cache/
+__pycache__/
+
+# Temp
+.tmp/
+*.tmp
+
+# Local tooling
+.remember/
+.serena/
+
+# Graphify
+graphify-out/
+.graphify_*
+graph-chunk*.json
+.tmp_graph.*
+test-output.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+.gstack/
+
+# Runtime data (never versioned)
+.freebuff/
+studio_projects/
+preview_shots/
+preview-redesigns/shots/
+
+# Extracted text / book sources (large, not versioned)
+extracted_text/
+film_books/
+Cursors/
+.opencode/
+
+# Scratch artifacts at repo root
+/_*.png
+/_*.log
+/_*.json
+/_*.txt
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Personal creative source — never versioned
+/Pain_3_updated_FULL.pdf
+
+# Orphaned experiment artifacts (kept on disk, never versioned)
+/graph_fragment_chunk3.json
+/knowledge_graph_chunk3.json
+/app_findings.gbnf
+
+# WorkBuddy local state (memory, skills cache)
+/.workbuddy-ai/

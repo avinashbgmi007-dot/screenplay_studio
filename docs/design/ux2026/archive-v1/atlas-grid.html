@@ -1,0 +1,148 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio v2 — 4 · Atlas Grid</title>
+<link rel="stylesheet" href="shared/base.css">
+<style>
+/* atlas-grid: the whole studio is an asymmetric bento; score is the hero tile */
+:root{--bg:#f4f5f8;--surface:#ffffff;--surface2:#eef0f4;--ink:#1c2130;--muted:#697086;
+--line:#e3e6ee;--accent:#6d28d9;--on-accent:#fff;--radius:14px}
+.topbar,.rail{background:#fff}
+.room-btn[aria-selected="true"]{background:var(--accent);color:#fff}
+.avatar{border-radius:12px;background:#ede9fe;color:#5b21b6}
+.script{--paper:#fff;border-radius:14px}
+.s-h{color:#241a4d}
+.cat,.verdict,.modal{border-radius:14px;box-shadow:0 1px 2px rgba(28,33,48,.05)}
+.score{color:var(--accent)}
+.v-tag{background:#f1edfd;color:#5b21b6;border-color:#e4dcfa}
+.sev.high{background:#ef4444}.sev.med{background:#f59e0b}.sev.low{background:#10b981}
+.verify{color:#0e9f6e}.q-applied{color:#0e9f6e;border-color:#b7e2cf}
+.chip{background:#fff}.chip:hover{border-color:var(--accent);color:var(--accent)}
+.ta{background:#fafbfd;border-color:var(--line);border-radius:12px}
+.send,.btn-pri{background:var(--accent);border-radius:11px}
+.btn-ghost{border-radius:11px}
+.bento{flex:1;display:grid;grid-template-columns:280px 1fr 340px;gap:16px;padding:16px 20px;
+ overflow:auto;align-content:start}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.tile h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+ color:var(--muted);margin-bottom:10px}
+.hero-tile{grid-column:1/-1;display:flex;align-items:center;gap:26px;padding:22px 26px}
+.mini-script{font-family:var(--font-script);font-size:12px;line-height:1.5;color:#333a4d;
+ background:#fbfbfd;border:1px dashed var(--line);border-radius:10px;padding:12px 14px}
+.kpi{display:flex;gap:18px;margin-left:auto;font-size:12px;color:var(--muted)}
+.kpi b{display:block;font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
+</style></head>
+<body data-default-room="feedback">
+<header class="topbar">
+ <span class="brand" style="color:var(--accent)">◆ Atlas</span><span class="dot-conn"></span>
+ <nav class="rooms"><button class="room-btn" data-room-btn="desk">Desk</button>
+  <button class="room-btn" data-room-btn="cowrite">Co-write</button>
+  <button class="room-btn" data-room-btn="feedback">Feedback</button></nav>
+ <div class="top-actions"><button class="btn-ghost" style="min-height:32px;padding:5px 12px" data-fid="new-project">＋ New</button>
+  <button class="icon-btn" data-modal="settings" data-fid="settings">⚙</button></div>
+</header>
+<div class="frame">
+ <aside class="rail">
+  <button class="rail-item active" data-fid="library">◈ The Late Hour</button>
+  <button class="rail-item" data-dismiss-target="#ideas-fly" data-fid="ideas">Ideas<span class="count">4</span></button>
+  <div class="dismissable" id="ideas-fly" style="background:#f7f6fe;border:1px solid #e4dcfa;border-radius:10px;padding:4px;margin:2px 0">
+   <button class="rail-item">Logline v3</button><button class="rail-item">Prequel beat</button></div>
+  <button class="rail-item" data-fid="shelf">On the shelf<span class="count">3</span></button>
+ </aside>
+ <div class="main">
+  <div class="projbar"><span class="proj-title">The Late Hour</span><span class="crumb">feature · draft 3/2</span>
+   <kbd style="margin-left:auto">Ctrl K</kbd></div>
+
+  <!-- DESK as bento -->
+  <section class="panel on" data-room-panel="desk">
+   <div class="toolbar">
+    <button class="t-btn" data-fid="undo">↶</button><button class="t-btn" data-fid="redo">↷</button>
+    <button class="t-btn" data-fid="premise">Premise</button><button class="t-btn" data-fid="focus">Focus</button>
+    <button class="t-btn" data-fid="reader">Reader</button><button class="t-btn" data-dismiss-target="#amenu" data-fid="exports">Export ▾</button>
+    <div class="findbar"><input class="search" placeholder="Find…"><span data-fid="finding-summary">3 findings S2–S3</span></div>
+    <div class="dismissable" id="amenu" style="position:absolute;left:230px;top:40px;z-index:20;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;min-width:190px;box-shadow:0 12px 32px rgba(28,33,48,.12)">
+     <button class="rail-item">Fountain</button><button class="rail-item">Final Draft .fdx</button>
+     <button class="rail-item">Text</button><button class="rail-item">Print / PDF</button><button class="rail-item">Backup .zip</button></div>
+   </div>
+   <div class="bento">
+    <div class="tile hero-tile" data-fid="script-tile">
+     <div style="max-width:430px">
+      <h4>Scene 3 — reading</h4>
+      <p class="mini-script">INT. WRITER'S ROOM — DAWN<br>Grey light. SHE KEPT THE KEY.<br>MARA: I kept the key.</p></div>
+     <div class="kpi"><span>scenes<b>3</b></span><span>characters<b>2+1</b></span><span>findings<b>12</b></span></div>
+     <div style="display:flex;flex-direction:column;gap:8px;margin-left:auto">
+      <button class="btn-ghost" data-fid="beatboard">Beat board</button>
+      <button class="btn-ghost" data-fid="compare">Compare d2↔d3</button>
+      <button class="btn-ghost" data-fid="revise-desk">Revision desk</button>
+      <button class="btn-ghost" data-fid="stash">Stash · 2</button></div>
+    </div>
+    <div class="tile" data-fid="structure-tile"><h4>Scenes &amp; cast</h4>
+     <button class="scene-it active"><span class="no">1</span>INT. APARTMENT — NIGHT</button>
+     <button class="scene-it"><span class="no">2</span>INT. STAIRWELL — CONT.</button>
+     <button class="scene-it"><span class="no">3</span>INT. WRITER'S ROOM — DAWN</button>
+     <div style="margin-top:8px"><span class="char-chip">MARA</span><span class="char-chip">DEV</span></div></div>
+    <div class="tile"><h4>Margin notes</h4>
+     <p class="margnote">exit line lands twice — cut the second</p>
+     <p class="margnote">key prop S1 → payoff S3 ✓</p>
+     <div class="toolbar" style="border:none;padding:6px 0 0" data-fid="draft-bar">
+      <select class="sel"><option>Draft 3</option></select>
+      <button class="t-btn" data-fid="upload">⤒ Upload script</button></div></div>
+   </div>
+  </section>
+
+  <!-- CO-WRITE -->
+  <section class="panel" data-room-panel="cowrite">
+   <div class="cowrite" style="padding:0">
+    <div class="partner" style="margin:16px 20px 0;border:1px solid var(--line);border-radius:14px;background:#fff">
+     <span class="avatar">S</span><div><p class="p-name">Sameer</p><p class="p-sub">craft partner · scene 3</p></div>
+     <div class="lens"><button aria-pressed="true">Craft</button><button aria-pressed="false">Doctor</button><button aria-pressed="false">Line-by-line</button></div>
+     <button class="icon-btn" data-fid="reset-persona">⟲</button><button class="t-btn" data-fid="sams-notes">Sam's notes</button>
+     <button class="icon-btn" data-fid="clear-chat">⌫</button></div>
+    <div class="thread" style="padding:16px 20px">
+     <div class="msg user" style="background:var(--accent)">Does the dawn scene earn its ending?</div>
+     <div class="msg ai" style="box-shadow:0 1px 3px rgba(28,33,48,.06)">It does — if you trust the key. You state the feeling twice.<span class="grounded">✓ grounded · Scene 3</span></div></div>
+    <div class="composer-zone cowrite" style="margin:0 20px 16px;border:1px solid var(--line);border-radius:14px;background:#fff">
+     <div class="explore-rail" style="background:var(--surface2)">
+      <button class="rail-btn" data-q="Punch up Mara's exit line.">⚡<span>Punch up exit</span></button>
+      <button class="rail-btn" data-q="What does Dev want?">?<span>Dev's want</span></button>
+      <button class="rail-btn restore" title="Restore chips">···<span>Restore chips</span></button></div>
+     <div class="composer">
+      <div class="chips"><button class="chip" data-q="Punch up Mara's exit line.">⚡ Punch up Mara's exit</button>
+       <button class="chip" data-q="What does Dev want in this scene?">What does Dev want?</button>
+       <button class="chip" data-q="Where does scene 3 slow down?">Where's it slow?</button></div>
+      <label class="c-label" for="ta-ag">Ask Sameer — Enter sends · Shift+Enter newline</label>
+      <textarea id="ta-ag" class="ta" rows="2"></textarea>
+      <div class="send-row"><button class="send">Send ⏎</button></div></div></div></div>
+  </section>
+
+  <!-- FEEDBACK -->
+  <section class="panel" data-room-panel="feedback">
+   <div class="fb-head" style="padding:16px 20px 10px">
+    <select class="sel"><option>English</option><option>हिन्दी</option><option>తెలుగు</option></select>
+    <button class="btn-pri">▶ Run analysis</button><button class="btn-ghost">Re-parse</button><button class="btn-ghost">Retry failed</button>
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto"><span class="crumb">done · 41s</span>
+     <div class="progress"><i style="width:100%"></i></div><span class="v-tag">verified</span></div></div>
+   <nav class="tabs" style="margin:0 20px"><button class="tab" data-tab-for="a-rep" aria-selected="true">Report</button>
+    <button class="tab" data-tab-for="a-q" aria-selected="false">Fix queue <span class="count">4</span></button></nav>
+   <div class="fb-body tabpane" id="a-rep" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="tile hero-tile" style="grid-column:1/-1"><span class="score">7.4<small>/10</small></span>
+     <div class="meta"><strong>Draft 3 vs Draft 2 — up 0.6</strong><span>Confidence high · grounded 3/3</span></div>
+     <button class="btn-ghost" style="margin-left:auto">Export .md</button></div>
+    <div class="tile"><h4>Craft &amp; structure · 7.8</h4>
+     <div class="note" style="border-top:none;padding-top:0"><span class="sev med"></span><div>Exit line lands twice — keep window subtext.
+      <div class="n-meta"><button class="jump" style="color:var(--accent)">→ Scene 3</button><span class="verify">✓ “I kept the key.”</span></div></div></div></div>
+    <div class="tile"><h4>Continuity · 6.9</h4>
+     <div class="note" style="border-top:none;padding-top:0"><span class="sev high"></span><div>Orange bag vanishes S2→S3.
+      <div class="n-meta"><button class="jump" style="color:var(--accent)">→ Scenes 2–3</button><span class="verify">✓ prop ledger ×1</span></div></div></div></div></div>
+   <div class="fb-body tabpane hidden" id="a-q"><div class="tile">
+    <div class="queue-row" style="border-top:none"><div style="flex:1">Fix orange-bag continuity</div><span class="q-status q-applied">applied</span></div>
+    <div class="queue-row"><div style="flex:1">Cut repeated exit line</div><span class="q-status q-open">open</span></div>
+    <div class="queue-row"><div style="flex:1">Vary Dev's second apology</div><span class="q-status q-open">open</span></div>
+    <div class="queue-row"><div style="flex:1">Act I turn earlier ~4pp</div><span class="q-status q-open">skipped</span></div></div></div>
+  </section></div></div>
+<footer class="statusbar"><span>● demo craft model · connected</span><span>tok/s 38</span>
+ <span>sprint 24:13</span><span class="grow"></span><kbd>Ctrl K</kbd></footer>
+<div class="checklist"><b>R1–R5 verified:</b> feedback room with hero score tile (R1/R5) · menus close outside/Esc (R2) · chips→rail after first send (R3) · composer autogrows (R4). Signature: asymmetric bento — desk, notes and controls are tiles; the verdict is the hero tile.</div>
+<div class="modal-back" id="settings"><div class="modal"><h2>Settings</h2>
+ <div class="f-row"><label for="ag-u">llama-server URL</label><input id="ag-u" value="http://127.0.0.1:8080"></div>
+ <button class="btn-pri" data-close>Done</button></div></div>
+<script src="shared/app.js"></script></body></html>

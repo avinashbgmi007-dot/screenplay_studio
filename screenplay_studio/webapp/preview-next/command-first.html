@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command-first — Design Lab</title>
+<link rel="stylesheet" href="_lab.css">
+<style>
+.cmd-hero{position:fixed;inset:46px 0 0;display:grid;place-items:center;background:
+  radial-gradient(800px 400px at 50% 30%, rgba(38,47,82,.4), transparent), var(--lab-void)}
+.cmd-hero .center{text-align:center;max-width:560px;padding:0 24px}
+.cmd-hero h1{font-size:22px;font-weight:600;margin-bottom:8px}
+.cmd-hero .sub{color:var(--lab-muted);font-size:14px;margin-bottom:26px}
+.cmd-hero .bigbtn{background:var(--lab-panel);border:1px solid var(--lab-line);color:var(--lab-muted);
+  padding:14px 26px;min-height:52px;font-size:14px;border-radius:10px;width:100%;text-align:left;display:flex;gap:12px;align-items:center}
+.cmd-hero .bigbtn:hover{border-color:var(--lab-accent);color:var(--lab-text)}
+.cmd-hero .bigbtn .k{font-family:Consolas,monospace;border:1px solid var(--lab-line);padding:3px 9px;border-radius:5px;font-size:11.5px;color:var(--lab-accent)}
+.cmd-hero .trio{display:flex;gap:10px;margin-top:14px}
+.cmd-hero .trio button{flex:1;background:var(--lab-panel);border:1px solid var(--lab-line);color:var(--lab-text);
+  padding:12px;min-height:44px;font-size:12.5px;border-radius:8px}
+.cmd-hero .trio button:hover{border-color:var(--lab-accent)}
+.cmd-hero .trio button b{display:block;font-size:13px;margin-bottom:2px}
+.cmd-hero .trio button span{color:var(--lab-muted);font-size:11.5px}
+#palette{position:fixed;inset:0;z-index:890;display:none;background:rgba(4,7,14,.7)}
+#palette.open{display:flex;align-items:flex-start;justify-content:center;padding-top:120px}
+#palette .pal{background:var(--lab-raised);border:1px solid var(--lab-accent);width:560px;max-width:94%}
+#palette .pal input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--lab-line);color:var(--lab-accent);padding:13px 15px;font:inherit;font-size:14.5px;outline:none}
+#palette .pitem{display:block;width:100%;text-align:left;padding:10px 15px;min-height:42px;color:var(--lab-text);font-size:13.5px}
+#palette .pitem:hover{background:var(--lab-panel);color:var(--lab-accent)}
+#palette .pitem b{color:var(--lab-muted);font-weight:400;margin-left:9px;font-size:11px}
+[data-desk]{position:fixed;inset:46px 0 84px;display:none;z-index:600}
+.desk-ctl{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);z-index:930;display:flex;gap:6px;background:var(--lab-raised);border:1px solid var(--lab-line);padding:6px;border-radius:99px}
+.desk-ctl button{color:var(--lab-muted);border:1px solid var(--lab-line);padding:8px 13px;min-height:36px;border-radius:99px;font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="cmd-hero" data-ia-landing>
+  <div class="center">
+    <h1 data-lab-title2></h1>
+    <div class="sub">Design Lab · IA 6 of 6 · command-first — the screen is almost empty on purpose. Everything is one command away.</div>
+    <button class="bigbtn" id="pal-open"><span class="k">⌘K</span> Ask for anything — scenes, findings, Sameer, the verdict…</button>
+    <div class="trio">
+      <button data-open-desk><b>Workbench</b><span>script + feedback + Sameer</span></button>
+      <button id="cmd-findings"><b>The verdict</b><span><span id="cmd-fcount"></span> findings</span></button>
+      <button id="cmd-chat"><b>Sameer</b><span>real thread</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- inline findings panel (summoned) -->
+<div id="inline-findings" style="position:fixed;inset:46px 0 0;z-index:700;display:none;background:var(--lab-void);overflow-y:auto;padding:60px 40px">
+  <div style="max-width:760px;margin:0 auto" data-findings-surface>
+    <h2 style="font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:var(--lab-muted);margin-bottom:14px">The verdict — all findings</h2>
+    <div id="cmd-findings-list" style="background:transparent"></div>
+  </div>
+  <button data-close-inline style="position:fixed;top:56px;right:24px;border:1px solid var(--lab-line);color:var(--lab-muted);padding:8px 14px;min-height:40px">✕ close</button>
+</div>
+
+<div id="palette">
+  <div class="pal">
+    <input id="pal-input" placeholder="Type a command — try “scene 2”, “findings”, “sameer”…" aria-label="Palette">
+    <div id="pal-items"></div>
+  </div>
+</div>
+
+<script>window.LAB_IA = "command"; window.LAB_PROJECT = null;</script>
+<script src="_payload.js"></script>
+<script src="_lab.js"></script>
+<script>
+(function(){
+  const $ = Lab.$, $$ = Lab.$$;
+  Lab.onLocate = () => Lab.showDesk(true);
+  Lab.onDiscuss = () => Lab.showDesk(true);
+
+  const COMMANDS = [
+    ["workbench", "script + feedback + Sameer, side by side", () => Lab.showDesk(true)],
+    ["findings", "the full verdict, every finding", () => openFindings()],
+    ["sameer", "the real conversation thread", () => { Lab.showDesk(true); setTimeout(() => $$("[data-lab-composer-input]").forEach(t => t.focus()), 100); }],
+    ["scene 1", "jump to scene 1", () => jumpScene(1)],
+    ["scene 2", "jump to scene 2", () => jumpScene(2)],
+    ["scene 3", "jump to scene 3", () => jumpScene(3)],
+  ];
+  function jumpScene(n){
+    Lab.showDesk(true);
+    setTimeout(() => {
+      const pg = $(`[data-scene="${n}"]`);
+      if (pg) { pg.scrollIntoView({ block: "start" }); pg.classList.add("lab-flash"); setTimeout(() => pg.classList.remove("lab-flash"), 1800); }
+    }, 80);
+  }
+  function openFindings(){
+    $("#inline-findings").style.display = "block";
+    Lab.renderFindingsInto("#cmd-findings-list");
+    Lab.wireFindingVerbs("#inline-findings", () => Lab.renderFindingsInto("#cmd-findings-list"));
+  }
+
+  function openPalette(){
+    $("#palette").classList.add("open");
+    renderPal("");
+    $("#pal-input").value = ""; $("#pal-input").focus();
+  }
+  function renderPal(q){
+    const items = COMMANDS.filter(([c, d]) => (c + " " + d).toLowerCase().includes(q.toLowerCase()));
+    $("#pal-items").innerHTML = items.map(([c, d]) =>
+      `<button class="pitem" data-cmd="${c}">${c}<b>${d}</b></button>`).join("") ||
+      '<button class="pitem" disabled>no match</button>';
+  }
+
+  Lab.mountChrome();
+  Lab.mountDesk(true);
+  Lab.boot({
+    render(){
+      $$("[data-lab-title2]").forEach(el => el.textContent = Lab.data.title || "");
+      $("#cmd-fcount").textContent = Lab.fixItems().length;
+      Lab.wireFindingVerbs(".cmd-hero", () => {});
+      $("#pal-open").addEventListener("click", openPalette);
+      $("#palette").addEventListener("click", e => {
+        if (e.target.id === "palette") $("#palette").classList.remove("open");
+        const b = e.target.closest("[data-cmd]");
+        if (b){ const c = COMMANDS.find(x => x[0] === b.dataset.cmd); if (c){ c[2](); $("#palette").classList.remove("open"); } }
+      });
+      $("#pal-input").addEventListener("input", e => renderPal(e.target.value));
+      $("#pal-input").addEventListener("keydown", e => {
+        if (e.key === "Escape") $("#palette").classList.remove("open");
+        if (e.key === "Enter"){ const f = $("#pal-items .pitem[data-cmd]"); if (f){ const c = COMMANDS.find(x => x[0] === f.dataset.cmd); if (c){ c[2](); $("#palette").classList.remove("open"); } } }
+      });
+      document.addEventListener("keydown", e => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k"){ e.preventDefault(); openPalette(); }
+      });
+      $("#cmd-findings").addEventListener("click", openFindings);
+      $("#cmd-chat").addEventListener("click", () => Lab.showDesk(true));
+      $$("[data-close-inline]").forEach(b => b.addEventListener("click", () => $("#inline-findings").style.display = "none"));
+      Lab.chatHistory().then(h => Lab.renderThread($("#lab-thread"), h.messages)).catch(() => {});
+    }
+  });
+})();
+</script>
+</body>
+</html>

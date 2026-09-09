@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Six Concept Worlds — Screenplay Studio redesign</title>
+<style>
+:root{--ink:#efe7d7;--bg:#0d0b10;--amber:#e8a54b;--muted:#94897a;--line:#2b261f}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Georgia,serif;line-height:1.55;min-height:100vh}
+header{padding:44px 32px 8px;text-align:center}
+header h1{font-size:33px;font-weight:600}
+header h1 em{color:var(--amber);font-style:italic}
+header p{color:var(--muted);max-width:660px;margin:12px auto 0;font-size:14.5px}
+.viewbar{display:flex;justify-content:center;gap:8px;padding:18px 16px;flex-wrap:wrap}
+.viewbar button{background:none;border:1px solid var(--line);color:var(--muted);padding:6px 14px;border-radius:99px;cursor:pointer;font:15px Georgia,serif}
+.viewbar button.on{background:var(--amber);border-color:var(--amber);color:var(--ink);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;padding:8px 32px 40px;max-width:1400px;margin:0 auto}
+@media (max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:680px){.grid{grid-template-columns:1fr}}
+.card{background:#181410;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .2s ease,border-color .2s ease;cursor:pointer}
+@media (prefers-reduced-motion: reduce){.card{transition:none}}
+.card:hover{transform:translateY(-5px);border-color:var(--amber)}
+.swatch-strip{height:34px;display:flex}
+.swatch-strip i{flex:1}
+.thumb{height:206px;border-bottom:1px solid var(--line);overflow:hidden;display:block;background:#000}
+.thumb iframe{width:calc(100% + 40px);height:800px;border:0;transform:scale(.45);transform-origin:0 0;pointer-events:none}
+.card .body{padding:16px 18px 14px;flex:1;display:flex;flex-direction:column}
+.num{font-size:11px;color:var(--amber);letter-spacing:.24em;text-transform:uppercase}
+.name{font-size:20px;margin-top:3px}
+.personality{color:var(--muted);font-size:13px;margin-top:7px;flex:1}
+.open-link{margin-top:13px;font-size:13.5px;color:var(--amber);text-decoration:none}
+.open-link:hover{text-decoration:underline}
+.howto{max-width:880px;margin:0 auto 56px;padding:0 32px;color:var(--muted);font-size:14px;text-align:center}
+.howto b{color:var(--ink)}
+.frame-view{display:none;height:calc(100vh - 100px);padding:0 32px 32px}
+.frame-view.on{display:block}
+.frame-view iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Six concept worlds.<br><em>One writer's life, imagined six ways.</em></h1>
+  <p>Each world is born from a single metaphor of the writing life and carries the four real moments — the nervous upload, the verdict read alone, the late-night Sameer debate, the spark that becomes a script. Same bones everywhere: script-first, click-outside dismissal, chips that tuck away, a composer that grows with you.</p>
+</header>
+
+<div class="viewbar">
+  <button class="on" data-view="cards">Cards</button>
+  <button data-view="fr">Live view ▸</button>
+  <select id="pick" style="background:#181410;color:var(--ink);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font:inherit;display:none">
+    <option value="noir">① Midnight Desk</option><option value="paper">② The Verdict</option><option value="brutal">③ Spark Wall</option><option value="swiss">④ The Theatre</option><option value="organic">⑤ First Light</option><option value="terminal">⑥ The River</option>
+  </select>
+</div>
+
+<section class="frame-view" id="frameView"><iframe id="live" title="live world preview"></iframe></section>
+
+<div class="grid" id="cards"></div>
+
+<p class="howto"><b>How to review:</b> the top preview bar inside each world walks the four moments — but play with the world itself: pull the lamp cord in ①, break the wax seal's letter in ②, answer Sameer's one question on the wall in ③, scroll the spotlight down the stage in ④, <b>tick findings resolved and watch the sun rise in ⑤</b>, and drift the river end-to-end in ⑥.</p>
+
+<script>
+const designs=[
+ {id:"noir",n:"①",name:"Midnight Desk",p:"THE LAMP. A pool of light in a dark room; the page glows warm at the center. Findings drift in as fireflies with hover-tips; Sameer is a glowing orb at the desk's edge. Pull the cord to begin.",sw:["#0d0b10","#e8a54b","#f5ecd8","#241d12"]},
+ {id:"paper",n:"②",name:"The Verdict",p:"THE LETTER. The report as a craftsman's typed letter — wax-seal score, evidence quotes set into the prose, red-pencil margin notes. The P.S. is Sameer; the enclosures are your sparks.",sw:["#e9e2d2","#fbf7ec","#7a2e2e","#a04b3a"]},
+ {id:"brutal",n:"③",name:"Spark Wall — ★ chosen spine",p:"CHOSEN WORLD (hybrid): the glass spark canvas is home; the verdict room carries First Light's dawn meter — resolve findings and the sky warms; 'Read like water' opens the River as a continuous read mode. One question at a time; sparks graduate into pages.",sw:["#0a0e1a","#6ee7ff","#a78bfa","#ffd58a"]},
+ {id:"swiss",n:"④",name:"The Theatre",p:"THE STAGE. Scenes sit under a spotlight that follows your scroll; the Doctor's notes hang in the balcony beside each beat; Sameer whispers from the wings; findings are director's notes.",sw:["#0b0a0c","#7a1f2b","#d8b26a","#efe6d4"]},
+ {id:"organic",n:"⑤",name:"First Light",p:"NIGHT → DAWN. The whole sky is the progress bar: tick findings resolved and the sun climbs the horizon, stars fade, the room warms. Feedback becomes a ritual you can finish.",sw:["#0e1220","#f2a56b","#ffd9a3","#e8a54b"]},
+ {id:"terminal",n:"⑥",name:"The River",p:"ONE FLOW. No rooms at all — source stones flow into pages, the debate joins as a confluence, findings settle in the estuary, sparks feed the tributary. Scroll is the whole navigation.",sw:["#081316","#5eead4","#f2e9d4","#2c2620"]}
+];
+const cards=document.getElementById('cards');
+designs.forEach(d=>{
+  const c=document.createElement('div');
+  c.className='card';
+  c.innerHTML=`
+   <div class="swatch-strip">${d.sw.map(s=>`<i style="background:${s}"></i>`).join('')}</div>
+   <span class="thumb"><iframe src="${d.id}.html" loading="lazy" title="${d.name}" tabindex="-1"></iframe></span>
+   <div class="body">
+     <span class="num">world ${d.n}</span>
+     <span class="name serif">${d.name}</span>
+     <span class="personality">${d.p}</span>
+     <a class="open-link" href="${d.id}.html" onclick="event.stopPropagation()">open ${d.id}.html ↗</a>
+   </div>`;
+  c.addEventListener('click',()=>show(d.id));
+  cards.appendChild(c);
+});
+document.getElementById('viewbar').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-view]');if(!b)return;
+  document.querySelectorAll('#viewbar button').forEach(x=>x.classList.toggle('on',x===b));
+  const fr=b.dataset.view==='fr';
+  document.getElementById('cards').style.display=fr?'none':'grid';
+  document.getElementById('frameView').classList.toggle('on',fr);
+  document.getElementById('pick').style.display=fr?'inline-block':'none';
+});
+function show(id){
+  document.querySelectorAll('#viewbar button').forEach(x=>x.classList.toggle('on',x.dataset.view==='fr'));
+  document.getElementById('cards').style.display='none';
+  document.getElementById('frameView').classList.add('on');
+  document.getElementById('pick').style.display='inline-block';
+  document.getElementById('pick').value=id;
+  document.getElementById('live').src=id+'.html';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.getElementById('pick').addEventListener('change',e=>{
+  if(e.target.value)document.getElementById('live').src=e.target.value+'.html';
+});
+</script>
+</body>
+</html>

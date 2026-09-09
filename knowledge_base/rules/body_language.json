@@ -1,0 +1,134 @@
+[
+  {
+    "id": "body_language_limbic_leak",
+    "name": "Limbic System Leakage",
+    "taxonomy_level": "nonverbal",
+    "category": "body_language",
+    "source": {
+      "type": "framework",
+      "originator": "Joe Navarro",
+      "work": "What Every Body is Saying"
+    },
+    "definition": "The limbic brain (emotions) controls involuntary body responses that are difficult to fake. True feelings leak through feet, hands, and facial micro-expressions even when words say otherwise.",
+    "detection_signal": "A character's body contradicts their words: feet pointed toward the exit while saying 'I want to stay,' or hands gripping tightly while voice remains calm.",
+    "counter_considerations": "Do not flag when body language is intentionally performed for an audience or when the contradiction is the character's deliberate act.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "body_language_pacifying"
+    ]
+  },
+  {
+    "id": "body_language_pacifying",
+    "name": "Pacifying Behaviors",
+    "taxonomy_level": "nonverbal",
+    "category": "body_language",
+    "source": {
+      "type": "framework",
+      "originator": "Joe Navarro",
+      "work": "What Every Body is Saying"
+    },
+    "definition": "Self-soothing gestures (neck touching, face rubbing, arm stroking, lip pressing) reduce anxiety and stress. They increase when a person feels threatened, uncertain, or is hiding something.",
+    "detection_signal": "A character unconsciously touches their neck, rubs their arm, or presses their lips together during a tense conversation or when asked a difficult question.",
+    "counter_considerations": "Do not flag pacifying behaviors when the character has a physical reason (cold, injury, itch) or when they are clearly self-conscious about the gesture.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "body_language_limbic_leak"
+    ]
+  },
+  {
+    "id": "body_language_feet_direction",
+    "name": "Feet Reveal True Intent",
+    "taxonomy_level": "nonverbal",
+    "category": "body_language",
+    "source": {
+      "type": "framework",
+      "originator": "Joe Navarro",
+      "work": "What Every Body is Saying"
+    },
+    "definition": "The feet are the most honest part of the body. People point their feet toward what they find interesting or toward the exit when they want to leave, regardless of what their face says.",
+    "detection_signal": "A character's feet or toes point toward the door, away from a person, or toward someone they are attracted to, revealing true preference.",
+    "counter_considerations": "Do not flag when feet are constrained by seating, when the character is physically unable to move, or when the narrative doesn't have access to foot-level detail.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "body_language_limbic_leak"
+    ]
+  },
+  {
+    "id": "body_language_gravity_defying",
+    "name": "Gravity-Defying Behaviors",
+    "taxonomy_level": "nonverbal",
+    "category": "body_language",
+    "source": {
+      "type": "framework",
+      "originator": "Joe Navarro",
+      "work": "What Every Body is Saying"
+    },
+    "definition": "When people feel good, powerful, or excited, they defy gravity: standing taller, raising arms, puffing the chest, lifting the chin. Negative emotions create weight-bearing postures.",
+    "detection_signal": "A character suddenly stands straighter, lifts their head, or raises their chin when hearing good news, or slumps and lowers their head when defeated.",
+    "counter_considerations": "Do not flag when posture changes are due to physical factors (fatigue, injury) or when the character is deliberately posturing for effect.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "body_language_pacifying"
+    ]
+  },
+  {
+    "id": "body_language_ventral_exposure",
+    "name": "Ventral Exposure Signals Trust",
+    "taxonomy_level": "nonverbal",
+    "category": "body_language",
+    "source": {
+      "type": "framework",
+      "originator": "Joe Navarro",
+      "work": "What Every Body is Saying"
+    },
+    "definition": "Showing the front of the torso (chest, stomach, heart) is a sign of comfort and trust. Turning the ventral side away or shielding it with objects signals discomfort or defensiveness.",
+    "detection_signal": "A character turns their torso toward someone when comfortable, or angles away and creates barriers (crossed arms, bags, furniture) when defensive.",
+    "counter_considerations": "Do not flag when the character's positioning is dictated by physical constraints (tight space, furniture arrangement) rather than emotional state.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "body_language_feet_direction"
+    ]
+  },
+  {
+    "id": "body_language_territorial",
+    "name": "Territorial Behavior",
+    "taxonomy_level": "nonverbal",
+    "category": "body_language",
+    "source": {
+      "type": "framework",
+      "originator": "Joe Navarro",
+      "work": "What Every Body is Saying"
+    },
+    "definition": "People claim and defend territory instinctively. Objects placed around a person, expansive postures, and desk positioning all signal dominance and territorial control.",
+    "detection_signal": "A character spreads out in a chair, places objects strategically, or reacts with visible discomfort when someone invades their claimed space.",
+    "counter_considerations": "Do not flag when territorial behavior is clearly comedic, when the space is genuinely shared, or when the character is too young or unfamiliar with the concept.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "body_language_ventral_exposure"
+    ]
+  }
+]

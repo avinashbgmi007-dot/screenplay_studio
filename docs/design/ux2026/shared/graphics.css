@@ -1,0 +1,41 @@
+/* ux2026 v3 graphics — grain, aurora scaffolding, rings, glows. Colors live in each page's skin. */
+
+/* film grain overlay: put .grain on a fixed full-size div (or body-level wrapper) */
+.grain{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* aurora scaffold: <div class="aurora"><i style="..."></i>...</div>; pages size/color blobs */
+.aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.aurora i{position:absolute;display:block;border-radius:50%;filter:blur(70px);will-change:transform;
+  transform-origin:center}
+
+/* luminous top edge for elevated surfaces */
+.lum-edge{position:relative}
+.lum-edge::before{content:"";position:absolute;left:12%;right:12%;top:-1px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,color-mix(in oklab,#fff 55%,transparent) 50%,transparent)}
+
+/* score ring: inline svg circle.score-arc + circle.score-track; kit animates dashoffset */
+.ring{position:relative;display:grid;place-items:center}
+.ring svg{transform:rotate(-90deg)}
+.ring .score-track{fill:none;stroke:var(--surface2);stroke-width:7}
+.ring .score-arc{fill:none;stroke:url(#ringGrad) var(--accent);stroke-width:7;stroke-linecap:round;
+  stroke-dasharray:var(--c,339.3);stroke-dashoffset:var(--c,339.3);
+  filter:drop-shadow(0 0 8px color-mix(in oklab,var(--accent) 70%,transparent))}
+.ring .score-num{position:absolute;font-family:var(--display);font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+/* soft outer glow utility */
+.glow{box-shadow:0 0 0 1px color-mix(in oklab,var(--accent) 30%,transparent),
+  0 10px 40px -10px color-mix(in oklab,var(--accent) 55%,transparent)}
+
+/* hairline divider that fades at ends */
+.hairline{height:1px;border:0;background:linear-gradient(90deg,transparent,var(--line) 18%,var(--line) 82%,transparent)}
+
+/* cursor spotlight host (Nocta): fixed div following --gx/--gy set by kit.js */
+.spotlight{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(560px circle at var(--gx,50%) var(--gy,30%),
+    color-mix(in oklab,var(--accent) 9%,transparent),transparent 62%)}
+
+/* dotted workshop grid (Beatwall) — page sets --dot color/size */
+.dotgrid{background-image:radial-gradient(var(--dot,rgba(23,26,32,.14)) 1px,transparent 1px);
+  background-size:var(--dotgap,22px) var(--dotgap,22px)}

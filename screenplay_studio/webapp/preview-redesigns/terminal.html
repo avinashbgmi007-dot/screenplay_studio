@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⑥ The River — One Continuous Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=IBM+Plex+Mono:wght@400&family=Karla:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --deep:#081316; --deeper:#050d10; --bio:#5eead4; --bio-soft:rgba(94,234,212,.14);
+  --sand:#f2e9d4; --sand-ink:#2c2620; --txt:#d6e2dd; --dim:#7f958d; --edge:rgba(94,234,212,.16);
+  --red:#e07070; --amber:#eab968;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:linear-gradient(180deg,var(--deeper),var(--deep) 30%,#0a1a1d 70%,#0d2124);color:var(--txt);
+ font-family:"Karla",system-ui,sans-serif;font-size:14.5px;line-height:1.62;overflow:hidden}
+h1,h2,h3,.serif{font-family:"Fraunces",Georgia,serif;font-weight:400}
+.mono{font-family:"IBM Plex Mono",monospace}
+svg.i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+
+#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(4,10,12,.85);border-bottom:1px solid var(--edge);font-size:12px;backdrop-filter:blur(8px)}
+#pv b{font-family:"Fraunces",serif;color:var(--bio);margin-right:10px}
+#pv button{background:none;border:1px solid var(--edge);color:var(--dim);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
+#pv button.on{background:var(--bio);border-color:var(--bio);color:#04211b;font-weight:700}
+main{padding-top:42px;height:calc(100vh - 42px)}
+[data-screen]{display:none;height:100%;position:relative;overflow:hidden}
+[data-screen].active{display:block}
+[data-screen].active .river{display:block}
+
+/* ====== THE RIVER — one scroll, five movements ====== */
+.river{height:100%;overflow-y:auto;scroll-behavior:smooth}
+.mov{position:relative;padding:64px 0 70px}
+.mov-inner{max-width:660px;margin:0 auto;padding:0 30px}
+/* movement marker + section label */
+.mov-head{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+.mov-head .nm{font-family:"Fraunces",serif;font-style:italic;font-size:21px;color:var(--bio)}
+.mov-head .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--edge),transparent)}
+.mov-kick{font:10.5px "Karla";letter-spacing:.26em;text-transform:uppercase;color:var(--dim)}
+/* wave separators between movements */
+.wave{display:block;width:100%;height:44px;color:var(--edge)}
+/* source stones (shelf) */
+.stones{display:flex;gap:14px;flex-wrap:wrap}
+.stone{background:rgba(255,255,255,.045);border:1px solid var(--edge);border-radius:999px;padding:12px 22px;cursor:pointer;transition:transform .25s ease, border-color .25s ease;backdrop-filter:blur(4px)}
+@media (prefers-reduced-motion: reduce){.stone{transition:none}}
+.stone:hover{transform:translateY(-4px);border-color:var(--bio)}
+.stone b{font-family:"Fraunces",serif;font-weight:600;font-size:15px}
+.stone span{display:block;font-size:11px;color:var(--dim);margin-top:2px}
+/* flowing pages */
+.pageflow{background:var(--sand);color:var(--sand-ink);border-radius:26px 26px 26px 6px;padding:44px 48px;font-family:"IBM Plex Mono",monospace;font-size:14px;line-height:1.7;box-shadow:0 26px 70px rgba(0,0,0,.45);position:relative;margin-bottom:22px}
+.pageflow::before{content:attr(data-scene);position:absolute;top:16px;right:26px;font:600 10px "Karla";letter-spacing:.18em;color:#a3906d}
+.pageflow .slug{font-weight:700;margin-bottom:13px}
+.pageflow .cue{text-transform:uppercase;margin:15px 0 2px 120px}
+.pageflow .dl{margin-left:58px;max-width:400px}
+.pageflow .ac{margin:10px 0}
+.pageflow .hot{border-bottom:2px dotted #b3854a;cursor:pointer}
+/* confluence — Sameer swims alongside */
+.samrill{display:flex;gap:14px;align-items:flex-start;margin:16px 0}
+.samface{width:38px;height:38px;border-radius:50% 50% 50% 8px;background:linear-gradient(135deg,var(--bio),#8fd3c7);color:#04211b;display:grid;place-items:center;font-family:"Fraunces",serif;font-weight:600;flex:0 0 auto}
+.samrill .line{background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:14px 14px 14px 4px;padding:12px 16px;font-size:13.5px;backdrop-filter:blur(4px)}
+.samrill .line .who{font:9.5px "Karla";letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 12px;transition:.2s ease}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px dashed var(--edge);color:var(--bio);background:none;border-radius:99px;padding:4px 11px;font:11.5px "Karla";cursor:pointer;white-space:nowrap}
+.chip:hover{background:var(--bio-soft)}
+.chips.collapsed{flex-direction:column;align-items:flex-start}
+.chips.collapsed .chip .lbl{display:none}
+.chips.collapsed:hover .chip .lbl{display:inline}
+.composer{width:100%;min-height:42px;max-height:140px;resize:none;background:rgba(255,255,255,.05);border:1px solid var(--edge);border-radius:12px;color:var(--txt);padding:11px 13px;font:13px "Karla";outline:none}
+.composer:focus{border-color:var(--bio)}
+/* estuary — findings settle like sediment */
+.sediment{border-left:3px solid var(--edge);border-radius:0 12px 12px 0;padding:12px 18px;margin-bottom:13px;background:rgba(255,255,255,.035)}
+.sediment.high{border-left-color:var(--red)}
+.sediment.med{border-left-color:var(--amber)}
+.sediment .t{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
+.sev-dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+.sev-dot.high{background:var(--red)}.sev-dot.med{background:var(--amber)}.sev-dot.low{background:#5d7a72}
+.sediment .q{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--bio);margin:7px 0 3px;padding-left:10px;border-left:1px solid var(--edge)}
+.sediment p{font-size:12.5px;color:var(--dim)}
+/* tributary sparks */
+.tribs{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.trib{background:rgba(94,234,212,.05);border:1px solid var(--edge);border-radius:14px;padding:15px 17px;cursor:pointer;transition:transform .25s ease,border-color .25s ease}
+@media (prefers-reduced-motion: reduce){.trib{transition:none}}
+.trib:hover{transform:translateY(-4px);border-color:var(--bio)}
+.trib b{font-family:"Fraunces",serif;font-weight:600;display:block;margin-bottom:4px}
+.trib span{font-size:12px;color:var(--dim)}
+/* scroll current indicator */
+.current{position:fixed;right:22px;top:50%;transform:translateY(-50%);z-index:80;display:flex;flex-direction:column;gap:12px}
+.current i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;transition:.2s ease}
+.current i.on{background:var(--bio);box-shadow:0 0 12px 3px var(--bio-soft);transform:scale(1.25)}
+.river-status{position:fixed;left:0;right:0;bottom:0;height:30px;z-index:80;display:flex;align-items:center;gap:16px;padding:0 20px;background:rgba(4,10,12,.7);border-top:1px solid var(--edge);font:10.5px "Karla";color:var(--dim);backdrop-filter:blur(6px)}
+.river-status .g{width:6px;height:6px;border-radius:50%;background:#79f7b7;display:inline-block;margin-right:5px}
+.river-status .sp{margin-left:auto;color:var(--bio)}
+</style>
+</head>
+<body>
+
+<nav id="pv"><b>⑥ The River</b>
+<button data-goto="m-source" class="on">Source</button><button data-goto="m-pages">The Flow</button><button data-goto="m-debate">The Confluence</button><button data-goto="m-verdict">The Estuary</button><button data-goto="m-spark">The Tributary</button>
+<span style="margin-left:auto;color:var(--dim)">concept world 6 of 6 — no rooms; writing is one continuous flow</span></nav>
+
+<main>
+<section data-screen="river" class="active">
+<div class="river" id="river">
+
+  <!-- SOURCE -->
+  <div class="mov" id="m-source">
+    <div class="mov-inner">
+      <div class="mov-head"><span class="nm">The source</span><span class="rule"></span><span class="mov-kick">where it begins</span></div>
+      <h2 class="serif" style="font-size:29px;font-style:italic;margin-bottom:10px">Every script starts as water finding a path.</h2>
+      <p style="color:var(--dim);margin-bottom:26px">Pick up a stone, or drop a new one in. The current runs one way — down through pages, arguments, verdicts, and back to sparks.</p>
+      <div class="stones">
+        <div class="stone" data-goto="m-pages"><b>Pain · v3</b><span>98 pp · flows past 22 scenes</span></div>
+        <div class="stone"><b>Gun Pen</b><span>a short, still pooling</span></div>
+        <div class="stone" data-goto="m-spark"><b>✎ Loose water</b><span>an idea, not yet a river</span></div>
+      </div>
+    </div>
+  </div>
+
+  <svg class="wave" viewBox="0 0 1200 44" preserveAspectRatio="none"><path d="M0 22 C 150 0 300 44 450 22 C 600 0 750 44 900 22 C 1050 0 1150 30 1200 22" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+
+  <!-- THE FLOW (pages) -->
+  <div class="mov" id="m-pages">
+    <div class="mov-inner">
+      <div class="mov-head"><span class="nm">The flow</span><span class="rule"></span><span class="mov-kick">the pages themselves · script-first</span></div>
+      <div class="pageflow" data-scene="SC 01 / 22">
+        <p class="slug">INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
+        <p class="ac">A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
+        <p class="cue">ARJUN</p>
+        <p class="dl">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
+      </div>
+      <div class="pageflow" data-scene="SC 02 / 22">
+        <p class="slug">EXT. ROAD-SIDE TEA STALL — DAY</p>
+        <p class="ac">Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
+        <p class="cue">STALL OWNER</p>
+        <p class="dl">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
+      </div>
+      <p style="font-size:12px;color:var(--dim);text-align:center">— the river carries you downstream; margin notes drift in from the bank —</p>
+    </div>
+  </div>
+
+  <svg class="wave" viewBox="0 0 1200 44" preserveAspectRatio="none"><path d="M0 22 C 200 44 350 0 550 22 C 750 44 900 0 1100 22 L 1200 18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+
+  <!-- THE CONFLUENCE (debate) -->
+  <div class="mov" id="m-debate">
+    <div class="mov-inner">
+      <div class="mov-head"><span class="nm">The confluence</span><span class="rule"></span><span class="mov-kick">two currents, one argument</span></div>
+      <div class="samrill"><span class="samface">S</span><div class="line"><div class="who">Sameer · 1:47 AM</div>Achhi khabar pehle: Arjun ka want ab Scene 1 se crystal clear hai. Ab kadwi baat — scenes 8–14 ek hi beat teen baar. Pressure badhta nahi. Kis ek me Arjun <b>CHOOSE</b> karta hai? Wohi rakho, baaki do collapse.</div></div>
+      <div class="samrill" style="justify-content:flex-end"><div class="line" style="border-radius:14px 14px 4px 14px;background:rgba(94,234,212,.09)">to kya hatayein?</div></div>
+      <div class="chips explore-chips">
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Show the collapsed scene</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg><span class="lbl">Raise stakes instead</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/></svg><span class="lbl">Compare with Gun Pen's mid</span></button>
+        <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M9 5h11v10H12l-4 4zM4 8v7"/></svg><span class="lbl">Read it in Tenglish voice</span></button>
+      </div>
+      <textarea class="composer" rows="1" placeholder="Wade in — answer Sameer…"></textarea>
+    </div>
+  </div>
+
+  <svg class="wave" viewBox="0 0 1200 44" preserveAspectRatio="none"><path d="M0 20 C 180 0 360 44 560 22 C 760 0 940 44 1200 20" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+
+  <!-- THE ESTUARY (verdict) -->
+  <div class="mov" id="m-verdict">
+    <div class="mov-inner">
+      <div class="mov-head"><span class="nm">The estuary</span><span class="rule"></span><span class="mov-kick">where the current slows and truth settles</span></div>
+      <h2 class="serif" style="font-size:26px;font-style:italic;margin-bottom:6px">“A tight first act carrying an unaired second.”</h2>
+      <p class="mono" style="color:var(--bio);font-size:13px;margin-bottom:20px">score 7.2 · 12 of 44 findings open · verified quotes only</p>
+      <div class="sediment high"><div class="t"><span class="sev-dot high"></span>The gun never fires</div>
+        <div class="q">“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?” — SC 01</div>
+        <p>The father-call lands only as mood. Pay it off by Act III's midpoint — or cut the specificity.</p></div>
+      <div class="sediment med"><div class="t"><span class="sev-dot med"></span>The stall owner vanishes</div>
+        <div class="q">“Nee account tho guddi pattuko ra.” — SC 02</div>
+        <p>Best early antagonist — gone for twenty scenes.</p></div>
+      <div class="sediment med"><div class="t"><span class="sev-dot med"></span>Duplicate pressure beats</div>
+        <p>SC 9 · 11 · 13 — the same promise three times. Keep the one where Arjun chooses.</p></div>
+      <div class="sediment"><div class="t"><span class="sev-dot low"></span>Voice bleed</div>
+        <p>Two scenes drift school-Telugu on a street-Tenglish tongue.</p></div>
+    </div>
+  </div>
+
+  <svg class="wave" viewBox="0 0 1200 44" preserveAspectRatio="none"><path d="M0 22 C 240 40 420 4 640 22 C 860 40 1020 8 1200 22" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+
+  <!-- THE TRIBUTARY (spark) -->
+  <div class="mov" id="m-spark" style="padding-bottom:120px">
+    <div class="mov-inner">
+      <div class="mov-head"><span class="nm">The tributary</span><span class="rule"></span><span class="mov-kick">new water joins the river</span></div>
+      <div class="tribs">
+        <div class="trib"><b>What if the call comes too late?</b><span>Open the premise backwards.</span></div>
+        <div class="trib"><b>A hero who counts everything</b><span>Scarcity made visible.</span></div>
+        <div class="trib"><b>The stall owner's story</b><span>Who pretends not to see?</span></div>
+        <div class="trib" style="border-style:dashed"><b>✎ Fresh water</b><span>Start from nothing — Sameer asks first.</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="current" id="current">
+  <i data-goto="m-source" class="on" title="Source"></i>
+  <i data-goto="m-pages" title="The Flow"></i>
+  <i data-goto="m-debate" title="The Confluence"></i>
+  <i data-goto="m-verdict" title="The Estuary"></i>
+  <i data-goto="m-spark" title="The Tributary"></i>
+</div>
+<div class="river-status">
+  <span><span class="g"></span>qwen3-14B @ :8080</span><span id="curLabel">source · where it begins</span><span>12/44 findings open</span>
+  <span class="sp">⏱ 18:42 · flowing</span>
+</div>
+</section>
+</main>
+
+<script>
+const river=document.getElementById('river');
+const labels={ 'm-source':'source · where it begins','m-pages':'the flow · the pages themselves','m-debate':'the confluence · the argument','m-verdict':'the estuary · what settled','m-spark':'the tributary · new water' };
+function scrollToMov(id){
+  document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'});
+  document.querySelectorAll('#pv [data-goto]').forEach(b=>b.classList.toggle('on',b.dataset.goto===id));
+  document.querySelectorAll('.current i').forEach(i=>i.classList.toggle('on',i.dataset.goto===id));
+  const lb=document.getElementById('curLabel');if(lb&&labels[id])lb.textContent=labels[id];
+}
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-goto]');
+  if(g){scrollToMov(g.dataset.goto);return;}
+});
+// current dot follows manual scroll
+const movs=[...document.querySelectorAll('.mov')];
+let ticking=false;
+river.addEventListener('scroll',()=>{
+  if(ticking)return;ticking=true;
+  requestAnimationFrame(()=>{
+    const mid=river.scrollTop+river.clientHeight*0.4;
+    let act=movs[0].id;
+    movs.forEach(m=>{if(m.offsetTop<=mid)act=m.id;});
+    document.querySelectorAll('.current i').forEach(i=>i.classList.toggle('on',i.dataset.goto===act));
+    document.querySelectorAll('#pv [data-goto]').forEach(b=>b.classList.toggle('on',b.dataset.goto===act));
+    const lb=document.getElementById('curLabel');if(lb&&labels[act])lb.textContent=labels[act];
+    ticking=false;
+  });
+},{passive:true});
+document.querySelectorAll('.composer').forEach(t=>{
+  t.addEventListener('input',()=>{
+    t.style.height='auto';t.style.height=Math.min(t.scrollHeight,140)+'px';
+    if(t.value.trim())document.querySelectorAll('.chips').forEach(c=>c.classList.add('collapsed'));
+  });
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.activeElement)document.activeElement.blur();});
+</script>
+</body>
+</html>

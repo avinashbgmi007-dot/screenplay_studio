@@ -1,0 +1,283 @@
+[
+  {
+    "id": "comedy_reel_laugh",
+    "name": "Every Reel Needs a Big Laugh",
+    "taxonomy_level": "structure_pacing",
+    "category": "structure",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "At minimum, every reel (10-15 minute sequence) of a comedy should contain at least one major laugh-out-loud moment. The audience expects regular comedic payoffs. A reel without a significant laugh risks losing the audience.",
+    "detection_signal": "Divide script into ~8 sequences/reels. Check if each contains at least one major comedic set-piece, joke, or humorous situation. Flag reels that are purely dramatic or expository without comedic relief.",
+    "counter_considerations": "Dramedy or dark comedy may concentrate humor differently. Some reels may build tension that pays off in a later comedic release.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries",
+      "page_estimates"
+    ],
+    "related_rules": [
+      "comedy_start_late_leave_early"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_start_late_leave_early",
+    "name": "Start Scenes Late, Leave Early",
+    "taxonomy_level": "scene",
+    "category": "scene_craft",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "Comedy scenes should enter the scene as late as possible and exit as early as possible \u00e2\u20ac\u201d get to the joke or comedic situation quickly and cut before the laughter dies. Starting too early kills the setup; staying too long kills the punchline.",
+    "detection_signal": "Check if scenes begin with unnecessary setup, pleasantries, or establishing action before the comedic situation. Check if scenes linger after the comedic payoff.",
+    "counter_considerations": "Some comedy relies on slow-burn or awkward tension that requires patient setup. Improvised comedy scenes may need more runway.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "comedy_reel_laugh"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_midpoint_physical_intimacy",
+    "name": "Rom-Com Midpoint Physical Intimacy",
+    "taxonomy_level": "structure_pacing",
+    "category": "structure",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "In romantic comedies, the exact midpoint of the movie typically features the couple's first physical intimacy (sex, magical kiss, or equivalent romantic milestone). This is the point of no return \u00e2\u20ac\u201d stakes are raised and there is no turning back.",
+    "detection_signal": "Locate the midpoint of the script. Check if the romantic leads share a significant physical or emotional milestone. Verify that after this point, the relationship stakes are higher and separation becomes more painful.",
+    "counter_considerations": "Some romantic comedies delay physical intimacy until later. The midpoint can also be a false intimacy or a relationship setback that still raises stakes.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "comedy_trivial_taken_seriously"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_trivial_taken_seriously",
+    "name": "Comedy Characters in Tragedy",
+    "taxonomy_level": "character",
+    "category": "tone",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Scriptshadow/Amber",
+      "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
+    },
+    "definition": "In comedy, characters need to think they are in a tragedy. The comedy comes from characters taking trivial matters with deadly seriousness. When a character treats a minor inconvenience as life-or-death, the gap between their perception and reality creates humor.",
+    "detection_signal": "Check if characters in comedic situations react with disproportionate gravity. Look for the gap between the triviality of the situation and the intensity of the character's emotional response.",
+    "counter_considerations": "Absurdist comedy may not rely on this gap. Slapstick operates on physical comedy rather than character perception.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "comedy_reel_laugh"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_subtext_not_literal",
+    "name": "Dialogue Must Have Subtext",
+    "taxonomy_level": "dialogue",
+    "category": "dialogue",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Scriptshadow/Amber",
+      "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
+    },
+    "definition": "Comedy dialogue should rarely be on-the-nose. Characters should talk around things, use sarcasm, misdirection, double entendres, and evasiveness. The best comedy dialogue has layers \u00e2\u20ac\u201d what characters say versus what they mean.",
+    "detection_signal": "Check if dialogue is literal and direct (characters saying exactly what they mean). Flag scenes where characters explain their feelings directly. Look for subtext, irony, or gap between dialogue and action.",
+    "counter_considerations": "Some comedy uses deadpan literalism for effect (e.g., Leslie Nielsen characters). The key is that the literalism is intentional and character-driven, not accidental.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "comedy_trivial_taken_seriously"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_contradictory_characters",
+    "name": "Contradictory Character Placements",
+    "taxonomy_level": "character",
+    "category": "concept",
+    "source": {
+      "type": "general_craft",
+      "originator": "Randy Ingermanson",
+      "work": "Writing Fiction for Dummies"
+    },
+    "definition": "Classic comedy is a twist on the expected: Create an expectation, and then flip it. The easiest way to flip the expected is to place your character in some sort of contradictory situation: a New Yorker in the country, a farmer in New York, a slob traveling with a clean freak.",
+    "detection_signal": "Check if the comedy derives from placing characters in situations that contradict their nature or expectations. Verify that the premise creates inherent friction between character and environment.",
+    "counter_considerations": "Some comedy derives humor from character behavior rather than situational contrast. The key is that there must be a clear source of comedic friction.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "comedy_trivial_taken_seriously"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_relationship_difficulty",
+    "name": "If Boy Can Easily Get Girl, No Story",
+    "taxonomy_level": "plot_thread",
+    "category": "premise",
+    "source": {
+      "type": "framework",
+      "originator": "Michael Hauge",
+      "work": "Writing Screenplays That Sell"
+    },
+    "definition": "In comedy, if boy can easily get girl, you don't have a story. The difficulty of achieving the goal must be genuine and escalating. Easy victories produce no comedy.",
+    "detection_signal": "Check if the protagonist's goal is genuinely difficult to achieve. Verify that obstacles are real and escalating. Flag scripts where the protagonist achieves their goal without significant struggle.",
+    "counter_considerations": "Some comedies derive humor from the protagonist's incompetence rather than external obstacles. The key is that there must be genuine difficulty, whether external or internal.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "comedy_trivial_taken_seriously"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_death_stakes",
+    "name": "Comedy Stakes Are Psychological Death",
+    "taxonomy_level": "plot_thread",
+    "category": "stakes",
+    "source": {
+      "type": "general_craft",
+      "originator": "Randy Ingermanson",
+      "work": "Writing Fiction for Dummies"
+    },
+    "definition": "In comedy, the character must believe they will suffer psychological death if they don't gain their objective. The 'something trivial' must matter so much to the characters that they believe they will die inside if they fail. The audience laughs because the stakes are trivial to us but life-or-death to the character.",
+    "detection_signal": "Check if the protagonist treats their goal with disproportionate gravity. Verify that the character believes failure will result in psychological death (loss of identity, purpose, or dignity). Flag scripts where characters are genuinely nonchalant about their goals.",
+    "counter_considerations": "Some comedies use understated characters. The key is that even understated characters must have internal stakes that matter to them.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "comedy_trivial_taken_seriously"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_exaggeration_mechanism",
+    "name": "Exaggeration as Comedic Mechanism",
+    "taxonomy_level": "scene",
+    "category": "scene_craft",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard comedy writing principle found across multiple sources."
+    },
+    "definition": "Comedy often works through exaggeration \u00e2\u20ac\u201d taking a normal situation, trait, or reaction and amplifying it beyond reality. The exaggeration must be rooted in recognizable truth to be funny.",
+    "detection_signal": "Check if comedic scenes exaggerate recognizable situations, traits, or reactions. Verify that the exaggeration is rooted in truth that audiences can relate to.",
+    "counter_considerations": "Some comedy relies on understatement rather than exaggeration. The key is that the comedic mechanism must be consistent with the film's style.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "comedy_trivial_taken_seriously"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_timing_is_everything",
+    "name": "Comedic Timing in Scene Length",
+    "taxonomy_level": "structure_pacing",
+    "category": "pacing",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard comedy writing principle found across multiple sources."
+    },
+    "definition": "Comedy scenes have specific timing requirements. Scenes should be long enough to set up the joke but short enough to maintain energy. Lingering after the punchline deflates the humor.",
+    "detection_signal": "Check if comedy scenes maintain appropriate length. Verify that scenes don't overstay their welcome after the comedic payoff.",
+    "counter_considerations": "Some comedy relies on extended awkward silences or slow-burn humor. The key is that the timing must be intentional and effective.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "comedy_start_late_leave_early"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_escalation_pattern",
+    "name": "Comedy Escalates Through Pattern Breaking",
+    "taxonomy_level": "plot_thread",
+    "category": "escalation",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard comedy writing principle found across multiple sources."
+    },
+    "definition": "Comedy escalates by establishing a pattern and then breaking it. The first instance is funny, the second is funnier, and the third breaks the pattern for maximum comedic effect.",
+    "detection_signal": "Check if comedic scenes establish patterns and then break them. Verify that the pattern-breaking creates escalating humor.",
+    "counter_considerations": "Some comedy relies on repetition rather than pattern-breaking. The key is that the comedic structure must be effective.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "comedy_reel_laugh"
+    ],
+    "genre": "comedy"
+  },
+  {
+    "id": "comedy_character_flaws_funny",
+    "name": "Character Flaws Create Comedy",
+    "taxonomy_level": "character",
+    "category": "character_design",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard comedy writing principle found across multiple sources."
+    },
+    "definition": "Comedy often derives from character flaws \u00e2\u20ac\u201d perfection isn't funny, but the gap between who we are and who we think we are creates humor. Flaws should be recognizable and relatable.",
+    "detection_signal": "Check if comedic characters have clear, recognizable flaws. Verify that these flaws create humorous situations and conflicts.",
+    "counter_considerations": "Some comedy relies on external situations rather than character flaws. The key is that if character-based comedy is used, the flaws must be effective.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "comedy_trivial_taken_seriously"
+    ],
+    "genre": "comedy"
+  }
+]

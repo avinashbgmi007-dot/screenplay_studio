@@ -1,0 +1,259 @@
+[
+  {
+    "id": "action_pacing_relentless",
+    "name": "Action Pacing Is Relentless",
+    "taxonomy_level": "structure_pacing",
+    "category": "pacing",
+    "source": {
+      "type": "general_craft",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "Action films maintain relentless pacing with minimal downtime between action sequences. The audience expects regular thrills and momentum. Extended pauses without physical or emotional escalation risk losing the audience.",
+    "detection_signal": "Map action sequences across the script. Check if downtime between action beats is minimal. Flag extended sequences without physical or emotional escalation.",
+    "counter_considerations": "Some action films use deliberate pacing contrast. The key is that the dominant mode should be relentless forward momentum.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries",
+      "page_estimates"
+    ],
+    "related_rules": [
+      "action_hero_must_be_active"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_hero_must_be_active",
+    "name": "Hero Must Be Active",
+    "taxonomy_level": "character",
+    "category": "protagonist",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "In action films, the protagonist must be as active as possible \u00e2\u20ac\u201d making decisions, taking initiative, driving events forward rather than reacting passively. The hero earns leadership through action, not inheritance.",
+    "detection_signal": "Track the protagonist's actions across the script. Check if they initiate key plot movements, make consequential decisions, and physically engage with threats.",
+    "counter_considerations": "Some action heroes start passive and become active. The key is that by the midpoint, the hero must be driving the action.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "action_villain_strength"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_villain_strength",
+    "name": "Villain Must Be Formidable",
+    "taxonomy_level": "character",
+    "category": "antagonist",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "If the villain/antagonist is weak, the protagonist cannot shine. The antagonist must be formidable, intelligent, and threatening enough to credibly challenge the hero. A weak villain makes the hero's struggle unconvincing.",
+    "detection_signal": "Evaluate the antagonist's capabilities, plan, and threat level. Check if the antagonist has clear advantages over the protagonist at key story points.",
+    "counter_considerations": "Some action films feature institutional antagonists. The key is that the threat must be formidable and credible.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "action_hero_must_be_active"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_stakes_physical_death",
+    "name": "Physical Death at Stake",
+    "taxonomy_level": "plot_thread",
+    "category": "stakes",
+    "source": {
+      "type": "general_craft",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "Action films almost always have physical death at stake. The protagonist faces mortal danger \u00e2\u20ac\u201d failure means death, not just professional or psychological consequences.",
+    "detection_signal": "Check if the protagonist faces physical death as a consequence of failure. Verify that the threat of death is explicit and present throughout the story.",
+    "counter_considerations": "Some action films focus on professional or psychological death. The key is that the primary mode of death must be clearly established.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "action_hero_must_be_active"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_escalation_constant",
+    "name": "Action Escalates Constantly",
+    "taxonomy_level": "plot_thread",
+    "category": "escalation",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "In action films, things must go wrong constantly. Plans fail, allies betray, equipment breaks, new threats emerge. The protagonist should never have things go well for too long. Escalation is the engine of suspense.",
+    "detection_signal": "Map the protagonist's obstacles across the script. Check if problems compound and escalate rather than resolving cleanly.",
+    "counter_considerations": "Moments of success are necessary for pacing contrast. The key is that any success should be temporary or come with new complications.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "action_hero_must_be_active"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_hero_villain_flipside",
+    "name": "Hero and Villain Are Flip Sides",
+    "taxonomy_level": "character",
+    "category": "character_relationship",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "The hero and villain should share key traits, backgrounds, or desires, differing only in moral choices or methods. This creates a dynamic where the hero could become the villain if they made different choices.",
+    "detection_signal": "Check if the hero and villain share key traits or backgrounds. Verify that they differ in moral choices or methods, not just in 'good vs evil' alignment.",
+    "counter_considerations": "Some action films feature pure good vs pure evil. The key is that the hero-villain dynamic should be compelling.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "action_villain_strength"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_hero_underdog",
+    "name": "Hero Must Be Underdog",
+    "taxonomy_level": "character",
+    "category": "protagonist",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "The hero must face opposition stronger or smarter than themselves. Invincible heroes create no suspense. The hero must use wits, not just strength, to overcome superior opposition.",
+    "detection_signal": "Check if the villain has physical advantage, resources, intelligence, or moral flexibility that hero lacks. Verify that the hero must use wits, not just strength.",
+    "counter_considerations": "Some action films feature competent heroes. The key is that the hero must face genuine challenges that test their abilities.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "action_hero_must_be_active"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_set_pieces_varied",
+    "name": "Action Set Pieces Must Be Varied",
+    "taxonomy_level": "scene",
+    "category": "scene_craft",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard action writing principle found across multiple sources."
+    },
+    "definition": "Action set pieces should vary in type, location, and intensity. Repeating the same type of action (e.g., car chases) without variation creates monotony.",
+    "detection_signal": "Check if action sequences vary in type, location, and intensity. Verify that the audience experiences different kinds of action throughout the film.",
+    "counter_considerations": "Some action films focus on one type of action (e.g., martial arts films). The key is that the action should be varied within the chosen type.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "action_pacing_relentless"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_physical_consequences",
+    "name": "Action Has Physical Consequences",
+    "taxonomy_level": "character",
+    "category": "realism",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard action writing principle found across multiple sources."
+    },
+    "definition": "In action films, physical confrontations should have consequences. Heroes should show injuries, fatigue, and the physical toll of combat. Invincibility reduces tension.",
+    "detection_signal": "Check if the protagonist shows physical consequences of action (injuries, fatigue). Verify that the physical toll of combat is visible.",
+    "counter_considerations": "Some action films stylize violence. The key is that the level of consequence should be consistent with the film's style.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "action_hero_underdog"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_villain_plan_clear",
+    "name": "Villain's Plan Must Be Clear",
+    "taxonomy_level": "plot_thread",
+    "category": "antagonist_structure",
+    "source": {
+      "type": "general_craft",
+      "originator": "William Martell",
+      "work": "The Secrets of Action Screenwriting"
+    },
+    "definition": "The villain's plan must be clearly established so the audience understands what they're trying to achieve and why it matters. A vague villain plan creates confusion.",
+    "detection_signal": "Check if the villain's plan is clearly established. Verify that the audience understands what the villain is trying to achieve and why it matters.",
+    "counter_considerations": "Some action films reveal the villain's plan gradually. The key is that the plan must be clear by the midpoint at the latest.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "action_villain_strength"
+    ],
+    "genre": "action"
+  },
+  {
+    "id": "action_hero_competence",
+    "name": "Hero Must Demonstrate Competence",
+    "taxonomy_level": "character",
+    "category": "protagonist",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard action writing principle found across multiple sources."
+    },
+    "definition": "The action hero must demonstrate competence early so the audience believes they can succeed. The hero's skills should be shown, not just told.",
+    "detection_signal": "Check if the hero demonstrates competence in early scenes. Verify that the hero's skills are shown through action, not exposition.",
+    "counter_considerations": "Some action heroes are ordinary people thrust into extraordinary circumstances. The key is that the hero must demonstrate competence at some point.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "action_hero_must_be_active"
+    ],
+    "genre": "action"
+  }
+]

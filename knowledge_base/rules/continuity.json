@@ -1,0 +1,78 @@
+[
+  {
+    "id": "prop_continuity",
+    "name": "Prop Continuity",
+    "taxonomy_level": "continuity",
+    "category": "physical_continuity",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard production/script-supervision practice as much as a 'theory' -- included here because it's a concrete, highly checkable class of error once the knowledge graph exists."
+    },
+    "definition": "An object established as being in a character's possession, a specific location, or a specific state (broken, hidden, given away) should remain consistent with that state in later scenes unless a scene explicitly shows or implies it changing hands, location, or condition.",
+    "detection_signal": "Using the knowledge graph's prop-mention index: track each significant prop's established location/owner/state across scenes in order. Flag contradictions (a character holding an object established as left behind, or destroyed, in an earlier scene, with no intervening scene explaining its return).",
+    "counter_considerations": "Off-screen time skips can plausibly explain a prop's status changing without an on-page scene showing it — check for explicit time-skip markers before flagging as a hard contradiction; otherwise flag as lower-confidence.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["chekhovs_gun"]
+  },
+  {
+    "id": "timeline_consistency",
+    "name": "Timeline Consistency",
+    "taxonomy_level": "continuity",
+    "category": "temporal_continuity",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard script-supervision practice."
+    },
+    "definition": "Explicit or implicit time markers (day/night designations in scene headings, stated dates, references to elapsed time, characters' stated ages) should form a coherent, non-contradictory timeline across the script.",
+    "detection_signal": "Using the knowledge graph: build a sequence of day/night designations and any explicit time references (INT./EXT. headers' time-of-day, dialogue references to dates/durations/ages). Flag contradictions (e.g. a 'DAY' scene immediately following a 'NIGHT' scene with dialogue implying no time has passed; a character's stated age shifting without a time skip).",
+    "counter_considerations": "Non-linear narratives (flashbacks, intercut timelines, dream sequences) are a deliberate structure — the check needs to first establish whether the script uses a non-linear structure before treating an apparent contradiction as an error rather than an intentional cut.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["prop_continuity"]
+  },
+  {
+    "id": "character_trait_continuity",
+    "name": "Character Physical/Biographical Trait Continuity",
+    "taxonomy_level": "continuity",
+    "category": "character_continuity",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard script-supervision practice."
+    },
+    "definition": "Physical descriptions and biographical facts established for a character (age, physical description, family relationships, hometown, occupation, name spelling) should remain consistent across all their appearances unless a scene explicitly addresses a change.",
+    "detection_signal": "Using the knowledge graph's character-trait index: collect every explicit statement of a character's physical/biographical trait across the script. Flag direct contradictions (different stated ages without an explained time skip, an established sibling later referred to as a cousin, inconsistent name spelling in dialogue vs. scene headings).",
+    "counter_considerations": "None of significance — this is one of the more purely mechanical, high-confidence checks in this knowledge base. A flagged contradiction here is very likely a genuine continuity error rather than an intentional narrative choice, though it's still worth a quick human confirmation.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["timeline_consistency"]
+  },
+  {
+    "id": "world_rule_consistency_continuity",
+    "name": "World-Rule Consistency (Continuity Angle)",
+    "taxonomy_level": "continuity",
+    "category": "world_building",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "This is the same underlying principle as story_macro.json's world_rule_consistency, included here as well because it's operationally a knowledge-graph continuity check, not just a macro-thematic one -- the two entries share detection logic but serve different taxonomy purposes (macro trust vs. line-level contradiction detection)."
+    },
+    "definition": "See world_rule_consistency in story_macro.json for the full theoretical framing. At the continuity level, the practical check is narrower: does any single explicit rule-statement directly contradict a later explicit event, independent of thematic considerations.",
+    "detection_signal": "Using the knowledge graph: cross-reference explicit rule-establishing statements against explicit later events for direct logical contradiction.",
+    "counter_considerations": "Same as world_rule_consistency: an acknowledged/consequential exception is not an error.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": ["knowledge_graph"],
+    "related_rules": ["world_rule_consistency"]
+  }
+]

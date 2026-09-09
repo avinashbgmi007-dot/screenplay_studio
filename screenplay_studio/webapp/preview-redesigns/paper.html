@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>② The Verdict — The Doctor's Letter</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Special+Elite&family=Karla:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --desk:#e9e2d2; --paper:#fbf7ec; --ink:#2b2620; --dim:#8b8172;
+  --wax:#7a2e2e; --pencil:#a04b3a; --line:#ddd2bd; --amber:#b07d2e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--desk);color:var(--ink);font-family:"Karla",system-ui,sans-serif;font-size:14.5px;line-height:1.6;overflow:hidden}
+h1,h2,h3,.serif{font-family:"Cormorant Garamond",Georgia,serif}
+.type{font-family:"Special Elite","Courier New",monospace}
+svg.i{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+
+#pv{position:fixed;top:0;left:0;right:0;z-index:900;display:flex;align-items:center;gap:6px;padding:8px 16px;background:#d9d0bc;border-bottom:1px solid var(--line);font-size:12px}
+#pv b{font-family:"Cormorant Garamond",serif;color:var(--wax);margin-right:10px;font-size:15px}
+#pv button{background:none;border:1px solid var(--line);color:var(--dim);padding:4px 12px;border-radius:99px;cursor:pointer;font:inherit}
+#pv button.on{background:var(--wax);border-color:var(--wax);color:var(--paper)}
+main{padding-top:42px;height:calc(100vh - 42px)}
+[data-screen]{display:none;height:100%;position:relative;overflow:hidden}
+[data-screen].active{display:block}
+.desk-grain{position:absolute;inset:0;pointer-events:none;z-index:0;background:
+ radial-gradient(600px 300px at 15% 8%, rgba(122,46,46,.05), transparent),var(--desk)}
+
+/* ====== THE MAIL TRAY (upload moment) ====== */
+.tray-wrap{position:relative;z-index:2;height:100%;display:grid;place-items:center}
+.tray{width:min(620px,88vw);background:var(--paper);border:1px solid var(--line);box-shadow:0 24px 60px rgba(90,70,40,.18);padding:40px 46px 34px;position:relative}
+.tray::before{content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);width:64px;height:8px;background:repeating-linear-gradient(90deg,#c9bfa8 0 8px,transparent 8px 16px);border-radius:4px}
+.tray h1{font-size:30px;font-weight:400;text-align:center;margin:8px 0 6px}
+.tray .dek{text-align:center;color:var(--dim);font-size:13.5px;margin-bottom:26px}
+.mail{display:flex;flex-direction:column;gap:12px}
+.env{display:flex;align-items:center;gap:14px;border:1px solid var(--line);background:#fffdf6;padding:14px 18px;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease;position:relative}
+@media (prefers-reduced-motion: reduce){.env{transition:none}}
+.env:hover{transform:translateY(-3px);box-shadow:0 10px 26px rgba(90,70,40,.15)}
+.env .stamp2{width:38px;height:46px;border:1.5px dashed var(--wax);display:grid;place-items:center;color:var(--wax);font:600 9px "Karla";text-transform:uppercase;letter-spacing:.1em;transform:rotate(-4deg);flex:0 0 auto}
+.env b{font-family:"Cormorant Garamond",serif;font-size:18px}
+.env span{display:block;font-size:12px;color:var(--dim)}
+.env .seal-mini{margin-left:auto;width:26px;height:26px;border-radius:50%;background:var(--wax);opacity:.85;flex:0 0 auto}
+.env.blank .seal-mini{background:none;border:1.5px dashed var(--dim)}
+
+/* ====== THE LETTER (verdict) & MANUSCRIPT (pages) — shared paper ====== */
+.paper-wrap{position:relative;z-index:2;height:100%;overflow-y:auto;padding:44px 0 90px}
+.sheet{width:min(760px,92vw);margin:0 auto;background:var(--paper);border:1px solid var(--line);box-shadow:0 26px 70px rgba(90,70,40,.2);padding:56px 64px 48px;position:relative}
+.lh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:26px}
+.lh .who1{font-family:"Cormorant Garamond",serif;font-size:23px}
+.lh .who2{font-size:12px;color:var(--dim);margin-top:2px}
+.wax{width:88px;height:88px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#9a4242,var(--wax) 65%,#571f1f);color:#f6e9e0;display:grid;place-content:center;text-align:center;transform:rotate(-7deg);box-shadow:0 6px 18px rgba(90,30,30,.35);flex:0 0 auto}
+.wax .n{font-family:"Cormorant Garamond",serif;font-size:30px;line-height:1}
+.wax .c{font-size:8px;letter-spacing:.16em;text-transform:uppercase;margin-top:3px}
+.letter{font-family:"Cormorant Garamond",serif;font-size:17.5px;line-height:1.72}
+.letter p{margin-bottom:16px}
+.letter .drop::first-letter{font-size:54px;float:left;line-height:.8;padding:4px 8px 0 0}
+.ev{margin:18px 0;padding:10px 18px;border-left:3px solid var(--pencil);background:#f7f0df;font-family:"Special Elite","Courier New",monospace;font-size:13px;color:#4b4438}
+.ev .src{display:block;margin-top:6px;font:10.5px "Karla";letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.margin-red{position:absolute;right:-190px;width:160px;font-family:"Cormorant Garamond",serif;font-style:italic;font-size:14.5px;color:var(--pencil);transform:rotate(-2deg)}
+.finding-no{display:flex;gap:10px;margin:22px 0 0;align-items:flex-start}
+.finding-no .no{font-family:"Special Elite",monospace;color:var(--pencil);font-size:13px;flex:0 0 auto;padding-top:2px}
+.sig{text-align:right;margin-top:30px;font-family:"Cormorant Garamond",serif;font-style:italic;font-size:19px}
+.sig small{display:block;font:11px "Karla";color:var(--dim);letter-spacing:.1em;text-transform:uppercase;font-style:normal}
+.sev-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.sev-dot.high{background:#b32828}.sev-dot.med{background:var(--amber)}.sev-dot.low{background:#b9ae99}
+
+/* the manuscript pages (script-first moment) */
+.ms{font-family:"Special Elite","Courier New",monospace;font-size:14px;line-height:1.7;color:#33291c}
+.ms .slug{font-weight:400;text-decoration:underline;margin-bottom:12px}
+.ms .cue{margin:16px 0 2px 130px;text-transform:uppercase}
+.ms .dl{margin-left:60px;max-width:400px}
+.ms .ac{margin:11px 0}
+.ms .hot{background:#f3e6c8;border-bottom:2px dotted var(--pencil);cursor:pointer}
+.ms-note{border-left:3px solid var(--wax);background:#f7efe0;font-family:"Karla";font-size:12.5px;color:#5a5040;padding:9px 13px;margin:12px 0 12px 40px}
+.ms-note b{color:var(--wax)}
+
+/* ====== P.S. — THE DEBATE (Sameer's note) ====== */
+.ps-band{margin:26px -20px 0;border-top:2px dashed var(--line);padding-top:22px}
+.note-card{background:#fffbe9;border:1px solid #e5d9b8;border-radius:3px;box-shadow:0 8px 22px rgba(90,70,40,.14);padding:18px 22px;transform:rotate(-.6deg);font-family:"Cormorant Garamond",serif;font-size:16.5px;line-height:1.6;position:relative}
+.note-card::before{content:"Sameer";position:absolute;top:-11px;left:18px;background:#fffbe9;border:1px solid #e5d9b8;font:600 10px "Karla";letter-spacing:.14em;text-transform:uppercase;color:var(--amber);padding:3px 10px}
+.note-card .pin{position:absolute;top:-8px;right:22px;width:14px;height:14px;border-radius:50%;background:var(--wax);box-shadow:0 3px 6px rgba(0,0,0,.25)}
+.reply{margin-top:18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fffdf6;border-radius:99px;padding:5px 12px;font:12px "Karla";color:#5a5040;cursor:pointer;white-space:nowrap;transition:.18s ease}
+@media (prefers-reduced-motion: reduce){.chip{transition:none}}
+.chip:hover{border-color:var(--wax);color:var(--wax)}
+.chips.collapsed{flex-direction:column;align-items:flex-start}
+.chips.collapsed .chip .lbl{display:none}
+.chips.collapsed:hover .chip .lbl{display:inline}
+.composer{width:100%;min-height:42px;max-height:150px;resize:none;border:1px solid var(--line);background:#fffdf6;padding:11px 14px;font:13.5px "Karla";outline:none}
+.composer:focus{border-color:var(--wax)}
+.status-strip{position:absolute;left:0;right:0;bottom:0;height:28px;background:#d9d0bc;border-top:1px solid var(--line);display:flex;align-items:center;gap:15px;padding:0 18px;font:11px "Karla";color:var(--dim);z-index:40}
+.status-strip .g{width:6px;height:6px;border-radius:50%;background:#5a7a4a;display:inline-block;margin-right:5px}
+.status-strip .sp{margin-left:auto;color:var(--wax)}
+
+/* ====== ENCLOSURES (spark moment) ====== */
+.enclosure{border:1.5px dashed var(--pencil);background:#fdf8ec;padding:16px 20px;margin-top:12px;cursor:pointer;transition:transform .2s ease}
+@media (prefers-reduced-motion: reduce){.enclosure{transition:none}}
+.enclosure:hover{transform:rotate(-.5deg) translateY(-2px)}
+.enclosure b{font-family:"Cormorant Garamond",serif;font-size:17px}
+.enclosure span{display:block;font-size:12.5px;color:var(--dim);margin-top:3px}
+.enclosure .tag{font:600 9.5px "Karla";letter-spacing:.16em;text-transform:uppercase;color:var(--pencil)}
+</style>
+</head>
+<body>
+
+<nav id="pv"><b>② The Verdict</b>
+<button data-go="upload" class="on">The Mail Tray</button><button data-go="pages">The Manuscript</button><button data-go="verdict">The Letter</button><button data-go="debate">The P.S.</button><button data-go="spark">Enclosures</button>
+<span style="margin-left:auto;color:var(--dim)">concept world 2 of 6 — the report as a craftsman's letter</span></nav>
+
+<main>
+
+<!-- MAIL TRAY -->
+<section data-screen="upload" class="active">
+  <div class="desk-grain"></div>
+  <div class="tray-wrap"><div class="tray">
+    <h1>The mail has come.</h1>
+    <p class="dek">Your scripts, returned from the desk of the Premise Doctor. One letter still sealed.</p>
+    <div class="mail">
+      <div class="env" data-go="verdict"><span class="stamp2">1st read</span><div><b>Pain — draft three</b><span>98 pp · read &amp; reviewed yesterday · 12 findings remain open</span></div><span class="seal-mini"></span></div>
+      <div class="env" data-go="pages"><span class="stamp2">re-read</span><div><b>Pain — the manuscript itself</b><span>open the pages first, if you prefer</span></div><span class="seal-mini" style="background:var(--amber)"></span></div>
+      <div class="env"><span class="stamp2">pending</span><div><b>Gun Pen</b><span>short · 3 scenes · not yet read</span></div><span class="seal-mini" style="background:var(--dim)"></span></div>
+      <div class="env blank" data-go="spark"><span class="stamp2">blank</span><div><b>An unwritten letter</b><span>an idea, not yet addressed to anyone</span></div><span class="seal-mini"></span></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- MANUSCRIPT -->
+<section data-screen="pages">
+  <div class="desk-grain"></div>
+  <div class="paper-wrap"><div class="sheet">
+    <div class="lh"><div><div class="who1">Pain — the manuscript</div><div class="who2">draft three · 98 pages · read under the Doctor's lamp</div></div>
+      <div class="wax" style="transform:rotate(5deg);opacity:.9"><div class="n">v3</div><div class="c">draft</div></div></div>
+    <div class="ms">
+      <p class="slug">SC 1 — INT. RENTED ROOM — KUKATPALLY — NIGHT</p>
+      <p class="ac">A ceiling fan turns slow. On a cot, <span class="hot">ARJUN (29), hollow-eyed</span>, stares at a phone glowing on his chest. Missed calls stack like bricks.</p>
+      <p class="cue">ARJUN</p>
+      <p class="dl">Naana… cheppu. Cheppalekha ante nenu intlo unna leda?</p>
+      <div class="ms-note"><b>Doctor's pencil —</b> the phone glow does the lamp's job here. Keep it; it answers Act II.</div>
+      <p class="slug" style="margin-top:22px">SC 2 — EXT. ROAD-SIDE TEA STALL — DAY</p>
+      <p class="ac">Steam. Tumbling glasses. <span class="hot">Arjun counts coins twice before ordering one.</span> The stall owner pretends not to see.</p>
+      <p class="cue">STALL OWNER</p>
+      <p class="dl">Nee account tho guddi pattuko ra. Idi naadi kaadu.</p>
+      <div class="ms-note"><b>Doctor's pencil —</b> this coin-count is a promise. The ledger will look for its payoff.</div>
+    </div>
+  </div></div>
+  <div class="status-strip"><span><span class="g"></span>qwen3-14B @ :8080</span><span>sc 2 · 214 words</span><span>12/44 open</span><span class="sp">⏱ 18:42</span></div>
+</section>
+
+<!-- THE LETTER -->
+<section data-screen="verdict">
+  <div class="desk-grain"></div>
+  <div class="paper-wrap"><div class="sheet">
+    <div class="lh"><div><div class="who1">From the desk of<br>the Premise Doctor</div><div class="who2">regarding: PAIN, draft three · read once, slowly · verified quotes only</div></div>
+      <div class="wax"><div class="n">7.2</div><div class="c">verdict</div></div></div>
+    <div class="letter">
+      <p class="drop">You asked me to read this the way an audience would — tired, on a weeknight, hoping to care. I did. Here is what I found: a real engine, running on half its cylinders.</p>
+      <p>Arjun's need to know —</p>
+      <div class="ev">“Naana… cheppu. Cheppalekha ante nenu intlo unna leda?”<span class="src">Scene 1 · INT. Rented Room — Night</span></div>
+      <p>— is genuine. The premise earns itself by page twelve. But then the engine idles: forty pages of pressure without escalation. The ledger flags scenes 9, 11 and 13 as the same promise made three times.</p>
+      <div class="finding-no"><span class="no">No.1</span><div><span class="sev-dot high"></span><b>The gun never fires.</b> The father-call promised above lands only as mood. Land it by Act III's midpoint — or cut the specificity.</div></div>
+      <div class="finding-no"><span class="no">No.2</span><div><span class="sev-dot med"></span><b>The stall owner vanishes.</b> Your best early antagonist — <i>“Nee account tho guddi pattuko ra”</i> — disappears for twenty scenes. Bring him back or let the absence speak.</div></div>
+      <div class="finding-no"><span class="no">No.3</span><div><span class="sev-dot low"></span><b>Voice bleed.</b> Two scenes slip into school-Telugu while Arjun's idiolect runs street-Tenglish. A reader hears it; an audience will too.</div></div>
+      <div class="sig">Diagnosis first, no sugar —<br><span class="type" style="font-size:15px">the Premise Doctor</span><small>every quote verified against your pages</small></div>
+    </div>
+    <div class="margin-red" style="top:210px">payoff owed by p. 88!</div>
+    <div class="margin-red" style="top:330px">best beat in the draft — wasted?</div>
+  </div></div>
+</section>
+
+<!-- P.S. — THE DEBATE -->
+<section data-screen="debate">
+  <div class="desk-grain"></div>
+  <div class="paper-wrap"><div class="sheet">
+    <div class="letter">
+      <p style="font-family:'Special Elite',monospace;font-size:13px;letter-spacing:.06em;color:var(--dim)">P.S. — Sameer slipped a note under the door after the Doctor left.</p>
+      <div class="ps-band">
+        <div class="note-card"><span class="pin"></span>Achhi khabar pehle: Arjun ka want ab Scene 1 se crystal clear hai. Ab kadwi baat — scenes 8–14 ek hi beat teen baar. Kis ek me Arjun <i>CHOOSE</i> karta hai? Wohi rakho, baaki do 1.5 page me collapse. Likh dikhau?</div>
+        <div class="chips explore-chips" id="ps-chips" style="margin-top:16px">
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Show the collapsed scene</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg><span class="lbl">Raise stakes instead</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5M18 3v4h-4M6 21v-4h4"/></svg><span class="lbl">Compare with Gun Pen's mid</span></button>
+          <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M9 5h11v10H12l-4 4zM4 8v7"/></svg><span class="lbl">Read it in Tenglish voice</span></button>
+        </div>
+        <div class="reply composer-zone" style="position:relative">
+          <textarea class="composer" rows="1" placeholder="Write back to Sameer…"></textarea>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ENCLOSURES -->
+<section data-screen="spark">
+  <div class="desk-grain"></div>
+  <div class="paper-wrap"><div class="sheet">
+    <div class="lh"><div><div class="who1">Enclosures</div><div class="who2">three prompts the Doctor left in the envelope — ideas before structure</div></div></div>
+    <div class="enclosure"><span class="tag">Enclosure A</span><b>What if the call comes too late?</b><span>Open Pain's premise backwards — start from the missed call, earn the rest as memory.</span></div>
+    <div class="enclosure"><span class="tag">Enclosure B</span><b>A hero who counts everything</b><span>Arjun's coin-counting as a recurring motif — scarcity made visible, page after page.</span></div>
+    <div class="enclosure"><span class="tag">Enclosure C</span><b>The stall owner's story</b><span>Who pretends not to see, and why? A side-character one-pager.</span></div>
+    <div class="enclosure" style="border-style:dashed"><span class="tag">Enclosure D</span><b>Write your own</b><span>Sameer asks the first question; you answer in pieces.</span></div>
+    <div class="chips explore-chips" style="margin-top:16px">
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg><span class="lbl">Ask Sameer about these</span></button>
+      <button class="chip"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="lbl">Turn an enclosure into a page</span></button>
+    </div>
+    <div class="reply"><textarea class="composer" rows="1" placeholder="Rip an enclosure open — start writing…"></textarea></div>
+  </div></div>
+</section>
+
+</main>
+
+<script>
+function go(name){
+  document.querySelectorAll('[data-screen]').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
+  document.querySelectorAll('#pv [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===name));
+}
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');
+  if(g){go(g.dataset.go);}
+});
+document.querySelectorAll('.composer').forEach(t=>{
+  t.addEventListener('input',()=>{
+    t.style.height='auto';t.style.height=Math.min(t.scrollHeight,150)+'px';
+    if(t.value.trim())document.querySelectorAll('.chips').forEach(c=>c.classList.add('collapsed'));
+  });
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.activeElement)document.activeElement.blur();});
+</script>
+</body>
+</html>

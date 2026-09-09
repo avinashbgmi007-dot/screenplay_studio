@@ -1,0 +1,233 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio v2 — 1 · Paper Desk</title>
+<link rel="stylesheet" href="shared/base.css">
+<style>
+/* paper-desk: warm utilitarian minimalism (hairlines, flat, pastel spots) */
+:root{--bg:#fbfaf7;--surface:#fff;--surface2:#f3f1ec;--ink:#2f3437;--muted:#787774;
+--line:#eaeaea;--accent:#111111;--on-accent:#fff;--script-ink:#26292c;
+--font-display:Georgia,'Times New Roman',serif}
+.topbar{background:#fbfaf7}.rooms{background:transparent;border-left:1px solid #eaeaea;
+border-right:1px solid #eaeaea;border-radius:0;padding:0 4px}
+.room-btn{border-radius:6px}
+.room-btn[aria-selected="true"]{box-shadow:none;background:#111;color:#fff}
+.avatar{background:#fdebd9;color:#956400;border-radius:10px;font-family:var(--font-display)}
+.script{border-radius:8px;box-shadow:none}
+.s-h{color:#111}.margnote{color:#9a5b00;font-style:normal;font-size:12px}
+.margnote b{color:#9f2f2d;font-style:normal;text-decoration:line-through;text-decoration-thickness:1px}
+.v-tag.ok{background:#edf3ec;color:#346538;border-color:#dbe7da}
+.chip{border-radius:6px;background:#fff}
+.score{letter-spacing:-.03em}
+.cat,.verdict{box-shadow:none;border-radius:8px}
+.statusbar{font-family:ui-monospace,monospace}
+</style></head>
+<body data-default-room="feedback">
+<header class="topbar">
+ <span class="brand"><svg class="i" viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2zm0 0a2 2 0 0 1 2-2h13"/></svg>Screenplay Studio</span>
+ <span class="dot-conn" title="Connected"></span>
+ <nav class="rooms" aria-label="Rooms">
+  <button class="room-btn" data-room-btn="desk">The Desk</button>
+  <button class="room-btn" data-room-btn="cowrite">Co-write</button>
+  <button class="room-btn" data-room-btn="feedback">Feedback</button>
+ </nav>
+ <div class="top-actions">
+  <button class="btn-ghost" data-fid="new-project" style="min-height:32px;padding:5px 12px">＋ New project</button>
+  <button class="icon-btn" data-modal="settings" title="Settings (self-hosted, no telemetry)" data-fid="settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg></button>
+ </div>
+</header>
+<div class="frame">
+ <aside class="rail">
+  <button class="rail-item active" data-dismiss-target="#ideas-fly"><svg class="i" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c.7.7 1 1.2 1 2h6c0-.8.3-1.3 1-2a6 6 0 0 0-4-10z"/></svg>Idea room<span class="count">4</span></button>
+  <button class="rail-item" data-fid="shelf"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h4v16H5zM15 4h4v16h-4zM9 9l6-3"/></svg>On the shelf</button>
+  <button class="rail-item" data-fid="library"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Your library</button>
+  <div class="dismissable" id="ideas-fly">
+   <div class="rail-h">Open ideas</div>
+   <button class="rail-item">The Late Hour — logline v3</button>
+   <button class="rail-item">Dev &amp; Mara prequel beat</button>
+  </div>
+  <div style="margin-top:auto;padding:8px">
+   <p style="font-size:11px;color:var(--muted);line-height:1.5">Everything stays on this machine. Fonts ship with the app — zero outside requests.</p>
+  </div>
+ </aside>
+ <div class="main">
+  <div class="projbar">
+   <button class="icon-btn" title="Home / welcome" data-fid="home"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></button>
+   <span class="proj-title">The Late Hour</span><span class="crumb">feature · Draft 3</span>
+   <select class="sel" data-fid="branch" style="margin-left:auto"><option>Draft 3 (current)</option><option>Draft 2</option></select>
+   <kbd>Ctrl K</kbd>
+  </div>
+
+  <!-- DESK -->
+  <section class="panel on" data-room-panel="desk">
+   <div class="toolbar">
+    <button class="t-btn" data-fid="undo"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button>
+    <button class="t-btn" data-fid="redo"><svg class="i" viewBox="0 0 24 24" style="transform:scaleX(-1)"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button>
+    <button class="t-btn" data-fid="premise">Premise</button>
+    <button class="t-btn" data-fid="focus">Focus</button>
+    <button class="t-btn" data-fid="reader">Reader view</button>
+    <button class="t-btn" data-dismiss-target="#export-menu" data-fid="exports">Export ▾</button>
+    <button class="t-btn" data-fid="revise-desk">Revision desk</button>
+    <div class="findbar"><input class="search" placeholder="Find in script…"><span data-fid="finding-summary">3 findings in scene 2–3</span></div>
+    <div class="dismissable" id="export-menu" style="position:absolute;left:210px;top:40px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.06);min-width:190px">
+     <button class="rail-item">Fountain (.fountain)</button><button class="rail-item">Final Draft (.fdx)</button>
+     <button class="rail-item">Plain text (.txt)</button><button class="rail-item">Print / PDF</button>
+     <button class="rail-item">Backup (.zip)</button></div>
+   </div>
+   <div style="display:flex;flex:1;min-height:0">
+    <aside class="struc">
+     <div class="rail-h">Scenes</div>
+     <button class="scene-it"><span class="no">1</span>INT. APARTMENT — NIGHT</button>
+     <button class="scene-it active"><span class="no">2</span>INT. STAIRWELL — CONT.</button>
+     <button class="scene-it"><span class="no">3</span>INT. WRITER'S ROOM — DAWN</button>
+     <div class="rail-h">Characters</div>
+     <div><span class="char-chip">MARA</span><span class="char-chip">DEV</span><span class="char-chip">SAMEER</span></div>
+     <div class="rail-h">Margin notes</div>
+     <p class="margnote"><b>spelled twice?</b> — exit line lands again at window</p>
+     <p class="margnote">key prop introduced S1, pays off S3 ✓</p>
+     <div class="rail-h">Tools</div>
+     <button class="rail-item" data-fid="stash">Stash <span class="count">2</span></button>
+     <button class="rail-item" data-fid="beatboard">Beat board</button>
+     <button class="rail-item" data-fid="compare">Compare drafts</button>
+    </aside>
+    <div class="scriptwrap"><article class="script">
+     <p class="s-h">1 INT. APARTMENT — NIGHT</p>
+     <p class="s-act">A desk lamp. MARA types three words, deletes them. The radiator ticks like a clock that owes her money.</p>
+     <p class="s-char">MARA</p><p class="s-paren">(to no one)</p><p class="s-dial">Last line. Last line. Last—</p>
+     <p class="s-h">2 INT. STAIRWELL — CONTINUOUS</p>
+     <p class="s-act">DEV takes the steps two at a time, a paper bag of oranges clutched like evidence.</p>
+     <p class="s-char">DEV</p><p class="s-dial">You said nine. It's nine-oh-two and I'm the one apologizing.</p>
+     <p class="s-h">3 INT. WRITER'S ROOM — DAWN</p>
+     <p class="s-act">Grey light. The page reads: SHE KEPT THE KEY. Mara sets it on the sill beside a dead plant.</p>
+    </article></div>
+   </div>
+   <div class="toolbar" style="border-top:1px solid var(--line);border-bottom:none" data-fid="draft-bar">
+    <select class="sel"><option>Draft 3</option><option>Draft 2</option></select>
+    <button class="t-btn">⤒ Upload .pdf/.fdx/.txt/.fountain/.md</button>
+    <span class="crumb">saved 12s ago · autosave on</span>
+   </div>
+  </section>
+
+  <!-- CO-WRITE (paper-desk signature: script stays visible beside the chat) -->
+  <section class="panel" data-room-panel="cowrite">
+   <aside style="width:300px;flex:none;border-right:1px solid var(--line);overflow-y:auto"
+          data-fid="context-script">
+    <div class="rail-h" style="padding-left:14px">Scene 3 · what Sameer reads</div>
+    <div class="scriptwrap" style="padding:12px 16px"><article class="script" style="padding:22px 24px;font-size:11.5px">
+     <p class="s-h">3 INT. WRITER'S ROOM — DAWN</p>
+     <p class="s-act">Grey light. SHE KEPT THE KEY. Mara sets it on the sill beside a dead plant.</p>
+     <p class="s-char">MARA</p><p class="s-dial">I kept the key.</p>
+     <p class="s-act" style="opacity:.6">(She doesn't look back.)</p>
+    </article></div>
+    <button class="quote-card on" data-fid="quote-card" style="margin:0 16px 12px;width:auto;align-self:auto">
+     ✂ quoted: “I kept the key.” — S3</button>
+   </aside>
+   <div class="cowrite">
+    <div class="partner" data-fid="partner-card">
+     <span class="avatar">S</span>
+     <div><p class="p-name">Sameer</p><p class="p-sub">craft partner · reads scene 3 now</p></div>
+     <div class="lens" data-fid="persona-lens">
+      <button aria-pressed="true">Craft</button><button aria-pressed="false">Doctor</button><button aria-pressed="false">Line-by-line</button>
+     </div>
+     <button class="icon-btn" data-fid="reset-persona" title="Reset persona"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+     <button class="t-btn" data-fid="sams-notes">Sam's notes</button>
+     <button class="icon-btn" data-fid="clear-chat" title="Clear conversation"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2m-8 0l1 13h8l1-13"/></svg></button>
+    </div>
+    <div class="thread">
+     <div class="msg user">Does the dawn scene earn its ending?</div>
+     <div class="msg ai">It does — if you trust the key. Right now you state the feeling twice.<span class="grounded">✓ grounded · Scene 3 — INT. WRITER'S ROOM - DAWN</span></div>
+     <div class="hist-pop" data-fid="chat-history">↑ earlier 14 messages</div>
+    </div>
+    <div class="composer-zone cowrite" data-fid="composer">
+     <div class="explore-rail" data-fid="explore-rail" aria-label="Explore paths">
+      <button class="rail-btn" data-q="Punch up Mara's exit line."><svg class="i" viewBox="0 0 24 24"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg><span>Punch up exit</span></button>
+      <button class="rail-btn" data-q="What does Dev want in this scene?"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 10a3 3 0 1 1 4 2.8c-.8.4-1 .9-1 1.7"/><path d="M12 17.5v.1"/></svg><span>Dev's want</span></button>
+      <button class="rail-btn" data-q="Beat check for act two."><svg class="i" viewBox="0 0 24 24"><path d="M4 19h16M6 15l4-6 3 3 5-7"/></svg><span>Beat check</span></button>
+      <button class="rail-btn restore" title="Show explore chips again"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>Restore chips</span></button>
+     </div>
+     <div class="composer">
+      <div class="chips" data-fid="explore-chips" aria-label="One tap, Sameer runs with it">
+       <button class="chip" data-q="Punch up Mara's exit line.">Punch up Mara's exit</button>
+       <button class="chip" data-q="What does Dev want in this scene?">What does Dev want?</button>
+       <button class="chip" data-q="Where does scene 3 slow down?">Where's it slow?</button>
+      </div>
+      <label class="c-label" for="ta-pd">Ask Sameer — Enter sends · Shift+Enter new line</label>
+      <textarea id="ta-pd" class="ta" rows="2" placeholder="Two lines fit fine now…"></textarea>
+      <div class="send-row">
+       <span class="hist-pop">↑ history</span>
+       <button class="send">Send<kbd style="border-color:rgba(255,255,255,.35);background:transparent;color:#fff">⏎</kbd></button>
+      </div>
+     </div>
+    </div>
+   </div>
+  </section>
+
+  <!-- FEEDBACK (R1/R5: first-class reading room) -->
+  <section class="panel" data-room-panel="feedback">
+   <div class="fb-head" data-fid="feedback-controls">
+    <select class="sel" data-fid="report-language"><option>English</option><option>हिन्दी</option><option>తెలుగు</option><option>தமிழ்</option><option>Español</option></select>
+    <button class="btn-pri" data-fid="run-analysis"><svg class="i" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9z"/></svg>Run analysis</button>
+    <button class="btn-ghost" data-fid="reparse">Re-parse</button>
+    <button class="btn-ghost" data-fid="retry-failed">Retry failed</button>
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto" data-fid="progress">
+     <span class="crumb">done · 41s</span><div class="progress" title="parse → craft → continuity → verify"><i style="width:100%"></i></div>
+     <span class="v-tag ok">verified</span>
+    </div>
+   </div>
+   <nav class="tabs">
+    <button class="tab" data-tab-for="fb-report" aria-selected="true">Report</button>
+    <button class="tab" data-tab-for="fb-queue" aria-selected="false">Fix queue <span class="count">4</span></button>
+   </nav>
+   <div class="fb-body tabpane" id="fb-report">
+    <div class="verdict" data-fid="verdict">
+     <span class="score">7.4<small>/10</small></span>
+     <div class="meta"><strong>Draft 3 vs Draft 2 — up 0.6</strong><span>Confidence: high · 12 findings · grounded on 3/3 scenes</span></div>
+     <span class="v-tag">feature · 108 pages</span>
+     <button class="btn-ghost" data-fid="export-report" style="margin-left:auto">Export .md</button>
+    </div>
+    <section class="cat"><h3>Craft &amp; structure<span class="c-score">7.8</span></h3>
+     <div class="note"><span class="sev med"></span><div>Mara's exit line lands twice — subtext at the window, then spelled out to Dev. Keep the first.
+      <div class="n-meta"><button class="jump">→ Scene 3</button><span class="verify">✓ evidence: “I kept the key.”</span></div></div></div>
+     <div class="note"><span class="sev low"></span><div>Act I turns 4 pages later than the midpoint math suggests.
+      <div class="n-meta"><button class="jump">→ Scene 2</button><span class="verify">✓ beats: setup / turn / payoff</span></div></div></div>
+    </section>
+    <section class="cat"><h3>Continuity<span class="c-score">6.9</span></h3>
+     <div class="note"><span class="sev high"></span><div>The oranges appear in Dev's hands in S2 but the bag is gone before he sets anything down.
+      <div class="n-meta"><button class="jump">→ Scenes 2–3</button><span class="verify">✓ prop ledger: paper bag ×1</span></div></div></div>
+    </section>
+    <section class="cat"><h3>Dialogue<span class="c-score">7.5</span></h3>
+     <div class="note"><span class="sev med"></span><div>Dev apologizes in two consecutive beats — vary one entrance to keep the asymmetry that makes him funny.
+      <div class="n-meta"><button class="jump">→ Scene 2</button><span class="verify">✓ both entrances quoted in notes</span></div></div></div>
+    </section>
+   </div>
+   <div class="fb-body tabpane hidden" id="fb-queue">
+    <div class="verdict" style="padding:14px 20px"><strong>Triage the findings — apply, or send them out.</strong>
+     <button class="btn-ghost" data-fid="export-report" style="margin-left:auto">Export .md</button></div>
+    <div class="cat">
+     <div class="queue-row"><span class="sev high"></span><div style="flex:1">Fix orange-bag continuity across S2→S3</div><span class="q-status q-applied">applied</span></div>
+     <div class="queue-row"><span class="sev med"></span><div style="flex:1">Cut repeated exit line (keep window version)</div><span class="q-status q-open">open</span></div>
+     <div class="queue-row"><span class="sev med"></span><div style="flex:1">Vary Dev's second apology entrance</div><span class="q-status q-open">open</span></div>
+     <div class="queue-row"><span class="sev low"></span><div style="flex:1">Nudge Act I turn earlier by ~4 pages</div><span class="q-status q-open">skipped</span></div>
+    </div>
+   </div>
+  </section>
+ </div>
+</div>
+<footer class="statusbar" data-fid="status-strip">
+ <span data-fid="model-chip">● demo craft model · connected</span><span>tok/s 38</span>
+ <span>sprint 24:13</span><span>elapsed 1:02:47</span><span class="grow"></span>
+ <button class="icon-btn" data-fid="dawn-toggle" title="Dawn light" style="width:26px;height:26px"><svg class="i" viewBox="0 0 24 24"><path d="M17 18a5 5 0 0 0-10 0M12 9V3M4 22h16m-2-8l1.5-1.5M6 14l-1.5-1.5"/></svg></button>
+</footer>
+<div class="checklist"><b>R1</b> upload lands here, Run analysis primary ✓ · <b>R2</b> export menu + ideas flyout close on outside click/Esc ✓ ·
+<b>R3</b> chips → rail after first send (send something) ✓ · <b>R4</b> composer autogrows to 40vh ✓ · <b>R5</b> feedback = full room, queue peer tab ✓<br>
+fids present: new-project ideas shelf library home branch undo redo premise focus reader exports revise-desk finding-summary stash beatboard compare draft-bar upload partner-card persona-lens reset-persona sams-notes clear-chat quote-card chat-history explore-chips explore-rail composer context-script report-language run-analysis reparse retry-failed progress tabs verdict categories notes jump verify export-report queue status-strip model-chip metrics dawn-toggle settings palette modals(rewrite fork samnotes)</div>
+
+<div class="modal-back" id="settings"><div class="modal"><h2>Settings</h2>
+ <div class="f-row"><label for="s-url">llama-server URL</label><input id="s-url" value="http://127.0.0.1:8080"></div>
+ <div class="f-row"><label for="s-timeout">Request timeout (s)</label><input id="s-timeout" value="120"></div>
+ <div class="f-row"><label for="s-fast">Fast model (chat turns)</label><input id="s-fast" value="demo craft model"></div>
+ <button class="btn-pri" data-close>Done</button></div></div>
+<div class="modal-back" id="palette"><div class="modal"><h2>Command palette</h2>
+ <input class="search" style="width:100%" placeholder="Type a command… rooms, export, compare, run analysis">
+ <p class="crumb" style="margin-top:10px">Esc closes · everything keyboard-first</p></div></div>
+<script src="shared/app.js"></script>
+</body></html>

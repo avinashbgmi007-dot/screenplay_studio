@@ -1,0 +1,201 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio v2 — 2 · Spotlight Stage</title>
+<link rel="stylesheet" href="shared/base.css">
+<style>
+/* spotlight-stage: house lights down, tungsten up */
+:root{--bg:#12121f;--surface:#1b1b30;--surface2:#232338;--ink:#f3efe6;--muted:#a09cb4;
+--line:#2e2e48;--accent:#e8b33d;--on-accent:#241c05;--script-ink:#ece7da;
+--font-display:Georgia,serif}
+body{background:radial-gradient(1200px 500px at 50% -10%,#26264a00 0%,transparent),var(--bg)}
+.topbar{background:#17172a}.rail,.struc{background:#17172a}
+.room-btn[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.rooms{background:#10101c}
+.script{background:#15151f;border-color:#34345a;--paper:#15151f}
+.s-h{color:var(--accent)}
+.msg.ai{background:#20203a;border-color:#34345a}
+.chip{background:#20203a;border-color:#34345a;color:#cfcbe2}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.ta{background:#10101c;border-color:#34345a;color:var(--ink)}
+textarea.ta::placeholder{color:#7b7794}
+.send,.btn-pri{background:var(--accent);color:var(--on-accent)}
+.btn-ghost{border-color:#3a3a5e;color:#d8d4ea}.btn-ghost:hover{background:#22223c}
+.cat,.verdict,.modal{background:var(--surface)}
+.score{color:var(--accent)}
+.v-tag{background:#26263e;color:#bdb8d6}
+.sev.high{background:#ff7d7d}.sev.med{background:#ffc861}.sev.low{background:#7ddba4}
+.verify{color:#8fd9ab}.q-applied{color:#8fd9ab;border-color:#3f7a58}
+/* signature: sprocket rail */
+.frame{flex-direction:row-reverse}
+.rail{width:76px;padding:14px 10px;gap:10px;align-items:center;border-right:none;border-left:none;
+ background:repeating-linear-gradient(180deg,#17172a 0 26px,#131322 26px 30px)}
+.rail .sprocket-btn{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;
+ justify-content:center;color:var(--muted);border:1px solid #34345a;background:#181828;
+ flex-direction:column;gap:3px;font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+.rail .sprocket-btn[aria-selected="true"]{color:var(--on-accent);background:var(--accent);
+ border-color:var(--accent);box-shadow:0 0 22px rgba(232,179,61,.35)}
+.rail-item{justify-content:center}.rail-h,.crumb,.hist-pop{display:none}
+/* scenes as film frames */
+.frames-strip{display:flex;gap:14px;padding:16px 20px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.frame-card{min-width:210px;background:#181828;border:1px solid #34345a;border-radius:10px;padding:10px 12px;
+ font-family:var(--font-mono);font-size:11px;color:#bdb8d6;cursor:pointer}
+.frame-card.active{border-color:var(--accent);box-shadow:0 0 18px rgba(232,179,61,.25)}
+.frame-card b{display:block;font-family:var(--font-ui);font-size:12px;color:var(--ink);
+ margin-bottom:4px;letter-spacing:.02em}
+.frame-card .holes{height:6px;margin:-2px -4px 8px;background:repeating-linear-gradient(90deg,
+ transparent 0 10px,#10101c 10px 16px)}
+</style></head>
+<body data-default-room="desk">
+<header class="topbar">
+ <span class="brand" style="color:var(--accent)">✦ Screenplay Studio</span>
+ <span class="dot-conn" style="background:#7ddba4"></span>
+ <nav class="rooms" aria-label="Rooms">
+  <button class="room-btn" data-room-btn="desk">Desk</button>
+  <button class="room-btn" data-room-btn="cowrite">Co-write</button>
+  <button class="room-btn" data-room-btn="feedback">Feedback</button>
+ </nav>
+ <div class="top-actions">
+  <button class="btn-ghost" style="min-height:32px;padding:5px 12px" data-fid="new-project">New</button>
+  <button class="icon-btn" data-modal="settings" data-fid="settings" title="Settings">⚙</button>
+ </div>
+</header>
+<div class="frame">
+ <aside class="rail">
+  <button class="sprocket-btn" data-room-btn="desk" aria-selected="true">▤<span>desk</span></button>
+  <button class="sprocket-btn" data-room-btn="cowrite">✎<span>write</span></button>
+  <button class="sprocket-btn" data-room-btn="feedback">◉<span>notes</span></button>
+  <div style="flex:1"></div>
+  <button class="icon-btn" data-fid="library" title="Library">☰</button>
+  <button class="icon-btn" data-fid="shelf" title="On the shelf">⌸</button>
+  <button class="icon-btn" data-fid="dawn-toggle" title="House lights">☀</button>
+ </aside>
+ <div class="main">
+  <div class="projbar" style="background:#17172a">
+   <span class="proj-title">The Late Hour</span><span class="crumb" style="color:#8f8aa8">feature · Draft 3 · night shoot</span>
+   <select class="sel sel" data-fid="branch" style="margin-left:auto;background:#10101c;border-color:#34345a;color:var(--ink)"><option>Draft 3</option><option>Draft 2</option></select>
+   <kbd>Ctrl K</kbd>
+  </div>
+
+  <!-- DESK: dailies strip + script -->
+  <section class="panel on" data-room-panel="desk">
+   <div class="frames-strip" data-fid="scenes-strip">
+    <button class="frame-card"><span class="holes"></span><b>S1 · INT. APARTMENT — NIGHT</b>mara types · key introduced</button>
+    <button class="frame-card active"><span class="holes"></span><b>S2 · INT. STAIRWELL — CONT.</b>dev arrives · oranges prop</button>
+    <button class="frame-card"><span class="holes"></span><b>S3 · INT. WRITER'S ROOM — DAWN</b>key pays off · act break</button>
+    <button class="frame-card" data-fid="beatboard"><span class="holes"></span><b>+ Beat board</b></button>
+    <button class="frame-card" data-fid="compare"><span class="holes"></span><b>⇄ Compare drafts</b></button>
+    <button class="frame-card" data-fid="revise-desk"><span class="holes"></span><b>✂ Revision desk</b></button>
+   </div>
+   <div class="toolbar" style="background:#17172a">
+    <button class="t-btn" data-fid="undo" style="color:#bdb8d6">↶</button><button class="t-btn" data-fid="redo" style="color:#bdb8d6">↷</button>
+    <button class="t-btn" data-fid="premise">Premise</button><button class="t-btn" data-fid="focus">Focus</button>
+    <button class="t-btn" data-fid="reader">Reader</button>
+    <button class="t-btn" data-dismiss-target="#exp-menu" data-fid="exports">Export ▾</button>
+    <div class="findbar"><input class="search" placeholder="Find…" style="background:#10101c;border-color:#34345a;color:var(--ink)"><span data-fid="finding-summary" style="color:#8f8aa8">3 findings S2–S3</span></div>
+    <div class="dismissable" id="exp-menu" style="position:absolute;left:250px;top:40px;z-index:20;background:#20203a;border:1px solid #34345a;border-radius:10px;padding:6px;min-width:190px;box-shadow:0 14px 40px rgba(0,0,0,.5)">
+     <button class="rail-item" style="color:#d8d4ea">Fountain (.fountain)</button><button class="rail-item" style="color:#d8d4ea">Final Draft (.fdx)</button>
+     <button class="rail-item" style="color:#d8d4ea">Plain text (.txt)</button><button class="rail-item" style="color:#d8d4ea">Print / PDF</button>
+     <button class="rail-item" style="color:#d8d4ea">Backup (.zip)</button></div>
+   </div>
+   <div style="display:flex;flex:1;min-height:0">
+    <div class="scriptwrap" style="padding:22px"><article class="script">
+     <p class="s-h">2 INT. STAIRWELL — CONTINUOUS</p>
+     <p class="s-act">DEV takes the steps two at a time, a paper bag of oranges clutched like evidence.</p>
+     <p class="s-char">DEV</p><p class="s-dial">You said nine. It's nine-oh-two and I'm the one apologizing.</p>
+     <p class="s-h">3 INT. WRITER'S ROOM — DAWN</p>
+     <p class="s-act">Grey light. SHE KEPT THE KEY. Mara sets it on the sill beside a dead plant.</p>
+     <p class="s-char">MARA</p><p class="s-dial">I kept the key.</p>
+    </article></div>
+    <aside class="struc" style="width:220px;border-right:none;border-left:1px solid var(--line)">
+     <div class="rail-h" style="color:#8f8aa8">Characters</div>
+     <div><span class="char-chip" style="background:#20203a;border-color:#34345a;color:#d8d4ea">MARA</span>
+      <span class="char-chip" style="background:#20203a;border-color:#34345a;color:#d8d4ea">DEV</span></div>
+     <div class="rail-h" style="color:#8f8aa8">Margin notes</div>
+     <p class="margnote" style="color:#cbb27e;border-color:var(--accent)">exit line lands twice — cut the second</p>
+     <div class="rail-h" style="color:#8f8aa8">Stash</div>
+     <button class="rail-item" style="color:#bdb8d6" data-fid="stash">Cut lines <span class="count">2</span></button>
+    </aside>
+   </div>
+  </section>
+
+  <!-- CO-WRITE: subtitle cards -->
+  <section class="panel" data-room-panel="cowrite">
+   <div class="cowrite">
+    <div class="partner" style="background:#17172a">
+     <span class="avatar" style="background:#e8b33d;color:#241c05;border-radius:12px">S</span>
+     <div><p class="p-name">Sameer</p><p class="p-sub">on set · reading scene 3</p></div>
+     <div class="lens" data-fid="persona-lens" style="background:#10101c">
+      <button aria-pressed="true">Craft</button><button aria-pressed="false">Doctor</button><button aria-pressed="false">Line-by-line</button></div>
+     <button class="t-btn" data-fid="reset-persona" style="color:#bdb8d6">Reset</button>
+     <button class="t-btn" data-fid="sams-notes" style="color:#bdb8d6">Sam's notes</button>
+     <button class="icon-btn" data-fid="clear-chat" title="Clear" style="color:#bdb8d6">⌫</button>
+    </div>
+    <div class="thread">
+     <div class="msg user" style="background:#e8b33d;color:#241c05">Does the dawn scene earn its ending?</div>
+     <div class="msg ai">It does — if you trust the key. You state the feeling twice.<span class="grounded" style="border-color:#34345a;color:#8f8aa8">✓ grounded · S3 — INT. WRITER'S ROOM - DAWN</span></div>
+    </div>
+    <div class="composer-zone cowrite" style="background:#17172a">
+     <div class="explore-rail" style="background:#10101c">
+      <button class="rail-btn" style="color:#bdb8d6" data-q="Punch up Mara's exit line.">⚡<span>Punch up exit</span></button>
+      <button class="rail-btn" style="color:#bdb8d6" data-q="What does Dev want?"><span style="font-size:15px">?</span><span>Dev's want</span></button>
+      <button class="rail-btn restore" title="Restore chips" style="color:#bdb8d6">···<span>Restore chips</span></button>
+     </div>
+     <div class="composer">
+      <div class="chips">
+       <button class="chip" data-q="Punch up Mara's exit line.">Punch up Mara's exit</button>
+       <button class="chip" data-q="What does Dev want in this scene?">What does Dev want?</button>
+       <button class="chip" data-q="Where does scene 3 slow down?">Where's it slow?</button></div>
+      <label class="c-label" for="ta-ss" style="color:#8f8aa8">Ask Sameer — Enter sends · Shift+Enter new line</label>
+      <textarea id="ta-ss" class="ta" rows="2"></textarea>
+      <div class="send-row"><button class="send">Action!</button></div>
+     </div>
+    </div>
+   </div>
+  </section>
+
+  <!-- FEEDBACK: dailies review -->
+  <section class="panel" data-room-panel="feedback">
+   <div class="fb-head" style="background:#17172a">
+    <select class="sel" style="background:#10101c;border-color:#34345a;color:var(--ink)"><option>English</option><option>हिन्दी</option><option>తెలుగు</option></select>
+    <button class="btn-pri">▶ Run analysis</button>
+    <button class="btn-ghost">Re-parse</button><button class="btn-ghost">Retry failed</button>
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+     <span class="crumb" style="color:#8f8aa8;display:block">done · 41s</span>
+     <div class="progress" style="background:#26263e"><i style="width:100%;background:#e8b33d"></i></div>
+     <span class="v-tag">verified</span></div>
+   </div>
+   <nav class="tabs" style="background:#17172a;border-color:#2e2e48">
+    <button class="tab" data-tab-for="r2-rep" aria-selected="true" style="color:#bdb8d6">Report</button>
+    <button class="tab" data-tab-for="r2-q" aria-selected="false" style="color:#bdb8d6">Fix queue · 4</button>
+   </nav>
+   <div class="fb-body tabpane" id="r2-rep">
+    <div class="verdict"><span class="score">7.4<small>/10</small></span>
+     <div class="meta"><strong style="color:var(--ink)">Draft 3 vs Draft 2 — up 0.6</strong><span>Confidence high · grounded 3/3 scenes</span></div>
+     <button class="btn-ghost" style="margin-left:auto">Export .md</button></div>
+    <section class="cat"><h3>Craft &amp; structure<span class="c-score" style="color:#8f8aa8">7.8</span></h3>
+     <div class="note" style="border-color:#34345a"><span class="sev med"></span><div>Exit line lands twice — keep the window subtext, cut the rest.
+      <div class="n-meta"><button class="jump" style="color:var(--accent)">→ Scene 3</button><span class="verify">✓ “I kept the key.”</span></div></div></div></section>
+    <section class="cat"><h3>Continuity<span class="c-score" style="color:#8f8aa8">6.9</span></h3>
+     <div class="note" style="border-color:#34345a"><span class="sev high"></span><div>Orange bag vanishes between S2 and S3.
+      <div class="n-meta"><button class="jump" style="color:var(--accent)">→ Scenes 2–3</button><span class="verify">✓ prop ledger ×1</span></div></div></div></section>
+   </div>
+   <div class="fb-body tabpane hidden" id="r2-q">
+    <div class="cat">
+     <div class="queue-row" style="border-color:#34345a"><div style="flex:1">Fix orange-bag continuity</div><span class="q-status q-applied">applied</span></div>
+     <div class="queue-row" style="border-color:#34345a"><div style="flex:1">Cut repeated exit line</div><span class="q-status q-open">open</span></div>
+     <div class="queue-row" style="border-color:#34345a"><div style="flex:1">Vary Dev's second apology</div><span class="q-status q-open">open</span></div>
+     <div class="queue-row" style="border-color:#34345a"><div style="flex:1">Nudge Act I turn earlier</div><span class="q-status q-open">skipped</span></div></div>
+   </div>
+  </section>
+ </div>
+</div>
+<footer class="statusbar" style="background:#17172a;border-color:#2e2e48">
+ <span>● demo craft model · connected</span><span>tok/s 38</span><span>sprint 24:13</span>
+ <span class="grow"></span><kbd>Ctrl K</kbd> palette
+</footer>
+<div class="checklist" style="background:#10101c;border-color:#2e2e48"><b>R1–R5 all verified here:</b> feedback is a full room (R5) with Run analysis primary (R1); export menu closes on outside click/Esc (R2); send once to see chips collapse to the sprocket rail with hover/focus labels (R3); composer autogrows to 40vh (R4). Signature: scenes as film frames on a sprocket rail; house-lights via ☀.</div>
+<div class="modal-back" id="settings"><div class="modal"><h2>Settings</h2>
+ <div class="f-row"><label for="ss-u">llama-server URL</label><input id="ss-u" value="http://127.0.0.1:8080"></div>
+ <button class="btn-pri" data-close>Done</button></div></div>
+<script src="shared/app.js"></script>
+</body></html>

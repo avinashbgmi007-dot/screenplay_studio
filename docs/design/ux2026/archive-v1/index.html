@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio UX v2 — Six Directions</title>
+<link rel="stylesheet" href="shared/base.css">
+<style>
+body{background:#f7f6f3}
+.hub{max-width:1180px;margin:0 auto;padding:40px 28px 80px}
+.hub h1{font-size:30px;letter-spacing:-.02em;margin:0 0 6px;font-weight:800}
+.hub .lede{color:var(--muted);margin:0 0 30px;line-height:1.6;max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;
+ gap:10px;text-decoration:none;color:inherit;transition:transform .16s ease,box-shadow .16s ease}
+.card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(20,20,20,.09)}
+.swatch{height:64px;border-radius:9px;display:flex;align-items:flex-end;padding:10px;border:1px solid rgba(0,0,0,.06)}
+.swatch b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.card h2{margin:2px 0 0;font-size:17px}
+.card p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.sig{font-size:12px;color:var(--ink)}
+.sig b{color:var(--accent)}
+.open-hint{font-size:11px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-top:auto}
+.review{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:26px}
+.review h3{margin:0 0 8px}
+.review li{line-height:1.7;font-size:13.5px;color:#333}
+.planlink{display:inline-block;margin-top:22px;font-size:13px;color:var(--accent)}
+</style></head>
+<body><div class="hub">
+ <h1>Studio UX v2 — six directions</h1>
+ <p class="lede">Six contrasting, fully interactive static designs for the redesigned studio. All six carry the same
+ feature inventory and obey the same shell contract — three real rooms (Desk · Co-write · Feedback), feedback as a
+ first-class room, Sameer dismisses outside-click/Esc everywhere, explore-chips collapse to a rail after your first
+ message, and a composer that autogrows. Pick one identity; its placeholder map ships with it.</p>
+ <div class="grid">
+  <a class="card" href="paper-desk.html"><div class="swatch" style="background:#FBFAF7;color:#2F3437"><b>cream · amber · oxblood</b></div>
+   <h2>1 · Paper Desk</h2><p>The writer's warm desk. Manuscript margins, proofread marks, Georgia display. Calm, flat, hairline borders.</p>
+   <p class="sig"><b>Signature:</b> margin annotations in proofreader's language</p><span class="open-hint">Open →</span></a>
+  <a class="card" href="spotlight-stage.html"><div class="swatch" style="background:#12121F;color:#E8B33D"><b>tungsten on indigo-charcoal</b></div>
+   <h2>2 · Spotlight Stage</h2><p>The screening room. Your scenes play as film frames on a sprocket rail; house lights dim when Sameer talks.</p>
+   <p class="sig"><b>Signature:</b> film-frame scene rail + dimming house lights</p><span class="open-hint">Open →</span></a>
+  <a class="card" href="console-dark.html"><div class="swatch" style="background:#0D1117;color:#39d353"><b>slate · phosphor cyan/green</b></div>
+   <h2>3 · Console Dark</h2><p>A production console. Dense mono labels, stat blocks, keyboard-first — the studio as a call-sheet terminal.</p>
+   <p class="sig"><b>Signature:</b> everything reads like a production terminal; keys hinted everywhere</p><span class="open-hint">Open →</span></a>
+  <a class="card" href="atlas-grid.html"><div class="swatch" style="background:#F6F7F9;color:#6D28D9"><b>light bento · electric violet</b></div>
+   <h2>4 · Atlas Grid</h2><p>Bento product console. The whole studio is an asymmetric tile grid; the feedback score is the hero tile.</p>
+   <p class="sig"><b>Signature:</b> score-as-hero-tile bento with violet single accent</p><span class="open-hint">Open →</span></a>
+  <a class="card" href="splitline.html"><div class="swatch" style="background:linear-gradient(90deg,#faf7f2 49.5%,#d92d20 49.5%,#d92d20 50.5%,#f5f7fa 50.5%);color:#141414"><b>warm half ∥ cool half</b></div>
+   <h2>5 · Splitline</h2><p>The literal two-room thesis: co-write and feedback share the screen as equal halves around a red seam.</p>
+   <p class="sig"><b>Signature:</b> the seam + mirrored room headers</p><span class="open-hint">Open →</span></a>
+  <a class="card" href="margins.html"><div class="swatch" style="background:#fff;color:#111;border-bottom:3px double #111"><b>cobalt & black · Didot display</b></div>
+   <h2>6 · Margins</h2><p>Editorial magazine. Feedback is typeset as “The Notes Issue” — masthead, kickers, drop caps, folios.</p>
+   <p class="sig"><b>Signature:</b> the report as a cover story you read top-to-bottom</p><span class="open-hint">Open →</span></a>
+ </div>
+ <div class="review"><h3>How to review each page (2 minutes)</h3>
+  <ol><li><b>R1/R5 — feedback first?</b> Upload-finished lands you in a full Feedback room; Run analysis / verdict are primary, never a corner pane.</li>
+  <li><b>R2 — click away:</b> open Export ▾ or Sameer's card, then click elsewhere or press Esc — it dismisses everywhere.</li>
+  <li><b>R3 — send one message:</b> explore chips collapse to a hover/focus rail; “···” restores them.</li>
+  <li><b>R4 — type three lines:</b> the composer autogrows to ~40vh then scrolls internally; Enter sends (demo reply streams word-by-word).</li>
+  <li><b>Ctrl+K</b> opens the command palette stub; ⚙ opens Settings; tabs switch Report ↔ Fix queue.</li></ol></div>
+ <a class="planlink" href="../../../superpowers/plans/2026-08-26-studio-ux-v2-redesign.md">Implementation plan & critique → docs/superpowers/plans/2026-08-26-studio-ux-v2-redesign.md</a>
+</div>
+<script src="shared/app.js"></script></body></html>

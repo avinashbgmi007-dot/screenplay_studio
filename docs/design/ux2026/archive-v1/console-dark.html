@@ -1,0 +1,143 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio v2 — 3 · Console Dark</title>
+<link rel="stylesheet" href="shared/base.css">
+<style>
+/* console-dark: call-sheet terminal. mono labels, phosphor accents, kbd-first */
+:root{--bg:#0d1117;--surface:#131a23;--surface2:#1a2330;--ink:#dbe4ee;--muted:#7d8b9d;
+--line:#223041;--accent:#39c5a3;--on-accent:#06231b;--script-ink:#cfd9e4;
+--font-ui:'Segoe UI',system-ui,sans-serif;--font-mono:ui-monospace,'Cascadia Mono',Consolas,monospace}
+.topbar,.rail,.struc,.partner,.composer-zone,.tabs,.statusbar,.projbar,.toolbar{background:var(--surface)}
+.brand{font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.14em;font-size:12.5px}
+.rooms{background:#0a0f15}.room-btn[aria-selected="true"]{background:var(--accent);color:var(--on-accent);box-shadow:none}
+.script{--paper:#10161e;border-color:#223041;border-radius:6px;box-shadow:none}
+.s-h{color:var(--accent)}
+.cat,.verdict,.modal{background:var(--surface);border-radius:6px}
+.score{color:var(--accent)}
+.v-tag{border-radius:4px;background:#16202b;color:#9fb0c3}
+.sev.high{background:#ff6b6b}.sev.med{background:#f5b95f}.sev.low{background:#57c99b}
+.verify{color:#57c99b}.q-applied{color:#57c99b;border-color:#2a5f4a}
+.chip{border-radius:4px;background:#16202b;color:#a9b8ca}
+.ta{background:#0a0f15;border-color:#223041;border-radius:6px;color:var(--ink)}
+.send,.btn-pri{background:var(--accent);color:var(--on-accent);border-radius:6px}
+.btn-ghost{border-radius:6px;border-color:#2c3d51;color:#c3cfdd}
+.rail-item:hover,.t-btn:hover{background:#1a2330}
+kbd{background:#16202b;color:#9fb0c3;border-color:#2c3d51}
+.stat{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.stat b{display:block;font-size:17px;color:var(--ink);font-weight:600}
+</style></head>
+<body data-default-room="feedback">
+<header class="topbar">
+ <span class="brand">screenplay//studio</span><span class="dot-conn" style="background:#57c99b"></span>
+ <nav class="rooms"><button class="room-btn" data-room-btn="desk">desk</button>
+  <button class="room-btn" data-room-btn="cowrite">co_write</button>
+  <button class="room-btn" data-room-btn="feedback">feedback</button></nav>
+ <div class="top-actions"><span class="stat" data-fid="metrics">tok/s <b>38</b> · uptime 1:02</span>
+  <button class="btn-ghost" style="min-height:30px;padding:4px 10px" data-fid="new-project">+ new</button>
+  <button class="icon-btn" data-modal="settings" data-fid="settings" title="Settings">⚙</button></div>
+</header>
+<div class="frame">
+ <aside class="rail">
+  <div class="rail-h">library</div>
+  <button class="rail-item active" data-fid="library" style="color:#c3cfdd">▸ the_late_hour</button>
+  <button class="rail-item" data-fid="shelf" style="color:#7d8b9d">shelf (3)</button>
+  <button class="rail-item" data-dismiss-target="#ideas-fly" data-fid="ideas" style="color:#7d8b9d">idea_room [4]</button>
+  <div class="dismissable" id="ideas-fly" style="background:#131a23;border:1px solid var(--line);border-radius:6px;padding:4px;margin:4px 0">
+   <button class="rail-item" style="color:#a9b8ca">logline_v3</button><button class="rail-item" style="color:#a9b8ca">prequel_beat</button></div>
+  <div style="margin-top:auto" class="stat">draft_3 · 108p<br>autosave ✓ 12s<br><kbd>Ctrl K</kbd> commands</div>
+ </aside>
+ <div class="main">
+  <div class="projbar"><span class="proj-title" style="font-family:var(--font-mono);font-size:14px">the_late_hour.feature</span>
+   <select class="sel" data-fid="branch" style="margin-left:auto;background:#0a0f15;border-color:#223041"><option>draft_3 *</option><option>draft_2</option></select></div>
+
+  <!-- DESK -->
+  <section class="panel on" data-room-panel="desk">
+   <div class="toolbar">
+    <button class="t-btn" data-fid="undo">↶</button><button class="t-btn" data-fid="redo">↷</button>
+    <button class="t-btn" data-fid="premise">premise</button><button class="t-btn" data-fid="focus">focus</button>
+    <button class="t-btn" data-fid="reader">reader</button><button class="t-btn" data-dismiss-target="#xmenu" data-fid="exports">export ▾</button>
+    <button class="t-btn" data-fid="revise-desk">revision_desk</button>
+    <div class="findbar"><input class="search" placeholder="/ find" style="background:#0a0f15;border-color:#223041"><span data-fid="finding-summary">3 findings s2–s3</span></div>
+    <div class="dismissable" id="xmenu" style="position:absolute;left:240px;top:40px;z-index:20;background:#131a23;border:1px solid var(--line);border-radius:6px;padding:4px;min-width:180px">
+     <button class="rail-item">fountain</button><button class="rail-item">final_draft .fdx</button>
+     <button class="rail-item">txt</button><button class="rail-item">print/pdf</button><button class="rail-item">backup.zip</button></div>
+   </div>
+   <div style="display:flex;flex:1;min-height:0">
+    <aside class="struc"><div class="rail-h">scenes</div>
+     <button class="scene-it" style="color:#7d8b9d"><span class="no">01</span>INT. APARTMENT — NIGHT</button>
+     <button class="scene-it active"><span class="no">02</span>INT. STAIRWELL — CONT.</button>
+     <button class="scene-it" style="color:#7d8b9d"><span class="no">03</span>INT. WRITER'S ROOM — DAWN</button>
+     <div class="rail-h">cast</div><div><span class="char-chip" style="background:#16202b;border-radius:4px;color:#a9b8ca">MARA</span><span class="char-chip" style="background:#16202b;border-radius:4px;color:#a9b8ca">DEV</span></div>
+     <div class="rail-h">notes</div><p class="margnote" style="color:#9fb0c3;border-color:var(--accent)">exit line ×2 — cut second</p>
+     <button class="rail-item" data-fid="stash" style="color:#7d8b9d">stash [2]</button>
+     <button class="rail-item" data-fid="beatboard" style="color:#7d8b9d">beat_board</button>
+     <button class="rail-item" data-fid="compare" style="color:#7d8b9d">compare d2↔d3</button></aside>
+    <div class="scriptwrap"><article class="script">
+     <p class="s-h">2 INT. STAIRWELL — CONTINUOUS</p>
+     <p class="s-act">DEV takes the steps two at a time, a paper bag of oranges clutched like evidence.</p>
+     <p class="s-char">DEV</p><p class="s-dial">You said nine. It's nine-oh-two and I'm the one apologizing.</p>
+     <p class="s-h">3 INT. WRITER'S ROOM — DAWN</p>
+     <p class="s-act">Grey light. SHE KEPT THE KEY.</p><p class="s-char">MARA</p><p class="s-dial">I kept the key.</p>
+    </article></div></div>
+   <div class="toolbar" data-fid="draft-bar"><select class="sel" style="background:#0a0f15;border-color:#223041"><option>draft_3</option></select>
+    <button class="t-btn" data-fid="upload">⤒ upload .pdf/.fdx/.txt/.fountain/.md</button><span class="stat">autosave ✓ 12s ago</span></div>
+  </section>
+
+  <!-- CO_WRITE -->
+  <section class="panel" data-room-panel="cowrite">
+   <div class="cowrite">
+    <div class="partner"><span class="avatar" style="background:var(--accent);border-radius:6px">S</span>
+     <div><p class="p-name">sameer</p><p class="p-sub">craft partner · s3</p></div>
+     <div class="lens" style="background:#0a0f15"><button aria-pressed="true">craft</button><button aria-pressed="false">doctor</button><button aria-pressed="false">line_by_line</button></div>
+     <button class="t-btn" data-fid="reset-persona">reset</button><button class="t-btn" data-fid="sams-notes">sam_notes</button>
+     <button class="icon-btn" data-fid="clear-chat">⌫</button></div>
+    <div class="thread">
+     <div class="msg user" style="border-radius:6px">does the dawn scene earn its ending?</div>
+     <div class="msg ai" style="border-radius:6px;font-family:var(--font-mono);font-size:13px">it does — if you trust the key. you state the feeling twice.<span class="grounded" style="color:#57c99b;border-color:#223041">✓ grounded · s3 INT. WRITER'S ROOM - DAWN</span></div></div>
+    <div class="composer-zone cowrite">
+     <div class="explore-rail" style="background:#0a0f15">
+      <button class="rail-btn" data-q="Punch up Mara's exit line." style="color:#a9b8ca">⚡<span>punch_up exit</span></button>
+      <button class="rail-btn" data-q="What does Dev want?" style="color:#a9b8ca">?<span>dev_want</span></button>
+      <button class="rail-btn restore" style="color:#a9b8ca" title="Restore chips">···<span>restore chips</span></button></div>
+     <div class="composer">
+      <div class="chips"><button class="chip" data-q="Punch up Mara's exit line.">punch up mara's exit</button>
+       <button class="chip" data-q="What does Dev want in this scene?">what does dev want?</button>
+       <button class="chip" data-q="Where does scene 3 slow down?">where's it slow?</button></div>
+      <label class="c-label" for="ta-cd" style="color:#7d8b9d">ask sameer — <kbd>⏎</kbd> send · <kbd>⇧⏎</kbd> newline</label>
+      <textarea id="ta-cd" class="ta" rows="2"></textarea>
+      <div class="send-row"><span class="stat">↑ history 14</span><button class="send">send ⏎</button></div></div></div></div>
+  </section>
+
+  <!-- FEEDBACK -->
+  <section class="panel" data-room-panel="feedback">
+   <div class="fb-head"><select class="sel" style="background:#0a0f15;border-color:#223041"><option>en</option><option>hi</option><option>te</option></select>
+    <button class="btn-pri">▶ run_analysis</button><button class="btn-ghost">re_parse</button><button class="btn-ghost">retry_failed</button>
+    <div style="display:flex;align-items:center;gap:10px;margin-left:auto"><span class="stat">done · 41s</span>
+     <div class="progress" style="background:#16202b"><i style="width:100%"></i></div><span class="v-tag">verified ✓</span></div></div>
+   <nav class="tabs"><button class="tab" data-tab-for="c-rep" aria-selected="true">report</button>
+    <button class="tab" data-tab-for="c-q" aria-selected="false">fix_queue [4]</button></nav>
+   <div class="fb-body tabpane" id="c-rep">
+    <div class="verdict"><span class="score">7.4<small>/10</small></span>
+     <div class="meta"><strong>d3 vs d2 ▲0.6</strong><span>confidence HIGH · grounded 3/3 scenes · 12 findings</span></div>
+     <button class="btn-ghost" style="margin-left:auto">export .md</button></div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap" data-fid="stat-tiles">
+     <div class="cat" style="flex:1;min-width:200px"><h3 style="font-family:var(--font-mono);text-transform:uppercase;font-size:12px">craft<span class="c-score">7.8</span></h3>
+      <div class="note" style="border-color:#223041"><span class="sev med"></span><div>exit line lands twice — keep window subtext.
+       <div class="n-meta"><button class="jump" style="color:var(--accent)">→ s3</button><span class="verify">✓ “I kept the key.”</span></div></div></div></div>
+     <div class="cat" style="flex:1;min-width:200px"><h3 style="font-family:var(--font-mono);text-transform:uppercase;font-size:12px">continuity<span class="c-score">6.9</span></h3>
+      <div class="note" style="border-color:#223041"><span class="sev high"></span><div>orange bag vanishes s2→s3.
+       <div class="n-meta"><button class="jump" style="color:var(--accent)">→ s2–s3</button><span class="verify">✓ prop_ledger ×1</span></div></div></div></div></div></div>
+   <div class="fb-body tabpane hidden" id="c-q">
+    <div class="cat">
+     <div class="queue-row" style="border-color:#223041"><div style="flex:1">fix orange-bag continuity</div><span class="q-status q-applied">applied</span></div>
+     <div class="queue-row" style="border-color:#223041"><div style="flex:1">cut repeated exit line</div><span class="q-status q-open">open</span></div>
+     <div class="queue-row" style="border-color:#223041"><div style="flex:1">vary dev's second apology</div><span class="q-status q-open">open</span></div>
+     <div class="queue-row" style="border-color:#223041"><div style="flex:1">act I turn earlier ~4pp</div><span class="q-status q-open">skipped</span></div></div></div>
+  </section></div></div>
+<footer class="statusbar"><span>● demo craft model · connected</span><span>sprint 24:13</span>
+ <span class="grow"></span><kbd>?</kbd> shortcuts · <kbd>Ctrl K</kbd> palette · <kbd>g f</kbd> goto feedback</footer>
+<div class="checklist"><b>R1–R5 verified:</b> run_analysis primary in a full room (R1/R5) · menus close outside/Esc (R2) · chips→rail on first send, hover/focus reveals (R3) · composer autogrows (R4). Signature: call-sheet terminal — mono labels, phosphor accents, keyboard-first hints everywhere.</div>
+<div class="modal-back" id="settings"><div class="modal"><h2>settings</h2>
+ <div class="f-row"><label for="cd-u">llama-server URL</label><input id="cd-u" value="http://127.0.0.1:8080"></div>
+ <button class="btn-pri" data-close>close</button></div></div>
+<script src="shared/app.js"></script></body></html>

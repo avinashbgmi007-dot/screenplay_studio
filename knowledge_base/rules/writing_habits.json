@@ -1,0 +1,69 @@
+[
+  {
+    "id": "cron_story_genius_before_plot",
+    "name": "Know the Protagonist's Inner Problem Before Creating the Plot",
+    "taxonomy_level": "psychology",
+    "category": "planning",
+    "source": {
+      "type": "framework",
+      "originator": "Lisa Cron",
+      "work": "Story Genius"
+    },
+    "definition": "Plot must be created to force the protagonist to deal with a specific internal conflict. The character's pre-existing inner misbelief and desire must be established before the plot is designed, not after.",
+    "detection_signal": "A story where the protagonist's goals and fears appear to be retrofitted to fit the plot rather than the plot arising naturally from the character's internal situation.",
+    "counter_considerations": "Revision-stage analysis may not reveal the planning process. Flag only when the disconnect between character interior and plot mechanics is visible on the page.",
+    "severity_default": "high",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_summaries",
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "controlling_idea"
+    ]
+  },
+  {
+    "id": "cron_dopamine_hook",
+    "name": "Effective Stories Trigger Curiosity-Driven Dopamine Response",
+    "taxonomy_level": "psychology",
+    "category": "reader_engagement",
+    "source": {
+      "type": "framework",
+      "originator": "Lisa Cron",
+      "work": "Story Genius"
+    },
+    "definition": "Readers are biologically hooked not by beautiful prose or dramatic events, but by the intense curiosity an effective story generates. The brain releases dopamine in response to unresolved questions about what will happen to someone facing a difficult problem.",
+    "detection_signal": "Scenes that fail to generate an unanswered question or that resolve tensions too quickly. Openings that establish setting or backstory without creating a specific question the reader needs answered.",
+    "counter_considerations": "Curiosity can be generated through character reveals, moral dilemmas, or mystery, not just cliffhangers. Do not flag atmospheric openings that establish a compelling question.",
+    "severity_default": "medium",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "mystery_foreshadowed_surprises"
+    ]
+  },
+  {
+    "id": "cron_pantsing_myth",
+    "name": "Writing Without a Blueprint Leads to Meandering, Aimless Stories",
+    "taxonomy_level": "psychology",
+    "category": "writing_process",
+    "source": {
+      "type": "framework",
+      "originator": "Lisa Cron",
+      "work": "Story Genius"
+    },
+    "definition": "Writing by the seat of your pants\u00e2\u20ac\u201dwithout knowing the protagonist's internal problem\u00e2\u20ac\u201dalmost always produces a sprawling, episodic manuscript. Creativity needs context; without the past to anchor the present, events feel random and fail to accumulate meaning.",
+    "detection_signal": "Manuscripts that feel episodic, where scenes do not build on each other. Stories that lose momentum around the midpoint. Plots that feel like a series of events rather than a unified arc.",
+    "counter_considerations": "Some natural storytellers can pants successfully, though they often produce sprawling first drafts. Do not flag stories that are clearly structured even if the author claims to have pantsed.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "alderson_cause_and_effect_scenes"
+    ]
+  }
+]

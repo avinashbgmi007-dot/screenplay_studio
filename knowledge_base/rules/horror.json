@@ -1,0 +1,282 @@
+[
+  {
+    "id": "horror_discovery_phase_no_urgency",
+    "name": "Discovery Phase Needs Time to Breathe",
+    "taxonomy_level": "scene",
+    "category": "pacing",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "Scriptshadow/Amber",
+      "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
+    },
+    "definition": "In horror films, there is a 'discovery phase' where characters first enter the haunted/threatened space. This sequence should be milked for maximum anticipation and dread \u00e2\u20ac\u201d it is the one time you do NOT want urgency.",
+    "detection_signal": "Look for scenes where characters first explore a dangerous location (haunted house, alien colony, dark forest). Check if the writer rushes through discovery or allows tension to build through exploration.",
+    "counter_considerations": "If the discovery phase has already been established in a previous act, urgency may be appropriate. High-concept horror that skips straight to the threat may compress this phase intentionally.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "horror_tone_set_immediately"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_tone_set_immediately",
+    "name": "First Page Sets Horror Tone",
+    "taxonomy_level": "story_macro",
+    "category": "tone",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "The first page of a horror script must establish the horror tone. Do not open with comedy or lightheartedness if the film is horror \u00e2\u20ac\u201d the reader's expectations must be calibrated immediately.",
+    "detection_signal": "Check if the opening page/scene contains imagery, language, or events consistent with horror (dread, danger, darkness, threat). Flag if the opening feels tonally mismatched.",
+    "counter_considerations": "Some horror films use tonal dissonance as a deliberate strategy (opening with bright comedy before the horror hits). This is acceptable only if the tonal shift is clearly intentional and thematic.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "horror_discovery_phase_no_urgency"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_reel_event_requirement",
+    "name": "Every Reel Must Have a Horror Payoff",
+    "taxonomy_level": "structure_pacing",
+    "category": "structure",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "At minimum, every reel (approximately 10-15 minute sequence) of a horror film should contain a major horror event \u00e2\u20ac\u201d a death, a transformation, a scare, or a visceral moment. The audience expects regular genre thrills.",
+    "detection_signal": "Divide script into ~8 sequences/reels. Check if each contains at least one significant horror event (death, attack, supernatural manifestation, body horror). Flag reels that are purely conversational with no genre payoff.",
+    "counter_considerations": "Slow-burn horror may concentrate its payoffs in later reels. Psychological horror may substitute a dread-building revelation for a visceral event.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries",
+      "page_estimates"
+    ],
+    "related_rules": [
+      "horror_tone_set_immediately"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_virgin_archetype",
+    "name": "The Virgin Survivor Archetype",
+    "taxonomy_level": "character",
+    "category": "archetype",
+    "source": {
+      "type": "attributed_principle",
+      "originator": "David Hohl",
+      "work": "101 Kick-Ass Screenwriting Tips"
+    },
+    "definition": "Horror scripts should include at least one character who fits the 'virgin' survivor archetype \u00e2\u20ac\u201d someone who is more innocent, cautious, or morally upright than the other characters, and who has a higher likelihood of surviving to the end.",
+    "detection_signal": "Look for a character who is notably more cautious, innocent, or morally principled than the ensemble. Check if this character survives while more reckless characters die.",
+    "counter_considerations": "Modern horror frequently subverts this trope by killing the apparent survivor or by having no survivor at all. The rule is a structural convention, not a requirement.",
+    "severity_default": "low",
+    "confidence_tier": "medium",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "horror_monster_defeat"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_monster_defeat",
+    "name": "Central Struggle Against Monster",
+    "taxonomy_level": "plot_thread",
+    "category": "conflict",
+    "source": {
+      "type": "general_craft",
+      "originator": "Randy Ingermanson",
+      "work": "Writing Fiction for Dummies"
+    },
+    "definition": "The central struggle in horror stories focuses on escaping from and eventually defeating a monster (either human or nonhuman). The protagonist must face an overwhelming threat that threatens their survival.",
+    "detection_signal": "Check if the script establishes a clear monster/threat that the protagonist must escape or defeat. Verify that the threat is genuinely overwhelming and that survival is uncertain.",
+    "counter_considerations": "Some horror films end in defeat or ambiguous resolution. The key is that the central struggle must be about survival against a monstrous threat.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "horror_virgin_archetype"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_stakes_physical_death",
+    "name": "Physical Death at Stake",
+    "taxonomy_level": "plot_thread",
+    "category": "stakes",
+    "source": {
+      "type": "general_craft",
+      "originator": "Randy Ingermanson",
+      "work": "Writing Fiction for Dummies"
+    },
+    "definition": "Horror stories must establish physical death as the primary stake. The protagonist faces mortal danger \u00e2\u20ac\u201d failure means death, not just professional or psychological consequences.",
+    "detection_signal": "Check if the protagonist faces physical death as a consequence of failure. Verify that the threat of death is explicit and present throughout the story.",
+    "counter_considerations": "Some horror films focus on psychological or existential death. The key is that the primary mode of death must be clearly established and consistent.",
+    "severity_default": "high",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "horror_monster_defeat"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_rules_established_early",
+    "name": "Horror World Rules Established Early",
+    "taxonomy_level": "story_macro",
+    "category": "worldbuilding",
+    "source": {
+      "type": "general_craft",
+      "originator": "Angus Fletcher",
+      "work": "Screenwriting 101"
+    },
+    "definition": "The rules of a horror world must be established crisply and clearly at the beginning. These rules provide the context for the audience to appreciate what follows. Once established, audiences will accept even implausible events if they are consistent with the established rules.",
+    "detection_signal": "Check if the first 10-15 pages establish the basic rules of the horror world (what the threat is, how it operates, what the rules of engagement are). Verify that these rules are demonstrated through action, not exposition.",
+    "counter_considerations": "Some horror films gradually reveal world rules for dramatic effect. The key is that the basic rules should be clear early, with advanced rules revealed as the story progresses.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "horror_tone_set_immediately"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_tension_building",
+    "name": "Tension Builds Through Unanswered Questions",
+    "taxonomy_level": "structure_pacing",
+    "category": "tension",
+    "source": {
+      "type": "general_craft",
+      "originator": "James Scott Bell",
+      "work": "Conflict & Suspense"
+    },
+    "definition": "Horror tension builds through unanswered questions and delayed reveals. The audience's imagination fills in the gaps, often creating something more frightening than what could be shown explicitly.",
+    "detection_signal": "Check if the script withholds information from the audience. Look for partial reveals, off-screen events, and suggestions of threat rather than explicit depiction.",
+    "counter_considerations": "Some horror films rely on explicit depiction rather than suggestion. The key is that the tension-building method must be consistent with the film's approach.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "horror_reel_event_requirement"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_atmosphere_over_dialogue",
+    "name": "Atmosphere Over Dialogue",
+    "taxonomy_level": "scene",
+    "category": "scene_craft",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard horror screenwriting principle emphasizing visual storytelling over exposition."
+    },
+    "definition": "Horror scenes should prioritize atmosphere and visual storytelling over dialogue. The threat should be felt through environment, sound, and imagery rather than explained through conversation.",
+    "detection_signal": "Check if horror scenes rely on dialogue to explain the threat. Look for atmospheric descriptions, sound cues, and visual elements that create dread without exposition.",
+    "counter_considerations": "Some horror films use dialogue effectively to build dread (characters discussing the threat). The key is that dialogue should enhance atmosphere, not replace it.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_text"
+    ],
+    "related_rules": [
+      "horror_tone_set_immediately"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_vulnerability_escalation",
+    "name": "Vulnerability Escalates Through Isolation",
+    "taxonomy_level": "plot_thread",
+    "category": "escalation",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Standard horror structure principle where isolation increases vulnerability."
+    },
+    "definition": "Horror protagonists become increasingly isolated as the story progresses \u00e2\u20ac\u201d allies die, communication fails, escape routes close. This isolation amplifies vulnerability and dread.",
+    "detection_signal": "Track the protagonist's social connections across the script. Check if allies are removed, communication is cut off, or escape routes are blocked as the story progresses.",
+    "counter_considerations": "Some horror films maintain ensemble casts throughout. The key is that the protagonist's vulnerability must increase through some mechanism.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "horror_monster_defeat"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_final_girl_strength",
+    "name": "Final Girl Must Earn Survival",
+    "taxonomy_level": "character",
+    "category": "character_arc",
+    "source": {
+      "type": "general_craft",
+      "originator": null,
+      "work": null,
+      "note": "Carol Clover's 'Final Girl' archetype from Men, Women, and Chain Saws (1992), widely applied in horror criticism."
+    },
+    "definition": "The Final Girl's survival should be earned through character choices, not just luck or innocence. She must demonstrate resourcefulness, courage, or moral clarity that distinguishes her from the victims.",
+    "detection_signal": "Check if the Final Girl makes active choices that contribute to her survival. Verify that her survival feels earned rather than arbitrary.",
+    "counter_considerations": "Some horror films deliberately subvert the Final Girl trope. The key is that if the trope is used, the character should earn her survival.",
+    "severity_default": "medium",
+    "confidence_tier": "high",
+    "requires": [
+      "knowledge_graph"
+    ],
+    "related_rules": [
+      "horror_virgin_archetype"
+    ],
+    "genre": "horror"
+  },
+  {
+    "id": "horror_ordinary_world_horror",
+    "name": "Ordinary World Must Contrast Horror",
+    "taxonomy_level": "story_macro",
+    "category": "contrast",
+    "source": {
+      "type": "general_craft",
+      "originator": "Christopher Vogler",
+      "work": "The Writer's Journey"
+    },
+    "definition": "The horror protagonist's ordinary world must be established as normal and safe before the horror intrudes. This contrast makes the horror more impactful by showing what's being threatened.",
+    "detection_signal": "Check if the opening scenes establish a normal, safe world before the horror begins. Verify that the ordinary world contrasts with the horror that follows.",
+    "counter_considerations": "Some horror films open with the horror already in progress. The key is that the contrast between normal and horror must exist at some point.",
+    "severity_default": "low",
+    "confidence_tier": "high",
+    "requires": [
+      "scene_summaries"
+    ],
+    "related_rules": [
+      "horror_tone_set_immediately"
+    ],
+    "genre": "horror"
+  }
+]

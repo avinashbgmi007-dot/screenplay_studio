@@ -1,0 +1,37 @@
+[project]
+name = "script-doctor-studio"
+version = "0.1.0"
+description = "Local, privacy-first screenplay analysis and co-writing studio (parser, analyzer, co-writer, craft knowledge base)"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31.0",
+    "flask>=3.0.0",
+    "pdfplumber>=0.11.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6", "pytest>=8.0"]
+stt = ["faster-whisper>=1.0.0"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = ["docs", ".agents", ".claude"]
+
+[tool.ruff.lint]
+# Conservative starter set: real errors only (syntax, undefined names,
+# unused imports/variables). Widen deliberately as the codebase settles.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests carry exploratory scaffolding (unused fixture imports, one-line
+# setup statements); production packages stay fully strict.
+"tests/**" = ["F401", "F811", "F841", "E402", "E702", "E741", "F541"]
+
+# Deliberate patterns: deferred sibling-package imports; documented scratch runner.
+"_debate.py" = ["E402", "F541"]
+"screenplay_studio/demo_model.py" = ["E402"]
+"screenplay_studio/webapp_server.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
