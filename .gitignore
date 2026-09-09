@@ -66,3 +66,4 @@ Cursors/
 
 # WorkBuddy local state (memory, skills cache)
 /.workbuddy-ai/
+/tmp*/
