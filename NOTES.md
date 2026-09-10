@@ -324,6 +324,14 @@ Verified: 620 pytest (+5 v3 tests), 12/12 Playwright browser checks (`tests/e2e_
 
 ## Current State
 
+### Redesign step zero DONE (2026-09-10) — `docs/REDESIGN_MASTER_PLAN.md`
+
+The pre-design scaffold is committed (e7204d9) and critique-passed. Key contents: surface×gate inventory (18-suite canon — correction: `export_flush`/`translate_mic`/`library_delete` join the 15-suite ladder when their surfaces are touched), measured CSS audit (45 tokens split across night `:root` L114 + `body.dawn` L2752; ~60 off-token hexes; 166 rgba literals; 17 z-index values; 68 `!important`; DESIGN.md↔app font drift), frozen invariants, ring-fenced removals batch, R0–R6 phasing skeleton, reserved IA homes for all 10 deferred feature-UIs, and the 9-question agenda for the UI/UX discussion.
+
+**The strategic fork the design discussion must settle first**: `DESIGN.md` (Nocta — violet glass, Instrument Serif/DM Sans/JetBrains Mono, ⌘K palette-first, prototypes at `docs/design/ux2026/`: nocta/lumen/beatwall + shared kit) vs. the shipped Midnight Desk (warm lamp room, Caveat/Special Elite/Courier Prime, never systematized). Evolve Midnight / land Nocta / hybrid — a taste call, made with the three prototypes open side-by-side.
+
+**R0 (pixel-neutral token consolidation + z-ladder + encoding cleanup) may start immediately** — it needs no design answers; R1+ are gated on the design discussion. Ring-fenced removals (`#struct-rail`, `#rail-edge-tab`, `#pane-divider`, legacy `.desk`) land in R6 with their own dependency proofs.
+
 ### Phase 14 — E2E Sign-off Journey GREEN (2026-09-10)
 
 **The gate**: `tests/e2e_browser_phase14_signoff_journey.py` — one continuous journey per MD §15 (Landing → Idea → Write → Sameer → Premise → Script → Unanalyzed → Failure/retry contract → Run/Progress/Complete → Feedback → Category → Finding → Evidence → Sameer/Sushruta lenses → Inline Edit → Undo/Redo → Beat Board → Compare → Revision → Return → Export), plus session restore, selection-to-ask, notes, error handling, tablet/mobile/desktop sweep, keyboard focus, reduced motion, and zero-JS-errors. **48/48 PASS.** Full ladder re-confirmed green after the fixes (15 suites + journey = 16); pytest 100% with zero F marks (686 baseline preserved).
