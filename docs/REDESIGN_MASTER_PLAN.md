@@ -65,7 +65,7 @@ Every live surface, the phase that built it, and the gate that protects it durin
 |---|---|---|
 | Token definitions | 45 tokens × 2 blocks (night `:root` L114 + `body.dawn` L2752) | Dawn lives 2,600 lines below night — override collisions, no single source. **Consolidate into one token layer at the top.** |
 | `var(--…)` usages | 1,004 | Good bones — tokens are real and load-bearing. |
-| Off-token hex literals | ~60 (top: `#b98a44`×10, `#a89c88`×9, `#1a140d`×8, `#b3573f`×7, `#4a4238`×7) | The Midnight-Desk warm palette was never tokenized. Normalize into named tokens or delete. |
+| Off-token hex literals | ~60 (top: `#b98a44`×10, `#a89c88`×9, `#1a140d`×8, `#b3573f`×7, `#4a4238`×7) | The Midnight-Desk warm palette was never tokenized. Normalize into named tokens or delete. **R0.7: top-5 offenders all tokenized** (`--desk-amber/text-dim/line-dim/rust/panel` + `--accent-ink` for `#1a140d`, 8 sites). Remaining: 92 literals / 54 distinct — `#000`/`#fff` primitives, the Phase-12-approved Spark Wall identity cluster, and single-use literals (R0.3 convention). |
 | `rgba(` literals | 166 | Mostly glass/surface whites — fold into `--glass*`/`--surface*` tokens. |
 | z-index values in the wild | 59 declarations (R0 audit; the earlier "17 distinct" count under-measured — 28 distinct values incl. micro-layers) | **R0.1 DONE:** 31 overlay/system literals → 21 named `--z-*` tokens (values 1:1); 0–8 micro-layers intentionally literal. |
 | Fonts actually shipped | Caveat · Courier Prime · IBM Plex Mono · Source Serif 4 · Special Elite (9 self-hosted woff2 ✓) | `DESIGN.md` claims Instrument Serif + DM Sans + JetBrains Mono — **the design doc and the app disagree**. See §4. |

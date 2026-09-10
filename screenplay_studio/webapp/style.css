@@ -140,6 +140,7 @@
   --lamp-bright: #9b8aff;
   --consult: #53c7f0;
   --consult-deep: #3da8d4;
+  --accent-ink: #1a140d;   /* dark ink on lamp-lit fills — primary btns, active pills, send, rail flashes */
   /* severity middle tier — amber sits between ok(green) and danger(red) */
   --sev-mid: #e8a24f;
 
@@ -449,7 +450,7 @@ body::before {
 
 .btn-primary {
   background: linear-gradient(180deg, var(--accent-bright), var(--accent));
-  color: #1a140d;
+  color: var(--accent-ink);
   border: 1px solid var(--accent-deep);
   border-radius: var(--radius-sm);
   padding: 9px 14px;
@@ -813,7 +814,7 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .room-toggle-btn:hover { color: var(--text); }
 .room-toggle-btn.active {
   background: var(--accent);
-  color: #1a140d;
+  color: var(--accent-ink);
   box-shadow: 0 0 16px -2px var(--glow-strong);
 }
 .room-chip {
@@ -851,7 +852,7 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   cursor: pointer;
   background: transparent;
 }
-.branch-pill.active { background: var(--accent); color: #1a140d; border-color: transparent; }
+.branch-pill.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .branch-pill.add { color: var(--accent); border-style: dashed; }
 
 /* ============================================================
@@ -1755,7 +1756,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   width: 32px; height: 32px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, var(--accent-bright), var(--accent-deep));
-  color: #1a140d;
+  color: var(--accent-ink);
   display: grid; place-items: center;
   font-family: var(--font-typewriter);
   font-size: 14px;
@@ -1979,7 +1980,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 
 #send-btn {
   background: var(--accent);
-  color: #1a140d;
+  color: var(--accent-ink);
   border: none;
   border-radius: 8px;
   width: 38px; height: 38px;
@@ -3695,7 +3696,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .rail-scene:hover { background: var(--ink-800); color: var(--text); }
 .rail-scene.flash { animation: sceneFlash 0.9s ease-out; }
 @keyframes sceneFlash {
-  0% { background: var(--accent); color: #1a140d; }
+  0% { background: var(--accent); color: var(--accent-ink); }
   100% { background: transparent; }
 }
 .rail-scene-num {
@@ -3803,7 +3804,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   cursor: pointer;
   padding: 0 9px;
 }
-.rail-note-form button:hover { background: var(--accent); color: #1a140d; }
+.rail-note-form button:hover { background: var(--accent); color: var(--accent-ink); }
 
 .rail-foot {
   flex: 0 0 auto;
@@ -3922,7 +3923,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   width: 28px; height: 28px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
   font-family: var(--font-typewriter); font-size: 12px; font-weight: bold;
-  color: #1a140d;
+  color: var(--accent-ink);
 }
 .fv-avatar.consult { background: radial-gradient(circle at 35% 30%, var(--consult), var(--consult-deep)); box-shadow: 0 0 10px -2px rgba(134, 166, 189, 0.4); }
 .fv-avatar.cowrite { background: radial-gradient(circle at 35% 30%, var(--accent), var(--accent-deep)); box-shadow: 0 0 10px -2px var(--glow-strong); }
