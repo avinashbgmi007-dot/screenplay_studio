@@ -151,14 +151,29 @@ def main() -> None:
                f"banner={banner_visible} desk={desk_open}")
 
             # ---- A. export button lives in the Feedback room ----
+            # The corrupt-project banner from the check above still covers
+            # the top strip for its 10s life, and the project bar idle-fades
+            # after 4s — dismiss the banner and wake the chrome first (the
+            # same pattern the phase-14 journey uses before top-bar clicks).
+            page.locator("#error-banner-dismiss").click()
+            page.mouse.move(700, 20)
+            page.wait_for_timeout(300)
             page.locator("#shelf-trigger").hover()
             page.wait_for_timeout(300)
             page.locator(".project-item", has_text="Seed Export").first.click()
             page.wait_for_timeout(800)
             ok("healthy project opens normally",
                page.locator("#project-title").inner_text().strip() == "Seed Export")
-            page.locator("#room-feedback-btn").click()
-            page.wait_for_timeout(600)
+            # The Feedback DRAWER room is the surface that owns the toolbar's
+            # export button (loadFeedbackPanels -> renderReportPanel shows
+            # it). With a project open, #room-feedback-btn routes to the
+            # full-screen Feedback View instead, so the drawer room is
+            # reached the same way the text-popup's "Ask consultant" action
+            # reaches it (app.js openFeedbackRoom — the established evaluate
+            # nudge, same as ui_fixes uses for openDock).
+            page.mouse.move(700, 20)
+            page.evaluate("openFeedbackRoom()")
+            page.wait_for_timeout(800)
 
             btn = page.locator("#report-export-btn")
             ok("export button visible with report", btn.is_visible())
@@ -179,11 +194,19 @@ def main() -> None:
                 ok("clicking downloads the report", False, str(e)[:80])
 
             # ---- C. status strip honesty: demo badge, then live re-attach ----
+            # The drawer opened by openFeedbackRoom overlays the strip's
+            # right side, and #status-model stays display:none until the
+            # strip itself is hovered — close the drawer, hover the strip
+            # first (its left edge), then the item.
+            page.locator("#drawer-close").click()
+            page.wait_for_timeout(400)
             dot_cls = page.locator("#connection-dot").get_attribute("class") or ""
             ok("demo mode shows amber dot, not green", "demo" in dot_cls, dot_cls)
             ok("strip names the demo, not a fake model id",
                page.locator("#status-model-label").inner_text().strip() == "demo craft model")
 
+            page.locator("#status-strip").hover(position={"x": 10, "y": 10})
+            page.wait_for_timeout(200)
             page.locator("#status-model").hover()
             page.wait_for_timeout(300)
             card_txt = page.locator("#conn-card").inner_text()
@@ -214,6 +237,8 @@ def main() -> None:
             fake.server_close()
 
             # ---- B. pagehide flush of pending idea autosave ----
+            # wake the chrome before the top-bar click (same pattern)
+            page.mouse.move(700, 20)
             page.locator("#room-cowrite-btn").click()
             page.locator("#ideas-trigger").hover()
             page.wait_for_timeout(300)
