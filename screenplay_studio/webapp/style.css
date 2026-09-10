@@ -250,6 +250,51 @@ body { --accent: var(--lamp); --accent-deep: var(--lamp-deep); --accent-bright: 
 body[data-room="feedback"] { --accent: var(--consult); --accent-deep: var(--consult-deep); --accent-bright: #6dd8f7;
        --glow: rgba(83, 199, 240, 0.14); --glow-strong: rgba(83, 199, 240, 0.26); }
 
+/* ============================================================
+   Dawn — draw the curtains: a warm morning room
+   ============================================================ */
+
+body.dawn {
+  /* Nocta dawn — daylight glass */
+  --ink-950: #f1ede4;
+  --ink-900: #f5f1e8;
+  --ink-850: #f9f5ec;
+  --ink-800: #fffdf6;
+  --ink-700: #ffffff;
+  --line: rgba(30, 25, 50, 0.12);
+  --line-soft: rgba(30, 25, 50, 0.07);
+
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --surface: rgba(255, 255, 255, 0.55);
+  --surface2: rgba(30, 25, 50, 0.06);
+
+  --paper: #fffdf5;
+  --paper-2: #f5efe0;
+  --paper-line: #e3d9c0;
+  --paper-ink: #2a2318;
+  --paper-muted: #6b6150;
+
+  --text: #26242e;
+  --text-muted: #75707f;
+  --text-faint: #9a95a5;
+
+  --lamp: #6b5ce6;
+  --lamp-bright: #8578f0;
+  --lamp-deep: #5a4dcc;
+  --consult: #3ab8d8;
+  --consult-deep: #2a9aba;
+  --sev-mid: #a06a20;
+
+  --accent2: #3ab8d8;
+
+  --danger: #9c3527; /* was #c94a5a (Nocta dawn) — fails WCAG AA on dawn's light surfaces (3.43–4.48); zAI's a11y bump passes (5.23+) */
+  --danger-bg: rgba(156, 53, 39, 0.12);
+  --ok: #2eb87a;
+  --ok-bg: rgba(90, 122, 73, 0.12);
+}
+
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -2813,49 +2858,7 @@ body.idea-mode #rail-edge-tab { display: none !important; }
 .spotlight-mode .status-strip .status-item:not(#status-project):not(#sprint-timer):not(#status-elapsed):not(#status-dawn) { opacity: 0.45; }
 .status-project { font-weight: 600; letter-spacing: 0.02em; }
 
-/* ============================================================
-   Dawn — draw the curtains: a warm morning room
-   ============================================================ */
 
-body.dawn {
-  /* Nocta dawn — daylight glass */
-  --ink-950: #f1ede4;
-  --ink-900: #f5f1e8;
-  --ink-850: #f9f5ec;
-  --ink-800: #fffdf6;
-  --ink-700: #ffffff;
-  --line: rgba(30, 25, 50, 0.12);
-  --line-soft: rgba(30, 25, 50, 0.07);
-
-  --glass: rgba(255, 255, 255, 0.72);
-  --glass-strong: rgba(255, 255, 255, 0.88);
-  --surface: rgba(255, 255, 255, 0.55);
-  --surface2: rgba(30, 25, 50, 0.06);
-
-  --paper: #fffdf5;
-  --paper-2: #f5efe0;
-  --paper-line: #e3d9c0;
-  --paper-ink: #2a2318;
-  --paper-muted: #6b6150;
-
-  --text: #26242e;
-  --text-muted: #75707f;
-  --text-faint: #9a95a5;
-
-  --lamp: #6b5ce6;
-  --lamp-bright: #8578f0;
-  --lamp-deep: #5a4dcc;
-  --consult: #3ab8d8;
-  --consult-deep: #2a9aba;
-  --sev-mid: #a06a20;
-
-  --accent2: #3ab8d8;
-
-  --danger: #9c3527; /* was #c94a5a (Nocta dawn) — fails WCAG AA on dawn's light surfaces (3.43–4.48); zAI's a11y bump passes (5.23+) */
-  --danger-bg: rgba(156, 53, 39, 0.12);
-  --ok: #2eb87a;
-  --ok-bg: rgba(90, 122, 73, 0.12);
-}
 body.dawn #sidebar, body.dawn .room-panel {
   border-color: var(--line-soft);
 }
