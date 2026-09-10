@@ -172,7 +172,6 @@
 
   /* motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --t: 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* z-ladder — named stacking layers (R0). Values are preserved 1:1 from the
@@ -233,6 +232,7 @@
   --shadow-a30: rgba(0, 0, 0, 0.3);
   --shadow-a18: rgba(0, 0, 0, 0.18);
   --shadow-a12: rgba(0, 0, 0, 0.12);
+  --shadow-paper: 0 18px 50px -18px rgba(0, 0, 0, 0.65), 0 2px 8px var(--shadow-a35);  /* the paper lift — welcome card + findings-view scene pages */
   --wash-w06: rgba(255, 255, 255, 0.06);
   --wash-w05: rgba(255, 255, 255, 0.05);
   --wash-w04: rgba(255, 255, 255, 0.04);
@@ -908,7 +908,7 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   color: var(--paper-ink);
   border-radius: 4px;
   padding: 34px 38px 30px;
-  box-shadow: 0 18px 50px -18px rgba(0, 0, 0, 0.65), 0 2px 8px var(--shadow-a35);
+  box-shadow: var(--shadow-paper);
 }
 .welcome-card::before {
   content: "";
@@ -3312,7 +3312,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 /* the Stash button sits under the ask-Sameer button — cooler accent so the
    two actions read differently at a glance */
 .quote-float.stash-float {
-  background: linear-gradient(180deg, var(--ink-600), var(--ink-700));
+  background: linear-gradient(180deg, var(--ink-700), var(--ink-800));
   border-color: var(--line);
   color: var(--text);
 }
@@ -4143,8 +4143,8 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 .wd-ask { display: block; margin-bottom: 8px; }
 .wd-btn { border: 1px solid var(--line-soft); background: transparent; color: var(--text-muted); border-radius: 999px; padding: 4px 12px; margin-right: 8px; font-size: 12px; font-family: var(--font-ui); cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s; }
 .wd-btn:hover { border-color: var(--accent-bright); color: var(--accent-bright); }
-.wd-keep { border-color: var(--accent-dim); color: var(--accent-bright); }
-.wd-keep:hover { background: color-mix(in srgb, var(--accent-dim) 18%, transparent); }
+.wd-keep { border-color: color-mix(in oklab, var(--accent) 40%, transparent); color: var(--accent-bright); }
+.wd-keep:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
 /* a selected passage attaching to the composer pops in */
 .quote-card { animation: quoteIn 0.26s cubic-bezier(0.2, 0.7, 0.25, 1) both; }
@@ -4380,7 +4380,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   font-family: var(--font-mono);
   font-size: 11.5px;
   line-height: 1.55;
-  color: var(--text-dim, #b8ac97);
+  color: #b8ac97;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4598,7 +4598,7 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
 .conn-card-row b { color: var(--text, #e6dcc8); font-weight: 600; }
 .conn-card-row.ok b { color: var(--ok, #7fae72); }
 .conn-card-row.demo b { color: var(--sev-mid); }
-.conn-card-row.fail b { color: var(--danger, #c96a5a); }
+.conn-card-row.fail b { color: var(--danger); }
 .conn-card-row.switch { color: var(--desk-amber-bright); white-space: normal; }
 
 /* ============================================================
@@ -4779,19 +4779,6 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   box-shadow: 0 0 6px var(--accent);
 }
 
-/* ---- Spring motion utilities ---- */
-@keyframes rise {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: none; }
-}
-.rise { animation: rise 0.28s var(--spring) both; animation-delay: calc(var(--i, 0) * 50ms); }
-
-@keyframes pop-in-spring {
-  from { opacity: 0; transform: scale(0.94) translateY(8px); }
-  to { opacity: 1; }
-}
-.rise-pop { animation: pop-in-spring 0.26s var(--spring) both; animation-delay: calc(var(--i, 0) * 45ms); }
-
 /* Word-streaming text (chat replies) */
 .w { display: inline-block; animation: w-in 0.24s var(--ease-out) both; }
 @keyframes w-in {
@@ -4826,7 +4813,6 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
 /* ---- Reduced motion clamp ---- */
 @media (prefers-reduced-motion: reduce) {
   .sameer-panel { transition: none; }
-  .rise, .rise-pop { animation: none; opacity: 1; transform: none; }
   .w { animation: none; opacity: 1; }
   .caret { animation: none; }
   .cursor-spotlight { display: none; }

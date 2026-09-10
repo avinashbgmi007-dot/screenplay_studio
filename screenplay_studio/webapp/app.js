@@ -2651,7 +2651,7 @@ function appendSystemNote(text, isError) {
   const note = el("div", "msg assistant");
   note.appendChild(el("div", "msg-role", "Studio"));
   const bubble = el("div", "msg-bubble", text);
-  if (isError) bubble.style.color = "var(--rust-flag)";
+  if (isError) bubble.style.color = "var(--danger)";
   note.appendChild(bubble);
   container.appendChild(note);
   container.scrollTop = container.scrollHeight;
@@ -3254,14 +3254,14 @@ async function sendMessage() {
           stopTicker();
           pending.classList.remove("msg-pending");
           pendingBubble.textContent = "Stopped waiting — Sam was still working when the time cap hit. Send the message again to retry.";
-          pendingBubble.style.color = "var(--rust-flag)";
+          pendingBubble.style.color = "var(--danger)";
           finishTurn();
         });
       } else if (pendingBubble) {
         stopTicker();
         pendingBubble.textContent = "Couldn't get a reply: " + e.message;
         pending.classList.remove("msg-pending");
-        pendingBubble.style.color = "var(--rust-flag)";
+        pendingBubble.style.color = "var(--danger)";
         showError("Chat message failed: " + e.message);
         finishTurn();
       } else {
