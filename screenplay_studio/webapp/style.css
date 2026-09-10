@@ -239,6 +239,9 @@
   --consult-glow-55: rgba(110, 231, 255, 0.55);
   --consult-glow-45: rgba(110, 231, 255, 0.45);
   --consult-glow-12: rgba(110, 231, 255, 0.12);
+  --glow-lamp-08: rgba(126, 107, 255, 0.08);
+  --glow-lamp-05: rgba(126, 107, 255, 0.05);
+  --glow-lamp-06: rgba(126, 107, 255, 0.06);
 }
 
 /* room lighting — the signature element */
@@ -3041,7 +3044,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 }
 .pb-item:hover { background: var(--surface2); }
 .pb-item.active {
-  background: rgba(126,107,255,0.08);
+  background: var(--glow-lamp-08);
   border-left: 2px solid var(--accent);
   padding-left: 6px;
 }
@@ -4039,7 +4042,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   cursor: pointer; transition: color 0.15s, background 0.15s;
 }
 .fv-tab:hover { background: var(--surface2); color: var(--text); }
-.fv-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: rgba(126,107,255,0.05); }
+.fv-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--glow-lamp-05); }
 .fv-right-pane { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .fv-board-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -4065,7 +4068,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 }
 .fv-board-row:hover { background: var(--surface2); }
 .fv-board-row.highlighted {
-  background: rgba(126,107,255,0.08);
+  background: var(--glow-lamp-08);
   border-left: 2px solid var(--accent); padding-left: 6px;
 }
 .fv-board-row.dimmed { opacity: 0.35; }
@@ -4118,7 +4121,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 
 /* Scene highlighting in Feedback View */
 .fv-scene.active .fv-finding-dots {
-  border-color: var(--accent); background: rgba(126,107,255,0.06);
+  border-color: var(--accent); background: var(--glow-lamp-06);
 }
 
 
@@ -5272,7 +5275,7 @@ body:not(.idea-mode) #manuscript-workspace {
 }
 .scene-index-item.active {
   border-left-color: var(--accent);
-  background: rgba(126,107,255,0.08);
+  background: var(--glow-lamp-08);
   color: var(--text);
 }
 .scene-index-num {
