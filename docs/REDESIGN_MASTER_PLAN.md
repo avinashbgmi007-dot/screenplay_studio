@@ -67,8 +67,9 @@ Every live surface, the phase that built it, and the gate that protects it durin
 | `var(--…)` usages | 1,004 | Good bones — tokens are real and load-bearing. |
 | Off-token hex literals | ~60 (top: `#b98a44`×10, `#a89c88`×9, `#1a140d`×8, `#b3573f`×7, `#4a4238`×7) | The Midnight-Desk warm palette was never tokenized. Normalize into named tokens or delete. |
 | `rgba(` literals | 166 | Mostly glass/surface whites — fold into `--glass*`/`--surface*` tokens. |
-| z-index values in the wild | 17 distinct (1…9999; top real: 9999, 800, 600, 520, 515, 510…) | No layer ladder. **Adopt a documented scale** (e.g. `--z-base/raised/sticky/dock/board/toolbar/drawer/modal/toast`) and migrate. |
+| z-index values in the wild | 59 declarations (R0 audit; the earlier "17 distinct" count under-measured — 28 distinct values incl. micro-layers) | **R0.1 DONE:** 31 overlay/system literals → 21 named `--z-*` tokens (values 1:1); 0–8 micro-layers intentionally literal. |
 | Fonts actually shipped | Caveat · Courier Prime · IBM Plex Mono · Source Serif 4 · Special Elite (9 self-hosted woff2 ✓) | `DESIGN.md` claims Instrument Serif + DM Sans + JetBrains Mono — **the design doc and the app disagree**. See §4. |
+| `!important` count | 68 | **R0.4 audit verdict: 0 removals.** Every site is load-bearing (beats inline styles from JS: `#script-pane` flex vs pane-width restore, dock-slot display vs setRoom inline; beats important-vs-important media rules: river-read dock vs mobile sheet), canonical (reduced-motion, print, resizing cursors), or beats ID-specificity bases (mode-hiding rules). R1+ component rewrites may retire them case-by-case with fresh cascade proofs. |
 
 ### Known hazards (carry the discipline, not just the code)
 - **Mojibake**: baked double-encoded UTF-8 in webapp files (`â€”` = em-dash, 3rd char U+201D). Edits must match literal file bytes. One placeholder (`#project-title`) was user-visible and got fixed in P14; the rest are comment-level. A redesign pass is the natural moment to clean the file encoding for real.
