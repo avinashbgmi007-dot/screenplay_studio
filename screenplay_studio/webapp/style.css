@@ -174,6 +174,35 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --t: 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* z-ladder — named stacking layers (R0). Values are preserved 1:1 from the
+     pre-R0 ad-hoc ladder: numbers untouched, only names added, so every
+     existing stacking relationship is bit-identical.
+     Local stacking micro-layers (0-8: cards, ::before washes, rail panels,
+     composer, tabs — all inside their own stacking contexts, never competing
+     with overlays) stay literal on purpose. app.js keeps one literal
+     zIndex="600" (lang-menu) that must track --z-above-drawer. */
+  --z-chrome: 10;           /* sidebar toggle, fv right-edge tab, scene index */
+  --z-pop: 40;              /* history pop, idea quote float, mobile sidebar */
+  --z-feedback-head: 46;    /* feedback header (pipeline child 47 clears it) */
+  --z-pipeline: 47;         /* analyze pipeline popover */
+  --z-float: 50;            /* sidebar edge tab, modal overlay */
+  --z-river: 60;            /* river current ribbon */
+  --z-menu: 80;             /* mic language menu */
+  --z-banner: 100;          /* error banner, overflow dropdown */
+  --z-badge: 300;           /* level badge */
+  --z-dock-sheet: 420;      /* context dock mobile sheet */
+  --z-sameer: 500;          /* sameer panel */
+  --z-board: 510;           /* problem board */
+  --z-board-tab: 515;       /* problem board + rail edge tabs */
+  --z-rail: 520;            /* struct rail, desk toolbar above the board */
+  --z-drawer: 590;          /* room drawer (chat) */
+  --z-above-drawer: 600;    /* desk gutter, lang menu, conn card — clear 590 */
+  --z-edge-affordance: 610; /* right-edge affordance above drawer + panels */
+  --z-scene-float: 620;     /* scene index above dock sheet (420) + drawer */
+  --z-quote: 700;           /* quote float */
+  --z-popup: 800;           /* selection text popup */
+  --z-grain: 9999;          /* body::before film grain, always on top */
 }
 
 /* room lighting — the signature element */
@@ -236,7 +265,7 @@ body::before {
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 1px;
-  z-index: 9999;
+  z-index: var(--z-grain);
   pointer-events: none;
   background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--accent) 15%, transparent) 30%, color-mix(in oklab, var(--accent2) 10%, transparent) 70%, transparent);
 }
@@ -281,7 +310,7 @@ body::before {
   cursor: pointer;
   display: grid;
   place-items: center;
-  z-index: 10;
+  z-index: var(--z-chrome);
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .sidebar-toggle:hover { color: var(--text); border-color: var(--accent); }
@@ -301,7 +330,7 @@ body::before {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 50;
+  z-index: var(--z-float);
   background: var(--ink-800);
   border: 1px solid var(--line-soft);
   border-left: none;
@@ -974,7 +1003,7 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 /* the desk toolbar outranks the docked Problem Board (z 510) so its buttons
    stay clickable and the overflow dropdown — which opens downward into the
    layout row where the board docks — lands ABOVE the board, not under it */
-#manuscript-workspace > #desk-toolbar { z-index: 520; }
+#manuscript-workspace > #desk-toolbar { z-index: var(--z-rail); }
 
 #script-search {
   flex: 1;
@@ -1015,7 +1044,7 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   border: 1px solid var(--line);
   border-radius: var(--radius-sm, 10px);
   padding: 4px;
-  z-index: 100;
+  z-index: var(--z-banner);
   backdrop-filter: blur(12px);
   box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
 }
@@ -1894,7 +1923,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45), 0 12px 32px rgba(0, 0, 0, 0.4);
-  z-index: 40;
+  z-index: var(--z-pop);
 }
 #history-pop[hidden] { display: none; }
 .history-item {
@@ -1934,7 +1963,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   position: relative;
   /* above the night vignette (40) + grain (45) so the pipeline popover
      (child z-index 47) is never dimmed or clipped */
-  z-index: 46;
+  z-index: var(--z-feedback-head);
 }
 .feedback-header > div:first-child { flex: 1 1 auto; min-width: 0; }
 .feedback-title { font-family: var(--font-typewriter); font-size: 14.5px; color: var(--text); }
@@ -2043,7 +2072,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   visibility: hidden;
   transform: translateY(-4px);
   transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
-  z-index: 47;
+  z-index: var(--z-pipeline);
 }
 .analyze-progress:hover .analyze-pipeline,
 .analyze-progress:focus-within .analyze-pipeline { opacity: 1; visibility: visible; transform: translateY(0); }
@@ -2102,7 +2131,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .error-banner {
   position: fixed;
   top: 0; left: 0; right: 0;
-  z-index: 100;
+  z-index: var(--z-banner);
   background: var(--danger);
   color: #fff;
   padding: 10px 20px;
@@ -2209,7 +2238,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-float);
 }
 .modal {
   background: linear-gradient(180deg, var(--ink-850), var(--ink-900));
@@ -2906,7 +2935,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   box-shadow: -18px 0 40px rgba(0, 0, 0, 0.35);
   transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1);
   overflow: hidden;
-  z-index: 510;
+  z-index: var(--z-board);
 }
 .problem-board.pb-collapsed {
   /* 100% of the board + its 38px inset from the row's right edge — the slide
@@ -3048,7 +3077,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   position: absolute;
   right: 38px; top: 50%;
   transform: translateY(-50%);
-  z-index: 515;
+  z-index: var(--z-board-tab);
   writing-mode: vertical-rl;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -3090,7 +3119,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
     position: fixed;
     right: 0;
     bottom: 84px;            /* clear of the composer's hit zone */
-    z-index: 610;            /* above the drawer (590) and room panels */
+    z-index: var(--z-edge-affordance);            /* above the drawer (590) and room panels */
     writing-mode: horizontal-tb;
     padding: 10px 12px;
     border: 1px solid var(--line);
@@ -3102,7 +3131,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 }
 
 @media (max-width: 640px) {
-  #sidebar { position: fixed; z-index: 40; height: 100%; transform: translateX(-100%); transition: transform 0.2s ease; }
+  #sidebar { position: fixed; z-index: var(--z-pop); height: 100%; transform: translateX(-100%); transition: transform 0.2s ease; }
   #sidebar.open { transform: translateX(0); }
   .project-bar-right { flex-wrap: wrap; }
   #welcome-view { padding: 24px 16px 90px; }
@@ -3223,7 +3252,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
    rides above the partner drawer so it's reachable even while Sam is open. */
 .quote-float {
   position: absolute;
-  z-index: 700;
+  z-index: var(--z-quote);
   font-family: var(--font-typewriter);
   font-size: 12px;
   color: var(--paper, #f5efe2);
@@ -3409,7 +3438,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   box-shadow: 18px 0 40px rgba(0, 0, 0, 0.35);
   transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1);
   overflow: hidden;
-  z-index: 520;
+  z-index: var(--z-rail);
 }
 #struct-rail.rail-collapsed {
   transform: translateX(-105%);
@@ -3422,7 +3451,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   position: absolute;
   left: 0; top: 50%;
   transform: translateY(-50%);
-  z-index: 515;
+  z-index: var(--z-board-tab);
   writing-mode: vertical-rl;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -3457,7 +3486,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   box-shadow: -18px 0 46px rgba(0, 0, 0, 0.35);
   transform: translateX(110%);
   transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1);
-  z-index: 590;
+  z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;
 }
@@ -3526,7 +3555,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   position: absolute;
   top: 0; right: 0; bottom: 0;
   width: 56px;
-  z-index: 600;
+  z-index: var(--z-above-drawer);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3770,7 +3799,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 /* Text selection popup — appears on highlight in Idea Room, script, Revision View */
 .text-popup {
   position: fixed;
-  z-index: 800;
+  z-index: var(--z-popup);
   min-width: 180px;
   background: var(--glass-strong, rgba(19, 19, 29, 0.82));
   border: 1px solid var(--line);
@@ -3948,7 +3977,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   position: absolute;
   right: 0; top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
+  z-index: var(--z-chrome);
   writing-mode: vertical-rl;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -4320,7 +4349,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 /* ------- idea-page selection chip + ephemeral translations ------- */
 .idea-quote-float {
   position: absolute;
-  z-index: 40;
+  z-index: var(--z-pop);
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid color-mix(in oklab, var(--accent) 50%, transparent);
@@ -4412,7 +4441,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
    inline left used to stretch the box all the way to the viewport edge. */
 .lang-menu {
   position: fixed;
-  z-index: 600; display: flex; flex-direction: column;
+  z-index: var(--z-above-drawer); display: flex; flex-direction: column;
   background: var(--panel-bg, #201a14);
   border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent);
   border-radius: 9px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
@@ -4465,7 +4494,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   50% { box-shadow: 0 0 0 6px rgba(224, 82, 82, 0.08); }
 }
 .mic-lang-menu {
-  position: absolute; right: 6px; bottom: 40px; z-index: 80;
+  position: absolute; right: 6px; bottom: 40px; z-index: var(--z-menu);
   display: flex; flex-direction: column; min-width: 128px;
   background: var(--panel-bg, #201a14);
   border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent); border-radius: 9px;
@@ -4517,7 +4546,7 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   border: 1px solid var(--line, #3a322a);
   border-radius: 8px;
   padding: 10px 12px;
-  z-index: 600;
+  z-index: var(--z-above-drawer);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   font-size: 11.5px;
   line-height: 1.6;
@@ -4556,7 +4585,7 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   top: 0;
   bottom: 0;
   width: 380px;
-  z-index: 500;
+  z-index: var(--z-sameer);
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--line);
@@ -4684,7 +4713,7 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   position: fixed;
   left: 16px;
   bottom: 44px;
-  z-index: 300;
+  z-index: var(--z-badge);
   display: flex;
   align-items: center;
   gap: 7px;
@@ -4929,7 +4958,7 @@ body.river-read #flow-btn.active {
   display: none;
   flex-direction: column;
   gap: 12px;
-  z-index: 60;
+  z-index: var(--z-river);
   padding: 14px 6px;
 }
 /* the partner gutter owns the right edge — the current nav lives beside it,
@@ -5161,7 +5190,7 @@ body:not(.idea-mode) #manuscript-workspace {
   bottom: 0;
   width: 44px;
   overflow: hidden;
-  z-index: 10;
+  z-index: var(--z-chrome);
   background: var(--ink-900);
   border-right: 1px solid var(--line-soft);
   transition: width 0.25s ease;
@@ -5558,7 +5587,7 @@ body.river-read #right-edge-affordance { display: none; }
     top: 0;
     right: 0;
     bottom: 0;
-    z-index: 420;
+    z-index: var(--z-dock-sheet);
     width: 0;
     min-width: 0;
     border-left: none;
@@ -5655,7 +5684,7 @@ body:not(.idea-mode) .desk {
     top: 0;
     bottom: 0;
     width: 44px;
-    z-index: 620;              /* above the dock sheet (420) + drawer (590) */
+    z-index: var(--z-scene-float);              /* above the dock sheet (420) + drawer (590) */
     border-right: 1px solid var(--line);
     box-shadow: 8px 0 24px rgba(0, 0, 0, 0.4);
     transition: width 0.25s ease;
