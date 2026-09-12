@@ -5537,6 +5537,21 @@ body.river-read #context-dock {
   /* ...and while it is forced to 0 width it must not stay focusable either */
   visibility: hidden !important;
 }
+/* a11y (WCAG 2.3.3 Animation from Interactions): the shelf, the partner
+   drawer, the Sameer panel and the Context Dock all slide. Honour the user's
+   reduced-motion preference for the chrome the same way the manuscript and
+   the decorative layers already do. */
+@media (prefers-reduced-motion: reduce) {
+  #sidebar,
+  .drawer,
+  .drawer.open,
+  .sameer-panel,
+  .sameer-panel.open,
+  #context-dock,
+  #context-dock.open {
+    transition: none;
+  }
+}
 #right-edge-affordance {
   /* WIREFRAME ALIGNMENT — State 4 gives the right edge a 32px hit area at
      x:1408-1440 and keeps the 700px manuscript column clear of it. So the

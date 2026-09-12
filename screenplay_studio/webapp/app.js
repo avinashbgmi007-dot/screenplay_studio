@@ -4241,6 +4241,22 @@ function highlightMatches(node, text, query) {
 // .scene-page, data-scene-number, scene-page-N ids, the el-* line classes
 // — jumpToScene, focus mode, river read, Problem Board sync and
 // selection-to-ask all depend on them.
+// a11y (WCAG 4.1.3 Status Messages): announce a NEW manuscript load. Every
+// re-render (typing, undo, notes, search) flows through renderManuscript, so
+// gate on the scene count actually changing — otherwise the polite live
+// region would fire on every keystroke.
+let lastAnnouncedSceneCount = -1;
+function announceManuscriptLoad(count) {
+  if (count === lastAnnouncedSceneCount) return;
+  lastAnnouncedSceneCount = count;
+  const el = document.getElementById("a11y-status");
+  if (el) {
+    el.textContent = count
+      ? `Manuscript loaded: ${count} scene${count === 1 ? "" : "s"}.`
+      : "";
+  }
+}
+
 function renderManuscript(container) {
   if (!container) container = getManuscriptContainer();
   if (!container) return;
@@ -4334,6 +4350,8 @@ function renderManuscript(container) {
 
   renderSceneIndex();
   updateSceneIndexHighlight();
+  // announce only when the manuscript itself changed (see announceManuscriptLoad)
+  announceManuscriptLoad(state.script && state.script.scenes ? state.script.scenes.length : 0);
   // Phase 6: an open Evidence lens re-assembles after every manuscript
   // re-render — undo/redo, rewrites, notes, retry, search all flow through
   // here, so the dock never shows a stale ledger.
