@@ -1742,6 +1742,18 @@ function wireSprint() {
   } catch (_) { /* private mode */ }
   el.addEventListener("click", toggleSprint);
   el.addEventListener("dblclick", resetSprint);
+  // a11y (WCAG 2.1.1 Keyboard): the sprint timer is role="button" + tabindex=0
+  // but only had click/dblclick handlers, so it was focusable and announced as
+  // a button yet did nothing from the keyboard. Enter/Space toggles; R resets.
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      toggleSprint();
+    } else if (e.key === "r" || e.key === "R") {
+      e.preventDefault();
+      resetSprint();
+    }
+  });
   renderSprint();
 }
 
@@ -4400,6 +4412,9 @@ function renderSceneIndex() {
     item.appendChild(el("span", "scene-index-head", (scene.heading_raw || "").slice(0, 60)));
     if (total > 0) {
       const dots = el("span", "scene-index-dots");
+      // the item's own aria-label already spells out the counts, so the
+      // decorative dots stay out of the a11y tree (no double announcement)
+      dots.setAttribute("aria-hidden", "true");
       for (const sev of ["high", "medium", "low"]) {
         if (counts[sev] > 0) {
           const d = el("i", "dot " + sev);

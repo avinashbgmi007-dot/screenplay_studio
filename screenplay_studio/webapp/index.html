@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b336">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b337">
 </head>
 <body data-room="cowrite">
 
@@ -94,7 +94,12 @@
         <label id="dropzone" for="file-input">
           <span class="dropzone-icon">✎</span>
           <span class="dropzone-text">Lay a manuscript here — <code>.fdx</code> <code>.pdf</code> <code>.txt</code> <code>.fountain</code> <code>.md</code></span>
-          <input type="file" id="file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
+          <!-- a11y (WCAG 2.1.1 Keyboard): the file input must stay in the TAB
+               ORDER. `hidden` (display:none) made the dropzone a mouse-only
+               affordance — a <label> is not focusable and the control it
+               points at was removed from the tree. `.vh` hides it visually
+               while keeping it focusable; #dropzone:focus-within draws the ring. -->
+          <input type="file" id="file-input" class="vh" accept=".fdx,.pdf,.txt,.fountain,.md">
         </label>
 
         <div id="upload-status" class="upload-status"></div>
@@ -737,7 +742,7 @@
 </div>
 
 <script src="core.js?v=hx1b112"></script>
-<script src="app.js?v=hx1b336"></script>
+<script src="app.js?v=hx1b337"></script>
 <div id="river-current" aria-hidden="true"></div>
 <div class="dawn-wash" aria-hidden="true"></div>
 </body>
