@@ -542,6 +542,18 @@ function renderDashboard() {
     actions.appendChild(backup);
     card.appendChild(actions);
 
+    // a11y (WCAG 2.1.1 Keyboard): the card is a div — same fix as the shelf
+    // rows. role=button + tabindex + Enter/Space (its inner dash-open
+    // button stays the labelled shortcut).
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+        openProject(p.project);
+      }
+    });
     card.addEventListener("click", () => {
       if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
       openProject(p.project);
@@ -622,6 +634,18 @@ function renderProjectList() {
       deleteProjectFlow(p.project, p.title);
     });
     item.appendChild(del);
+    // a11y (WCAG 2.1.1 Keyboard): the shelf row is a div, so the open
+    // action was mouse-only. role=button + tabindex + Enter/Space — the
+    // same pattern as .scene-index-item.
+    item.setAttribute("role", "button");
+    item.setAttribute("tabindex", "0");
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+        openProject(p.project);
+      }
+    });
     item.addEventListener("click", () => {
       if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
       openProject(p.project);
@@ -1017,6 +1041,17 @@ function renderIdeaList() {
       }
     });
     item.appendChild(del);
+    // a11y (WCAG 2.1.1 Keyboard): the idea row is a div — same fix as the
+    // project shelf row. role=button + tabindex + Enter/Space.
+    item.setAttribute("role", "button");
+    item.setAttribute("tabindex", "0");
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (idea.unreadable) { showError("This idea's file is damaged on disk and can't be opened."); return; }
+        openIdea(idea.id);
+      }
+    });
     item.addEventListener("click", () => {
       if (idea.unreadable) { showError("This idea's file is damaged on disk and can't be opened."); return; }
       openIdea(idea.id);
