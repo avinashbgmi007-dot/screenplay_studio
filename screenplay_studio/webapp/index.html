@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b349">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b350">
 </head>
 <body data-room="cowrite">
 
@@ -81,7 +81,7 @@
   <button id="sidebar-edge-tab" class="sidebar-edge-tab" type="button" title="Open the sidebar">☰ Shelf</button>
 
   <!-- Center -->
-  <main id="main" tabindex="-1">
+  <main id="main" tabindex="-1" aria-label="Writing desk">
 
     <!-- Welcome — the room at night -->
     <section id="welcome-view" class="view">
@@ -138,7 +138,7 @@
       </div>
     </section>
 
-    <header id="project-bar" style="display:none;">
+    <header id="project-bar" aria-label="Project bar" style="display:none;">
       <div class="project-bar-left">
         <button id="home-btn" class="home-btn" type="button" title="Back to the desk — the shelf, your library, and the idea room">⌂</button>
         <h2 id="project-title">—</h2>
@@ -464,7 +464,7 @@
     </div>
 
     <!-- Status strip: model · connection · loop metrics · sprint · room light -->
-    <footer id="status-strip" class="status-strip">
+    <footer id="status-strip" class="status-strip" aria-label="Status strip">
       <span id="status-project" class="status-item status-project" style="display:none;"></span>
       <span id="status-conn" class="status-item" title="Model connection status — hover for details">—</span>
       <span id="status-model" class="status-item status-model-wrap">
@@ -755,7 +755,7 @@
 </div>
 
 <script src="core.js?v=hx1b112"></script>
-<script src="app.js?v=hx1b349"></script>
+<script src="app.js?v=hx1b350"></script>
 <div id="river-current" aria-hidden="true"></div>
 <div class="dawn-wash" aria-hidden="true"></div>
 </body>
