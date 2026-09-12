@@ -7719,6 +7719,13 @@ function initNoctaDesign() {
   document.querySelectorAll(".modal-overlay").forEach((m) => {
     m.addEventListener("mouseenter", showChrome);
   });
+  // a11y pass 12 (WCAG 2.4.7): keyboard focus into either bar reveals the
+  // chrome and re-arms the same 4s idle timer the mouse path uses —
+  // Tab-only users could otherwise focus invisible controls after idle-hide.
+  ["#project-bar", "#desk-toolbar"].forEach((sel) => {
+    const bar = $(sel);
+    if (bar) bar.addEventListener("focusin", showChrome);
+  });
 
   // Sameer panel
   const sameerClose = $("#sameer-close");

@@ -108,6 +108,12 @@ def run():
             # the contract allows ONE right-edge hit area. The project bar's
             # Co-write toggle is bound to the SAME openCowriteRoom handler the
             # gutter-sam tab used, so it is the canonical replacement.)
+            # NOTE: the Nocta auto-hide chrome hides #project-bar after 4s
+            # idle (pointer-events:none). Playwright's actionability check
+            # does NOT dispatch the mousemove that would re-show it, so a
+            # click >4s after load deadlocks — move the mouse to the top
+            # edge first, exactly what a real user does.
+            page.mouse.move(500, 60)
             page.locator("#room-cowrite-btn").click()
             drawer_cls = ""
             for _ in range(20):

@@ -4875,6 +4875,16 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   opacity: 1;
   pointer-events: auto;
 }
+/* WCAG 2.4.7 (a11y pass 12): keyboard focus must reveal the hidden chrome.
+   Tab can reach #project-bar / #desk-toolbar controls while the bars are
+   invisible (the 4s idle hide only tracks mouse proximity); without this
+   rule focus lands on unseeable buttons. Same :focus-within pattern as the
+   hover-reveal rows (pass 6). */
+.auto-hide-chrome #project-bar:focus-within,
+.auto-hide-chrome #desk-toolbar:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 /* ---- Sameer contextual slide-in panel ---- */
 .sameer-panel {

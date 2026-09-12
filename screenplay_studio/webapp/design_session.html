@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Design Session — R1+ Identity Walk (ux2026 × live studio)</title>
+<style>
+/* ============ DESIGN SESSION CONSOLE — self-contained, no external requests ============ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a10;--panel:#12121a;--panel-2:#171722;--line:rgba(255,255,255,.10);
+  --ink:#eceaf4;--muted:#9a96ac;--faint:#6f6b82;
+  --violet:#7e6bff;--violet-glow:rgba(126,107,255,.35);
+  --cyan:#53c7f0;--amber:#e8a24f;--ok:#34d399;
+  --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --spring:cubic-bezier(.34,1.56,.64,1);
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:13.5px;line-height:1.5;overflow:hidden;display:flex;flex-direction:column}
+button{cursor:pointer;background:none;border:none;color:inherit;font:inherit}
+
+/* ---- top console bar ---- */
+.console{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);
+  border-bottom:1px solid var(--line);flex:none;z-index:10}
+.console .brand{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);white-space:nowrap}
+.console .brand b{color:var(--violet);font-weight:700}
+.ctl{display:flex;align-items:center;gap:6px}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 11px;border-radius:8px;
+  border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font-size:12px;font-weight:600;
+  transition:background .18s,border-color .18s,transform .25s var(--spring);white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2)}
+.btn:active{transform:scale(.96)}
+.btn.on{background:var(--violet);border-color:var(--violet);color:#fff;
+  box-shadow:0 4px 18px -6px var(--violet-glow)}
+.btn.dawn-btn.on{background:var(--amber);border-color:var(--amber);color:#1a1408;box-shadow:0 4px 18px -6px rgba(232,162,79,.4)}
+.sep{width:1px;height:22px;background:var(--line);flex:none}
+.layout-toggle{margin-left:auto;display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:8px;padding:3px}
+.layout-toggle button{min-height:24px;padding:0 9px;border-radius:6px;font-size:11px;font-weight:600;color:var(--muted)}
+.layout-toggle button.on{background:var(--violet);color:#fff}
+
+/* ---- stage ---- */
+.stage{flex:1;position:relative;overflow:hidden;background:
+  radial-gradient(900px 500px at 80% -12%, rgba(126,107,255,.07), transparent 60%),
+  radial-gradient(700px 400px at 5% 110%, rgba(83,199,240,.05), transparent 60%), var(--bg)}
+
+/* 4-up grid: prototypes × live */
+.quad{position:absolute;inset:0;display:grid;gap:8px;padding:8px;
+  grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.cell{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  background:var(--panel);display:flex;flex-direction:column;min-height:0;min-width:0}
+.cell-head{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);
+  flex:none;background:var(--panel-2)}
+.cell-head .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.cell-head .name{font-size:12px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+.cell-head .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell-head .grow{flex:1}
+.icon-btn{width:26px;height:26px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;
+  color:var(--muted);font-size:13px;transition:background .15s,color .15s}
+.icon-btn:hover{background:rgba(255,255,255,.08);color:var(--ink)}
+.icon-btn.pop{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+.cell-frame{flex:1;position:relative;min-height:0}
+.cell-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#0b0b10}
+
+/* single view */
+.quad.solo{grid-template-columns:1fr;grid-template-rows:1fr}
+.quad.solo .cell{display:none}
+.quad.solo .cell.focus{display:flex}
+.quad.hide-proto .cell.proto{display:none}
+.quad.hide-proto{grid-template-columns:1fr}
+.quad.hide-live .cell.live{display:none}
+.quad.hide-live{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr}
+
+/* ---- comparison overlay ---- */
+.compare{position:absolute;right:12px;top:12px;bottom:12px;width:340px;z-index:20;display:flex;
+  border:1px solid var(--line);border-radius:14px;background:rgba(14,14,22,.92);
+  backdrop-filter:blur(14px);box-shadow:0 30px 80px -30px rgba(0,0,0,.8);
+  transform:translateX(calc(100% + 24px));transition:transform .45s var(--spring)}
+.compare.open{transform:none}
+.compare-inner{flex:1;overflow-y:auto;padding:16px 18px 22px;min-width:0}
+.compare h3{font-size:15px;margin-bottom:2px}
+.compare .sub{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--violet);margin-bottom:14px}
+.axis{border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+.axis .axis-name{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;margin-bottom:7px}
+.axis .axis-name .n{width:18px;height:18px;border-radius:50%;background:var(--violet);color:#fff;
+  font-size:10px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-family:var(--mono)}
+.axis table{width:100%;border-collapse:collapse;font-size:11.5px}
+.axis th{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  text-align:left;padding:3px 4px;border-bottom:1px solid var(--line);font-weight:600}
+.axis td{padding:5px 4px;vertical-align:top;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted)}
+.axis td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+.axis td .chip{display:inline-block;padding:1px 6px;border-radius:99px;font-size:9.5px;font-family:var(--mono);
+  border:1px solid var(--line);color:var(--faint)}
+.axis tr:last-child td{border-bottom:none}
+.axis .note{margin-top:6px;font-size:10.5px;color:var(--faint);border-top:1px dashed var(--line);padding-top:5px}
+.compare-close{position:absolute;top:8px;right:10px}
+.axis .you{color:var(--amber)}
+
+/* ---- questions bar ---- */
+.qbar{position:absolute;left:12px;bottom:12px;right:12px;z-index:15;display:none;gap:8px;
+  padding:10px 14px;border:1px solid var(--line);border-radius:12px;
+  background:rgba(14,14,22,.92);backdrop-filter:blur(14px);align-items:center}
+.qbar.open{display:flex}
+.qbar .q{font-size:12.5px;color:var(--ink);flex:1;min-width:0}
+.qbar .q b{color:var(--amber)}
+.qbar .ans{display:flex;gap:5px;flex:none}
+.qbar .ans button{min-height:26px;padding:0 10px;border-radius:7px;font-size:11px;font-weight:600;
+  border:1px solid var(--line);color:var(--muted);background:rgba(255,255,255,.03)}
+.qbar .ans button:hover{color:var(--ink);border-color:rgba(255,255,255,.25)}
+.qbar .progress{font-family:var(--mono);font-size:10px;color:var(--faint);flex:none}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<div class="console">
+  <span class="brand"><b>◆</b> DESIGN SESSION · R1+ identity walk</span>
+  <span class="sep"></span>
+  <div class="ctl">
+    <button class="btn" id="syncDawn" title="Toggle dawn/night across ALL four surfaces (prototypes AND live studio)">☀ Dawn sync: all four</button>
+  </div>
+  <span class="sep"></span>
+  <div class="ctl">
+    <button class="btn" id="btnCompare">📊 Comparison table</button>
+  </div>
+  <span class="sep"></span>
+  <div class="ctl">
+    <button class="btn" id="btnWalk">▶ Start the guided walk (5 axes)</button>
+  </div>
+  <div class="layout-toggle">
+    <button id="layQuad" class="on" title="All four surfaces">Quad</button>
+    <button id="layProto" title="Prototypes only">3× Proto</button>
+    <button id="layLive" title="Live studio only">Live</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="quad" id="quad">
+
+    <div class="cell proto" data-key="nocta">
+      <div class="cell-head">
+        <span class="dot" style="background:#7e6bff"></span>
+        <span class="name">Nocta</span>
+        <span class="tag">command-driven · dark glass · violet</span>
+        <span class="grow"></span>
+        <button class="icon-btn" title="Focus this surface" onclick="solo('nocta')">⛶</button>
+      </div>
+      <div class="cell-frame"><iframe src="preview-design/nocta.html" title="Nocta prototype"></iframe></div>
+    </div>
+
+    <div class="cell proto" data-key="lumen">
+      <div class="cell-head">
+        <span class="dot" style="background:#a78bfa"></span>
+        <span class="name">Lumen</span>
+        <span class="tag">glass depth · ambient light · violet</span>
+        <span class="grow"></span>
+        <button class="icon-btn" title="Focus this surface" onclick="solo('lumen')">⛶</button>
+      </div>
+      <div class="cell-frame"><iframe src="preview-design/lumen.html" title="Lumen prototype"></iframe></div>
+    </div>
+
+    <div class="cell proto" data-key="beatwall">
+      <div class="cell-head">
+        <span class="dot" style="background:#5b8cff"></span>
+        <span class="name">Beatwall</span>
+        <span class="tag">spatial canvas · precision tool · blue</span>
+        <span class="grow"></span>
+        <button class="icon-btn" title="Focus this surface" onclick="solo('beatwall')">⛶</button>
+      </div>
+      <div class="cell-frame"><iframe src="preview-design/beatwall.html" title="Beatwall prototype"></iframe></div>
+    </div>
+
+    <div class="cell live" data-key="live">
+      <div class="cell-head">
+        <span class="dot" style="background:#e8a24f"></span>
+        <span class="name">Live Studio</span>
+        <span class="tag">shipping app · :8500 · current identity</span>
+        <span class="grow"></span>
+        <button class="icon-btn" title="Focus this surface" onclick="solo('live')">⛶</button>
+      </div>
+      <div class="cell-frame"><iframe src="http://127.0.0.1:8500/" title="Live Screenplay Studio"></iframe></div>
+    </div>
+
+  </div>
+
+  <!-- comparison overlay -->
+  <div class="compare" id="compare">
+    <button class="icon-btn compare-close" onclick="document.getElementById('compare').classList.remove('open')">✕</button>
+    <div class="compare-inner">
+      <h3>The four surfaces, side by side</h3>
+      <div class="sub">five axes · live-measured · no lorem</div>
+
+      <div class="axis">
+        <div class="axis-name"><span class="n">1</span> Typography (what actually renders)</div>
+        <table>
+          <tr><th>surface</th><th>identity fonts</th><th>script face</th></tr>
+          <tr><td>Nocta</td><td>claims Instrument Serif + DM Sans — <b style="color:var(--amber)">but loads neither</b> (falls back Georgia + system-ui)</td><td>Courier Prime</td></tr>
+          <tr><td>Lumen</td><td>kit stack: Georgia display + system-ui body</td><td>Courier Prime</td></tr>
+          <tr><td>Beatwall</td><td>kit stack: Georgia + system-ui (Inter-like density)</td><td>Courier Prime</td></tr>
+          <tr><td>Live</td><td>tokens say Instrument Serif + DM Sans — <b style="color:var(--amber)">also unbundled</b>; ships Caveat/Special Elite/Courier Prime/IBM Plex Mono</td><td>Courier Prime 13px</td></tr>
+        </table>
+        <div class="note">⚠ Both "violet glass" surfaces cite fonts they don't bundle. If you pick a direction, its fonts must actually be downloaded into webapp/fonts/ — or the identity is fiction on every machine without them.</div>
+      </div>
+
+      <div class="axis">
+        <div class="axis-name"><span class="n">2</span> Density &amp; spacing</div>
+        <table>
+          <tr><th>surface</th><th>feel</th><th>base size</th></tr>
+          <tr><td>Nocta</td><td>compact, Linear-like; tight rails, small caps labels</td><td>14px / 11px labels</td></tr>
+          <tr><td>Lumen</td><td>airy — floating panels with generous glass margins</td><td>14px, more padding</td></tr>
+          <tr><td>Beatwall</td><td>tool density — canvas grid, cards, minimap</td><td>13px, canvas scale</td></tr>
+          <tr><td>Live</td><td>medium-dense studio chrome</td><td>13px / script 13px</td></tr>
+        </table>
+        <div class="note">The live app's script body (13px) vs the v2.1 contract's 16px is an open call — flagged for you, not pre-decided.</div>
+      </div>
+
+      <div class="axis">
+        <div class="axis-name"><span class="n">3</span> Navigation model</div>
+        <table>
+          <tr><th>surface</th><th>model</th><th>cost to adopt</th></tr>
+          <tr><td>Nocta</td><td>⌘K palette-first: no tabs/rails, one focused surface; rooms morph in place</td><td>High — rebuilds IA, but the live app already HAS a ⌘K palette</td></tr>
+          <tr><td>Lumen</td><td>floating dock + lens orb; panels summoned, nothing persistent</td><td>High — new shell, new motion system</td></tr>
+          <tr><td>Beatwall</td><td>zoomable scene-card wall on act lanes; minimap + list twin</td><td>Very high — different product shape for the writing room</td></tr>
+          <tr><td>Live</td><td>shelf + 44px rail + dock + drawer (the wireframe-aligned desk)</td><td>— (baseline)</td></tr>
+        </table>
+        <div class="note">Axis 3 is where the three architectures truly differ: this choice changes layout code, not just paint. The live app's nav is contract-bound (wireframe) — a swap here is R2+ scope.</div>
+      </div>
+
+      <div class="axis">
+        <div class="axis-name"><span class="n">4</span> Dawn / light theme</div>
+        <table>
+          <tr><th>surface</th><th>night</th><th>dawn</th></tr>
+          <tr><td>Nocta</td><td>#09090e void + violet</td><td><b>warm cream #f1ede4</b> — same warmth family as live</td></tr>
+          <tr><td>Lumen</td><td>#07070d + aurora</td><td>cool lavender #eef0fb</td></tr>
+          <tr><td>Beatwall</td><td>#101319 (its default is LIGHT #f4f6f9)</td><td>blue-tinted light-first</td></tr>
+          <tr><td>Live</td><td>#09090e void + violet lamp</td><td>warm cream #f1ede4 (AA-verified)</td></tr>
+        </table>
+        <div class="note">Nocta's dawn palette ≈ the live app's dawn palette (same cream + warm ink family). Lumen/Beatwall go cool-light — a different dawn philosophy. Only Beatwall treats light as the primary.</div>
+      </div>
+
+      <div class="axis">
+        <div class="axis-name"><span class="n">5</span> Motion language</div>
+        <table>
+          <tr><th>surface</th><th>signature</th><th>safety</th></tr>
+          <tr><td>Nocta</td><td>cursor spotlight, morphing rooms, ⌘K pop</td><td>shared kit: spring + reduced-motion clamp</td></tr>
+          <tr><td>Lumen</td><td>parallax drift, refraction sweep, lens orb</td><td>same kit</td></tr>
+          <tr><td>Beatwall</td><td>spring physics pins, camera fly-to, glide</td><td>same kit</td></tr>
+          <tr><td>Live</td><td>restrained: 200ms ease transitions, drawer slides</td><td>prefers-reduced-motion honored (a11y pass 3)</td></tr>
+        </table>
+        <div class="note">All prototypes share motion.css — spring overshoot via linear() with cubic-bezier fallback, and every animation collapses under reduced-motion. Whichever direction wins, the motion kit ports as-is.</div>
+      </div>
+
+      <div class="axis" style="border-color:rgba(232,162,79,.35)">
+        <div class="axis-name"><span class="n" style="background:var(--amber);color:#1a1408">✓</span> What R1 actually inherits from each</div>
+        <table>
+          <tr><th>if you pick…</th><th>R1 tokens shift to</th></tr>
+          <tr><td>Nocta</td><td>mostly <b>already there</b>: violet lamp, glass surfaces, cream dawn. R1 = type discipline + spotlight moments + ⌘K-first polish</td></tr>
+          <tr><td>Lumen</td><td>violet shifts cooler (#7c5cf0), cool-lavender dawn, glass depth + blur tokens; motion budget grows</td></tr>
+          <tr><td>Beatwall</td><td>blue accent (#2563eb), light-first, tool-density type; dawn becomes the default and night the alt</td></tr>
+        </table>
+        <div class="note">All a11y work survives any choice — passes 1-11 are semantic/contrast, not identity.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- guided walk bar -->
+  <div class="qbar" id="qbar">
+    <div class="q" id="qText"></div>
+    <div class="ans" id="qAns"></div>
+    <span class="progress" id="qProg"></span>
+  </div>
+</div>
+
+<script>
+/* ---------- layout modes ---------- */
+const quad = document.getElementById('quad');
+function clearLayout(){ quad.classList.remove('solo','hide-proto','hide-live');
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('focus')); }
+function solo(key){ clearLayout(); quad.classList.add('solo');
+  document.querySelector('.cell[data-key="'+key+'"]')?.classList.add('focus'); markLayout('solo'); }
+function mode3proto(){ clearLayout(); quad.classList.add('hide-live'); markLayout('proto'); }
+function modeLive(){ clearLayout(); quad.classList.add('hide-proto'); markLayout('live'); }
+function modeQuad(){ clearLayout(); markLayout('quad'); }
+function markLayout(m){ ['layQuad','layProto','layLive'].forEach(id=>
+  document.getElementById(id).classList.toggle('on',
+    (id==='layQuad'&&m==='quad')||(id==='layProto'&&m==='proto')||(id==='layLive'&&m==='live'))); }
+document.getElementById('layQuad').onclick = modeQuad;
+document.getElementById('layProto').onclick = mode3proto;
+document.getElementById('layLive').onclick = modeLive;
+
+/* ---------- dawn sync across all four surfaces ---------- */
+let dawn = false;
+const protoFrames = {
+  nocta:  document.querySelector('.cell[data-key="nocta"] iframe'),
+  lumen:  document.querySelector('.cell[data-key="lumen"] iframe'),
+  beatwall: document.querySelector('.cell[data-key="beatwall"] iframe')
+};
+const liveFrame = document.querySelector('.cell.live iframe');
+function syncDawn(){
+  dawn = !dawn;
+  // Nocta + Lumen: add/remove body.dawn (night is their default).
+  for (const k of ['nocta','lumen']) {
+    try { protoFrames[k].contentDocument.body.classList.toggle('dawn', dawn); } catch(e) {}
+  }
+  // Beatwall: LIGHT is its default; night = body.dark (inverted convention).
+  try { const b = protoFrames.beatwall.contentDocument.body;
+    b.classList.toggle('dark', dawn); b.classList.remove('dawn'); } catch(e) {}
+  // Live studio: drive its own dawn class inside the frame (same class its toggle uses).
+  try { liveFrame.contentDocument.body.classList.toggle('dawn', dawn); } catch(e) {}
+  const btn = document.getElementById('syncDawn');
+  btn.classList.toggle('on', dawn);
+  btn.textContent = dawn ? '🌙 Night sync: all four' : '☀ Dawn sync: all four';
+}
+document.getElementById('syncDawn').onclick = syncDawn;
+
+/* ---------- comparison overlay ---------- */
+document.getElementById('btnCompare').onclick = () =>
+  document.getElementById('compare').classList.toggle('open');
+
+/* ---------- guided walk ---------- */
+const walk = [
+  { q:"<b>Axis 1 · Fonts.</b> Look at Nocta and the Live Studio — both claim Instrument Serif + DM Sans, but neither bundles the files, so both render Georgia + system-ui. Do you want the Nocta identity fonts actually bundled (real .woff2 files), or do we design around Georgia + system-ui honestly?",
+    a:["Bundle the violet fonts","Keep system stacks","Decide later"], k:"fonts" },
+  { q:"<b>Axis 2 · Density.</b> Compare the same finding note across surfaces: Nocta is compact (Linear-like), Lumen is airy glass, Beatwall is tool-dense, Live is medium. Which density should R1 tune toward?",
+    a:["Compact (Nocta)","Airy (Lumen)","Tool-dense (Beatwall)","Keep Live's"], k:"density" },
+  { q:"<b>Axis 3 · Navigation.</b> This is the fork with real build cost: Nocta's ⌘K-palette-first (no rails) vs Live's shelf+rail+dock (wireframe-bound). Beatwall/Lumen mean new shells. Note: your binding wireframe fixed Live's nav — changing it is R2+ scope, R1 can only paint it. Do you want to keep the wireframe nav long-term?",
+    a:["Keep wireframe nav","Nocta nav (R2+)","Decide later"], k:"nav" },
+  { q:"<b>Axis 4 · Dawn philosophy.</b> Nocta's dawn is warm cream #f1ede4 — the SAME warmth family as the live app. Lumen goes cool lavender, Beatwall is light-first. Warm cream keeps continuity with everything already AA-verified. Which dawn?",
+    a:["Warm cream (Nocta/Live)","Cool lavender (Lumen)","Light-first (Beatwall)","Decide later"], k:"dawn" },
+  { q:"<b>Axis 5 · Motion.</b> All three share the spring-physics motion kit (ports as-is, reduced-motion safe). Signatures differ: Nocta's spotlight, Lumen's parallax, Beatwall's fly-to, Live's restraint. How bold should R1 motion be?",
+    a:["Restrained (Live today)","Spotlight moments (Nocta)","Full ambient (Lumen)","Decide later"], k:"motion" }
+];
+let wi = 0; const answers = {};
+function startWalk(){ wi = 0; showQ(); document.getElementById('btnWalk').textContent = '⏭ Next question'; }
+function showQ(){
+  const item = walk[wi]; if(!item){ return endWalk(); }
+  document.getElementById('qText').innerHTML = item.q;
+  const ans = document.getElementById('qAns'); ans.innerHTML = '';
+  item.a.forEach((label, ix) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => { answers[item.k] = label; wi++; showQ(); };
+    ans.appendChild(b);
+  });
+  document.getElementById('qProg').textContent = (wi+1) + ' / ' + walk.length;
+  document.getElementById('qbar').classList.add('open');
+}
+function endWalk(){
+  document.getElementById('qbar').classList.remove('open');
+  document.getElementById('btnWalk').textContent = '✓ Walk complete — see summary';
+  console.log('DESIGN SESSION ANSWERS:', JSON.stringify(answers, null, 2));
+  const blob = new Blob([JSON.stringify({ session:'R1+ identity walk', date:new Date().toISOString(), answers }, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'design-session-answers.json'; a.click();
+  alert('Walk complete — answers saved to design-session-answers.json.\n\n' + JSON.stringify(answers, null, 2));
+}
+document.getElementById('btnWalk').onclick = () => {
+  if (wi === 0 || wi >= walk.length) startWalk();
+  else showQ();
+};
+</script>
+</body>
+</html>
