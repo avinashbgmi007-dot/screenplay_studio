@@ -5662,7 +5662,7 @@ function renderFvChat(containerId, room) {
   if (!container) return;
   var branchData = currentBranchData();
   if (!branchData || !branchData.messages || !branchData.messages.length) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">Start a conversation...</div>';
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:var(--fs-sm);">Start a conversation...</div>';
     return;
   }
   var msgs = branchData.messages;
@@ -5676,7 +5676,7 @@ function renderFvChat(containerId, room) {
     var cls = m.role === 'user' ? 'user' : 'ai';
     html += '<div class="fv-msg ' + cls + '">' + (m.content || m.text || '') + '</div>';
   });
-  container.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px;">Start a conversation...</div>';
+  container.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:var(--fs-sm);">Start a conversation...</div>';
   container.scrollTop = container.scrollHeight;
 }
 
