@@ -4160,7 +4160,20 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   border-top: 1px solid var(--line-soft);
   display: flex; gap: 6px;
 }
-.fv-composer .inp { flex: 1; }
+.fv-composer .inp {
+  flex: 1;
+  /* a11y (WCAG 1.4.3, caught by axe): .inp had NO background rule, so it
+     kept the UA-default WHITE fill while its text inherited --text
+     (#ecebf4 in night) — typed text sat at 1.18:1 on white. Match the
+     app's input house style instead. */
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  color: var(--text);
+}
+.fv-composer .inp::placeholder { color: var(--text-faint); }
+.fv-composer .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--glow); }
 .fv-script {
   flex: 1; overflow-y: auto;
   padding: 20px 32px;
@@ -4791,6 +4804,10 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
 .status-item.switch {
   color: var(--desk-amber-bright);
   cursor: pointer;
+}
+/* a11y (WCAG 1.4.3): only the decorative dot pulses — the text stays at
+   full contrast (pulsing the whole line fell to 4.15:1 night / 2.2:1 dawn). */
+.status-item.switch .switch-dot {
   animation: switch-nudge 1.6s ease-in-out infinite;
 }
 @keyframes switch-nudge { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }

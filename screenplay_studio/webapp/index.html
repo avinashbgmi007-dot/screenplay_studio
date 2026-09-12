@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b350">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b353">
 </head>
 <body data-room="cowrite">
 
@@ -124,7 +124,7 @@
 
       <!-- The dashboard: every script on the desk as a card — status, stats,
            one-click actions. Nothing buried in menus. -->
-      <div id="dashboard" class="dashboard" aria-label="Your scripts">
+      <div id="dashboard" class="dashboard" role="region" aria-label="Your scripts">
         <div class="dash-head">
           <span class="dash-title">On the desk</span>
           <span id="dash-conn" class="dash-conn" title="Model server status">…</span>
@@ -138,7 +138,7 @@
       </div>
     </section>
 
-    <header id="project-bar" aria-label="Project bar" style="display:none;">
+    <header id="project-bar" role="region" aria-label="Project bar" style="display:none;">
       <div class="project-bar-left">
         <button id="home-btn" class="home-btn" type="button" title="Back to the desk — the shelf, your library, and the idea room">⌂</button>
         <h2 id="project-title">—</h2>
@@ -390,7 +390,7 @@
 
       <!-- Manuscript Stage: the partner drawer — summoned from the gutter, gone
            when you close it. The script keeps the room. -->
-      <div class="drawer" id="room-drawer" aria-label="Partner">
+      <div class="drawer" id="room-drawer" role="region" aria-label="Partner">
         <div class="drawer-head">
           <div class="drawer-avatar sam" id="drawer-av">S</div>
           <div class="drawer-name" id="drawer-name">Sameer <small>co-writer — beside you</small></div>
@@ -464,7 +464,7 @@
     </div>
 
     <!-- Status strip: model · connection · loop metrics · sprint · room light -->
-    <footer id="status-strip" class="status-strip" aria-label="Status strip">
+    <footer id="status-strip" class="status-strip" role="region" aria-label="Status strip">
       <span id="status-project" class="status-item status-project" style="display:none;"></span>
       <span id="status-conn" class="status-item" title="Model connection status — hover for details">—</span>
       <span id="status-model" class="status-item status-model-wrap">
@@ -610,7 +610,7 @@
             </div>
             <div id="fv-cowrite-messages" class="fv-messages"></div>
             <form id="fv-cowrite-composer" class="fv-composer">
-              <input id="fv-cowrite-input" type="text" placeholder="Rewrite suggestion..." class="inp">
+              <input id="fv-cowrite-input" type="text" aria-label="Suggest a rewrite" placeholder="Rewrite suggestion..." class="inp">
               <button type="submit" class="btn-primary btn-small">&raquo;</button>
             </form>
           </div>
@@ -755,7 +755,7 @@
 </div>
 
 <script src="core.js?v=hx1b112"></script>
-<script src="app.js?v=hx1b350"></script>
+<script src="app.js?v=hx1b353"></script>
 <div id="river-current" aria-hidden="true"></div>
 <div class="dawn-wash" aria-hidden="true"></div>
 </body>

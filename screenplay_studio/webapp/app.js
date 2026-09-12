@@ -396,7 +396,11 @@ async function checkConnection() {
           ? { available: true, url: probe.url, models: probe.models || [] }
           : { available: false };
         if (probe.available && connEl) {
-          connEl.textContent = "● your model is back — click to switch";
+          // a11y (WCAG 1.4.3, caught by axe): pulsing the WHOLE line's opacity
+          // dragged the text to 4.15:1 (night) and ~2.2:1 (dawn) at the trough.
+          // Only the decorative ● dot pulses now; the words stay at full
+          // contrast in both themes.
+          connEl.innerHTML = '<span class="switch-dot" aria-hidden="true">●</span> your model is back — click to switch';
           connEl.className = "status-item switch";
           connEl.title = `Your llama-server answered at ${probe.url}` +
             (probe.models && probe.models.length ? ` — ${probe.models[0]}` : "");
@@ -542,10 +546,11 @@ function renderDashboard() {
     actions.appendChild(backup);
     card.appendChild(actions);
 
-    // a11y (WCAG 2.1.1 Keyboard): the card is a div — same fix as the shelf
-    // rows. role=button + tabindex + Enter/Space (its inner dash-open
-    // button stays the labelled shortcut).
-    card.setAttribute("role", "button");
+    // a11y (WCAG 2.1.1 Keyboard + axe nested-interactive): same as the
+    // shelf rows — a labelled GROUP (open via Enter/Space, "Open desk →",
+    // "Backup", ✕), never role="button" (would nest interactives).
+    card.setAttribute("role", "group");
+    card.setAttribute("aria-label", `Open project ${p.title}`);
     card.setAttribute("tabindex", "0");
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -634,10 +639,12 @@ function renderProjectList() {
       deleteProjectFlow(p.project, p.title);
     });
     item.appendChild(del);
-    // a11y (WCAG 2.1.1 Keyboard): the shelf row is a div, so the open
-    // action was mouse-only. role=button + tabindex + Enter/Space — the
-    // same pattern as .scene-index-item.
-    item.setAttribute("role", "button");
+    // a11y (WCAG 2.1.1 Keyboard + axe nested-interactive): the shelf row is
+    // a GROUP of actions (open via Enter/Space, ✕ remove) — role="button"
+    // on the container NESTED interactive controls (axe serious). The row
+    // stays keyboard-openable (tabindex + Enter/Space) as a labelled group.
+    item.setAttribute("role", "group");
+    item.setAttribute("aria-label", `Open project ${p.title}`);
     item.setAttribute("tabindex", "0");
     item.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -1041,9 +1048,11 @@ function renderIdeaList() {
       }
     });
     item.appendChild(del);
-    // a11y (WCAG 2.1.1 Keyboard): the idea row is a div — same fix as the
-    // project shelf row. role=button + tabindex + Enter/Space.
-    item.setAttribute("role", "button");
+    // a11y (WCAG 2.1.1 Keyboard + axe nested-interactive): same as the
+    // project shelf row — a labelled GROUP (open via Enter/Space, ✎ rename,
+    // ✕ remove), never role="button" (would nest interactives).
+    item.setAttribute("role", "group");
+    item.setAttribute("aria-label", `Open idea ${(idea.title || 'Untitled idea')}`);
     item.setAttribute("tabindex", "0");
     item.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
