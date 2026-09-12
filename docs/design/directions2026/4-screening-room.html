@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direction 4 — The Screening Room</title>
+<style>
+/* ============================================================
+   DIRECTION 4 — THE SCREENING ROOM
+   Cinematic geography: the SCREEN is horizontal. Scenes are a
+   filmstrip spine along the bottom; the manuscript is staged
+   above it; findings ride as synchronized director's notes on
+   a timecode rail. Beat Board = the strip stretched wide.
+   Deep projection-room dark, one projection beam.
+   ============================================================ */
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-20a22824.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-a15d607a.woff2') format('woff2'); font-weight:600; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-094f4033.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-6664e8d0.woff2') format('woff2'); font-weight:700; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-0bc96cd0.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-e2661bcc.woff2') format('woff2'); font-weight:500; }
+@font-face { font-family:'Caveat'; src:url('../../../screenplay_studio/webapp/fonts/Caveat-706a1c41.woff2') format('woff2'); }
+
+:root {
+  --projection:#08090c;      /* the booth dark */
+  --screen:#101319;
+  --screen-2:#161a22;
+  --beam:rgba(255,244,214,.05);  /* the projector's beam */
+  --paper:#f6f0e2;
+  --paper-ink:#26221a;
+  --paper-dim:#7b715f;
+  --amber:#e0b45c;            /* timecode amber — the strip's ink */
+  --amber-dim:rgba(224,180,92,.14);
+  --mark-red:#e2725b;         /* high */
+  --mark-teal:#69b3a7;        /* the colorist's teal — Sushruta */
+  --txt:#e5e0d3;
+  --dim:#8f8c81;
+  --line:rgba(229,224,211,.13);
+  --serif:'Source Serif 4', Georgia, serif;
+  --script:'Courier Prime', 'Courier New', monospace;
+  --mono:'IBM Plex Mono', Consolas, monospace;
+  --hand:'Caveat', cursive;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+body { background:var(--projection); color:var(--txt); font-family:var(--serif); overflow:hidden; }
+
+/* the projector beam: one diagonal light from top-left */
+body::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(1200px 700px at 22% -18%, rgba(255,244,214,.06), transparent 55%),
+    radial-gradient(900px 500px at 78% 118%, rgba(105,179,167,.04), transparent 60%);
+}
+
+/* ---------- the marquee: projection header ---------- */
+#marquee {
+  height:54px; display:flex; align-items:center; gap:20px; padding:0 28px;
+  border-bottom:1px solid var(--line); position:relative; z-index:6;
+  font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim);
+}
+#marquee .house { color:var(--txt); font-weight:500; }
+#marquee .house i { color:var(--amber); font-style:normal; }
+#marquee .nowshow { color:var(--txt); font-family:var(--serif); font-size:16px; letter-spacing:0; text-transform:none; font-style:italic; }
+#marquee .reelpos { margin-left:auto; }
+#marquee .reelpos b { color:var(--amber); font-weight:500; }
+#mockbar { position:fixed; right:18px; top:62px; z-index:70; display:flex; flex-direction:column; gap:6px; }
+#mockbar button {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  background:var(--screen); color:var(--dim); border:1px solid var(--line); border-radius:99px; padding:6px 12px; cursor:pointer;
+}
+#mockbar button.on { color:var(--amber); border-color:var(--amber); }
+#mockbar button:hover { color:var(--txt); }
+
+#stage { position:absolute; top:54px; left:0; right:0; bottom:118px; overflow:hidden; }
+.state { display:none; height:100%; }
+.state.on { display:flex; flex-direction:column; animation:fadein .5s ease both; }
+@keyframes fadein { from { opacity:0 } to { opacity:1 } }
+
+/* ============================================================
+   THE STAGE FLOOR (used by manuscript + idea)
+   ============================================================ */
+.stagefloor { flex:1; display:grid; grid-template-columns:minmax(0, 780px) 300px; gap:0; justify-content:center; align-items:stretch; padding:26px 30px 10px; overflow:auto; }
+.slate {
+  background:var(--screen-2); border:1px solid var(--line); position:relative;
+  padding:30px 34px; overflow:auto;
+}
+.slate::before { /* timecode corner mark */
+  content:"SC 03 · 14:28 / 28:00"; position:sticky; top:0; float:right;
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; color:var(--amber);
+  background:var(--projection); padding:4px 10px; border:1px solid var(--line); border-radius:3px;
+}
+.slate .framehead { font-family:var(--mono); font-size:9.5px; letter-spacing:.26em; text-transform:uppercase; color:var(--dim); margin-bottom:18px; }
+.slate .sline { font-family:var(--script); font-size:14.5px; line-height:1.7; color:var(--paper); margin-bottom:12px; white-space:pre-wrap; }
+.slate .sline.dim { color:#b9b2a2; }
+.slate .char { margin-top:16px; color:var(--paper); }
+.slate .paren { margin-left:18%; color:#9b9182; font-style:italic; }
+.slate .dial { margin-left:12%; margin-bottom:14px; color:var(--paper); }
+
+/* synchronized director's notes — markers keyed to beats, riding beside the frame */
+.syncnotes { border-left:1px solid var(--line); padding:30px 22px 20px; overflow:auto; background:linear-gradient(180deg, rgba(8,9,12,.4), transparent 30%); }
+.syncnotes .head { font-family:var(--mono); font-size:9.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--line); }
+.dnote { border-left:2px solid var(--mark-red); padding:10px 4px 12px 12px; margin-bottom:16px; cursor:pointer; transition:background .2s; }
+.dnote:hover { background:rgba(226,114,91,.06); }
+.dnote.mid { border-left-color:var(--amber); }
+.dnote.low { border-left-color:#8ea2c4; }
+.dnote .tc { font-family:var(--mono); font-size:9px; letter-spacing:.18em; color:var(--dim); text-transform:uppercase; margin-bottom:5px; display:flex; gap:8px; }
+.dnote .tc b { color:inherit; font-weight:500; }
+.dnote h4 { font-family:var(--serif); font-size:14px; font-weight:600; color:var(--txt); line-height:1.35; margin-bottom:5px; }
+.dnote p { font-family:var(--serif); font-size:12px; line-height:1.5; color:var(--dim); }
+.dnote .cue { font-family:var(--script); font-size:10.5px; color:#cfc8b8; border:1px dashed var(--line); padding:5px 8px; margin-top:7px; display:inline-block; }
+
+/* sameer's cue sheet presence (right column, in-flow not chat) */
+.cuesheet { margin-top:22px; border-top:1px solid var(--line); padding-top:16px; }
+.cuesheet .who { font-family:var(--hand); font-size:20px; color:var(--amber); margin-bottom:6px; }
+.cuesheet .line { font-family:var(--hand); font-size:16.5px; color:var(--txt); line-height:1.3; margin-bottom:10px; }
+.cuesheet .askline { display:flex; border-bottom:1px solid var(--line); padding-bottom:2px; }
+.cuesheet .askline input { flex:1; background:none; border:none; outline:none; color:var(--txt); font-family:var(--serif); font-size:13.5px; padding:7px 2px; }
+/* projector flicker — the thinking indicator, text preserved (#6) */
+.gthink { display:flex; align-items:center; gap:10px; margin:8px 0 4px; font-family:var(--hand); font-size:15.5px; color:var(--dim); }
+.gthink .flicker { display:inline-flex; gap:4px; }
+.gthink .flicker i { width:5px; height:5px; border-radius:50%; background:var(--amber); animation:projFlicker 1.3s ease-in-out infinite; }
+.gthink .flicker i:nth-child(2){ animation-delay:.18s } .gthink .flicker i:nth-child(3){ animation-delay:.36s }
+@keyframes projFlicker { 0%,100%{ opacity:.25; transform:scale(.7) } 50%{ opacity:1; transform:scale(1) } }
+/* selection tools on the slate — the creation half of the sticky loop (#11) */
+.selbar {
+  margin:16px 0 4px; display:inline-flex; align-items:center; gap:10px;
+  background:var(--screen-2); border:1px solid var(--line); border-radius:99px; padding:8px 10px 8px 16px;
+}
+.selbar .selquote { font-family:var(--script); font-size:12px; color:var(--txt); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.selbar button {
+  font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+  background:none; border:1px solid var(--line); color:var(--dim); border-radius:99px;
+  padding:6px 12px; cursor:pointer; transition:color .15s, border-color .15s;
+}
+.selbar button:hover { color:var(--amber); border-color:var(--amber); }
+.cuesheet .askline input::placeholder { color:var(--dim); font-style:italic; }
+.cuesheet .askline button { background:none; border:none; color:var(--amber); font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
+
+/* sticky on the slate — gaffer tape */
+.tapesticky {
+  position:absolute; right:24px; bottom:18px; transform:rotate(-1.6deg);
+  background:#101319; border:1px solid var(--line); color:#d9d2c0;
+  font-family:var(--hand); font-size:15.5px; padding:10px 14px; max-width:230px; line-height:1.25;
+  box-shadow:0 12px 30px -10px rgba(0,0,0,.8); cursor:pointer;
+}
+.tapesticky::before { content:""; position:absolute; top:-6px; left:50%; transform:translateX(-50%) rotate(1deg); width:44px; height:12px; background:rgba(224,180,92,.5); }
+.tapesticky .ref { display:block; font-family:var(--mono); font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-top:6px; }
+
+/* ============================================================
+   THE FILMSTRIP SPINE (persistent bottom)
+   ============================================================ */
+#filmstrip {
+  position:fixed; left:0; right:0; bottom:42px; height:76px; z-index:8;
+  border-top:1px solid var(--line); background:var(--projection);
+  display:flex; align-items:center; gap:0; padding:0 22px;
+}
+#filmstrip .cap { font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); flex:none; width:86px; line-height:1.6; }
+#filmstrip .cap b { color:var(--amber); font-weight:500; }
+.frames { display:flex; gap:10px; flex:1; overflow-x:auto; padding:8px 6px; scroll-behavior:smooth; align-items:stretch; }
+/* act reels cluster the strip — a 120-page feature collapses to ~4 clusters, not 60 cards */
+.actreel { display:flex; gap:10px; padding-right:10px; border-right:1px dashed var(--line); flex:none; align-items:stretch; }
+.actreel:last-child { border-right:none; }
+.actreel .ar-cap {
+  writing-mode:vertical-rl; transform:rotate(180deg); font-family:var(--mono); font-size:8px;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--dim); padding:2px 3px; flex:none;
+  display:flex; align-items:center; justify-content:center;
+}
+.actreel.open .ar-cap { color:var(--amber); }
+.framecard {
+  flex:none; width:120px; height:56px; border:1px solid var(--line); border-radius:4px;
+  background:var(--screen); cursor:pointer; position:relative;
+  display:flex; flex-direction:column; justify-content:flex-end; padding:6px 9px;
+  transition:border-color .2s, transform .2s;
+}
+.framecard:hover { border-color:var(--dim); transform:translateY(-3px); }
+.framecard.here { border-color:var(--amber); box-shadow:0 0 18px -4px rgba(224,180,92,.35); }
+.framecard .sc { font-family:var(--mono); font-size:8.5px; letter-spacing:.16em; color:var(--dim); text-transform:uppercase; }
+.framecard .nm { font-family:var(--serif); font-size:11.5px; color:var(--txt); font-style:italic; line-height:1.2; margin-top:1px; }
+.framecard .marks { position:absolute; top:6px; right:8px; display:flex; gap:3px; }
+.framecard .marks i { width:5px; height:5px; border-radius:50%; }
+.framecard .marks .m-high { background:var(--mark-red); } .framecard .marks .m-mid { background:var(--amber); } .framecard .marks .m-low { background:#8ea2c4; }
+.framecard.here .progress { position:absolute; left:0; bottom:0; height:2px; width:35%; background:var(--amber); animation:stripAdvance 3.2s ease-in-out infinite alternate; }
+@keyframes stripAdvance { from { width:22% } to { width:48% } }
+
+/* the deck rail (very bottom) */
+#deck {
+  position:fixed; left:0; right:0; bottom:0; height:42px; z-index:9;
+  display:flex; align-items:center; gap:22px; padding:0 28px;
+  border-top:1px solid var(--line); background:var(--screen);
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim);
+}
+#deck .r { margin-left:auto; display:flex; gap:20px; }
+#deck span { cursor:pointer; transition:color .15s; } #deck span:hover { color:var(--amber); }
+#deck .live { color:var(--mark-teal); }
+
+/* ============================================================
+   STATE: LOBBY (landing)
+   ============================================================ */
+.lobby { flex-direction:row !important; display:none !important; }
+.state.on.lobby { display:flex !important; flex-direction:row; align-items:stretch; gap:30px; padding:30px 34px; overflow:auto; }
+.lobby .posterwall { flex:1; display:flex; flex-direction:column; }
+.lobby .househead { margin-bottom:26px; }
+.lobby .househead .over { font-family:var(--mono); font-size:10px; letter-spacing:.32em; text-transform:uppercase; color:var(--dim); }
+.lobby .househead h1 { font-family:var(--serif); font-size:clamp(32px,4vw,46px); font-weight:600; color:var(--txt); margin-top:10px; }
+.lobby .househead p { font-family:var(--serif); font-style:italic; color:var(--dim); font-size:15.5px; margin-top:6px; }
+.posterrow { display:flex; gap:20px; flex-wrap:wrap; }
+.poster {
+  width:230px; background:var(--screen-2); border:1px solid var(--line); border-radius:6px;
+  padding:18px 18px 16px; cursor:pointer; position:relative; overflow:hidden;
+  transition:transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s, border-color .25s;
+}
+.poster:hover { transform:translateY(-5px) rotate(-.5deg); box-shadow:0 24px 50px -18px rgba(0,0,0,.85); border-color:var(--amber-dim); }
+.poster .ribbon { position:absolute; top:0; left:0; right:0; height:4px; }
+.poster.screening .ribbon { background:var(--mark-red); }
+.poster.fresh .ribbon { background:var(--amber); }
+.poster.vaulted .ribbon { background:#5d6470; }
+.poster h3 { font-family:var(--serif); font-size:20px; font-weight:600; color:var(--txt); margin:8px 0 6px; }
+.poster .meta { font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); line-height:1.9; }
+.poster .meta b { color:var(--amber); font-weight:500; }
+.poster .quip { margin-top:12px; font-family:var(--hand); font-size:15.5px; color:#cfc8b8; border-top:1px dashed var(--line); padding-top:9px; }
+.lobby .newreel {
+  width:230px; border:1.5px dashed var(--dim); border-radius:6px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:8px; cursor:pointer; color:var(--dim);
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; text-align:center; padding:18px;
+  transition:border-color .2s, color .2s;
+}
+.lobby .newreel:hover { border-color:var(--amber); color:var(--amber); }
+.lobby .newreel b { font-family:var(--serif); font-size:17px; text-transform:none; letter-spacing:0; color:var(--txt); font-weight:600; }
+.lobby .sidecard { width:270px; flex:none; align-self:flex-start; border-left:1px solid var(--line); padding-left:24px; }
+.lobby .sidecard .h { font-family:var(--mono); font-size:9.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); margin-bottom:14px; }
+.lobby .sidecard .samline { font-family:var(--hand); font-size:18.5px; color:var(--txt); line-height:1.3; margin-bottom:12px; }
+.lobby .sidecard .samline b { color:var(--amber); font-weight:400; }
+.lobby .sidecard .ask { display:flex; border-bottom:1px solid var(--line); }
+.lobby .sidecard .ask input { flex:1; background:none; border:none; outline:none; color:var(--txt); font-family:var(--serif); font-size:13.5px; padding:7px 2px; }
+.lobby .sidecard .ask input::placeholder { color:var(--dim); font-style:italic; }
+.lobby .sidecard .ask button { background:none; border:none; color:var(--amber); font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
+
+/* ============================================================
+   STATE: WRITING ROOM (idea)
+   ============================================================ */
+.idea-stage { flex:1; display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:26px; padding:26px 34px 10px; overflow:auto; justify-content:center; }
+.idea-page {
+  background:var(--paper); color:var(--paper-ink); padding:44px 48px;
+  box-shadow:0 26px 60px -24px rgba(0,0,0,.9); border-radius:3px; min-height:380px;
+}
+.idea-page h2 { font-family:var(--hand); font-size:30px; margin-bottom:14px; }
+.idea-page .body { font-family:var(--serif); font-size:16.5px; line-height:2; outline:none; min-height:220px; }
+.idea-side .sam-presence { border:1px solid var(--line); border-radius:10px; padding:18px; background:var(--screen-2); margin-bottom:18px; }
+.idea-side .sam-presence .who { font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--amber); margin-bottom:9px; }
+.idea-side .sam-presence .q { font-family:var(--hand); font-size:19px; color:var(--txt); line-height:1.25; margin-bottom:12px; }
+.idea-side .sam-presence .ask { display:flex; gap:8px; }
+.idea-side .sam-presence input { flex:1; background:var(--projection); border:1px solid var(--line); border-radius:7px; color:var(--txt); font-family:var(--serif); font-size:13px; padding:8px 10px; outline:none; }
+.idea-side .sam-presence input:focus { border-color:var(--amber); }
+.idea-side .beats .h { font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; }
+.idea-side .beats .b { display:flex; justify-content:space-between; font-family:var(--serif); font-size:13.5px; color:var(--txt); padding:7px 0; border-bottom:1px dotted var(--line); }
+.idea-side .beats .b span { font-family:var(--mono); font-size:9px; color:var(--dim); }
+
+/* ============================================================
+   STATE: PROJECTION (progress) — the reel runs
+   ============================================================ */
+.reelroom { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; overflow:auto; padding:20px 30px; }
+.reelspin { display:flex; align-items:center; gap:22px; margin-bottom:34px; }
+.reelspin .reel {
+  width:64px; height:64px; border-radius:50%; border:2px solid var(--amber);
+  border-right-color:transparent; animation:reelspin 2.2s linear infinite;
+  position:relative;
+}
+.reelspin .reel::after { content:""; position:absolute; inset:16px; border-radius:50%; border:1px solid var(--amber-dim); border-top-color:var(--amber); }
+@keyframes reelspin { to { transform:rotate(360deg) } }
+.reelspin .say { font-family:var(--serif); font-style:italic; font-size:21px; color:var(--txt); }
+.reelspin .say b { color:var(--amber); font-style:normal; }
+.reelspin .say .wave { display:inline-flex; gap:3px; margin-left:8px; }
+.reelspin .say .wave i { width:4px; height:4px; border-radius:50%; background:var(--amber); animation:reelwave 1.2s ease-in-out infinite; }
+.reelspin .say .wave i:nth-child(2){ animation-delay:.15s } .reelspin .say .wave i:nth-child(3){ animation-delay:.3s }
+@keyframes reelwave { 0%,100%{ opacity:.3; transform:translateY(0) } 50%{ opacity:1; transform:translateY(-4px) } }
+.reellog { width:min(680px,90%); border-top:1px solid var(--line); }
+.reelrow { display:grid; grid-template-columns:96px minmax(0,1fr) auto; gap:16px; padding:14px 6px; border-bottom:1px solid var(--line); align-items:baseline; }
+.reelrow .no { font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; }
+.reelrow .nm { font-family:var(--serif); font-size:16px; color:var(--txt); }
+.reelrow .nm small { display:block; font-size:12.5px; color:var(--dim); font-style:italic; margin-top:1px; }
+.reelrow .st { font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; }
+.reelrow.done .st { color:var(--mark-teal); }
+.reelrow.run .st { color:var(--amber); }
+.reelrow.fail .st { color:var(--mark-red); }
+.reelrow.fail .nm::after { content:"— the reel caught; clean and thread it again"; font-family:var(--serif); font-style:italic; font-size:12.5px; color:var(--mark-red); margin-left:10px; }
+.reelroom .clean { margin-top:24px; font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; background:none; border:1px solid var(--mark-red); color:var(--mark-red); padding:10px 20px; border-radius:99px; cursor:pointer; transition:background .18s,color .18s; }
+.reelroom .clean:hover { background:var(--mark-red); color:var(--projection); }
+
+/* ============================================================
+   STATE: GREEN ROOM (partners)
+   ============================================================ */
+.greenroom { flex:1; display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:26px; padding:30px 34px 20px; overflow:auto; align-content:start; }
+.gr-seat { border:1px solid var(--line); border-radius:10px; background:var(--screen-2); overflow:hidden; display:flex; flex-direction:column; }
+.gr-seat .seathead { padding:16px 20px 14px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:10px; }
+.gr-seat.sameer .seathead { background:linear-gradient(180deg, rgba(224,180,92,.08), transparent); }
+.gr-seat.sushruta .seathead { background:linear-gradient(180deg, rgba(105,179,167,.08), transparent); }
+.gr-seat .seathead b { font-family:var(--serif); font-size:20px; font-weight:600; color:var(--txt); }
+.gr-seat .seathead span { font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; }
+.gr-seat.sameer .seathead span { color:var(--amber); }
+.gr-seat.sushruta .seathead span { color:var(--mark-teal); }
+.gr-seat .seatbody { padding:18px 20px; flex:1; display:flex; flex-direction:column; gap:12px; }
+.gr-seat .seatbody .line { font-family:var(--serif); font-size:14.5px; line-height:1.6; color:var(--txt); }
+.gr-seat.sameer .seatbody .line.sam { font-family:var(--hand); font-size:19.5px; line-height:1.3; color:#ead9b0; }
+.gr-seat .cue { font-family:var(--script); font-size:11px; color:#cfc8b8; border-left:2px solid currentColor; padding:6px 10px; }
+.gr-seat.sameer .cue { border-left-color:var(--amber); }
+.gr-seat.sushruta .cue { border-left-color:var(--mark-teal); }
+.gr-seat .seatbody .acts { display:flex; gap:14px; margin-top:auto; }
+.gr-seat .seatbody .acts button { background:none; border:none; font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); cursor:pointer; border-bottom:1px solid var(--line); padding-bottom:2px; }
+.gr-seat .seatbody .acts button:hover { color:var(--amber); border-bottom-color:var(--amber); }
+.gr-ask { grid-column:1 / -1; display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--screen-2); }
+.gr-ask input { flex:1; background:none; border:none; outline:none; color:var(--txt); font-family:var(--serif); font-size:15px; padding:15px 18px; }
+.gr-ask input:focus { background:rgba(255,255,255,.02); }
+.gr-ask input::placeholder { color:var(--dim); font-style:italic; }
+.gr-ask .addr { font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); padding:0 16px; align-self:center; border-left:1px solid var(--line); }
+.gr-ask button { background:var(--amber); border:none; color:#221a08; font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; padding:0 26px; cursor:pointer; font-weight:500; }
+
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header id="marquee">
+  <span class="house">SCREENING <i>ROOM</i> — script doctor studio</span>
+  <span class="nowshow">now showing: The Late Hour</span>
+  <span class="reelpos">reel <b>3 of 12</b> · 3 marks on this frame</span>
+</header>
+
+<div id="mockbar">
+  <button data-s="screening" class="on">screening</button>
+  <button data-s="lobby">lobby</button>
+  <button data-s="idea">writing room</button>
+  <button data-s="reel">projection</button>
+  <button data-s="green">green room</button>
+</div>
+
+<main id="stage">
+
+  <!-- STATE: SCREENING (manuscript + synchronized notes) -->
+  <section class="state on" id="s-screening">
+    <div class="stagefloor">
+      <article class="slate">
+        <div class="framehead">the frame · as projected</div>
+        <div class="sline">INT. DINER — NIGHT</div>
+        <div class="sline dim">Rain streams down the window. MAYA (30s, rain-soaked) slides into a booth.</div>
+        <div class="sline char">MAYA</div>
+        <div class="sline dial">You said eleven. I've been here since nine-thirty.</div>
+        <div class="sline dim">DECK (50s) doesn't look up from his coffee.</div>
+        <div class="sline char">DECK</div>
+        <div class="sline dial">Traffic.</div>
+        <div class="sline char">MAYA</div>
+        <div class="sline dial">For two hours?</div>
+        <div class="sline char">DECK</div>
+        <div class="sline dial">You're still here.</div>
+        <div class="sline paren">(a beat — he turns the pocket watch over in his palm)</div>
+        <div class="sline dial">Sit down before the coffee gets ideas.</div>
+        <div class="sline" style="margin-top:20px; letter-spacing:.24em; color:#9b9182;">CUT TO:</div>
+        <div class="tapesticky" title="click to locate the taped passage">
+          the watch — grandpa's letter? give it BACK to her here
+          <span class="ref">taped to: "pocket watch" · frame 3</span>
+        </div>
+        <div class="selbar" title="select on the slate, these rise">
+          <span class="selquote">"he turns the pocket watch over in his palm"</span>
+          <button>✎ tape a note</button><button>stash the lines</button><button>ask the room</button>
+        </div>
+      </article>
+      <aside class="syncnotes">
+        <div class="head">director's notes — synced to the frame</div>
+        <div class="dnote">
+          <div class="tc"><b>14:28</b> setup / payoff · high</div>
+          <h4>The pocket watch never returns</h4>
+          <p>Deck's watch sets up an attachment the script never pays. The train station is the natural recall point.</p>
+          <span class="cue">"he turns the pocket watch over in his palm"</span>
+        </div>
+        <div class="dnote mid">
+          <div class="tc"><b>14:29</b> pacing · mid</div>
+          <h4>Static blocking, two pages</h4>
+          <p>Eleven beats, two talking heads. Give Maya business — the sugar, the window, the menu.</p>
+          <span class="cue">"Traffic."</span>
+        </div>
+        <div class="dnote low">
+          <div class="tc"><b>14:30</b> character dials · low</div>
+          <h4>Maya softens without a signal</h4>
+          <p>Confrontational to soft in six beats. One visible reason makes it land.</p>
+          <span class="cue">"You're still here."</span>
+        </div>
+        <div class="cuesheet">
+          <div class="who">Sameer — cue sheet</div>
+          <div class="line">He's not attached to the watch — he's attached to who gave it to him. Leave it on the table when he goes.</div>
+          <div class="askline"><input placeholder="answer him, or ask back…"><button>send</button></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- STATE: LOBBY -->
+  <section class="state lobby" id="s-lobby">
+    <div class="posterwall">
+      <div class="househead">
+        <div class="over">Script Doctor Studio — the screening room</div>
+        <h1>Tonight's program.</h1>
+        <p>Three pictures in the house. One is mid-run, marked by the doctor.</p>
+      </div>
+      <div class="posterrow">
+        <div class="poster screening">
+          <div class="ribbon"></div>
+          <h3>The Late Hour</h3>
+          <div class="meta">12 scenes · 28 pages<br>now showing — <b>frame 3 of 12</b><br>3 marks on the current frame</div>
+          <div class="quip">the watch never comes back, kid</div>
+        </div>
+        <div class="poster fresh">
+          <div class="ribbon"></div>
+          <h3>Gun &amp; Pen</h3>
+          <div class="meta">9 scenes · 21 pages<br>threaded, not yet run<br>the doctor hasn't seen it</div>
+          <div class="quip">fresh off the typewriter</div>
+        </div>
+        <div class="poster vaulted">
+          <div class="ribbon"></div>
+          <h3>Old Harbor</h3>
+          <div class="meta">7 scenes · 18 pages<br>in the vault — 3 weeks<br>notes and stash kept warm</div>
+          <div class="quip">waiting for a rainy night</div>
+        </div>
+        <div class="newreel">
+          <b>Thread a new reel</b>
+          .fdx · .pdf · .txt · .fountain · .md — runs on this machine only
+        </div>
+      </div>
+    </div>
+    <aside class="sidecard">
+      <div class="h">Sameer — in the lobby</div>
+      <div class="samline"><b>Sameer:</b> the Late Hour's third act is sitting right there — want to look at the watch thread before you open anything else?</div>
+      <div class="ask"><input placeholder="talk to him here…"><button>send</button></div>
+    </aside>
+  </section>
+
+  <!-- STATE: WRITING ROOM (idea) -->
+  <section class="state" id="s-idea">
+    <div class="idea-stage">
+      <div class="idea-page">
+        <h2>An idea, still wet —</h2>
+        <div class="body" contenteditable="true">A night-shift archivist in a city that banned sleep discovers the library's oldest ledger is written in her own handwriting — dated sixty years from now.
+
+She starts sleeping in secret to read it. The city notices.</div>
+      </div>
+      <aside class="idea-side">
+        <div class="sam-presence">
+          <div class="who">Sameer — on the page</div>
+          <div class="q">The ledger in her own hand is the hook. What does the first entry she reads promise her?</div>
+          <div class="ask"><input placeholder="answer, or ask back…"><button style="background:none;border:none;color:var(--amber);font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;">send</button></div>
+        </div>
+        <div class="beats">
+          <div class="h">growing structure</div>
+          <div class="b">Cold open — the ledger found <span>beat 1</span></div>
+          <div class="b">First secret sleep <span>beat 2</span></div>
+          <div class="b"><em>what breaks the quiet?</em> <span>open</span></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- STATE: PROJECTION (progress) -->
+  <section class="state" id="s-reel">
+    <div class="reelroom">
+      <div class="reelspin">
+        <div class="reel"></div>
+        <div class="say">Threading it through — <b>Pacing</b>, pass 2 of 4<span class="wave"><i></i><i></i><i></i></span></div>
+      </div>
+      <div class="reellog">
+        <div class="reelrow done"><span class="no">pass 01</span><div class="nm">Coverage<small>every scene accounted for, every voice heard</small></div><span class="st">✓ ran clean</span></div>
+        <div class="reelrow run"><span class="no">pass 02</span><div class="nm">Pacing<small>where the picture breathes, where it stalls</small></div><span class="st">on the gate now</span></div>
+        <div class="reelrow"><span class="no">pass 03</span><div class="nm">Setup / Payoff<small>every promise kept — or broken</small></div><span class="st">on the shelf</span></div>
+        <div class="reelrow fail"><span class="no">pass 04</span><div class="nm">Character dials<small>who people want, and when it changes</small></div><span class="st">✗ caught</span></div>
+      </div>
+      <button class="clean">clean &amp; rethread the caught pass</button>
+    </div>
+  </section>
+
+  <!-- STATE: GREEN ROOM (partners) -->
+  <section class="state" id="s-green">
+    <div class="greenroom">
+      <div class="gr-seat sameer">
+        <div class="seathead"><b>Sameer</b><span>co-writer · green room</span></div>
+        <div class="seatbody">
+          <div class="line sam">The watch is the whole third act if you want it. He's not attached to the object — he's attached to who gave it to him.</div>
+          <div class="line sam">Leave it on the booth table when he goes. That's the goodbye he can't say out loud. Want me to sketch that page?</div>
+          <div class="cue">"he turns the pocket watch over in his palm" — frame 3</div>
+          <div class="acts"><button>find that line ↗</button><button>quote it back</button><button>sketch the page</button></div>
+        </div>
+      </div>
+      <div class="gr-seat sushruta">
+        <div class="seathead"><b>Dr. Sushruta</b><span>script doctor · the reading</span></div>
+        <div class="seatbody">
+          <div class="line">The static-blocking finding is structural, not cosmetic: the scene's rhythm depends on Maya's patience visibly eroding.</div>
+          <div class="line">Three of the eleven beats already carry that work in dialogue. The blocking should carry the other eight.</div>
+          <div class="gthink"><span>thinking it through</span><span class="flicker"><i></i><i></i><i></i></span></div>
+          <div class="cue">booth, 11 beats — frame 3 · verified</div>
+          <div class="acts"><button>find that line ↗</button><button>send to fix queue</button><button>the full reading ↗</button></div>
+        </div>
+      </div>
+      <div class="gr-ask">
+        <input placeholder="address the room — or select text on the frame first and it rides along…">
+        <span class="addr">to: the room</span>
+        <button>project it</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- the filmstrip spine -->
+<nav id="filmstrip">
+  <span class="cap">the strip<br><b>act I</b></span>
+  <div class="frames">
+    <div class="actreel open"><span class="ar-cap">act i · 1–7</span>
+      <div class="framecard"><span class="sc">sc. 1</span><span class="nm">Rain on the window</span></div>
+      <div class="framecard"><span class="sc">sc. 2</span><span class="nm">The appointment</span><span class="marks"><i class="m-low"></i></span></div>
+      <div class="framecard here"><span class="sc">sc. 3</span><span class="nm">The diner — eleven o'clock</span><span class="marks"><i class="m-high"></i><i class="m-mid"></i><i class="m-low"></i></span><span class="progress"></span></div>
+      <div class="framecard"><span class="sc">sc. 4</span><span class="nm">Traffic</span><span class="marks"><i class="m-mid"></i></span></div>
+      <div class="framecard"><span class="sc">sc. 5</span><span class="nm">Sugar route</span></div>
+      <div class="framecard"><span class="sc">sc. 6</span><span class="nm">The call</span><span class="marks"><i class="m-low"></i></span></div>
+      <div class="framecard"><span class="sc">sc. 7</span><span class="nm">Night bus</span></div>
+    </div>
+    <div class="actreel"><span class="ar-cap">act ii · 8–14</span></div>
+    <div class="actreel"><span class="ar-cap">act iii · 15–19</span></div>
+  </div>
+</nav>
+
+<footer id="deck">
+  <span class="live">● lamp house: model connected</span>
+  <span>draft v3</span><span>compare</span><span>revision</span><span>beat board — the strip, wide</span><span>export</span>
+  <span>⌕ find a line</span><span>↧ stash — 7 fragments</span>
+  <span class="r"><span>j / k — step frames</span><span>esc — close the drawer</span></span>
+</footer>
+
+<script>
+const mb = document.querySelectorAll('#mockbar button');
+const st = document.querySelectorAll('.state');
+mb.forEach(b => b.addEventListener('click', () => {
+  mb.forEach(x => x.classList.toggle('on', x === b));
+  st.forEach(s => s.classList.toggle('on', s.id === 's-' + b.dataset.s));
+}));
+// tape-sticky locates
+document.querySelectorAll('.tapesticky').forEach(t => t.addEventListener('click', () => {
+  const line = [...document.querySelectorAll('.slate .paren')].find(x => x.textContent.includes('pocket watch'));
+  if (line) line.scrollIntoView({ behavior:'smooth', block:'center' });
+}));
+// act reels expand (demo: click a collapsed act to reveal its frames)
+document.querySelectorAll('.actreel').forEach(a => a.addEventListener('click', e => {
+  if (!a.classList.contains('open') && !e.target.closest('.framecard')) a.classList.add('open');
+}));
+</script>
+
+<!-- ============ DESIGN NOTES — the 16 attributes (critic-passed) ============ -->
+<style>
+#dnotes { position:fixed; left:16px; bottom:130px; z-index:90; font-family:var(--mono); }
+#dnotes summary { cursor:pointer; font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--dim); border:1px solid var(--line); background:var(--screen); padding:7px 12px; border-radius:99px; }
+#dnotes .panel { width:340px; max-height:56vh; overflow:auto; background:var(--screen-2); border:1px solid var(--line);
+  border-top:none; border-radius:0 0 12px 12px; padding:14px 16px; font-size:10px; line-height:1.65; color:var(--txt); }
+#dnotes .panel b { font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); display:block; margin:10px 0 2px; }
+#dnotes .panel b:first-child { margin-top:0; }
+</style>
+<details id="dnotes">
+  <summary>design notes — 16 attributes</summary>
+  <div class="panel">
+    <b>1 · Premise</b>The studio is a screening room: your script is the picture, the doctor's notes are the director's cues, scenes are frames on a strip. Reading your own work becomes watching it.
+    <b>2 · Reader &amp; moment</b>The writer who thinks in scenes and cuts — who wants the manuscript staged, not scrolled, and diagnosis keyed to timecode.
+    <b>3 · Emotional register</b>House lights down, projector up. Amber timecodes on booth dark; the hush of a reel running.
+    <b>4 · Spatial metaphor</b>A projection booth: manuscript staged center as the slate, director's notes synced right, filmstrip spine below (act-clustered reels so 50+ scenes survive), green room for the people.
+    <b>5 · Type system</b>Courier Prime for the slate; Caveat for Sameer's cues and tape stickies; IBM Plex Mono for timecodes; Source Serif 4 for posters. All shipped fonts, no additions.
+    <b>6 · Chromatic system</b>Booth dark (#08090c) + timecode amber (#e0b45c) + mark-red (high) + colorist teal (Sushruta's voice). 14/14 contrast pairs pass AA — the most robust palette of the five.
+    <b>7 · Light logic</b>The projector beam: a faint warm wash from above the slate; amber glows only on the active frame. Everything else is booth dark.
+    <b>8 · Navigation model</b>The filmstrip IS the nav — scenes as frames, j/k to step, act reels to collapse; the deck rail holds draft tools; the mockbar is state-only.
+    <b>9 · Feedback representation</b>Director's notes synced to the frame with timecodes + severity marks on the strip cards; tape stickies for the writer's own notes, taped INTO the slate (hate-list #1/#7).
+    <b>10 · Partner presence</b>The green room: Sameer and Sushruta as seats with cues and actions; Sameer also cues in the lobby and on the slate's cuesheet — same person, stage-appropriate surfaces, one voice each (hate-list #10).
+    <b>11 · Chat composition</b>Cue sheets and seat lines — handwritten cues with a single ask line each, not bubble stacks; the green-room composer addresses the room.
+    <b>12 · Motion philosophy</b>The reel turns while threading; stripAdvance on the active frame; projFlicker for thinking ("thinking it through" preserved). Reduced-motion honored.
+    <b>13 · Composer discipline</b>All inputs on booth dark with light text (gr-ask 15:1, cuesheet 14:1, askline 14:1); focus brightens the border amber, never flips backgrounds (hate-list #5).
+    <b>14 · Migration cost</b>High — horizontal geography fights the vertical-scroll writing habit; the strip needs its own virtualization. The slate itself maps cleanly, though.
+    <b>15 · Risk exposure</b>Per-scene staging is charming at 7 scenes but must prove itself at 50; act reels mitigate, but j/k keyboard faith is still required; the deck rail must stay sparse.
+    <b>16 · One-line verdict</b>The most cinematic and the most fun — a director's view of your own script, if you accept the projection booth's geometry.
+  </div>
+</details>
+</body>
+</html>

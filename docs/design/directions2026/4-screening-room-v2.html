@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direction 4 — The Screening Room · v2 (warm booth, paper stage)</title>
+<style>
+/* ============================================================
+   DIRECTION 4 v2 — THE SCREENING HOUSE
+   User-directed evolution of 4-screening-room.html. Six defects
+   of v1 fixed by grafting the other directions' strengths:
+   · COLD BOOTH  -> warm 2am house (#0d0b08 family, Night Room)
+   · SPECIMEN    -> the page IS the projected frame: light paper,
+                    Courier 16px, 13:1 ink — built for writing
+   · TIMECODE KEYS -> scene-first ("sc. 3 · the watch · 14:28")
+   · TWO-AXIS EYE -> reading is vertical ONLY; the strip is demoted
+                    to a chapter navigator (click to jump, never
+                    a reading surface)
+   · WHISPER UI  -> every tool a visible labeled word, 10.5px min
+   · THIN ROOM   -> green room seats carry real conversations
+   Severity never colors words on paper: dot + wash only (13:1 ink
+   preserved on every line). 25/25 audited pairs pass (see audit/).
+   ============================================================ */
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-20a22824.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-a15d607a.woff2') format('woff2'); font-weight:600; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-094f4033.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-6664e8d0.woff2') format('woff2'); font-weight:700; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-0bc96cd0.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-e2661bcc.woff2') format('woff2'); font-weight:500; }
+@font-face { font-family:'Caveat'; src:url('../../../screenplay_studio/webapp/fonts/Caveat-706a1c41.woff2') format('woff2'); }
+
+:root {
+  --booth:#0d0b08;            /* the house at 2am — warm near-black */
+  --booth-2:#14110d;          /* raised surfaces: chips, seats, rail */
+  --hair:#2c261e;             /* hairline on warm dark */
+  --amber:#e0b45c;            /* chapter lights, keys, the strip's ink */
+  --amber-soft:rgba(224,180,92,.14);
+  --moon:#a9b7c4;             /* Sushruta's voice — cool second person */
+  --mark-red:#e2725b;         /* alarm red (rail borders, caught passes) */
+  --mark-teal:#69b3a7;        /* machine status: lamp live, ran clean */
+  --page:#f4e9d3;             /* THE PROJECTED FRAME — light paper */
+  --page-ink:#292219;         /* 13.04:1 on paper */
+  --page-dim:#6d6050;         /* 5.07:1 — parens, transitions */
+  --fdot-high:#c4563a;        /* finding dots ON PAPER (non-text, 3:1+) */
+  --fdot-mid:#b07a3a;
+  --fdot-low:#5a7896;
+  --txt:#d8cbb5;              /* room text on booth: 12.29:1 */
+  --dim:#8d8272;              /* room dim: 5.21:1 booth / 4.99:1 booth-2 */
+  --cue:#cfc8b8;              /* script quotes in the rail: 11.3:1 */
+  --serif:'Source Serif 4', Georgia, serif;
+  --script:'Courier Prime', 'Courier New', monospace;
+  --mono:'IBM Plex Mono', Consolas, monospace;
+  --hand:'Caveat', cursive;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+body { background:var(--booth); color:var(--txt); font-family:var(--serif); overflow:hidden; }
+
+/* the page IS the projector: paper glow lights the house from center */
+body::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(1100px 620px at 50% -10%, rgba(244,233,211,.07), transparent 62%),
+    radial-gradient(800px 480px at 50% 116%, rgba(224,180,92,.05), transparent 60%);
+}
+
+/* ---------- the marquee: house header ---------- */
+#marquee {
+  height:54px; display:flex; align-items:center; gap:20px; padding:0 28px;
+  border-bottom:1px solid var(--hair); position:relative; z-index:6;
+  font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim);
+}
+#marquee .house { color:var(--txt); font-weight:500; }
+#marquee .house i { color:var(--amber); font-style:normal; }
+#marquee .nowshow { color:var(--txt); font-family:var(--serif); font-size:16px; letter-spacing:0; text-transform:none; font-style:italic; }
+#marquee .reelpos { margin-left:auto; }
+#marquee .reelpos b { color:var(--amber); font-weight:500; }
+#mockbar { position:fixed; right:18px; top:62px; z-index:70; display:flex; flex-direction:column; gap:6px; }
+#mockbar button {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  background:var(--booth-2); color:var(--dim); border:1px solid var(--hair); border-radius:99px; padding:6px 12px; cursor:pointer;
+}
+#mockbar button.on { color:var(--amber); border-color:var(--amber); }
+#mockbar button:hover { color:var(--txt); }
+
+#stage { position:absolute; top:54px; left:0; right:0; bottom:118px; overflow:hidden; }
+.state { display:none; height:100%; }
+.state.on { display:flex; flex-direction:column; animation:fadein .5s ease both; }
+@keyframes fadein { from { opacity:0 } to { opacity:1 } }
+
+/* ============================================================
+   THE SCREENING FLOOR: paper frame + director's rail
+   ============================================================ */
+.stagefloor { flex:1; display:grid; grid-template-columns:minmax(0,740px) 320px; gap:30px; justify-content:center; align-items:stretch; padding:24px 30px 8px; }
+/* THE FRAME — the manuscript as projected paper. Written ON, not looked at. */
+.frame {
+  background:var(--page); color:var(--page-ink); position:relative;
+  padding:44px 52px 40px; overflow:auto; border-radius:3px;
+  box-shadow:0 30px 70px -28px rgba(0,0,0,.85), 0 2px 12px rgba(0,0,0,.4);
+}
+.frame .corner {
+  position:sticky; top:0; float:right; z-index:2; margin:0 0 14px 12px;
+  font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--amber); background:var(--booth); padding:5px 11px; border:1px solid var(--hair); border-radius:3px;
+}
+.frame .framehead { font-family:var(--mono); font-size:10px; letter-spacing:.26em; text-transform:uppercase; color:var(--page-dim); margin-bottom:20px; }
+.frame .sline { font-family:var(--script); font-size:16px; line-height:1.72; color:var(--page-ink); margin-bottom:13px; white-space:pre-wrap; }
+.frame .sline.dim { color:var(--page-dim); }
+.frame .char { margin-top:18px; }
+.frame .paren { margin-left:18%; color:var(--page-dim); font-style:italic; }
+.frame .dial { margin-left:12%; margin-bottom:15px; }
+
+/* finding lines: the diagnosis lives IN the paper. Words stay ink (13:1);
+   severity rides the dot + wash only. Hover rings; click locates its note. */
+.fl { position:relative; border-radius:4px; cursor:pointer; padding:1px 4px; margin-left:-4px; margin-right:-4px;
+      transition:background .3s ease, box-shadow .3s ease; }
+.fl:focus-visible { outline:2px solid var(--fdot-mid); outline-offset:2px; }
+.fl .dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:8px; vertical-align:1px; }
+.fl.high { background:rgba(196,86,58,.13); box-shadow:inset 0 0 0 1px rgba(196,86,58,.28); } .fl.high .dot { background:var(--fdot-high); }
+.fl.mid { background:rgba(176,122,58,.12); box-shadow:inset 0 0 0 1px rgba(176,122,58,.24); } .fl.mid .dot { background:var(--fdot-mid); }
+.fl.low { background:rgba(90,120,150,.11); box-shadow:inset 0 0 0 1px rgba(90,120,150,.22); } .fl.low .dot { background:var(--fdot-low); }
+.fl:hover { box-shadow:inset 0 0 0 1.5px var(--sev, var(--fdot-low)), 0 0 22px -8px var(--sev, var(--fdot-low)); }
+.fl.high { --sev:var(--fdot-high); } .fl.mid { --sev:var(--fdot-mid); } .fl.low { --sev:var(--fdot-low); }
+.fl.pulse { animation:flPulse 1.6s ease 2; }
+@keyframes flPulse { 0%,100% { background:rgba(224,180,92,.10); } 50% { background:rgba(224,180,92,.30); } }
+
+/* selection tools — the creation half of the sticky loop (#11). A dark
+   chip resting ON the paper, like the remote on your desk. */
+.selbar {
+  margin:20px 0 6px; display:inline-flex; align-items:center; gap:10px;
+  background:var(--booth-2); border:1px solid var(--hair); border-radius:99px; padding:8px 10px 8px 16px;
+}
+.selbar .selquote { font-family:var(--script); font-size:12.5px; color:var(--txt); max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.selbar button {
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  background:none; border:1px solid var(--hair); color:var(--dim); border-radius:99px;
+  padding:6px 13px; cursor:pointer; transition:color .15s, border-color .15s;
+}
+.selbar button:hover { color:var(--amber); border-color:var(--amber); }
+
+/* gaffer-tape sticky: the writer's own note, taped INTO the frame */
+.tapesticky {
+  position:absolute; right:26px; bottom:20px; transform:rotate(-1.6deg);
+  background:var(--booth-2); border:1px solid var(--hair); color:#d9c9a8;
+  font-family:var(--hand); font-size:16px; padding:10px 14px; max-width:235px; line-height:1.25;
+  box-shadow:0 12px 30px -10px rgba(0,0,0,.8); cursor:pointer;
+}
+.tapesticky::before { content:""; position:absolute; top:-6px; left:50%; transform:translateX(-50%) rotate(1deg); width:46px; height:12px; background:rgba(224,180,92,.5); }
+.tapesticky .ref { display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-top:6px; }
+.tapesticky:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
+.tapesticky:hover { transform:rotate(-.8deg) translateY(-3px); }
+
+/* ---------- the director's rail: scene-first notes, synced both ways ---------- */
+.rail { overflow:auto; padding:26px 2px 16px; }
+.rail .head { font-family:var(--mono); font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--hair); }
+.dnote { border-left:2px solid var(--mark-red); padding:10px 4px 12px 14px; margin-bottom:16px; cursor:pointer; transition:background .2s, box-shadow .2s; border-radius:0 6px 6px 0; }
+.dnote:hover { background:rgba(226,114,91,.06); }
+.dnote.mid { border-left-color:var(--amber); }
+.dnote.low { border-left-color:#5a7896; }
+.dnote.lit { background:var(--amber-soft); box-shadow:0 0 0 1px var(--amber-soft), inset 2px 0 0 var(--amber); }
+.dnote:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
+/* scene-first key — the timecode is flavor, not the address */
+.dnote .key { font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--amber); margin-bottom:6px; display:flex; gap:10px; flex-wrap:wrap; }
+.dnote .key .tc { color:var(--dim); }
+.dnote h4 { font-family:var(--serif); font-size:14.5px; font-weight:600; color:var(--txt); line-height:1.35; margin-bottom:5px; }
+.dnote p { font-family:var(--serif); font-size:12.5px; line-height:1.55; color:var(--dim); }
+.dnote .cue { font-family:var(--script); font-size:11px; color:var(--cue); border:1px dashed var(--hair); padding:5px 9px; margin-top:8px; display:inline-block; border-radius:4px; }
+
+/* Sameer's cue sheet — one presence per surface (#10) */
+.cuesheet { margin-top:22px; border-top:1px solid var(--hair); padding-top:16px; }
+.cuesheet .who { font-family:var(--hand); font-size:20px; color:var(--amber); margin-bottom:6px; }
+.cuesheet .line { font-family:var(--hand); font-size:16.5px; color:var(--txt); line-height:1.3; margin-bottom:10px; }
+.cuesheet .askline { display:flex; border-bottom:1px solid var(--hair); padding-bottom:2px; }
+.cuesheet .askline input { flex:1; background:none; border:none; outline:none; color:var(--txt); font-family:var(--serif); font-size:13.5px; padding:7px 2px; }
+.cuesheet .askline input::placeholder { color:var(--dim); font-style:italic; }
+.cuesheet .askline input:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
+.cuesheet .askline button { background:none; border:none; color:var(--amber); font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
+/* projector flicker — the thinking indicator, text preserved (#6) */
+.gthink { display:flex; align-items:center; gap:10px; margin:8px 0 4px; font-family:var(--hand); font-size:15.5px; color:var(--dim); }
+.gthink .flicker { display:inline-flex; gap:4px; }
+.gthink .flicker i { width:5px; height:5px; border-radius:50%; background:var(--amber); animation:projFlicker 1.3s ease-in-out infinite; }
+.gthink .flicker i:nth-child(2){ animation-delay:.18s } .gthink .flicker i:nth-child(3){ animation-delay:.36s }
+@keyframes projFlicker { 0%,100%{ opacity:.25; transform:scale(.7) } 50%{ opacity:1; transform:scale(1) } }
+
+/* ============================================================
+   THE CHAPTER STRIP — a navigator, never a reading surface.
+   Click a chapter, land on its page. Act reels keep 50+ scenes
+   legible as ~4 clusters.
+   ============================================================ */
+#filmstrip {
+  position:fixed; left:0; right:0; bottom:44px; height:76px; z-index:8;
+  border-top:1px solid var(--hair); background:var(--booth);
+  display:flex; align-items:center; gap:0; padding:0 22px;
+}
+#filmstrip .cap { font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--dim); flex:none; width:92px; line-height:1.6; }
+#filmstrip .cap b { color:var(--amber); font-weight:500; }
+.frames { display:flex; gap:10px; flex:1; overflow-x:auto; padding:8px 6px; scroll-behavior:smooth; align-items:stretch; }
+.actreel { display:flex; gap:10px; padding-right:10px; border-right:1px dashed var(--hair); flex:none; align-items:stretch; }
+.actreel:last-child { border-right:none; }
+.actreel .ar-cap {
+  writing-mode:vertical-rl; transform:rotate(180deg); font-family:var(--mono); font-size:9px;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--dim); padding:2px 3px; flex:none;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.actreel.open .ar-cap { color:var(--amber); }
+.framecard {
+  flex:none; width:124px; height:56px; border:1px solid var(--hair); border-radius:4px;
+  background:var(--booth-2); cursor:pointer; position:relative;
+  display:flex; flex-direction:column; justify-content:flex-end; padding:6px 9px;
+  transition:border-color .2s, transform .2s;
+}
+.framecard:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
+.framecard:hover { border-color:var(--dim); transform:translateY(-3px); }
+.framecard.here { border-color:var(--amber); box-shadow:0 0 18px -4px rgba(224,180,92,.35); }
+.framecard .sc { font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; color:var(--dim); text-transform:uppercase; }
+.framecard .nm { font-family:var(--serif); font-size:12px; color:var(--txt); font-style:italic; line-height:1.2; margin-top:1px; }
+.framecard .marks { position:absolute; top:6px; right:8px; display:flex; gap:3px; }
+.framecard .marks i { width:5px; height:5px; border-radius:50%; }
+.framecard .marks .m-high { background:var(--fdot-high); } .framecard .marks .m-mid { background:var(--fdot-mid); } .framecard .marks .m-low { background:var(--fdot-low); }
+.framecard.here .progress { position:absolute; left:0; bottom:0; height:2px; width:35%; background:var(--amber); animation:stripAdvance 3.2s ease-in-out infinite alternate; }
+@keyframes stripAdvance { from { width:22% } to { width:48% } }
+
+/* ---------- the deck rail: every tool a visible word (no whispers) ---------- */
+#deck {
+  position:fixed; left:0; right:0; bottom:0; height:44px; z-index:9;
+  display:flex; align-items:center; gap:20px; padding:0 28px;
+  border-top:1px solid var(--hair); background:var(--booth-2);
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim);
+}
+#deck .r { margin-left:auto; display:flex; gap:18px; }
+#deck span { cursor:pointer; transition:color .15s; } #deck span:hover { color:var(--amber); }
+#deck .live { color:var(--mark-teal); }
+
+/* ============================================================
+   STATE: LOBBY (landing)
+   ============================================================ */
+.lobby { flex-direction:row !important; display:none !important; }
+.state.on.lobby { display:flex !important; flex-direction:row; align-items:stretch; gap:30px; padding:30px 34px; overflow:auto; }
+.lobby .posterwall { flex:1; display:flex; flex-direction:column; }
+.lobby .househead { margin-bottom:26px; }
+.lobby .househead .over { font-family:var(--mono); font-size:10px; letter-spacing:.32em; text-transform:uppercase; color:var(--dim); }
+.lobby .househead h1 { font-family:var(--serif); font-size:clamp(32px,4vw,46px); font-weight:600; color:var(--txt); margin-top:10px; }
+.lobby .househead p { font-family:var(--serif); font-style:italic; color:var(--dim); font-size:15.5px; margin-top:6px; }
+.posterrow { display:flex; gap:20px; flex-wrap:wrap; }
+.poster {
+  width:230px; background:var(--booth-2); border:1px solid var(--hair); border-radius:6px;
+  padding:18px 18px 16px; cursor:pointer; position:relative; overflow:hidden;
+  transition:transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s, border-color .25s;
+}
+.poster:hover { transform:translateY(-5px) rotate(-.5deg); box-shadow:0 24px 50px -18px rgba(0,0,0,.85); border-color:var(--amber-soft); }
+.poster .ribbon { position:absolute; top:0; left:0; right:0; height:4px; }
+.poster.screening .ribbon { background:var(--mark-red); }
+.poster.fresh .ribbon { background:var(--amber); }
+.poster.vaulted .ribbon { background:#5d6470; }
+.poster h3 { font-family:var(--serif); font-size:20px; font-weight:600; color:var(--txt); margin:8px 0 6px; }
+.poster .meta { font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); line-height:1.9; }
+.poster .meta b { color:var(--amber); font-weight:500; }
+.poster .quip { margin-top:12px; font-family:var(--hand); font-size:15.5px; color:var(--cue); border-top:1px dashed var(--hair); padding-top:9px; }
+.lobby .newreel {
+  width:230px; border:1.5px dashed var(--dim); border-radius:6px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:8px; cursor:pointer; color:var(--dim);
+  font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; text-align:center; padding:18px;
+  transition:border-color .2s, color .2s;
+}
+.lobby .newreel:hover { border-color:var(--amber); color:var(--amber); }
+.lobby .newreel b { font-family:var(--serif); font-size:17px; text-transform:none; letter-spacing:0; color:var(--txt); font-weight:600; }
+.lobby .sidecard { width:270px; flex:none; align-self:flex-start; border-left:1px solid var(--hair); padding-left:24px; }
+.lobby .sidecard .h { font-family:var(--mono); font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); margin-bottom:14px; }
+.lobby .sidecard .samline { font-family:var(--hand); font-size:18.5px; color:var(--txt); line-height:1.3; margin-bottom:12px; }
+.lobby .sidecard .samline b { color:var(--amber); font-weight:400; }
+.lobby .sidecard .ask { display:flex; border-bottom:1px solid var(--hair); }
+.lobby .sidecard .ask input { flex:1; background:none; border:none; outline:none; color:var(--txt); font-family:var(--serif); font-size:13.5px; padding:7px 2px; }
+.lobby .sidecard .ask input::placeholder { color:var(--dim); font-style:italic; }
+.lobby .sidecard .ask input:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
+.lobby .sidecard .ask button { background:none; border:none; color:var(--amber); font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
+
+/* ============================================================
+   STATE: WRITING ROOM (idea)
+   ============================================================ */
+.idea-stage { flex:1; display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:26px; padding:26px 34px 10px; overflow:auto; justify-content:center; }
+.idea-page {
+  background:var(--page); color:var(--page-ink); padding:44px 48px;
+  box-shadow:0 26px 60px -24px rgba(0,0,0,.9), 0 2px 10px rgba(0,0,0,.4); border-radius:3px; min-height:380px;
+}
+.idea-page h2 { font-family:var(--hand); font-size:30px; margin-bottom:14px; }
+.idea-page .body { font-family:var(--serif); font-size:16.5px; line-height:2; outline:none; min-height:220px; }
+.idea-side .sam-presence { border:1px solid var(--hair); border-radius:10px; padding:18px; background:var(--booth-2); margin-bottom:18px; }
+.idea-side .sam-presence .who { font-family:var(--mono); font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--amber); margin-bottom:9px; }
+.idea-side .sam-presence .q { font-family:var(--hand); font-size:19px; color:var(--txt); line-height:1.25; margin-bottom:12px; }
+.idea-side .sam-presence .ask { display:flex; gap:8px; }
+.idea-side .sam-presence input { flex:1; background:var(--booth); border:1px solid var(--hair); border-radius:7px; color:var(--txt); font-family:var(--serif); font-size:13px; padding:8px 10px; outline:none; }
+.idea-side .sam-presence input:focus { border-color:var(--amber); }
+.idea-side .beats .h { font-family:var(--mono); font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; }
+.idea-side .beats .b { display:flex; justify-content:space-between; font-family:var(--serif); font-size:13.5px; color:var(--txt); padding:7px 0; border-bottom:1px dotted var(--hair); }
+.idea-side .beats .b span { font-family:var(--mono); font-size:9.5px; color:var(--dim); }
+
+/* ============================================================
+   STATE: PROJECTION (progress) — the reel runs
+   ============================================================ */
+.reelroom { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; overflow:auto; padding:20px 30px; }
+.reelspin { display:flex; align-items:center; gap:22px; margin-bottom:34px; }
+.reelspin .reel {
+  width:64px; height:64px; border-radius:50%; border:2px solid var(--amber);
+  border-right-color:transparent; animation:reelspin 2.2s linear infinite;
+  position:relative;
+}
+.reelspin .reel::after { content:""; position:absolute; inset:16px; border-radius:50%; border:1px solid var(--amber-soft); border-top-color:var(--amber); }
+@keyframes reelspin { to { transform:rotate(360deg) } }
+.reelspin .say { font-family:var(--serif); font-style:italic; font-size:21px; color:var(--txt); }
+.reelspin .say b { color:var(--amber); font-style:normal; }
+.reelspin .say .wave { display:inline-flex; gap:3px; margin-left:8px; }
+.reelspin .say .wave i { width:4px; height:4px; border-radius:50%; background:var(--amber); animation:reelwave 1.2s ease-in-out infinite; }
+.reelspin .say .wave i:nth-child(2){ animation-delay:.15s } .reelspin .say .wave i:nth-child(3){ animation-delay:.3s }
+@keyframes reelwave { 0%,100%{ opacity:.3; transform:translateY(0) } 50%{ opacity:1; transform:translateY(-4px) } }
+.reellog { width:min(680px,90%); border-top:1px solid var(--hair); }
+.reelrow { display:grid; grid-template-columns:96px minmax(0,1fr) auto; gap:16px; padding:14px 6px; border-bottom:1px solid var(--hair); align-items:baseline; }
+.reelrow .no { font-family:var(--mono); font-size:10px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; }
+.reelrow .nm { font-family:var(--serif); font-size:16px; color:var(--txt); }
+.reelrow .nm small { display:block; font-size:12.5px; color:var(--dim); font-style:italic; margin-top:1px; }
+.reelrow .st { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; }
+.reelrow.done .st { color:var(--mark-teal); }
+.reelrow.run .st { color:var(--amber); }
+.reelrow.fail .st { color:var(--mark-red); }
+.reelrow.fail .nm::after { content:"— the reel caught; clean and thread it again"; font-family:var(--serif); font-style:italic; font-size:12.5px; color:var(--mark-red); margin-left:10px; }
+.reelroom .clean { margin-top:24px; font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; background:none; border:1px solid var(--mark-red); color:var(--mark-red); padding:10px 20px; border-radius:99px; cursor:pointer; transition:background .18s,color .18s; }
+.reelroom .clean:hover { background:var(--mark-red); color:var(--booth); }
+
+/* ============================================================
+   STATE: GREEN ROOM (partners) — seats with real conversations
+   ============================================================ */
+.greenroom { flex:1; display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:26px; padding:30px 34px 20px; overflow:auto; align-content:start; }
+.gr-seat { border:1px solid var(--hair); border-radius:10px; background:var(--booth-2); overflow:hidden; display:flex; flex-direction:column; }
+.gr-seat .seathead { padding:16px 20px 14px; border-bottom:1px solid var(--hair); display:flex; align-items:baseline; gap:10px; }
+.gr-seat.sameer .seathead { background:linear-gradient(180deg, rgba(224,180,92,.08), transparent); }
+.gr-seat.sushruta .seathead { background:linear-gradient(180deg, rgba(169,183,196,.08), transparent); }
+.gr-seat .seathead b { font-family:var(--serif); font-size:20px; font-weight:600; color:var(--txt); }
+.gr-seat .seathead span { font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; }
+.gr-seat.sameer .seathead span { color:var(--amber); }
+.gr-seat.sushruta .seathead span { color:var(--moon); }
+.gr-seat .seatbody { padding:18px 20px; flex:1; display:flex; flex-direction:column; gap:12px; }
+.gr-seat .seatbody .line { font-family:var(--serif); font-size:14.5px; line-height:1.6; color:var(--txt); }
+.gr-seat.sameer .seatbody .line.sam { font-family:var(--hand); font-size:19.5px; line-height:1.3; color:#ead9b0; }
+.gr-seat.sushruta .seatbody .line.doc { border-left:2px solid var(--moon); padding-left:12px; }
+.gr-seat .cue { font-family:var(--script); font-size:11px; color:var(--cue); border-left:2px solid currentColor; padding:6px 10px; }
+.gr-seat.sameer .cue { border-left-color:var(--amber); }
+.gr-seat.sushruta .cue { border-left-color:var(--moon); }
+.gr-seat .seatbody .acts { display:flex; gap:14px; margin-top:auto; flex-wrap:wrap; }
+.gr-seat .seatbody .acts button { background:none; border:none; font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); cursor:pointer; border-bottom:1px solid var(--hair); padding-bottom:2px; }
+.gr-seat .seatbody .acts button:hover { color:var(--amber); border-bottom-color:var(--amber); }
+.gr-ask { grid-column:1 / -1; display:flex; border:1px solid var(--hair); border-radius:10px; overflow:hidden; background:var(--booth-2); }
+.gr-ask input { flex:1; background:none; border:none; outline:none; color:var(--txt); font-family:var(--serif); font-size:15px; padding:15px 18px; }
+.gr-ask input:focus { background:rgba(255,255,255,.02); }
+.gr-ask input::placeholder { color:var(--dim); font-style:italic; }
+.gr-ask .addr { font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); padding:0 16px; align-self:center; border-left:1px solid var(--hair); }
+.gr-ask button { background:var(--amber); border:none; color:#221704; font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; padding:0 26px; cursor:pointer; font-weight:500; }
+
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header id="marquee">
+  <span class="house">SCREENING <i>HOUSE</i> — script doctor studio</span>
+  <span class="nowshow">now showing: The Late Hour</span>
+  <span class="reelpos">chapter <b>3 of 12</b> · 3 marks on this page</span>
+</header>
+
+<div id="mockbar">
+  <button data-s="screening" class="on">screening</button>
+  <button data-s="lobby">lobby</button>
+  <button data-s="idea">writing room</button>
+  <button data-s="reel">projection</button>
+  <button data-s="green">green room</button>
+</div>
+
+<main id="stage">
+
+  <!-- STATE: SCREENING (paper frame + synced director's rail) -->
+  <section class="state on" id="s-screening">
+    <div class="stagefloor">
+      <article class="frame">
+        <div class="corner">sc. 3 of 12 · the diner · 14:28</div>
+        <div class="framehead">the projected frame · written on, not looked at</div>
+        <div class="sline">INT. DINER — NIGHT</div>
+        <div class="sline dim">Rain streams down the window. MAYA (30s, rain-soaked) slides into a booth.</div>
+        <div class="sline char">MAYA</div>
+        <div class="sline dial">You said eleven. I've been here since nine-thirty.</div>
+        <div class="sline dim">DECK (50s) doesn't look up from his coffee.</div>
+        <div class="sline char">DECK</div>
+        <div class="sline dial fl mid" data-k="blocking" tabindex="0" role="button" aria-label="finding: static blocking. activates: open this note in the director's rail" title="click to open this note in the rail"><span class="dot" aria-hidden="true"></span>Traffic.</div>
+        <div class="sline char">MAYA</div>
+        <div class="sline dial">For two hours?</div>
+        <div class="sline char">DECK</div>
+        <div class="sline dial fl low" data-k="soften" tabindex="0" role="button" aria-label="finding: maya softens without a signal. activates: open this note in the director's rail" title="click to open this note in the rail"><span class="dot" aria-hidden="true"></span>You're still here.</div>
+        <div class="sline paren fl high" data-k="watch" tabindex="0" role="button" aria-label="high-severity finding: the pocket watch never returns. activates: open this note in the director's rail" title="click to open this note in the rail"><span class="dot" aria-hidden="true"></span>(a beat — he turns the pocket watch over in his palm)</div>
+        <div class="sline dial">Sit down before the coffee gets ideas.</div>
+        <div class="sline" style="margin-top:20px; letter-spacing:.24em; color:var(--page-dim);">CUT TO:</div>
+        <div class="tapesticky" tabindex="0" role="button" aria-label="taped note: the watch — grandpa's letter? give it back to her here. activates: locate the taped passage" title="click to locate the taped passage">
+          the watch — grandpa's letter? give it BACK to her here
+          <span class="ref">taped to: sc. 3 · "pocket watch"</span>
+        </div>
+        <div class="selbar" title="select on the page, these rise">
+          <span class="selquote">"he turns the pocket watch over in his palm"</span>
+          <button>✎ tape a note</button><button>stash the lines</button><button>ask the room</button>
+        </div>
+      </article>
+      <aside class="rail">
+        <div class="head">director's notes — synced to sc. 3</div>
+        <div class="dnote" data-k="watch" tabindex="0" role="button" aria-label="director's note: the pocket watch never returns. activates: locate this line on the page">
+          <div class="key">sc. 3 · the watch <span class="tc">· 14:28</span> · high</div>
+          <h4>The pocket watch never returns</h4>
+          <p>Deck's watch sets up an attachment the script never pays. The train station is the natural recall point.</p>
+          <span class="cue">"he turns the pocket watch over in his palm"</span>
+        </div>
+        <div class="dnote mid" data-k="blocking" tabindex="0" role="button" aria-label="director's note: static blocking, two pages. activates: locate this line on the page">
+          <div class="key">sc. 3 · deck's coffee <span class="tc">· 14:29</span> · mid</div>
+          <h4>Static blocking, two pages</h4>
+          <p>Eleven beats, two talking heads. Give Maya business — the sugar, the window, the menu.</p>
+          <span class="cue">"Traffic."</span>
+        </div>
+        <div class="dnote low" data-k="soften" tabindex="0" role="button" aria-label="director's note: maya softens without a signal. activates: locate this line on the page">
+          <div class="key">sc. 3 · "you're still here" <span class="tc">· 14:30</span> · low</div>
+          <h4>Maya softens without a signal</h4>
+          <p>Confrontational to soft in six beats. One visible reason makes it land.</p>
+          <span class="cue">"You're still here."</span>
+        </div>
+        <div class="cuesheet">
+          <div class="who">Sameer — cue sheet</div>
+          <div class="line">He's not attached to the watch — he's attached to who gave it to him. Leave it on the table when he goes.</div>
+          <div class="askline"><input placeholder="answer him, or ask back…"><button>send</button></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- STATE: LOBBY -->
+  <section class="state lobby" id="s-lobby">
+    <div class="posterwall">
+      <div class="househead">
+        <div class="over">Script Doctor Studio — the screening house</div>
+        <h1>Tonight's program.</h1>
+        <p>Three pictures in the house. One is mid-run, marked by the doctor.</p>
+      </div>
+      <div class="posterrow">
+        <div class="poster screening">
+          <div class="ribbon"></div>
+          <h3>The Late Hour</h3>
+          <div class="meta">12 scenes · 28 pages<br>now showing — <b>chapter 3 of 12</b><br>3 marks on the current page</div>
+          <div class="quip">the watch never comes back, kid</div>
+        </div>
+        <div class="poster fresh">
+          <div class="ribbon"></div>
+          <h3>Gun &amp; Pen</h3>
+          <div class="meta">9 scenes · 21 pages<br>threaded, not yet run<br>the doctor hasn't seen it</div>
+          <div class="quip">fresh off the typewriter</div>
+        </div>
+        <div class="poster vaulted">
+          <div class="ribbon"></div>
+          <h3>Old Harbor</h3>
+          <div class="meta">7 scenes · 18 pages<br>in the vault — 3 weeks<br>notes and stash kept warm</div>
+          <div class="quip">waiting for a rainy night</div>
+        </div>
+        <div class="newreel">
+          <b>Thread a new reel</b>
+          .fdx · .pdf · .txt · .fountain · .md — runs on this machine only
+        </div>
+      </div>
+    </div>
+    <aside class="sidecard">
+      <div class="h">Sameer — in the lobby</div>
+      <div class="samline"><b>Sameer:</b> the Late Hour's third act is sitting right there — want to look at the watch thread before you open anything else?</div>
+      <div class="ask"><input placeholder="talk to him here…"><button>send</button></div>
+    </aside>
+  </section>
+
+  <!-- STATE: WRITING ROOM (idea) -->
+  <section class="state" id="s-idea">
+    <div class="idea-stage">
+      <div class="idea-page">
+        <h2>An idea, still wet —</h2>
+        <div class="body" contenteditable="true">A night-shift archivist in a city that banned sleep discovers the library's oldest ledger is written in her own handwriting — dated sixty years from now.
+
+She starts sleeping in secret to read it. The city notices.</div>
+      </div>
+      <aside class="idea-side">
+        <div class="sam-presence">
+          <div class="who">Sameer — on the page</div>
+          <div class="q">The ledger in her own hand is the hook. What does the first entry she reads promise her?</div>
+          <div class="ask"><input placeholder="answer, or ask back…"><button style="background:none;border:none;color:var(--amber);font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;">send</button></div>
+        </div>
+        <div class="beats">
+          <div class="h">growing structure</div>
+          <div class="b">Cold open — the ledger found <span>beat 1</span></div>
+          <div class="b">First secret sleep <span>beat 2</span></div>
+          <div class="b"><em>what breaks the quiet?</em> <span>open</span></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- STATE: PROJECTION (progress) -->
+  <section class="state" id="s-reel">
+    <div class="reelroom">
+      <div class="reelspin">
+        <div class="reel"></div>
+        <div class="say">Threading it through — <b>Pacing</b>, pass 2 of 4<span class="wave"><i></i><i></i><i></i></span></div>
+      </div>
+      <div class="reellog">
+        <div class="reelrow done"><span class="no">pass 01</span><div class="nm">Coverage<small>every scene accounted for, every voice heard</small></div><span class="st">✓ ran clean</span></div>
+        <div class="reelrow run"><span class="no">pass 02</span><div class="nm">Pacing<small>where the picture breathes, where it stalls</small></div><span class="st">on the gate now</span></div>
+        <div class="reelrow"><span class="no">pass 03</span><div class="nm">Setup / Payoff<small>every promise kept — or broken</small></div><span class="st">on the shelf</span></div>
+        <div class="reelrow fail"><span class="no">pass 04</span><div class="nm">Character dials<small>who people want, and when it changes</small></div><span class="st">✗ caught</span></div>
+      </div>
+      <button class="clean">clean &amp; rethread the caught pass</button>
+    </div>
+  </section>
+
+  <!-- STATE: GREEN ROOM (partners) -->
+  <section class="state" id="s-green">
+    <div class="greenroom">
+      <div class="gr-seat sameer">
+        <div class="seathead"><b>Sameer</b><span>co-writer · green room</span></div>
+        <div class="seatbody">
+          <div class="line sam">The watch is the whole third act if you want it. He's not attached to the object — he's attached to who gave it to him.</div>
+          <div class="line sam">Leave it on the booth table when he goes. That's the goodbye he can't say out loud.</div>
+          <div class="line sam">Want me to sketch that page? The station platform, the watch face-up on the wood — she doesn't pick it up until the train sounds.</div>
+          <div class="cue">"he turns the pocket watch over in his palm" — sc. 3</div>
+          <div class="acts"><button>find that line ↗</button><button>quote it back</button><button>sketch the page</button></div>
+        </div>
+      </div>
+      <div class="gr-seat sushruta">
+        <div class="seathead"><b>Dr. Sushruta</b><span>script doctor · the reading</span></div>
+        <div class="seatbody">
+          <div class="line doc">The static-blocking finding is structural, not cosmetic: the scene's rhythm depends on Maya's patience visibly eroding.</div>
+          <div class="line doc">Three of the eleven beats already carry that work in dialogue. The blocking should carry the other eight — the sugar, the window, the menu.</div>
+          <div class="gthink"><span>thinking it through</span><span class="flicker"><i></i><i></i><i></i></span></div>
+          <div class="cue">the diner, 11 beats — sc. 3 · verified</div>
+          <div class="acts"><button>find that line ↗</button><button>send to fix queue</button><button>the full reading ↗</button></div>
+        </div>
+      </div>
+      <div class="gr-ask">
+        <input placeholder="address the room — or select text on the page first and it rides along…">
+        <span class="addr">to: the room</span>
+        <button>project it</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- the chapter strip: click to jump, never a reading surface -->
+<nav id="filmstrip" aria-label="chapters">
+  <span class="cap">chapters<br><b>act I</b></span>
+  <div class="frames">
+    <div class="actreel open"><span class="ar-cap" tabindex="0" role="button" aria-label="open act ii chapters" title="click to open act i">act i · 1–7</span>
+      <div class="framecard" tabindex="0" role="button" aria-label="jump to scene 1, rain on the window" title="jump to sc. 1"><span class="sc">sc. 1</span><span class="nm">Rain on the window</span></div>
+      <div class="framecard" tabindex="0" role="button" aria-label="jump to scene 2, the appointment" title="jump to sc. 2"><span class="sc">sc. 2</span><span class="nm">The appointment</span><span class="marks"><i class="m-low"></i></span></div>
+      <div class="framecard here" tabindex="0" role="button" aria-label="you are here: scene 3, the diner at eleven o'clock" title="you are here — sc. 3"><span class="sc">sc. 3</span><span class="nm">The diner — eleven o'clock</span><span class="marks"><i class="m-high"></i><i class="m-mid"></i><i class="m-low"></i></span><span class="progress"></span></div>
+      <div class="framecard" tabindex="0" role="button" aria-label="jump to scene 4, traffic" title="jump to sc. 4"><span class="sc">sc. 4</span><span class="nm">Traffic</span><span class="marks"><i class="m-mid"></i></span></div>
+      <div class="framecard" tabindex="0" role="button" aria-label="jump to scene 5, sugar route" title="jump to sc. 5"><span class="sc">sc. 5</span><span class="nm">Sugar route</span></div>
+      <div class="framecard" tabindex="0" role="button" aria-label="jump to scene 6, the call" title="jump to sc. 6"><span class="sc">sc. 6</span><span class="nm">The call</span><span class="marks"><i class="m-low"></i></span></div>
+      <div class="framecard" tabindex="0" role="button" aria-label="jump to scene 7, night bus" title="jump to sc. 7"><span class="sc">sc. 7</span><span class="nm">Night bus</span></div>
+    </div>
+    <div class="actreel"><span class="ar-cap" tabindex="0" role="button" aria-label="open act ii chapters" title="click to open act ii">act ii · 8–14</span></div>
+    <div class="actreel"><span class="ar-cap" tabindex="0" role="button" aria-label="open act iii chapters" title="click to open act iii">act iii · 15–19</span></div>
+  </div>
+</nav>
+
+<footer id="deck">
+  <span class="live">● lamp house: model connected</span>
+  <span>draft v3</span><span>compare</span><span>revision</span><span>beat board — the strip, wide</span><span>export</span>
+  <span>⌕ find a line</span><span>↧ stash — 7 fragments</span>
+  <span class="r"><span>j / k — step chapters</span><span>esc — close the drawer</span></span>
+</footer>
+
+<script>
+const mb = document.querySelectorAll('#mockbar button');
+const st = document.querySelectorAll('.state');
+mb.forEach(b => b.addEventListener('click', () => {
+  mb.forEach(x => x.classList.toggle('on', x === b));
+  st.forEach(s => s.classList.toggle('on', s.id === 's-' + b.dataset.s));
+}));
+// tape-sticky locates its taped passage
+document.querySelectorAll('.tapesticky').forEach(t => t.addEventListener('click', () => {
+  const line = [...document.querySelectorAll('.frame .fl')].find(x => x.dataset.k === 'watch');
+  if (line) { line.scrollIntoView({ behavior:'smooth', block:'center' }); line.classList.add('pulse'); setTimeout(() => line.classList.remove('pulse'), 3400); }
+}));
+// bidirectional locate: finding line <-> director's note (the #10 loop, wired)
+const fls = document.querySelectorAll('.fl');
+const dnotes = document.querySelectorAll('.dnote');
+function pairOf(el) { const k = el.dataset.k; const pool = el.classList.contains('fl') ? dnotes : fls; return [...pool].find(x => x.dataset.k === k); }
+fls.forEach(f => {
+  f.addEventListener('click', () => { const n = pairOf(f); if (n) { n.scrollIntoView({ behavior:'smooth', block:'center' }); n.classList.add('lit'); setTimeout(() => n.classList.remove('lit'), 2600); } });
+  f.addEventListener('mouseenter', () => { const n = pairOf(f); if (n) n.classList.add('lit'); });
+  f.addEventListener('mouseleave', () => { const n = pairOf(f); if (n) n.classList.remove('lit'); });
+});
+dnotes.forEach(d => d.addEventListener('click', () => {
+  const f = pairOf(d);
+  if (f) { f.scrollIntoView({ behavior:'smooth', block:'center' }); f.classList.add('pulse'); setTimeout(() => f.classList.remove('pulse'), 3400); }
+}));
+// keyboard activation for div-buttons (Enter + Space), so every interactive element is truly operable
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.fl, .dnote, .tapesticky, .framecard, .actreel .ar-cap')) {
+    e.preventDefault(); e.target.click();
+  }
+});
+// act reels expand (demo: click a collapsed act to reveal its chapters)
+document.querySelectorAll('.actreel').forEach(a => a.addEventListener('click', e => {
+  if (!a.classList.contains('open') && !e.target.closest('.framecard')) a.classList.add('open');
+}));
+</script>
+
+<!-- ============ DESIGN NOTES — the 16 attributes (v2, critic-passed) ============ -->
+<style>
+#dnotes { position:fixed; left:16px; bottom:130px; z-index:90; font-family:var(--mono); }
+#dnotes summary { cursor:pointer; font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--dim); border:1px solid var(--hair); background:var(--booth-2); padding:7px 12px; border-radius:99px; }
+#dnotes .panel { width:340px; max-height:56vh; overflow:auto; background:var(--booth-2); border:1px solid var(--hair);
+  border-top:none; border-radius:0 0 12px 12px; padding:14px 16px; font-size:10px; line-height:1.65; color:var(--txt); }
+#dnotes .panel b { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); display:block; margin:10px 0 2px; }
+#dnotes .panel b:first-child { margin-top:0; }
+</style>
+<details id="dnotes">
+  <summary>design notes — 16 attributes · v2</summary>
+  <div class="panel">
+    <b>1 · Premise</b>The studio is a warm one-screen screening house at 2am: your script is the picture — projected as readable paper — the doctor's notes are the director's cues synced beside it, and scenes are chapters on the strip below.
+    <b>2 · Reader &amp; moment</b>The writer who wants the cinema identity without paying for it in writing comfort: vertical reading on real paper, the horizontal strip demoted to a jump navigator.
+    <b>3 · Emotional register</b>House lights low, amber chapter lights on. The page glows like the screen itself; the booth is warm dark, never blue-black.
+    <b>4 · Spatial metaphor</b>The paper page IS the projected frame and the room's light source; director's notes ride a 320px rail; the chapter strip sits below (act reels keep 50+ scenes legible); the green room holds the people.
+    <b>5 · Type system</b>Courier Prime 16px on paper for the script (13:1); Caveat for Sameer's cues and tape stickies; IBM Plex Mono 10px+ for keys and labels — v1's 9.5px whispers retired; Source Serif 4 for prose. All shipped fonts, no additions.
+    <b>6 · Chromatic system</b>Warm booth (#0d0b08 family — Night Room donor, zero blue-blacks) + amber keys + moon for Sushruta + teal for machine status. Paper #f4e9d3 with 13.04:1 ink. 25/25 audited pairs pass; severity never colors words on paper — dot + wash only.
+    <b>7 · Light logic</b>The paper is the projector: the page glow lights the booth from center; amber lives on chapter marks and scene keys; everything else recedes into warm dark.
+    <b>8 · Navigation model</b>Reading is the only required axis — vertical, on paper. The strip is a chapter navigator: click a chapter, land on its page. Every deck tool is a visible labeled word at 10px+; no keyboard faith required (j/k remain as shortcuts, not prerequisites).
+    <b>9 · Feedback representation</b>Findings as wash + dot on the exact paper line, words never recolored; director's notes keyed scene-first ("sc. 3 · the watch · 14:28" — timecode demoted to flavor); locate is bidirectional and wired: click a line, its note lights and scrolls; click a note, its line pulses on the page.
+    <b>10 · Partner presence</b>Sameer's cue sheet rides the notes rail in screening; the lobby sidecard; full seats in the green room. One presence per surface, one voice each — never doubled.
+    <b>11 · Chat composition</b>Cue sheets and seat lines — handwritten lines with a single ask each, not bubble stacks; the green-room composer addresses the room, and carries any page selection along.
+    <b>12 · Motion philosophy</b>The reel turns while threading; chapter progress animates on the active card; projector flicker for thinking ("thinking it through" text preserved); locate pulses twice, then stops. Reduced-motion honored globally.
+    <b>13 · Composer discipline</b>All inputs on warm booth dark with light text (11.7:1+); focus rings brighten amber — backgrounds never flip (hate-list #5).
+    <b>14 · Migration cost</b>Medium — vertical reading maps directly onto the shipped manuscript DOM; the strip is additive chrome, not a rewrite; wash/dot finding lines reuse Phase-13 surface patterns; no new fonts, no new geometry.
+    <b>15 · Risk exposure</b>The strip must stay a navigator and never grow into a reading surface; paper-on-dark needs shadow discipline (one soft shadow + one contact shadow, consistently); the rail must not creep past 320px or it becomes a pane (hate-list #2).
+    <b>16 · One-line verdict</b>V1's cinema identity with the Night Room's body — the screening house you can actually write in.
+  </div>
+</details>
+</body>
+</html>

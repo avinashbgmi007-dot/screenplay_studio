@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direction 2 — The Night Room</title>
+<style>
+/* ============================================================
+   DIRECTION 2 — THE NIGHT ROOM
+   The immersion pole. The manuscript IS the interface: full-bleed
+   pages floating in dark. No sidebars, no docks, no chrome.
+   Findings live INSIDE the page as underglow; partners are
+   summoned presences; navigation is the palette (⌘K / Ctrl+K).
+   ============================================================ */
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-20a22824.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-a15d607a.woff2') format('woff2'); font-weight:600; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-094f4033.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-6664e8d0.woff2') format('woff2'); font-weight:700; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-cdc2c233.woff2') format('woff2'); font-style:italic; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-0bc96cd0.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-e2661bcc.woff2') format('woff2'); font-weight:500; }
+@font-face { font-family:'Caveat'; src:url('../../../screenplay_studio/webapp/fonts/Caveat-706a1c41.woff2') format('woff2'); }
+@font-face { font-family:'Special Elite'; src:url('../../../screenplay_studio/webapp/fonts/SpecialElite-ee78eab2.woff2') format('woff2'); }
+
+:root {
+  --night:#0d0b08;             /* warm near-black — the room at 2am */
+  --night-2:#14110d;
+  --ember:#e8a24f;             /* the one warm signal — findings + accents */
+  --ember-soft:rgba(232,162,79,.14);
+  --moon:#a9b7c4;              /* cool second voice — Sushruta */
+  --moon-soft:rgba(169,183,196,.12);
+  --page:#f4e9d3;              /* manuscript paper — the light object */
+  --page-ink:#292219;
+  --page-dim:#6d6050;
+  --hair:#2c261e;
+  --txt:#d8cbb5;
+  --txt-dim:#8d8272;
+  --serif:'Source Serif 4', Georgia, serif;
+  --script:'Courier Prime', 'Courier New', monospace;
+  --mono:'IBM Plex Mono', Consolas, monospace;
+  --hand:'Caveat', cursive;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+body {
+  background:var(--night); color:var(--txt); font-family:var(--serif);
+  overflow:hidden; position:relative;
+}
+/* the room's single light source: paper glow, top-center */
+body::before {
+  content:""; position:fixed; inset:0; pointer-events:none;
+  background:
+    radial-gradient(1100px 620px at 50% -12%, rgba(244,233,211,.07), transparent 62%),
+    radial-gradient(700px 500px at 50% 118%, rgba(232,162,79,.05), transparent 60%);
+}
+
+/* ---------- top whisper: one line, fades when you write ---------- */
+#whisper {
+  position:fixed; top:0; left:0; right:0; height:46px; z-index:8;
+  display:flex; align-items:center; gap:16px; padding:0 26px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--txt-dim); transition:opacity .5s ease;
+}
+#whisper .proj { color:var(--txt); }
+#whisper .k { margin-left:auto; opacity:.85; }
+#whisper .k::before { content:"⌘"; font-size:12px; margin-right:6px; }
+body.writing #whisper { opacity:.25; }
+
+/* ---------- command palette: the primary nav ---------- */
+#palette {
+  position:fixed; left:50%; top:12vh; transform:translateX(-50%) scale(.97);
+  width:min(620px, 90vw); z-index:60; opacity:0; pointer-events:none;
+  transition:opacity .22s ease, transform .22s cubic-bezier(.22,1,.36,1);
+}
+#palette.open { opacity:1; pointer-events:auto; transform:translateX(-50%) scale(1); }
+#palette .box {
+  background:var(--night-2); border:1px solid var(--hair); border-radius:12px;
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.8); overflow:hidden;
+}
+#palette input {
+  width:100%; background:none; border:none; outline:none; color:var(--txt);
+  font-family:var(--serif); font-size:17px; padding:16px 20px;
+  border-bottom:1px solid var(--hair);
+}
+#palette input::placeholder { color:var(--txt-dim); font-style:italic; }
+#palette .list { max-height:300px; overflow:auto; padding:6px; }
+#palette .opt {
+  display:flex; align-items:baseline; gap:12px; padding:10px 14px; border-radius:8px;
+  cursor:pointer; color:var(--txt-dim); font-family:var(--serif); font-size:14.5px;
+}
+#palette .opt:hover, #palette .opt.sel { background:var(--ember-soft); color:var(--txt); }
+#palette .opt .go { margin-left:auto; font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; }
+#palette .hintline { padding:8px 20px 10px; font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--txt-dim); border-top:1px solid var(--hair); }
+
+/* ---------- state switcher (mockup nav only) ---------- */
+#mockbar {
+  position:fixed; right:18px; top:54px; z-index:70; display:flex; flex-direction:column; gap:6px;
+}
+#mockbar button {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  background:rgba(20,17,13,.85); color:var(--txt-dim); border:1px solid var(--hair);
+  border-radius:99px; padding:6px 12px; cursor:pointer; backdrop-filter:none;
+  transition:color .15s, border-color .15s;
+}
+#mockbar button:hover { color:var(--txt); }
+#mockbar button.on { color:var(--ember); border-color:var(--ember); }
+
+/* ---------- the pages ---------- */
+#room { position:absolute; inset:46px 0 52px; overflow-y:auto; scroll-behavior:smooth; }
+.state { display:none; }
+.state.on { display:block; animation:pageIn .55s cubic-bezier(.22,1,.36,1) both; }
+@keyframes pageIn { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:none; } }
+
+.page {
+  width:min(720px, 86vw); margin:34px auto; background:var(--page);
+  color:var(--page-ink); padding:58px 64px 66px; position:relative;
+  box-shadow:0 30px 70px -28px rgba(0,0,0,.85), 0 2px 12px rgba(0,0,0,.4);
+  border-radius:3px;
+}
+.page .sline { font-family:var(--script); font-size:15px; line-height:1.65; margin-bottom:13px; white-space:pre-wrap; }
+.page .char { margin:18px 0 2px; }
+.page .paren { margin-left:20%; color:var(--page-dim); font-style:italic; }
+.page .dial { margin-left:14%; margin-bottom:15px; }
+.page .trans { margin:16px 0 26px; letter-spacing:.24em; color:var(--page-dim); }
+
+/* finding underglow: the diagnosis lives in the paper, not beside it.
+   Words stay ink; severity is carried by the dot + wash only (text never dims). */
+.glowline {
+  position:relative; border-radius:4px; cursor:pointer;
+  transition:background .35s ease, box-shadow .35s ease;
+  color:var(--page-ink);
+}
+.glowline.high { background:rgba(196,86,58,.13); box-shadow:inset 0 0 0 1px rgba(196,86,58,.28); }
+.glowline.mid { background:rgba(232,162,79,.11); box-shadow:inset 0 0 0 1px rgba(232,162,79,.22); }
+.glowline.low { background:rgba(90,120,150,.10); box-shadow:inset 0 0 0 1px rgba(90,120,150,.20); }
+.glowline .dot {
+  display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:8px;
+  vertical-align:1px; opacity:.95;
+}
+.glowline.high .dot { background:#c4563a; }
+.glowline.mid .dot { background:#b07a3a; }
+.glowline.low .dot { background:#5a7896; }
+.glowline { --sev:#5a7896; }
+.glowline.high { --sev:#c4563a; } .glowline.mid { --sev:#b07a3a; } .glowline.low { --sev:#5a7896; }
+.glowline:hover { box-shadow:inset 0 0 0 1.5px var(--sev), 0 0 24px -6px var(--sev); }
+.glowline .badge {
+  position:absolute; right:-14px; top:50%; transform:translate(100%,-50%);
+  font-family:var(--mono); font-size:9px; letter-spacing:.14em; white-space:nowrap;
+  color:var(--page-dim); opacity:0; transition:opacity .3s ease; text-transform:uppercase;
+}
+.glowline.high .badge { color:#c4563a; } .glowline.mid .badge { color:#b07a3a; } .glowline.low .badge { color:#5a7896; }
+.page:hover .glowline .badge { opacity:.9; }
+
+/* margin whisper ticks: tiny scene-relative presence counts */
+.pagewrap { position:relative; width:min(720px,86vw); margin:34px auto; }
+.pw-count {
+  position:absolute; right:-58px; top:58px; writing-mode:vertical-rl;
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--txt-dim); opacity:.7;
+}
+.pw-count b { color:var(--ember); font-weight:500; }
+
+/* selection bar: rises under the page when a line is selected */
+.selbar {
+  margin:14px auto 0; width:fit-content; display:flex; align-items:center; gap:10px;
+  background:var(--night-2); border:1px solid var(--hair); border-radius:99px; padding:8px 10px 8px 16px;
+  box-shadow:0 14px 34px -14px rgba(0,0,0,.7);
+}
+.selbar .selquote { font-family:var(--script); font-size:12.5px; color:var(--txt); max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.selbar button {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase;
+  background:none; border:1px solid var(--hair); color:var(--txt-dim); border-radius:99px;
+  padding:6px 12px; cursor:pointer; transition:color .15s, border-color .15s;
+}
+.selbar button:hover { color:var(--ember); border-color:var(--ember); }
+
+/* sticky note: writer's own — pinned INTO the page, tucked at the fold */
+.page .pinsticky {
+  position:absolute; right:14px; bottom:-14px; transform:rotate(2.4deg);
+  background:var(--night-2); color:var(--hand); font-family:var(--hand); font-size:16px;
+  border:1px solid var(--hair); padding:10px 14px; max-width:220px;
+  box-shadow:0 12px 26px -8px rgba(0,0,0,.7); cursor:pointer;
+  color:#d9c9a8; line-height:1.2;
+}
+.page .pinsticky:hover { transform:rotate(1.2deg) translateY(-3px); }
+
+/* summoned presence: Sameer rises from the bottom, over furniture only */
+#presence {
+  position:fixed; left:50%; bottom:0; transform:translate(-50%, 100%);
+  width:min(760px, 92vw); z-index:50; transition:transform .45s cubic-bezier(.22,1,.36,1);
+}
+#presence.up { transform:translate(-50%, 0); }
+#presence .pskin {
+  background:var(--night-2); border:1px solid var(--hair); border-bottom:none;
+  border-radius:16px 16px 0 0; padding:18px 22px 0; box-shadow:0 -20px 60px -18px rgba(0,0,0,.75);
+}
+#presence .prow { display:flex; align-items:baseline; gap:12px; margin-bottom:10px; }
+#presence .who { font-family:var(--hand); font-size:22px; color:var(--ember); }
+#presence .role { font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--txt-dim); }
+#presence .closep { margin-left:auto; background:none; border:none; color:var(--txt-dim); font-family:var(--mono); font-size:10px; cursor:pointer; letter-spacing:.14em; text-transform:uppercase; }
+#presence .say { font-family:var(--hand); font-size:19px; color:var(--txt); line-height:1.3; margin-bottom:12px; }
+#presence .composer { display:flex; align-items:flex-end; gap:12px; padding:12px 2px 16px; }
+#presence textarea {
+  flex:1; background:var(--night); border:1px solid var(--hair); border-radius:10px;
+  color:var(--txt); font-family:var(--serif); font-size:15px; padding:11px 14px;
+  min-height:46px; max-height:140px; resize:none; outline:none;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.45);
+}
+#presence textarea:focus { border-color:var(--ember); box-shadow:inset 0 2px 8px rgba(0,0,0,.45), 0 0 0 3px var(--ember-soft); }
+#presence textarea::placeholder { color:var(--txt-dim); font-style:italic; }
+#presence .send {
+  width:46px; height:46px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--ember); color:#221704; font-size:17px; font-weight:700;
+  box-shadow:0 8px 22px -6px var(--ember-soft); transition:transform .15s;
+}
+#presence .send:hover { transform:translateY(-2px); }
+
+/* thinking glyph: three breath-dots, text stays, wave replaced by breathing */
+.thinking { display:flex; align-items:center; gap:12px; font-family:var(--hand); font-size:18px; color:var(--txt-dim); padding:6px 2px 10px; }
+.thinking .b { display:inline-flex; gap:4px; }
+.thinking .b i { width:5px; height:5px; border-radius:50%; background:var(--ember); animation:breathe 1.6s ease-in-out infinite; }
+.thinking .b i:nth-child(2){ animation-delay:.22s } .thinking .b i:nth-child(3){ animation-delay:.44s }
+@keyframes breathe { 0%,100%{ transform:scale(.6); opacity:.3 } 50%{ transform:scale(1); opacity:1 } }
+
+/* ============================================================
+   STATE: LANDING — the dark desk, pages as lit objects
+   ============================================================ */
+.landing { padding:60px 0 80px; text-align:center; }
+.landing .eyebrow { font-family:var(--mono); font-size:10.5px; letter-spacing:.34em; text-transform:uppercase; color:var(--txt-dim); }
+.landing h1 { font-family:var(--serif); font-size:clamp(34px, 4.4vw, 52px); font-weight:600; color:var(--txt); margin:18px 0 12px; }
+.landing .sub { font-family:var(--serif); font-style:italic; font-size:16.5px; color:var(--txt-dim); max-width:52ch; margin:0 auto; line-height:1.6; }
+.landing .openk {
+  margin:36px auto 0; width:fit-content; font-family:var(--mono); font-size:11px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--txt); border:1px solid var(--hair); border-radius:99px;
+  padding:13px 26px; cursor:pointer; display:flex; gap:10px; align-items:center;
+  background:rgba(20,17,13,.6); transition:border-color .2s, color .2s;
+}
+.landing .openk:hover { border-color:var(--ember); color:var(--ember); }
+.stack { display:flex; flex-direction:column; gap:18px; width:min(560px,88vw); margin:44px auto 0; }
+.st-page {
+  background:var(--page); color:var(--page-ink); text-align:left; padding:20px 26px;
+  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 18px; cursor:pointer;
+  box-shadow:0 16px 40px -18px rgba(0,0,0,.8); border-radius:3px;
+  transition:transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s;
+}
+.st-page:hover { transform:translateY(-4px); box-shadow:0 24px 56px -18px rgba(0,0,0,.85); }
+.st-page .ttl { font-family:var(--serif); font-size:19px; font-weight:600; }
+.st-page .met { font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--page-dim); }
+.st-page .glowmark { font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:#a05230; }
+.st-page .glowmark.ok { color:#5c7a4a; }
+.st-page .dims { grid-column:1/-1; font-family:var(--mono); font-size:9.5px; color:var(--page-dim); border-top:1px dashed var(--page-dim); padding-top:7px; margin-top:5px; opacity:.85; }
+
+/* ============================================================
+   STATE: IDEA — a single page + Sameer presence always near
+   ============================================================ */
+.idea .page { min-height:420px; }
+.idea .page h2 { font-family:var(--hand); font-size:31px; color:var(--page-ink); margin-bottom:16px; }
+.idea .page .body { font-family:var(--serif); font-size:17px; line-height:2.05; color:var(--page-ink); min-height:240px; outline:none; }
+.idea .qfloat {
+  position:fixed; right:28px; bottom:76px; width:300px; z-index:40;
+  background:var(--night-2); border:1px solid var(--hair); border-radius:14px;
+  padding:16px 18px; box-shadow:0 22px 60px -18px rgba(0,0,0,.8);
+}
+.idea .qfloat .who { font-family:var(--mono); font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--ember); margin-bottom:8px; }
+.idea .qfloat .q { font-family:var(--hand); font-size:19px; color:var(--txt); line-height:1.25; }
+.idea .qfloat .ask { margin-top:10px; display:flex; gap:8px; }
+.idea .qfloat input { flex:1; background:var(--night); border:1px solid var(--hair); border-radius:8px; color:var(--txt); font-family:var(--serif); font-size:13.5px; padding:8px 10px; outline:none; }
+.idea .qfloat input:focus { border-color:var(--ember); }
+
+/* ============================================================
+   STATE: READING PROGRESS — the pages turn themselves
+   ============================================================ */
+.watch { padding:70px 0 60px; text-align:center; }
+.watch .status { font-family:var(--serif); font-style:italic; font-size:20px; color:var(--txt-dim); }
+.watch .status b { color:var(--txt); font-style:normal; }
+.watch .film { width:min(680px,88vw); margin:38px auto 0; display:flex; flex-direction:column; gap:0; }
+.watch .frame {
+  display:grid; grid-template-columns:150px minmax(0,1fr) auto; gap:18px; align-items:baseline;
+  padding:16px 10px; border-bottom:1px solid var(--hair); text-align:left;
+}
+.watch .frame .pass { font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--txt-dim); }
+.watch .frame .what { font-family:var(--serif); font-size:16.5px; color:var(--txt); }
+.watch .frame .what small { display:block; font-size:13px; color:var(--txt-dim); font-style:italic; margin-top:2px; }
+.watch .frame .st { font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
+.watch .frame.done .st { color:#7fae76; }
+.watch .frame.now .st { color:var(--ember); }
+.watch .frame.now .what::after {
+  content:""; display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--ember); margin-left:10px; vertical-align:2px; animation:breathe 1.4s ease-in-out infinite;
+}
+.watch .frame.fail .st { color:#c4563a; }
+.watch .frame.fail .what small { color:#c4563a; font-style:italic; }
+.watch .retry { margin-top:26px; font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; background:none; border:1px solid #c4563a; color:#c4563a; padding:10px 20px; border-radius:99px; cursor:pointer; transition:background .2s,color .2s; }
+.watch .retry:hover { background:#c4563a; color:var(--night); }
+
+/* ============================================================
+   STATE: CONSULTATION — Sushruta under cool moonlight
+   ============================================================ */
+.moonroom { padding:30px 0 60px; }
+.moonroom .page .sushhead { font-family:var(--mono); font-size:10px; letter-spacing:.26em; text-transform:uppercase; color:var(--page-dim); border-bottom:1px solid var(--page-dim); padding-bottom:8px; margin-bottom:18px; display:flex; justify-content:space-between; }
+.moonroom .page h3 { font-family:var(--serif); font-size:24px; font-weight:600; margin-bottom:14px; }
+.moonroom .page .diag { font-family:var(--serif); font-size:15.5px; line-height:1.75; }
+.moonroom .page .diag h6 { font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--page-dim); margin:18px 0 6px; }
+.moonroom .page .locate { font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--page-dim); cursor:pointer; border-bottom:1px dotted var(--page-dim); }
+/* sameer's side of the moon room — same paper, his hand */
+.moonroom .sam-page .sushhead { border-bottom-color:var(--page-dim); }
+.moonroom .sam-page .letter { font-family:var(--hand); font-size:21px; line-height:1.45; color:var(--page-ink); margin:14px 0 18px; }
+.moonroom .sam-page .cue { font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--page-dim); margin-top:18px; }
+.moonroom .sam-page .askback { display:flex; gap:10px; margin-top:22px; border-top:1px dashed var(--page-dim); padding-top:14px; }
+.moonroom .sam-page .askback input { flex:1; background:var(--night-2); border:1px solid var(--hair); border-radius:8px; color:var(--txt); font-family:var(--serif); font-size:13.5px; padding:9px 11px; outline:none; }
+.moonroom .sam-page .askback input:focus { border-color:var(--ember); }
+.moonroom .sam-page .askback button { background:var(--ember); border:none; border-radius:8px; color:#221704; font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; padding:0 14px; cursor:pointer; }
+.moonroom .page.sam-page { display:none; }
+.moonroom[data-view="sam"] .page.sush-page { display:none; }
+.moonroom[data-view="sam"] .page.sam-page { display:block; }
+.moonroom[data-view="sush"] .page.sush-page { display:block; }
+.moonroom[data-view="sush"] .page.sam-page { display:none; }
+.moonroom .switchrow { width:min(680px,88vw); margin:22px auto 0; display:flex; gap:12px; justify-content:center; }
+.moonroom .switchrow button { font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; background:none; border:1px solid var(--hair); color:var(--txt-dim); padding:9px 18px; border-radius:99px; cursor:pointer; }
+.moonroom .switchrow button.on { color:var(--ember); border-color:var(--ember); }
+
+/* bottom scene river (night room's only persistent furniture) */
+#river {
+  position:fixed; left:0; right:0; bottom:0; height:52px; z-index:8;
+  display:flex; align-items:center; gap:8px; padding:0 26px;
+  background:linear-gradient(180deg, transparent, rgba(13,11,8,.9) 40%);
+}
+#river .dots { display:flex; gap:7px; margin:0 auto; }
+#river .dots span { width:7px; height:7px; border-radius:50%; background:var(--hair); cursor:pointer; transition:transform .15s, background .2s; }
+#river .dots span:hover { transform:scale(1.4); }
+#river .dots span.here { background:var(--ember); box-shadow:0 0 10px var(--ember-soft); }
+#river .dots span.has { background:var(--txt-dim); }
+#river .lab { font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--txt-dim); }
+
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+
+<div id="whisper">
+  <span class="proj">The Late Hour</span>
+  <span>scene 3 · 3 marks glowing</span>
+  <span class="k">press K — everything is here</span>
+</div>
+
+<!-- mockup state nav (not part of the design) -->
+<div id="mockbar">
+  <button data-s="landing">landing</button>
+  <button data-s="proof" class="on">manuscript</button>
+  <button data-s="idea">idea</button>
+  <button data-s="watch">progress</button>
+  <button data-s="moon">consultation</button>
+</div>
+
+<!-- command palette -->
+<div id="palette" class="open">
+  <div class="box">
+    <input id="pinput" placeholder="Go anywhere, ask anything, run anything…" value="the watch">
+    <div class="list">
+      <div class="opt sel">Jump to the pocket watch — scene 3 <span class="go">enter</span></div>
+      <div class="opt">Ask Sameer about the watch payoff <span class="go">↵ ask</span></div>
+      <div class="opt">Dr. Sushruta: read the setup/payoff findings <span class="go">↵ read</span></div>
+      <div class="opt">Run analysis — the full reading <span class="go">↵ run</span></div>
+      <div class="opt">Search the pages — find any line <span class="go">↵ find</span></div>
+      <div class="opt">Fix queue — today's work order <span class="go">↵ queue</span></div>
+      <div class="opt">Beat board — the whole picture, wide <span class="go">↵ board</span></div>
+      <div class="opt">Compare drafts — v2 against v3 <span class="go">↵ compare</span></div>
+      <div class="opt">Revision history — every save, restorable <span class="go">↵ history</span></div>
+      <div class="opt">Stash — the 7 fragments you kept <span class="go">↵ stash</span></div>
+      <div class="opt">New idea page <span class="go">↵ new</span></div>
+      <div class="opt">Export the marked pages <span class="go">↵ export</span></div>
+    </div>
+    <div class="hintline">↑↓ move · ↵ go · esc close — every screen, tool and person in the studio answers here</div>
+  </div>
+</div>
+
+<main id="room">
+
+  <!-- STATE: LANDING -->
+  <section class="state landing" id="s-landing">
+    <div class="eyebrow">Script Doctor Studio</div>
+    <h1>The night room is open.</h1>
+    <p class="sub">Your pages under one lamp, the doctor reading over your shoulder, everything on this machine. No interface between you and the work — just a key away.</p>
+    <div class="openk">open the palette — K</div>
+    <div class="stack">
+      <div class="st-page">
+        <span class="ttl">The Late Hour</span>
+        <span class="glowmark">3 marks glowing</span>
+        <span class="met">12 scenes · 28 pages</span>
+        <span class="met">read yesterday, 22:14</span>
+        <div class="dims">coverage ✓ · pacing ✓ · setup/payoff — 3 open findings</div>
+      </div>
+      <div class="st-page">
+        <span class="ttl">Gun &amp; Pen</span>
+        <span class="glowmark ok">unlit — awaiting first read</span>
+        <span class="met">9 scenes · 21 pages</span>
+        <div class="dims">parsed, not yet analyzed · the doctor waits</div>
+      </div>
+      <div class="st-page">
+        <span class="ttl">Old Harbor</span>
+        <span class="glowmark ok">resting</span>
+        <span class="met">3 weeks untouched</span>
+        <div class="dims">notes + stash kept warm</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATE: MANUSCRIPT + FINDINGS AS UNDERGLOW -->
+  <section class="state proof on" id="s-proof">
+    <div class="pagewrap">
+      <div class="pw-count">scene 3 — <b>3 glowing</b> · 1 note pinned</div>
+      <article class="page">
+        <div class="sline">INT. DINER — NIGHT</div>
+        <div class="sline">Rain streams down the window. MAYA (30s, rain-soaked) slides into a booth.</div>
+        <div class="sline char">MAYA</div>
+        <div class="sline dial glowline high" title="Setup/Payoff — high: the watch never returns">
+          <span class="dot"></span>You said eleven. I've been here since nine-thirty.
+        </div>
+        <div class="sline">DECK (50s) doesn't look up from his coffee.</div>
+        <div class="sline char">DECK</div>
+        <div class="sline dial glowline mid" title="Pacing — mid: static blocking"><span class="dot"></span>Traffic.</div>
+        <div class="sline char">MAYA</div>
+        <div class="sline dial">For two hours?</div>
+        <div class="sline char">DECK</div>
+        <div class="sline dial glowline low" title="Character dials — low: the shift needs a reason"><span class="dot"></span>You're still here.</div>
+        <div class="sline paren">(a beat — he turns the pocket watch over in his palm)</div>
+        <div class="sline dial">Sit down before the coffee gets ideas.</div>
+        <div class="sline trans">CUT TO:</div>
+        <div class="pinsticky" title="click to locate the pinned lines">the watch — grandpa's letter? maybe he returns it to HER
+          <span style="display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-dim);margin-top:6px;">pinned · "pocket watch" · scene 3</span>
+        </div>
+      </article>
+      <!-- selection tools — the creation half of the sticky loop (#11) -->
+      <div class="selbar" title="select any line, these rise">
+        <span class="selquote">"he turns the pocket watch over in his palm"</span>
+        <button>✎ pin a note</button><button>stash the lines</button><button>ask about this</button>
+      </div>
+    </div>
+    <p style="text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--txt-dim);margin:10px 0 40px">click a glowing line · hover for its category · K for everything</p>
+  </section>
+
+  <!-- STATE: IDEA -->
+  <section class="state idea" id="s-idea">
+    <div class="page">
+      <h2>An idea, still wet —</h2>
+      <div class="body" contenteditable="true">A night-shift archivist in a city that banned sleep discovers the library's oldest ledger is written in her own handwriting — dated sixty years from now.
+
+She starts sleeping in secret to read it. The city notices.</div>
+    </div>
+    <div class="qfloat">
+      <div class="who">Sameer — on the page with you</div>
+      <div class="q">The ledger in her own hand is the hook. What does the first entry she reads promise her?</div>
+      <div class="ask"><input placeholder="answer, or ask back…"><button style="background:none;border:1px solid var(--hair);border-radius:8px;color:var(--ember);font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:0 12px;cursor:pointer;">send</button></div>
+    </div>
+  </section>
+
+  <!-- STATE: PROGRESS -->
+  <section class="state watch" id="s-watch">
+    <div class="status">The doctor is reading — <b>page 14 of 28</b>. Two passes done, one flagged.</div>
+    <div class="film">
+      <div class="frame done"><span class="pass">pass 01</span><div class="what">Coverage<small>every scene accounted for, every voice heard</small></div><span class="st">✓ read</span></div>
+      <div class="frame now"><span class="pass">pass 02</span><div class="what">Pacing<small>where the picture breathes, where it stalls</small></div><span class="st">reading</span></div>
+      <div class="frame"><span class="pass">pass 03</span><div class="what">Setup / Payoff<small>every promise the script makes — kept or broken</small></div><span class="st">queued</span></div>
+      <div class="frame fail"><span class="pass">pass 04</span><div class="what">Character dials<small>who people want, and when it changes</small></div><span class="st">✗ flagged</span></div>
+    </div>
+    <button class="retry">re-read the flagged pass</button>
+  </section>
+
+  <!-- STATE: CONSULTATION (Sushruta / Sameer — same paper, two voices) -->
+  <section class="state moonroom" id="s-moon" data-view="sush">
+    <div class="page sush-page">
+      <div class="sushhead"><span>Dr. Sushruta — formal reading</span><span>scene 3 · the diner</span></div>
+      <h3>On the diner scene —</h3>
+      <div class="diag">
+        The static-blocking finding is structural, not cosmetic: the scene's rhythm depends on Maya's patience visibly eroding. Three of the eleven beats already carry that work in dialogue; the blocking should carry the other eight.
+        <h6>Recommendation</h6>
+        Give the sugar dispenser a journey across the table. Small, trackable, and the audience can time her shift without a word of exposition.
+        <h6>Evidence</h6>
+        <span class="locate">locate: "Traffic." — scene 3 ↗</span> · <span class="locate">locate: booth, 11 beats ↗</span>
+      </div>
+    </div>
+    <div class="page sam-page">
+      <div class="sushhead"><span>Sameer — the conversation</span><span>on the watch, sc. 3</span></div>
+      <div class="letter">He's not attached to the OBJECT — he's attached to who gave it to him. If he leaves it on the booth table when he goes, that's the goodbye he can't say out loud.</div>
+      <div class="letter">Want me to sketch that page? I can have it on your desk before the coffee gets ideas.</div>
+      <div class="cue">"he turns the pocket watch over in his palm" — scene 3</div>
+      <div class="askback">
+        <input placeholder="answer him, or ask back…">
+        <button>send</button>
+      </div>
+    </div>
+    <div class="switchrow">
+      <button class="on" data-v="sush">Dr. Sushruta — the reading</button>
+      <button data-v="sam">Sameer — the conversation</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- summoned presence (Sameer) — rises over furniture, never the page -->
+<div id="presence" class="up">
+  <div class="pskin">
+    <div class="prow">
+      <span class="who">Sameer</span>
+      <span class="role">co-writer · on the marked line</span>
+      <button class="closep">esc — send him away</button>
+    </div>
+    <div class="say">The watch is the whole third act if you want it. He's not attached to the object — he's attached to who gave it to him. Leave it on the table when he goes; that's the goodbye he can't say.</div>
+    <div class="thinking"><span>thinking it through</span><span class="b"><i></i><i></i><i></i></span></div>
+    <div class="composer">
+      <textarea placeholder="reply, or select a line first — the question rides with it…"></textarea>
+      <button class="send">↑</button>
+    </div>
+  </div>
+</div>
+
+<footer id="river">
+  <span class="lab">act I</span>
+  <div class="dots"><span></span><span></span><span class="here"></span><span class="has"></span><span></span><span></span><span class="has"></span></div>
+  <span class="lab">scene 3 of 12</span>
+</footer>
+
+<script>
+const mb = document.querySelectorAll('#mockbar button');
+const st = document.querySelectorAll('.state');
+const pres = document.getElementById('presence');
+// initial state: manuscript — whisper dimmed because the page IS the focus
+document.body.classList.add('writing');
+mb.forEach(b => b.addEventListener('click', () => {
+  mb.forEach(x => x.classList.toggle('on', x === b));
+  st.forEach(s => s.classList.toggle('on', s.id === 's-' + b.dataset.s));
+  // sameer is summoned in the proof state only — one canonical presence everywhere
+  if (b.dataset.s === 'proof') pres.classList.add('up'); else pres.classList.remove('up');
+  // the whisper dims only when the manuscript is the centered focus (hate-list #3)
+  document.body.classList.toggle('writing', b.dataset.s === 'proof' || b.dataset.s === 'idea');
+}));
+// moon room: one voice at a time on the same paper
+document.querySelectorAll('.switchrow button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.switchrow button').forEach(x => x.classList.toggle('on', x === b));
+  document.getElementById('s-moon').dataset.view = b.dataset.v;
+}));
+// presence demo
+document.addEventListener('keydown', e => { if (e.key === 'Escape') pres.classList.remove('up'); });
+// glowlines summon presence with context
+document.querySelectorAll('.glowline').forEach(g => g.addEventListener('click', () => {
+  pres.classList.add('up');
+}));
+// palette demo toggle
+const pal = document.getElementById('palette');
+document.getElementById('pinput').addEventListener('keydown', e => { if (e.key === 'Escape') pal.classList.remove('open'); });
+// sticky locates
+document.querySelectorAll('.pinsticky').forEach(p => p.addEventListener('click', () => {
+  const gl = document.querySelector('.glowline.high'); if (gl) gl.scrollIntoView({ behavior:'smooth', block:'center' });
+}));
+</script>
+
+<!-- ============ DESIGN NOTES — the 16 attributes (critic-passed) ============ -->
+<style>
+#dnotes { position:fixed; left:16px; bottom:60px; z-index:90; font-family:var(--mono); }
+#dnotes summary { cursor:pointer; font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--txt-dim); border:1px solid var(--hair); background:var(--night-2); padding:7px 12px; border-radius:99px; }
+#dnotes .panel { width:340px; max-height:60vh; overflow:auto; background:var(--night-2); border:1px solid var(--hair);
+  border-top:none; border-radius:0 0 12px 12px; padding:14px 16px; font-size:10px; line-height:1.65; color:var(--txt); }
+#dnotes .panel b { font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ember); display:block; margin:10px 0 2px; }
+#dnotes .panel b:first-child { margin-top:0; }
+</style>
+<details id="dnotes">
+  <summary>design notes — 16 attributes</summary>
+  <div class="panel">
+    <b>1 · Premise</b>The room at 2am: the manuscript IS the interface — full-bleed pages floating in warm dark, everything else summoned on key. The immersion pole of the five.
+    <b>2 · Reader &amp; moment</b>The writer deep in a night draft — wants the interface to disappear, trusts a keyboard, finds any chrome at the page's edge an intrusion.
+    <b>3 · Emotional register</b>Solitude with company nearby. One lamp's worth of light (paper glow top-center), the room silent except the page.
+    <b>4 · Spatial metaphor</b>A dark study: the page is the only light object; scene markers are a river of dots at the floor; partners rise from below only when called.
+    <b>5 · Type system</b>Source Serif 4 + Courier Prime for the manuscript; IBM Plex Mono for the whisper/palette; Caveat for Sameer and stickies. Same library as the shipped app — zero new fonts.
+    <b>6 · Chromatic system</b>Warm near-black room (#0d0b08), one ember accent (#e8a24f) for signals, cool moon (#a9b7c4) as Sushruta's voice; pages are warm paper. Severity = wash + dot only — words never change color (text stays #292219 on paper, 13:1).
+    <b>7 · Light logic</b>The page is the light source: radial paper-glow above, ember floor-glow below. Depth = real shadows on the sheet, no UI gradients.
+    <b>8 · Navigation model</b>Command palette (K) is the primary nav — jump, ask, run, export all from one line; the dot-river is the only persistent furniture; the whisper strip fades ONLY when the page is focus (hate-list #3 honored by state).
+    <b>9 · Feedback representation</b>Underglow INSIDE the paper: each finding is a colored wash + severity dot on its exact line; hover reveals a margin badge. Nothing covers a word; no side panels of findings anywhere (hate-list #1/#7).
+    <b>10 · Partner presence</b>Summoned presences: Sameer rises as a bottom sheet over furniture only (never the page); Sushruta speaks on the moon-lit page. One surface each — the idea state shares the same summoned component, no duplicates (hate-list #10).
+    <b>11 · Chat composition</b>Handwritten letters on the page itself (Sameer) / formal reading documents (Sushruta) — not bubbles; composer is a single strip with 11.8:1 text visibility (hate-list #5/#8).
+    <b>12 · Motion philosophy</b>Breathing: pageIn on state, breathe dots while thinking ("thinking it through" text preserved), presence rise is the only large motion; all reduced-motion honored.
+    <b>13 · Composer discipline</b>Every input dark-bg with light text ≥ 4.99:1; focus = ember border + soft ring — no background flips. The typed text is always the brightest thing in the room.
+    <b>14 · Migration cost</b>High — this negates the shipped shell (no masthead, no docks, palette-first). A rebuild, not an evolution; worth it only if immersion is the top criterion.
+    <b>15 · Risk exposure</b>Keyboard-faith navigation may alienate mouse-first users; the palette must be exhaustive or it feels broken; zero persistent affordances means discoverability rests entirely on the landing copy.
+    <b>16 · One-line verdict</b>The purest writing experience of the five and the most radical departure — maximum immersion, maximum migration.
+  </div>
+</details>
+</body>
+</html>

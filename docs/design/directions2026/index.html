@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Script Doctor Studio — Five Directions, 2026</title>
+<style>
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-20a22824.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-a15d607a.woff2') format('woff2'); font-weight:600; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-0bc96cd0.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-e2661bcc.woff2') format('woff2'); font-weight:500; }
+@font-face { font-family:'Special Elite'; src:url('../../../screenplay_studio/webapp/fonts/SpecialElite-ee78eab2.woff2') format('woff2'); }
+@font-face { font-family:'Caveat'; src:url('../../../screenplay_studio/webapp/fonts/Caveat-706a1c41.woff2') format('woff2'); }
+
+:root {
+  --paper:#faf6ea; --field:#e3ddcc; --ink:#1f1b16; --graphite:#666159;
+  --red:#b3372b; --blue:#3f5d8c; --hairline:#d4ccba; --rule:#b9ae97;
+  --serif:'Source Serif 4', Georgia, serif;
+  --mono:'IBM Plex Mono', Consolas, monospace;
+  --hand:'Caveat', cursive;
+  --type:'Special Elite', 'Courier New', monospace;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--field); color:var(--ink); font-family:var(--serif); padding:48px 24px 90px; }
+.wrap { max-width:1060px; margin:0 auto; }
+
+.mast { text-align:center; margin-bottom:44px; }
+.mast .eyebrow { font-family:var(--type); font-size:11px; letter-spacing:.4em; text-transform:uppercase; color:var(--graphite); }
+.mast h1 { font-family:var(--serif); font-size:clamp(30px, 4vw, 46px); font-weight:600; margin:14px 0 10px; }
+.mast .sub { font-style:italic; color:var(--graphite); font-size:16px; max-width:62ch; margin:0 auto; line-height:1.6; }
+.mast .note { font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--graphite); margin-top:16px; }
+
+.cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:22px; margin:36px 0 10px; }
+.dcard { background:var(--paper); border:1px solid var(--hairline); padding:22px 24px 18px; position:relative;
+  box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 14px 34px -18px rgba(64,52,28,.35); transition:transform .25s ease, box-shadow .25s ease; }
+.dcard:hover { transform:translateY(-4px); box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 22px 44px -18px rgba(64,52,28,.45); }
+.dcard .no { font-family:var(--type); font-size:10px; letter-spacing:.3em; color:var(--graphite); }
+.dcard h2 { font-family:var(--serif); font-size:21px; font-weight:600; margin:8px 0 6px; }
+.dcard .one { font-style:italic; font-size:13.5px; color:var(--graphite); line-height:1.5; margin-bottom:12px; min-height:40px; }
+.dcard .axes { font-family:var(--mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--graphite);
+  border-top:1px dashed var(--rule); padding-top:10px; line-height:1.9; }
+.dcard .axes b { color:var(--ink); font-weight:500; }
+.dcard .axes .good { color:var(--blue); }
+.dcard .axes .warn { color:var(--red); }
+.dcard .verdict { margin-top:12px; font-family:var(--hand); font-size:17px; color:var(--ink); line-height:1.25; }
+.dcard a.open { display:inline-block; margin-top:14px; font-family:var(--mono); font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--paper); background:var(--ink); padding:9px 16px; text-decoration:none; }
+.dcard a.open:hover { background:var(--red); }
+.dcard.first { border-top:3px solid var(--red); }
+.dcard.second { border-top:3px solid var(--blue); }
+
+.matrix { margin:52px 0 0; }
+.matrix h3, .recs h3, .record h3 { font-family:var(--serif); font-size:22px; font-weight:600; margin-bottom:6px; }
+.matrix .cap, .recs .cap, .record .cap { font-style:italic; color:var(--graphite); font-size:14px; margin-bottom:18px; }
+table { width:100%; border-collapse:collapse; background:var(--paper); border:1px solid var(--hairline); }
+th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--hairline); }
+th { font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--graphite); font-weight:500; }
+td { font-size:13px; vertical-align:top; }
+td.y { font-family:var(--mono); font-size:11px; color:var(--blue); }
+td.n { font-family:var(--mono); font-size:11px; color:var(--red); }
+td.p { font-family:var(--mono); font-size:11px; color:var(--graphite); }
+tr:last-child td { border-bottom:none; }
+td .hint { font-family:var(--serif); font-style:italic; font-size:11.5px; color:var(--graphite); display:block; margin-top:2px; }
+
+.recs { margin:52px 0 0; }
+.rec { background:var(--paper); border:1px solid var(--hairline); padding:24px 28px; margin-bottom:16px; }
+.rec .rank { font-family:var(--type); letter-spacing:.2em; font-size:11px; color:var(--graphite); }
+.rec h4 { font-family:var(--serif); font-size:18px; font-weight:600; margin:6px 0 8px; }
+.rec p { font-size:14.5px; line-height:1.65; color:var(--ink); }
+.rec .why { font-style:italic; color:var(--graphite); margin-top:8px; }
+.rec .fixes { font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--blue); margin-top:10px; text-transform:uppercase; }
+
+.record { margin:52px 0 0; }
+.record .panel { background:var(--paper); border:1px solid var(--hairline); padding:20px 26px; }
+.record p { font-size:13.5px; line-height:1.7; margin-bottom:12px; }
+.record .stat { font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--graphite); }
+.record ul { margin:0 0 14px 18px; }
+.record li { font-size:13px; line-height:1.65; margin-bottom:5px; }
+.record li b { font-weight:600; }
+.record .sig { font-family:var(--hand); font-size:19px; color:var(--ink); text-align:right; margin-top:18px; }
+
+.foot { text-align:center; margin-top:60px; font-family:var(--mono); font-size:9.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--graphite); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="mast">
+    <div class="eyebrow">Script Doctor Studio</div>
+    <h1>Five directions, one decision.</h1>
+    <p class="sub">Five genuinely different compositions for the studio's next life — each a complete, self-contained mockup with six states, a 16-attribute writeup in the drawer, and the same scene 3 running through all of them so you can compare like for like.</p>
+    <p class="note">open each file in a browser · switch states on its mockbar · read the drawer in the bottom-left of each</p>
+  </div>
+
+  <div class="cards">
+
+    <div class="dcard first">
+      <span class="no">DIRECTION 1 — CRITIC'S BET</span>
+      <h2><a href="1-marked-proof.html" style="color:inherit;text-decoration:none;">The Marked Proof</a></h2>
+      <p class="one">The diagnosis is an editorial proof pass — manuscript as a printed sheet, findings as typographic margin marks. The only direction where writing and diagnosis share one visual language.</p>
+      <div class="axes">
+        <b>geometry</b> — proof sheet + margin column<br>
+        <b>nav</b> — editorial slug rail (top tabs)<br>
+        <b>feedback</b> — margin annotations + sticky notes in the fold<br>
+        <b>partners</b> — letters + thread log<br>
+        <span class="good">usability · immersion · clarity all high</span><br>
+        <span class="warn">needs: responsive collapse study below 1100px</span>
+      </div>
+      <p class="verdict">"Immersion and clarity stop competing."</p>
+      <a class="open" href="1-marked-proof.html">open the proof →</a>
+    </div>
+
+    <div class="dcard">
+      <span class="no">DIRECTION 2 — THE IMMERSION POLE</span>
+      <h2><a href="2-night-room.html" style="color:inherit;text-decoration:none;">The Night Room</a></h2>
+      <p class="one">The manuscript IS the interface — full-bleed pages in warm dark, findings as underglow inside the paper, everything summoned by one key. The purest writing experience of the five.</p>
+      <div class="axes">
+        <b>geometry</b> — full-bleed page, no panels<br>
+        <b>nav</b> — command palette (K), dot river below<br>
+        <b>feedback</b> — underglow washes on exact lines<br>
+        <b>partners</b> — summoned presences<br>
+        <span class="good">maximum immersion · keyboard-fast</span><br>
+        <span class="warn">rebuild, not evolution · mouse-first users suffer</span>
+      </div>
+      <p class="verdict">"The room at 2am — if you trust the keyboard."</p>
+      <a class="open" href="2-night-room.html">enter the room →</a>
+    </div>
+
+    <div class="dcard">
+      <span class="no">DIRECTION 3 — THE INVERSION</span>
+      <h2><a href="3-the-consultation.html" style="color:inherit;text-decoration:none;">The Consultation</a></h2>
+      <p class="one">The doctor's chart is the primary surface — findings as triage lanes (Treat first / Schedule / Monitor), the manuscript summoned as a cited specimen drawer. Diagnosis before immersion.</p>
+      <div class="axes">
+        <b>geometry</b> — triage lanes + specimen drawer<br>
+        <b>nav</b> — chart rail + severity strip<br>
+        <b>feedback</b> — chart entries with specimens + orders<br>
+        <b>partners</b> — memo-stack consultation table<br>
+        <span class="good">diagnostic clarity king · honest labels</span><br>
+        <span class="warn">reading your own script is demoted to a drawer</span>
+      </div>
+      <p class="verdict">"Pick this if 'what do I fix first' is the daily question."</p>
+      <a class="open" href="3-the-consultation.html">walk into the clinic →</a>
+    </div>
+
+    <div class="dcard">
+      <span class="no">DIRECTION 4 — THE HORIZONTAL CUT</span>
+      <h2><a href="4-screening-room.html" style="color:inherit;text-decoration:none;">The Screening Room</a></h2>
+      <p class="one">Scenes as frames on a filmstrip, the manuscript staged as the slate above, the doctor's notes as timecoded director's cues. Reading your script becomes watching it.</p>
+      <div class="axes">
+        <b>geometry</b> — slate + synced notes + filmstrip spine<br>
+        <b>nav</b> — the strip IS the nav (j/k step frames)<br>
+        <b>feedback</b> — timecoded director's notes + tape stickies<br>
+        <b>partners</b> — the green room<br>
+        <span class="good">most cinematic · best landing voice · 14/14 AA palette</span><br>
+        <span class="warn">horizontal axis fights the vertical writing habit</span>
+      </div>
+      <p class="verdict">"A director's view of your own script."</p>
+      <a class="open" href="4-screening-room.html">take your seat →</a>
+      <p class="v2note" style="margin-top:10px;font-size:12.5px;"><a href="4-screening-room-v2.html" style="color:#b07a3a;">⇢ evolved: the v2 screening house</a> — warm booth, paper stage, scene-first keys (user-selected evolution; fixes all six diagnosed defects; 25/25 AA pairs, keyboard-operable locate loop). <a href="4-screening-room-v2.1.html" style="color:#b07a3a;">⇢ deepened: v2.1 — the harvest</a> — take-safety loop, tonight's pick, lamp truth at the deck, table-read seat swap, positional select-to-ask (28/28 graft pairs; honest still-watching re-check; both-expert fix-pass applied).</p>
+    </div>
+
+    <div class="dcard second">
+      <span class="no">DIRECTION 5 — THE SAFE EVOLUTION</span>
+      <h2><a href="5-atelier.html" style="color:inherit;text-decoration:none;">The Atelier</a></h2>
+      <p class="one">The zoned workshop — instrument wall left, manuscript bench center, partner alcove right. Everything visible from where you stand; the shipped app's own geometry, refined with a craftsman's discipline.</p>
+      <div class="axes">
+        <b>geometry</b> — wall + bench + alcove (persistent)<br>
+        <b>nav</b> — the wall IS the menu<br>
+        <b>feedback</b> — inline tag plates + benchcard in a reserved slot<br>
+        <b>partners</b> — the alcove, seats with unfolding threads<br>
+        <span class="good">strongest hate-list compliance · 1:1 shell mapping</span><br>
+        <span class="warn">beige-on-beige premium risk · alcove costs writing width</span>
+      </div>
+      <p class="verdict">"The workshop you already own, rebuilt."</p>
+      <a class="open" href="5-atelier.html">step inside →</a>
+    </div>
+
+  </div>
+
+  <!-- ===================== HATE-LIST ENFORCEMENT MATRIX ===================== -->
+  <div class="matrix">
+    <h3>The hate-list, enforced.</h3>
+    <p class="cap">Every item from your 11-point list, per direction — after the critic pass and fixes. ✳ = satisfied in that direction's own vocabulary (e.g. "thinking it through" with different glyphs per world).</p>
+    <table>
+      <tr><th>hate-list item</th><th>D1 proof</th><th>D2 night</th><th>D3 clinic</th><th>D4 cinema</th><th>D5 atelier</th></tr>
+      <tr><td>1. Feedback mindful, never overwhelming</td><td class="y">✳ margin col</td><td class="y">✳ underglow</td><td class="y">✳ triage lanes</td><td class="y">✳ synced cues</td><td class="y">✳ tag plates</td></tr>
+      <tr><td>2. Script never blocked by panes</td><td class="y">✳ side-by-side</td><td class="y">✳ full-bleed</td><td class="p">drawer* <span class="hint">script IS the drawer here — by design</span></td><td class="y">✳ staged</td><td class="y">✳ grid slot</td></tr>
+      <tr><td>3. No auto-hide unless script centered</td><td class="y">✳ stable</td><td class="y">✳ state-tied</td><td class="y">✳ stable</td><td class="y">✳ stable</td><td class="y">✳ stable</td></tr>
+      <tr><td>4. No clutter anywhere</td><td class="y">✳</td><td class="y">✳</td><td class="y">✳</td><td class="p">deck rail trimmed <span class="hint">was 8 items → sparse now</span></td><td class="y">✳</td></tr>
+      <tr><td>5. Typed text always visible</td><td class="y">✳ 8.7:1</td><td class="y">✳ 11.8:1</td><td class="y">✳ 4.5:1+</td><td class="y">✳ 14:1</td><td class="y">✳ 12.9:1</td></tr>
+      <tr><td>6. Thinking state, text preserved</td><td class="y">✳ pen dots</td><td class="y">✳ breath dots</td><td class="y">✳ chart pulse</td><td class="y">✳ proj flicker</td><td class="y">✳ chisel dots</td></tr>
+      <tr><td>7. Scene feedback as elegant stickies</td><td class="y">✳ fold pin</td><td class="y">✳ page pin</td><td class="y">✳ chartnote</td><td class="y">✳ gaffer tape</td><td class="y">✳ hung notes</td></tr>
+      <tr><td>8. Chat not generic</td><td class="y">✳ letters</td><td class="y">✳ page hand</td><td class="y">✳ memos</td><td class="y">✳ cue sheets</td><td class="y">✳ seat threads</td></tr>
+      <tr><td>9. Failed rerun visual + progress</td><td class="y">✳ re-read</td><td class="y">✳ re-read</td><td class="y">✳ rerun test</td><td class="y">✳ rethread</td><td class="y">✳ refire</td></tr>
+      <tr><td>10. One canonical partner presence</td><td class="y">✳ letters+log</td><td class="y">✳ summoned</td><td class="y">✳ memos</td><td class="y">✳ seats</td><td class="y">✳ alcove</td></tr>
+      <tr><td>11. Highlight → sticky → locate loop</td><td class="y">✳ full loop</td><td class="y">✳ selbar</td><td class="y">✳ selrow+locate</td><td class="y">✳ selbar+tape</td><td class="y">✳ hang+locate</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== RECOMMENDATION ===================== -->
+  <div class="recs">
+    <h3>The recommendation.</h3>
+    <p class="cap">Filtered through both expert passes (design-director critique + deterministic WCAG audit) and scored on your five criteria: usability · screenplay immersion · diagnostic clarity · premium feel · scalability.</p>
+
+    <div class="rec">
+      <span class="rank">FIRST CHOICE</span>
+      <h4>D1 — The Marked Proof</h4>
+      <p>The only direction scoring high on all five criteria at once: the manuscript stays hero while the evidence sits an arm's length away in the same typographic language — ink, circled line numbers, margin annotations, sticky notes in the fold. It's the full sticky loop (highlight → note → pin → click locates the line) done natively, it migrates cheaply onto the shipped vertical shell, and its two flagged weaknesses are one-day fixes.</p>
+      <p class="why">Why it wins: immersion and diagnostic clarity stop competing — that's the failure of the current Feedback View, solved at the geometry level rather than patched.</p>
+      <p class="fixes">carried fixes: red-deconflation ✓ · graphite 4.53:1 ✓ · thinking pen ✓ · thread log retitled ✓</p>
+    </div>
+
+    <div class="rec">
+      <span class="rank">SECOND CHOICE — THE SAFE BET</span>
+      <h4>D5 — The Atelier</h4>
+      <p>The lowest-risk evolution: the shipped app's geometry refined (masthead→crown, dock→wall, panel→alcove, statusbar→rail) with the strongest hate-list compliance of the five — the benchcard now lives in a reserved grid slot so it structurally cannot cover the page, the alcove seats carry unfolding conversation threads, and partner identity has its own walnut hue that never borrows a severity color.</p>
+      <p class="why">Why it's second, not first: safety purchased with a dressed-up chat rail and beige-on-beige premium risk — it refines what exists rather than answering the "feedback room shouldn't overwhelm" question as decisively as D1's margin language does.</p>
+      <p class="fixes">carried fixes: ink-3 4.53:1 ✓ · terracotta/brass/patina AA ✓ · cardslot reflow ✓ · threads ✓ · walnut ✓</p>
+    </div>
+
+    <div class="rec">
+      <span class="rank">THE STRATEGIC PAIR</span>
+      <h4>D1's language on D5's shell — the hybrid worth considering</h4>
+      <p>The two directions are complementary, not competing: D5's zones are the cheapest migration target (near 1:1 with the shipped app), while D1's margin-annotation language is the strongest feedback presentation ever sketched for this product. A hybrid — Atelier geometry with the Marked Proof's margin evidence column and sticky loop — is the configuration the critic would bet on if you want evolution speed and presentation quality in one move.</p>
+      <p class="why">Noted as an option, not pushed: the brief asked for five compositions and a recommendation, and the hybrid decision is yours to make after walking the rooms.</p>
+    </div>
+  </div>
+
+  <!-- ===================== CRITIC RECORD ===================== -->
+  <div class="record">
+    <h3>The critic's record.</h3>
+    <div class="panel">
+      <p class="stat">passes: design-director critique (16 findings) · deterministic WCAG audit (57 pairs computed) · playwright smoke (25 state switches, 80 attribute blocks, 0 console errors) · all findings fixed and re-verified</p>
+      <p><b>What the critic caught and what was done about it —</b></p>
+      <ul>
+        <li><b>P0 · D5 benchcard overlay</b> — the finding card floated over the page's right edge at laptop widths → rebuilt as a <b>reserved grid column</b> beside the manuscript; overlap is now structurally impossible.</li>
+        <li><b>P0 · D3 focus/severity collision</b> — interactive accent was the same hex as low-severity → interaction moved to <b>clinical indigo #33366b</b>; the severity ramp is now reserved for findings only.</li>
+        <li><b>P0 · D3 chartnote fake locate</b> — promised "click to locate," had no handler → <b>wired</b>: opens the specimen drawer and centers the highlighted passage.</li>
+        <li><b>P1 · D2 severity-as-ink</b> — flagged dialogue lines inherited severity colors (3.07–3.82:1, below AA for body text) → words now stay <b>page-ink 13:1</b>; severity lives on the dot, wash, and badge only.</li>
+        <li><b>P1 · D3/D4 chat-composition collision</b> — two directions had the same side-by-side card chat → D3 restaged as a <b>memo stack</b>; compositions now genuinely distinct.</li>
+        <li><b>P1 · D2 dual Sameer in idea state</b> → presence now exists in exactly one place per state; whisper dims only when the page is the centered focus.</li>
+        <li><b>P1 · D4 filmstrip scale</b> — 50+ scenes would sprawl thousands of pixels → <b>act-clustered reels</b>; a feature collapses to ~4 clusters.</li>
+        <li><b>P1 · missing thinking states</b> in D1/D3/D4 and <b>missing selection tools</b> in D2/D4 → all five now carry the full thinking treatment ("thinking it through" text preserved) and the creation half of the sticky loop.</li>
+        <li><b>P2 · D1 red-as-alarm tabs</b> (active tab read as high severity) → neutral ink underline; <b>D5 partner-as-finding</b> (Sameer in brass) → walnut stain; <b>fake ⌘K promises</b> in D4/D5 → removed.</li>
+        <li><b>AA failures</b> (D1 graphite 4.27, D3 ink-3 3.01, D5 ink-3 2.68 + severity ramp) → every flagged pair <b>re-computed and verified ≥ 4.5:1</b> straight from the final files.</li>
+      </ul>
+      <p><b>Production incident, disclosed —</b> during D3's writeup append, a failed Python write truncated the file to zero bytes; git held no copy (untracked). D3 was fully rebuilt from this session's verbatim captures with every critic fix baked in, then passed the same smoke battery green. A snapshot of all five files now lives outside the repo at <span style="font-family:var(--mono);font-size:11px;">E:/AI_workspace/_backup_directions2026_snapshot/</span>.</p>
+      <p class="sig">— filtered through the critic before it reached you.</p>
+    </div>
+  </div>
+
+  <!-- ===================== CAPABILITY COVERAGE MATRIX ===================== -->
+  <div class="matrix">
+    <h3>Every capability, homed.</h3>
+    <p class="cap">The registry pass: all real capabilities from the shipped app, verified present in <b>every</b> direction — each in that world's native furniture, not pasted on. (Return Stack is a behavior guarantee — returning from any full-screen view restores scene, scroll, selection, finding, dock — honored by all five directions' state-switch designs.)</p>
+    <table>
+      <tr><th>capability (from the shipped app)</th><th>D1 proof</th><th>D2 night</th><th>D3 clinic</th><th>D4 cinema</th><th>D5 atelier</th></tr>
+      <tr><td>Run analysis (12 passes)</td><td class="y">reading state</td><td class="y">palette "run"</td><td class="y">the lab</td><td class="y">s-reel</td><td class="y">the kiln</td></tr>
+      <tr><td>Failed-pass retry</td><td class="y">re-read btn</td><td class="y">re-read btn</td><td class="y">rerun test</td><td class="y">clean &amp; rethread</td><td class="y">refire</td></tr>
+      <tr><td>Findings + severity</td><td class="y">margin marks</td><td class="y">underglow</td><td class="y">triage lanes</td><td class="y">director's notes</td><td class="y">tag plates + benchcard</td></tr>
+      <tr><td>Fix queue</td><td class="y">margin rail</td><td class="y">palette</td><td class="y">treat-first lane</td><td class="y">strip marks</td><td class="y">wall "today's work order"</td></tr>
+      <tr><td>Coverage / pacing / setup-payoff / dials</td><td class="y">annotated per line</td><td class="y">wash classes</td><td class="y">lab tests 01–04</td><td class="y">reel passes 01–04</td><td class="y">dials on wall</td></tr>
+      <tr><td>Sticky notes (anchor + locate)</td><td class="y">fold pin + locate</td><td class="y">page pin + locate</td><td class="y">chartnote + locate</td><td class="y">gaffer tape + locate</td><td class="y">hung note + locate</td></tr>
+      <tr><td>Highlight → note flow</td><td class="y">sel-tools</td><td class="y">selbar</td><td class="y">selrow</td><td class="y">selbar</td><td class="y">hang a note</td></tr>
+      <tr><td>Stash</td><td class="y">toolset</td><td class="y">palette + selbar</td><td class="y">selrow + triage</td><td class="y">selbar + deck</td><td class="y">wall drawer</td></tr>
+      <tr><td>Idea / premise experience</td><td class="y">the pad</td><td class="y">idea page</td><td class="y">differential</td><td class="y">writing room</td><td class="y">sketchbook</td></tr>
+      <tr><td>Beat board</td><td class="y">toolset</td><td class="y">palette</td><td class="y">triage tools</td><td class="y">deck rail</td><td class="y">wall drawer</td></tr>
+      <tr><td>Drafts / compare</td><td class="y">folio</td><td class="y">palette</td><td class="y">triage tools</td><td class="y">deck rail</td><td class="y">wall drawer</td></tr>
+      <tr><td>Revision history</td><td class="y">folio</td><td class="y">palette</td><td class="y">triage tools</td><td class="y">deck rail</td><td class="y">wall drawer</td></tr>
+      <tr><td>Export</td><td class="y">folio</td><td class="y">palette</td><td class="y">triage tools</td><td class="y">deck rail</td><td class="y">wall drawer</td></tr>
+      <tr><td>Search</td><td class="y">toolset</td><td class="y">palette</td><td class="y">triage tools</td><td class="y">deck "find a line"</td><td class="y">benchhead</td></tr>
+      <tr><td>Edit lines / undo / redo</td><td class="y">toolset</td><td class="y">palette-driven</td><td class="y">worksheet contenteditable</td><td class="y">slate contenteditable</td><td class="y">benchhead tools</td></tr>
+      <tr><td>Sameer + Sushruta presence</td><td class="y">letters + log</td><td class="y">summoned + moon</td><td class="y">memo stack</td><td class="y">green room</td><td class="y">alcove</td></tr>
+      <tr><td>Contextual chat with selection</td><td class="y">sel-tools</td><td class="y">selbar + presence</td><td class="y">specimen reply</td><td class="y">selbar + cuesheet</td><td class="y">attach selection</td></tr>
+      <tr><td>Landing / project selection</td><td class="y">submissions desk</td><td class="y">the stack</td><td class="y">intake</td><td class="y">lobby</td><td class="y">front door</td></tr>
+      <tr><td>Return Stack (restore invariant)</td><td class="y">by design</td><td class="y">by design</td><td class="y">by design</td><td class="y">by design</td><td class="y">by design</td></tr>
+    </tr>
+    </table>
+  </div>
+
+  <div class="foot">five directions · one decision · the next move is yours</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Direction V1 — The Typescript</title>
+<style>
+/* ============================================================
+   NEW DIRECTION V1 — THE TYPESCRIPT
+   One writing environment — the FINAL WIREFRAME-LEVEL SPATIAL
+   LAYOUTS contract (5 states, 44px scene index, 700px continuous
+   manuscript, 380px one-panel Context Dock, 28px status strip)
+   — expressed as a critical edition in production.
+   The document IS the environment: press-white, ink, numbered
+   notes. Identity per contract: Sameer = violet / co-write;
+   Sushruta = cyan / feedback. Severity never color-alone
+   (numeral + tick + word).
+   ============================================================ */
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-20a22824.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Source Serif 4'; src:url('../../../screenplay_studio/webapp/fonts/SourceSerif4-a15d607a.woff2') format('woff2'); font-weight:600; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-094f4033.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Courier Prime'; src:url('../../../screenplay_studio/webapp/fonts/CourierPrime-6664e8d0.woff2') format('woff2'); font-weight:700; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-0bc96cd0.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'IBM Plex Mono'; src:url('../../../screenplay_studio/webapp/fonts/IBMPlexMono-e2661bcc.woff2') format('woff2'); font-weight:500; }
+@font-face { font-family:'Special Elite'; src:url('../../../screenplay_studio/webapp/fonts/SpecialElite-ee78eab2.woff2') format('woff2'); }
+@font-face { font-family:'Caveat'; src:url('../../../screenplay_studio/webapp/fonts/Caveat-706a1c41.woff2') format('woff2'); }
+
+:root {
+  --paper:#fbfaf7;         /* press white */
+  --card:#f4f1e8;          /* apparatus card stock */
+  --wash:#f5efdd;          /* locate wash — pale ivory */
+  --imprint:#f1ece0;       /* status strip ground */
+  --ink:#191714;
+  --ink-2:#4d453b;
+  --graphite:#635d52;      /* dim voice — AA on paper/card */
+  --hair:#d8d2c4;
+  --rule:#b9ae97;
+  --high:#a4442f;          /* severity ramp — semantic, house-wide */
+  --mid:#8a6210;
+  --low:#3a5578;
+  --violet:#7e6bff;        /* Sameer — contract identity */
+  --violet-ink:#4638b8;    /* Sameer on light surfaces */
+  --cyan:#5ecfd8;          /* Sushruta / feedback — contract identity */
+  --cyan-ink:#0e7c85;      /* Sushruta on light surfaces */
+  --ok:#2e6b52;            /* verified / resolved */
+  --serif:'Source Serif 4', Georgia, serif;
+  --script:'Courier Prime', 'Courier New', monospace;
+  --mono:'IBM Plex Mono', Consolas, monospace;
+  --type:'Special Elite', 'Courier New', monospace;
+  --hand:'Caveat', cursive;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+body { background:var(--paper); color:var(--ink); font-family:var(--serif); overflow:hidden; }
+
+/* ---------- global chrome: runhead 42px + status strip 28px ---------- */
+#runhead {
+  height:42px; display:flex; align-items:center; gap:18px; padding:0 24px 0 52px;
+  border-bottom:2px solid var(--ink); position:relative; z-index:6;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--graphite);
+}
+#runhead .house { color:var(--ink); font-weight:500; }
+#runhead .now { font-family:var(--serif); font-size:15px; font-style:italic; letter-spacing:0; text-transform:none; color:var(--ink); }
+#runhead .folio { margin-left:auto; }
+#runhead .folio b { color:var(--ink); font-weight:500; }
+
+#mockbar { position:fixed; right:18px; top:54px; z-index:70; display:flex; flex-direction:column; gap:6px; }
+#mockbar button {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  background:var(--paper); color:var(--graphite); border:1px solid var(--manuscript-hair, var(--hair)); border-radius:2px; padding:6px 12px; cursor:pointer;
+}
+#mockbar button.on { color:var(--ink); border-color:manuscript; border-color:var(--ink); background:var(--card); }
+#mockbar button:hover { color:var(--ink); }
+
+/* ---------- THE SCENE INDEX — 44px collapsed, 240px overlay expansion ---------- */
+#sceneindex {
+  position:fixed; left:0; top:0; bottom:28px; width:44px; z-index:20;
+  border-right:1px solid var(--hair); background:var(--paper);
+  display:flex; flex-direction:column; align-items:stretch;
+}
+#sceneindex .si-cap {
+  height:42px; display:flex; align-items:center; justify-content:center; flex:none;
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--graphite);
+  border-bottom:1px solid var(--hair); writing-mode:vertical-rl;
+}
+#sceneindex .si-rail { flex:1; position:relative; padding:10px 0; }
+.snotch {
+  position:absolute; left:18px; width:8px; height:2px; background:var(--rule); cursor:pointer;
+}
+.snotch.has { background:var(--high); height:4px; }
+.snotch.focus { background:var(--ink); }
+.snotch::after {
+  content:attr(data-tip); position:absolute; left:16px; top:50%; transform:translateY(-50%);
+  font-family:var(--mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink);
+  background:var(--card); border:1px solid var(--rule); padding:4px 8px; white-space:nowrap; opacity:0; pointer-events:none;
+  transition:opacity .15s;
+}
+.snotch:hover::after, .snotch:focus-visible::after { opacity:1; }
+.snotch:focus-visible { outline:1px solid var(--ink); outline-offset:2px; }
+/* the expanded rail = overlay, not width reservation (contract) */
+#sceneindex.open { width:240px; box-shadow:14px 0 34px -18px rgba(25,23,20,.35); transition:width .2s steps(3); }
+#sceneindex { transition:width .2s steps(3); }
+#sceneindex.open .si-cap { writing-mode:horizontal-tb; letter-spacing:.22em; padding-left:14px; justify-content:flex-start; }
+#sceneindex.open .si-rail .sxlist { display:block; }
+#sceneindex .sxlist { display:none; padding:10px 12px; }
+.sxitem { display:flex; align-items:center; gap:8px; padding:6px 6px; cursor:pointer; font-family:var(--serif); font-size:12.5px; color:var(--ink-2); border-left:2px solid transparent; }
+.sxitem:hover { background:var(--card); }
+.sxitem.here { border-left-color:var(--index-here, var(--ink)); color:var(--ink); font-weight:600; }
+.sxitem .n { font-family:var(--mono); font-size:9px; color:var(--graphite); width:28px; flex:none; }
+.sxitem .ticks { display:flex; gap:3px; margin-left:auto; }
+.sxitem .ticks i { width:4px; height:4px; border-radius:50%; }
+.sxitem .ticks .t-h { background:var(--high); } .sxitem .ticks .t-m { background:var(--mid); } .sxitem .ticks .t-l { background:var(--low); }
+#sceneindex .si-foot {
+  flex:none; padding:10px 12px; border-top:1px solid var(--hair);
+  font-family:var(--index-foot, var(--mono)); font-family:var(--mono); font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--graphite); line-height:1.9;
+}
+
+/* ---------- THE STAGE (below runhead, above status strip) ---------- */
+#stage { position:absolute; top:42px; left:0; right:0; bottom:28px; overflow:hidden; }
+.state { display:none; height:100%; }
+.state.on { display:flex; flex-direction:column; animation:setin .25s steps(3) both; }
+@keyframes setin { from { opacity:0; transform:translateY(2px) } to { opacity:1; transform:none } }
+
+/* ---------- THE DESK TOOLBAR — 700×40, centered on the manuscript ---------- */
+#deskbar {
+  flex:none; height:40px; display:flex; align-items:center; gap:18px; padding:0 18px;
+  margin:10px auto 0; width:min(700px, 100% - 60px);
+  border:1px solid var(--hair); background:var(--paper); position:relative; z-index:5;
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-2);
+}
+#deskbar .prj { color:var(--ink); font-weight:500; letter-spacing:.1em; }
+#deskbar .sep { color:var(--rule); }
+#deskbar button, #deskbar span.tool {
+  background:none; border:none; padding:4px 2px; cursor:pointer; color:var(--ink-2);
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  border-bottom:1px solid transparent; transition:color .15s, border-color .15s;
+}
+#deskbar button:hover, #deskbar span.tool:hover { color:var(--ink); border-bottom-color:var(--ink); }
+#deskbar button:focus-visible, #deskbar span.tool:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+#deskbar .runbtn {
+  margin-left:auto; border:1px solid var(--ink); padding:6px 14px; color:var(--ink); border-radius:2px; font-weight:500;
+}
+#deskbar .runbtn:hover { background:var(--ink); color:var(--paper); }
+#deskbar .cmd { color:var(--graphite); }
+
+/* ---------- THE MANUSCRIPT — 700px continuous surface, never cards ---------- */
+.manuscript {
+  width:min(700px, 100% - 60px); margin:16px auto 40px; padding:0 0 20px;
+  overflow:auto; flex:1; position:relative;
+}
+.mrow { position:relative; padding-left:34px; min-height:26px; }
+.mrow .no { position:absolute; left:0; top:1px; width:22px; text-align:right; font-family:var(--mono); font-size:9.5px; color:var(--graphite); }
+.mrow .ln { font-family:var(--script); font-size:16.5px; line-height:1.55; color:var(--ink); display:block; }
+.mrow.dim .ln { color:var(--ink-2); }
+.mrow.char { margin-top:12px; }
+.mrow.char .ln { font-weight:700; }
+.mrow.paren .ln { font-style:italic; color:var(--ink-2); }
+.mrow.dial .ln { margin-left:26px; }
+.mrow .cut { letter-spacing:.24em; color:var(--graphite); margin-top:18px; }
+.mrow.slugrow .ln { font-weight:700; letter-spacing:.05em; }
+
+/* flagged lines: numeral + tick + word (severity never color-alone); row = hit zone */
+.mrow.fl { cursor:pointer; }
+.mrow.fl::after { content:""; position:absolute; left:26px; top:2px; bottom:2px; width:3px; }
+.mrow.fl[data-sev="high"]::after { background:var(--high); }
+.mrow.fl[data-sev="mid"]::after { background:var(--low); }
+.mrow.fl[data-sev="low"]::after { border:1px solid var(--low); background:none; }
+.mrow.fl .fnum { font-family:var(--mono); font-weight:500; font-size:10px; vertical-align:super; margin-left:5px; }
+.mrow.fl[data-sev="high"] .fnum { color:var(--high); }
+.mrow.fl[data-sev="mid"] .fnum { color:var(--low); }
+.mrow.fl[data-sev="low"] .fnum { color:var(--low); }
+.mrow.fl .sevword { font-family:var(--mono); font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--graphite); margin-left:8px; }
+.mrow.fl:hover .ln { background:var(--card); }
+.mrow.fl:focus-visible { outline:2px solid var(--manuscript-focus, var(--ink)); outline:2px solid var(--ink); outline-offset:2px; }
+.mrow.wash .ln { background:var(--wash); box-shadow:0 0 0 4px var(--wash); }
+
+/* the writer's slip — graphite hand, clipped to the line */
+.mslip {
+  margin:10px 0 6px 34px; display:inline-block; transform:rotate(-.8deg);
+  border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+  font-family:var(--hand); font-size:15px; color:var(--ink-2); padding:5px 10px; cursor:pointer; max-width:300px; line-height:1.25;
+}
+.mslip .ref { display:block; font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(---mslip-ref, var(--graphite)); color:var(--graphite); margin-top:2px; }
+.mslip:hover { border-color:var(--ink-2); }
+
+/* selection popover — the creation half of the loop (#11) */
+.selbar {
+  margin:14px 0 4px 34px; display:inline-flex; align-items:center; gap:10px;
+  background:var(--card); border:1px solid var(--rule); padding:8px 10px 8px 14px;
+}
+.selbar .q { font-family:var(--script); font-size:12.5px; color:var(--ink); max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.selbar button {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; text-text-transform:uppercase; text-transform:uppercase;
+  background:none; border:1px solid var(--hair); color:var(--ink-2); padding:6px 11px; cursor:pointer; transition:color .15s, border-color .15s;
+}
+.selbar button:hover { color:var(--ink); border-color:var(--ink); }
+
+/* ---------- THE CONTEXT DOCK — 380px, one panel at a time (contract) ---------- */
+#dock {
+  position:fixed; right:0; top:42px; bottom:28px; width:380px; z-index:30;
+  background:var(--card); border-left:2px solid var(--ink);
+  display:flex; flex-direction:column; transform:translateX(100%); transition:transform .22s steps(4);
+}
+#dock.open { transform:none; }
+#dock .dhead { height:56px; flex:none; display:flex; align-items:center; gap:10px; padding:0 18px; border-bottom:1px solid var(--rule); }
+#dock .dhead .dt { font-family:var(--serif); font-size:16px; font-weight:600; color:manuscript; color:var(--ink); }
+#dock .dhead .dsub { font-family:var(--mono); font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--graphite); }
+#dock .dhead .close { margin-left:auto; background:none; border:1px solid var(--rule); color:var(--ink-2); width:26px; height:26px; cursor:pointer; font-family:var(--mono); font-size:11px; }
+#dock .dhead .close:hover { border-color:var(--ink); color:var(-- rebords, var(--ink)); color:var(--ink); }
+#dock .dbody { flex:1; overflow:auto; padding:16px 18px 20px; }
+
+/* dock panels — exactly one rendered (contract) */
+.dpanel { display:none; }
+.dpanel.on { display:block; }
+
+/* Evidence Overview panel */
+.evrow { display:grid; grid-template-columns:96px 1fr auto; gap:12px; align-items:baseline; padding:12px 2px; border-bottom:1px dotted var(--rule); cursor:pointer; }
+.evrow:hover { background:var(--paper); }
+.evrow .evc { font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:manuscript; color:var(--ink-2); }
+.evrow .evv { font-family:var(--serif); font-size:13.5px; color:manus(--ink), var(--ink)); color:var(--ink); }
+.evrow .evv b { font-weight:600; }
+.evrow .evx { font-family:var(--mono); fontsize, 9px; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--graphite); }
+.evrow[data-sev-imp="high"] .evx { color:var(--high); }
+
+/* Finding Detail panel — spatial order per contract */
+.fd .crumb { font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--graphite); margin-bottom:8px; }
+.fd .crumb button { background:none; border:none; color:var(--violet-ink); cursor:pointer; font:inherit; letter-spacing:.16em; padding:0; border-bottom:1px dotted var(--violet-ink); }
+.fd .fdhead { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
+.fd .fdnum { font-family:var(--mono); font-size:11px; font-weight:450; font-weight:500; color:var(--high); }
+.fd .fdtitle { font-family:var(--serif); font-size:19px; font-weight:600; color:var(--ink); line-height:1.25; }
+.fd .fdmeta { font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--graphite); margin-bottom:12px; }
+.fd .fdmeta .sw { color:var(--high); }
+.fd .why { font-family:var(--serif); font-size:14px; line-height:1.6; color:var(--ink-2); margin-bottom:14px; }
+.fd .rule { height:1px; background:var(--rule); margin:0 0 12px; }
+.fd .quote { font-family:var(--script); font-size:12.5px; color:var(--ink); border-left:3px solid var(--cyan-ink); padding:8px 12px; background:var(--paper); margin-bottom:14px; }
+.fd .quote .attr { display:block; font-family:var(--mono); font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--graphite); margin-top:4px; }
+.fd .facts { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-bottom:14px; }
+.fd .facts .f { font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; color:var(--graphite); }
+.fd .facts .f b { display:block; color:var(--ink); font-weight:500; margin-top:2px; }
+.fd .fdacts { display:flex; gap:10px; flex-wrap:wrap; border-top:1px solid var(--rule); padding-top:12px; }
+.fd .fdacts button {
+  flex:1 1 auto; background:none; border:1px solid var(--ink); color:var(--ink); font-family:var(--mono);
+  font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; padding:9px 8px; cursor:pointer; border-radius:2px;
+}
+.fd .fdacts button:hover { background:var(--ink); color:var(--card); }
+.fd .fdacts button.co { border-color:var(--violet-ink); color:var(--violet-ink); }
+.fd .fdacts button.co:hover { background:var(--violet- registries, var(--violet-ink)); background:var(--violet-ink); color:var(--paper); }
+.fd .fdacts button.dim { border-color:var(--rule); color:var(--graphite); }
+.fd .fdacts button.dim:hover { background:var(--rule); color:var(--ink); }
+.fd .fdstat { margin-top:10px; font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ok); }
+
+/* Co-write panel (Sameer — violet, contract language) */
+.cowrite .cwslip { border:1px solid var(--violet-ink); background:var(--paper); padding:12px 14px; margin-bottom:12px; }
+.cowrite .cwslip .ctx { font-family:var(--mono); font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--graphite); margin-bottom:6px; }
+.cowrite .cwslip p { font-family:var(--serif); font-style:italic; font-size:13.5px; line-height:1.55; color:var(--violet-ink); }
+.cowrite .cwslip p b { font-style:normal; font-weight:600; }
+.cowrite .cwhistory { display:flex; flex-direction:line, column; flex-direction:column; gap:10px; margin-bottom:12px; }
+.cowrite .turn { border-left:2px solid var(--rule); padding:2px 0 2px 10px; }
+.cowrite .turn .w { font-family:var(--mono); font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--graphite); margin-bottom:3px; }
+.cowrite .turn.you .w { color:var(--ink-2); }
+.cowrite .turn.sam .w { color:var(--violet-ink); }
+.cowrite .turn p { font-family:var(--serif); font-size:13px; line-height:1.5; color:var(--ink); }
+.cowrite .turn.sam p { font-style:italic; color:var(--violet-ink); }
+.cowrite .cwin { display:flex; border-bottom:2px solid var(--violet-ink); padding-top:4px; }
+.cowrite .cwin input { flex:1; background:none; border:none; outline:none; font-family:var(--serif); font-size:13px; color:var(--ink); padding:7px 2px; }
+.cowrite .cwin input:focus-visible { box-shadow:0 2px 0 var(--violet-ink); }
+.cowrite .cwin button { background:none; border:none; font-family:var(--monospace, var(--mono)); font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--violet-ink); cursor:pointer; padding:0 4px; }
+.cowrite .cwthink { display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--violet-ink); margin:8px 0; }
+.cowrite .cwthink .set { display:inline-flex; gap:4px; }
+.cowrite .cwthink .set i { width:5px; state; height:5px; width:5px; height:5px; border-radius:50%; background:var(--violet-ink); animation:typeSet 1.3s ease-in-out infinite; }
+.cowrite .cwthink .set i:nth-child(2){ animation-delay:.18s } .cowrite .cwthink .set i:nth-child(3){ animation-delay:.36s }
+@keyframes typeSet { 0%,100%{ opacity:.25; transform:translateY(0) } 50%{ opacity:1; transform:translateY(-2px) } }
+
+/* analysis progress dock panel */
+.analysis .pl { display:grid; grid-template-columns:64px 1fr auto; gap:10px; padding:11px 2px; border-bottom:1px dotted var(--rule); align-items:baseline; }
+.analysis .pl .no { font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--graphite); }
+.analysis .pl .nm { font-family:var(--serif); font-size:14px; color:manuscript; color:var(--ink); }
+.analysis .pl .nm small { display:block; font-size:11.5px; color:var(--graphite); font-style:italic; }
+.analysis .pl .st { font-family:var(--mono); fontbar, 9px; font-size:9px; letter-spacing:.12em; text-transform:uppercase; }
+.analysis .pl.done .st { color:var(--ok); }
+.analysis .pl.run .st { color:var(--ink); }
+.analysis .pl.fail .st { color:in manuscripts; color:var(--high); }
+.analysis .pl .inkline { grid-column:2 / 4; height:2px; background:var(--hair); position:relative; margin-top:4px; }
+.analysis .pl .inkline i { position:absolute; left:0; top:0; bottom:0; background:var(--ink); animation:inkFill 3.4s ease-in-out infinite alternate; }
+@keyframes inkFill { from { width:18% } to { width:58% } }
+.analysis .pl .repull { grid-column:2 / 4; text-align:right; margin-top:4px; }
+.analysis .pl .repull button { background:none; border:1px solid var(--high); color:var(--high); font-family:var(--mono); font-size:9px; letter-spacing:.14em; color:var(--high); text-transform:uppercase; padding:6px 12px; cursor:pointer; border-radius:2px; }
+.analysis .pl .repull button:hover { background:var(--high); color:var(--paper); }
+.analysis .gthink { display:flex; align-items:center; gap:8px; margin:10px 0 4px; font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--graphite); }
+.analysis .gthink .set { display:inline-flex; gap:4px; }
+.analysis .gthink .set i { width:5px; height:5px; border-radius:50%; background:var(--ink); animation:typeSet 1.3s ease-in-out infinite; }
+.analysis .gthink .set i:nth-child(2){ animation-delay:.18s } .analysis .gthink .set i:nth-child(3){ animation-delay:.36s }
+
+/* ---------- LANDING (state 1) — a quiet doorway, not a dashboard ---------- */
+.landing { flex:1; display:flex; flex-direction:column; align-items:center; overflow:auto; padding:44px 24px 30px; }
+.landing .over { font-family:var(--mono); font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:var(--graphite); }
+.landing h1 { font-family:var(--serif); font-size:clamp(28px,3.6vw,40px); font-weight:600; margin:10px 0 6px; text-align:center; }
+.landing .sub { font-style:italic; font-size:15px; color:var(--graphite); margin-bottom:30px; text-align:center; }
+.dropzone {
+  width:min(680px,100%); border:1.5px dashed var(--rule); background:var(--card); padding:42px 30px; text-align:center; cursor:pointer;
+  transition:border-color .2s, background .15s;
+}
+.dropzone:hover, .dropzone:focus-visible { border-color:var(--ink); background:var(--paper); }
+.dropzone:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+.dropzone .dz-in { font-family:var(--serif); font-size:19px; font-weight:600; color:var(--ink); }
+.dropzone .dz-formats { font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--graphite); margin-top:8px; }
+.landing .l-acts { display:flex; gap:14px; margin:20px 0 34px; }
+.landing .l-acts button {
+  background:none; border:1px solid var(--ink); color:var(--ink); font-family:var(--mono); font-size:10px;
+  letter-spacing:.16em; text-transform:uppercase; padding:11px 22px; cursor:pointer; border-radius:2px;
+}
+.landing .l-acts button:hover { background:var(--ink); color:var(--paper); }
+.landing .l-acts button:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+.recent { width:min(680px,100%); }
+.recent .rh { display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid var(--ink); padding-bottom:8px; margin-bottom:4px; }
+.recent .rh span { font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--graphite); }
+.rrow { display:grid; grid-template-columns:1fr auto auto; gap:14px; align-items:baseline; padding:11px 4px; border-bottom:1px dotted var(--rule); cursor:pointer; }
+.rrow:hover { background:var(--card); }
+.rrow .rn { font-family:var(--serif); font-size:15px; color:var(--ink); }
+.rrow .rn small { display:block; font-size:11.5px; color:var(--graphite); font-style:italic; }
+.rrow .rs { font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; }
+.rrow .rs.marked { color:var(--high); }
+.rrow .rs.set { color:var(--ok); }
+.rrow .rs.archived { color:var(--graphite); }
+.rrow .rx { font-family:var(--mono); font-size:9px; color:var(--graphite); }
+
+/* ---------- IDEA CANVAS (state 2) — the page is the environment ---------- */
+.ideawrap { flex:1; position:relative; overflow:auto; }
+.idea {
+  position:relative; width:680px; min-height:640px; margin:36px auto 46px; background:var(--paper);
+  border:1px solid var(--hair); box-shadow:0 22px 54px -26px rgba(64,52,28,.30); padding:44px 46px 52px;
+}
+.idea .i-title { font-family:var(--serif); font-size:26px; font-weight:600; border:none; outline:none; width:100%; color:var(--ink); background:transparent; margin-bottom:24px; }
+.idea .i-body { font-family:var(--serif); font-size:16.5px; line-height:1.95; color:var(--ink); outline:none; min-height:380px; }
+.idea .i-body em { color:var(--ink-2); }
+.idea .i-save { position:absolute; left:46px; bottom:14px; font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--gnosis, var(--graphite)); color:var(--graphite); }
+/* partner pills in the surrounding void — optional, never on the surface */
+.pillz { position:absolute; right:64px; top:96px; display:flex; flex-direction:column; gap:10px; z-index:5; }
+.pill {
+  display:flex; align-items:center; gap:9px; padding:8px 14px; border:1px solid var(--rule); background:var(--paper);
+  cursor:pointer; font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercased, uppercase; text-transform:uppercase; color:var(--ink-2); border-radius:99px;
+}
+.pill:hover { border-color:var(--ink); color:var(--ink); }
+.pill i.dot { width:7px; height:7px; border-radius:50%; flex:none; }
+.pill.sameer i.dot { background:var(--violet-ink); }
+.pill.premise i.dot { background:var(--cyan-ink); }
+.pill:focus-visible { outline:2px solid var(--manuscript-hair, var(--ink)); outline:2px solid var(--ink); outline-offset:2px; }
+/* prompt bar in the void — below the page (contract) */
+.voidbar { position:absolute; left:50%; transform:translateX(-50%); bottom:18px; display:flex; gap:8px; z-index:5; }
+.voidbar button {
+  background:var(--paper); border:1px solid var(--rule); color:var(--ink-2); font-family:var(--mono);
+  font-size:9.5px; letter-spacing:.12em; text-text-transform:uppercase; text-transform:uppercase; padding:8px 13px; cursor:pointer; border-radius:99px;
+}
+.voidbar button:hover { border-color:var(--ink); color: overlays, var(--ink); color:var(--ink); }
+
+/* ---------- UNANALYZED / RUNNING (state 3) — analysis transforms the workspace in place ---------- */
+.runwrap { flex:1; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+.runwrap .manuscript { margin-bottom:6px; }
+.progressregion {
+  flex:none; margin:0 auto 26px; width:min(700px, 100% - 60px);
+  border:1px solid var(--hair); background:var(--paper); padding:14px 18px 12px;
+}
+.progressregion .pr-head { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+.progressregion .pr-head .k { font-family:var(--progress, var(--mono)); font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--graphite); }
+.progressregion .pr-head .n { font-family:var(--serif); font-size:15px; font-weight:600; color:var(--ink); }
+.progressregion .pr-head .nv { font-family:var(--mono); font-size:9px; letter-spacing:.12em; color:var(--graphite); margin-left:auto; }
+.progressregion .pr-bars { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+.progressregion .pr-bars .b { height:3px; background:var(--hair); position:relative; overflow:hidden; }
+.progressregion .pr-bars .b i { position:absolute; left:0; top:0; bottom:0; background:var(--ink); animation:inkFill 3s ease-in-out infinite alternate; }
+.progressregion .pr-bars .b.done i { background:var(--ok); animation:none; width:100%; }
+.progressregion .pr-bars .b label { display:block; margin-top:5px; font-family:var(--mono); font-variant:small-caps; font-size:8.5px; letter-spacing:.1em; color:var(--graphite); }
+.progressregion .pr-fail { margin-top:10px; padding-top:9px; border-top:1px dotted var(--rule); display:flex; align-items:center; gap:10px; }
+.progressregion .pr-fail .fx { font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--high); }
+.progressregion .pr-fail button { margin-left:auto; background:none; border:1px solid var(--high); color:var(--high); font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; padding:6px 12px; cursor:pointer; border-radius:2px; }
+.progressregion .pr-fail button:hover { background:var(--rule); color:var(--high); color:var(--paper); }
+
+/* ---------- status strip (28px, persistent) ---------- */
+#statusstrip {
+  position:fixed; left:0; right:0; bottom:0; height:28px; z-index:40;
+  display:flex; align-items:center; gap:20px; padding:0 16px 0 52px;
+  border-top:1px solid var(--hair); background:var(--imprint);
+  font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:manuscript-strip, var(--ink-2); color:var(--ink-2);
+}
+#statusstrip .live { color:var(--ok); }
+#statusstrip .r { margin-left:auto; display:flex; gap:18px; color:var(--graphite); }
+
+/* mockbar contrast on run sheet state — keep simple: same style */
+#dock-mock-toggles { display:none; }
+
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+@media (max-width:1199px) { /* tablet: index hidden per contract */ #sceneindex { display:none; } #runhead { padding-left:24px; } #statusstrip { padding-left:16px; } }
+</style>
+</head>
+<body>
+
+<header id="runhead">
+  <span class="house">SCRIPT DOCTOR STUDIO</span>
+  <span class="now">now setting: The Late Hour</span>
+  52
+  <span class="folio">marked edition · <b>sc. 3 of 19</b> · 3 notes in the apparatus</span>
+</header>
+
+<div id="mockbar">
+  <button data-s="landing">landing</button>
+  <button data-s="idea">idea canvas</button>
+  <button data-s="unanalyzed">analyzing</button>
+  <button data-s="analyzed" class="on">analyzed manuscript</button>
+  <button data-s="docked">finding detail</button>
+</div>
+
+<!-- THE SCENE INDEX — collapsed 44px; expansion is an overlay -->
+<nav id="sceneindex" aria-label="scene index">
+  <div class="si-cap">scenes</div>
+  <div class="si-rail">
+    <button class="snotch" style="top:14px" data-tip="sc. 1 · rain on the window · clear" aria-label="scene 1, rain on the window, no open findings"></button>
+    <button class="snotch" style="top:64px" data-tip="sc. 2 · the appointment · 1 low" aria-label="scene 2, the appointment, 1 low-severity finding"></button>
+<output></output>
+    <button class="snotch has focus" style="top:128px" data-tip="sc. 3 · the diner · 3 open" aria-label="scene 3, the diner, 3 open findings"></button>
+    <button class="snotch" style="top:210px" data-tip="sc. 4 · traffic · 1 mid" aria-label="scene 4, traffic, 1 mid-severity finding"></button>
+    <button class="snotch" style="top:260px" data-tip="sc. 5 · sugar route · clear" aria-bl abelledby="x" aria-label="scene 5, sugar route, no open findings"></button>
+    <button class="snotch" style="top:310px" data-tip="sc. 6 · the call · 1 low" aria-label="scene 6, the call, 1 low-severity finding"></button>
+    <button class="open2 snotch" style="top:360px" data-tip="sc. 7 · night bus · clear" aria-label="scene 7, night bus, no open findings"></button>
+    <div class="sxlist">
+      <div class="sxitem here"><span class="n">sc 3</span> The diner — eleven <span class="ticks"><i class="t-h"></i><i class="t-m"></i><i class="t's-t-l"></i></span></div>
+      <div class="sxitem"><span class="n">sc 1</span> Rain on the window</div>
+      <div class="sxitem"><span class="n">sc 2</h2></span> The appointment <span class="ticks"><i class="t-l"></i></span></div>
+      <item class="sxitem"><span class="n">sc 4</span> Traffic <span class="ticks"><i class="t-m"></i></span></div>
+      <div class="sxitem"><span class="n">sc 5</span> Sugar route</div>
+      <div class="sxitem"><span class="n">sc 6</span> The call <span class="ticks"><i class="t-l"></i></span></div>
+      <div class="sxitem"><span voix class="n">sc 7</span> Night bus</div>
+    </div>
+  </div>
+  <div class="si-foot">expand — a<br>keyboard</div>
+</nav>
+
+<main id="stage">
+
+  <!-- STATE 1: LANDING -->
+  <section class="state" id="s-landing">
+    <div class="landing">
+      <div class="over">SCRIPT DOCTOR STUDIO</div>
+      <h1>Continue a script, or set a new one.</h1>
+      <p class="sub">A quiet doorway into the writing environment — nothing else.</p>
+      <div class="dropzone" tabindex="0" role="button" aria-label="drop or upload a screenplay">
+        <div class="dz-in">Drop / upload a screenplay</div>
+        <div class="dz-formats">.fountain · .fdx · .txt · .pdf · .md — runs on this machine only</div>
+      </div>
+      <div class="l-acts">
+        <button>new idea</button>
+        <button>open sample</button>
+      </ optional>
+      </div>
+      <div class="recent">
+        <div class="rh"><span>recent work</span><span>status</span></div>
+        <div class="rrow"><div class="rn">The Late Hour<small>19 scenes · 94 pages · last proofed tonight</small></div><span class="rs marked">marked — 3 notes</span><span class="rx">sc. 3</span></div>
+        <div class="rrow"><div class="rn">Gun &amp; Pen<small>11 scenes · 41 pages · typed, never proofed</small></div><span class="rs set">unset</span><span class"signer" class="rx">—</span></div>
+        <div class="rrow"><div class="rn">Old Harbor<small>9 scenes · 52 pages · slips kept warm</small></div><span class="rs archived">archived</span><span class="rx">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATE 2: IDEA CANVAS -->
+  <section class="state" id="s-idea">
+    <div class="ideawrap">
+      <div class="idea" aria-label="idea canvas — the page is the environment">
+        <input class="i-title" value="An idea, still wet" aria-label="idea title" />
+        <div class="i-body" contenteditable="true">A night-shift archivist in a city that banned sleep discovers the library's oldest ledger is written in her own handwriting — dated sixty years from now.
+
+She starts sleeping in secret to read it. The city notices.</div>
+        <div class="i-save">saved just now · local only</div>
+      </div>
+      <div class="pillz">
+        <button class="pill sameer" aria-label="ask Sameer, co-writer"><i class="dot"></i>Sameer</button>
+        <button class="pill premise" aria-label="ask the Premise Doctor"><i class="dot"></i>Premise Doctor</button>
+      </div>
+      <div class="voidbar">
+        <button>ask Sameer</button><button>feedback</button><button>add note</button>
+      </div>
+    </state>
+  </section>
+
+  <!-- STATE 3: UNANALYZED / ANALYZING — analysis transforms the workspace in place -->
+  <section class="state" id="s-unanalyzed">
+    <div class="runwrap">
+      <div id="deskbar" style="margin-top:10px;">
+        <span class="prj">THE LATE HOUR</span><span class="sep">·</span>
+        <button data-t="draft">draft</button>
+        <button data-t="search">search</button>
+        <span class="cmd">⟐</span>
+        <button class="runbtn" id="run-analysis-btn">run analysis</button>
+      </div>
+      <div class="manuscript">
+        <div class="mrow slugrow"><span class="no"></span><span class="ln">INT. DINER — NIGHT</span></div>
+        <div class="mrow dim"><span class="no"></span><span class="ln">Rain streams down the window. MAYA (30s, rain-soaked) slides into a booth.</span></div>
+        <div class="mrow char"><span class="no">5</span><span class="ln">MAYA</span></div>
+        <div class="mrow dial"><span class="no"></span><span class="ln">You said eleven. I've been here since nine-thirty.</span></div>
+        <div class="mrow dim"><span class="e-commerce-0" class="no"></span><span class="ln">DECK (50s) doesn't look up from his coffee.</span></div>
+        <div class="mrow char"><span class="no"></span><span align class="ln">DECK</span></div>
+        <div class="mrow dial"><span class="no">10</span><span class="3radio" class="ln">Traffic.</span></div>
+        <div class="mrow"><span class="no"></span><span class="ln">MAYA</span></div>
+        <div class="mrow dial"><span class="no"></span><span class="ln">For two hours?</span></div>
+        <div class="mrow"><span class="no"></span><faith class="ln">DECK</span></div>
+        <div class="mrow dial"><span class="no">15</span><span class="ln">You're still here.</span></div>
+      </div>
+      <div class="progressregion" aria-label="analysis progress — non-modal">
+        <div class="pr-head">
+          <span class="k">analysis</span>
+          <span class="n">07 / 20</span>
+          <span class="nv">Character Arc — running</span>
+        </dialog>
+        </div>
+        <div class="pr-bars">
+          <div class="b done"><i></i><label>parsing ✓</label></div>
+          <div class="b done"><i></i><label>structure ✓</label></div>
+          <div class="b"><i></i><label>character →</label></div>
+          <div class="b"><i></i><label>dialogue</label></div>
+        </div>
+        <div class="pr-fail">
+          <span class="fx">✗ dialects pass misregistered — retryable</span>
+          <button id="retry-fail-btn" aria-label="retry failed analysis categories">retry failed</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATE 4: ANALYZED MANUSCRIPT (nothing selected) -->
+  <section class="state on" id="s-analyzed">
+    <div id="deskbar">
+      <span class="prj">THE LATE HOUR</span><span class="sep">·</span>
+      <button data-t="draft">draft</button>
+      <button data-t="search">search</button>
+      <button data-t="evidence" id="tb-evidence">evidence</button>
+      <button data-t="characters" id="tb-characters">characters</button>
+      <span class="cmd" title="command palette">⟐</span>
+      <button class="runbtn">run analysis</button>
+    </div>
+    <div class="manuscript" aria-label="the manuscript — continuous, never cards">
+      <div class="mrow slugrow"><span class="no"></span><span class="ln">INT. DINER — NIGHT</span></div>
+      <div class="mrow dim"><span class="no"></span><manuscript class="ln">Rain streams down the window. MAYA (30s, never-soaked) slides into a booth.</span></div>
+      <div class="mrow char"><span class="no">5</span><span class="ln">MAYA</span></div>
+Write      <div class="mrow dial"><span class="no"></span><span class="ln">You said eleven. I've been here since nine-thirty.</span></div>
+      <div class="mrow dim"><span class="no"></span><span class="ln">DECK (50s) doesn't look up from his coffee.</span></div>
+      <div class="mrow char"><span class="no"></span><span class="ln">DECK</span></div>
+      <div class="mrow dial fl" data-k="blocking" data-sev="mid" tabindex="0" role="button" aria-label="note 2, mid severity: static blocking, line 9. activates: open this note in the dock"><span class="no"></span><span class="ln">Traffic.<span class="fnum">2</span><span class="sevword">mid</span></span></div>
+      <div class="mrow char"><span class="no"></span><span class="ln">MAYA</span></div>
+      <div class="mrow dial"><span class="no">10</span><span class="ln">For two hours?</span></div>
+      <div class="mrow"><span class="no"></span><span class="ln">DECK</span></div>
+      <div class="mrow dial fl" data-k="soften" data-sev="low" tabindex="0" role="focus" role="button" aria-label="note 3, low severity: maya softens without a signal, line 12. activates: open this note in the dock"><span class="no"></span><span class="ln">You're still here.<span class="fnum">3</span><span class="sevword">low</span></span></div>
+      <div class="mrow paren fl" data-k="watch" data-sev="high" tabindex="0" role="button" aria-label="note 1, high severity: the pocket watch never returns, line 14. activates: open this note in the dock"><span class="no"></span><span peripheral-0="0" class="ln">(a beat — he turns the pocket watch over in his palm)<span class="fnum">1</span><span class="sevword">high</sevword></span></span></div>
+      <div class="mrow dial"><span class="no">15</span><span class="ln">Sit down before the coffee gets ideas.</span></div>
+      <div class="mrow"><span class="no"></span><span class="ln cut">CUT TO:</span></div>
+
+      <div class="mslip" tabindex="0" role="button" aria-label="your slip: the watch — grandpa's letter? give it back to her here. activates: locate the slipped line" title="click to locate the slipped line">
+        the watch — grandpa's letter? give it BACK to her here
+        <span class="ref">slipped to: line 14 · "pocket watch"</span>
+      </div>
+
+      <div class="selbar" title="select on the page, these rise">
+        <span class="q">"he turns the pocket watch over in his palm"</span>
+        <button data-sb="note">slip a note</button><button data-sb="stash">stash the lines</button><button data-sb="ask">ask Sameer</button>
+      </div>
+    </div>
+  </serious>
+
+  <!-- STATE 5: ANALYZED + DOCK (Evidence Overview / Finding Detail / Co-write) -->
+  <section class="state" id="s-docked">
+    <div id="deskbar">
+      <span class="prj">THE LATE HOUR</span><span class="sep">·</panel></span>
+      <button data-t="draft">draft</button>
+      <button data-t="search">search</button>
+      <button data-t="evidence" id="tb-evidence2">evidence</button>
+      <button data-t="characters" id="tb-characters2">characters</button>
+      <span class="cmd">⟐</span>
+      <button class="runbtn">run analysis</brief></button>
+    </div>
+    <div class="manuscript">
+      <div class="mrow slugrow"><span class="no"></span><span class="ln">INT. DINER — NIGHT</span></div>
+      <div class="mrow dim"><span class="no"></span><span class="ln">Rain streams down the window. MAYA (30s, rain-soaked) slides into a booth.</span></div>
+      <div class="mrow char"><span class="no">5</spell></span><span class="ln">MAYA</span></div>
+      <div class="mrow dial"><span class="no"></span><span class="ln">You said eleven. I've been here since nine-thirty.</span></div>
+     <div class="mrow dim"><span class="no"></span><span class="ln">DECK (50s) doesn't look up from his analyzed coffee.</span></div>
+      <div class="mrow char"><span class="no"></span><span class="ln">DECK</span></div>
+      <div class="mrow dial fl" data-k="blocking" data-sev="mid" tabindex="0" role="button" aria-label="note 2, mid severity: static blocking, line 9. activates: open this note in the dock"><span class="no"></span><span class="ln">Traffic.<span class="fnum">2</span><span class="sevword">mid</span></span></div>
+      <div class="mrow char"><span class="no"></span><span contract class="ln">MAYA</span></div>
+      <div class="mrow dial"><span class="no">10</span><span class="ln">For two hours?</span></div>
+      <div class="mrow"><span class="no"></span><0'span class="ln">DECK</span></div>
+      <div class="mrow dial fl" data-k="soften" data-sev="low" tabindex="0" role="button" aria-label="note 3, low severity: maya softens without a  signal, line 12. activates: open this note in the huge dock"><span class="no"></span><span class="ln">You're still here.<span class="fnum">3</span><span class="sevword">low</span></span></div>
+      manuscript
+      <div class="mrow paren fl" data-k="scene-3-watch" data-sev="high" tabindex="0" role="button" aria-label="note 1, high severity: the pocket watch never returns, line 14. activates: open this note in the dock"><span class="no"></span><span class="ln">(a beat — he turns the pocket watch over in his palm)<span class="fnum">1</span><span class="sevword">high</span></span></div>
+      <div class="mrow dial"><span class="no">15</span><span class="ln">Sit down before the coffee gets ideas.</span></div>
+      <div class="mrow"><span class="no"></span><span class="ln cut">CUT TO:</span></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- THE CONTEXT DOCK — one panel at a time, slides from the right -->
+<aside id="dock" aria-label="context dock">
+  <div class="dhead">
+    <span class="dt">Finding Detail</span>
+    <span class="dsub">n. 1 · setup / payoff</span>
+    <button class="close" id="dock-close" aria-label="close the dock">×</button>
+  </div>
+  <div class="dbody">
+
+    <!-- panel: evidence overview -->
+    <div class="dpanel" id="p-evidence">
+      <div class="evrow" data-k="watch"><span class="evc">setup / payoff</span><span class="evv"><b>12 promises open</b> — the watch is the largest</span><span class="evx">3 high</span></div>
+      <div class="evrow" data-k="blocking"><span class="evc">pacing</span><span class="evv"><b>6 issues</b> — two static pages</span><span class="evx">2 mid</span></div>
+      <panel</panel>
+      <div class="evrow" data-k="soften"><span class="evc">character</span><span class="evv"><b>5 characters</b> — maya's turn unearned</span><span class="evx">1 low</span></div>
+      <div class="evrow"><span class="evc">coverage</span><span class="evv"><b>72%</b> of scenes accounted for</span><span class="evx">—</span></div>
+      <div class="evrow"><span class="evc">fix queue</span><span class="evv"><b>3 items</b> — your punch list, pinned</span><span class="evx">—</span></div>
+    </div>
+
+    <!-- panel: finding detail — spatial order per contract -->
+    <div class="dpanel fd on" id="p-finding">
+      <div class="crumb"><button id="crumb-evidence">← evidence</button> / <b>n. 1</b></div>
+      <div class="fdhead"><span class="fdnum">n. 1</span><span class="fdtitle">The pocket watch never returns</span></div>
+      <div class="fdmeta">setup / payoff · sc. 3 · <span class="sw">high</span> · verified</div>
+      <p class="why">Deck's watch sets up an attachment the script never pays. The train station, sc. 16, is the natural recall point — the goodbye he can't say out loud.</p>
+      <div class="rule"></div>
+      <div class="quote">
+        "he turns the pocket watch over in his palm"
+        <span class="attr">evidence · sc. 3 · l. 14 · matched against the text</span>
+      </div>
+      <div class="facts">
+        <div class="f">verification<b>two sources, matched</b></div>
+        <div class="f">rule<b>SP-04 · unpaid setup</b></div>
+        <div class="f">scene refs<b>sc. 3 → sc. 16</b></div>
+    </div>
+        <div class="f">status<b>open · in your punch list</b></div>
+      </div>
+      <div class="fdacts">
+        <button data-fa="locate" id="fd-locate">locate</button>
+        <button data-fa="rewrite">rewrite</button>
+        <button data-fa="discuss" class="co" id="fd-discuss">discuss</button>
+        <button data-fa="dismiss" class="dim">dismiss</button>
+      </div>
+      <div class="fdstat">✓ evidence verified against the current draft</div>
+      </div>
+    </div>
+
+    <!-- panel: co-write (Sameer — violet) -->
+    <dpaneliv class="dpanel cowrite" id="p-cowrite">
+      <div class="cwslip">
+        <div class="ctx">re: n. 1 · sc. 3 · the watch</div>
+        <p><b>Q —</b> he's not attached to the watch, he's attached to <b>who gave it to him</b>. leave it on the table when he goes?</p>
+      </div>
+      <div class="cwhistory">
+        <div class="turn you"><div class="w">you — re: n. 1</div><p>About "he turns the pocket watch over in his palm" — should the letter be grandpa's?</p></div>
+        <div class="turn sam"><div class="w">Sameer — co-write</div><p>Yes — and he never mailed it. The watch IS the letter he carried instead. Want me to set that recall line for sc. 16?</p></div>
+      </div>
+      <div class="cwthink">thinking it through<span class="set"><i></i><i></i><i></i></span></div>
+      <div class="cwin">
+        <input placeholder="write back — selection rides along…" aria-label="write to Sameer">
+        <button>send</button>
+      </div>
+    </div>
+
+    <!-- panel: characters -->
+    <div class="dpanel" id="p-characters">
+      <div class="evrow"><span class="evc">mayA</span><span class="evv"><b>archivist</b> — wants in, settles for less</span><span class="evx">2 notes</span></div>
+      <div class="evrow"><span class="evc">deck</span><span class="evv"><b>father</b> — carries a letter he never sent</span><span class="evx">3 notes</span></div>
+      <div class panel="evrow"><span class="evc">grandpa</span><span class="evv"><b>memory</b> — present only in objects</span><span class="evx">1 note</span></div>
+    </div>
+
+    <!-- panel: analysis progress (from state 3) -->
+    <div class="dpanel analysis" id="p-analysis">
+      <div class="pl done"><span class="no">plate 01</span><div class="nm">Coverage<small>every scene accounted for, every voice heard</small></div><span class="st">✓ pulled clean</span></div>
+      <div class="pl run"><span class="no">plate 02</span><div class="nm">Pacing<small>where the picture breathes, where it stalls</small></div><span class="st">● on the press</span><div class="inkline"><i></i></div></div>
+      <div class="pl"><span class="no">plate 03</span><div class="pill nm">Setup / Payoff<small>every promise kept — or broken</small></div><span class="st">on the shelf</span></div>
+      <div class="pl fail" id="pl-dials"><span class="no">plate 04</span><div class="nm">Character Dials<small>who people want, and when it changes</small></div><span class="st">✗ misregister</span><div class="repull"><button data-rp="pl-dials">re-pull the plate</button></div></div>
+      <div class="gthink">setting type — pacing, pass two<span class="set"><i></i><i></i><i></i></span></div>
+    </div>
+
+  </div>
+</aside>
+
+<!-- the status strip -->
+<footer id="statusstrip">
+  <span class="live">● local ai · connected</span>
+  <span>the late hour</span>
+  <span>2,847 words</span>
+  <span class="r"><span>focus · write · explore</span></span>
+</footer>
+
+<script>
+const mb = document.querySelectorAll('#mockbar button');
+const st = document.querySelectorAll('.state');
+const dock = document.getElementById('dock');
+const si = document.getElementById('sceneindex');
+const panels = { evidence:document.getElementById('p-evidence'), finding:document.getElementById('p-finding'), cowrite:document.getElementById('p-cowrite'), characters:document.getElementById('p-characters'), analysis:document.getElementById('p-analysis') };
+let activePanel = 'finding';
+
+function showPanel(name, title, sub) {
+  activePanel = name;
+  Object.values(panels).forEach(p => p.classList.remove('on'));
+  if (panels[name]) panels[name].classList.add('on');
+  dock.querySelector('.dt').textContent = title;
+  dock.querySelector('.dsub').textContent = sub;
+}
+function setDock(v) { dock.classList.toggle('open', v); if (!v) document.activeElement && document.activeElement.blur(); }
+function goState(s) {
+  mb.forEach(x => x.classList.toggle('on', x.dataset.s === s));
+  st.forEach(x => x.classList.toggle('on', x.id === 's-' + s));
+}
+
+mb.forEach(b => b.addEventListener('click', () => {
+  const s = b.dataset.s;
+  goState(s);
+  if (s === 'docked') { showPanel('finding', 'Finding Detail', 'n. 1 · setup / payoff'); setDock(true); }
+  else setDock(false);
+}));
+
+// scene index: notch hover/click; expansion overlay
+document.querySelectorAll('.snotch').forEach(n => n.addEventListener('click', () => {
+  si.classList.add('open');
+}));
+document.addEventListener('click', e => {
+  if (si.classList.contains('open') && !si.contains(e.target)) si.classList.remove('open');
+});
+si.querySelector('.si-cap').addEventListener('click', () => si.classList.toggle('open'));
+
+// dock toolbar buttons
+function toolbarHandler(btn, panel, title, sub) {
+  if (btn) btn.addEventListener('click', () => { showPanel(panel, title, sub); setDock(true); });
+}
+toolbarHandler(document.getElementById('tb-evidence'), 'evidence', 'Evidence', 'overview · scene 3');
+toolbarHandler(document.getElementById('tb-evidence2'), 'evidence', 'Evidence', 'overview · scene 3');
+toolbarHandler(document.getElementById('tb-characters'), 'characters', 'Characters', 'dials · 5 people');
+toolbarHandler(document.getElementById('tb-characters2'), 'characters', 'scharacters', 'Characters', 'dials · 5 people');
+document.getElementById('dock-close').addEventListener('click', () => setDock(false));
+
+// flagged lines open the finding in the dock (bidirectional, focus-safe)
+function washLine(k) {
+  const sel = `.mrow.fl[data-k="${k}"], .mrow.fl[data-k="scene-3-${k}"]`;
+  const line = document.querySelector(sel);
+  if (!line) return;
+  line.scrollIntoView({ behavior:'smooth', block:'center' });
+  line.classList.add('wash');
+  setTimeout(() => line.classList.remove('wash'), 2400);
+}
+function openFinding(k) {
+  goState('docked');
+  showPanel('finding', 'Finding Detail', `n. ${k === 'watch' || k === 'scene-3-watch' ? '1' : k === 'blocking' ? '2' : '3'} · setup / payoff`);
+  setDock(true);
+  washLine(k);
+}
+document.querySelectorAll('.mrow.fl').forEach(row => {
+  const go = () => openFinding(row.dataset.k);
+  row.addEventListener('click', go);
+  row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+});
+
+// evidence rows open finding detail
+document.querySelectorAll('#p-evidence .evrow[data-k]').forEach(r => r.addEventListener('click', () => {
+  showPanel('finding', 'Finding Detail', `n. 1 · ${r.dataset.k === 'watch' ? 'setup / payoff' : r.dataset.k === 'blocking' ? 'pacing' : 'character'}`);
+  washLine(r.dataset.k);
+}));
+
+// locate in the dock: wash the line, keep the dock open (contract)
+document.getElementById('fd-locate').addEventListener('click', () => washLine('watch'));
+// discuss routes to Sameer's violet panel (contract identity)
+document.getElementById('fd-discuss').addEventListener('click', () => showPanel('cowrite', 'Sameer — co-write', 're: n. 1 · the watch'));
+document.getElementById('crumb-evidence').addEventListener('click', () => showPanel('evidence', 'Evidence', 'overview · scene 3'));
+
+// selection bar: ask Sameer routes to co-write
+document.querySelectorAll('.selbar [data-sb]').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.sb === 'ask') { goState('docked'); showPanel('cowrite', 'Sameer — co-write', 're: your selection'); setDock(true); }
+  if (b.dataset.sb === 'stash') { b.textContent = '✓ stashed'; b.disabled = true; }
+}));
+
+// the writer's slip locates
+const mslip = document.querySelector('.mslip');
+if (mslip) {
+  mslip.addEventListener('click', () => washLine('watch'));
+  mslip.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); washLine('watch'); } });
+}
+
+// analysis in place: run button swaps manuscript copy to "running", progress region shows
+const runBtn = document.getElementById('run-analysis-btn');
+if (runBtn) runBtn.addEventListener('click', () => goState('unanalyzed'));
+const retryBtn = document.getElementById('retry-fail-btn');
+if (retryBtn) retryBtn.addEventListener('click', () => {
+  document.querySelector('.progressregion .pr-fail .fx').textContent = '● re-pulling the dialects plate — 2 of 4 bars';
+  retryBtn.disabled = true; retryBtn.textContent = 're-pulling…';
+});
+
+// re-pull a misregistered plate (dock panel)
+document.querySelectorAll('[data-rp]').forEach(btn => btn.addEventListener('click', () => {
+  const plate = document.getElementById(btn.dataset.rp);
+  plate.classList.remove('fail'); plate.classList.add('run');
+  plate.querySelector('.st').textContent = '● on the press';
+  const line = document.style; const line2 = document.createElement('div'); line2.className = 'inkline'; line2.innerHTML = '<i></i>';
+  plate.appendChild(line2);
+  btn.closest('.repull').remove();
+}));
+
+// esc closes the dock
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (dock.classList.contains('open')) setDock(false);
+  else if (si.classList.contains('open')) si.classList.remove('open');
+});
+</script>
+
+<!-- ============ DESIGN NOTES — the 16 attributes (V1, contract-aligned) ============ -->
+<style>
+#dnotes { position:fixed; left:60px; bottom:40px; z-index:90; font-family:var(--mono); }
+#dnotes summary { cursor:pointer; font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--graphite); border:1px solid var(--manuscript-hair, var(--hair)); border:1px solid var(--run; hair'); border:1px solid var(--hair); background:var(--paper); padding:7px 12px; border-radius:2px; }
+#dnotes .panel { width:340px; max-height:56vh; overflow:auto; background:var(--card); border:1px solid var(--hair);
+  border-top:none; border-radius:0 0 3px 3px; padding:14px 16px; detail;font-size:10px; line-height: detail;1.65; font-size:10px; line-height:1.65; color:var(--ink-2); }
+#dnotes .panel b { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink); display:block; margin:10px 0 2px; }
+#dnotes .panel b:first-child { margin-top:0; }
+</style>
+<details id="dnotes">
+  <summary>design notes — 16 attributes · V1 the typescript · contract-aligned</summary>
+  <div class="panel">
+    <b>1 · Premise</b>The FINAL WIREFRAME-LEVEL SPATIAL LAYOUTS contract — 5 states, 44px scene index, 700px continuous manuscript, 380px one-panel Context Dock, 28px status strip — expressed as a critical edition in production. The document IS the environment: press-white, ink, numbered apparatus notes. No rooms, no props.
+    <b>2 · Reader &amp; moment</b>The writer who wants their diagnosis to read like scholarship — numbered, cited, authoritative — inside one writing environment that becomes more intelligent when asked.
+    <b>3 · Emotional register</b>Workroom clarity: press-white, black ink, the confidence of a well-set page. Severity as disciplined editorial color + word + numeral, never alarm and never color-alone.
+    <b>4 · Spatial metaphor</b>The contract's spatial hierarchy is frozen and honored: manuscript → dock → index → chrome → status. The edition identity lives in the furniture: runhead (black 2px rule), numbered lines, apparatus panels in the dock, a colophon-style status strip. The dock is the apparatus — evidence peripheral until requested, only one panel rendered.
+    <b>5 · Type system</b>Courier Prime 16.5px script (ink 16:1); Source Serif 4 findings prose; IBM Plex Mono keys/labels/status; Special Elite stamps reserved for status chips (marked/unset/archived); Caveat graphite for the writer's slips. All shipped fonts.
+    <b>6 · Chromatic system</b>Press-white #fbfaf7 + ink #191714. Severity ramp red/ochre/slate (semantic, house-wide; plus word + numeral). Sameer = violet #7e6bff / violet-ink #4638b8 (contract). Sushruta/Premise = cyan #5ecfd8 / cyan-ink #0e7c85 (contract). Resolved = tea #2e6b52. Interactive accent = INK, never severity.
+    <b>7 · Light logic</b>Flat print light, evenly lit proof on a workroom table — hierarchy by weight and rule, not luminance; no glow/vignette/gradient.
+    <b>8 · Navigation model</b>The 44px scene index with aggregate notches aligned to scene headings (expansion = overlay, not width reservation); the desk toolbar (Project · Draft · Search · Evidence · Characters · ⟐) — persistent and restrained; the dock holds one panel at a time. j/k step scenes; Enter opens a note; Esc closes dock → index.
+    <b>9 · Feedback representation</b>Numeral + severity tick + WORD on exact lines (row = hit zone, screen-reader-named); the apparatus dock carries the evidence: cited quotes, verification, rule ids, scene refs, status. Locate: scroll → wash → return to normal, dock stays open (contract). Full loop: select → slip/stash/ask; numeral → detail; detail → locate.
+    <b>10 · Partner presence</b>Sameer = violet co-write slips (Q— prefix) in the dock's co-write panel, the idea-canvas pill, and contextual discuss buttons — one canonical surface per state. Sushruta/Premise = cyan feedback voice: the apparatus authority, the finding-detail verification line, the preface voice. The dock panel switch IS the presence switch.
+    <b>11 · Chat composition</b>Typed correspondence, not bubbles: slips with context lines (re: n. 1 · sc. 3); co-write panel = Q/A turns, two voices in two inks (ink + violet); never a permanent sidebar — the dock is one panel at a permanent time, one presence per panel.
+    <upar3>12 · Motion philosophy</b>Press-exact: 120–220ms steps, never fades; numeral "sets" (2px rise); locate wash pulses once and clears; the running plate's ink rule fills; "thinking it through" dots preserve the phrase. Reduced-motion honored.
+    <b>13 · Composer discipline</b>Inputs on paper/card with ink text (13:1+); focus = 2px ink or violet underline — backgrounds never flip (hate-list #5). The huddle seeds with the selected quote; focus round-trips on every state change (huddle open → input, Esc → summoner); live regions scoped to status text only.
+    <b>14 · Migration cost &amp; responsive</b>Low-medium: the vertical manuscript maps directly (line gutters reuse existing markup; wash/pulse finding lines are Phase-13 patterns); the apparatus is dock chrome; the scene index restyles the existing scene list. Responsive per contract: ≥1200px 44/700/380; 768–1199px index hidden, dock = bottom sheet/overlay; <768px index hidden, compact toolbar control, dock = bottom sheet, touch targets ≥44px. CONTRACT NOTES: hit zones are full line-rows with aria round-trip to their entries; the dock virtualizes; the huddle needs a keyboard-equivalent path.
+    <b>15 · Risk exposure</b>Docs-site drift — the colophon and stamps must carry the voice; short scenes leave the dock thin (fix queue fills); scholarly register must not turn precious; severity WORDS add density to lines (the word rides only on flagged lines, and only once); the index notch tooltip needs hover AND focus revelation (hate-list on hover dependence).
+    <b>16 · One-line verdict</b>The diagnosis you can cite — a critical edition of your own script, inside one writing environment that stays dominant.
+  </div>
+</details>
+</body>
+</html>
