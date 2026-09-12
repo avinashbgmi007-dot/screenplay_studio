@@ -5580,8 +5580,11 @@ body:not(.idea-mode) #manuscript-workspace {
   transform: translateX(calc(100% + 380px));
 }
 @media (max-width: 900px) {
-  /* tablet/mobile hide the scene index (contract §Responsive) — its 44px
-     reservation goes with it so the manuscript takes the full width */
+  /* narrow desks: the rail's 44px RESERVATION is revoked so the manuscript
+     takes the full width — the rail itself stays (compact 40px overlay at
+     768-1199 per the tablet block below; a left sheet with a pinned 44px
+     handle below 768). The rail overlays the transparent side of the
+     centred column, never the text (verified: rail 0-40, column from 60). */
   .manuscript-workspace-layout { margin-right: 0; padding-left: 0; }
 }
 #scene-index {
