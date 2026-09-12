@@ -306,7 +306,28 @@ body.dawn {
      used as a TEXT colour in 14 places. #14784a scores 4.71. */
   --ok: #14784a;
   --ok-bg: rgba(90, 122, 73, 0.12);
+
+  /* a11y (WCAG 1.4.3): dawn is a LIGHT theme, but the --desk-* palette is a
+     NIGHT palette (warm light ink for a dark desk) that dawn never overrode.
+     That left dark-brown desk components — sidebar flyouts, language menus,
+     the connection card — sitting on a cream page, and put the page-level desk
+     text at 2.31:1 with the status highlights as low as 1.43:1. Dawn gets a
+     light desk: light panels + warm DARK inks. Night is untouched. */
+  --desk-panel: #fffdf6;
+  --desk-panel-2: #f9f5ec;
+  --desk-line-deep: #e3d9c0;
+  --desk-line-dim: #d9cfb6;
+  --desk-text-dim: #655a4a;      /* 5.77 on the #f1ede4 body */
+  --desk-amber: #7d5818;         /* 5.48 */
+  --desk-amber-bright: #8a6220;  /* 4.67 */
+  --desk-rust: #8a3c28;          /* 6.52 */
+  --desk-ok: #2a7038;            /* 5.18 */
+  --desk-warn: #a04a3a;          /* 5.08 */
 }
+
+/* the dash cards hard-code a dark fill (rgba(30,26,21,0.82)) rather than using
+   --desk-panel, so they need their own dawn flip to match the light desk. */
+body.dawn .dash-card { background: var(--ink-800); }
 
 
 * { box-sizing: border-box; }
