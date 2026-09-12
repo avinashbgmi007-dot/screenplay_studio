@@ -150,11 +150,14 @@
 
   /* ink on paper / text on dark */
   --text: #ecebf4;
-  --text-muted: #8b889c;
-  /* a11y (WCAG 1.4.3 Contrast, Minimum): #5a586a measured 2.87:1 on the
-     --ink-950 void — a hard fail for the ~60 metadata labels that use it.
-     #7d7a8c measures 4.76:1, clearing AA for normal text. */
-  --text-faint: #7d7a8c;
+  /* a11y (WCAG 1.4.3): for LIGHT text on dark the worst case is the LIGHTEST
+     surface, not the darkest — and these two were only checked against the
+     --ink-950 void. On --ink-800 (#1a1a22) the faint tier scored 4.14 and on
+     --ink-700 (#22222c) 3.78. Re-tuned against #22222c: faint 4.94,
+     muted 5.59, with the faint<->muted ordering preserved on every surface.
+     (Dawn is the mirror case and uses its own darkest-surface values.) */
+  --text-muted: #9a98ab;
+  --text-faint: #908ea3;
   --danger: #fb7185;
   --danger-bg: rgba(251, 113, 133, 0.14);
   --ok: #34d399;
@@ -216,7 +219,10 @@
   --desk-amber: #b98a44;      /* desk accent (inline-edit outline, dash active) */
   --desk-text-dim: #a89c88;   /* muted desk text (fix-queue, dash metadata) */
   --desk-line-dim: #4a4238;   /* desk hairlines (fix-queue borders, dash dividers) */
-  --desk-rust: #b3573f;       /* failure/dismissal flag color */
+  /* a11y (WCAG 1.4.3): #b3573f scored 3.70 on the dash card's real composited
+     fill (rgba(30,26,21,0.82) over the void = #1a1714), and .dash-warn uses it
+     as 11px TEXT. #cd7052 scores 5.13 there. */
+  --desk-rust: #cd7052;       /* failure/dismissal flag color */
   --desk-panel: #201a14;      /* dark panel fill (sidebar flyouts, idea context) */
   --desk-panel-2: #1c1814;    /* conn-card fill */
   --desk-line-deep: #3a322a;  /* conn-card border */
@@ -287,9 +293,18 @@ body.dawn {
   --text-muted: #635e6b;
   --text-faint: #6b6675;
 
-  --lamp: #6b5ce6;
-  --lamp-bright: #8578f0;
+  /* a11y (WCAG 1.4.3): dawn's lamp was light (4.18 on the body) because it had
+     been tuned for DARK fills — but it is also used as TEXT (the room chip) and
+     as a border, where a light violet fails on a light page. Dawn's lamp is
+     therefore dark now, which flips --accent-ink to a LIGHT ink (see below).
+     Hierarchy preserved: lamp-deep #5a4dcc < lamp #6354c7 < lamp-bright #6b5ed4. */
+  --lamp: #6354c7;              /* 4.96 on the dawn body */
+  --lamp-bright: #6b5ed4;       /* 4.94 on --ink-800, where its text uses live */
   --lamp-deep: #5a4dcc;
+  /* the ink that sits ON lamp/consult fills: dawn's fills are dark, so the ink
+     must be light. #fffdf5 clears AA on both dawn room accents (5.69 cowrite,
+     5.55 feedback). Night keeps its dark ink (4.73 on #7e6bff). */
+  --accent-ink: #fffdf5;
   /* a11y (WCAG 1.4.3 / 1.4.11): on the #f1ede4 body these were cyan 1.99 and
      amber 3.93 — failing the 4.5:1 text floor (sev-mid is used as text 7x) and,
      for the cyan, even the 3:1 non-text floor. Re-tuned: consult 4.84,
@@ -1463,8 +1478,12 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   font-family: var(--font-typewriter);
   font-size: 12px;
   background: transparent;
-  border: 1px dashed var(--accent-deep);
-  color: var(--accent);
+  /* a11y (WCAG 1.4.3): this chip sits on the CREAM manuscript page, where the
+     raw room accent scored 3.18 (violet, cowrite) and 2.23 (cyan, feedback).
+     Mixing the accent toward the paper ink keeps the room's identity while
+     clearing AA on paper in BOTH rooms. */
+  border: 1px dashed color-mix(in oklab, var(--accent) 62%, var(--paper-ink));
+  color: color-mix(in oklab, var(--accent) 62%, var(--paper-ink));
   border-radius: 4px;
   padding: 1px 8px;
   cursor: pointer;
