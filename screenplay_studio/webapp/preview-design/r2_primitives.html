@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R2 primitives — current vs proposed</title>
+<style>
+  /* Self-contained mirror of the app's night/dawn token system (subset needed
+     by this preview). Values copied from style.css :root + body.dawn. */
+  :root {
+    --ink-950: #09090e; --ink-900: #0e0e14; --ink-850: #131319; --ink-800: #1a1a22;
+    --line: rgba(255,255,255,0.085); --line-soft: rgba(255,255,255,0.05);
+    --glass: rgba(17,17,26,0.66); --surface: rgba(255,255,255,0.032);
+    --text: #eceaf4; --text-muted: #9d99b5; --text-faint: #6b6880;
+    --accent: #7e6bff; --accent-deep: #6354c7; --accent-bright: #9d8bff;
+    --ok: #4ade80; --danger: #f87171; --sev-mid: #e8a24f;
+    --glow: rgba(126,107,255,0.16); --glow-strong: rgba(126,107,255,0.30);
+    --font-ui: "DM Sans", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+    --radius: 14px; --radius-sm: 10px;
+    --fs-3xs: 9px; --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 12px; --fs-body: 13px;
+    --fs-md: 14px; --fs-lg: 15px; --fs-body-l: 16px; --fs-xl: 17px; --fs-2xl: 18px;
+    --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 10px;
+    --sp-6: 12px; --sp-7: 14px; --sp-8: 16px; --sp-9: 18px; --sp-10: 20px;
+    /* PROPOSED R2 radius ladder (spec §1) */
+    --r-pill: 999px; --r-lg: 12px; --r-md: 8px; --r-sm: 4px; --r-xs: 2px;
+  }
+  body.dawn {
+    --ink-950: #f1ede4; --ink-900: #e9e4d8; --ink-850: #efece4; --ink-800: #f6f3ec;
+    --line: rgba(26,20,13,0.14); --line-soft: rgba(26,20,13,0.08);
+    --glass: rgba(246,243,236,0.85); --surface: rgba(26,20,13,0.04);
+    --text: #26215c; --text-muted: #5f5e5a; --text-faint: #8a867d;
+    --accent: #6354c7; --accent-deep: #5243ad; --accent-bright: #7e6bff;
+    --sev-mid: #a06a20;
+    --glow: rgba(99,84,199,0.18); --glow-strong: rgba(99,84,199,0.32);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--ink-950); color: var(--text);
+    font-family: var(--font-ui); font-size: var(--fs-lg); line-height: 1.55;
+    padding: var(--sp-8) var(--sp-9); transition: background 200ms ease;
+  }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  .sub { color: var(--text-muted); font-size: var(--fs-sm); margin: 0 0 var(--sp-8); }
+  .bar { display: flex; gap: var(--sp-5); align-items: center; margin-bottom: var(--sp-8); flex-wrap: wrap; }
+  .bar button {
+    background: var(--surface); border: 1px solid var(--line); color: var(--text);
+    font: inherit; font-size: var(--fs-sm); padding: var(--sp-3) var(--sp-6);
+    border-radius: var(--r-md); cursor: pointer;
+  }
+  .bar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-bright); }
+  .tabhint { font-size: var(--fs-xs); color: var(--text-faint); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-6); }
+  .cell { border: 1px solid var(--line-soft); border-radius: var(--r-lg); padding: var(--sp-6); min-height: 120px; }
+  .cell h2 { font-size: var(--fs-md); font-weight: 500; margin: 0 0 var(--sp-2); }
+  .cell .why { font-size: var(--fs-xs); color: var(--text-faint); margin: 0 0 var(--sp-5); }
+  .row { display: flex; gap: var(--sp-5); align-items: center; flex-wrap: wrap; }
+  .row + .row { margin-top: var(--sp-4); }
+  .tag { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-faint); width: 74px; flex: none; }
+
+  /* ===== CURRENT column: swatches mirroring the live app's actual values ===== */
+  .cur-btn-paper {
+    background: var(--ink-800); color: var(--text); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 9px 14px; font-family: var(--font-mono);
+    font-size: var(--fs-body); cursor: pointer;
+    box-shadow: 0 6px 18px -6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
+  }
+  .cur-dock-tab {
+    background: transparent; color: var(--text-muted); border: none;
+    border-radius: 6px; padding: 5px 8px; font-size: var(--fs-body); cursor: pointer;
+  }
+  .cur-dock-tab[aria-selected="true"] { background: var(--surface); color: var(--text); }
+  .cur-chip {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 10px; font-size: var(--fs-sm); color: var(--text-muted);
+  }
+  .cur-input {
+    background: var(--ink-800); border: 1px solid var(--accent-deep); border-radius: var(--radius-sm);
+    padding: 10px 12px; font-size: 13.5px; color: var(--text); width: 100%;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .cur-select {
+    background: var(--ink-800); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 8px; font-size: var(--fs-sm);
+  }
+  .cur-card {
+    background: var(--glass); border: 1px solid var(--line-soft); border-radius: var(--radius);
+    padding: var(--sp-7) var(--sp-8); width: 100%;
+  }
+  .cur-scroll { height: 90px; overflow-y: scroll; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); padding: var(--sp-3); }
+  .cur-scroll div { height: 14px; margin-bottom: 6px; background: var(--surface); border-radius: 4px; }
+
+  /* ===== PROPOSED column: the R2 spec's exact recipes (designer, lead-critiqued) ===== */
+
+  /* Radius ladder mapping (spec §1):
+     pill 999px  <- 999px×33 + 99px×2
+     --r-lg 12px <- 12px×2, 14px (--radius legacy), 16px idea editor
+     --r-md 8px  <- 8px×18, 10px×13 (--radius-sm legacy), 6px×18
+     --r-sm 4px  <- 4px×26, 3px×10
+     --r-xs 2px  <- 2px×7, odd folds (5/7/9px down)
+     Exempt: river-read speech-bubble 22/22/22/6 (single-use expressive shape) */
+
+  /* Focus recipe (spec §2) — 75% ring (lead-corrected from 65%: 65% fails
+     WCAG 1.4.11 at 2.74:1 on the night shell; 75% = 3.32:1 night / 3.15:1
+     dawn). Inputs swap to the two-layer box-shadow glow. */
+  .prop-scope :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--accent) 75%, transparent);
+    outline-offset: 2px;
+  }
+  .prop-scope :where(input, textarea, select, [contenteditable]):focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 100%, transparent),
+                0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+
+  /* State system (spec §3) — 200ms house motion; on-accent via brightness,
+     on-surface via the color-mix house rule. */
+  .prop-btn-primary, .prop-btn-ghost, .prop-tab {
+    font: inherit; font-size: var(--fs-body); cursor: pointer;
+    transition: background 200ms ease, filter 200ms ease, border-color 200ms ease, transform 200ms ease;
+  }
+  .prop-btn-primary {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: var(--r-md); padding: 9px 14px; font-family: var(--font-mono);
+  }
+  .prop-btn-primary:hover { filter: brightness(1.1); }
+  .prop-btn-primary:active { filter: brightness(0.9); transform: scale(0.98); }
+  .prop-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .prop-btn-ghost {
+    background: var(--surface); color: var(--text); border: 1px solid var(--line);
+    border-radius: var(--r-md); padding: 9px 14px; font-family: var(--font-mono);
+  }
+  .prop-btn-ghost:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+  .prop-btn-ghost:active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+  .prop-btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; color: var(--text-faint); }
+  .prop-tab {
+    background: transparent; color: var(--text-muted); border: none;
+    border-radius: var(--r-md); padding: 5px 8px;
+  }
+  .prop-tab[aria-selected="true"] { background: color-mix(in oklab, var(--accent) 12%, transparent); color: var(--text); }
+  .prop-tab[aria-selected="true"]::after { content: ""; }
+
+  /* statically-forced state demos so every state is visible without hovering */
+  .is-hover-primary { filter: brightness(1.1); }
+  .is-active-primary { filter: brightness(0.9); transform: scale(0.98); }
+  .is-hover-ghost { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+  .is-active-ghost { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+  .is-disabled { opacity: 0.5; cursor: not-allowed; color: var(--text-faint); }
+
+  .prop-chip {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill);
+    padding: 3px 10px; font-size: var(--fs-sm); color: var(--text-muted);
+  }
+  .prop-input {
+    background: var(--ink-800); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 10px 12px; font-size: var(--fs-body); color: var(--text); width: 100%;
+  }
+  .prop-card {
+    background: var(--glass); border: 1px solid var(--line-soft); border-radius: var(--r-lg);
+    padding: var(--sp-7) var(--sp-8); width: 100%;
+  }
+  .prop-select-wrap { position: relative; display: inline-flex; }
+  .prop-select {
+    appearance: none; -webkit-appearance: none;
+    background: var(--ink-800) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 0h8L4 4z' fill='%236b6880'/%3E%3C/svg%3E") no-repeat right var(--sp-4) center;
+    color: var(--text); border: 1px solid var(--line);
+    border-radius: var(--r-md); padding: 4px var(--sp-6) 4px var(--sp-4); font: inherit;
+    font-size: var(--fs-sm); cursor: pointer;
+  }
+  .prop-select:disabled { opacity: 0.5; cursor: not-allowed; }
+  .prop-scroll { height: 90px; overflow-y: scroll; border: 1px solid var(--line-soft); border-radius: var(--r-md); padding: var(--sp-3); }
+  .prop-scroll div { height: 14px; margin-bottom: 6px; background: var(--surface); border-radius: var(--r-sm); }
+  .prop-scroll::-webkit-scrollbar { width: 10px; }
+  .prop-scroll::-webkit-scrollbar-thumb { border-radius: var(--r-pill); background: color-mix(in oklab, var(--accent) 30%, transparent); }
+  .prop-scroll::-webkit-scrollbar-thumb:hover { background: color-mix(in oklab, var(--accent) 45%, transparent); }
+
+  .legend { margin-top: var(--sp-8); font-size: var(--fs-xs); color: var(--text-faint); }
+  .note { color: var(--sev-mid); }
+</style>
+</head>
+<body>
+  <h1>R2 primitives — current vs proposed</h1>
+  <p class="sub">Every family in both themes. Proposed = the R2 spec's exact recipes (radius ladder · unified focus · one state system · selects + scrollbars). Sign-off instrument for the R2 design pass.</p>
+
+  <div class="bar">
+    <button id="theme-toggle" aria-pressed="false">Switch to dawn</button>
+    <span class="tabhint">Tab through the proposed column to see the unified focus recipe (ring on buttons/chips, double glow on inputs/selects).</span>
+  </div>
+
+  <div class="grid prop-scope">
+
+    <div class="cell" id="cell-buttons">
+      <h2>Buttons</h2>
+      <p class="why">radius: 10px paper / 6px tabs today → one ladder (--r-md 8px); states ad-hoc (~31 rules) → one system (brightness on-accent, color-mix on-surface, 200ms)</p>
+      <div class="row"><span class="tag">today</span>
+        <button class="cur-btn-paper">Open the sample page</button>
+        <button class="cur-dock-tab" aria-selected="false">Evidence</button>
+        <button class="cur-dock-tab" aria-selected="true">Stash &amp; Notes</button>
+      </div>
+      <div class="row"><span class="tag">proposed</span>
+        <button class="prop-btn-primary">Run the audit</button>
+        <button class="prop-btn-primary is-hover-primary">hover</button>
+        <button class="prop-btn-primary is-active-primary">active</button>
+        <button class="prop-btn-primary" disabled>disabled</button>
+      </div>
+      <div class="row"><span class="tag">proposed</span>
+        <button class="prop-btn-ghost">Stash the draft</button>
+        <button class="prop-btn-ghost is-hover-ghost">hover</button>
+        <button class="prop-btn-ghost is-active-ghost">active</button>
+        <button class="prop-btn-ghost" disabled>disabled</button>
+        <button class="prop-tab" aria-selected="true">Evidence</button>
+      </div>
+    </div>
+
+    <div class="cell" id="cell-chips">
+      <h2>Chips &amp; pills</h2>
+      <p class="why">pill 999px today → --r-pill 999px (unchanged rendering); severity/ok chips stay token-driven</p>
+      <div class="row"><span class="tag">today</span>
+        <span class="cur-chip">dialogue</span>
+        <span class="cur-chip" style="color: var(--sev-mid); border-color: color-mix(in oklab, var(--sev-mid) 40%, transparent)">pacing · high</span>
+        <span class="cur-chip" style="color: var(--ok); border-color: color-mix(in oklab, var(--ok) 40%, transparent)">analyzed</span>
+      </div>
+      <div class="row"><span class="tag">proposed</span>
+        <span class="prop-chip">dialogue</span>
+        <span class="prop-chip" style="color: var(--sev-mid); border-color: color-mix(in oklab, var(--sev-mid) 40%, transparent)">pacing · high</span>
+        <span class="prop-chip" style="color: var(--ok); border-color: color-mix(in oklab, var(--ok) 40%, transparent)">analyzed</span>
+        <span class="prop-chip is-hover-ghost">hoverable chip</span>
+      </div>
+    </div>
+
+    <div class="cell" id="cell-inputs">
+      <h2>Inputs</h2>
+      <p class="why">radius 10px + accent-deep border today → --r-md + neutral border; focus: 3 scattered recipes → one :focus-visible double glow</p>
+      <div class="row"><span class="tag">today</span>
+        <input class="cur-input" type="text" value="Command palette input today" aria-label="current input">
+      </div>
+      <div class="row"><span class="tag">proposed</span>
+        <input class="prop-input" type="text" value="Command palette input proposed" aria-label="proposed input">
+      </div>
+      <div class="label" style="font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-faint); margin-top: var(--sp-5)">click / tab into both to compare focus</div>
+    </div>
+
+    <div class="cell" id="cell-cards">
+      <h2>Cards &amp; panels</h2>
+      <p class="why">--radius 14px legacy + scattered literals today → --r-lg 12px for glass cards, --r-md 8px for small cards</p>
+      <div class="row"><span class="tag">today</span>
+        <div class="cur-card" style="flex:1">
+          <strong style="font-size: var(--fs-md)">Feedback card</strong>
+          <p style="margin: 6px 0 0; color: var(--text-muted); font-size: var(--fs-sm)">Glass panel, 1px line-soft border, 14px radius.</p>
+        </div>
+      </div>
+      <div class="row"><span class="tag">proposed</span>
+        <div class="prop-card" style="flex:1">
+          <strong style="font-size: var(--fs-md)">Feedback card</strong>
+          <p style="margin: 6px 0 0; color: var(--text-muted); font-size: var(--fs-sm)">Glass panel, 1px line-soft border, --r-lg 12px.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell" id="cell-selects">
+      <h2>Selects</h2>
+      <p class="why">native chrome, inconsistent radius (6px vs 10px across 7 instances) → appearance:none + inline SVG caret + --r-md, focus glow like inputs</p>
+      <div class="row"><span class="tag">today</span>
+        <select class="cur-select" aria-label="current select">
+          <option>Reader perspective</option>
+          <option>Director</option>
+        </select>
+        <select class="cur-select" aria-label="current select 2" style="border-radius: var(--radius-sm)">
+          <option>Switch draft</option>
+        </select>
+      </div>
+      <div class="row"><span class="tag">proposed</span>
+        <span class="prop-select-wrap">
+          <select class="prop-select" aria-label="proposed select">
+            <option>Reader perspective</option>
+            <option>Director</option>
+          </select>
+        </span>
+        <span class="prop-select-wrap">
+          <select class="prop-select" aria-label="proposed select 2">
+            <option>Switch draft</option>
+          </select>
+        </span>
+        <select class="prop-select" aria-label="proposed disabled select" disabled>
+          <option>disabled</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="cell" id="cell-scrollbars">
+      <h2>Scrollbars</h2>
+      <p class="why">10px mono-color thumbs on 11 surfaces today → pill-radius thumb, accent 30% → 45% on hover (works in both themes via tokens)</p>
+      <div class="row"><span class="tag">today</span>
+        <div class="cur-scroll" role="region" aria-label="current scrollbar demo" tabindex="0">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+      <div class="row"><span class="tag">proposed</span>
+        <div class="prop-scroll" role="region" aria-label="proposed scrollbar demo" tabindex="0">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="legend">Ladder mapping: pill 999px ← 999px×33 + 99px×2 · --r-lg 12px ← 12px×2, 14px legacy, 16px editor · --r-md 8px ← 8/10/6px · --r-sm 4px ← 4/3px · --r-xs 2px ← 2px + odd folds. Exempt: river-read speech-bubble tail (22/22/22/6, single-use expressive shape). <span class="note">This page is the sign-off instrument — the proposed values become the R2 implementation tokens.</span></p>
+
+  <script>
+    const t = document.getElementById('theme-toggle');
+    t.addEventListener('click', () => {
+      const dawn = document.body.classList.toggle('dawn');
+      t.setAttribute('aria-pressed', dawn);
+      t.textContent = dawn ? 'Switch to night' : 'Switch to dawn';
+    });
+  </script>
+</body>
+</html>
