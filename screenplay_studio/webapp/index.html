@@ -9,9 +9,14 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b338">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b340">
 </head>
 <body data-room="cowrite">
+
+<!-- a11y (WCAG 2.4.1 Bypass Blocks): the shelf, the project bar and the desk
+     toolbar all precede the manuscript in the tab order. This jumps straight
+     to the writing surface. It is off-screen until focused. -->
+<a class="skip-link" href="#main">Skip to the writing surface</a>
 
 <div id="error-banner" class="error-banner" style="display:none;">
   <span id="error-banner-text"></span>
@@ -76,7 +81,7 @@
   <button id="sidebar-edge-tab" class="sidebar-edge-tab" type="button" title="Open the sidebar">☰ Shelf</button>
 
   <!-- Center -->
-  <main id="main">
+  <main id="main" tabindex="-1">
 
     <!-- Welcome — the room at night -->
     <section id="welcome-view" class="view">
@@ -750,7 +755,7 @@
 </div>
 
 <script src="core.js?v=hx1b112"></script>
-<script src="app.js?v=hx1b338"></script>
+<script src="app.js?v=hx1b340"></script>
 <div id="river-current" aria-hidden="true"></div>
 <div class="dawn-wash" aria-hidden="true"></div>
 </body>

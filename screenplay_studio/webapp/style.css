@@ -280,21 +280,31 @@ body.dawn {
   --paper-muted: #6b6150;
 
   --text: #26242e;
-  --text-muted: #75707f;
-  --text-faint: #9a95a5;
+  /* a11y (WCAG 1.4.3): dawn's text tiers were tuned against white (#fff..)
+     but the darkest dawn surface is the --ink-950 body #f1ede4, where
+     #75707f scored 4.10 and #9a95a5 only 2.49 — both hard AA fails.
+     Re-tuned against #f1ede4: muted 5.38, faint 4.75 (faint stays lighter). */
+  --text-muted: #635e6b;
+  --text-faint: #6b6675;
 
   --lamp: #6b5ce6;
   --lamp-bright: #8578f0;
   --lamp-deep: #5a4dcc;
-  --consult: #3ab8d8;
-  --consult-deep: #2a9aba;
-  --sev-mid: #a06a20;
+  /* a11y (WCAG 1.4.3 / 1.4.11): on the #f1ede4 body these were cyan 1.99 and
+     amber 3.93 — failing the 4.5:1 text floor (sev-mid is used as text 7x) and,
+     for the cyan, even the 3:1 non-text floor. Re-tuned: consult 4.84,
+     consult-deep 5.83, sev-mid 5.06. */
+  --consult: #15708a;
+  --consult-deep: #0f6379;
+  --sev-mid: #8a5a14;
 
-  --accent2: #3ab8d8;
+  --accent2: #15708a;
 
   --danger: #9c3527; /* was #c94a5a (Nocta dawn) — fails WCAG AA on dawn's light surfaces (3.43–4.48); zAI's a11y bump passes (5.23+) */
   --danger-bg: rgba(156, 53, 39, 0.12);
-  --ok: #2eb87a;
+  /* a11y (WCAG 1.4.3): #2eb87a scored 2.18 on the #f1ede4 body, and --ok is
+     used as a TEXT colour in 14 places. #14784a scores 4.71. */
+  --ok: #14784a;
   --ok-bg: rgba(90, 122, 73, 0.12);
 }
 
@@ -775,6 +785,35 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   flex-direction: column;
   background: var(--ink-950);
 }
+
+/* a11y (WCAG 2.4.1 Bypass Blocks): off-screen until focused, then it drops
+   into view at the top-left. Colours come from the ink/text tiers so the pair
+   stays AA in BOTH themes (the lamp-on-ink pairs do not). */
+.skip-link {
+  position: absolute;
+  left: 10px;
+  top: -80px;
+  z-index: 9999;
+  padding: 10px 16px;
+  background: var(--ink-800);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--lamp);
+  outline-offset: 2px;
+}
+/* the skip TARGET must not paint a full-viewport ring — the link's own focus
+   ring already signals the action and the focus lands on the content */
+#main:focus { outline: none; }
 
 .view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
@@ -2084,7 +2123,11 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 }
 .history-item:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); }
 .history-item.current { background: color-mix(in oklab, var(--accent) 20%, transparent); }
-.history-num { color: var(--lamp); font-size: 11px; font-family: var(--font-mono); flex-shrink: 0; letter-spacing: 0.04em; }
+/* a11y (WCAG 1.4.3): this 11px ordinal was the ONLY place --lamp was used as
+   text. Dawn's lamp scores 4.18 on the #f1ede4 body (under the 4.5 text floor)
+   and darkening the lamp token would break the dark-ink-on-lamp button pair,
+   so the ordinal uses the muted tier instead — it is metadata, not an accent. */
+.history-num { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); flex-shrink: 0; letter-spacing: 0.04em; }
 .history-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; opacity: 0.92; }
 
 /* ---- feedback room ---- */
