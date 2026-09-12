@@ -240,6 +240,13 @@ def main() -> None:
             # wake the chrome before the top-bar click (same pattern)
             page.mouse.move(700, 20)
             page.locator("#room-cowrite-btn").click()
+            # The script room auto-collapses the shelf (wireframe contract: the
+            # manuscript owns the room, no permanent left nav). Reopen it from
+            # its edge tab before hovering a control that lives inside it.
+            shelf_tab = page.locator("#sidebar-edge-tab")
+            if shelf_tab.is_visible():
+                shelf_tab.click()
+                page.wait_for_timeout(350)
             page.locator("#ideas-trigger").hover()
             page.wait_for_timeout(300)
             page.locator("#new-idea-btn").click()

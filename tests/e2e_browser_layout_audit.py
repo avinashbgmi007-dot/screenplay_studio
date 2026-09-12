@@ -73,10 +73,15 @@ def main():
             )
             dead = page.evaluate(
                 """(vars) => {
+                  // --badge-h is assigned per-element by JS on .branch-badge
+                  // (hue of the branch pill) — it never lives on :root/body,
+                  // so it is legitimately absent from the global cascade.
+                  const jsSet = new Set(['--badge-h']);
                   const bad = [];
                   const root = getComputedStyle(document.documentElement);
                   const body = getComputedStyle(document.body);
                   for (const v of vars) {
+                    if (jsSet.has(v)) continue;
                     const val = root.getPropertyValue(v) || body.getPropertyValue(v);
                     if (!val.trim()) bad.push(v);
                   }
@@ -159,17 +164,18 @@ def main():
                 CHECKS.ok("status strip items vertically aligned",
                           spread <= 2, f"top spread {spread:.1f}px")
 
-            # ---- 5. sidebar edge alignment ---------------------------------
-            # The app shell is [sidebar | main]: status strip belongs to the
-            # MAIN column (x = sidebar width), not to the sidebar. Its left
-            # edge must equal the main column's left edge.
-            sidebar = measure(page, "#sidebar")
+            # ---- 5. status strip span --------------------------------------
+            # WIREFRAME CONTRACT (States 1/4/5): "Status strip x:0-1440,
+            # 1440 x 28". It spans the FULL viewport — under the (now-overlay)
+            # shelf and under the manuscript column. It no longer starts at
+            # the main column's left edge, so the old [sidebar|main] check is
+            # obsolete.
             status = measure(page, "#status-strip")
-            if sidebar and status:
-                CHECKS.ok("status strip starts at main column",
-                          approx(status["x"], sidebar["x"] + sidebar["width"], 2),
-                          f"main.x={sidebar['x'] + sidebar['width']:.1f} "
-                          f"status.x={status['x']:.1f}")
+            if status:
+                CHECKS.ok("status strip spans full viewport",
+                          approx(status["x"], 0, 2)
+                          and approx(status["width"], 1440, 2),
+                          f"status x={status['x']:.1f} w={status['width']:.1f}")
 
             # ---- 6. viewport fit ------------------------------------------
             for sel in ["#sidebar", "#status-strip", "#welcome-view", "#app"]:
@@ -217,24 +223,29 @@ def main():
                 # auto-hide chrome: wake before measuring project-bar bits
                 page.mouse.move(10, 400)
                 page.wait_for_timeout(400)
-                ws = measure(page, "#script-pane")
+                # NOTE: the live manuscript row is .manuscript-workspace-layout
+                # ([44px scene index | manuscript column]). The legacy
+                # #script-pane/.desk pair is `display:none` outside idea-mode
+                # (body:not(.idea-mode) .desk), so measuring it always yields
+                # 0x0 — that was a dead-container false alarm, not a layout bug.
+                ws = measure(page, ".manuscript-workspace-layout")
                 si = measure(page, "#scene-index")
                 toolbar = measure(page, "#desk-toolbar")
                 if toolbar and ws:
-                    CHECKS.ok("toolbar above script pane",
+                    CHECKS.ok("toolbar above manuscript row",
                               toolbar["y"] + toolbar["height"] <= ws["y"] + 4,
                               f"toolbar bottom "
                               f"{toolbar['y'] + toolbar['height']:.1f} "
-                              f"vs script top {ws['y']:.1f}")
-                # scene index may legitimately be an overlay; check it stays
-                # inside the workspace column when open
+                              f"vs row top {ws['y']:.1f}")
+                # the 44px scene index is the row's first child; it must sit
+                # inside the workspace row
                 if ws and si:
-                    CHECKS.ok("scene index within script pane bounds",
+                    CHECKS.ok("scene index within manuscript row",
                               si["x"] >= ws["x"] - 1
                               and si["x"] + si["width"]
                               <= ws["x"] + ws["width"] + 1,
                               f"index x={si['x']:.1f} w={si['width']:.1f} vs "
-                              f"pane x={ws['x']:.1f} w={ws['width']:.1f}")
+                              f"row x={ws['x']:.1f} w={ws['width']:.1f}")
 
             CHECKS.ok("no JS page errors", len(errors) == 0,
                       "; ".join(errors[:3]))

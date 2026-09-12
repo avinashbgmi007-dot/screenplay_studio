@@ -39,6 +39,13 @@ def run(base):
               and page.locator("#idea-list").count() == 1)
 
         def new_idea():
+            # The writing surfaces auto-collapse the shelf (wireframe contract:
+            # the page owns the room, "no permanent left navigation"). Reopen
+            # it from its edge tab before reaching for a control inside it.
+            tab = page.locator("#sidebar-edge-tab")
+            if tab.is_visible():
+                tab.click()
+                page.wait_for_timeout(350)
             page.locator("#new-idea-btn").click()
             page.wait_for_timeout(400)
 
@@ -98,7 +105,13 @@ def run(base):
               not any(k in r3 for k in ("brass key", "courier", "midnight")), r3[:140])
 
         # ================= SHELF DELETE ========================================
-        # the shelf lives in a collapsed sidebar flyout now -- open it first
+        # the shelf lives in a collapsed sidebar flyout now -- open it first.
+        # (The idea room also auto-collapses the whole shelf, per the wireframe
+        # contract's "no permanent left navigation", so bring it back first.)
+        tab = page.locator("#sidebar-edge-tab")
+        if tab.is_visible():
+            tab.click()
+            page.wait_for_timeout(400)
         page.locator("#ideas-trigger").hover()
         page.wait_for_timeout(400)
         row = page.locator(".idea-item").first

@@ -74,6 +74,13 @@ def run(base):
         check("mic chip still rides the idea page", geo["mic"])
 
         # ---- Bug 3: each trigger opens ITS OWN flyout, no dead zones -------
+        # The wireframe pass made the writing surfaces (script AND idea) drop
+        # the shelf so the page owns the full void — contract State 2/4: "no
+        # permanent left navigation". Reopen it from its edge tab before
+        # exercising the flyouts that live inside it.
+        page.locator("#sidebar-edge-tab").click()
+        page.wait_for_timeout(450)
+
         def center(sel):
             b = page.locator(sel).bounding_box()
             return b["x"] + b["width"] / 2, b["y"] + b["height"] / 2

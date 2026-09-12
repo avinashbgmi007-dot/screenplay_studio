@@ -886,13 +886,16 @@ function toggleRail(collapsed) {
 }
 
 // collapsible left sidebar (the shelf) — same pattern as the structure rail
-function toggleSidebar(collapsed) {
+// persist=false: the auto-collapse the writing environment performs when a
+// project/idea opens must NOT overwrite the writer's own shelf preference —
+// the landing desk still opens with the shelf exactly as they left it.
+function toggleSidebar(collapsed, persist = true) {
   const sidebar = $("#sidebar");
   const edgeTab = $("#sidebar-edge-tab");
   if (!sidebar) return;
   sidebar.classList.toggle("sidebar-collapsed", collapsed);
   if (edgeTab) edgeTab.classList.toggle("visible", collapsed);
-  savePrefs({ sidebar_collapsed: collapsed });
+  if (persist) savePrefs({ sidebar_collapsed: collapsed });
 }
 
 // ---------- writer's library (past work the personas can draw on) ----------
@@ -1032,6 +1035,8 @@ function showWelcomeDesk() {
   $("#welcome-view").style.display = "flex";
   $("#project-bar").style.display = "none";
   $("#idea-canvas").style.display = "none";
+  // the landing desk restores the writer's own shelf preference
+  toggleSidebar(!!loadPrefs().sidebar_collapsed, false);
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "none";
   hideAllViews();
@@ -1121,6 +1126,9 @@ async function openIdea(id) {
 
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "flex";
+    // the idea canvas is a writing surface too — same rule as openProject:
+    // the shelf is not permanent here either (the edge tab brings it back)
+    toggleSidebar(true, false);
     setRoom("cowrite");
     closeRoomDrawer(); // Sameer stays OFF the stage until the writer summons him
     saveSession();
@@ -1801,6 +1809,9 @@ function goHome() {
   hideAllViews();
   $("#welcome-view").style.display = "flex";
   $("#project-bar").style.display = "none";
+  // back at the landing desk: restore the shelf exactly as the writer left
+  // it (the writing environment's auto-collapse is never persisted)
+  toggleSidebar(!!loadPrefs().sidebar_collapsed, false);
   const input = $("#input");
   if (input) input.value = "";
   try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
@@ -1843,6 +1854,12 @@ async function openProject(name) {
     $("#welcome-view").style.display = "none";
     const ws = document.querySelector(".workspace");
     if (ws) ws.style.display = "flex";
+    // WIREFRAME ALIGNMENT — the writing environment has no permanent left
+    // navigation: the shelf slides away so the Scene Index owns x:0-44 and
+    // the 700px manuscript column can centre on the viewport. Not persisted
+    // (persist=false) — the landing desk keeps the writer's shelf preference,
+    // and the edge tab brings the shelf back at any time.
+    toggleSidebar(true, false);
     $("#project-bar").style.display = "flex";
     $("#project-title").textContent = project.title;
     $("#project-title").title = project.title;
@@ -4083,6 +4100,12 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
   const head = el("div", "scene-page-head");
   head.appendChild(el("span", "scene-page-num", `Scene ${scene.scene_number}`));
   const heading = el("span", "scene-heading-line", scene.heading_raw);
+  // a11y (WCAG 1.3.1 Info and Relationships): the scenes are one continuous
+  // column now (no card chrome), so the slug line is the only programmatic
+  // boundary left between scenes — expose it as a heading so screen-reader
+  // users can navigate scene by scene.
+  heading.setAttribute("role", "heading");
+  heading.setAttribute("aria-level", "2");
   if (searchQuery) highlightMatches(heading, scene.heading_raw, searchQuery);
   head.appendChild(heading);
   if (scene.page_estimate) {

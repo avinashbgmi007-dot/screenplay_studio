@@ -104,7 +104,11 @@ def run():
                       page.locator("#composer").count() == 1)
 
             # project view closes the partner drawer by design — summon Sameer
-            page.locator("#gutter-sam").click()
+            # (the 56px right-edge gutter was retired in the wireframe pass:
+            # the contract allows ONE right-edge hit area. The project bar's
+            # Co-write toggle is bound to the SAME openCowriteRoom handler the
+            # gutter-sam tab used, so it is the canonical replacement.)
+            page.locator("#room-cowrite-btn").click()
             drawer_cls = ""
             for _ in range(20):
                 drawer_cls = page.locator("#room-drawer").get_attribute("class") or ""

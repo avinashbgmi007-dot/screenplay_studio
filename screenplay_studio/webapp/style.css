@@ -364,20 +364,30 @@ body::before {
 /* ---- Sidebar: the shelf ---- */
 
 #sidebar {
+  /* WIREFRAME ALIGNMENT — the contract's hard constraint is "no permanent
+     left navigation": the writing surface must own the full 1440px so the
+     700px manuscript column can centre on the viewport (State 4 x:388-1088).
+     The shelf therefore leaves the flex flow and becomes a summoned overlay,
+     exactly like the Context Dock: it still slides in, it just never eats
+     the manuscript's column. It stops above the 28px global status strip. */
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 28px;
+  z-index: var(--z-drawer);
   width: var(--sidebar-w);
-  flex-shrink: 0;
   overflow-y: auto;
   min-height: 0;
   background:
     repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 5px),
     linear-gradient(180deg, var(--ink-900), var(--ink-950));
   border-right: 1px solid var(--line-soft);
+  box-shadow: 18px 0 46px var(--shadow-a35);
   display: flex;
   flex-direction: column;
   padding: 18px 14px 14px;
   gap: 14px;
-  position: relative;
-  transition: width 0.25s ease;
+  transition: width 0.25s ease, box-shadow 0.25s ease;
 }
 
 /* collapsible sidebar (same pattern as the structure rail) */
@@ -405,6 +415,7 @@ body::before {
   padding: 0;
   overflow: hidden;
   border-right: none;
+  box-shadow: none;
 }
 #sidebar.sidebar-collapsed > * { display: none; }
 #sidebar.sidebar-collapsed .sidebar-toggle { display: none; }
@@ -861,10 +872,17 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 
 #welcome-view {
   position: relative;
-  overflow: hidden;
+  /* WIREFRAME ALIGNMENT — the landing is a quiet doorway, not a clipped
+     box: overflow:hidden + 90px bottom padding made the last 31px of the
+     desk unreachable at 1440x900 (scrollHeight 906 vs clientHeight 875).
+     It scrolls now, and `safe center` keeps the group centred when there
+     is room without pushing its top out of reach when there isn't. */
+  overflow-y: auto;
+  overflow-x: hidden;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px 90px;
+  justify-content: safe center;
+  padding: 28px 24px 16px;
 }
 
 /* (Phase 12: the literal desk lamp + its glow field are retired —
@@ -904,11 +922,15 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .welcome-card {
   position: relative;
   z-index: 2;
-  width: min(560px, 86%);
+  /* WIREFRAME ALIGNMENT — State 1: "Main landing content centered ~680px
+     wide". At 560 the doorway read as a small ticket rather than the
+     room's front door; 720 gives a 660px content column (≈ the contract's
+     680 once the card's 30px gutters are counted). */
+  width: min(720px, 92%);
   background: var(--paper);
   color: var(--paper-ink);
   border-radius: 4px;
-  padding: 34px 38px 30px;
+  padding: 34px 30px 30px;
   box-shadow: var(--shadow-paper);
 }
 .welcome-card::before {
@@ -951,7 +973,16 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 }
 
 #dropzone {
-  display: block;
+  /* WIREFRAME ALIGNMENT — State 1: "Upload/dropzone centered ~680 × 180px".
+     The dashed target is the doorway's single job, so it gets a 150px target
+     instead of the old 104px slip (a full 180 would push the "On the desk"
+     grid past the 1440x900 fold); flex centring keeps the icon + caption
+     optically centred at any width. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
   border: 1.5px dashed rgba(43, 36, 27, 0.35);
   border-radius: 6px;
   padding: 22px;
@@ -1163,24 +1194,22 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .scene-page {
   width: 100%;
   max-width: 700px;
-  background: linear-gradient(180deg, var(--paper-2), var(--paper));
+  /* WIREFRAME ALIGNMENT — contract §State 4: "Manuscript is a continuous
+     surface, never scene cards. No page-stack metaphor." The per-scene card
+     chrome is gone: flat paper (a per-page gradient restarts at every seam
+     and reads as banding), square corners, no drop shadow, no resting tilt.
+     With #manuscript-container's gap at 0 the scenes butt together into ONE
+     unbroken 700px cream column. */
+  background: var(--paper);
   color: var(--paper-ink);
-  border-radius: 3px;
-  box-shadow: 0 18px 44px -18px var(--shadow-a60), 0 2px 8px var(--shadow-a30);
-  padding: 26px 32px 30px;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 24px 32px 26px;
   position: relative;
-  transform: rotate(var(--tilt, -0.3deg));
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.scene-page::before {
-  content: "";
-  position: absolute; inset: 10px;
-  border: 1px solid rgba(43, 36, 27, 0.10);
-  border-radius: 2px;
-  pointer-events: none;
-}
-.scene-page:hover { transform: rotate(0deg); }
-.scene-page:nth-child(even) { --tilt: 0.4deg; }
+/* (Phase 12/WA: the inset hairline frame was the card's tell — retired with
+   the card. river-read re-declares its own border on the dark surface.) */
+.scene-page::before { display: none; }
 .scene-page.hidden { display: none; }
 
 .scene-page-head {
@@ -1271,7 +1300,12 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   transition: border-color 0.12s ease;
 }
 .finding-note:hover { border-left-color: var(--accent); }
-.finding-note.sev-medium { border-left-color: var(--accent); }
+/* WIREFRAME ALIGNMENT — the finding rail encodes severity, so it must use the
+   pinned severity ramp, not the room accent. .sev-medium borrowed var(--accent)
+   (violet in the writing room, cyan in the feedback room) and there was no
+   .sev-high rule at all. Now high=danger, medium=--sev-mid, low=--ok. */
+.finding-note.sev-high { border-left-color: var(--danger); }
+.finding-note.sev-medium { border-left-color: var(--sev-mid); }
 .finding-note.sev-low { border-left-color: var(--ok); }
 .finding-note.addressed { opacity: 0.45; border-left-color: var(--ok); }
 .finding-note-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }
@@ -2698,7 +2732,12 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   min-height: 0;
   position: relative;
   padding: 22px 28px 70px;
-  max-width: 860px;
+  /* WIREFRAME ALIGNMENT — State 2: "Idea page x:380-1060 ... 680 x 720".
+     A 680px page matches the contract and the 700px manuscript column, so
+     the idea phase and the script phase share one measure; 720px caps the
+     page height to the contract's page (the void around it stays void). */
+  max-width: 680px;
+  max-height: 720px;
   margin: 0 auto;
   width: 100%;
 }
@@ -3208,9 +3247,9 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
     display: none !important;
   }
   #manuscript-workspace { display: block !important; }
-  /* the row's 56px gutter clearance is screen chrome, not paper — the
+  /* the row's scene-index reservation is screen chrome, not paper — the
      printed column must stay centred on the full sheet */
-  .manuscript-workspace-layout { margin-right: 0; }
+  .manuscript-workspace-layout { margin-right: 0; padding-left: 0; }
   body::before, body::after { display: none !important; }
 
   #main { padding: 0 !important; margin: 0 !important; }
@@ -3418,13 +3457,13 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   animation: scene-flash 1.4s ease;
 }
 @keyframes scene-flash {
-  0%   { box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 60%, transparent), 0 18px 44px -18px var(--shadow-a60); }
-  60%  { box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent), 0 18px 44px -18px var(--shadow-a60); }
-  100% { box-shadow: 0 18px 44px -18px var(--shadow-a60), 0 2px 8px var(--shadow-a30); }
+  0%   { box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 60%, transparent); }
+  60%  { box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent); }
+  100% { box-shadow: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scene-page.flash { animation: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 60%, transparent), 0 18px 44px -18px var(--shadow-a60); }
+  .scene-page.flash { animation: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 60%, transparent); }
 }
 
 /* resizable script pane — drag the divider to resize the script pane */
@@ -3510,7 +3549,12 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .rail-edge-tab:hover { color: var(--accent); border-color: var(--accent-deep); }
-#struct-rail.rail-collapsed + .rail-edge-tab { display: block; }
+/* WIREFRAME ALIGNMENT — dead chrome. #struct-rail is display:none globally
+   (Phase 13 retired it; the Stash + margin notes moved into the Context
+   Dock), so this tab could never summon anything — yet it was VISIBLE on
+   load at the main column's left edge (x=264), a stray pill with no job.
+   The reveal rule is gone; the tab never renders. */
+.rail-edge-tab { display: none; }
 
 /* ============================================================
    Manuscript Stage — the partner drawer + the right-edge gutter
@@ -3521,19 +3565,39 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 
 .drawer {
   position: absolute;
-  top: 0; right: 56px; bottom: 0;
+  /* WIREFRAME ALIGNMENT — the 56px right offset reserved space for the
+     partner gutter, which is now retired (display:none). At right:56px the
+     closed drawer (translateX 110% of 380 = 418) landed at x=1422, leaving
+     an 18px sliver on-screen that intercepted every click aimed at the
+     right-edge affordance (x:1408-1440). Anchor flush to the edge so the
+     closed drawer sits fully off-canvas, and guard pointer events as a
+     belt-and-suspenders against any future sliver. */
+  top: 0; right: 0; bottom: 0;
   width: 380px;
   max-width: calc(100vw - 140px);
   background: var(--ink-900);
   border-left: 1px solid var(--line-soft);
   box-shadow: -18px 0 46px var(--shadow-a35);
   transform: translateX(110%);
-  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1);
+  /* a11y (WCAG 2.4.3 Focus Order): transform + pointer-events alone leave the
+     closed panel's buttons in the TAB ORDER — a keyboard user could Tab into
+     an invisible partner chat. visibility:hidden removes it from focus and the
+     a11y tree; the 0.28s delay lets the slide-out finish first. */
+  visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1),
+              visibility 0s linear 0.28s;
   z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;
+  pointer-events: none;
 }
-.drawer.open { transform: translateX(0); }
+.drawer.open {
+  transform: translateX(0);
+  pointer-events: auto;
+  visibility: visible;
+  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1),
+              visibility 0s linear 0s;
+}
 
 .drawer-head {
   display: flex;
@@ -3595,11 +3659,18 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .drawer .partner-name { display: none; }
 
 .gutter {
+  /* WIREFRAME ALIGNMENT — the contract gives the right edge ONE 32px hit
+     area (State 4, x:1408-1440) that summons the Context Dock; the dock's
+     lens tabs then switch Sameer / Sushruta / Evidence. This 56px strip was
+     a THIRD, older partner switcher duplicating both the project bar's
+     Co-write/Feedback toggle and the dock lenses — and it sat exactly on
+     top of the affordance once the row stopped reserving 56px for it.
+     Retired: partners are reached from the project bar or the dock. */
+  display: none;
   position: absolute;
   top: 0; right: 0; bottom: 0;
   width: 56px;
   z-index: var(--z-above-drawer);
-  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -3819,14 +3890,19 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 4px 16px;
+  /* WIREFRAME ALIGNMENT — contract: "Status strip 28px", full width, at
+     y:872-900. It measured 25.3px from the 4px vertical padding + 10.5px
+     line; pinned to exactly 28px and made the global bottom chrome (the
+     sidebar stops above it). */
+  padding: 0 16px;
   border-top: 1px solid var(--line-soft);
   background: var(--ink-900);
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--text-faint);
-  flex: 0 0 auto;
-  min-height: 24px;
+  flex: 0 0 28px;
+  height: 28px;
+  min-height: 28px;
 }
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px; }
 .status-item.ok { color: var(--desk-ok); }
@@ -4206,7 +4282,10 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 
 .dashboard {
   width: min(860px, 92%);
-  margin: 26px auto 40px;
+  /* WIREFRAME ALIGNMENT — trimmed top/bottom from 26/40 so the doorway's
+     tall dropzone target does not push the "On the desk" grid needlessly
+     far below the fold at 1440x900. */
+  margin: 16px auto 0;
   position: relative;
   z-index: 2;
 }
@@ -4318,7 +4397,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 /* how-it-works strip */
 .dash-how {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px; margin-top: 20px;
+  gap: 12px; margin-top: 12px;
 }
 .how-step {
   border: 1px dashed var(--desk-line-dim);
@@ -5053,6 +5132,10 @@ body:not(.dawn) .status-strip {
 #manuscript-workspace {
   display: none;
   flex: 1;
+  /* a11y/layout (WCAG 1.4.10 Reflow): as a row-flex item inside .workspace it
+     defaulted to min-width:auto and held the whole manuscript row at its
+     min-content (~1129px), overflowing a 1000px viewport. */
+  min-width: 0;
   min-height: 0;
   position: relative;
 }
@@ -5071,20 +5154,29 @@ body:not(.idea-mode) #manuscript-workspace {
 #desk-toolbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  /* Phase 13: every legacy #script-toolbar control rides this one row —
-     the wrap decision sums the items' flex-BASIS (not their shrunk
-     sizes), so the bases are budgeted: 8 gaps + the tool cluster stay
-     under the 1088px content box at 1440 (see the P13 gate). */
+  /* WIREFRAME ALIGNMENT — contract: "Desk toolbar 700 × 40px", and State 4
+     puts it at y:20-60. The height is now pinned to exactly 40px on desktop
+     (it measured 47 with the old 8/6 vertical padding). The row keeps its
+     one-line budget at 1440; narrow desks re-wrap in the ≤900px block. */
+  flex-wrap: nowrap;
+  height: 40px;
   gap: 8px;
-  padding: 8px 16px 6px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--ink-950);
   min-height: 40px;
-  /* Phase 13: the row carries the tools now — keep them clear of the
-     partner gutter's 56px strip (same clearance the workspace row uses) */
-  margin-right: 56px;
+  /* a11y (WCAG 2.1.1 Keyboard / 1.4.10 Reflow): with nowrap the row overflows
+     between ~901px and ~1100px. Without a scroll affordance the right-most
+     controls were clipped and unreachable by mouse AND keyboard. Scroll them
+     into reach instead of hiding them. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
+#desk-toolbar::-webkit-scrollbar { height: 4px; }
+#desk-toolbar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+#desk-toolbar::-webkit-scrollbar-track { background: transparent; }
 .desk-analyze {
   font-weight: 600;
 }
@@ -5179,7 +5271,10 @@ body:not(.idea-mode) #manuscript-workspace {
 /* the diff chips sit under the desk toolbar now (was the hidden legacy row) */
 #manuscript-workspace > .diff-banner { margin: 0 16px 8px; }
 @media (max-width: 900px) {
-  #desk-toolbar { padding: 6px 10px; margin-right: 0; }
+  /* narrow desks: the one-line 40px budget can't hold the tools — let the
+     row wrap again and grow past the contract height (height is a desktop
+     reference; a wrapped 40px row would clip controls) */
+  #desk-toolbar { padding: 6px 10px; margin-right: 0; flex-wrap: wrap; height: auto; }
   .desk-analyze-progress { flex: 1 1 100%; }
   .desk-analyze-status { flex: 1 1 100%; white-space: normal; }
   #desk-toolbar .desk-drafts { margin-left: 0; }
@@ -5189,11 +5284,18 @@ body:not(.idea-mode) #manuscript-workspace {
   flex: 1;
   min-height: 0;
   position: relative;
-  /* the partner gutter owns the last 56px of the app's right edge — the
-     dock and its edge tab live inside the true usable row, clear of the
-     gutter tabs (mirrors .drawer's right: 56px). Under 900px the gutter
-     hides and the row reclaims the strip. */
-  margin-right: 56px;
+  /* WIREFRAME ALIGNMENT — State 4: the Scene Index owns x:0-44 and the 700px
+     manuscript column centres in the space to its right. Reserving the 44px
+     here (in place of the retired 56px partner-gutter clearance) is what
+     lands the column on the contract's x:388-1088 with the dock closed, and
+     x:202-902 with it open (the dock claims its own 380px). The old
+     margin-right:56px pushed the column 24px right of contract. */
+  padding-left: 44px;
+  /* a11y/layout (WCAG 1.4.10 Reflow): as a flex item this row defaulted to
+     min-width:auto, so at <~1130px it refused to shrink and pushed the whole
+     row (and the absolutely-positioned right-edge affordance) past the
+     viewport edge — the affordance became unclickable at 1000px. */
+  min-width: 0;
   /* Phase 13: the Problem Board lives in this row now, and its collapsed
      state is translateX(105%) — without a clip its left edge lands 15px
      past the row (a 41px full-height strip bleeding into the transparent
@@ -5210,7 +5312,9 @@ body:not(.idea-mode) #manuscript-workspace {
   transform: translateX(calc(100% + 380px));
 }
 @media (max-width: 900px) {
-  .manuscript-workspace-layout { margin-right: 0; }
+  /* tablet/mobile hide the scene index (contract §Responsive) — its 44px
+     reservation goes with it so the manuscript takes the full width */
+  .manuscript-workspace-layout { margin-right: 0; padding-left: 0; }
 }
 #scene-index {
   position: absolute;
@@ -5252,6 +5356,10 @@ body:not(.idea-mode) #manuscript-workspace {
   display: flex;
   align-items: center;
   padding: 4px 6px;
+  /* a11y (WCAG 2.5.8 Target Size, Minimum): the 11px label + 4px padding
+     measured ~23px tall. 24px clears the AA target floor. */
+  min-height: 24px;
+  box-sizing: border-box;
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -5303,10 +5411,24 @@ body:not(.idea-mode) #manuscript-workspace {
   background: var(--danger);
 }
 .scene-index-dots .dot.medium {
-  background: var(--lamp);
+  /* WIREFRAME ALIGNMENT — severity must be a STABLE semantic signal. This dot
+     used var(--lamp) (the room accent), so a medium finding was VIOLET in the
+     writing room and CYAN in the feedback room. It now uses the pinned amber
+     middle tier, the same token .sev-badge.sev-medium uses. */
+  background: var(--sev-mid);
 }
 .scene-index-dots .dot.low {
   background: var(--ok);
+}
+/* a11y/contract ("Severity must never depend on color alone"): the three rail
+   dots also differ in SHAPE, so severity survives greyscale and colour-blind
+   viewing — high = disc, medium = rounded square, low = hollow ring. */
+.scene-index-dots .dot.high { border-radius: 50%; }
+.scene-index-dots .dot.medium { border-radius: 1px; }
+.scene-index-dots .dot.low {
+  background: transparent;
+  border: 1.5px solid var(--ok);
+  box-sizing: border-box;
 }
 .scene-index-empty {
   padding: 12px 6px;
@@ -5316,14 +5438,25 @@ body:not(.idea-mode) #manuscript-workspace {
 }
 #manuscript-container {
   flex: 1;
+  /* a11y/layout (WCAG 1.4.10 Reflow): without min-width:0 this flex item
+     could not shrink below its min-content (~1085px), so the manuscript row
+     overflowed the viewport on tablet widths. Now it shrinks and the page
+     column re-centres. */
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 28px;
+  /* WIREFRAME ALIGNMENT — the 28px inter-card gap is what made the pages
+     read as separate cards. At 0 the scenes form one continuous sheet; the
+     non-scene blocks (craft shelf, script-level notes, empty hint) keep
+     their own breathing room below. */
+  gap: 0;
 }
+#manuscript-container > :not(.scene-page) { margin-bottom: 16px; }
 /* focusable scroll container (`s` focuses the manuscript) — no ring, the
    whole pane is the surface */
 #manuscript-container:focus { outline: none; }
@@ -5343,20 +5476,42 @@ body:not(.idea-mode) #manuscript-workspace {
   border-left: none;
   display: flex;
   flex-direction: column;
-  transition: width 0.25s ease, min-width 0.25s ease;
+  /* a11y (WCAG 2.4.3 Focus Order): a 0-width overflow:hidden dock still keeps
+     its lens tabs, buttons and inputs in the TAB ORDER — a keyboard user can
+     Tab into an invisible panel. visibility:hidden removes the closed dock
+     from focus + the a11y tree; the delay lets the 0.25s collapse finish. */
+  visibility: hidden;
+  transition: width 0.25s ease, min-width 0.25s ease,
+              visibility 0s linear 0.25s;
 }
 #context-dock.open {
   width: 380px;
   min-width: 320px;
   border-left: 1px solid var(--line-soft);
   box-shadow: -14px 0 36px rgba(0, 0, 0, 0.28);
+  visibility: visible;
+  transition: width 0.25s ease, min-width 0.25s ease,
+              visibility 0s linear 0s;
 }
 /* the dock is chrome — it never prints, never rides in the idea room,
    and bows out of the power modes like the drawer does */
 body.idea-mode #context-dock,
 .spotlight-mode #context-dock,
-body.river-read #context-dock { width: 0 !important; min-width: 0 !important; border: none; box-shadow: none; }
+body.river-read #context-dock {
+  width: 0 !important; min-width: 0 !important; border: none; box-shadow: none;
+  /* ...and while it is forced to 0 width it must not stay focusable either */
+  visibility: hidden !important;
+}
 #right-edge-affordance {
+  /* WIREFRAME ALIGNMENT — State 4 gives the right edge a 32px hit area at
+     x:1408-1440 and keeps the 700px manuscript column clear of it. So the
+     affordance leaves the flex row (where its width stole 33px from the
+     column's centring box) and becomes a right-edge overlay. */
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: var(--z-chrome);
   flex: 0 0 auto;
   writing-mode: vertical-rl;
   font-family: var(--font-mono);
@@ -5370,7 +5525,6 @@ body.river-read #context-dock { width: 0 !important; min-width: 0 !important; bo
   border-radius: 10px 0 0 10px;
   padding: 16px 9px;
   cursor: pointer;
-  align-self: center;
   transition: color 0.2s ease, border-color 0.2s ease;
 }
 #right-edge-affordance:hover { color: var(--text); border-color: var(--line); }
