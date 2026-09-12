@@ -3085,6 +3085,15 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   font-size: var(--fs-body);
   padding: 1px var(--sp-1);
 }
+/* a11y (WCAG 2.4.7): the base outline:none above suppressed the global
+   :focus-visible ring with NO substitute — the weakest focus cue in the app
+   (found in the R2 primitives census, 2026-09-12). Same house border+glow
+   pattern as .idea-title-input. */
+.idea-rename-input:focus {
+  outline: none;
+  border-bottom: 1px dashed var(--accent);
+  box-shadow: 0 1px 0 0 var(--glow), 0 0 0 2px var(--glow);
+}
 .idea-rename {
   background: transparent;
   border: none;
