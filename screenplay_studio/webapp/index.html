@@ -9,7 +9,7 @@
      browsers never revalidate into a stale sheet (no-cache only revalidates
      against the browser's own copy; a versioned URL forces a fresh fetch).
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
-     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b347">
+     page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b348">
 </head>
 <body data-room="cowrite">
 
@@ -146,8 +146,8 @@
       </div>
       <div class="project-bar-right">
         <div id="room-toggle" class="room-toggle" role="tablist" aria-label="Rooms">
-          <button id="room-cowrite-btn" class="room-toggle-btn active" role="tab" aria-selected="true" type="button">Co-write</button>
-          <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" type="button">Feedback</button>
+          <button id="room-cowrite-btn" class="room-toggle-btn active" role="tab" aria-selected="true" aria-controls="cowrite-panel" type="button">Co-write</button>
+          <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" aria-controls="feedback-panel" type="button">Feedback</button>
         </div>
         <span id="room-chip" class="room-chip">Writer's Desk</span>
         <button id="palette-btn" class="palette-btn" title="Command palette (Ctrl+K)" type="button">⌘K</button>
@@ -265,18 +265,18 @@
               <button class="dock-close" id="dock-close" type="button" title="Close the dock — the page keeps the room">✕</button>
             </div>
             <div class="dock-lenses" role="tablist" aria-label="Dock lenses">
-              <button class="dock-lens-tab" id="dock-tab-evidence" role="tab" aria-selected="true" type="button">Evidence</button>
-              <button class="dock-lens-tab" id="dock-tab-sameer" role="tab" aria-selected="false" type="button">Sameer</button>
-              <button class="dock-lens-tab" id="dock-tab-sushruta" role="tab" aria-selected="false" type="button">Sushruta</button>
-              <button class="dock-lens-tab" id="dock-tab-notes" role="tab" aria-selected="false" type="button">Stash &amp; Notes</button>
+              <button class="dock-lens-tab" id="dock-tab-evidence" role="tab" aria-selected="true" aria-controls="dock-lens-evidence" type="button">Evidence</button>
+              <button class="dock-lens-tab" id="dock-tab-sameer" role="tab" aria-selected="false" aria-controls="dock-lens-sameer" type="button">Sameer</button>
+              <button class="dock-lens-tab" id="dock-tab-sushruta" role="tab" aria-selected="false" aria-controls="dock-lens-sushruta" type="button">Sushruta</button>
+              <button class="dock-lens-tab" id="dock-tab-notes" role="tab" aria-selected="false" aria-controls="dock-lens-notes" type="button">Stash &amp; Notes</button>
             </div>
             <div class="dock-body">
-              <div class="dock-lens" data-lens="evidence">
+              <div class="dock-lens" id="dock-lens-evidence" role="tabpanel" aria-labelledby="dock-tab-evidence" data-lens="evidence">
                 <!-- Phase 6: rendered by renderDockEvidence() — this hint is
                      the pre-analysis fallback and is replaced on render -->
                 <p class="dock-lens-hint">Evidence Overview — the findings ledger for the scene you're on. Run Analysis to assemble it.</p>
               </div>
-              <div class="dock-lens" data-lens="sameer" hidden>
+              <div class="dock-lens" id="dock-lens-sameer" role="tabpanel" aria-labelledby="dock-tab-sameer" data-lens="sameer" hidden>
                 <!-- Phase 7: the live #cowrite-panel conversation is ADOPTED
                      into this slot while the dock is open (portal), and
                      returned to the room panel on close. The hint is the
@@ -284,12 +284,12 @@
                 <div class="dock-chat-slot" data-chat-slot="sameer"></div>
                 <p class="dock-lens-hint dock-chat-fallback">Sameer — the co-writer beside the page. Open a project and the conversation arrives here.</p>
               </div>
-              <div class="dock-lens" data-lens="sushruta" hidden>
+              <div class="dock-lens" id="dock-lens-sushruta" role="tabpanel" aria-labelledby="dock-tab-sushruta" data-lens="sushruta" hidden>
                 <!-- Phase 7: the consultant's chat adopts into this slot -->
                 <div class="dock-chat-slot" data-chat-slot="sushruta"></div>
                 <p class="dock-lens-hint dock-chat-fallback">Dr. Sushruta — the consultant's diagnosis beside the page. Open a project and ask him anything.</p>
               </div>
-              <div class="dock-lens dock-notes-lens" data-lens="notes" hidden>
+              <div class="dock-lens dock-notes-lens" id="dock-lens-notes" role="tabpanel" aria-labelledby="dock-tab-notes" data-lens="notes" hidden>
                 <!-- Phase 13: the Stash + margin notes home. The legacy
                      structure rail (their old home) is retired — the rail was
                      globally display:none, so these features had no reachable
@@ -398,7 +398,7 @@
         </div>
 
       <!-- Co-write room: the writer's desk -->
-      <section id="cowrite-panel" class="room-panel" aria-label="Co-write">
+      <section id="cowrite-panel" class="room-panel" role="tabpanel" aria-labelledby="room-cowrite-btn">
         <div id="partner-card" class="partner-card">
           <span class="avatar">S</span>
           <span class="partner-name">Sameer — AI writing partner</span>
@@ -414,13 +414,13 @@
         <form id="composer" class="composer">
           <div id="quote-card" class="quote-card" hidden></div>
           <div id="history-pop" class="history-pop" role="listbox" aria-label="Previous messages" hidden></div>
-          <textarea id="input" placeholder="Ask about a scene, a character, a note in the margins — Sameer answers as he thinks…" rows="1"></textarea>
+          <textarea id="input" aria-label="Message Sameer" placeholder="Ask about a scene, a character, a note in the margins — Sameer answers as he thinks…" rows="1"></textarea>
           <button type="submit" id="send-btn" aria-label="Send">➤</button>
         </form>
       </section>
 
       <!-- Feedback room: the consultant's desk -->
-      <section id="feedback-panel" class="room-panel" aria-label="Feedback" style="display:none;">
+      <section id="feedback-panel" class="room-panel" role="tabpanel" aria-labelledby="room-feedback-btn" style="display:none;">
         <div class="feedback-header">
           <div>
             <div class="feedback-title">Dr. Sushruta's Report</div>
@@ -574,7 +574,7 @@
           </div>
           <div id="fv-consult-messages" class="fv-messages"></div>
           <form id="fv-consult-composer" class="fv-composer">
-            <input id="fv-consult-input" type="text" placeholder="Ask Dr. Sushruta..." class="inp">
+            <input id="fv-consult-input" type="text" aria-label="Message Dr. Sushruta" placeholder="Ask Dr. Sushruta..." class="inp">
             <button type="submit" class="btn-primary btn-small">&raquo;</button>
           </form>
         </div>
@@ -642,21 +642,21 @@
 <div id="settings-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" style="display:none;">
   <div class="modal">
     <h3 id="settings-modal-title">Server &amp; Model</h3>
-    <label class="modal-label">llama-server URL</label>
+    <label class="modal-label" for="server-url-input">llama-server URL</label>
     <input type="text" id="server-url-input" placeholder="http://localhost:8080">
 
-    <label class="modal-label">Response timeout (seconds)</label>
+    <label class="modal-label" for="timeout-input">Response timeout (seconds)</label>
     <input type="number" id="timeout-input" placeholder="600" min="30" max="7200" step="10">
     <p class="modal-hint">Local models can genuinely take minutes per reply, especially with
       CPU-offloaded experts, a quantized KV cache, or a large context window — raise this if
       replies are timing out rather than actually failing.</p>
 
-    <label class="modal-label">Fast model (optional)</label>
+    <label class="modal-label" for="fast-model-input">Fast model (optional)</label>
     <input type="text" id="fast-model-input" placeholder="e.g. qwen2.5-1.5b — leave blank to use one model for everything">
     <p class="modal-hint">The cheap tier: scene summaries and quick reads route here, the deep
       analysis stays on the main model. Leave blank on a one-model box — it auto-falls back.</p>
 
-    <label class="modal-label">Chat turn cap (seconds)</label>
+    <label class="modal-label" for="turn-timeout-input">Chat turn cap (seconds)</label>
     <input type="number" id="turn-timeout-input" placeholder="120" min="15" max="1800" step="5">
     <p class="modal-hint">If a reply is still generating when this hits, you get a
       “still working — keep waiting?” prompt instead of a silent hang.</p>
@@ -705,7 +705,7 @@
 <div id="fork-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="fork-modal-title" style="display:none;">
   <div class="modal">
     <h3 id="fork-modal-title">Fork this conversation</h3>
-    <label class="modal-label">Name this branch</label>
+    <label class="modal-label" for="fork-name-input">Name this branch</label>
     <input type="text" id="fork-name-input" placeholder="e.g. alt-ending">
     <div class="modal-actions">
       <button id="fork-cancel" class="btn-secondary">Cancel</button>
@@ -755,7 +755,7 @@
 </div>
 
 <script src="core.js?v=hx1b112"></script>
-<script src="app.js?v=hx1b347"></script>
+<script src="app.js?v=hx1b348"></script>
 <div id="river-current" aria-hidden="true"></div>
 <div class="dawn-wash" aria-hidden="true"></div>
 </body>
