@@ -888,11 +888,20 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .home-btn:hover { color: var(--accent); border-color: var(--accent-deep); transform: translateY(-1px); }
 .home-btn:active { transform: translateY(0); }
 .project-bar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* a11y (WCAG 1.4.10 Reflow, 320px reference): the title is a flex item that
+   never shrank (no min-width:0 of its own), so at 320px the right side's
+   fixed controls squeezed .project-bar-left to 94px and the title got
+   width 0 — invisible while the branch pill stayed whole. The TITLE takes
+   the shrink budget (flex:1 + min-width:0 + its own ellipsis) inside the
+   row; the row itself must NOT get flex-basis 0 — that collapsed its box
+   under the nowrap pills and spilled them over the right block. */
 #project-title {
   font-family: var(--font-typewriter);
   font-weight: 400;
   font-size: 16.5px;
   margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
   color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -952,6 +961,16 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   background: transparent;
 }
 .branch-pill.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+/* a11y (WCAG 1.4.10): let branch pills truncate under 400px rather than
+   stealing the title's shrink budget (same flexbox-basis lesson as P13). */
+@media (max-width: 400px) {
+  .branch-pill { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* a11y (WCAG 1.4.10 Reflow): at 320px the right block's fixed chrome
+     (toggle + chip + palette button = 179px) starved the left row to 94px
+     and the project TITLE hit width 0 — core content invisible. The chip
+     duplicates the room toggle's active state, so it yields first. */
+  #room-chip { display: none; }
+}
 .branch-pill.add { color: var(--accent); border-style: dashed; }
 
 /* ============================================================
