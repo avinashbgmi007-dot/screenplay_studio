@@ -639,6 +639,11 @@ body::before {
 .project-item:hover .project-delete { opacity: 1; }
 .project-delete:hover { color: var(--danger); background: var(--danger-bg); }
 @media (hover: none) { .project-delete { opacity: 1; } }
+/* a11y (WCAG 2.4.7 Focus Visible): the ✕ was hover-revealed only, so a
+   keyboard user Tabbed onto an INVISIBLE delete button — and Enter there
+   deletes a project they cannot see. Reveal the shelf's action buttons
+   when the row holds keyboard focus, mirroring .msg-rail / .analyze-pipeline. */
+.project-item:focus-within .project-delete { opacity: 1; }
 
 /* ---- the idea room: scriptless ideas on the corkboard ---- */
 
@@ -668,6 +673,11 @@ body::before {
 .idea-item:hover .project-delete { opacity: 1; }
 .idea-item .project-delete:hover { color: var(--danger); background: var(--danger-bg); }
 @media (hover: none) { .idea-item .project-delete { opacity: 1; } }
+/* a11y (WCAG 2.4.7): same keyboard reveal as the project shelf — without
+   this, the ideas flyout alone had 54 invisible tab stops (rename + delete
+   on every idea row). */
+.idea-item:focus-within .project-delete { opacity: 1; }
+.idea-item:focus-within .idea-rename { opacity: 1; }
 .idea-item.active {
   border-style: solid;
   border-color: var(--accent);
@@ -2866,7 +2876,15 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   color: var(--text);
   padding: 2px 0;
 }
-.idea-title-input:focus { border-bottom: 1px dashed var(--accent); }
+/* a11y (WCAG 2.4.7): every other text input in the app swaps the global
+   :focus-visible ring for an EQUALLY visible cue (border + 2px glow — see
+   #script-search:focus). The bare 1px dashed underline here was the weakest
+   focus cue in the app, so the title field now uses the same house pattern. */
+.idea-title-input:focus {
+  outline: none;
+  border-bottom: 1px dashed var(--accent);
+  box-shadow: 0 1px 0 0 var(--glow), 0 0 0 2px var(--glow);
+}
 .idea-structure-btn {
   background: transparent;
   border: none;
@@ -3951,12 +3969,25 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 
 .stash-list, .rail-notes { display: flex; flex-direction: column; gap: 5px; }
 .stash-item, .rail-note {
+  position: relative;   /* anchor the row's ✕ (shared .project-delete) */
   background: var(--ink-800);
   border: 1px solid var(--line-soft);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 11.5px;
 }
+/* a11y + layout fix (WCAG 2.4.7): the stash/note ✕ shares .project-delete
+   but NO rule ever revealed it or anchored it to its row — every ✕ floated
+   to the dock's top-right corner at opacity 0, invisible to mouse AND
+   keyboard, with all of them stacked on one spot. Anchor to the row and
+   reveal on row hover, row keyboard focus, and touch, like the shelves. */
+.stash-item .project-delete,
+.rail-note .project-delete { top: 4px; right: 4px; }
+.stash-item:hover .project-delete,
+.stash-item:focus-within .project-delete,
+.rail-note:hover .project-delete,
+.rail-note:focus-within .project-delete { opacity: 1; }
+@media (hover: none) { .stash-item .project-delete, .rail-note .project-delete { opacity: 1; } }
 .stash-item-text { color: var(--text); max-height: 54px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .stash-item-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; }
 .stash-item-meta { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-faint); }
@@ -4445,6 +4476,9 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   box-shadow: 0 8px 22px var(--shadow-a35);
 }
 .dash-card.active { border-color: var(--desk-amber); }
+/* a11y (WCAG 2.4.7): the dash-card ✕ shares .project-delete's hover-only
+   reveal — keyboard focus must reveal it too (same fix as the shelves). */
+.dash-card:focus-within .project-delete { opacity: 1; }
 
 .dash-card-head { display: flex; align-items: center; gap: 8px; }
 .dash-card-title {
