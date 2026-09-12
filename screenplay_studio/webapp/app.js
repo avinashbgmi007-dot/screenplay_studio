@@ -926,6 +926,12 @@ function toggleSidebar(collapsed, persist = true) {
   if (!sidebar) return;
   sidebar.classList.toggle("sidebar-collapsed", collapsed);
   if (edgeTab) edgeTab.classList.toggle("visible", collapsed);
+  // body-level mirror for the scene rail: an OPEN shelf overlays x:0-264 and
+  // would bury the 44px scene index (both sit at left:0; shelf z 590 > rail z 10).
+  // The rail indents to the shelf's right edge while the shelf is open, so
+  // both remain visible and the rail keeps its persistent-chrome contract
+  // (design-critic P1, session 2026-09-12).
+  document.body.classList.toggle("shelf-open", !collapsed);
   if (persist) savePrefs({ sidebar_collapsed: collapsed });
 }
 

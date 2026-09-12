@@ -5556,6 +5556,19 @@ body:not(.idea-mode) #manuscript-workspace {
      past the row (a 41px full-height strip bleeding into the transparent
      gutter). Clip the row so the collapsed board is simply gone. */
   overflow: hidden;
+  /* design-critic P1: when the shelf is summoned the scene rail indents to
+     the shelf's right edge — the reserved rail strip widens with it so the
+     700px column shifts right instead of being overlaid (the shelf stays an
+     overlay for everything EXCEPT the rail strip, which is persistent chrome).
+     MIN-WIDTH GUARD: on ≤900px narrow desks the media query below zeroes the
+     padding (the rail's 44px reservation is revoked); a plain body.shelf-open
+     rule (0,2,0) would out-specify that media rule (0,1,0) and shove 308px
+     of padding into a 900px viewport. The min-width clause keeps the indent a
+     desktop-only behaviour. */
+  transition: padding-left 0.25s ease;
+}
+@media (min-width: 901px) {
+  body.shelf-open .manuscript-workspace-layout { padding-left: calc(var(--sidebar-w) + 44px); }
 }
 /* the board bows to an open dock — both are right-edge surfaces, and the
    board would otherwise bury 300 of the dock's 380px (and the dock's
@@ -5580,10 +5593,23 @@ body:not(.idea-mode) #manuscript-workspace {
   overflow: hidden;
   z-index: var(--z-chrome);
   background: var(--ink-900);
+  /* design-critic P1 (2026-09-12): the summoned shelf overlays left:0-264 at
+     z 590 and buried this 44px rail (z 10). While the shelf is open the rail
+     indents to the shelf's right edge so both stay visible — the rail remains
+     persistent chrome per the wireframe (State 4 x:0-44 when the shelf is
+     away). ONE transition list: left (the shelf-open indent) + width (the
+     expanded 240px state) — two separate transition declarations would
+     override each other (last one wins). */
+  transition: left 0.25s ease, width 0.25s ease;
   border-right: 1px solid var(--line-soft);
-  transition: width 0.25s ease;
   display: flex;
   flex-direction: column;
+}
+@media (min-width: 901px) {
+  /* MIN-WIDTH GUARD (critique pass 2): same reasoning as the layout padding
+     above — ≤900px narrow desks keep the rail at left:0 (its 44px reservation
+     is revoked there by the max-width:900 media rule). */
+  body.shelf-open #scene-index { left: var(--sidebar-w); }
 }
 #scene-index.expanded {
   width: 240px;
