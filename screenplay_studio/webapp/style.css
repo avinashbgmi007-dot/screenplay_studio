@@ -335,6 +335,17 @@
   --shadow-a18: rgba(0, 0, 0, 0.18);
   --shadow-a12: rgba(0, 0, 0, 0.12);
   --shadow-paper: 0 18px 50px -18px rgba(0, 0, 0, 0.65), 0 2px 8px var(--shadow-a35);  /* the paper lift — welcome card + findings-view scene pages */
+  /* R3 elevation ladder — full shadow recipes. Two languages, both named:
+     LEAN shadows slide sideways with side panels; LIFT shadows raise
+     overlays. Alphas ride the --shadow-aN family so the dawn warm flip
+     (body.dawn) reaches every step at once. */
+  --elev-lean-right: -14px 0 36px var(--shadow-a35);  /* dock + board (unified) */
+  --elev-lean-left: 18px 0 46px var(--shadow-a35);     /* sidebar */
+  --elev-modal: 0 14px 44px var(--shadow-a55);         /* modals, palette */
+  --elev-float: 0 12px 32px -8px var(--shadow-a60);   /* pop-overs: banner, text-popup */
+  --elev-fab: 0 8px 22px -8px var(--shadow-a60);      /* quote-float */
+  --elev-tab: -6px 0 18px var(--shadow-a30);          /* pb-edge-tab */
+  --blur-glass: 14px;                                  /* glass panels + pop-overs */
   --wash-w06: rgba(255, 255, 255, 0.06);
   --wash-w05: rgba(255, 255, 255, 0.05);
   --wash-w04: rgba(255, 255, 255, 0.04);
@@ -430,6 +441,22 @@ body.dawn {
   --desk-rust: #8a3c28;          /* 6.52 */
   --desk-ok: #2a7038;            /* 5.18 */
   --desk-warn: #a04a3a;          /* 5.08 */
+
+  /* R3 dawn shadows: black-alpha shadows read muddy on warm paper; the one
+     existing dawn shadow override (welcome card) was already warm-tinted —
+     the house language for paper is WARM shadows. Flip the whole --shadow-aN
+     family (same alphas, so weights stay identical; only temperature
+     changes). Every --elev-* step rides these, so the flip reaches all
+     composite elevations at once. */
+  --shadow-a60: rgba(97, 76, 43, 0.60);
+  --shadow-a55: rgba(97, 76, 43, 0.55);
+  --shadow-a50: rgba(97, 76, 43, 0.50);
+  --shadow-a45: rgba(97, 76, 43, 0.45);
+  --shadow-a40: rgba(97, 76, 43, 0.40);
+  --shadow-a35: rgba(97, 76, 43, 0.35);
+  --shadow-a30: rgba(97, 76, 43, 0.30);
+  --shadow-a18: rgba(97, 76, 43, 0.18);
+  --shadow-a12: rgba(97, 76, 43, 0.12);
 }
 
 /* the dash cards hard-code a dark fill (rgba(30,26,21,0.82)) rather than using
@@ -525,7 +552,7 @@ body::before {
     repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 5px),
     linear-gradient(180deg, var(--ink-900), var(--ink-950));
   border-right: 1px solid var(--line-soft);
-  box-shadow: 18px 0 46px var(--shadow-a35);
+  box-shadow: var(--elev-lean-left);
   display: flex;
   flex-direction: column;
   padding: var(--sp-9) var(--sp-7) var(--sp-7);
@@ -1387,8 +1414,8 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   border-radius: var(--r-md);
   padding: var(--sp-2);
   z-index: var(--z-banner);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 32px -8px var(--shadow-a60);
+  backdrop-filter: blur(var(--blur-glass));
+  box-shadow: var(--elev-float);
 }
 .overflow-item {
   display: flex;
@@ -2620,7 +2647,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   width: 340px;
   max-height: 84vh;
   overflow-y: auto;
-  box-shadow: 0 14px 44px var(--shadow-a55);
+  box-shadow: var(--elev-modal);
 }
 .modal h3 {
   font-family: var(--font-typewriter);
@@ -2694,13 +2721,21 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 #palette-input {
   width: 100%;
   background: var(--ink-800);
-  border: 1px solid var(--accent-deep);
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: var(--sp-5) var(--sp-6);
   font-family: var(--font-code); /* Nocta identity: ⌘K palette chrome in JetBrains Mono */
   font-size: var(--fs-body);
   color: var(--text);
   box-shadow: inset 0 2px 6px var(--shadow-a30);
+}
+/* R3: the palette input joins the unified R2 input treatment — neutral rest
+   border + the double-glow focus recipe every other input uses. */
+#palette-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 2px 6px var(--shadow-a30),
+              0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 .palette-results { margin-top: var(--sp-5); max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-1); }
 .palette-row {
@@ -2719,7 +2754,8 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   cursor: pointer;
 }
 .palette-row.sel { background: color-mix(in oklab, var(--accent) 14%, transparent); border-color: var(--accent-deep); color: var(--text); }
-.palette-row:hover:not(.sel) { background: rgba(233, 223, 206, 0.05); }
+.palette-row:hover:not(.sel) { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.palette-row:active:not(.sel) { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 .palette-keys {
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
@@ -3305,7 +3341,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   flex-direction: column;
   background: linear-gradient(180deg, var(--ink-900), var(--ink-950));
   border-left: 1px solid var(--line-soft);
-  box-shadow: -18px 0 40px var(--shadow-a35);
+  box-shadow: var(--elev-lean-right);
   transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1);
   overflow: hidden;
   z-index: var(--z-board);
@@ -3505,7 +3541,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
     border: 1px solid var(--line);
     border-right: none;
     border-radius: var(--r-md) 0 0 var(--r-md);
-    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--elev-tab);
     background: var(--ink-900);
   }
 }
@@ -3875,7 +3911,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   max-width: calc(100vw - 140px);
   background: var(--ink-900);
   border-left: 1px solid var(--line-soft);
-  box-shadow: -18px 0 46px var(--shadow-a35);
+  box-shadow: var(--elev-lean-right);
   transform: translateX(110%);
   /* a11y (WCAG 2.4.3 Focus Order): transform + pointer-events alone leave the
      closed panel's buttons in the TAB ORDER — a keyboard user could Tab into
@@ -4235,8 +4271,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: var(--sp-2);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 32px -8px var(--shadow-a60);
+  backdrop-filter: blur(var(--blur-glass));
+  box-shadow: var(--elev-float);
   animation: popup-in 0.15s var(--ease-out, ease-out);
 }
 @keyframes popup-in {
@@ -4807,7 +4843,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   cursor: pointer;
-  box-shadow: 0 8px 22px -8px rgba(0, 0, 0, 0.65);
+  box-shadow: var(--elev-fab);
 }
 .idea-quote-float:hover { background: color-mix(in oklab, var(--accent) 15%, transparent); }
 
@@ -5053,8 +5089,8 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   flex-direction: column;
   border-left: 1px solid var(--line);
   background: color-mix(in srgb, var(--ink-950) 85%, transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
   transform: translateX(100%);
   /* a11y (WCAG 2.4.3 Focus Order): same trap as .drawer — translateX alone
      leaves the closed panel's buttons in the TAB ORDER. visibility:hidden
@@ -5198,8 +5234,8 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   border-radius: var(--r-pill);
   border: 1px solid var(--line);
   background: var(--glass);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-muted);
@@ -5470,13 +5506,18 @@ body:not(.dawn) {
     radial-gradient(900px 560px at 92% 104%, rgba(167, 139, 250, 0.07), transparent 65%),
     var(--ink-950);
 }
-/* glass edges: panels get a faint cool rim so surfaces read as glass on void */
+/* glass edges: panels get a faint cool rim so surfaces read as glass on void.
+   R3 fix: the rim previously REPLACED .modal's elevation shadow (box-shadow
+   is one property, not additive) — night modals had silently lost their lift;
+   only dawn modals cast a shadow. The rim now rides WITH the elevation. */
 body:not(.dawn) #sidebar,
 body:not(.dawn) .room-panel,
 body:not(.dawn) .drawer,
-body:not(.dawn) .modal,
 body:not(.dawn) .craft-panel {
   box-shadow: inset 0 1px 0 var(--wash-w04);
+}
+body:not(.dawn) .modal {
+  box-shadow: var(--elev-modal), inset 0 1px 0 var(--wash-w04);
 }
 body:not(.dawn) #project-bar,
 body:not(.dawn) #desk-toolbar,
@@ -5883,7 +5924,7 @@ body:not(.idea-mode) #manuscript-workspace {
   width: 380px;
   min-width: 320px;
   border-left: 1px solid var(--line-soft);
-  box-shadow: -14px 0 36px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--elev-lean-right);
   visibility: visible;
   transition: width 0.25s ease, min-width 0.25s ease,
               visibility 0s linear 0s;
