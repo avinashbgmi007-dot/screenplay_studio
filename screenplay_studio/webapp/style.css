@@ -614,8 +614,12 @@ body::before {
   box-shadow: 0 6px 18px -6px var(--glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   transition: filter 0.12s ease, transform 0.06s ease;
 }
-.btn-primary:hover { filter: brightness(1.07); }
-.btn-primary:active { transform: scale(0.98); }
+/* R2.2 state system: on-accent controls use the brightness recipe (hover
+   1.1, active 0.9 + 0.98 press-in); on-surface controls use the house
+   color-mix wash (8% hover / 12% active); disabled = opacity .5 + no-entry
+   cursor. One recipe for all families, replacing the 1.06-1.15 scatter. */
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:active { transform: scale(0.98); filter: brightness(0.9); }
 .btn-primary:disabled { opacity: 0.55; cursor: default; filter: none; }
 
 .btn-secondary {
@@ -628,7 +632,8 @@ body::before {
   cursor: pointer;
   transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
-.btn-secondary:hover { border-color: var(--accent-deep); background: rgba(233, 223, 206, 0.07); color: var(--text); }
+.btn-secondary:hover { border-color: var(--accent-deep); background: color-mix(in oklab, var(--accent) 8%, transparent); color: var(--text); }
+.btn-secondary:active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 .btn-secondary:disabled { opacity: 0.5; cursor: default; }
 .btn-secondary.danger { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 45%, transparent); }
 .btn-secondary.danger:hover { border-color: var(--danger); background: var(--danger-bg); }
@@ -649,7 +654,7 @@ body::before {
   box-shadow: 0 6px 18px -6px var(--glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   transition: filter 0.15s;
 }
-#new-project-btn:hover { filter: brightness(1.06); }
+#new-project-btn:hover { filter: brightness(1.1); }
 
 .sidebar-new-btn {
   font-family: var(--font-mono);
@@ -832,8 +837,8 @@ body::before {
 }
 .premise-field input:focus, .premise-field textarea:focus {
   outline: none;
-  border-color: var(--accent-deep);
-  box-shadow: 0 0 0 1px var(--accent-deep);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 .premise-field input::placeholder, .premise-field textarea::placeholder { color: var(--text-faint); font-style: italic; }
 .premise-hint {
@@ -2235,7 +2240,11 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   box-shadow: inset 0 2px 6px var(--shadow-a30);
 }
 .composer textarea::placeholder { color: var(--text-muted); }
-.composer textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--glow); }
+.composer textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
+}
 
 #send-btn {
   background: var(--accent);
@@ -2249,7 +2258,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   box-shadow: 0 4px 12px -2px var(--glow-strong);
   transition: filter 0.12s ease;
 }
-#send-btn:hover { filter: brightness(1.08); }
+#send-btn:hover { filter: brightness(1.1); }
 #send-btn:disabled { background: var(--line); color: var(--text-faint); cursor: default; box-shadow: none; }
 
 /* previous-input list rising out of the composer */
@@ -2365,14 +2374,29 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   font-family: var(--font-mono);
 }
 #persona-select, #mode-select, #report-lang-select, #draft-select, #compare-from-select {
-  background: var(--ink-800);
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--ink-800) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 0h8L4 4z' fill='%236b6880'/%3E%3C/svg%3E") no-repeat right var(--sp-4) center;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-3) calc(var(--sp-6) + var(--sp-4)) var(--sp-3) var(--sp-4);
   font-size: var(--fs-sm);
   color: var(--text);
+  cursor: pointer;
 }
-#report-lang-select { padding: var(--sp-2) var(--sp-3); font-size: var(--fs-xs); }
+/* R2.3 selects: same focus recipe as inputs (the double glow); disabled
+   follows the state system. */
+#persona-select:focus-visible, #mode-select:focus-visible,
+#report-lang-select:focus-visible, #draft-select:focus-visible,
+#compare-from-select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
+}
+#persona-select:disabled, #mode-select:disabled,
+#report-lang-select:disabled, #draft-select:disabled,
+#compare-from-select:disabled { opacity: 0.5; cursor: not-allowed; }
+#report-lang-select { padding: var(--sp-2) var(--sp-6) var(--sp-2) var(--sp-3); font-size: var(--fs-xs); }
 
 /* analysis progress */
 .analyze-progress {
@@ -2615,7 +2639,11 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   margin-bottom: var(--sp-4);
   color: var(--text);
 }
-.modal input[type="text"]:focus { outline: none; border-color: var(--accent); }
+.modal input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
+}
 .modal-hint { font-size: var(--fs-xs); color: var(--text-faint); margin: var(--sp-2) 0 var(--sp-8); line-height: 1.5; }
 .modal-actions { display: flex; justify-content: flex-end; gap: var(--sp-4); margin-top: var(--sp-6); }
 .modal-wide { width: 560px; max-width: 92vw; }
@@ -3092,8 +3120,8 @@ body.focus-mode #script-pane { background: var(--ink-950); }
    pattern as .idea-title-input. */
 .idea-rename-input:focus {
   outline: none;
-  border-bottom: 1px dashed var(--accent);
-  box-shadow: 0 1px 0 0 var(--glow), 0 0 0 2px var(--glow);
+  border-bottom: 1px solid var(--accent);  /* dashed (rest) -> solid: the state cue */
+  box-shadow: 0 1px 0 0 var(--accent), 0 0 0 2px var(--glow);
 }
 .idea-rename {
   background: transparent;
@@ -3163,13 +3191,17 @@ body.dawn #sidebar, body.dawn .room-panel {
 body.dawn::before {
   background: radial-gradient(120% 100% at 50% 40%, transparent 62%, rgba(139, 118, 80, 0.18) 100%);
 }
-/* buttons: night's translucent fills vanish on light — give them real surfaces */
+/* buttons: night's translucent fills vanish on light — give them real surfaces
+   (base fill only; hover/active wash violet INTO the solid surface rather
+   than replacing it with a translucent tint — same color-mix recipe, solid
+   base preserved) */
 body.dawn .btn-secondary {
   background: var(--ink-800);
   color: var(--text);
   border-color: var(--line);
 }
-body.dawn .btn-secondary:hover { background: var(--paper-2); border-color: var(--accent-deep); }
+body.dawn .btn-secondary:hover { background: color-mix(in oklab, var(--accent) 8%, var(--ink-800)); }
+body.dawn .btn-secondary:active { background: color-mix(in oklab, var(--accent) 12%, var(--ink-800)); }
 body.dawn .sidebar-footer-btn:hover { background: var(--ink-800); }
 body.dawn .room-panel::before { background: radial-gradient(120% 70% at 20% -10%, rgba(176, 124, 40, 0.10), transparent 60%); }
 /* the progress pill is hardcoded dark — lift it for light mode */
@@ -3236,7 +3268,9 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 .project-list::-webkit-scrollbar-thumb, .palette-results::-webkit-scrollbar-thumb,
 .modal::-webkit-scrollbar-thumb,
 .composer textarea::-webkit-scrollbar-thumb, .feedback-pane::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--line), var(--ink-700));
+  /* R2.5 scrollbar recipe: accent 30% wash (hover 45%) — replaces the
+     mono gradient; token-driven so night/dawn both work unchanged. */
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
   border-radius: var(--r-pill);
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -3248,7 +3282,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 .project-list::-webkit-scrollbar-thumb:hover, .palette-results::-webkit-scrollbar-thumb:hover,
 .modal::-webkit-scrollbar-thumb:hover,
 .composer textarea::-webkit-scrollbar-thumb:hover, .feedback-pane::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--accent-deep), var(--accent));
+  background: color-mix(in oklab, var(--accent) 45%, transparent);
 }
 .messages::-webkit-scrollbar-corner, #manuscript-container::-webkit-scrollbar-corner,
 .beatboard-board::-webkit-scrollbar-corner, .compare-panes::-webkit-scrollbar-corner {
@@ -3317,14 +3351,21 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 
 .pb-filter {
   margin-left: auto;
+  appearance: none;
+  -webkit-appearance: none;
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   color: var(--text-muted);
-  background: transparent;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 0h8L4 4z' fill='%236b6880'/%3E%3C/svg%3E") no-repeat right var(--sp-3) center;
   border: 1px solid var(--line-soft);
   border-radius: var(--r-sm);
-  padding: var(--sp-1) var(--sp-3);
+  padding: var(--sp-1) calc(var(--sp-5) + var(--sp-3)) var(--sp-1) var(--sp-3);
   cursor: pointer;
+}
+.pb-filter:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 
 .pb-list {
@@ -3603,7 +3644,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   white-space: nowrap;
   box-shadow: 0 10px 24px var(--shadow-a55), 0 0 0 1px var(--shadow-a35);
 }
-.quote-float:hover { filter: brightness(1.08); }
+.quote-float:hover { filter: brightness(1.1); }
 .quote-float:active { transform: translateY(1px); }
 .quote-float[hidden] { display: none; }
 /* the Stash button sits under the ask-Sameer button — cooler accent so the
@@ -3613,7 +3654,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   border-color: var(--line);
   color: var(--text);
 }
-.quote-float.stash-float:hover { filter: brightness(1.15); }
+.quote-float.stash-float:hover { filter: brightness(1.1); }
 
 .quote-card {
   flex: 1 0 100%;
@@ -4516,7 +4557,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 
 /* send button: a quiet lift so the primary action breathes */
 #send-btn { transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease; }
-#send-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.07); box-shadow: 0 4px 12px -4px var(--shadow-a50); }
+#send-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); box-shadow: 0 4px 12px -4px var(--shadow-a50); }
 #send-btn:active:not(:disabled) { transform: translateY(0); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4554,7 +4595,7 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   border-color: var(--desk-rust);
   color: var(--desk-rust);
 }
-.retry-failed:hover { filter: brightness(1.15); }
+.retry-failed:hover { filter: brightness(1.1); }
 
 /* ---------- streaming reply sink ---------- */
 
@@ -5125,7 +5166,11 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
   background: var(--surface);
   color: var(--text);
 }
-.sp-composer textarea:focus-visible { border-color: var(--accent); }
+.sp-composer textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
+}
 .sp-composer .send-btn {
   width: 38px;
   height: 38px;
@@ -5556,9 +5601,18 @@ body:not(.idea-mode) #manuscript-workspace {
 }
 #desk-toolbar .desk-drafts .draft-label { font-size: var(--fs-2xs); }
 #desk-toolbar .desk-drafts select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--ink-800) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 0h8L4 4z' fill='%236b6880'/%3E%3C/svg%3E") no-repeat right var(--sp-3) center;
   max-width: 110px;
   font-size: var(--fs-sm);
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) calc(var(--sp-6) + var(--sp-3)) var(--sp-2) var(--sp-3);
+  cursor: pointer;
+}
+#desk-toolbar .desk-drafts select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 #desk-toolbar .desk-drafts .btn-secondary { padding: var(--sp-2) var(--sp-4); font-size: var(--fs-sm); }
 #desk-toolbar .upload-status { font-size: var(--fs-xs); }
@@ -5935,7 +5989,7 @@ body.river-read #right-edge-affordance { display: none; }
 .dock-lens-tab[aria-selected="true"] {
   color: var(--text);
   border-color: var(--line);
-  background: var(--ink-800);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
 }
 .dock-body {
   flex: 1 1 auto;
