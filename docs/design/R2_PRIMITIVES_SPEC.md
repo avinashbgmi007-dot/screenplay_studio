@@ -1,6 +1,11 @@
-# R2 Primitives — design spec (sign-off draft)
+# R2 Primitives — design spec
 
-Status: DRAFT — awaiting user sign-off on the four decisions below.
+Status: **IMPLEMENTED 2026-09-13** (user signed all four decisions as
+recommended 2026-09-12; commits 86a8927 tokens + fd369c5 families).
+Certification: full ladder — all 22 non-preview suites green, 0 failures
+(preview_next + preview_redesigns remain the documented pre-existing
+static-page pair). Permanent gate added: `_r2_a11y_guard.py` (flags any new
+bare `outline: none` suppressor).
 Date: 2026-09-12. Author: session agent, with consults (primitive-designer for
 the CSS recipes, primitive-census for the inventory evidence).
 
@@ -94,11 +99,17 @@ compare-from, +1) with inconsistent radius treatments (6px, 8px, 10px literals).
 --r-pill: 999px;   /* pills, badges, toggles — absorbs 999px×33 + 99px×2 */
 --r-lg: 12px;      /* large cards, modals, composer surfaces — absorbs 12px×2,
                      14px legacy (--radius), 16px idea editor (fold down) */
---r-md: 8px;       /* buttons, inputs, selects, dock cards — absorbs 8px×18, 10px×13
-                     + legacy --radius-sm, + 6px×18 (fold up) */
---r-sm: 4px;       /* small chips, thumbnails, scrollbar thumbs — absorbs 4px×26, 3px×10 */
---r-xs: 2px;       /* micro corners, kbd — absorbs 2px×7, and 5px/7px/9px odd folds down */
+--r-md: 8px;       /* buttons, inputs, selects, dock cards — absorbs 8px×18,
+                     10px×13 + legacy --radius-sm, + 6px×18 + 7px×4 + 9px×2 (fold up) */
+--r-sm: 4px;       /* small chips, thumbnails, scrollbar thumbs — absorbs 4px×26, 3px×10, 5px×3 (fold down) */
+--r-xs: 2px;       /* micro corners, kbd — absorbs 2px×7 */
 ```
+
+Odd-value folding rule: nearest step (5→4, 7→8, 9→8) — max 1px delta,
+sub-perceptual, same principle as the R1 spacing odd-fold. Directional
+shapes keep their geometry with tokens: `10px 0 0 10px` → `var(--r-md) 0 0
+var(--r-md)` (×5), `3px 0 0 3px` → `var(--r-sm) 0 0 var(--r-sm)`,
+`14px 14px 0 0` → `var(--r-lg) var(--r-lg) 0 0`.
 
 Exemptions: river-read speech-bubble tail (22/22/22/6 asymmetric, single-use
 expressive), 50%/`::before` circles via `border-radius:50%` (not a "value",
