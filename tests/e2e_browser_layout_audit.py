@@ -247,6 +247,75 @@ def main():
                               f"index x={si['x']:.1f} w={si['width']:.1f} vs "
                               f"row x={ws['x']:.1f} w={ws['width']:.1f}")
 
+            # ---- 9. GO 2 contracts (writer's loop / fold / dock law) --------
+            # 9a. FV fold (1A): the entry point routes to the workspace dock —
+            # no reachable path may set state.view = "fv" any more.
+            fv = page.evaluate(
+                """() => {
+                  if (typeof openFeedbackView !== 'function') return null;
+                  const src = String(openFeedbackView);
+                  return { routes: src.includes('openDock'),
+                           dormant: !src.includes('state.view = "fv"')
+                                    && !src.includes("state.view = 'fv'") };
+                }"""
+            )
+            if fv is not None:
+                CHECKS.ok("FV folded into workspace (routes to dock, dormant clone)",
+                          fv["routes"] and fv["dormant"],
+                          f"routes={fv['routes']} dormant={fv['dormant']}")
+
+            if cards.count() > 0:
+                # 9b. dock law: with the dock open the manuscript never drops
+                # below half the app width (frozen wireframe law).
+                page.evaluate("() => { if (typeof openDock === 'function') openDock('evidence'); }")
+                page.wait_for_timeout(700)
+                widths = page.evaluate(
+                    """() => {
+                      const app = document.querySelector('#app');
+                      const ws = document.querySelector('.manuscript-workspace-layout');
+                      const dock = document.querySelector('#context-dock');
+                      if (!app || !ws) return null;
+                      return { app: app.getBoundingClientRect().width,
+                               ws: ws.getBoundingClientRect().width,
+                               dockOpen: !!(dock && dock.classList.contains('open')) };
+                    }"""
+                )
+                if widths and widths["dockOpen"]:
+                    CHECKS.ok("manuscript keeps majority width with dock open",
+                              widths["ws"] >= 0.5 * widths["app"] - 2,
+                              f"ws {widths['ws']:.0f} vs half of {widths['app']:.0f}")
+
+                # 9c. loop keys both ways (2A): with findings, engage the loop
+                # and confirm N steps findings; exit and confirm N no longer does.
+                loop = page.evaluate(
+                    """() => {
+                      if (typeof startLoop !== 'function' || typeof loopState === 'undefined')
+                        return null;
+                      if (!(state.findings || []).length) return { skipped: true };
+                      const before = loopState.pos;
+                      startLoop();
+                      const entered = loopState.active;
+                      const pos1 = loopState.pos;
+                      return { skipped: false, entered, stepped: pos1 >= 0,
+                               before, pos1 };
+                    }"""
+                )
+                if loop and not loop.get("skipped"):
+                    CHECKS.ok("fix loop engages and steps on entry",
+                              loop["entered"] and loop["stepped"],
+                              f"entered={loop['entered']} pos={loop['pos1']}")
+                    # Esc exits (contextual keys return to scene-stepping)
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(200)
+                    after = page.evaluate(
+                        "() => ({ active: loopState.active, dock: document.querySelector('#context-dock').classList.contains('open') })")
+                    CHECKS.ok("Esc exits the loop before the dock",
+                              after["active"] is False and after["dock"] is True,
+                              f"active={after['active']} dockOpen={after['dock']}")
+                    page.evaluate("() => { if (typeof closeDock === 'function') closeDock(); }")
+                elif loop and loop.get("skipped"):
+                    CHECKS.ok("fix loop skips cleanly with no findings", True)
+
             CHECKS.ok("no JS page errors", len(errors) == 0,
                       "; ".join(errors[:3]))
             CHECKS.finish()

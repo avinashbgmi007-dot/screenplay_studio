@@ -261,3 +261,75 @@ class TestFindingIdentity:
         revision.undismiss_finding(m, 1)
         data = json.load(open(m.project_dir + "/dismissed_findings.json", encoding="utf-8"))
         assert all(d.get("index") != 1 for d in data)
+
+
+# ---------- writer intent + last-pass scorekeeping (GO 2) ----------
+
+class TestFindingIntents:
+    def test_set_get_clear_roundtrip(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        revision.set_finding_intent(m, "fabc123", "deferred")
+        assert revision.finding_intents(m) == {"fabc123": "deferred"}
+        revision.set_finding_intent(m, "fabc123", "addressed")
+        assert revision.finding_intents(m) == {"fabc123": "addressed"}
+        revision.set_finding_intent(m, "fabc123", None)
+        assert revision.finding_intents(m) == {}
+
+    def test_intents_survive_report_regeneration(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        revision.set_finding_intent(m, "fabc123", "deferred")
+        # the report regenerates (re-scored, renumbered) — the id key holds
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        report["findings"][0]["severity"] = "low"
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        assert revision.finding_intents(m) == {"fabc123": "deferred"}
+
+    def test_intents_missing_file_is_empty(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        assert revision.finding_intents(m) == {}
+
+
+class TestLastPass:
+    def test_first_pass_returns_none(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        assert revision.last_pass_snapshot(m) is None
+
+    def test_second_pass_arithmetic(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        old = report["findings"]
+        assert revision.last_pass_snapshot(m) is None  # snapshot seeds, no arithmetic yet
+        # second pass: keep findings 0 and 2 as-is, drop finding 1 (fixed),
+        # add one brand-new finding (re-scored finding 0 keeps its id = still live)
+        kept = [old[0], old[2]]
+        fresh = dict(old[1], issue="A brand new observation entirely.", evidence_quote=None)
+        report["findings"] = kept + [fresh]
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        lp = revision.last_pass_snapshot(m)
+        assert lp is not None
+        assert lp["last_total"] == len(old)
+        assert lp["still_live"] == 2
+        assert lp["fixed"] == len(old) - 2  # everything seeded but not kept
+        assert lp["new"] == 1
+
+    def test_idempotent_reads(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        report["findings"] = report["findings"][:1]
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        first = revision.last_pass_snapshot(m)
+        second = revision.last_pass_snapshot(m)  # same mtime — served from the guard
+        assert first == second
+
+    def test_ghosted_marks_report_writer_intent(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        revision.last_pass_snapshot(m)  # seed: this pass has been seen
+        gone = report["findings"][0]
+        gid = revision.compute_finding_id(gone)
+        revision.set_finding_intent(m, gid, "addressed")
+        report["findings"] = report["findings"][1:]  # the marked finding transformed away
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        lp = revision.last_pass_snapshot(m)
+        assert lp["fixed"] >= 1  # the marked finding is among the transformed
+        assert any(g["finding_id"] == gid and g["intent"] == "addressed" for g in lp["ghosted_marks"])

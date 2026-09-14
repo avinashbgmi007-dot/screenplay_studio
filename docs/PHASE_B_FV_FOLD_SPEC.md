@@ -1,7 +1,7 @@
 # PHASE_B — FV Fold + Writer's Ledger Riders (R1-R9, refined) — In-Repo Spec
 
-**Status:** GO 1 (identity + counting contract + forward-compatible states) IMPLEMENTED in this commit.
-**GO 2 (fold surfaces, loop, arrival strip) — next approved step, per phases below.**
+**Status:** GO 1 (identity + counting contract + forward-compatible states) IMPLEMENTED.
+**GO 2 (fold + loop + ink + intent store + arrival strip) IMPLEMENTED — all riders live.**
 **Source of truth:** this file (self-contained; replaces the external anchoring-doc dependency).
 **Constitution:** behaviors on T1/T2 surfaces only — zero new surfaces, no pin, no pagination, one manuscript.
 
@@ -45,28 +45,42 @@ Every rider below passed: *which tier?* (T1/T2 behavior), *which writer question
   red**, excluded from scene totals. Phase E fills it from the R4 diff.
 - CSS-only (marks never reflow script text); `.finding-note.deferred/.ghosted` + state chips.
 
-## 4. GO 2 riders (per shared plan phases — next approved step)
+## 4. GO 2 riders (IMPLEMENTED — production homes post-1A)
 
-| Rider | Phase | Contract |
+**The fold (1A):** `openFeedbackView()` routes to the workspace + dock Evidence lens
+(`app.js:openWorkspaceWithFold` semantics — 6 call sites + session restore all land on the
+workspace); the 3-panel `#feedback-view` clone is **dormant, unreachable** (grep-gated), not deleted.
+
+| Rider | Phase | Production home + contract |
 |---|---|---|
-| R2-b keyboard next-finding loop | B Stage 3 | N/↓ span-to-span; ONE loop across all surfaces (manuscript spans, dock evidence lens, fix queue); chip auto-open; mark-addressed + Discuss from the loop (portal contract); visible focus ring, instant reveal, reduced-motion collapsed. Verify `N` unbound vs palette keys. |
-| R5-b ink discipline | B Stage 3 | ONE filter state (severity + category + defer) drives ink, rail counts, board, dock counts, loop. Default = highs inked, mediums/lows in rail counts + board until summoned. Several findings on one line → one numbered chip. Marks never reflow script text (no layout shift). Arrival shows ink via rail dots + first-finding halo. |
-| R8 category count-chips + ambient cap | B Stage 3 | Rail header chips (pacing 4 · dialogue 7 · …); tap = filtered view, NO regrouping. One ambient event: peek-chip suppresses lens pulse; ambience never queues. |
-| R6 leak guards | B assertions | Lasting unread dot after peek-chip fades; Esc hides drawer never kills transcript; drawer overlays dock never manuscript width (ratified geometry, now asserted); compare/beatboard exact scroll return. |
-| R3 defer full | D | id-keyed client intent persisted (rides edits-data store); "addressed-or-nothing makes me lie" — resolved; own filter; dimmed, excluded from open counts. |
-| R7 copy evidence | D | One-click copy of evidence quote + scene slug on the finding card. |
-| R4 scorekeeping | E | On analysis arrival: "Last pass: 62. Still live: 41. Fixed: 14. New: 7." ONE generation snapshot (`lastPassIds`) in the project store; diff on arrival; cap one generation back (boring is good). R1-b ids make cross-pass lineage structural; scene_refs drift classifies as SAME finding. |
-| N1 trust in arrival | E | The arrival strip carries `verification_summary`: "4 of 6 quotes verified (67%)". |
-| N2 inline retry | E | Partial arrivals expose Retry-failed inline at the arrival moment. |
-| A1 (criterion only) | — | Deferred in-app editing's reopening criterion refined to **surgical edits at Locate targets** (single-element edits; drafts + undo/redo already production-real in revision.py). The defer stands — criterion refinement, not a build. |
+| R2-b keyboard next-finding loop | B Stage 3 | `startLoop/stepLoop/exitLoop/renderLoopBar` — N/↓ next, P/↑ prev (wrap-around), Esc exits before the dock closes. Loop bar re-docks itself after any Evidence-lens re-render (filter toggle mid-loop never loses it). Contextual per 2A: loop-active owns n/j/p/k; scene-stepping resumes on exit. |
+| R5-b ink discipline | B Stage 3 | ONE filter state `state.findingFilter` (severity + category + defer) drives ink, board list, loop list and counts — N3 law, disagreement impossible by construction. Default = highs inked. Inline `<mark class="finding-ink">` inherits font — never reflows (aria-hidden). |
+| R8 category count-chips + ambient cap | B Stage 3 | Dock Evidence header chips (board post-1A): severity toggles + category count-chips + next-pass toggle + `⇉ fix loop` button. Peek-chip is the one ambient event; lens pulse suppressed during it. |
+| R6 leak guards | B assertions | Layout-audit section 9: FV routes-to-dock + dormant, dock open with manuscript ≥ half width, loop engages/steps, Esc exits loop keeping the dock open. Audit 30/30. |
+| R3 defer full | D | `finding_marks.json` intent store (ONE store: mark-addressed + defer, id-keyed, survives regeneration); POST `/api/projects/<name>/findings/intent`; `findingDisposition` reads intents first; writer intent wins display, observed status stays visible. |
+| R7 copy evidence | D | `copyFindingEvidence` on deep dock cards + loop bar — quote + `— Scene N` slug, clipboard with execCommand fallback. |
+| R4 scorekeeping | E | `last_pass.json` mtime-guarded lazy diff (ONE generation back, honest None on first pass) riding the `/edits` payload → `buildArrivalStrip` at the Evidence-lens top. |
+| N1 trust in arrival | E | Arrival strip carries the verification readout ("N of M quotes verified (P%)"). |
+| N2 inline retry | E | `failed_categories` → inline "Retry failed (k)" button at the arrival moment. |
+| R9 ghosted | E | `state.ghostedIds` filled ONLY from real writer intents absent from the new pass (never fabricated) — muted, expandable, never red, in no open count. |
+| A1 (criterion only) | — | Deferred in-app editing's reopening criterion refined to **surgical edits at Locate targets**. The defer stands. |
 
 ## 5. Verification gates (per step)
 
-- GO 1 (this commit): `pytest tests/test_revision.py tests/test_webapp_revision.py` (existing + new
-  id-persistence tests) · `python tests/e2e_browser_layout_audit.py` 29/29 · live probe: seeded report
-  re-analysis (re-score + scene insert) preserves addressed/dismiss marks; golden JS/Python id match;
-  counting module counts agree across dock + fix queue + summary.
-- GO 2: e2e phase5/6/7/14 + R6 leak-guard assertions + layout audit 29/29 + live loop probe across dock + manuscript.
+- GO 1: `pytest tests/test_revision.py tests/test_webapp_revision.py tests/test_webapp_api.py`
+  (existing + new id-persistence tests) · `python tests/e2e_browser_layout_audit.py` 29/29 · live probe:
+  seeded report re-analysis (re-score + scene insert) preserves addressed/dismiss marks; golden JS/Python
+  id match; counting module counts agree across dock + fix queue + summary.
+- GO 2 (this commit): pytest GO 2 scope **92/92** (test_revision 31 incl. intent/last_pass + webapp 61) ·
+  layout audit **30/30** (section 9 = GO 2 contracts) · live probe `probe-go2.py` **R1-R7 green**:
+  fold route (view cowrite + dock evidence + fv hidden), filter drives ink both directions, loop steps
+  across a real 2-entry seam (N + P) and re-docks the bar after a mid-loop filter re-render, intents
+  persist to disk + survive reload with dispositions `[addressed, deferred]`, arrival arithmetic exact
+  ("Last pass: 3 · Still live: 1 · Fixed: 2 · New: 1"), ghosted filled only from real intents, unread
+  dot → cleared by Evidence open. Two pre-existing failures elsewhere in the full suite
+  (`test_audit_hardening` ideas-race, `test_feature_batch` SessionStore race) are Windows file-lock
+  races in modules GO 2 never touched (git-verified) — declared out of scope.
+- FV deletion (the dormant clone) is a separate later commit.
 - Push remains the user's job.
 
 ## 6. Critique notes (the filter this spec passed)

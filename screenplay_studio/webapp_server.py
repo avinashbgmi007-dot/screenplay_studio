@@ -844,9 +844,18 @@ def get_edits(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    from .revision import edits_log, finding_statuses, redo_stack
+    from .revision import edits_log, finding_statuses, redo_stack, finding_intents, last_pass_snapshot
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
-    return jsonify({"edits": edits_log(m), "findings_status": statuses, "can_undo": bool(edits_log(m)), "can_redo": bool(redo_stack(m))})
+    # writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride the same
+    # fetch the client already makes on every script load — no second path
+    intents = finding_intents(m)
+    lp = None
+    try:
+        lp = last_pass_snapshot(m)
+    except (OSError, ValueError):
+        lp = None  # unreadable snapshot must never break the edits fetch
+    return jsonify({"edits": edits_log(m), "findings_status": statuses, "can_undo": bool(edits_log(m)), "can_redo": bool(redo_stack(m)),
+                    "finding_intents": intents, "last_pass": lp})
 
 
 def _strip_rewrite_noise(line: str) -> str:
@@ -1259,6 +1268,25 @@ def undismiss_finding_route(name, index):
     body = request.get_json(silent=True) or {}
     undismiss_finding(m, index, body.get("finding_id"))
     return jsonify({"ok": True, "index": index})
+
+
+@app.route("/api/projects/<name>/findings/intent", methods=["POST"])
+def set_finding_intent_route(name):
+    """The writer's own judgment (R2-b mark-addressed / R3 next-pass), keyed
+    by content-hash id so it survives report regeneration. intent=null clears
+    the mark. Observed status (the quote actually gone from the text) still
+    wins display; this is the writer's call on everything else."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    body = request.get_json(silent=True) or {}
+    fid = body.get("finding_id")
+    if not fid:
+        return _error("finding_id required.", 400)
+    from .revision import set_finding_intent
+    set_finding_intent(m, fid, body.get("intent"))
+    return jsonify({"ok": True, "finding_id": fid, "intent": body.get("intent")})
 
 
 # ---------- Design Lab (preview-next) ----------

@@ -82,6 +82,90 @@ def dismissed_finding_ids(m) -> set:
         return set()
 
 
+# ---------- writer intent (R2-b mark-addressed + R3 defer) ----------
+# ONE store for the writer's own judgment, keyed by content-hash id so it
+# survives report regeneration. Observed status (quote gone from the text)
+# still wins display; intent is the writer's call on everything else.
+def finding_marks_path(m) -> str:
+    return os.path.join(m.project_dir, "finding_marks.json")
+
+
+def finding_intents(m) -> dict:
+    """{finding_id: "addressed" | "deferred"} — the writer's intent marks."""
+    try:
+        with open(finding_marks_path(m), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {k: v for k, v in data.items() if v in ("addressed", "deferred")}
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError, AttributeError):
+        return {}
+
+
+def set_finding_intent(m, finding_id: str, intent) -> None:
+    path = finding_marks_path(m)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {}
+    if intent in ("addressed", "deferred"):
+        data[finding_id] = intent
+    else:
+        data.pop(finding_id, None)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+# ---------- last-pass scorekeeping (R4, one generation back) ----------
+def last_pass_path(m) -> str:
+    return os.path.join(m.project_dir, "last_pass.json")
+
+
+def last_pass_snapshot(m):
+    """Diff this pass against the previous one: {last_total, still_live,
+    fixed, new, ghosted_marks}. Computed lazily with an mtime guard so
+    repeated GETs are idempotent; one generation back (boring is good).
+    Returns None on the first pass (no arithmetic yet — honest)."""
+    report_path = m.report_findings_path if m.stage("analyze").status == "complete" else None
+    if not report_path or not os.path.exists(report_path):
+        return None
+    rp_mtime = os.path.getmtime(report_path)
+    snap = None
+    try:
+        with open(last_pass_path(m), "r", encoding="utf-8") as f:
+            snap = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+        snap = None
+    if snap and snap.get("report_mtime") == rp_mtime:
+        return snap.get("payload")
+    with open(report_path, "r", encoding="utf-8") as f:
+        report = json.load(f)
+    findings = report.get("findings", [])
+    new_ids = [compute_finding_id(f) for f in findings]
+    issues = {compute_finding_id(f): (f.get("issue") or "") for f in findings}
+    payload = None
+    if snap and isinstance(snap.get("ids"), list):
+        old_ids = snap["ids"]
+        new_set = set(new_ids)
+        still = set(old_ids) & new_set
+        intents = finding_intents(m)
+        payload = {
+            "computed_at": time.time(),
+            "last_total": len(old_ids),
+            "still_live": len(still),
+            "fixed": len(old_ids) - len(still),
+            "new": len(new_ids) - len(still),
+            "ghosted_marks": [
+                {"finding_id": gid, "issue": (snap.get("issues") or {}).get(gid, ""),
+                 "intent": intents.get(gid)}
+                for gid in old_ids if gid not in new_set and intents.get(gid)
+            ][:50],
+        }
+    with open(last_pass_path(m), "w", encoding="utf-8") as f:
+        json.dump({"ids": new_ids, "issues": issues, "report_mtime": rp_mtime,
+                   "payload": payload}, f)
+    return payload
+
+
 def working_path(m) -> str:
     return os.path.join(m.project_dir, "working.json")
 

@@ -22,6 +22,10 @@ const state = {
   findingIds: [],         // index -> content-hash finding id (computeFindingId)
   findingDefer: {},       // finding id -> "deferred" (client intent, Phase D) — forward-compat
   ghostedIds: new Set(),  // finding ids the writer saw as stale (Phase E diff) — forward-compat
+  findingFilter: { severities: ["high"], showDeferred: false, category: null }, // ONE filter: drives ink, board, loop, counts (R5-b)
+  findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
+  lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
+  lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
   editsData: null,        // { edits, findings_status } from /edits
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
@@ -3574,11 +3578,19 @@ async function loadScriptData() {
     statusById[String(s.index)] = s.status;
   }
   state.findingStatus = statusById;
+  // writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride /edits
+  state.findingMarks = (edits && edits.finding_intents) || {};
+  const lp = (edits && edits.last_pass) || null;
+  const arrived = !!(lp && lp.computed_at && state.lastPassKey !== lp.computed_at);
+  state.lastPass = lp;
+  if (lp && lp.computed_at) state.lastPassKey = lp.computed_at;
+  if (lp && lp.ghosted_marks) state.ghostedIds = new Set(lp.ghosted_marks.map((g) => g.finding_id));
   try {
     state.fixQueue = await api(`${base}/fixqueue`);
   } catch (_) {
     state.fixQueue = { items: [], acts: [] };
   }
+  if (arrived && findings.length) scheduleArrivalPeek();
   renderDraftBar();
   await renderDiffBanner();
 }
@@ -4034,6 +4046,28 @@ function findingNoteEl(f, index, opts = {}) {
   }
 
   const actions = el("div", "finding-note-actions");
+  // writer intent + copy (deep cards only — the loop's home surface; the
+  // dock is where the writer's judgment is made, margin pins stay read-only)
+  if (opts.deep) {
+    const id = (state.findingIds && state.findingIds[index]) || String(index);
+    const mkIntent = (label, intent, title) => {
+      const b = el("button", "intent-btn" + (state.findingMarks[id] === intent ? " active" : ""), label);
+      b.type = "button";
+      b.title = title;
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setFindingIntent(id, state.findingMarks[id] === intent ? null : intent);
+      });
+      return b;
+    };
+    actions.appendChild(mkIntent("\u2713", "addressed", "My call: addressed (survives re-analysis)"));
+    actions.appendChild(mkIntent("\u23ED", "deferred", "Park for the next pass"));
+    const cp = el("button", "intent-btn", "\u29C9");
+    cp.type = "button";
+    cp.title = "Copy the evidence + scene slug";
+    cp.addEventListener("click", (e) => { e.stopPropagation(); copyFindingEvidence(f); });
+    actions.appendChild(cp);
+  }
   const locateBtn = el("button", "", "🎯 Locate");
   locateBtn.type = "button";
   locateBtn.title = "Jump to the exact line this finding quotes";
@@ -4218,6 +4252,9 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
   head.appendChild(addNoteBtn);
   page.appendChild(head);
 
+  // ink (R5-b): the ONE filter drives the page — active search wins
+  // (transient beats persistent); anchors computed once per scene
+  const inkAnchors = searchQuery ? [] : inkAnchorsFor(findings);
   for (const e of scene.elements) {
     if (e.type === "scene_heading") continue;
     const line = el("div", `el-${e.type}`);
@@ -4225,6 +4262,7 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
     if (e.type === "parenthetical" && !text.startsWith("(")) text = `(${text})`;
     line.textContent = text;
     if (searchQuery) highlightMatches(line, text, searchQuery);
+    else if (inkAnchors.length) decorateLineWithInk(line, text, inkAnchors);
     // change-mark star: this line is the NEW text of an applied edit (Arc
     // Studio's most-praised touch) — hover shows what it replaced
     wireInlineEdit(line, scene.scene_number, e.text);
@@ -4604,6 +4642,8 @@ function setDockLens(lens) {
   // Phase 6: the evidence lens assembles on every activation — it reads live
   // state (report, fix queue, manuscript data), never a stale copy.
   if (lens === "evidence" && dockIsOpen()) renderDockEvidence();
+  // the unread dot lives until the writer actually opens the Evidence lens
+  if (lens === "evidence") clearEvidenceUnread();
   // Phase 13: the Stash & Notes lens renders from live state on activation
   // (same renderers the rail used — no second data path)
   if (lens === "notes" && dockIsOpen()) renderDockNotesLens();
@@ -4769,6 +4809,24 @@ function renderDockEvidence() {
     return;
   }
 
+  // -- 0b. the arrival strip (R4): the "finally" — scorekeeping + trust +
+  // inline retry + ghosted marks, at the top of the board where arrival lands.
+  const arrival = buildArrivalStrip();
+  if (arrival) lens.appendChild(arrival);
+
+  // -- 0a. the ONE filter row (R5-b + R8): severity toggles drive ink,
+  // board list, loop and counts together; category chips count and filter —
+  // tap = filtered view, NO regrouping. The loop button engages the
+  // keyboard fix loop (R2-b); N/↓ step findings until Esc.
+  const filterRow = buildFindingFilterRow();
+  const loopBtn = el("button", "fchip fchip-loop");
+  loopBtn.type = "button";
+  loopBtn.textContent = "\u21C9 fix loop";
+  loopBtn.title = "Keyboard fix loop: N/\u2193 next finding \u00B7 P/\u2191 previous \u00B7 mark, park, discuss, copy \u00B7 Esc to leave";
+  loopBtn.addEventListener("click", () => startLoop());
+  filterRow.appendChild(loopBtn);
+  lens.appendChild(filterRow);
+
   // -- 0. script mass strip + ruler (orientation) ---------------------------
   const strip = buildScriptMassStrip();
   if (strip.children.length) lens.appendChild(strip);
@@ -4876,12 +4934,275 @@ function renderDockEvidence() {
   renderCharacterPanel(craftWrap);
   renderWriterMirrorPanel(craftWrap);
   if (craftWrap.children.length) lens.appendChild(craftWrap);
+
+  // any lens rebuild mid-loop (filter toggle, intent change) wiped the
+  // transient bar + card state — re-dock it here (idempotent when inactive)
+  renderLoopBar();
 }
 
 // ---------- evidence orientation helpers (mass strip / script ruler / sp spine) ----------
 // SP_STATUS lives at module scope: the ledger rows print it, the spine
 // tooltips announce it — one source, two presentations.
 const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
+
+// ---------- ink (R5-b): the ONE filter drives page ink, board list, loop ----------
+// Ink anchors per scene: open findings with quotes that pass the filter,
+// highest severity first — one ink per line, several findings collapse to
+// one numbered chip (the number = how many collapsed here).
+function inkAnchorsFor(findings) {
+  const out = [];
+  for (const { f, index } of findings || []) {
+    const q = (f.evidence_quote || "").trim();
+    if (q.length < 2) continue;
+    if (findingDisposition(f, index) !== "open") continue;
+    const sev = (f.severity || "low").toLowerCase();
+    if (!state.findingFilter.severities.includes(sev)) continue;
+    if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) continue;
+    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q, sev });
+  }
+  const order = { high: 0, medium: 1, low: 2 };
+  out.sort((a, b) => (order[a.sev] - order[b.sev]) || (b.q.length - a.q.length));
+  return out;
+}
+// wrap ONE anchor's first occurrence inline — same technique as
+// highlightMatches; an inline mark inherits the line's font so text never
+// reflows. Returns how many anchors live on this line (the chip count).
+function decorateLineWithInk(line, text, anchors) {
+  let hits = 0, first = null;
+  for (const a of anchors) {
+    if (text.indexOf(a.q) !== -1) { hits += 1; if (!first) first = a; }
+  }
+  if (!first) return 0;
+  const idx = text.indexOf(first.q);
+  line.textContent = "";
+  line.appendChild(document.createTextNode(text.slice(0, idx)));
+  const mark = document.createElement("mark");
+  mark.className = "finding-ink ink-" + first.sev;
+  mark.dataset.findingId = first.id;
+  mark.setAttribute("aria-hidden", "true"); // the margin pins + board carry semantics
+  mark.title = (first.f.issue || "").slice(0, 140);
+  mark.textContent = text.slice(idx, idx + first.q.length);
+  if (hits > 1) {
+    const chip = document.createElement("i");
+    chip.className = "ink-chip";
+    chip.textContent = "\u00D7" + hits;
+    chip.title = hits + " findings share this line";
+    mark.appendChild(chip);
+  }
+  line.appendChild(mark);
+  line.appendChild(document.createTextNode(text.slice(idx + first.q.length)));
+  return hits;
+}
+
+// ---------- writer intent (R2-b / R3): one setter, every surface re-renders ----------
+async function setFindingIntent(findingId, intent) {
+  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
+  try {
+    await api(`${base}/findings/intent`, { method: "POST", body: JSON.stringify({ finding_id: findingId, intent }) });
+  } catch (e) {
+    showError("Could not save your mark: " + e.message);
+    return;
+  }
+  if (intent) state.findingMarks[findingId] = intent;
+  else delete state.findingMarks[findingId];
+  renderDockEvidence();
+  renderManuscript();
+  renderSceneIndex();
+}
+
+// ---------- arrival (R5-b peek + R9-adjacent unread dot) ----------
+// One ambient window per arrival: the first inked line gets a halo, the dock
+// tab carries a lasting unread dot until the Evidence lens is opened. No
+// other ambience runs during the window (one-ambient-event cap, R8).
+let arrivalTimer = null;
+function scheduleArrivalPeek() {
+  clearTimeout(arrivalTimer);
+  arrivalTimer = setTimeout(() => {
+    const tab = document.getElementById("dock-tab-evidence");
+    if (tab && !(document.getElementById("context-dock") || {}).classList?.contains("open")) {
+      tab.classList.add("has-unread");
+    }
+    const firstInk = document.querySelector(".finding-ink");
+    if (firstInk) {
+      firstInk.classList.add("ink-halo");
+      setTimeout(() => firstInk.classList.remove("ink-halo"), 4000);
+    }
+  }, 700);
+}
+function clearEvidenceUnread() {
+  const tab = document.getElementById("dock-tab-evidence");
+  if (tab) tab.classList.remove("has-unread");
+}
+
+// ---------- arrival strip (R4 + N1 + N2): the "finally" ----------
+// "Last pass: 62. Still live: 41. Fixed: 14. New: 7." + the trust readout +
+// inline retry when the pass arrived partially. Fixed findings expand to a
+// muted ghosted list — never red, in no open count (R9).
+function buildArrivalStrip() {
+  const lp = state.lastPass;
+  if (!lp || !lp.computed_at) return null;
+  const strip = el("div", "dock-arrival-strip");
+  const head = el("div", "dock-arrival-head");
+  head.appendChild(el("span", "dock-arrival-line",
+    `Last pass: ${lp.last_total} \u00B7 Still live: ${lp.still_live} \u00B7 Fixed: ${lp.fixed} \u00B7 New: ${lp.new}`));
+  const vs = state.report && state.report.verification_summary;
+  if (vs) {
+    const vTotal = (vs.verified || 0) + (vs.not_found || 0) + (vs.no_quote || 0) + (vs.scene_not_found || 0);
+    if (vTotal) head.appendChild(el("span", "dock-trust",
+      (vs.verified || 0) + " of " + vTotal + " quotes verified (" + Math.round(100 * (vs.verified || 0) / vTotal) + "%)"));
+  }
+  strip.appendChild(head);
+  // inline retry (N2): the moment a partial arrival is seen is the moment it's fixed
+  const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
+  const failed = (projSummary && projSummary.failed_categories) || [];
+  if (failed.length) {
+    const retry = el("button", "dock-arrival-retry");
+    retry.type = "button";
+    retry.textContent = "Retry failed (" + failed.length + ")";
+    retry.title = "Re-run only the failed categories — the report merges";
+    retry.addEventListener("click", async () => {
+      retry.disabled = true;
+      retry.textContent = "Retrying\u2026";
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/retry-failed`, { method: "POST" });
+        await loadScriptData();
+        renderDockEvidence();
+        renderManuscript();
+      } catch (e) {
+        retry.disabled = false;
+        retry.textContent = "Retry failed";
+        showError("Retry failed: " + e.message);
+      }
+    });
+    strip.appendChild(retry);
+  }
+  // ghosted: the writer's marks that transformed — muted, expandable, never red
+  const ghosted = lp.ghosted_marks || [];
+  if (ghosted.length) {
+    const det = el("details", "dock-ghosted");
+    det.appendChild(el("summary", "dock-ghosted-summary", ghosted.length + " of your marks moved on"));
+    for (const g of ghosted) {
+      const r = el("div", "dock-ghosted-row");
+      r.appendChild(el("span", "dock-ghosted-issue", (g.issue || "finding").slice(0, 110)));
+      if (g.intent) r.appendChild(el("span", "dock-ghosted-intent", g.intent === "addressed" ? "was marked addressed" : "was next pass"));
+      det.appendChild(r);
+    }
+    strip.appendChild(det);
+  }
+  return strip;
+}
+
+// ---------- the keyboard fix loop (R2-b, contextual keys per 2A) ----------
+// When engaged, N/↓ step findings and P/↑ steps back — scene-stepping
+// muscle memory is untouched the moment the loop exits (Esc).
+const loopState = { active: false, pos: -1 };
+function loopList() {
+  const out = [];
+  (state.findings || []).forEach((f, index) => {
+    const d = findingDisposition(f, index);
+    if (d === "deferred" ? !state.findingFilter.showDeferred : d !== "open") return;
+    const sev = (f.severity || "low").toLowerCase();
+    if (!state.findingFilter.severities.includes(sev)) return;
+    if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) return;
+    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index) });
+  });
+  return out;
+}
+function startLoop() {
+  if (!state.findings || !state.findings.length) return;
+  loopState.active = true;
+  loopState.pos = -1;
+  openDock("evidence");
+  renderLoopBar();
+  stepLoop(1);
+}
+function exitLoop() {
+  loopState.active = false;
+  loopState.pos = -1;
+  renderLoopBar();
+}
+function stepLoop(dir) {
+  const list = loopList();
+  if (!list.length) return;
+  loopState.pos = (loopState.pos + dir + list.length) % list.length; // wrap — no dead ends
+  const { f, index, id } = list[loopState.pos];
+  // span-level first: the ink anchor; scene-level fallback (cross-line quotes)
+  const ink = document.querySelector(`.finding-ink[data-finding-id="${CSS.escape(id)}"]`);
+  if (ink) {
+    ink.scrollIntoView({ behavior: "smooth", block: "center" });
+    ink.classList.remove("flash");
+    void ink.offsetWidth; // restart the animation
+    ink.classList.add("flash");
+    setTimeout(() => ink.classList.remove("flash"), 1600);
+  } else {
+    jumpToScene(findingTargetScene(f));
+  }
+  // chip auto-open: the dock card expands to the same finding
+  const card = document.querySelector(`.dock-lens[data-lens="evidence"] .finding-note[data-finding-index="${index}"]`);
+  if (card) {
+    card.classList.add("expanded", "loop-current");
+    card.scrollIntoView({ block: "nearest" });
+    document.querySelectorAll(".dock-lens[data-lens=\"evidence\"] .finding-note.loop-current").forEach((n) => {
+      if (n !== card) n.classList.remove("loop-current");
+    });
+  }
+  renderLoopBar();
+}
+function renderLoopBar() {
+  const old = document.getElementById("loop-bar");
+  if (old) old.remove();
+  if (!loopState.active) return;
+  const list = loopList();
+  // a filter change mid-loop can shrink the list past pos — the bar never
+  // lies; the next step normalizes state.pos through the wrap math
+  const shownPos = list.length ? Math.min(loopState.pos, list.length - 1) : -1;
+  const bar = el("div", "loop-bar");
+  bar.id = "loop-bar";
+  bar.appendChild(el("span", "loop-pos", list.length ? (shownPos + 1) + " of " + list.length : "none open"));
+  const mk = (label, title, fn) => {
+    const b = el("button", "loop-btn");
+    b.type = "button";
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener("click", fn);
+    return b;
+  };
+  bar.appendChild(mk("\u2191", "Previous finding (P)", () => stepLoop(-1)));
+  bar.appendChild(mk("\u2193", "Next finding (N)", () => stepLoop(1)));
+  const cur = loopList()[shownPos];
+  if (cur) {
+    bar.appendChild(mk("\u2713 addressed", "Mark addressed (the writer's call — survives re-analysis)",
+      () => setFindingIntent(cur.id, state.findingMarks[cur.id] === "addressed" ? null : "addressed")));
+    bar.appendChild(mk("\u23ED next pass", "Park it for the next pass (R3)",
+      () => setFindingIntent(cur.id, state.findingMarks[cur.id] === "deferred" ? null : "deferred")));
+    bar.appendChild(mk("\u{1F4AC} discuss", "Ask Sameer about this exact line",
+      () => { setPendingQuote({ scene_number: findingTargetScene(cur.f), text: cur.f.evidence_quote || cur.f.issue || "" }); setDockLens("sameer"); }));
+    bar.appendChild(mk("\u29C9 copy", "Copy the evidence + scene slug (R7)", () => copyFindingEvidence(cur.f)));
+  }
+  bar.appendChild(mk("esc", "Leave the loop — N goes back to next-scene", exitLoop));
+  const lens = document.querySelector('.dock-lens[data-lens="evidence"]');
+  if (lens) lens.prepend(bar);
+  // transient card state rides the re-render: re-dock the current expansion
+  if (cur) {
+    const card = document.querySelector(`.dock-lens[data-lens="evidence"] .finding-note[data-finding-index="${cur.index}"]`);
+    if (card) card.classList.add("expanded", "loop-current");
+  }
+}
+function copyFindingEvidence(f) {
+  const sc = findingTargetScene(f);
+  const scene = sc != null ? (state.script.scenes || []).find((s) => s.scene_number === sc) : null;
+  const text = (f.evidence_quote || f.issue || "") + (sc != null ? `\n\u2014 Scene ${sc}${scene && scene.heading_raw ? " (" + scene.heading_raw + ")" : ""}` : "");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (_) { /* clipboard unavailable */ }
+    ta.remove();
+  }
+}
 
 // ---------- content-hash finding identity (R1 refined) ----------
 // JS twin of revision.py compute_finding_id — the server observes, the
@@ -4917,11 +5238,13 @@ function computeFindingId(f) {
 // before, which the live probe verifies.
 function findingDisposition(f, index) {
   const id = (state.findingIds && state.findingIds[index]) || String(index);
-  if (state.findingDefer && state.findingDefer[id] === "deferred") return "deferred";
-  if (state.ghostedIds && state.ghostedIds.has(id)) return "ghosted";
   const st = state.findingStatus || {};
   const status = st[id] != null ? st[id] : (st[String(index)] != null ? st[String(index)] : st[index]);
   if (status === "addressed") return "addressed";
+  const intent = state.findingMarks && state.findingMarks[id];
+  if (intent === "deferred") return "deferred";
+  if (intent === "addressed") return "addressed";
+  if (state.ghostedIds && state.ghostedIds.has(id)) return "ghosted";
   if (isFindingDismissed(index, id)) return "dismissed";
   return "open";
 }
@@ -4939,6 +5262,53 @@ function findingStatusOf(f, index) {
   const st = state.findingStatus || {};
   const id = (state.findingIds && state.findingIds[index]) || String(index);
   return st[id] != null ? st[id] : (st[String(index)] != null ? st[String(index)] : st[index]);
+}
+
+/** The ONE filter row (R5-b + R8): severity toggles + category count-chips +
+ *  the next-pass toggle. Every surface (ink, board list, loop) reads the same
+ *  state.findingFilter — the page and the board cannot disagree. */
+function buildFindingFilterRow() {
+  const row = el("div", "dock-filter-row");
+  const mk = (label, active, title, onClick) => {
+    const c = el("button", "fchip" + (active ? " active" : ""));
+    c.type = "button";
+    c.textContent = label;
+    c.title = title;
+    c.setAttribute("aria-pressed", active ? "true" : "false");
+    c.addEventListener("click", onClick);
+    return c;
+  };
+  const rerender = () => { renderDockEvidence(); renderManuscript(); };
+  for (const s of ["high", "medium", "low"]) {
+    const on = state.findingFilter.severities.includes(s);
+    row.appendChild(mk(s[0].toUpperCase() + s.slice(1), on, (on ? "Inked on the page" : "Hidden from the page") + " — click to toggle", () => {
+      const i = state.findingFilter.severities.indexOf(s);
+      if (i >= 0) state.findingFilter.severities.splice(i, 1);
+      else state.findingFilter.severities.push(s);
+      if (!state.findingFilter.severities.length) state.findingFilter.severities.push(s); // never all-off
+      rerender();
+    }));
+  }
+  // category count-chips: counts over open findings (severity-agnostic),
+  // tap filters the board list + ink to that category, tap again clears
+  const catCounts = {};
+  (state.findings || []).forEach((f, index) => {
+    if (findingDisposition(f, index) !== "open") return;
+    const c = f.category || "other";
+    catCounts[c] = (catCounts[c] || 0) + 1;
+  });
+  for (const c of Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a])) {
+    const active = state.findingFilter.category === c;
+    row.appendChild(mk((CATEGORY_LABELS[c] || c) + " " + catCounts[c], active,
+      (active ? "Showing all categories" : "Show only " + (CATEGORY_LABELS[c] || c)),
+      () => { state.findingFilter.category = active ? null : c; rerender(); }));
+  }
+  const dp = state.findingFilter.showDeferred;
+  row.appendChild(mk("Next pass", dp, dp ? "Deferred findings shown" : "Deferred findings parked", () => {
+    state.findingFilter.showDeferred = !dp;
+    rerender();
+  }));
+  return row;
 }
 
 /** Whole-script orientation strip: open/total + severity mass + category
@@ -5580,32 +5950,16 @@ var fvCurrentScene = -1;
 var fvBoardFilter = "all";
 
 async function openFeedbackView() {
-  if (state.view === "fv") return;
-  exitSpotlight();
-  fvPrevRoom = state.view === "cowrite" || state.view === "feedback" ? state.view : "cowrite";
-  state.view = "fv";
-  hideAllViews();
-  closeRoomDrawer();
-  var cowriteBtn = document.getElementById("room-cowrite-btn");
-  var feedbackBtn = document.getElementById("room-feedback-btn");
-  cowriteBtn.classList.remove("active");
-  cowriteBtn.setAttribute("aria-selected", "false");
-  feedbackBtn.classList.add("active");
-  feedbackBtn.setAttribute("aria-selected", "true");
-  document.getElementById("room-chip").textContent = "\u{1F4CB} Feedback";
-  document.getElementById("feedback-view").style.display = "flex";
-  try { await loadScriptData(); } catch (e) { showError("Could not load the script: " + e.message); }
-  var ws2 = document.querySelector(".workspace");
-  if (ws2) ws2.style.display = "none";
-  renderFeedbackView();
-  initFvScrollSync();
-  initFvDividers();
-  // Reset the right panel to expanded state on open
-  var fvRight = document.querySelector("#feedback-view .fv-right");
-  if (fvRight) fvRight.classList.remove("fv-right-collapsed");
-  var fvEdgeTab = document.getElementById("fv-right-edge-tab");
-  if (fvEdgeTab) fvEdgeTab.style.display = "none";
-  saveSession();
+  // FV folded into the room (GO 2, ratified 1A): the dock's Evidence lens IS
+  // the Problem Board and the dock carries both partners — one real
+  // manuscript, no shrunken clone, one ledger. The old 3-panel view
+  // (#feedback-view) stays dormant: setRoom hides it and no reachable path
+  // selects the fv view any more (grep gate in the layout audit).
+  if (state.view !== "cowrite") setRoom("cowrite");
+  if (state.currentProject && !state.script) {
+    try { await loadScriptData(); } catch (e) { showError("Could not load the script: " + e.message); }
+  }
+  openDock("evidence");
 }
 
 function closeFeedbackView() {
@@ -6691,6 +7045,7 @@ function bindGlobalShortcuts() {
     // Esc — the page wins: dismiss the partner drawer, then the craft shelf,
     // then the structure rail (palette Esc is handled above; modals keep Esc).
     if (e.key === "Escape") {
+      if (loopState.active) { exitLoop(); return; }
       if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
       if (state.view === "revision") { closeRevisionView(); return; }
       if (state.view === "premise") { closePremiseView(); return; }
@@ -6714,6 +7069,14 @@ function bindGlobalShortcuts() {
     // and the rail (r) belong there too
     if (!state.currentProject && !state.inIdea) return;
 
+    // the keyboard fix loop (R2-b, contextual per 2A): while engaged, the
+    // finding keys OWN n/j/p/k — scene-stepping resumes the moment the loop
+    // exits. Esc is handled above (loop exits before the dock closes).
+    if (loopState.active) {
+      if (e.key === "n" || e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); stepLoop(1); return; }
+      if (e.key === "p" || e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); stepLoop(-1); return; }
+      return;
+    }
     if (e.key === "?") { e.preventDefault(); openPalette(true); }
     else if (e.key === "/") { e.preventDefault(); paletteCommands().find((c) => c.keys === "/").run(); }
     else if (e.key === "c") { openCowriteRoom(); }

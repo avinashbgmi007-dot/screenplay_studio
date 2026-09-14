@@ -6478,3 +6478,46 @@ body:not(.idea-mode) .desk {
 .finding-note.ghosted{opacity:.6;filter:saturate(.4)}
 .finding-note.deferred .finding-note-state,.finding-note.ghosted .finding-note-state{color:var(--text-faint);font-family:var(--font-body,var(--font-base,var(--font-mono)))}
 .finding-note.deferred .finding-note-state,.finding-note.ghosted .finding-note-state{font-style:italic}
+
+/* ============================================================
+   GO 2: the ONE filter row (R5-b/R8) + ink (R5-b) + arrival strip
+   (R4/N1/N2) + keyboard loop (R2-b) + unread dot — both registers
+   ride the token ladder.
+   ============================================================ */
+.dock-filter-row { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; }
+.fchip { appearance:none; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:2px var(--sp-3); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
+.fchip:hover { color:var(--text); border-color:var(--lamp); }
+.fchip.active { background:var(--lamp); border-color:var(--lamp); color:var(--accent-ink); font-weight:600; }
+.fchip:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
+.fchip-loop { margin-left:auto; border-style:dashed; }
+.finding-ink { background:transparent; color:inherit; font:inherit; border-bottom:2px solid var(--lamp); cursor:help; border-radius:1px; }
+.finding-ink.ink-high { border-bottom-color:var(--danger); box-shadow:inset 0 -3px 0 rgba(200,80,58,.14); }
+.finding-ink.ink-medium { border-bottom-color:var(--sev-mid); box-shadow:inset 0 -3px 0 rgba(232,162,79,.12); }
+.finding-ink.ink-low { border-bottom-color:var(--ok); box-shadow:inset 0 -3px 0 rgba(124,196,138,.10); }
+.ink-chip { font-style:normal; font-size:var(--fs-3xs); font-weight:700; margin-left:var(--sp-2); padding:0 5px; border-radius:999px; background:var(--lamp); color:var(--accent-ink); vertical-align:super; }
+.finding-ink.ink-halo { animation:ink-halo 4s ease-out 1; }
+@keyframes ink-halo { 0%,70% { box-shadow:0 0 0 2px var(--glow-strong), 0 0 18px var(--glow-strong); } 100% { box-shadow:none; } }
+.finding-ink.flash { animation:ink-flash 1.6s ease-out 1; }
+@keyframes ink-flash { 0%,60% { background:var(--glow); } 100% { background:transparent; } }
+#dock-tab-evidence.has-unread::after { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lamp); margin-left:4px; box-shadow:0 0 8px var(--glow-strong); }
+.dock-arrival-strip { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-3); border:1px solid var(--lamp); border-radius:var(--r-md); background:var(--glow); }
+.dock-arrival-head { display:flex; align-items:baseline; gap:var(--sp-3); flex-wrap:wrap; }
+.dock-arrival-line { font-size:var(--fs-xs); font-weight:600; color:var(--text); }
+.dock-arrival-retry { align-self:flex-start; appearance:none; border:1px solid var(--danger); background:var(--danger-bg,rgba(200,80,58,.10)); color:var(--danger); border-radius:var(--r-sm); padding:2px var(--sp-3); font-size:var(--fs-2xs); cursor:pointer; }
+.dock-arrival-retry:disabled { opacity:.6; cursor:default; }
+.dock-ghosted summary { font-size:var(--fs-2xs); color:var(--text-faint); cursor:pointer; }
+.dock-ghosted-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
+.dock-ghosted-issue { font-size:var(--fs-2xs); color:var(--text-muted); opacity:.75; }
+.dock-ghosted-intent { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; white-space:nowrap; }
+.loop-bar { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; padding:var(--sp-2) var(--sp-3); border:1px solid var(--lamp); border-radius:var(--r-md); background:var(--glass-strong); position:sticky; top:0; z-index:2; }
+.loop-pos { font-size:var(--fs-2xs); font-weight:700; color:var(--lamp); font-variant-numeric:tabular-nums; }
+.loop-btn { appearance:none; border:1px solid var(--line); background:var(--surface); border-radius:var(--r-sm); padding:2px var(--sp-3); font-size:var(--fs-2xs); color:var(--text); cursor:pointer; }
+.loop-btn:hover { border-color:var(--lamp); color:var(--lamp); }
+.loop-btn:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
+.finding-note.loop-current { border-color:var(--lamp); box-shadow:0 0 0 1px var(--lamp), 0 0 14px var(--glow); }
+.intent-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
+.intent-btn:hover { border-color:var(--lamp); color:var(--lamp); }
+.intent-btn.active { border-color:var(--ok); color:var(--ok); font-weight:700; }
+@media (prefers-reduced-motion: reduce) {
+  .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
+}
