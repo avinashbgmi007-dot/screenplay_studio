@@ -6472,3 +6472,9 @@ body:not(.idea-mode) .desk {
 .finding-deep-badge { align-self:flex-start; font-size:var(--fs-2xs); font-weight:600; border-radius:var(--r-sm); padding:1px var(--sp-2); }
 .finding-deep-badge.verified { color:var(--ok); border:1px solid var(--ok); }
 .finding-deep-badge.unverified { color:var(--danger); border:1px solid var(--danger); }
+
+/* forward-compatible finding states (R3 defer / R9 ghosting): muted, never red, CSS-only (marks never reflow script text) */
+.finding-note.deferred{opacity:.72}
+.finding-note.ghosted{opacity:.6;filter:saturate(.4)}
+.finding-note.deferred .finding-note-state,.finding-note.ghosted .finding-note-state{color:var(--text-faint);font-family:var(--font-body,var(--font-base,var(--font-mono)))}
+.finding-note.deferred .finding-note-state,.finding-note.ghosted .finding-note-state{font-style:italic}

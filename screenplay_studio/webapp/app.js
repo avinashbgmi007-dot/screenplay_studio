@@ -18,10 +18,13 @@ const state = {
   view: "chat",          // "chat" | "script"
   script: null,           // working-copy ScriptDocument JSON (script view)
   findings: [],           // findings from report.findings.json
-  findingStatus: {},      // finding index -> addressed / still_present / unknown
+  findingStatus: {},      // finding id (or legacy index) -> addressed / still_present / unknown
+  findingIds: [],         // index -> content-hash finding id (computeFindingId)
+  findingDefer: {},       // finding id -> "deferred" (client intent, Phase D) — forward-compat
+  ghostedIds: new Set(),  // finding ids the writer saw as stale (Phase E diff) — forward-compat
   editsData: null,        // { edits, findings_status } from /edits
   drafts: null,           // { active_draft, drafts } from /drafts
-  fixQueue: null,         // { items, acts } from /fixqueue
+  fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
   reportStats: null,      // stats from report.findings.json
   premise: null,          // premise card carried into a graduated project
   notes: [],              // the writer's own margin notes
@@ -3560,11 +3563,17 @@ async function loadScriptData() {
   state.findings = findings;
   state.report = report;
   state.reportStats = (report && report.stats) || null;
-  const statusByIndex = {};
+  // content-hash identity: the client computes the SAME id the server
+  // observes (revision.py compute_finding_id). Status reads prefer id —
+  // the writer's marks survive re-scoring and scene insert-shift — and
+  // fall back to legacy index entries for old projects.
+  state.findingIds = findings.map((f) => computeFindingId(f));
+  const statusById = {};
   for (const s of (state.editsData.findings_status && state.editsData.findings_status.findings) || []) {
-    statusByIndex[s.index] = s.status;
+    if (s.finding_id) statusById[s.finding_id] = s.status;
+    statusById[String(s.index)] = s.status;
   }
-  state.findingStatus = statusByIndex;
+  state.findingStatus = statusById;
   try {
     state.fixQueue = await api(`${base}/fixqueue`);
   } catch (_) {
@@ -3981,20 +3990,25 @@ async function renderDiffBanner() {
 
 function findingStatusSummary() {
   const summary = { addressed: 0, open: 0 };
-  for (const [idx, status] of Object.entries(state.findingStatus)) {
-    if (state.findings[idx] && state.findings[idx].category === "formatting") continue;
-    if (status === "addressed") summary.addressed += 1;
+  (state.findings || []).forEach((f, index) => {
+    if (f.category === "formatting") return;
+    const d = findingDisposition(f, index);
+    if (d === "addressed") summary.addressed += 1;
     else summary.open += 1;
-  }
+  });
   return summary;
 }
 
 function findingNoteEl(f, index, opts = {}) {
-  const note = el("div", "finding-note" + (SEVERITY_CLASS[f.severity] || "") + (opts.addressed ? " addressed" : ""));
+  const disp = opts.disposition || "open";
+  // forward-compatible states (Phase D defer / Phase E ghosting): muted
+  // rendering only — never red, never reflowing script text (CSS-only)
+  const stateClass = disp === "deferred" ? " deferred" : disp === "ghosted" ? " ghosted" : "";
+  const note = el("div", "finding-note" + (SEVERITY_CLASS[f.severity] || "") + (opts.addressed ? " addressed" : "") + stateClass);
   note.dataset.findingIndex = String(index);
   const top = el("div", "finding-note-top");
   const cat = el("span", "finding-note-cat", CATEGORY_LABELS[f.category] || f.category);
-  const stateEl = el("span", "finding-note-state", opts.addressed ? "addressed" : "");
+  const stateEl = el("span", "finding-note-state", opts.addressed ? "addressed" : (disp === "deferred" ? "next pass" : disp === "ghosted" ? "stale" : ""));
   top.appendChild(cat);
   top.appendChild(stateEl);
   note.appendChild(top);
@@ -4225,7 +4239,7 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
   if (findings.length || notes.length) {
     const margin = el("div", "scene-notes");
     for (const { f, index } of findings) {
-      const addressed = state.findingStatus[index] === "addressed";
+      const addressed = findingStatusOf(f, index) === "addressed";
       margin.appendChild(findingNoteEl(f, index, { addressed }));
     }
     if (notes.length) {
@@ -4466,7 +4480,7 @@ let sceneIndexRAF = null;
 function sceneIndexSeverity(sceneNumber) {
   const counts = { high: 0, medium: 0, low: 0 };
   (state.findings || []).forEach((f, index) => {
-    if (state.findingStatus && state.findingStatus[index] === "addressed") return;
+    if (!findingOpen(f, index)) return;
     const refs = (f.scene_refs && f.scene_refs.length) ? f.scene_refs : (f.scene ? [f.scene] : []);
     if (!refs.includes(sceneNumber)) return;
     const sev = (f.severity || "low").toLowerCase();
@@ -4777,7 +4791,7 @@ function renderDockEvidence() {
   // -- 3. findings on the current scene (Where, precisely) -----------------
   const data = prepareManuscriptData(); // the single source of truth
   const sceneNum = currentManuscriptScene();
-  const isAddressed = (index) => state.findingStatus && state.findingStatus[index] === "addressed";
+  const isAddressed = (f, index) => findingStatusOf(f, index) === "addressed";
   const sceneFindings = sceneNum != null ? (data.byScene[sceneNum] || []) : [];
   if (sceneFindings.length) {
     const sec = el("div", "dock-section dock-section-scene-findings");
@@ -4787,7 +4801,7 @@ function renderDockEvidence() {
     const list = el("div", "dock-finding-list");
     for (const { f, index } of sceneFindings) {
       // Addressed / Still Present rides along (MD §7 preserve list)
-      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index), deep: true }));
+      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     }
     sec.appendChild(list);
     lens.appendChild(sec);
@@ -4798,7 +4812,7 @@ function renderDockEvidence() {
     sec.appendChild(el("div", "dock-section-title", "Script-level findings"));
     const list = el("div", "dock-finding-list");
     for (const { f, index } of data.scriptLevel) {
-      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index), deep: true }));
+      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     }
     sec.appendChild(list);
     lens.appendChild(sec);
@@ -4818,7 +4832,7 @@ function renderDockEvidence() {
     title.appendChild(el("span", "dock-section-count", String(list.length)));
     sec.appendChild(title);
     const wrap = el("div", "dock-finding-list");
-    for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index), deep: true }));
+    for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     sec.appendChild(wrap);
     lens.appendChild(sec);
   }
@@ -4869,6 +4883,64 @@ function renderDockEvidence() {
 // tooltips announce it — one source, two presentations.
 const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
 
+// ---------- content-hash finding identity (R1 refined) ----------
+// JS twin of revision.py compute_finding_id — the server observes, the
+// client displays; both produce the SAME id. Key = category + verified
+// evidence_quote; scene_refs ride as data (insert-shift keeps the id);
+// severity is a judgment, not identity. no_quote tier keys on category +
+// normalized issue (documented weak tier).
+function _strHash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (((h << 5) + h + s.charCodeAt(i)) | 0) >>> 0;
+  return h;
+}
+function _base36(h) {
+  const D = "0123456789abcdefghijklmnopqrstuvwxyz";
+  if (!h) return "0";
+  let out = "";
+  while (h) { out = D[h % 36] + out; h = Math.floor(h / 36); }
+  return out;
+}
+function computeFindingId(f) {
+  const quote = (f.evidence_quote || "").trim();
+  const norm = quote ? quote : "issue:" + (f.issue || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 100);
+  return "f" + _base36(_strHash((f.category || "other") + "|" + norm));
+}
+
+// ---------- the finding counting contract (N3) ----------
+// ONE source for disposition (open / addressed / deferred / ghosted /
+// dismissed). Every counting surface — mass strip, script ruler, scene
+// index counts, summary, fix queue, keyboard loop — reads this; the
+// writer's totals cannot disagree between surfaces. Deferred (client
+// intent) and ghosted (server-observed drift) stores are forward-compatible
+// hooks for Phase D/E; today they resolve empty and count exactly as
+// before, which the live probe verifies.
+function findingDisposition(f, index) {
+  const id = (state.findingIds && state.findingIds[index]) || String(index);
+  if (state.findingDefer && state.findingDefer[id] === "deferred") return "deferred";
+  if (state.ghostedIds && state.ghostedIds.has(id)) return "ghosted";
+  const st = state.findingStatus || {};
+  const status = st[id] != null ? st[id] : (st[String(index)] != null ? st[String(index)] : st[index]);
+  if (status === "addressed") return "addressed";
+  if (isFindingDismissed(index, id)) return "dismissed";
+  return "open";
+}
+function findingOpen(f, index) {
+  return findingDisposition(f, index) === "open";
+}
+function isFindingDismissed(index, id) {
+  const flags = (state.fixQueue && state.fixQueue.dismissed_flags) || [];
+  return flags.some((d) => (id && d.finding_id === id) || d.index === index);
+}
+// the module's status read, exposed for surfaces that need the raw
+// addressed/still_present/unknown judgment (never for counting — count via
+// findingDisposition/findingOpen so totals cannot disagree)
+function findingStatusOf(f, index) {
+  const st = state.findingStatus || {};
+  const id = (state.findingIds && state.findingIds[index]) || String(index);
+  return st[id] != null ? st[id] : (st[String(index)] != null ? st[String(index)] : st[index]);
+}
+
 /** Whole-script orientation strip: open/total + severity mass + category
  *  weights + the trust readout (verification_summary ships in the report and
  *  rendered nowhere else). Static by design — orientation, not interaction. */
@@ -4876,12 +4948,12 @@ function buildScriptMassStrip() {
   const strip = el("div", "dock-mass-strip");
   const findings = state.findings || [];
   if (!findings.length) return strip;
-  const open = (index) => !(state.findingStatus && state.findingStatus[index] === "addressed");
+  const open = (f, index) => findingOpen(f, index);
   const sev = { high: 0, medium: 0, low: 0 };
   const cat = {};
   let openTotal = 0;
   findings.forEach((f, index) => {
-    if (!open(index)) return;
+    if (!open(f, index)) return;
     openTotal += 1;
     const s = (f.severity || "low").toLowerCase();
     if (sev[s] != null) sev[s] += 1;
@@ -5271,7 +5343,6 @@ function renderReportPanel() {
     const spHead = el("div", "craft-panel-head");
     spHead.appendChild(el("span", "craft-panel-title", "Setup / Payoff"));
     spCard.appendChild(spHead);
-    const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
     sp.forEach((e) => {
       const setScenes = (e.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
       const payScenes = (e.payoff_scenes && e.payoff_scenes.length) ? e.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
@@ -5989,7 +6060,7 @@ function renderRevisionView() {
   // navigator: one row per scene — severity dots + count; click jumps the page
   for (const scene of state.script.scenes) {
     const fg = byScene[scene.scene_number] || [];
-    const allAddressed = fg.length > 0 && fg.every(({ index }) => state.findingStatus[index] === "addressed");
+    const allAddressed = fg.length > 0 && fg.every(({ f, index }) => findingStatusOf(f, index) === "addressed");
     const row = el("button", "revision-nav-row" + (allAddressed ? " ok" : ""));
     row.type = "button";
     row.title = `Scene ${scene.scene_number} — ${fg.length} finding${fg.length === 1 ? "" : "s"}${allAddressed ? " (all addressed)" : ""}`;
@@ -6160,7 +6231,7 @@ function renderBeatboard() {
     // language as the Revision navigator, so the dots mean one thing everywhere.
     const openForScene = [];
     (state.findings || []).forEach((f, index) => {
-      if (state.findingStatus[index] === "addressed") return;
+      if (findingStatusOf(f, index) === "addressed") return;
       if ((f.scene_refs || []).includes(num)) openForScene.push(f);
     });
     if (openForScene.length) {

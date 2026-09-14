@@ -30,6 +30,58 @@ from difflib import SequenceMatcher
 from screenplay_parser.models import ScriptDocument
 
 
+# ---------- content-hash finding identity (R1 refined) ----------
+# A finding's identity is its content, not its position in the report array.
+# Key = category + evidence_quote (the quote is verified against script text,
+# so it is the stable anchor); scene_refs ride as DATA — they renumber when
+# the writer inserts a scene and must NOT orphan the writer's marks.
+# Severity is a judgment about a note, not its identity — re-scoring keeps
+# the id. Reasoning-only findings (no quote) key on category + normalized
+# issue text (documented weak tier: drift re-classifies honestly on the
+# next pass).
+# The JS twin lives in webapp/app.js (computeFindingId + _strHash) — the
+# server observes, the client displays; both MUST produce the same id.
+_BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+
+def _base36(h: int) -> str:
+    if h == 0:
+        return "0"
+    out = ""
+    while h:
+        out = _BASE36[h % 36] + out
+        h //= 36
+    return out
+
+
+def _str_hash(s: str) -> int:
+    h = 5381
+    for ch in s:
+        h = ((h << 5) + h + ord(ch)) & 0xFFFFFFFF
+    return h
+
+
+def compute_finding_id(f: dict) -> str:
+    quote = (f.get("evidence_quote") or "").strip()
+    if quote:
+        norm = quote
+    else:
+        norm = "issue:" + " ".join((f.get("issue") or "").lower().split())[:100]
+    return "f" + _base36(_str_hash((f.get("category") or "other") + "|" + norm))
+
+
+def dismissed_finding_ids(m) -> set:
+    """Set of finding_ids currently dismissed for this project (legacy
+    entries that never carried an id simply don't appear here)."""
+    try:
+        with open(dismissed_path(m), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {d["finding_id"] for d in data
+                if isinstance(d, dict) and d.get("finding_id")}
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+        return set()
+
+
 def working_path(m) -> str:
     return os.path.join(m.project_dir, "working.json")
 
@@ -344,7 +396,7 @@ def dismissed_issues(m) -> set:
         return set()
 
 
-def dismiss_finding(m, index: int, issue: str) -> None:
+def dismiss_finding(m, index: int, issue: str, finding_id: str | None = None) -> None:
     path = dismissed_path(m)
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -352,20 +404,28 @@ def dismiss_finding(m, index: int, issue: str) -> None:
     except (FileNotFoundError, json.JSONDecodeError):
         data = []
     entry = {"index": int(index), "issue": issue or ""}
+    if finding_id:
+        entry["finding_id"] = finding_id
     if entry not in data:
         data.append(entry)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 
-def undismiss_finding(m, index: int) -> None:
+def undismiss_finding(m, index: int, finding_id: str | None = None) -> None:
     path = dismissed_path(m)
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return
-    data = [d for d in data if not (isinstance(d, dict) and int(d.get("index", -1)) == int(index))]
+    # Prefer id (survives report regeneration); fall back to legacy index
+    # entries that never carried one (old projects).
+    data = [d for d in data if not (
+        isinstance(d, dict)
+        and (d.get("finding_id") == finding_id if finding_id
+             else int(d.get("index", -1)) == int(index))
+    )]
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
@@ -406,12 +466,18 @@ def finding_statuses(m) -> dict:
     statuses = []
     for idx, f in enumerate(report.get("findings", [])):
         quote = f.get("evidence_quote")
+        entry = {
+            "index": idx,
+            "category": f.get("category"),
+            "finding_id": compute_finding_id(f),
+        }
         if not quote:
-            statuses.append({"index": idx, "category": f.get("category"), "status": "unknown"})
+            entry["status"] = "unknown"
         elif quote_present(doc, quote):
-            statuses.append({"index": idx, "category": f.get("category"), "status": "still_present"})
+            entry["status"] = "still_present"
         else:
-            statuses.append({"index": idx, "category": f.get("category"), "status": "addressed"})
+            entry["status"] = "addressed"
+        statuses.append(entry)
 
     summary = {"addressed": 0, "still_present": 0, "unknown": 0}
     for s in statuses:

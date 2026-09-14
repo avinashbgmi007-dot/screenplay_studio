@@ -142,15 +142,19 @@ class TestRewriteScene:
         assert not any("[fixed]" in t for t in texts)
 
 
+def _analyzed_manifest(tmp_path, sample_fountain, mock_server):
+    m = ProjectManifest.create(str(tmp_path / "ana"), sample_fountain)
+    m.server_url = mock_server
+    m.save()
+    orch = Orchestrator(m)
+    orch.run_parse()
+    orch.run_analyze()
+    return m
+
+
 class TestFindingStatuses:
     def _analyzed_manifest(self, tmp_path, sample_fountain, mock_server):
-        m = ProjectManifest.create(str(tmp_path / "ana"), sample_fountain)
-        m.server_url = mock_server
-        m.save()
-        orch = Orchestrator(m)
-        orch.run_parse()
-        orch.run_analyze()
-        return m
+        return _analyzed_manifest(tmp_path, sample_fountain, mock_server)
 
     def test_addressed_when_quote_edited_out(self, tmp_path, sample_fountain, mock_server):
         m = self._analyzed_manifest(tmp_path, sample_fountain, mock_server)
@@ -187,3 +191,73 @@ class TestFindingStatuses:
     def test_statuses_empty_when_no_report(self, manifest):
         statuses = revision.finding_statuses(manifest)
         assert statuses["findings"] == []
+
+
+# ---------- content-hash finding identity (R1-b, GO 1) ----------
+
+class TestFindingIdentity:
+    def test_id_stable_for_same_content(self):
+        f = {"category": "character", "evidence_quote": "I'll tell you everything when this is over.", "severity": "high", "scene_refs": [1]}
+        assert revision.compute_finding_id(f) == revision.compute_finding_id(dict(f))
+
+    def test_id_survives_rescoring(self):
+        # severity is a judgment about a note, not its identity
+        f = {"category": "character", "evidence_quote": "I'll tell you everything when this is over.", "severity": "high"}
+        g = {"category": "character", "evidence_quote": "I'll tell you everything when this is over.", "severity": "medium"}
+        assert revision.compute_finding_id(f) == revision.compute_finding_id(g)
+
+    def test_id_survives_scene_insert_shift(self):
+        # scene_refs ride as data — renumbering must not orphan marks
+        f = {"category": "character", "evidence_quote": "I'll tell you everything when this is over.", "scene_refs": [1]}
+        g = {"category": "character", "evidence_quote": "I'll tell you everything when this is over.", "scene_refs": [3]}
+        assert revision.compute_finding_id(f) == revision.compute_finding_id(g)
+
+    def test_id_differs_across_category_or_quote(self):
+        f = {"category": "character", "evidence_quote": "one"}
+        g = {"category": "dialogue", "evidence_quote": "one"}
+        h = {"category": "character", "evidence_quote": "two"}
+        assert revision.compute_finding_id(f) != revision.compute_finding_id(g)
+        assert revision.compute_finding_id(f) != revision.compute_finding_id(h)
+
+    def test_no_quote_tier_deterministic(self):
+        f = {"category": "theme", "issue": "The  theme  states   itself once."}
+        g = {"category": "theme", "issue": "the theme states itself once."}
+        assert revision.compute_finding_id(f) == revision.compute_finding_id(g)
+
+    def test_statuses_carry_ids(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        statuses = revision.finding_statuses(m)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        for s, f in zip(statuses["findings"], report["findings"]):
+            assert s["finding_id"] == revision.compute_finding_id(f)
+
+    def test_dismiss_sticks_by_id_through_regenerated_report(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        f = report["findings"][0]
+        fid = revision.compute_finding_id(f)
+        revision.dismiss_finding(m, 0, f.get("issue") or "", fid)
+        # the report regenerates: same content, NEW position (re-scoring reordered)
+        moved = dict(f, severity="low")
+        report2 = {"findings": [report["findings"][1], moved] + report["findings"][2:]}
+        json.dump(report2, open(m.report_findings_path, "w", encoding="utf-8"))
+        # legacy lookup is position-bound: the same content at a NEW index no
+        # longer matches the writer's (index, issue) mark...
+        new_issue = report2["findings"][0].get("issue") or ""
+        assert (0, new_issue) not in revision.dismissed_issues(m)
+        # ...but the id lookup DOES match — the writer's mark survives
+        assert fid in revision.dismissed_finding_ids(m)
+
+    def test_undismiss_by_id_and_legacy_index(self, tmp_path, sample_fountain, mock_server):
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        f = report["findings"][0]
+        fid = revision.compute_finding_id(f)
+        revision.dismiss_finding(m, 0, f.get("issue") or "", fid)
+        revision.undismiss_finding(m, 0, fid)
+        assert fid not in revision.dismissed_finding_ids(m)
+        # legacy entry (no id) still removed by index
+        revision.dismiss_finding(m, 1, "legacy")
+        revision.undismiss_finding(m, 1)
+        data = json.load(open(m.project_dir + "/dismissed_findings.json", encoding="utf-8"))
+        assert all(d.get("index") != 1 for d in data)

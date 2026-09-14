@@ -1184,7 +1184,7 @@ def get_fixqueue(name):
     report = _load_report_sanitized(m)
 
     from screenplay_parser.structure import assign_acts, act_for_scene
-    from .revision import load_working, finding_statuses
+    from .revision import load_working, finding_statuses, compute_finding_id, dismissed_finding_ids
     doc = load_working(m)
     acts = assign_acts(doc)
     act_names = {a["act"]: a["name"] for a in acts}
@@ -1193,6 +1193,7 @@ def get_fixqueue(name):
 
     from .revision import dismissed_issues as _dismissed
     dismissed_keys = _dismissed(m)
+    dismissed_ids = dismissed_finding_ids(m)
 
     items = []
     for idx, f in enumerate(report.get("findings", [])):
@@ -1201,6 +1202,7 @@ def get_fixqueue(name):
         act = act_for_scene(acts, scene) if scene else None
         items.append({
             "index": idx,
+            "finding_id": compute_finding_id(f),
             "category": f.get("category"),
             "severity": f.get("severity"),
             "issue": f.get("issue"),
@@ -1215,13 +1217,18 @@ def get_fixqueue(name):
 
     # Triage: dismissed findings are flagged (flag-don't-drop applies to the
     # writer's own judgment too) but hidden unless explicitly asked for. A
-    # dismissal only sticks while the report still says the same thing at
-    # that index — a regenerated report re-opens everything honestly.
+    # dismissal sticks by content-hash id (survives report regeneration);
+    # legacy (index, issue) entries keep working for old projects.
     for it in items:
-        it["dismissed"] = (it["index"], (it["issue"] or "")) in dismissed_keys
+        it["dismissed"] = (it["finding_id"] in dismissed_ids
+                           or (it["index"], (it["issue"] or "")) in dismissed_keys)
     include_dismissed = request.args.get("include_dismissed") == "1"
     visible = [i for i in items if include_dismissed or not i["dismissed"]]
+    # The writer's ledger flags for the client counting contract (N3): the
+    # dock's evidence lens reads these so totals agree with the fix queue.
     return jsonify({"items": visible, "acts": acts,
+                    "dismissed_flags": [{"index": it["index"], "finding_id": it["finding_id"]}
+                                        for it in items if it["dismissed"]],
                     "dismissed_count": len(items) - len(visible),
                     "total_count": len(items)})
 
@@ -1238,7 +1245,7 @@ def dismiss_finding_route(name, index):
         return _error("Project not found.", 404)
     body = request.get_json(silent=True) or {}
     from .revision import dismiss_finding
-    dismiss_finding(m, index, body.get("issue") or "")
+    dismiss_finding(m, index, body.get("issue") or "", body.get("finding_id"))
     return jsonify({"ok": True, "index": index})
 
 
@@ -1249,7 +1256,8 @@ def undismiss_finding_route(name, index):
     except FileNotFoundError:
         return _error("Project not found.", 404)
     from .revision import undismiss_finding
-    undismiss_finding(m, index)
+    body = request.get_json(silent=True) or {}
+    undismiss_finding(m, index, body.get("finding_id"))
     return jsonify({"ok": True, "index": index})
 
 
