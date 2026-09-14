@@ -61,16 +61,34 @@ tests/                    pytest suite against tests/mock_unified_server.py (+ n
 ### Add a co-writer persona or mode
 
 1. Add to `PERSONAS` / `MODES` in `screenplay_cowriter/personas.py`.
-2. The web UI reads the persona/mode lists from `GET /api/config` (server-driven); it also
-   ships a hardcoded fallback list (`FALLBACK_PERSONAS` at the top of
-   `screenplay_studio/webapp/app.js`) — update that too so the fallback stays in sync
-   (known maintenance gotcha).
+2. The web UI reads the persona/mode lists from `GET /api/config` (server-driven) — new
+   personas appear automatically. The client's `FALLBACK_PERSONAS` is a degradation
+   fallback only (used when `/api/config` doesn't answer); it does NOT need updating, and
+   `test_fallback_personas_stay_subset_of_server` in `tests/test_webapp_api.py` guards
+   that it stays a subset.
 
 ### Add a webapp endpoint
 
 1. Add an `@app.route` in `screenplay_studio/webapp_server.py` (projects keyed by `<name>`).
 2. Use proper status codes (400/404/500/502); keep failure isolation — never let a missing optional piece crash the project list.
 3. Update the endpoint table in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+### Extend the evidence surfaces (GO 2 riders)
+
+The dock's Evidence lens is the board; the findings rider system rides these contracts
+(see `docs/PHASE_B_FV_FOLD_SPEC.md`):
+
+1. **One filter state** — `state.findingFilter` (app.js) drives ink, board list, loop list
+   and counts together; never count a surface independently (the N3 counting contract:
+   `findingDisposition`/`findingOpen`/`findingStatusOf`).
+2. **Identity** — key every persisted mark by `computeFindingId`/`compute_finding_id`
+   (category + evidence_quote), never by index; marks must survive regeneration.
+3. **Ink is decoration** — inline `<mark>`, inherits the page font, never reflows,
+   `aria-hidden`; the board carries semantics.
+4. **New transient bars ride the lens re-render** — anything appended inside the Evidence
+   lens must re-dock itself after `renderDockEvidence` (see `renderLoopBar`'s re-dock call).
+5. **Never lie, never go red** — ghosted/deferred states are dim + chips, in no open
+   count; intent ids absent from a new pass are ghosted only from real writer marks.
 
 ### Add a project stage
 

@@ -563,3 +563,21 @@ class TestProgressStall:
         m2 = ProjectManifest.load(webapp_server._project_dir(project))
         assert m2.stage("analyze").status == "failed"
         assert not os.path.exists(m.progress_path)
+
+
+def test_fallback_personas_stay_subset_of_server():
+    """The client's FALLBACK_PERSONAS (used only when /api/config doesn't
+    answer) must stay a subset of the server-driven persona ids — by-design
+    graceful degradation, not a hand-synced second list."""
+    import re
+
+    from screenplay_cowriter.personas import PERSONAS
+
+    app_js = os.path.join(os.path.dirname(webapp_server.__file__), "webapp", "app.js")
+    with open(app_js, encoding="utf-8") as f:
+        js = f.read()
+    m = re.search(r"const FALLBACK_PERSONAS = \[(.*?)\]", js, re.S)
+    assert m, "FALLBACK_PERSONAS declaration not found in app.js"
+    fallback = re.findall(r'"([a-z_]+)"', m.group(1))
+    assert fallback, "FALLBACK_PERSONAS parsed empty"
+    assert set(fallback) <= set(PERSONAS.keys())

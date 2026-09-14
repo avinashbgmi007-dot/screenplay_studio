@@ -30,7 +30,7 @@ python -m screenplay_cowriter chat --new "Name" --report report.findings.json --
 # Web app (Flask, port 8500) — module, not a studio subcommand
 python -m screenplay_studio.webapp_server --port 8500 --projects-dir ./studio_projects
 
-# Tests (660+ tests collected; mock llama-server, no model needed)
+# Tests (700+ tests collected; mock llama-server, no model needed)
 python -m pytest tests/
 ```
 
@@ -92,6 +92,6 @@ Key flows:
 ## Gotchas
 
 - Analyzer/co-writer stages require a running llama-server; parser and KB do not.
-- Hardcoded persona list in `screenplay_studio/webapp/app.js` (doesn't sync with server `PERSONAS`); default category tuple lives in `pipeline.py:analyze()`.
+- The client's `FALLBACK_PERSONAS` (app.js) is a degradation fallback only — the server-driven list is the source of truth; a test in `tests/test_webapp_api.py` guards the subset. Default category tuple lives in `pipeline.py:analyze()`.
 - OCR-parsed PDFs are best-effort (mark project as low-confidence).
 - Project dirs (`studio_projects/`, `.freebuff/`) are git-ignored runtime data.

@@ -66,12 +66,12 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 |---|---|---|
 | `manifest.py` | `ProjectManifest`, `StageStatus` | `project.json`; resume semantics (pending/running/complete/failed/skipped) |
 | `orchestrator.py` | `Orchestrator`, `OrchestratorError` | `run_parse` → `run_analyze` → `start_chat`; total-vs-partial failure handling; `retry_failed=True` resumes failed categories only (merge via `AnalysisResult.merge`) |
-| `revision.py` | `ensure_working`, `load_working`, `save_working`, `has_edits`, `reset_working`, `redo_stack`, `clear_redo` | Working copy rewrite/apply/undo/redo/export loop |
+| `revision.py` | `ensure_working`, `load_working`, `save_working`, `has_edits`, `reset_working`, `redo_stack`, `clear_redo` | Working copy rewrite/apply/undo/redo/export loop. GO 1/2: `compute_finding_id` (content-hash finding identity: category + evidence_quote; djb2→base36 — twin of `app.js` `computeFindingId`), `dismissed_finding_ids`, `finding_intents`/`set_finding_intent` (`finding_marks.json` intent store: mark-addressed + defer, id-keyed, survives regeneration), `last_pass_snapshot` (mtime-guarded `last_pass.json` diff: last_total/still_live/fixed/new/ghosted_marks; one generation back, honest None on first pass) |
 | `diff.py` | `snapshot_active`, `upload_new_draft`, `activate_draft`, `diff_scenes`, `diff_findings`, `compare_drafts`, `diff_drafts` | Draft snapshots + cross-draft diffing |
 | `beatboard.py` | `get_order`, `set_order`, `reset_order`, `has_board`, `export_reordered`, `board_view` | Scene reordering / beat board |
 | `notes.py` | `load_notes`, `notes_for_scene`, `add_note`, `update_note`, `delete_note` | Per-project notes |
 | `watch.py` | `process_pending`, `watch_loop` | Watch-folder auto-analysis |
-| `ideas.py` | `IdeaStore` | Idea room store: free-form page + premise card + auto-title, graduation into projects; ids validated by jsonio |
+| `ideas.py` | `IdeaStore` | Idea room store: free-form page + premise card + auto-title, graduation into projects; ids validated by jsonio; `save_content`/`rename`/`save_card` merge under a locked load-modify-write (`_modify`) so a racing save never clobbers fields it didn't see |
 | `stt.py` | `transcribe`, `supported_languages`, `STTUnavailableError` | Local dictation (faster-whisper lazy import or localhost whisper server); never off-machine |
 | `character_track.py` | `build_character_tracks` | Per-character presence/traits/interactions rail from KG + report |
 | `metrics.py` | `load`, `record_analysis`, `record_reply`, `record_findings` | Quiet local writing-loop metrics (status strip ⚡) |
@@ -79,10 +79,10 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `demo_model.py` | `start_demo_server` | In-process demo craft model (rule-based) so the desk works without llama-server; a reachable real server always wins |
 | `webapp_demo.py` | `main` | Launcher alias: webapp_server with the demo model forced on |
 | `sample.py` | `SAMPLE_TITLE`, `SAMPLE_SCRIPT` | Bundled 3-scene sample ("The Late Hour") |
-| `webapp_server.py` | Flask app + `main`, `ServerConfig`, `_import_cowriter`, `CowriterUnavailableError` | Web UI backend (port 8500); serves `webapp/` static + JSON API; `/api/config` exposes personas/modes |
-| `jsonio.py` | `atomic_write_json`, `check_safe_id` | Shared atomic JSON persistence (tmp + os.replace + per-path lock) and the safe-id contract that blocks path traversal at every store |
+| `webapp_server.py` | Flask app + `main`, `ServerConfig`, `_import_cowriter`, `CowriterUnavailableError` | Web UI backend (port 8500); serves `webapp/` static + JSON API; `/api/config` exposes personas/modes; GO 2 route: POST `/api/projects/<name>/findings/intent` (the intent store) |
+| `jsonio.py` | `atomic_write_json`, `lock_for`, `retry_permission`, `check_safe_id` | Shared atomic JSON persistence (tmp + os.replace + per-path RLock so stores can hold it across a load-modify-write) + bounded retry for Windows sharing violations (WinError 32) + the safe-id contract that blocks path traversal at every store |
 | `cli.py` | `main`, `cmd_run`, `cmd_resume`, `cmd_status`, `cmd_watch` | `run`/`resume`/`status`/`watch` subcommands |
-| `webapp/` | `index.html`, `app.js`, `core.js`, `style.css` | Vanilla JS SPA (no build step); `core.js` holds the DOM-free pure helpers (unit-tested in `node --test tests/js/`) |
+| `webapp/` | `index.html`, `app.js`, `core.js`, `style.css`, `tungsten.css` | Vanilla JS SPA (no build step); `core.js` holds the DOM-free pure helpers (unit-tested in `node --test tests/js/`); `tungsten.css` is the frozen visual system override (night + dawn registers, loads after style.css). GO 1/2 client symbols in `app.js`: `computeFindingId` (id twin of `revision.py`), the counting contract `findingDisposition`/`findingOpen`/`findingStatusOf` (every surface reads it — N3 law), `openFeedbackView` (the fold: routes to the workspace + dock Evidence lens; the `#feedback-view` clone is dormant/unreachable), the ONE filter state `state.findingFilter` + `buildFindingFilterRow`, ink `inkAnchorsFor`/`decorateLineWithInk`, the keyboard fix loop `startLoop`/`stepLoop`/`exitLoop`/`renderLoopBar` (contextual n/p/esc), intent buttons via `setFindingIntent`, `buildArrivalStrip` (scorekeeping + trust + retry + ghosted), `copyFindingEvidence` |
 
 ## knowledge_base — craft rules (no model)
 

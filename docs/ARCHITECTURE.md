@@ -69,6 +69,9 @@ screenplay-studio_1/
 │   ├── orchestrator.py         # Orchestrator class, full pipeline runner
 │   ├── manifest.py             # ProjectManifest, StageStatus, resume-from-partial
 │   ├── revision.py             # Working-copy rewrite / apply / export loop
+│   │                           #   + GO 1/2: compute_finding_id (content-hash finding identity),
+│   │                           #   finding_intents/set_finding_intent (finding_marks.json),
+│   │                           #   last_pass_snapshot (last_pass.json diff)
 │   ├── diff.py                 # Draft snapshots + cross-draft diffing
 │   ├── beatboard.py            # Scene reordering / beat board
 │   ├── notes.py                # Per-project notes store
@@ -79,17 +82,19 @@ screenplay-studio_1/
 │   ├── ideas.py                # Idea store (idea rooms, graduation, premise cards)
 │   ├── stt.py                  # Local dictation (faster-whisper, optional)
 │   ├── metrics.py              # Desk metrics store (reply timings, fix counts)
-│   ├── jsonio.py               # atomic_write_json / read_json helpers
+│   ├── jsonio.py               # atomic_write_json / lock_for / retry_permission (WinError-32 retry)
 │   ├── demo_model.py           # Built-in demo craft model (fallback when no llama-server)
-│   ├── webapp_server.py        # Flask backend (port 8500)
+│   ├── webapp_server.py        # Flask backend (port 8500) + POST /findings/intent route
 │   └── webapp/                 # Static frontend (no build step)
-│       ├── index.html          # Single-page app shell (~665 lines)
-│       ├── app.js              # Client-side JS (~6,990 lines)
+│       ├── index.html          # Single-page app shell (~770 lines)
+│       ├── app.js              # Client-side JS (~8,530 lines; GO 1/2 evidence surfaces)
 │       ├── core.js             # DOM-free pure helpers (unit-tested via node --test)
-│       ├── style.css           # Nocta violet/cyan design system (~5,120 lines)
-│       ├── fonts/               # Self-hosted .woff2
+│       ├── style.css           # Base design system (~6,520 lines; Nocta token fallback)
+│       ├── tungsten.css        # Frozen visual system override (night + dawn registers)
+│       ├── fonts/               # Self-hosted .woff2 (Instrument Serif + DM Sans)
 │       ├── preview-redesigns/  # Six visual-direction prototypes (+ screenshots)
-│       └── preview-next/       # Seven interaction-model prototypes (Design Lab)
+│       ├── preview-next/       # Seven interaction-model prototypes (Design Lab)
+│       └── preview-r4/         # Visual-direction mockups + probes (untracked design material)
 ├── knowledge_base/             # 263 attributed screenwriting-craft rules (26 rule files)
 │   ├── knowledge_base.py       # KnowledgeBase, Rule dataclass
 │   ├── rules/                  # Per-category rule JSON
@@ -153,9 +158,19 @@ screenplay-studio_1/
   in place (rides the edits/apply path — undoable, change-starred).
 
 ### Client-Side JavaScript (`screenplay_studio/webapp/app.js` + `core.js`)
-- `app.js` is ~6,990 lines of vanilla JS handling all client logic; `core.js` holds the
+- `app.js` is ~8,530 lines of vanilla JS handling all client logic; `core.js` holds the
   DOM-free pure helpers (`fuzzyScore`, `formatMessageContent`, `truncate`, `formatElapsed`,
   `fmtDuration`, `shortModelId`) — unit-tested in `node --test tests/js/`.
+- **GO 1/2 evidence surfaces** — `computeFindingId` (id twin of `revision.py`), the one
+  counting contract `findingDisposition`/`findingOpen`/`findingStatusOf` (every surface
+  reads it), the fold `openFeedbackView` (routes Feedback entry points to the workspace +
+  dock Evidence lens; the `#feedback-view` clone is dormant/unreachable), ONE filter state
+  (`state.findingFilter`) driving ink/board/loop/counts together, ink marks
+  (`inkAnchorsFor`/`decorateLineWithInk`), the contextual keyboard fix loop
+  (`startLoop`/`stepLoop`/`exitLoop`/`renderLoopBar`; n/p/esc when active, scene-stepping
+  on exit), intent buttons (`setFindingIntent`), and the arrival strip (`buildArrivalStrip`:
+  scorekeeping + trust + inline retry + ghosted marks). Full spec:
+  `docs/PHASE_B_FV_FOLD_SPEC.md` + `docs/UI_UX_SPECIFICATION.md` §4.9.
 - **Rooms** — `setRoom("cowrite"|"feedback")` swaps panel + `body[data-room]` identity;
   `openRoomDrawer`/`closeRoomDrawer` manage the summoned partner drawer; legacy saved views
   (`chat`/`script`) map to the Co-write room on restore.
@@ -177,9 +192,14 @@ screenplay-studio_1/
   (mic chips), sprint timer, session/prefs restore, error banner** — see
   `docs/UI_UX_SPECIFICATION.md` §7 for the full interaction catalog.
 
-### CSS (`screenplay_studio/webapp/style.css`)
-- ~5,120 lines of custom CSS (base design system + the NOCTA v4 layer: auto-hide chrome,
-  cursor spotlight, level badge, Sameer slide-in mock panel).
+### CSS (`screenplay_studio/webapp/style.css` + `tungsten.css`)
+- ~6,520 lines of base CSS (design system + the NOCTA v4 layer: auto-hide chrome,
+  cursor spotlight, level badge, Sameer slide-in mock panel) carrying the token fallback.
+- `tungsten.css` is the **frozen visual system override** (loads after style.css; night +
+  dawn registers): volumetric gold key, lit-from-top vellum, severity never color-alone,
+  Sameer violet + Sushruta cyan re-pinned, reduced-motion collapses to instant. Both
+  registers theme automatically from the token ladder — new components ride existing
+  token classes.
 - Full design-token system via CSS variables: void ink ramp, glass surfaces, paper,
   violet/cyan room accents, type scale (`--font-typewriter/script/serif/display/ui/mono/hand`),
   radius, motion curves.
@@ -188,13 +208,14 @@ screenplay-studio_1/
 - `prefers-reduced-motion` kill-switch, `:focus-visible` rings, accent `::selection`.
 
 ### HTML (`screenplay_studio/webapp/index.html`)
-- ~665 lines. SPA shell: collapsible sidebar (brand · new-page · Ideas/shelf/library
+- ~770 lines. SPA shell: collapsible sidebar (brand · new-page · Ideas/shelf/library
   flyouts · Dawn/Settings footer), welcome scene + dashboard, project bar, workspace
   (structural rail · desk · Problem Board · gutter · room drawer), status strip, Beat
-  Board / Compare / Revision / Feedback-View full-screen views, premise pane + idea canvas,
-  NOCTA chrome (Sameer panel mock, level badge, cursor spotlight), five modals (Settings,
-  Rewrite, Palette, Fork, Sam's notes). References cache-busted
-  `style.css`/`core.js`/`app.js` (`?v=<hash>`).
+  Board / Compare / Revision / Feedback-View full-screen views (the Feedback View is
+  dormant — the fold routes its entry points to the workspace dock, §app.js GO 1/2),
+  premise pane + idea canvas, NOCTA chrome (Sameer panel mock, level badge, cursor
+  spotlight), five modals (Settings, Rewrite, Palette, Fork, Sam's notes). References
+  cache-busted `style.css`/`core.js`/`app.js`/`tungsten.css` (`?v=<hash>`).
 
 ---
 

@@ -43,16 +43,25 @@ languages stay the five listed above). UI chrome stays English.
 
 ### 2.1 Palette (CSS custom properties, `:root`)
 
-The app is a "warm room at night." Night = deep ink-blue void (Spark Wall edition) with the
-manuscript as bright cream paper under a lamp. The **room lighting is the signature**: the
-Co-write room is warm amber, the Feedback room is cool slate, and the CSS `body[data-room]`
+The app is a "warm room at night." Night = deep warm ink void with the manuscript as
+sunlit-vellum paper under a volumetric gold key. The **room lighting is the signature**: the
+Co-write room is Sameer violet, the Feedback room is Sushruta cyan, and the CSS `body[data-room]`
 swaps the whole accent ramp.
 
-> The current theme is **"Nocta Craft Precision"** (violet/cyan on near-black ink). The
-> original warm-amber palette was superseded; the table below is the live token set in
-> `style.css` (`:root`, lines ~114–175).
+> The shipped visual system is **"Tungsten"** (frozen: refine-freeze-tungsten) — a cascade
+> override layer in `webapp/tungsten.css` that loads *after* `style.css` and re-pins the
+> token ladder in **both registers** (night + `body.dawn` morning edition: warm parchment,
+> same conic key geometry, Sameer violet + Sushruta cyan re-pinned for light). The base
+> token values in the table below are the `style.css` fallback set (the pre-Tungsten
+> "Nocta Craft Precision" violet/cyan ramp, still live in `:root`); the **shipped** night
+> values come from the override: `--ink-950 #150f0a`, `--lamp #e8c56a` (gold),
+> `--consult #7ad0e8`, `--danger #c8503a`; the dawn override re-pins `--lamp #7d5f16`,
+> `--consult #15708a`, `--danger #a03722`. **All interactive/accented UI must read from
+> these variables — never hardcoded colors — so both registers theme automatically.**
 
-| Token | Night value | Purpose |
+Base token set in `style.css` (`:root`, the fallback under the Tungsten override):
+
+| Token | Night value (base) | Purpose |
 |---|---|---|
 | `--ink-950` | `#09090e` | page void background |
 | `--ink-900` | `#0e0e14` | raised surfaces (bars, panels) |
@@ -70,10 +79,10 @@ swaps the whole accent ramp.
 | `--paper-ink` | `#2b241b` | text on paper |
 | `--paper-muted` | `#6d6050` | muted text on paper |
 | `--paper-line` | `#d9ccae` | rules on paper |
-| `--lamp` | `#7e6bff` | violet accent (Co-write) |
+| `--lamp` | `#7e6bff` | Sameer violet accent (Co-write) |
 | `--lamp-deep` | `#6354cc` | violet deep |
 | `--lamp-bright` | `#9b8aff` | violet bright |
-| `--consult` | `#53c7f0` | cyan accent (Feedback) |
+| `--consult` | `#53c7f0` | Sushruta cyan accent (Feedback) |
 | `--consult-deep` | `#3da8d4` | cyan deep |
 | `--accent2` | `#53c7f0` | secondary accent |
 | `--info` | `#60a5fa` | info accent |
@@ -89,14 +98,16 @@ swaps the whole accent ramp.
 | `--ease-out` / `--spring` / `--t` | cubic-beziers / 200ms | motion curves |
 
 Room swap: `body` sets `--accent/--accent-deep/--accent-bright/--glow/--glow-strong` to the
-violet values by default (`--glow: rgba(126,107,255,…)`) ; `body[data-room="feedback"]`
-overrides them to the cyan values (`--accent-bright: #6dd8f7`, `--glow: rgba(83,199,240,…)`).
+violet values by default; `body[data-room="feedback"]` overrides them to the cyan values
+(`--accent-bright: #6dd8f7`). The Tungsten override re-pins both ramps
+(night: gold lamp + cyan consult; dawn: deep-gold lamp + `#15708a` consult).
 **All interactive/accented UI must read from these variables, never hardcoded colors.**
 
-Dawn (light) theme: `body.dawn` re-overrides the ramp to a **daylight glass** palette
-(`--ink-950: #f1ede4`, `--lamp: #6b5ce6`, `--consult: #3ab8d8`, `--danger: #9c3527`,
-`--ok: #2eb87a`). It must round-trip cleanly with the night theme (toggle button
-in sidebar + status strip).
+Dawn (light) theme: `body.dawn` re-overrides the ramp to a **daylight** palette — in the
+shipped Tungsten register this is warm parchment (`--ink-950: #f2e8d6`, `--lamp: #7d5f16`,
+`--consult: #15708a`, `--danger: #a03722`, `--ok: #14784a`; night+dawn share ink,
+typography, severity shapes and the conic key geometry). It must round-trip cleanly with
+the night theme (toggle button in sidebar + status strip).
 
 River-read (Spark Wall) special surface: dark-glass stream with teal accents
 (`#5eead4` borders/lines on `rgba(10,14,26,.82)` pages) — a read-like-water mode.
@@ -298,19 +309,23 @@ The consultant's desk — "Dr. Sushruta's Report".
   conversational lenses are switched via rooms/lens, not dropdowns. `/api/config` still
   serves the full persona/mode lists and the fallback contract below stands.
 
-### 4.4b Feedback View (`#feedback-view`) — the full-screen consultant surface
+### 4.4b Feedback View (`#feedback-view`) — DORMANT since the GO 2 fold
 
-**This — not the drawer panel — is what the Feedback room toggle, the `f` shortcut, and the
-Consultant gutter tab open for projects.** `state.view = "fv"`; the drawer panel
+**Status (GO 2, "1A — fold FV in"): the Feedback room toggle, the `f` shortcut, and the
+Consultant gutter tab now all route to the main workspace** — they open the Context Dock
+with the **Evidence lens** active (mass strip + deep cards + filter row) instead of this
+surface. `openFeedbackView()` is a fold: it never sets `state.view = "fv"`; session
+restore maps a stored `view: "fv"` to the workspace too, and the layout audit grep-gates
+that no reachable path sets it. The three-pane surface below remains in the DOM **dormant,
+unreachable — not deleted** (its removal is a separate later commit). The drawer panel
 (§4.4) remains reachable in idea-less contexts via `openFeedbackRoom()`.
 
-- **Three panes**: left Dr. Sushruta chat (streaming via `sendFvMessage`), center script
+- **Three panes (dormant)**: left Dr. Sushruta chat (streaming via `sendFvMessage`), center script
   column with per-scene finding severity dots (`renderFeedbackView`), right panel with
   Board/Sameer tabs (`switchFvTab`).
-- **Layout machinery**: maximize toggle (`fv-maximized`), draggable pane dividers
+- **Layout machinery (dormant)**: maximize toggle (`fv-maximized`), draggable pane dividers
   (`initFvDividers`), scroll sync between script column and findings (`initFvScrollSync`),
   and an honest `fin` end-marker at the bottom of the script column.
-- Session restore handles `view: "fv"`; Esc closes it (part of the cascade, §7.3).
 
 ### 4.4c Problem Board (`#problem-board`)
 
@@ -371,9 +386,10 @@ conversation carry over so the same Sameer/memory continues on the script desk.
 | **Fork** | name the branch → create fork |
 | **Sam's notes on you** | writer relationship memory: dimensions, observations list (each with "forget this"), "Refresh now", empty state, Close |
 
-### 4.8 NOCTA chrome layer (v4 additions)
+### 4.8 Tungsten chrome layer (v4 additions)
 
-On top of the base shell (all in `app.js` `initNoctaDesign` + `style.css` NOCTA section):
+On top of the base shell (all in `app.js` `initNoctaDesign` — the function kept its
+historical name — plus the `style.css` NOCTA section and the `tungsten.css` override):
 
 - **Auto-hide chrome**: the project bar + script toolbar fade to `opacity 0` after 4s idle;
   any mouse move within 120px (or hovering sidebar/modal) restores them.
@@ -383,6 +399,37 @@ On top of the base shell (all in `app.js` `initNoctaDesign` + `style.css` NOCTA 
 - **Craft level badge** (`#level-badge`): "Level 1 · Upload & Discover" → Level 4;
   auto-advances on finding-card clicks (`setCraftLevel`).
 - **Cursor spotlight** (`#cursor-spotlight`): a fixed radial gradient following the mouse.
+
+### 4.9 GO 2 evidence surfaces (the writer's loop + the fold)
+
+Riders on the main workspace (zero new surfaces — the Context Dock's Evidence lens IS the
+board; full rationale in `docs/PHASE_B_FV_FOLD_SPEC.md`):
+
+- **The fold**: Feedback entry points open the dock Evidence lens (§4.4b status).
+- **One filter row** (dock Evidence header, `buildFindingFilterRow`): severity toggles +
+  category count-chips + next-pass toggle + `⇉ fix loop` button. **One filter state
+  (`state.findingFilter`) drives ink, board list, loop list and counts together** — the
+  page and the board cannot disagree by construction. Default = highs inked.
+- **Ink marks** (`inkAnchorsFor`/`decorateLineWithInk`): each inked finding's verified
+  quote is wrapped in an inline `<mark class="finding-ink">` on its scene page — inherits
+  the page font, never reflows, `aria-hidden` (decoration; the board carries semantics);
+  active search suppresses ink (transient beats persistent).
+- **The keyboard fix loop** (`startLoop`/`stepLoop`/`exitLoop`/`renderLoopBar`): engaged
+  via the `⇉` button; loop bar (i-of-N · prev/next · mark-addressed · next-pass · Discuss
+  · copy · Esc) re-docks itself after any lens re-render; N/P step with wrap-around across
+  the filtered list, scrolling to the finding's ink anchor + flash, auto-expanding its dock
+  card (`.loop-current`); Discuss = `setPendingQuote` + the Sameer lens; copy = quote +
+  scene slug (clipboard with execCommand fallback). Esc exits the loop — the dock stays.
+- **Intent buttons** (deep dock cards): ✓ mark-addressed / ⏭ next-pass / ⧉ copy — persisted
+  to `finding_marks.json` (id-keyed via GO 1 identity, survives report regeneration);
+  deferred findings dim, leave open counts, and carry a "next pass" chip.
+- **The arrival strip** (`buildArrivalStrip`, dock Evidence top): when a new report lands —
+  "Last pass: N · Still live · Fixed · New" (computed from `last_pass.json`, one
+  generation back) + the trust readout ("N of M quotes verified (P%)") + an inline
+  **Retry failed (k)** when categories failed + **ghosted marks** (writer-intent findings
+  absent from the new pass — muted, expandable, never red, in no open count). One ambient
+  peek-chip on arrival; a lasting unread dot rides `#dock-tab-evidence` until the lens is
+  opened.
 
 ---
 
@@ -515,11 +562,11 @@ rail note input rather than calling the Stash endpoint — different from §7.2'
 | `b` | Open the Beat Board (project only) |
 | `d` | Compare drafts side by side (project only) |
 | `v` | Toggle the Revision view (project only) |
-| `j` / `n` | Next scene (script view) |
-| `k` / `p` | Previous scene (script view) |
+| `j` / `n` | Next scene (script view) — **while the fix loop is active: next finding (with `↓`)** |
+| `k` / `p` | Previous scene (script view) — **while the fix loop is active: previous finding (with `↑`)** |
 | `/` | Search the script |
 | `?` | Show all shortcuts (palette help) |
-| `Esc` | Leave spotlight → dismiss partner drawer → craft shelf → structure rail → modals → flyouts (full cascade in §7.3) |
+| `Esc` | Leave spotlight → **exit the fix loop (dock stays)** → dismiss partner drawer → craft shelf → structure rail → modals → flyouts (full cascade in §7.3) |
 | `↑`/`↓` + `Enter` | Palette navigation / run |
 | Inline edit: `Enter` save · `Esc` cancel · `Shift+Enter` newline | |
 | Composer: `Enter` send · `Shift+Enter` newline · `↑`/`↓` history · `Esc` cancel history | |
@@ -596,16 +643,19 @@ dialogue_lines, dialogue_share, first_scene, last_scene, traits, interactions:
 |---|---|---|---|
 | GET | `/projects/<name>/script` | — | `ScriptDocument` JSON + per-scene `page_estimate`/`word_count` + `runtime_minutes` |
 | POST | `/projects/<name>/rewrite` | `{scene_number, finding_index?, instruction?}` | `{scene_number, note, replacements:[{old,new}], scene_text}` |
-| GET | `/projects/<name>/edits` | — | `{edits, findings_status, can_undo, can_redo}` |
+| GET | `/projects/<name>/edits` | — | `{edits, findings_status, can_undo, can_redo, finding_intents, last_pass}` |
 | POST | `/projects/<name>/edits/apply` | `{scene_number, replacements:[{old,new}]}` | `{applied, skipped, scene_text_after, findings_status}` |
 | POST | `/projects/<name>/edits/undo` | — | `{..., findings_status}` |
 | POST | `/projects/<name>/edits/redo` | — | `{..., findings_status}` |
 | POST | `/projects/<name>/edits/reset` | — | `{ok, has_edits}` |
+| POST | `/projects/<name>/findings/intent` | `{finding_id, intent: "addressed"\|"deferred"}` | `{ok}` — the GO 2 intent store (`finding_marks.json`, id-keyed via GO 1 identity; survives regeneration) |
 | GET | `/projects/<name>/export` | `?format=fountain|fdx|txt` | file download |
 | GET | `/projects/<name>/metrics` | — | `{avg_reply_seconds, analysis_seconds, findings_total, findings_fixed, findings_fixed_pct, discussed}` |
 
 `findings_status` shape: `{findings:[{index, status}], summary:{addressed, still_present,
-unknown}}`.
+unknown}}`. `finding_intents` shape: `{<finding_id>: "addressed"\|"deferred"}`. `last_pass`
+shape: `{last_total, still_live, fixed, new, ghosted_marks}` or `null` (honest None on the
+first pass; computed lazily with an mtime guard, one generation back).
 
 ### 9.5 Notes, Stash, premise
 | Method | Path | Request | Response |
@@ -742,13 +792,15 @@ the session "saw" (used for stale-session honesty), in addition to the shape in 
 
 ## 12. Reference files & implementation notes
 
-- Frontend source of truth: `screenplay_studio/webapp/` — `index.html` (~665 lines, SPA
-  shell), `app.js` (~6,990 lines, all client logic), `style.css` (~5,120 lines, full
-  design system incl. the NOCTA layer), `core.js` (~96 lines, DOM-free pure helpers:
+- Frontend source of truth: `screenplay_studio/webapp/` — `index.html` (~770 lines, SPA
+  shell), `app.js` (~8,530 lines, all client logic), `style.css` (~6,520 lines, full
+  design system incl. the NOCTA layer), `tungsten.css` (frozen visual system override,
+  night + dawn registers — loads after `style.css`), `core.js` (~96 lines, DOM-free pure helpers:
   `fuzzyScore`, `formatMessageContent`, `truncate`, `formatElapsed`, `fmtDuration`,
-  `shortModelId`), plus `fonts/` (self-hosted woff2) and the Design Lab preview folders
-  (`preview-redesigns/`, `preview-next/`).
-- Backend: `screenplay_studio/webapp_server.py` (~2,770 lines) — all endpoints in §9.
+  `shortModelId`), plus `fonts/` (self-hosted woff2, Instrument Serif + DM Sans,
+  18 `@font-face` declarations) and the Design Lab preview folders
+  (`preview-redesigns/`, `preview-next/`, `preview-r4/`).
+- Backend: `screenplay_studio/webapp_server.py` (~2,805 lines) — all endpoints in §9.
 - Pure helpers must stay DOM-free (unit-tested in `node --test tests/js/`).
 - Cache-busting: `index.html` references `style.css?v=<hash>` / `app.js?v=<hash>` /
   `core.js?v=<hash>` — bump the query whenever those files change (no-cache only revalidates

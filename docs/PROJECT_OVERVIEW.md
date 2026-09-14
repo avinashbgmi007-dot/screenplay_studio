@@ -45,5 +45,11 @@ A thin glue layer (`screenplay_studio`) that runs the three pieces in sequence, 
 - Server-driven personas with frontend fallback
 
 ## Known Issues
-- **Frontend persona fallback list** (`screenplay_studio/webapp/app.js`) is maintained in sync with the server's 8 personas by hand — it can drift when a persona is added server-side.
-- **Unbundled display fonts** — `--font-display` (Instrument Serif) and `--font-ui` (DM Sans) are referenced in `style.css` but not shipped in `webapp/fonts/`; both silently fall back to Georgia/system-ui.
+- **Persona fallback list** (`screenplay_studio/webapp/app.js`, `FALLBACK_PERSONAS`) is used
+  only when `/api/config` doesn't answer — the server-driven list is the source of truth
+  (new personas appear automatically). By-design graceful degradation, guarded by a small
+  test asserting the fallback stays a subset of the server's personas.
+- **The shipped visual register rides the Tungsten override** (`webapp/tungsten.css`, night
+  + dawn); the violet/cyan token set in `style.css` is the fallback under it. Retire the
+  fallback only together with the override (boring is good: the override layer is the
+  freeze).

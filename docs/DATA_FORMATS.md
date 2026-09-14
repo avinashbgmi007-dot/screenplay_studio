@@ -19,6 +19,8 @@ my_project/
 ├── edits.json               <- undo log of applied edits
 ├── edits.redo.json          <- redo stack
 ├── dismissed_findings.json  <- finding triage (dismissed indexes)
+├── finding_marks.json       <- GO 2 writer-intent store (mark-addressed / defer)
+├── last_pass.json           <- GO 2 scorekeeping snapshot (mtime-guarded diff)
 ├── notes.json               <- margin notes (writer's)
 ├── stash.json               <- saved passages (the Stash)
 ├── beatboard.json           <- saved scene order
@@ -362,6 +364,20 @@ All written atomically (`jsonio.atomic_write_json`). Schemas (top level):
 - **edits.redo.json** — redo stack; same record shape as edits.json.
 - **dismissed_findings.json** — triage. Array of `{index: int, issue: str}`. (The fix queue
   itself is computed per-request from findings + dismissals + working copy — no file.)
+  Entries gain `finding_id` when written by the GO 1+ client (legacy entries keep the
+  `(index, issue)` shape and keep working).
+- **finding_marks.json** — GO 2 writer-intent store (mark-addressed + defer). Dict
+  `{<finding_id>: "addressed" | "deferred"}`. Id-keyed via GO 1 identity
+  (category + evidence_quote hash), so marks survive report regeneration, re-scores and
+  scene shifts; writer intent wins display, observed status stays visible on the card.
+  Read by `findingDisposition` (app.js) before any computed status; deferred findings
+  dim, leave open counts, and carry a "next pass" chip. Served on `/edits` as
+  `finding_intents`; written via POST `/api/projects/<name>/findings/intent`.
+- **last_pass.json** — GO 2 scorekeeping snapshot, computed lazily with an mtime guard
+  when `/edits` serves a newer report (one generation back; honest `null` on the first
+  pass). `{last_total, still_live, fixed, new, ghosted_marks}` where `ghosted_marks` are
+  finding ids the writer addressed/deferred that are absent from the new pass (filled only
+  from real intents, never fabricated). Drives the dock's arrival strip.
 - **premise.json** — premise card, present when the project graduated from an idea:
   `{title, logline, premise, questions: [str], content}` (`content` only added on graduation).
 
