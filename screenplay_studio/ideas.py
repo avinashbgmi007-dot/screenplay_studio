@@ -22,7 +22,7 @@ import shutil
 import time
 import uuid
 
-from .jsonio import atomic_write_json, check_safe_id
+from .jsonio import atomic_write_json, check_safe_id, lock_for
 
 EMPTY_CARD = {"title": "", "logline": "", "premise": "", "questions": []}
 
@@ -70,12 +70,31 @@ class IdeaStore:
         return meta
 
     def load(self, idea_id: str) -> dict:
+        # reader-side bounded retry: a concurrent tmp+os.replace can make the
+        # open raise a Windows sharing violation (WinError 32 ->
+        # PermissionError) — GETs must outlast the writer, never 500.
+        from .jsonio import retry_permission
+        return retry_permission(lambda: self._read_meta_raw(idea_id))
+
+    def _read_meta_raw(self, idea_id: str) -> dict:
         with open(self._meta_path(idea_id), "r", encoding="utf-8") as f:
             return json.load(f)
 
     def _write(self, idea_id: str, meta: dict) -> None:
         meta["updated_at"] = time.time()
         atomic_write_json(self._meta_path(idea_id), meta)
+
+    def _modify(self, idea_id: str, fn) -> dict:
+        """Locked load-modify-write of idea.json. rename/save_card/save_content
+        all merge into the STORED meta under the per-path lock, so a racing
+        save can't clobber fields the writer didn't send (the lost-update the
+        ideas race test asserts: rename loading stale content and writing it
+        back over a just-saved page)."""
+        with lock_for(self._meta_path(idea_id)):
+            meta = self.load(idea_id)
+            fn(meta)
+            self._write(idea_id, meta)
+        return meta
 
     @staticmethod
     def auto_title_from(content: str) -> str:
@@ -91,44 +110,43 @@ class IdeaStore:
         """Save the free-form page. While the title is auto (the writer hasn't
         renamed by hand), the shelf title follows the page's first line and
         the card's working title stays in sync so the chat sees it."""
-        meta = self.load(idea_id)
-        meta["content"] = content or ""
-        if meta.get("auto_title", True):
-            meta["title"] = self.auto_title_from(meta["content"])
-            card = dict(meta.get("card") or EMPTY_CARD)
-            card["title"] = meta["title"]
-            meta["card"] = card
-        self._write(idea_id, meta)
-        return meta
+        def apply(meta):
+            meta["content"] = content or ""
+            if meta.get("auto_title", True):
+                meta["title"] = self.auto_title_from(meta["content"])
+                card = dict(meta.get("card") or EMPTY_CARD)
+                card["title"] = meta["title"]
+                meta["card"] = card
+        return self._modify(idea_id, apply)
 
     def rename(self, idea_id: str, title: str) -> dict:
         """A deliberate rename — from here the title is the writer's, and the
         page's first line stops overriding it."""
-        meta = self.load(idea_id)
-        meta["title"] = (title or "").strip() or "Untitled idea"
-        meta["auto_title"] = False
-        card = dict(meta.get("card") or EMPTY_CARD)
-        card["title"] = meta["title"]
-        meta["card"] = card
-        self._write(idea_id, meta)
-        return meta
+        def apply(meta):
+            meta["title"] = (title or "").strip() or "Untitled idea"
+            meta["auto_title"] = False
+            card = dict(meta.get("card") or EMPTY_CARD)
+            card["title"] = meta["title"]
+            meta["card"] = card
+        return self._modify(idea_id, apply)
 
     def save_card(self, idea_id: str, card: dict) -> dict:
         """Merge the incoming card fields into the stored card (partial saves
         never wipe fields the client didn't send), and keep the shelf title in
         sync with the card's working title when one is set."""
-        meta = self.load(idea_id)
-        card = card or {}
-        stored = dict(meta.get("card") or EMPTY_CARD)
-        for key in ("title", "logline", "premise", "questions"):
-            if key in card:
-                stored[key] = card[key]
-        stored["questions"] = [q for q in (stored.get("questions") or []) if str(q).strip()]
-        meta["card"] = stored
-        if (stored.get("title") or "").strip():
-            meta["title"] = stored["title"].strip()
-        self._write(idea_id, meta)
-        return meta
+        incoming = card or {}
+
+        def apply(meta):
+            stored = dict(meta.get("card") or EMPTY_CARD)
+            for key in ("title", "logline", "premise", "questions"):
+                if key in incoming:
+                    stored[key] = incoming[key]
+            stored["questions"] = [q for q in (stored.get("questions") or []) if str(q).strip()]
+            meta["card"] = stored
+            if (stored.get("title") or "").strip():
+                meta["title"] = stored["title"].strip()
+
+        return self._modify(idea_id, apply)
 
     def list(self) -> list[dict]:
         out = []

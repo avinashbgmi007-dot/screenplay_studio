@@ -14,17 +14,41 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 
 _LOCKS_GUARD = threading.Lock()
-_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS: dict[str, threading.RLock] = {}
 
 
-def _lock_for(path: str) -> threading.Lock:
+def _lock_for(path: str) -> threading.RLock:
+    # RLock (not Lock): stores hold this across a load-modify-write cycle and
+    # atomic_write_json re-acquires it inside — reentrancy, same mutual
+    # exclusion across threads.
     key = os.path.abspath(path)
     with _LOCKS_GUARD:
         if key not in _LOCKS:
-            _LOCKS[key] = threading.Lock()
+            _LOCKS[key] = threading.RLock()
         return _LOCKS[key]
+
+
+def lock_for(path: str) -> threading.RLock:
+    """Public per-path lock for load-modify-write cycles: hold it across the
+    load so a racing writer can't clobber fields the writer didn't see."""
+    return _lock_for(path)
+
+
+def retry_permission(fn, attempts: int = 3):
+    """Run fn() with a short bounded retry for Windows sharing violations:
+    a concurrent reader/writer (or AV/indexer) can briefly hold a file open —
+    open/os.replace then raises PermissionError([WinError 32]). A real
+    failure (attempts misses) still raises."""
+    for attempt in range(attempts):
+        try:
+            return fn()
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def atomic_write_json(path: str, data) -> None:
@@ -34,7 +58,7 @@ def atomic_write_json(path: str, data) -> None:
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, path)
+        retry_permission(lambda: os.replace(tmp, path))
 
 
 # IDs come from URL path segments; anything outside this charset is a probe,

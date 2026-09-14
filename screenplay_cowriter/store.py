@@ -44,7 +44,11 @@ class SessionStore:
         path = self._path(session_id)
         if not os.path.exists(path):
             raise FileNotFoundError(f"No session '{session_id}' found in {self.sessions_dir}")
-        return Session.load(path)
+        # reader-side bounded retry: the writer's tmp+os.replace can make a
+        # concurrent open raise a Windows sharing violation (WinError 32 ->
+        # PermissionError) — the hammer contract is that load always parses.
+        from screenplay_studio.jsonio import retry_permission
+        return retry_permission(lambda: Session.load(path))
 
     def save(self, session: Session) -> None:
         # Serialize writes per session file: concurrent turns on the same
@@ -56,7 +60,8 @@ class SessionStore:
         with _lock_for(path):
             tmp = path + ".tmp"
             session.save(tmp)
-            os.replace(tmp, path)
+            from screenplay_studio.jsonio import retry_permission
+            retry_permission(lambda: os.replace(tmp, path))
 
     def list(self) -> list[dict]:
         """Lightweight listing (id, title, branch count, last updated) without full deserialization cost."""
