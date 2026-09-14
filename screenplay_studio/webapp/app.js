@@ -4000,6 +4000,25 @@ function findingNoteEl(f, index, opts = {}) {
   note.appendChild(top);
   note.appendChild(el("span", "finding-note-text", f.issue));
 
+  // evidence-deep (opt-in): diagnosis + verified quote + trust badge — the
+  // card answers WHY the doctor says it and WHERE it was verified. Dock lens
+  // only; margin pins and feedback-room buckets stay shallow.
+  if (opts.deep) {
+    const deep = el("div", "finding-deep");
+    if (f.why_it_matters) deep.appendChild(el("span", "finding-deep-why", f.why_it_matters));
+    if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
+    const v = f.verification;
+    if (v && v.status) {
+      const badge = el("span", "finding-deep-badge " + (v.status === "verified" ? "verified" : "unverified"));
+      badge.textContent = v.status === "verified"
+        ? "\u2713 verified" + (v.confidence != null ? " \u00B7 " + Number(v.confidence).toFixed(2) : "") + (v.matched_scene != null ? " \u00B7 S" + v.matched_scene : "")
+        : "\u26A0 unverified";
+      deep.appendChild(badge);
+    }
+    if (deep.children.length) note.appendChild(deep);
+    if (f.rule_id) cat.title = "Grounded in knowledge-base rule " + f.rule_id;
+  }
+
   const actions = el("div", "finding-note-actions");
   const locateBtn = el("button", "", "🎯 Locate");
   locateBtn.type = "button";
@@ -4674,6 +4693,7 @@ function refreshDockEvidenceScene() {
   dockEvidenceCurrentScene = now;
   const sceneBox = document.querySelector(".dock-evidence-scene");
   if (sceneBox) renderDockEvidenceSceneBox(sceneBox);
+  refreshDockRulerMarker();
 }
 
 function renderDockEvidenceSceneBox(box) {
@@ -4735,11 +4755,17 @@ function renderDockEvidence() {
     return;
   }
 
+  // -- 0. script mass strip + ruler (orientation) ---------------------------
+  const strip = buildScriptMassStrip();
+  if (strip.children.length) lens.appendChild(strip);
+  lens.appendChild(buildScriptRuler());
+
   // -- 1. current-scene strip (What is wrong HERE? Where?) ----------------
   const sceneBox = el("div", "dock-evidence-scene");
   renderDockEvidenceSceneBox(sceneBox);
   lens.appendChild(sceneBox);
   dockEvidenceCurrentScene = currentManuscriptScene();
+  refreshDockRulerMarker();
 
   // -- 2. Fix Queue (What should I do next?) -------------------------------
   // The queue is the doctor's ordered to-do; it opens first for a reason.
@@ -4761,7 +4787,7 @@ function renderDockEvidence() {
     const list = el("div", "dock-finding-list");
     for (const { f, index } of sceneFindings) {
       // Addressed / Still Present rides along (MD §7 preserve list)
-      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index) }));
+      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index), deep: true }));
     }
     sec.appendChild(list);
     lens.appendChild(sec);
@@ -4772,7 +4798,7 @@ function renderDockEvidence() {
     sec.appendChild(el("div", "dock-section-title", "Script-level findings"));
     const list = el("div", "dock-finding-list");
     for (const { f, index } of data.scriptLevel) {
-      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index) }));
+      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index), deep: true }));
     }
     sec.appendChild(list);
     lens.appendChild(sec);
@@ -4792,7 +4818,7 @@ function renderDockEvidence() {
     title.appendChild(el("span", "dock-section-count", String(list.length)));
     sec.appendChild(title);
     const wrap = el("div", "dock-finding-list");
-    for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index) }));
+    for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(index), deep: true }));
     sec.appendChild(wrap);
     lens.appendChild(sec);
   }
@@ -4810,15 +4836,19 @@ function renderDockEvidence() {
   }
 
   // -- 6. Setup / Payoff ------------------------------------------------------
+  // The ledger twice: once as a scene spine (promise structure at a glance —
+  // setup/payoff markers connected by status-shaped lines), once as the full
+  // text rows below (the record — nothing lost, flag don't drop).
   const sp = state.report && state.report.setup_payoff;
   if (sp && sp.length) {
     const sec = el("div", "dock-section");
     sec.appendChild(el("div", "dock-section-title", "Setup / Payoff"));
-    const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
+    sec.appendChild(buildSetupPayoffSpine(sp));
     sp.forEach((e2) => {
       const setScenes = (e2.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
       const payScenes = (e2.payoff_scenes && e2.payoff_scenes.length) ? e2.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
       const row = el("p", "dock-sp-row", `[${SP_STATUS[e2.status] || e2.status}] ${e2.setup} — set up in ${setScenes}, payoff: ${payScenes}`);
+      if (e2.kind) row.appendChild(el("span", "dock-sp-kind", e2.kind));
       if (e2.note) row.appendChild(el("p", "fix-row-why", e2.note));
       sec.appendChild(row);
     });
@@ -4832,6 +4862,170 @@ function renderDockEvidence() {
   renderCharacterPanel(craftWrap);
   renderWriterMirrorPanel(craftWrap);
   if (craftWrap.children.length) lens.appendChild(craftWrap);
+}
+
+// ---------- evidence orientation helpers (mass strip / script ruler / sp spine) ----------
+// SP_STATUS lives at module scope: the ledger rows print it, the spine
+// tooltips announce it — one source, two presentations.
+const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
+
+/** Whole-script orientation strip: open/total + severity mass + category
+ *  weights + the trust readout (verification_summary ships in the report and
+ *  rendered nowhere else). Static by design — orientation, not interaction. */
+function buildScriptMassStrip() {
+  const strip = el("div", "dock-mass-strip");
+  const findings = state.findings || [];
+  if (!findings.length) return strip;
+  const open = (index) => !(state.findingStatus && state.findingStatus[index] === "addressed");
+  const sev = { high: 0, medium: 0, low: 0 };
+  const cat = {};
+  let openTotal = 0;
+  findings.forEach((f, index) => {
+    if (!open(index)) return;
+    openTotal += 1;
+    const s = (f.severity || "low").toLowerCase();
+    if (sev[s] != null) sev[s] += 1;
+    const c = f.category || "other";
+    cat[c] = (cat[c] || 0) + 1;
+  });
+  if (!openTotal) return strip;
+  const head = el("div", "dock-mass-head");
+  head.appendChild(el("span", "dock-mass-total", openTotal + " open of " + findings.length + " findings"));
+  const vs = state.report && state.report.verification_summary;
+  if (vs) {
+    const vTotal = (vs.verified || 0) + (vs.not_found || 0) + (vs.no_quote || 0) + (vs.scene_not_found || 0);
+    if (vTotal) {
+      head.appendChild(el("span", "dock-trust", (vs.verified || 0) + " of " + vTotal + " quotes verified (" + Math.round(100 * (vs.verified || 0) / vTotal) + "%)"));
+    }
+  }
+  strip.appendChild(head);
+  // severity mass: dots + printed counts — never color-alone
+  const mass = el("div", "dock-mass-sev");
+  for (const s of ["high", "medium", "low"]) {
+    if (!sev[s]) continue;
+    const m = el("span", "dock-mass-mark");
+    m.title = sev[s] + " " + s;
+    m.appendChild(el("i", "sev-dot " + s));
+    m.appendChild(el("span", "dock-mass-count", String(sev[s])));
+    mass.appendChild(m);
+  }
+  strip.appendChild(mass);
+  // category weights: single-hue stacked bar (decorative, aria-hidden) with
+  // the printed counts row beneath — same pattern as scene-index dots
+  const catKeys = Object.keys(cat).sort((a, b) => cat[b] - cat[a]);
+  if (catKeys.length) {
+    const bar = el("div", "dock-mass-cat");
+    bar.setAttribute("aria-hidden", "true");
+    for (const c of catKeys) {
+      const seg = el("span", "dock-mass-cat-seg");
+      seg.style.width = (100 * cat[c] / openTotal) + "%";
+      bar.appendChild(seg);
+    }
+    strip.appendChild(bar);
+    strip.appendChild(el("div", "dock-mass-cat-row", catKeys.map((c) => (CATEGORY_LABELS[c] || c) + " " + cat[c]).join(" \u00B7 ")));
+  }
+  return strip;
+}
+
+/** Script ruler: one tick per scene; tick weight = open findings; the tick
+ *  the writer is reading carries the current marker. Orientation read of
+ *  where the diagnostic weight sits — the Scene Index stays the navigator. */
+function buildScriptRuler() {
+  const scenes = (state.script && state.script.scenes) || [];
+  if (!scenes.length) return document.createDocumentFragment();
+  const ruler = el("div", "dock-ruler");
+  ruler.appendChild(el("div", "dock-ruler-title", "Diagnostic weight by scene"));
+  const track = el("div", "dock-ruler-track");
+  for (const scene of scenes) {
+    const counts = sceneIndexSeverity(scene.scene_number);
+    const total = counts.high + counts.medium + counts.low;
+    const tick = el("button", "dock-ruler-tick" + (total ? " hot" : "") +
+      (counts.high ? " sev-high" : counts.medium ? " sev-medium" : counts.low ? " sev-low" : ""));
+    tick.type = "button";
+    tick.dataset.sceneNumber = String(scene.scene_number);
+    const label = "S" + scene.scene_number + " \u2014 " + (scene.heading_raw || "").slice(0, 60) +
+      (total ? " (" + counts.high + " high \u00B7 " + counts.medium + " medium \u00B7 " + counts.low + " low)" : " clean");
+    tick.title = label;
+    tick.setAttribute("aria-label", label);
+    const stem = el("i", "dock-ruler-stem");
+    stem.style.height = Math.min(26, 4 + total * 5) + "px";
+    tick.appendChild(stem);
+    tick.addEventListener("click", () => jumpToScene(scene.scene_number));
+    track.appendChild(tick);
+  }
+  ruler.appendChild(track);
+  return ruler;
+}
+
+/** Mark the ruler tick the writer is currently reading (cheap: class only —
+ *  called from the scene-tracking scroll hook and the full evidence render). */
+function refreshDockRulerMarker() {
+  const track = document.querySelector(".dock-ruler-track");
+  if (!track) return;
+  const now = String(currentManuscriptScene());
+  track.querySelectorAll(".dock-ruler-tick").forEach((t) => {
+    t.classList.toggle("current", t.dataset.sceneNumber === now);
+  });
+}
+
+/** Setup/Payoff spine: the ledger's promise structure on a scene scale —
+ *  setup ● and payoff ◆ markers, connected by status-shaped lines (solid =
+ *  paid, dashed = red herring, dotted = abandoned, missing + ghost ✗ =
+ *  dangling). Markers jump to their scenes; the text rows below remain the
+ *  record (flag don't drop). */
+function buildSetupPayoffSpine(sp) {
+  const frag = document.createDocumentFragment();
+  const scenes = (state.script && state.script.scenes) || [];
+  const maxScene = scenes.length ? Math.max(...scenes.map((s) => s.scene_number)) : 0;
+  if (!maxScene) return frag;
+  const spine = el("div", "dock-sp-spine");
+  const pct = (n) => Math.max(1, Math.min(99, 100 * n / maxScene));
+  sp.forEach((e2) => {
+    const setScenes = e2.setup_scenes || [];
+    const payScenes = e2.payoff_scenes || [];
+    const setupN = setScenes.length ? Math.min(setScenes[0], maxScene) : null;
+    const payoffN = payScenes.length ? Math.min(payScenes[payScenes.length - 1], maxScene) : null;
+    const line = el("div", "dock-sp-line " + (e2.status || ""));
+    line.title = (e2.note || e2.setup || "").slice(0, 200);
+    if (setupN != null && payoffN != null) {
+      const conn = el("i", "dock-sp-conn " + (e2.status || ""));
+      conn.style.left = pct(setupN) + "%";
+      conn.style.width = Math.max(0, pct(payoffN) - pct(setupN)) + "%";
+      line.appendChild(conn);
+    }
+    if (setupN != null) {
+      const mk = el("button", "dock-sp-mk setup");
+      mk.type = "button";
+      mk.style.left = pct(setupN) + "%";
+      mk.title = "Setup \u00B7 S" + setupN + " \u00B7 " + (e2.setup || "").slice(0, 120);
+      mk.setAttribute("aria-label", mk.title);
+      mk.textContent = "\u25CF";
+      mk.addEventListener("click", () => jumpToScene(setupN));
+      line.appendChild(mk);
+    }
+    if (payoffN != null) {
+      const mk = el("button", "dock-sp-mk payoff");
+      mk.type = "button";
+      mk.style.left = pct(payoffN) + "%";
+      mk.title = "Payoff \u00B7 S" + payoffN + " \u00B7 " + (SP_STATUS[e2.status] || e2.status);
+      mk.setAttribute("aria-label", mk.title);
+      mk.textContent = "\u25C6";
+      mk.addEventListener("click", () => jumpToScene(payoffN));
+      line.appendChild(mk);
+    } else if (e2.status === "dangling") {
+      const brk = el("i", "dock-sp-mk ghost");
+      brk.style.left = "97%";
+      brk.textContent = "\u00D7";
+      line.appendChild(brk);
+    }
+    spine.appendChild(line);
+  });
+  const scale = el("div", "dock-sp-scale");
+  const step = Math.max(1, Math.round(maxScene / 8));
+  for (let n = 1; n <= maxScene; n += step) scale.appendChild(el("span", "dock-sp-tick", "S" + n));
+  spine.appendChild(scale);
+  frag.appendChild(spine);
+  return frag;
 }
 
 /** Central refresh hook — called from the renderManuscript tail and after
