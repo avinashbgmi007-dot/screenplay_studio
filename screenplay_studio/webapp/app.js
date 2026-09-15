@@ -4088,6 +4088,13 @@ function findingNoteEl(f, index, opts = {}) {
     cp.title = "Copy the evidence + scene slug";
     cp.addEventListener("click", (e) => { e.stopPropagation(); copyFindingEvidence(f); });
     actions.appendChild(cp);
+    // GAP-4: the escalation gesture — ask Dr. Sushruta WHY this was flagged,
+    // with the finding (and its quote) riding into the consult turn
+    const why = el("button", "intent-btn", "\uD83E\uDE7A");
+    why.type = "button";
+    why.title = "Ask Dr. Sushruta why this was flagged — the finding rides along";
+    why.addEventListener("click", (e) => { e.stopPropagation(); discussWithDoctor(f, index); });
+    actions.appendChild(why);
   }
   const locateBtn = el("button", "", "🎯 Locate");
   locateBtn.type = "button";
@@ -5665,6 +5672,26 @@ function discussFinding(f, index) {
   $("#input").focus();
 }
 
+// GAP-4: the escalation route — one gesture from a finding card to Dr.
+// Sushruta WITH the finding in hand. Pins the quote (so the consult turn
+// rides it into the doctor's context), opens the doctor's lens (the persona
+// switch is the lens contract), and seeds the "why" question the writer
+// was about to type.
+function discussWithDoctor(f, index) {
+  const sceneNumber = (f.scene_refs || [])[0] || null;
+  const quoteText = f.evidence_quote || f.issue;
+  if (quoteText) setPendingQuote({ scene_number: sceneNumber, text: quoteText });
+  openDock("sushruta");
+  const input = document.getElementById("fv-consult-input");
+  if (input) {
+    const cat = CATEGORY_LABELS[f.category] || f.category || "this";
+    input.value = `Why was the ${cat.toLowerCase()} finding on ${sceneNumber != null ? "Scene " + sceneNumber : "the whole script"} flagged? What exactly is wrong?`;
+    input.focus();
+    const ev = new Event("input", { bubbles: true });
+    input.dispatchEvent(ev);
+  }
+}
+
 let welcomeShownFor = null;
 function maybeShowWelcome() {
   if (!state.currentProject) return;
@@ -6323,6 +6350,14 @@ function updateFvStatus(sceneNum) {
   if (findings.length) status.textContent += ' \u2014 ' + findings.length + ' finding' + (findings.length > 1 ? 's' : '');
 }
 
+// tiny escape for the legacy FV bubbles (innerHTML path) — messages are
+// writer/model text; never trust them into raw HTML
+function _fvEscape(s) {
+  return String(s).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
 function renderFvChat(containerId, room) {
   var container = document.getElementById(containerId);
   if (!container) return;
@@ -6333,14 +6368,32 @@ function renderFvChat(containerId, room) {
   }
   var msgs = branchData.messages;
   if (room === 'consult') {
-    msgs = msgs.filter(function(m) { return m.role === 'assistant' && (!m.partner || m.partner === 'consultant'); });
+    // GAP-4: the doctor's column shows the CONSULTANT'S side of the thread —
+    // assistant turns tagged partner=script_consultant AND the writer's own
+    // questions from those turns (partner-tagged user messages). Legacy
+    // sessions (partner undefined) keep the old assistant-only view so no
+    // history silently vanishes.
+    msgs = msgs.filter(function(m) {
+      if (m.partner) return m.partner === 'script_consultant';
+      return m.role === 'assistant';
+    });
   } else {
-    msgs = msgs.filter(function(m) { return m.role === 'user' || (m.role === 'assistant' && (!m.partner || m.partner === 'sameer')); });
+    msgs = msgs.filter(function(m) {
+      if (m.partner) return m.partner === 'writing_partner';
+      return m.role === 'user' || (m.role === 'assistant' && (!m.partner || m.partner === 'sameer'));
+    });
   }
   var html = '';
   msgs.forEach(function(m) {
     var cls = m.role === 'user' ? 'user' : 'ai';
-    html += '<div class="fv-msg ' + cls + '">' + (m.content || m.text || '') + '</div>';
+    // the writer's consult question shows what it was ABOUT: the pinned
+    // quote rides as a chip above the question (same info the doctor saw)
+    if (m.role === 'user' && m.quote && m.quote.text) {
+      var q = String(m.quote.text).slice(0, 140);
+      html += '<div class="fv-msg-quote" title="The passage this question was about">' +
+              _fvEscape(q) + '</div>';
+    }
+    html += '<div class="fv-msg ' + cls + '">' + _fvEscape(m.content || m.text || '') + '</div>';
   });
   container.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:var(--fs-sm);">Start a conversation...</div>';
   container.scrollTop = container.scrollHeight;
@@ -6367,6 +6420,15 @@ async function sendFvMessage(partner) {
   var text = input.value.trim();
   if (!text) return;
   input.value = '';
+  // GAP-4: the consult turn carries the pinned quote when one exists — the
+  // doctor answers ABOUT the finding the writer was looking at, not the
+  // project in general. Sent once, then cleared (same semantics as the
+  // main composer's pendingQuote).
+  var quote = null;
+  if (partner === 'consultant' && pendingQuote) {
+    quote = pendingQuote;
+    clearPendingQuote();
+  }
   var userDiv = document.createElement('div');
   userDiv.className = 'fv-msg user';
   userDiv.textContent = text;
@@ -6379,8 +6441,18 @@ async function sendFvMessage(partner) {
   container.scrollTop = container.scrollHeight;
   try {
     var sessionId = await ensureSession();
+    // The composer's partner IS the voice. A session created by this very
+    // send starts on the default persona (Sameer) — flush the lens persona
+    // BEFORE the turn is stored, or the doctor's first answer gets tagged
+    // and spoken as Sameer (same first-send contract as the idea room's
+    // premise-doctor path).
+    var wantPersona = partner === 'consultant' ? 'script_consultant' : 'writing_partner';
+    var branchNow = currentBranchData() || {};
+    if (branchNow.active_persona !== wantPersona) {
+      try { await _setPersonaMode(wantPersona, branchNow.active_mode || 'peer'); } catch (_) { /* lens still shows */ }
+    }
     var base = '/projects/' + encodeURIComponent(state.currentProject);
-    var res = await streamChatTurn(base + '/chat/sessions/' + sessionId, text, null, typingDiv, container);
+    var res = await streamChatTurn(base + '/chat/sessions/' + sessionId, text, quote, typingDiv, container);
     state.branches[state.currentBranch] = Object.assign({}, currentBranchData(), { messages: res.messages });
     renderFvChat(containerId, partner === 'consultant' ? 'consult' : 'cowrite');
   } catch (err) {

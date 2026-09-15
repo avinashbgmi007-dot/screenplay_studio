@@ -26,6 +26,7 @@ class Message:
     mode: str | None = None  # e.g. "evidence_discussion", "brainstorm", "persona:producer"
     scene_refs: list[int] = field(default_factory=list)  # scenes pulled into context for this turn
     quote: dict | None = None  # select-to-reply: {"scene_number": int, "text": str}
+    partner: str | None = None  # the persona this turn was spoken WITH ("writing_partner" | "script_consultant"); None = legacy
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -35,7 +36,7 @@ class Message:
         return Message(
             role=d["role"], content=d["content"], timestamp=d.get("timestamp", time.time()),
             mode=d.get("mode"), scene_refs=d.get("scene_refs", []),
-            quote=d.get("quote"),
+            quote=d.get("quote"), partner=d.get("partner"),
         )
 
 

@@ -339,7 +339,11 @@ or `{"stage": "failed", "status": "failed", "detail": "<error>", "ts": …}`.
           "timestamp": 0.0,
           "mode": "peer",
           "scene_refs": [1],             // scenes injected into context this turn
-          "quote": {"scene_number": 1, "text": "…"}  // select-to-reply passage (optional)
+          "quote": {"scene_number": 1, "text": "…"},  // select-to-reply passage (optional)
+          "partner": "script_consultant" // persona this turn was spoken with (writing_partner |
+                                         // script_consultant); null on legacy messages — the
+                                         // FV columns scope by it and fall back to the old
+                                         // assistant-only view when absent
         }
       ]
     }

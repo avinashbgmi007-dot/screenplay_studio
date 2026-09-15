@@ -70,13 +70,27 @@ ids** (two pairs share `category + normalized issue`), so with **no writer actio
 `Fixed: 2 · New: 2` when the set-truth is `0 · 0`. This is not demo-only: the weak no-quote tier keys
 on normalized issue text, so repeated phrasing collides with a real model too.
 
-### GAP-4 — the Sushruta lens carries no per-finding context
-`sendFvMessage` passes `quote = null` into `streamChatTurn` (app.js:6316/6336) — only the Sameer
-cowrite path consumes `pendingQuote`. Live: a real "why was this flagged?" reply arrives (grounded on
-the scene map + "9 findings riding along") but `msgsContainQuote = false` — the answer is
-project-level, never pinned to the finding the writer was looking at. Secondary UX note: `renderFvChat`
-filters the consult column to `role === 'assistant'` (app.js:6289), so the writer's own question is
-**not shown** in the doctor's column.
+### GAP-4 — the Sushruta lens carries no per-finding context · **FIXED (tuning go, T3/d9)**
+`sendFvMessage` passed `quote = null` into `streamChatTurn` — only the Sameer cowrite path consumed
+`pendingQuote`. Live: a real "why was this flagged?" reply arrived (grounded on the scene map + "9
+findings riding along") but the answer was project-level, never pinned to the finding the writer was
+looking at. Secondary UX note: `renderFvChat` filtered the consult column to `role === 'assistant'`,
+so the writer's own question was **not shown** in the doctor's column.
+**Fix (T3):** (1) consult turns now ride the pinned quote into `streamChatTurn` — the doctor's prompt
+carries `Passage from the script: "…"` and the passage is stored on the user message; (2) the
+composer's partner is flushed onto the live session BEFORE the turn is stored (a session created by
+the send started on the default persona — the idea room's premise-doctor first-send contract, mirrored);
+(3) every stored turn is tagged `partner` (writing_partner | script_consultant) and the consult column
+scopes by it, rendering the writer's own turn + a quote chip (legacy sessions fall back to the old
+assistant-only view — no history vanishes); (4) a 🩺 escalation action on deep board cards pins the
+finding, flips to the Sushruta lens and seeds the "why" question in one gesture.
+Verified: 6 new pytest cases (`tests/test_consult_context.py` — quote reaches the prompt, is stored,
+malformed dropped, persona tagging both ways, legacy round-trip); d9 end-to-end on gun_pen
+(`docs/audit/validation-d9.py`) — the escalation gesture, the stored quote + persona (client AND server
+session JSON), the writer's turn rendering in the doctor's column, the quote chip, and a consultant-voiced
+reply — **13/13 checks pass**. First d9 run caught a real bug: the lens persona switch was skipped when
+no session existed yet (dockLensPersona no-ops without one), so the doctor's first turn spoke and was
+tagged as Sameer — fixed with the send-time flush.
 
 ### GAP-5 — "quote-visible drift" is structurally impossible (the plan's fix #3 premise is wrong)
 `Orchestrator` loads `m.parsed_path` for analysis (orchestrator.py:110, :232) — the **original
@@ -121,8 +135,9 @@ not a dead-end. Tuning note only: consider labelling the card "note" vs "quote".
 2. ~~**GAP-1**~~ — **DONE** (T2): ONE predicate `findingPassesFilter(f, index)` behind ink, board
    list, loop list and fix queue; honest empty-filter hints on board + queue; phase6 contract
    updated (28/28), d8 probe 14/14.
-3. **GAP-4** — pass the finding (or `pendingQuote`) into the FV consult turn, and render the writer's
-   own turn in the consult column.
+3. ~~**GAP-4**~~ — **DONE** (T3): consult turns ride the finding's quote, the turn is tagged with the
+   persona and the writer's own question renders in the doctor's column; a 🩺 escalation gesture on
+   deep cards pins + flips + seeds in one move. d9 probe 13/13, 6 new pytest cases.
 4. **GAP-5** — decide the product intent: if the strip should reflect writer progress, analysis must
    read the working copy (or the strip must stop implying writer-fix causality).
 5. ~~Close the three ⏳ rows~~ — **done in d6** (see "Coverage closed"). Residue: the clean-bill and

@@ -316,8 +316,8 @@ class CoWriterEngine:
 
         reply = ensure_forward_momentum(reply, turn_kind)
 
-        branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode, quote=quote))
-        branch.messages.append(Message(role="assistant", content=reply, mode=branch.active_mode))
+        branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode, quote=quote, partner=branch.active_persona))
+        branch.messages.append(Message(role="assistant", content=reply, mode=branch.active_mode, partner=branch.active_persona))
 
         if self.store is not None:
             self.store.save(session)

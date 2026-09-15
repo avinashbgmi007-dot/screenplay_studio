@@ -423,6 +423,14 @@ board; full rationale in `docs/PHASE_B_FV_FOLD_SPEC.md`):
 - **Intent buttons** (deep dock cards): ✓ mark-addressed / ⏭ next-pass / ⧉ copy — persisted
   to `finding_marks.json` (id-keyed via GO 1 identity, survives report regeneration);
   deferred findings dim, leave open counts, and carry a "next pass" chip.
+- **Escalation to Dr. Sushruta** (deep dock cards): 🩺 pins the finding's quote, opens the
+  Sushruta lens and seeds the "why was this flagged?" question — one gesture from a card to
+  the doctor WITH the finding in hand. The consult turn then rides the quote into the
+  doctor's prompt, and every stored turn is tagged `partner` (`writing_partner` |
+  `script_consultant`) so the Sushruta lens renders the writer's own question + a quote chip
+  alongside the doctor's replies (legacy sessions without tags keep the assistant-only view).
+  The composer's partner is flushed onto the session before the turn is stored, so a session
+  created by the send never speaks the doctor's first answer in Sameer's voice.
 - **The arrival strip** (`buildArrivalStrip`, dock Evidence top): when a new report lands —
   "Last pass: N · Still live · Fixed · New" (computed from `last_pass.json`, one
   generation back) + the trust readout ("N of M quotes verified (P%)") + an inline

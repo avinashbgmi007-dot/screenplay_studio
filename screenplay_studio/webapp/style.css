@@ -4356,6 +4356,16 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   flex: 1; overflow-y: auto; padding: var(--sp-6);
   display: flex; flex-direction: column; gap: var(--sp-5);
 }
+.fv-msg-quote {
+  font-size: var(--fs-xs, 12px);
+  opacity: 0.85;
+  font-style: italic;
+  border-left: 2px solid var(--consult, #53c7f0);
+  padding: 4px 10px;
+  margin: 6px 18px 0 18px;
+  max-width: 75%;
+  overflow-wrap: anywhere;
+}
 .fv-msg { max-width: 90%; padding: var(--sp-4) var(--sp-6); border-radius: var(--r-sm); font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.5; }
 .fv-msg.user { align-self: flex-end; background: var(--paper); color: var(--paper-ink); border-top-right-radius: 2px; }
 .fv-msg.ai { align-self: flex-start; background: var(--ink-800); border: 1px solid var(--line); color: var(--text); border-top-left-radius: 2px; }
