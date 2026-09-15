@@ -169,8 +169,8 @@ screenplay-studio_1/
   (`inkAnchorsFor`/`decorateLineWithInk`), the contextual keyboard fix loop
   (`startLoop`/`stepLoop`/`exitLoop`/`renderLoopBar`; n/p/esc when active, scene-stepping
   on exit), intent buttons (`setFindingIntent`), and the arrival strip (`buildArrivalStrip`:
-  scorekeeping + trust + inline retry + ghosted marks). Full spec:
-  `docs/PHASE_B_FV_FOLD_SPEC.md` + `docs/UI_UX_SPECIFICATION.md` §4.9.
+  scoped pass line + a working-copy draft clause + trust + inline retry + ghosted marks).
+  Full spec: `docs/PHASE_B_FV_FOLD_SPEC.md` + `docs/UI_UX_SPECIFICATION.md` §4.9.
 - **Rooms** — `setRoom("cowrite"|"feedback")` swaps panel + `body[data-room]` identity;
   `openRoomDrawer`/`closeRoomDrawer` manage the summoned partner drawer; legacy saved views
   (`chat`/`script`) map to the Co-write room on restore.

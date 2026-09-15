@@ -6513,6 +6513,8 @@ body:not(.idea-mode) .desk {
 .dock-arrival-strip { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-3); border:1px solid var(--lamp); border-radius:var(--r-md); background:var(--glow); }
 .dock-arrival-head { display:flex; align-items:baseline; gap:var(--sp-3); flex-wrap:wrap; }
 .dock-arrival-line { font-size:var(--fs-xs); font-weight:600; color:var(--text); }
+.dock-arrival-scope { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; }
+.dock-arrival-draft { font-size:var(--fs-2xs); font-weight:600; color:var(--text-muted); }
 .dock-arrival-retry { align-self:flex-start; appearance:none; border:1px solid var(--danger); background:var(--danger-bg,rgba(200,80,58,.10)); color:var(--danger); border-radius:var(--r-sm); padding:2px var(--sp-3); font-size:var(--fs-2xs); cursor:pointer; }
 .dock-arrival-retry:disabled { opacity:.6; cursor:default; }
 .dock-ghosted summary { font-size:var(--fs-2xs); color:var(--text-faint); cursor:pointer; }

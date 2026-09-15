@@ -5090,16 +5090,37 @@ function clearEvidenceUnread() {
 }
 
 // ---------- arrival strip (R4 + N1 + N2): the "finally" ----------
-// "Last pass: 62. Still live: 41. Fixed: 14. New: 7." + the trust readout +
-// inline retry when the pass arrived partially. Fixed findings expand to a
-// muted ghosted list — never red, in no open count (R9).
+// The pass line ("Pass: 62 → 41 still live · 14 no longer flagged · 7 new") +
+// a scope chip + the trust readout + the writer's OWN progress ("Your draft: N
+// addressed") + inline retry when the pass arrived partially. GAP-5: the four
+// pass numbers are analyzer re-read drift and can never track writer edits —
+// the scope chip says so on-screen, and the draft clause carries the
+// working-copy truth (observed "addressed") that used to be missing here.
+// Ghosted marks expand to a muted list — never red, in no open count (R9).
 function buildArrivalStrip() {
   const lp = state.lastPass;
   if (!lp || !lp.computed_at) return null;
   const strip = el("div", "dock-arrival-strip");
   const head = el("div", "dock-arrival-head");
+  // GAP-5: these four numbers diff THIS pass against the PREVIOUS one — both
+  // read the parse-of-record (orchestrator.py loads m.parsed_path), so writer
+  // edits can never move them. Say "Pass:", not "Last pass… Fixed", so the
+  // line reads as analyzer drift instead of borrowed writer progress.
   head.appendChild(el("span", "dock-arrival-line",
-    `Last pass: ${lp.last_total} \u00B7 Still live: ${lp.still_live} \u00B7 Fixed: ${lp.fixed} \u00B7 New: ${lp.new}`));
+    `Pass: ${lp.last_total} \u2192 ${lp.still_live} still live \u00B7 ${lp.fixed} no longer flagged \u00B7 ${lp.new} new`));
+  const scope = el("span", "dock-arrival-scope", "from the last run, not your edits");
+  scope.title = "These compare one analysis pass to the previous one. They never respond to your edits \u2014 your own progress rides beside them.";
+  head.appendChild(scope);
+  // GAP-5's honest counterpart: the working-copy truth the pass line cannot
+  // carry. Same counting contract as the revision strip (N3) — the writer's
+  // number agrees with every other surface. Sits with the pass line (left) so
+  // "what the passes say / what you've done" reads in one breath; the
+  // secondary quote-trust metric stays pushed right.
+  const prog = findingStatusSummary();
+  if (prog.addressed || prog.open) {
+    head.appendChild(el("span", "dock-arrival-draft",
+      `${prog.addressed} of ${prog.addressed + prog.open} addressed by you`));
+  }
   const vs = state.report && state.report.verification_summary;
   if (vs) {
     const vTotal = (vs.verified || 0) + (vs.not_found || 0) + (vs.no_quote || 0) + (vs.scene_not_found || 0);

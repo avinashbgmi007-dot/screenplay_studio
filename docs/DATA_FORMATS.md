@@ -377,13 +377,21 @@ All written atomically (`jsonio.atomic_write_json`). Schemas (top level):
   Read by `findingDisposition` (app.js) before any computed status; deferred findings
   dim, leave open counts, and carry a "next pass" chip. Served on `/edits` as
   `finding_intents`; written via POST `/api/projects/<name>/findings/intent`.
-- **last_pass.json** — GO 2 scorekeeping snapshot, computed lazily with an mtime guard
-  when `/edits` serves a newer report (one generation back; honest `null` on the first
-  pass). `{last_total, still_live, fixed, new, ghosted_marks}` where `ghosted_marks` are
-  finding ids the writer addressed/deferred that are absent from the new pass (filled only
-  from real intents, never fabricated). **All counts are DISTINCT-id counts** — duplicate
-  finding ids (same category + same quote/issue) are one finding, so a no-op re-analysis
-  always reports `fixed=0, new=0`, never phantom progress. Drives the dock's arrival strip.
+- **last_pass.json** — GO 2 scorekeeping snapshot, computed lazily with an **(mtime,
+  content-signature) guard** when `/edits` serves a newer report (one generation back;
+  honest `null` on the first pass). The signature (`report_sig` = SHA-1 over the distinct
+  finding ids) closes the same-tick hole the mtime alone cannot: a report rewritten within
+  one filesystem timestamp tick keeps the same mtime, so an mtime-only guard would serve a
+  stale payload (`null` after arithmetic exists, or stale Fixed/New). `{ids, issues,
+  report_mtime, report_sig, payload}` where `payload` = `{last_total, still_live, fixed,
+  new, ghosted_marks}` and `ghosted_marks` are finding ids the writer addressed/deferred
+  that are absent from the new pass (filled only from real intents, never fabricated).
+  **All counts are DISTINCT-id counts** — duplicate finding ids (same category + same
+  quote/issue) are one finding, so a no-op re-analysis always reports `fixed=0, new=0`,
+  never phantom progress. Drives the dock's **arrival strip pass line** — which compares
+  analysis passes, NOT writer edits (both passes read the parse-of-record, so writer edits
+  can never move these numbers; the writer's own progress rides `findings_status` and the
+  strip's draft clause).
 - **premise.json** — premise card, present when the project graduated from an idea:
   `{title, logline, premise, questions: [str], content}` (`content` only added on graduation).
 

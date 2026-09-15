@@ -432,12 +432,19 @@ board; full rationale in `docs/PHASE_B_FV_FOLD_SPEC.md`):
   The composer's partner is flushed onto the session before the turn is stored, so a session
   created by the send never speaks the doctor's first answer in Sameer's voice.
 - **The arrival strip** (`buildArrivalStrip`, dock Evidence top): when a new report lands —
-  "Last pass: N · Still live · Fixed · New" (computed from `last_pass.json`, one
-  generation back) + the trust readout ("N of M quotes verified (P%)") + an inline
-  **Retry failed (k)** when categories failed + **ghosted marks** (writer-intent findings
-  absent from the new pass — muted, expandable, never red, in no open count). One ambient
-  peek-chip on arrival; a lasting unread dot rides `#dock-tab-evidence` until the lens is
-  opened.
+  the **pass line** "Pass: N → M still live · K no longer flagged · J new" (computed from
+  `last_pass.json`, one generation back) + a scope chip ("from the last run, not your edits")
+  + a **draft clause** carrying the writer's OWN working-copy progress ("K of M addressed by
+  you", same counting contract as the revision strip) + the trust readout ("N of M quotes
+  verified (P%)", pushed right) + an inline **Retry failed (k)** when categories failed +
+  **ghosted marks** (writer-intent findings absent from the new pass — muted, expandable,
+  never red, in no open count). One ambient peek-chip on arrival; a lasting unread dot rides
+  `#dock-tab-evidence` until the lens is opened.
+  **GAP-5 honesty:** the pass numbers compare one analysis pass to the previous one; both
+  read the parse-of-record (`orchestrator.py` loads `m.parsed_path`), so they can never
+  respond to writer edits. The scope chip says so on-screen and the draft clause carries the
+  working-copy truth (`finding_statuses`) that the strip previously lacked — the word
+  "Fixed" (which borrowed writer credit it couldn't earn) is gone.
 
 ---
 
