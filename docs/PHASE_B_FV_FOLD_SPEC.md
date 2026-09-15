@@ -76,7 +76,10 @@ workspace); the 3-panel `#feedback-view` clone is **dormant, unreachable** (grep
   fold route (view cowrite + dock evidence + fv hidden), filter drives ink both directions, loop steps
   across a real 2-entry seam (N + P) and re-docks the bar after a mid-loop filter re-render, intents
   persist to disk + survive reload with dispositions `[addressed, deferred]`, arrival arithmetic exact
-  ("Last pass: 3 · Still live: 1 · Fixed: 2 · New: 1"), ghosted filled only from real intents, unread
+  ("Last pass: 3 · Still live: 1 · Fixed: 2 · New: 1" — **copy SUPERSEDED by GAP-5**: the live pass
+  line now reads "Pass: N → M still live · K no longer flagged · J new" + a scope chip, because these
+  numbers compare analysis passes and can never respond to writer edits; the writer's own progress
+  rides the draft clause "K of M addressed by you"), ghosted filled only from real intents, unread
   dot → cleared by Evidence open. Two pre-existing failures elsewhere in the full suite
   (`test_audit_hardening` ideas-race, `test_feature_batch` SessionStore race) are Windows file-lock
   races in modules GO 2 never touched (git-verified) — declared out of scope.

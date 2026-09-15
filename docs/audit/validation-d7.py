@@ -3,9 +3,12 @@
 #   pass 1: upload gun_pen.pdf -> analyze -> seed last_pass snapshot
 #   pass 2: re-analyze with NO writer action (no edits, no intents)
 #           -> /edits last_pass must report fixed=0, new=0 (distinct-identity truth)
-#   browser: the arrival strip string must byte-match "Last pass: N . Still live: N
-#           . Fixed: 0 . New: 0" and the ghosted summary must be ABSENT
-#           (no writer marks exist to ghost).
+#   browser: the arrival strip's PASS LINE must byte-match
+#           "Pass: N -> N still live . 0 no longer flagged . 0 new" and the
+#           ghosted summary must be ABSENT (no writer marks exist to ghost).
+#   (GAP-5 later rescoped this copy: the pass numbers compare analysis passes,
+#   never writer edits — word "Fixed" retired, scope chip added, and the
+#   writer's own progress rides the draft clause.)
 # Before the fix: 9 findings / 7 distinct ids -> "Fixed: 2 . New: 2" manufactured
 # out of duplicate rows. After: honest zeros.
 import sys, os, json, tempfile
@@ -104,18 +107,26 @@ pg.evaluate("() => setDockLens('evidence')")
 pg.wait_for_timeout(1000)
 strip = pg.evaluate("""() => ({
   strip:(document.querySelector('.dock-arrival-line')||{}).textContent||null,
+  scope:(document.querySelector('.dock-arrival-scope')||{}).textContent||null,
+  draft:(document.querySelector('.dock-arrival-draft')||{}).textContent||null,
   ghosted:(document.querySelector('.dock-ghosted-summary')||{}).textContent||null
 })""")
 print("STRIP", json.dumps(strip, ensure_ascii=False))
 if lp:
-    expected = (f"Last pass: {lp.get('last_total')} \u00b7 Still live: {lp.get('still_live')} "
-                f"\u00b7 Fixed: {lp.get('fixed')} \u00b7 New: {lp.get('new')}")
+    expected = (f"Pass: {lp.get('last_total')} \u2192 {lp.get('still_live')} still live "
+                f"\u00b7 {lp.get('fixed')} no longer flagged \u00b7 {lp.get('new')} new")
     check("BROWSER: arrival strip string == server payload (exact)",
           strip["strip"] == expected,
           f"browser={strip['strip']!r} expected={expected!r}")
-    check("BROWSER: strip shows honest zeros (Fixed: 0 · New: 0)",
-          "Fixed: 0" in (strip["strip"] or "") and "New: 0" in (strip["strip"] or ""),
+    check("BROWSER: strip shows honest zeros (0 no longer flagged . 0 new)",
+          "0 no longer flagged" in (strip["strip"] or "") and "0 new" in (strip["strip"] or ""),
           strip["strip"])
+    # GAP-5: the pass numbers are scoped on-screen, and the writer's own
+    # working-copy progress rides beside them (the signal the strip lacked).
+    check("BROWSER: GAP-5 scope chip says the numbers are not writer edits",
+          "not your edits" in (strip["scope"] or ""), strip["scope"])
+    check("BROWSER: GAP-5 draft clause carries the working-copy progress",
+          "addressed by you" in (strip["draft"] or ""), strip["draft"])
 check("BROWSER: no ghosted summary (no writer marks exist)",
       not strip["ghosted"], strip["ghosted"])
 pg.screenshot(path=os.path.join(SHOTS, "validation-24-gap3-arrival-zero.png"))

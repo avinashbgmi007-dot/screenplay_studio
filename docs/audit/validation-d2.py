@@ -64,8 +64,10 @@ for i, f in enumerate(f1):
           "sc=" + str(f.get("scene_refs")), "|", (f.get("issue") or "")[:44])
 check("P1 report has findings", len(f1) > 0, len(f1))
 check("P1 verification_summary present", bool(vs1), vs1)
-check("P1 ids are unique across findings (no dup ids)",
-      len(set(ids1)) == len(ids1), f"{len(ids1)} findings / {len(set(ids1))} distinct ids")
+# GAP-3: compute_finding_id CAN collide (same category + same quote/issue) —
+# gun_pen itself carries 9 rows / 7 distinct ids. Duplicates are ONE finding for
+# arithmetic; the de-dup contract is asserted after the control pass below.
+print("P1_ID_DUPES", len(ids1), "rows /", len(set(ids1)), "distinct")
 
 # seed the last_pass snapshot (first GET -> honest null payload)
 e1 = edits()
@@ -90,6 +92,14 @@ check("CONTROL: no writer action -> report Fixed=0 (set-based truth)",
 check("CONTROL: no writer action -> report New=0 (set-based truth)",
       (lp_ctrl or {}).get("new") == ctrl_new_true,
       f"server new={ (lp_ctrl or {}).get('new') } vs true={ctrl_new_true}")
+# GAP-3 de-dup contract: with duplicates present and ZERO writer action, a no-op
+# re-analysis must report fixed=0/new=0 AND last_total as a DISTINCT count.
+check("CONTROL: last_total counts DISTINCT ids (dup rows collapse to one finding)",
+      (lp_ctrl or {}).get("last_total") == len(set(ids1)),
+      f"last_total={(lp_ctrl or {}).get('last_total')} distinct={len(set(ids1))} rows={len(ids1)}")
+check("CONTROL: duplicate rows cannot manufacture phantom progress",
+      (lp_ctrl or {}).get("fixed") == 0 and (lp_ctrl or {}).get("new") == 0,
+      f"fixed={(lp_ctrl or {}).get('fixed')} new={(lp_ctrl or {}).get('new')} for {len(ids1)} rows / {len(set(ids1))} distinct")
 print("CTRL_ARITH server(still,fixed,new)=",
       (lp_ctrl or {}).get("still_live"), (lp_ctrl or {}).get("fixed"), (lp_ctrl or {}).get("new"),
       "| list-vs-set truth (still,fixed,new)=", ctrl_still, ctrl_fixed_true, ctrl_new_true,
@@ -176,14 +186,33 @@ if len(ids1) >= 3:
 if verified:
     idx, vf = verified
     quote = vf.get("evidence_quote")
-    scene = (vf.get("scene_refs") or [None])[0]
-    # rewrite the quoted line WITHOUT the trigger phrase -> demo re-keys the
-    # finding (quote-keyed id -> issue-keyed id) = quote-visible drift
-    newline = "MARA: Then it stays between us. (rewritten by the writer.)"
-    app = requests.post(base + f"/api/projects/{NAME}/edits/apply",
-                        json={"scene_number": scene,
-                              "replacements": [{"old": quote, "new": newline}]}, timeout=60)
-    print("E4_APPLY", app.status_code, (app.text or "")[:200])
+    # CONTRACT: a verified finding carries EMPTY scene_refs -> use
+    # verification.matched_scene (the d3-proven contract). With scene_refs the
+    # POST 400s ("scene_number is required") and the drift checks below pass
+    # VACUOUSLY (nothing was edited).
+    scene = (vf.get("verification") or {}).get("matched_scene")
+    if quote and scene is not None:
+        # rewrite the quoted line WITHOUT the trigger phrase.
+        # GAP-5 NOTE: this does NOT re-key the finding — analysis reads the
+        # parse-of-record, so the id survives (asserted as STRUCTURAL below).
+        # What DOES move is the working-copy truth: the apply response's
+        # findings_status flips the finding to "addressed" (the signal the
+        # arrival strip now carries in its draft clause).
+        newline = "MARA: Then it stays between us. (rewritten by the writer.)"
+        app = requests.post(base + f"/api/projects/{NAME}/edits/apply",
+                            json={"scene_number": scene,
+                                  "replacements": [{"old": quote, "new": newline}]}, timeout=60)
+        print("E4_APPLY", app.status_code, (app.text or "")[:200])
+        check("IN-BETWEEN: the quote-visible edit actually applied (not a silent 400)",
+              app.status_code == 200, f"{app.status_code} {(app.text or '')[:120]}")
+        _row = next((r for r in ((app.json() or {}).get("findings_status", {}).get("findings") or [])
+                     if r.get("finding_id") == verified_old_id), None)
+        print("GAP5_EDIT_STATUS", verified_old_id, _row)
+        check("GAP-5: the writer's edit reads 'addressed' from the working copy "
+              "(the truth the pass line structurally cannot carry)",
+              bool(_row) and _row.get("status") == "addressed", _row)
+    else:
+        print("E4_SKIP", "no verified quote / no matched_scene", bool(quote), scene)
 
 # seed snapshot for this generation, then pass 3
 edits()
@@ -210,9 +239,19 @@ check("IN-BETWEEN: writer intent persisted to disk (finding_intents non-empty)",
       bool(intents), intents)
 check("IN-BETWEEN: deferred intent recorded",
       any(v == "deferred" for v in intents.values()), intents)
-check("IN-BETWEEN: quote-visible edit caused the quoted finding's id to drift",
-      bool(verified_old_id) and verified_old_id not in new_set,
-      f"old_id={verified_old_id} still_in_new={verified_old_id in new_set if verified_old_id else None}")
+# GAP-5: analysis reads the parse-of-record (orchestrator.py loads m.parsed_path),
+# so a quote-visible EDIT does NOT re-key the finding — the id SURVIVES. This is
+# exactly why the strip's pass numbers cannot mean writer progress (and why the
+# strip now says so + carries the working-copy draft clause instead). Assert the
+# true structural fact; a same-pass re-analyze still has to be honest about it.
+check("STRUCTURAL (GAP-5): the quoted finding's id SURVIVES a writer edit "
+      "(analysis reads the parse, not the working copy)",
+      bool(verified_old_id) and verified_old_id in new_set,
+      f"old_id={verified_old_id} in_new={verified_old_id in new_set if verified_old_id else None}")
+check("STRUCTURAL (GAP-5): the quoted finding's id SURVIVES a writer edit "
+      "(analysis reads the parse, not the working copy)",
+      bool(verified_old_id) and verified_old_id in new_set,
+      f"old_id={verified_old_id} in_new={verified_old_id in new_set if verified_old_id else None}")
 check("ARRIVAL: server still_live == set-truth",
       (lp or {}).get("still_live") == exp_still,
       f"server={(lp or {}).get('still_live')} truth={exp_still}")
@@ -237,19 +276,30 @@ pg.evaluate("() => setDockLens('evidence')")
 pg.wait_for_timeout(1000)
 strip = pg.evaluate("""() => ({
   strip:(document.querySelector('.dock-arrival-line')||{}).textContent||null,
+  scope:(document.querySelector('.dock-arrival-scope')||{}).textContent||null,
+  draft:(document.querySelector('.dock-arrival-draft')||{}).textContent||null,
   ghosted:(document.querySelector('.dock-ghosted-summary')||{}).textContent||null,
   trust:(document.querySelector('.dock-trust')||{}).textContent||null,
   dot: document.getElementById('dock-tab-evidence').classList.contains('has-unread')
 })""")
 print("E5_STRIP", json.dumps(strip, ensure_ascii=False))
-expected = (f"Last pass: {(lp or {}).get('last_total')} \u00b7 Still live: {(lp or {}).get('still_live')} "
-            f"\u00b7 Fixed: {(lp or {}).get('fixed')} \u00b7 New: {(lp or {}).get('new')}")
+# GAP-5: the pass line is scoped ("from the last run, not your edits") and the
+# draft clause carries the working-copy truth the strip previously lacked.
+expected = (f"Pass: {(lp or {}).get('last_total')} \u2192 {(lp or {}).get('still_live')} still live "
+            f"\u00b7 {(lp or {}).get('fixed')} no longer flagged \u00b7 {(lp or {}).get('new')} new")
 check("ARRIVAL: browser strip string == server payload (exact)",
       strip["strip"] == expected, f"browser={strip['strip']!r} expected={expected!r}")
+check("ARRIVAL: scope chip says the pass numbers are not writer edits",
+      "not your edits" in (strip["scope"] or ""), strip["scope"])
 check("ARRIVAL: unread dot present on fresh load after a new pass", dot is True, dot)
 check("ARRIVAL: unread dot cleared once Evidence lens opened", strip["dot"] is False, strip["dot"])
-check("ARRIVAL: ghosted summary rendered (deferred mark muted)",
-      bool(strip["ghosted"]), strip["ghosted"])
+# GAP-5: ghosted marks need a vanished id that carries an intent — unreachable
+# while analysis reads the parse (ids survive). Assert the honest ABSENCE; the
+# render path itself is covered by d6's seeded payload (H1).
+check("ARRIVAL: no ghosted summary — nothing vanished to ghost (GAP-5: ids survive)",
+      not strip["ghosted"], strip["ghosted"])
+check("ARRIVAL: the draft clause carries the writer's working-copy progress",
+      "addressed by you" in (strip["draft"] or ""), strip["draft"])
 pg.screenshot(path=os.path.join(SHOTS, "validation-23-arrival-strip.png"))
 
 b.close(); pw.stop()

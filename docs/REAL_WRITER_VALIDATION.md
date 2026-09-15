@@ -1,7 +1,7 @@
 # Real-Writer Validation — the one-page checklist
 
-The one gate left. Automation proved the machinery (703/703 pytest · 30/30 layout audit ·
-live probes R1–R7 with exact arithmetic) — only a writer with their own script can prove
+The one gate left. Automation proved the machinery (713/713 pytest · 30/30 layout audit ·
+live probes d6/d7/d10 with exact arithmetic) — only a writer with their own script can prove
 the promises. One sitting, one page, honest notes.
 
 ## Setup (5 min)
@@ -25,7 +25,8 @@ the promises. One sitting, one page, honest notes.
 | Surface | Question | Answer | Felt note (one line) |
 |---|---|---|---|
 | Arrival strip | Did the numbers change how you started — or did you skip them? | | |
-| Arrival strip | Did you trust Still live / Fixed / New? Anything read wrong? | | |
+| Arrival strip | Did you read the **Pass** line as *your* progress, or as the analyzer's? (It compares analysis passes only — never your edits. Did the scope chip land, or did you miss it?) | | |
+| Arrival strip | **"N of M addressed by you"** — did you trust it? Did it agree with what the board and cards showed? | | |
 | Arrival strip | Ghosted marks: honest (never red, in no open count)? | | |
 | Fix loop | Was N/P actually faster than clicking through a list? | | |
 | Fix loop | Did your eyes stay on the manuscript? Dock card auto-open: help or distract? | | |
@@ -39,7 +40,8 @@ the promises. One sitting, one page, honest notes.
 
 ## What the answers decide
 
-- **Strip**: prominence, placement (dock Evidence top), trust formatting.
+- **Strip**: prominence, placement (dock Evidence top), whether the scope chip earns its
+  place or is noise, trust formatting, the wording of the draft clause.
 - **Loop**: bar density, peek-chip timing (~4s), unread-dot persistence.
 - **Defaults**: highs-only ink amount, filter state.
 - **Anything felt-wrong**: file it — tuning is cheap now that machinery is verified.
@@ -47,4 +49,4 @@ the promises. One sitting, one page, honest notes.
 ## The rule
 
 **Felt > machinery.** If a number is exact but the moment felt wrong, the moment wins —
-machinery is already proven (703/703 · 30/30 · R1–R7); this session judges the promise.
+machinery is already proven (713/713 · 30/30 · d6/d7/d10 green); this session judges the promise.

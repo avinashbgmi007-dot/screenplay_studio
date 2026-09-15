@@ -1,10 +1,10 @@
 # gun_pen.pdf — Full Feedback-Projection Audit — VERDICT TABLE
 
-**Date:** 2026-09-14 (corrected Phase D re-run)
+**Date:** 2026-09-14 (corrected Phase D re-run; tuning go through 2026-09-15)
 **Script:** `gun_pen.pdf` — 6 pages, 3 scenes, clean text layer
 **Engine:** built-in demo craft model (`webapp_server --demo-model`) — deterministic; findings depth is demo-limited and stated where it matters.
 **Harness:** `tests/e2e_browser_common.start_studio` (Playwright) — the project's own first-class browser harness.
-**Probes:** `docs/audit/validation-d2.py` … `validation-d6.py` (corrected) · shots `impl-shots/validation-22..28-*.png`
+**Probes:** `docs/audit/validation-d2.py` … `validation-d6.py` (corrected) · shots `impl-shots/validation-22..29-*.png`
 
 > **Probe honesty note.** The first Phase D run (`validation-d.py`) was invalidated by three
 > probe bugs, all fixed here: (1) it read `findings`/`finding_ids` from `/edits`, which
@@ -30,17 +30,20 @@
 | C3 | `report.md` matches desk numbers | ✓ projected | `report.md` (5,454 B) opens; header matches the desk (Scenes 3 · Characters 3 · pages 6 · CONSIDER · logline · genre); findings count == `report.findings.json` (9) |
 | E1 | Escalation · **Sameer** handoff | ✓ escalation | `pendingQuote` pinned (scene 1 + text), drawer opens, quote card visible, composer prefilled |
 | E2 | Escalation · **Sushruta** "why" | **GAP-4** | Lens replies (grounded on scene map + findings count) but carries **no per-finding context**; `msgsContainQuote=false` |
-| F1 | Arrival strip — browser == server | ✓ exact | `"Last pass: 9 · Still live: 7 · Fixed: 2 · New: 2"` byte-matches the `/edits` payload |
-| F2 | Arrival strip — **arithmetic is true** | **GAP-3** | Reports `Fixed: 2 · New: 2` with **zero writer action** (set-truth `0 · 0`) |
+| F1 | Arrival strip — browser == server | ✓ exact | Pass line byte-matches the `/edits` payload (copy now scoped — "Pass: N → M still live · K no longer flagged · J new") |
+| F2 | Arrival strip — **arithmetic is true** | ✓ **FIXED (GAP-3)** | Reported `Fixed: 2 · New: 2` with **zero writer action** — now distinct-id honest (`0 no longer flagged · 0 new`) |
 | F3 | Unread-dot lifecycle | ✓ projected | Dot present on fresh load after a new pass; cleared on Evidence-lens open |
 | G1 | Intent marks survive + exclude from open count | ✓ projected | `finding_intents` on disk; `openCount 5 < 9`; deferred disposition surfaces |
 | G2 | Writer-fix signal (observed "addressed") | ✓ projected | Quote-visible edit → `findings_status` = `addressed`; survives reload |
-| G3 | "Quote-visible drift" drives Fixed/New | **GAP-5 (structural)** | Edit applied (`similarity 1.0`) yet the finding's id **survived** — re-analysis reads the original parse |
+| G3 | "Quote-visible drift" drives Fixed/New | ✓ **RESOLVED (GAP-5)** | Edit applied (`similarity 1.0`) yet the pass line stays `0 no longer flagged` — re-analysis reads the parse, so the numbers can't mean writer progress. Now scoped on-screen + a draft clause ("K of M addressed by you") carries the working-copy truth instead |
 | H1 | Ghosted state renders | ✓ projected (render-path) | Seeded payload renders "1 of your marks moved on" + the vanished issue tagged "was next pass"; the *arithmetic* stays unreachable per GAP-5 |
-| **I1** | **Severity/category filter × board list** | **GAP-1** | Filter at highs-only → board still shows **15 cards (4 medium + 11 low)** + 9 fix-queue rows |
+| I1 | **Severity/category filter × board list** | ✓ **FIXED (GAP-1)** | Filter now drives board list + fix queue too (was 15 cards + 9 rows at highs-only); d8 14/14 |
 | I2 | Discuss on a no-quote finding | ✓ **graceful** (GAP-2 downgraded) | Fallback pins the issue text (`evidence_quote \|\| issue`); quote card visible |
 
 **Score:** 13 ✓ (projected/graceful/escalation) · 5 confirmed GAPs/structural · 0 unexercised.
+**Post-tuning:** all four code GAPs fixed (GAP-3 T1, GAP-1 T2, GAP-4 T3, GAP-5 T4) plus one en-route
+guard bug (T4b). 0 open GAPs. Every finding-emitting surface now reads the same filtered,
+distinct-id, scoped-signal truth.
 
 ---
 
@@ -92,13 +95,37 @@ reply — **13/13 checks pass**. First d9 run caught a real bug: the lens person
 no session existed yet (dockLensPersona no-ops without one), so the doctor's first turn spoke and was
 tagged as Sameer — fixed with the send-time flush.
 
-### GAP-5 — "quote-visible drift" is structurally impossible (the plan's fix #3 premise is wrong)
+### GAP-5 — "quote-visible drift" is structurally impossible · **RESOLVED (tuning go, T4/d10)**
 `Orchestrator` loads `m.parsed_path` for analysis (orchestrator.py:110, :232) — the **original
 parse**, not the working copy. So editing a cited line never changes the analyzed text, the finding's
 `category+quote` id is stable, and Fixed/New can never respond to writer fixes. The writer-fix signal
 does exist — but it lives in `finding_statuses` (observed `addressed`, from the **working copy**,
 revision.py:549-563) and the disposition/counts, **not** the arrival strip. Net: the strip's
 "Fixed/New" means *analyzer-pass drift only*, and (via GAP-3) can be false even then.
+
+**Resolution (T4):** recon reframed this from "make analysis read the working copy" to a labeling
+defect with a ready-made true signal. `revision.py:6-7` states the split as design intent — *"every
+export / re-verification / chat context read goes through the working copy"* — so there are
+deliberately **two signals**, and both already ride the same `/edits` response the strip comes from
+(webapp_server.py:857): the pass diff (parse-of-record) and `findings_status` (working copy). Making
+analysis read the working copy would have changed the analyzer's evidence base and quote-verification
+semantics — a large, risky change to honest zero. The smaller honest change was already available:
+(1) the pass line reads "Pass: N → M still live · K no longer flagged · J new" with a scope chip
+("from the last run, not your edits") — the word "Fixed" is gone, so nothing borrows writer credit;
+(2) a **draft clause** carries the writer's own working-copy progress ("K of M addressed by you",
+same counting contract as the revision strip — N3), the signal the strip lacked. Verified: d10
+end-to-end (`docs/audit/validation-d10.py`) — the writer edited a verified line (`similarity 1.0`,
+draft flipped to `addressed`) yet the pass line stayed `0 no longer flagged · 0 new`, proving the
+numbers cannot track writer fixes; the strip then shows "1 of 9 addressed by you" — **16/16**.
+
+**En-route bug (T4b):** the mtime-only guard in `last_pass_snapshot` was unsound — a report rewritten
+within one filesystem timestamp tick keeps the same mtime, so the guard served a **stale payload**
+(`null` after arithmetic already existed, or stale Fixed/New). Surfaced as a full-suite flake
+(`test_second_pass_arithmetic` intermittently `assert None is not None`; reproduced deterministically,
+baseline-confirmed absent-in-isolation at HEAD `512a866`). Fixed by pairing the mtime with a
+**content signature** (`report_sig` = SHA-1 over distinct finding ids); new regression test
+`test_guard_survives_same_tick_rewrite` (fails on the old code, passes on the fix). Flake gone:
+87/87 × 5 repeats; full suite **713 passed**.
 
 ### GAP-2 — DOWNGRADED (was filed as a gap; live evidence contradicts it)
 Phase C reported "Discuss on a no_quote finding → `pendingQuote: null`". The code pins
@@ -138,8 +165,12 @@ not a dead-end. Tuning note only: consider labelling the card "note" vs "quote".
 3. ~~**GAP-4**~~ — **DONE** (T3): consult turns ride the finding's quote, the turn is tagged with the
    persona and the writer's own question renders in the doctor's column; a 🩺 escalation gesture on
    deep cards pins + flips + seeds in one move. d9 probe 13/13, 6 new pytest cases.
-4. **GAP-5** — decide the product intent: if the strip should reflect writer progress, analysis must
-   read the working copy (or the strip must stop implying writer-fix causality).
+4. ~~**GAP-5**~~ — **DONE** (T4): the strip's pass line is scoped and honest ("Pass: N → M still
+   live · K no longer flagged · J new" + "from the last run, not your edits"), and it now carries
+   the writer's own working-copy progress ("K of M addressed by you"). Analysis deliberately still
+   reads the parse-of-record (revision.py:6-7 is the design intent); the fix is honest copy plus the
+   true signal, not a change to the analyzer's evidence base. d10 probe 16/16. En route: fixed the
+   `last_pass_snapshot` same-tick mtime-guard hole (content signature) that was flaking the suite.
 5. ~~Close the three ⏳ rows~~ — **done in d6** (see "Coverage closed"). Residue: the clean-bill and
    ghosted states were verified via *seeded* payloads, so one real-model pass would still be worth it.
 
