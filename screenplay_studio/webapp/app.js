@@ -22,7 +22,7 @@ const state = {
   findingIds: [],         // index -> content-hash finding id (computeFindingId)
   findingDefer: {},       // finding id -> "deferred" (client intent, Phase D) — forward-compat
   ghostedIds: new Set(),  // finding ids the writer saw as stale (Phase E diff) — forward-compat
-  findingFilter: { severities: ["high"], showDeferred: false, category: null }, // ONE filter: drives ink, board, loop, counts (R5-b)
+  findingFilter: { severities: ["high"], showDeferred: false, category: null }, // ONE filter: drives ink, board, loop, fix queue, counts (R5-b + GAP-1)
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
@@ -3605,13 +3605,34 @@ function addPanel(container, panel) {
 
 function renderFixQueuePanel(container) {
   const items = (state.fixQueue && state.fixQueue.items) || [];
-  const open = items.filter((i) => i.status !== "addressed" && !i.dismissed);
-  if (!items.length && !state.fixQueueShowDismissed) return;
+  // the ONE filter applies to the queue too (R5-b completed): rows whose
+  // severity/category the chips hide stay in the report but out of the
+  // writer's to-do view — page, board and queue cannot disagree (N3).
+  // Dismissed rows keep their separate toggle; addressed ride as before.
+  const inFilter = (item) => {
+    const sev = (item.severity || "low").toLowerCase();
+    if (!state.findingFilter.severities.includes(sev)) return false;
+    if (state.findingFilter.category && (item.category || "other") !== state.findingFilter.category) return false;
+    return true;
+  };
+  const shown = items.filter((i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed);
+  if (!shown.length) {
+    if (!items.length && !state.fixQueueShowDismissed) return;
+    const panel = el("div", "craft-panel fix-queue");
+    const head = el("div", "craft-panel-head");
+    head.appendChild(el("span", "craft-panel-title", "Fix queue — 0 shown / " + (state.fixQueue && (state.fixQueue.total_count != null ? state.fixQueue.total_count : items.length) || items.length) + " total"));
+    panel.appendChild(head);
+    const hint = el("p", "fix-row-why", "No rows match the current filter — toggle a severity or category chip on the Evidence board to widen the to-do.");
+    panel.appendChild(hint);
+    addPanel(container, panel); // container may be an array (craft shelf) or a node
+    return;
+  }
   const total = (state.fixQueue && (state.fixQueue.total_count != null ? state.fixQueue.total_count : items.length)) || items.length;
+  const openShown = shown.filter((i) => i.status !== "addressed").length;
 
   const panel = el("div", "craft-panel fix-queue");
   const head = el("div", "craft-panel-head");
-  head.appendChild(el("span", "craft-panel-title", `Fix queue — ${open.length} open / ${total} total`));
+  head.appendChild(el("span", "craft-panel-title", `Fix queue — ${openShown} open / ${shown.length} shown / ${total} total`));
   // dawn meter: night → dawn as findings get resolved (the room literally warms)
   const dm = el("div", "dawn-meter");
   dm.title = "The dawn meter — the share of findings you've resolved. The room warms as it climbs.";
@@ -3633,7 +3654,7 @@ function renderFixQueuePanel(container) {
   }
   panel.appendChild(head);
 
-  for (const item of items) {
+  for (const item of shown) {
     const row = el("div", "fix-row" + (item.status === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
     row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
@@ -4850,7 +4871,9 @@ function renderDockEvidence() {
   const data = prepareManuscriptData(); // the single source of truth
   const sceneNum = currentManuscriptScene();
   const isAddressed = (f, index) => findingStatusOf(f, index) === "addressed";
-  const sceneFindings = sceneNum != null ? (data.byScene[sceneNum] || []) : [];
+  const sceneFindings = sceneNum != null
+    ? (data.byScene[sceneNum] || []).filter(({ f, index }) => findingPassesFilter(f, index))
+    : [];
   if (sceneFindings.length) {
     const sec = el("div", "dock-section dock-section-scene-findings");
     const title = el("div", "dock-section-title",
@@ -4865,11 +4888,12 @@ function renderDockEvidence() {
     lens.appendChild(sec);
   }
   // script-level findings ride beneath the scene's own
-  if (data.scriptLevel.length) {
+  const scriptLevel = (data.scriptLevel || []).filter(({ f, index }) => findingPassesFilter(f, index));
+  if (scriptLevel.length) {
     const sec = el("div", "dock-section");
     sec.appendChild(el("div", "dock-section-title", "Script-level findings"));
     const list = el("div", "dock-finding-list");
-    for (const { f, index } of data.scriptLevel) {
+    for (const { f, index } of scriptLevel) {
       list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     }
     sec.appendChild(list);
@@ -4879,9 +4903,13 @@ function renderDockEvidence() {
   // -- 4. findings grouped by category (How serious, organized) ------------
   // Reuses the same grouping renderReportPanel performs, but with the full
   // findingNoteEl card (actions intact) instead of the read-only row.
+  // The ONE filter applies here too (R5-b): the chips above drive what
+  // shows, so the board and the page agree by construction.
   const byCat = {};
   (state.report && state.report.findings || []).forEach((f, i) => {
-    (byCat[f.category] = byCat[f.category] || []).push({ f, index: f.index != null ? f.index : i });
+    const index = f.index != null ? f.index : i;
+    if (!findingPassesFilter(f, index)) return;
+    (byCat[f.category] = byCat[f.category] || []).push({ f, index });
   });
   for (const [cat, list] of Object.entries(byCat)) {
     const sec = el("div", "dock-section");
@@ -4892,6 +4920,15 @@ function renderDockEvidence() {
     const wrap = el("div", "dock-finding-list");
     for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     sec.appendChild(wrap);
+    lens.appendChild(sec);
+  }
+  // honest emptiness: findings exist but the filter hides them all — the
+  // writer asked for a narrower view, and the board says so (never a blank)
+  const anyBoardCards = sceneFindings.length + scriptLevel.length;
+  if (!anyBoardCards && Object.keys(byCat).length === 0 && (state.findings || []).length) {
+    const sec = el("div", "dock-section");
+    sec.appendChild(el("div", "dock-lens-hint",
+      "No findings match the current filter — toggle a severity or category chip above to widen the view."));
     lens.appendChild(sec);
   }
 
@@ -4945,6 +4982,20 @@ function renderDockEvidence() {
 // tooltips announce it — one source, two presentations.
 const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: "🪦 Abandoned", red_herring: "🪄 Red herring" };
 
+// ---------- the ONE filter predicate (GAP-1 fix, R5-b completed) ----------
+// ONE predicate behind ink, board list, loop list and fix queue: a finding
+// shows iff its disposition passes (open, or deferred when Next-pass is on)
+// AND its severity AND category pass the chips. Every surface reads it, so
+// the page and the board cannot disagree (N3 law) — by construction.
+function findingPassesFilter(f, index) {
+  const d = findingDisposition(f, index);
+  if (d === "deferred" ? !state.findingFilter.showDeferred : d !== "open") return false;
+  const sev = (f.severity || "low").toLowerCase();
+  if (!state.findingFilter.severities.includes(sev)) return false;
+  if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) return false;
+  return true;
+}
+
 // ---------- ink (R5-b): the ONE filter drives page ink, board list, loop ----------
 // Ink anchors per scene: open findings with quotes that pass the filter,
 // highest severity first — one ink per line, several findings collapse to
@@ -4954,11 +5005,8 @@ function inkAnchorsFor(findings) {
   for (const { f, index } of findings || []) {
     const q = (f.evidence_quote || "").trim();
     if (q.length < 2) continue;
-    if (findingDisposition(f, index) !== "open") continue;
-    const sev = (f.severity || "low").toLowerCase();
-    if (!state.findingFilter.severities.includes(sev)) continue;
-    if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) continue;
-    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q, sev });
+    if (!findingPassesFilter(f, index)) continue;
+    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q, sev: (f.severity || "low").toLowerCase() });
   }
   const order = { high: 0, medium: 1, low: 2 };
   out.sort((a, b) => (order[a.sev] - order[b.sev]) || (b.q.length - a.q.length));
@@ -5099,11 +5147,7 @@ const loopState = { active: false, pos: -1 };
 function loopList() {
   const out = [];
   (state.findings || []).forEach((f, index) => {
-    const d = findingDisposition(f, index);
-    if (d === "deferred" ? !state.findingFilter.showDeferred : d !== "open") return;
-    const sev = (f.severity || "low").toLowerCase();
-    if (!state.findingFilter.severities.includes(sev)) return;
-    if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) return;
+    if (!findingPassesFilter(f, index)) return;
     out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index) });
   });
   return out;
@@ -5264,9 +5308,12 @@ function findingStatusOf(f, index) {
   return st[id] != null ? st[id] : (st[String(index)] != null ? st[String(index)] : st[index]);
 }
 
-/** The ONE filter row (R5-b + R8): severity toggles + category count-chips +
- *  the next-pass toggle. Every surface (ink, board list, loop) reads the same
- *  state.findingFilter — the page and the board cannot disagree. */
+/** The ONE filter row (R5-b + R8, GAP-1 completed): severity toggles +
+ *  category count-chips + the next-pass toggle. Every surface (ink, board
+ *  list, loop list, fix queue) reads the same state.findingFilter through
+ *  findingPassesFilter — the page and the board cannot disagree. Category
+ *  chips count open findings (severity-agnostic orientation); dismissed
+ *  rows keep their own separate toggle in the queue. */
 function buildFindingFilterRow() {
   const row = el("div", "dock-filter-row");
   const mk = (label, active, title, onClick) => {

@@ -46,17 +46,21 @@
 
 ## Confirmed findings
 
-### GAP-1 — the "ONE filter" is PARTIAL (board ignores it) · reproduced
-`state.findingFilter` drives **ink** (`inkAnchorsFor`, app.js:4952), the **loop** (`loopList`,
+### GAP-1 — the "ONE filter" is PARTIAL (board ignores it) · **FIXED (tuning go, T2/d8)**
+`state.findingFilter` drove **ink** (`inkAnchorsFor`, app.js:4952), the **loop** (`loopList`,
 app.js:5099) and the **chips/counts** — but **not the board list**: `renderDockEvidence`
-(app.js:4860-4874) iterates `sceneFindings`/`data.scriptLevel` and `prepareManuscriptData`
-(app.js:4293) never reads the filter; the fix queue ignores it too. The doc comment
-(app.js:5267-5269) claims the filter drives "ink, board list, loop" — implementation disagrees
-with intent.
-**Measured (d5):** default filter = `["high"]`; board = **15 cards** (4 medium, 11 low); fix queue
-= **9 rows**; ink = 0. Turning Low on did not change the board. → page and board disagree (N3
-violation). *Note:* ink could not be exercised on this script — its single quoted finding is
-script-level (no scene), so there is no line to ink; reported as untested, not as a failure.
+(app.js:4860-4874) iterated `sceneFindings`/`data.scriptLevel` unfiltered; the fix queue
+ignored it too. The doc comment claimed the filter drives "ink, board list, loop" — implementation
+disagreed with intent (N3 violation).
+**Fix (T2):** ONE predicate `findingPassesFilter(f, index)` now sits behind ink, board list (scene +
+script-level + category sections), loop list, and fix queue — every surface reads the same filter, so
+page/board/queue agree by construction. A filter matching nothing shows the honest empty hint ("No
+findings match the current filter — toggle a severity or category chip above"), never a blank; the queue
+reads "N open / M shown / T total". d8 end-to-end on gun_pen: cards 0→11→4→15→3 tracking the chips,
+queue rows in lockstep, category narrows both surfaces — **14/14 checks pass**. phase6 e2e contract
+updated to exercise both sides (default empty-hint + widened reveal); suite **28/28** after one
+real bug the first run exposed (the empty-queue panel bypassed `addPanel`, throwing TypeError on the
+craft-shelf's array container — the manuscript never rendered).
 
 ### GAP-3 — arrival arithmetic manufactures false Fixed/New under duplicate ids · reproduced
 `last_pass_snapshot` (revision.py:143-156) computes `still = set(old) & set(new)` but then
@@ -112,10 +116,11 @@ not a dead-end. Tuning note only: consider labelling the card "note" vs "quote".
   cause is **GAP-3** (duplicate-id arithmetic), and the demo model is deterministic.
 
 ## Recommended next go (tuning — gaps filed, not hotfixed)
-1. ~~**GAP-3 first**~~ — **DONE** (see above): the diff is set-based on distinct ids; arrival strip
+1. ~~**GAP-3 first**~~ — **DONE** (T1): the diff is set-based on distinct ids; arrival strip
    reports honest zeros under duplicates. 33/33 revision tests + 80/80 webapp API tests green.
-2. **GAP-1** — route the board list + fix queue through the same filter predicate (extract one
-   `findingPassesFilter(f, index)` used by ink, loop, board and queue).
+2. ~~**GAP-1**~~ — **DONE** (T2): ONE predicate `findingPassesFilter(f, index)` behind ink, board
+   list, loop list and fix queue; honest empty-filter hints on board + queue; phase6 contract
+   updated (28/28), d8 probe 14/14.
 3. **GAP-4** — pass the finding (or `pendingQuote`) into the FV consult turn, and render the writer's
    own turn in the consult column.
 4. **GAP-5** — decide the product intent: if the strip should reflect writer progress, analysis must
