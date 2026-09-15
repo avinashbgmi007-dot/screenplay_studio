@@ -124,7 +124,13 @@ def last_pass_snapshot(m):
     """Diff this pass against the previous one: {last_total, still_live,
     fixed, new, ghosted_marks}. Computed lazily with an mtime guard so
     repeated GETs are idempotent; one generation back (boring is good).
-    Returns None on the first pass (no arithmetic yet — honest)."""
+    Returns None on the first pass (no arithmetic yet — honest).
+
+    Identity is DISTINCT finding ids (compute_finding_id can collide —
+    e.g. two dialogue findings quoting the same line). Duplicate ids in
+    either pass are ONE finding for arithmetic: a re-analysis that
+    changes nothing must report fixed=0/new=0, never manufacture
+    phantom progress out of duplicate rows."""
     report_path = m.report_findings_path if m.stage("analyze").status == "complete" else None
     if not report_path or not os.path.exists(report_path):
         return None
@@ -144,16 +150,16 @@ def last_pass_snapshot(m):
     issues = {compute_finding_id(f): (f.get("issue") or "") for f in findings}
     payload = None
     if snap and isinstance(snap.get("ids"), list):
-        old_ids = snap["ids"]
-        new_set = set(new_ids)
-        still = set(old_ids) & new_set
+        old_ids = [gid for gid in dict.fromkeys(snap["ids"])]  # distinct, order kept
+        old_set, new_set = set(old_ids), set(new_ids)
+        still = old_set & new_set
         intents = finding_intents(m)
         payload = {
             "computed_at": time.time(),
-            "last_total": len(old_ids),
+            "last_total": len(old_set),
             "still_live": len(still),
-            "fixed": len(old_ids) - len(still),
-            "new": len(new_ids) - len(still),
+            "fixed": len(old_set) - len(still),
+            "new": len(new_set) - len(still),
             "ghosted_marks": [
                 {"finding_id": gid, "issue": (snap.get("issues") or {}).get(gid, ""),
                  "intent": intents.get(gid)}
@@ -161,7 +167,8 @@ def last_pass_snapshot(m):
             ][:50],
         }
     with open(last_pass_path(m), "w", encoding="utf-8") as f:
-        json.dump({"ids": new_ids, "issues": issues, "report_mtime": rp_mtime,
+        json.dump({"ids": [gid for gid in dict.fromkeys(new_ids)], "issues": issues,
+                   "report_mtime": rp_mtime,
                    "payload": payload}, f)
     return payload
 

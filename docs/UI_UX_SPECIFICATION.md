@@ -655,7 +655,9 @@ dialogue_lines, dialogue_share, first_scene, last_scene, traits, interactions:
 `findings_status` shape: `{findings:[{index, status}], summary:{addressed, still_present,
 unknown}}`. `finding_intents` shape: `{<finding_id>: "addressed"\|"deferred"}`. `last_pass`
 shape: `{last_total, still_live, fixed, new, ghosted_marks}` or `null` (honest None on the
-first pass; computed lazily with an mtime guard, one generation back).
+first pass; computed lazily with an mtime guard, one generation back). All `last_pass`
+counts are **distinct finding-id counts**: duplicate ids (same category + quote/issue) are
+counted once, so a no-op re-analysis reports `fixed: 0, new: 0`.
 
 ### 9.5 Notes, Stash, premise
 | Method | Path | Request | Response |

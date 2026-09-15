@@ -377,7 +377,9 @@ All written atomically (`jsonio.atomic_write_json`). Schemas (top level):
   when `/edits` serves a newer report (one generation back; honest `null` on the first
   pass). `{last_total, still_live, fixed, new, ghosted_marks}` where `ghosted_marks` are
   finding ids the writer addressed/deferred that are absent from the new pass (filled only
-  from real intents, never fabricated). Drives the dock's arrival strip.
+  from real intents, never fabricated). **All counts are DISTINCT-id counts** — duplicate
+  finding ids (same category + same quote/issue) are one finding, so a no-op re-analysis
+  always reports `fixed=0, new=0`, never phantom progress. Drives the dock's arrival strip.
 - **premise.json** — premise card, present when the project graduated from an idea:
   `{title, logline, premise, questions: [str], content}` (`content` only added on graduation).
 

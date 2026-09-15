@@ -298,6 +298,10 @@ class TestLastPass:
         m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
         report = json.load(open(m.report_findings_path, encoding="utf-8"))
         old = report["findings"]
+        # the mock report itself carries a duplicate id (10 rows, 9 distinct —
+        # two rows collide on category+issue), so this test exercises the
+        # distinct-identity arithmetic on real fixture data, not just by setup
+        distinct = len({revision.compute_finding_id(f) for f in old})
         assert revision.last_pass_snapshot(m) is None  # snapshot seeds, no arithmetic yet
         # second pass: keep findings 0 and 2 as-is, drop finding 1 (fixed),
         # add one brand-new finding (re-scored finding 0 keeps its id = still live)
@@ -307,9 +311,9 @@ class TestLastPass:
         json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
         lp = revision.last_pass_snapshot(m)
         assert lp is not None
-        assert lp["last_total"] == len(old)
+        assert lp["last_total"] == distinct  # distinct ids, not raw rows
         assert lp["still_live"] == 2
-        assert lp["fixed"] == len(old) - 2  # everything seeded but not kept
+        assert lp["fixed"] == distinct - 2  # every distinct finding seeded but not kept
         assert lp["new"] == 1
 
     def test_idempotent_reads(self, tmp_path, sample_fountain, mock_server):
@@ -333,3 +337,48 @@ class TestLastPass:
         lp = revision.last_pass_snapshot(m)
         assert lp["fixed"] >= 1  # the marked finding is among the transformed
         assert any(g["finding_id"] == gid and g["intent"] == "addressed" for g in lp["ghosted_marks"])
+
+    def test_duplicate_ids_no_phantom_progress(self, tmp_path, sample_fountain, mock_server):
+        # gun_pen pathology: findings sharing an id (same category + same
+        # issue text / same quoted line). A re-analysis that changed NOTHING
+        # used to report "Fixed: 2 · New: 2" because the arithmetic mixed
+        # list length with set size. Distinct-identity truth: fixed=0, new=0
+        # — duplicates are one finding, not free progress.
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        dup = dict(report["findings"][0])  # same content -> same finding id
+        report["findings"] = report["findings"] + [dup, dict(dup)]  # 3 extra rows, 0 extra ids
+        distinct = len({revision.compute_finding_id(f) for f in report["findings"]})
+        assert distinct < len(report["findings"])  # the pathology is present
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        seed = revision.last_pass_snapshot(m)
+        assert seed is None  # first snapshot seeds, no arithmetic yet
+        # pass 2: byte-identical report (the writer touched nothing)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        lp = revision.last_pass_snapshot(m)
+        assert lp is not None
+        assert lp["last_total"] == distinct  # distinct ids, not raw row count
+        assert lp["still_live"] == distinct
+        assert lp["fixed"] == 0  # the old bug: rows - distinct = phantom fixes
+        assert lp["new"] == 0     # the old bug: same phantom on the new side
+
+    def test_duplicate_ids_ghosted_listed_once(self, tmp_path, sample_fountain, mock_server):
+        # a duplicated finding the writer marked, then the report drops BOTH
+        # copies: the ghosted list must carry it once, not once per row.
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        dup = dict(report["findings"][0])
+        report["findings"] = report["findings"] + [dup]
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        revision.last_pass_snapshot(m)  # seed with the duplicate present
+        gid = revision.compute_finding_id(dup)
+        revision.set_finding_intent(m, gid, "addressed")
+        # pass 2: every copy of the duplicated finding is gone
+        others = [f for f in report["findings"] if revision.compute_finding_id(f) != gid]
+        report["findings"] = others
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        lp = revision.last_pass_snapshot(m)
+        listed = [g["finding_id"] for g in lp["ghosted_marks"]]
+        assert listed.count(gid) == 1  # ghosted once, not once per duplicated row
+        assert lp["fixed"] == 1  # one distinct finding left, not 2 rows
