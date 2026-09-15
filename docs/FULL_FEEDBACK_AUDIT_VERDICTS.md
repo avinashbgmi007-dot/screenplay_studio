@@ -4,7 +4,7 @@
 **Script:** `gun_pen.pdf` — 6 pages, 3 scenes, clean text layer
 **Engine:** built-in demo craft model (`webapp_server --demo-model`) — deterministic; findings depth is demo-limited and stated where it matters.
 **Harness:** `tests/e2e_browser_common.start_studio` (Playwright) — the project's own first-class browser harness.
-**Probes:** `docs/audit/validation-d2.py` … `validation-d6.py` (corrected) · shots `impl-shots/validation-22..29-*.png`
+**Probes:** `docs/audit/validation-d2.py` … `validation-d6.py` (corrected; tuning regressions `validation-d7.py` … `validation-d10.py`) · shots `impl-shots/validation-22..29-*.png`
 
 > **Probe honesty note.** The first Phase D run (`validation-d.py`) was invalidated by three
 > probe bugs, all fixed here: (1) it read `findings`/`finding_ids` from `/edits`, which
@@ -29,7 +29,7 @@
 | C2 | Failed categories | ✓ quiet-state | None failed live; retry credited to existing tests (plan fix #4/#6) |
 | C3 | `report.md` matches desk numbers | ✓ projected | `report.md` (5,454 B) opens; header matches the desk (Scenes 3 · Characters 3 · pages 6 · CONSIDER · logline · genre); findings count == `report.findings.json` (9) |
 | E1 | Escalation · **Sameer** handoff | ✓ escalation | `pendingQuote` pinned (scene 1 + text), drawer opens, quote card visible, composer prefilled |
-| E2 | Escalation · **Sushruta** "why" | **GAP-4** | Lens replies (grounded on scene map + findings count) but carries **no per-finding context**; `msgsContainQuote=false` |
+| E2 | Escalation · **Sushruta** "why" | ✓ **FIXED (GAP-4)** | Was project-level only (`msgsContainQuote=false`); now the consult turn rides the pinned quote into the prompt AND stores it — the doctor answers the finding the writer is looking at; the writer's own question renders in the column (T3/d9 13/13) |
 | F1 | Arrival strip — browser == server | ✓ exact | Pass line byte-matches the `/edits` payload (copy now scoped — "Pass: N → M still live · K no longer flagged · J new") |
 | F2 | Arrival strip — **arithmetic is true** | ✓ **FIXED (GAP-3)** | Reported `Fixed: 2 · New: 2` with **zero writer action** — now distinct-id honest (`0 no longer flagged · 0 new`) |
 | F3 | Unread-dot lifecycle | ✓ projected | Dot present on fresh load after a new pass; cleared on Evidence-lens open |
@@ -40,10 +40,10 @@
 | I1 | **Severity/category filter × board list** | ✓ **FIXED (GAP-1)** | Filter now drives board list + fix queue too (was 15 cards + 9 rows at highs-only); d8 14/14 |
 | I2 | Discuss on a no-quote finding | ✓ **graceful** (GAP-2 downgraded) | Fallback pins the issue text (`evidence_quote \|\| issue`); quote card visible |
 
-**Score:** 13 ✓ (projected/graceful/escalation) · 5 confirmed GAPs/structural · 0 unexercised.
+**Score (at audit time):** 13 ✓ (projected/graceful/escalation) · 5 confirmed GAPs/structural · 0 unexercised.
 **Post-tuning:** all four code GAPs fixed (GAP-3 T1, GAP-1 T2, GAP-4 T3, GAP-5 T4) plus one en-route
-guard bug (T4b). 0 open GAPs. Every finding-emitting surface now reads the same filtered,
-distinct-id, scoped-signal truth.
+guard bug (T4b). 0 open GAPs — rows E2/F2/G3/I1 carry their FIXED/RESOLVED verdicts above. Every
+finding-emitting surface now reads the same filtered, distinct-id, scoped-signal truth.
 
 ---
 
