@@ -10,7 +10,7 @@ sys.path.insert(0, r"E:\screenplay-studio_1_verdent")
 import requests
 from e2e_browser_common import start_studio
 from playwright.sync_api import sync_playwright
-from screenplay_studio.revision import compute_finding_id
+from screenplay_studio.revision import compute_finding_id, _report_signature
 
 SHOTS = r"C:\Users\Avinash-Pro\Downloads\GLM_5_3_SCRIPT_DOCTOR_HANDOFF\03_design_exploration\round-2-maximal\impl-shots"
 PDF = r"C:\Users\Avinash-Pro\Downloads\gun_pen.pdf"
@@ -104,8 +104,14 @@ lp_path = os.path.join(pdir, "last_pass.json")
 lp_bak = lp_path + ".bak" if os.path.exists(lp_path) else None
 if lp_bak: shutil.copyfile(lp_path, lp_bak)
 mtime = os.path.getmtime(fj_path)
+# T4b: the guard is (mtime, content signature). A seeded snapshot MUST carry
+# the matching report_sig, or the (correctly) stronger guard recomputes and
+# discards the seed — the payload never reaches the client.
+with open(fj_path, encoding="utf-8") as _f:
+    _rep_for_sig = json.load(_f)
 seed = {"ids": [compute_finding_id(f) for f in (rep.get("findings") or [])],
         "issues": {}, "report_mtime": mtime,
+        "report_sig": _report_signature(_rep_for_sig),
         "payload": {"computed_at": 1789400000.0, "last_total": n_find, "still_live": n_find - 1,
                     "fixed": 1, "new": 0,
                     "ghosted_marks": [{"finding_id": "fGHOST123", "issue": "Pace drag - Scene 1 runs long with little movement",

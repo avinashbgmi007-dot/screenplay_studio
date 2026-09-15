@@ -21,6 +21,7 @@ client so the shape is reliable):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -120,9 +121,27 @@ def last_pass_path(m) -> str:
     return os.path.join(m.project_dir, "last_pass.json")
 
 
+def _report_signature(report: dict) -> str:
+    """Cheap content fingerprint of a findings report.
+
+    The mtime guard alone is not sound: a report written twice within one
+    filesystem timestamp tick (a fast re-analyze, or a test that rewrites in
+    the same tick) keeps the same mtime, so the guard would serve the STALE
+    payload — reporting `None` (first-pass) after arithmetic already exists,
+    or stale Fixed/New numbers. Pairing the mtime with a content hash closes
+    that hole without re-reading the report on every GET.
+    """
+    findings = report.get("findings", [])
+    h = hashlib.sha1()
+    for f in findings:
+        h.update(compute_finding_id(f).encode("utf-8"))
+        h.update(b"\x00")
+    return h.hexdigest()
+
+
 def last_pass_snapshot(m):
     """Diff this pass against the previous one: {last_total, still_live,
-    fixed, new, ghosted_marks}. Computed lazily with an mtime guard so
+    fixed, new, ghosted_marks}. Computed lazily with an mtime+sig guard so
     repeated GETs are idempotent; one generation back (boring is good).
     Returns None on the first pass (no arithmetic yet — honest).
 
@@ -141,10 +160,15 @@ def last_pass_snapshot(m):
             snap = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
         snap = None
-    if snap and snap.get("report_mtime") == rp_mtime:
-        return snap.get("payload")
+    # The guard is (mtime, content signature): a same-tick rewrite changes the
+    # signature even when the mtime cannot. Legacy snapshots without a sig
+    # simply recompute once and gain one.
+    snap_sig = snap.get("report_sig") if isinstance(snap, dict) else None
     with open(report_path, "r", encoding="utf-8") as f:
         report = json.load(f)
+    report_sig = _report_signature(report)
+    if snap and snap.get("report_mtime") == rp_mtime and snap_sig == report_sig:
+        return snap.get("payload")
     findings = report.get("findings", [])
     new_ids = [compute_finding_id(f) for f in findings]
     issues = {compute_finding_id(f): (f.get("issue") or "") for f in findings}
@@ -168,7 +192,7 @@ def last_pass_snapshot(m):
         }
     with open(last_pass_path(m), "w", encoding="utf-8") as f:
         json.dump({"ids": [gid for gid in dict.fromkeys(new_ids)], "issues": issues,
-                   "report_mtime": rp_mtime,
+                   "report_mtime": rp_mtime, "report_sig": report_sig,
                    "payload": payload}, f)
     return payload
 

@@ -6,6 +6,7 @@ finding-resolution status (addressed / still_present / unknown).
 """
 
 import json
+import os
 import time
 
 import pytest
@@ -324,6 +325,22 @@ class TestLastPass:
         first = revision.last_pass_snapshot(m)
         second = revision.last_pass_snapshot(m)  # same mtime — served from the guard
         assert first == second
+
+    def test_guard_survives_same_tick_rewrite(self, tmp_path, sample_fountain, mock_server):
+        # The mtime guard alone is unsound: a report rewritten within one
+        # filesystem timestamp tick keeps the same mtime, so the guard would
+        # serve the STALE payload (None after arithmetic already exists). The
+        # content signature must force a recompute. This is the exact race that
+        # flaked test_second_pass_arithmetic under a full-suite ordering.
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        assert revision.last_pass_snapshot(m) is None  # seed, honest first pass
+        tick = os.path.getmtime(m.report_findings_path)
+        report["findings"] = report["findings"][:1]
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        os.utime(m.report_findings_path, (tick, tick))  # force the same-tick collision
+        lp = revision.last_pass_snapshot(m)
+        assert lp is not None, "same-tick rewrite must not be masked by the mtime guard"
 
     def test_ghosted_marks_report_writer_intent(self, tmp_path, sample_fountain, mock_server):
         m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
