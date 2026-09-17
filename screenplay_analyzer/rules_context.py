@@ -73,6 +73,21 @@ KB_FRAGMENT_SOFT_WARN = _env_int("SCREENPLAY_KB_WARN", 40000)
 
 _TIER_ORDER = {"high": 0, "medium": 1, "low": 2}
 
+
+def is_genre_scoped(rule) -> bool:
+    """True when a rule is tagged for one genre only.
+
+    Such a rule is only meaningful once the script's genre is known. The
+    generic passes (theme, character, structure, scene_function, dialogue,
+    plot_thread) all run *before* the coverage pass reports a genre, so
+    injecting these there hands every script the principles of all eight
+    genres at once — a romance receiving horror's and thriller's rules.
+    They are therefore excluded from the generic path and delivered instead
+    by the genre-scoped fragment (prompt_fragment_for_genre), which runs
+    after coverage and knows the genre.
+    """
+    return bool((getattr(rule, "genre", "") or "").strip())
+
 # Labels already reported for exceeding the soft ceiling. This is a notice
 # cache, not behaviour: pytest resets the stdlib warning registry per test, so
 # without it one oversized pass turns into a hundred lines of summary noise.
@@ -88,32 +103,39 @@ class RulesContext:
 
     # ---- rule selection ---------------------------------------------------
 
-    def rules_for_category(self, category: str) -> list:
+    def rules_for_category(self, category: str, include_genre_rules: bool = False) -> list:
         """Rules for a finding category, de-duplicated by rule id (the same
-        rule can sit under more than one taxonomy level)."""
+        rule can sit under more than one taxonomy level).
+
+        Genre-tagged rules are skipped unless `include_genre_rules` is set:
+        see `is_genre_scoped` for why the generic path must stay genre-neutral."""
         rules: list = []
         seen: set = set()
         for level in CATEGORY_TO_TAXONOMY_LEVELS.get(category, []):
             for r in self.kb.for_taxonomy_level(level):
+                if not include_genre_rules and is_genre_scoped(r):
+                    continue
                 if r.id not in seen:
                     seen.add(r.id)
                     rules.append(r)
         return rules
 
-    def rules_for_pass(self, pass_name: str) -> list:
+    def rules_for_pass(self, pass_name: str, include_genre_rules: bool = False) -> list:
         """Category rules + PASS_EXTRAS files, de-duplicated by rule id.
 
         An extra file may legitimately contribute rules no taxonomy level
         covers (scene_function's visual_storytelling.json); it must never
         re-add one a level already supplied (character's psychology.json /
         body_language.json were 54/54 duplicates before this de-dupe)."""
-        rules = (self.rules_for_category(pass_name)
+        rules = (self.rules_for_category(pass_name, include_genre_rules=include_genre_rules)
                  if pass_name in CATEGORY_TO_TAXONOMY_LEVELS else [])
         seen = {r.id for r in rules}
         for filename in PASS_EXTRAS.get(pass_name, []):
             if not hasattr(self.kb, "for_file"):
                 continue
             for r in self.kb.for_file(filename):
+                if not include_genre_rules and is_genre_scoped(r):
+                    continue
                 if r.id not in seen:
                     seen.add(r.id)
                     rules.append(r)

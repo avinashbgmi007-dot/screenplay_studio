@@ -130,7 +130,22 @@ def test_chat_stream_decodes_utf8_not_latin1():
         def log_message(self, *args):
             pass
 
+        def _drain(self):
+            """Read and discard the request body before answering.
+
+            The client POSTs a JSON body; if we reply and close without
+            reading it, the close can race the client's still-in-flight write
+            and surface as a ConnectionError (a RST) on the client side. That
+            race is timing-dependent — it never fires when this file runs
+            alone, but it does intermittently inside a full-suite run, which
+            is exactly what made this test flaky.
+            """
+            length = int(self.headers.get("Content-Length") or 0)
+            if length:
+                self.rfile.read(length)
+
         def do_GET(self):  # /v1/models for resolve_model
+            self._drain()
             payload = json.dumps({"object": "list",
                                   "data": [{"id": "test-model"}]}).encode("utf-8")
             self.send_response(200)
@@ -140,6 +155,7 @@ def test_chat_stream_decodes_utf8_not_latin1():
             self.wfile.write(payload)
 
         def do_POST(self):  # SSE stream — deliberately WITHOUT charset
+            self._drain()
             body = b""
             for piece in pieces:
                 frame = json.dumps({"choices": [{"delta": {"content": piece}}]},
@@ -152,7 +168,14 @@ def test_chat_stream_decodes_utf8_not_latin1():
             self.end_headers()
             self.wfile.write(body)
 
-    with socketserver.TCPServer(("127.0.0.1", 0), Handler) as httpd:
+    # ThreadingTCPServer, not TCPServer: a single-threaded accept loop stalls
+    # every other connection behind the one it is serving, so any lingering
+    # socket (keep-alive, a slow read) turns into a spurious connect failure.
+    class _Server(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True
+        daemon_threads = True
+
+    with _Server(("127.0.0.1", 0), Handler) as httpd:
         port = httpd.server_address[1]
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         try:

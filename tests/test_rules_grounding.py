@@ -264,3 +264,88 @@ def test_rule_fragment_states_its_curated_severity():
         assert rule.severity_default in fragment, (
             f"{rule.id} fragment does not carry '{rule.severity_default}'"
         )
+
+
+# --------------------------------------------------------------------------
+# Genre scoping — a second silent-empty bug, and the leak it hid behind
+#
+# The knowledge base tags 90 rules with a genre. Two things were wrong:
+#   (a) `for_genre` matched the tag with `==` on a free-text field. The
+#       coverage grammar does not constrain `genre`, so a model answering
+#       "Romantic Comedy" or "Sci-Fi Thriller" got [] — genre grounding was
+#       silently off for every real-world label.
+#   (b) those 90 rules also sat inside the generic taxonomy levels, so every
+#       *other* pass received all eight genres at once: a romance was handed
+#       horror's and thriller's principles.
+# --------------------------------------------------------------------------
+
+# labels a model plausibly returns, none of which is a bare KB tag
+_FREE_TEXT_GENRES = [
+    "romance", "Romantic Comedy", "rom-com", "romantic",
+    "sci-fi", "Science Fiction", "Sci-Fi Thriller", "scifi",
+    "thriller", "psychological thriller", "suspense",
+    "mystery", "whodunit", "crime", "detective",
+    "horror", "supernatural", "drama", "comedy", "action",
+]
+
+
+def test_for_genre_resolves_free_text_labels(rc):
+    unresolved = [g for g in _FREE_TEXT_GENRES if not rc.kb.for_genre(g)]
+    assert not unresolved, (
+        "these real-world genre labels resolve to NO rules — genre-scoped "
+        f"grounding is silently off for them: {unresolved}"
+    )
+
+
+def test_for_genre_still_returns_nothing_for_an_unknown_genre(rc):
+    """Tolerance must not become 'match anything'."""
+    assert rc.kb.for_genre("interpretive dance documentary") == []
+    assert rc.kb.for_genre("") == []
+    assert rc.kb.for_genre(None) == []
+
+
+def test_genre_scoped_fragment_is_never_empty_for_a_tagged_genre(rc):
+    from knowledge_base import KnowledgeBase
+    genres = {(r.genre or "").strip() for r in KnowledgeBase().all() if (r.genre or "").strip()}
+    assert genres, "the KB carries no genre-tagged rules — this guard is vacuous"
+    empty = sorted(g for g in genres if not rc.prompt_fragment_for_genre(g).strip())
+    assert not empty, f"tagged genres rendering an empty fragment: {empty}"
+
+
+def test_every_genre_tagged_rule_is_reachable_through_the_genre_path(rc):
+    """The generic path no longer carries genre rules, so the genre path must
+    be able to deliver every one of them — otherwise a rule becomes
+    unreachable everywhere."""
+    from knowledge_base import KnowledgeBase
+    unreachable = []
+    for rule in KnowledgeBase().all():
+        tag = (rule.genre or "").strip()
+        if tag and rule.id not in {r.id for r in rc.rules_for_genre(tag)}:
+            unreachable.append(rule.id)
+    assert not unreachable, f"genre-tagged rules no rule path can deliver: {unreachable}"
+
+
+def test_no_genre_tagged_rule_leaks_into_a_generic_pass(rc):
+    """The generic passes run BEFORE the genre is known, so they must stay
+    genre-neutral. Otherwise a romance receives all eight genres' principles."""
+    from screenplay_analyzer.rules_context import is_genre_scoped
+    offenders = {}
+    for name in set(CATEGORY_TO_TAXONOMY_LEVELS) | set(PASS_EXTRAS):
+        leaked = [r.id for r in rc.rules_for_pass(name) if is_genre_scoped(r)]
+        if leaked:
+            offenders[name] = leaked
+    assert not offenders, (
+        "genre-specific rules are being injected into genre-blind passes "
+        f"(the caller does not know the script's genre yet): {offenders}"
+    )
+
+
+def test_generic_path_can_opt_back_into_genre_rules(rc):
+    """The exclusion is a default, not a wall — a caller that already knows the
+    genre (e.g. the genre pass, or a future genre-aware reorder) can ask for
+    the full set."""
+    neutral = rc.rules_for_pass("theme")
+    full = rc.rules_for_pass("theme", include_genre_rules=True)
+    assert len(full) > len(neutral), "include_genre_rules=True changed nothing"
+    assert all(not (r.genre or "").strip() for r in neutral)
+

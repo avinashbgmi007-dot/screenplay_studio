@@ -21,6 +21,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 from dataclasses import dataclass, field
 
 
@@ -106,18 +107,67 @@ class KnowledgeBase:
     def for_taxonomy_level(self, level: str) -> list:
         return [r for r in self._rules.values() if r.taxonomy_level == level]
 
+    # Common ways a model words a genre, mapped to the single lowercase token
+    # the knowledge base tags rules with.
+    _GENRE_ALIASES = {
+        "sciencefiction": "scifi",
+        "sf": "scifi",
+        "scifi": "scifi",
+        "romcom": "romance",
+        "romanticcomedy": "romance",
+        "romantic": "romance",
+        "spy": "thriller",
+        "suspense": "thriller",
+        "psychologicalthriller": "thriller",
+        "crime": "mystery",
+        "detective": "mystery",
+        "whodunit": "mystery",
+        "supernatural": "horror",
+        "period": "drama",
+    }
+
+    @staticmethod
+    def _norm_genre(text: str) -> str:
+        """Lowercase a genre label and drop punctuation, so "Sci-Fi" and the
+        stored tag "scifi" normalise to the same key."""
+        return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
     def for_genre(self, genre: str) -> list:
         """Return rules tagged with this genre (genre-specific rules only).
-        Falls back to filename-based lookup if genre field is not set."""
-        if not genre:
+
+        Matching is deliberately tolerant. The caller passes whatever the
+        coverage pass reported, and `genre` is unconstrained free text in the
+        coverage grammar — so the model may answer "Romantic Comedy", "Sci-Fi
+        Thriller", "Psychological Thriller". The previous exact-match lookup
+        (`r.genre == genre.strip().lower()`) returned [] for every such label,
+        which silently disabled genre-scoped grounding for real-world answers.
+        """
+        if not genre or not str(genre).strip():
             return []
-        genre_lower = genre.strip().lower()
-        # Primary: rules with explicit genre field
-        tagged = [r for r in self._rules.values() if r.genre == genre_lower]
-        if tagged:
-            return tagged
-        # Fallback: rules from genre-named files (e.g., horror.json -> horror)
-        return self.for_file(f"{genre_lower}.json")
+        want = self._norm_genre(genre)
+        if not want:
+            return []
+        by_tag: dict = {}
+        for r in self._rules.values():
+            tag = self._norm_genre(getattr(r, "genre", "") or "")
+            if tag:
+                by_tag.setdefault(tag, []).append(r)
+        if not by_tag:
+            return self.for_file(f"{want}.json")
+        # 1. exact (normalised) match, after alias resolution
+        for candidate in (want, self._GENRE_ALIASES.get(want, "")):
+            if candidate and candidate in by_tag:
+                return by_tag[candidate]
+        # 2. one label contains the other ("scifi" vs "scifithriller")
+        for tag, rules in by_tag.items():
+            if tag in want or want in tag:
+                return rules
+        # 3. alias of a contained tag ("psychologicalthriller" -> thriller)
+        for tag, rules in by_tag.items():
+            if self._GENRE_ALIASES.get(tag, "") and self._GENRE_ALIASES[tag] in want:
+                return rules
+        # 4. fallback: rules from genre-named files (e.g. horror.json -> horror)
+        return self.for_file(f"{want}.json")
 
     def for_file(self, filename: str) -> list:
         """Return all rules from a specific JSON file."""
