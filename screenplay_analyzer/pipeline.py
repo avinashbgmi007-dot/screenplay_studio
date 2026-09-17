@@ -51,6 +51,9 @@ class _NullRulesContext:
     def fragment_for_pass(self, pass_name: str) -> str:
         return ""
 
+    def prompt_fragment_for_genre(self, genre: str) -> str:
+        return ""
+
 
 def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
@@ -385,13 +388,19 @@ def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerC
     return verify_findings(reads, doc)
 
 
-def run_logline_test(logline: str, overview: str, title: str, client: LlamaServerClient, language: str = "eng") -> dict:
+def run_logline_test(logline: str, overview: str, title: str, client: LlamaServerClient,
+                     language: str = "eng", rules_fragment: str = "") -> dict:
     """The logline test: does the premise land in one clean sentence? Signal is
-    strong / workable / muddled — diagnosis only, no grades."""
+    strong / workable / muddled — diagnosis only, no grades.
+
+    `rules_fragment` carries the KB's pitch rules (PASS_EXTRAS["logline_test"]).
+    It is appended last so existing positional callers are unaffected."""
     if not logline or not logline.strip():
         return {}
     grammar = logline_test_grammar()
-    system, user = prompts.logline_test_prompt(logline, overview, title, language=language)
+    system, user = prompts.logline_test_prompt(logline, overview, title,
+                                               language=language,
+                                               rules_fragment=rules_fragment)
     result = client.chat_json(system, user, grammar=grammar, max_tokens=700, fast=True)
     if isinstance(result, dict):
         return result
@@ -703,7 +712,9 @@ def analyze(
         try:
             emit("logline_test", "running", "Testing the logline")
             result.logline_test = run_logline_test(
-                result.coverage["logline"], overview, doc.title, client, language=report_language
+                result.coverage["logline"], overview, doc.title, client,
+                rules_fragment=rules_ctx.fragment_for_pass("logline_test"),
+                language=report_language,
             )
             result.category_outcomes["logline_test"] = "ok"
             emit("logline_test", "complete")
@@ -722,7 +733,7 @@ def analyze(
         try:
             emit("genre", "running", "Checking genre conventions")
             from .genre import run_genre_check
-            genre_findings = _normalize_findings(run_genre_check(result.coverage, overview, client, language=report_language), "genre")
+            genre_findings = _normalize_findings(run_genre_check(result.coverage, overview, client, rules_ctx=rules_ctx, language=report_language), "genre")
             # genre findings get the same quote-verification as every other finding
             genre_findings = verify_findings(genre_findings, doc)
             all_findings.extend(genre_findings)

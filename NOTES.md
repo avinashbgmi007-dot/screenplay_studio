@@ -522,3 +522,47 @@ HONEST BOX stated to the writer: with `--demo-model` (the only engine available 
 ## T7 - disposal of the recovery backup (2026-09-16)
 
 DISPOSED `_recovery_backup_20260915/` (13 files, 1.3M) - the insurance copy made during the git object-store incident (T2 entry above). Before deleting I PROVED it redundant rather than trusting the label, because "insurance" and "redundant" are not the same claim. METHOD (reusable): for each file run `git hash-object` and ask whether that blob is REACHABLE - `git rev-list --all --objects | grep "^<hash> "`. 12 of 13 came back byte-identical to reachable blobs. The 13th - `FULL_FEEDBACK_AUDIT_VERDICTS.md` (blob `34b4834ee4`) - was UNREACHABLE, so it needed a second test: is it a SUPERSET or a SUBSET of reachable content? Diffed against every reachable version of the doc: vs `080fb0c` it differs by 22 lines, all confined to the GAP-1 section; vs `d43bce5` (T2) that GAP-1 section is an EARLIER draft (header `FIXED (tuning go, d8)` before the `T2` tag was added; missing the 3-line "suite 28/28" addendum `d43bce5` carries); and its GAP-3/4/5 tail is BYTE-IDENTICAL to `080fb0c`. So the blob is a mid-edit SNAPSHOT of the T2 doc update - every line is either identical to a reachable version or an earlier variant of one. Zero unique information -> deletion is lossless. LESSON: an unreachable blob is NOT automatically valuable - test whether it is a superset of reachable content before preserving it, and prove redundancy by content-hash reachability rather than by the folder's name. Working tree now: 3 by-design strays (`SESSION_SUMMARY.md`, the gun_pen plan artifact, `preview-r4/`).
+
+## T8 - KB grounding repaired (2026-09-18, review-driven)
+
+A read-only critical review of the whole codebase (three parallel reconnaissance passes + direct source
+verification) found the knowledge base was only PARTLY wired to the model - silently. Fixed the
+highest-impact cluster first, sequentially, with a live tracker in the plan file.
+
+THE BREAK: `CATEGORY_TO_TAXONOMY_LEVELS` (`screenplay_analyzer/rules_context.py`) keyed the taxonomy
+level as `"plot"` while the pipeline asks for `prompt_fragment_for_category("plot_thread")`
+(`pipeline.py:644`, `principles_engine.py:102`). `.get("plot_thread", [])` -> `[]` -> `""` - so the
+Principles Engine (Chekhov's Gun) and the whole-script setup/payoff ledger ran with ZERO named
+principles. No error, no warning, just an empty fragment. 39 rules / 31,359 chars restored. Renamed the
+key rather than aliasing it, because `plot_thread` is the name used by pipeline/report/grammar/UI.
+
+ALSO DEAD: genre grounding (`genre.py:113`'s `if rules_ctx` guard never fired - `pipeline.py:725` passed
+no `rules_ctx`) and logline/pitch grounding (`PASS_EXTRAS["logline_test"]` unreachable -
+`run_logline_test` took no fragment). Both wired: genre prompt 101 -> 8,737 chars, logline 100 -> 2,291.
+
+FRAGMENT HYGIENE: added structural id-dedupe (`rules_for_category` / `rules_for_pass`). Found MORE waste
+than the review claimed - `PASS_EXTRAS["character"]` was 54/54 duplicates AND `dialogue_advanced.json`
+was 12/12. Dedupe rather than deleting the entries, so extras still contribute genuinely-new rules
+(`scene_function`'s visual_storytelling: 5 of them). character 117,507 -> 79,053 chars; dialogue
+25,517 -> 17,596.
+
+BUDGET: `SCREENPLAY_KB_BUDGET` (hard cap, default 0 = unlimited) + `SCREENPLAY_KB_WARN` (soft notice,
+default 40000). Over budget, whole rules are kept highest-confidence-first and the omission is STATED IN
+THE PROMPT - never silently dropped. The character pass (79k chars / ~20k tokens) trips the soft notice
+by design; it dedupes per label, because pytest resets the stdlib warning registry per test (one signal
+had become 102 warnings).
+
+THE GUARD (the real deliverable): `tests/test_rules_grounding.py` (16 tests). The load-bearing one scans
+the analyzer source for the grounding calls it makes BY LITERAL and asserts each yields a non-empty
+fragment - the test that would have caught this. MUTATION-PROVED: it fails on the pre-fix mapping and
+passes on the fix. Writing it caught my own false positive - `fragment_for_pass("logline_test")` is
+grounded via `PASS_EXTRAS`, not the category map - so the contract became "asks for grounding => gets a
+fragment". LESSON: empty grounding is invisible unless something asserts it is not empty; the same class
+covers a key typo, a level-name typo, and an unwired pass.
+
+GATE: non-browser suite **713 -> 729 passed, 1 warning, 0 failures**. (One `test_llm_client` failure
+appeared once, did not reproduce, and port `1554` appears nowhere in the codebase - a sandbox port flake,
+not a regression.) Browser e2e not re-run this session.
+
+REMAINING (tracked in the plan file): T0.6 severity_default, T0.7 atomic progress.json, T0.8 analyze lock
++ Origin guard, T0.9 partial-failure semantics.

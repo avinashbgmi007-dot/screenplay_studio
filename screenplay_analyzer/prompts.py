@@ -213,7 +213,8 @@ def structure_analysis_prompt(scene_overview: str, title: str, total_scenes: int
     return system, user
 
 
-def logline_test_prompt(logline: str, scene_overview: str, title: str, language: str = "eng") -> tuple[str, str]:
+def logline_test_prompt(logline: str, scene_overview: str, title: str,
+                        language: str = "eng", rules_fragment: str = "") -> tuple[str, str]:
     system = (
         "You are a professional script doctor. A logline's job is to land the whole "
         "premise in one sentence: a specific protagonist, a concrete want, a real "
@@ -232,6 +233,8 @@ def logline_test_prompt(logline: str, scene_overview: str, title: str, language:
         f"Current logline: {logline or '(none)'}\n\n"
         f"Scene-by-scene overview:\n\n{scene_overview}"
     )
+    if rules_fragment:
+        user = user + "\n\n" + rules_fragment
     return system, user
 
 
