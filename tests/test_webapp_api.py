@@ -522,6 +522,37 @@ class TestProgressStall:
         assert data["stage"] == "dialogue"
         assert data["status"] == "running"
 
+    def test_torn_progress_file_does_not_400_the_poller(self, http_client):
+        """A half-written progress file used to raise JSONDecodeError — which
+        subclasses ValueError and hit the global handler as a spurious 400 in
+        the middle of a run. The poller must get a sane 200 instead."""
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_running("analyze")
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            f.write('{"stage": "dialogue", "status": "run')   # torn mid-write
+
+        resp = http_client.get(f"/api/projects/{project}/progress")
+        assert resp.status_code == 200, f"torn progress surfaced as HTTP {resp.status_code}"
+        data = resp.get_json()
+        assert "stage" in data and "status" in data
+
+    def test_progress_writes_use_the_atomic_writer(self):
+        """Guard the fix at the source: the three progress writes were plain
+        open()+json.dump, which a concurrent poller could catch half-written.
+        No bare progress write may come back."""
+        import pathlib
+
+        src = pathlib.Path(webapp_server.__file__).with_name("orchestrator.py") \
+            .read_text(encoding="utf-8")
+        assert 'open(m.progress_path, "w"' not in src, (
+            "progress.json is written non-atomically again — a concurrent "
+            "/progress poll can catch it half-written"
+        )
+        assert "atomic_write_json(m.progress_path" in src
+
     def test_legacy_progress_without_ts_left_alone(self, http_client):
         import json
 
@@ -581,3 +612,54 @@ def test_fallback_personas_stay_subset_of_server():
     fallback = re.findall(r'"([a-z_]+)"', m.group(1))
     assert fallback, "FALLBACK_PERSONAS parsed empty"
     assert set(fallback) <= set(PERSONAS.keys())
+
+
+class TestAnalyzeSerializationAndOriginGuard:
+    """Two hardening fixes: a per-project analysis lock (two browser tabs could
+    interleave manifest + report writes) and a cross-origin write guard (any
+    page the browser visits could POST here — including a destructive DELETE)."""
+
+    def _upload_only(self, http_client):
+        return _upload(http_client).get_json()["project"]
+
+    def test_concurrent_analyze_is_rejected_with_409(self, http_client):
+        project = self._upload_only(http_client)
+        lock = webapp_server._analyze_lock(project)
+        assert lock.acquire(blocking=False)
+        try:
+            resp = http_client.post(f"/api/projects/{project}/analyze", json={})
+            assert resp.status_code == 409, "a second concurrent analyze was allowed to start"
+        finally:
+            lock.release()
+        # and the lock is released again, so the endpoint recovers
+        assert webapp_server._analyze_lock(project).acquire(blocking=False)
+        webapp_server._analyze_lock(project).release()
+
+    def test_retry_failed_shares_the_same_lock(self, http_client):
+        project = self._upload_only(http_client)
+        lock = webapp_server._analyze_lock(project)
+        assert lock.acquire(blocking=False)
+        try:
+            resp = http_client.post(f"/api/projects/{project}/analyze/retry-failed", json={})
+            assert resp.status_code == 409
+        finally:
+            lock.release()
+
+    def test_foreign_origin_write_is_rejected(self, http_client):
+        resp = http_client.post("/api/sample", json={},
+                                headers={"Origin": "http://evil.example"})
+        assert resp.status_code == 403, "a foreign page could POST to the local server"
+
+    def test_null_origin_write_is_rejected(self, http_client):
+        """`Origin: null` comes from sandboxed iframes and file:// pages."""
+        resp = http_client.post("/api/sample", json={}, headers={"Origin": "null"})
+        assert resp.status_code == 403
+
+    def test_loopback_origin_write_is_allowed(self, http_client):
+        resp = http_client.post("/api/sample", json={},
+                                headers={"Origin": "http://127.0.0.1:8500"})
+        assert resp.status_code != 403
+
+    def test_reads_are_unaffected_by_the_origin_guard(self, http_client):
+        resp = http_client.get("/api/config", headers={"Origin": "http://evil.example"})
+        assert resp.status_code == 200

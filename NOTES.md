@@ -566,3 +566,46 @@ not a regression.) Browser e2e not re-run this session.
 
 REMAINING (tracked in the plan file): T0.6 severity_default, T0.7 atomic progress.json, T0.8 analyze lock
 + Origin guard, T0.9 partial-failure semantics.
+
+## T9 - severity, atomicity, hardening (2026-09-18, session 2)
+
+T0.6-T0.8 of the review's list, plus one correction.
+
+T0.6 SEVERITY: `Rule.severity_default` was populated on all 263 rules (149 medium / 71 high / 43 low) and
+read by NOTHING, so the same defect could be graded differently depending on which pass found it.
+`to_prompt_fragment()` now states `Severity if confirmed: <curated>`, so the model grades against the
+curated value. NOTE: severity is grammar-REQUIRED (`grammar.py:73`), so the "missing severity" fallback in
+`_normalize_findings` is unreachable for model output - I deliberately did NOT add KB plumbing for a path
+that cannot execute.
+
+T0.7 ATOMIC PROGRESS: the three `progress.json` writes in `orchestrator.py` used plain `open()+json.dump`
+while `/progress` read it with a bare `json.load`. A concurrent poll could hit a torn file, and
+`JSONDecodeError` subclasses `ValueError`, so the global handler returned a spurious 400 mid-run. Now
+`atomic_write_json` (tmp + `os.replace`, per-path lock, Windows retry) plus a guarded reader that falls back
+to the manifest instead of 400ing. Removed two now-dead `import json as _json/_json2`.
+
+T0.8 ANALYZE LOCK + ORIGIN GUARD: `/analyze` and `/analyze/retry-failed` had NO per-project lock - two
+browser tabs could interleave manifest + report writes. Added a non-blocking per-project lock: the second
+caller gets a clear 409. THE TEST CAUGHT A FLAW IN MY OWN FIX - the retry's completeness check ran BEFORE
+the lock, so a running analysis would not have blocked a retry; the lock now precedes the stage check. Also
+added a `before_request` cross-origin write guard: any non-loopback `Origin` on a state-changing request
+gets 403 (a foreign page can no longer POST `localhost:8500`, including `DELETE` = rmtree). Reads and
+origin-less clients (curl, tests) unaffected.
+
+CORRECTION - T0.9 IS NOT A BUG (my review overstated it). A3 claimed partial failure is recorded as
+`complete` and a degraded report is "indistinguishable from a good one". The second half is wrong:
+`AGENTS.md:55` documents the behaviour as intentional ("a partial failure (some categories OK) is `complete`
+with visible errors"), the manifest records `failed_categories` + `partial_errors`, and the UI surfaces it
+(a dashboard `N failed` chip + a `Retry failed` button). Recorded, machine-readable, visible. Changing the
+stage status would contradict a documented design decision - a product choice, not a defect, and not mine
+to make unilaterally. Closed as invalid; annotated in the review's A3 row.
+
+NEWLY FOUND, NOT FIXED: `tests/test_llm_client.py::test_chat_stream_decodes_utf8_not_latin1` flakes ONLY in
+full-suite runs. Proven independent of my changes - excluding `test_webapp_api.py` (which I modified) still
+fails; excluding `test_llm_client.py` gives 733 passed / 0 failures. It spins a SINGLE-THREADED
+`socketserver.TCPServer` on a daemon thread and immediately POSTs to it, and imports only
+`screenplay_cowriter.llm_client`, which I never touched. Suggested fix (test-only, ~3 lines):
+`ThreadingTCPServer` or a readiness wait. Flagged, not applied - outside the approved list.
+
+GATE: non-browser suite 733 passed / 0 failures with `test_llm_client` excluded; 738 passed + 1 flake with
+it included.

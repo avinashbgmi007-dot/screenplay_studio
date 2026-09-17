@@ -36,6 +36,32 @@ WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 
 app = Flask(__name__, static_folder=None)
 
+
+# ---------------------------------------------------------------------------
+# Cross-origin write guard.
+#
+# The server binds 127.0.0.1 and has no auth, so any page the browser visits
+# can POST/DELETE here — including `DELETE /api/projects/<name>` (an rmtree)
+# and `/analyze`. A browser attaches `Origin` to cross-origin requests, so
+# reject any state-changing request carrying a non-loopback one. Requests with
+# no Origin header (curl, the test client, same-origin form posts) are allowed:
+# the threat model is a foreign *page*, not a local tool.
+# ---------------------------------------------------------------------------
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+@app.before_request
+def _reject_cross_origin_writes():
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    origin = request.headers.get("Origin")
+    if not origin:
+        return None
+    from urllib.parse import urlparse
+    if urlparse(origin).hostname in _LOOPBACK_HOSTS:
+        return None
+    return jsonify({"error": "cross-origin request rejected"}), 403
+
 # Set by main() at startup — kept module-level for simplicity, matching
 # the same pattern already used in screenplay_cowriter/server.py.
 PROJECTS_DIR = "./studio_projects"
@@ -495,6 +521,25 @@ def delete_project(name):
     return jsonify({"ok": True, "project": name})
 
 
+# ---------------------------------------------------------------------------
+# Per-project analysis serialization.
+#
+# /analyze and /analyze/retry-failed both load the manifest, rewrite its
+# stage, run the pipeline for minutes, then write the report. Two of them on
+# one project interleave those writes and clobber each other's report — the
+# server is threaded, so this is reachable from two browser tabs. A
+# non-blocking per-project lock turns the second caller into a clear 409
+# instead of a corrupted result.
+# ---------------------------------------------------------------------------
+_ANALYZE_LOCKS: dict[str, threading.Lock] = {}
+_ANALYZE_LOCKS_GUARD = threading.Lock()
+
+
+def _analyze_lock(name: str) -> threading.Lock:
+    with _ANALYZE_LOCKS_GUARD:
+        return _ANALYZE_LOCKS.setdefault(name, threading.Lock())
+
+
 @app.route("/api/projects/<name>/analyze", methods=["POST"])
 def analyze_project(name):
     try:
@@ -502,6 +547,17 @@ def analyze_project(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
 
+    lock = _analyze_lock(name)
+    if not lock.acquire(blocking=False):
+        return _error("An analysis is already running for this project — "
+                      "wait for it to finish before starting another.", 409)
+    try:
+        return _analyze_locked(m)
+    finally:
+        lock.release()
+
+
+def _analyze_locked(m):
     m.server_url = CONFIG["server_url"]
     m.model_id = CONFIG["model"]
     m.fast_model = CONFIG["fast_model"]
@@ -553,9 +609,23 @@ def retry_failed_categories(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    if m.stage("analyze").status != "complete":
-        return _error("Analysis hasn't completed yet — run the full analysis first.", 400)
 
+    # Same per-project lock as /analyze — a retry must not race a full run.
+    # Taken BEFORE the stage check so a currently-running analysis always wins
+    # (otherwise a retry would slip past on a stale 'complete' stage).
+    lock = _analyze_lock(name)
+    if not lock.acquire(blocking=False):
+        return _error("An analysis is already running for this project — "
+                      "wait for it to finish before retrying.", 409)
+    try:
+        if m.stage("analyze").status != "complete":
+            return _error("Analysis hasn't completed yet — run the full analysis first.", 400)
+        return _retry_failed_locked(m)
+    finally:
+        lock.release()
+
+
+def _retry_failed_locked(m):
     m.server_url = CONFIG["server_url"]
     m.model_id = CONFIG["model"]
     m.fast_model = CONFIG["fast_model"]
@@ -1154,8 +1224,19 @@ def get_progress(name):
     if not os.path.exists(m.progress_path):
         stage = m.stage("analyze").status
         return jsonify({"stage": "done" if stage == "complete" else "idle", "status": "complete" if stage == "complete" else "idle", "detail": ""})
-    with open(m.progress_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(m.progress_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (ValueError, OSError):
+        # A torn or half-written progress file. Writes are atomic now, so this
+        # is defence in depth for a legacy file or an external writer — and a
+        # transient read must never surface as a 400 to the poller mid-run.
+        stage = m.stage("analyze").status
+        return jsonify({
+            "stage": "done" if stage == "complete" else "idle",
+            "status": "complete" if stage == "complete" else "idle",
+            "detail": "progress unreadable — retrying",
+        })
     # ts is the heartbeat written by every run since the fix; a file without
     # it is guaranteed legacy (all current runs stamp it), so its own mtime is
     # the best available signal for when the dead run last wrote.

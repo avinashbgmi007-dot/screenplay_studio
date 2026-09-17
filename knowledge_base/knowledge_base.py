@@ -55,12 +55,20 @@ class Rule:
         return " ".join(parts)
 
     def to_prompt_fragment(self) -> str:
-        """The actual text injected into an analyzer prompt for this rule."""
+        """The actual text injected into an analyzer prompt for this rule.
+
+        `severity_default` is the KB's curated severity for this rule. It was
+        previously never read anywhere, so the same defect could be graded
+        differently depending on which pass happened to find it. Stating it
+        here lets the model grade against the curated value instead of
+        guessing.
+        """
         return (
             f"### {self.name} (source: {self.attribution})\n"
             f"Definition: {self.definition}\n"
             f"What to look for: {self.detection_signal}\n"
             f"Do NOT flag when: {self.counter_considerations}\n"
+            f"Severity if confirmed: {self.severity_default}\n"
             f"[confidence_tier: {self.confidence_tier} — "
             f"{'treat findings as near-certain if detection_signal is met' if self.confidence_tier == 'high' else 'treat findings as a judgment call' if self.confidence_tier == 'medium' else 'frame findings as a discussion prompt, not a verdict'}]"
         )

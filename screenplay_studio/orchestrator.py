@@ -11,6 +11,7 @@ again picks up from analyze — parse isn't redone.
 
 from __future__ import annotations
 
+from .jsonio import atomic_write_json
 from .manifest import ProjectManifest
 
 
@@ -91,7 +92,6 @@ class Orchestrator:
         language = m.report_language or "eng"
 
         m.mark_running("analyze")
-        import json as _json
         try:
             from screenplay_parser.models import ScriptDocument
             from screenplay_analyzer.pipeline import analyze
@@ -104,8 +104,9 @@ class Orchestrator:
                 # from "the process died mid-stage" (a hard crash leaves no
                 # done/failed write behind — without a timestamp that stale
                 # 'running' file would lie forever).
-                with open(m.progress_path, "w", encoding="utf-8") as f:
-                    _json.dump(dict(event, ts=_t.time()), f)
+                # Atomic (tmp + os.replace): the /progress poller runs on
+                # another thread and must never catch this file half-written.
+                atomic_write_json(m.progress_path, dict(event, ts=_t.time()))
 
             doc = ScriptDocument.load(m.parsed_path)
             client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
@@ -137,8 +138,7 @@ class Orchestrator:
 
             save_report(result, m.report_md_path, m.report_findings_path)
             import time as _t
-            with open(m.progress_path, "w", encoding="utf-8") as f:
-                _json.dump({"stage": "done", "status": "complete", "detail": "Analysis complete", "ts": _t.time()}, f)
+            atomic_write_json(m.progress_path, {"stage": "done", "status": "complete", "detail": "Analysis complete", "ts": _t.time()})
 
             if result.model_used:
                 m.model_id = result.model_used
@@ -170,11 +170,9 @@ class Orchestrator:
                     "failed_categories": failed_categories,
                 })
         except Exception as e:
-            import json as _json2
             import time as _t2
             try:
-                with open(m.progress_path, "w", encoding="utf-8") as f:
-                    _json2.dump({"stage": "failed", "status": "failed", "detail": str(e), "ts": _t2.time()}, f)
+                atomic_write_json(m.progress_path, {"stage": "failed", "status": "failed", "detail": str(e), "ts": _t2.time()})
             except Exception:
                 pass
             m.mark_failed("analyze", str(e))

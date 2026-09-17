@@ -240,3 +240,27 @@ def test_logline_test_still_accepts_the_old_positional_call():
     client = _RecordingClient()
     run_logline_test("x", "y", "z", client, "eng")   # must not raise
     assert client.calls
+
+
+# --------------------------------------------------------------------------
+# Curated severity
+# --------------------------------------------------------------------------
+
+def test_every_rule_has_a_curated_severity():
+    from knowledge_base import KnowledgeBase
+    missing = [r.id for r in KnowledgeBase().all()
+               if not (r.severity_default or "").strip()]
+    assert not missing, f"rules with no severity_default: {missing}"
+
+
+def test_rule_fragment_states_its_curated_severity():
+    """`severity_default` was populated on all 263 rules and read by nothing,
+    so the same defect could be graded differently depending on which pass
+    found it. It now rides the prompt, guiding the model's choice."""
+    from knowledge_base import KnowledgeBase
+    for rule in KnowledgeBase().all():
+        fragment = rule.to_prompt_fragment()
+        assert "Severity if confirmed:" in fragment, f"{rule.id} omits its severity"
+        assert rule.severity_default in fragment, (
+            f"{rule.id} fragment does not carry '{rule.severity_default}'"
+        )
