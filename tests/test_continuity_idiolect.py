@@ -21,9 +21,14 @@ def _parse(text):
         os.unlink(path)
 
 
-def _rules(doc, rule_id):
+def _rules(doc, check_id):
+    """Findings from this deterministic pass, matched on its own `check_id`.
+
+    `rule_id` now carries the knowledge-base rule the check implements (the UI
+    renders it as "Grounded in knowledge-base rule <id>"), so it is no longer
+    the pass's identity — `check_id` is."""
     findings, _ = run_continuity_analysis(doc)
-    return [f for f in findings if f.get("rule_id") == rule_id]
+    return [f for f in findings if f.get("check_id") == check_id]
 
 
 # ---- continuity: unmarked time flips ----
@@ -237,7 +242,7 @@ I am afraid of how it lands.
 def test_idiolect_shift_flagged():
     doc = _parse(SHIFT)
     findings, _ = run_idiolect_analysis(doc)
-    voice_breaks = [f for f in findings if f.get("rule_id") == "idiolect_consistency"]
+    voice_breaks = [f for f in findings if f.get("check_id") == "idiolect_consistency"]
     # AARAV (3 short lines then 3 long lines) must be flagged; the check needs
     # >= 6 lines so only characters with both halves sampled qualify.
     assert any("AARAV" in f["issue"] for f in voice_breaks)
@@ -246,7 +251,7 @@ def test_idiolect_shift_flagged():
 def test_idiolect_consistent_not_flagged():
     doc = _parse(STABLE)
     findings, _ = run_idiolect_analysis(doc)
-    assert [f for f in findings if f.get("rule_id") == "idiolect_consistency"] == []
+    assert [f for f in findings if f.get("check_id") == "idiolect_consistency"] == []
 
 
 # ---- Tenglish promise extraction ----

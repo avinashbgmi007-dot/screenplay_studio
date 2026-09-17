@@ -81,7 +81,14 @@ def _time_flip_findings(doc: ScriptDocument) -> list[dict]:
             "severity": "low",
             "scene_refs": [cur.scene_number],
             "evidence_quote": cur.heading_raw,
-            "rule_id": "unmarked_time_flip",
+            # Two fields, two meanings. `rule_id` is the knowledge-base rule
+            # this check implements — the UI renders it as "Grounded in
+            # knowledge-base rule <id>", so it must resolve in the KB.
+            # `check_id` is this pass's own stable name, used by
+            # AnalysisResult.merge to recognise a finding that regenerates on
+            # every run (see _DETERMINISTIC_CHECK_IDS).
+            "rule_id": "timeline_consistency",
+            "check_id": "unmarked_time_flip",
         })
     return findings
 
@@ -140,7 +147,8 @@ def _name_variant_findings(doc: ScriptDocument, by_char: dict) -> list[dict]:
                 "severity": "low",
                 "scene_refs": sorted(a_scenes | b_scenes)[:6],
                 "evidence_quote": by_char[a][0] if by_char.get(a) else None,
-                "rule_id": "character_name_variant",
+                "rule_id": "character_trait_continuity",
+                "check_id": "character_name_variant",
             })
     return findings
 

@@ -134,7 +134,7 @@ Snapshot taken: 2026-08-22 · HEAD `0ef433f` ("Let go of the Pain_FD_4_scenes pr
 - **continuity.py** — unmarked opposite time flips (NIGHT↔DAY/MORNING; CONTINUOUS clears) + name variants (Levenshtein≤2 or prefix≥4 chars with ≤3 extra, never share a scene, both speak). Evidence quotes are verbatim headings/lines so verification passes.
 - **voice.py** — voice-bleed: fingerprints (top-40 word freq cosine ×0.7 + style distance ×0.3) over ≥3-line characters, threshold 0.72, shared-scene requirement, cap 6 pairs. Subtext: on-the-nose regex ("I'm so angry", "I love you", "I'm in love"). Idiolect: mean-line-length shift ≥45% between halves (≥6 lines total, ≥3/half).
 - **dials.py** — one call whole cast (≤8 chars), clamps scores 1–10, trims note 200.
-- **pacing.py** — pace_score = 100×(0.6·density_norm + 0.4·inverted action_share_norm); drag ≥68 & ≥20 words, cap 4; drag_findings category structure/rule pacing_drag.
+- **pacing.py** — pace_score = 100×(0.6·density_norm + 0.4·inverted action_share_norm); drag ≥68 & ≥20 words, cap 4; drag_findings category structure / `check_id` pacing_drag (mechanical, so no `rule_id`).
 - **formatting_check.py** — deterministic heading checks (missing INT/EXT, missing time-of-day; more rules further down the file — read before editing).
 - **genre.py** — 10 genre convention sets as expectations-to-test; substring then word-overlap match, default drama.
 - **feedback_filter.py** — drops dialect-ID/subtitle meta-commentary from issue+why_it_matters (quote exempt). Conservative sentence-level sibling lives in cowriter/language_meta.py — keep pattern sets in sync.

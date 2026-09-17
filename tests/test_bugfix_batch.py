@@ -82,6 +82,10 @@ def test_upload_success_swaps_source_atomically(tmp_path):
 # ---------------------------------------------------------------- M1
 
 def test_merge_drops_deterministic_findings_keeps_model_findings(tmp_path):
+    # NB: this fixture deliberately uses the LEGACY shape — deterministic check
+    # names stored in `rule_id`. New reports put the check name in `check_id`
+    # and the knowledge-base rule in `rule_id`, so merge matches on either
+    # field. Keeping the old shape here is what guards that backward compat.
     prev = {
         "findings": [
             {"category": "theme", "rule_id": None, "issue": "model theme finding"},

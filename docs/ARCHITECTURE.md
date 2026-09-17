@@ -315,7 +315,7 @@ genre, logline_test) plus deterministic passes. Actual order in `analyze()`:
 1. **Formatting checks & stats** — deterministic, no model: missing INT/EXT, time-of-day, character capitalization, heavy parentheticals, long action blocks; character counts, dialogue ratios.
 2. **Craft passes (deterministic)** — voice-bleed, on-the-nose subtext, and **idiolect** (characters speaking with one voice) — no model calls.
 3. **Continuity pass** — deterministic: time flips, name variants (no model call).
-4. **Pacing** — deterministic per-scene pace index (density × inverted action-share), drags flagged over a threshold, capped at 4. Also emits `pacing_drag` findings. No model call.
+4. **Pacing** — deterministic per-scene pace index (density × inverted action-share), drags flagged over a threshold, capped at 4. Also emits pace-drag findings (`check_id: pacing_drag` — a mechanical measure, so no `rule_id`: that field is reserved for ids that resolve in the knowledge base). No model call.
 5. **Scene summaries** — LLM-generated per-scene summaries (chunked, token-budgeted).
 6. **Dialogue analysis** — per-scene dialogue findings with verbatim quotes (chunked).
 7. **Script-level categories** — theme, character, structure, scene-function (one model call each, over the scene-summary overview).

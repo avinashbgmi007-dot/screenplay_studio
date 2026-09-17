@@ -677,3 +677,57 @@ egri_character_incontrovertible. Added `RulesContext.severity_for()` + a stub-to
 happened to match. The bug was that the KB was not the source of truth.
 
 GATE: non-browser suite 751 passed / 0 failures / 1 warning (+6 tests; test_rules_grounding.py 24 -> 30).
+
+## T12 - the KB reaches the co-writer, and a false UI claim (T1.7-T1.8)
+
+### T1.7 - F3: the co-writer can see the rules behind the findings
+
+`ReportContext.compact_summary()` (context.py:180) is what rides the co-writer's system prompt every turn,
+and it rendered findings as "(category, severity) Scene N: issue - why". The finding's `rule_id` was never
+shown, so the doctor could quote the verdict but not the rule behind it - advice drifted to general
+impressions. That was F3, the last HIGH item.
+
+Added `ReportContext.craft_principles()`: distinct rule_ids the report cites -> lazily-loaded (GUARDED)
+knowledge base -> "**Name** (attribution): definition", capped by MAX_CRAFT_RULES/MAX_CRAFT_CHARS. Wired
+into build_system_prompt right after the report summary. The idea room and ungrounded reports are
+untouched. Real data: Pain_3 cites 2 distinct rules -> a 754-char block. Bounded, not bloaty.
+
+### T1.8 - NEW: a false user-facing claim (found because T1.7's output looked wrong)
+
+The new block listed 1 of 2 rules and called the other "omitted". That was a bug in my own code (it
+counted UNKNOWN ids as OMITTED) - but chasing it surfaced something bigger:
+
+**6 of the 7 rule_ids the analyzer emitted were not knowledge-base rules at all** - voice_bleed,
+on_the_nose, idiolect_consistency, pacing_drag, unmarked_time_flip, character_name_variant. And the UI
+renders that field as "Grounded in knowledge-base rule <id>" (app.js:4066), so every deterministic finding
+asserted grounding in a rule that does not exist. User-visible, not latent.
+
+The OBVIOUS fix (rename the values to real KB rules) was WRONG, and reading the code is what showed it:
+`AnalysisResult._DETERMINISTIC_RULE_IDS` (pipeline.py:131) contains exactly those six names, and merge()
+keys on them to drop stale deterministic findings during a partial retry. Renaming the values would have
+silently broken retry-merge - duplicated findings in the report. The six are an intentional INTERNAL CHECK
+namespace, not KB ids.
+
+So the defect was ONE FIELD CARRYING TWO MEANINGS. Split them:
+- `rule_id` = the KB rule the finding rests on; must resolve in the KB. Mapped the four with exact
+  counterparts: unmarked_time_flip -> timeline_consistency, character_name_variant ->
+  character_trait_continuity (the rule literally lists "name spelling"), voice_bleed ->
+  distinct_character_voice, on_the_nose -> on_the_nose_vs_subtext.
+- `check_id` = the pass's own stable name (merge keys on it). The two with no KB rule behind them
+  (idiolect_consistency, pacing_drag) keep only this, so the UI makes no claim.
+- _DETERMINISTIC_RULE_IDS -> _DETERMINISTIC_CHECK_IDS, and merge() matches `check_id` OR the LEGACY
+  `rule_id`, so reports already on disk still merge correctly. test_bugfix_batch.py deliberately keeps the
+  legacy shape as that guard.
+
+LESSON: when a fix looks obvious, read what else depends on the thing you are about to rename. The
+"obvious" rename would have broken retry-merge silently - the same failure class this whole effort is
+about. The dependency (`_DETERMINISTIC_RULE_IDS`) was two files away and only a grep found it.
+
+LESSON 2: my own new code's confusing output ("1 omitted") was the thread that led to a real bug. Chasing
+a number that does not add up beats explaining it away.
+
+Guards added (mutation-proved): every literal rule_id in the analyzer resolves in the KB (6 -> 0 dangling);
+every check_id is registered in _DETERMINISTIC_CHECK_IDS and is NOT a KB id; merge drops both shapes.
+
+GATE: non-browser 760 passed / 0 failures (+9 tests; test_rules_grounding.py 30 -> 39);
+browser phase6 28/28, phase7 15/15, smoke 18/18.

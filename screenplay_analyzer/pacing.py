@@ -89,7 +89,11 @@ def drag_findings(rows: list[dict]) -> list[dict]:
             continue
         findings.append({
             "category": "structure",
-            "rule_id": "pacing_drag",
+            # `check_id`, not `rule_id`: the pace index is a mechanical measure
+            # with no knowledge-base rule behind it. `rule_id` is reserved for
+            # ids that resolve in the KB (the UI renders it as "Grounded in
+            # knowledge-base rule <id>"), so a non-KB id there is a false claim.
+            "check_id": "pacing_drag",
             "issue": f"Pace drag — Scene {r['scene_number']} runs long with little movement",
             "why_it_matters": (
                 f"{r['words']} words across {r['beats']} beats "

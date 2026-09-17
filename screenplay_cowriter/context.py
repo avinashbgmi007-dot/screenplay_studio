@@ -29,6 +29,13 @@ SCENE_REF_RE = re.compile(r"[Ss]cene\s+(\d+)")
 
 MAX_SCENES_INJECTED_PER_TURN = 4  # cap context growth if someone mentions ten scene numbers at once
 
+# The craft-principles block is derived from the report's rule ids, so it is
+# already bounded by how many distinct rules a report cites — but cap it anyway
+# so a pathological report can't blow the prompt (see C7: the findings summary
+# itself is uncapped, so this block must not add to that problem).
+MAX_CRAFT_RULES = 10
+MAX_CRAFT_CHARS = 3000
+
 # Standing rule: the writer knows what language their pages are in — the
 # co-writer never comments on the script's language itself (dialect
 # identification, subtitles, non-native-speaker accessibility). Kept in the
@@ -213,6 +220,63 @@ class ReportContext:
 
         return "\n\n".join(parts) if parts else "(No report loaded — discussing the raw script only.)"
 
+    def craft_principles(self, max_rules: int = MAX_CRAFT_RULES,
+                         max_chars: int = MAX_CRAFT_CHARS) -> str:
+        """The named craft principles the findings actually rest on.
+
+        Findings carry a `rule_id` when they were grounded in the knowledge
+        base, but the summary above showed the co-writer only the finding's
+        prose — so it could quote the doctor's verdict without being able to
+        see the rule the verdict rests on, and its advice drifted to general
+        impressions. This names the distinct rules in play (never the whole
+        KB), deduped and capped.
+
+        Returns "" when no finding cites a rule or the knowledge base isn't
+        installed — the co-writer then behaves exactly as before, keeping its
+        standalone guarantee (the import is lazy and guarded).
+        """
+        rule_ids: list[str] = []
+        for f in self.data.get("findings") or []:
+            rid = str(f.get("rule_id") or "").strip()
+            if rid and rid not in rule_ids:
+                rule_ids.append(rid)
+        if not rule_ids:
+            return ""
+        try:
+            from knowledge_base import KnowledgeBase
+        except ImportError:
+            return ""
+        kb = KnowledgeBase()
+        lines: list[str] = []
+        used = 0
+        unknown = 0
+        for rid in rule_ids[:max_rules]:
+            try:
+                rule = kb.get(rid)
+            except KeyError:
+                # A rule id the KB does not know. Counted separately from the
+                # space cap below — an unknown id is a dangling reference in
+                # the report, not something this block chose to leave out.
+                unknown += 1
+                continue
+            line = f"- **{rule.name}** ({rule.attribution}): {rule.definition}"
+            if lines and used + len(line) > max_chars:
+                break
+            lines.append(line)
+            used += len(line)
+        if not lines:
+            return ""
+        block = (
+            "CRAFT PRINCIPLES IN PLAY — the named rules behind the findings "
+            "above, from the same knowledge base the analyzer used. Ground your "
+            "advice in these rather than general impressions; where you go "
+            "beyond them, say so:\n" + "\n".join(lines)
+        )
+        omitted = len(rule_ids) - len(lines) - unknown
+        if omitted > 0:
+            block += f"\n({omitted} further principle(s) not listed here.)"
+        return block
+
 
 # The idea page's free-form notes, capped so a long canvas can't blow the
 # prompt; the tail is what the writer is currently shaping, which matters
@@ -276,12 +340,18 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         title = script_ctx.title or report_ctx.title or "this screenplay"
         script_map = script_ctx.script_map()
         map_block = f"\n\nHere is a map of the script itself:\n\n{script_map}" if script_map else ""
+        # The rules the findings rest on, so advice is anchored to the craft
+        # source rather than to the finding's prose alone. Empty when the
+        # report cites no rule ids, so nothing changes for older reports.
+        _craft = report_ctx.craft_principles()
+        craft_block = f"\n\n{_craft}" if _craft else ""
         prompt = (
             f"{persona_text(persona)}\n\n"
             f"{mode_text(mode)}\n\n"
             f"{examples_block}\n"
             f"You're discussing the screenplay \"{title}\" with its writer. Here is the "
-            f"standing analysis report for reference:\n\n{report_ctx.compact_summary()}{map_block}\n\n"
+            f"standing analysis report for reference:\n\n{report_ctx.compact_summary()}"
+            f"{craft_block}{map_block}\n\n"
             f"When specific scene text is relevant to the current question, it will be "
             f"provided below as additional context for this turn. If it isn't provided "
             f"and you need exact wording to answer precisely, say so rather than guessing "

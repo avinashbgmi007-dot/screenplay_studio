@@ -52,6 +52,15 @@ tests/                    pytest suite against tests/mock_unified_server.py (+ n
 4. Emit `progress_cb` stage events so the web UI shows progress.
 5. Add a `CATEGORY_TITLES` entry in `report.py` if findings carry a new category.
 6. Add a mock branch in `tests/mock_unified_server.py` (match on a distinctive system-prompt phrase) and a test.
+7. Set the finding's rule fields correctly — they are **two different things**:
+   - **`rule_id`** — the knowledge-base rule the finding rests on. It must resolve in the KB: the UI
+     renders it as *"Grounded in knowledge-base rule &lt;id&gt;"* (`app.js:4066`), so a non-KB id is a
+     visible false claim. Omit it when no rule applies.
+   - **`check_id`** — your pass's own stable name. A deterministic pass that regenerates on every run
+     **must** set one and register it in `AnalysisResult._DETERMINISTIC_CHECK_IDS` (`pipeline.py`),
+     or a partial retry's `merge` will carry a stale copy forward and the writer sees the finding twice.
+   A deterministic check can set both (e.g. `rule_id: "timeline_consistency"`, `check_id: "unmarked_time_flip"`).
+   `tests/test_rules_grounding.py` guards both contracts.
 
 ### Add a craft rule to the knowledge base
 

@@ -92,7 +92,10 @@ def test_drag_findings_are_structured():
     findings = drag_findings(rows)
     for f in findings:
         assert f["category"] == "structure"
-        assert f["rule_id"] == "pacing_drag"
+        # `check_id` is the pass's own name; `rule_id` is reserved for ids that
+        # resolve in the knowledge base, and the pace index has no KB rule.
+        assert f["check_id"] == "pacing_drag"
+        assert "rule_id" not in f
         assert f["severity"] == "medium"
         assert isinstance(f["scene_refs"], list) and f["scene_refs"]
 

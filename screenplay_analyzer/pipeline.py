@@ -128,7 +128,12 @@ class AnalysisResult:
 
     # Deterministic passes that regenerate on EVERY analyze run and must
     # never be carried forward from a previous report during a merge.
-    _DETERMINISTIC_RULE_IDS = frozenset({
+    #
+    # These are the passes' own `check_id` names, not knowledge-base rule ids
+    # (a deterministic pass is a mechanical check; it cites the KB rule it
+    # implements separately, in `rule_id`). Reports written before that split
+    # carry the same names in `rule_id`, so merge checks both fields.
+    _DETERMINISTIC_CHECK_IDS = frozenset({
         "voice_bleed", "on_the_nose", "idiolect_consistency",
         "unmarked_time_flip", "character_name_variant", "pacing_drag",
     })
@@ -156,7 +161,9 @@ class AnalysisResult:
         prev_findings = [
             f for f in (prev.get("findings") or [])
             if ((f.get("category"), f.get("issue")) not in fresh_keys
-                and f.get("rule_id") not in self._DETERMINISTIC_RULE_IDS)
+                and f.get("check_id") not in self._DETERMINISTIC_CHECK_IDS
+                # legacy reports stored the check name in rule_id
+                and f.get("rule_id") not in self._DETERMINISTIC_CHECK_IDS)
         ]
         self.findings = prev_findings + list(self.findings)
 

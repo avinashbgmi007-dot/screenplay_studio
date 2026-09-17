@@ -136,7 +136,12 @@ def run_voice_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
             "severity": "medium",
             "scene_refs": shared,
             "evidence_quote": by_char[a][0] if by_char[a] else None,
-            "rule_id": "voice_bleed",
+            # `rule_id` must resolve in the KB (the UI renders it as "Grounded
+            # in knowledge-base rule <id>"); `check_id` is this pass's own
+            # stable name, used by AnalysisResult.merge to recognise findings
+            # that regenerate on every run.
+            "rule_id": "distinct_character_voice",
+            "check_id": "voice_bleed",
         })
     return findings, []
 
@@ -224,7 +229,11 @@ def run_idiolect_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
             "severity": "low",
             "scene_refs": sorted(first_scenes | second_scenes)[:6],
             "evidence_quote": first[0] if first else None,
-            "rule_id": "idiolect_consistency",
+            # `check_id`, not `rule_id`: this is a mechanical voice-drift check
+            # with no knowledge-base rule behind it. `rule_id` is reserved for
+            # ids that resolve in the KB — the UI renders it as "Grounded in
+            # knowledge-base rule <id>", so a non-KB id there is a false claim.
+            "check_id": "idiolect_consistency",
         })
     return findings, []
 
@@ -250,7 +259,8 @@ def run_subtext_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
                         "severity": "low",
                         "scene_refs": [scene.scene_number],
                         "evidence_quote": line,
-                        "rule_id": "on_the_nose",
+                        "rule_id": "on_the_nose_vs_subtext",
+                        "check_id": "on_the_nose",
                     })
                 current = None
     return findings, []

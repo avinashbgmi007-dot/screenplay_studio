@@ -415,3 +415,135 @@ def test_the_two_plot_passes_agree_on_a_shared_rule(rc):
     assert engine["severity"] == ledger[0]["severity"] == rc.severity_for(rule)
 
 
+# --------------------------------------------------------------------------
+# rule_id must be a REAL knowledge-base rule
+#
+# The UI renders `rule_id` as "Grounded in knowledge-base rule <id>"
+# (app.js:4066). The deterministic passes used to put their own check names in
+# that field — six of them (voice_bleed, on_the_nose, idiolect_consistency,
+# pacing_drag, unmarked_time_flip, character_name_variant) matched no KB rule,
+# so the UI asserted grounding that did not exist. They now carry `check_id`
+# for their own identity and `rule_id` only where a KB rule really applies.
+# --------------------------------------------------------------------------
+
+def _literal_rule_fields(field: str) -> dict[str, set[str]]:
+    """Every `"<field>": "value"` literal in the analyzer source, by value."""
+    pattern = re.compile(r'"' + field + r'"\s*:\s*"([^"]+)"')
+    found: dict[str, set[str]] = {}
+    for path in sorted(ANALYZER_DIR.glob("*.py")):
+        for value in pattern.findall(path.read_text(encoding="utf-8")):
+            found.setdefault(value, set()).add(path.name)
+    return found
+
+
+def test_every_literal_rule_id_resolves_in_the_knowledge_base(rc):
+    """A dangling rule_id is a false grounding claim in the UI."""
+    from knowledge_base import KnowledgeBase
+    known = {r.id for r in KnowledgeBase().all()}
+    dangling = {rid: sorted(files)
+                for rid, files in _literal_rule_fields("rule_id").items()
+                if rid not in known}
+    assert not dangling, (
+        "the analyzer cites rule ids that are not knowledge-base rules — the UI "
+        f"would claim grounding in a rule that does not exist: {dangling}"
+    )
+
+
+def test_check_ids_are_the_deterministic_passes_own_names(rc):
+    """`check_id` is the pass's identity (merge keys on it), explicitly NOT a
+    knowledge-base claim — so it must never accidentally be a KB rule id."""
+    from knowledge_base import KnowledgeBase
+    from screenplay_analyzer.pipeline import AnalysisResult
+    known = {r.id for r in KnowledgeBase().all()}
+    found = _literal_rule_fields("check_id")
+    assert found, "no check_id literals found — the scan is broken"
+    collides = sorted(k for k in found if k in known)
+    assert not collides, f"check_id values that are also KB rules (ambiguous): {collides}"
+    unknown = sorted(k for k in found if k not in AnalysisResult._DETERMINISTIC_CHECK_IDS)
+    assert not unknown, (
+        "these check_ids are not registered in _DETERMINISTIC_CHECK_IDS, so "
+        f"merge would carry stale copies forward: {unknown}"
+    )
+
+
+def test_merge_recognises_both_the_new_and_legacy_field_names(tmp_path):
+    """Reports written before the split stored the check name in `rule_id`;
+    merge must still drop those, or a retry duplicates every deterministic
+    finding."""
+    from screenplay_analyzer.pipeline import AnalysisResult
+    import json
+    from screenplay_parser.models import ScriptDocument
+
+    prev = {"findings": [
+        {"category": "continuity", "rule_id": "unmarked_time_flip", "issue": "legacy flip"},
+        {"category": "continuity", "check_id": "unmarked_time_flip", "issue": "new flip"},
+        {"category": "theme", "rule_id": "chekhovs_gun", "issue": "model finding"},
+    ]}
+    path = tmp_path / "report.findings.json"
+    path.write_text(json.dumps(prev), encoding="utf-8")
+    result = AnalysisResult(doc=ScriptDocument(title=None, author=None,
+                                               source_format="txt", source_filename="x"))
+    result.merge(str(path))
+    issues = [f["issue"] for f in result.findings]
+    assert "legacy flip" not in issues
+    assert "new flip" not in issues
+    assert "model finding" in issues
+
+
+# --------------------------------------------------------------------------
+# The knowledge base must also reach the CO-WRITER (review item F3)
+# --------------------------------------------------------------------------
+
+def test_craft_principles_block_names_the_rules_behind_the_findings(rc):
+    from screenplay_cowriter.context import ReportContext
+    report = {"findings": [{"category": "plot_thread", "rule_id": "martell_plants_and_payoffs"},
+                           {"category": "plot_thread", "rule_id": "chekhovs_gun"}]}
+    block = ReportContext(report).craft_principles()
+    assert "CRAFT PRINCIPLES IN PLAY" in block
+    assert "Plants and Payoffs" in block or "martell" in block.lower()
+    assert "Chekhov" in block
+
+
+def test_craft_principles_is_empty_when_nothing_is_grounded():
+    """Older reports cite no rule ids — the co-writer must be unchanged."""
+    from screenplay_cowriter.context import ReportContext
+    assert ReportContext({}).craft_principles() == ""
+    assert ReportContext({"findings": [{"category": "dialogue", "issue": "x"}]}).craft_principles() == ""
+
+
+def test_craft_principles_skips_unknown_ids_without_crashing():
+    from screenplay_cowriter.context import ReportContext
+    assert ReportContext({"findings": [{"rule_id": "not_a_rule"}]}).craft_principles() == ""
+
+
+def test_craft_principles_is_bounded():
+    from knowledge_base import KnowledgeBase
+    from screenplay_cowriter.context import ReportContext, MAX_CRAFT_CHARS
+    ids = [r.id for r in KnowledgeBase().all()]
+    block = ReportContext({"findings": [{"rule_id": i} for i in ids]}).craft_principles()
+    assert block, "a report citing every rule rendered nothing"
+    assert len(block) <= MAX_CRAFT_CHARS + 600, f"block is unbounded ({len(block)} chars)"
+    assert "not listed here" in block, "a truncated block must say so"
+
+
+def test_craft_principles_reaches_the_cowriter_system_prompt(rc):
+    from screenplay_cowriter.context import ReportContext, ScriptContext, build_system_prompt
+    report = ReportContext({"findings": [{"rule_id": "chekhovs_gun"}]})
+    script = ScriptContext({"title": "T", "scenes": []})
+    for persona in ("script_consultant", "writing_partner"):
+        prompt = build_system_prompt(script, report, persona, "discuss")
+        assert "CRAFT PRINCIPLES IN PLAY" in prompt, (
+            f"the {persona} prompt carries no knowledge-base grounding"
+        )
+
+
+def test_craft_principles_stays_out_of_the_idea_room(rc):
+    """The idea room has no report — nothing to ground in."""
+    from screenplay_cowriter.context import ReportContext, ScriptContext, build_system_prompt
+    prompt = build_system_prompt(ScriptContext({"title": "T", "scenes": []}),
+                                 ReportContext({"findings": [{"rule_id": "chekhovs_gun"}]}),
+                                 "writing_partner", "discuss", premise={"title": "idea"})
+    assert "CRAFT PRINCIPLES IN PLAY" not in prompt
+
+
+
