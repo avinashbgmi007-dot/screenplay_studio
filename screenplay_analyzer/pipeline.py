@@ -54,6 +54,9 @@ class _NullRulesContext:
     def prompt_fragment_for_genre(self, genre: str) -> str:
         return ""
 
+    def severity_for(self, rule_id: str, default: str = "medium") -> str:
+        return default
+
 
 def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
@@ -655,7 +658,7 @@ def analyze(
             )
             result.setup_payoff = ledger
             existing_plot = [f for f in all_findings if f.get("category") == "plot_thread"]
-            all_findings.extend(dangling_findings(ledger, existing_plot))
+            all_findings.extend(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx))
             result.category_outcomes["setup_payoff"] = "failed" if ledger_errors else "ok"
             if ledger_errors:
                 result.errors.extend(ledger_errors)

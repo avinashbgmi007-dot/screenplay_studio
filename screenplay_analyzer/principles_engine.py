@@ -31,6 +31,7 @@ from screenplay_parser.knowledge_graph import KnowledgeGraph
 from . import prompts
 from .grammar import principle_judgment_grammar
 from .llm_client import LlamaServerClient, LlamaServerError
+from .rules_context import severity_for as _severity_for
 
 # candidates below this many mentions or with an implausibly generic name
 # aren't worth spending a model call on — cheap pre-filter before stage 2
@@ -54,11 +55,16 @@ def _judge_candidate(
 
 
 def _finding_from_judgment(
-    candidate_kind: str, candidate_name: str, scenes_mentioned: list[int], judgment: dict, rule_id: str
+    candidate_kind: str, candidate_name: str, scenes_mentioned: list[int], judgment: dict,
+    rule_id: str, severity: str = "medium",
 ) -> dict | None:
     """Only emit a finding when it's actually actionable: significant AND
     not paid off. A significant-and-paid-off candidate, or a not-significant
     one, isn't something the writer needs to act on.
+
+    `severity` comes from the cited rule's curated `severity_default` (see
+    RulesContext.severity_for) rather than a flat default, so the same defect
+    is graded the same way whichever pass reports it.
 
     Diagnosis only — no suggested_resolution field. Piece 2 explains what's
     wrong and why; proposing how to fix it is Piece 3's job, and only when
@@ -75,7 +81,7 @@ def _finding_from_judgment(
         "rule_id": rule_id,
         "issue": f'{kind_label}: "{candidate_name}"',
         "why_it_matters": judgment.get("reasoning", ""),
-        "severity": "medium",
+        "severity": severity,
         "scene_refs": scenes_mentioned,
         "evidence_quote": None,  # candidate mentions are cited by scene_refs; verifier can still check scene existence
     }
@@ -111,7 +117,10 @@ def run_principles_engine(
                 client, rules_fragment, "recurring_object", prop.name,
                 prop.mention_texts, total_scenes, language,
             )
-            finding = _finding_from_judgment("recurring_object", prop.name, prop.scenes_mentioned, judgment, "chekhovs_gun")
+            finding = _finding_from_judgment(
+                "recurring_object", prop.name, prop.scenes_mentioned, judgment, "chekhovs_gun",
+                severity=_severity_for(rules_ctx, "chekhovs_gun"),
+            )
             if finding:
                 findings.append(finding)
         except LlamaServerError as e:
@@ -125,7 +134,8 @@ def run_principles_engine(
                 mention_contexts, total_scenes, language,
             )
             finding = _finding_from_judgment(
-                "dialogue_promise", promise.text, [promise.scene_number], judgment, "setup_payoff_general"
+                "dialogue_promise", promise.text, [promise.scene_number], judgment, "setup_payoff_general",
+                severity=_severity_for(rules_ctx, "setup_payoff_general"),
             )
             if finding:
                 findings.append(finding)

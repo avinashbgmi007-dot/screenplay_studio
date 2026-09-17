@@ -56,7 +56,9 @@ tests/                    pytest suite against tests/mock_unified_server.py (+ n
 ### Add a craft rule to the knowledge base
 
 1. Add a JSON entry in `knowledge_base/rules/<taxonomy_level>.json` following the schema in `knowledge_base/README.md` (id, name, taxonomy_level, category, source, definition, detection_signal, counter_considerations, severity_default, confidence_tier, requires, related_rules).
-2. No code changes needed — `rules_context.py` injects rules by `taxonomy_level`/`category` at prompt time.
+2. **Check the taxonomy level is actually reachable.** `rules_context.py` injects rules by `taxonomy_level`, but only for the levels named in `CATEGORY_TO_TAXONOMY_LEVELS` — so a rule under a level no entry names is loaded and never sent to the model. If you introduce a new level (or a new pass), add it to that map **and** to `PASS_EXTRAS` if it has no category of its own.
+3. **The map's keys are the category names the pipeline asks for, verbatim.** They are looked up by string, so a near-miss fails silently: an earlier `"plot"` key against a `"plot_thread"` lookup returned `[]` and left the Principles Engine and the setup/payoff ledger with zero grounding — no error, just an empty prompt fragment. `tests/test_rules_grounding.py` scans the analyzer source for the grounding calls it makes by literal and fails if any of them renders empty; run it after touching the map.
+4. **Genre-tagged rules are not injected by taxonomy level.** A rule with a non-empty `genre` field is excluded from the generic passes (which run before the script's genre is known) and reaches the model only through the genre pass, via `for_genre()`. Tagging a rule with a genre is therefore a *routing* decision, not decoration — and if you tag one, the genre must exist in `GENRE_CONVENTIONS` (`genre.py`) and in the KB's genre vocabulary.
 
 ### Add a co-writer persona or mode
 

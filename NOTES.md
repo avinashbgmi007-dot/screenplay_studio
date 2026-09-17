@@ -609,3 +609,71 @@ fails; excluding `test_llm_client.py` gives 733 passed / 0 failures. It spins a 
 
 GATE: non-browser suite 733 passed / 0 failures with `test_llm_client` excluded; 738 passed + 1 flake with
 it included.
+
+## T10 - Tier 1 (feedback engine): the flake fixed, and the genre layer
+
+### The flake is fixed (was "flagged, not applied")
+
+Root cause, finally pinned: the test's handler answered the POST WITHOUT reading the request body. The
+client is still writing its JSON when the server replies and closes, so the close can race the in-flight
+write and surface as a `ConnectionError` (a RST) on the client. Timing-dependent - which is exactly why it
+was solo-green and full-suite-red. Fixed by draining `Content-Length` before responding and using a
+`ThreadingTCPServer` (allow_reuse_address, daemon_threads) so one lingering socket cannot stall the accept
+loop. 30/30 solo runs pass. The suite is now 751 passed / 0 failures with `test_llm_client.py` INCLUDED -
+the gate no longer needs an exclusion, which is the real win.
+
+### Genre grounding: a second silent-empty, and the leak it hid behind
+
+Measured before deciding: 90 of 263 rules carry a genre tag, and they sat INSIDE the generic taxonomy
+levels (plot_thread 26, character 22, story_macro 17, structure_pacing 13, scene 10, dialogue 2).
+
+1. `for_genre` was exact-match (`r.genre == genre.strip().lower()`) on a field the coverage grammar emits
+   as an unconstrained string. So "Romantic Comedy", "Sci-Fi Thriller" and "psychological thriller" all
+   returned [] - genre-scoped grounding was silently OFF for every real-world label. Same silent-empty
+   class as `plot_thread`. Now normalises punctuation (Sci-Fi -> scifi) and falls back exact -> alias ->
+   substring -> filename. Mutation-proved: 0 -> 11 / 0 -> 10 / 0 -> 12.
+2. Those 90 rules were also injected into every genre-BLIND pass, so a romance was handed horror's and
+   thriller's principles. The generic passes run BEFORE coverage (genre first known at pipeline.py:701),
+   so they cannot be genre-scoped - they must be genre-neutral. `rules_for_category` / `rules_for_pass`
+   now skip genre-tagged rules by default; `include_genre_rules=True` is the opt-in.
+
+DELIBERATE TRADE-OFF: genre-neutral passes are thinner (theme 23 -> 6 rules, plot_thread 39 -> 13). The
+genre-specific craft is not lost - it arrives through the genre pass, the only pass that knows the genre
+and receives that genre's 11-12 rules (`prompt_fragment_for_genre`, wired in T0.5). Net: the right rules in
+the right pass instead of all eight genres everywhere. To overrule: the ideal is detecting the genre before
+the grounded passes, but `ANALYSIS_STAGES` (app.js:2116) is an ORDERED list driving a weighted progress
+bar, so emitting coverage early makes the bar run backwards.
+
+CONTENT GAP (not fixed): the KB has no rules tagged `fantasy` or `western`, though `genre.py`'s
+GENRE_CONVENTIONS covers both. KB authoring, not wiring.
+
+### CORRECTION #2 - F8 is NOT a bug either (my review overstated it, again)
+
+F8 claimed verification "gates nothing ... not_found findings are retained and shown with the same weight
+as verified ones". The first half is true; the second is false. `DEVELOPMENT.md:39` documents retention as
+deliberate ("Don't drop unverified findings - flag them"), and the flag is surfaced four ways: report
+badges (`report.py:12-15`), a distinct `Evidence (unverified)` label (`report.py:145-151`), a per-card
+`verified / unverified` badge (`app.js:4057-4062`), and an `N of M quotes verified` readout
+(`app.js:5124-5128`). Two of my review's items (A3/T0.9, F8) were overstated in the same way: right about
+the mechanism, wrong about its effect.
+
+### F12 - the doc that caused the original bug
+
+`DEVELOPMENT.md:59` promised "No code changes needed - rules_context.py injects rules by
+taxonomy_level/category at prompt time". That belief is what produced the `plot_thread` silent-empty.
+Rewritten to the real contract: the level must be named in CATEGORY_TO_TAXONOMY_LEVELS; the map's keys are
+the pipeline's LITERAL category names (a near-miss fails silently); genre-tagged rules route only through
+the genre pass; `test_rules_grounding.py` is the guard.
+
+### F5 residual - severity now comes from the rule, not a hardcode
+
+T0.6 put `severity_default` in the PROMPT. But the passes that cite a rule id by hand still hardcoded a
+flat `"medium"`, and the principles judgment grammar carries no severity field (`grammar.py:99`), so that
+hardcode was the only source. The KB curates `high` for martell_plants_and_payoffs, lyons_story_spine,
+no_coincidental_resolution, alderson_cause_and_effect_scenes, cron_external_plot_spur and
+egri_character_incontrovertible. Added `RulesContext.severity_for()` + a stub-tolerant module-level
+`severity_for(ctx, ...)`; `_finding_from_judgment` takes a severity; `dangling_findings` takes an optional
+`rules_ctx`. HONEST: latent, not live - both cited rules are curated `medium` today, so the hardcode
+happened to match. The bug was that the KB was not the source of truth.
+
+GATE: non-browser suite 751 passed / 0 failures / 1 warning (+6 tests; test_rules_grounding.py 24 -> 30).

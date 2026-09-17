@@ -88,6 +88,17 @@ def is_genre_scoped(rule) -> bool:
     """
     return bool((getattr(rule, "genre", "") or "").strip())
 
+
+def severity_for(rules_ctx, rule_id: str, default: str = "medium") -> str:
+    """The curated severity for a rule, tolerating a stub/None context.
+
+    Callers that may be handed a lightweight test double (several tests pass
+    an object exposing only `fragment_for_pass`) use this instead of calling
+    `rules_ctx.severity_for` directly.
+    """
+    fn = getattr(rules_ctx, "severity_for", None)
+    return fn(rule_id, default) if callable(fn) else default
+
 # Labels already reported for exceeding the soft ceiling. This is a notice
 # cache, not behaviour: pytest resets the stdlib warning registry per test, so
 # without it one oversized pass turns into a hundred lines of summary noise.
@@ -202,6 +213,27 @@ class RulesContext:
             return self.kb.get(rule_id).to_prompt_fragment()
         except KeyError:
             return ""
+
+    def severity_for(self, rule_id: str, default: str = "medium") -> str:
+        """The curated severity for a rule, so the same defect is graded the
+        same way whichever pass reports it.
+
+        Deterministic passes used to hardcode a severity while citing a KB rule
+        whose own `severity_default` disagreed — e.g. a "Promise never fulfilled"
+        grounded in `martell_plants_and_payoffs` (curated **high**) was filed as
+        **medium**. The rule is the source of truth; `default` only covers a
+        missing/unknown id (and the no-KB path).
+        """
+        if not rule_id:
+            return default
+        get = getattr(self.kb, "get", None)
+        if not callable(get):
+            return default
+        try:
+            rule = get(rule_id)
+        except KeyError:
+            return default
+        return (getattr(rule, "severity_default", "") or "").strip() or default
 
     def rules_for_genre(self, genre: str) -> list:
         """Get rules specific to a genre from the knowledge base.

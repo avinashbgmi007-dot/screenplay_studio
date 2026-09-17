@@ -349,3 +349,69 @@ def test_generic_path_can_opt_back_into_genre_rules(rc):
     assert len(full) > len(neutral), "include_genre_rules=True changed nothing"
     assert all(not (r.genre or "").strip() for r in neutral)
 
+
+# --------------------------------------------------------------------------
+# Curated severity must reach the FINDING, not just the prompt
+#
+# T0.6 put `severity_default` in the rule fragment so the model is guided. But
+# the deterministic passes that cite a rule id by hand still hardcoded a flat
+# "medium" — so a "Promise never fulfilled" grounded in a rule the KB curates
+# as **high** was filed as medium. The rule is the source of truth.
+# --------------------------------------------------------------------------
+
+def test_severity_for_reads_the_curated_rule(rc):
+    assert rc.severity_for("chekhovs_gun") == "medium"
+    assert rc.severity_for("martell_plants_and_payoffs") == "high"
+    assert rc.severity_for("lyons_story_spine") == "high"
+
+
+def test_severity_for_falls_back_for_an_unknown_id(rc):
+    assert rc.severity_for("no_such_rule") == "medium"
+    assert rc.severity_for("no_such_rule", "low") == "low"
+    assert rc.severity_for("") == "medium"
+
+
+def test_severity_for_tolerates_a_stub_or_missing_context():
+    """Several tests pass an object exposing only `fragment_for_pass`."""
+    from screenplay_analyzer.rules_context import severity_for
+    assert severity_for(None, "martell_plants_and_payoffs") == "medium"
+    assert severity_for(object(), "martell_plants_and_payoffs", "low") == "low"
+
+
+def test_principles_finding_takes_the_cited_rules_severity(rc):
+    from screenplay_analyzer.principles_engine import _finding_from_judgment
+    judgment = {"significant": True, "paid_off": False, "reasoning": "never returns"}
+    high = _finding_from_judgment("recurring_object", "the locket", [2], judgment,
+                                  "martell_plants_and_payoffs",
+                                  severity=rc.severity_for("martell_plants_and_payoffs"))
+    assert high["severity"] == "high", (
+        "a finding citing a rule the KB curates as high is still graded medium"
+    )
+    medium = _finding_from_judgment("recurring_object", "the locket", [2], judgment,
+                                    "chekhovs_gun", severity=rc.severity_for("chekhovs_gun"))
+    assert medium["severity"] == "medium"
+
+
+def test_ledger_finding_takes_the_cited_rules_severity(rc):
+    from screenplay_analyzer.setup_payoff import dangling_findings
+    ledger = [{"status": "dangling", "setup": "the broken watch", "setup_scenes": [3], "note": ""}]
+    assert dangling_findings(ledger, [], rules_ctx=rc)[0]["severity"] == \
+        rc.severity_for("setup_payoff_general")
+    # back-compat: no context still yields a valid severity
+    assert dangling_findings(ledger, [])[0]["severity"] == "medium"
+
+
+def test_the_two_plot_passes_agree_on_a_shared_rule(rc):
+    """The whole point: one rule id, one severity, whichever pass reports it."""
+    from screenplay_analyzer.principles_engine import _finding_from_judgment
+    from screenplay_analyzer.setup_payoff import dangling_findings
+    rule = "setup_payoff_general"
+    judgment = {"significant": True, "paid_off": False, "reasoning": "x"}
+    engine = _finding_from_judgment("dialogue_promise", "a promise", [1], judgment, rule,
+                                    severity=rc.severity_for(rule))
+    ledger = dangling_findings(
+        [{"status": "abandoned", "setup": "a promise", "setup_scenes": [1], "note": ""}],
+        [], rules_ctx=rc)
+    assert engine["severity"] == ledger[0]["severity"] == rc.severity_for(rule)
+
+

@@ -27,6 +27,7 @@ from __future__ import annotations
 from . import prompts
 from .grammar import setup_payoff_ledger_grammar
 from .deterministic_utils import int_list
+from .rules_context import severity_for as _severity_for
 
 # Cap total ledger entries so a long script's overview + a greedy model can't
 # blow the output budget or the grammar's patience.
@@ -108,10 +109,15 @@ def run_setup_payoff_ledger(
     return cleaned[:MAX_LEDGER_ENTRIES], []
 
 
-def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict]) -> list[dict]:
+def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
+                      rules_ctx=None) -> list[dict]:
     """Fold dangling/abandoned ledger entries into findings for the Fix Queue,
     deduped against existing plot_thread findings (e.g. the Principles
-    Engine's 'Promise never fulfilled' for the same candidate)."""
+    Engine's 'Promise never fulfilled' for the same candidate).
+
+    `rules_ctx` is optional: when present, the finding takes the cited rule's
+    curated severity instead of a flat default, so this pass and the
+    Principles Engine grade the same defect the same way."""
     existing_texts = []
     for f in existing_plot_thread:
         issue = (f.get("issue") or "").lower()
@@ -132,7 +138,7 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict]) -> l
             "rule_id": "setup_payoff_general",
             "issue": f'{label}: "{setup}"',
             "why_it_matters": e.get("note") or "Set up on the page, never paid off.",
-            "severity": "medium",
+            "severity": _severity_for(rules_ctx, "setup_payoff_general"),
             "scene_refs": e.get("setup_scenes") or [],
             "evidence_quote": None,
         })
