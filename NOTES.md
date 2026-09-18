@@ -1308,3 +1308,65 @@ SELF-CAUGHT TEST BUGS
 - The span-cap test could not tell "capped" from "uncapped" (the count is 1 either
   way). Rewritten with the genuine quotes first and the invention past the cap.
 
+
+================================================================================
+2026-09-19 — WAVE 2: the demo model says so (§5 item 8, §7 item 10)
+================================================================================
+Items verbatim: "Demo-mode banner on the report itself" + "Demo Sameer honestly
+labeled in the partner card ... not just an amber dot".
+
+WHAT SHIPPED
+- app.js: isDemoModel() + partnerLabel(base) — ONE helper, so the two partner-name
+  call sites (project open, idea-room lens switch) cannot drift.
+- app.js: applyDemoDisclosure() toggles every [data-demo-banner] element. Two
+  surfaces: the dock (a PROJECT's report) and #feedback-panel (the idea room's).
+- index.html: the dock banner sits AFTER .dock-head and BEFORE .dock-lenses — i.e.
+  OUTSIDE #dock-lens-evidence, because renderDockEvidence() replaces that element's
+  contents and would wipe it.
+- style.css: .demo-banner / .dock-demo-banner, coloured with var(--sev-mid), NOT a
+  literal amber (the phase-12 pass tokenized three hardcoded ambers; a test now
+  guards the literal from coming back).
+- webapp_server.py: DEMO_REPORT_BANNER + _report_banner() + _md_to_html(md, banner).
+  The EXPORTED report carries the disclosure, injected right after <body>. This is
+  the case that matters most: an exported HTML report outlives the status strip that
+  would have explained it, so a producer receiving one has no other way to know the
+  findings are canned. _report_banner() is factored out so the DECISION is testable
+  without standing up a project with a complete analyze stage.
+
+THE PLACEMENT BUG — found by looking, not by reasoning
+v1 put the banner only in #feedback-panel, the obvious home ("Dr. Sushruta's
+Report"). A BROWSER check showed it NEVER RENDERED: for a PROJECT, #feedback-panel
+is the legacy/idea-room surface and is display:none — the report renders in the DOCK
+(#context-dock). Every unit test passed while a demo project showed no disclosure at
+all. Two more details fell out of the same check:
+- .feedback-header is a flex row, so a banner inside it becomes a flex item and
+  shoves the toolbar sideways.
+- the dock banner must be outside the rendered lens.
+
+VERIFIED LIVE, BOTH MODES (Playwright)
+  demo (--demo-model)  -> partner card "…— stand-in (connect your model for the real
+                          one)", visible banners: 1
+  real (localhost:8080) -> "Sameer — AI writing partner", visible banners: 0
+  0 JS errors in both.
+
+LIMITATIONS (flagged, not hidden)
+- The disclosure is PER-SURFACE, not per-report provenance. A report generated while
+  a real model was connected, then exported after the server went away, carries no
+  banner — correct (it WAS a real report), but it means the banner describes the
+  studio's current state, not the report's origin. Stamping provenance into
+  report.md at analysis time is the durable fix; not done.
+- The idea-room panel banner is NOT browser-verified (no script in the idea room, so
+  out of scope for this pass). Flagged, not assumed.
+
+TESTS
+tests/test_demo_banner.py (new, 16). Gate: 999 passed / 0 failures (+16 from 983);
+browser smoke 18/18, phase7 15/15, phase6 28/28.
+
+SELF-CAUGHT TEST BUGS
+- Two tests keyed on the string "demo-banner", which also appears in the <style>
+  block — so they passed/failed for the wrong reason. Now keyed on the banner text.
+- Bash note: `export X=… && cmd &` backgrounds the WHOLE chain, so a second server
+  launched afterwards does NOT inherit the export. Set the env inline per command.
+  Also: `nohup … &` from a tool call dies when the call ends — start the server and
+  probe it in the SAME call, then kill it.
+

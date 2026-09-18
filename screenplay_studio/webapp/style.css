@@ -2331,6 +2331,27 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 
 /* ---- feedback room ---- */
 
+/* Demo-model disclosure (§5 item 8). Coloured with --sev-mid rather than a
+   literal amber: the phase-12 colour-discipline fix tokenized three hardcoded
+   ambers, and this token resolves differently per theme by design. */
+.demo-banner {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--sev-mid);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  padding: var(--sp-5) var(--sp-6);
+  margin: 0 var(--sp-8) var(--sp-5);
+}
+.demo-banner[hidden] { display: none; }
+/* Inside the dock the banner sits between the head and the lens tabs, so it needs
+   tighter insets than the panel version and must not be squeezed by the dock's
+   column flex. */
+.dock-demo-banner { margin: var(--sp-4) var(--sp-5); flex: 0 0 auto; }
+
 .feedback-header {
   display: flex;
   align-items: center;

@@ -264,6 +264,16 @@
               <span class="dock-title">Context</span>
               <button class="dock-close" id="dock-close" type="button" title="Close the dock — the page keeps the room">✕</button>
             </div>
+            <!-- The demo disclosure for a PROJECT lives here, not in
+                 #feedback-panel: that panel is the legacy/idea-room surface and
+                 is display:none for a project, where the report renders in this
+                 dock. Static (outside .dock-body) so renderDockEvidence(), which
+                 replaces the lens contents, cannot wipe it. -->
+            <div class="demo-banner dock-demo-banner" data-demo-banner hidden>
+              <b>Built-in stand-in model.</b> These findings and the co-writer both
+              come from the demo craft model, not a real language model. Connect your
+              own llama-server for a real review.
+            </div>
             <div class="dock-lenses" role="tablist" aria-label="Dock lenses">
               <button class="dock-lens-tab" id="dock-tab-evidence" role="tab" aria-selected="true" aria-controls="dock-lens-evidence" type="button">Evidence</button>
               <button class="dock-lens-tab" id="dock-tab-sameer" role="tab" aria-selected="false" aria-controls="dock-lens-sameer" type="button">Sameer</button>
@@ -421,6 +431,13 @@
 
       <!-- Feedback room: the consultant's desk -->
       <section id="feedback-panel" class="room-panel" role="tabpanel" aria-labelledby="room-feedback-btn" style="display:none;">
+        <!-- Sits OUTSIDE .feedback-header: that is a flex row, and a banner
+             inside it would become a flex item and shove the toolbar sideways. -->
+        <div class="demo-banner" data-demo-banner hidden>
+          <b>Built-in stand-in model.</b> This report comes from the demo craft
+          model, not a real language model — the findings are canned, not a reading
+          of your pages. Connect your own llama-server and run the analysis again.
+        </div>
         <div class="feedback-header">
           <div>
             <div class="feedback-title">Dr. Sushruta's Report</div>

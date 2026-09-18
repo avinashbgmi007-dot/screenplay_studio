@@ -328,6 +328,7 @@ async function loadConfig() {
     console.warn("Could not load config:", e);
   }
   updateStatusStrip();
+  applyDemoDisclosure();
   checkConnection();
 }
 
@@ -342,6 +343,7 @@ async function saveConfig() {
       body: JSON.stringify({ server_url, timeout, fast_model, turn_timeout }),
     });
     closeModal("#settings-modal");
+    applyDemoDisclosure();
     checkConnection();
   } catch (e) {
     showError("Couldn't save settings: " + e.message);
@@ -450,6 +452,31 @@ async function checkConnection() {
   }
   updateStatusStrip();
   renderConnCard();
+}
+
+// Demo mode means the "report" and the "co-writer" are a rule-based stand-in, not
+// a model. The amber dot in the status strip is a status, not a label — the
+// surfaces a writer actually reads have to say it themselves (§5 item 8,
+// §7 item 10). One helper, so the two partner-name call sites cannot drift.
+function isDemoModel() {
+  return !!(state.config && state.config.demo_model);
+}
+
+function partnerLabel(base) {
+  return isDemoModel()
+    ? `${base} — stand-in (connect your model for the real one)`
+    : base;
+}
+
+// The report's own disclosure. One attribute, several surfaces: the report lives
+// in the dock for a project and in the Feedback panel for the idea room, and a
+// demo studio is a stand-in for the findings AND the co-writer either way. Toggling
+// them all from one place is what stops one surface drifting out of date.
+function applyDemoDisclosure() {
+  const demo = isDemoModel();
+  document.querySelectorAll("[data-demo-banner]").forEach((el) => {
+    el.hidden = !demo;
+  });
 }
 
 function updateStatusStrip() {
@@ -1413,11 +1440,11 @@ function setIdeaLens(room) {
   const partnerName = $(".partner-name");
   const input = $("#input");
   if (room === "feedback") {
-    partnerName.textContent = "Premise Doctor — Development Exec";
+    partnerName.textContent = partnerLabel("Premise Doctor — Development Exec");
     input.placeholder = "Ask the premise doctor to test the idea…";
     document.body.dataset.room = "feedback";
   } else {
-    partnerName.textContent = "Sameer — AI writing partner";
+    partnerName.textContent = partnerLabel("Sameer — AI writing partner");
     input.placeholder = "Talk it through with Sameer…";
     document.body.dataset.room = "cowrite";
   }
@@ -1922,7 +1949,7 @@ async function openProject(name) {
     $("#idea-canvas").style.display = "none";
     $("#desk-toolbar").style.display = "flex"; // Phase 13: the desk's row owns the tools now
     const mc = getManuscriptContainer(); if (mc) mc.style.display = "";
-    $(".partner-name").textContent = "Sameer — AI writing partner";
+    $(".partner-name").textContent = partnerLabel("Sameer — AI writing partner");
     $("#input").placeholder = "Ask about a scene, a character, a note in the margins…";
     const project = await api(`/projects/${encodeURIComponent(name)}`);
     renderProjectList();

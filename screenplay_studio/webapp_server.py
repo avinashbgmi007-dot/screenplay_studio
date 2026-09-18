@@ -1733,10 +1733,36 @@ def send_idea_message_stream(idea_id, sid):
 # ---------- shareable report export ----------
 
 
-def _md_to_html(md: str) -> str:
+DEMO_REPORT_BANNER = (
+    '<div class="demo-banner"><b>Built-in stand-in model.</b> This report was '
+    'produced by the demo craft model, not a real language model — the findings '
+    'are canned, not a reading of your pages. Connect your own llama-server and '
+    'run the analysis again for a real review.</div>'
+)
+
+
+def _report_banner() -> str:
+    """The disclosure an exported report carries when the analysis came from the
+    demo model. Empty otherwise — a report from a real model says nothing extra,
+    and a permanent banner would train the writer to ignore it.
+
+    Factored out of the route so the DECISION is testable without standing up a
+    project whose analyze stage is complete.
+    """
+    return DEMO_REPORT_BANNER if _DEMO_MODEL_ACTIVE else ""
+
+
+def _md_to_html(md: str, banner: str = "") -> str:
     """Tiny, dependency-free markdown -> HTML renderer for the report. Handles
     the subset report.py emits: #/##/### headings, **bold**, *italic*, tables,
-    - bullets, hr, and paragraphs."""
+    - bullets, hr, and paragraphs.
+
+    `banner` is injected immediately after <body>. It exists so a demo-model
+    report can disclose that on the artifact ITSELF: the export is the thing that
+    leaves the app, and the amber dot in the status strip does not travel with
+    it. An exported report that reads as a real review when it isn't is exactly
+    the kind of pretending this product's UI law forbids.
+    """
 
     from html import escape
 
@@ -1825,9 +1851,12 @@ def _md_to_html(md: str) -> str:
   table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
   th, td {{ border: 1px solid #bbb; padding: 5px 9px; font-size: 13.5px; text-align: left; }}
   th {{ background: #f0ece2; }}
-  @media print {{ body {{ margin: 0; }} }}
+  .demo-banner {{ border: 1px solid #b8860b; background: #fdf6e3; padding: 10px 14px;
+    margin: 0 0 22px; font-family: -apple-system, Segoe UI, sans-serif; font-size: 13.5px;
+    line-height: 1.5; }}
+  @media print {{ body {{ margin: 0; }} .demo-banner {{ break-inside: avoid; }} }}
 </style></head>
-<body>{body}</body></html>"""
+<body>{banner}{body}</body></html>"""
 
 
 @app.route("/api/projects/<name>/report/export", methods=["GET"])
@@ -1842,7 +1871,7 @@ def export_report(name):
         return _error("Analysis hasn't completed for this project yet.", 400)
     with open(m.report_md_path, "r", encoding="utf-8") as f:
         md = f.read()
-    html = _md_to_html(md)
+    html = _md_to_html(md, _report_banner())
     safe_title = "".join(c if c.isalnum() or c in "-_ " else "_" for c in (m.title or "script"))
     return send_file(
         io.BytesIO(html.encode("utf-8")),

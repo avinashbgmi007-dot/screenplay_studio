@@ -505,3 +505,90 @@ A false flag tells the writer their co-writer is lying when it isn't. So:
 
 
 
+---
+
+# WAVE 2 — the demo model says so (§5 item 8, §7 item 10)
+
+Items verbatim: *"Demo-mode banner on the report itself"* (§5.8) and *"Demo Sameer
+honestly labeled in the partner card ("Sameer's stand-in — connect your model for
+the real one"), not just an amber dot"* (§7.10).
+
+When no llama-server is reachable the studio falls back to a rule-based craft
+model. That is an honest workflow demo — but the only thing that said so was an
+amber dot and a hover card on the desk, while the report read like a professional
+review and the partner card said "Sameer — AI writing partner". The product's own
+law is that the UI never pretends.
+
+## What shipped
+
+- **The partner card** now reads *"Sameer — AI writing partner — stand-in (connect
+  your model for the real one)"*, through a single `partnerLabel()` helper so the
+  two call sites (project open, idea-room lens switch) cannot drift.
+- **The report carries a banner** — in the dock for a project, in the Feedback panel
+  for the idea room, toggled from one `[data-demo-banner]` selector.
+- **The exported report carries it too.** `_md_to_html(md, banner)` injects it
+  directly after `<body>`, and `export_report` passes it only when the demo model is
+  active. This is the case that matters most: an exported HTML report outlives the
+  status strip that would otherwise have explained it, so a producer receiving one
+  has no other way to know the findings are canned.
+
+## The placement bug, caught by looking rather than by reasoning
+
+The first version put the banner only in `#feedback-panel` — the obvious home, since
+that is literally the "Dr. Sushruta's Report" panel. **A browser check showed it
+never rendered.** For a *project*, `#feedback-panel` is the legacy/idea-room surface
+and is `display:none`; the report renders in the **dock** (`#context-dock`). A demo
+project therefore showed no disclosure at all, and every unit test passed while it
+did.
+
+Two further details came out of the same check:
+
+- The dock's banner must sit **outside** `#dock-lens-evidence`, because
+  `renderDockEvidence()` replaces that element's contents and would wipe it.
+- `.feedback-header` is a flex row, so a banner placed inside it becomes a flex item
+  and shoves the toolbar sideways.
+
+The banner is styled with `var(--sev-mid)`, **not** a literal amber: the phase-12
+pass tokenized three hardcoded ambers, including a dawn rule that had hardcoded the
+night amber and so overrode its own token. A test now asserts the literal does not
+come back.
+
+## Verified in a browser, in both modes
+
+| mode | partner card | visible banners |
+|---|---|---|
+| demo (`--demo-model`) | `…— stand-in (connect your model for the real one)` | **1** |
+| real (`localhost:8080`) | `Sameer — AI writing partner` | **0** |
+
+0 JS errors in both. The unit tests could not have established this — they assert
+the wiring, and the wiring was right while the placement was wrong.
+
+## Honest limitations
+
+- The disclosure is **per-surface, not per-report**. A report generated while a real
+  model was connected, then exported after the server went away, carries no banner —
+  which is correct (it *was* a real report) but means the banner describes the
+  studio's current state, not the report's provenance. Stamping provenance into
+  `report.md` at analysis time would be the durable fix; not done here.
+- The two banners say slightly different things (the dock's also covers the
+  co-writer). Deliberate: the dock banner appears on every lens.
+- The idea-room panel banner is unverified in a browser — the idea room has no
+  script, so it was out of scope for this pass. Flagged, not silently assumed.
+
+## Verification
+
+- `tests/test_demo_banner.py` (new, 16): the banner decision (absent for a real
+  model, present for demo); its position above the findings; that it names the
+  remedy, not just the problem; that the export styles it; that an empty banner
+  leaves the document byte-identical; the colour discipline; and the wiring for both
+  in-app surfaces (one `partnerLabel` helper, one `[data-demo-banner]` toggle, the
+  dock banner present and outside the rendered lens).
+- Two of my own tests were wrong at first and were caught by running them: they
+  keyed on the string `"demo-banner"`, which also appears in the `<style>` block, so
+  they passed and failed for the wrong reason. They now key on the banner's own
+  text.
+- Suite: **999 passed / 0 failures / 0 errors** (was 983; +16). Browser gates
+  unchanged: smoke 18/18, phase7 15/15, phase6 28/28.
+
+
+
