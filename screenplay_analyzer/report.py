@@ -5,8 +5,32 @@ specific findings without re-parsing markdown) from an AnalysisResult.
 """
 
 import json
+import os
+import tempfile
 
 from .pipeline import AnalysisResult
+
+
+def _atomic_write_text(path: str, text: str) -> None:
+    """Write `text` to `path` via a temp file + os.replace, so a crash or kill
+    mid-write leaves the PREVIOUS file intact instead of a torn or empty one
+    (M5b). The report is the product's core artifact; `open(path, "w")` is
+    truncate-then-write, which is exactly the window that loses it.
+
+    Local to Piece 2 on purpose: the packages stay standalone (no import of
+    screenplay_studio.jsonio, whose helper this mirrors)."""
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp-report-", suffix=".part")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 VERIFICATION_BADGE = {
     "verified": "",
@@ -335,7 +359,9 @@ def to_findings_json(result: AnalysisResult) -> dict:
 
 
 def save_report(result: AnalysisResult, md_path: str, json_path: str) -> None:
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(render_markdown(result))
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(to_findings_json(result), f, indent=2, ensure_ascii=False)
+    # Both writes go through a temp file + os.replace (M5b): a failure partway
+    # through must never leave a truncated report.md or an unparseable
+    # report.findings.json behind — the previous good report survives instead.
+    _atomic_write_text(md_path, render_markdown(result))
+    _atomic_write_text(json_path, json.dumps(to_findings_json(result), indent=2,
+                                            ensure_ascii=False))

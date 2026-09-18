@@ -277,5 +277,26 @@ The 4 failures are **phase-12 visual/motion discipline** — pre-existing (ident
 
 
 *Verification artifacts: the one-shot live probes lived in `_qa_bugrepro/` and `tests/_*.py` (untracked scratch, not part of the repo). Their durable equivalents are the committed regression tests — `test_h7_chat_fix.py`, `test_capability_token.py`, `test_session_lost_update.py`, `test_dismiss_index.py`, `test_nonascii_titles.py` — plus `tests/e2e_browser_token_mode.py` and `tests/_run_e2e_sweep.py` (the sweep runner).*
+---
+
+# WAVE 2 — M5 (data safety) SHIPPED
+
+The one path that could destroy a writer's data. Two halves, both TDD.
+
+**M5a — force-reanalyze destroyed the previous good report.**
+`_analyze_locked` reset the stage *and* deleted `report.findings.json` / `report.md` / `progress.json` **before** running. If the run then failed (dead llama-server → 502) the writer's analysis was already gone. The deletions were never needed: the orchestrator short-circuits on `stage.status == "complete"` (`orchestrator.py:62-73`), which resetting the stage already defeats.
+- Fix: keep the stage reset and the `progress.json` clear (a transient heartbeat, regenerated within seconds); **stop deleting the report files**. A successful run overwrites them via `save_report()`; a failed one leaves the last good report intact.
+- Test: `test_webapp_api.py::test_failed_force_rerun_preserves_the_previous_report` — RED (`the good report was destroyed by a failed re-run`) → GREEN. The pre-existing `test_force_rerun_actually_reruns` still passes, so the re-run genuinely still happens.
+- Note: `reparse` was already correct (it parses first and only invalidates artifacts on success) — no change needed there.
+
+**M5b — `save_report` wrote non-atomically.**
+Plain `open(path, "w")` is truncate-then-write: a crash/kill in that window left an empty `report.md` or an unparseable `report.findings.json` (the product's core artifact), and the report route then 500s.
+- Fix: a local `_atomic_write_text()` in `screenplay_analyzer/report.py` (temp file + `os.replace`, temp cleaned on any failure). Deliberately **not** imported from `screenplay_studio.jsonio` — Piece 2 stays standalone, per the composability contract.
+- Tests: `test_report_atomicity.py` (4). **Mutation-proved**: reverting to the old non-atomic body fails 3 of the 4, so the tests genuinely discriminate rather than merely passing.
+
+**Verified:** unit suite green; the `force` path still re-runs (sibling test), and during a run `get_report` still 400s on the non-complete stage — so a surviving report is never served as if fresh.
+
+**Not changed (deliberate):** whether the UI should *surface* the surviving report after a failed re-run. The stage is left `pending` (honest: the re-run did not complete), so the report file is recoverable but not displayed. That is a design question, not a data-safety one — flagged, not decided unilaterally.
+
 
 

@@ -140,6 +140,35 @@ class TestProjectLifecycle:
         m = ProjectManifest.load(webapp_server._project_dir(project))
         assert os.path.exists(m.progress_path)
 
+    def test_failed_force_rerun_preserves_the_previous_report(self, http_client, monkeypatch):
+        """M5: a force-reanalyze used to delete the report files UP FRONT, so a
+        run that then failed (dead llama-server) destroyed the writer's previous
+        good analysis. The deletions were never needed — the orchestrator
+        short-circuits on the stage STATUS, which the route already resets."""
+        import json
+
+        from screenplay_studio import orchestrator as orch_mod
+
+        project = _upload(http_client).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        report_path = os.path.join(webapp_server._project_dir(project), "report.findings.json")
+        md_path = os.path.join(webapp_server._project_dir(project), "report.md")
+        first = json.load(open(report_path, encoding="utf-8"))
+        assert os.path.exists(md_path)
+
+        # the re-run dies, exactly like an unreachable model server
+        def boom(self, **kw):
+            raise orch_mod.OrchestratorError("Could not connect to llama-server.")
+
+        monkeypatch.setattr(orch_mod.Orchestrator, "run_analyze", boom)
+        resp = http_client.post(f"/api/projects/{project}/analyze", json={"force": True})
+        assert resp.status_code == 502
+
+        # the previous good report survived, byte for byte
+        assert os.path.exists(report_path), "the good report was destroyed by a failed re-run"
+        assert os.path.exists(md_path), "the good markdown report was destroyed by a failed re-run"
+        assert json.load(open(report_path, encoding="utf-8")) == first
+
     def test_reparse_resets_analysis_and_regenerates_parse(self, http_client):
         upload_resp = _upload(http_client)
         project = upload_resp.get_json()["project"]

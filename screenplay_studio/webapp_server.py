@@ -629,11 +629,17 @@ def _analyze_locked(m):
     body = request.get_json(silent=True) or {}
     if body.get("force"):
         from .manifest import StageStatus
+        # Resetting the stage to pending is what forces the re-run: the
+        # orchestrator short-circuits on `stage.status == "complete"`, not on the
+        # report files existing. The report files used to be deleted here too,
+        # which meant a re-run that then FAILED (dead llama-server) destroyed the
+        # writer's previous good analysis — M5, the one path that could lose
+        # real data. They are left in place: a successful run overwrites them via
+        # save_report(), and a failed one leaves the last good report readable.
         m.stages["analyze"] = StageStatus()
-        if os.path.exists(m.report_findings_path):
-            os.remove(m.report_findings_path)
-        if os.path.exists(m.report_md_path):
-            os.remove(m.report_md_path)
+        # progress.json is a transient heartbeat, not the writer's data — clear
+        # it so the poller can't report the previous run's final state while this
+        # one is starting.
         if os.path.exists(m.progress_path):
             os.remove(m.progress_path)
         m.save()
