@@ -51,17 +51,43 @@ class SessionStore:
         return retry_permission(lambda: Session.load(path))
 
     def save(self, session: Session) -> None:
-        # Serialize writes per session file: concurrent turns on the same
-        # conversation (e.g. a retry racing a slow first attempt) must not
-        # clobber each other's messages. The write also lands atomically
-        # (temp file + os.replace) so a concurrent reader never sees a torn,
-        # half-written JSON file.
+        # Serialize writes per session file AND merge across concurrent turns.
+        # The lock alone only serializes the writes; the load that produced
+        # `session` happened OUTSIDE it, so a stale in-memory snapshot would
+        # overwrite (lose) messages a faster turn already saved (H4). Inside the
+        # lock, re-read the on-disk session and union any branch messages this
+        # in-memory snapshot is missing, keyed by content, so no persisted turn
+        # is silently dropped. The write also lands atomically (temp file +
+        # os.replace) so a concurrent reader never sees a torn JSON file.
         path = self._path(session.session_id)
         with _lock_for(path):
+            if os.path.exists(path):
+                try:
+                    disk = Session.load(path)
+                    self._merge_missing_messages(disk, session)
+                except Exception:
+                    pass  # a corrupt/unreadable base must not block the save
             tmp = path + ".tmp"
             session.save(tmp)
             from screenplay_studio.jsonio import retry_permission
             retry_permission(lambda: os.replace(tmp, path))
+
+    @staticmethod
+    def _merge_missing_messages(disk: Session, session: Session) -> None:
+        """Append onto `session` any branch messages present on `disk` (the
+        already-saved state) that this in-memory snapshot lacks. Keyed on
+        (branch, role, content) so the two halves of one turn never collide and
+        a repeated phrase on a different turn is still its own message."""
+        for bname, dbranch in disk.branches.items():
+            sbranch = session.branches.get(bname)
+            if sbranch is None:
+                session.branches[bname] = dbranch  # whole branch is new to us
+                continue
+            have = {(m.role, m.content) for m in sbranch.messages}
+            for m in dbranch.messages:
+                if (m.role, m.content) not in have:
+                    sbranch.messages.append(m)
+                    have.add((m.role, m.content))
 
     def list(self) -> list[dict]:
         """Lightweight listing (id, title, branch count, last updated) without full deserialization cost."""

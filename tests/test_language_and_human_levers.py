@@ -80,7 +80,8 @@ def test_mirror_instruction_content_and_english_absent():
 def test_post_history_reminder_is_final_message():
     client, _ = _engine_and_turn("What about scene 3?")
     last = client.messages[-1]
-    assert last["role"] == "system"
+    # H7a: final message is a USER note carrying the voice check (not system).
+    assert last["role"] == "user"
     assert "Voice check" in last["content"]
     # the writer's turn sits immediately before it
     assert client.messages[-2]["role"] == "user"
@@ -97,8 +98,10 @@ def test_first_line_anchor_only_on_empty_history():
 
 def test_trait_reminder_injected_at_depth():
     client, _ = _engine_and_turn("and now?", history=8)
-    system_contents = [m["content"] for m in client.messages if m["role"] == "system"]
-    assert any("stay in voice" in c for c in system_contents)
+    # H7a: the trait reminder now rides as a USER note (single-system contract),
+    # so scan all messages, not just system ones.
+    contents = [m["content"] for m in client.messages]
+    assert any("stay in voice" in c for c in contents)
     # positioned inside the history, not at the very end
     assert client.messages[-1]["content"].startswith("[Voice check")
 

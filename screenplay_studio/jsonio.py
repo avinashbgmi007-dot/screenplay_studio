@@ -77,3 +77,23 @@ def check_safe_id(value: str, kind: str = "id") -> str:
     if not value or not SAFE_ID_RE.match(value):
         raise ValueError(f"invalid {kind}: {value!r}")
     return value
+
+
+def safe_dir_name(title: str, max_len: int = 64) -> str:
+    """Fold a human-readable title into a filesystem-safe ASCII directory name,
+    keeping the display title (in the manifest) untouched. H2: `str.isalnum` is
+    Unicode-aware so a Telugu/Hindi title survived the per-char sanitizer into
+    check_safe_id, which is ASCII-only and 400'd it. Here we NFKD-strip diacritics
+    and keep only ASCII alnum/-/_; if nothing ASCII survives (pure Telugu/Hindi),
+    fall back to a short stable hash so the dir is still safe and unique-ish.
+    """
+    import unicodedata
+    nfkd = unicodedata.normalize("NFKD", title or "")
+    ascii_only = nfkd.encode("ascii", "ignore").decode("ascii")
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in ascii_only)
+    safe = safe.strip("_")
+    if not safe:
+        import hashlib
+        safe = hashlib.sha1((title or "untitled").encode("utf-8")).hexdigest()[:8]
+    # suffix auto-increment handles collisions for identical titles
+    return safe[:max_len]

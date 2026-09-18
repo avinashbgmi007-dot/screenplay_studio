@@ -398,11 +398,13 @@ def _conversational_reply(messages: list) -> str:
     Dr. Sushruta verdict-first and cold. Both ground ONLY in what's actually
     injected into context (scene map, mood facts, case file) — never invented."""
     system = "\n".join(m["content"] for m in messages if m["role"] == "system")
-    # the writer's turn -- NOT the post-history voice reminder that now rides
-    # after the history as the final system message
+    # The writer's turn is the last REAL user message — skip the trailing
+    # bracketed voice-check note ("[Voice check ...]") that H7a now appends as
+    # a final user-role message (it used to be a system message). Without this,
+    # the demo grounds on the reminder instead of the writer's words.
     user = ""
     for _m in reversed(messages):
-        if _m.get("role") == "user":
+        if _m.get("role") == "user" and not _m.get("content", "").lstrip().startswith("[Voice check"):
             user = _m["content"]
             break
     if not user:

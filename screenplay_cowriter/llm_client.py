@@ -67,6 +67,10 @@ class LlamaServerClient(BaseLlamaClient):
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
+            # Reasoning models (e.g. qwen3.6) burn the whole token budget on a
+            # thinking preamble and return content="" (finish_reason="length").
+            # Disable thinking the same way the analyzer does (H7b).
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         if repeat_penalty is not None:
             payload["repeat_penalty"] = repeat_penalty
@@ -103,7 +107,12 @@ class LlamaServerClient(BaseLlamaClient):
                 raise LlamaServerError(f"llama-server at {self.base_url} returned a non-JSON response: {e}") from e
 
         try:
-            return data["choices"][0]["message"]["content"]
+            msg = data["choices"][0]["message"]
+            content = msg.get("content")
+            if not content:
+                # Reasoning model: the reply landed in reasoning_content instead.
+                content = msg.get("reasoning_content") or ""
+            return content
         except (KeyError, IndexError) as e:
             raise LlamaServerError(f"Unexpected response shape from llama-server: {data}") from e
 
@@ -122,6 +131,8 @@ class LlamaServerClient(BaseLlamaClient):
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
+            # See chat(): disable reasoning-model thinking so content isn't empty.
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         if repeat_penalty is not None:
             payload["repeat_penalty"] = repeat_penalty
@@ -161,6 +172,9 @@ class LlamaServerClient(BaseLlamaClient):
                 choices = obj.get("choices") or [{}]
                 delta = choices[0].get("delta") or {}
                 piece = delta.get("content")
+                if not piece:
+                    # Reasoning model streaming: text arrives under reasoning_content.
+                    piece = delta.get("reasoning_content")
                 if piece:
                     parts.append(piece)
                     on_token(piece)

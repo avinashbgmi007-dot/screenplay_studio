@@ -28,7 +28,7 @@ from functools import lru_cache
 
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 
-from .jsonio import check_safe_id
+from .jsonio import check_safe_id, safe_dir_name
 
 from .ideas import IdeaStore
 from .manifest import ProjectManifest
@@ -51,18 +51,32 @@ app = Flask(__name__, static_folder=None)
 # ---------------------------------------------------------------------------
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
+# H1: capability token. OFF by default (None) so the local single-user default —
+# the SPA, the E2E harness, the CLI, curl — keeps working unchanged. Enabled by
+# main() only when the operator passes --require-token (hardened mode). When set,
+# it is handed to the SPA as a SameSite=Strict cookie on `/` and must be echoed
+# back as X-Studio-Token on every mutating request — a foreign page can neither
+# read the cookie nor set a custom header without triggering CORS, which closes
+# the no-Origin blind-write hole the Origin check alone leaves open.
+_API_TOKEN = None
+
 
 @app.before_request
 def _reject_cross_origin_writes():
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
+    # Defense-in-depth: a foreign Origin is always rejected, token or not.
     origin = request.headers.get("Origin")
-    if not origin:
-        return None
-    from urllib.parse import urlparse
-    if urlparse(origin).hostname in _LOOPBACK_HOSTS:
-        return None
-    return jsonify({"error": "cross-origin request rejected"}), 403
+    if origin:
+        from urllib.parse import urlparse
+        if urlparse(origin).hostname not in _LOOPBACK_HOSTS:
+            return jsonify({"error": "cross-origin request rejected"}), 403
+    if _API_TOKEN:
+        # Token configured: require it, using the constant-time compare.
+        import hmac
+        if not hmac.compare_digest(request.headers.get("X-Studio-Token", ""), _API_TOKEN):
+            return jsonify({"error": "missing or invalid capability token"}), 403
+    return None
 
 # Set by main() at startup — kept module-level for simplicity, matching
 # the same pattern already used in screenplay_cowriter/server.py.
@@ -151,6 +165,10 @@ def _too_large(e):
 def index():
     resp = send_from_directory(WEBAPP_DIR, "index.html")
     resp.headers["Cache-Control"] = "no-cache"
+    if _API_TOKEN:
+        # SameSite=Strict so a foreign page's request never carries it; the SPA
+        # reads it and echoes it back as the X-Studio-Token header.
+        resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
     return resp
 
 
@@ -459,7 +477,7 @@ def create_sample_project():
     Deduplicates by title — reopening the sample keeps one shelf entry."""
     from .sample import SAMPLE_TITLE, SAMPLE_SCRIPT
 
-    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in SAMPLE_TITLE) or "project"
+    safe_name = safe_dir_name(SAMPLE_TITLE)  # H2: ASCII fold (sample title is ASCII-safe)
     project_dir = _project_dir(safe_name)
     if os.path.exists(project_dir):
         try:
@@ -496,7 +514,10 @@ def create_project():
         return _error("Empty filename.")
 
     title = request.form.get("title") or os.path.splitext(upload.filename)[0]
-    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in title) or "project"
+    # H2: fold to ASCII for the directory name; Unicode `isalnum` would pass
+    # Telugu/Hindi through and then fail check_safe_id's ASCII-only regex.
+    # safe_dir_name keeps the display `title` in the manifest untouched.
+    safe_name = safe_dir_name(title)
 
     project_dir = _project_dir(safe_name)
     suffix = 1
@@ -1370,9 +1391,24 @@ def dismiss_finding_route(name, index):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    # M4: validate the index against the current report so a stale/out-of-range
+    # index can't be silently stored as a bogus dismissal.
+    import json as _json
+    import os as _os
+    findings = None
+    if m.stage("analyze").status == "complete" and _os.path.exists(m.report_findings_path):
+        try:
+            with open(m.report_findings_path, encoding="utf-8") as f:
+                findings = _json.load(f).get("findings") or []
+        except Exception:
+            findings = []
+    if findings is None:
+        return _error("No analysis report to dismiss from.", 400)
+    if index < 0 or index >= len(findings):
+        return _error(f"Finding index {index} is out of range (0–{len(findings)-1}).", 400)
     body = request.get_json(silent=True) or {}
     from .revision import dismiss_finding
-    dismiss_finding(m, index, body.get("issue") or "", body.get("finding_id"))
+    dismiss_finding(m, index, body.get("issue") or findings[index].get("issue") or "", body.get("finding_id"))
     return jsonify({"ok": True, "index": index})
 
 
@@ -2970,8 +3006,11 @@ def graduate_idea(idea_id):
 
 
 def main():
-    global PROJECTS_DIR, CONFIG
+    global PROJECTS_DIR, CONFIG, _API_TOKEN
     parser = argparse.ArgumentParser()
+    parser.add_argument("--require-token", action="store_true",
+                        help="Hardened mode: require a per-process capability token "
+                             "(X-Studio-Token) on all mutating requests.")
     parser.add_argument("--port", type=int, default=8500)
     parser.add_argument("--projects-dir", default="./studio_projects")
     parser.add_argument("--server", default="http://localhost:8080", help="Default llama-server URL")
@@ -2981,6 +3020,10 @@ def main():
                              "works live without a GGUF. Testing only; the default flow "
                              "(your llama-server on :8080) is untouched.")
     args = parser.parse_args()
+
+    if args.require_token and _API_TOKEN is None:
+        import secrets
+        _API_TOKEN = secrets.token_urlsafe(24)  # H1: per-process capability token
 
     PROJECTS_DIR = args.projects_dir
     os.makedirs(PROJECTS_DIR, exist_ok=True)

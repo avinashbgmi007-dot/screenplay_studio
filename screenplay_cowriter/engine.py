@@ -180,30 +180,44 @@ class CoWriterEngine:
         system -> scene/quote context -> few-shot examples (budget-permitting)
         -> [history with trait reminder at fixed depth] -> user turn ->
         post-history voice reminder (last word before generation carries the
-        most weight -- the SillyTavern post-history lever)."""
+        most weight -- the SillyTavern post-history lever).
+
+        SINGLE-SYSTEM CONTRACT (H7a): some llama-server builds return HTTP 500
+        on any payload carrying two or more `system` messages, and this build is
+        one of them (verified live). The analyzer works because it sends exactly
+        one system + one user. So the co-writer sends at most ONE system message:
+        the persona system prompt. The scene block, quote context, and few-shot
+        examples are folded INTO that system text; the mid-history trait reminder
+        and the post-history voice reminder ride as USER-role bracketed notes
+        (same position, same weight, no extra system role)."""
         from .personas import (post_history_reminder, trait_reminder,
                                persona_examples, FIRST_LINE_ANCHOR)
-        messages = [{"role": "system", "content": system_prompt}]
+        # Fold every context block into the single system prompt's text.
+        system_text = system_prompt
         if scene_block:
-            messages.append({"role": "system", "content": scene_block})
+            system_text += "\n\n" + scene_block
         if quote_context:
-            messages.append({"role": "system", "content": quote_context})
-        total = sum(len(m["content"]) for m in messages)
+            system_text += "\n\n" + quote_context
+        total = len(system_text)
         examples = persona_examples(persona)
         if examples and total + len(examples) <= self.FEWSHOT_CHAR_BUDGET:
-            messages.append({"role": "system", "content": examples})
+            system_text += "\n\n" + examples
             total += len(examples)
+        messages = [{"role": "system", "content": system_text}]
         hist = list(history)[-self.history_window:]
         msgs = [{"role": m.role, "content": m.content} for m in hist]
         if len(msgs) >= self.TRAIT_DEPTH:
+            # user-role so we never add a second system message
             msgs.insert(-self.TRAIT_DEPTH + 1,
-                        {"role": "system", "content": trait_reminder(persona)})
+                        {"role": "user", "content": trait_reminder(persona)})
         messages.extend(msgs)
         messages.append({"role": "user", "content": prompt_user})
         anchor = ""
         if not hist:
             anchor = "\n\n" + FIRST_LINE_ANCHOR
-        messages.append({"role": "system",
+        # post-history voice reminder: last word before generation, as a user
+        # note (was a second system message — the H7a 500 trigger).
+        messages.append({"role": "user",
                          "content": post_history_reminder(persona) + anchor})
         return messages
 

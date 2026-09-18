@@ -24,6 +24,16 @@ import tempfile
 import time
 import urllib.request
 
+# Windows consoles default to cp1252, so any check detail carrying a non-Latin-1
+# glyph (✕ ≤ ≥ — the suites' own wording) crashes the PRINT, not the check:
+# phase8/9/11 passed every assertion and still exited 1 on a UnicodeEncodeError.
+# Make stdout/stderr UTF-8 once, here, for every suite that imports this module.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # non-reconfigurable stream (pytest capture)
+        pass
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -77,6 +87,17 @@ class Studio:
         self.projects_dir = projects_dir
         self.log_path = log_path
         self._log_file = None
+        self.token = None  # H1: capability token read from /'s Set-Cookie
+
+    def _fetch_token(self):
+        try:
+            with urllib.request.urlopen(self.base_url + "/", timeout=15) as r:
+                sc = r.headers.get("Set-Cookie", "")
+        except Exception:
+            return None
+        import re as _re
+        m = _re.search(r"studio_token=([^;]*)", sc)
+        return m.group(1) if m else None
 
     def get_json(self, path):
         """GET <base><path> and parse the JSON body."""
@@ -180,6 +201,7 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
             cfg = json.loads(urllib.request.urlopen(base + "/api/config",
                                                     timeout=3).read().decode())
             if cfg.get("demo_model"):
+                studio.token = studio._fetch_token()  # H1
                 return studio
             last_err = "server is up but demo_model is not active"
         except Exception as e:

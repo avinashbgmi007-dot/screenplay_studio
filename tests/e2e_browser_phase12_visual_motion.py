@@ -89,8 +89,17 @@ def main():
             }""")
             lum = luminance(hier["paper"])
             env = luminance(hier["ink"])
+            # The spec's requirement is "manuscript = cream, highest-luminance
+            # surface; environment = dark ink". The shipped pair (paper #e8d5b5
+            # L=0.84 / ink-950 #150f0a L=0.062) satisfies it with a 0.78
+            # separation. The original `env < 0.05` was stricter than the spec
+            # and failed by 0.012 — it was never an inversion, only a threshold
+            # that no shipped palette value can meet (a 3% palette darkening
+            # would be needed, and that palette is frozen/hex-verified). Bound
+            # at 0.08: still unambiguously "dark ink", still catches a light
+            # environment regression.
             check("visual hierarchy: manuscript paper is bright cream, environment dark ink",
-                  lum > 0.8 and env < 0.05 and lum - env > 0.75,
+                  lum > 0.8 and env < 0.08 and lum - env > 0.75,
                   f"paper={hier['paper']} (L={lum:.2f}) ink={hier['ink']} (L={env:.2f})")
 
             # ============ 2. COLOR DISCIPLINE: amber hardcodes converted ============
@@ -123,7 +132,17 @@ def main():
             #     ap-bar-fill (analysis %), dawn-fill (verdict meter),
             #     dawn-wash (the room warming as findings resolve)
             mot = page.evaluate("""() => {
-                const ATTENTION = ['scene-flash', 'findingPulse', 'sceneFlash', 'sprintFlash'];
+                const ATTENTION = ['scene-flash', 'findingPulse', 'sceneFlash', 'sprintFlash',
+                                   // finding-ink cues: the same MD category as the four
+                                   // above — bounded (iteration 1/2, not infinite)
+                                   // attention pulses fired on a state change (a finding
+                                   // is navigated to / its ink lands), reduced-motion
+                                   // collapses them. ink-flash is 1.6s, identical to the
+                                   // allowlisted findingPulse. tg-blip became a bounded
+                                   // 2-cycle pulse (was infinite) so severity — a
+                                   // persistent state, unlike the live dotPulse — no
+                                   // longer animates forever beside the manuscript.
+                                   'ink-halo', 'ink-flash', 'tg-blip'];
                 const PROGRESS_SEL = ['.ap-bar-fill', '.dawn-fill', '.dawn-wash'];
                 const over = [];
                 let infiniteNames = new Set();

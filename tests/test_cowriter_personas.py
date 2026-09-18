@@ -109,7 +109,9 @@ def test_engine_injects_the_matching_persona_reminder(persona):
     engine.send_message(session, "what about scene 3?")
     assert client.messages, "the turn produced no prompt"
     last = client.messages[-1]
-    assert last["role"] == "system"
+    # H7a: the reminder is folded into a final USER note, not a system message,
+    # because 2+ system roles make some llama-server builds return HTTP 500.
+    assert last["role"] == "user"
     assert last["content"].startswith(P.post_history_reminder(persona))
 
 

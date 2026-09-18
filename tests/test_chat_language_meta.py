@@ -506,10 +506,13 @@ class TestEngineQuoteContext:
         assert "Just don't do anything stupid." in all_text
         assert "Scene 2" in all_text
         # the passage also rides inside the user turn itself (adjacent to the
-        # question), not just in a system message. The FINAL message is now
-        # the post-history voice reminder by design; the writer's turn sits
-        # just before it.
-        last_user = [m for m in client.messages if m["role"] == "user"][-1]
+        # question), not just in a system message. The FINAL message is now the
+        # post-history voice reminder (a user note per H7a); the writer's turn —
+        # carrying the quote — sits just before it. Find the user turn that
+        # actually carries the question, not the reminder note.
+        user_turns = [m for m in client.messages
+                      if m["role"] == "user" and not m["content"].lstrip().startswith("[Voice check")]
+        last_user = user_turns[-1]
         assert "Just don't do anything stupid." in last_user["content"]
         # stored on the user message
         user_msg = [m for m in session.branch.messages if m.role == "user"][-1]

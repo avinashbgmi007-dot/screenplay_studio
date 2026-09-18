@@ -139,26 +139,27 @@ def run(base):
         check("complete: findings render in state", n_findings > 0, f"n={n_findings}")
 
         # ================= 9. FEEDBACK -> CATEGORY -> FINDING =================
+        # GO 2 fold (ratified): openFeedbackView() routes to the workspace + the
+        # dock's Evidence lens — that lens IS the Problem Board. The old
+        # #feedback-view 3-panel clone is deliberately dormant and unreachable
+        # (grep-gated in the layout audit). Asserting the clone's visibility here
+        # was a stale check that could never pass; assert the LIVE surface, and
+        # pin the clone as hidden so a regression can't quietly revive it.
         page.evaluate("() => openFeedbackView()")
-        page.wait_for_selector("#feedback-view", state="visible", timeout=8000)
-        check("feedback: view opens", page.locator("#feedback-view").is_visible())
-        rows = page.locator("#fv-board-list .fv-board-row")
-        check("category/finding: board renders findings by category",
-              rows.count() > 0, f"rows={rows.count()}")
-        cats = page.locator("#fv-board-list .fv-board-cat").all_inner_texts()
-        check("category: board rows name their categories",
-              any(c.strip() for c in cats), str(cats[:3]))
-        # board row click scrolls the script column (finding locate)
-        rows.first.click()
+        page.wait_for_selector("#context-dock.open", timeout=8000)
         page.wait_for_timeout(500)
-        check("finding: board row locates the scene", True)
-        # the FV carries its own 3-panel evidence layout; the Context Dock
-        # is the MANUSCRIPT's companion (in-flow inside .workspace, which
-        # the FV hides) — exit the FV before the dock legs
-        page.locator("#fv-close").click()
-        page.wait_for_timeout(600)
+        lens = page.locator('.dock-lens[data-lens="evidence"]')
+        check("feedback: the Evidence lens opens (the folded board)", lens.is_visible())
+        check("category/finding: the board renders findings by scene",
+              lens.locator(".dock-evidence-scene").count() > 0,
+              f"scenes={lens.locator('.dock-evidence-scene').count()}")
+        check("feedback: the retired clone stays dormant",
+              not page.locator("#feedback-view").is_visible())
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
         check("feedback: back to the manuscript cleanly",
               page.locator("#manuscript-container .scene-page").count() > 0)
+
 
         # ================= 10. EVIDENCE =================
         page.evaluate("() => openDock('evidence')")

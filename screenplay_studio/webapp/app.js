@@ -51,11 +51,22 @@ function getManuscriptContainer() {
   return document.getElementById('manuscript-container');
 }
 
+// H1: echo the capability token the server set as a cookie on `/` so mutating
+// requests prove they come from the served SPA, not a foreign blind write.
+function _studioToken() {
+  const m = document.cookie.match(/(?:^|;\s*)studio_token=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : "";
+}
+
 async function api(path, options = {}) {
-  const resp = await fetch(API + path, {
-    headers: options.body && !(options.body instanceof FormData) ? { "Content-Type": "application/json" } : undefined,
-    ...options,
-  });
+  const headers = Object.assign(
+    {},
+    options.body && !(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {},
+    options.headers || {}
+  );
+  const tok = _studioToken();
+  if (tok) headers["X-Studio-Token"] = tok;
+  const resp = await fetch(API + path, { ...options, headers });
   let data = null;
   try { data = await resp.json(); } catch (_) { /* no body */ }
   if (!resp.ok) {
@@ -79,9 +90,12 @@ async function api(path, options = {}) {
 // Falls back to the blocking endpoint when the stream route is missing.
 async function streamChatTurn(base, text, quote, bubble, scrollContainer) {
   const body = JSON.stringify(quote ? { text, quote } : { text });
+  const _h = { "Content-Type": "application/json" };
+  const _tok = _studioToken();
+  if (_tok) _h["X-Studio-Token"] = _tok;
   const resp = await fetch(API + base + "/messages/stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: _h,
     body,
   });
   if (resp.status === 404 || !resp.body) {

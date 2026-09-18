@@ -14,7 +14,19 @@ CHECKS = Checks()
 
 
 def main():
-    base = os.environ["E2E_BASE"].rstrip("/")
+    # Dual-mode, like export_flush: talk to a running studio when E2E_BASE is
+    # set (the shared-sweep convention), otherwise boot a private demo studio —
+    # so the suite participates in the ordinary sweep instead of hard-failing
+    # with a KeyError on an env var most runs never set.
+    external = os.environ.get("E2E_BASE")
+    if not external:
+        from e2e_browser_common import open_studio
+        with open_studio() as base:
+            return _run(base.rstrip("/"))
+    _run(external.rstrip("/"))
+
+
+def _run(base):
     with sync_playwright() as pw:
         from e2e_browser_common import launch
         browser, page, errors = launch(pw)
