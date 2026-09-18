@@ -440,6 +440,41 @@ def resolve_categories(run_categories) -> tuple[str, ...]:
     return cats
 
 
+# ---------------------------------------------------------------------------
+# Evidence depth (§5 item 4).
+#
+# The script-level passes judge from the MODEL-WRITTEN scene summaries, never the
+# raw pages — a deliberate trade to fit the context window, and the single biggest
+# honest limitation of the analysis. The writer cannot see that trade today: a
+# finding is a finding.
+#
+# So every pass declares what it actually read. This is stamped where the pass
+# RUNS rather than inferred from the finding's category, because a category is not
+# a reliable proxy: `pacing` emits its drag findings under category "structure",
+# so a category-based rule would report every pace drag as a summary-derived
+# judgement when it in fact read the parsed pages directly.
+# ---------------------------------------------------------------------------
+EVIDENCE_FULL_TEXT = "full_text"   # read the parsed pages, or facts extracted from them
+EVIDENCE_OVERVIEW = "overview"     # read the model's scene summaries
+
+
+def _tag_evidence(findings, source: str):
+    """Stamp each finding with the evidence its pass actually read."""
+    for f in findings:
+        f["evidence_source"] = source
+    return findings
+
+
+def evidence_depth(findings) -> dict:
+    """How much of the report rests on the pages, and how much on a summary of
+    them. `unknown` is kept visible rather than folded into either side: a pass
+    that forgets to declare its source must not silently read as full-text."""
+    full = sum(1 for f in findings if f.get("evidence_source") == EVIDENCE_FULL_TEXT)
+    over = sum(1 for f in findings if f.get("evidence_source") == EVIDENCE_OVERVIEW)
+    return {"full_text": full, "overview": over,
+            "unknown": len(findings) - full - over, "total": len(findings)}
+
+
 def analyze(
     doc: ScriptDocument,
     client: LlamaServerClient,
@@ -506,16 +541,16 @@ def analyze(
         emit("voice", "running", "Comparing character voices")
         from .voice import run_voice_analysis, run_subtext_analysis
         voice_findings, _ = run_voice_analysis(doc)
-        all_findings.extend(voice_findings)
+        all_findings.extend(_tag_evidence(voice_findings, EVIDENCE_FULL_TEXT))
         emit("voice", "complete")
         emit("subtext", "running", "Scanning for on-the-nose lines")
         subtext_findings, _ = run_subtext_analysis(doc)
-        all_findings.extend(subtext_findings)
+        all_findings.extend(_tag_evidence(subtext_findings, EVIDENCE_FULL_TEXT))
         emit("subtext", "complete")
         emit("idiolect", "running", "Checking voices stay consistent")
         from .voice import run_idiolect_analysis
         idiolect_findings, _ = run_idiolect_analysis(doc)
-        all_findings.extend(idiolect_findings)
+        all_findings.extend(_tag_evidence(idiolect_findings, EVIDENCE_FULL_TEXT))
         emit("idiolect", "complete")
     except Exception as e:
         result.errors.append(f"Craft passes (voice/subtext) failed: {e}")
@@ -527,7 +562,7 @@ def analyze(
         emit("continuity", "running", "Checking scene continuity")
         from .continuity import run_continuity_analysis
         continuity_findings, _ = run_continuity_analysis(doc)
-        all_findings.extend(continuity_findings)
+        all_findings.extend(_tag_evidence(continuity_findings, EVIDENCE_FULL_TEXT))
         emit("continuity", "complete")
     except Exception as e:
         result.errors.append(f"Continuity pass failed: {e}")
@@ -540,7 +575,7 @@ def analyze(
         emit("pacing", "running", "Measuring scene pace")
         from .pacing import per_scene_pace, drag_findings
         result.pacing = per_scene_pace(doc)
-        all_findings.extend(drag_findings(result.pacing))
+        all_findings.extend(_tag_evidence(drag_findings(result.pacing), EVIDENCE_FULL_TEXT))
         emit("pacing", "complete")
     except Exception as e:
         result.errors.append(f"Pacing pass failed: {e}")
@@ -572,7 +607,7 @@ def analyze(
             emit("dialogue", "running", "Reading dialogue & action")
             dialogue_findings, dialogue_errors = run_dialogue_analysis(doc, client, rules_ctx, chunk_size=scene_chunk_size, language=report_language)
             emit("dialogue", "complete")
-            all_findings.extend(dialogue_findings)
+            all_findings.extend(_tag_evidence(dialogue_findings, EVIDENCE_FULL_TEXT))
             result.category_outcomes["dialogue"] = "failed" if dialogue_errors else "ok"
             if dialogue_errors:
                 result.errors.append(
@@ -596,7 +631,9 @@ def analyze(
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
-                all_findings.extend(run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language))
+                all_findings.extend(_tag_evidence(
+                    run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language),
+                    EVIDENCE_OVERVIEW))
                 emit(cat, "complete")
                 result.category_outcomes[cat] = "ok"
             except LlamaServerError as e:
@@ -618,7 +655,7 @@ def analyze(
         try:
             emit("principles", "running", "Checking setups & payoffs")
             principle_findings, principle_errors = run_principles_engine(_kg, client, rules_ctx, doc.scene_count, language=report_language)
-            all_findings.extend(principle_findings)
+            all_findings.extend(_tag_evidence(principle_findings, EVIDENCE_FULL_TEXT))
             result.errors.extend(principle_errors)
             result.category_outcomes["principles"] = "failed" if principle_errors else "ok"
             emit("principles", "complete")
@@ -665,7 +702,7 @@ def analyze(
             )
             result.setup_payoff = ledger
             existing_plot = [f for f in all_findings if f.get("category") == "plot_thread"]
-            all_findings.extend(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx))
+            all_findings.extend(_tag_evidence(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx), EVIDENCE_OVERVIEW))
             result.category_outcomes["setup_payoff"] = "failed" if ledger_errors else "ok"
             if ledger_errors:
                 result.errors.extend(ledger_errors)
@@ -746,7 +783,7 @@ def analyze(
             genre_findings = _normalize_findings(run_genre_check(result.coverage, overview, client, rules_ctx=rules_ctx, language=report_language), "genre")
             # genre findings get the same quote-verification as every other finding
             genre_findings = verify_findings(genre_findings, doc)
-            all_findings.extend(genre_findings)
+            all_findings.extend(_tag_evidence(genre_findings, EVIDENCE_OVERVIEW))
             result.findings = all_findings
             # update verification summary incrementally (only new findings)
             prev = result.verification or {"verified": 0, "not_found": 0, "no_quote": 0, "scene_not_found": 0}
@@ -787,6 +824,13 @@ def analyze(
     # the summary reflects exactly what the writer will see.
     result.findings = filter_findings(result.findings)
     result.verification = verification_summary(result.findings)
+
+    # 9. evidence depth — computed LAST, on the filtered list, so the number the
+    # writer is shown describes exactly the findings they are being shown. Placed
+    # in `stats` because that already flows to report.md, the served report JSON
+    # and the webapp, so no new plumbing is needed to surface it.
+    result.stats = result.stats or {}
+    result.stats["evidence_depth"] = evidence_depth(result.findings)
 
     emit("done", "complete", "Analysis complete")
     return result

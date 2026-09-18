@@ -1370,3 +1370,58 @@ SELF-CAUGHT TEST BUGS
   Also: `nohup … &` from a tool call dies when the call ends — start the server and
   probe it in the SAME call, then kill it.
 
+
+================================================================================
+2026-09-19 — WAVE 4: the report states its evidence depth (§5 item 4)
+================================================================================
+Item verbatim: "Report evidence-depth honestly — '30 findings — 12 from full text,
+18 from overview' converts invisible false-negative risk into visible scope."
+This is the §2 "summary-telephone ceiling" made COUNTABLE.
+
+WHY THE CLASSIFICATION IS RECORDED, NOT INFERRED  <-- the load-bearing decision
+The obvious implementation maps a finding's `category` to a source. That is WRONG:
+pacing.py files its drag findings under `category: "structure"` — the same category
+the script-level pass uses — even though the pacing pass reads the parsed pages
+directly. A category-based rule would report every pace drag as a summary-derived
+judgement. So each of the TEN `all_findings.extend(...)` sites declares what its pass
+actually read, via one `_tag_evidence(findings, source)` helper:
+  full_text : voice · subtext · idiolect · continuity · PACING · dialogue · principles
+  overview  : the script-level categories (theme/character/structure/scene_function)
+              · the setup/payoff ledger · genre
+`principles` = full_text on the grounds that its KG input is deterministic candidates
+extracted from the script, not a model-written summary. JUDGEMENT CALL, recorded.
+`unknown` is a THIRD bucket, not folded into either side — a pass that forgets to
+declare its source must not silently read as full-text (the flattering direction).
+
+SURFACED IN THREE PLACES
+- report.md, under Evidence Verification: a bolded count + what to do with it
+  ("Treat the second group as a second opinion on structure, not as a reading of your
+  pages"). The older prose caveat is KEPT — the count adds to it, does not replace it.
+- the served report JSON: stats.evidence_depth
+- the app's Coverage panel: a muted mono line + hover, GUARDED on the field existing
+  (every report analysed before this change lacks it; unguarded it would print
+  "undefined of undefined").
+
+MEASURED on the pain_tenglish fixture: full_text 3 / overview 4 / unknown 0 (dialogue
++ continuity vs theme/structure/scene_function/genre — matches the pass wiring).
+
+LIMITATIONS (flagged)
+- principles is a judgement call, not "read the pages" in the dialogue pass's sense.
+- the number describes the PASS, not the sentence: a summary-derived finding that is
+  right still counts as summary-derived. Scope, not accuracy.
+- old reports carry no depth line (correct — the data was not recorded).
+- stated once per report in the Coverage panel, not annotated per card (30 cards of
+  the same label is noise).
+
+TESTS
+tests/test_evidence_depth.py (new, 25). The load-bearing guard: EVERY
+`all_findings.extend` must be `_tag_evidence`-wrapped, asserted statically on the
+source, so a future pass cannot silently land in `unknown`. Plus a full pipeline run
+leaving ZERO unattributed findings and both sides non-empty.
+Gate: 1024 passed / 0 failures (+25 from 999); browser smoke 18/18, phase7 15/15,
+phase6 28/28.
+
+SELF-CAUGHT TEST BUG
+- AnalysisResult(doc) takes a required `doc` — the report-rendering helper could not
+  construct a bare result.
+

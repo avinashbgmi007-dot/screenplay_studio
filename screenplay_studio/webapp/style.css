@@ -6170,6 +6170,15 @@ body.river-read #right-edge-affordance { display: none; }
   margin: 0 0 var(--sp-3) 0;
   font-style: italic;
 }
+/* Evidence depth (§5 item 4) — a scope statement, so it reads as meta rather
+   than as a finding: mono, muted, and above the weaknesses it qualifies. */
+.dock-cov-depth {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  margin: var(--sp-2) 0 var(--sp-3) 0;
+  cursor: help;
+}
 .dock-cov-weak, .dock-sp-row {
   font-size: var(--fs-sm);
   line-height: 1.55;

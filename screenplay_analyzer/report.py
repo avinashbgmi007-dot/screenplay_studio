@@ -327,6 +327,26 @@ def render_markdown(result: AnalysisResult) -> str:
             f"expected for theme/character/structure/scene-function findings, which reason from scene "
             f"summaries rather than full text)."
         )
+        # Evidence depth (§5 item 4): the paragraph above describes the ceiling in
+        # prose; this states its SIZE. A count is what makes an invisible
+        # false-negative risk visible — "reason from scene summaries" is a caveat,
+        # "18 of 30 came from a summary" is a scope.
+        depth = (result.stats or {}).get("evidence_depth") or {}
+        if depth.get("total"):
+            lines.append(
+                f"\n**Evidence depth:** of {depth['total']} findings, "
+                f"**{depth.get('full_text', 0)} came from the full script text** and "
+                f"**{depth.get('overview', 0)} from scene summaries** — a description of the "
+                f"script rather than the script itself. Treat the second group as a second "
+                f"opinion on structure, not as a reading of your pages."
+            )
+            if depth.get("unknown"):
+                # Never fold an unattributed pass into either side: a pass that
+                # forgot to declare its source must not read as full-text.
+                lines.append(
+                    f"\n*{depth['unknown']} finding(s) could not be attributed to a pass — "
+                    f"reported here rather than counted as either.*"
+                )
         if v.get("not_found", 0) > 0:
             lines.append(
                 "\n*Unverified findings are kept in the report above (marked ⚠️) rather than "

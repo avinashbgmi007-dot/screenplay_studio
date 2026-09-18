@@ -592,3 +592,84 @@ the wiring, and the wiring was right while the placement was wrong.
 
 
 
+---
+
+# WAVE 4 — the report states its evidence depth (§5 item 4)
+
+The item, verbatim: *"Report evidence-depth honestly — '30 findings — 12 from full
+text, 18 from overview' converts invisible false-negative risk into visible scope."*
+
+This is the §2 "summary-telephone ceiling" made countable. The script-level passes
+judge from the **model-written scene summaries**, never the raw pages — a deliberate
+trade to fit the context window, and the single biggest honest limitation of the
+analysis. The report already described that trade in prose (*"expected for
+theme/character/structure/scene-function findings, which reason from scene summaries
+rather than full text"*). A caveat in prose is not a scope. **"4 of 7 came from a
+summary" is.**
+
+## Why the classification is recorded, not inferred
+
+The obvious implementation is to map the finding's `category` to a source. That
+would be **wrong**, and the code says so plainly: `pacing.py` files its drag findings
+under `category: "structure"` — the same category the script-level pass uses — even
+though the pacing pass reads the parsed pages directly. A category-based rule would
+report every pace drag as a summary-derived judgement.
+
+So each of the ten `all_findings.extend(...)` sites declares what its pass actually
+read, through one `_tag_evidence(findings, source)` helper:
+
+| source | passes |
+|---|---|
+| `full_text` | voice · subtext · idiolect · continuity · **pacing** · dialogue · principles |
+| `overview` | the script-level categories (theme/character/structure/scene_function) · the setup/payoff ledger · genre |
+
+`principles` is `full_text` on the grounds that its knowledge-graph input is
+deterministic candidates extracted from the script, not a model-written summary. That
+is a judgement call, and it is recorded here as one.
+
+`unknown` is kept as a third bucket rather than folded into either side: a pass that
+forgets to declare its source must not silently read as full-text, which is the
+flattering direction.
+
+## What the writer sees
+
+On the reference fixture the pipeline reports **3 from full text, 4 from scene
+summaries** (dialogue + continuity vs theme/structure/scene_function/genre — matching
+the pass wiring exactly). It surfaces in three places:
+
+- **`report.md`**, under *Evidence Verification*, as a bolded count with a sentence
+  saying what to do with it (*"Treat the second group as a second opinion on
+  structure, not as a reading of your pages"*).
+- **The served report JSON** (`stats.evidence_depth`), so any client can read it.
+- **The app's Coverage panel**, as a muted mono line with a hover that explains it —
+  guarded on the field existing, because every report analysed before this change
+  lacks it and an unguarded render would print *"undefined of undefined"*.
+
+## Honest limitations
+
+- **`principles` is a judgement call** (above). It is not "read the pages" in the
+  same sense the dialogue pass is.
+- **The number describes the pass, not the sentence.** A summary-derived finding that
+  happens to be right still counts as summary-derived; the count is about scope, not
+  accuracy.
+- **Old reports carry no depth line.** Correct — the information was not recorded —
+  but it means the line appears only for analyses run after this change.
+- **The depth is per-report, not per-finding-in-the-UI.** The app states the ratio
+  once in the Coverage panel rather than annotating each card; annotating 30 cards
+  would be noise.
+
+## Verification
+
+- `tests/test_evidence_depth.py` (new, 25): the counter (both sides, `unknown`, empty,
+  no key loss); **the load-bearing guard that every `all_findings.extend` is
+  `_tag_evidence`-wrapped**, so a future pass cannot silently land in `unknown`; the
+  mixed-category split asserted at the source; a full pipeline run leaving **zero**
+  unattributed findings and both sides non-empty; the rendered line; the `unknown`
+  disclosure; no line when the field is absent; the older prose caveat surviving; the
+  served JSON; and the app wiring including the missing-field guard.
+- Suite: **1024 passed / 0 failures / 0 errors** (was 999; +25).
+- One test bug of mine, caught by running it: `AnalysisResult` takes a `doc` as a
+  required argument, so the report-rendering helper could not construct a bare result.
+
+
+

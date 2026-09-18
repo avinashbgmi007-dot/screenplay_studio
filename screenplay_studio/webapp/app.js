@@ -4989,6 +4989,18 @@ function renderDockEvidence() {
     sec.appendChild(head);
     if (cov.logline) sec.appendChild(el("p", "dock-cov-logline", cov.logline));
     (cov.weaknesses || []).forEach((w) => sec.appendChild(el("p", "dock-cov-weak", "• " + w)));
+    // Evidence depth (§5 item 4): how much of this report read the pages, and how
+    // much read a model-written summary of them. Absent on reports analysed before
+    // the field existed, so it is rendered only when present.
+    const depth = state.report && state.report.stats && state.report.stats.evidence_depth;
+    if (depth && depth.total) {
+      const line = el("p", "dock-cov-depth",
+        `Evidence depth — ${depth.full_text} of ${depth.total} from the full script text, `
+        + `${depth.overview} from scene summaries.`);
+      line.title = "Script-level passes reason from scene summaries rather than the raw pages. "
+        + "Treat those findings as a second opinion on structure, not a reading of your pages.";
+      sec.appendChild(line);
+    }
     lens.appendChild(sec);
   }
 
