@@ -1479,3 +1479,49 @@ SELF-CAUGHT TEST BUGS
 - passed an empty by_name map; assumed `unmarked_time_flip` was a KB rule id (it is
   not); and `kb=None` means "load the default KB", not "no KB".
 
+
+================================================================================
+2026-09-19 — WAVE 2 / H3: the fake composer is DELETED; craft questions now reach a real one
+================================================================================
+Item verbatim: "A fake Sameer chat composer silently discards user input in a product
+whose stated law is 'the UI never pretends'." Resolution offered: wire-or-delete.
+
+**THE REALITY WAS WORSE THAN THE FINDING.** The off-canvas #sameer-panel was not a
+fake sitting in a corner — it was the DESTINATION OF EVERY CRAFT QUESTION IN THE
+COMMAND PALETTE. All seven ("Why doesn't my dialogue land?", "Is my Act II sagging?",
+...) call openSameerWith(), which opened that panel and filled #sameer-ta; its Send
+appended the text to its own thread and made NO API CALL. So the product's headline
+craft entry point discarded the writer's question in silence, under a heading that
+said "Sameer". It also shipped three hardcoded "messages" (a stairwell, a character
+named Mara) shown regardless of which script was open.
+
+RESOLVED BY DELETION, NOT WIRING. The Co-write room already has a real composer
+(#composer / #input / #send-btn, streaming from messages/stream); a second one would
+duplicate it. openSameerWith() now PRE-FILLS the real composer — which makes the craft
+palette actually work for the first time, rather than merely stopping it from lying.
+
+DELETED
+- index.html: the whole panel (markup + canned transcript + #sameer-ta/#sameer-send)
+- app.js: toggleSameerPanel(), sameerPanelOpen, the close/send/keydown handlers, and
+  the stale `closest("#sameer-ta")` in the selection-popup hit-test
+- style.css: 144 lines (.sameer-panel + .sp-*), plus 3 orphan references
+- tungsten.css: the night + dawn .sameer-panel colour pins
+- e2e_browser_common.py: the send_chat docstring explained a workaround for the
+  deleted #sameer-send — rewritten so it does not describe a surface that is gone
+
+THE DELETION ITSELF CREATED A STALE REFERENCE, and a test caught it: a live
+`e.target.closest("#sameer-ta")` survived the HTML removal and would have thrown on
+every selection-popup interaction. test_fake_composer_removed.py now scans NON-COMMENT
+code for every deleted id. (First version of that test flagged my own explanatory
+comment — comments are stripped now.)
+
+BEHAVIOUR CHANGE, deliberate: the craft questions PRE-FILL rather than auto-send. The
+old panel looked like it sent, so they appeared to work.
+
+LEFT ALONE: webapp/preview-design/*.html still has .sp-* rules — lab artifacts, not
+shipped surface (the Wave-2 sweep classified them LAB).
+
+TESTS: tests/test_fake_composer_removed.py (new, 12).
+Gate: 1067 passed / 0 failures (+12 from 1055); browser smoke 18/18, phase7 15/15,
+phase6 28/28.
+

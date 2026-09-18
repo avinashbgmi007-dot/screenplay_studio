@@ -772,3 +772,69 @@ flips needing two separate fixes.
 
 
 
+---
+
+# WAVE 2 — H3: the fake composer is deleted, and the craft questions now reach a real one
+
+The item, verbatim: *"H3 — A fake Sameer chat composer silently discards user input
+in a product whose stated law is 'the UI never pretends'."* §5/Wave-2 asks to
+**wire-or-delete** it.
+
+**The finding was accurate, and the reality was worse than the description.**
+
+The off-canvas `#sameer-panel` was not merely a fake surface sitting in a corner. It
+was **the destination of every craft question in the command palette**. All seven —
+*"Why doesn't my dialogue land?"*, *"Is my Act II sagging?"*, *"Am I violating
+setup/payoff?"* — call `openSameerWith()`, which opened that panel and filled
+`#sameer-ta`. Its Send button then appended the text to its own thread and made **no
+API call**. So the product's headline craft entry point discarded the writer's
+question in silence, under a heading that said "Sameer".
+
+It also shipped three hardcoded "messages" — prose about a stairwell and a character
+named Mara — rendered regardless of which script the writer had actually opened.
+
+## Resolved by deletion, not wiring
+
+The Co-write room already has a real composer that reaches the API (`#composer` /
+`#input` / `#send-btn`, streaming from `messages/stream`). Wiring a second one would
+duplicate it. So the panel is deleted and `openSameerWith()` now pre-fills the real
+composer — which makes the craft palette **work** for the first time, rather than
+merely stopping it from lying.
+
+Deleted: the panel markup (with its canned transcript), `toggleSameerPanel()` and its
+handlers, 144 lines of `.sameer-panel` / `.sp-*` CSS plus three orphan references, and
+the dawn-theme colour pins in `tungsten.css`.
+
+**One stale reference was caught that the deletion itself created:** a live
+`e.target.closest("#sameer-ta")` in the selection-popup hit-test survived the HTML
+removal and would have thrown on every popup interaction. A test now scans the
+non-comment code for every deleted id.
+
+## Honest notes
+
+- **Deleting was a judgement call between the two options the review offered.** The
+  reasoning is that a second composer would duplicate the room's own, and that the
+  panel's only unique behaviour was the lying. If a floating quick-ask surface is
+  wanted later, it should be built on the real composer, not restored from this one.
+- **The command-palette craft questions now pre-fill rather than auto-send.** The
+  writer still presses Send. That is a deliberate change of behaviour — the old panel
+  looked like it sent, so the questions appeared to work.
+- The design-gallery copies under `webapp/preview-design/` still contain `.sp-*`
+  rules. Those are lab artifacts, not shipped surface (the Wave-2 sweep classified
+  them `LAB`), and were left alone.
+
+## Verification
+
+- `tests/test_fake_composer_removed.py` (new, 12): the panel, its transcript, its
+  echo-composer and its toggle are gone; no live code references a deleted id; the CSS
+  is gone; a note explains why; `openSameerWith` targets the real composer and still
+  opens the room; all seven craft prompts remain wired; and the real composer still
+  exists and still streams to the API.
+- The harness's `send_chat` docstring explained a workaround for the now-deleted
+  `#sameer-send`; it has been rewritten so it does not describe a surface that no
+  longer exists, and a test pins that.
+- Suite: **1067 passed / 0 failures / 0 errors** (was 1055; +12). Browser gates
+  unchanged: smoke 18/18, phase7 15/15, phase6 28/28.
+
+
+

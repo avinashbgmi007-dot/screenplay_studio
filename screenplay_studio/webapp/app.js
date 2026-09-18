@@ -8472,23 +8472,22 @@ function expandProblemBoard() {
 // Auto-hide chrome, Sameer panel, level badge, cursor spotlight
 // ============================================================
 
-// ---- Craft palette helper: open Sameer with a pre-filled question ----
+// ---- Craft palette helper: pre-fill the composer that actually sends ----
+//
+// This used to open the off-canvas #sameer-panel and fill #sameer-ta — a surface
+// whose Send button echoed the text into its own thread and made no API call, and
+// whose three "messages" were hardcoded prose about a script nobody had opened.
+// Because all seven craft questions in the command palette route through here,
+// every one of them was silently discarded (H3). The panel is deleted; the
+// question now lands in the Co-write room's real composer, one keystroke from
+// being sent.
 function openSameerWith(question) {
-  // Switch to cowrite room if not there, then open Sameer panel
   if (state.view !== "cowrite") openCowriteRoom();
-  toggleSameerPanel(true);
-  const ta = $("#sameer-ta");
-  if (ta) { ta.value = question; ta.focus(); }
-}
-
-// ---- Sameer panel toggle ----
-let sameerPanelOpen = false;
-
-function toggleSameerPanel(forceOpen) {
-  const panel = $("#sameer-panel");
-  if (!panel) return;
-  sameerPanelOpen = forceOpen !== undefined ? forceOpen : !sameerPanelOpen;
-  panel.classList.toggle("open", sameerPanelOpen);
+  const input = $("#input");
+  if (input) {
+    input.value = question;
+    input.focus();
+  }
 }
 
 // ---- Level badge (progressive revelation) ----
@@ -8554,29 +8553,8 @@ function initNoctaDesign() {
     if (bar) bar.addEventListener("focusin", showChrome);
   });
 
-  // Sameer panel
-  const sameerClose = $("#sameer-close");
-  if (sameerClose) sameerClose.addEventListener("click", () => toggleSameerPanel(false));
-  const sameerSend = $("#sameer-send");
-  if (sameerSend) sameerSend.addEventListener("click", () => {
-    const ta = $("#sameer-ta");
-    const text = ta ? ta.value.trim() : "";
-    if (!text) return;
-    const thread = $("#sameer-thread");
-    const msg = document.createElement("div");
-    msg.className = "sp-msg user";
-    msg.textContent = text;
-    thread.appendChild(msg);
-    ta.value = "";
-    thread.scrollTop = thread.scrollHeight;
-  });
-  const sameerTa = $("#sameer-ta");
-  if (sameerTa) sameerTa.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      $("#sameer-send").click();
-    }
-  });
+  // (The off-canvas Sameer panel's handlers were removed with the panel itself —
+  // H3. Its Send echoed the text into its own thread and never called the API.)
 
   // Level badge — auto-advance on finding interaction
   document.addEventListener("click", (e) => {
@@ -8656,7 +8634,7 @@ document.addEventListener("DOMContentLoaded", init);
     // synthetic or lands on the document node — closest only exists on
     // Elements, and one stray throw would kill the selection popup for
     // the rest of the session
-    if (e.target && e.target.closest && (e.target.closest(".composer") || e.target.closest("#sameer-ta") || e.target.closest("#input"))) {
+    if (e.target && e.target.closest && (e.target.closest(".composer") || e.target.closest("#input"))) {
       hidePopup();
       return;
     }

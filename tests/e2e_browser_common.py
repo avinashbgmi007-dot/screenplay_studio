@@ -268,10 +268,10 @@ def last_reply(page):
 def send_chat(page, text):
     """Type into the Sameer composer and hit Send.
 
-    exact=True: the off-canvas #sameer-send panel button carries the
-    accessible name "Send to Sameer", which CONTAINS "Send" — a substring
-    match resolves to 2 buttons and strict mode refuses. The composer's
-    #send-btn is the only button named exactly "Send".
+    exact=True still matters even though the off-canvas #sameer-send panel is gone
+    (H3): the composer's own button is named exactly "Send", and any future control
+    whose accessible name merely CONTAINS "Send" would make a substring match
+    resolve to two buttons, which strict mode refuses.
     """
     box = page.locator("#input")
     box.fill(text)

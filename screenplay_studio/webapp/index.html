@@ -731,23 +731,12 @@
   </div>
 </div>
 
-<!-- Sameer contextual slide-in panel -->
-<div class="sameer-panel" id="sameer-panel">
-  <div class="sp-head">
-    <div class="sp-avatar">S</div>
-    <div><div class="sp-name">Sameer</div><div class="sp-sub">co-writer · craft mentor</div></div>
-    <button class="sp-close" id="sameer-close" aria-label="Close Sameer panel">✕</button>
-  </div>
-  <div class="sp-thread" id="sameer-thread">
-    <div class="sp-msg ai">Read Draft 3 overnight. The stairwell scene sings.<div class="craft-ref">McKee — Gap Analysis</div></div>
-    <div class="sp-msg ai">Act II midpoint arrives 12 pages late. Promote the stairwell.<div class="craft-ref">Snyder — Midpoint</div></div>
-    <div class="sp-msg ai">Mara exit line works as subtext. Cut the repeat.<div class="craft-ref">McKee — Setup/Payoff</div></div>
-  </div>
-  <div class="sp-composer">
-    <textarea id="sameer-ta" rows="1" placeholder="Ask Sameer..."></textarea>
-    <button class="send-btn" id="sameer-send" aria-label="Send to Sameer">→</button>
-  </div>
-</div>
+<!-- The off-canvas "Sameer panel" was removed (H3). Its Send button echoed the
+     typed text into its own thread and made NO API call, and its three "messages"
+     were hardcoded prose about a script nobody had opened. It was also the target
+     of every craft question in the command palette, so those were discarded in
+     silence. The Co-write room's own composer is the real surface and the craft
+     questions now land there. -->
 
 <!-- Level badge (progressive revelation) -->
 <div class="level-badge" id="level-badge">
