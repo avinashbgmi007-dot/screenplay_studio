@@ -276,6 +276,6 @@ The 4 failures are **phase-12 visual/motion discipline** — pre-existing (ident
 **Suite after all fixes: 403 checks passed, 0 failed (26 suites).**
 
 
-*Verification artifacts (sweep results, probe outputs, bug-repro scripts) retained under `tests/_e2e_sweep_results.txt`, `tests/_real_model_probe_out.txt`, `tests/_ux_probe_out.txt`, and `_qa_bugrepro/`.*
+*Verification artifacts: the one-shot live probes lived in `_qa_bugrepro/` and `tests/_*.py` (untracked scratch, not part of the repo). Their durable equivalents are the committed regression tests — `test_h7_chat_fix.py`, `test_capability_token.py`, `test_session_lost_update.py`, `test_dismiss_index.py`, `test_nonascii_titles.py` — plus `tests/e2e_browser_token_mode.py` and `tests/_run_e2e_sweep.py` (the sweep runner).*
 
 
