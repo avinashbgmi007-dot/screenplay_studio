@@ -111,7 +111,7 @@
       "knowledge_graph"
     ],
     "related_rules": [
-      "fundamental_attribution_error"
+      "cognitive_bias_fundamental_attribution"
     ]
   },
   {
@@ -133,7 +133,7 @@
       "scene_text"
     ],
     "related_rules": [
-      "anchoring_effect"
+      "cognitive_bias_anchoring"
     ]
   },
   {
@@ -156,7 +156,7 @@
       "knowledge_graph"
     ],
     "related_rules": [
-      "sunk_cost_fallacy"
+      "cognitive_bias_sunk_cost"
     ]
   },
   {
@@ -178,7 +178,7 @@
       "scene_text"
     ],
     "related_rules": [
-      "loss_aversion"
+      "cognitive_bias_loss_aversion"
     ]
   },
   {
@@ -201,7 +201,7 @@
       "knowledge_graph"
     ],
     "related_rules": [
-      "confirmation_bias"
+      "cognitive_bias_confirmation"
     ]
   },
   {
@@ -224,7 +224,7 @@
       "knowledge_graph"
     ],
     "related_rules": [
-      "anchoring_effect"
+      "cognitive_bias_anchoring"
     ]
   },
   {

@@ -174,15 +174,33 @@ class KnowledgeBase:
         rule_ids = self._files.get(filename, [])
         return [self._rules[rid] for rid in rule_ids if rid in self._rules]
 
+    # ---- query API --------------------------------------------------------
+    # The pipeline routes rules by `taxonomy_level` (+ PASS_EXTRAS files, and
+    # `genre` for the genre-scoped pass) — see
+    # screenplay_analyzer/rules_context.py. The three filters below cover the
+    # KB's *other* declared axes. They are deliberately NOT wired into
+    # grounding yet: which rules reach a prompt is a quality change that
+    # cannot be measured without a live model, and a wrong guess silently
+    # degrades every finding. They are exercised by tests/test_kb_schema.py so
+    # they cannot rot, and the README states the same contract.
+
+    # Every token a rule may declare in `requires`. Declared here (rather than
+    # inferred from the JSON) so a typo is caught instead of silently
+    # mis-gating a rule.
+    CAPABILITIES = ("scene_text", "scene_summaries", "knowledge_graph", "page_estimates")
+
     def for_category(self, category: str) -> list:
-        """Public query API — reserved for per-category prompt building."""
+        """Rules carrying this fine-grained `category` tag (e.g. "stakes",
+        "subtext"). This is NOT the pipeline's finding category — the finding
+        categories are the keys of CATEGORY_TO_TAXONOMY_LEVELS."""
         return [r for r in self._rules.values() if r.category == category]
 
     def requiring(self, capability: str) -> list:
-        """Public query API — rules needing a capability, e.g. 'knowledge_graph'."""
+        """Rules whose check needs `capability` — one of `CAPABILITIES`."""
         return [r for r in self._rules.values() if capability in r.requires]
 
     def by_confidence_tier(self, tier: str) -> list:
+        """Rules at a `confidence_tier` — "high" | "medium" | "low"."""
         return [r for r in self._rules.values() if r.confidence_tier == tier]
 
     def render_for_prompt(self, rules: list) -> str:
@@ -191,10 +209,14 @@ class KnowledgeBase:
 
     def stats(self) -> dict:
         from collections import Counter
-        tiers = Counter(r.confidence_tier for r in self._rules.values())
         levels = Counter(r.taxonomy_level for r in self._rules.values())
+        # Built through the public filter rather than a second inline
+        # comprehension, so the query API is exercised on every stats() call
+        # instead of sitting unused beside a duplicate of itself (F9).
+        tiers = {tier: len(self.by_confidence_tier(tier))
+                 for tier in sorted({r.confidence_tier for r in self._rules.values()})}
         return {
             "total_rules": len(self._rules),
-            "by_confidence_tier": dict(tiers),
+            "by_confidence_tier": tiers,
             "by_taxonomy_level": dict(levels),
         }

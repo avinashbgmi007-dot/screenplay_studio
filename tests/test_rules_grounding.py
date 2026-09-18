@@ -21,6 +21,7 @@ import pytest
 from screenplay_analyzer.rules_context import (
     CATEGORY_TO_TAXONOMY_LEVELS,
     PASS_EXTRAS,
+    UNROUTED_CATEGORIES,
     RulesContext,
 )
 
@@ -99,6 +100,61 @@ def test_script_level_category_loop_names_are_mapped():
     see its names — pin them explicitly."""
     expected = {"theme", "character", "structure", "scene_function"}
     assert expected <= set(CATEGORY_TO_TAXONOMY_LEVELS)
+
+
+def test_every_mapping_key_is_routed_or_documented_as_unrouted():
+    """The other direction of the grounding contract (review item F6/T1.2).
+
+    A live pass name with no mapping key is the silent-empty bug. The reverse
+    — a mapping key no pass asks for — is quieter and just as misleading: it
+    advertises grounding that never happens. Both directions are pinned, so
+    adding either one forces a decision instead of a silent no-op.
+    """
+    from screenplay_analyzer.pipeline import ALL_CATEGORIES
+
+    # A key is "routed" when some pass asks for it by that name. `plot_thread`
+    # is asked for by the Principles Engine and the setup/payoff ledger, which
+    # appear in ALL_CATEGORIES under their own names.
+    routed = set(ALL_CATEGORIES) | set(PASS_EXTRAS) | {"plot_thread"}
+    unrouted = set(CATEGORY_TO_TAXONOMY_LEVELS) - routed
+    assert unrouted == set(UNROUTED_CATEGORIES), (
+        f"the unrouted mapping keys changed: {sorted(unrouted)} (declared "
+        f"{sorted(UNROUTED_CATEGORIES)}). Route the new key, or add it to "
+        f"UNROUTED_CATEGORIES with the reason it has no pass."
+    )
+
+
+def test_continuity_rules_are_never_injected_but_are_still_attributed(rc):
+    """T1.2's evidence, pinned.
+
+    Continuity is deterministic by design (continuity.py reads the parsed
+    structure directly, so it works even when the model's context is too small
+    for a prompt pass). Its four KB rules therefore never ride a prompt. The
+    two checks that have a KB counterpart cite it as `rule_id`, which is what
+    carries the rule into the report tooltip and the co-writer's craft block —
+    attributed even though never injected.
+    """
+    continuity_ids = {r.id for r in rc.kb.for_file("continuity.json")}
+    assert continuity_ids, "continuity.json is empty — the mapping key is dead weight"
+
+    # Iterate the LIVE pass names, not the mapping keys: `rules_for_pass
+    # ("continuity")` would happily return the rules, which is exactly the
+    # false negative to avoid here.
+    from screenplay_analyzer.pipeline import ALL_CATEGORIES
+    live_passes = set(ALL_CATEGORIES) | set(PASS_EXTRAS) | {"plot_thread"}
+    injected = {r.id for name in live_passes for r in rc.rules_for_pass(name)}
+    assert not (continuity_ids & injected), (
+        f"a continuity rule now reaches a live prompt: "
+        f"{sorted(continuity_ids & injected)} — if deliberate, update "
+        f"UNROUTED_CATEGORIES and this test together"
+    )
+
+    source = (ANALYZER_DIR / "continuity.py").read_text(encoding="utf-8")
+    cited = set(re.findall(r'"rule_id":\s*"([^"]+)"', source))
+    assert cited, "continuity.py cites no KB rule — its findings lost their grounding"
+    assert cited <= continuity_ids, (
+        f"continuity.py cites rules outside continuity.json: {sorted(cited - continuity_ids)}"
+    )
 
 
 def test_pass_extras_files_all_exist(rc):

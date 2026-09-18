@@ -36,6 +36,20 @@ CATEGORY_TO_TAXONOMY_LEVELS = {
     "revision": ["revision"],
 }
 
+# Keys no pipeline pass asks for by name. They are kept because they record
+# which taxonomy level each category owns, and because their rules still reach
+# a prompt through PASS_EXTRAS — except "continuity", whose four rules have no
+# pass at all: continuity is deterministic by design
+# (screenplay_analyzer/continuity.py), and its two KB-backed checks cite their
+# rule as `rule_id`, which is what puts the rule in the report tooltip and the
+# co-writer's craft block. A model-based continuity pass would be a feature,
+# not a wiring fix.
+#
+# tests/test_rules_grounding.py pins this set in both directions, so a new key
+# cannot be added without deciding how it is routed — and a live pass name
+# cannot appear without a key (the silent-empty bug, F1).
+UNROUTED_CATEGORIES = frozenset({"continuity", "pitch", "revision"})
+
 # Extra rule files to inject into specific pipeline passes.
 # Key: pass name (as used in pipeline.py), Value: list of filenames.
 # These may add rules no taxonomy level covers (scene_function's

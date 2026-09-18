@@ -108,17 +108,45 @@ item) or can run from single-scene / whole-script-summary context alone.
 ## How this gets consumed (for the build)
 
 Each analyzer check, instead of hand-writing its own paraphrase of a craft
-concept into a prompt, retrieves the relevant rule(s) by `taxonomy_level`
-and/or `category` from this file and includes the rule's `definition` and
-`detection_signal` verbatim in the prompt sent to the model. This means:
+concept into a prompt, retrieves the relevant rule(s) **by `taxonomy_level`**
+from this file and includes the rule's `definition` and `detection_signal`
+verbatim in the prompt sent to the model. The routing table lives in
+`screenplay_analyzer/rules_context.py` (`CATEGORY_TO_TAXONOMY_LEVELS`, plus
+`PASS_EXTRAS` for whole extra files, plus a genre-scoped path used by the
+genre pass). This means:
 
 1. The same rule text is used every time that check runs, regardless of
    which local model is loaded — the theory doesn't degrade with model size.
 2. Adding a new rule (say, entry #10 in the Principles Engine) means adding
-   one JSON entry, not guessing whether a given model "already knows" it.
+   one JSON entry **tagged with a `taxonomy_level` that is already mapped**,
+   not guessing whether a given model "already knows" it. A rule whose level
+   is not in the routing table is never injected — silently.
 3. `confidence_tier` flows through to the report — `low`-confidence
    findings get framed as discussion prompts in the report/co-writer, not
    asserted as fact, matching how we already handle unverified quotes.
+
+### Which fields actually route, and which are declared only
+
+Only `taxonomy_level` selects rules for a prompt. Three more axes are declared
+in the schema and queryable through `KnowledgeBase`, but are **not wired into
+grounding yet** — changing which rules reach a prompt is a quality change that
+cannot be measured without a live model, so it is a deliberate decision rather
+than an oversight:
+
+| Field | Query | Status |
+|---|---|---|
+| `taxonomy_level` | `for_taxonomy_level()` | **Live** — the only routing axis |
+| (filename) | `for_file()` | **Live** — via `PASS_EXTRAS` |
+| `genre` | `for_genre()` | **Live** — the genre-scoped pass only |
+| `category` | `for_category()` | Declared, not routed — and not the same axis as a finding category |
+| `requires` | `requiring()` | Declared, not routed — tokens validated against `KnowledgeBase.CAPABILITIES` |
+| `confidence_tier` | `by_confidence_tier()` | Declared — orders the prompt budget, does not select rules |
+| `related_rules` | — | Declared, not routed — cross-references validated by `tests/test_kb_schema.py` |
+
+`tests/test_kb_schema.py` enforces the shape of the above;
+`tests/test_rules_grounding.py` enforces the routing table itself — that every
+mapped level holds rules, that a pass cannot ask for grounding it does not
+receive, and that an unrouted key is declared as such.
 
 ## Status
 

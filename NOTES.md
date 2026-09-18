@@ -751,3 +751,54 @@ phase6 28/28, phase7 15/15, smoke 18/18.
 PROCESS NOTE (mine): I made the rename edit BEFORE grepping for what depended on those values, and only
 found _DETERMINISTIC_RULE_IDS afterwards. Caught before running anything, but the order was wrong - grep
 first.
+
+--- T14: the last two Tier 1 items, plus a third dangling-reference class (2026-09-18) ---
+
+T1.2 (F6) CLOSED AS DOCUMENTED, NOT FIXED. Measured first: every mapped taxonomy level holds rules (no
+fourth silent-empty), and no level with rules is unmapped. `pitch` and `revision` ARE routed - not by their
+mapping key but by PASS_EXTRAS (logline_test -> pitch.json, scene_function -> revision.json). Only
+`continuity` has no pass, and that is deliberate: continuity is deterministic by design (continuity.py:
+"they read the parsed structure directly so they work even when the server's context is too small for the
+model passes"). Its two KB-backed checks cite timeline_consistency and character_trait_continuity as
+`rule_id`, which after T12/T1.7 puts those rules in the report tooltip AND the co-writer's craft block. So
+2 of the 4 are attributed though none is injected. Giving prop_continuity and
+world_rule_consistency_continuity a home means a model-based continuity pass - a FEATURE (13th category:
+prompt, grammar, mock, tests), not a wiring fix. Not built.
+Shipped: UNROUTED_CATEGORIES names the three unrouted keys with the reason; two guards pin it in BOTH
+directions - a live pass with no key (the silent-empty bug) and a key with no pass (grounding that never
+happens).
+
+T1.6 (F9). The defect was never the three methods - it was README.md promising retrieval by
+"taxonomy_level and/or category" when only taxonomy_level routes. Same class as the DEVELOPMENT.md:59 lie
+that produced the original bug. Now: KnowledgeBase.CAPABILITIES DECLARES the capability vocabulary
+(scene_text, scene_summaries, knowledge_graph, page_estimates) instead of it being inferred from the JSON,
+so a typo is caught rather than silently mis-gating a rule; stats() builds its tier distribution THROUGH
+by_confidence_tier() so the query API runs on every call instead of beside a duplicate inline
+comprehension; README gained a table of live vs declared-only axes; new tests/test_kb_schema.py (7 tests)
+exercises all three APIs and validates the schema's shape. NOT wired into grounding on purpose - which
+rules reach a prompt is a quality change that cannot be measured without a live model.
+
+T1.9 (NEW, found while doing T1.6): 14 `related_rules` cross-references named rules that do not exist.
+`related_rules` is populated on 261 of 263 rules and consumed by nothing, so a broken reference was
+invisible - the THIRD instance of the dangling-reference class after the plot_thread key and the six
+rule_ids. Six were prefix-omissions in psychology.json and are repointed (sunk_cost -> loss_aversion
+becomes -> cognitive_bias_loss_aversion, etc). The other 8 reference concepts never authored
+(egri_central_thesis, cron_third_rail, nonverbal_cluster_reading, manipulation_flattery, ...) - a to-author
+list, not noise, so they are kept and named in _KNOWN_UNAUTHORED_TARGETS, asserted as a SUBSET so
+authoring one is fine but adding a new dangling reference fails.
+
+T1.10 (NEW, a pre-existing test flake, NOT a product bug): test_revision.py::
+TestLastPass::test_duplicate_ids_no_phantom_progress flaked ~1 run in 2, full-suite only, 12/12 solo. The
+test simulates a second pass by rewriting the report BYTE-IDENTICALLY; the (mtime, report_sig) guard then
+cannot tell it from a repeated GET - which is CORRECT, because an identical report with an unchanged mtime
+genuinely is indistinguishable from no rewrite, and the signature cannot help when the content did not
+change either. In production a re-analysis runs minutes later so the mtime always differs. Fixed the
+simulation, not the product: _write_report_as_new_pass() advances the mtime explicitly.
+
+SELF-CRITIQUE: my own new test caught a flaw in my EARLIER verification. I had checked "no pass injects a
+continuity rule" by iterating the mapping KEYS - which include `continuity` itself, so
+rules_for_pass("continuity") looked live. The claim was right; the check was sloppy. Same lesson as the
+port-1554 argument: right conclusion, wrong proof.
+
+GATE: non-browser 776 passed / 0 failures / 1 warning (+9 tests: 7 schema + 2 census); flake fix verified
+over 3 consecutive full-suite runs.

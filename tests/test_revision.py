@@ -290,6 +290,25 @@ class TestFindingIntents:
         assert revision.finding_intents(m) == {}
 
 
+def _write_report_as_new_pass(m, report):
+    """Write the report the way a fresh analysis pass would, mtime included.
+
+    A real second pass runs minutes after the first, so its mtime differs. A
+    test that rewrites within the same filesystem timestamp tick looks like a
+    repeated GET to the `(mtime, report_sig)` guard — and that is correct
+    behaviour, not a bug: a *byte-identical* report whose mtime did not change
+    genuinely is indistinguishable from no rewrite, and the signature cannot
+    help because the content did not change either. The mtime is therefore
+    advanced explicitly so the simulation is faithful.
+
+    Only needed when the rewritten content is identical; a content change
+    already forces the recompute through the signature.
+    """
+    json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+    st = os.stat(m.report_findings_path)
+    os.utime(m.report_findings_path, (st.st_atime, st.st_mtime + 1))
+
+
 class TestLastPass:
     def test_first_pass_returns_none(self, tmp_path, sample_fountain, mock_server):
         m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
@@ -370,9 +389,11 @@ class TestLastPass:
         json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
         seed = revision.last_pass_snapshot(m)
         assert seed is None  # first snapshot seeds, no arithmetic yet
-        # pass 2: byte-identical report (the writer touched nothing)
+        # pass 2: byte-identical report (the writer touched nothing). The
+        # content is unchanged, so only the mtime marks this as a NEW pass —
+        # see _write_report_as_new_pass for why that has to be explicit.
         report = json.load(open(m.report_findings_path, encoding="utf-8"))
-        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        _write_report_as_new_pass(m, report)
         lp = revision.last_pass_snapshot(m)
         assert lp is not None
         assert lp["last_total"] == distinct  # distinct ids, not raw row count
