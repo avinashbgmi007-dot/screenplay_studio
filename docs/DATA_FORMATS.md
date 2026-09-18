@@ -208,7 +208,14 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
       "severity": "low",                  // low | medium | high
       "scene_refs": [1],
       "evidence_quote": "I'll tell you everything when this is over.",  // null when reasoning-only
-      "rule_id": null,                    // knowledge-base rule id when grounded
+      "rule_id": null,                    // knowledge-base rule id when grounded; MUST resolve in the
+                                          //   KB — the UI renders it as "Grounded in knowledge-base
+                                          //   rule <id>" (app.js:4066). Omit when no rule applies.
+      "check_id": null,                   // a deterministic pass's own stable name (voice_bleed,
+                                          //   pacing_drag, unmarked_time_flip, ...). NEVER a KB id.
+                                          //   Required for passes that regenerate every run —
+                                          //   AnalysisResult._DETERMINISTIC_CHECK_IDS + merge() use it
+                                          //   to drop stale copies on a partial retry.
       "verification": {
         "status": "verified",             // verified | not_found | no_quote | scene_not_found
         "matched_scene": 1,               // scene the quote matched in (verified only)

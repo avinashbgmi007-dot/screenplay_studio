@@ -731,3 +731,23 @@ every check_id is registered in _DETERMINISTIC_CHECK_IDS and is NOT a KB id; mer
 
 GATE: non-browser 760 passed / 0 failures (+9 tests; test_rules_grounding.py 30 -> 39);
 browser phase6 28/28, phase7 15/15, smoke 18/18.
+
+### T1.8b - the residual I nearly shipped: existing reports still lied
+
+Fixing the SOURCE does nothing for reports already on disk. Checked: both staged projects carried the legacy
+shape (P11_Gate and Pain_3 each held `rule_id: "unmarked_time_flip"`), so the false tooltip would have
+persisted for exactly the projects the writer is about to look at.
+
+`_sanitize_report` (webapp_server.py:245) already exists for this pattern - its docstring says it is
+"applied at serve time so projects analyzed before the filter existed display the same clean report without
+a re-analysis" - so the re-filing went there. `_normalize_rule_ids()` moves any `rule_id` that does not
+resolve in the KB to `check_id`; the lookup is lru_cached and guarded, and without a KB nothing is touched
+(we cannot then tell a stale id from a real one). Verified on the real files: Pain_3's served report now
+exposes only setup_payoff_general, which resolves.
+
+GATE: non-browser 767 passed / 0 failures (+7 webapp tests); browser gates re-run after the webapp change -
+phase6 28/28, phase7 15/15, smoke 18/18.
+
+PROCESS NOTE (mine): I made the rename edit BEFORE grepping for what depended on those values, and only
+found _DETERMINISTIC_RULE_IDS afterwards. Caught before running anything, but the order was wrong - grep
+first.

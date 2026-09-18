@@ -24,6 +24,8 @@ import time
 import traceback
 import zipfile
 
+from functools import lru_cache
+
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 
 from .jsonio import check_safe_id
@@ -242,6 +244,41 @@ def _sync_server_url_to_projects(server_url: str, model=_UNSET) -> None:
             continue  # unreadable project dir — never let one bad manifest break the settings save
 
 
+@lru_cache(maxsize=1)
+def _kb_rule_ids() -> frozenset:
+    """The real knowledge-base rule ids, resolved once. Empty when the
+    knowledge base isn't installed — callers then leave reports untouched,
+    because without it we cannot tell a real id from a stale one."""
+    try:
+        from knowledge_base import KnowledgeBase
+    except ImportError:
+        return frozenset()
+    return frozenset(r.id for r in KnowledgeBase().all())
+
+
+def _normalize_rule_ids(findings: list) -> list:
+    """Re-file a `rule_id` that is not a knowledge-base rule as `check_id`.
+
+    The UI renders `rule_id` as "Grounded in knowledge-base rule <id>"
+    (app.js:4066), so a value that does not resolve in the KB is a false
+    claim. Reports written before that contract was split stored the
+    deterministic passes' own check names (voice_bleed, pacing_drag,
+    unmarked_time_flip, ...) in `rule_id`; this moves them at serve time, so
+    an existing project displays honestly without a re-analysis."""
+    known = _kb_rule_ids()
+    if not known:
+        return findings
+    out = []
+    for f in findings:
+        rid = f.get("rule_id") if isinstance(f, dict) else None
+        if rid and rid not in known:
+            f = dict(f)
+            f.pop("rule_id", None)
+            f.setdefault("check_id", rid)
+        out.append(f)
+    return out
+
+
 def _sanitize_report(report: dict) -> dict:
     """Drop non-writing feedback (dialect identification, subtitle meta-
     commentary) from a stored report before it reaches the writer. Applied at
@@ -253,7 +290,7 @@ def _sanitize_report(report: dict) -> dict:
     if isinstance(findings, list):
         from screenplay_analyzer.feedback_filter import filter_findings
         report = dict(report)
-        report["findings"] = filter_findings(findings)
+        report["findings"] = _normalize_rule_ids(filter_findings(findings))
     return report
 
 
