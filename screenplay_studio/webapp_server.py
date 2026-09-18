@@ -2006,15 +2006,15 @@ def _load_session_and_engine(project: str, session_id: str):
         memory = None  # memory unavailable or unreadable — never break the chat
     # The writer's past work rides along so Sameer/the doctor can draw on
     # earlier scripts — with the current project excluded so the digest never
-    # blurs into the script on the desk.
-    try:
-        lib_mod = _import_cowriter("writer_library")
-        lib_text = lib_mod.library_digest_text(_writer_library(exclude=project))
-    except Exception:
-        lib_text = None
+    # blurs into the script on the desk. Both blocks are passed as PROVIDERS:
+    # this function runs for GET/DELETE/branch-switch requests that never
+    # build a prompt, and the shelf walk must not happen for them (C10).
+    library_text, case_file_text = _shelf_providers(project)
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
-                            memory_scope=f"project:{project}", writer_library_text=lib_text,
-                            mood_text=_mood_fragment(m), doctor_case_text=_doctor_case_file(exclude=project))
+                            memory_scope=f"project:{project}",
+                            writer_library_text=library_text,
+                            mood_text=_mood_fragment(m),
+                            doctor_case_text=case_file_text)
     return session, engine, store
 
 
@@ -2403,10 +2403,99 @@ def _mood_fragment(m) -> str | None:
         return None  # mood is garnish — never break a chat turn
 
 
+# ---------------------------------------------------------------------------
+# Shelf digests: lazily built, memoised on a stat-only fingerprint (C10).
+#
+# The writer's past-work digest and the doctor's case file are both computed by
+# walking every project on the shelf and parsing its JSON. That walk used to
+# run on every session request — including GET, DELETE and branch switches,
+# which never build a prompt — and on every chat turn whether or not the shelf
+# had changed. The cost scales with the shelf: ~8 ms for the five tiny probe
+# projects on this machine, but a shelf of feature-length parses is roughly
+# 100x the JSON, so a mature library pays seconds per turn for a digest that
+# is usually identical to the one built a moment ago.
+#
+# Two changes:
+#   1. the server hands the engine *providers* (zero-arg callables) instead of
+#      finished strings, and the engine resolves them only when it builds a
+#      prompt (engine.py: _resolve_prompt_block). A request that never
+#      generates now does no shelf work at all.
+#   2. each provider memoises on a fingerprint of exactly the files it reads,
+#      so an unchanged shelf costs a handful of stat() calls instead of
+#      parsing every project's JSON.
+#
+# The fingerprint is (name, mtime_ns, size) per file. It opens nothing, and it
+# covers re-analysis, applied edits, a new project and a deletion — so a stale
+# digest cannot survive a change to any input.
+# ---------------------------------------------------------------------------
+
+_SHELF_DIGEST_FILES = ("parsed.json", "report.findings.json", "project.json", "working.json")
+
+_SHELF_CACHE: dict = {}
+_SHELF_CACHE_LOCK = threading.Lock()
+# A shelf change adds a cache key rather than invalidating one, so the map is
+# bounded; the oldest entry is evicted once it grows past this.
+_SHELF_CACHE_MAX = 8
+
+
+def _file_stamp(path: str):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _shelf_fingerprint(exclude: str | None = None):
+    """Stat-only fingerprint of the shelf, covering every file the two digests
+    read. None when the shelf itself cannot be listed — a transient failure
+    that must not be cached."""
+    root = os.path.abspath(PROJECTS_DIR)
+    try:
+        names = sorted(os.listdir(root))
+    except OSError:
+        return None
+    rows = []
+    for name in names:
+        if name == "ideas" or name == exclude:
+            continue
+        d = os.path.join(root, name)
+        if not os.path.isdir(d):
+            continue
+        rows.append((name, tuple(_file_stamp(os.path.join(d, f)) for f in _SHELF_DIGEST_FILES)))
+    return (root, tuple(rows))
+
+
+def _cached_shelf_digest(key: str, fingerprint, build):
+    """Memoise build() against a shelf fingerprint. The cached value is
+    returned as-is — callers must treat it as read-only. A None fingerprint
+    (the shelf cannot be listed) is never cached: it is a transient failure,
+    not a state worth remembering."""
+    if fingerprint is None:
+        return build()
+    cache_key = (key, fingerprint)
+    with _SHELF_CACHE_LOCK:
+        if cache_key in _SHELF_CACHE:
+            return _SHELF_CACHE[cache_key]
+    value = build()
+    with _SHELF_CACHE_LOCK:
+        _SHELF_CACHE[cache_key] = value
+        while len(_SHELF_CACHE) > _SHELF_CACHE_MAX:
+            _SHELF_CACHE.pop(next(iter(_SHELF_CACHE)), None)
+    return value
+
+
 def _doctor_case_file(exclude: str | None = None) -> str | None:
     """Dr. Sushruta's case file on the WRITER: patterns across their whole shelf,
     computed from manifests + findings + edit logs. Evidence-only — patterns and
-    numbers, never passages. None when there's nothing to say."""
+    numbers, never passages. None when there's nothing to say.
+
+    Memoised on the shelf fingerprint (see _cached_shelf_digest)."""
+    return _cached_shelf_digest("case_file", _shelf_fingerprint(exclude),
+                                lambda: _build_doctor_case_file(exclude))
+
+
+def _build_doctor_case_file(exclude: str | None = None) -> str | None:
     try:
         root = os.path.abspath(PROJECTS_DIR)
         if not os.path.isdir(root):
@@ -2474,12 +2563,54 @@ def _doctor_case_file(exclude: str | None = None) -> str | None:
 
 
 def _writer_library(exclude: str | None = None) -> list[dict]:
-    """Digest of the writer's parsed projects — deterministic, no model calls."""
+    """Digest of the writer's parsed projects — deterministic, no model calls.
+
+    Memoised on the shelf fingerprint, so the sidebar poll and the per-turn
+    prompt share one walk instead of one each. Treat the result as read-only."""
     try:
         lib_mod = _import_cowriter("writer_library")
-        return lib_mod.build_library(PROJECTS_DIR, exclude=exclude)
-    except (CowriterUnavailableError, OSError, ValueError):
+    except CowriterUnavailableError:
         return []
+    return _cached_shelf_digest("library", _shelf_fingerprint(exclude),
+                                lambda: _build_library(lib_mod, exclude))
+
+
+def _build_library(lib_mod, exclude: str | None) -> list[dict]:
+    try:
+        return lib_mod.build_library(PROJECTS_DIR, exclude=exclude)
+    except (OSError, ValueError):
+        return []
+
+
+def _shelf_providers(exclude: str | None):
+    """The two deferred shelf blocks for one request, as zero-arg providers.
+
+    The engine calls each only when it actually builds a prompt, so a request
+    that never generates never touches the shelf. They share ONE fingerprint,
+    so the doctor's turn — the only one that builds both — pays for the stat
+    walk once instead of twice.
+    """
+    box: dict = {}
+
+    def fingerprint():
+        if "fp" not in box:
+            box["fp"] = _shelf_fingerprint(exclude)
+        return box["fp"]
+
+    def library_text():
+        try:
+            lib_mod = _import_cowriter("writer_library")
+        except CowriterUnavailableError:
+            return None
+        library = _cached_shelf_digest("library", fingerprint(),
+                                       lambda: _build_library(lib_mod, exclude))
+        return lib_mod.library_digest_text(library) or None
+
+    def case_file_text():
+        return _cached_shelf_digest("case_file", fingerprint(),
+                                    lambda: _build_doctor_case_file(exclude))
+
+    return library_text, case_file_text
 
 
 @app.route("/api/writer-library", methods=["GET"])

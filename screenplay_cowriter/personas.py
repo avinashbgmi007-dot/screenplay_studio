@@ -42,6 +42,13 @@ HUMAN_VOICE_RULES = (
 # verdict-first, and his praise is rare enough to bank. Each knows the other
 # exists and holds their own line against him.
 
+# The script doctor is the only persona that reads the cross-project case file
+# (the gate lives in context.build_system_prompt). Named here so that gate and
+# the server's lazy provider cannot drift apart: a mismatched literal on one
+# side would silently stop the doctor's case file from ever being built — the
+# same silent-empty class as the `plot_thread` grounding break.
+DOCTOR_PERSONA = "script_consultant"
+
 PERSONAS = {
     "script_consultant": (
         "You are Dr. Sushruta, an experienced script doctor who has read this screenplay closely "

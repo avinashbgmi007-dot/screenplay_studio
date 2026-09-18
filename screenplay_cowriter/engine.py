@@ -7,6 +7,7 @@ free operations that don't need a model call — this module handles only the
 
 from .models import Session, Message
 from .llm_client import LlamaServerClient
+from .personas import DOCTOR_PERSONA
 from .context import (
     ScriptContext, ReportContext, build_system_prompt, build_scene_context_block,
     resolve_referenced_scenes,
@@ -27,6 +28,28 @@ from .reply_transforms import (
 REPEAT_PENALTY = 1.3
 
 HISTORY_WINDOW = 16  # most recent messages kept verbatim; older context relies on the standing report summary
+
+
+def _resolve_prompt_block(value):
+    """A prompt block may be given as text or as a zero-arg callable.
+
+    The callable form exists so the server can defer its cross-project shelf
+    scan (the writer's past-work digest and the doctor's case file) to the
+    moment a prompt is actually built — loading a session, switching a branch
+    or deleting a chat never generates, so it must never pay for a digest it
+    will not use. Resolving here, on the one path that builds a prompt, also
+    means no caller can forget to pass one: a caller that omits it would
+    otherwise silently strip the co-writer's memory of the writer's shelf.
+
+    A provider that raises yields None. These blocks are context, never a
+    dependency, and an unreadable shelf must not break the chat.
+    """
+    if value is None or isinstance(value, str):
+        return value
+    try:
+        return value()
+    except Exception:
+        return None
 
 # Voice drift detection: track AI tells per persona to catch slow drift
 _VOICE_DRIFT_HISTORY = {}  # persona -> list of tell counts per reply
@@ -100,11 +123,14 @@ class CoWriterEngine:
         # writer_library.py). When present it rides in every turn so Sameer /
         # the doctor can draw on earlier scripts without confusing them with
         # the current one. None by default — CLI stays byte-identical.
+        # Accepts a string or a zero-arg provider (see _resolve_prompt_block);
+        # the server passes a provider so the shelf scan is deferred.
         self.writer_library_text = writer_library_text
         # Deterministic room state (facts from real project data) and the
         # doctor's cross-project case file. Both optional; build_system_prompt
         # routes the case file to the script_consultant persona only. None by
-        # default — CLI byte-identical.
+        # default — CLI byte-identical. The case file likewise accepts a
+        # provider; it is resolved only for the persona that reads it.
         self.mood_text = mood_text
         self.doctor_case_text = doctor_case_text
 
@@ -226,6 +252,16 @@ class CoWriterEngine:
             cold_start_line = None
         relationship_card = self.memory.card_text(scope=self.memory_scope) if self.memory is not None else None
 
+        # Resolve the deferred shelf blocks once per turn — and only for the
+        # persona that actually reads each one. The case file is the doctor's
+        # lens alone, so building it for the other seven personas is a
+        # cross-project scan whose output build_system_prompt would discard.
+        writer_library_text = _resolve_prompt_block(self.writer_library_text)
+        doctor_case_text = (
+            _resolve_prompt_block(self.doctor_case_text)
+            if branch.active_persona == DOCTOR_PERSONA else None
+        )
+
         # Explicit 'scene N' mentions plus scenes where a named character
         # speaks — writers ask about their script by naming people, and the
         # model can only ground on text it's actually shown.
@@ -274,8 +310,8 @@ class CoWriterEngine:
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
-                premise=self.premise, writer_library_text=self.writer_library_text,
-                mood_text=self.mood_text, doctor_case_text=self.doctor_case_text,
+                premise=self.premise, writer_library_text=writer_library_text,
+                mood_text=self.mood_text, doctor_case_text=doctor_case_text,
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
             if lang_note:
                 system_prompt += "\n\n" + lang_note
@@ -297,8 +333,8 @@ class CoWriterEngine:
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
-                premise=self.premise, writer_library_text=self.writer_library_text,
-                mood_text=self.mood_text, doctor_case_text=self.doctor_case_text,
+                premise=self.premise, writer_library_text=writer_library_text,
+                mood_text=self.mood_text, doctor_case_text=doctor_case_text,
             )
             if lang_note:
                 system_prompt += "\n\n" + lang_note

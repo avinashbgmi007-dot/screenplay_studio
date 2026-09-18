@@ -23,7 +23,7 @@ import json
 import re
 from difflib import SequenceMatcher
 
-from .personas import persona_text, persona_examples, mode_text
+from .personas import persona_text, persona_examples, mode_text, DOCTOR_PERSONA
 
 SCENE_REF_RE = re.compile(r"[Ss]cene\s+(\d+)")
 
@@ -362,7 +362,7 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         # never model-improvised). Colors energy/patience; carries no facts
         # the persona could misquote as script content.
         prompt += f"\n\n{mood_text}"
-    if doctor_case_text and persona == "script_consultant":
+    if doctor_case_text and persona == DOCTOR_PERSONA:
         # The doctor's case file on this writer — cross-project PATTERNS only,
         # never script content. Sameer never sees it; it's not his lens.
         prompt += f"\n\n{doctor_case_text}"
