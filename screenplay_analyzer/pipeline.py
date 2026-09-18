@@ -823,6 +823,21 @@ def analyze(
     # is noise for the writer, not feedback. Filter after verification so
     # the summary reflects exactly what the writer will see.
     result.findings = filter_findings(result.findings)
+
+    # 8b. cross-rule dedup (§5 item 3) — the same defect filed under related rules
+    # in the same scene becomes one finding, which STATES what it absorbed. Runs
+    # before the verification summary and the evidence depth so every downstream
+    # count describes the set the writer actually receives.
+    before_dedup = len(result.findings)
+    try:
+        from .dedupe import dedupe_related_findings
+        result.findings = dedupe_related_findings(result.findings)
+    except Exception as e:
+        # A dedup that cannot read the cluster map must leave the findings alone,
+        # never guess at what is related — and must never fail the run.
+        result.errors.append(f"Cross-rule dedup skipped: {e}")
+    merged_away = before_dedup - len(result.findings)
+
     result.verification = verification_summary(result.findings)
 
     # 9. evidence depth — computed LAST, on the filtered list, so the number the
@@ -831,6 +846,8 @@ def analyze(
     # and the webapp, so no new plumbing is needed to surface it.
     result.stats = result.stats or {}
     result.stats["evidence_depth"] = evidence_depth(result.findings)
+    if merged_away:
+        result.stats["findings_merged"] = merged_away
 
     emit("done", "complete", "Analysis complete")
     return result

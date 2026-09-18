@@ -673,3 +673,102 @@ the pass wiring exactly). It surfaces in three places:
 
 
 
+---
+
+# WAVE 4 — cross-rule dedup (§5 item 3)
+
+The item, verbatim: *"Cross-rule finding dedup — the same defect filed under 2–3
+related rule_ids (subtext/exposition cluster) should merge; generalize the existing
+setup/payoff ledger dedup."*
+
+**The item is real, and it was confirmed on real data before anything was built.**
+On `gun_pen_2` scene 2, one on-the-nose exposition problem arrives as three findings:
+
+```
+On-the-Nose Dialogue vs. Subtext   "Dialogue is on-the-nose, explicitly stating..."
+Say the Opposite                   "Dialogue contains multiple on-the-nose statements..."
+Exposition as Ammunition           "Dialogue is purely functional exposition..."
+```
+
+A fourth dialogue finding in the same scene, `Distinct Character Voice`, is a
+genuinely different defect and must survive.
+
+## Two measured facts killed the obvious implementations
+
+**Text similarity finds nothing.** Across all 36 findings in the real report, no pair
+reached even 0.19 similarity — the model wrote different prose for each rule. A
+text-based dedup is a no-op here.
+
+**The transitive closure of `related_rules` is far too coarse — and it is wrong.**
+`related_rules` is written one-directionally, so it is symmetrised here. But *chaining*
+those edges collapses 271 rules into clusters of up to 61 members, and puts
+`distinct_character_voice` in the **same** cluster as `on_the_nose_vs_subtext`.
+**The first implementation used the closure: it merged 36 findings down to 10 and
+swallowed the voice finding** — precisely the error the item exists to prevent. The
+real report caught it; no unit test would have.
+
+So the merge predicate is a **direct edge**, evaluated only between findings that are
+both present and in the same scene:
+
+```
+merge(A, B)  iff  A and B share a scene
+             and  B's rule is in A's related_rules (or vice versa)
+```
+
+That is precise where the closure is not: the trio are pairwise linked through
+`on_the_nose_vs_subtext`, while `distinct_character_voice` has no direct edge to any
+of them. Restricting the closure to the findings actually present is what keeps it
+local.
+
+## Measured result on the real report
+
+**36 findings → 21** (15 merged). Scene 2: `On-the-Nose` absorbs `Say the Opposite`
+and `Exposition as Ammunition`; **`Distinct Character Voice` is preserved**. Scene 3:
+`Laying Pipe` absorbs the same two rules — correctly, because a defect in a different
+scene is a different fix.
+
+Nothing is dropped: the survivor keeps its own text and gains a `merged_rule_ids` list
+plus a clause on `why_it_matters` (*"Also flagged under: …"*), so a writer reading one
+card sees that other rules agreed. Same "flag, don't silently drop" policy as the
+verifier. A dedup that quietly deletes a finding is the same failure as the one it
+fixes.
+
+Also merged: the same rule twice in the same scene (a duplicate by definition), and
+the same rule in two scenes is deliberately **not** merged — that is the Pain_3 case,
+where `unmarked_time_flip` fires at scenes 13→14 and 17→18. Those are two separate
+flips needing two separate fixes.
+
+## Honest limitations
+
+- **The KB's relation graph is dense**, so a rule can be directly related to a dozen
+  others. The merge is only as good as that data; if two rules are wrongly related,
+  two distinct findings can merge. The survivor names what it absorbed, so the loss is
+  visible rather than silent.
+- **`principles`-style structural merges are the aggressive end.** On the real report,
+  `Three-Act Structure` absorbed four structure rules. Defensible (one structural
+  problem, four lenses) but it is the kind of merge a writer may want un-done; there is
+  no un-merge.
+- **A finding with no scene is never merged**, so script-level duplicates survive.
+  Deliberate: merging them by rule alone would combine observations from different
+  parts of the script.
+- **`unmarked_time_flip` is not a KB rule id** (the continuity pass writes a
+  non-KB id into `rule_id`), so it can never be related to anything. This is the
+  `rule_id` / `check_id` split the earlier audit flagged, resurfacing from the other
+  direction — noted, not fixed here.
+
+## Verification
+
+- `tests/test_cross_rule_dedup.py` (new, 31): the relation map (symmetry, no
+  self-relation, the unrelated pair, and **a test that documents the closure being too
+  coarse** so the justification cannot silently go stale); rule-reference resolution
+  for both id and display name; the trio collapsing; **the voice finding surviving**;
+  same-rule-two-scenes staying two; no-scene never merging; severity and tie-break
+  survivor selection; scene union; the stated clause; input not mutated; idempotence;
+  and the pipeline wiring (including that a dedup failure is recorded, not swallowed).
+- Suite: **1055 passed / 0 failures / 0 errors** (was 1024; +31).
+- Three test bugs of mine, caught by running them: an empty `by_name` map, a rule id
+  assumed to be in the KB that is not, and `kb=None` meaning "load the default KB"
+  rather than "no KB".
+
+
+

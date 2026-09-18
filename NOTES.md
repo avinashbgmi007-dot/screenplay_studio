@@ -1425,3 +1425,57 @@ SELF-CAUGHT TEST BUG
 - AnalysisResult(doc) takes a required `doc` — the report-rendering helper could not
   construct a bare result.
 
+
+================================================================================
+2026-09-19 — WAVE 4: cross-rule dedup (§5 item 3)
+================================================================================
+Item verbatim: "the same defect filed under 2-3 related rule_ids (subtext/exposition
+cluster) should merge; generalize the existing setup/payoff ledger dedup."
+CONFIRMED ON REAL DATA FIRST: gun_pen_2 scene 2 files ONE on-the-nose exposition
+problem as THREE findings (On-the-Nose Dialogue vs. Subtext / Say the Opposite /
+Exposition as Ammunition), while a 4th dialogue finding in the same scene —
+Distinct Character Voice — is a genuinely different defect.
+
+TWO MEASURED FACTS KILLED THE OBVIOUS IMPLEMENTATIONS
+1. Text similarity finds NOTHING: across all 36 real findings no pair reached 0.19.
+   The model wrote different prose per rule.
+2. The transitive closure of related_rules is TOO COARSE *and WRONG*: it collapses
+   271 rules into clusters of up to 61 and puts distinct_character_voice in the SAME
+   cluster as on_the_nose_vs_subtext. **The first implementation used the closure: 36
+   findings -> 10, swallowing the voice finding.** The real report caught it; no unit
+   test would have. Lesson: run a dedup against real output before believing it.
+
+THE PREDICATE (screenplay_analyzer/dedupe.py)
+  merge(A,B) iff A and B share a SCENE and B's rule is in A's related_rules (or vice
+  versa) — a DIRECT edge, evaluated only between findings actually present.
+Also merges the same rule twice in one scene. Never merges a finding with no scene.
+The closure is restricted to the present findings, which is what keeps it local.
+
+MEASURED RESULT on the real report: 36 -> 21 (15 merged).
+  scene 2: On-the-Nose absorbs Say the Opposite + Exposition as Ammunition;
+           ** Distinct Character Voice is PRESERVED **
+  scene 3: Laying Pipe absorbs the same two rules (a different scene IS a different fix)
+Nothing is dropped: the survivor gains merged_rule_ids AND a stated clause on
+why_it_matters ("Also flagged under: ..."), so one card shows that other rules agreed.
+
+LIMITATIONS (flagged)
+- the KB relation graph is dense; a wrong edge can merge two distinct findings. The
+  survivor names what it absorbed, so the loss is visible, not silent.
+- structural merges are the aggressive end (Three-Act Structure absorbed 4 rules on
+  the real report). Defensible, but there is no un-merge.
+- script-level findings (no scene) are never merged, so duplicates there survive.
+- `unmarked_time_flip` is NOT a KB rule id (the continuity pass writes a non-KB id
+  into rule_id) so it can never be related to anything — the rule_id/check_id split
+  the earlier audit flagged, resurfacing from the other direction. Noted, not fixed.
+
+TESTS
+tests/test_cross_rule_dedup.py (new, 31), including a test that DOCUMENTS the closure
+being too coarse so the justification cannot silently go stale, and a pipeline-wiring
+test proving the dedup actually runs (a perfect module that never runs is worthless).
+Gate: 1055 passed / 0 failures (+31 from 1024); browser smoke 18/18, phase7 15/15,
+phase6 28/28.
+
+SELF-CAUGHT TEST BUGS
+- passed an empty by_name map; assumed `unmarked_time_flip` was a KB rule id (it is
+  not); and `kb=None` means "load the default KB", not "no KB".
+
