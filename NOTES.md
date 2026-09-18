@@ -956,3 +956,217 @@ TESTS: 4 new in test_writer_library.py (flag reaches the prompt; no `?` placehol
 a readable neighbour unaffected).
 
 GATE: non-browser 831 passed / 0 failures / 0 errors; browser phase7 15/15, smoke 18/18, phase6 28/28.
+
+================================================================================
+gun_pen.pdf — FULL FEEDBACK-PROJECTION AUDIT (session-only, 2026-09-18)
+================================================================================
+Plan: docs/gun_pen.pdf_full_feedback_audit_—_split_matrix,_es-09142139.plan.md
+Method: live studio on the REAL llama-server (localhost:8080,
+qwen3.6-35b-a3b-pruned-v2.gguf), project `gun_pen_2`. 6 PDF pages, real text layer
+(5,762 chars), 3 scenes, parse confidence LOW, 35 findings / 13-13 categories ok /
+527s. Audit harness: tests/e2e_browser_gun_pen_audit.py (stages matrix | escalation |
+inbetween | pass2 | cleanbill). Screenshots: impl-shots/. NO production code changed.
+TWO passes were run: pass 1 (35 findings) and pass 2 (36 findings, re-analysis over a
+BYTE-IDENTICAL parsed.json — the writer's edits go to working.json, which the analyzer
+does not read). Pass 2 is what proves G1 and G8; both are filed below.
+
+--------------------------------------------------------------------------------
+GAPS FILED (product promises the desk does not keep)
+Read G1 and G8 FIRST — they are the two REAL-MODEL-STRUCTURAL findings, both proven
+against pass 2's byte-identical analyzer input. G2–G7 were filed in pass 1.
+--------------------------------------------------------------------------------
+
+--- G1 (CRITICAL, trust) — every dialogue finding reads "addressed" on an UNEDITED
+    script, and the board then DELETES the Dialogue category ---
+MECHANISM (PROVEN, with a worked example — not inferred):
+- revision.quote_present() (revision.py:548) does `any(target in t for t in all_texts)`
+  then a SequenceMatcher ratio >= 0.95 — comparing the RAW quote against ONE ELEMENT
+  at a time (elements are ~35 chars, line-wrapped).
+- screenplay_analyzer.verifier._normalize (verifier.py:26) LOWERCASES and STRIPS
+  PUNCTUATION (re.sub(r"[^\w\s]", "", …)), joins a scene's elements into one string,
+  and matches containment against that; else a sliding-window fuzzy at >= 0.72.
+Two independent reasons the engine misses a quote the verifier accepts (either
+suffices): the quote SPANS TWO line-wrapped elements (the engine only ever compares a
+quote to one element), and the model wrote STRAIGHT quotes where the script has CURLY
+ones (the verifier strips both, the engine strips neither).
+WORKED EXAMPLE, verbatim from parsed.json Scene 1:
+    element[7]  'yudhame jarguthundi... “you are the'
+    element[8]  'sum of all your choices”'
+    finding.evidence_quote  '"you are the sum of all your choices"'
+  => verifier: verified, confidence 1.0.  quote_present(): False => "addressed".
+HOW STRONG ARE THE 8 (re-measured with the verifier's own normaliser):
+  6 verbatim in the script (verifier conf 1.0) — the engine is flatly wrong
+  1 accepted by the verifier at 0.82 fuzzy   — model paraphrase
+  1 genuine paraphrase (not_found, 0.56)     — "addressed" accidentally nearer true
+finding_statuses never consults the writer's intent — "addressed" is PURELY
+quote_present() == False, so the phantom is structural, not a one-off.
+EVIDENCE, PASS 1 (35 findings): `cmp` says working.json == parsed.json (IDENTICAL —
+no edits made). findings_status = {addressed: 7, still_present: 2, unknown: 26}.
+quote_present() is True for only 2 of the 9 verified quotes (both short enough to
+fit one wrapped line); all 7 Telugu/Tenglish voiceover quotes -> False.
+EVIDENCE, PASS 2 (36 findings, STRENGTHENED — measured against the PRISTINE
+parsed.json, the analyzer's own input, never edited): findings_status =
+{addressed: 8, still_present: 1, unknown: 27}; ALL 8 addressed are DIALOGUE, and
+7 of the 8 carry verification.status == "verified" (the verifier FOUND the quote in
+the script the status engine says it is gone from) — 6 of those verbatim at
+confidence 1.0. Report: dialogue 8 · structure 7
+· character 5 · scene_function 5 · genre 5 · theme 3 · plot_thread 2 · continuity 1.
+=> 100% of dialogue findings are falsely "addressed", on BOTH real-model passes.
+DESK CONSEQUENCE (measured with the audit's own writer marks CLEARED, so this is
+unpolluted): client disposition = 28 open / 8 addressed. The board's sections render
+FINDINGS — SCENE 1 · SCRIPT-LEVEL FINDINGS · CONTINUITY 1 · STRUCTURE 7 · THEME 3 ·
+CHARACTER 5 · SCENE FUNCTION 5 · PLOT ECONOMY 2 · GENRE 5 · COVERAGE · SETUP/PAYOFF —
+NO DIALOGUE. The mass strip's own category summary reads "Structure 7 · Character 5
+· Scene function 5 · Genre 5 · Theme 3 · Plot economy 2 · Continuity 1" — NO
+DIALOGUE. So the single most useful category on a dialogue-heavy script is silently
+deleted from the sections, the chips AND the strip summary. The trust surface
+collapses with it: the strip advertises "8 of 36 quotes verified (22%)" while the
+board renders 2 verified badges (the verified tier is dialogue-dominated).
+The error also reaches the persisted metrics: gun_pen_2/metrics.json records
+"findings_open": 28. This breaks the product's own N3 law ("the writer's totals
+cannot agree between surfaces... the writer's number agrees with every other
+surface") on the FIRST screen a real writer sees.
+Screenshots: impl-shots/C00-phantom-addressed.png, A02-evidence-lens-full.png.
+PROBE HONESTY: the first pass-2 reading showed 10 addressed / 0 verified badges —
+2 of those 10 and 1 of the hidden badges were the AUDIT'S OWN marks
+(finding_marks.json: f1atq8x7 + fc8epm4 addressed). Marks were cleared and the
+measurement re-taken before any conclusion was drawn; the 8 / all-dialogue result
+above is the unpolluted one. The audit's one working-copy edit was also UNDONE
+(/edits/undo) so the project is left writer-neutral.
+FIX DIRECTION (not done — session-only): make quote_present() compare against the
+JOINED scene text (the same join the verifier uses), or normalise both to the same
+line model. One matcher, one answer.
+
+--- G8 (HIGH, trust) — the arrival strip reports LLM run-to-run variance as writer
+    progress ---
+MECHANISM: compute_finding_id = hash(category | evidence_quote or
+"issue:" + issue[:100]). For the no-quote tier — 27 of 36 findings (75%) — the id is
+a hash of LLM-AUTHORED PROSE, which the model rewords on every run. last_pass_snapshot
+then has no writer-action gate: fixed = len(old_set) - len(still), purely id-based.
+EVIDENCE: on a no-op re-analysis the strip reads "Pass: 33 -> 4 still live · 29 no
+longer flagged · 32 new". parsed.json mtime is UNCHANGED across both passes
+(2026-09-18 17:30:01) while the report is 2026-09-19 00:26:05 => byte-identical
+analyzer input, zero writer action. PROOF BY CONSTRUCTION: appending " (reworded)" to
+a no-quote finding's issue changes its id fc8epm4 -> fj0wwc9; the same mutation on a
+QUOTED finding leaves its id (f1atq8x7) unchanged.
+CORRECTION TO docs/FULL_FEEDBACK_AUDIT_VERDICTS.md (2026-09-14 section): its GAP-5
+resolution and its H1 "the ghosted path is structurally unreachable" both rested on
+"GAP-5 keeps ids stable". That is TRUE of the deterministic demo engine and FALSE of
+a real model (ids churn ~88%/run). The scoped copy ("from the last run, not your
+edits") is honest about what is compared, but cannot make meaningful a number that
+moves 88% on identical input.
+FIX DIRECTION (not open — needs a product decision): key the no-quote tier on a
+DETERMINISTIC signal (category + scene + check_id, not the model's sentence), or gate
+Fixed/New on an actual writer edit.
+
+--- G2 (MED, trust) — the desk says "a clean bill" on a 36-finding project ---
+MECHANISM: refreshDeskToolbar() (app.js:2329) is called at project-open (app.js:1952)
+BEFORE state.findings is populated (app.js:3581), and loadScriptData() never re-runs
+it. So the status line is rendered from an empty findings array and never corrected.
+EVIDENCE: on gun_pen (35 findings) #desk-analyze-status reads "Analysis complete — a
+clean bill. The Evidence lens has the coverage." while the same screen shows "28 open
+of 35 total". Screenshot: impl-shots/C01-desk-status.png.
+
+--- G3 (MED, UX) — the fix loop covers its own bar ---
+MECHANISM: "⇉ fix loop" -> startLoop() (app.js:5197) -> stepLoop(1) (5210). stepLoop
+uses the ink anchor when the current finding has a quote; otherwise it falls back to
+jumpToScene() (2805) — and jumpToScene() UNCONDITIONALLY calls openCowriteRoom()
+(2807). The partner drawer (#room-drawer.open) then sits over #context-dock, so the
+loop bar's mark / park / discuss / copy buttons are unreachable by mouse.
+EVIDENCE: captured call stack (classList.add patch) = openRoomDrawer <- openCowriteRoom
+<- jumpToScene <- stepLoop <- startLoop <- the fix-loop chip. 26 of 35 findings have
+no quote => no ink anchor => the fallback fires for most findings. Playwright reports
+"#messages-scroll ... subtree intercepts pointer events" on the loop bar.
+Screenshot: impl-shots/ESC-0-loop-bar.png.
+FIX DIRECTION: jumpToScene() should not open the room when called from the loop
+(pass a flag), or the loop bar should re-dock above the drawer.
+
+--- G4 (LOW, reachability) — the character dials render into dead chrome ---
+renderReportPanel() (app.js:5795) builds the dials into #feedback-view (dormant), and
+the scene-rail copy `.rail-char-dials` lives inside #struct-rail, which style.css:3886
+declares display:none ("WIREFRAME ALIGNMENT — dead chrome"). The dock's CHARACTERS
+panel shows presence, not dials. EVIDENCE: 15 .dial-row nodes exist in the DOM;
+`.rail-char-dials` firstVisible=False; the dock's CHARACTERS panel has 0 dial rows.
+Screenshot: impl-shots/B-character-dials.png.
+
+--- G5 (LOW, honesty) — the arrival basis can never equal the board basis ---
+compute_finding_id keys on category + verified quote, so duplicate quotes collapse:
+35 findings -> 33 DISTINCT ids (three dialogue findings share `fnhi8s3`). The arrival
+"Pass:" arithmetic counts distinct ids (last_total = 33) while the board counts rows
+(35). Both numbers are on the same screen. Documented as deliberate in
+revision.last_pass_snapshot (a no-change re-run must report fixed=0/new=0), but the
+two totals are never reconciled in the UI. Screenshot: impl-shots/PASS2-arrival-strip.png.
+
+--- G6 (cosmetic) — the readable artifact is titled after the temp upload name ---
+report.md line 1 reads "# Script Doctor Report: source.pdf" (the multipart temp
+filename), not the project title "gun_pen".
+
+--- G7 (cosmetic) — parse confidence LOW on a PDF with a real text layer ---
+report.md line 3: "(pdf, parse confidence: low)". The 6-page PDF yields 5,762 chars of
+extractable text and 3 parsed scenes, so the low confidence is not an OCR fallback —
+worth a look at what drives the score.
+
+--------------------------------------------------------------------------------
+MATRIX CORRECTION (the plan's split matrix vs what the backend actually emits)
+--------------------------------------------------------------------------------
+The plan's row A lists `principles` and `setup_payoff` as finding-emitting categories.
+On this script:
+  * `principles` produced ZERO findings (its category ran ok — a graceful empty row,
+    not a gap).
+  * `setup_payoff` does NOT own a category: its abandoned setups surface as
+    `plot_thread` findings (2 of them, rule_id=setup_payoff_general) — exactly the
+    plan's "dangling entries fold into Plot Economy".
+  * `genre` is a finding category (4 findings), NOT a report block; the "genre block"
+    is coverage.genre ("Thriller / Drama").
+  * categories the plan omits that DO emit: `continuity` (1), `plot_thread` (2).
+Actual row A (8 categories, 35 findings): dialogue 8 · structure 6 · scene_function 6 ·
+character 5 · genre 4 · theme 3 · plot_thread 2 · continuity 1.
+Actual row B (report sections, all present): pacing (3 scenes) · character_dials (3) ·
+character_reads (3) · logline_test (signal "muddled") · coverage (CONSIDER).
+rule_id vs check_id split is live: 3 findings carry a KB `rule_id`
+(character_trait_continuity, setup_payoff_general x2), 32 carry only a `check_id`
+(which holds the rule NAME) — so the "Grounded in knowledge-base rule X" tooltip
+applies to 3 of 35.
+
+--------------------------------------------------------------------------------
+PROJECTED ✓ (verified live, no gap)
+--------------------------------------------------------------------------------
+* All 8 finding categories render as board sections; every deep card carries a trust
+  chip — "✓ verified · <conf> · Sn" on the 9 quoted, "⚠ unverified" on the 26
+  no_quote (flag-don't-drop holds).
+* Quote trust readout "9 of 35 quotes verified (26%)" matches the report exactly, on
+  both the mass strip and the arrival strip. Verification is category-correlated:
+  dialogue 8/8 + continuity 1/1 verified; structure/scene_function/character/genre/
+  theme/plot_thread are 100% no_quote (script-level passes cite scene numbers only).
+* Severity is never colour-alone (printed labels/dots); mass strip, script ruler and
+  the setup/payoff spine all render from real data.
+* Quiet state: failed_categories == [], no inline retry button, dash warn absent. The
+  retry mechanism is credited to existing tests (test_feature_batch,
+  test_bugfix_batch, e2e phase8_lifecycle, e2e phase14_signoff_journey).
+* Clean bill: no zero-finding row occurs naturally on gun_pen, so the plan's synthetic
+  fallback was used (tests/_gunpen_clean_bill.py). The empty pass reads "Analysis
+  complete — a clean bill. The Evidence lens has the coverage.", the lens is not blank
+  (coverage renders), there are no finding cards, no mass strip and no retry button.
+  Screenshot: impl-shots/C-clean-bill.png.
+* report.md exists (29,421 B / 251 lines), opens (the export route converts it to
+  printable HTML) and matches the desk's numbers (3 scenes / 3 characters / 6 pages).
+* ESCALATION, both routes, live on the real model:
+  - Sameer: Discuss from a deep card AND from a fix-queue row AND from the loop bar
+    all pin the quote (setPendingQuote -> #quote-card), open the room and seed the
+    composer; a real reply streams back; the scene page gains the `.scene-discussed`
+    tag on the scene the quote names (scene-anchored findings only — a script-level
+    finding pins scene_number=null and correctly tags nothing).
+  - Sushruta: the "ask the doctor why" gesture pins the quote, opens the lens and
+    seeds "Why was the <category> finding on Scene N flagged? What exactly is wrong?".
+    The reply carries genuine PER-FINDING reasoning: what was flagged ("on-the-nose"
+    exposition), why (explains the action instead of showing it), where (Scene 2) and
+    the actual quoted line. Hypothesis CONFIRMED — no gap.
+
+--------------------------------------------------------------------------------
+ARTIFACTS
+--------------------------------------------------------------------------------
+tests/e2e_browser_gun_pen_audit.py  — the audit (stages; E2E_BASE + real model)
+tests/_gunpen_probe.py              — read-only report/section probe
+tests/_gunpen_clean_bill.py         — the synthetic clean-bill seed (plan fix #5)
+impl-shots/                         — one verdict screenshot per row + audit_results.json
+
