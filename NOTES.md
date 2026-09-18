@@ -925,3 +925,34 @@ One of those guards initially failed against its own DOCSTRING (which names the 
 checking only the code after the docstring.
 
 GATE: non-browser 827 passed / 0 failures / 0 errors; browser phase7 15/15, smoke 18/18, phase6 28/28.
+
+--- T2.10 (C4) - the library grounding guard: true, but the remedy is a product decision ---
+
+C4 said "the grounding guard is prompt text only - nothing detects or blocks past-work/current-script
+merging." That is TRUE. It is also true of every behaviour rule in this system (the voice rules, the
+persona rules, the report-grounding rule). The one place a deterministic backstop exists, `ground_reply`
+for invented scene numbers, works because a scene number is a machine-checkable token with an unambiguous
+referent.
+
+WHY I DID NOT ADD AN ENFORCER: a "past-work merge" detector would have to decide SEMANTICALLY whether the
+reply is conflating two scripts. `extract_character_refs` makes a narrow version feasible - flag a character
+who exists only in a past project - but a writer can legitimately say "remember Siddharth from my last
+script?", so the detector would fire on correct replies. A false positive here means the co-writer accuses
+the writer of a mistake they did not make, which is worse than the failure it prevents. Closing it as
+by-design with the reasoning, not quietly.
+
+THE PRECISE SUB-DEFECT FOUND INSTEAD: `build_library` sets `unreadable: True` for a project whose
+parsed.json is corrupt - and NOTHING READ IT (grep: the only other `unreadable` hits are the ideas store and
+the shelf listing, a different structure). So `library_digest_text` rendered a corrupt project as an ordinary
+row:
+    - "Broken" (? scenes, ?): characters -; themes: not analyzed yet
+That is the one thing the guard forbids. The guard says "never invent details of past scripts beyond what
+is listed", and a row of question marks is an invitation to fill the gap. The flag existed to say "we could
+not read this" and the block threw it away.
+FIX: the unreadable entry now uses the same key as a readable one (`project`, was `name`), and the digest
+states it plainly: `- "Broken": the file is unreadable - nothing about this script is known. Do not describe
+it or guess at its contents.`
+TESTS: 4 new in test_writer_library.py (flag reaches the prompt; no `?` placeholders; key shape consistent;
+a readable neighbour unaffected).
+
+GATE: non-browser 831 passed / 0 failures / 0 errors; browser phase7 15/15, smoke 18/18, phase6 28/28.

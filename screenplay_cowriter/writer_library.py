@@ -55,7 +55,9 @@ def build_library(projects_dir: str, exclude: str | None = None, limit: int = 0)
                 p = json.load(f)
         except (OSError, ValueError):
             # Flag, don't drop: a corrupt parse still counts as past work.
-            entries.append({"name": name, "title": name, "unreadable": True})
+            # Same key as a readable entry ("project") so consumers never have
+            # to special-case the shape.
+            entries.append({"project": name, "title": name, "unreadable": True})
             continue
         themes = []
         report_path = os.path.join(d, "report.findings.json")
@@ -84,11 +86,22 @@ def build_library(projects_dir: str, exclude: str | None = None, limit: int = 0)
 
 def library_digest_text(library: list[dict], limit: int = 6) -> str:
     """Compact prompt block for the system prompt — a few lines per project,
-    clearly separated from the current script, with the grounding guard."""
+    clearly separated from the current script, with the grounding guard.
+
+    An unreadable project is stated as such. It used to render as a normal
+    entry full of "?" placeholders, which is the one thing the guard forbids:
+    the guard says "never invent details of past scripts beyond what is
+    listed", and a row of question marks is an invitation to fill the gap."""
     if not library:
         return ""
     lines = ["PAST WORK — other scripts on this writer's shelf (for reference only):"]
     for e in library[:limit]:
+        if e.get("unreadable"):
+            lines.append(
+                f"- \"{e.get('title')}\": the file is unreadable — nothing about "
+                f"this script is known. Do not describe it or guess at its contents."
+            )
+            continue
         chars = ", ".join(e.get("characters") or []) or "—"
         scenes = e.get("scene_count") or "?"
         fmt = e.get("source_format") or "?"

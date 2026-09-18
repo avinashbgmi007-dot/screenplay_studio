@@ -65,6 +65,52 @@ def test_digest_text_has_guard_and_content(tmp_path):
     assert library_digest_text([]) == ""
 
 
+class TestUnreadableProjects:
+    """A corrupt parse is flagged, and the FLAG MUST REACH THE PROMPT.
+
+    The grounding guard forbids inventing details of past scripts "beyond what
+    is listed". A corrupt project used to be listed as a normal row of "?"
+    placeholders — an invitation to fill the gap, which is precisely what the
+    guard forbids. `unreadable` was set by build_library and read by nothing.
+    """
+
+    def _corrupt(self, root, name):
+        d = os.path.join(root, name)
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "parsed.json"), "w", encoding="utf-8") as f:
+            f.write("{not valid json")
+        return d
+
+    def test_a_corrupt_project_is_flagged_not_dropped(self, tmp_path):
+        self._corrupt(str(tmp_path), "Broken")
+        lib = build_library(str(tmp_path))
+        assert len(lib) == 1
+        assert lib[0]["unreadable"] is True
+        # same key as a readable entry, so consumers never special-case the shape
+        assert lib[0]["project"] == "Broken"
+
+    def test_the_flag_reaches_the_prompt(self, tmp_path):
+        self._corrupt(str(tmp_path), "Broken")
+        text = library_digest_text(build_library(str(tmp_path)))
+        assert "Broken" in text
+        assert "unreadable" in text.lower(), "the digest hid the corruption from the model"
+        assert "Do not describe it" in text
+
+    def test_no_inviting_placeholders_for_a_corrupt_project(self, tmp_path):
+        self._corrupt(str(tmp_path), "Broken")
+        text = library_digest_text(build_library(str(tmp_path)))
+        assert "? scenes" not in text, "a '?' row invites the model to invent details"
+        assert "not analyzed yet" not in text
+
+    def test_a_readable_project_alongside_is_unaffected(self, tmp_path):
+        _make_project(str(tmp_path), "Good", "Good Script", ["MARA"], themes=["x"])
+        self._corrupt(str(tmp_path), "Broken")
+        text = library_digest_text(build_library(str(tmp_path)))
+        assert "Good Script" in text and "MARA" in text
+        assert "unreadable" in text.lower()
+        assert "never invent details of past scripts" in text
+
+
 @pytest.fixture
 def http_client(tmp_path):
     webapp_server.PROJECTS_DIR = str(tmp_path / "proj")
