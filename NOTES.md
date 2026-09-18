@@ -1243,6 +1243,68 @@ times), and the fingerprint is (mtime_ns, size). Measured on this machine: two
 back-to-back writes of an equal-length body carry the SAME st_mtime_ns 17 times
 in 20, so the blind window is ~one system clock tick (~15ms). Fixed by making the
 test's rewrite change the SIZE (a real re-analysis does), and the limitation is
-now documented on _file_stamp. It was NOT caused by the M1 change (different
-code path) — but it broke the gate, so it had to go.
+  now documented on _file_stamp. It was NOT caused by the M1 change (different
+  code path) — but it broke the gate, so it had to go.
+
+
+================================================================================
+2026-09-19 — WAVE 3: the co-writer's quotes are verified (§7 P0 #3)
+================================================================================
+Track: docs/CRITICAL_REVIEW_2026-09-18.md (Wave 3 #4).
+Item verbatim: "Verify Sameer's quotes against injected scene text (reuse
+verifier.py's fuzzy match; flag-don't-drop per house convention)."
+
+WHAT SHIPPED
+- screenplay_cowriter/reply_transforms.py: verify_reply_quotes(reply, script_ctx,
+  scene_numbers). Two passes:
+    * containment against the WHOLE script under the verifier's _normalize
+      (linear; absorbs curly/straight quotes AND line-wrapped scene text);
+    * fuzzy (_best_fuzzy_match @ FUZZY_MATCH_THRESHOLD), BOUNDED to the injected
+      scene_numbers.
+  Flags by APPENDING a note; the reply body is never altered. Idempotent
+  (_QUOTE_FLAG_MARK), 8-span cap, word floor of 4, 80-char display truncation.
+- engine.py: _guard_reply(reply, scene_refs) = quote guard THEN the existing
+  scene-number guard, each judging the MODEL's output only (not the other's note).
+  Replaces the two _ground_reply_for_room call sites.
+
+WHY IT REUSES verifier.py AND DOES NOT GROW A SECOND MATCHER
+A naive substring test fails on a wrapped quote and on straight-vs-curly quotes —
+EXACTLY the defect that made the analyzer report a whole dialogue category as
+"addressed" on an unedited script (GAP-6, the CRITICAL audit finding). A second
+matcher here would have reintroduced it in the co-writer. Three tests pin it.
+
+MEASUREMENT THAT FORCED THE DESIGN (do not undo the bounding)
+First version ran fuzzy over the whole script. Synthetic feature-length:
+  120 scenes / 43k words -> 902 ms PER TURN
+  180 scenes / 86k words -> 1824 ms PER TURN
+Bounded to the injected scenes: same case -> 31-71 ms (~30x). The item itself says
+"against injected scene text", so the fast version is also the faithful one.
+
+PRECISION (measured, not guessed)
+On the REAL replies captured by the earlier audit: sameer_reply has 0 quoted spans;
+sushruta_reply has 2 — "on-the-nose" (1 word, a craft term) and "Journalist ga inka
+unna" (4 words, a genuine Telugu line). The word floor of 4 keeps the real quote and
+drops the aside. BOTH real replies pass through BYTE-IDENTICAL; the invented-line
+probe is flagged.
+
+LIMITATIONS (flagged, not hidden)
+- A quote the writer typed and the model echoed back is not in the script -> would
+  be flagged. The wording is a question, not an accusation ("ignore me").
+- Past the 8-span cap there is no verification. Bought deliberately; pinned.
+- The idea room is guarded twice (no scenes + empty haystack) so NEITHER check is
+  individually mutation-provable. Defence in depth, not a gap — stated in the doc.
+- Containment rebuilds a normalised copy of the script each turn (~31 ms on 180
+  scenes). Not cached.
+
+TESTS
+tests/test_reply_quote_guard.py (new, 27). 7 mutations, 7 caught (word floor;
+whole-script containment; unbounded fuzzy; fuzzy removed; idempotence; truncation;
+span cap). Gate: 983 passed / 0 failures (+27 from 956).
+
+SELF-CAUGHT TEST BUGS
+- Passed None as report_ctx (the engine needs a real ReportContext).
+- The "long quote" fixture exceeded the 400-char span cap, so it never matched and
+  the test asserted on a span the extractor had correctly rejected.
+- The span-cap test could not tell "capped" from "uncapped" (the count is 1 either
+  way). Rewritten with the genuine quotes first and the invention past the cap.
 

@@ -411,3 +411,97 @@ the four staged projects assemble 8,870 / 11,775 / 14,285 / 27,523).
 
 
 
+---
+
+# WAVE 3 — the co-writer's quotes are verified (§7 P0 #3)
+
+The §7 P0 item, verbatim: *"Verify Sameer's quotes against injected scene text
+(reuse `verifier.py`'s fuzzy match; flag-don't-drop per house convention)."*
+
+Sameer and the doctor quote the pages constantly — it is most of what makes them
+feel like they have read the script, and it is the easiest thing for a small local
+model to fake. An invented line that sounds like the writer's voice reads exactly
+like a real one.
+
+## One matcher, one answer
+
+The guard reuses `screenplay_analyzer.verifier` — its normaliser and its fuzzy
+threshold — rather than growing a second matcher of its own. That is the whole
+design, and it is not a style preference: a naive substring test fails on a quote
+that spans a line wrap, and on one typed with straight quotes where the script has
+curly ones. **That is exactly the defect that made the analyzer report an entire
+dialogue category as "addressed" on a script nobody had edited** (the CRITICAL
+finding from the earlier audit). Writing a second matcher here would have
+reintroduced it in the co-writer. Three tests exist purely to pin that it hasn't.
+
+## Two passes, because the cheap one is exact
+
+- **Containment against the WHOLE script**, under the verifier's normaliser. Linear,
+  and it already absorbs the curly/straight and line-wrap differences, so it settles
+  the overwhelming majority of genuine quotes wherever they come from.
+- **Fuzzy, bounded to `scene_numbers`** — the scenes actually injected into this
+  turn, i.e. the material the model was shown. The verifier's sliding window is
+  generous by design, but it is O(script).
+
+**The bounding was forced by a measurement, not by taste.** The first version ran
+the fuzzy pass over the whole script. On a synthetic feature-length script that cost
+**902 ms (120 scenes) and 1,824 ms (180 scenes)** — per turn, whenever the model
+paraphrased rather than quoted exactly. Bounding it to the injected scenes brought
+the same case to **31–71 ms**, a ~30× cut, and it is also the more faithful reading
+of the item ("against injected scene text").
+
+## Precision is the thing that matters
+
+A false flag tells the writer their co-writer is lying when it isn't. So:
+
+- **A word floor of 4**, measured rather than guessed. On the replies the earlier
+  audit captured from the real model, the doctor quoted a craft term
+  (`"on-the-nose"`, 1 word) and a genuine Telugu line (`"Journalist ga inka unna"`,
+  4 words). The floor keeps the real quote and drops the aside. The analyzer's
+  verifier uses `<3` for a DECLARED quote — a finding's `evidence_quote` field,
+  always meant as script text; free prose needs a higher bar.
+- **Validated against the real replies.** Both captured replies (`sameer_reply`,
+  `sushruta_reply` — one with no quotes at all, one with a craft term plus a
+  genuine line) pass through **byte-identical**. The invented-line probe is flagged.
+
+## Honest limitations
+
+- **The flag is advisory and can be wrong.** A quote the writer typed in their own
+  message, echoed back by the model, is not in the script and would be flagged. The
+  wording is deliberately a question, not an accusation: *"if it's a paraphrase, or
+  it came from somewhere else, ignore me."*
+- **The span cap costs coverage.** A reply quoting more than 8 things gets no
+  verification beyond the 8th. Bought deliberately: the guard exists to catch a
+  fabricated line, not to audit an essay. Pinned by a test.
+- **The idea room is guarded twice** (no scenes, and an empty haystack). The
+  redundancy means neither check is individually necessary — so neither is
+  individually mutation-provable. Defence in depth, not a gap.
+- **Containment still builds a normalised copy of the script every turn** — ~31 ms
+  on a 180-scene script. Not cached; noted rather than fixed.
+- The guard cannot check whether the quote is used *well* — only whether the words
+  exist. §2's "verification verifies the quote, never the claim" still stands.
+
+## Verification
+
+- `tests/test_reply_quote_guard.py` (new, 27 tests): genuine quotes (exact, wrapped,
+  curly-vs-straight, from a non-injected scene, light paraphrase) all pass
+  untouched; inventions are flagged, and the reply body is never altered; precision
+  (word floor, craft terms, the other guard's own note); the fuzzy bounding is
+  observable; it stays silent on no script, empty script, missing context and an
+  unimportable verifier; it is idempotent; the span cap is observable; and the flag
+  reaches the **persisted** assistant turn.
+- **7 mutations, 7 caught** — dropping the word floor, dropping whole-script
+  containment, unbounded fuzzy, removing the fuzzy pass, removing idempotence,
+  removing truncation, removing the span cap.
+- Two test bugs of my own were caught while writing it: I passed `None` for the
+  report context (the engine needs a real one), and my "long quote" fixture exceeded
+  the 400-char span cap so it never matched — the test was asserting on a span the
+  extractor had correctly rejected.
+- Suite: **983 passed / 0 failures / 0 errors** (was 956; +27).
+- The span-cap test was initially unable to tell "capped" from "uncapped" — it
+  asserted a count that is 1 either way. Rewritten so the genuine quotes come first
+  and the invention sits past the cap, which is the only arrangement that makes the
+  cap observable.
+
+
+

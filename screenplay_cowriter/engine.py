@@ -14,6 +14,7 @@ from .context import (
 )
 from .reply_transforms import (
     clean_reply, ground_reply, persona_register, normalize_quote,
+    verify_reply_quotes,
 )
 
 # Generation budget for chat turns. Local models that fall into a repetition
@@ -176,6 +177,23 @@ class CoWriterEngine:
         if self.premise is not None:
             return reply
         return ground_reply(reply, self.script_ctx)
+
+    def _guard_reply(self, reply: str, scene_refs=None) -> str:
+        """The reply-side honesty guards, applied to the MODEL's output only.
+
+        Quote verification runs first so it never scans a note the scene-number
+        guard appended, and vice versa — each guard judges the model, not the
+        other guard. (Both filters are narrow enough that a cross-read would be
+        harmless, but relying on that would be luck.)
+
+        `scene_refs` is the material injected into this turn; quote verification
+        bounds its fuzzy pass to those scenes. Quote verification needs no room
+        check of its own: with no scenes it returns the reply untouched, which is
+        exactly the idea-room behaviour.
+        """
+        return self._ground_reply_for_room(
+            verify_reply_quotes(reply, self.script_ctx, scene_refs)
+        )
 
     def _memory_entities(self) -> list:
         """Character names from the current script, used to classify refresh
@@ -381,7 +399,7 @@ class CoWriterEngine:
             except Exception:
                 branch.awaiting_probe = False  # never strand the writer mid-probe
                 raise
-            reply = self._ground_reply_for_room(reply)
+            reply = self._guard_reply(reply, scene_refs)
             branch.awaiting_probe = True
         else:
             system_prompt = build_system_prompt(
@@ -399,7 +417,7 @@ class CoWriterEngine:
                 system_prompt, branch.messages, prompt_user, branch.active_persona,
                 scene_block=scene_block, quote_context=quote_context)
             reply = clean_reply(self._generate(messages, on_token))
-            reply = self._ground_reply_for_room(reply)
+            reply = self._guard_reply(reply, scene_refs)
             reply = cap_suggestions(reply)
 
         reply = persona_register(reply, branch.active_persona)
