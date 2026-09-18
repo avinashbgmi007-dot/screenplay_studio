@@ -314,7 +314,7 @@ class CoWriterEngine:
         reply = persona_register(reply, branch.active_persona)
         reply = _detect_voice_drift(reply, branch.active_persona)
 
-        reply = ensure_forward_momentum(reply, turn_kind)
+        reply = ensure_forward_momentum(reply, turn_kind, branch.active_persona)
 
         branch.messages.append(Message(role="user", content=user_text, scene_refs=scene_refs, mode=branch.active_mode, quote=quote, partner=branch.active_persona))
         branch.messages.append(Message(role="assistant", content=reply, mode=branch.active_mode, partner=branch.active_persona))

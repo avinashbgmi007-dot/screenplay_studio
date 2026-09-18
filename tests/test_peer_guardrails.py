@@ -37,14 +37,20 @@ def test_probe_prompt_forbids_suggestions():
     assert "one question" in PROBE_SYSTEM_PROMPT.lower()
 
 
+# The forward nudge is a COLLABORATOR's move, so these all name the desk
+# partner explicitly. The persona gate itself is covered by
+# test_the_doctor_never_gets_a_forward_nudge below.
+DESK = "writing_partner"
+
+
 def test_forward_reply_left_untouched():
     from screenplay_cowriter.peer import ensure_forward_momentum
-    assert ensure_forward_momentum("What do you think?", "idea") == "What do you think?"
+    assert ensure_forward_momentum("What do you think?", "idea", DESK) == "What do you think?"
 
 
 def test_stranded_reply_gets_nudge_for_idea_turn():
     from screenplay_cowriter.peer import ensure_forward_momentum
-    out = ensure_forward_momentum("That could work.", "idea")
+    out = ensure_forward_momentum("That could work.", "idea", DESK)
     assert out.startswith("That could work.")
     assert out != "That could work."
     assert out.rstrip().endswith("?")  # every nudge template ends with a question
@@ -56,21 +62,44 @@ def test_no_nudge_for_factual_answer():
     long_factual = "In act two, Mara confronts her brother at the warehouse, and the " \
                    "situation escalates into a confrontation that changes everything. " * 4
     assert len(long_factual) > 200
-    assert ensure_forward_momentum(long_factual, "question") == long_factual
+    assert ensure_forward_momentum(long_factual, "question", DESK) == long_factual
 
 
 def test_short_factual_turn_still_gets_nudge():
     from screenplay_cowriter.peer import ensure_forward_momentum
-    assert ensure_forward_momentum("Act two.", "idea") != "Act two."
+    assert ensure_forward_momentum("Act two.", "idea", DESK) != "Act two."
     # a DIRECT QUESTION gets a clean answer -- no trailing nudge (evasive)
-    assert ensure_forward_momentum("Act two.", "question") == "Act two."
+    assert ensure_forward_momentum("Act two.", "question", DESK) == "Act two."
 
 
 def test_nudges_rotate_no_repeat_back_to_back():
     from screenplay_cowriter.peer import ensure_forward_momentum, FORWARD_NUDGES
-    a = ensure_forward_momentum("Yes.", "idea")
-    b = ensure_forward_momentum("Yes.", "idea")
+    a = ensure_forward_momentum("Yes.", "idea", DESK)
+    b = ensure_forward_momentum("Yes.", "idea", DESK)
     assert a != b
+
+
+def test_the_doctor_never_gets_a_forward_nudge():
+    """His voice check says "verdict first... diagnosis is your job; fixes are
+    Sameer's department", so closing a diagnosis with "Want me to run with
+    this?" both breaks character and offers the wrong desk's service."""
+    from screenplay_cowriter.peer import ensure_forward_momentum
+    verdict = "Act two sags because the midpoint resolves the question too early."
+    assert ensure_forward_momentum(verdict, "idea", "script_consultant") == verdict
+
+
+def test_evaluators_and_the_reactor_get_no_nudge():
+    from screenplay_cowriter.peer import ensure_forward_momentum
+    for persona in ("producer", "audience", "genre_specialist"):
+        assert ensure_forward_momentum("It reads thin.", "idea", persona) == "It reads thin."
+
+
+def test_an_unknown_persona_gets_no_nudge():
+    """The nudge is a character decision, not a house style — so an unclassified
+    persona is left alone rather than nudged as if it were Sameer."""
+    from screenplay_cowriter.peer import ensure_forward_momentum
+    assert ensure_forward_momentum("It reads thin.", "idea", "mystery_guest") == "It reads thin."
+    assert ensure_forward_momentum("It reads thin.", "idea") == "It reads thin."
 
 
 def test_cap_leaves_single_suggestion_alone():

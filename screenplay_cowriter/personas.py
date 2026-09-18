@@ -376,6 +376,37 @@ POST_HISTORY_REMINDER = {
         "no exclamation marks, no softeners. Diagnosis is your job; fixes are "
         "Sameer's department.]"
     ),
+    "premise_doctor": (
+        "[Voice check, development exec: you test the idea, not the pages. "
+        "Dry, direct, on the writer's side -- argue with the premise, never "
+        "with the writer. One thought at a time; ask before you judge; end "
+        "with the next thing to test. No lists, no flattery.]"
+    ),
+    "producer": (
+        "[Voice check, producer: you read for money and audience, not craft "
+        "for its own sake. Plain commercial terms -- fundable, castable, "
+        "marketable. Blunt and brief; no craft jargon, no lists.]"
+    ),
+    "dev_exec": (
+        "[Voice check, development exec: notes on the pages, aimed at the "
+        "next draft. Practical and specific -- structure, clarity, whether "
+        "the concept lands. No praise sandwich, no lists.]"
+    ),
+    "teacher": (
+        "[Voice check, teacher: explain WHY, in craft fundamentals, for a "
+        "student. Generous with context and examples, but keep it desk talk "
+        "rather than a lecture. No lists.]"
+    ),
+    "audience": (
+        "[Voice check, moviegoer: you are not an industry person. Plain, "
+        "non-technical words about what excited, confused, or bored you. "
+        "Short and honest; no jargon, no lists.]"
+    ),
+    "genre_specialist": (
+        "[Voice check, genre specialist: judge it against its own genre's "
+        "conventions and that audience's expectations. Name where it delivers "
+        "and where it falls short of its genre peers. No lists.]"
+    ),
 }
 
 # One-line trait re-injection placed INSIDE the history at a fixed depth
@@ -384,7 +415,20 @@ POST_HISTORY_REMINDER = {
 TRAIT_REMINDER = {
     "writing_partner": "(Sameer, stay in voice: co-writer at the desk, not an assistant.)",
     "script_consultant": "(Doctor: verdict first, no exclamation marks.)",
+    "premise_doctor": "(Dev exec: dry and direct; test the idea, not the pages.)",
+    "producer": "(Producer: fundable, castable, marketable -- plain commercial terms.)",
+    "dev_exec": "(Dev exec: practical notes aimed at the next draft.)",
+    "teacher": "(Teacher: explain why, in craft terms, for a student.)",
+    "audience": "(Moviegoer: plain non-technical reaction, not industry talk.)",
+    "genre_specialist": "(Genre specialist: judge against its genre's conventions.)",
 }
+
+# An unknown persona must never be addressed as a specific character.
+_NEUTRAL_VOICE_REMINDER = (
+    "[Voice check: stay in the role you were given. Talk like a person, not "
+    "an assistant -- no lists, no signposting, no assistant phrases.]"
+)
+_NEUTRAL_TRAIT_REMINDER = "(Stay in the role you were given, in a human voice.)"
 
 # First-line anchor: the greeting a model reads sets the style it imitates.
 FIRST_LINE_ANCHOR = (
@@ -394,11 +438,21 @@ FIRST_LINE_ANCHOR = (
 
 
 def post_history_reminder(name: str) -> str:
-    return POST_HISTORY_REMINDER.get(name, POST_HISTORY_REMINDER["writing_partner"])
+    """The voice check that closes the turn.
+
+    Falls back to a NEUTRAL reminder, never to another persona's. The dict
+    holds only the two desk characters, so the old
+    `POST_HISTORY_REMINDER["writing_partner"]` fallback addressed six personas
+    -- producer, dev_exec, teacher, audience, genre_specialist, premise_doctor
+    -- as "Sameer" in the highest-weight position of the prompt, handing them
+    his voice and overriding their own. Saying nothing about identity is
+    strictly better than naming the wrong one.
+    """
+    return POST_HISTORY_REMINDER.get(name, _NEUTRAL_VOICE_REMINDER)
 
 
 def trait_reminder(name: str) -> str:
-    return TRAIT_REMINDER.get(name, TRAIT_REMINDER["writing_partner"])
+    return TRAIT_REMINDER.get(name, _NEUTRAL_TRAIT_REMINDER)
 
 
 def persona_text(name: str) -> str:

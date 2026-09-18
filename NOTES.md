@@ -800,5 +800,42 @@ continuity rule" by iterating the mapping KEYS - which include `continuity` itse
 rules_for_pass("continuity") looked live. The claim was right; the check was sloppy. Same lesson as the
 port-1554 argument: right conclusion, wrong proof.
 
-GATE: non-browser 776 passed / 0 failures / 1 warning (+9 tests: 7 schema + 2 census); flake fix verified
-over 3 consecutive full-suite runs.
+GATE: non-browser 776 passed / 0 failures (+9 tests: 7 schema + 2 census), confirmed via --junitxml; the
+flake did not recur in any post-fix full-suite run (was ~1 in 2).
+
+--- T15: Tier 2 begins - the co-writer's voice (T2.1, T2.2) (2026-09-18) ---
+
+T2.1 (C2) - SIX PERSONAS WERE ADDRESSED AS "SAMEER" IN THE HIGHEST-WEIGHT PROMPT POSITION.
+POST_HISTORY_REMINDER / TRAIT_REMINDER held only the two desk characters (writing_partner,
+script_consultant) and fell back to writing_partner's entry. That reminder rides AFTER the chat history -
+the last system message of the turn, closest to generation, which is exactly why it was put there - so
+producer, dev_exec, teacher, audience, genre_specialist and premise_doctor were each told "[Voice check,
+Sameer: you are a person at a shared desk...]" and handed his voice. The Producer lost its own
+instructions to a reminder naming a different character. (premise_doctor is NOT Dr. Sushruta - it reads
+concepts, not pages - so it was mislabelled too.)
+FIX: a voice check for every persona, and the fallback is now NEUTRAL, never another character's. Naming
+the wrong identity is worse than naming none.
+GUARD: tests/test_cowriter_personas.py (new) - every persona has both reminders; no two share one; only
+the desk pair is named; an unknown persona gets the neutral text; and an end-to-end pass through
+send_message asserts the last message carries THIS persona's reminder. All three guards mutation-proved
+against the pre-fix state (they fail on it).
+NOTE: my first check of this bug said all 8 personas got Sameer's reminder. Wrong - it matched the
+substring "Sameer's department" inside the DOCTOR's text. The real number is 6, and the substring check is
+the same trap I had already written into the skill.
+
+T2.2 (C8) - THE FORWARD NUDGE FIRED FOR THE DOCTOR. ensure_forward_momentum appended "Want me to run with
+this and see where it goes?" to any short reply with no persona gate, so the Doctor's diagnosis closed by
+offering to act - contradicting his own voice check ("verdict first... diagnosis is your job; fixes are
+Sameer's department") and offering the other desk's service.
+FIX: the nudge is a COLLABORATOR's move, so it is gated. NUDGE_PERSONAS = {writing_partner,
+premise_doctor, dev_exec, teacher}; NO_NUDGE_PERSONAS = {script_consultant, producer, audience,
+genre_specialist}. Every persona is classified explicitly and a guard fails if a new one is added without
+a decision. An unknown persona gets no nudge - it is a character decision, not a house style.
+The five existing guardrail tests asserted the OLD contract (any short reply is nudged), so they now name
+the desk partner explicitly; three new tests pin the doctor/evaluators/unknown cases.
+JUDGEMENT CALL, flagged: which personas count as "collaborators" is a product decision. I put teacher in
+(he asks questions of a student) and producer/audience/genre_specialist out (they deliver a read). Easy to
+move - the classification is one frozenset.
+
+GATE: non-browser 803 passed / 0 failures / 0 errors (via --junitxml); browser gates re-run after the
+co-writer change.

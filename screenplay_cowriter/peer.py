@@ -60,6 +60,21 @@ FORWARD_NUDGES = [
     "Want me to sketch a version so we can react to something real?",
     "What's your instinct on the next move?",
 ]
+
+# Which personas may close a turn by offering to move the work forward.
+#
+# The nudge is a COLLABORATOR's move: it offers to act. It used to be appended
+# to every persona's short reply, which meant the Doctor's diagnosis ended
+# with "Want me to run with this and see where it goes?" — contradicting his
+# own voice check ("verdict first... diagnosis is your job; fixes are Sameer's
+# department") and offering the other desk's service. The evaluators and the
+# reactor do not offer to act either: they deliver a read and stop.
+#
+# Every persona is classified explicitly, and tests/test_cowriter_personas.py
+# fails if a new one is added without a decision.
+NUDGE_PERSONAS = frozenset({"writing_partner", "premise_doctor", "dev_exec", "teacher"})
+NO_NUDGE_PERSONAS = frozenset({"script_consultant", "producer", "audience", "genre_specialist"})
+
 _nudge_index = 0
 
 
@@ -77,7 +92,7 @@ def _has_forward_ending(reply: str) -> bool:
 STRANDED_THRESHOLD = 120  # chars: replies at/above this are substantial, never nudged
 
 
-def ensure_forward_momentum(reply: str, turn_kind: str) -> str:
+def ensure_forward_momentum(reply: str, turn_kind: str, persona: str | None = None) -> str:
     """Append a forward nudge only when the reply is SHORT and doesn't already
     end forward. A substantial reply (a complete answer, a developed thought)
     is never stranded — real humans end on a period; the goal is the writer
@@ -85,10 +100,17 @@ def ensure_forward_momentum(reply: str, turn_kind: str) -> str:
 
     A DIRECT QUESTION from the writer never gets a nudge: they asked, we
     answered -- tacking "want me to run with this?" onto an answer reads as
-    evasive. Questions get clean answers."""
+    evasive. Questions get clean answers.
+
+    `persona` gates it to the collaborators (`NUDGE_PERSONAS`); an unknown or
+    absent persona gets no nudge, because the nudge is a character decision,
+    not a house style.
+    """
     global _nudge_index
     t = (reply or "").strip()
     if not t:
+        return reply
+    if persona not in NUDGE_PERSONAS:
         return reply
     if turn_kind == "question":
         return reply
