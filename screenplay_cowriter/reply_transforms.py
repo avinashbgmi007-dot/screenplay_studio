@@ -43,44 +43,6 @@ def ground_reply(reply: str, script_ctx) -> str:
     )
 
 
-def strip_anti_ai_tells(reply: str) -> str:
-    """Strip common AI tells that break the fiction of a human collaborator.
-    Based on 2026 research into AI voice drift and anti-patterns. These are
-    the phrases that immediately mark text as machine-written."""
-    # Banned openings — the model loves to start with these
-    OPENINGS = [
-        r"^(?:Great question[!.]|Absolutely[!.]|I'?d be happy to|"
-        r"That'?s a (?:really )?(?:good|great|excellent|interesting) point[!.]|"
-        r"Let me (?:help|think|consider|address)|"
-        r"I (?:appreciate|understand) (?:your|the)|"
-        r"Thank you for (?:sharing|asking|bringing))\s*",
-    ]
-    for pat in OPENINGS:
-        reply = re.sub(pat, "", reply, count=1, flags=re.IGNORECASE)
-    # Banned hedging phrases — AI loves to hedge; humans commit
-    HEDGE = [
-        r"\b(?:it'?s (?:worth|important) (?:noting|mentioning|pointing out) that)\b",
-        r"\b(?:in (?:order to|terms of))\b",
-        r"\b(?:due to the fact that)\b",
-        r"\b(?:with (?:regard to|respect to))\b",
-        r"\b(?:at the (?:end of the day|end of the day))\b",
-        r"\b(?:it goes without saying)\b",
-        r"\b(?:needless to say)\b",
-    ]
-    for pat in HEDGE:
-        reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
-    # Banned closings
-    CLOSERS = [
-        r"\s*(?:let me know if you need anything else|"
-        r"I (?:hope|hope this) (?:helps|was helpful)|"
-        r"don'?t hesitate to (?:reach out|ask)|"
-        r"feel free to (?:ask|reach out|let me know))\.?\s*$",
-    ]
-    for pat in CLOSERS:
-        reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
-    return reply.strip()
-
-
 def persona_register(reply: str, persona: str) -> str:
     """Deterministic register guard, per persona. The doctor's card forbids
     exclamation marks; a local model excited by a good beat can still emit one,
@@ -88,43 +50,24 @@ def persona_register(reply: str, persona: str) -> str:
     mechanical level, no matter what the model feels like. (Sameer keeps his
     natural register; HUMAN_VOICE_RULES already caps his exclamations.)
 
-    Also enforces persona-specific anti-AI patterns and voice consistency."""
+    The register is the only thing handled here. The banned phrases — shared
+    AND persona-specific — live in `persona_specs` and are applied by the
+    single `strip_banned_phrases` pass below. They used to be re-implemented
+    here as well (HEDGE_DOCTOR / FILLER_DOCTOR / a local SAMEER_BANNED), so
+    every persona-specific phrase was applied twice per reply and the two
+    copies could drift apart.
+    """
     if persona == "script_consultant":
+        # A replacement, not a removal: deleting the marks would leave the
+        # sentence without its terminator.
         reply = reply.replace("!", ".")
-        # Doctor never hedges — verdict first, no softeners
-        HEDGE_DOCTOR = [
-            r"\b(?:I think|I feel|maybe|perhaps|it seems like|"
-            r"it (?:appears|looks) (?:like|as if)|"
-            r"this (?:might|could|may) be)\b",
-        ]
-        for pat in HEDGE_DOCTOR:
-            reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
-        # Doctor never uses filler phrases
-        FILLER_DOCTOR = [
-            r"\b(?:actually|basically|honestly|frankly|to be honest)\b",
-        ]
-        for pat in FILLER_DOCTOR:
-            reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
     elif persona == "writing_partner":
         # Sameer: max one exclamation per reply (already in HUMAN_VOICE_RULES,
         # but enforce mechanically — keep only the first)
-        excl_count = reply.count("!")
-        if excl_count > 1:
+        if reply.count("!") > 1:
             first = reply.index("!")
-            reply = reply[:first+1] + reply[first+1:].replace("!", ".")
-        # Sameer never uses AI assistant phrases
-        SAMEER_BANNED = [
-            r"\b(?:I'?d be happy to|Let me (?:help|assist)|"
-            r"That'?s a (?:great|good|interesting) question|"
-            r"I (?:understand|appreciate) your)\b",
-        ]
-        for pat in SAMEER_BANNED:
-            reply = re.sub(pat, "", reply, flags=re.IGNORECASE)
-    # Strip common AI tells from all personas
-    reply = strip_anti_ai_tells(reply)
-    # Apply persona-specific banned phrases
-    reply = strip_banned_phrases(reply, persona)
-    return reply
+            reply = reply[:first + 1] + reply[first + 1:].replace("!", ".")
+    return strip_banned_phrases(reply, persona)
 
 
 def normalize_quote(quote):

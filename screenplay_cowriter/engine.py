@@ -12,7 +12,7 @@ from .context import (
     resolve_referenced_scenes,
 )
 from .reply_transforms import (
-    clean_reply, ground_reply, strip_anti_ai_tells, persona_register, normalize_quote,
+    clean_reply, ground_reply, persona_register, normalize_quote,
 )
 
 # Generation budget for chat turns. Local models that fall into a repetition

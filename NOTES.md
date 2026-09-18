@@ -873,3 +873,55 @@ the playbook calls "the strongest consistency lever." Authoring five example blo
 that should match the writer's taste - flagged, not written.
 
 GATE: non-browser 804 passed / 0 failures / 0 errors; browser phase7 15/15, smoke 18/18, phase6 28/28.
+
+--- T2.4 (C9) - the anti-AI filter was not "duplicated", it was MANGLING every reply ---
+
+C9 said "duplicated anti-AI filter logic in two places, run back-to-back". The duplication was real, but it
+was the least of it. The two filters were COMPLEMENTARY, each masking the other's defect, and together they
+produced user-visible damage:
+
+    "Great question! Let me think about this. Your act two sags."
+      -> "about this. Your act two sags."
+    "Absolutely! Let me help. The hook is thin."
+      -> ". The hook is thin."
+    "I'd be happy to help. Your dialogue sings."
+      -> "help. Your dialogue sings."
+
+THE MECHANISM, two independent faults:
+1. `persona_specs.SHARED_BANNED_PHRASES` wrapped its opening/closing patterns in `\b(?:...)\b`. After a
+   phrase ending in `!` or `.`, the trailing `\b` can never match, so the filter silently failed to catch
+   the MOST common AI openings ("Great question!", "Absolutely!", "That's a really interesting point.").
+2. It then deleted the remaining phrases IN PLACE with no sentence awareness, so stripping "Let me think"
+   from "Let me think about this." left "about this." — the filter manufacturing the exact damage it exists
+   to prevent.
+`strip_anti_ai_tells` ran first and its anchored `^(?:...)\s*` openings caught what (1) missed, which is
+why the mangling looked like a working filter. On top of that, `persona_register` re-implemented the doctor's
+and Sameer's phrase lists (HEDGE_DOCTOR / FILLER_DOCTOR / a local SAMEER_BANNED), so every persona-specific
+phrase was applied TWICE and the two copies were free to drift.
+No tests existed for any of it — grep for the function names in tests/ returned nothing.
+
+THE FIX - one filter, correct by construction:
+- `persona_specs` now groups the shared patterns BY REMOVAL STRATEGY: SHARED_OPENERS and SHARED_CLOSERS are
+  removed as WHOLE SENTENCES (repeatable, so two pleasantries both go), SHARED_HEDGES are REWRITTEN
+  ("in order to" -> "to", "due to the fact that" -> "because"), SHARED_SELF_REFERENCE is dropped in place.
+- `_tidy()` repairs whitespace and punctuation so a removal cannot leave " ." or a dangling mark, and
+  capitalises ONLY when something was actually stripped from the front (that is what creates a lowercase
+  continuation).
+- `persona_register` now owns ONLY the register (the doctor's `!` -> `.` replacement, Sameer's one-`!` cap)
+  and delegates everything else.
+- Deleted `strip_anti_ai_tells` and the dead import of it in engine.py.
+- A reply that was nothing but pleasantries falls back to the original rather than emitting an empty turn.
+
+REGRESSION I CAUSED AND CAUGHT: the first `_tidy` capitalised unconditionally, which turned a legitimate
+lowercase reply ("plain reply") into "Plain reply" and broke
+test_feature_batch::test_engine_without_chat_stream_falls_back_to_blocking_call. The capitalisation is now
+conditional. A guard pins both halves (lowercase passthrough AND continuation repair).
+
+TESTS: tests/test_anti_ai_filter.py (new, 25 tests) - no-fragment, no-dangling-punctuation, register
+preserved, hedges rewritten, fiction rule for all 8 personas, lowercase passthrough, clean-reply
+passthrough, plus three guards that the duplication cannot come back (the second filter must not exist;
+persona_register must not re-implement the lists; the shared groups must not reappear in the persona lists).
+One of those guards initially failed against its own DOCSTRING (which names the removed blocks) - fixed by
+checking only the code after the docstring.
+
+GATE: non-browser 827 passed / 0 failures / 0 errors; browser phase7 15/15, smoke 18/18, phase6 28/28.
