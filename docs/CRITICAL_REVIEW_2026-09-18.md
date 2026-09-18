@@ -245,7 +245,7 @@ All five Wave-1 items implemented TDD (RED → GREEN → live re-verify). **Suit
 - **H4 merge keys on (branch, role, content).** Two turns sending byte-identical text across a race could dedupe; low harm (identical content), add timestamp to the key if it ever matters.
 - **H7a changed the voice reminder from a trailing system message to a trailing user note.** Correct for this llama-server build (single-system), but it is a small fidelity change vs. the original "post-history system lever" design for models that accept multi-system.
 
-**Not yet done:** commits; M5 / phase-12 visuals remain.
+**Status of the two open items at the time of writing:** commits were outstanding, and M5 / phase-12 visuals remained. **All three have since landed** — M5 and phase-12 are written up below, and the commits are `6e45824` (Wave 1), `c7f9984`, `ffe8e22` (M5). This line previously read as if they were still open, which contradicted the sections further down the same document.
 
 ## Full browser sweep — post-Wave-1 (26 suites)
 
@@ -297,6 +297,117 @@ Plain `open(path, "w")` is truncate-then-write: a crash/kill in that window left
 **Verified:** unit suite green; the `force` path still re-runs (sibling test), and during a run `get_report` still 400s on the non-complete stage — so a surviving report is never served as if fresh.
 
 **Not changed (deliberate):** whether the UI should *surface* the surviving report after a failed re-run. The stage is left `pending` (honest: the re-run did not complete), so the report file is recoverable but not displayed. That is a design question, not a data-safety one — flagged, not decided unilaterally.
+
+
+
+---
+
+# WAVE 3 — M1: the prompt budget is ON, and sized from the model
+
+The §1 M1 finding, verbatim: *"Prompt budget default-off — silent context
+truncation on feature-length scripts; the 'honest degraded turn' machinery
+exists but requires an env var nobody sets."* The shed ladder, the bounded
+renderers and the trim note all shipped (C7) — but behind
+`SCREENPLAY_PROMPT_BUDGET`, defaulting to `0`. A capability nobody can reach is
+the same as a capability that isn't there.
+
+## What changed
+
+**1. On by default.** An unset env var now yields a real budget instead of `0`
+(unlimited). An explicit `0` still means unlimited — the CLI and the tests need
+to be able to switch it off — and a *typo* falls back to the default rather than
+to `0`, because falling back to `0` would turn a mistyped variable into "no
+protection at all", which is the exact silent failure M1 names.
+
+**2. Sized from the model, not guessed.** A fixed constant is wrong in both
+directions: 48k chars would shed garnish a 90k-token model can easily afford,
+while still truncating a 4k-token one. So the budget is derived from the context
+window the server reports — `BaseLlamaClient.context_window()` reads
+`/props → default_generation_settings.n_ctx` (the per-slot window, i.e. what
+this client actually gets) — and converted with two named, separately tunable
+factors: the prompt may claim **half** the window (the rest is the reply, the
+16-message history and up to 4 injected scenes), at **2 chars/token** rather
+than the usual ~4, because this app is built for Telugu/Hindi/Tenglish writers
+and Indic scripts tokenize far worse than English. The constant (48,000) is now
+only the fallback for a server that doesn't answer `/props`.
+
+The probe is best-effort by construction — unreachable, missing, non-JSON,
+non-object and nonsensical bodies all return `None`, which hands the decision
+back to the constant rather than breaking a chat turn or silently disabling the
+budget. It is cached per base_url (160 ms first call, 0.002 ms after; `None` is
+cached too, so a build without `/props` isn't re-probed every turn), and it is
+resolved through the engine's existing deferred-provider mechanism, so a request
+that never builds a prompt never probes — the same C10 contract the shelf
+digests follow.
+
+## Measured behaviour
+
+The largest staged project (`gun_pen_2`, 3 scenes, 36 findings, a 27,523-char
+prompt) against models reporting different windows:
+
+| model `n_ctx` | budget | result |
+|---|---|---|
+| 4,096 | 4,096 | trimmed — **and warns**: the prompt is below the irreducible floor |
+| 8,192 | 8,192 | trimmed — **and warns** (same reason) |
+| 16,384 | 16,384 | trimmed — sheds lowest-value blocks and states the cut |
+| 32,768 | 32,768 | intact |
+| 65,536 | 65,536 | intact |
+| **90,112** (the model in use) | 90,112 | **intact** |
+
+That is the whole design intent in one table: it protects a small-context model,
+and it is inert on a large one. **No project currently on disk is trimmed by
+either the derived budget or the fallback** (largest prompt 27,523 chars;
+the four staged projects assemble 8,870 / 11,775 / 14,285 / 27,523).
+
+## Honest limitations
+
+- **The chars-per-token figure is an approximation, and it is the weak link.**
+  A budget expressed in characters cannot be exact when the constraint is in
+  tokens. 2.0 is conservative for English and still optimistic for a dense Indic
+  script, so a Telugu-heavy prompt on a small model could still be truncated.
+  This is why the env var survives as the operator's override.
+- **The two factors currently multiply to 1.0**, so the budget is numerically
+  "one character per token of the window". They are kept separate because they
+  encode different assumptions and either may need to move without the other —
+  but a reader who sees `0.5 * 2.0` should know it is a coincidence of the
+  chosen values, not a design intent. Pinned by a test so a change to either is
+  deliberate.
+- **A 4k/8k model now warns on every turn.** That is correct — the prompt
+  genuinely does not fit — but it is noisy. Not addressed here.
+- **The idea room shares the mechanism** (the premise card grows as you talk),
+  so it inherits the same approximation.
+
+## Verification
+
+- `tests/test_prompt_budget_default.py` (new, 57 tests): the default is on; the
+  env override in every shape (unset / blank / typo / `0` / negative / real);
+  the derivation; the probe's seven failure modes and its caching; the engine's
+  deferral; and the server's provider.
+- `tests/test_prompt_budget.py` updated: the class that asserted *"the default
+  is inert"* now asserts the opposite contract — that being on by default costs
+  an ordinary prompt nothing. The old name was left stale by the change and is
+  the kind of contradiction this review exists to catch.
+- **7 mutations, 7 caught** — reverting the default to off, falling back to `0`
+  on a typo, returning `0` for an unknown window, resolving the budget eagerly at
+  construction, letting a raising provider propagate, dropping the probe cache,
+  and passing the raw window through instead of deriving all fail the tests that
+  claim to guard them.
+- Suite: **956 passed / 0 failures / 0 errors** (was 898; +58).
+- One test was found to be vacuous during this work and fixed: because the two
+  factors multiply to 1.0, an assertion that the provider "derives" the budget
+  could not tell derivation from passing the raw window through. It is now
+  pinned with a sentinel.
+- **A latent flake from the earlier T2.7 shelf-cache work (commit `08febe7`) was
+  found and fixed here.** `test_a_changed_project_invalidates` failed in the full
+  suite while passing in isolation: the fixture rewrote `parsed.json` with an
+  equal-length body (111 bytes either way), and the fingerprint is
+  `(mtime_ns, size)` — and on this machine two back-to-back writes of an
+  equal-length body carry the *same* `st_mtime_ns` **17 times in 20**, a blind
+  window of about one system clock tick (~15 ms). The test now changes the file's
+  size (as a real re-analysis does), and the limitation is documented on
+  `_file_stamp`. It was not caused by this change — different code path — but it
+  made the gate untrustworthy, which is the same class of problem as the harness
+  rot in Wave 2.
 
 
 

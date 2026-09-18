@@ -1022,6 +1022,15 @@ DIALOGUE. So the single most useful category on a dialogue-heavy script is silen
 deleted from the sections, the chips AND the strip summary. The trust surface
 collapses with it: the strip advertises "8 of 36 quotes verified (22%)" while the
 board renders 2 verified badges (the verified tier is dialogue-dominated).
+AND THE MARGIN INK GOES BLANK — the worst of it. An ink pin needs a finding that is
+OPEN, CARRIES A QUOTE and NAMES A SCENE. Of the 9 quoted findings, 8 are the
+phantom-addressed dialogue ones and the 9th (continuity) is script-level
+(scene_refs []), so it has no scene to anchor to:
+    .finding-ink (margin pins) total: 0
+    inkable (open AND quoted AND scene-anchored): 0 of 9
+So on a script the writer never edited the manuscript shows NO margin pins at all.
+The audit spine asks the desk three questions — what did I get? where is the flaw?
+what do I do? The first is miscounted and the second is SILENT.
 The error also reaches the persisted metrics: gun_pen_2/metrics.json records
 "findings_open": 28. This breaks the product's own N3 law ("the writer's totals
 cannot agree between surfaces... the writer's number agrees with every other
@@ -1169,4 +1178,71 @@ tests/e2e_browser_gun_pen_audit.py  — the audit (stages; E2E_BASE + real model
 tests/_gunpen_probe.py              — read-only report/section probe
 tests/_gunpen_clean_bill.py         — the synthetic clean-bill seed (plan fix #5)
 impl-shots/                         — one verdict screenshot per row + audit_results.json
+
+
+================================================================================
+2026-09-19 — WAVE 3 / M1: the prompt budget is ON, sized from the model
+================================================================================
+Track: docs/CRITICAL_REVIEW_2026-09-18.md (Wave 3, item 3; §1 M1).
+The shed ladder + bounded renderers + trim note shipped in C7 but sat behind
+SCREENPLAY_PROMPT_BUDGET, default 0 (unlimited) — "an env var nobody sets", so a
+feature-length prompt was still silently truncated. That is now closed.
+
+WHAT CHANGED
+- context.py: PROMPT_CHAR_BUDGET defaults to DEFAULT_PROMPT_CHAR_BUDGET (48000)
+  instead of 0. Explicit 0 still = unlimited. A TYPO now falls back to the
+  default, NOT to 0 — falling back to 0 would turn a mistyped variable into
+  "no protection", which is the exact silent failure M1 names.
+- context.py: budget_for_context(n_ctx) — pure. budget = n_ctx x 0.5 (the prompt
+  gets half the window; the reply + 16-msg history + up to 4 injected scenes need
+  the rest) x 2.0 chars/token (conservative: Indic scripts tokenize far worse
+  than English). The product of the two factors is 1.0 at these settings, so the
+  budget is "one char per token of the window" — the factors are kept separate
+  because they encode different assumptions, and a test pins the product.
+- llm_client_base.py: BaseLlamaClient.context_window() — best-effort GET /props,
+  reads default_generation_settings.n_ctx (per-slot, i.e. what this client gets),
+  falls back to a top-level n_ctx. Returns None on unreachable / non-JSON /
+  non-object / nonsensical bodies. Cached per base_url (None cached too, so a
+  build without /props is not re-probed). Measured: 160ms first, 0.002ms cached.
+- engine.py: prompt_budget accepts an int OR a zero-arg provider, resolved in
+  send_message via _resolve_prompt_budget — the same deferred contract as the
+  shelf blocks (C10): a request that never builds a prompt never probes.
+- webapp_server.py: _prompt_budget_provider(client), wired into BOTH engine
+  constructions (project chat + idea room).
+
+MEASURED (largest staged project, gun_pen_2: 27,523-char prompt)
+  n_ctx  4,096 -> budget  4,096  trimmed + WARNS (below the irreducible floor)
+  n_ctx  8,192 -> budget  8,192  trimmed + WARNS (same)
+  n_ctx 16,384 -> budget 16,384  trimmed, sheds garnish and says so
+  n_ctx 32,768 -> budget 32,768  intact
+  n_ctx 90,112 -> budget 90,112  intact   <-- the model in use
+NO staged project is trimmed by either the derived budget or the 48k fallback
+(the four assemble 8,870 / 11,775 / 14,285 / 27,523 chars).
+
+TESTS
+tests/test_prompt_budget_default.py (new, 58). tests/test_prompt_budget.py: the
+class asserting "the default is inert" now asserts the opposite contract.
+7 mutations, 7 caught (default back to off; typo -> 0; unknown window -> 0; eager
+resolution at construction; raising provider propagates; no probe cache; raw
+window passed through instead of derived).
+Gate: 956 passed / 0 failures / 0 errors (+58 from 898).
+
+KNOWN LIMITATIONS (flagged, not hidden)
+- chars/token is an APPROXIMATION and the weak link: a char budget cannot be
+  exact when the constraint is in tokens. 2.0 is conservative for English and
+  still optimistic for a dense Indic script. The env var is the operator's
+  override.
+- A 4k/8k model now warns on every turn. Correct (the prompt does not fit) but
+  noisy. Not addressed.
+
+INCIDENTAL — a latent flake from T2.7 (commit 08febe7), found by this run
+test_shelf_cache.py::test_a_changed_project_invalidates failed in the full suite
+but passed in isolation 3/3. Cause: _write_project rewrote parsed.json with an
+EQUAL-LENGTH body ("Draft One" -> "Draft Two", both 9 chars; 111 bytes both
+times), and the fingerprint is (mtime_ns, size). Measured on this machine: two
+back-to-back writes of an equal-length body carry the SAME st_mtime_ns 17 times
+in 20, so the blind window is ~one system clock tick (~15ms). Fixed by making the
+test's rewrite change the SIZE (a real re-analysis does), and the limitation is
+now documented on _file_stamp. It was NOT caused by the M1 change (different
+code path) — but it broke the gate, so it had to go.
 

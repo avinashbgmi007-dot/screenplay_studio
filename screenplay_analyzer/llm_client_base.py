@@ -10,9 +10,17 @@ Each consumer subclasses BaseLlamaClient and adds its own chat method:
 from __future__ import annotations
 
 import re
+import threading
 import time
 
 import requests
+
+# The context window a server reports changes only when the server restarts, and
+# a client is constructed per web request — so the probe result is cached by
+# base_url rather than per client. None is cached too: a build without /props
+# must not be re-probed on every turn.
+_CONTEXT_WINDOW_CACHE: dict[str, int | None] = {}
+_CONTEXT_WINDOW_LOCK = threading.Lock()
 
 
 class LlamaServerError(Exception):
@@ -92,6 +100,57 @@ class BaseLlamaClient:
             return True
         except LlamaServerError:
             return False
+
+    def context_window(self) -> int | None:
+        """The context window this server reports, in TOKENS — or None.
+
+        Exists so a caller can size its own prompt against the model it is
+        actually talking to instead of guessing a constant. The co-writer uses
+        it for its prompt budget: a model reporting a small window gets a small
+        budget (and the prompt sheds garnish rather than being silently
+        truncated), while a model with room is left alone.
+
+        Best-effort by design. `/props` is a llama.cpp endpoint that some builds
+        don't expose, and a capability probe must never fail a chat turn — so
+        every failure path returns None and the caller falls back to a constant.
+        """
+        key = self.base_url
+        with _CONTEXT_WINDOW_LOCK:
+            if key in _CONTEXT_WINDOW_CACHE:
+                return _CONTEXT_WINDOW_CACHE[key]
+        n_ctx = self._probe_context_window()
+        with _CONTEXT_WINDOW_LOCK:
+            _CONTEXT_WINDOW_CACHE[key] = n_ctx
+        return n_ctx
+
+    def _probe_context_window(self) -> int | None:
+        """One GET /props, read for the per-slot context size.
+
+        llama.cpp reports it under `default_generation_settings.n_ctx` (already
+        divided across `total_slots`, so it is the window this client actually
+        gets); the bare top-level `n_ctx` is accepted as a fallback for builds
+        that report it differently.
+        """
+        try:
+            resp = requests.get(f"{self.base_url}/props", timeout=3, headers=self.extra_headers)
+            resp.raise_for_status()
+            data = resp.json()
+        except (requests.RequestException, ValueError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        gen = data.get("default_generation_settings")
+        gen = gen if isinstance(gen, dict) else {}
+        params = gen.get("params")
+        params = params if isinstance(params, dict) else {}
+        for candidate in (gen.get("n_ctx"), data.get("n_ctx"), params.get("n_ctx")):
+            try:
+                value = int(candidate)
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                return value
+        return None
 
     def _check_busy(self, status: int, body: str) -> bool:
         """True if the response indicates the server is busy."""

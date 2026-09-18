@@ -172,10 +172,18 @@ class TestShelfDigestIsMemoised:
         _write_project(shelf, "Alpha", title="Draft One")
         assert webapp_server._writer_library()[0]["title"] == "Draft One"
 
-        _write_project(shelf, "Alpha", title="Draft Two", scenes=9)
+        # The rewrite deliberately changes the file's SIZE, not only its mtime.
+        # The fingerprint is (mtime_ns, size), and this filesystem's timestamps
+        # come from a clock that ticks coarsely — measured: two back-to-back
+        # writes of an equal-length body carry the SAME mtime_ns 17 times in 20.
+        # A same-size rewrite inside one tick is therefore invisible to a
+        # stat-only fingerprint by design (see _file_stamp), which made this
+        # test flaky in a full-suite run. A real re-analysis rewrites the
+        # content and so changes the size, which is what this now models.
+        _write_project(shelf, "Alpha", title="Draft Two, revised", scenes=9)
         refreshed = webapp_server._writer_library()
         assert len(walk_counter) == 2, "the digest was served stale after an edit"
-        assert refreshed[0]["title"] == "Draft Two"
+        assert refreshed[0]["title"] == "Draft Two, revised"
 
     def test_a_new_project_invalidates(self, shelf, walk_counter):
         _write_project(shelf, "Alpha")

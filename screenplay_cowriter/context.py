@@ -20,12 +20,99 @@ alongside it, per the composability goal from the start of this project.
 from __future__ import annotations
 
 import json
+import os
 import re
+import warnings
 from difflib import SequenceMatcher
 
 from .personas import persona_text, persona_examples, mode_text, DOCTOR_PERSONA
 
 SCENE_REF_RE = re.compile(r"[Ss]cene\s+(\d+)")
+
+# ---------------------------------------------------------------------------
+# Global prompt budget (C7, M1).
+#
+# Every block that rides into the co-writer's system prompt is individually
+# capped — findings are "small enough to keep wholesale", the map caps its
+# character list, PAST WORK caps its project count, the craft block caps its
+# rules. Nothing capped their SUM. A feature-length script with a heavily
+# flagged report assembles a prompt far larger than a small local model's
+# window, and llama.cpp truncates it silently: the model then answers from a
+# mangled context with no sign anything was lost.
+#
+# ON BY DEFAULT (M1). It used to require SCREENPLAY_PROMPT_BUDGET, which
+# nobody sets, so the protection existed only on paper. When the budget bites,
+# whole blocks are dropped lowest-value-first and the omission is STATED in the
+# prompt, so a degraded turn is honest instead of silently wrong.
+#
+# The value is normally DERIVED from the model's own reported context window
+# (BaseLlamaClient.context_window -> budget_for_context), because a fixed
+# number is wrong in both directions: a 90k-token model would shed garnish it
+# can easily afford, while a 4k-token model would still truncate. The constant
+# below is only the fallback for servers that don't answer /props.
+#
+# Sizing, measured on the staged projects: the irreducible floor (persona, mode,
+# examples, guards, findings) is ~8.5k chars; a 22-scene project assembles ~14k;
+# the largest staged report (36 findings) assembles ~27.5k; a feature-length
+# script with a heavy report projects to ~30k, before the turn adds up to 4 full
+# scenes plus a 16-message history window. 48k leaves headroom over every
+# project on disk while still bounding a runaway prompt.
+#
+# SCREENPLAY_PROMPT_BUDGET overrides it; an explicit 0 restores unlimited.
+# ---------------------------------------------------------------------------
+DEFAULT_PROMPT_CHAR_BUDGET = 48000
+
+
+def _budget_from_env(default: int) -> int:
+    """SCREENPLAY_PROMPT_BUDGET, or `default` when unset, blank or unparseable.
+
+    An explicit 0 means unlimited — the pre-M1 behaviour, kept because the CLI
+    and the tests rely on being able to turn the budget off completely. A typo
+    must not silently disable the protection, so a value that isn't a number
+    falls back to the default rather than to 0."""
+    raw = (os.environ.get("SCREENPLAY_PROMPT_BUDGET") or "").strip()
+    if not raw:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
+
+
+PROMPT_CHAR_BUDGET = _budget_from_env(DEFAULT_PROMPT_CHAR_BUDGET)
+
+# How the budget is derived from a model's reported window.
+#
+# Both factors are deliberately conservative, and the asymmetry is the point:
+# over-trimming is visible, graceful and stated in the prompt, while
+# under-trimming is the silent truncation this whole mechanism exists to stop.
+# - The system prompt is only half the turn. The rest is the reply, the
+#   16-message history window, and up to MAX_SCENES_INJECTED_PER_TURN full
+#   scenes — so the prompt may claim half the window, not all of it.
+# - 2 chars/token rather than the usual ~4: this app is built for
+#   Telugu/Hindi/Tenglish writers, and Indic scripts tokenize far worse than
+#   English. Under-estimating the budget costs a shed block; over-estimating it
+#   costs the writer their context without telling them.
+#
+# At these two settings the product is 1.0, so the budget is simply "one
+# character per token of the model's window" — the factors are kept separate
+# because they encode different assumptions (how much of the window this block
+# may use vs. how many characters a token is worth) and either may need to move
+# without the other. The chars-per-token figure remains an APPROXIMATION: it is
+# conservative for English and still optimistic for a dense Indic script, which
+# is why the env var exists as the operator's override.
+PROMPT_BUDGET_CONTEXT_FRACTION = 0.5
+PROMPT_BUDGET_CHARS_PER_TOKEN = 2.0
+
+
+def budget_for_context(n_ctx_tokens: int | None) -> int | None:
+    """A prompt budget in characters for a model reporting `n_ctx_tokens`.
+
+    None when the window is unknown or nonsensical — the caller then uses
+    PROMPT_CHAR_BUDGET. Pure, so the derivation is testable without a server."""
+    if not n_ctx_tokens or n_ctx_tokens <= 0:
+        return None
+    return int(n_ctx_tokens * PROMPT_BUDGET_CONTEXT_FRACTION * PROMPT_BUDGET_CHARS_PER_TOKEN)
 
 MAX_SCENES_INJECTED_PER_TURN = 4  # cap context growth if someone mentions ten scene numbers at once
 
@@ -146,28 +233,53 @@ class ScriptContext:
             self._characters = chars
         return self._characters
 
-    def script_map(self, max_characters: int = 24) -> str:
+    def script_map(self, max_characters: int = 24, max_chars: int = 0) -> str:
         """A compact standing map of the script: scene headings plus which
         characters appear where. Cheap enough to ride in the system prompt
         every turn, and it lets the co-writer point at exact scenes even when
         the writer's question doesn't name a scene number (full scene text is
-        still injected on demand when a scene is referenced)."""
+        still injected on demand when a scene is referenced).
+
+        `max_chars` (0 = unbounded) is the prompt budget's lever. Over it, the
+        character-presence section goes first — the scene list is what locates
+        a scene — and if that is still not enough, scene lines are cut from the
+        tail. Either way the cut is STATED, so the model knows the map is
+        partial rather than believing the script ends where the list does."""
         scenes = self.data.get("scenes", [])
         if not scenes:
             return ""
-        lines = [f"SCRIPT MAP — {len(scenes)} scenes:"]
+        header = f"SCRIPT MAP — {len(scenes)} scenes:"
+        scene_lines = []
         for s in scenes:
             num = s.get("scene_number")
             heading = s.get("heading_raw") or s.get("heading") or ""
-            lines.append(f"Scene {num}: {heading}")
+            scene_lines.append(f"Scene {num}: {heading}")
 
         chars = self.character_presence()
+        char_lines = []
         if chars:
             ordered = sorted(chars.items(), key=lambda kv: -len(kv[1]))[:max_characters]
-            lines.append("CHARACTER PRESENCE (scene numbers where each appears):")
-            for name, nums in ordered:
-                lines.append(f"{name}: {', '.join(str(n) for n in nums)}")
-        return "\n".join(lines)
+            char_lines = ["CHARACTER PRESENCE (scene numbers where each appears):"]
+            char_lines += [f"{name}: {', '.join(str(n) for n in nums)}" for name, nums in ordered]
+
+        lines = [header] + scene_lines + char_lines
+        if not max_chars or len("\n".join(lines)) <= max_chars:
+            return "\n".join(lines)
+
+        # over budget: drop the character section first, then cut scene lines
+        lines = [header] + scene_lines
+        if len("\n".join(lines)) <= max_chars:
+            return "\n".join(lines) + "\n(Character presence omitted for space.)"
+
+        kept = []
+        for line in lines:
+            if len("\n".join(kept + [line])) > max_chars:
+                break
+            kept.append(line)
+        if len(kept) <= 1:  # not even the header fits — say so rather than emit a bare header
+            return f"SCRIPT MAP — {len(scenes)} scenes (list omitted for space)."
+        kept.append(f"(…{len(lines) - len(kept)} further line(s) omitted for space.)")
+        return "\n".join(kept)
 
 
 class ReportContext:
@@ -184,9 +296,20 @@ class ReportContext:
     def model_used(self):
         return self.data.get("model_used")
 
-    def compact_summary(self) -> str:
+    # Severity ordering for the budget's findings trim. The KB curates the
+    # severity, so it is the ranking the trim should respect.
+    _SEVERITY_RANK = {"high": 0, "medium": 1, "low": 2}
+
+    def compact_summary(self, max_findings: int = 0, drop_why: bool = False) -> str:
         """A dense but complete text form of coverage + all findings — this is
-        what stays in the system prompt every turn."""
+        what stays in the system prompt every turn.
+
+        `max_findings` and `drop_why` (both off by default) are the prompt
+        budget's last-resort levers. The findings are the point of the
+        conversation, so they are trimmed only after every optional block has
+        been dropped — and the trim keeps the highest-severity findings, then
+        restores report order, so the survivors are still readable in sequence.
+        The omission is stated rather than silently applied."""
         parts = []
         cov = self.data.get("coverage")
         if cov:
@@ -199,6 +322,15 @@ class ReportContext:
             )
 
         findings = self.data.get("findings", [])
+        omitted = 0
+        if findings and max_findings and len(findings) > max_findings:
+            ranked = sorted(range(len(findings)),
+                            key=lambda i: self._SEVERITY_RANK.get(
+                                str(findings[i].get("severity") or "").lower(), 3))
+            keep = sorted(ranked[:max_findings])
+            omitted = len(findings) - len(keep)
+            findings = [findings[i] for i in keep]
+
         if findings:
             parts.append("REPORT FINDINGS:")
             for f in findings:
@@ -206,11 +338,13 @@ class ReportContext:
                 status = f.get("verification", {}).get("status", "")
                 flag = " [UNVERIFIED QUOTE]" if status == "not_found" else ""
                 issue = f.get('issue', f.get('finding', ''))  # fallback for older report.findings.json files
-                why = f.get('why_it_matters', '')
+                why = "" if drop_why else f.get('why_it_matters', '')
                 line = f"- ({f.get('category')}, {f.get('severity')}) {scene_str}: {issue}"
                 if why:
                     line += f" — {why}"
                 parts.append(f"{line}{flag}")
+            if omitted:
+                parts.append(f"({omitted} further finding(s) not listed here — for space.)")
 
         formatting = self.data.get("formatting_findings", [])
         if formatting:
@@ -311,14 +445,51 @@ def _premise_block(card: dict | None) -> str:
     return "\n".join(parts) if parts else "(The page is empty so far — you're shaping the idea together.)"
 
 
+def _shed_ladder():
+    """The prompt budget's shed steps, lowest value first and cumulative.
+
+    What is never shed: the persona, the mode, the example dialogue, the voice
+    and grounding rules, the findings' `issue` lines, and the writer's own
+    relationship card / cold-start line — those are the conversation. What goes
+    first is garnish (room state), then the doctor's case file, then the
+    writer's past work, then the craft principles, then detail inside the map
+    and finally the findings' rationale. Each step keeps the previous one."""
+    plan: dict = {}
+    for key, value in (
+        ("drop_mood", True),
+        ("drop_case", True),
+        ("drop_library", True),
+        ("drop_craft", True),
+        ("map_chars", 2000),
+        ("map_chars", 800),
+        ("report_why", False),
+        ("map_chars", 400),
+        ("report_max", 12),
+    ):
+        plan = {**plan, key: value}
+        yield dict(plan)
+
+
+PROMPT_SHED_LADDER = tuple(_shed_ladder())
+
+PROMPT_TRIM_NOTE = (
+    "CONTEXT TRIMMED — this turn's context was cut to fit the model's window, so "
+    "some reference material above is missing. Do not assume it does not exist: "
+    "if you need something that isn't here, say so and ask."
+)
+
+
 def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, persona: str, mode: str,
                         relationship_card: str | None = None, cold_start_line: str | None = None,
                         premise: dict | None = None, writer_library_text: str | None = None,
-                        mood_text: str | None = None, doctor_case_text: str | None = None) -> str:
+                        mood_text: str | None = None, doctor_case_text: str | None = None,
+                        budget: int | None = None) -> str:
     examples = persona_examples(persona)
     examples_block = f"\n\n{examples}" if examples else ""
     if premise is not None:
         # Idea room: no script, no report — the premise card is the material.
+        # No shed ladder here: the only unbounded block is the page itself, and
+        # _premise_block already caps it with a stated cut.
         idea_title = (premise.get("title") or "").strip() or "this idea"
         update_note = (premise.get("page_update") or "").strip()
         update_block = (
@@ -338,42 +509,78 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         )
     else:
         title = script_ctx.title or report_ctx.title or "this screenplay"
-        script_map = script_ctx.script_map()
-        map_block = f"\n\nHere is a map of the script itself:\n\n{script_map}" if script_map else ""
-        # The rules the findings rest on, so advice is anchored to the craft
-        # source rather than to the finding's prose alone. Empty when the
-        # report cites no rule ids, so nothing changes for older reports.
-        _craft = report_ctx.craft_principles()
-        craft_block = f"\n\n{_craft}" if _craft else ""
-        prompt = (
-            f"{persona_text(persona)}\n\n"
-            f"{mode_text(mode)}\n\n"
-            f"{examples_block}\n"
-            f"You're discussing the screenplay \"{title}\" with its writer. Here is the "
-            f"standing analysis report for reference:\n\n{report_ctx.compact_summary()}"
-            f"{craft_block}{map_block}\n\n"
-            f"When specific scene text is relevant to the current question, it will be "
-            f"provided below as additional context for this turn. If it isn't provided "
-            f"and you need exact wording to answer precisely, say so rather than guessing "
-            f"at exact lines from memory.\n\n{GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
-        )
-    if mood_text:
-        # Deterministic room state (facts computed from real project data —
-        # never model-improvised). Colors energy/patience; carries no facts
-        # the persona could misquote as script content.
-        prompt += f"\n\n{mood_text}"
-    if doctor_case_text and persona == DOCTOR_PERSONA:
-        # The doctor's case file on this writer — cross-project PATTERNS only,
-        # never script content. Sameer never sees it; it's not his lens.
-        prompt += f"\n\n{doctor_case_text}"
-    if relationship_card:
-        prompt += f"\n\n{relationship_card}"
-    if cold_start_line:
-        prompt += f"\n\n{cold_start_line}"
-    if writer_library_text:
-        # The writer's past work — a different shelf, with a grounding guard
-        # baked into the block itself (never merged with the current script).
-        prompt += f"\n\n{writer_library_text}"
+
+        def render(*, drop_mood=False, drop_case=False, drop_library=False, drop_craft=False,
+                   map_chars=0, report_max=0, report_why=True):
+            script_map = script_ctx.script_map(max_chars=map_chars)
+            map_block = f"\n\nHere is a map of the script itself:\n\n{script_map}" if script_map else ""
+            # The rules the findings rest on, so advice is anchored to the craft
+            # source rather than to the finding's prose alone. Empty when the
+            # report cites no rule ids, so nothing changes for older reports.
+            _craft = "" if drop_craft else report_ctx.craft_principles()
+            craft_block = f"\n\n{_craft}" if _craft else ""
+            body = (
+                f"{persona_text(persona)}\n\n"
+                f"{mode_text(mode)}\n\n"
+                f"{examples_block}\n"
+                f"You're discussing the screenplay \"{title}\" with its writer. Here is the "
+                f"standing analysis report for reference:\n\n"
+                f"{report_ctx.compact_summary(max_findings=report_max, drop_why=not report_why)}"
+                f"{craft_block}{map_block}\n\n"
+                f"When specific scene text is relevant to the current question, it will be "
+                f"provided below as additional context for this turn. If it isn't provided "
+                f"and you need exact wording to answer precisely, say so rather than guessing "
+                f"at exact lines from memory.\n\n{GROUNDING_INSTRUCTION}\n\n{LANGUAGE_META_INSTRUCTION}\n\n{PLAIN_TEXT_INSTRUCTION}"
+            )
+            if mood_text and not drop_mood:
+                # Deterministic room state (facts computed from real project data —
+                # never model-improvised). Colors energy/patience; carries no facts
+                # the persona could misquote as script content.
+                body += f"\n\n{mood_text}"
+            if doctor_case_text and persona == DOCTOR_PERSONA and not drop_case:
+                # The doctor's case file on this writer — cross-project PATTERNS only,
+                # never script content. Sameer never sees it; it's not his lens.
+                body += f"\n\n{doctor_case_text}"
+            if relationship_card:
+                body += f"\n\n{relationship_card}"
+            if cold_start_line:
+                body += f"\n\n{cold_start_line}"
+            if writer_library_text and not drop_library:
+                # The writer's past work — a different shelf, with a grounding guard
+                # baked into the block itself (never merged with the current script).
+                body += f"\n\n{writer_library_text}"
+            return body
+
+        full = render()
+        prompt = full
+        limit = PROMPT_CHAR_BUDGET if budget is None else budget
+        if limit and len(prompt) > limit:
+            # The trim note has to be PAID FOR out of the budget. Fitting the
+            # prompt and then appending the note pushes it back over the limit —
+            # which then reports the budget as unreachable when it was not.
+            reserve = len(PROMPT_TRIM_NOTE) + 2
+            for plan in PROMPT_SHED_LADDER:
+                prompt = render(**plan)
+                if len(prompt) + reserve <= limit:
+                    break
+            # State the cut only when content actually changed: a ladder step
+            # that had nothing to remove is not a trimmed turn.
+            if prompt != full:
+                prompt += "\n\n" + PROMPT_TRIM_NOTE
+            if len(prompt) > limit:
+                # The ladder has a floor: the persona, the mode, the example
+                # dialogue, the guards and the findings are not shed, so a
+                # budget below their sum is unreachable. Measured: a 22-scene
+                # script with 17 findings floors at ~12k chars. Say so loudly —
+                # otherwise the operator believes the cap is protecting them
+                # while the server still truncates.
+                warnings.warn(
+                    f"Prompt budget {limit} chars is unreachable for this turn: the "
+                    f"irreducible context (persona, guards, examples and findings) is "
+                    f"~{len(prompt) // 1000}k chars. Raise SCREENPLAY_PROMPT_BUDGET or "
+                    f"the model will truncate silently.",
+                    RuntimeWarning,
+                )
     return prompt
 
 

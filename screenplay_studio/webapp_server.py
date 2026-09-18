@@ -2056,7 +2056,8 @@ def _load_session_and_engine(project: str, session_id: str):
                             memory_scope=f"project:{project}",
                             writer_library_text=library_text,
                             mood_text=_mood_fragment(m),
-                            doctor_case_text=case_file_text)
+                            doctor_case_text=case_file_text,
+                            prompt_budget=_prompt_budget_provider(client))
     return session, engine, store
 
 
@@ -2369,7 +2370,8 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
     premise["page_update"] = _page_update_note(session.last_seen_content, premise["content"])
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
                             premise=premise,
-                            memory_scope=f"idea:{idea_id}", writer_library_text=None)
+                            memory_scope=f"idea:{idea_id}", writer_library_text=None,
+                            prompt_budget=_prompt_budget_provider(client))
     engine._current_page_content = premise["content"]
     return session, engine, store
 
@@ -2481,6 +2483,20 @@ _SHELF_CACHE_MAX = 8
 
 
 def _file_stamp(path: str):
+    """(mtime_ns, size) — the cheapest thing that changes when a project does.
+
+    Deliberately stat-only: the point of the fingerprint is to decide whether the
+    digests can be reused WITHOUT reading a single project file, so a content
+    hash would defeat it.
+
+    Known, bounded limitation: a rewrite that lands in the same filesystem
+    timestamp tick AND keeps the byte size identical is invisible here. Measured
+    on this machine, two back-to-back writes of an equal-length body carry the
+    same `st_mtime_ns` 17 times in 20, so the blind window is roughly one system
+    clock tick (~15ms). In practice a re-analysis rewrites several files with
+    different content over seconds, so the digest is not served stale; the risk
+    is a same-size rewrite inside that tick, which no real workflow produces.
+    """
     try:
         st = os.stat(path)
     except OSError:
@@ -2653,6 +2669,33 @@ def _shelf_providers(exclude: str | None):
                                     lambda: _build_doctor_case_file(exclude))
 
     return library_text, case_file_text
+
+
+def _prompt_budget_provider(client):
+    """The co-writer's prompt budget for this model, as a zero-arg provider.
+
+    M1: the budget is on by default, and sized from the model the writer is
+    actually talking to. A model that reports a small context window gets a
+    small budget — so the prompt sheds garnish (and says so) instead of being
+    silently truncated — while a model with room is left alone. That per-model
+    sizing is why this is derived rather than a constant: a fixed number would
+    over-trim a large-context model and still truncate a small one.
+
+    Deferred for the same reason as the shelf blocks: this runs only when a
+    prompt is actually built, so loading a session, switching a branch or
+    deleting a chat never pays for the probe. Returns None when the server
+    doesn't report a window, which hands the decision back to
+    context.PROMPT_CHAR_BUDGET.
+    """
+    def budget():
+        context_mod = _import_cowriter("context")
+        try:
+            n_ctx = client.context_window()
+        except Exception:
+            n_ctx = None  # a capability probe must never break a chat turn
+        return context_mod.budget_for_context(n_ctx)
+
+    return budget
 
 
 @app.route("/api/writer-library", methods=["GET"])

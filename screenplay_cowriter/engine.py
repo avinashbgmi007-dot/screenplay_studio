@@ -51,6 +51,34 @@ def _resolve_prompt_block(value):
     except Exception:
         return None
 
+
+def _resolve_prompt_budget(value):
+    """The prompt budget for a turn: an int, or None to use the module default.
+
+    Accepts a number or a zero-arg callable, for the same reason the context
+    blocks do — the server derives the budget from the model's reported context
+    window, and that probe must not run for a request that never builds a prompt
+    (loading a session, switching a branch, deleting a chat).
+
+    Degrades to None on a provider that raises or reports no window, so the
+    caller falls back to PROMPT_CHAR_BUDGET rather than silently losing the
+    budget altogether. An int is clamped at 0, which build_system_prompt reads
+    as "unlimited".
+    """
+    if value is None:
+        return None
+    if callable(value):
+        try:
+            value = value()
+        except Exception:
+            return None
+    if value is None:
+        return None
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return None
+
 # Voice drift detection: track AI tells per persona to catch slow drift
 _VOICE_DRIFT_HISTORY = {}  # persona -> list of tell counts per reply
 
@@ -97,7 +125,8 @@ class CoWriterEngine:
     def __init__(self, client: LlamaServerClient, script_ctx: ScriptContext, report_ctx: ReportContext,
                  history_window: int = HISTORY_WINDOW, store=None, memory=None, premise: dict | None = None,
                  memory_scope: str | None = None, writer_library_text: str | None = None,
-                 mood_text: str | None = None, doctor_case_text: str | None = None):
+                 mood_text: str | None = None, doctor_case_text: str | None = None,
+                 prompt_budget: int | None = None):
         self.client = client
         self.script_ctx = script_ctx
         self.report_ctx = report_ctx
@@ -133,6 +162,11 @@ class CoWriterEngine:
         # provider; it is resolved only for the persona that reads it.
         self.mood_text = mood_text
         self.doctor_case_text = doctor_case_text
+        # Global prompt budget (M1). None lets build_system_prompt apply its
+        # own default; the server passes a provider that derives the budget
+        # from the model's reported context window, so it is resolved on the
+        # one path that builds a prompt. See _resolve_prompt_budget.
+        self.prompt_budget = prompt_budget
 
     def _ground_reply_for_room(self, reply: str) -> str:
         """Reply-side hallucination guard, room-aware. In the idea room there
@@ -275,6 +309,11 @@ class CoWriterEngine:
             _resolve_prompt_block(self.doctor_case_text)
             if branch.active_persona == DOCTOR_PERSONA else None
         )
+        # The prompt budget, resolved once per turn. Deferred for the same
+        # reason as the shelf blocks: the server derives it from the model's
+        # reported context window, and a request that never builds a prompt
+        # must not pay for that probe.
+        prompt_budget = _resolve_prompt_budget(self.prompt_budget)
 
         # Explicit 'scene N' mentions plus scenes where a named character
         # speaks — writers ask about their script by naming people, and the
@@ -326,6 +365,7 @@ class CoWriterEngine:
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
                 premise=self.premise, writer_library_text=writer_library_text,
                 mood_text=self.mood_text, doctor_case_text=doctor_case_text,
+                budget=prompt_budget,
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
             if lang_note:
                 system_prompt += "\n\n" + lang_note
@@ -349,6 +389,7 @@ class CoWriterEngine:
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
                 premise=self.premise, writer_library_text=writer_library_text,
                 mood_text=self.mood_text, doctor_case_text=doctor_case_text,
+                budget=prompt_budget,
             )
             if lang_note:
                 system_prompt += "\n\n" + lang_note
