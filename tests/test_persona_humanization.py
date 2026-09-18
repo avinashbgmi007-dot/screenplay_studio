@@ -5,7 +5,7 @@ character-AI ecosystem playbook (RealChar / Soul-of-Waifu / humanizer)."""
 from screenplay_cowriter.context import ScriptContext, ReportContext, build_system_prompt
 from screenplay_cowriter.personas import PERSONAS, HUMAN_VOICE_RULES
 
-HUMAN_PERSONAS = ("writing_partner", "script_consultant", "premise_doctor")
+ALL_PERSONAS = tuple(sorted(k for k in PERSONAS if not k.endswith("_examples")))
 
 
 def _prompt(persona: str, mode: str = "peer", premise=None):
@@ -15,12 +15,27 @@ def _prompt(persona: str, mode: str = "peer", premise=None):
 
 
 class TestSharedVoiceRules:
-    def test_voice_rules_ride_every_human_persona(self):
-        for persona in HUMAN_PERSONAS:
+    def test_voice_rules_ride_every_persona(self):
+        """EVERY persona, not a hand-picked subset.
+
+        This test used to iterate a hardcoded tuple of exactly the three
+        personas that already carried the rules — so it could never fail, and
+        five personas (producer, dev_exec, teacher, audience, genre_specialist)
+        shipped with no voice rules at all. Derive the list from PERSONAS so a
+        newly added persona is covered automatically.
+        """
+        assert len(ALL_PERSONAS) >= 8, "persona list collapsed — the scan is broken"
+        for persona in ALL_PERSONAS:
             p = _prompt(persona)
             assert "How a real person talks" in p, persona
             assert "Great question!" in p, persona  # the anti-pattern is named, so it can be avoided
             assert "Never say \"as an AI\"" in p, persona
+
+    def test_voice_rules_appear_exactly_once(self):
+        """Appending must not double the block for personas that embed it."""
+        for persona in ALL_PERSONAS:
+            p = _prompt(persona)
+            assert p.count("How a real person talks") == 1, persona
 
     def test_no_persona_breaks_the_fiction(self):
         # The humanization playbook's hard rule: nobody at the desk admits to

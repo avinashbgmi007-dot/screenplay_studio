@@ -456,7 +456,27 @@ def trait_reminder(name: str) -> str:
 
 
 def persona_text(name: str) -> str:
-    return PERSONAS.get(name, PERSONAS[DEFAULT_PERSONA])
+    """The persona's own text, with the shared human-voice rules GUARANTEED.
+
+    The rules are universal: every persona is a person at this desk, so no
+    persona may open with "Great question!", pad, or admit to being a model —
+    regardless of whether it is a collaborator or a reader.
+
+    Sameer, Dr. Sushruta and the premise doctor carry a copy inside their own
+    text, placed where it reads best for them (Sameer's sits before his closing
+    instruction, so it is deliberately not at the end). The other five personas
+    are one-paragraph role descriptions with no rules at all, so the rules are
+    appended here. This is the only prompt path (context.build_system_prompt),
+    which makes it the one place that can guarantee the contract.
+
+    Why it matters: before this, five of eight personas shipped with no voice
+    rules whatsoever, and the test that claimed to check "every human persona"
+    iterated a hardcoded tuple of exactly the three that already passed.
+    """
+    text = PERSONAS.get(name, PERSONAS[DEFAULT_PERSONA])
+    if HUMAN_VOICE_RULES.strip() in text:
+        return text  # already carries them, in the position chosen for it
+    return f"{text}\n\n{HUMAN_VOICE_RULES}"
 
 
 def persona_examples(name: str) -> str:

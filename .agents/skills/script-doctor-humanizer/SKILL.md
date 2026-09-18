@@ -26,9 +26,15 @@ one-liner about a scene that's coasting beats a paragraph of tsk-tsking.
 | **humanizer** (`blader/humanizer`) | Anti-AI-pattern list + no-fabrication: the doctor must never invent a scene, a line, or a story detail to support a note. |
 | **super-agent-party** (`heshengtao/super-agent-party`) | Consistent persona across surfaces — the doctor's voice must survive long sessions and mode switches without going robotic or sycophantic. |
 
-## The voice rules (already embedded as `HUMAN_VOICE_RULES`)
+## The voice rules (`HUMAN_VOICE_RULES`)
 
-Appended to both doctor personas every turn:
+**Universal — every persona, not just the doctor pair.** Both doctor personas
+embed the block in their own text; `persona_text()` appends it to any persona
+that does not, so no persona (including the five reader personas) can ship
+without the anti-AI rules. Enforced by
+`tests/test_persona_humanization.py::TestSharedVoiceRules`.
+
+The doctor pair carry it every turn:
 
 1. **No canned openings/closers** — no "Great question!", "Love that!", no
    boilerplate closers; one exclamation point per reply at most.

@@ -839,3 +839,37 @@ move - the classification is one frozenset.
 
 GATE: non-browser 803 passed / 0 failures / 0 errors (via --junitxml); browser gates re-run after the
 co-writer change.
+
+--- T2.3 (C1) - the humanizer playbooks: the review's framing was wrong, the bug underneath was real ---
+
+C1 said the humanizer playbooks (`.agents/skills/sameer-humanizer`, `script-doctor-humanizer`) are
+"documentation only" and should be wired into the runtime. THAT FRAMING IS A CATEGORY ERROR: `.agents/skills/`
+are developer-facing playbooks for the person tuning the personas. They are not runtime modules and loading
+them per turn would be wrong (and expensive). Third instance this session of "right about the mechanism,
+wrong about its effect" - see F8/T0.9.
+
+WHAT THE PLAYBOOKS ACTUALLY DOCUMENT, and where the code broke it: both state the voice rules are
+"appended every turn. Non-negotiable." The rules existed (`HUMAN_VOICE_RULES`, 1187 chars) but were
+interpolated into exactly THREE persona strings - writing_partner, script_consultant, premise_doctor - and
+`persona_text()` was a bare dict lookup with no append. The other five personas (producer, dev_exec,
+teacher, audience, genre_specialist) had NO voice rules AT ALL, so any of them could open with "Great
+question!" or break the fiction with "as an AI".
+
+THE GUARD THAT COULD NOT FAIL: `test_voice_rules_ride_every_human_persona` iterated
+`HUMAN_PERSONAS = ("writing_partner", "script_consultant", "premise_doctor")` - a hardcoded tuple of exactly
+the three personas that already passed. A test named "every human persona" that can never fail is worse
+than no test: it certifies the absence of a check.
+
+FIX: `persona_text()` now guarantees the contract structurally - it appends HUMAN_VOICE_RULES when the
+persona's own text does not already contain it. Sameer carries his copy MID-TEXT (before his closing
+instruction), so the append deliberately leaves the three curated personas byte-identical (verified:
+`persona_text(n) == PERSONAS[n]` for all three) and adds 1189 chars to each of the other five. One prompt
+path (`context.py:330,349`) means one place can guarantee it. The guard now derives the list from PERSONAS,
+asserts >= 8 personas (so a collapsed scan fails), and pins "exactly once" so a future embed cannot double it.
+MUTATION-PROVED: pre-fix, 5 of 8 personas had no rules; post-fix, 0.
+
+REMAINING (belongs to T2.8, the persona stubs): only 3 of 8 personas have an example-dialogue block, which
+the playbook calls "the strongest consistency lever." Authoring five example blocks is creative content
+that should match the writer's taste - flagged, not written.
+
+GATE: non-browser 804 passed / 0 failures / 0 errors; browser phase7 15/15, smoke 18/18, phase6 28/28.

@@ -20,9 +20,21 @@ that they're a person working with you.
 | **humanizer** (`blader/humanizer`) | The 33 anti-AI-pattern list (canned openings, signposting, padding, synonym-stacking, manufactured punchlines, em-dash habit) + the **no-fabrication rule** (never add facts/names not in the material). |
 | **super-agent-party** (`heshengtao/super-agent-party`) | Persona persistence across surfaces — Sameer's voice must survive mode/persona switches and long sessions, not reset. |
 
-## The voice rules (already embedded as `HUMAN_VOICE_RULES`)
+## The voice rules (`HUMAN_VOICE_RULES`)
 
-Appended to Sameer's persona every turn. Non-negotiable:
+**Universal — every persona, not just Sameer.** `persona_text()` appends the
+block to any persona that does not already embed it, so no persona can
+silently ship without them. Sameer carries his copy *mid-text*, before his
+closing instruction ("You know the analysis report exists…"), so the append
+deliberately leaves his text untouched. Enforced by
+`tests/test_persona_humanization.py::TestSharedVoiceRules`, which derives the
+persona list from `PERSONAS` rather than hardcoding it.
+
+This was a real bug: the rules reached only 3 of 8 personas, and the guard
+that claimed to check "every human persona" iterated a hardcoded tuple of
+exactly those three — so it could never fail.
+
+Non-negotiable:
 
 1. **No canned openings/closers** — no "Great question!", "Absolutely!", "I hope this helps!", no "let me know if you need anything else" endings. One exclamation point per reply at most, and only when earned.
 2. **No signposting or padding** — no "Let me think about this", no "Here's what I think", no filler phrases, no synonym-stacking, no em-dash habit.
