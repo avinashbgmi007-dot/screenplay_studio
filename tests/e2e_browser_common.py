@@ -78,6 +78,43 @@ def free_port():
     return port
 
 
+_TOKEN_CACHE = {}
+
+
+def studio_token(base):
+    """The capability token the studio set as a SameSite=Strict cookie on `/`.
+
+    Returns None when the server runs with --no-token (the self-booted harness
+    default). Cached per base URL; best-effort -- any failure reads as no token.
+    """
+    base = base.rstrip("/")
+    if base in _TOKEN_CACHE:
+        return _TOKEN_CACHE[base]
+    tok = None
+    try:
+        with urllib.request.urlopen(base + "/", timeout=10) as r:
+            sc = r.headers.get("Set-Cookie", "")
+        import re as _re
+        m = _re.search(r"studio_token=([^;]*)", sc)
+        tok = m.group(1) if m else None
+    except Exception:
+        tok = None
+    _TOKEN_CACHE[base] = tok
+    return tok
+
+
+def studio_headers(base):
+    """Headers a direct (non-browser) client needs to write to `base`.
+
+    Empty when the studio has no token; X-Studio-Token otherwise. This lets a
+    suite run against a secure-by-default LIVE studio (E2E_BASE) without the
+    operator having to pass --no-token. The browser flows get the token as a
+    cookie automatically.
+    """
+    tok = studio_token(base)
+    return {"X-Studio-Token": tok} if tok else {}
+
+
 class Studio:
     """A booted webapp_server subprocess. Use as a context manager."""
 

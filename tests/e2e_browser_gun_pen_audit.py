@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)  # for screenplay_studio / screenplay_cowriter imports
-from e2e_browser_common import Checks, launch  # noqa: E402
+from e2e_browser_common import Checks, launch, studio_headers  # noqa: E402
 
 BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8500").rstrip("/")
 PROJECT = os.environ.get("GUNPEN_PROJECT", "gun_pen_2")
@@ -52,7 +52,10 @@ def gap(name, cond, detail=""):
 
 
 def api(method, path, **kw):
-    r = requests.request(method, BASE + path, timeout=kw.pop("timeout", 60), **kw)
+    headers = dict(kw.pop("headers", None) or {})
+    headers.update(studio_headers(BASE))  # no-op unless the studio is token-protected
+    r = requests.request(method, BASE + path, timeout=kw.pop("timeout", 60),
+                         headers=headers, **kw)
     r.raise_for_status()
     return r.json() if r.content else {}
 
@@ -634,7 +637,8 @@ def step_pass2():
     if os.environ.get("GUNPEN_SKIP_ANALYZE") != "1":
         try:
             r = requests.post(f"{BASE}/api/projects/{PROJECT}/analyze",
-                              json={"force": True}, timeout=900)
+                              json={"force": True}, timeout=900,
+                              headers=studio_headers(BASE))
             check("pass2: force re-analysis accepted", r.status_code in (200, 201),
                   str(r.status_code))
         except Exception as e:
