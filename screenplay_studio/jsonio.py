@@ -15,9 +15,15 @@ import json
 import os
 import threading
 import time
+import weakref
 
 _LOCKS_GUARD = threading.Lock()
-_LOCKS: dict[str, threading.RLock] = {}
+# Weak values (L1): a per-path lock is only worth keeping while somebody holds
+# it. Any thread inside `with lock:` holds a strong reference for the duration,
+# so an entry can never be collected under a waiter's feet; a path nobody is
+# touching costs nothing. The previous plain dict kept a path string plus a lock
+# for every file ever touched, for the life of the process.
+_LOCKS: "weakref.WeakValueDictionary[str, threading.RLock]" = weakref.WeakValueDictionary()
 
 
 def _lock_for(path: str) -> threading.RLock:
@@ -26,9 +32,11 @@ def _lock_for(path: str) -> threading.RLock:
     # exclusion across threads.
     key = os.path.abspath(path)
     with _LOCKS_GUARD:
-        if key not in _LOCKS:
-            _LOCKS[key] = threading.RLock()
-        return _LOCKS[key]
+        lock = _LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _LOCKS[key] = lock
+        return lock
 
 
 def lock_for(path: str) -> threading.RLock:
@@ -37,16 +45,31 @@ def lock_for(path: str) -> threading.RLock:
     return _lock_for(path)
 
 
+# A Windows sharing violation (another process has the file open) and a byte-range
+# lock violation (an AV scanner or indexer holding a range) are both TRANSIENT:
+# the holder lets go within milliseconds, so a bounded retry is the right answer.
+# Any other PermissionError is a genuine access denial — retrying it can only fail
+# again, and it delays the error the caller needs to see (L2).
+_TRANSIENT_WINERRORS = frozenset({32, 33})  # ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+
+
+def _is_transient_lock_error(exc: PermissionError) -> bool:
+    # `winerror` exists only on Windows. On POSIX there is no sharing-violation
+    # semantics to retry — rename is atomic, so a PermissionError there is final.
+    return getattr(exc, "winerror", None) in _TRANSIENT_WINERRORS
+
+
 def retry_permission(fn, attempts: int = 3):
     """Run fn() with a short bounded retry for Windows sharing violations:
     a concurrent reader/writer (or AV/indexer) can briefly hold a file open —
-    open/os.replace then raises PermissionError([WinError 32]). A real
-    failure (attempts misses) still raises."""
+    open/os.replace then raises PermissionError([WinError 32]). A genuine
+    failure raises at once: a real access denial is not retried, and neither is
+    a transient error once `attempts` are exhausted."""
     for attempt in range(attempts):
         try:
             return fn()
-        except PermissionError:
-            if attempt == attempts - 1:
+        except PermissionError as exc:
+            if not _is_transient_lock_error(exc) or attempt == attempts - 1:
                 raise
             time.sleep(0.05 * (attempt + 1))
 
@@ -95,5 +118,21 @@ def safe_dir_name(title: str, max_len: int = 64) -> str:
     if not safe:
         import hashlib
         safe = hashlib.sha1((title or "untitled").encode("utf-8")).hexdigest()[:8]
-    # suffix auto-increment handles collisions for identical titles
+    # Collisions between identical titles are resolved by the CALLER (the
+    # project-create routes append a numeric suffix via suffixed_id below) —
+    # nothing in here increments anything.
     return safe[:max_len]
+
+
+def suffixed_id(base: str, suffix: int, max_len: int = 64) -> str:
+    """`base` with a collision suffix that still satisfies the id contract.
+
+    `safe_dir_name` may return exactly `max_len` characters and `check_safe_id`
+    caps the whole name at 64, so appending "_2" to a 64-char base produced a
+    66-char name that `check_safe_id` rejected — "create this title twice"
+    became a 500 on the second create. Trim the base to make room.
+    """
+    if suffix <= 1:
+        return base[:max_len]
+    tail = f"_{suffix}"
+    return base[: max_len - len(tail)] + tail

@@ -13,7 +13,12 @@ import time
 
 import requests
 
-from screenplay_analyzer.llm_client_base import BaseLlamaClient, LlamaServerError, ModelNotFoundError
+from screenplay_analyzer.llm_client_base import (
+    BaseLlamaClient,
+    LlamaServerError,
+    ModelNotFoundError,
+    busy_retry_delay,
+)
 
 
 class WatchdogTimeoutError(LlamaServerError):
@@ -86,7 +91,7 @@ class LlamaServerClient(BaseLlamaClient):
                 status = getattr(resp, "status_code", 200)
                 if self._check_busy(status, getattr(resp, "text", "") or "") and attempt < busy_retries:
                     attempt += 1
-                    time.sleep(1.5 * attempt)
+                    time.sleep(busy_retry_delay(attempt))
                     continue
                 resp.raise_for_status()
                 data = resp.json()

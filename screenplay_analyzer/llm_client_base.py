@@ -9,6 +9,7 @@ Each consumer subclasses BaseLlamaClient and adds its own chat method:
 
 from __future__ import annotations
 
+import random
 import re
 import threading
 import time
@@ -29,6 +30,20 @@ class LlamaServerError(Exception):
 
 class ModelNotFoundError(LlamaServerError):
     pass
+
+
+def busy_retry_delay(attempt: int, base: float = 1.5) -> float:
+    """Equal jitter for the busy-retry backoff (L3).
+
+    llama-server is single-occupancy, so several clients that all saw the same
+    "busy" used to sleep exactly 1.5s, 3.0s, 4.5s... and retry in lockstep: the
+    backoff grew, but it separated nobody, and the herd collided again on every
+    round. Half the wait stays fixed (so the backoff still grows), half is
+    random (so the herd spreads across the window). One implementation, shared
+    by both clients — the analyzer's and the co-writer's chat path.
+    """
+    half = base * attempt / 2
+    return half + random.uniform(0, half)
 
 
 class BaseLlamaClient:
@@ -172,7 +187,7 @@ class BaseLlamaClient:
                 status = getattr(resp, "status_code", 200)
                 if self._check_busy(status, getattr(resp, "text", "") or "") and attempt < busy_retries:
                     attempt += 1
-                    time.sleep(1.5 * attempt)
+                    time.sleep(busy_retry_delay(attempt))
                     continue
                 resp.raise_for_status()
                 return resp.json()

@@ -1850,3 +1850,90 @@ through in 7s: `b4f83dd..3183aef main -> main`, exit 0. Verified against the TRU
 main is now fully synced, ahead 0. LESSON: a stalled push is worth ONE plain retry before
 blaming credentials -- the stall was transient, no re-auth was needed.
 
+
+2026-09-19 -- C10 PASS: the section-1 residual, closed. Two "latent" items were real.
+================================================================================
+Track: docs/CRITICAL_REVIEW_2026-09-18.md, section C row 10. Eight items (H5, L1-L7).
+
+THE HEADLINE: the board filed these as latent hygiene, and the recon found THREE of them
+are reachable failures a writer can hit.
+
+1. L4 -- NOT MAX_PATH, but the 64-char id cap, and it IS live.
+   `safe_dir_name` returns up to 64 chars and `check_safe_id` caps the whole name at 64.
+   The collision path appended a suffix: `base + "_2"` on a 64-char fold = 66 chars =>
+   ValueError. So "create a project with this title" worked ONCE and failed on the
+   second create of the same title. Proved before touching anything:
+     base len = 64 | base+'_2' len = 66 | check_safe_id RAISES
+   Fix: `jsonio.suffixed_id(base, n)` trims the base so base+suffix still fits.
+   The MAX_PATH half of the item is NOT live: the longest real store path is 77 chars,
+   the 64-char worst case is ~188, and Windows' limit is 260. Measured, not assumed.
+
+2. L5 -- the TOCTOU is in THREE places, not the one the board named.
+   `create_project` (:528), `graduate_idea` (:3051) and the sample route (:486) all did
+   `while os.path.exists(d): ...` then `os.makedirs(d, exist_ok=True)`. Two concurrent
+   creates with the same title both pass the check, both pick the same suffix, and BOTH
+   succeed on exist_ok=True into ONE directory -- two uploads interleaved in one project.
+   Fix: `_claim_project_dir(base)` uses `os.makedirs` AS the test-and-set; losing the
+   mkdir race is the signal to take the next suffix. The sample route keeps its
+   dedup-by-title semantics: losing the race means the other request IS the sample.
+
+3. H2 RESURFACED in `graduate_idea` -- the H2 fix missed a route.
+   `create_project` and the sample route moved to `safe_dir_name`; graduate_idea kept the
+   pre-H2 Unicode-aware per-char sanitizer. A Telugu/Hindi title survived as non-ASCII and
+   was refused by check_safe_id inside _project_dir:
+     400 {"error": "invalid project name: 'త_ల_గ__క_థ'"}
+   So an idea with a Telugu title could not be graduated AT ALL. Same fold applied.
+
+   HONEST CORRECTION to my own first draft: I called this a 500. It is a 400 -- a
+   registered ValueError handler catches it. That matters, because my first test asserted
+   only "not 500" and PASSED against the broken code. Caught by running the mutation check;
+   the test now demands 201. A guard that cannot fail is not a guard.
+
+THE REST
+- L2 `retry_permission` retried EVERY PermissionError, including genuine ACL denials
+  (WinError 5), which can only fail again and merely delay the error. Now retries only the
+  transient file-busy errors (WinError 32/33) and raises immediately otherwise. On POSIX
+  there is no sharing-violation semantics to wait out (rename is atomic), so a
+  PermissionError there is final -- it used to sleep 0.15s first for nothing.
+- L3 the busy backoff was `time.sleep(1.5 * attempt)`: every client that saw the same
+  "busy" slept exactly 1.5s, 3.0s, 4.5s... and retried in lockstep. The backoff grew but
+  separated nobody. Now equal-jittered via ONE shared `busy_retry_delay()`.
+  THE BOARD UNDER-COUNTED THIS ONE: the same unjittered sleep was in the co-writer's chat
+  path (`llm_client.py:89`). Fixing only the cited line would have left the chat herd
+  intact. Both call sites now share the helper (a source-level test pins that).
+- L1 both per-path lock registries are weak-valued (`jsonio._LOCKS`, `SessionStore._LOCKS`).
+  A holder keeps a strong ref for the duration of `with lock:`, so an entry cannot vanish
+  under a waiter, and a path nobody holds costs nothing. The plain dicts kept one path
+  string + lock per file ever touched, for the life of the process. Verified first that
+  Lock and RLock both support weakrefs, and that a held lock survives in the dict.
+- L6 `_print_status(manifest)` sat AFTER the try in cmd_run and cmd_resume, so the
+  `sys.exit(1)` on the error path skipped it -- the writer got "ERROR: ..." and nothing
+  about the state they were left in. Moved into a `finally`. It is the only place that
+  names WHICH stage failed.
+- L7 removed the dead one-span `**` replace in `_md_to_html.inline()` (the regex on the
+  very next line already converted every span, the first included).
+
+NOT FIXED, ON PURPOSE
+- H5 lock ordering is NOT a bug. I traced it: the analyze lock is the outer lock, held for
+  a whole run, and the code under it takes jsonio/store per-path locks -- but NOTHING that
+  takes a per-path lock ever reaches back for an analyze lock, so the wait-for graph has no
+  cycle. Rather than churn a working primitive, the discipline is now written down as a
+  contract next to `_ANALYZE_LOCKS`: if a future path ever needs both, take the analyze
+  lock FIRST; per-path locks are leaves. "No discipline" is fixed by documenting the
+  discipline that the call graph already has.
+
+SELF-CAUGHT MISTAKE (record it)
+An early edit to cli.py had an `old_string` that ran one line too far and deleted
+`def cmd_resume(args):` -- which would have silently merged cmd_resume's body into cmd_run
+(a REAL bug, introduced by me, in a file the tests then still passed). Caught immediately by
+py_compile + a grep for `^def cmd_`; repaired before anything ran. RULE: after any edit that
+touches a boundary, re-check the structure (defs present, compiles), not just the diff hunk.
+
+EVIDENCE
+- tests/test_c10_residuals.py (28 checks). **19 of the 28 FAIL on the pre-fix code** --
+  proved by stashing the fix and re-running, twice (the first count was 17; strengthening
+  the graduate test and adding the store-registry test took it to 19).
+- pytest 1129 passed / 0 failed (+28 from 1101).
+- browser: smoke 18/18, token_mode 3/3, branch_ui 11/11, phase6 28/28.
+
+

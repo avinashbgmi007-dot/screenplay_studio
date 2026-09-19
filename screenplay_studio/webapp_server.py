@@ -28,7 +28,7 @@ from functools import lru_cache
 
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 
-from .jsonio import check_safe_id, safe_dir_name
+from .jsonio import check_safe_id, safe_dir_name, suffixed_id
 
 from .ideas import IdeaStore
 from .manifest import ProjectManifest
@@ -190,6 +190,32 @@ def static_files(filename):
 def _project_dir(name: str) -> str:
     check_safe_id(name, "project name")
     return os.path.join(PROJECTS_DIR, name)
+
+
+def _claim_project_dir(base: str) -> str:
+    """Atomically claim a fresh project directory derived from `base`.
+
+    `os.makedirs` IS the test-and-set here. The previous shape —
+    `while os.path.exists(d): d = next(...)` followed by
+    `os.makedirs(d, exist_ok=True)` — let two concurrent creates with the same
+    title both pass the existence check, both pick the same suffix, and then
+    BOTH succeed on `exist_ok=True` into one directory, interleaving two
+    uploads inside a single project (L5). Losing the mkdir race is now the
+    signal to try the next suffix, so the claim is atomic.
+
+    The suffix goes through `suffixed_id` because a base that already fills the
+    64-char id contract cannot take a "_2" appended: the name became 66 chars
+    and `check_safe_id` rejected it, so creating the SAME title twice 500'd on
+    the second create (L4).
+    """
+    for suffix in range(1, 1001):
+        name = suffixed_id(base, suffix)
+        try:
+            os.makedirs(_project_dir(name))
+        except FileExistsError:
+            continue
+        return _project_dir(name)
+    raise RuntimeError(f"could not find a free project directory for {base!r}")
 
 
 def _load_manifest(name: str) -> ProjectManifest:
@@ -483,14 +509,21 @@ def create_sample_project():
 
     safe_name = safe_dir_name(SAMPLE_TITLE)  # H2: ASCII fold (sample title is ASCII-safe)
     project_dir = _project_dir(safe_name)
-    if os.path.exists(project_dir):
+    try:
+        # Atomic claim (L5): makedirs IS the test-and-set. The old
+        # `if os.path.exists(...)` / `makedirs(exist_ok=True)` pair let two
+        # concurrent "open the sample" requests both decide the directory was
+        # missing, then interleave two manifests into it. Losing the race means
+        # another request is already creating the sample — and the sample IS
+        # deduplicated by title, so returning theirs is the correct answer.
+        os.makedirs(project_dir)
+    except FileExistsError:
         try:
             m = ProjectManifest.load(project_dir)
             return jsonify(_manifest_summary(m))
         except Exception:
             pass  # corrupt dir — fall through and re-create
 
-    os.makedirs(project_dir, exist_ok=True)
     tmp_path = os.path.join(project_dir, "_sample.fountain")
     with open(tmp_path, "w", encoding="utf-8") as f:
         f.write(SAMPLE_SCRIPT)
@@ -523,13 +556,7 @@ def create_project():
     # safe_dir_name keeps the display `title` in the manifest untouched.
     safe_name = safe_dir_name(title)
 
-    project_dir = _project_dir(safe_name)
-    suffix = 1
-    while os.path.exists(project_dir):
-        suffix += 1
-        project_dir = _project_dir(f"{safe_name}_{suffix}")
-
-    os.makedirs(project_dir, exist_ok=True)
+    project_dir = _claim_project_dir(safe_name)
     ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
     upload.save(tmp_path)
@@ -593,6 +620,17 @@ def delete_project(name):
 # non-blocking per-project lock turns the second caller into a clear 409
 # instead of a corrupted result.
 # ---------------------------------------------------------------------------
+# LOCK ORDER (H5): these are the process's OUTER locks. One is held for a whole
+# analysis run — minutes — and while it is held the code below takes jsonio and
+# SessionStore per-path locks. Nothing on the other side ever reaches back for
+# an analyze lock, so the wait-for graph has no cycle and cannot deadlock. That
+# is a property of the call graph rather than of the lock types, so it is
+# written down: if a future path ever needs BOTH, take the analyze lock FIRST.
+# Per-path locks (jsonio.lock_for, SessionStore._lock_for) are leaves.
+#
+# Bounded by design: one entry per project that has been analysed, and the
+# holder keeps a strong reference for the whole run, so an entry is never
+# collected while it is the thing providing mutual exclusion.
 _ANALYZE_LOCKS: dict[str, threading.Lock] = {}
 _ANALYZE_LOCKS_GUARD = threading.Lock()
 
@@ -1781,8 +1819,9 @@ def _md_to_html(md: str, banner: str = "") -> str:
 
     def inline(text):
         text = escape(text)
-        text = text.replace("**", "<strong>", 1).replace("**", "</strong>", 1) if text.count("**") >= 2 else text
-        # handle multiple bold spans robustly
+        # The regex below already converts every bold span, the first one
+        # included, so the hand-rolled single-span replace that used to sit on
+        # this line was dead work on every line of every report (L7).
         import re as _re
         text = _re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
         text = _re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
@@ -3045,14 +3084,14 @@ def graduate_idea(idea_id):
         return _error("Idea not found.", 404)
 
     title = request.form.get("title") or os.path.splitext(upload.filename)[0]
-    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in title) or "project"
-    project_dir = _project_dir(safe_name)
-    suffix = 1
-    while os.path.exists(project_dir):
-        suffix += 1
-        project_dir = _project_dir(f"{safe_name}_{suffix}")
-
-    os.makedirs(project_dir, exist_ok=True)
+    # H2, resurfacing: this route kept the pre-H2 Unicode-aware sanitizer while
+    # create_project and the sample route moved to safe_dir_name. A Telugu or
+    # Hindi title survived here as non-ASCII and was refused by check_safe_id's
+    # ASCII-only regex inside _project_dir, so graduating an idea with such a
+    # title answered 400 and could not be done at all. Same fold as the other
+    # two create paths.
+    safe_name = safe_dir_name(title)
+    project_dir = _claim_project_dir(safe_name)
     ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
     upload.save(tmp_path)

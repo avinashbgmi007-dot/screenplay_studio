@@ -73,8 +73,12 @@ def cmd_run(args):
         print(f"ERROR: {e}", file=sys.stderr)
         print(f"Project state saved at '{args.project}' — fix the issue and rerun to resume from here.", file=sys.stderr)
         sys.exit(1)
-
-    _print_status(manifest)
+    finally:
+        # L6: this block is the only place that names WHICH stage failed and with
+        # what error, so it has to print on the failure path too. It used to sit
+        # after the try, which the `sys.exit` above skipped — the writer saw
+        # "ERROR: ..." and then nothing at all about the state they were left in.
+        _print_status(manifest)
 
 
 def cmd_resume(args):
@@ -95,8 +99,9 @@ def cmd_resume(args):
     except OrchestratorError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
-
-    _print_status(manifest)
+    finally:
+        # L6: same as cmd_run — the stage table has to survive the error path.
+        _print_status(manifest)
 
 
 def cmd_status(args):

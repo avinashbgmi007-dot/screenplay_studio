@@ -8,6 +8,7 @@ keeps the whole thing inspectable/hand-editable if something goes wrong.
 import glob
 import os
 import threading
+import weakref
 
 from .models import Session
 
@@ -15,16 +16,23 @@ from .models import Session
 # every-10-turns memory refresh can overlap a save from another request;
 # without this, two concurrent saves of the SAME session file race and the
 # last write wins — silently dropping a just-stored message.
+#
+# Weak values (L1), the same shape as jsonio's registry: a holder keeps a strong
+# reference for the duration of `with lock:`, so the entry cannot vanish under a
+# waiter's feet, and a session nobody is saving costs nothing. The plain dict
+# kept one entry per session file for the life of the process.
 _LOCKS_GUARD = threading.Lock()
-_LOCKS: dict = {}
+_LOCKS: "weakref.WeakValueDictionary[str, threading.Lock]" = weakref.WeakValueDictionary()
 
 
 def _lock_for(path: str) -> threading.Lock:
     key = os.path.abspath(path)
     with _LOCKS_GUARD:
-        if key not in _LOCKS:
-            _LOCKS[key] = threading.Lock()
-        return _LOCKS[key]
+        lock = _LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _LOCKS[key] = lock
+        return lock
 
 
 class SessionStore:
