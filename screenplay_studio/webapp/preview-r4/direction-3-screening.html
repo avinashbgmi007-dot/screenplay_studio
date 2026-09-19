@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<title>Direction 3 — Screening Room · Script Doctor Studio</title>
+<style>
+@font-face{font-family:'JetBrains Mono';src:url(../fonts/JetBrainsMono-n400-83c005d4.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'IBM Plex Mono';src:url(../fonts/IBMPlexMono-e2661bcc.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'DM Sans';src:url(../fonts/DMSans-n400-9fea608a.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-094f4033.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-cdc2c233.woff2);font-weight:700;font-display:swap}
+:root{--bg:#0c1420;--panel:#121d2b;--steel:#182635;--glass:rgba(16,27,41,.84);--hair:rgba(148,178,210,.16);--hair2:rgba(148,178,210,.08);--txt:#d9e3ef;--mut:#7d8ea3;--faint:#54677e;--amb:#ffb454;--cool:#6fc9e8;--sevh:#ff6b6b;--sevm:#ffb454;--sevl:#4ade80;--paper:#101a27;--ink-s:#e6d9c2;--ui:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;--mono2:'IBM Plex Mono',monospace;--script:'Courier Prime',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070d16;font-family:var(--ui);color:var(--txt);-webkit-font-smoothing:antialiased}
+.wrap{width:1440px;margin:0 auto;padding:36px 0 90px}
+.idhead{display:flex;align-items:center;gap:14px;margin-bottom:26px;padding:0 4px}
+.idhead h1{font:400 20px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.idhead .sub{font:400 10px/1.5 var(--mono);color:var(--mut);letter-spacing:.1em;text-transform:uppercase}
+.chips{display:flex;gap:6px;margin-left:auto}
+.chip{width:20px;height:20px;border-radius:4px;border:1px solid var(--hair)}
+.footnote{margin:10px 4px 0;font:400 10px/1.7 var(--mono);color:var(--faint)}
+.frame{position:relative;width:1440px;height:900px;overflow:hidden;background:radial-gradient(1000px 600px at 720px 120px,rgba(255,180,84,.04),transparent),var(--bg);border:1px solid var(--hair2);border-radius:10px;margin:0 auto 56px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.flabel{position:absolute;top:0;left:24px;z-index:9;font:400 9px/1 var(--mono);color:var(--faint);letter-spacing:.16em;text-transform:uppercase;background:var(--bg);padding:9px 12px;border:1px solid var(--hair);border-radius:0 0 8px 8px}
+.strip{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;gap:18px;padding:0 16px;background:var(--panel);border-top:1px solid var(--hair);font:400 10px/1 var(--mono);color:var(--mut)}
+.strip .ok{width:7px;height:7px;border-radius:50%;background:var(--sevl);margin-right:7px;display:inline-block}
+.grow{flex:1}
+.lg-col{width:680px;margin:104px auto 0;text-align:center}
+.lg-brand{font:400 11px/1 var(--mono);letter-spacing:.34em;color:var(--mut);text-transform:uppercase}
+.lg-brand .amb{color:var(--amb)}
+.lg-greet{font:400 34px/1.1 var(--mono);letter-spacing:.04em;margin:24px 0 12px}
+.lg-greet .car{display:inline-block;width:11px;height:26px;background:var(--amb);vertical-align:-2px;margin-left:4px}
+.lg-sub{font:400 14px/1.5 var(--ui);color:var(--mut)}
+.drop{width:680px;height:180px;margin:32px 0 0;border:1px dashed rgba(255,180,84,.5);border-radius:10px;background:var(--steel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.drop b{font:400 15px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.drop i{font:400 11px/1 var(--mono);color:var(--mut);font-style:normal}
+.drop-ic{width:34px;height:34px;border-radius:8px;background:rgba(255,180,84,.14);color:var(--amb);font:400 18px/34px var(--mono);text-align:center}
+.lg-act{display:flex;gap:12px;justify-content:center;margin:18px 0 40px}
+.btn-p{background:var(--amb);color:#201404;border:none;border-radius:6px;padding:11px 22px;font:400 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.btn-g{background:transparent;color:var(--txt);border:1px solid var(--hair);border-radius:6px;padding:11px 22px;font:400 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.rw-h{font:400 10px/1 var(--mono);letter-spacing:.22em;color:var(--faint);text-transform:uppercase;margin-bottom:6px;text-align:left}
+.rw-row{display:flex;align-items:center;gap:14px;padding:13px 4px;border-bottom:1px solid var(--hair2);text-align:left}
+.rw-name{font:400 13px/1 var(--mono);width:170px}
+.rw-status{font:400 11px/1 var(--mono);color:var(--mut);flex:1}
+.rw-status.ok{color:var(--amb)}
+.rw-status.vio{color:var(--cool)}
+.rw-time{font:400 10px/1 var(--mono);color:var(--faint)}
+</style>
+</head>
+<body>
+<div class='wrap'>
+<header class='idhead'><h1>Direction 3 — Screening Room</h1><span class='sub'>Cinematic Slate · the night-shift cutting bay</span><span class='chips'><span class='chip' style='background:#0c1420'></span><span class='chip' style='background:#182635'></span><span class='chip' style='background:#ffb454'></span><span class='chip' style='background:#101a27'></span></span></header>
+<section class='frame'>
+<div class='flabel'>State 1 — Landing · Work Selector</div>
+<div class='lg-col'>
+<div class='lg-brand'>Script Doctor <span class='amb'>·</span> Studio</div>
+<h2 class='lg-greet'>EVENING, WRITER<span class='car'></span></h2>
+<p class='lg-sub'>Continue a script or start an idea. Everything stays on this machine.</p>
+<div class='drop'><span class='drop-ic'>+</span><b>Drop / upload screenplay</b><i>.fountain · .fdx · .pdf · .txt · .md</i></div>
+<div class='lg-act'><button class='btn-p' type='button'>New Idea</button><button class='btn-g' type='button'>Open Sample</button></div>
+<div class='rw-h'>Recent Work</div>
+<div class='rw-row'><span class='rw-name'>gun_pen_2</span><span class='rw-status ok'>analysis complete · 12/13 stages</span><span class='rw-time'>2h ago</span></div>
+<div class='rw-row'><span class='rw-name'>The_Late_Hour</span><span class='rw-status'>parsed · 4 scenes</span><span class='rw-time'>yesterday</span></div>
+<div class='rw-row'><span class='rw-name'>Untitled Idea</span><span class='rw-status vio'>idea · saved 19:02</span><span class='rw-time'>now</span></div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>local AI · llama-server :8080</span><span>status strip · 28px</span></div>
+</section>
+
+<style>
+.id-frame{background:radial-gradient(900px 560px at 720px 130px,rgba(255,180,84,.05),transparent),var(--bg)}
+.id-page{position:absolute;left:380px;top:90px;width:680px;height:720px;background:var(--glass);border:1px solid var(--hair);border-radius:12px;box-shadow:0 12px 32px -8px rgba(0,0,0,.55);backdrop-filter:blur(14px);padding:48px 48px 40px}
+.id-title{font:400 26px/1.15 var(--mono);letter-spacing:.02em;border-bottom:1px solid var(--hair2);padding-bottom:18px}
+.car{display:inline-block;width:11px;height:24px;background:var(--amb);vertical-align:-3px;margin-left:4px}
+.id-body{margin-top:26px;font:400 15px/1.75 var(--ui);color:#b8c5d6}
+.id-body p{margin-bottom:14px}
+.id-save{position:absolute;left:428px;top:816px;font:400 10px/1 var(--mono);color:var(--sevl)}
+.id-tools{position:absolute;left:590px;top:816px;font:400 10px/1 var(--mono);color:var(--mut);letter-spacing:.04em}
+.id-pill{position:absolute;left:1120px;width:132px;height:36px;border-radius:6px;border:1px solid rgba(255,180,84,.4);background:rgba(255,180,84,.12);color:var(--amb);font:400 10px/36px var(--mono);letter-spacing:.1em;text-transform:uppercase;text-align:center}
+.pill-s{top:180px}
+.id-pill.doc{border-color:rgba(111,201,232,.4);background:rgba(111,201,232,.08);color:var(--cool)}
+.pill-d{top:228px}
+.id-mic{position:absolute;left:998px;top:744px;width:36px;height:36px;border-radius:50%;border:1px solid var(--hair);background:var(--panel);color:var(--mut);font:400 10px/36px var(--mono);text-align:center}
+</style>
+<section class='frame id-frame'>
+<div class='flabel'>State 2 — Idea Canvas · Empty Idea</div>
+<div class='id-page'>
+<h3 class='id-title'>Untitled Idea<span class='car'></span></h3>
+<div class='id-body'>
+<p>A scooter by the shore, a tide that refuses to keep its promise, and a phone that never rings.</p>
+<p>Raya waits for someone who said the sea would wait for him.</p>
+</div>
+</div>
+<span class='id-save'>saved 19:02</span>
+<span class='id-tools'>Ask Sameer · Feedback · Add Note · ⋯</span>
+<span class='id-pill pill-s'>Sameer</span>
+<span class='id-pill doc pill-d'>Premise Doctor</span>
+<span class='id-mic'>◍</span>
+<div class='strip'><span><span class='ok'></span>connected · idea session</span><span class='grow'></span><span>Untitled Idea · saved</span><span>Sameer in the void</span></div>
+</section>
+
+<style>
+.an-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--hair);background:var(--panel);padding-top:56px}
+.notch{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:18px}
+.notch .n{font:400 9px/1 var(--mono);color:var(--faint)}
+.d-sevh{width:9px;height:9px;border-radius:50%;background:var(--sevh)}
+.d-sevm{width:9px;height:9px;background:var(--sevm)}
+.d-sevl{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid var(--sevl)}
+.an-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--hair);border-radius:8px;padding:0 14px}
+.an-tb .prj{font:500 12px/1 var(--ui)}
+.an-tb .sep{color:var(--faint);font:400 10px/1 var(--mono)}
+.srch{flex:1;background:var(--bg);border:1px solid var(--hair);border-radius:6px;padding:7px 10px;font:400 11px/1 var(--mono);color:var(--faint)}
+.btn-run{background:var(--amb);color:#201404;border:none;border-radius:6px;padding:8px 14px;font:400 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.an-ghost{height:10px;border-radius:4px;background:rgba(148,178,210,.08);margin:14px 0}
+.an-band{position:absolute;left:388px;top:150px;width:700px;background:var(--glass);border:1px solid var(--hair);border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.5);backdrop-filter:blur(14px);padding:22px 24px}
+.an-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.an-head .n07{font:400 30px/1 var(--mono);color:var(--amb)}
+.an-head .st{font:400 15px/1 var(--ui)}
+.an-head .run{margin-left:auto;font:400 10px/1 var(--mono);color:var(--amb);letter-spacing:.12em;text-transform:uppercase}
+.an-row{display:flex;align-items:center;gap:10px;padding:7px 0;font:400 12px/1 var(--mono);color:var(--mut)}
+.an-row .tk{width:14px;text-align:center}
+.an-row.done .tk{color:var(--sevl)}
+.an-row.now{color:var(--txt)}
+.an-row.now .tk{color:var(--amb)}
+.an-row.pend{color:var(--faint)}
+.an-bar{height:3px;border-radius:2px;background:rgba(148,178,210,.12);margin:14px 0 8px}
+.an-fill{height:3px;border-radius:2px;background:var(--amb);width:414px}
+.an-eta{display:flex;justify-content:space-between;font:400 10px/1 var(--mono);color:var(--faint)}
+.dk-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--hair);background:var(--panel);padding-top:60px}
+.dk-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px}
+.dk-tb .t{font:500 12px/1 var(--ui)}
+.dk-tb .draft{font:400 10px/1 var(--mono);color:var(--mut);border:1px solid var(--hair);border-radius:6px;padding:5px 8px}
+.dk-tb .lnk{font:400 12px/1 var(--ui);color:var(--mut)}
+.dk-tb .kbtn{margin-left:auto;font:400 10px/1 var(--mono);color:var(--mut);border:1px solid var(--hair);border-radius:6px;padding:6px 8px}
+.dk-ms{position:absolute;left:388px;top:60px;width:700px;bottom:28px;padding:36px 56px;background:var(--paper);border-radius:4px 4px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.35);color:var(--ink-s);font-family:var(--script);font-size:13px;line-height:1.7}
+.dk-ms h4{font:700 13px/1.5 var(--script);letter-spacing:.04em;margin:26px 0 14px;text-transform:uppercase}
+.dk-ms h4:first-child{margin-top:0}
+.dk-ms .act{margin:12px 0}
+.dk-ms .chr{margin:14px 0 0;text-align:center;font-weight:700}
+.dk-ms .dlg{margin:0 0 4px 150px}
+.dk-ms .est{float:right;font:400 9px/1 var(--mono);color:var(--mut)}
+</style>
+<section class='frame'>
+<div class='flabel'>State 3 — Unanalyzed · Analysis Running</div>
+<div class='an-rail'>
+<div class='notch'><span class='n'>47</span></div>
+<div class='notch'><span class='d-sevh'></span></div>
+<div class='notch'><span class='d-sevm'></span></div>
+<div class='notch'><span class='d-sevl'></span></div>
+<div class='notch'><span class='n'>51</span></div>
+<div class='notch'><span class='d-sevh'></span></div>
+</div>
+<div class='an-tb'><span class='prj'>The Late Hour</span><span class='sep'>·</span><span class='draft'>Draft v2</span><span class='srch'>Search the script</span><button class='btn-run' type='button'>Run Analysis</button></div>
+<div class='an-ghost' style='position:absolute;left:388px;top:80px;width:700px'></div>
+<div class='an-ghost' style='position:absolute;left:388px;top:104px;width:640px'></div>
+<div class='an-band'>
+<div class='an-head'><span class='n07'>07 / 20</span><span class='st'>Character Arc</span><span class='run'>running</span></div>
+<div class='an-row done'><span class='tk'>✓</span>Parsing</div>
+<div class='an-row done'><span class='tk'>✓</span>Structure</div>
+<div class='an-row done'><span class='tk'>✓</span>Voice + subtext</div>
+<div class='an-row done'><span class='tk'>✓</span>Scene summaries</div>
+<div class='an-row now'><span class='tk'>→</span>Character Arc</div>
+<div class='an-row pend'><span class='tk'>○</span>Coverage</div>
+<div class='an-bar'><div class='an-fill'></div></div>
+<div class='an-eta'><span>20-stage pipeline</span><span>eta 4 min</span></div>
+</div>
+<div class='strip'><span><span class='ok'></span>connected</span><span class='grow'></span><span>The Late Hour · analysis 07/20</span><span>in-place · non-modal</span></div>
+</section>
+<section class='frame'>
+<div class='flabel'>State 4 — Analyzed Desk · Nothing Selected</div>
+<div class='dk-rail'>
+<div class='notch'><span class='n'>47</span></div>
+<div class='notch'><span class='d-sevh'></span></div>
+<div class='notch'><span class='d-sevm'></span></div>
+<div class='notch'><span class='d-sevl'></span></div>
+<div class='notch'><span class='n'>51</span></div>
+<div class='notch'><span class='d-sevh'></span></div>
+<div class='notch'><span class='d-sevm'></span></div>
+<div class='notch'><span class='n'>54</span></div>
+</div>
+<div class='dk-tb'><span class='t'>The Late Hour</span><span class='draft'>Draft v2</span><span class='srch'>Search the script</span><span class='lnk'>Evidence</span><span class='lnk'>Characters</span><span class='kbtn'>⌘K</span></div>
+<div class='dk-ms'>
+<h4>EXT. Coastal Road — Night<span class='est'>≈ 2 min</span></h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore, headlight pulsing.</p>
+<p class='chr'>RAYA</p>
+<p class='dlg'>You said the tide would wait.</p>
+<p class='dlg'>The sea does not wait. I waited.</p>
+<h4>INT. Car — Continuous<span class='est'>≈ 1 min</span></h4>
+<p class='act'>The map glows on the dashboard. Nobody speaks.</p>
+<p class='act'>Raya folds the map into a square small enough to swallow.</p>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The Late Hour · 2,847 words</span><span>Focus · Write · Explore</span></div>
+</section>
+
+<style>
+.dd-tb{position:absolute;left:202px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px}
+.dd-tb .t{font:500 12px/1 var(--ui)}
+.dd-tb .draft{font:400 10px/1 var(--mono);color:var(--mut);border:1px solid var(--hair);border-radius:6px;padding:5px 8px}
+.dd-tb .lnk{font:400 12px/1 var(--ui);color:var(--mut)}
+.dd-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--hair);background:var(--panel);padding-top:60px}
+.dd-ms{position:absolute;left:202px;top:60px;width:700px;bottom:28px;padding:36px 56px;background:var(--paper);border-radius:4px 4px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.35);color:var(--ink-s);font-family:var(--script);font-size:13px;line-height:1.7}
+.dd-ms h4{font:700 13px/1.5 var(--script);margin:0 0 14px;text-transform:uppercase}
+.dd-ms .act{margin:12px 0}
+.dd-dock{position:absolute;left:1060px;top:0;width:380px;height:872px;background:var(--glass);border-left:1px solid var(--hair);box-shadow:-14px 0 36px rgba(0,0,0,.4);backdrop-filter:blur(14px);display:flex;flex-direction:column}
+.dd-head{height:56px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--hair);font:400 10px/1 var(--mono);letter-spacing:.16em;color:var(--mut);text-transform:uppercase}
+.dd-head .x{margin-left:auto;color:var(--faint)}
+.dd-tabs{display:flex;gap:4px;padding:10px 14px 0}
+.dd-tab{font:400 10px/1 var(--mono);letter-spacing:.08em;padding:7px 10px;border-radius:5px;color:var(--mut)}
+.dd-tab.on{background:rgba(255,180,84,.14);color:var(--amb)}
+.dd-tab.cy{color:var(--cool)}
+.dd-body{flex:1;overflow:hidden;padding:14px 18px}
+.covrow{display:flex;align-items:center;gap:14px;padding:2px 0 12px}
+.cov-n{font:400 34px/1 var(--mono)}
+.cov-badge{font:400 9px/1 var(--mono);letter-spacing:.12em;color:var(--amb);border:1px solid rgba(255,180,84,.4);background:rgba(255,180,84,.08);border-radius:5px;padding:5px 8px;text-transform:uppercase}
+.cov-note{font:400 11px/1.5 var(--ui);color:var(--mut);flex:1}
+.ov{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--hair2)}
+.ov .lab{font:400 9px/1 var(--mono);letter-spacing:.16em;color:var(--faint);text-transform:uppercase;width:118px}
+.ov .val{font:400 11px/1.4 var(--mono);color:var(--mut);flex:1;text-align:right}
+.ov .val b{color:var(--txt);font-weight:500}
+.fd{margin-top:12px;background:var(--steel);border:1px solid var(--hair);border-left:3px solid var(--amb);border-radius:8px;padding:16px}
+.fd-bc{font:400 9px/1 var(--mono);letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-bottom:12px}
+.fd-tt{display:flex;align-items:center;gap:8px;font:500 14px/1.3 var(--ui);margin-bottom:6px}
+.fd-cat{display:inline-block;font:400 9px/1 var(--mono);letter-spacing:.08em;color:var(--mut);border:1px solid var(--hair);border-radius:4px;padding:4px 7px;text-transform:uppercase;margin-bottom:10px}
+.fd-why{font:400 12px/1.6 var(--ui);color:var(--mut);margin-bottom:12px}
+.fd-q{border-left:2px solid var(--amb);background:rgba(255,180,84,.05);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:10px}
+.fd-q .q{font:400 12px/1.55 var(--script);color:var(--ink-s)}
+.fd-q .who{font:400 9px/1 var(--mono);color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-top:6px}
+.fd-ver{display:flex;align-items:center;gap:8px;font:400 10px/1 var(--mono);color:var(--sevl);margin-bottom:8px}
+.fd-ver .conf{color:var(--faint)}
+.fd-ref{font:400 10px/1 var(--mono);color:var(--faint);margin-bottom:10px}
+.fd-st{font:400 9px/1 var(--mono);letter-spacing:.12em;color:var(--amb);text-transform:uppercase}
+.fd-act{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--hair2)}
+.fa{font:400 11px/1 var(--ui);border:1px solid var(--hair);border-radius:5px;padding:8px 12px;color:var(--mut)}
+.fa.on{background:var(--amb);border-color:var(--amb);color:#201404}
+</style>
+<section class='frame'>
+<div class='flabel'>State 5 — Context Dock · Finding Detail</div>
+<div class='dd-rail'>
+<div class='notch'><span class='n'>47</span></div>
+<div class='notch'><span class='d-sevh'></span></div>
+<div class='notch'><span class='d-sevm'></span></div>
+<div class='notch'><span class='n'>50</span></div>
+<div class='notch'><span class='d-sevh'></span></div>
+</div>
+<div class='dd-tb'><span class='t'>The Late Hour</span><span class='draft'>Draft v2</span><span class='srch'>Search the script</span><span class='lnk'>Evidence</span><span class='lnk'>Characters</span></div>
+<div class='dd-ms'>
+<h4>EXT. Coastal Road — Night</h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore.</p>
+<p class='act'>RAYA — You said the tide would wait.</p>
+</div>
+<div class='dd-dock'>
+<div class='dd-head'>Evidence · Context Dock<span class='x'>✕</span></div>
+<div class='dd-tabs'><span class='dd-tab on'>EVIDENCE</span><span class='dd-tab'>SAMEER</span><span class='dd-tab cy'>SUSHRTA</span><span class='dd-tab'>STASH + NOTES</span></div>
+<div class='dd-body'>
+<div class='covrow'><svg width='86' height='86'><circle cx='43' cy='43' r='38' fill='none' stroke='rgba(148,178,210,.12)' stroke-width='5'/><circle cx='43' cy='43' r='38' fill='none' stroke='#ffb454' stroke-width='5' stroke-linecap='round' stroke-dasharray='238.8' stroke-dashoffset='66.9' transform='rotate(-90 43 43)'/></svg><span class='cov-n'>72</span><span class='cov-badge'>Consider</span><span class='cov-note'>logline reads; the tide promise pays at 52</span></div>
+<div class='ov'><span class='lab'>Pacing</span><span class='val'><b>6</b> issues · 2 drag scenes</span></div>
+<div class='ov'><span class='lab'>Setup · Payoff</span><span class='val'><b>12</b> open · 9 dangling</span></div>
+<div class='ov'><span class='lab'>Dials</span><span class='val'><b>5</b> characters · 3 open arcs</span></div>
+<div class='ov'><span class='lab'>Findings</span><span class='val'><b>41</b> character findings</span></div>
+<div class='ov'><span class='lab'>Fix Queue</span><span class='val'><b>21</b> rows · 3 high</span></div>
+<div class='fd'>
+<div class='fd-bc'>Evidence / Fix Queue</div>
+<div class='fd-tt'><span class='d-sevh'></span>The promise never pays</div>
+<span class='fd-cat'>Plot thread</span>
+<p class='fd-why'>The scooter promise sets an expectation the third act never touches; the plot economy stalls.</p>
+<div class='fd-q'><p class='q'>You said the tide would wait.</p><p class='who'>RAYA · SC 47</p></div>
+<div class='fd-ver'>✓ matched · 0.96<span class='conf'>quote verified</span></div>
+<p class='fd-ref'>scenes 47 · 52</p>
+<p class='fd-st'>status · open</p>
+<div class='fd-act'><span class='fa on'>Locate</span><span class='fa'>Rewrite</span><span class='fa'>Discuss</span><span class='fa'>Dismiss</span></div>
+</div>
+</div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The Late Hour · 2,847 words</span><span>one dock panel · ms shifted to 202px</span></div>
+</section>
+<p class='footnote'>DIRECTION 3 — SCREENING ROOM · CINEMATIC SLATE — deep slate blue · steel + signal amber · cool glass, thin lines, data-dense mono · JetBrains Mono + IBM Plex Mono + DM Sans + Courier Prime — static mockup · 1440×900 · scroll</p>
+</div>
+</body>
+</html>

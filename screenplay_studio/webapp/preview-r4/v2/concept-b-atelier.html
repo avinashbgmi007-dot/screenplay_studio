@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<title>Concept B — The Atelier · Script Doctor Studio</title>
+<style>
+@font-face{font-family:'Instrument Serif';src:url(../fonts/InstrumentSerif-n400-5eb09b5a.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'DM Sans';src:url(../fonts/DMSans-n400-9fea608a.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'DM Sans';src:url(../fonts/DMSans-n500-8cf23b6b.woff2);font-weight:500;font-display:swap}
+@font-face{font-family:'IBM Plex Mono';src:url(../fonts/IBMPlexMono-e2661bcc.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Caveat';src:url(../fonts/Caveat-706a1c41.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-094f4033.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-cdc2c233.woff2);font-weight:700;font-display:swap}
+:root{--field:#ebe6da;--sheet:#f8f3e8;--card:#f4eee0;--edge:#dcd3c1;--rule:#d5cbb8;--rule2:#e3dccc;--txt:#3a332a;--ink:#2f2a22;--mut:#8a7f6d;--faint:#a89d89;--pen:#7a2f35;--vio-w:#efe9f4;--vio-b:#7e6bff;--cyan-w:#e7f0f4;--cyan-b:#3d9dc0;--paper:#f8f3e8;--sevh:#9f2f2d;--sevm:#956400;--sevl:#346538;--serif:'Instrument Serif',Georgia,serif;--ui:'DM Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',monospace;--hand:'Caveat',cursive;--script:'Courier Prime',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#e4ded0;font-family:var(--ui);color:var(--txt);-webkit-font-smoothing:antialiased}
+.wrap{width:1460px;margin:0 auto;padding:36px 0 90px}
+.idhead{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;padding:0 10px}
+.idhead h1{font:400 26px/1 var(--serif);letter-spacing:-.02em}
+.idhead .sub{font:400 10px/1.6 var(--mono);color:var(--mut);letter-spacing:.08em;text-transform:uppercase}
+.idnote{margin:0 10px 24px;font:400 10px/1.7 var(--mono);color:var(--faint)}
+.frame{position:relative;width:1440px;height:900px;overflow:hidden;margin:0 auto 54px;border:1px solid #d8d0be;border-radius:10px;background:var(--field);box-shadow:0 10px 44px rgba(90,70,40,.14)}
+.flabel{position:absolute;top:0;left:24px;z-index:9;font:400 8px/1 var(--mono);color:var(--faint);letter-spacing:.28em;text-transform:uppercase;background:var(--field);padding:10px 12px;border:1px solid #d8d0be;border-radius:0 0 6px 6px}
+.eng{font:500 8px/1 var(--mono);letter-spacing:.26em;color:var(--mut);text-transform:uppercase}
+.strip{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;gap:16px;padding:0 16px;background:#e9e4d7;border-top:1px solid #d8d0be;font:400 9px/1 var(--mono);color:var(--mut)}
+.strip .ok{width:6px;height:6px;border-radius:50%;background:var(--sevl);margin-right:6px;display:inline-block}
+.grow{flex:1}
+.lg-col{width:680px;margin:92px auto 0;text-align:center}
+.lg-brand{font:500 9px/1 var(--mono);letter-spacing:.34em;color:var(--mut);text-transform:uppercase}
+.lg-greet{font:400 48px/1.06 var(--serif);letter-spacing:-.025em;margin:20px 0 8px;color:var(--ink)}
+.lg-sub{font:400 13px/1.5 var(--ui);color:var(--mut)}
+.drop{width:680px;height:180px;margin:30px 0 0;background:var(--sheet);border:1px solid var(--edge);border-radius:6px;box-shadow:3px 3px 0 #ded5c2,0 14px 30px rgba(90,70,40,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
+.drop b{font:400 17px/1 var(--serif);letter-spacing:-.01em;color:var(--ink)}
+.drop i{font:400 10px/1 var(--mono);color:var(--mut);font-style:normal;letter-spacing:.1em}
+.lg-act{display:flex;gap:12px;justify-content:center;margin:18px 0 36px}
+.btn-p{background:var(--pen);color:#f8f3e8;border:none;border-radius:4px;padding:11px 24px;font:400 12px/1 var(--ui);cursor:pointer;box-shadow:2px 2px 0 #c9bfa9}
+.btn-g{background:var(--sheet);color:var(--ink);border:1px solid var(--edge);border-radius:4px;padding:11px 24px;font:400 12px/1 var(--ui);cursor:pointer;box-shadow:2px 2px 0 #ded5c2}
+.rw-h{display:flex;align-items:center;gap:12px;text-align:left;margin-bottom:4px}
+.rw-card{background:var(--card);border:1px solid var(--edge);border-radius:6px;box-shadow:2px 2px 0 #ded5c2,0 8px 18px rgba(90,70,40,.08);padding:4px 16px}
+.rw-row{display:flex;align-items:center;gap:14px;padding:12px 2px;border-bottom:1px solid var(--rule2);text-align:left}
+.rw-row:last-child{border-bottom:none}
+.rw-name{font:500 12px/1 var(--mono);width:150px;color:var(--ink)}
+.rw-status{font:400 10px/1 var(--mono);color:var(--mut);letter-spacing:.04em;flex:1}
+.rw-status.ok{color:var(--sevl)}
+.rw-status.vio{color:var(--vio-b)}
+.rw-time{font:400 9px/1 var(--mono);color:var(--faint)}
+</style>
+</head>
+<body>
+<div class='wrap'>
+<header class='idhead'><h1>Concept B — The Atelier</h1><span class='sub'>restrained physical material · paper stacks · ruled cards · stamped gauges</span></header>
+<p class='idnote'>MATERIALITY warm field + real paper stack (offset layering, shadow depth) · DATA crafted objects (typed cards · ledger rows · stamped badge · sliders) · DENSITY quiet progressive · NAV layered tray — wireframe geometry locked · no wood/desk kitsch</p>
+<section class='frame'>
+<div class='flabel'>State 1 — Landing · Work Selector</div>
+<div class='lg-col'>
+<div class='lg-brand'>Script Doctor · Studio</div>
+<h2 class='lg-greet'>Continue a script or start an idea.</h2>
+<p class='lg-sub'>Everything stays on this machine.</p>
+<div class='drop'><b>Drop / upload screenplay</b><i>.fountain · .fdx · .pdf · .txt · .md</i></div>
+<div class='lg-act'><button class='btn-p' type='button'>New Idea</button><button class='btn-g' type='button'>Open Sample</button></div>
+<div class='rw-h'><span class='eng'>Recent Work</span></div>
+<div class='rw-card'>
+<div class='rw-row'><span class='rw-name'>gun_pen_2</span><span class='rw-status ok'>analysis complete · 12/13</span><span class='rw-time'>2h ago</span></div>
+<div class='rw-row'><span class='rw-name'>The_Late_Hour</span><span class='rw-status'>parsed · 4 scenes</span><span class='rw-time'>yesterday</span></div>
+<div class='rw-row'><span class='rw-name'>Untitled Idea</span><span class='rw-status vio'>idea · saved 19:02</span><span class='rw-time'>now</span></div>
+</div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>local AI · llama-server :8080</span></div>
+</section>
+
+<style>
+.id-frame{background:var(--field)}
+.id-page{position:absolute;left:380px;top:90px;width:680px;height:720px;background:var(--paper);border:1px solid var(--edge);border-radius:8px;box-shadow:4px 4px 0 #dcd3bf,8px 8px 0 #e4ddca,0 24px 44px rgba(90,70,40,.16);padding:46px 48px 40px}
+.id-brand{font:500 8px/1 var(--mono);letter-spacing:.28em;color:var(--faint);text-transform:uppercase;margin-bottom:20px}
+.id-title{font:400 32px/1.1 var(--serif);letter-spacing:-.02em;color:var(--ink);border-bottom:1px solid var(--rule2);padding-bottom:18px}
+.car{display:inline-block;width:2px;height:24px;background:var(--pen);vertical-align:-3px;margin-left:4px}
+.id-body{margin-top:24px;font:400 15px/1.75 var(--ui);color:#4a4336}
+.id-body p{margin-bottom:13px}
+.id-save{position:absolute;left:428px;top:814px;font:400 9px/1 var(--mono);color:var(--sevl);letter-spacing:.08em}
+.id-tools{position:absolute;left:566px;top:814px;font:400 9px/1 var(--mono);color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
+.id-pill{position:absolute;left:1120px;width:132px;height:36px;border-radius:4px;border:1px solid #d3c5d1;background:var(--vio-w);color:var(--vio-b);font:500 12px/34px var(--ui);text-align:center;box-shadow:2px 2px 0 #ded5c2}
+.pill-s{top:180px}
+.id-pill.doc{border-color:#c3d7dd;background:var(--cyan-w);color:var(--cyan-b)}
+.pill-d{top:228px}
+.id-mic{position:absolute;left:998px;top:742px;width:36px;height:36px;border-radius:50%;border:1px solid var(--edge);background:var(--sheet);color:var(--mut);font:400 10px/36px var(--mono);text-align:center;box-shadow:2px 2px 0 #ded5c2}
+</style>
+<section class='frame id-frame'>
+<div class='flabel'>State 2 — Idea Canvas · Empty Idea</div>
+<div class='id-page'>
+<div class='id-brand'>IDEA · PAPER SHEET</div>
+<h3 class='id-title'>Untitled Idea<span class='car'></span></h3>
+<div class='id-body'>
+<p>A scooter by the shore, a tide that refuses to keep its promise, and a phone that never rings.</p>
+<p>Raya waits for someone who said the sea would wait for him.</p>
+</div>
+</div>
+<span class='id-save'>saved 19:02</span>
+<span class='id-tools'>ask sameer · feedback · add note · ⋯</span>
+<span class='id-pill pill-s'>Sameer</span>
+<span class='id-pill doc pill-d'>Premise Doctor</span>
+<span class='id-mic'>◍</span>
+<div class='strip'><span><span class='ok'></span>connected · idea session</span><span class='grow'></span><span>Untitled Idea · saved</span><span>paper sheet · stacked shadows</span></div>
+</section>
+
+<style>
+.an-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid #d8d0be;background:#e7e2d4;padding-top:52px}
+.sc-n{font:500 8px/1 var(--mono);color:var(--faint);text-align:center;margin-bottom:6px}
+.sc-tab{display:flex;flex-direction:column;align-items:center;gap:5px;margin-bottom:14px}
+.tab-h{width:10px;height:14px;border-radius:2px 2px 0 0;background:var(--sevh);opacity:.85;box-shadow:1px 1px 0 #d1c7b2}
+.tab-m{width:10px;height:14px;border-radius:2px 2px 0 0;background:var(--sevm);opacity:.85;box-shadow:1px 1px 0 #d1c7b2}
+.tab-l{width:10px;height:14px;border-radius:2px 2px 0 0;background:var(--sevl);opacity:.85;box-shadow:1px 1px 0 #d1c7b2}
+.tab-x{width:10px;height:8px;border-radius:2px;background:#d6cdb8;box-shadow:1px 1px 0 #cfc5af}
+.an-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px;background:var(--sheet);border:1px solid var(--edge);border-radius:6px;padding:0 12px;box-shadow:2px 2px 0 #ded5c2,0 8px 18px rgba(90,70,40,.1)}
+.an-tb .prj{font:500 12px/1 var(--ui);color:var(--ink)}
+.an-tb .draft{font:400 9px/1 var(--mono);color:var(--mut);border:1px solid var(--edge);border-radius:3px;padding:4px 7px;background:var(--card)}
+.srch{flex:1;background:var(--field);border:1px solid var(--rule2);border-radius:4px;padding:6px 10px;font:400 10px/1 var(--mono);color:var(--faint)}
+.btn-run{background:var(--pen);color:var(--paper);border:none;border-radius:4px;padding:8px 14px;font:400 12px/1 var(--ui);cursor:pointer;box-shadow:2px 2px 0 #c9bfa9}
+.an-ghost{height:9px;border-radius:2px;background:rgba(90,70,40,.06);margin:13px 0}
+.an-band{position:absolute;left:388px;top:150px;width:700px;background:var(--card);border:1px solid var(--edge);border-radius:8px;box-shadow:3px 3px 0 #ded5c2,0 18px 36px rgba(90,70,40,.14);padding:20px 22px 18px}
+.an-head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.an-head .n07{font:400 30px/1 var(--serif);color:var(--ink)}
+.an-head .st{font:400 14px/1 var(--ui);color:var(--ink)}
+.an-head .run{margin-left:auto;font:500 8px/1 var(--mono);color:var(--sevm);letter-spacing:.22em;text-transform:uppercase}
+.an-bar{height:4px;border-radius:2px;background:var(--rule2);box-shadow:inset 0 1px 2px rgba(90,70,40,.12);margin-bottom:14px}
+.an-fill{height:4px;border-radius:2px;background:var(--pen);width:210px}
+.an-rows{display:grid;grid-template-columns:1fr 1fr;column-gap:24px}
+.an-row{display:flex;align-items:center;gap:9px;padding:7px 0;font:400 11px/1 var(--mono);color:var(--mut);border-bottom:1px solid var(--rule2)}
+.an-row:last-child,.an-row:nth-last-child(2){border-bottom:none}
+.an-row .tk{width:12px;text-align:center;font-size:10px}
+.an-row.done{color:#6a6252}
+.an-row.done .tk{color:var(--sevl)}
+.an-row.now{color:var(--ink);font-weight:500}
+.an-row.now .tk{color:var(--sevm)}
+.an-row.pend{color:var(--faint)}
+.an-eta{display:flex;justify-content:space-between;font:400 9px/1 var(--mono);color:var(--faint);margin-top:12px;letter-spacing:.1em}
+</style>
+<section class='frame'>
+<div class='flabel'>State 3 — Unanalyzed · Analysis Running</div>
+<div class='an-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-tab'><span class='tab-h'></span></div>
+<div class='sc-tab'><span class='tab-m'></span></div>
+<div class='sc-tab'><span class='tab-l'></span></div>
+<div class='sc-n'>51</div>
+<div class='sc-tab'><span class='tab-h'></span></div>
+<div class='sc-tab'><span class='tab-x'></span></div>
+</div>
+<div class='an-tb'><span class='prj'>The Late Hour</span><span class='draft'>Draft v2</span><span class='srch'>search the script</span><button class='btn-run' type='button'>Run Analysis</button></div>
+<div class='an-ghost' style='position:absolute;left:388px;top:80px;width:700px'></div>
+<div class='an-ghost' style='position:absolute;left:388px;top:104px;width:640px'></div>
+<div class='an-band'>
+<div class='an-head'><span class='n07'>07 / 20</span><span class='st'>Character Arc</span><span class='run'>running</span></div>
+<div class='an-bar'><div class='an-fill'></div></div>
+<div class='an-rows'>
+<div class='an-row done'><span class='tk'>✓</span>Parsing</div>
+<div class='an-row done'><span class='tk'>✓</span>Voice + subtext</div>
+<div class='an-row done'><span class='tk'>✓</span>Structure</div>
+<div class='an-row done'><span class='tk'>✓</span>Scene summaries</div>
+<div class='an-row now'><span class='tk'>→</span>Character Arc</div>
+<div class='an-row pend'><span class='tk'>○</span>Coverage</div>
+</div>
+<div class='an-eta'><span>20-stage pipeline · in-place</span><span>eta 4 min</span></div>
+</div>
+<div class='strip'><span><span class='ok'></span>connected</span><span class='grow'></span><span>The Late Hour · analysis 07/20</span><span>ruled ledger card · non-modal</span></div>
+</section>
+
+<style>
+.dk-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid #d8d0be;background:#e7e2d4;padding-top:56px}
+.dk-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px}
+.dk-tb .t{font:500 12px/1 var(--ui);color:var(--ink)}
+.dk-tb .draft{font:400 9px/1 var(--mono);color:var(--mut);border:1px solid var(--edge);border-radius:3px;padding:4px 7px;background:var(--card)}
+.dk-tb .lnk{font:400 11px/1 var(--ui);color:var(--mut)}
+.dk-tb .lnk.on{color:var(--pen);font-weight:500}
+.dk-tb .kbtn{margin-left:auto;font:400 9px/1 var(--mono);color:var(--faint);border:1px solid var(--edge);border-radius:3px;padding:5px 8px;background:var(--card)}
+.dk-ms{position:absolute;left:388px;top:60px;width:700px;bottom:28px;padding:34px 56px;background:var(--paper);border-radius:6px 6px 0 0;box-shadow:4px 4px 0 #dcd3bf,8px 8px 0 #e4ddca,0 -6px 30px rgba(90,70,40,.1);color:#3a332a;font-family:var(--script);font-size:13px;line-height:1.7}
+.dk-ms h4{font:700 13px/1.5 var(--script);letter-spacing:.04em;margin:24px 0 13px;text-transform:uppercase}
+.dk-ms h4:first-child{margin-top:0}
+.dk-ms .act{margin:11px 0}
+.dk-ms .chr{margin:13px 0 0;text-align:center;font-weight:700}
+.dk-ms .dlg{margin:0 0 4px 150px}
+.dk-ms .est{float:right;font:400 9px/1 var(--mono);color:var(--mut)}
+</style>
+<section class='frame'>
+<div class='flabel'>State 4 — Analyzed Desk · Nothing Selected</div>
+<div class='dk-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-tab'><span class='tab-h'></span></div>
+<div class='sc-tab'><span class='tab-m'></span></div>
+<div class='sc-tab'><span class='tab-l'></span></div>
+<div class='sc-n'>51</div>
+<div class='sc-tab'><span class='tab-h'></span></div>
+<div class='sc-tab'><span class='tab-m'></span></div>
+<div class='sc-n'>54</div>
+</div>
+<div class='dk-tb'><span class='t'>The Late Hour</span><span class='draft'>Draft v2</span><span class='srch' style='flex:1;background:var(--field);border:1px solid var(--rule2);border-radius:4px;padding:6px 10px;font:400 10px/1 var(--mono);color:var(--faint)'>search the script</span><span class='lnk on'>Evidence</span><span class='lnk'>Characters</span><span class='kbtn'>⌘K</span></div>
+<div class='dk-ms'>
+<h4>EXT. Coastal Road — Night<span class='est'>≈ 2 min</span></h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore, headlight pulsing.</p>
+<p class='chr'>RAYA</p>
+<p class='dlg'>You said the tide would wait.</p>
+<p class='dlg'>The sea does not wait. I waited.</p>
+<h4>INT. Car — Continuous<span class='est'>≈ 1 min</span></h4>
+<p class='act'>The map glows on the dashboard. Nobody speaks.</p>
+<p class='act'>Raya folds the map into a square small enough to swallow.</p>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The Late Hour · 2,847 words</span><span>Focus · Write · Explore</span></div>
+</section>
+
+<style>
+.dd-tb{position:absolute;left:202px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px}
+.dd-tb .t{font:500 12px/1 var(--ui);color:var(--ink)}
+.dd-tb .draft{font:400 9px/1 var(--mono);color:var(--mut);border:1px solid var(--edge);border-radius:3px;padding:4px 7px;background:var(--card)}
+.dd-tb .lnk{font:400 11px/1 var(--ui);color:var(--mut)}
+.dd-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid #d8d0be;background:#e7e2d4;padding-top:56px}
+.dd-ms{position:absolute;left:202px;top:60px;width:700px;bottom:28px;padding:34px 56px;background:var(--paper);border-radius:6px 6px 0 0;box-shadow:4px 4px 0 #dcd3bf,8px 8px 0 #e4ddca,0 -6px 30px rgba(90,70,40,.1);color:#3a332a;font-family:var(--script);font-size:13px;line-height:1.7}
+.dd-ms h4{font:700 13px/1.5 var(--script);margin:0 0 13px;text-transform:uppercase}
+.dd-ms .act{margin:11px 0}
+.dd-dock{position:absolute;left:1060px;top:0;width:380px;height:872px;background:#ede8db;border-left:1px solid #d3cab6;box-shadow:-12px 0 32px rgba(90,70,40,.16);display:flex;flex-direction:column}
+.dd-head{height:56px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid #d3cab6;font:500 8px/1 var(--mono);letter-spacing:.22em;color:var(--mut);text-transform:uppercase}
+.dd-head .x{margin-left:auto;color:var(--faint);font-size:10px}
+.dd-tabs{display:flex;gap:4px;padding:10px 12px 0}
+.dd-tab{font:400 10px/1 var(--ui);padding:8px 10px;border-radius:4px 4px 0 0;color:var(--mut);border:1px solid transparent;border-bottom:none}
+.dd-tab.on{background:var(--card);border:1px solid var(--edge);border-bottom:none;color:var(--ink);box-shadow:0 -3px 0 var(--pen) inset}
+.dd-tab.cy{color:var(--cyan-b)}
+.dd-body{flex:1;overflow:hidden;padding:12px}
+.tcard{background:var(--card);border:1px solid var(--edge);border-radius:6px;box-shadow:3px 3px 0 #ded5c2,0 10px 20px rgba(90,70,40,.1);padding:14px 16px;margin-bottom:12px}
+.tcard+.tcard{box-shadow:2px 2px 0 #ded5c2,0 8px 16px rgba(90,70,40,.08)}
+.cov{display:flex;align-items:center;gap:14px}
+.stamp{width:86px;height:86px;border-radius:50%;border:2px solid var(--pen);box-shadow:inset 0 0 0 2px var(--card),inset 0 0 0 3px rgba(122,47,53,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--sheet)}
+.stamp .n{font:400 30px/1 var(--serif);color:var(--pen)}
+.stamp .v{font:500 6px/1 var(--mono);letter-spacing:.24em;color:rgba(122,47,53,.75);text-transform:uppercase;margin-top:3px}
+.cov .tt{font:400 17px/1.2 var(--serif);color:var(--ink);margin-bottom:4px}
+.cov .nt{font:400 10px/1.55 var(--mono);color:var(--mut)}
+.led{padding:9px 2px;border-top:1px solid var(--rule2);display:flex;align-items:baseline;gap:10px;font:400 10px/1.4 var(--mono)}
+.led .lab{font:500 8px/1 var(--mono);letter-spacing:.18em;color:var(--mut);text-transform:uppercase;width:96px;flex:none}
+.led .val{color:#6a6252;flex:1}
+.led .val b{color:var(--ink);font-weight:500}
+.led .chk{font:500 8px/1 var(--mono);letter-spacing:.14em;color:var(--sevl)}
+.led .chk.m{color:var(--sevm)}
+.sl-row{display:flex;align-items:center;gap:9px;padding:7px 2px}
+.sl-row .nm{font:400 10px/1 var(--mono);color:#6a6252;width:56px}
+.sl-tr{flex:1;height:4px;border-radius:2px;background:var(--rule2);box-shadow:inset 0 1px 2px rgba(90,70,40,.15);position:relative}
+.sl-f{position:absolute;left:0;top:0;height:4px;border-radius:2px;background:var(--pen)}
+.sl-k{position:absolute;top:-4px;width:12px;height:12px;border-radius:50%;background:var(--sheet);border:1px solid rgba(122,47,53,.6);box-shadow:0 1px 2px rgba(90,70,40,.3)}
+.sl-v{font:400 9px/1 var(--mono);color:var(--faint);width:26px;text-align:right}
+.fd{background:var(--card);border:1px solid var(--edge);border-radius:6px;box-shadow:3px 3px 0 #ded5c2,0 12px 22px rgba(90,70,40,.12);padding:14px 16px}
+.fd-bc{font:500 8px/1 var(--mono);letter-spacing:.2em;color:var(--faint);text-transform:uppercase;margin-bottom:10px}
+.fd-tt{display:flex;align-items:center;gap:8px;font:500 16px/1.25 var(--serif);letter-spacing:-.01em;color:var(--ink);margin-bottom:5px}
+.fd-cat{display:inline-block;font:500 8px/1 var(--mono);letter-spacing:.12em;color:var(--cyan-b);background:var(--cyan-w);border-radius:3px;padding:4px 7px;text-transform:uppercase;margin-bottom:8px}
+.fd-why{font:400 11px/1.6 var(--ui);color:#6a6252;margin-bottom:10px}
+.fd-q{border-left:3px solid var(--pen);background:var(--paper);border-radius:0 5px 5px 0;padding:10px 12px;margin-bottom:8px;box-shadow:2px 2px 0 #e4ddca}
+.fd-q .q{font:400 12px/1.55 var(--script);color:#3a332a}
+.fd-q .who{font:500 8px/1 var(--mono);color:var(--faint);letter-spacing:.14em;text-transform:uppercase;margin-top:5px}
+.fd-hand{font:400 17px/1.25 var(--hand);color:var(--pen);margin:6px 0 2px}
+.fd-ver{display:flex;align-items:center;gap:8px;font:400 9px/1 var(--mono);color:var(--sevl);margin-bottom:4px}
+.fd-ver .conf{color:var(--faint)}
+.fd-ref{font:400 9px/1 var(--mono);color:var(--faint);margin-bottom:3px}
+.fd-st{font:500 8px/1 var(--mono);letter-spacing:.18em;color:var(--sevm);text-transform:uppercase}
+.fd-act{display:flex;gap:6px;margin-top:11px;padding-top:10px;border-top:1px solid var(--rule2)}
+.fa{font:400 11px/1 var(--ui);border:1px solid var(--edge);border-radius:4px;padding:7px 10px;color:#6a6252;background:var(--sheet);box-shadow:2px 2px 0 #ded5c2}
+.fa.on{background:var(--pen);border-color:var(--pen);color:var(--paper);box-shadow:2px 2px 0 #c9bfa9}
+</style>
+
+<section class='frame'>
+<div class='flabel'>State 5 — Context Dock · Finding Detail</div>
+<div class='dd-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-tab'><span class='tab-h'></span></div>
+<div class='sc-tab'><span class='tab-m'></span></div>
+<div class='sc-n'>50</div>
+<div class='sc-tab'><span class='tab-h'></span></div>
+</div>
+<div class='dd-tb'><span class='t'>The Late Hour</span><span class='draft'>Draft v2</span><span class='lnk'>Evidence</span><span class='lnk'>Characters</span></div>
+<div class='dd-ms'>
+<h4>EXT. Coastal Road — Night</h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore.</p>
+<p class='act'>RAYA — You said the tide would wait.</p>
+</div>
+<div class='dd-dock'>
+<div class='dd-head'>Evidence · Card Tray<span class='x'>✕</span></div>
+<div class='dd-tabs'><span class='dd-tab on'>Evidence</span><span class='dd-tab'>Sameer</span><span class='dd-tab cy'>Doctor</span><span class='dd-tab'>Stash + Notes</span></div>
+<div class='dd-body'>
+<div class='tcard'>
+<div class='cov'>
+<div class='stamp'><span class='n'>72</span><span class='v'>Consider</span></div>
+<div><div class='tt'>The script reads whole.</div><p class='nt'>logline reads; the tide promise pays at 52</p></div>
+</div>
+</div>
+<div class='tcard'>
+<div class='led'><span class='lab'>Pacing</span><span class='val'><b>6</b> issues · 2 drag scenes</span><span class='chk m'>▲</span></div>
+<div class='led'><span class='lab'>Setup · Payoff</span><span class='val'><b>12</b> open · 9 dangling</span><span class='chk'>✓</span></div>
+<div class='led'><span class='lab'>Dials</span><span class='val'><b>5</b> characters · 3 arcs</span><span class='chk'>✓</span></div>
+<div class='led'><span class='lab'>Findings</span><span class='val'><b>41</b> character findings</span><span class='chk'>✓</span></div>
+<div class='sl-row'><span class='nm'>RAYA</span><span class='sl-tr'><span class='sl-f' style='width:74%'></span><span class='sl-k' style='left:74%'></span></span><span class='sl-v'>74</span></div>
+<div class='sl-row'><span class='nm'>MIRA</span><span class='sl-tr'><span class='sl-f' style='width:52%'></span><span class='sl-k' style='left:52%'></span></span><span class='sl-v'>52</span></div>
+</div>
+<div class='fd'>
+<div class='fd-bc'>Evidence / Fix Queue</div>
+<div class='fd-tt'><span style='width:9px;height:9px;border-radius:50%;background:var(--sevh);opacity:.85'></span>The promise never pays</div>
+<span class='fd-cat'>Plot thread</span>
+<p class='fd-why'>The scooter promise sets an expectation the third act never touches; the plot economy stalls.</p>
+<div class='fd-q'><p class='q'>You said the tide would wait.</p><p class='who'>Raya · SC 47</p></div>
+<p class='fd-hand'>the scooter promise reads gorgeous — pay it</p>
+<div class='fd-ver'>✓ matched · 0.96<span class='conf'>quote verified</span></div>
+<p class='fd-ref'>scenes 47 · 52</p>
+<p class='fd-st'>status · open</p>
+<div class='fd-act'><span class='fa on'>Locate</span><span class='fa'>Rewrite</span><span class='fa'>Discuss</span><span class='fa'>Dismiss</span></div>
+</div>
+</div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The Late Hour · 2,847 words</span><span>one dock panel · ms shifted to 202px</span></div>
+</section>
+<p class='idnote' style='margin-top:4px'>CONCEPT B — THE ATELIER · palettes swapped, still tells apart: paper stacks, ruled cards, stamped gauge, ink ticks, physical sliders, typed verdict, quiet progressive density</p>
+</div>
+</body>
+</html>

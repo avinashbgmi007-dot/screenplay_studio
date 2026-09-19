@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<title>Concept C — The Monolith · Script Doctor Studio</title>
+<style>
+@font-face{font-family:'Instrument Serif';src:url(../fonts/InstrumentSerif-n400-5eb09b5a.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'DM Sans';src:url(../fonts/DMSans-n400-9fea608a.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'IBM Plex Mono';src:url(../fonts/IBMPlexMono-e2661bcc.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-094f4033.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-cdc2c233.woff2);font-weight:700;font-display:swap}
+:root{--void:#0b0b0c;--bone:#f4f2ec;--ink:#16161a;--mut:#8a8a90;--faint:#55555b;--rule:#26262a;--rule2:#1b1b1f;--gmut:#b9b7ae;--vio:#9b8aff;--cyan:#7fd4ef;--sevh:#c9c6bd;--sevm:#a5a29a;--sevl:#8a8780;--serif:'Instrument Serif',Georgia,serif;--ui:'DM Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',monospace;--script:'Courier Prime',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080809;font-family:var(--ui);color:var(--bone);-webkit-font-smoothing:antialiased}
+.wrap{width:1460px;margin:0 auto;padding:36px 0 90px}
+.idhead{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;padding:0 10px}
+.idhead h1{font:400 30px/1 var(--serif);letter-spacing:-.02em}
+.idhead .sub{font:400 9px/1.6 var(--mono);color:var(--faint);letter-spacing:.26em;text-transform:uppercase}
+.idnote{margin:0 10px 24px;font:400 9px/1.7 var(--mono);color:var(--faint);letter-spacing:.06em}
+.frame{position:relative;width:1440px;height:900px;overflow:hidden;margin:0 auto 54px;border:1px solid var(--rule);border-radius:8px;background:var(--void);box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.flabel{position:absolute;top:0;left:24px;z-index:9;font:400 8px/1 var(--mono);color:var(--faint);letter-spacing:.3em;text-transform:uppercase;background:var(--void);padding:10px 12px;border:1px solid var(--rule);border-radius:0 0 6px 6px}
+.eng{font:400 8px/1 var(--mono);letter-spacing:.3em;color:var(--faint);text-transform:uppercase}
+.strip{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--void);border-top:1px solid var(--rule);font:400 9px/1 var(--mono);color:var(--faint);letter-spacing:.1em}
+.strip .ok{width:6px;height:6px;border-radius:50%;background:var(--sevl);margin-right:6px;display:inline-block}
+.grow{flex:1}
+.lg-col{width:720px;margin:118px auto 0;text-align:left;padding:0 40px}
+.lg-brand{font:400 8px/1 var(--mono);letter-spacing:.4em;color:var(--faint);text-transform:uppercase}
+.lg-greet{font:400 78px/1.02 var(--serif);letter-spacing:-.03em;margin:22px 0 14px;color:var(--bone)}
+.lg-greet em{font-style:italic;color:var(--gmut)}
+.lg-sub{font:400 13px/1.5 var(--ui);color:var(--mut);margin-bottom:34px}
+.drop{width:100%;height:150px;border:1px solid var(--rule);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
+.drop b{font:400 22px/1 var(--serif);letter-spacing:-.01em}
+.drop i{font:400 9px/1 var(--mono);color:var(--faint);font-style:normal;letter-spacing:.16em}
+.lg-act{display:flex;gap:26px;margin:16px 0 44px;justify-content:center}
+.brk{font:400 13px/1 var(--mono);color:var(--bone);letter-spacing:.04em;cursor:pointer}
+.brk.p{color:var(--vio)}
+.brk i{color:var(--faint);font-style:normal}
+.rw-h{display:flex;align-items:center;gap:12px;margin-bottom:2px}
+.rw-row{display:flex;align-items:baseline;gap:18px;padding:14px 0;border-bottom:1px dotted var(--rule)}
+.rw-name{font:400 14px/1 var(--serif);letter-spacing:0;width:190px}
+.rw-status{font:400 10px/1 var(--mono);color:var(--mut);letter-spacing:.08em;flex:1}
+.rw-time{font:400 9px/1 var(--mono);color:var(--faint)}
+.glyph{font:400 12px/1 var(--mono);color:var(--sevh)}
+.glyph.m{color:var(--sevm)}
+.glyph.l{color:var(--sevl)}
+</style>
+</head>
+<body>
+<div class='wrap'>
+<header class='idhead'><h1>Concept C — The Monolith</h1><span class='sub'>single material · rules + type only · monumental · no chrome</span></header>
+<p class='idnote'>MATERIALITY one material — the page (bone); everything else is typographic on void · DATA monumental numerals · single-stroke meters · typographic ledgers · glyph severity — no fills, no charts, no panel chrome · DENSITY minimal monumental · NAV typographic overlay — wireframe geometry locked</p>
+<section class='frame'>
+<div class='flabel'>State 1 — Landing · Work Selector</div>
+<div class='lg-col'>
+<div class='lg-brand'>Script Doctor · Studio</div>
+<h2 class='lg-greet'>Continue the script. <em>or start an idea.</em></h2>
+<p class='lg-sub'>Everything stays on this machine.</p>
+<div class='drop'><b>Drop / upload screenplay</b><i>.fountain · .fdx · .pdf · .txt · .md</i></div>
+<div class='lg-act'><span class='brk p'><i>[</i> New Idea <i>]</i></span><span class='brk'><i>[</i> Open Sample <i>]</i></span></div>
+<div class='rw-h'><span class='eng'>Recent Work</span></div>
+<div class='rw-row'><span class='rw-name'>gun_pen_2</span><span class='glyph l'>●</span><span class='rw-status'>analysis complete · 12/13</span><span class='rw-time'>2h ago</span></div>
+<div class='rw-row'><span class='rw-name'>The_Late_Hour</span><span class='glyph m'>▲</span><span class='rw-status'>parsed · 4 scenes</span><span class='rw-time'>yesterday</span></div>
+<div class='rw-row'><span class='rw-name'>Untitled Idea</span><span class='glyph'>✕</span><span class='rw-status'>idea · saved 19:02</span><span class='rw-time'>now</span></div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>local AI · llama-server :8080</span></div>
+</section>
+
+<style>
+.id-page{position:absolute;left:380px;top:90px;width:680px;height:720px;background:var(--bone);color:var(--ink);padding:46px 48px 40px;box-shadow:0 0 0 1px var(--rule)}
+.id-brand{font:400 8px/1 var(--mono);letter-spacing:.3em;color:var(--ink);opacity:.45;text-transform:uppercase;margin-bottom:20px}
+.id-title{font:400 38px/1.05 var(--serif);letter-spacing:-.03em;color:var(--ink);border-bottom:1px solid rgba(22,22,26,.18);padding-bottom:18px}
+.car{display:inline-block;width:2px;height:26px;background:var(--ink);vertical-align:-3px;margin-left:5px;animation:none}
+.id-body{margin-top:24px;font:400 15px/1.8 var(--ui);color:rgba(22,22,26,.78)}
+.id-body p{margin-bottom:13px}
+.id-save{position:absolute;left:428px;top:814px;font:400 8px/1 var(--mono);color:var(--sevl);letter-spacing:.2em;text-transform:uppercase}
+.id-tools{position:absolute;left:590px;top:814px;font:400 9px/1 var(--mono);color:var(--faint);letter-spacing:.1em}
+.id-pill{position:absolute;left:1120px;height:36px;font:400 12px/34px var(--mono);color:var(--gmut);letter-spacing:.04em;cursor:pointer}
+.pill-s{top:180px}
+.id-pill.doc{color:var(--cyan)}
+.pill-d{top:228px}
+.id-pill i{color:var(--faint);font-style:normal}
+.id-mic{position:absolute;left:998px;top:742px;width:36px;height:36px;border:1px solid var(--rule);color:var(--faint);font:400 10px/34px var(--mono);text-align:center}
+.an-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--rule);padding-top:52px}
+.sc-n{font:400 11px/1 var(--serif);color:var(--faint);text-align:center;margin-bottom:7px}
+.sc-g{font:400 11px/1 var(--mono);text-align:center;margin-bottom:13px;color:var(--sevh)}
+.sc-g.m{color:var(--sevm)}
+.sc-g.l{color:var(--sevl)}
+.an-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--rule);padding:0 2px 10px}
+.an-tb .t{font:400 17px/1 var(--serif);letter-spacing:-.01em}
+.an-tb .draft{font:400 8px/1 var(--mono);color:var(--faint);letter-spacing:.2em;text-transform:uppercase}
+.an-tb .lnk{font:400 12px/1 var(--mono);color:var(--mut)}
+.btn-run{margin-left:auto;font:400 12px/1 var(--mono);color:var(--vio);letter-spacing:.04em;cursor:pointer}
+.an-ghost{height:1px;background:var(--rule2);margin:15px 0;position:relative}
+.an-ghost::after{content:'';position:absolute;left:0;top:-1px;height:3px;background:var(--rule2);width:100%}
+.an-num{position:absolute;left:388px;top:150px;width:700px}
+.an-num .big{font:400 110px/1 var(--serif);letter-spacing:-.04em;color:var(--bone)}
+.an-num .lab{font:400 8px/1 var(--mono);letter-spacing:.3em;color:var(--faint);text-transform:uppercase;margin:2px 0 18px}
+.an-line{height:1px;background:var(--rule);position:relative;margin-bottom:20px}
+.an-line .f{position:absolute;left:0;top:-1px;height:3px;background:var(--bone);width:35%}
+.an-led{display:grid;grid-template-columns:1fr 1fr;column-gap:40px}
+.an-row{display:flex;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px dotted var(--rule);font:400 10px/1 var(--mono);color:var(--mut);letter-spacing:.08em}
+.an-row .tk{width:14px;text-align:center;color:var(--faint)}
+.an-row.done .tk{color:var(--sevl)}
+.an-row.now{color:var(--bone)}
+.an-row.now .tk{color:var(--sevm)}
+.an-eta{display:flex;justify-content:space-between;font:400 8px/1 var(--mono);color:var(--faint);letter-spacing:.24em;text-transform:uppercase;margin-top:16px}
+</style>
+<section class='frame'>
+<div class='flabel'>State 2 — Idea Canvas · Empty Idea</div>
+<div class='id-page'>
+<div class='id-brand'>Idea · the bone page</div>
+<h3 class='id-title'>Untitled Idea<span class='car'></span></h3>
+<div class='id-body'>
+<p>A scooter by the shore, a tide that refuses to keep its promise, and a phone that never rings.</p>
+<p>Raya waits for someone who said the sea would wait for him.</p>
+</div>
+</div>
+<span class='id-save'>saved 19:02</span>
+<span class='id-tools'>ask sameer · feedback · add note · ⋯</span>
+<span class='id-pill pill-s'><i>[</i> Sameer <i>]</i></span>
+<span class='id-pill doc pill-d'><i>[</i> Premise Doctor <i>]</i></span>
+<span class='id-mic'>◍</span>
+<div class='strip'><span><span class='ok'></span>connected · idea session</span><span class='grow'></span><span>Untitled Idea · saved</span><span>bone page · single material</span></div>
+</section>
+<section class='frame'>
+<div class='flabel'>State 3 — Unanalyzed · Analysis Running</div>
+<div class='an-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-g'>✕</div>
+<div class='sc-g m'>▲</div>
+<div class='sc-g l'>●</div>
+<div class='sc-n'>51</div>
+<div class='sc-g'>✕</div>
+</div>
+<div class='an-tb'><span class='t'>The Late Hour</span><span class='draft'>Draft v2</span><span class='lnk'>search</span><span class='btn-run'>Run Analysis</span></div>
+<div class='an-ghost' style='position:absolute;left:388px;top:82px;width:700px'></div>
+<div class='an-num'>
+<div class='big'>07<span style='color:var(--faint);font-size:52px'>/20</span></div>
+<div class='lab'>Character Arc · running · in-place</div>
+<div class='an-line'><div class='f'></div></div>
+<div class='an-led'>
+<div class='an-row done'><span class='tk'>✓</span>Parsing</div>
+<div class='an-row done'><span class='tk'>✓</span>Voice + subtext</div>
+<div class='an-row done'><span class='tk'>✓</span>Structure</div>
+<div class='an-row done'><span class='tk'>✓</span>Scene summaries</div>
+<div class='an-row now'><span class='tk'>→</span>Character Arc</div>
+<div class='an-row'><span class='tk'>○</span>Coverage</div>
+</div>
+<div class='an-eta'><span>20-stage pipeline</span><span>eta 4 min</span></div>
+</div>
+<div class='strip'><span><span class='ok'></span>connected</span><span class='grow'></span><span>The Late Hour · analysis 07/20</span><span>typographic meter · non-modal</span></div>
+</section>
+
+<style>
+.dk-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--rule);padding-top:56px}
+.dk-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--rule);padding-bottom:10px}
+.dk-tb .t{font:400 17px/1 var(--serif);letter-spacing:-.01em}
+.dk-tb .draft{font:400 8px/1 var(--mono);color:var(--faint);letter-spacing:.2em;text-transform:uppercase}
+.dk-tb .lnk{font:400 12px/1 var(--mono);color:var(--mut)}
+.dk-tb .lnk.on{color:var(--bone)}
+.dk-tb .kbtn{margin-left:auto;font:400 9px/1 var(--mono);color:var(--faint);letter-spacing:.16em}
+.dk-ms{position:absolute;left:388px;top:60px;width:700px;bottom:28px;padding:36px 56px;background:var(--bone);color:var(--ink);font-family:var(--script);font-size:13px;line-height:1.7;box-shadow:0 0 0 1px var(--rule)}
+.dk-ms h4{font:700 13px/1.5 var(--script);margin:24px 0 13px;letter-spacing:.04em;text-transform:uppercase}
+.dk-ms h4:first-child{margin-top:0}
+.dk-ms .act{margin:11px 0}
+.dk-ms .chr{margin:13px 0 0;text-align:center;font-weight:700}
+.dk-ms .dlg{margin:0 0 4px 150px}
+.dk-ms .est{float:right;font:400 9px/1 var(--mono);color:rgba(22,22,26,.5)}
+</style>
+<section class='frame'>
+<div class='flabel'>State 4 — Analyzed Desk · Nothing Selected</div>
+<div class='dk-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-g'>✕</div>
+<div class='sc-g m'>▲</div>
+<div class='sc-g l'>●</div>
+<div class='sc-n'>51</div>
+<div class='sc-g'>✕</div>
+<div class='sc-g m'>▲</div>
+<div class='sc-n'>54</div>
+</div>
+<div class='dk-tb'><span class='t'>The Late Hour</span><span class='draft'>Draft v2</span><span class='lnk' style='color:var(--faint)'>search</span><span class='lnk on'>Evidence</span><span class='lnk'>Characters</span><span class='kbtn'>⌘K</span></div>
+<div class='dk-ms'>
+<h4>EXT. Coastal Road — Night<span class='est'>≈ 2 min</span></h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore, headlight pulsing.</p>
+<p class='chr'>RAYA</p>
+<p class='dlg'>You said the tide would wait.</p>
+<p class='dlg'>The sea does not wait. I waited.</p>
+<h4>INT. Car — Continuous<span class='est'>≈ 1 min</span></h4>
+<p class='act'>The map glows on the dashboard. Nobody speaks.</p>
+<p class='act'>Raya folds the map into a square small enough to swallow.</p>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The Late Hour · 2,847 words</span><span>Focus · Write · Explore</span></div>
+</section>
+
+<style>
+.dd-tb{position:absolute;left:202px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--rule);padding-bottom:10px}
+.dd-tb .t{font:400 17px/1 var(--serif)}
+.dd-tb .draft{font:400 8px/1 var(--mono);color:var(--faint);letter-spacing:.2em;text-transform:uppercase}
+.dd-tb .lnk{font:400 12px/1 var(--mono);color:var(--mut)}
+.dd-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--rule);padding-top:56px}
+.dd-ms{position:absolute;left:202px;top:60px;width:700px;bottom:28px;padding:36px 56px;background:var(--bone);color:var(--ink);font-family:var(--script);font-size:13px;line-height:1.7;box-shadow:0 0 0 1px var(--rule)}
+.dd-ms h4{font:700 13px/1.5 var(--script);margin:0 0 13px;text-transform:uppercase}
+.dd-ms .act{margin:11px 0}
+.dd-dock{position:absolute;left:1060px;top:0;width:380px;height:872px;border-left:1px solid var(--rule);padding:0 26px;overflow:hidden;display:flex;flex-direction:column}
+.dd-head{height:56px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--rule);font:400 8px/1 var(--mono);letter-spacing:.3em;color:var(--faint);text-transform:uppercase}
+.dd-head .x{margin-left:auto;color:var(--faint);font-size:10px}
+.dd-tabs{display:flex;gap:18px;padding:14px 0 0;border-bottom:1px solid var(--rule);padding-bottom:12px}
+.dd-tab{font:400 9px/1 var(--mono);letter-spacing:.14em;color:var(--faint);text-transform:uppercase;padding-bottom:11px;margin-bottom:-13px;border-bottom:1px solid transparent}
+.dd-tab.on{color:var(--bone);border-bottom:1px solid var(--bone)}
+.dd-tab.cy{color:var(--cyan)}
+.dd-body{flex:1;overflow:hidden;padding-top:18px}
+.cov{margin-bottom:14px}
+.cov .n{font:400 96px/1 var(--serif);letter-spacing:-.04em;color:var(--bone)}
+.cov .bd{font:400 8px/1 var(--mono);letter-spacing:.26em;color:var(--mut);text-transform:uppercase;margin:0 0 12px}
+.cov .lab{font:400 7px/1 var(--mono);letter-spacing:.3em;color:var(--faint);text-transform:uppercase}
+.cov .nt{font:400 10px/1.6 var(--ui);color:var(--mut);margin-top:8px}
+.cov .line{height:1px;background:var(--rule);position:relative;margin-top:10px}
+.cov .line .f{position:absolute;left:0;top:-1px;height:3px;background:var(--bone);width:68%}
+.led{padding:10px 0;border-bottom:1px dotted var(--rule);display:flex;align-items:baseline;gap:12px;font:400 9px/1.4 var(--mono);letter-spacing:.06em;color:var(--mut)}
+.led .lab{font:400 7px/1 var(--mono);letter-spacing:.24em;color:var(--faint);text-transform:uppercase;width:110px;flex:none}
+.led .val b{color:var(--bone);font-weight:400}
+.led .g{margin-left:auto;font-size:11px;color:var(--sevh)}
+.led .g.m{color:var(--sevm)}
+.led .g.l{color:var(--sevl)}
+.sc{display:grid;grid-template-columns:110px 1fr 26px;gap:0 10px;align-items:baseline;padding:9px 0;border-bottom:1px dotted var(--rule);font:400 9px/1.5 var(--mono);color:var(--mut);letter-spacing:.04em}
+.sc .nm{font:400 8px/1 var(--mono);letter-spacing:.2em;color:var(--faint);text-transform:uppercase}
+.sc .bar{position:relative;height:1px;background:var(--rule2);top:-1px}
+.sc .bar .f{position:absolute;left:0;top:-1px;height:3px;background:var(--mut)}
+.sc .v{text-align:right;color:var(--faint)}
+.fd{margin-top:16px;padding-top:16px;border-top:1px solid var(--rule)}
+.fd-bc{font:400 7px/1 var(--mono);letter-spacing:.28em;color:var(--faint);text-transform:uppercase;margin-bottom:10px}
+.fd-tt{display:flex;align-items:baseline;gap:10px;font:400 24px/1.15 var(--serif);letter-spacing:-.02em;color:var(--bone);margin-bottom:4px}
+.fd-tt .g{font:400 13px/1 var(--mono);color:var(--sevh)}
+.fd-cat{font:400 7px/1 var(--mono);letter-spacing:.24em;color:var(--mut);text-transform:uppercase;display:block;margin-bottom:10px}
+.fd-why{font:400 12px/1.65 var(--ui);color:var(--mut);margin-bottom:14px}
+.fd-q{padding:12px 0 12px 20px;border-left:1px solid var(--rule);position:relative;margin-bottom:12px}
+.fd-q::before{content:'“';position:absolute;left:-6px;top:-14px;font:400 46px/1 var(--serif);color:var(--faint)}
+.fd-q .q{font:400 13px/1.6 var(--script);color:var(--gmut)}
+.fd-q .who{font:400 8px/1 var(--mono);letter-spacing:.22em;color:var(--faint);text-transform:uppercase;margin-top:7px}
+.fd-ver{font:400 8px/1 var(--mono);letter-spacing:.14em;color:var(--sevl);text-transform:uppercase;margin-bottom:3px}
+.fd-ver i{color:var(--faint);font-style:normal;letter-spacing:.08em;text-transform:none}
+.fd-meter{height:1px;background:var(--rule2);position:relative;margin-bottom:10px}
+.fd-meter .f{position:absolute;left:0;top:-1px;height:3px;background:var(--sevl);width:92%}
+.fd-ref{font:400 8px/1 var(--mono);letter-spacing:.14em;color:var(--faint);text-transform:uppercase;margin-bottom:3px}
+.fd-st{font:400 7px/1 var(--mono);letter-spacing:.3em;color:var(--mut);text-transform:uppercase}
+.fd-act{display:flex;gap:20px;margin-top:15px;padding-top:13px;border-top:1px solid var(--rule)}
+.fa{font:400 10px/1 var(--mono);letter-spacing:.06em;color:var(--mut);cursor:pointer}
+.fa i{color:var(--faint);font-style:normal}
+.fa.on{color:var(--vio)}
+.fa.on i{color:var(--vio)}
+</style>
+
+<section class='frame'>
+<div class='flabel'>State 5 — Context Dock · Finding Detail</div>
+<div class='dd-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-g'>✕</div>
+<div class='sc-g m'>▲</div>
+<div class='sc-n'>50</div>
+<div class='sc-g'>✕</div>
+</div>
+<div class='dd-tb'><span class='t'>The Late Hour</span><span class='draft'>Draft v2</span><span class='lnk'>search</span><span class='lnk'>Evidence</span></div>
+<div class='dd-ms'>
+<h4>EXT. Coastal Road — Night</h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore.</p>
+<p class='act'>RAYA — You said the tide would wait.</p>
+</div>
+<div class='dd-dock'>
+<div class='dd-head'>Evidence · typographic overlay<span class='x'>✕</span></div>
+<div class='dd-tabs'><span class='dd-tab on'>Evidence</span><span class='dd-tab'>Sameer</span><span class='dd-tab cy'>Doctor</span><span class='dd-tab'>Stash + Notes</span></div>
+<div class='dd-body'>
+<div class='cov'>
+<div class='n'>72</div>
+<div class='bd'>Coverage · Consider</div>
+<div class='nt'>logline reads; the tide promise pays at 52</div>
+<div class='line'><div class='f'></div></div>
+</div>
+<div class='led'><span class='lab'>Pacing</span><span class='val'><b>6</b> issues · 2 drag scenes</span><span class='g m'>▲</span></div>
+<div class='led'><span class='lab'>Setup · Payoff</span><span class='val'><b>12</b> open · 9 dangling</span><span class='g'>✕</span></div>
+<div class='led'><span class='lab'>Character Dials</span><span class='val'><b>5</b> characters · 3 arcs</span><span class='g l'>●</span></div>
+<div class='led'><span class='lab'>Findings</span><span class='val'><b>41</b> character findings</span><span class='g l'>●</span></div>
+<div class='sc'><span class='nm'>Raya</span><span class='bar'><span class='f' style='width:74%'></span></span><span class='v'>74</span></div>
+<div class='sc'><span class='nm'>Mira</span><span class='bar'><span class='f' style='width:52%'></span></span><span class='v'>52</span></div>
+<div class='fd'>
+<div class='fd-bc'>Evidence / Fix Queue</div>
+<div class='fd-tt'><span class='g'>✕</span>The promise never pays</div>
+<span class='fd-cat'>Plot thread · severity high</span>
+<p class='fd-why'>The scooter promise sets an expectation the third act never touches; the plot economy stalls.</p>
+<div class='fd-q'><p class='q'>You said the tide would wait.</p><p class='who'>Raya · SC 47</p></div>
+<div class='fd-ver'>✓ matched · 0.96 <i>quote verified</i></div>
+<div class='fd-meter'><div class='f'></div></div>
+<p class='fd-ref'>scenes 47 · 52</p>
+<p class='fd-st'>status · open</p>
+<div class='fd-act'><span class='fa on'><i>[</i> Locate <i>]</i></span><span class='fa'><i>[</i> Rewrite <i>]</i></span><span class='fa'><i>[</i> Discuss <i>]</i></span><span class='fa'><i>[</i> Dismiss <i>]</i></span></div>
+</div>
+</div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The Late Hour · 2,847 words</span><span>one dock panel · ms shifted to 202px</span></div>
+</section>
+<p class='idnote' style='margin-top:4px'>CONCEPT C — THE MONOLITH · palettes swapped, still tells apart: rules-only chrome, monumental numerals, single-stroke meters, dotted ledgers, glyph severity, bone page as the one material object</p>
+</div>
+</body>
+</html>

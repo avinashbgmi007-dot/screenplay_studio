@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<title>Concept A — The Instrument · Script Doctor Studio</title>
+<style>
+@font-face{font-family:'Instrument Serif';src:url(../fonts/InstrumentSerif-n400-5eb09b5a.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'DM Sans';src:url(../fonts/DMSans-n400-9fea608a.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'DM Sans';src:url(../fonts/DMSans-n500-8cf23b6b.woff2);font-weight:500;font-display:swap}
+@font-face{font-family:'IBM Plex Mono';src:url(../fonts/IBMPlexMono-e2661bcc.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-094f4033.woff2);font-weight:400;font-display:swap}
+@font-face{font-family:'Courier Prime';src:url(../fonts/CourierPrime-cdc2c233.woff2);font-weight:700;font-display:swap}
+:root{--void:#070a10;--sheet:rgba(11,16,26,.88);--panel:#0b111c;--rule:rgba(130,160,255,.16);--rule2:rgba(130,160,255,.07);--grid:rgba(110,150,255,.045);--txt:#c8d2e6;--mut:#7a86a0;--eng:#4c5878;--vio:#7e6bff;--viob:#9b8aff;--cyan:#53c7f0;--paper:#f2e8d4;--ink:#2b241b;--ink-m:#6d6050;--sevh:#ff5d73;--sevm:#e8a24f;--sevl:#35d49a;--serif:'Instrument Serif',Georgia,serif;--ui:'DM Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',monospace;--script:'Courier Prime',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#04060a;font-family:var(--ui);color:var(--txt);-webkit-font-smoothing:antialiased}
+.wrap{width:1460px;margin:0 auto;padding:36px 0 90px}
+.idhead{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;padding:0 10px}
+.idhead h1{font:400 19px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.idhead .sub{font:400 10px/1.6 var(--mono);color:var(--mut);letter-spacing:.1em;text-transform:uppercase}
+.idnote{margin:0 10px 24px;font:400 10px/1.7 var(--mono);color:var(--eng);letter-spacing:.05em}
+.frame{position:relative;width:1440px;height:900px;overflow:hidden;margin:0 auto 54px;border:1px solid var(--rule);border-radius:10px;background:repeating-linear-gradient(90deg,var(--grid) 0 1px,transparent 1px 120px),repeating-linear-gradient(0deg,var(--grid) 0 1px,transparent 1px 120px),var(--void);box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.flabel{position:absolute;top:0;left:24px;z-index:9;font:400 8px/1 var(--mono);color:var(--eng);letter-spacing:.3em;text-transform:uppercase;background:var(--void);padding:10px 12px;border:1px solid var(--rule);border-radius:0 0 6px 6px}
+.eng{font:400 8px/1 var(--mono);letter-spacing:.3em;color:var(--eng);text-transform:uppercase}
+.strip{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--panel);border-top:1px solid var(--rule);font:400 9px/1 var(--mono);color:var(--mut);letter-spacing:.08em}
+.strip .ok{width:6px;height:6px;border-radius:50%;background:var(--sevl);margin-right:6px;display:inline-block}
+.grow{flex:1}
+.ruler{height:4px;background:repeating-linear-gradient(90deg,var(--rule) 0 1px,transparent 1px 14px)}
+.lg-col{width:680px;margin:92px auto 0;text-align:center}
+.lg-brand{font:400 9px/1 var(--mono);letter-spacing:.4em;color:var(--eng);text-transform:uppercase}
+.lg-greet{font:400 40px/1.1 var(--ui);letter-spacing:-.01em;margin:20px 0 8px;color:#dde5f4}
+.lg-sub{font:400 13px/1.5 var(--ui);color:var(--mut)}
+.drop{position:relative;width:680px;height:180px;margin:30px 0 0;border:1px solid var(--rule2);background:rgba(126,107,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
+.drop .cb{position:absolute;width:16px;height:16px}
+.cb.tl{top:-1px;left:-1px;border-top:2px solid var(--vio);border-left:2px solid var(--vio)}
+.cb.tr{top:-1px;right:-1px;border-top:2px solid var(--vio);border-right:2px solid var(--vio)}
+.cb.bl{bottom:-1px;left:-1px;border-bottom:2px solid var(--vio);border-left:2px solid var(--vio)}
+.cb.br{bottom:-1px;right:-1px;border-bottom:2px solid var(--vio);border-right:2px solid var(--vio)}
+.drop b{font:400 15px/1 var(--ui);letter-spacing:.04em}
+.drop i{font:400 10px/1 var(--mono);color:var(--mut);font-style:normal;letter-spacing:.12em}
+.lg-act{display:flex;gap:12px;justify-content:center;margin:18px 0 36px}
+.btn-p{background:var(--vio);color:#fff;border:none;border-radius:4px;padding:11px 24px;font:400 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;cursor:pointer}
+.btn-g{background:transparent;color:var(--txt);border:1px solid var(--rule);border-radius:4px;padding:11px 24px;font:400 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;cursor:pointer}
+.rw-h{display:flex;align-items:center;gap:12px;text-align:left;margin-bottom:4px}
+.rw-row{display:flex;align-items:center;gap:14px;padding:12px 4px;border-bottom:1px solid var(--rule2);text-align:left}
+.rw-row .ruler{flex:1;height:3px}
+.rw-name{font:500 12px/1 var(--mono);width:150px;letter-spacing:.04em}
+.rw-status{font:400 10px/1 var(--mono);color:var(--mut);letter-spacing:.06em}
+.rw-status.ok{color:var(--sevl)}
+.rw-status.vio{color:var(--viob)}
+.rw-time{font:400 9px/1 var(--mono);color:var(--eng);width:70px;text-align:right}
+</style>
+</head>
+<body>
+<div class='wrap'>
+<header class='idhead'><h1>Concept A — The Instrument</h1><span class='sub'>engineered precision · tick rulers · machined dials · layered depth</span></header>
+<p class='idnote'>MATERIALITY engineered dark + fine structural grid · DATA full instrument language (dials · tick scales · ledgers · sliders) · DENSITY cockpit · NAV instrument cluster · single material hierarchy — wireframe geometry locked</p>
+<section class='frame'>
+<div class='flabel'>State 1 — Landing · Work Selector</div>
+<div class='lg-col'>
+<div class='lg-brand'>Script Doctor · Studio</div>
+<h2 class='lg-greet'>Continue a script or start an idea.</h2>
+<p class='lg-sub'>Everything stays on this machine.</p>
+<div class='drop'><span class='cb tl'></span><span class='cb tr'></span><span class='cb bl'></span><span class='cb br'></span><b>Drop / upload screenplay</b><i>.fountain · .fdx · .pdf · .txt · .md</i></div>
+<div class='lg-act'><button class='btn-p' type='button'>New Idea</button><button class='btn-g' type='button'>Open Sample</button></div>
+<div class='rw-h'><span class='eng'>Recent Work</span><span class='ruler' style='flex:1'></span></div>
+<div class='rw-row'><span class='rw-name'>gun_pen_2</span><span class='rw-status ok'>analysis complete · 12/13</span><span class='ruler'></span><span class='rw-time'>2h ago</span></div>
+<div class='rw-row'><span class='rw-name'>The_Late_Hour</span><span class='rw-status'>parsed · 4 scenes</span><span class='ruler'></span><span class='rw-time'>yesterday</span></div>
+<div class='rw-row'><span class='rw-name'>Untitled Idea</span><span class='rw-status vio'>idea · saved 19:02</span><span class='ruler'></span><span class='rw-time'>now</span></div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>local AI · llama-server :8080</span></div>
+</section>
+
+<style>
+.id-frame{background:radial-gradient(900px 520px at 720px 120px,rgba(126,107,255,.06),transparent),repeating-linear-gradient(90deg,var(--grid) 0 1px,transparent 1px 120px),repeating-linear-gradient(0deg,var(--grid) 0 1px,transparent 1px 120px),var(--void)}
+.id-page{position:absolute;left:380px;top:90px;width:680px;height:720px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.5);backdrop-filter:blur(12px);padding:46px 48px 40px}
+.id-brand{font:400 8px/1 var(--mono);letter-spacing:.3em;color:var(--eng);text-transform:uppercase;margin-bottom:20px}
+.id-title{font:400 30px/1.1 var(--ui);letter-spacing:-.01em;color:#dde5f4;border-bottom:1px solid var(--rule2);padding-bottom:18px}
+.car{display:inline-block;width:2px;height:24px;background:var(--cyan);vertical-align:-3px;margin-left:4px}
+.id-body{margin-top:24px;font:400 15px/1.75 var(--ui);color:#a9b3ca}
+.id-body p{margin-bottom:13px}
+.id-save{position:absolute;left:428px;top:814px;font:400 9px/1 var(--mono);color:var(--sevl);letter-spacing:.1em}
+.id-tools{position:absolute;left:566px;top:814px;font:400 9px/1 var(--mono);color:var(--eng);letter-spacing:.16em;text-transform:uppercase}
+.id-pill{position:absolute;left:1120px;width:132px;height:36px;border-radius:4px;border:1px solid rgba(126,107,255,.45);background:rgba(126,107,255,.1);color:var(--viob);font:400 10px/34px var(--mono);letter-spacing:.14em;text-transform:uppercase;text-align:center}
+.pill-s{top:180px}
+.id-pill.doc{border-color:rgba(83,199,240,.45);background:rgba(83,199,240,.08);color:var(--cyan)}
+.pill-d{top:228px}
+.id-mic{position:absolute;left:998px;top:742px;width:36px;height:36px;border-radius:4px;border:1px solid var(--rule);background:var(--panel);color:var(--mut);font:400 10px/36px var(--mono);text-align:center}
+</style>
+<section class='frame id-frame'>
+<div class='flabel'>State 2 — Idea Canvas · Empty Idea</div>
+<div class='id-page'>
+<div class='id-brand'>IDEA · 680 × 720 SHEET</div>
+<h3 class='id-title'>Untitled Idea<span class='car'></span></h3>
+<div class='id-body'>
+<p>A scooter by the shore, a tide that refuses to keep its promise, and a phone that never rings.</p>
+<p>Raya waits for someone who said the sea would wait for him.</p>
+</div>
+</div>
+<span class='id-save'>saved 19:02</span>
+<span class='id-tools'>ask sameer · feedback · add note · ⋯</span>
+<span class='id-pill pill-s'>sameer</span>
+<span class='id-pill doc pill-d'>premise doctor</span>
+<span class='id-mic'>◍</span>
+<div class='strip'><span><span class='ok'></span>connected · idea session</span><span class='grow'></span><span>Untitled Idea · saved</span><span>glass instrument sheet · fine grid</span></div>
+</section>
+
+<style>
+.an-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--rule);background:var(--panel);padding-top:52px}
+.sc-n{font:400 8px/1 var(--mono);color:var(--eng);text-align:center;margin-bottom:6px;letter-spacing:.06em}
+.sc-tk{display:flex;flex-direction:column;align-items:center;gap:5px;margin-bottom:14px}
+.tk-h{width:2px;height:9px;background:var(--sevh)}
+.tk-m{width:2px;height:9px;background:var(--sevm)}
+.tk-l{width:2px;height:9px;background:var(--sevl)}
+.tk-x{width:9px;height:1px;background:var(--rule)}
+.an-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:0 12px;backdrop-filter:blur(12px)}
+.an-tb .prj{font:500 12px/1 var(--mono);letter-spacing:.04em}
+.an-tb .draft{font:400 9px/1 var(--mono);color:var(--mut);border:1px solid var(--rule2);border-radius:3px;padding:4px 7px;letter-spacing:.08em}
+.srch{flex:1;background:rgba(0,0,0,.3);border:1px solid var(--rule2);border-radius:3px;padding:6px 10px;font:400 10px/1 var(--mono);color:var(--eng);letter-spacing:.08em}
+.btn-run{background:var(--vio);color:#fff;border:none;border-radius:3px;padding:8px 14px;font:400 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+.an-ghost{height:9px;border-radius:2px;background:rgba(130,160,255,.06);margin:13px 0}
+.an-band{position:absolute;left:388px;top:150px;width:700px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;box-shadow:0 18px 46px rgba(0,0,0,.55);backdrop-filter:blur(12px);padding:20px 22px 18px}
+.an-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.an-head .n07{font:400 32px/1 var(--mono);color:#dde5f4}
+.an-head .st{font:400 14px/1 var(--ui);color:var(--txt)}
+.an-head .run{margin-left:auto;font:400 8px/1 var(--mono);color:var(--sevm);letter-spacing:.24em;text-transform:uppercase}
+.segs{display:flex;gap:3px;margin-bottom:14px}
+.seg{height:5px;flex:1;border-radius:1px;background:rgba(130,160,255,.1)}
+.seg.on{background:var(--vio)}
+.seg.cur{background:var(--viob);box-shadow:0 0 6px rgba(126,107,255,.5)}
+.an-rows{display:grid;grid-template-columns:1fr 1fr;column-gap:24px}
+.an-row{display:flex;align-items:center;gap:9px;padding:6px 0;font:400 11px/1 var(--mono);color:var(--mut);border-bottom:1px solid var(--rule2);letter-spacing:.04em}
+.an-row .tk{width:12px;text-align:center;font-size:10px}
+.an-row.done{color:#9aa5bd}
+.an-row.done .tk{color:var(--sevl)}
+.an-row.now{color:var(--txt)}
+.an-row.now .tk{color:var(--sevm)}
+.an-row.pend{color:var(--eng)}
+.an-eta{display:flex;justify-content:space-between;font:400 9px/1 var(--mono);color:var(--eng);letter-spacing:.14em;text-transform:uppercase;margin-top:12px}
+</style>
+<section class='frame'>
+<div class='flabel'>State 3 — Unanalyzed · Analysis Running</div>
+<div class='an-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-tk'><span class='tk-h'></span></div>
+<div class='sc-tk'><span class='tk-m'></span></div>
+<div class='sc-tk'><span class='tk-l'></span></div>
+<div class='sc-n'>51</div>
+<div class='sc-tk'><span class='tk-h'></span></div>
+<div class='sc-tk'><span class='tk-x'></span></div>
+</div>
+<div class='an-tb'><span class='prj'>The_Late_Hour</span><span class='draft'>DRAFT V2</span><span class='srch'>search the script</span><button class='btn-run' type='button'>Run Analysis</button></div>
+<div class='an-ghost' style='position:absolute;left:388px;top:80px;width:700px'></div>
+<div class='an-ghost' style='position:absolute;left:388px;top:104px;width:640px'></div>
+<div class='an-band'>
+<div class='an-head'><span class='n07'>07/20</span><span class='st'>Character Arc</span><span class='run'>running</span></div>
+<div class='segs'><span class='seg on'></span><span class='seg on'></span><span class='seg on'></span><span class='seg on'></span><span class='seg on'></span><span class='seg on'></span><span class='seg cur'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span><span class='seg'></span></div>
+<div class='an-rows'>
+<div class='an-row done'><span class='tk'>✓</span>Parsing</div>
+<div class='an-row done'><span class='tk'>✓</span>Voice + subtext</div>
+<div class='an-row done'><span class='tk'>✓</span>Structure</div>
+<div class='an-row done'><span class='tk'>✓</span>Scene summaries</div>
+<div class='an-row now'><span class='tk'>→</span>Character Arc</div>
+<div class='an-row pend'><span class='tk'>○</span>Coverage</div>
+</div>
+<div class='an-eta'><span>20-stage pipeline · in-place</span><span>eta 4 min</span></div>
+</div>
+<div class='strip'><span><span class='ok'></span>connected</span><span class='grow'></span><span>The_Late_Hour · analysis 07/20</span><span>segmented meter · non-modal</span></div>
+</section>
+
+<style>
+.dk-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--rule);background:var(--panel);padding-top:56px}
+.dk-tb{position:absolute;left:388px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px}
+.dk-tb .t{font:500 12px/1 var(--mono);letter-spacing:.04em}
+.dk-tb .draft{font:400 9px/1 var(--mono);color:var(--mut);border:1px solid var(--rule2);border-radius:3px;padding:4px 7px;letter-spacing:.08em}
+.dk-tb .lnk{font:400 11px/1 var(--ui);color:var(--mut);letter-spacing:.06em}
+.dk-tb .lnk.on{color:var(--viob)}
+.dk-tb .kbtn{margin-left:auto;font:400 9px/1 var(--mono);color:var(--eng);border:1px solid var(--rule2);border-radius:3px;padding:5px 8px;letter-spacing:.1em}
+.dk-ruler{position:absolute;left:388px;top:60px;width:700px}
+.dk-ms{position:absolute;left:388px;top:64px;width:700px;bottom:28px;padding:34px 56px;background:var(--paper);border-radius:4px 4px 0 0;box-shadow:0 -12px 44px rgba(0,0,0,.42);color:var(--ink);font-family:var(--script);font-size:13px;line-height:1.7}
+.dk-ms h4{font:700 13px/1.5 var(--script);letter-spacing:.04em;margin:24px 0 13px;text-transform:uppercase}
+.dk-ms h4:first-child{margin-top:0}
+.dk-ms .act{margin:11px 0}
+.dk-ms .chr{margin:13px 0 0;text-align:center;font-weight:700}
+.dk-ms .dlg{margin:0 0 4px 150px}
+.dk-ms .est{float:right;font:400 9px/1 var(--mono);color:var(--ink-m);letter-spacing:.06em}
+</style>
+<section class='frame'>
+<div class='flabel'>State 4 — Analyzed Desk · Nothing Selected</div>
+<div class='dk-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-tk'><span class='tk-h'></span></div>
+<div class='sc-tk'><span class='tk-m'></span></div>
+<div class='sc-tk'><span class='tk-l'></span></div>
+<div class='sc-n'>51</div>
+<div class='sc-tk'><span class='tk-h'></span></div>
+<div class='sc-tk'><span class='tk-m'></span></div>
+<div class='sc-n'>54</div>
+</div>
+<div class='dk-tb'><span class='t'>The_Late_Hour</span><span class='draft'>DRAFT V2</span><span class='srch' style='flex:1;background:rgba(0,0,0,.3);border:1px solid var(--rule2);border-radius:3px;padding:6px 10px;font:400 10px/1 var(--mono);color:var(--eng);letter-spacing:.08em'>search the script</span><span class='lnk on'>Evidence</span><span class='lnk'>Characters</span><span class='kbtn'>⌘K</span></div>
+<div class='dk-ruler ruler'></div>
+<div class='dk-ms'>
+<h4>EXT. Coastal Road — Night<span class='est'>≈ 2 min</span></h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore, headlight pulsing.</p>
+<p class='chr'>RAYA</p>
+<p class='dlg'>You said the tide would wait.</p>
+<p class='dlg'>The sea does not wait. I waited.</p>
+<h4>INT. Car — Continuous<span class='est'>≈ 1 min</span></h4>
+<p class='act'>The map glows on the dashboard. Nobody speaks.</p>
+<p class='act'>Raya folds the map into a square small enough to swallow.</p>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The_Late_Hour · 2,847 words</span><span>Focus · Write · Explore</span></div>
+</section>
+
+<style>
+.dd-tb{position:absolute;left:202px;top:20px;width:700px;height:40px;display:flex;align-items:center;gap:12px}
+.dd-tb .t{font:500 12px/1 var(--mono);letter-spacing:.04em}
+.dd-tb .draft{font:400 9px/1 var(--mono);color:var(--mut);border:1px solid var(--rule2);border-radius:3px;padding:4px 7px}
+.dd-tb .lnk{font:400 11px/1 var(--ui);color:var(--mut)}
+.dd-rail{position:absolute;left:0;top:0;width:44px;height:872px;border-right:1px solid var(--rule);background:var(--panel);padding-top:56px}
+.dd-ms{position:absolute;left:202px;top:60px;width:700px;bottom:28px;padding:34px 56px;background:var(--paper);border-radius:4px 4px 0 0;box-shadow:0 -12px 44px rgba(0,0,0,.42);color:var(--ink);font-family:var(--script);font-size:13px;line-height:1.7}
+.dd-ms h4{font:700 13px/1.5 var(--script);margin:0 0 13px;text-transform:uppercase}
+.dd-ms .act{margin:11px 0}
+.dd-dock{position:absolute;left:1060px;top:0;width:380px;height:872px;background:var(--sheet);border-left:1px solid var(--rule);box-shadow:-16px 0 40px rgba(0,0,0,.38);backdrop-filter:blur(12px);display:flex;flex-direction:column}
+.dd-head{height:56px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--rule);font:400 8px/1 var(--mono);letter-spacing:.26em;color:var(--eng);text-transform:uppercase}
+.dd-head .x{margin-left:auto;color:var(--eng);font-size:10px}
+.dd-tabs{display:flex;gap:3px;padding:10px 12px 0;border-bottom:1px solid var(--rule2)}
+.dd-tab{font:400 8px/1 var(--mono);letter-spacing:.18em;padding:8px 9px;border-radius:3px 3px 0 0;color:var(--eng);text-transform:uppercase;border-bottom:2px solid transparent}
+.dd-tab.on{color:var(--viob);border-bottom:2px solid var(--vio)}
+.dd-tab.cy{color:var(--cyan)}
+.dd-body{flex:1;overflow:hidden;padding:14px 16px}
+.cov{display:flex;align-items:center;gap:14px;padding-bottom:12px}
+.cov .n{font:400 24px/1 var(--mono);color:#dde5f4}
+.cov .bd{font:400 8px/1 var(--mono);color:var(--sevm);border:1px solid rgba(232,162,79,.4);background:rgba(232,162,79,.08);border-radius:3px;padding:5px 7px;letter-spacing:.18em;text-transform:uppercase}
+.cov .nt{font:400 10px/1.5 var(--ui);color:var(--mut);flex:1}
+.led{display:grid;grid-template-columns:96px 1fr 60px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--rule2);font:400 9px/1.4 var(--mono)}
+.led .lab{letter-spacing:.2em;color:var(--eng);text-transform:uppercase}
+.led .val{color:var(--mut);letter-spacing:.04em}
+.led .val b{color:#dde5f4;font-weight:500}
+.led .chk{text-align:right;color:var(--sevl);letter-spacing:.1em}
+.led .chk.m{color:var(--sevm)}
+.sl-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--rule2)}
+.sl-row .nm{font:400 10px/1 var(--mono);color:var(--mut);width:56px;letter-spacing:.04em}
+.sl-tr{flex:1;height:3px;border-radius:2px;background:rgba(130,160,255,.1);position:relative}
+.sl-f{position:absolute;left:0;top:0;height:3px;border-radius:2px;background:var(--vio)}
+.sl-k{position:absolute;top:-3px;width:9px;height:9px;border-radius:50%;background:#dde5f4;border:2px solid var(--vio)}
+.sl-v{font:400 9px/1 var(--mono);color:var(--eng);width:26px;text-align:right}
+.fd{margin-top:10px;background:rgba(0,0,0,.28);border:1px solid var(--rule);border-radius:6px;padding:14px}
+.fd-bc{font:400 8px/1 var(--mono);letter-spacing:.24em;color:var(--eng);text-transform:uppercase;margin-bottom:10px}
+.fd-tt{display:flex;align-items:center;gap:8px;font:500 13px/1.3 var(--ui);color:#dde5f4;margin-bottom:5px}
+.fd-cat{display:inline-block;font:400 8px/1 var(--mono);letter-spacing:.16em;color:var(--mut);border:1px solid var(--rule2);border-radius:3px;padding:4px 6px;text-transform:uppercase;margin-bottom:8px}
+.fd-why{font:400 11px/1.6 var(--ui);color:var(--mut);margin-bottom:10px}
+.fd-q{border-left:2px solid var(--vio);background:rgba(126,107,255,.05);border-radius:0 4px 4px 0;padding:9px 11px;margin-bottom:9px}
+.fd-q .q{font:400 12px/1.55 var(--script);color:var(--txt)}
+.fd-q .who{font:400 8px/1 var(--mono);color:var(--eng);letter-spacing:.18em;text-transform:uppercase;margin-top:5px}
+.fd-ver{display:flex;align-items:center;gap:8px;font:400 9px/1 var(--mono);color:var(--sevl);margin-bottom:4px;letter-spacing:.06em}
+.fd-meter{height:2px;background:rgba(130,160,255,.1);border-radius:1px;margin-bottom:8px}
+.fd-meter .f{width:92%;height:2px;background:var(--sevl);border-radius:1px}
+.fd-ref{font:400 9px/1 var(--mono);color:var(--eng);margin-bottom:3px;letter-spacing:.08em}
+.fd-st{font:400 8px/1 var(--mono);color:var(--sevm);letter-spacing:.2em;text-transform:uppercase}
+.fd-act{display:flex;gap:6px;margin-top:11px;padding-top:10px;border-top:1px solid var(--rule2)}
+.fa{font:400 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--rule);border-radius:3px;padding:7px 9px;color:var(--mut)}
+.fa.on{background:var(--vio);border-color:var(--vio);color:#fff}
+</style>
+
+<section class='frame'>
+<div class='flabel'>State 5 — Context Dock · Finding Detail</div>
+<div class='dd-rail'>
+<div class='sc-n'>47</div>
+<div class='sc-tk'><span class='tk-h'></span></div>
+<div class='sc-tk'><span class='tk-m'></span></div>
+<div class='sc-n'>50</div>
+<div class='sc-tk'><span class='tk-h'></span></div>
+</div>
+<div class='dd-tb'><span class='t'>The_Late_Hour</span><span class='draft'>DRAFT V2</span><span class='lnk'>Evidence</span><span class='lnk'>Characters</span></div>
+<div class='dd-ms'>
+<h4>EXT. Coastal Road — Night</h4>
+<p class='act'>Waves break against the rocks. A lone scooter idles by the shore.</p>
+<p class='act'>RAYA — You said the tide would wait.</p>
+</div>
+<div class='dd-dock'>
+<div class='dd-head'>Evidence · Instrument Cluster<span class='x'>✕</span></div>
+<div class='dd-tabs'><span class='dd-tab on'>Evidence</span><span class='dd-tab'>Sameer</span><span class='dd-tab cy'>Doctor</span><span class='dd-tab'>Stash + Notes</span></div>
+<div class='dd-body'>
+<div class='cov'>
+<svg width='92' height='92'>
+<circle cx='46' cy='46' r='40' fill='none' stroke='rgba(130,160,255,.1)' stroke-width='1'/>
+<circle cx='46' cy='46' r='34' fill='none' stroke='rgba(130,160,255,.25)' stroke-width='3' stroke-dasharray='1.5 4.9' transform='rotate(-90 46 46)'/>
+<circle cx='46' cy='46' r='40' fill='none' stroke='#7e6bff' stroke-width='3' stroke-linecap='round' stroke-dasharray='251.3' stroke-dashoffset='70.4' transform='rotate(-90 46 46)'/>
+</svg>
+<span class='n'>72</span>
+<span class='bd'>Consider</span>
+<span class='nt'>logline reads; the tide promise pays at 52</span>
+</div>
+<div class='led'><span class='lab'>Pacing</span><span class='val'><b>6</b> issues · 2 drag scenes</span><span class='chk m'>▲</span></div>
+<div class='led'><span class='lab'>Setup · Payoff</span><span class='val'><b>12</b> open · 9 dangling</span><span class='chk'>✓</span></div>
+<div class='led'><span class='lab'>Dials</span><span class='val'><b>5</b> characters · 3 open arcs</span><span class='chk'>✓</span></div>
+<div class='led'><span class='lab'>Findings</span><span class='val'><b>41</b> character findings</span><span class='chk'>✓</span></div>
+<div class='sl-row'><span class='nm'>RAYA</span><span class='sl-tr'><span class='sl-f' style='width:74%'></span><span class='sl-k' style='left:74%'></span></span><span class='sl-v'>74</span></div>
+<div class='sl-row'><span class='nm'>MIRA</span><span class='sl-tr'><span class='sl-f' style='width:52%'></span><span class='sl-k' style='left:52%'></span></span><span class='sl-v'>52</span></div>
+<div class='fd'>
+<div class='fd-bc'>Evidence / Fix Queue</div>
+<div class='fd-tt'><span class='tk-h' style='width:9px;height:9px;border-radius:50%;background:var(--sevh)'></span>The promise never pays</div>
+<span class='fd-cat'>Plot thread</span>
+<p class='fd-why'>The scooter promise sets an expectation the third act never touches; the plot economy stalls.</p>
+<div class='fd-q'><p class='q'>You said the tide would wait.</p><p class='who'>Raya · SC 47</p></div>
+<div class='fd-ver'>✓ matched · 0.96<span style='color:var(--eng);letter-spacing:.14em'>QUOTE VERIFIED</span></div>
+<div class='fd-meter'><div class='f'></div></div>
+<p class='fd-ref'>scenes 47 · 52</p>
+<p class='fd-st'>status · open</p>
+<div class='fd-act'><span class='fa on'>Locate</span><span class='fa'>Rewrite</span><span class='fa'>Discuss</span><span class='fa'>Dismiss</span></div>
+</div>
+</div>
+</div>
+<div class='strip'><span><span class='ok'></span>your model verified</span><span class='grow'></span><span>The_Late_Hour · 2,847 words</span><span>one dock panel · ms shifted to 202px</span></div>
+</section>
+<p class='idnote' style='margin-top:4px'>CONCEPT A — THE INSTRUMENT · palettes swapped, still tells apart: tick rulers, segmented meters, machined dial, engraved labels, ledger + slider language, cockpit density</p>
+</div>
+</body>
+</html>
