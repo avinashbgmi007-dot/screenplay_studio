@@ -1,0 +1,264 @@
+file,rule_id,name,taxonomy_level,genre,current_tier,proposed_tier,criterion,rationale,changed
+action.json,action_pacing_relentless,Action Pacing Is Relentless,structure_pacing,action,high,medium,T2,"sig asks whether downtime is 'minimal' — a trend, with no threshold to test",True
+action.json,action_hero_must_be_active,Hero Must Be Active,character,action,high,medium,T2,counting initiating actions is observable; 'as active as possible' is not,True
+action.json,action_villain_strength,Villain Must Be Formidable,character,action,high,low,T3,"the criterion is 'formidable', a quality verdict, not a test",True
+action.json,action_stakes_physical_death,Physical Death at Stake,plot_thread,action,high,high,T1,presence of a stakes mode is a bounded yes/no the sig can actually answer,False
+action.json,action_escalation_constant,Action Escalates Constantly,plot_thread,action,high,medium,T2,'things go wrong constantly' is a whole-script trend judged by feel,True
+action.json,action_hero_villain_flipside,Hero and Villain Are Flip Sides,character,action,high,medium,T2,shared traits are observable; whether the parallel means anything is a call,True
+action.json,action_hero_underdog,Hero Must Be Underdog,character,action,high,medium,T2,"relative power is observable, but 'genuine challenge' is judged",True
+action.json,action_set_pieces_varied,Action Set Pieces Must Be Varied,scene,action,high,medium,T2,"variety is countable, but 'enough variation' has no threshold",True
+action.json,action_physical_consequences,Action Has Physical Consequences,character,action,high,medium,T2,shown/not-shown is observable; 'consistent with the style' is a call,True
+action.json,action_villain_plan_clear,Villain's Plan Must Be Clear,plot_thread,action,high,medium,T2,clarity by the midpoint is a pattern; 'clear' has no operational test,True
+action.json,action_hero_competence,Hero Must Demonstrate Competence,character,action,high,medium,T2,a competence beat is observable; 'early enough' is a judgment,True
+body_language.json,body_language_limbic_leak,Limbic System Leakage,nonverbal,,high,medium,T2,"body-contradicts-words is a pattern you can point at, not a measurement",True
+body_language.json,body_language_pacifying,Pacifying Behaviors,nonverbal,,high,medium,T2,the gestures are observable; inferring the anxiety motive is interpretive,True
+body_language.json,body_language_feet_direction,Feet Reveal True Intent,nonverbal,,high,medium,T2,"an observable detail, but 'reveals true intent' is an inference",True
+body_language.json,body_language_gravity_defying,Gravity-Defying Behaviors,nonverbal,,high,medium,T2,posture change is observable; attributing it to emotion is interpretive,True
+body_language.json,body_language_ventral_exposure,Ventral Exposure Signals Trust,nonverbal,,high,medium,T2,observable blocking; the comfort/defensiveness reading is a judgment,True
+body_language.json,body_language_territorial,Territorial Behavior,nonverbal,,medium,medium,T2,same class as its file-mates; the dominance reading is interpretive,False
+character.json,character_arc_change,Character Arc as Value Change,character,,low,low,T3,keep — 'has not arced' is a verdict about internal change,False
+character.json,true_character_vs_characterization,True Character vs. Characterization,character,,low,low,T3,keep — 'is this choice consistent with their values' is interpretive,False
+character.json,want_vs_need,Conscious Want vs. Unconscious Need,character,,low,low,T3,keep — the rule's own text says flag as a discussion point,False
+character.json,cast_polarization,Cast Polarization,character,,low,low,T3,keep — 'interchangeable function' is a call about character design,False
+character.json,character_necessity,Character Necessity,character,,low,low,T3,keep — 'removable without loss' is judged against genre and tone,False
+character.json,stc_save_the_cat_scene,Save the Cat Scene,character,,high,medium,T2,a likeability beat is observable; 'likeable' is a quality judgment,True
+character.json,egri_character_contradiction,Character Contradiction as Source of Drama,character,,medium,medium,T2,"keep — internal contradiction is a pattern, not a measurable defect",False
+character.json,seger_goal_spine,Character Goal as Story Spine,character,,high,medium,T2,'every scene connects to the goal' is a pattern over the whole script,True
+character.json,seger_transformation_earned,Character Transformation Must Be Earned,character,,medium,medium,T2,keep — 'earned' leans subjective but the setup/payoff is checkable,False
+character.json,martell_supporting_character_function,Supporting Characters Must Serve the Protagonist,character,,high,medium,T2,mapping a supporting character's function is interpretive,True
+character.json,hauge_inner_conflict_drives_outer,Inner Conflict Must Drive Outer Conflict,character,,high,medium,T2,linking inner wound to outer plot is an interpretive reading,True
+character.json,hauge_identity_transformation,Six-Stage Character Transformation,character,,medium,medium,T2,keep — stage coverage is observable; 'incomplete' is judged,False
+character.json,weiland_lie_believed,Every Character Arc Is Driven by a Lie the Character Believes,character,,high,medium,T2,identifying 'the Lie' is an interpretation of character interior,True
+character.json,weiland_want_vs_need,The Conflict Between What the Character Wants and What They Need,character,,high,low,T3,the same concept as want_vs_need (low) — the two cannot disagree,True
+character.json,weiland_ghost_wound,The Ghost Is the Origin of the Lie,character,,high,medium,T2,the rule itself says the Ghost may be seeded gradually — a judgment,True
+character.json,weiland_five_arc_types,"Five Character Arc Types: Positive, Flat, Disillusionment, Fall, Corruption",character,,medium,medium,T2,keep — classifying an arc into five types is interpretive,False
+character.json,alderson_character_emotional_development,Track the Character's Emotional Arc Across the Entire Story,character,,high,medium,T2,"tracking an emotional arc is a reading, not a measurement",True
+comedy.json,comedy_reel_laugh,Every Reel Needs a Big Laugh,structure_pacing,comedy,high,medium,T2,the reel partition is mechanical; 'a major laugh' is a judgment,True
+comedy.json,comedy_start_late_leave_early,"Start Scenes Late, Leave Early",scene,comedy,high,medium,T2,"'unnecessary setup' vs necessary setup is a call, not a test",True
+comedy.json,comedy_midpoint_physical_intimacy,Rom-Com Midpoint Physical Intimacy,structure_pacing,comedy,high,medium,T2,midpoint placement is mechanical; 'a milestone' is interpretive,True
+comedy.json,comedy_trivial_taken_seriously,Comedy Characters in Tragedy,character,comedy,high,medium,T2,the gravity/reality gap is observable; 'disproportionate' is a judgment,True
+comedy.json,comedy_subtext_not_literal,Dialogue Must Have Subtext,dialogue,comedy,high,medium,T2,"same class as on_the_nose_vs_subtext, which is medium",True
+comedy.json,comedy_contradictory_characters,Contradictory Character Placements,character,comedy,high,medium,T2,'inherent friction' is a reading of the premise,True
+comedy.json,comedy_relationship_difficulty,"If Boy Can Easily Get Girl, No Story",plot_thread,comedy,high,medium,T2,'genuinely difficult' and 'escalating' are judged,True
+comedy.json,comedy_death_stakes,Comedy Stakes Are Psychological Death,plot_thread,comedy,high,medium,T2,disproportionate gravity is observable; 'believes they will die inside' is not,True
+comedy.json,comedy_exaggeration_mechanism,Exaggeration as Comedic Mechanism,scene,comedy,high,low,T3,'rooted in recognizable truth' is the definition of a taste call,True
+comedy.json,comedy_timing_is_everything,Comedic Timing in Scene Length,structure_pacing,comedy,high,low,T3,'long enough / short enough' has no threshold at all,True
+comedy.json,comedy_escalation_pattern,Comedy Escalates Through Pattern Breaking,plot_thread,comedy,high,medium,T2,pattern-then-break is observable; 'maximum comedic effect' is not,True
+comedy.json,comedy_character_flaws_funny,Character Flaws Create Comedy,character,comedy,high,low,T3,the criterion is literally 'funny',True
+continuity.json,prop_continuity,Prop Continuity,continuity,,high,high,T1,keep — a direct contradiction between two explicit statements of state,False
+continuity.json,timeline_consistency,Timeline Consistency,continuity,,high,high,T1,keep — time markers either contradict or they do not,False
+continuity.json,character_trait_continuity,Character Physical/Biographical Trait Continuity,continuity,,high,high,T1,keep — the rule's own text calls it one of the purely mechanical checks,False
+continuity.json,world_rule_consistency_continuity,World-Rule Consistency (Continuity Angle),continuity,,medium,high,T1,"raised from medium: 'does an explicit rule contradict a later explicit event' is exactly the continuity class, and the rule says so itself",True
+dialogue.json,on_the_nose_vs_subtext,On-the-Nose Dialogue vs. Subtext,dialogue,,medium,medium,T2,keep — 'on-the-nose' is a pattern requiring a read of intent,False
+dialogue.json,exposition_as_ammunition,"Exposition as Ammunition, Not Data Dump",dialogue,,medium,medium,T2,keep — 'does the speaker have an in-scene motive' is interpretive,False
+dialogue.json,distinct_character_voice,Distinct Character Voice,dialogue,,low,low,T3,keep — the rule's own text admits stylometry is unreliable here,False
+dialogue.json,stc_laying_pipe,Laying Pipe (Exposition Through Action),dialogue,,high,medium,T2,"'feels unnatural' is a judgment, and it duplicates a medium rule",True
+dialogue.json,martell_dialogue_is_character,Dialogue Is Character,dialogue,,high,low,T3,the same test as distinct_character_voice (low) — cover the names and read,True
+dialogue.json,martell_say_the_opposite,Say the Opposite (Subtext Through Contradiction),dialogue,,high,medium,T2,subtext-through-contradiction is a pattern; 'overuse' is a call,True
+dialogue.json,martell_three_line_rule,Three Line Rule (Dialogue Brevity),dialogue,,high,high,T1,keep — 'four or more lines without interruption' is countable,False
+dialogue.json,martell_see_and_say_rule,See and Say Rule (Don't Repeat What Was Shown),dialogue,,high,medium,T2,retelling what we just saw is observable; 'pure redundancy' is a call,True
+dialogue.json,martell_five_types_bad_exposition,Five Types of Bad Exposition,dialogue,,high,medium,T2,five named patterns are observable; whether one is present is judged,True
+dialogue_advanced.json,dialogue_subtext_layers,Dialogue Contains Multiple Subtext Layers,dialogue,,high,medium,T2,duplicates on_the_nose_vs_subtext (medium); the two must agree,True
+dialogue_advanced.json,dialogue_rhythm_pacing,Dialogue Rhythm Affects Pacing,dialogue,,high,medium,T2,'does rhythm match emotional intent' is an interpretive read,True
+dialogue_advanced.json,dialogue_voice_distinct,Each Character Has Distinct Voice,dialogue,,high,low,T3,duplicates distinct_character_voice (low); the two must agree,True
+dialogue_advanced.json,dialogue_conflict_essential,Every Dialogue Scene Needs Conflict,dialogue,,high,medium,T2,competing goals are observable; 'just conversation' is a judgment,True
+dialogue_advanced.json,dialogue_purpose_driven,Every Line Must Have Purpose,dialogue,,high,medium,T2,"'every line must serve a purpose' cannot be tested, only argued",True
+dialogue_advanced.json,dialogue_exposition_disguised,Exposition Must Be Disguised,dialogue,,high,medium,T2,duplicates exposition_as_ammunition (medium); 'feels natural' is a call,True
+dialogue_advanced.json,dialogue_emotional_leakage,Emotions Leak Through Dialogue,dialogue,,high,medium,T2,leakage through word choice is an interpretation of the line,True
+dialogue_advanced.json,dialogue_interrupts_overlaps,Interruptions and Overlaps Create Realism,dialogue,,high,medium,T2,interruptions are observable; 'feels authentic' is a judgment,True
+dialogue_advanced.json,dialogue_silence_powerful,Silence Can Be Most Powerful Dialogue,dialogue,,high,low,T3,'what is unsaid communicates volumes' is the definition of a taste call,True
+dialogue_advanced.json,dialogue_callbacks_payoffs,Dialogue Callbacks Create Cohesion,dialogue,,high,medium,T2,a callback is observable; whether it 'creates meaning' is a call,True
+dialogue_advanced.json,dialogue_power_dynamics,Dialogue Reveals Power Dynamics,dialogue,,high,medium,T2,who interrupts whom is observable; the status reading is interpretive,True
+dialogue_advanced.json,dialogueGMEMATICultural,Dialogue Reflects Cultural Context,dialogue,,high,medium,T2,'authentic to the character's background' is a judgment (also: the rule id is malformed — see findings),True
+drama.json,drama_emotional_authenticity,Emotional Authenticity Over Plot Mechanics,story_macro,drama,high,low,T3,'react authentically' is a verdict about emotional truth,True
+drama.json,drama_moral_complexity,Moral Complexity in Character Choices,character,drama,high,low,T3,'genuine moral dilemmas' and 'no easy answers' are taste calls,True
+drama.json,drama_internal_conflict_primary,Internal Conflict Drives Drama,plot_thread,drama,high,medium,T2,'is the internal struggle primary' is an interpretive reading,True
+drama.json,drama_dialogue_subtext,Dramatic Dialogue Contains Subtext,dialogue,drama,high,medium,T2,duplicates the medium subtext rules,True
+drama.json,drama_relationships_drive_plot,Relationships Drive Plot in Drama,plot_thread,drama,high,medium,T2,'feels organic rather than contrived' is a judgment,True
+drama.json,drama_stakes_personal,Drama Stakes Are Personal,plot_thread,drama,high,medium,T2,the stakes mode is observable; 'matters emotionally' is a call,True
+drama.json,drama_pacing_meditative,Drama Allows Meditative Pacing,structure_pacing,drama,high,low,T3,'adequate time' and 'not rushed' are pace preferences,True
+drama.json,drama_transformation_earned,Character Transformation Must Be Earned,character,drama,high,low,T3,'feels false' / 'earned' is the archetypal subjective verdict,True
+drama.json,drama_ambiguity_preserved,Drama Preserves Ambiguity,story_macro,drama,high,low,T3,'appropriate ambiguity' is a taste judgment about resolution style,True
+drama.json,drama_ensemble_depth,Ensemble Characters Have Depth,character,drama,high,medium,T2,'complete people vs plot functions' is a reading of the supporting cast,True
+drama.json,drama_consequences_real,Drama Has Real Consequences,plot_thread,drama,high,medium,T2,lasting consequences are observable; 'real' has no test,True
+horror.json,horror_discovery_phase_no_urgency,Discovery Phase Needs Time to Breathe,scene,horror,high,medium,T2,'rushed vs milked for dread' is a pacing judgment,True
+horror.json,horror_tone_set_immediately,First Page Sets Horror Tone,story_macro,horror,high,medium,T2,tonal imagery is observable; 'tonally mismatched' is a call,True
+horror.json,horror_reel_event_requirement,Every Reel Must Have a Horror Payoff,structure_pacing,horror,high,medium,T2,the partition is mechanical; 'a major horror event' is a judgment,True
+horror.json,horror_virgin_archetype,The Virgin Survivor Archetype,character,horror,medium,medium,T2,"keep — the rule itself calls it a convention, not a requirement",False
+horror.json,horror_monster_defeat,Central Struggle Against Monster,plot_thread,horror,high,medium,T2,'genuinely overwhelming' and 'survival uncertain' are judged,True
+horror.json,horror_stakes_physical_death,Physical Death at Stake,plot_thread,horror,high,high,T1,presence of a stakes mode is a bounded yes/no,False
+horror.json,horror_rules_established_early,Horror World Rules Established Early,story_macro,horror,high,medium,T2,the first 10-15 pages are locatable; 'clearly established' is a call,True
+horror.json,horror_tension_building,Tension Builds Through Unanswered Questions,structure_pacing,horror,high,medium,T2,withholding is observable; 'builds tension' is a judgment,True
+horror.json,horror_atmosphere_over_dialogue,Atmosphere Over Dialogue,scene,horror,high,low,T3,"'enhance, not replace' is an aesthetic verdict",True
+horror.json,horror_vulnerability_escalation,Vulnerability Escalates Through Isolation,plot_thread,horror,high,medium,T2,ally attrition is observable; 'increasingly isolated' is a reading,True
+horror.json,horror_final_girl_strength,Final Girl Must Earn Survival,character,horror,high,low,T3,'earned rather than arbitrary' is a taste verdict,True
+horror.json,horror_ordinary_world_horror,Ordinary World Must Contrast Horror,story_macro,horror,high,medium,T2,the ordinary-world setup is observable; 'contrast' is a reading,True
+mystery.json,mystery_clue_game,Riddle as Game Between Writer and Audience,story_macro,mystery,high,medium,T2,clue intervals are observable; 'fair but challenging' is a judgment,True
+mystery.json,mystery_foreshadowed_surprises,Surprises Must Be Foreshadowed,plot_thread,mystery,high,medium,T2,setup for a twist is locatable; 'adequately foreshadowed' is a call,True
+mystery.json,mystery_logline_clarity,Mystery Logline Must Be Clear,story_macro,mystery,high,medium,T2,"'articulable in one sentence' is a test on the logline, not the script",True
+mystery.json,mystery_reveal_timing,Explanation Before Climax,structure_pacing,mystery,high,medium,T2,the reveal position is locatable; 'enough time to process' is a call,True
+mystery.json,mystery_red_herrings,Red Herrings Must Be Fair,plot_thread,mystery,high,low,T3,"'fair, not cheating' and 'satisfying' are reader-experience verdicts",True
+mystery.json,mystery_detective_competence,Detective Must Be Competent,character,mystery,high,medium,T2,investigative acts are observable; 'competent' is a judgment,True
+mystery.json,mystery_stakes_personal,Mystery Stakes Must Be Personal,plot_thread,mystery,high,medium,T2,personal stakes are observable; 'emotional investment' is a call,True
+mystery.json,mystery_atmosphere_tension,Mystery Atmosphere Creates Tension,scene,mystery,high,low,T3,'appropriate atmosphere' is a mood verdict,True
+mystery.json,mystery_solution_satisfying,Mystery Solution Must Be Satisfying,story_macro,mystery,high,low,T3,the rule is named 'Must Be Satisfying' — the definition of subjective,True
+mystery.json,mystery_pacing_controlled,Mystery Pacing Is Controlled,structure_pacing,mystery,high,low,T3,'rushing or dragging' is a pace preference,True
+mystery.json,mystery_multiple_suspects,Multiple Suspects Create Depth,character,mystery,high,medium,T2,suspect count is observable; 'each is plausible' is a judgment,True
+pitch.json,stc_logline_four_requirements,Logline Must Meet Four Requirements,pitch,,high,high,T1,"keep — four named elements, present or absent; a checklist",False
+pitch.json,beaty_logline_needs_act_two,Logline Must Indicate Act Two (The Journey),pitch,,high,medium,T2,'does it convey the journey' is a reading of the logline,True
+pitch.json,beaty_logline_specific_detail,"Logline Needs Specific, Not Generic, Detail",pitch,,high,medium,T2,generic vs specific nouns is observable; 'lazy' is a judgment,True
+plot_thread.json,chekhovs_gun,Chekhov's Gun,plot_thread,,medium,medium,T2,keep — the rule itself requires filtering emphasis from set-dressing,False
+plot_thread.json,setup_payoff_general,General Setup and Payoff,plot_thread,,low,low,T3,keep — the rule's own text says flag as a discussion point,False
+plot_thread.json,subplot_resonance_or_contradiction,Subplot Function (Resonance or Contradiction),plot_thread,,low,low,T3,keep — thematic relation is the most interpretive of readings,False
+plot_thread.json,progressive_complications_no_repetition,Progressive Complications Without Repetition,plot_thread,,low,low,T3,keep — 'compounds or merely repeats' is a structural judgment,False
+plot_thread.json,no_coincidental_resolution,No Coincidental Resolution,plot_thread,,medium,medium,T2,"keep — 'was the mechanism set up earlier' is checkable, genre-dependent",False
+plot_thread.json,egri_character_incontrovertible,Character in Incontrovertible Confrontation,plot_thread,,medium,medium,T2,keep — 'could walk away' vs 'rooted in who they are' is interpretive,False
+plot_thread.json,seger_subplot_resonance,Subplots Must Resonate with Main Plot,plot_thread,,high,medium,T2,same test as subplot_resonance_or_contradiction; the two must agree,True
+plot_thread.json,martell_four_ds,"The Four Ds: Inside Moves (Dilemma, Denial, Decision, Drama)",plot_thread,,high,medium,T2,stage coverage is observable; 'genuine dilemmas' is a judgment,True
+plot_thread.json,martell_plants_and_payoffs,Plants Must Pay Off,plot_thread,,high,medium,T2,the same setup/payoff test as chekhovs_gun (medium),True
+plot_thread.json,hauge_five_stakes_levels,Five Levels of Stakes,plot_thread,,high,medium,T2,counting stake levels is observable; 'too small' is a judgment,True
+plot_thread.json,lyons_story_spine,"The Story Spine (Because of That, Not And Then)",plot_thread,,high,medium,T2,"'could this scene be removed' is a causality argument, not a test",True
+plot_thread.json,alderson_cause_and_effect_scenes,Scenes Must Be Linked by Cause and Effect,plot_thread,,high,medium,T2,same causality argument as lyons_story_spine,True
+plot_thread.json,cron_external_plot_spur,The External Plot Must Spur the Internal Struggle,plot_thread,,high,medium,T2,linking plot events to the internal misbelief is an interpretive reading,True
+power_dynamics.json,power_law_out_of_sight,"Out of Sight, Out of Mind",psychology,,high,medium,T2,deliberate absence is observable; 'weaponized' is an inference,True
+power_dynamics.json,power_conceal_intentions,Conceal Your Intentions,psychology,,high,medium,T2,hidden purpose is observable; the manipulative reading is a judgment,True
+power_dynamics.json,power_boldness_boldness,"Be Bold, Be Bold",psychology,,medium,medium,T2,keep — a risky action is observable; 'strategic vs reckless' is a call,False
+power_dynamics.json,power_selective_honesty,Selective Honesty and Generosity,psychology,,high,medium,T2,the kind act is observable; 'part of a larger pattern' is an inference,True
+power_dynamics.json,power_play_to_fantasies,Play to People's Fantasies,psychology,,high,medium,T2,'appeals to fantasy rather than evidence' is a reading,True
+power_dynamics.json,power_reputation,Guard Your Reputation,psychology,,high,medium,T2,reputation management is observable; 'extreme' is a judgment,True
+power_dynamics.json,power_crush_sentimentality,Crush Sentimentality,psychology,,medium,medium,T2,keep — a cold choice is observable; 'wrong choice' is the narrative's call,False
+psychology.json,cron_story_is_internal_struggle,"Story Is the Internal Struggle, Not the External Plot",psychology,,high,medium,T2,linking events to an internal change is an interpretive reading,True
+psychology.json,cron_before_story_starts,Every Story Begins In Medias Res of the Inner Story,psychology,,high,medium,T2,'no visible wound' is a reading of absence — always a judgment,True
+psychology.json,bell_fictive_dream,The Goal Is the Fictive Dreamâ€”Transport the Reader,psychology,,high,low,T3,'authorial presence' and 'sustains the dream' are taste verdicts,True
+psychology.json,cognitive_bias_anchoring,Anchoring Effect,psychology,,high,medium,T2,'disproportionately influenced' has no threshold; it is a reading,True
+psychology.json,cognitive_bias_confirmation,Confirmation Bias,psychology,,high,medium,T2,selective noticing is observable; 'filtering evidence' is an inference,True
+psychology.json,cognitive_bias_availability,Availability Heuristic,psychology,,high,medium,T2,'dramatically overestimates' is a judgment about a character's reasoning,True
+psychology.json,cognitive_bias_loss_aversion,Loss Aversion,psychology,,high,medium,T2,"'far past the point of reason' is a verdict, not a test",True
+psychology.json,cognitive_bias_sunk_cost,Sunk Cost Fallacy,psychology,,high,medium,T2,the stated rationale is observable; whether it is the fallacy is a call,True
+psychology.json,cognitive_bias_fundamental_attribution,Fundamental Attribution Error,psychology,,high,medium,T2,the double standard is observable; 'genuinely accurate' is a judgment,True
+psychology.json,cognitive_bias_halo_effect,Halo Effect,psychology,,high,medium,T2,'no logical connection' is an argument about the narrative's logic,True
+psychology.json,manipulation_anchoring_persuasion,Anchoring in Persuasion,psychology,,high,medium,T2,the outrageous opening offer is observable; intent is inferred,True
+psychology.json,manipulation_gaslighting,Gaslighting,psychology,,high,medium,T2,repeated denial is observable; the pattern claim is interpretive,True
+psychology.json,manipulation_isolation,Isolation as Control,psychology,,high,medium,T2,discouraging contact is observable; 'strategic vs situational' is a call,True
+psychology.json,manipulation_love_bombing,Love Bombing,psychology,,high,medium,T2,intensity is observable; 'genuine vs performative' is a judgment,True
+psychology.json,manipulation_foot_in_door,Foot-in-the-Door Technique,psychology,,high,medium,T2,escalating asks are observable; 'harmless vs deliberate' is a call,True
+psychology.json,manipulation_scarcity,Scarcity Principle,psychology,,high,medium,T2,'artificial urgency' requires inferring the character's intent,True
+psychology.json,profiling_baseline_shift,Baseline-to-Shift Detection,psychology,,high,medium,T2,a deviation from baseline is observable; the internal cause is inferred,True
+psychology.json,profiling_deception_indicators,Deception Indicator Clusters,psychology,,high,medium,T2,the clusters are observable; deception itself is never provable from text,True
+psychology.json,profiling_dominance_posture,Dominance and Submission Postures,psychology,,high,medium,T2,posture is observable; the power reading is interpretive,True
+psychology.json,profiling_emotional_triggers,Emotional Trigger Mapping,psychology,,high,medium,T2,'disproportionate' is the judgment; the reaction itself is observable,True
+psychology.json,psych_big_five_trait,Big Five Personality Traits,psychology,,high,medium,T2,assigning an OCEAN profile is an interpretation of behaviour,True
+psychology.json,psych_social_learning,Social Learning Theory,psychology,,medium,medium,T2,keep — imitating a model is observable; 'internalised' is inferred,False
+psychology.json,psych_maslow_hierarchy,Maslow's Hierarchy of Needs,psychology,,high,medium,T2,the need shift is observable; which rung is at stake is a reading,True
+psychology.json,psych_cognitive_dissonance,Cognitive Dissonance,psychology,,high,medium,T2,'rationalises a choice they know is wrong' requires reading interiority,True
+psychology.json,psych_classical_conditioning,Classical Conditioning,psychology,,medium,medium,T2,keep — a conditioned response is observable; the pairing is inferred,False
+psychology.json,psych_operant_conditioning,Operant Conditioning and Reinforcement Schedules,psychology,,high,medium,T2,'clearly being shaped' is a judgment about causality,True
+psychology.json,psych_eros Thanatos,Eros vs. Thanatos (Life and Death Drives),psychology,,medium,medium,T2,keep — a Freudian reading; the rule id is also malformed (see findings),False
+psychology.json,criminal_psychopathy_traits,Psychopathic Personality Traits,psychology,,high,medium,T2,diagnosing a personality disorder from a script is a clinical judgment,True
+psychology.json,criminal_psychopathy_mask,The Psychopathic Mask of Sanity,psychology,,high,medium,T2,'mask slips only when unobserved' is an inference about private moments,True
+psychology.json,criminal_antisocial_pattern,Antisocial Behavior Pattern,psychology,,high,medium,T2,"'persistent pattern across contexts' is a diagnostic threshold, not a test",True
+psychology.json,criminal_offender_profiling,Crime Scene Personality Indicators,psychology,,medium,medium,T2,keep — the rule itself says flag only when the evidence is unambiguous,False
+psychology.json,shadow_concept,The Shadow Self,psychology,,high,low,T3,'the rejected part of the self' is a depth-psychology interpretation,True
+psychology.json,shadow_projection,Shadow Projection,psychology,,high,low,T3,'we see in others what we deny in ourselves' cannot be tested from text,True
+psychology.json,shadow_denial_destruction,Shadow Denial Leads to Destruction,psychology,,high,low,T3,the dam-break reading is a psychoanalytic verdict,True
+psychology.json,shadow_integration,Shadow Integration,psychology,,high,low,T3,'superficial integration' is an unfalsifiable quality call,True
+psychology.json,enneagram_core_motivation,Enneagram Core Motivation and Fear,psychology,,medium,medium,T2,keep — a single underlying fear is an interpretive through-line,False
+psychology.json,enneagram_stress_direction,Enneagram Stress and Growth Directions,psychology,,medium,medium,T2,keep — typing behaviour under stress is interpretive,False
+psychology.json,enneagram_wing_influence,Enneagram Wing Influence,psychology,,low,low,T3,keep — the rule itself says it needs expert knowledge to identify,False
+psychology.json,enneagram_vice_passion,Enneagram Vice and Passion,psychology,,medium,medium,T2,keep — the chronic emotional lens is an interpretive pattern,False
+psychology.json,enneagram_blind_spot,Enneagram Blind Spot,psychology,,medium,medium,T2,keep — a blind spot is inferred from what the character fails to notice,False
+psychology.json,jung_introversion_extraversion,Introversion-Extraversion Spectrum,psychology,,high,medium,T2,energy direction is inferred; the rule itself warns against conflating skill,True
+psychology.json,jung_four_functions,Four Psychological Functions,psychology,,medium,medium,T2,keep — a dominant cognitive function is an interpretive claim,False
+psychology.json,jung_persona_shadow,Persona vs. Shadow,psychology,,high,medium,T2,the persona crack is observable; the Shadow reading is interpretive,True
+psychology.json,jung_individuation,Individuation as Character Arc,psychology,,high,medium,T2,'toward integration' is a reading of the arc's direction,True
+psychology.json,jung_compensation,Psychic Compensation,psychology,,medium,medium,T2,"keep — an unconscious origin is asserted, not observable",False
+psychology.json,jung_collective_unconscious,Collective Unconscious and Archetypes,psychology,,medium,medium,T2,keep — archetype recognition is inherently interpretive,False
+psychology.json,stress_personality_default,Default Stress Response Pattern,psychology,,high,medium,T2,regression under stress is observable; 'core vulnerability' is inferred,True
+psychology.json,stress_understress_behavior,Uncharacteristic Under-Stress Behavior,psychology,,high,medium,T2,'surprises everyone including themselves' is a judgment about character,True
+relationship.json,antagonist_force_balance,Antagonistic Force of Comparable Power,relationship,,low,low,T3,keep — 'credible pressure' and 'earned' are verdicts,False
+relationship.json,relationship_dynamic_consistency,Relationship Dynamic Consistency,relationship,,low,low,T3,keep — 'significant' change between scenes is a judgment of degree,False
+revision.json,epps_revision_first_draft,"First Draft Is Discovery, Not Perfection",revision,,medium,medium,T2,"keep — a process rule, judged from the draft's surface",False
+revision.json,epps_rewrite_distance,Rewriting Requires Emotional Distance,revision,,medium,medium,T2,"keep — a process rule; the sig reads symptoms, not a test",False
+revision.json,stein_four_dangers_of_telling,"Four Danger Areas of Telling: Backstory, Description, Setting, Emotion",revision,,high,high,T1,"keep — the sig is a lexical pattern ('She felt...', 'He remembered...')",False
+revision.json,zinsser_dump_the_clutter,Dump the Clutterâ€”Every Word Must Earn Its Place,revision,,high,high,T1,keep — qualifier/redundancy lists are greppable,False
+romance.json,romance_adult_children_opening,Lovers Introduced as Adult Children,story_macro,romance,high,low,T3,a dubious 'almost always' convention; asserting it would be dishonest,True
+romance.json,romance_theme_love,Theme Must Be Love-Related,story_macro,romance,high,medium,T2,'is the theme love-related' is a reading of the thematic through-line,True
+romance.json,romance_midpoint_no_return,Midpoint as Point of No Return,structure_pacing,romance,high,medium,T2,midpoint placement is mechanical; 'a milestone' is interpretive,True
+romance.json,romance_trivial_stakes_comedy,Romance Stakes Must Feel Life-or-Death,plot_thread,romance,high,medium,T2,disproportionate gravity is observable; 'believes it matters' is not,True
+romance.json,romance_psychological_death_stakes,Psychological Death as Romance Stakes,plot_thread,romance,high,medium,T2,'feels genuinely life-altering' is a judgment,True
+romance.json,romance_enemies_to_lovers,Enemies-to-Lovers Requires Genuine Friction,plot_thread,romance,high,medium,T2,'genuine friction vs contrived misunderstanding' is a call,True
+romance.json,romance_third_act_breakup,Third Act Breakup Must Be Earned,structure_pacing,romance,high,medium,T2,"'caused by internal flaw, not external misunderstanding' is a reading",True
+romance.json,romance_grand_gesture,Grand Gesture Must Be Personal,scene,romance,high,low,T3,"'personal, not generic' and 'earned' are taste verdicts",True
+romance.json,romance_complementary_flaws,Romantic Leads Have Complementary Flaws,character,romance,high,medium,T2,'flaws that complement' is an interpretation of character design,True
+romance.json,romance_emotional_vulnerability,Emotional Vulnerability Required,character,romance,high,medium,T2,vulnerability is observable; 'risks emotional exposure' is a reading,True
+romance.json,romance_satisfying_resolution,Romance Resolution Must Be Satisfying,story_macro,romance,high,high,T1,keep — the sig reduces to a bounded check: does the couple end together,False
+scene.json,scene_must_turn,Every Scene Must Turn,scene,,medium,medium,T2,"keep — the value shift is a reading, but a narrow and well-specified one",False
+scene.json,goal_conflict_disaster,"Scene Structure: Goal, Conflict, Disaster",scene,,medium,medium,T2,keep — identifying goal/opposition/outcome is a bounded per-scene read,False
+scene.json,obligatory_scene,The Obligatory Scene,scene,,low,low,T3,"keep — the rule itself says flag for discussion, not as a defect",False
+scene.json,enter_late_leave_early,"Enter Late, Leave Early",scene,,low,low,T3,keep — 'skippable padding' is a taste call,False
+scene.json,scene_necessity_test,Scene Necessity (Plot / Character / Theme Test),scene,,low,low,T3,keep — 'none of the three is clearly present' is a judgment,False
+scene.json,lakin_scene_hook,Scene Must Hook at Start and Leave with Tension,scene,,high,medium,T2,the opening/closing beats are observable; 'grabs attention' is a call,True
+scene.json,bell_opening_cromise,The Opening Must Make a Promise to the Reader,scene,,high,medium,T2,the opening page is locatable; 'creates a sense of' is a judgment,True
+scene.json,alderson_scene_tracker_elements,Every Scene Must Track Seven Essential Elements,scene,,high,medium,T2,seven named elements are checkable; 'accomplishes all seven' is a call,True
+scene.json,alderson_dramatic_vs_passive,Prefer Dramatic Action Over Passive Action,scene,,high,medium,T2,'dominated by passive action' is a judgment of degree,True
+scene.json,stein_dynamic_description,"Descriptions Should Be Dynamic, Not Static",scene,,high,medium,T2,static description blocks are observable; the rewrite advice is craft,True
+scene.json,weiland_characteristic_moment,The Characteristic Moment Must Establish the Protagonist Immediately,scene,,high,medium,T2,"'a failed Characteristic Moment' is an assessment, not a test",True
+scene.json,weiland_normal_world,The Normal World Must Demonstrate the Lie in Action,scene,,high,medium,T2,'demonstrates the Lie' is an interpretive link to character interior,True
+scene_design.json,lyons_scene_is_story,Each Scene Is a Mini-Story,scene,,high,medium,T2,'feels static' / 'wasted opportunity' is an assessment of the scene,True
+scene_design.json,dunne_scene_objective,Every Scene Has a Clear Objective and Obstacle,scene,,high,medium,T2,objective and obstacle are locatable; 'formidable enough' is a judgment,True
+scene_design.json,lakin_five_layers,Five Layers of Scene Construction,scene,,medium,medium,T2,keep — counting addressed layers is observable; 'genuinely thin' is a call,False
+scifi.json,scifi_concept_simplicity,Keep Sci-Fi Concepts Simple,story_macro,scifi,high,medium,T2,'can it be explained in one sentence' is a test on the logline,True
+scifi.json,scifi_rules_established_early,World Rules Must Be Established Early,story_macro,scifi,high,medium,T2,the first 10-15 pages are locatable; 'crisply' is a judgment,True
+scifi.json,scifi_simple_logline,Sci-Fi Logline Must Be Understandable,story_macro,scifi,high,medium,T2,same logline test; 'immediately understandable' is a call,True
+scifi.json,scifi_relationship_to_technology,Sci-Fi Themes Explore Man vs Technology,story_macro,scifi,high,low,T3,'technology as a mirror' is a thematic-quality verdict,True
+scifi.json,scifi_man_vs_nature,Sci-Fi Can Be Man vs Nature,plot_thread,scifi,high,medium,T2,the conflict mode is observable; 'indifferent or hostile' is a reading,True
+scifi.json,scifi_grounding_reality,Sci-Fi Must Ground in Human Reality,character,scifi,high,low,T3,'recognizable human emotions' and 'audience connects' are taste verdicts,True
+scifi.json,scifi_exposition_through_action,Sci-Fi Exposition Through Action,scene,scifi,high,medium,T2,demonstration vs dialogue is observable; 'minimal' is a judgment,True
+scifi.json,scifi_visual_storytelling,Sci-Fi Requires Strong Visual Storytelling,scene,scifi,high,medium,T2,the balance of shown vs told is observable; 'primary' is a call,True
+scifi.json,scifi_emotional_core,Sci-Fi Must Have Emotional Core,story_macro,scifi,high,low,T3,'recognizable emotional core' is a quality verdict,True
+scifi.json,scifi_consequences_realistic,Sci-Fi Consequences Must Feel Real,plot_thread,scifi,high,medium,T2,'benefits come with costs' is a reading of the world's logic,True
+story_macro.json,controlling_idea,Controlling Idea (Theme as Cause-and-Effect Statement),story_macro,,low,low,T3,keep — the rule's own text names it a discussion prompt,False
+story_macro.json,theme_contradiction,Theme Contradiction Without Earned Justification,story_macro,,low,low,T3,keep — 'unintended vs deliberate irony' is the hardest reading in the KB,False
+story_macro.json,genre_convention_fulfillment,Genre Convention Fulfillment,story_macro,,low,low,T3,keep — and note this is the GENERIC form of the 90 genre rules tagged high,False
+story_macro.json,world_rule_consistency,World-Building Rule Consistency,story_macro,,medium,medium,T2,"keep — 'violated without acknowledgment' is checkable, but reading a violation needs interpretation",False
+structure_pacing.json,three_act_structure,Three-Act Structure,structure_pacing,,medium,high,T1,raised from medium: the README's own example of a high rule is 'does this beat exist within its expected page range' — this is that check,True
+structure_pacing.json,save_the_cat_15_beats,Save the Cat 15-Beat Sheet,structure_pacing,,medium,high,T1,raised from medium: 15 named beats each against a target percentage range,True
+structure_pacing.json,heros_journey_12_stages,Hero's Journey (12 Stages),structure_pacing,,low,medium,T2,"raised from low: stage identification is interpretive, but not pure taste",True
+structure_pacing.json,mckee_five_part_design,Five-Part Story Design,structure_pacing,,medium,medium,T2,keep — escalation and a genuine dilemma are readings,False
+structure_pacing.json,pacing_escalation,Escalation of Conflict (Law of Conflict),structure_pacing,,low,medium,T2,raised from low: 'same-magnitude obstacles' is an observable pattern,True
+structure_pacing.json,opening_closing_bookend,Opening/Closing Image Bookend,structure_pacing,,low,medium,T2,raised from low: 'is there a deliberate echo' is observable,True
+structure_pacing.json,gulino_sequence_climax,Sequence Approach: Each Sequence Has Its Own Mini-Climax,structure_pacing,,high,medium,T2,the 8-sequence partition is mechanical; a 'mini-climax' is a judgment,True
+structure_pacing.json,gulino_dramatic_question,Each Sequence Must Raise and Answer a Dramatic Question,structure_pacing,,high,medium,T2,"raising and answering a question per sequence is observable, but 'clear' is a call",True
+structure_pacing.json,martell_act_two_conflict,Act Two Is the Conflict Act,structure_pacing,,high,medium,T2,'feels like a stall' is an assessment of the act,True
+structure_pacing.json,martell_deadlines_drive_momentum,Deadlines Drive Act Two Momentum,structure_pacing,,high,medium,T2,a deadline is locatable; 'implied urgency' is a judgment,True
+structure_pacing.json,martell_know_your_destination,Know Your Ending Before You Write,structure_pacing,,high,low,T3,a process rule; 'scenes feel aimless' is a taste verdict,True
+structure_pacing.json,bell_lock_system,"LOCK System: Lead, Objective, Confrontation, Knockout",structure_pacing,,high,medium,T2,four named elements are checkable; 'interesting enough' is a judgment,True
+structure_pacing.json,bell_midpoint_shift,The Midpoint Shifts the Story from Reaction to Action,structure_pacing,,high,medium,T2,reaction-to-action is observable; the rule text also carries mojibake,True
+structure_pacing.json,alderson_false_summit,The False Summit Before the True Climax,structure_pacing,,medium,medium,T2,keep — a false summit is locatable; 'requires' is genre-dependent,False
+theme.json,martell_theme_through_characters,Theme Expressed Through Character Choices,theme,,high,medium,T2,whether theme is dramatised vs stated is an observable structural pattern,True
+theme.json,weiland_theme_from_arc,Theme Emerges from the Character's Arc,theme,,high,low,T3,the sig is 'feels preachy or disconnected' — a taste verdict,True
+thriller.json,thriller_contained_premise,Contained Thriller Structure,story_macro,thriller,high,medium,T2,a single primary location is observable; 'inherently dramatic' is a claim,True
+thriller.json,thriller_characters_active,Characters Must Be Active in Contained Thrillers,character,thriller,high,medium,T2,tracking character action is observable; 'worst offense' is a verdict,True
+thriller.json,thriller_active_protagonist,Protagonist Must Be Active,character,thriller,high,medium,T2,same test as action_hero_must_be_active; the two must agree,True
+thriller.json,thriller_things_go_wrong,Escalating Things Going Wrong,plot_thread,thriller,high,medium,T2,same test as action_escalation_constant; the two must agree,True
+thriller.json,thriller_villain_strength,Strong Villain Required,character,thriller,high,low,T3,same test as action_villain_strength (low); 'formidable' is a verdict,True
+thriller.json,thriller_bonding_moment,Ensemble Bonding Scene,scene,thriller,high,medium,T2,a bonding scene is locatable; 'we feel the deaths' is a judgment,True
+thriller.json,thriller_locked_in_by_act_end,Protagonist Must Be Locked In by Act I End,structure_pacing,thriller,high,medium,T2,'cannot walk away' is locatable at the act break; 'catastrophic' is a call,True
+thriller.json,thriller_physical_death_stakes,Physical Death at Stake,plot_thread,thriller,high,high,T1,presence of a stakes mode is a bounded yes/no,False
+thriller.json,thriller_villain_drives_plot,Villain Drives the Plot,plot_thread,thriller,high,medium,T2,who initiates plot movement is observable; 'driving force' is a call,True
+thriller.json,thriller_unexpected_complications,Every Plan Must Have Unexpected Complications,plot_thread,thriller,high,medium,T2,plan setbacks are observable; 'every plan' is an absolute,True
+thriller.json,thriller_ticking_clock,Ticking Clock Creates Urgency,structure_pacing,thriller,high,medium,T2,a deadline is locatable; 'creates genuine urgency' is a judgment,True
+thriller.json,thriller_reversals_escalate,Reversals Must Escalate Stakes,plot_thread,thriller,high,medium,T2,reversals are locatable; whether stakes rose is an assessment,True
+visual_storytelling.json,visual_show_dont_tell,Show Don't Tell Through Visuals,scene,,high,medium,T2,'could this be shown' is a craft judgment on each passage,True
+visual_storytelling.json,visual_camera_angles_convey_perspective,Camera Angles Convey Perspective,scene,,high,medium,T2,angles are observable; 'match the emotional intent' is a reading,True
+visual_storytelling.json,visual_shot_size_emphasis,Shot Size Controls Emphasis,scene,,high,medium,T2,shot sizes are observable; 'directs attention appropriately' is a call,True
+visual_storytelling.json,visual_lighting_mood,Lighting Establishes Mood,scene,,high,low,T3,'supports the mood' is an aesthetic verdict,True
+visual_storytelling.json,visual_composition_framing,Composition Frames Character Relationships,scene,,high,medium,T2,framing is observable; the relationship reading is interpretive,True
+visual_storytelling.json,visual_color_symbolism,Color Can Symbolize Theme,scene,,medium,medium,T2,keep — a recurring colour is observable; 'reinforces theme' is a reading,False
+visual_storytelling.json,visual_movement_choreography,Movement Conveys Character State,scene,,high,medium,T2,movement is observable; the emotional attribution is an inference,True
+visual_storytelling.json,visual_ellipsis_time_passage,Visual Ellipsis for Time Passage,structure_pacing,,high,medium,T2,a montage/dissolve is observable; 'effectively compresses' is a judgment,True
+visual_storytelling.json,visual_sound_design_atmosphere,Sound Design Creates Atmosphere,scene,,high,medium,T2,sound cues are observable; 'enhances atmosphere' is a judgment,True
+visual_storytelling.json,visual_props_meaningful,Props Can Carry Meaning,scene,,medium,medium,T2,keep — a prop's use is observable; 'carries weight' is a reading,False
+writing_habits.json,cron_story_genius_before_plot,Know the Protagonist's Inner Problem Before Creating the Plot,psychology,,medium,medium,T2,keep — the rule itself says flag only what is visible on the page,False
+writing_habits.json,cron_dopamine_hook,Effective Stories Trigger Curiosity-Driven Dopamine Response,psychology,,medium,medium,T2,keep — an unanswered question is locatable; 'hooks' is a judgment,False
+writing_habits.json,cron_pantsing_myth,"Writing Without a Blueprint Leads to Meandering, Aimless Stories",psychology,,medium,medium,T2,keep — a process rule read from the draft's structure,False
