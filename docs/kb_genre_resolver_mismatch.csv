@@ -1,0 +1,45 @@
+label,kb_genre_resolved,kb_rule_count,conventions_resolved,fragment_chars,verdict
+horror,horror,12,horror,9762,agree
+thriller,thriller,12,thriller,10389,agree
+romance,romance,11,romance,8943,agree
+comedy,comedy,12,comedy,9855,agree
+action,action,11,action,8035,agree
+drama,drama,11,drama,8211,agree
+mystery,mystery,11,mystery,8374,agree
+scifi,scifi,10,drama,7760,DISAGREE
+Sci-Fi,scifi,10,sci-fi,7760,DISAGREE
+Science Fiction,scifi,10,drama,7760,DISAGREE
+SF,scifi,10,drama,7760,DISAGREE
+Rom-Com,romance,11,drama,8943,DISAGREE
+Romantic Comedy,romance,11,comedy,8943,DISAGREE
+romantic,romance,11,drama,8943,DISAGREE
+suspense,thriller,12,drama,10389,DISAGREE
+Psychological Thriller,thriller,12,thriller,10389,agree
+crime,mystery,11,drama,8374,DISAGREE
+detective,mystery,11,drama,8374,DISAGREE
+whodunit,mystery,11,drama,8374,DISAGREE
+supernatural,horror,12,drama,9762,DISAGREE
+spy,thriller,12,drama,10389,DISAGREE
+period,drama,11,drama,8211,agree
+Drama / Thriller,drama,11,thriller,8211,DISAGREE
+Drama/Thriller,drama,11,thriller,8211,DISAGREE
+Thriller/Drama,drama,11,thriller,8211,DISAGREE
+Sci-Fi Thriller,scifi,10,thriller,7760,DISAGREE
+Horror-Comedy,comedy,12,horror,9855,DISAGREE
+horror comedy,comedy,12,horror,9855,DISAGREE
+action comedy,action,11,comedy,8035,DISAGREE
+Crime Drama,drama,11,drama,8211,agree
+romantic drama,drama,11,drama,8211,agree
+western,-,0,western,0,rules=none
+fantasy,-,0,fantasy,0,rules=none
+coming of age,-,0,drama,0,both fall back to drama
+noir,-,0,drama,0,both fall back to drama
+neo-noir,-,0,drama,0,both fall back to drama
+biopic,-,0,drama,0,both fall back to drama
+satire,-,0,drama,0,both fall back to drama
+mockumentary,-,0,drama,0,both fall back to drama
+docudrama,drama,11,drama,8211,agree
+interpretive dance documentary,-,0,drama,0,both fall back to drama
+,-,0,drama,0,n/a (empty)
+actionable,action,11,action,8035,agree
+dramatic,drama,11,drama,8211,agree

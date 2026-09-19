@@ -1937,3 +1937,108 @@ EVIDENCE
 - browser: smoke 18/18, token_mode 3/3, branch_ui 11/11, phase6 28/28.
 
 
+================================================================================
+GENRE PASS: how it is detected, how it routes, and where it breaks (ANALYSIS ONLY)
+================================================================================
+No product code changed. The KB is untouched. Two new docs; everything measured by
+running the shipped resolvers. Reproduce with:
+    python .workbuddy-ai/scratch/genre_mismatch.py
+
+THE QUESTION ASKED, ANSWERED FIRST
+"Are genre-tagged rules mapped to their genre so they fire only for that genre, with
+non-genre rules left as they are?" YES -- that is already the shipped behaviour, and it
+is stricter than described. is_genre_scoped() (rules_context.py:91-103) + the guard at
+:141 and :162 exclude every genre-tagged rule from every generic pass. Measured: 90
+genre-tagged rules, ZERO leak into a generic pass. The only caller passing
+include_genre_rules=True anywhere is a test (test_rules_grounding.py:404). Nothing to
+build here.
+
+HOW GENRE IS DETECTED
+Not a heuristic, not a classifier -- the model invents it. The coverage prompt
+(prompts.py:426-439) NEVER mentions genre: the system prompt is about coverage and the
+recommendation, the user prompt is only "Title / Author / Scene overview". What forces a
+genre to exist is the JSON grammar (grammar.py:178), and the grammar's string rule
+(grammar.py:39) is `char*`, so an EMPTY genre is schema-valid. genre.py:108 then reads
+coverage["genre"] raw -- no validation, no normalisation, no controlled vocabulary, no
+user confirmation. That single unconstrained string gates 90 of 263 rules (34.2%).
+
+THE FINDING: TWO RESOLVERS THAT CONTRADICT EACH OTHER
+KnowledgeBase.for_genre() (KB rules) and genre.conventions_for() (audience checklist)
+were written separately and are not kept in sync. for_genre has a hand-written alias
+table (knowledge_base.py:112-127); conventions_for has NO alias table. Measured over 44
+realistic labels: they DISAGREE on 20 (45%).
+
+  "Drama / Thriller"  -> KB: drama (11 rules)   conventions: THRILLER   <- opposite halves
+  "Horror-Comedy"     -> KB: comedy (12)        conventions: horror
+  "Sci-Fi Thriller"   -> KB: scifi (10)         conventions: thriller
+  "Romantic Comedy"   -> KB: romance (11)       conventions: comedy
+  "scifi"             -> KB: scifi (10)         conventions: DRAMA (!)
+  "Science Fiction"   -> KB: scifi (10)         conventions: drama
+  "Rom-Com"           -> KB: romance (11)       conventions: drama
+  "crime"/"spy"/"supernatural"/"detective"      conventions: drama
+
+"THE FIRST ROW IS NOT HYPOTHETICAL: `"Drama / Thriller"` is the exact label the real
+gun_pen_2 fixture produced." On that script the KB applies 11 drama rules while the
+checklist tests thriller conventions -- the thriller rules and the thriller conventions
+never meet.
+
+MECHANISM: for_genre path 2 walks its tag table in FILE order (action, comedy, drama, ...)
+and returns the first tag found as a substring, so "dramathriller" hits drama first.
+conventions_for walks its dict in LITERAL order, where "thriller" is the first key, so it
+hits thriller first. Two arbitrary iteration orders pointing opposite ways.
+
+ALSO MEASURED
+- The `scifi` trap: the KB tags rules "scifi"; the conventions dict keys its list
+  "sci-fi". conventions_for only lowercases, it does not strip punctuation, so "scifi"
+  misses the key and falls to drama. Only the hyphenated "Sci-Fi" hits it.
+- 9 realistic labels get ZERO genre rules: western, fantasy, coming of age, noir,
+  neo-noir, biopic, satire, mockumentary, anything unrecognised. western and fantasy are
+  the sharp ones -- GENRE_CONVENTIONS has full checklists for both (genre.py:59-70) but
+  the KB has no rules tagged for either, so those scripts get a genre pass with
+  conventions and no craft grounding.
+- Substring matching fires on derived words: "actionable" -> 11 action rules,
+  "dramatic" -> 11 drama rules, "docudrama" -> 11 drama rules.
+- The 90 rules are spread over six taxonomy levels (plot_thread 26, character 22,
+  story_macro 17, structure_pacing 13, scene 10, dialogue 2) and are ALL delivered in ONE
+  call, whose findings are all category "genre". So a horror script's 2 character-level
+  horror rules never reach the character pass -- their findings surface under "Genre
+  Conventions" (report.py:55), not "Character".
+- Per-pass cost of the exclusion: theme loses 17 of 23 rules (74%), plot_thread 26 of 39
+  (67%), character 22 of 105, structure 13 of 28, scene_function 10 of 39, dialogue 2 of 23.
+- The 8 genre files are 100% tagged. dialogue_advanced/story_macro/visual_storytelling
+  carry the FIELD but set it to null -- `grep -l '"genre"'` matches 11 files, only 8
+  carry tags (the grep matches the key). I checked each file before writing the 90 figure.
+- Empty genre -> the genre pass is skipped (pipeline.py:779) and the category is recorded
+  "failed" (pipeline.py:816-819). Disclosed, not hidden -- credit where due.
+- RulesContext.dialogue_rules_for_genre() (rules_context.py:270-292) is DEAD CODE -- no
+  caller in the repo. The only production consumer of prompt_fragment_for_genre is
+  genre.py:113-114.
+- CROSS-CUTTING (not genre-specific): to_prompt_fragment() (knowledge_base.py:58-75) never
+  emits the rule ID, yet CITATION_INSTRUCTION_SUMMARY (prompts.py:44) tells the model to
+  "set rule_id to that principle's id" and app.js:4171 renders it. The model is asked to
+  cite an id it was never shown. Affects all 263 rules.
+
+NOT MEASURED (stated as a limit, not glossed)
+- How often the model's genre label is RIGHT -- needs a live model and a labelled corpus.
+- Whether the label is STABLE across runs -- temperature is not pinned per field, so two
+  analyses of one script could apply different rules.
+- Whether the applied genre changes any finding -- unmeasurable without a live model.
+- The only real-data sample is n=2 (Clean_Bill_Probe "Drama", gun_pen_2 "Drama / Thriller").
+  One of the two is a hybrid that triggers the contradiction. That is an illustration of a
+  structural defect, NOT evidence about model accuracy.
+
+DELIVERABLES (docs only)
+- docs/KB_GENRE_ROUTING.md -- detection logic, the routing with measured numbers, the
+  failure table, the efficiency assessment split into measured vs unmeasured, a
+  two-voice brainstorm (consultant + co-writer) with genre-as-contract, the
+  filter/weight/lens argument, hybrid handling, and what to cut; then an 6-point
+  self-critique and 5 ranked options.
+- docs/kb_genre_resolver_mismatch.csv -- all 44 labels through both resolvers.
+
+PROCESS: two read-only subagents (a genre-routing auditor and a multi-genre writer voice).
+Every checkable claim they made was verified against the KB and the proposal CSV -- all
+held. One nuance corrected: the midpoint pair (comedy_midpoint_physical_intimacy,
+romance_midpoint_no_return) is filed at the SAME tier today (both high -> medium), so the
+duplication is real but the tiers do not diverge there.
+
+
