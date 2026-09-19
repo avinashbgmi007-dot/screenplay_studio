@@ -2408,3 +2408,57 @@ contract). Mutation check by FILE BACKUP with hash-verified restore (never `git 
   app.js + style.css restored, sha256sum -c: both OK
 
 PUSH: still stranded on the credential path. 8 attempts across five passes now.
+
+================================================================================
+2026-09-20 — Production-readiness audit + implementation (audit -> fix -> commit)
+================================================================================
+
+WHAT THIS SESSION DID
+Ran a full read-only E2E production-readiness audit (docs/audit/production_readiness_2026-09-20.md)
+with 5 specialist sub-agents + independent verification, then implemented the greenlit backlog and
+committed it. Two commits: 987d018 (P2.8 craft history — the pre-existing WIP layer) and c36ceae
+(the production-readiness pass), plus 6ffb6f7 (test rename to the new contract). Nothing pushed
+(credential path still stranded — same blocker the last passes recorded).
+
+THE VERDICT (audit): the core is within sight of v1 — 1323-test suite green, full offline journey
+runs (sample->parse->analyze->fixqueue->chat->export all 200 with no llama-server) — but three
+gates blocked shipping: a dishonest offline fallback, a silent edit-loss chain, and a red CI.
+
+WHAT THE AUDIT FOUND, AND WHAT SHIPPED (TDD: watched RED -> GREEN)
+- Gate 0 / CI: ruff 15 -> 0 (two true-unused imports removed; ModelNotFoundError kept — it is a
+  __init__ re-export, the audit had it wrong; restored with noqa:F401). pypdfium2/pytest/playwright
+  were undeclared -> added a pyproject "ci" extra that ci.yml installs. Runner pinned ubuntu-24.04.
+  pip install . now works (added build-system + explicit packages; flat-layout auto-discovery was
+  failing on the ~40 junk root dirs).
+- Security: B1 SessionStore._path now check_safe_id-guards the session id (the webapp <sid>
+  converter delivers backslashes; ../../evil escaped sessions_dir). B2 webapp_demo delegates to
+  webapp_server.main() — the capability token is minted and the bind stays loopback (it previously
+  ran app.run(host=0.0.0.0) bypassing main(), exposing every route incl. DELETE to the LAN).
+- Data safety: A1 has_edits() returns True on a corrupt/unreadable edits.json (was: read as empty,
+  letting ensure_working() overwrite working.json — the only copy of applied edits — on re-parse).
+  A2 every writer-owned store routed through atomic_write_json (working/edits/redo/dismissed/marks/
+  last_pass/writer_profile + the ensure_working inline copy — the spy test caught that last gap).
+  D: the four canned demo findings now carry an explicit "[demo]" tag (flagging, not hiding — the
+  REVOLVER setup/payoff branch is genuinely derived and stays).
+- Flake: the two Windows os.replace hammer tests surfaced PermissionError(13, no winerror) under
+  full-suite AV pressure; the winerror-only filter correctly refused to retry it. USER DECISION:
+  retry_permission now retries EVERY PermissionError for a bounded jittered window (documented
+  risk: a genuine denial retries ~1s before raising — it still raises, never swallowed). The two
+  c10 tests asserting fail-fast were re-scribed to the new contract, not deleted.
+
+SELF-CRITIQUE (what I got wrong and fixed)
+- The audit overstated "4 unused imports" (one was a re-export). Restored.
+- My first spy tests failed on my own bugs (wrong class name WriterProfile->WriterMemory; missing
+  parse step). Test bugs, not code regressions.
+- The ensure_working inline-copy atomic gap was caught by the spy test, not by the audit.
+
+GATE
+ruff: All checks passed. Suite: 1336 passed / 0 failed (two consecutive clean full runs).
+Readiness suite tests/test_production_readiness.py: 13/13. pip install . + pip install ".[ci]"
+both verified in clean venvs (5 packages import from the installed dist).
+
+STILL OPEN (needs a decision, not just code)
+- A2 .bak snapshot per edit-apply (extra recovery net — optional).
+- D: demo mode still SHOWS a fix queue of tagged [demo] findings; hiding it entirely is a product call.
+- LICENSE / CHANGELOG (legal/product, not engineering).
+- PUSH: the credential-path push blocker persists; 7 commits ahead of origin/main now.
