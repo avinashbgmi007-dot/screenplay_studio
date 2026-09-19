@@ -2727,6 +2727,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .rewrite-candidates { display: flex; flex-direction: column; gap: var(--sp-4); margin-top: var(--sp-4); max-height: 340px; overflow-y: auto; }
 .rewrite-candidate {
   display: flex;
+  flex-wrap: wrap;   /* the Apply/Stash/Reject row drops to its own line */
   gap: var(--sp-5);
   align-items: flex-start;
   background: var(--ink-800);
@@ -2741,6 +2742,44 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .rewrite-new { display: block; color: var(--ok); }
 .rewrite-arrow { color: var(--accent); margin-right: var(--sp-3); font-family: var(--font-mono); }
 .rewrite-note { font-size: var(--fs-sm); font-style: italic; color: var(--text-muted); margin: var(--sp-5) 0 0; }
+
+/* the word-level diff (P1.4): only the words that moved are marked */
+.rewrite-diff { flex: 1; min-width: 0; line-height: 1.75; word-break: break-word; }
+.rewrite-diff .rd-same { color: var(--text-muted); }
+.rewrite-diff .rd-del {
+  color: var(--danger);
+  background: var(--danger-bg);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  border-radius: var(--r-xs);
+  padding: 0 1px;
+}
+.rewrite-diff .rd-ins {
+  color: var(--ok);
+  background: var(--ok-bg);
+  text-decoration: none;
+  border-radius: var(--r-xs);
+  padding: 0 1px;
+}
+.rewrite-candidate-actions { flex-basis: 100%; display: flex; gap: var(--sp-3); margin-top: var(--sp-2); }
+.rewrite-candidate-actions button {
+  font-size: var(--fs-2xs);
+  padding: var(--sp-1) var(--sp-4);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+}
+.rewrite-candidate-actions button:hover { border-color: var(--accent); }
+.rewrite-candidate-actions .rc-apply { border-color: var(--ok); color: var(--ok); }
+.rewrite-candidate-actions .rc-reject:hover { border-color: var(--danger); color: var(--danger); }
+/* a proposal that has been acted on keeps its diff visible, greyed — the writer
+   can still see what they took or parked */
+.rewrite-candidate-applied, .rewrite-candidate-stashed { opacity: 0.55; }
+.rewrite-candidate-applied { border-color: var(--ok); }
+.rewrite-candidate-stashed { border-color: var(--accent); }
+.rewrite-status.ok { color: var(--ok); }
 
 /* command palette */
 .palette-modal { width: 480px; max-width: 92vw; padding: var(--sp-7); }

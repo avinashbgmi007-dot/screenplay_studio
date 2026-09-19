@@ -2345,3 +2345,66 @@ BACKUP with hash-verified restore — never `git stash` here:
 
 PUSH: still stranded. The credential path is the blocker (disabling the helper fails FAST with
 "could not read Username"); 8 attempts across four passes. Needs re-authentication or a manual push.
+
+
+
+================================================================================
+2026-09-19 — P1.4: the select-to-rewrite loop (inline diff, Apply/Stash/Reject)
+================================================================================
+
+WHAT THE ITEM ASKED FOR
+"Select-to-rewrite loop: his proposed passage edits render as inline diffs with Apply/Stash/Reject,
+writing into working.json through the existing revision machinery — converts 'want me to sketch a
+version?' into the product's core loop."
+
+WHAT WAS ACTUALLY THERE (the recon)
+The backend already said the right thing and already existed:
+  - POST /rewrite  -> "Generates candidates only — nothing is applied until the writer approves via
+    /edits/apply." Returns {scene_number, note, replacements:[{old,new}], scene_text}.
+  - POST /edits/apply -> the existing revision machinery, writing working.json.
+  - stash_store.py + GET/POST/DELETE /stash -> the existing scrapbook.
+What was missing was the LOOP THE WRITER READS. A proposal rendered as the WHOLE old line struck
+through above the WHOLE new line in green, with one checkbox and one bulk "Apply changes". That is a
+diff you have to read twice to find the two words that moved, and there was NO WAY TO KEEP A PROPOSAL
+WITHOUT TAKING IT.
+
+WHAT SHIPPED
+1. A real word-level LCS diff (app.js `wordDiff` + `renderInlineDiff`): <del>/<ins> runs, only the
+   words that moved are marked. Deterministic on purpose — that is what makes it assertable from a
+   browser probe. A pair over 400 words returns null and falls back to the whole-line form rather than
+   allocating a table nobody reads.
+2. Apply / Stash / Reject PER PROPOSAL. Apply writes working.json through /edits/apply; Stash parks
+   the proposed line in the EXISTING project stash with the scene it came from (no new store);
+   Reject drops the row and writes nothing.
+3. The bulk checkbox + #rewrite-apply contract that phase14_signoff_journey asserts on is preserved
+   deliberately (`.rewrite-candidate` is still one node per proposal).
+
+A DESIGN BUG IN MY OWN FIRST CUT, CAUGHT BY THE SUITE
+`_markProposalRow` removed the action buttons after a Stash. That made Stash a ONE-WAY DOOR: the
+writer parked a proposal *in order to decide later* and could then neither Apply nor Reject it —
+the exact opposite of what a stash is for. The distinction is now explicit and tested:
+  - Apply and Reject are TERMINAL (the row keeps its diff, greyed, and stops offering actions).
+  - Stash is NOT (it only spends its own button).
+The first run of the new suite caught it as a 30-second click timeout on `.rc-reject`.
+
+A PROBE LESSON: a missing global CRASHED the suite instead of grading it
+With app.js reverted, `page.evaluate("([o,n]) => wordDiff(o,n)")` threw an uncaught evaluate error and
+aborted the whole file — RED, but useless as evidence, because it said nothing about which assertions
+the fix carries. Fixed two ways: `typeof wordDiff === 'function'` guards inside the evaluated
+expressions, and the whole integration block wrapped so a missing element is a graded failure rather
+than a timeout that kills the run. The mutation run then reports a real count.
+
+BLOCKED, NOT DONE: the chat-to-proposal bridge
+"Converts 'want me to sketch a version?' into the product's core loop" needs Sameer's CHAT REPLY to
+carry a structured proposal, i.e. a model-side structured-output contract. There is no live model in
+this environment to validate one, so it is BLOCKED for the same reason P1.5 is open. The
+finding -> rewrite -> Apply/Stash/Reject loop is the half that can be validated, and it is done.
+
+GATE
+pytest 1273 passed / 0 failed. Browser: rewrite_loop 36/36, phase14_signoff_journey 47/47 (that
+journey walks the inline-edit + Apply path this pass rewrote, so it is the regression guard for the
+contract). Mutation check by FILE BACKUP with hash-verified restore (never `git stash`):
+  app.js reverted -> 19 failed / 4 passed (exit 1)      FIXED -> 36 passed / 0 failed
+  app.js + style.css restored, sha256sum -c: both OK
+
+PUSH: still stranded on the credential path. 8 attempts across five passes now.

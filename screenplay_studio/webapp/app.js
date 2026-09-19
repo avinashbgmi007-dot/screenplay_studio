@@ -7014,6 +7014,152 @@ async function generateRewrite() {
   genBtn.disabled = false;
 }
 
+// ---- word-level diff for a proposed rewrite (P1.4) ----
+//
+// A proposal used to render as the WHOLE old line struck through above the WHOLE
+// new line in green. That is technically a diff, but it makes the writer re-read
+// both lines to find the two words that actually moved — which is the opposite of
+// what "show me the change" is for. This is a plain LCS over words.
+//
+// Deterministic on purpose (same pair in, same marks out), because that is what
+// makes it assertable from a browser probe. Screenplay lines are short, so the
+// O(n*m) table is nothing; a very long pair falls back to the whole-line form
+// rather than allocating a table nobody will read.
+const WORD_DIFF_MAX_WORDS = 400;
+
+function _diffWords(s) {
+  return String(s || "").trim().split(/\s+/).filter(Boolean);
+}
+
+function wordDiff(oldText, newText) {
+  const a = _diffWords(oldText), b = _diffWords(newText);
+  if (a.length > WORD_DIFF_MAX_WORDS || b.length > WORD_DIFF_MAX_WORDS) return null;
+  const n = a.length, m = b.length;
+  const dp = [];
+  for (let i = 0; i <= n; i++) dp.push(new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const runs = [];
+  const push = (kind, word) => {
+    const last = runs[runs.length - 1];
+    if (last && last.kind === kind) last.text += " " + word;
+    else runs.push({ kind, text: word });
+  };
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { push("same", a[i]); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { push("del", a[i]); i++; }
+    else { push("ins", b[j]); j++; }
+  }
+  while (i < n) { push("del", a[i]); i++; }
+  while (j < m) { push("ins", b[j]); j++; }
+  return runs;
+}
+
+function renderInlineDiff(rep) {
+  const runs = wordDiff(rep.old, rep.new);
+  if (!runs) {
+    // Too long to mark word by word — say so rather than pretending.
+    const pair = el("div", "rewrite-candidate-pair");
+    pair.appendChild(el("span", "rewrite-old", rep.old));
+    const newLine = el("span", "rewrite-new");
+    newLine.appendChild(el("span", "rewrite-arrow", "→"));
+    newLine.appendChild(document.createTextNode(rep.new));
+    pair.appendChild(newLine);
+    return pair;
+  }
+  const wrap = el("div", "rewrite-diff");
+  for (const run of runs) {
+    // del/ins rather than spans so the marks survive a screen reader and a
+    // copy-paste; the classes carry the colour.
+    const node = document.createElement(run.kind === "same" ? "span" : run.kind === "del" ? "del" : "ins");
+    node.className = "rd-" + run.kind;
+    node.textContent = run.text;
+    wrap.appendChild(node);
+  }
+  return wrap;
+}
+
+function _proposalLabel() {
+  const scene = rewriteState ? rewriteState.sceneNumber : null;
+  return scene != null ? `Proposed rewrite — scene ${scene}` : "Proposed rewrite";
+}
+
+// `terminal` is the difference between deciding and parking. Apply and Reject
+// END a proposal's life (the row keeps its diff, greyed, but stops offering
+// actions); Stash does NOT — the writer parked it precisely in order to decide
+// later, so Apply and Reject must still be there afterwards. Getting this
+// backwards made Stash a one-way door, which is the opposite of what a stash is.
+function _markProposalRow(row, state, terminal) {
+  row.classList.add("rewrite-candidate-" + state);
+  if (!terminal) return;
+  const cb = row.querySelector("input[type=checkbox]");
+  if (cb) cb.disabled = true;
+  const actions = row.querySelector(".rewrite-candidate-actions");
+  if (actions) actions.remove();
+}
+
+async function applyOneRewrite(rep, row) {
+  const status = $("#rewrite-status");
+  status.className = "rewrite-status";
+  status.textContent = "Applying…";
+  try {
+    await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/apply`, {
+      method: "POST",
+      body: JSON.stringify({ scene_number: rewriteState.sceneNumber, replacements: [rep] }),
+    });
+    _markProposalRow(row, "applied", true);
+    status.className = "rewrite-status ok";
+    status.textContent = "Applied to the working copy — Undo is in the script toolbar.";
+    await loadScriptData();
+    renderManuscript(document.getElementById('manuscript-container'));
+  } catch (e) {
+    status.className = "rewrite-status error";
+    status.textContent = "Apply failed: " + e.message;
+  }
+}
+
+async function stashOneRewrite(rep, row, btn) {
+  // Stash is the EXISTING scrapbook (stash_store.py), not a new store: the
+  // proposed line goes beside the script with the scene it came from, so a
+  // proposal the writer is not ready to take is parked rather than lost.
+  const status = $("#rewrite-status");
+  status.className = "rewrite-status";
+  status.textContent = "Stashing…";
+  try {
+    await api(`/projects/${encodeURIComponent(state.currentProject)}/stash`, {
+      method: "POST",
+      body: JSON.stringify({
+        text: rep.new,
+        title: _proposalLabel(),
+        scene_number: rewriteState.sceneNumber,
+      }),
+    });
+    _markProposalRow(row, "stashed", false);
+    if (btn) btn.disabled = true;   // no double-stashing; Apply/Reject stay live
+    status.className = "rewrite-status ok";
+    status.textContent = "Stashed beside the script — it's in the Stash list.";
+    await loadStash();
+  } catch (e) {
+    status.className = "rewrite-status error";
+    status.textContent = "Stash failed: " + e.message;
+  }
+}
+
+function rejectOneRewrite(row) {
+  const wrap = $("#rewrite-candidates");
+  row.remove();
+  const left = wrap.querySelectorAll(".rewrite-candidate").length;
+  if (!left) {
+    $("#rewrite-apply").style.display = "none";
+    $("#rewrite-status").className = "rewrite-status";
+    $("#rewrite-status").textContent = "All proposals set aside — nothing was changed.";
+  }
+}
+
 function renderRewriteCandidates(res) {
   const wrap = $("#rewrite-candidates");
   wrap.innerHTML = "";
@@ -7033,14 +7179,28 @@ function renderRewriteCandidates(res) {
     cb.type = "checkbox";
     cb.checked = true;
     cb.setAttribute("aria-label", "Apply this change");
-    const pair = el("div", "rewrite-candidate-pair");
-    pair.appendChild(el("span", "rewrite-old", rep.old));
-    const newLine = el("span", "rewrite-new");
-    newLine.appendChild(el("span", "rewrite-arrow", "→"));
-    newLine.appendChild(document.createTextNode(rep.new));
-    pair.appendChild(newLine);
+    const pair = renderInlineDiff(rep);
     row.appendChild(cb);
     row.appendChild(pair);
+    // Apply / Stash / Reject per proposal. The checkbox above still drives the
+    // bulk "Apply changes", so a writer who wants all of them takes one click.
+    const actions = el("div", "rewrite-candidate-actions");
+    const applyBtn = el("button", "rc-apply", "Apply");
+    applyBtn.type = "button";
+    applyBtn.title = "Write just this change into the working copy";
+    applyBtn.addEventListener("click", () => applyOneRewrite(rep, row));
+    const stashBtn = el("button", "rc-stash", "Stash");
+    stashBtn.type = "button";
+    stashBtn.title = "Park this version in the Stash and decide later";
+    stashBtn.addEventListener("click", () => stashOneRewrite(rep, row, stashBtn));
+    const rejectBtn = el("button", "rc-reject", "Reject");
+    rejectBtn.type = "button";
+    rejectBtn.title = "Drop this proposal — nothing is written";
+    rejectBtn.addEventListener("click", () => rejectOneRewrite(row));
+    actions.appendChild(applyBtn);
+    actions.appendChild(stashBtn);
+    actions.appendChild(rejectBtn);
+    row.appendChild(actions);
     wrap.appendChild(row);
   }
   $("#rewrite-apply").style.display = "inline-block";
