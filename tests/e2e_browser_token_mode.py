@@ -1,6 +1,7 @@
-"""E2E for H1 hardened mode: boot the studio with --require-token and verify the
+"""E2E for H1 secure-by-default: boot the studio with NO token flag and verify the
 SPA (which reads the cookie and echoes the header) can create + chat, while a
-blind server-side write with no token is 403.
+blind server-side write with no token is 403. This asserts the DEFAULT posture --
+previously the token required --require-token.
 
 Run:  python tests/e2e_browser_token_mode.py
 """
@@ -27,7 +28,7 @@ def boot_hardened():
     log = open(os.path.join(tmp.name, "srv.log"), "ab")
     proc = subprocess.Popen(
         [sys.executable, "-m", "screenplay_studio.webapp_server",
-         "--port", str(port), "--projects-dir", projects, "--demo-model", "--require-token"],
+         "--port", str(port), "--projects-dir", projects, "--demo-model"],
         cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT)
     base = f"http://127.0.0.1:{port}"
     for _ in range(100):

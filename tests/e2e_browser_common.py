@@ -164,8 +164,14 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
     # skips the "is :8080 up?" probe), the flag keeps it explicit.
     env["SCREENPLAY_STUDIO_DEMO_MODEL"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
+    # --no-token: the harness is a trusted local tool and seeds projects with
+    # direct server-side requests, which the secure-by-default capability token
+    # would 403. The harness opts out explicitly (it used to rely on the token
+    # being off globally). The hardened path stays covered by
+    # e2e_browser_token_mode.py and test_capability_token.py.
     cmd = [sys.executable, "-m", "screenplay_studio.webapp_server",
-           "--port", str(port), "--projects-dir", projects_dir, "--demo-model"]
+           "--port", str(port), "--projects-dir", projects_dir, "--demo-model",
+           "--no-token"]
     if server_url:
         # Drive --server through main() instead: both import-time demo paths
         # (env trigger and the :8080-unreachable fallback) would lock

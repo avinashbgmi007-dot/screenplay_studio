@@ -44,7 +44,7 @@ python -m screenplay_studio.webapp_server --demo-model
 | `resume DIR` | `--server`, `--model`, `--skip-chat`, `--retry-failed`, `--lang` | Skips completed stages. |
 | `status DIR` | — | Prints parse/analyze/chat status + errors. |
 | `watch DIR` | `--projects-dir`, `--server`, `--model`, `--poll SECS`, `--once`, `--categories`, `--lang` | Detects supported extensions; creates one project per file. |
-| `webapp_server` (module) | `--port` (default 8500), `--projects-dir`, `--server`, `--demo-model` | Serves the SPA + JSON API. Run as `python -m screenplay_studio.webapp_server`. |
+| `webapp_server` (module) | `--port` (default 8500), `--projects-dir`, `--server`, `--demo-model`, `--no-token` (default: token ON) | Serves the SPA + JSON API. Run as `python -m screenplay_studio.webapp_server`. **Secure by default:** a per-process capability token is minted on every launch and set as a `SameSite=Strict` cookie on `/`; mutating requests must echo it as `X-Studio-Token`. Your browser gets it automatically; scripted clients (curl, the E2E harness) pass `--no-token` on a loopback-only machine. `--require-token` is retained as a deprecated no-op. |
 
 ## screenplay_parser — Piece 1 (deterministic, no model)
 

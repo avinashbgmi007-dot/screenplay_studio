@@ -51,13 +51,17 @@ app = Flask(__name__, static_folder=None)
 # ---------------------------------------------------------------------------
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
-# H1: capability token. OFF by default (None) so the local single-user default —
-# the SPA, the E2E harness, the CLI, curl — keeps working unchanged. Enabled by
-# main() only when the operator passes --require-token (hardened mode). When set,
-# it is handed to the SPA as a SameSite=Strict cookie on `/` and must be echoed
-# back as X-Studio-Token on every mutating request — a foreign page can neither
-# read the cookie nor set a custom header without triggering CORS, which closes
-# the no-Origin blind-write hole the Origin check alone leaves open.
+# H1: capability token. SECURE BY DEFAULT — main() mints one on every launch and
+# hands it to the SPA as a SameSite=Strict cookie on `/`; mutating requests must
+# echo it back as X-Studio-Token. A foreign page can neither read the cookie nor
+# set a custom header without triggering CORS, which closes the no-Origin
+# blind-write hole the Origin check alone leaves open. `--no-token` is the
+# explicit opt-out for trusted scripted clients (the E2E harness, curl) on a
+# loopback-only machine.
+#
+# The module-level default stays None on purpose: bare test-client fixtures and
+# the Flask CLI path (which never calls main()) rely on the guard being off, and
+# only main() mints the token.
 _API_TOKEN = None
 
 
@@ -3083,12 +3087,29 @@ def graduate_idea(idea_id):
     return jsonify(_manifest_summary(manifest)), 201
 
 
+def _startup_token(no_token: bool):
+    """Secure by default: mint a per-process capability token on every launch.
+
+    H1: the Origin guard alone leaves a no-`Origin` blind write open (curl, a
+    no-cors fetch, a form POST) and `DELETE /api/projects/<name>` is an rmtree.
+    So the default is a token; `--no-token` is the explicit opt-out for trusted
+    scripted clients (the E2E harness, curl) on a loopback-only machine.
+    """
+    if no_token:
+        return None
+    import secrets
+    return secrets.token_urlsafe(24)
+
+
 def main():
     global PROJECTS_DIR, CONFIG, _API_TOKEN
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-token", action="store_true",
-                        help="Hardened mode: require a per-process capability token "
-                             "(X-Studio-Token) on all mutating requests.")
+                        help="(Deprecated -- now the default.) Require a per-process "
+                             "capability token (X-Studio-Token) on all mutating requests.")
+    parser.add_argument("--no-token", action="store_true",
+                        help="Opt OUT of the capability token. Trusted scripted clients "
+                             "(the E2E harness, curl) on a loopback-only machine only.")
     parser.add_argument("--port", type=int, default=8500)
     parser.add_argument("--projects-dir", default="./studio_projects")
     parser.add_argument("--server", default="http://localhost:8080", help="Default llama-server URL")
@@ -3099,9 +3120,9 @@ def main():
                              "(your llama-server on :8080) is untouched.")
     args = parser.parse_args()
 
-    if args.require_token and _API_TOKEN is None:
-        import secrets
-        _API_TOKEN = secrets.token_urlsafe(24)  # H1: per-process capability token
+    # H1: secure by default. --no-token is the explicit opt-out and wins if both
+    # flags are passed (never silently harden, never silently expose).
+    _API_TOKEN = _startup_token(args.no_token)
 
     PROJECTS_DIR = args.projects_dir
     os.makedirs(PROJECTS_DIR, exist_ok=True)
@@ -3115,6 +3136,11 @@ def main():
     print(f"Projects directory: {os.path.abspath(PROJECTS_DIR)}")
     print(f"Default model server: {CONFIG['server_url']}")
     print(f"Open http://localhost:{args.port} in your browser.")
+    if _API_TOKEN:
+        print("Writes require the capability token. Your browser gets it automatically "
+              "as a cookie; scripted clients send:")
+        print(f"  X-Studio-Token: {_API_TOKEN}")
+        print("  (pass --no-token to disable on a loopback-only machine)")
     # threaded: one long LLM turn must never freeze autosave/sidebar/etc.
     app.run(host="127.0.0.1", port=args.port, debug=False, threaded=True)
 

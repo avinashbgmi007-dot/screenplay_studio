@@ -193,6 +193,9 @@ def test_env_demo_model_survives_module_launch(tmp_path, monkeypatch):
     The demo URL chosen at import must survive main()."""
     import sys
     from screenplay_studio import webapp_server as ws
+    # main() now mints a capability token by default; keep this launch's token
+    # from leaking into the bare test-client fixtures used elsewhere.
+    monkeypatch.setattr(ws, "_API_TOKEN", None)
     monkeypatch.setattr(ws, "_DEMO_MODEL_ACTIVE", True)
     monkeypatch.setitem(ws.CONFIG, "server_url", "http://127.0.0.1:9091")  # demo url
     monkeypatch.setattr(ws.app, "run", lambda **kw: None)
@@ -206,6 +209,7 @@ def test_plain_module_launch_keeps_server_arg(tmp_path, monkeypatch):
     """Without any demo trigger, --server must still win (default flow intact)."""
     import sys
     from screenplay_studio import webapp_server as ws
+    monkeypatch.setattr(ws, "_API_TOKEN", None)
     monkeypatch.setattr(ws, "_DEMO_MODEL_ACTIVE", False)
     monkeypatch.setitem(ws.CONFIG, "server_url", "http://stale.example:1")
     monkeypatch.setattr(ws.app, "run", lambda **kw: None)
