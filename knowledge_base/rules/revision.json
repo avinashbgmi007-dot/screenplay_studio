@@ -9,7 +9,7 @@
       "originator": "Jack Epps Jr.",
       "work": "Screenwriting is Rewriting"
     },
-    "definition": "The first draft's purpose is to discover the story \u00e2\u20ac\u201d to find the characters, locate the themes, and map the emotional journey. Writers should not polish prose or perfect dialogue in the first draft. The job is to get the story on paper so it can be analyzed and improved.",
+    "definition": "The first draft's purpose is to discover the story \u2014 to find the characters, locate the themes, and map the emotional journey. Writers should not polish prose or perfect dialogue in the first draft. The job is to get the story on paper so it can be analyzed and improved.",
     "detection_signal": "Scripts that read as beautifully polished but feel structurally empty, or writers who spend excessive time on first-draft prose rather than story discovery.",
     "counter_considerations": "Some writers naturally produce polished first drafts. The rule targets the common trap of perfecting sentences before finding the story.",
     "severity_default": "low",
@@ -53,7 +53,7 @@
       "originator": "Sol Stein",
       "work": "Stein on Writing"
     },
-    "definition": "The four main areas where writers slip into telling instead of showing are: (1) backstory\u00e2\u20ac\u201ddumping past events, (2) character descriptions\u00e2\u20ac\u201dlisting physical traits, (3) setting descriptions\u00e2\u20ac\u201dblocking action for scenery, and (4) emotions\u00e2\u20ac\u201dnaming feelings instead of dramatizing them.",
+    "definition": "The four main areas where writers slip into telling instead of showing are: (1) backstory\u2014dumping past events, (2) character descriptions\u2014listing physical traits, (3) setting descriptions\u2014blocking action for scenery, and (4) emotions\u2014naming feelings instead of dramatizing them.",
     "detection_signal": "Passages that begin with 'She felt...' or 'He remembered...' followed by exposition. Long character descriptions in the first chapter. Setting paragraphs that stop the action. Direct statements of emotion.",
     "counter_considerations": "Some telling is efficient and appropriate for pacing. Brief backstory in dialogue, targeted emotional labels, and transitional summaries are acceptable. Do not flag intentional stylistic choices.",
     "severity_default": "medium",
@@ -68,7 +68,7 @@
   },
   {
     "id": "zinsser_dump_the_clutter",
-    "name": "Dump the Clutter\u00e2\u20ac\u201dEvery Word Must Earn Its Place",
+    "name": "Dump the Clutter\u2014Every Word Must Earn Its Place",
     "taxonomy_level": "revision",
     "category": "prose_economy",
     "source": {

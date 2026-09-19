@@ -9,7 +9,7 @@
       "originator": "Angus Fletcher",
       "work": "Screenwriting 101 (The Great Courses)"
     },
-    "definition": "Romantic comedies almost always begin by introducing the lovers as adult children \u00e2\u20ac\u201d the explicit offspring of a previous marriage. This opening establishes marriage as the deep rule that brought the lovers into being and that will allow them to bring forth children of their own, creating a story world where love triumphs generation after generation.",
+    "definition": "Romantic comedies almost always begin by introducing the lovers as adult children \u2014 the explicit offspring of a previous marriage. This opening establishes marriage as the deep rule that brought the lovers into being and that will allow them to bring forth children of their own, creating a story world where love triumphs generation after generation.",
     "detection_signal": "Check if the opening scenes establish the romantic leads' family backgrounds or parental relationships. Verify that marriage/love is presented as a generational tradition.",
     "counter_considerations": "Modern romantic comedies sometimes skip the family opening. The rule is a deep structural convention, not a surface requirement.",
     "severity_default": "low",
@@ -32,7 +32,7 @@
       "originator": "K.M. Weiland",
       "work": "5 Secrets of Story Structure"
     },
-    "definition": "If it is a romance, the themes will be related to love \u00e2\u20ac\u201d true love, soul mates, broken hearts, second chances, etc. The thematic backbone must be about the emotional journey of the relationship, not about external plot events.",
+    "definition": "If it is a romance, the themes will be related to love \u2014 true love, soul mates, broken hearts, second chances, etc. The thematic backbone must be about the emotional journey of the relationship, not about external plot events.",
     "detection_signal": "Check if the script's thematic statements relate to love, connection, vulnerability, or emotional risk. Verify that the protagonist's internal arc is about their capacity for love.",
     "counter_considerations": "Some films blend romance with other genres (action-romance, horror-romance). The key is that the romance must be thematically central, not just a subplot.",
     "severity_default": "high",
@@ -55,7 +55,7 @@
       "originator": "David Hohl",
       "work": "101 Kick-Ass Screenwriting Tips"
     },
-    "definition": "The midpoint of a romance typically represents the point of no return \u00e2\u20ac\u201d the moment when the relationship becomes irreversible (physical intimacy, declaration of love, or equivalent milestone). After this point, separation becomes exponentially more painful and stakes escalate.",
+    "definition": "The midpoint of a romance typically represents the point of no return \u2014 the moment when the relationship becomes irreversible (physical intimacy, declaration of love, or equivalent milestone). After this point, separation becomes exponentially more painful and stakes escalate.",
     "detection_signal": "Locate the midpoint. Check if the romantic leads reach a significant emotional or physical milestone. Verify that after this point, the relationship cannot simply be forgotten or walked away from.",
     "counter_considerations": "Some romances delay the midpoint milestone. The key is that the relationship must reach a point of no return before the final act.",
     "severity_default": "high",
@@ -197,7 +197,7 @@
       "work": null,
       "note": "Standard romance writing principle found across multiple sources."
     },
-    "definition": "Romantic leads should have complementary flaws \u00e2\u20ac\u201d each character's weakness addresses the other's need. This creates natural chemistry and makes the relationship feel necessary rather than arbitrary.",
+    "definition": "Romantic leads should have complementary flaws \u2014 each character's weakness addresses the other's need. This creates natural chemistry and makes the relationship feel necessary rather than arbitrary.",
     "detection_signal": "Check if the romantic leads have flaws that complement each other. Verify that each character's weakness is addressed by the other's strength.",
     "counter_considerations": "Some romances feature similar flaws. The key is that the flaws should create chemistry and connection, not just conflict.",
     "severity_default": "medium",
@@ -245,7 +245,7 @@
       "work": null,
       "note": "Standard romance writing principle found across multiple sources."
     },
-    "definition": "Romance readers expect a satisfying resolution \u00e2\u20ac\u201d the couple must end up together (Happy Ever After or Happy For Now). Denying this expectation violates the genre contract.",
+    "definition": "Romance readers expect a satisfying resolution \u2014 the couple must end up together (Happy Ever After or Happy For Now). Denying this expectation violates the genre contract.",
     "detection_signal": "Check if the romance ends with the couple together. Verify that the resolution satisfies the genre expectation for emotional closure.",
     "counter_considerations": "Some romances end tragically (like in literary fiction). The key is that the resolution must be appropriate to the genre and subgenre.",
     "severity_default": "high",

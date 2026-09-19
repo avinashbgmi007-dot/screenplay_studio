@@ -33,7 +33,7 @@
       "originator": "David Hohl",
       "work": "101 Kick-Ass Screenwriting Tips"
     },
-    "definition": "Comedy scenes should enter the scene as late as possible and exit as early as possible \u00e2\u20ac\u201d get to the joke or comedic situation quickly and cut before the laughter dies. Starting too early kills the setup; staying too long kills the punchline.",
+    "definition": "Comedy scenes should enter the scene as late as possible and exit as early as possible \u2014 get to the joke or comedic situation quickly and cut before the laughter dies. Starting too early kills the setup; staying too long kills the punchline.",
     "detection_signal": "Check if scenes begin with unnecessary setup, pleasantries, or establishing action before the comedic situation. Check if scenes linger after the comedic payoff.",
     "counter_considerations": "Some comedy relies on slow-burn or awkward tension that requires patient setup. Improvised comedy scenes may need more runway.",
     "severity_default": "medium",
@@ -56,7 +56,7 @@
       "originator": "David Hohl",
       "work": "101 Kick-Ass Screenwriting Tips"
     },
-    "definition": "In romantic comedies, the exact midpoint of the movie typically features the couple's first physical intimacy (sex, magical kiss, or equivalent romantic milestone). This is the point of no return \u00e2\u20ac\u201d stakes are raised and there is no turning back.",
+    "definition": "In romantic comedies, the exact midpoint of the movie typically features the couple's first physical intimacy (sex, magical kiss, or equivalent romantic milestone). This is the point of no return \u2014 stakes are raised and there is no turning back.",
     "detection_signal": "Locate the midpoint of the script. Check if the romantic leads share a significant physical or emotional milestone. Verify that after this point, the relationship stakes are higher and separation becomes more painful.",
     "counter_considerations": "Some romantic comedies delay physical intimacy until later. The midpoint can also be a false intimacy or a relationship setback that still raises stakes.",
     "severity_default": "medium",
@@ -102,7 +102,7 @@
       "originator": "Scriptshadow/Amber",
       "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
     },
-    "definition": "Comedy dialogue should rarely be on-the-nose. Characters should talk around things, use sarcasm, misdirection, double entendres, and evasiveness. The best comedy dialogue has layers \u00e2\u20ac\u201d what characters say versus what they mean.",
+    "definition": "Comedy dialogue should rarely be on-the-nose. Characters should talk around things, use sarcasm, misdirection, double entendres, and evasiveness. The best comedy dialogue has layers \u2014 what characters say versus what they mean.",
     "detection_signal": "Check if dialogue is literal and direct (characters saying exactly what they mean). Flag scenes where characters explain their feelings directly. Look for subtext, irony, or gap between dialogue and action.",
     "counter_considerations": "Some comedy uses deadpan literalism for effect (e.g., Leslie Nielsen characters). The key is that the literalism is intentional and character-driven, not accidental.",
     "severity_default": "medium",
@@ -195,7 +195,7 @@
       "work": null,
       "note": "Standard comedy writing principle found across multiple sources."
     },
-    "definition": "Comedy often works through exaggeration \u00e2\u20ac\u201d taking a normal situation, trait, or reaction and amplifying it beyond reality. The exaggeration must be rooted in recognizable truth to be funny.",
+    "definition": "Comedy often works through exaggeration \u2014 taking a normal situation, trait, or reaction and amplifying it beyond reality. The exaggeration must be rooted in recognizable truth to be funny.",
     "detection_signal": "Check if comedic scenes exaggerate recognizable situations, traits, or reactions. Verify that the exaggeration is rooted in truth that audiences can relate to.",
     "counter_considerations": "Some comedy relies on understatement rather than exaggeration. The key is that the comedic mechanism must be consistent with the film's style.",
     "severity_default": "medium",
@@ -267,7 +267,7 @@
       "work": null,
       "note": "Standard comedy writing principle found across multiple sources."
     },
-    "definition": "Comedy often derives from character flaws \u00e2\u20ac\u201d perfection isn't funny, but the gap between who we are and who we think we are creates humor. Flaws should be recognizable and relatable.",
+    "definition": "Comedy often derives from character flaws \u2014 perfection isn't funny, but the gap between who we are and who we think we are creates humor. Flaws should be recognizable and relatable.",
     "detection_signal": "Check if comedic characters have clear, recognizable flaws. Verify that these flaws create humorous situations and conflicts.",
     "counter_considerations": "Some comedy relies on external situations rather than character flaws. The key is that if character-based comedy is used, the flaws must be effective.",
     "severity_default": "medium",

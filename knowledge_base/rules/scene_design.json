@@ -9,7 +9,7 @@
       "originator": "Jeff Lyons",
       "work": "Rapid Story Development"
     },
-    "definition": "Every scene must have its own beginning, middle, and end \u00e2\u20ac\u201d its own mini-arc. A scene that merely exists to deliver information or connect two plot points is a wasted opportunity. Each scene should have a clear objective, an obstacle, and a resolution that changes the situation.",
+    "definition": "Every scene must have its own beginning, middle, and end \u2014 its own mini-arc. A scene that merely exists to deliver information or connect two plot points is a wasted opportunity. Each scene should have a clear objective, an obstacle, and a resolution that changes the situation.",
     "detection_signal": "Scenes that feel static, that have no clear beginning or end, that exist solely to deliver exposition, or where the situation at the end of the scene is identical to the beginning.",
     "counter_considerations": "Some scenes function as transitions or breathing room. The rule targets habitual scene-padding.",
     "severity_default": "high",
@@ -55,7 +55,7 @@
       "originator": "C.S. Lakin",
       "work": "Layer Your Novel"
     },
-    "definition": "Effective scenes are built in layers: (1) plot layer \u00e2\u20ac\u201d what happens, (2) character layer \u00e2\u20ac\u201d who changes and how, (3) thematic layer \u00e2\u20ac\u201d what the scene means in context of the story's argument, (4) emotional layer \u00e2\u20ac\u201d what the reader feels, (5) relational layer \u00e2\u20ac\u201d how relationships shift. Weak scenes address only one or two layers.",
+    "definition": "Effective scenes are built in layers: (1) plot layer \u2014 what happens, (2) character layer \u2014 who changes and how, (3) thematic layer \u2014 what the scene means in context of the story's argument, (4) emotional layer \u2014 what the reader feels, (5) relational layer \u2014 how relationships shift. Weak scenes address only one or two layers.",
     "detection_signal": "Scenes that advance plot but don't develop character, that have emotional moments without plot function, or that feel thematically disconnected from the story.",
     "counter_considerations": "Some scenes naturally emphasize one layer more than others. The rule targets scenes that are genuinely thin.",
     "severity_default": "medium",

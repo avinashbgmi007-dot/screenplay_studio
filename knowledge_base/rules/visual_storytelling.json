@@ -106,7 +106,7 @@
       "work": null,
       "note": "Standard visual storytelling principle found across multiple sources."
     },
-    "definition": "Visual composition \u00e2\u20ac\u201d how characters and objects are arranged in the frame \u00e2\u20ac\u201d communicates relationships, power dynamics, and emotional states. Characters framed together suggest connection; characters framed apart suggest isolation.",
+    "definition": "Visual composition \u2014 how characters and objects are arranged in the frame \u2014 communicates relationships, power dynamics, and emotional states. Characters framed together suggest connection; characters framed apart suggest isolation.",
     "detection_signal": "Check if visual composition supports character relationships and emotional dynamics. Verify that framing communicates what dialogue doesn't.",
     "counter_considerations": "Some scenes use neutral composition. The key is that composition choices should be purposeful when specified.",
     "severity_default": "medium",
@@ -154,7 +154,7 @@
       "work": null,
       "note": "Standard visual storytelling principle found across multiple sources."
     },
-    "definition": "Character movement \u00e2\u20ac\u201d how they enter, exit, and move through space \u00e2\u20ac\u201d communicates emotional state and intention. Hurried movement suggests anxiety, deliberate movement suggests confidence, stillness suggests tension.",
+    "definition": "Character movement \u2014 how they enter, exit, and move through space \u2014 communicates emotional state and intention. Hurried movement suggests anxiety, deliberate movement suggests confidence, stillness suggests tension.",
     "detection_signal": "Check if character movement descriptions match emotional intent. Verify that physical movement communicates what dialogue doesn't.",
     "counter_considerations": "Some scenes use minimal movement descriptions. The key is that movement choices should be purposeful when specified.",
     "severity_default": "medium",
@@ -202,7 +202,7 @@
       "work": null,
       "note": "Standard film sound design principle found across multiple sources."
     },
-    "definition": "Sound descriptions \u00e2\u20ac\u201d ambient noise, music cues, silence \u00e2\u20ac\u201d create atmosphere and emotional tone. Sound can foreshadow events, create tension, or release it.",
+    "definition": "Sound descriptions \u2014 ambient noise, music cues, silence \u2014 create atmosphere and emotional tone. Sound can foreshadow events, create tension, or release it.",
     "detection_signal": "Check if sound descriptions support the scene's emotional intent. Verify that sound design enhances atmosphere and tone.",
     "counter_considerations": "Some scenes use minimal sound descriptions. The key is that sound choices should be purposeful when specified.",
     "severity_default": "low",

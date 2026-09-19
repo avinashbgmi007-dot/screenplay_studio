@@ -101,7 +101,7 @@
       "originator": "Randy Ingermanson",
       "work": "Writing Fiction for Dummies"
     },
-    "definition": "Science fiction can also explore man's relationship to nature \u00e2\u20ac\u201d survival against alien environments, cosmic threats, or hostile ecosystems. The protagonist must face forces of nature that are indifferent or actively hostile to human survival.",
+    "definition": "Science fiction can also explore man's relationship to nature \u2014 survival against alien environments, cosmic threats, or hostile ecosystems. The protagonist must face forces of nature that are indifferent or actively hostile to human survival.",
     "detection_signal": "Check if the script features a protagonist struggling against natural or alien forces. Verify that the conflict involves survival against an indifferent or hostile environment.",
     "counter_considerations": "Not all sci-fi is man vs nature. The key is that if this theme is present, it must be central to the conflict.",
     "severity_default": "medium",
@@ -197,7 +197,7 @@
       "work": null,
       "note": "Standard sci-fi writing principle found across multiple sources."
     },
-    "definition": "Despite speculative elements, sci-fi must have a recognizable emotional core \u00e2\u20ac\u201d love, loss, identity, survival. The technology and world-building serve the emotional story, not the other way around.",
+    "definition": "Despite speculative elements, sci-fi must have a recognizable emotional core \u2014 love, loss, identity, survival. The technology and world-building serve the emotional story, not the other way around.",
     "detection_signal": "Check if the script has a recognizable emotional core. Verify that the sci-fi elements serve the emotional story rather than dominating it.",
     "counter_considerations": "Some sci-fi prioritizes ideas over emotion. The key is that the emotional core should be present and significant.",
     "severity_default": "medium",

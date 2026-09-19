@@ -32,7 +32,7 @@
       "originator": "David Hohl",
       "work": "101 Kick-Ass Screenwriting Tips"
     },
-    "definition": "Surprises in mystery scripts cannot be so shocking that the audience says 'WTF' \u00e2\u20ac\u201d they must be foreshadowed. The audience should be able to look back and see the signs they missed. Chekhov's gun principle applies: if you introduce an element, it must pay off.",
+    "definition": "Surprises in mystery scripts cannot be so shocking that the audience says 'WTF' \u2014 they must be foreshadowed. The audience should be able to look back and see the signs they missed. Chekhov's gun principle applies: if you introduce an element, it must pay off.",
     "detection_signal": "Check if major plot twists and reveals have earlier setup or hints. Look for objects, lines of dialogue, or character behaviors that gain new meaning after the reveal.",
     "counter_considerations": "Some mysteries use red herrings to misdirect. The key is that the actual solution should be foreshadowed, even if other elements suggest false solutions.",
     "severity_default": "high",
@@ -78,7 +78,7 @@
       "originator": "Ronald Tobias",
       "work": "20 Master Plots (And How to Build Them)"
     },
-    "definition": "In mystery structure, the explanation/reveal typically comes just before or during the climax \u00e2\u20ac\u201d the third movement of the riddle. The audience should have enough time to process the revelation before the story resolves. The reveal is the emotional and intellectual payoff.",
+    "definition": "In mystery structure, the explanation/reveal typically comes just before or during the climax \u2014 the third movement of the riddle. The audience should have enough time to process the revelation before the story resolves. The reveal is the emotional and intellectual payoff.",
     "detection_signal": "Check where the mystery's solution is revealed in the script. Verify that the reveal occurs before the final resolution, giving the audience time to process.",
     "counter_considerations": "Some mysteries delay the reveal until the very last moment for maximum impact. The key is that the reveal should feel like a culmination, not an afterthought.",
     "severity_default": "high",
@@ -102,7 +102,7 @@
       "work": null,
       "note": "Standard mystery writing principle found across multiple sources."
     },
-    "definition": "Red herrings (misleading clues) must be fair \u00e2\u20ac\u201d they should suggest plausible alternative solutions without being outright deceptive. The audience should feel tricked but not cheated.",
+    "definition": "Red herrings (misleading clues) must be fair \u2014 they should suggest plausible alternative solutions without being outright deceptive. The audience should feel tricked but not cheated.",
     "detection_signal": "Check if red herrings suggest plausible alternative solutions. Verify that they are fair misdirection, not outright deception.",
     "counter_considerations": "Some mysteries use aggressive misdirection. The key is that the misdirection should be fair and the solution should be satisfying.",
     "severity_default": "medium",
@@ -198,7 +198,7 @@
       "work": null,
       "note": "Standard mystery writing principle found across multiple sources."
     },
-    "definition": "The mystery's solution must be satisfying \u00e2\u20ac\u201d it should feel both surprising and inevitable. The audience should be able to look back and see how the clues pointed to the solution.",
+    "definition": "The mystery's solution must be satisfying \u2014 it should feel both surprising and inevitable. The audience should be able to look back and see how the clues pointed to the solution.",
     "detection_signal": "Check if the mystery's solution feels both surprising and inevitable. Verify that the clues point to the solution in retrospect.",
     "counter_considerations": "Some mysteries provide ambiguous solutions. The key is that the solution should be appropriate to the mystery's structure.",
     "severity_default": "high",

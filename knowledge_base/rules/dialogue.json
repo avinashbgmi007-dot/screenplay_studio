@@ -10,7 +10,7 @@
       "work": null,
       "note": "Standard, widely-taught screenwriting principle echoed across nearly every major craft source (McKee, Field, Snyder, and general script-consulting practice) in similar terms; not attributable to one originator."
     },
-    "definition": "Dialogue is 'on-the-nose' when a character states their feelings, intentions, or the scene's meaning directly and explicitly, rather than the audience inferring it from what's said around the point, from subtext, or from behavior. Real people rarely announce their exact emotional state; effective dialogue usually operates on two levels \u00e2\u20ac\u201d what's said, and what's actually meant/felt underneath.",
+    "definition": "Dialogue is 'on-the-nose' when a character states their feelings, intentions, or the scene's meaning directly and explicitly, rather than the audience inferring it from what's said around the point, from subtext, or from behavior. Real people rarely announce their exact emotional state; effective dialogue usually operates on two levels \u2014 what's said, and what's actually meant/felt underneath.",
     "detection_signal": "For emotionally significant dialogue exchanges, check whether characters state their feelings/intentions directly and explicitly ('I'm furious that you lied to me') versus expressing them indirectly through word choice, deflection, subject-changing, or action ('You know what? Forget it. I'll take the bus.').",
     "counter_considerations": "Direct emotional statements are appropriate and even necessary at certain high points (a genuine, earned confession scene) or for certain character types (a character established as blunt/socially direct). Flag patterns of on-the-nose dialogue throughout a script, not isolated instances at climactic moments.",
     "severity_default": "medium",
@@ -35,7 +35,7 @@
     },
     "definition": "Background/world/plot information a character states should serve that character's immediate scene goal (persuading, threatening, confessing, deflecting) rather than existing purely to inform the audience. Dialogue that exists only because the audience needs to know something, with no in-scene dramatic purpose for the character saying it, reads as an exposition dump.",
     "detection_signal": "For dialogue passages containing significant background/plot information, check whether the speaking character has an in-scene motivation for saying it at that moment (are they trying to accomplish something by telling this to this specific listener, right now), or whether the information's only function is audience clarity.",
-    "counter_considerations": "Some genres/formats (procedurals with a 'explain the case' convention, certain comedic or meta styles) intentionally lean into direct exposition as a stylistic choice \u00e2\u20ac\u201d weigh genre/tone.",
+    "counter_considerations": "Some genres/formats (procedurals with a 'explain the case' convention, certain comedic or meta styles) intentionally lean into direct exposition as a stylistic choice \u2014 weigh genre/tone.",
     "severity_default": "medium",
     "confidence_tier": "medium",
     "requires": [
@@ -56,9 +56,9 @@
       "work": null,
       "note": "Widely-taught principle, closely related to McKee's cast polarization (characters should hold contrasting attitudes) but applied specifically to how characters speak rather than what they believe."
     },
-    "definition": "Different characters should be identifiable by dialogue alone, without speaker tags \u00e2\u20ac\u201d through consistent differences in vocabulary, sentence rhythm, formality, verbal tics, or subject fixation, reflecting differences in background, education, temperament, or worldview.",
-    "detection_signal": "Compare dialogue samples from different major characters for surface-level distinguishability (vocabulary complexity, sentence length, characteristic phrases). This is flagged here as a genuinely lower-confidence check than most others in this knowledge base \u00e2\u20ac\u201d true stylometric distinctiveness is hard to assess reliably, especially for a local model, and false positives/negatives are both likely.",
-    "counter_considerations": "Characters from similar backgrounds who are meant to sound similar (e.g. members of a close-knit group with shared slang) may legitimately share vocal qualities \u00e2\u20ac\u201d the check should focus on characters expected to contrast, not flag similarity as inherently wrong.",
+    "definition": "Different characters should be identifiable by dialogue alone, without speaker tags \u2014 through consistent differences in vocabulary, sentence rhythm, formality, verbal tics, or subject fixation, reflecting differences in background, education, temperament, or worldview.",
+    "detection_signal": "Compare dialogue samples from different major characters for surface-level distinguishability (vocabulary complexity, sentence length, characteristic phrases). This is flagged here as a genuinely lower-confidence check than most others in this knowledge base \u2014 true stylometric distinctiveness is hard to assess reliably, especially for a local model, and false positives/negatives are both likely.",
+    "counter_considerations": "Characters from similar backgrounds who are meant to sound similar (e.g. members of a close-knit group with shared slang) may legitimately share vocal qualities \u2014 the check should focus on characters expected to contrast, not flag similarity as inherently wrong.",
     "severity_default": "low",
     "confidence_tier": "low",
     "requires": [
@@ -102,7 +102,7 @@
       "originator": "William Martell",
       "work": "Dialogue Secrets"
     },
-    "definition": "Every line of dialogue must reflect who is speaking \u00e2\u20ac\u201d their vocabulary, sentence rhythm, education, emotional state, and worldview. A reader should be able to cover character names and still know exactly who is speaking. If all characters sound alike, the dialogue has failed its primary function.",
+    "definition": "Every line of dialogue must reflect who is speaking \u2014 their vocabulary, sentence rhythm, education, emotional state, and worldview. A reader should be able to cover character names and still know exactly who is speaking. If all characters sound alike, the dialogue has failed its primary function.",
     "detection_signal": "Scenes where multiple characters speak in the same cadence, use similar vocabulary, or where dialogue could be swapped between characters without the reader noticing.",
     "counter_considerations": "Some characters may deliberately adopt a shared register (military, professional) for functional reasons. The rule targets generic, undifferentiated voices.",
     "severity_default": "high",

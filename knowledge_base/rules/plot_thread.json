@@ -11,8 +11,8 @@
       "note": "Popularized via Chekhov's letters and anecdote (commonly summarized as: 'If in Act One you have a pistol hanging on the wall, then it must fire in the last act'), not from a single treatise. Widely adopted across dramatic writing as a principle of narrative economy."
     },
     "definition": "Any object, ability, fact, or detail given deliberate narrative emphasis (visual focus, dialogue callout, repetition, a character reacting strongly to it) implicitly promises the audience it will matter later. If that promise goes unfulfilled, the emphasis was a false signal that misdirects audience attention and expectation.",
-    "detection_signal": "Using the knowledge graph: find objects/facts/abilities mentioned with narrative weight (dwelt on visually, named explicitly in dialogue, or reacted to) early or mid-script, that never recur or get referenced again. Not every mentioned object qualifies \u00e2\u20ac\u201d the detection must filter for ones that were given emphasis, not passing set-dressing.",
-    "counter_considerations": "Red herrings in mysteries/thrillers are a deliberate, legitimate exception \u00e2\u20ac\u201d an object can be emphasized specifically to mislead, as long as that misdirection itself pays off (the audience realizes they were misled). Also: not everything needs a literal payoff if the emphasis was establishing character or mood rather than plot (use judgment on whether the emphasis read as a plot promise).",
+    "detection_signal": "Using the knowledge graph: find objects/facts/abilities mentioned with narrative weight (dwelt on visually, named explicitly in dialogue, or reacted to) early or mid-script, that never recur or get referenced again. Not every mentioned object qualifies \u2014 the detection must filter for ones that were given emphasis, not passing set-dressing.",
+    "counter_considerations": "Red herrings in mysteries/thrillers are a deliberate, legitimate exception \u2014 an object can be emphasized specifically to mislead, as long as that misdirection itself pays off (the audience realizes they were misled). Also: not everything needs a literal payoff if the emphasis was establishing character or mood rather than plot (use judgment on whether the emphasis read as a plot promise).",
     "severity_default": "medium",
     "confidence_tier": "medium",
     "requires": [
@@ -35,7 +35,7 @@
     },
     "definition": "Beyond physical objects (Chekhov's Gun), any planted piece of information, a promise made in dialogue ('I'll tell you everything when this is over'), a skill mentioned once, or a relationship detail should be deliberately paid off later. A payoff that arrives without a setup can feel unearned (a deus ex machina); a setup without a payoff feels like an abandoned thread.",
     "detection_signal": "Using the knowledge graph: identify explicit promises made in dialogue ('I'll show you when...', 'someday you'll understand...') and check whether the promised information/event is later delivered. Cross-reference skills or capabilities mentioned once ('I used to be a locksmith') against whether they're used at a later point of narrative need.",
-    "counter_considerations": "Some unresolved threads are intentional (open endings, sequel setups, thematic ambiguity) \u00e2\u20ac\u201d flag as a discussion point rather than an error, especially for anything resolved-but-ambiguous.",
+    "counter_considerations": "Some unresolved threads are intentional (open endings, sequel setups, thematic ambiguity) \u2014 flag as a discussion point rather than an error, especially for anything resolved-but-ambiguous.",
     "severity_default": "medium",
     "confidence_tier": "low",
     "requires": [
@@ -57,7 +57,7 @@
     },
     "definition": "A subplot earns its place by relating to the central plot's controlling idea (theme) in one of two ways: resonance (the subplot reinforces the same thematic idea through a different set of circumstances, adding variation) or contradiction (the subplot deliberately argues against the central theme, adding irony and complexity). A subplot that does neither reads as a disconnected distraction.",
     "detection_signal": "For each identified subplot, compare its apparent thematic throughline against the story's central theme/controlling idea. Flag subplots that seem thematically unrelated to the main plot and don't appear to intentionally contrast it either.",
-    "counter_considerations": "Purely comedic or tonal-relief subplots can be legitimate without deep thematic connection, especially in ensemble comedies \u00e2\u20ac\u201d use judgment on genre expectations before flagging.",
+    "counter_considerations": "Purely comedic or tonal-relief subplots can be legitimate without deep thematic connection, especially in ensemble comedies \u2014 use judgment on genre expectations before flagging.",
     "severity_default": "medium",
     "confidence_tier": "low",
     "requires": [
@@ -79,7 +79,7 @@
     },
     "definition": "Each complication the protagonist faces should cross a new point of no return and be qualitatively different/harder than the last, not a repetition of a similar obstacle. Repetitiousness ('the enemy of rhythm,' in McKee's framing) causes a story to feel like it's spinning in place rather than advancing.",
     "detection_signal": "Trace the sequence of major obstacles the protagonist faces. Flag cases where consecutive complications are structurally identical (same type of obstacle, similar stakes, no escalation or new information).",
-    "counter_considerations": "A deliberate escalating repetition (each attempt fails in a worse way, e.g. comedic 'rule of three' structures) is a legitimate device \u00e2\u20ac\u201d the key distinction is whether repetition compounds or merely repeats.",
+    "counter_considerations": "A deliberate escalating repetition (each attempt fails in a worse way, e.g. comedic 'rule of three' structures) is a legitimate device \u2014 the key distinction is whether repetition compounds or merely repeats.",
     "severity_default": "medium",
     "confidence_tier": "low",
     "requires": [
@@ -102,7 +102,7 @@
     },
     "definition": "Coincidence is a legitimate tool to *complicate* a story (bad luck creating a new problem is fair), but resolving the central conflict through coincidence, luck, or an external force with no prior setup undercuts the causal logic the audience has been tracking, and reads as unearned.",
     "detection_signal": "Identify the mechanism that resolves the central conflict. Check whether that mechanism was established/set up earlier (a character's known skill, a previously-planted object or relationship) versus introduced only at the point of resolution.",
-    "counter_considerations": "Genre conventions vary \u00e2\u20ac\u201d some comedic or absurdist/farce traditions deliberately use coincidence as a structural device throughout, not just at the ending, and audiences read it as part of the genre's rules.",
+    "counter_considerations": "Genre conventions vary \u2014 some comedic or absurdist/farce traditions deliberately use coincidence as a structural device throughout, not just at the ending, and audiences read it as part of the genre's rules.",
     "severity_default": "high",
     "confidence_tier": "medium",
     "requires": [
@@ -122,7 +122,7 @@
       "originator": "Lajos Egri",
       "work": "The Art of Dramatic Writing"
     },
-    "definition": "Story arises when a character is placed in a situation where they cannot avoid confrontation \u00e2\u20ac\u201d where their specific nature makes conflict inevitable. The protagonist's identity (their background, physiology, sociological environment) must make the central conflict unavoidable and personal.",
+    "definition": "Story arises when a character is placed in a situation where they cannot avoid confrontation \u2014 where their specific nature makes conflict inevitable. The protagonist's identity (their background, physiology, sociological environment) must make the central conflict unavoidable and personal.",
     "detection_signal": "Protagonist who could easily walk away from the central conflict, or whose involvement feels arbitrary rather than rooted in who they are.",
     "counter_considerations": "Some stories deliberately explore reluctance or resistance to conflict. The rule targets stories where involvement feels contrived.",
     "severity_default": "high",
@@ -189,7 +189,7 @@
       "originator": "William Martell",
       "work": "Outlining and Theme"
     },
-    "definition": "Every element introduced in the script \u00e2\u20ac\u201d a character trait, a prop, a piece of information, a skill \u00e2\u20ac\u201d must have a payoff later. If you show a gun in Act One, it must go off by Act Three. If a character mentions a fear, that fear must be tested. Unplanted payoffs feel like deus ex machina; unplanted setups feel like loose ends.",
+    "definition": "Every element introduced in the script \u2014 a character trait, a prop, a piece of information, a skill \u2014 must have a payoff later. If you show a gun in Act One, it must go off by Act Three. If a character mentions a fear, that fear must be tested. Unplanted payoffs feel like deus ex machina; unplanted setups feel like loose ends.",
     "detection_signal": "Scripts with significant information or objects introduced early that are never referenced again, or climactic solutions that rely on elements never established.",
     "counter_considerations": "Some Chekhov's Guns are deliberately subverted for ironic effect. The rule targets carelessness, not clever misdirection.",
     "severity_default": "high",
@@ -212,7 +212,7 @@
       "originator": "Michael Hauge",
       "work": "Michael Hauge's Story Mastery"
     },
-    "definition": "Stakes operate on five levels: (1) Physical survival, (2) Emotional/psychological well-being, (3) Professional/career, (4) Relationship, (5) Spiritual/moral. The most powerful stories operate on multiple levels simultaneously \u00e2\u20ac\u201d a character fighting for their life (physical) while also fighting for their marriage (relationship) and their self-respect (spiritual).",
+    "definition": "Stakes operate on five levels: (1) Physical survival, (2) Emotional/psychological well-being, (3) Professional/career, (4) Relationship, (5) Spiritual/moral. The most powerful stories operate on multiple levels simultaneously \u2014 a character fighting for their life (physical) while also fighting for their marriage (relationship) and their self-respect (spiritual).",
     "detection_signal": "Stories with only one level of stakes, or where the stakes feel too small for the dramatic intensity the script demands.",
     "counter_considerations": "Some stories deliberately limit stakes for intimacy. The rule targets stories where stakes feel thin or unconvincing.",
     "severity_default": "medium",
@@ -235,7 +235,7 @@
       "originator": "Jeff Lyons",
       "work": "Rapid Story Development"
     },
-    "definition": "Events in a story must connect causally \u00e2\u20ac\u201d 'because of that' \u00e2\u20ac\u201d not sequentially \u00e2\u20ac\u201d 'and then.' If you can remove a scene and nothing breaks, it doesn't belong. Every event must cause the next, creating an unbreakable chain from beginning to end.",
+    "definition": "Events in a story must connect causally \u2014 'because of that' \u2014 not sequentially \u2014 'and then.' If you can remove a scene and nothing breaks, it doesn't belong. Every event must cause the next, creating an unbreakable chain from beginning to end.",
     "detection_signal": "Scripts where scenes can be rearranged or removed without affecting the story, where events feel episodic rather than causal, or where the story reads as 'this happened, then this happened, then this happened.'",
     "counter_considerations": "Some art-house or contemplative films deliberately use associative rather than causal structure. The rule targets commercial narrative.",
     "severity_default": "high",
@@ -280,7 +280,7 @@
       "originator": "Lisa Cron",
       "work": "Story Genius"
     },
-    "definition": "The external gauntlet of the plot must be specifically designed to force the protagonist to confront their internal misbelief. Every major plot event should challenge, pressure, or illuminate the character's inner conflict\u00e2\u20ac\u201dnot just provide spectacle.",
+    "definition": "The external gauntlet of the plot must be specifically designed to force the protagonist to confront their internal misbelief. Every major plot event should challenge, pressure, or illuminate the character's inner conflict\u2014not just provide spectacle.",
     "detection_signal": "Plot events that happen to the protagonist without forcing internal re-evaluation. Dramatic external crises that leave the character's beliefs and fears unchanged. Action sequences disconnected from the character's inner life.",
     "counter_considerations": "Plot events can spur internal change indirectly, by creating conditions that make the Lie untenable. Do not flag plot events that build pressure toward an inevitable internal reckoning.",
     "severity_default": "high",

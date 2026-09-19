@@ -54,7 +54,7 @@
       "originator": "Lisa Cron",
       "work": "Story Genius"
     },
-    "definition": "Writing by the seat of your pants\u00e2\u20ac\u201dwithout knowing the protagonist's internal problem\u00e2\u20ac\u201dalmost always produces a sprawling, episodic manuscript. Creativity needs context; without the past to anchor the present, events feel random and fail to accumulate meaning.",
+    "definition": "Writing by the seat of your pants\u2014without knowing the protagonist's internal problem\u2014almost always produces a sprawling, episodic manuscript. Creativity needs context; without the past to anchor the present, events feel random and fail to accumulate meaning.",
     "detection_signal": "Manuscripts that feel episodic, where scenes do not build on each other. Stories that lose momentum around the midpoint. Plots that feel like a series of events rather than a unified arc.",
     "counter_considerations": "Some natural storytellers can pants successfully, though they often produce sprawling first drafts. Do not flag stories that are clearly structured even if the author claims to have pantsed.",
     "severity_default": "low",

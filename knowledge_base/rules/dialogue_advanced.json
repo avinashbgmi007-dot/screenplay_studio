@@ -9,7 +9,7 @@
       "originator": "Robert McKee",
       "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
     },
-    "definition": "The best dialogue operates on multiple levels simultaneously \u00e2\u20ac\u201d what characters say, what they mean, what they hide, and what the audience understands. Each line should have at least two layers of meaning.",
+    "definition": "The best dialogue operates on multiple levels simultaneously \u2014 what characters say, what they mean, what they hide, and what the audience understands. Each line should have at least two layers of meaning.",
     "detection_signal": "Check if dialogue contains layers of meaning. Verify that characters rarely say exactly what they mean, especially in emotionally charged scenes.",
     "counter_considerations": "Some dialogue is intentionally direct for effect. The key is that subtext should be present in important scenes.",
     "severity_default": "medium",
@@ -33,7 +33,7 @@
       "work": null,
       "note": "Standard dialogue writing principle found across multiple sources."
     },
-    "definition": "Dialogue rhythm \u00e2\u20ac\u201d sentence length, punctuation, pauses \u00e2\u20ac\u201d controls scene pacing. Short, clipped sentences create tension; long, flowing sentences create intimacy or reflection.",
+    "definition": "Dialogue rhythm \u2014 sentence length, punctuation, pauses \u2014 controls scene pacing. Short, clipped sentences create tension; long, flowing sentences create intimacy or reflection.",
     "detection_signal": "Check if dialogue rhythm matches the scene's emotional intent. Verify that sentence structure supports pacing goals.",
     "counter_considerations": "Some scenes use inconsistent rhythm intentionally. The key is that rhythm choices should be purposeful.",
     "severity_default": "medium",
@@ -79,7 +79,7 @@
       "originator": "James Scott Bell",
       "work": "Conflict & Suspense"
     },
-    "definition": "Every dialogue scene must contain conflict \u00e2\u20ac\u201d characters want different things, have different perspectives, or are working at cross-purposes. Dialogue without conflict is just conversation.",
+    "definition": "Every dialogue scene must contain conflict \u2014 characters want different things, have different perspectives, or are working at cross-purposes. Dialogue without conflict is just conversation.",
     "detection_signal": "Check if dialogue scenes contain conflict. Verify that characters have competing goals or perspectives.",
     "counter_considerations": "Some dialogue scenes establish relationships before introducing conflict. The key is that conflict should be present in important scenes.",
     "severity_default": "high",
@@ -103,7 +103,7 @@
       "work": null,
       "note": "Standard dialogue writing principle found across multiple sources."
     },
-    "definition": "Every line of dialogue must serve a purpose \u00e2\u20ac\u201d advancing plot, revealing character, creating conflict, or establishing atmosphere. Lines without purpose should be cut.",
+    "definition": "Every line of dialogue must serve a purpose \u2014 advancing plot, revealing character, creating conflict, or establishing atmosphere. Lines without purpose should be cut.",
     "detection_signal": "Check if every line of dialogue serves a clear purpose. Verify that no lines are purely filler or exposition without dramatic value.",
     "counter_considerations": "Some dialogue establishes atmosphere or character voice. The key is that the purpose should be clear.",
     "severity_default": "medium",
@@ -151,7 +151,7 @@
       "work": null,
       "note": "Standard dialogue writing principle found across multiple sources."
     },
-    "definition": "Characters may try to hide their emotions, but emotions leak through dialogue \u00e2\u20ac\u201d in word choice, sentence structure, pauses, and what's left unsaid.",
+    "definition": "Characters may try to hide their emotions, but emotions leak through dialogue \u2014 in word choice, sentence structure, pauses, and what's left unsaid.",
     "detection_signal": "Check if characters' emotional states are revealed through dialogue mechanics, not just content. Verify that emotions leak through word choice, pauses, and omissions.",
     "counter_considerations": "Some characters are skilled at hiding emotions. The key is that emotional leakage should be present when appropriate.",
     "severity_default": "medium",
@@ -223,7 +223,7 @@
       "work": null,
       "note": "Standard dialogue writing principle found across multiple sources."
     },
-    "definition": "Returning to earlier dialogue \u00e2\u20ac\u201d phrases, arguments, promises \u00e2\u20ac\u201d creates cohesion and shows character development. Callbacks reward attentive audiences.",
+    "definition": "Returning to earlier dialogue \u2014 phrases, arguments, promises \u2014 creates cohesion and shows character development. Callbacks reward attentive audiences.",
     "detection_signal": "Check if dialogue callbacks are used effectively. Verify that returning to earlier dialogue creates meaning and shows development.",
     "counter_considerations": "Some stories don't use callbacks. The key is that if callbacks are used, they should be purposeful.",
     "severity_default": "low",
@@ -247,7 +247,7 @@
       "work": null,
       "note": "Standard dialogue writing principle found across multiple sources."
     },
-    "definition": "Dialogue reveals power dynamics between characters. Who speaks first, who interrupts, who controls the conversation \u00e2\u20ac\u201d all communicate relative status and power.",
+    "definition": "Dialogue reveals power dynamics between characters. Who speaks first, who interrupts, who controls the conversation \u2014 all communicate relative status and power.",
     "detection_signal": "Check if dialogue mechanics reveal power dynamics. Verify that conversation patterns communicate status and power relationships.",
     "counter_considerations": "Some scenes feature equal power dynamics. The key is that power relationships should be present when relevant.",
     "severity_default": "medium",

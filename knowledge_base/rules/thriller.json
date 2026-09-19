@@ -32,7 +32,7 @@
       "originator": "Scriptshadow/Amber",
       "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
     },
-    "definition": "In contained thrillers, characters must constantly be doing something to improve their situation \u00e2\u20ac\u201d exploring plans, fortifying defenses, gathering intelligence, attempting escape. Characters sitting around talking is the worst offense in this subgenre.",
+    "definition": "In contained thrillers, characters must constantly be doing something to improve their situation \u2014 exploring plans, fortifying defenses, gathering intelligence, attempting escape. Characters sitting around talking is the worst offense in this subgenre.",
     "detection_signal": "Track character actions in contained thriller scenes. Flag scenes where characters passively wait, have lengthy conversations without concurrent physical activity, or fail to advance their survival strategy.",
     "counter_considerations": "Brief breathing scenes between action beats are acceptable for pacing. Dialogue that reveals character under extreme pressure can be dramatically necessary.",
     "severity_default": "medium",
@@ -55,7 +55,7 @@
       "originator": "Scriptshadow/Amber",
       "work": "500 Screenwriting Secrets Hidden Inside 50 Great Movies"
     },
-    "definition": "In action/thriller scripts, the protagonist must be as active as possible \u00e2\u20ac\u201d making decisions, taking initiative, driving events forward rather than reacting passively to what the villain does. The hero earns leadership through action, not inheritance.",
+    "definition": "In action/thriller scripts, the protagonist must be as active as possible \u2014 making decisions, taking initiative, driving events forward rather than reacting passively to what the villain does. The hero earns leadership through action, not inheritance.",
     "detection_signal": "Track the protagonist's actions across the script. Check if they initiate key plot movements, make consequential decisions, and physically engage with threats.",
     "counter_considerations": "Some thriller subgenres (espionage, detective) require periods of observation and investigation before action. The protagonist's initial passivity can be part of their arc if they become active by the midpoint.",
     "severity_default": "medium",
@@ -147,7 +147,7 @@
       "originator": "David Hohl",
       "work": "101 Kick-Ass Screenwriting Tips"
     },
-    "definition": "By the end of Act I (or Reel 2), the protagonist must be irrevocably locked into the story \u00e2\u20ac\u201d they cannot walk away from the conflict without catastrophic consequences. This creates the urgency that drives the rest of the script.",
+    "definition": "By the end of Act I (or Reel 2), the protagonist must be irrevocably locked into the story \u2014 they cannot walk away from the conflict without catastrophic consequences. This creates the urgency that drives the rest of the script.",
     "detection_signal": "At the Act I turning point, check if the protagonist has a clear reason why they cannot abandon the conflict. Verify that stakes are established and that turning back would result in significant loss.",
     "counter_considerations": "Some thrillers use a delayed lock-in, where the protagonist initially resists engagement. The key is that by the end of Act I, the lock-in must be established.",
     "severity_default": "high",
@@ -239,7 +239,7 @@
       "originator": "Michael Hauge",
       "work": "Writing Screenplays That Sell"
     },
-    "definition": "Thrillers often employ a ticking clock \u00e2\u20ac\u201d a deadline by which the protagonist must act or face dire consequences. This creates urgency and prevents the hero from indefinitely delaying confrontation.",
+    "definition": "Thrillers often employ a ticking clock \u2014 a deadline by which the protagonist must act or face dire consequences. This creates urgency and prevents the hero from indefinitely delaying confrontation.",
     "detection_signal": "Check if the script establishes a clear deadline or time limit for the protagonist's actions. Verify that the deadline creates genuine urgency and forces action.",
     "counter_considerations": "Not all thrillers need a literal ticking clock. The key is that some form of urgency must compel the protagonist to act.",
     "severity_default": "medium",
@@ -262,7 +262,7 @@
       "originator": "Robert McKee",
       "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
     },
-    "definition": "Each reversal in a thriller should escalate the stakes \u00e2\u20ac\u201d the protagonist's situation should worsen with each turn. Reversals that return to the status quo reduce tension.",
+    "definition": "Each reversal in a thriller should escalate the stakes \u2014 the protagonist's situation should worsen with each turn. Reversals that return to the status quo reduce tension.",
     "detection_signal": "Track the major reversals in the plot. Check if each reversal raises the stakes or worsens the protagonist's situation. Flag reversals that return to a previous status quo.",
     "counter_considerations": "Some reversals are necessary for pacing contrast. The key is that the overall trajectory should be toward higher stakes.",
     "severity_default": "medium",

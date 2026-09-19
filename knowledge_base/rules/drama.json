@@ -32,7 +32,7 @@
       "originator": "Robert McKee",
       "work": "Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)"
     },
-    "definition": "In drama, characters face genuine moral dilemmas where every choice has consequences. There are no easy answers \u00e2\u20ac\u201d the audience should understand and sympathize with multiple perspectives.",
+    "definition": "In drama, characters face genuine moral dilemmas where every choice has consequences. There are no easy answers \u2014 the audience should understand and sympathize with multiple perspectives.",
     "detection_signal": "Check if the protagonist faces genuine moral dilemmas. Verify that choices have real consequences and that multiple perspectives are presented sympathetically.",
     "counter_considerations": "Some dramas present clear moral frameworks. The key is that the moral complexity should be appropriate to the story's themes.",
     "severity_default": "medium",
@@ -55,7 +55,7 @@
       "originator": "James Scott Bell",
       "work": "Conflict & Suspense"
     },
-    "definition": "Drama derives its power from internal conflict \u00e2\u20ac\u201d the protagonist's struggle with themselves, their values, their relationships. External events are secondary to the internal journey.",
+    "definition": "Drama derives its power from internal conflict \u2014 the protagonist's struggle with themselves, their values, their relationships. External events are secondary to the internal journey.",
     "detection_signal": "Check if the protagonist's internal struggle is the primary source of dramatic tension. Verify that external events serve the internal journey rather than overshadowing it.",
     "counter_considerations": "Some dramas balance internal and external conflict. The key is that internal conflict should be present and significant.",
     "severity_default": "medium",
@@ -79,7 +79,7 @@
       "work": null,
       "note": "Standard dramatic writing principle found across multiple sources."
     },
-    "definition": "In drama, what characters say is less important than what they mean. Subtext \u00e2\u20ac\u201d the gap between dialogue and intent \u00e2\u20ac\u201d reveals true emotional states and creates dramatic irony.",
+    "definition": "In drama, what characters say is less important than what they mean. Subtext \u2014 the gap between dialogue and intent \u2014 reveals true emotional states and creates dramatic irony.",
     "detection_signal": "Check if dramatic dialogue contains layers of meaning. Verify that characters rarely say exactly what they mean, especially in emotionally charged scenes.",
     "counter_considerations": "Some dramas use direct dialogue for specific effects. The key is that subtext should be present in the most important scenes.",
     "severity_default": "medium",
@@ -127,7 +127,7 @@
       "work": null,
       "note": "Standard dramatic writing principle found across multiple sources."
     },
-    "definition": "Drama derives its power from personal stakes \u00e2\u20ac\u201d relationships, identity, self-worth, family. The protagonist faces loss that matters emotionally, not just physically or professionally.",
+    "definition": "Drama derives its power from personal stakes \u2014 relationships, identity, self-worth, family. The protagonist faces loss that matters emotionally, not just physically or professionally.",
     "detection_signal": "Check if the protagonist faces personal loss (relationships, identity, family) as the primary stake. Verify that emotional consequences are more significant than physical or professional ones.",
     "counter_considerations": "Some dramas combine personal and professional stakes. The key is that personal stakes should be present and significant.",
     "severity_default": "medium",

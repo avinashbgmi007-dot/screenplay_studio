@@ -31,7 +31,7 @@
       "originator": "Naomi Beaty",
       "work": "Logline Shortcuts"
     },
-    "definition": "A logline that only describes the setup (who the character is and what happens to them) fails. It must also convey what the character does \u00e2\u20ac\u201d the method or journey of pursuing the goal. Without the Act Two element, the logline describes a premise, not a story.",
+    "definition": "A logline that only describes the setup (who the character is and what happens to them) fails. It must also convey what the character does \u2014 the method or journey of pursuing the goal. Without the Act Two element, the logline describes a premise, not a story.",
     "detection_signal": "Loglines that end at the inciting incident, describe only the character's situation without their active pursuit, or omit the method of achieving the goal.",
     "counter_considerations": "Some loglines imply the journey through genre conventions. The rule targets the common pitfall of stopping at the setup.",
     "severity_default": "high",

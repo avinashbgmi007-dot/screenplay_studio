@@ -33,7 +33,7 @@
       "originator": "William Martell",
       "work": "The Secrets of Action Screenwriting"
     },
-    "definition": "In action films, the protagonist must be as active as possible \u00e2\u20ac\u201d making decisions, taking initiative, driving events forward rather than reacting passively. The hero earns leadership through action, not inheritance.",
+    "definition": "In action films, the protagonist must be as active as possible \u2014 making decisions, taking initiative, driving events forward rather than reacting passively. The hero earns leadership through action, not inheritance.",
     "detection_signal": "Track the protagonist's actions across the script. Check if they initiate key plot movements, make consequential decisions, and physically engage with threats.",
     "counter_considerations": "Some action heroes start passive and become active. The key is that by the midpoint, the hero must be driving the action.",
     "severity_default": "high",
@@ -79,7 +79,7 @@
       "originator": "William Martell",
       "work": "The Secrets of Action Screenwriting"
     },
-    "definition": "Action films almost always have physical death at stake. The protagonist faces mortal danger \u00e2\u20ac\u201d failure means death, not just professional or psychological consequences.",
+    "definition": "Action films almost always have physical death at stake. The protagonist faces mortal danger \u2014 failure means death, not just professional or psychological consequences.",
     "detection_signal": "Check if the protagonist faces physical death as a consequence of failure. Verify that the threat of death is explicit and present throughout the story.",
     "counter_considerations": "Some action films focus on professional or psychological death. The key is that the primary mode of death must be clearly established.",
     "severity_default": "high",

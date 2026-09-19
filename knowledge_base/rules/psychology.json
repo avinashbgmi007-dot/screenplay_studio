@@ -48,7 +48,7 @@
   },
   {
     "id": "bell_fictive_dream",
-    "name": "The Goal Is the Fictive Dream\u00e2\u20ac\u201dTransport the Reader",
+    "name": "The Goal Is the Fictive Dream\u2014Transport the Reader",
     "taxonomy_level": "psychology",
     "category": "reader_experience",
     "source": {
@@ -56,8 +56,8 @@
       "originator": "James Scott Bell",
       "work": "Plot & Structure"
     },
-    "definition": "The purpose of fiction is to create a 'fictive dream'\u00e2\u20ac\u201dthe illusion that life is taking place on the page. When readers are under the spell of a story, they experience events as if they were real. The writer's job is to sustain this dream, not to showcase prose or technique.",
-    "detection_signal": "Moments where the author's presence becomes visible\u00e2\u20ac\u201dstylistic flourishes, authorial commentary, or meta-awareness that reminds the reader they are reading a constructed text.",
+    "definition": "The purpose of fiction is to create a 'fictive dream'\u2014the illusion that life is taking place on the page. When readers are under the spell of a story, they experience events as if they were real. The writer's job is to sustain this dream, not to showcase prose or technique.",
+    "detection_signal": "Moments where the author's presence becomes visible\u2014stylistic flourishes, authorial commentary, or meta-awareness that reminds the reader they are reading a constructed text.",
     "counter_considerations": "Certain literary styles intentionally break the fictive dream for thematic effect. Do not flag deliberate fourth-wall breaks or experimental narrative techniques.",
     "severity_default": "medium",
     "confidence_tier": "high",
