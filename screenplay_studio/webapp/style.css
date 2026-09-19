@@ -290,7 +290,6 @@
   --z-banner: 100;          /* error banner, overflow dropdown */
   --z-badge: 300;           /* level badge */
   --z-dock-sheet: 420;      /* context dock mobile sheet */
-  --z-sameer: 500;          /* sameer panel */
   --z-board: 510;           /* problem board */
   --z-board-tab: 515;       /* problem board + rail edge tabs */
   --z-rail: 520;            /* struct rail, desk toolbar above the board */

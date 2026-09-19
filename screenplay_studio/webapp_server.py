@@ -3120,6 +3120,14 @@ def main():
                              "(your llama-server on :8080) is untouched.")
     args = parser.parse_args()
 
+    if args.require_token:
+        # Deprecated: the capability token is minted by default now, so this flag
+        # changes nothing. It is still accepted so an existing launch script does
+        # not hard-fail on an unrecognised argument -- but it says so rather than
+        # being a silent no-op, which is what it was.
+        print("Note: --require-token is deprecated and has no effect; a capability "
+              "token is minted by default. Pass --no-token to opt out.")
+
     # H1: secure by default. --no-token is the explicit opt-out and wins if both
     # flags are passed (never silently harden, never silently expose).
     _API_TOKEN = _startup_token(args.no_token)

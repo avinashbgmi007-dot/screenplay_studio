@@ -1751,3 +1751,45 @@ arithmetic is the new arithmetic. Nothing committed.
 GOTCHA 3 (tooling): a very large `python - <<'PY'` heredoc gets TRUNCATED in this shell and
 dies with a bogus NameError/SyntaxError. Keep each heredoc small (roughly < 4 kB) or split it.
 
+
+================================================================================
+2026-09-19 -- HOUSEKEEPING PASS: dead no-op flag, orphaned token, scratch ignored
+================================================================================
+Track: docs/CRITICAL_REVIEW_2026-09-18.md (section C rows 9/10; the stale M2 row in B).
+
+THREE CHANGES
+1. `--require-token` was a DEAD NO-OP. argparse accepts it (help already read
+   "Deprecated -- now the default") but `args.require_token` is never read since the
+   secure-by-default refactor, so passing it did nothing and said nothing. Kept the
+   flag -- an existing launch script would otherwise hard-fail on an unrecognised
+   argument -- but main() now prints a one-line deprecation notice, so the no-op is
+   LOUD instead of silent. Verified by booting with --require-token: the notice
+   prints AND the token is still minted ("Writes require the capability token").
+2. `--z-sameer: 500` was ORPHANED by the H3 panel deletion -- defined in the z-scale,
+   referenced nowhere (repo-wide grep: only the definition). Removed; the scale now
+   runs --z-dock-sheet 420 -> --z-board 510 with no gap.
+3. `.gitignore` now covers the session scratch: `/_qa_bugrepro/`, `/freebuff-chat-*.md`,
+   `/SESSION_SUMMARY.md`, `/tests/_browser_smoke.png`. `git check-ignore -v` confirms
+   each pattern; `git status` is clean of them.
+
+DOC CORRECTIONS (the board was stale on M2)
+- Section B M2 said "Written, uncommitted, untested." FALSE on all three: it is
+  committed (app.js in `372e5a4`, style.css in `5d31ef3`), and fork/switch ARE
+  asserted at the API level (`test_webapp_api.py:306` fork+isolation, `:326` switch).
+  What is genuinely missing is a BROWSER test of the button -> modal -> POST path.
+  Row rewritten; section C row 9 updated to match.
+- Section C row 10 (L7 dead code) gains the two findings above.
+- `CLI_REFERENCE.md` wording updated (the flag prints a notice).
+
+PUSH: the 15 commits that had never reached the remote are now on origin/main
+(`2eb817f..8f713bc`, verified by `git ls-remote` -- NOT the tracking ref). The
+stale-tracking-ref disease recurred (8th time): `git status` still read "ahead 15"
+after a successful push; re-fixed by writing the loose ref by hand.
+
+GATE: **1101 passed / 0 failed** (pytest); browser `token_mode` **3/3** and
+`smoke` **18/18** (run because webapp_server.py changed). No new tests -- this is
+cleanup, and the suite is unchanged in size by design.
+
+NOT DONE (deliberately, awaiting the user): the C9 browser test for the fork UI;
+the C5 KB confidence-tier recalibration; the C10-C13 residual tail.
+

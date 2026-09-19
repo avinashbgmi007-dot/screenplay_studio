@@ -67,3 +67,9 @@ Cursors/
 # WorkBuddy local state (memory, skills cache)
 /.workbuddy-ai/
 /tmp*/
+
+# Session scratch / handoff artifacts (kept on disk, never versioned)
+/_qa_bugrepro/
+/freebuff-chat-*.md
+/SESSION_SUMMARY.md
+/tests/_browser_smoke.png
