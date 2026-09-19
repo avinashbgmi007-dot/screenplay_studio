@@ -75,3 +75,6 @@ Cursors/
 /freebuff-chat-*.md
 /SESSION_SUMMARY.md
 /tests/_browser_smoke.png
+
+# UI evidence shots (regenerate with tests/_ui_capture.py; never versioned - repo already carries 69 PNGs)
+/impl-shots/ui_audit/
