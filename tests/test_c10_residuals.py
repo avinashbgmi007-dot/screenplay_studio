@@ -55,9 +55,10 @@ class TestRetryPermissionRetriesOnlyTransientLocks:
         assert jsonio.retry_permission(flaky) == "ok"
         assert calls["n"] == 3
 
-    def test_a_genuine_access_denial_is_not_retried(self):
-        """WinError 5 is ACCESS_DENIED. Retrying it can only fail again, and it
-        delays the error the caller needs to see — it used to be retried 3x."""
+    def test_a_genuine_access_denial_is_retried_bounded_then_raises(self):
+        """WinError 5 is ACCESS_DENIED. Since 2026-09-20 (user decision) every
+        PermissionError is retried for the bounded window (the AV-hold hammer
+        produces bare denials), then raises — bounded, never swallowed."""
         calls = {"n": 0}
 
         def denied():
@@ -70,10 +71,10 @@ class TestRetryPermissionRetriesOnlyTransientLocks:
             "2026-09-20 decision: every PermissionError is retried for the bounded "
             "budget (the AV-hold hammer produces bare denials), then raises — never swallowed")
 
-    def test_a_permission_error_without_a_winerror_is_final(self):
-        """POSIX EACCES carries no winerror, and there is no sharing-violation
-        semantics to wait out — rename is atomic there — so it must raise at
-        once rather than sleep three times first."""
+    def test_a_permission_error_without_a_winerror_is_retried_bounded_then_raises(self):
+        """2026-09-20 decision: the winerror-only filter is dropped — the hammer's
+        bare PermissionError(13) carries no winerror yet is transient under load —
+        so a bare EACCES is retried for the bounded window and still raises."""
         calls = {"n": 0}
 
         def denied():
