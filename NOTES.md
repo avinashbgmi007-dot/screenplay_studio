@@ -1793,3 +1793,52 @@ cleanup, and the suite is unchanged in size by design.
 NOT DONE (deliberately, awaiting the user): the C9 browser test for the fork UI;
 the C5 KB confidence-tier recalibration; the C10-C13 residual tail.
 
+
+================================================================================
+2026-09-19 -- BRANCH UI BROWSER TEST (C9): a real bug the API tests could not see
+================================================================================
+Track: docs/CRITICAL_REVIEW_2026-09-18.md (section B M2; section C row 9).
+
+The branch UI was committed and API-tested but never driven in a browser -- the
+half that can rot silently. New suite: tests/e2e_browser_branch_ui.py (11 checks),
+self-booted demo studio.
+
+THE BUG IT FOUND (real, not a test artifact)
+A fresh project has NO session: openProject sets `state.currentSession = null` and
+seeds `state.branches = { main: {} }` (app.js:1983) -- sessions are created lazily
+on the first message. But the fork button renders on `state.currentProject` alone
+(renderBranches, app.js:3178). So on a fresh project the button was OFFERED and
+clicking it POSTed to /chat/sessions/null/fork -> 404 "Session or project not
+found." The modal stayed open (createFork threw before closeModal), so it read as
+"nothing happened". Reproduced from the error banner: "Couldn't create fork:
+Session or project not found."
+
+Why the API tests missed it: test_webapp_api.py forks an EXISTING session, so the
+null-session path never runs. This is the browser's job -- and it is the third time
+in this document's history that driving the real UI found what the data layer could
+not.
+
+THE FIX
+createFork() now calls the idempotent ensureSession() before the POST (app.js).
+That is the same lazy path the first message uses, so forking a fresh project now
+creates the session it needs instead of 404ing. app.js cache-bust hx1b385 -> hx1b386.
+
+SELF-CAUGHT PROCESS ERROR (important, and mine)
+While writing the housekeeping docs I sent THREE Edit calls to the SAME file
+(docs/CRITICAL_REVIEW_2026-09-18.md) in one message. All three reported success;
+only ONE persisted. The M2 row and the row-9 edit were silently LOST, and the
+housekeeping commit b4f83dd went out with a message claiming the M2 row was
+rewritten when it was not. This is EXACTLY the hazard NOTES.md already documents:
+"never batch parallel edits to the same file (race cost ~2 sessions of debugging;
+sequential edits only)." Both edits were re-applied SEQUENTIALLY, each verified
+with a grep before the next; the stale text is gone (grep "Written, uncommitted,
+untested" -> 0). RULE REINFORCED: one Edit per file per message, and VERIFY the
+write landed before committing.
+
+EVIDENCE
+- e2e_browser_branch_ui.py 11/11 (fork pill, modal opens, create succeeds, new pill
+  appears, merge-peek names the parent + fork point, switch moves the active pill,
+  switch back, no JS errors). RED before the fix (3 fails), GREEN after.
+- pytest 1101 passed / 0 failed (unchanged -- the browser suites are not collected).
+- browser: smoke 18/18, phase7 15/15, token_mode 3/3.
+

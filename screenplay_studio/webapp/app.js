@@ -3213,6 +3213,13 @@ async function createFork() {
   const name = $("#fork-name-input").value.trim();
   if (!name) return;
   try {
+    // A fresh project has NO session until the first message (see the lazy
+    // comment in openProject), but the fork button renders on currentProject
+    // alone -- so clicking it POSTed to /chat/sessions/null/fork and 404'd
+    // ("Session or project not found"): an offered control that could not
+    // succeed. Establish the session first; ensureSession is idempotent and is
+    // the same lazy path the first message uses.
+    await ensureSession();
     await api(`/projects/${encodeURIComponent(state.currentProject)}/chat/sessions/${state.currentSession}/fork`, {
       method: "POST", body: JSON.stringify({ name }),
     });
