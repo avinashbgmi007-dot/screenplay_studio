@@ -102,14 +102,19 @@ python -m screenplay_cowriter.server --port 8300 --sessions-dir ./sessions --mem
 | `--report`, `--script` | Paths to Piece 2 findings / Piece 1 parsed JSON. |
 | `--server`, `--model` | llama-server URL / model override. |
 | `--sessions-dir` | Default `./sessions` (also on `list` and `server`). |
-| `--memory-path` | Opt in to writer relationship memory (the webapp wires it by default). |
+| `--memory-path` | Writer relationship memory file. **Opt-in here** — without it this REPL is amnesiac. The `screenplay_studio run/resume` entry point to the same REPL defaults memory ON at `~/.screenplay_studio/writer_profile.json` with a `--no-memory` opt-out; the two defaults do not yet agree (see the OPEN ITEMS ledger). |
+
+On `chat` (and on `resume`, before the prompt) the session banner prints where the conversation
+stands, computed from stored state — *"You left off mid-probe: Sameer asked you a question about
+scene 4 (INT. HOSPITAL - NIGHT) and is waiting on your answer."* The probe line disappears by itself
+once the question is answered, because it reads a live flag rather than a stored timestamp.
 
 **In-chat slash commands** (`screenplay_cowriter chat` REPL):
 
 | Command | Purpose |
 |---|---|
 | `/fork <name>` | Branch off into a new named thread. |
-| `/switch <name>` | Jump to another branch. |
+| `/switch <name>` | Jump to another branch. Prints where that branch stands against the one it was forked from — *"was forked from 'main' at turn 6. Since then 'main' has added 4 turn(s) about scene 11, and this branch has not moved."* — and, when you land on a fork point, which branches were forked from it. |
 | `/branches` | List branches on this session. |
 | `/delete <branch>` | Discard a branch (can't delete `main`). |
 | `/persona <name>` | Switch persona: `writing_partner` (default), `premise_doctor`, `script_consultant`, `producer`, `dev_exec`, `teacher`, `audience`, `genre_specialist`. |

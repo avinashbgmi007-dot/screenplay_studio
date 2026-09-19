@@ -2248,3 +2248,100 @@ The safe procedure in THIS repo is a FILE BACKUP, not a git operation:
 `git stash` here at all.
 
 
+
+
+
+================================================================================
+2026-09-19 — P2.9 (reply-side language register) + P3.12/P3.13 (orientation)
+================================================================================
+
+WHAT THE ITEM ASKED FOR, AND WHAT THE RECON FOUND
+P2.9 read: "Reply-side language register check for Tenglish/Hinglish (token-ratio comparison of reply
+vs. writer message; soft re-ask once when wildly off)." Before writing any of it, the instrument was
+measured against the product's own output. The result killed the specified mechanism.
+
+  demo te generic 1   words=15 hits=0 ratio=0.00  detect_register -> NOT Tenglish
+  demo te generic 2   words=16 hits=6 ratio=0.38  detect_register -> Tenglish
+  demo hi generic 1   words=18 hits=4 ratio=0.22  detect_register -> Hinglish
+  demo hi generic 2   words=15 hits=1 ratio=0.07  detect_register -> NOT Hinglish
+  english control     words=13 hits=0 ratio=0.00  detect_register -> not a mix
+
+Two of the four genuine code-mixed replies the demo model ships are read as plain English, with the
+same signature as the English control. The cause is not a bad threshold, it is a bad INSTRUMENT: the
+bar is `token_hits / latin_words >= 0.12`, which is LENGTH-DEPENDENT. The writer writes 3-6 word
+messages; the co-writer writes 13-15 word prose. The same token density that clears 0.12 in a 4-word
+message reads 0.07 in a 15-word one. A reply-side judge on that instrument would re-ask on the demo
+model's correct output — a false positive on the product's own fixture.
+
+  => The Tenglish/Hinglish half of P2.9 is BLOCKED, not skipped. The prerequisite is a
+     length-independent Indic-Latin instrument, which needs a real corpus of reply-length code-mixed
+     text. A lexicon transcribed from the four strings above would be overfitting to a fixture, not
+     calibration — the same reasoning that BLOCKED S5.6.
+
+THREE THINGS SHIPPED INSTEAD, ALL FORCED BY THAT MEASUREMENT
+
+1. The writer-side bar is now length-independent (`ratio >= 0.12 OR >= 3 DISTINCT tokens`). This
+   fixes a LIVE defect the item never named: because the bar was a pure ratio, three distinct
+   transliterated tokens inside a message of 26+ words read below 0.12 and the writer got NO mirror
+   instruction at all — Sameer answered a paragraph of Tenglish in English. The ratio still settles
+   the short case, where one loanword is weak evidence; the absolute count settles the long one,
+   where three distinct transliterated tokens is code-mixing at any length. DISTINCT, so
+   "hai hai hai" is one kind, not three.
+
+2. The reply-side check ships for the SCRIPT registers only (Telugu / Devanagari). Unicode blocks are
+   exact, carry no threshold to tune, and do not care how long either side is. One soft re-ask:
+   NOT STREAMED (the writer's bubble is already showing the first reply's tokens; a second streamed
+   reply would append itself to the first and read as a glitch — the caller re-renders from the final
+   stored messages, so the swap is clean), accepted ONLY when it actually carries the register, and a
+   failed or unimproved retry keeps the first reply. The retry can never cost the writer the answer
+   they already had, and a model that will not mirror cannot make things worse by being asked twice.
+
+3. The ENGINE was breaking its own register guarantee. `peer.ensure_forward_momentum` appended the
+   English nudge "What's your instinct on the next move?" to a Telugu reply — deterministically, on
+   every short reply. The mirror had worked and the engine then broke it. A non-Latin reply now ends
+   without a nudge: the nudge list is English-only, and per-register nudges are a product decision
+   that needs a live model to validate. An honest short answer beats a two-language one.
+
+A BUG IN MY OWN GUARD, CAUGHT BY THE PROBE
+`register_mismatch` measured the reply's length with `_WORD = [a-zA-Z]+`. A reply written in Telugu
+script contains ZERO Latin words, so every correct reply read as "0 words — too short to judge" and
+returned None before reaching the pattern check. Right verdict, wrong reason, and the guard was DEAD
+for exactly the case it exists to detect. Fixed to a whitespace token count, and pinned by
+`test_the_length_check_counts_tokens_not_latin_words`, which uses a reply in a DIFFERENT Indic script
+(the only case the two versions disagree on).
+
+P3.13 — resume line, and P3.12 — branch diff: ONE deterministic module, THREE surfaces
+New `screenplay_cowriter/orientation.py`. No model call, nothing invented.
+
+  - You left off mid-probe: Sameer asked you a question about scene 4 (INT. HOSPITAL - NIGHT) and is
+    waiting on your answer.
+  - This branch ('alt') was forked from 'main' at turn 6. Since then 'main' has added 4 turn(s) about
+    scene 11, scene 12, and this branch has not moved.
+  - Branches forked from 'main': 'alt' (1 turn(s)).
+
+`awaiting_probe` is a LIVE flag the engine sets when it ends a turn on a probe question and clears on
+the writer's next turn, so the resume line retires itself rather than going stale. `forked_at_index`
+makes both sides' drift simple subtraction — a content diff would need a model; the counts do not, and
+the counts are what the writer is actually missing. The item's phrase "switching BACK" forced the
+third line: main has no parent, so without naming the branches forked FROM the one you land on, the
+fork point says nothing at all.
+
+Surfaces: the mood fragment (so the persona knows where you are — `_mood_fragment(m, session,
+script_ctx)`, with both new params optional so the existing contract and its test are untouched), the
+CLI session banner, and the CLI `/switch` output. One resolver, so the three cannot drift.
+
+A SECOND LIVE DEFECT, FOUND BY THIS PASS
+`Session.fork()` copied messages, persona and mode but NOT `awaiting_probe`. So a writer who forked to
+explore an idea got a normal turn instead of the probe answer the fork's own last message was asking
+for. One line, plus a test.
+
+GATE
+Full suite 1273 passed / 0 failed (was 1214; +59 = the two new files exactly). Mutation check by FILE
+BACKUP with hash-verified restore — never `git stash` here:
+  language_mirror.py reverted -> 22 of 32 fail      engine.py reverted -> 7 of 32 fail
+  peer.py reverted           ->  3 of 32 fail      models.py reverted -> 2 of 27 fail
+  webapp_server.py reverted  ->  2 of 3 mood fail  cli.py reverted    -> 3 of 3 CLI fail
+  orientation.py deleted     -> collection error   FIXED              -> 59/59 pass
+
+PUSH: still stranded. The credential path is the blocker (disabling the helper fails FAST with
+"could not read Username"); 8 attempts across four passes. Needs re-authentication or a manual push.

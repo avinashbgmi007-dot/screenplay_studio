@@ -271,6 +271,43 @@ class CoWriterEngine:
                                 temperature=self.CHAT_TEMPERATURE,
                                 repeat_penalty=self.CHAT_REPEAT_PENALTY)
 
+    def _generate_mirrored(self, messages, user_text, on_token=None):
+        """One generation, plus at most ONE soft re-ask when the reply dropped
+        the writer's script register (P2.9).
+
+        Bounded on every side, because each of these is a way the retry could
+        cost more than it buys:
+
+          * It fires only on the exact Unicode-block case (`register_mismatch`
+            refuses the fuzzy Latin-mix half — see `language_mirror`).
+          * The re-ask is NOT streamed. The writer's bubble is already showing
+            the first reply's tokens; streaming a second reply would append it
+            to the first and read as a glitch. The caller re-renders from the
+            final stored messages, so the swap is clean.
+          * The re-ask is accepted only when it ACTUALLY carries the register.
+            A retry that does no better is discarded and the first reply kept —
+            the retry can never cost the writer the answer they already had,
+            and a model that will not mirror cannot make things worse by being
+            asked twice.
+          * A failed re-ask is swallowed for the same reason. The first
+            generation's own exception still propagates untouched.
+        """
+        from .language_mirror import mirror_reask_instruction, register_mismatch
+
+        reply = clean_reply(self._generate(messages, on_token))
+        if register_mismatch(user_text, reply) is None:
+            return reply
+        note = mirror_reask_instruction(user_text)
+        if not note:
+            return reply
+        try:
+            retry = clean_reply(self._generate(messages + [{"role": "user", "content": note}]))
+        except Exception:
+            return reply
+        if register_mismatch(user_text, retry) is not None:
+            return reply
+        return retry
+
     def _assemble_messages(self, system_prompt, history, prompt_user, persona,
                            scene_block=None, quote_context=None, reprime=False):
         """Shared turn assembly for both probe and full paths. Order matters:
@@ -445,7 +482,7 @@ class CoWriterEngine:
                 system_prompt, branch.messages, prompt_user, branch.active_persona,
                 scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
             try:
-                reply = clean_reply(self._generate(messages, on_token))
+                reply = self._generate_mirrored(messages, user_text, on_token)
             except Exception:
                 branch.awaiting_probe = False  # never strand the writer mid-probe
                 raise
@@ -466,7 +503,7 @@ class CoWriterEngine:
             messages = self._assemble_messages(
                 system_prompt, branch.messages, prompt_user, branch.active_persona,
                 scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
-            reply = clean_reply(self._generate(messages, on_token))
+            reply = self._generate_mirrored(messages, user_text, on_token)
             reply = self._guard_reply(reply, scene_refs)
             reply = cap_suggestions(reply)
 

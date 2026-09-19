@@ -58,6 +58,16 @@ def run_repl(session: Session, store: SessionStore, client: LlamaServerClient, m
 
     print(f"\n[session {session.session_id}] \"{session.title}\" — branch: {session.current_branch}")
     print(f"Model: {session.model_id} @ {session.server_url}")
+    # Where this conversation stands (P3.13). The webapp re-renders the whole
+    # history on load, so its writer already sees this; a terminal writer gets
+    # a bare prompt, and "we left off mid-probe about scene 4" is the one thing
+    # they cannot recover from the screen.
+    try:
+        from .orientation import orientation_lines
+        for line in orientation_lines(session, script_ctx):
+            print(line)
+    except Exception:
+        pass  # orientation is garnish — never block a session from opening
     print("Type /help for commands, /quit to exit.\n")
 
     while True:
@@ -117,6 +127,14 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
                 session.switch(arg)
                 store.save(session)
                 print(f"Switched to branch '{arg}'.")
+                # P3.12: switching back is exactly when the writer has lost
+                # track of what the branch they left has done since.
+                try:
+                    from .orientation import branch_position
+                    for line in branch_position(session):
+                        print(line)
+                except Exception:
+                    pass  # orientation is garnish — never break a command
             except ValueError as e:
                 print(f"[error] {e}")
 

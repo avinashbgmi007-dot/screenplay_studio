@@ -114,6 +114,13 @@ class Session:
             forked_at_index=len(source.messages),
             active_persona=source.active_persona,
             active_mode=source.active_mode,
+            # The pending probe is conversation STATE, and the fork is a copy of
+            # the conversation: its history still ends on Sameer's question, so
+            # the fork is still waiting for the answer. Dropping it here (the
+            # field defaulted to False) meant a writer who forked to explore an
+            # idea got a normal turn instead of the probe answer the fork's own
+            # last message was asking for.
+            awaiting_probe=source.awaiting_probe,
         )
         self.branches[new_name] = new_branch
         self.current_branch = new_name

@@ -114,6 +114,19 @@ def ensure_forward_momentum(reply: str, turn_kind: str, persona: str | None = No
         return reply
     if turn_kind == "question":
         return reply
+    # The nudge list is English. Appending an English question to a reply the
+    # language mirror just kept in Telugu or Hindi is the ENGINE breaking the
+    # register it promised to keep — and because this is deterministic it would
+    # happen on every short reply, not occasionally. Until the nudges exist per
+    # register (a product decision, and one that needs a real model to
+    # validate), a non-Latin reply ends without one: an honest short answer
+    # beats a two-language one.
+    try:
+        from .language_mirror import reply_is_non_latin
+        if reply_is_non_latin(t):
+            return reply
+    except Exception:
+        pass  # the gate is an enhancement — never break a turn over it
     if _has_forward_ending(t):
         return reply
     if len(t) >= STRANDED_THRESHOLD:

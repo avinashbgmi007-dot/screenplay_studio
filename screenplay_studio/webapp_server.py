@@ -2127,7 +2127,7 @@ def _load_session_and_engine(project: str, session_id: str):
     engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
                             memory_scope=f"project:{project}",
                             writer_library_text=library_text,
-                            mood_text=_mood_fragment(m),
+                            mood_text=_mood_fragment(m, session, script_ctx),
                             doctor_case_text=case_file_text,
                             prompt_budget=_prompt_budget_provider(client))
     return session, engine, store
@@ -2491,8 +2491,15 @@ def _page_update_note(last_seen, current):
 # script content — so writer memory stays shared while script discussions stay
 # in their own session/project.
 
-def _mood_fragment(m) -> str | None:
-    """Room state for the persona cards — facts from real project data."""
+def _mood_fragment(m, session=None, script_ctx=None) -> str | None:
+    """Room state for the persona cards — facts from real project data.
+
+    `session` is optional and only adds the ORIENTATION lines (where the
+    conversation left off, where this branch sits against its parent). Both are
+    computed from stored state by `screenplay_cowriter.orientation`, so the
+    persona reads them as facts rather than reconstructing them — and callers
+    that have no session (or tests) get the original block unchanged.
+    """
     try:
         now = time.time()
         days = max(0, int((now - (m.updated_at or now)) // 86400))
@@ -2514,6 +2521,15 @@ def _mood_fragment(m) -> str | None:
             lines.append("- The doctor's report sits on the desk.")
         elif analyze_status in ("pending", "failed"):
             lines.append("- No analysis has been run yet.")
+        if session is not None:
+            try:
+                from screenplay_cowriter.orientation import orientation_lines
+                orient = orientation_lines(session, script_ctx)
+            except Exception:
+                orient = []  # orientation is garnish — never break a chat turn
+            if orient:
+                lines.append("Where this conversation stands:")
+                lines.extend(orient)
         return "\n".join(lines)
     except Exception:
         return None  # mood is garnish — never break a chat turn
