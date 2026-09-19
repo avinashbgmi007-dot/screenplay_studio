@@ -772,25 +772,6 @@ function renderRailScenes() {
   });
 }
 
-function jumpToScene(sceneNumber) {
-  const page = document.getElementById(`scene-page-${sceneNumber}`);
-  if (!page) return;
-  page.scrollIntoView({ behavior: "auto", block: "start" });
-  // a search filter would hide the scene — clear it so the jump lands
-  const search = $("#script-search");
-  if (search && search.value.trim()) {
-    search.value = "";
-    renderManuscript(document.getElementById('manuscript-container'));
-  }
-  const railItem = [...document.querySelectorAll("#rail-scenes .rail-scene")]
-    .find((n) => n.querySelector(".rail-scene-num").textContent === String(sceneNumber));
-  if (railItem) {
-    railItem.classList.remove("flash");
-    void railItem.offsetWidth; // restart the animation
-    railItem.classList.add("flash");
-  }
-}
-
 function renderRailNotes() {
   const list = $("#rail-notes");
   if (!list) return;
@@ -2829,9 +2810,11 @@ function renderQuoteBlock(quote) {
   return block;
 }
 
+// LOCATE only -- every caller (rail, ruler dots, scene index, the fix loop,
+// the quote block) wants to jump to a scene, never to open a room. The old
+// body also called openCowriteRoom(), which covered the loop's own bar.
 function jumpToScene(sceneNumber) {
   if (sceneNumber == null) return;
-  openCowriteRoom();
   let page = document.getElementById(`scene-page-${sceneNumber}`);
   if (!page || page.classList.contains("hidden")) {
     // a search filter may have hidden the scene — clear it so the jump lands
