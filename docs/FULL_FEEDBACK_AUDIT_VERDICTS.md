@@ -193,12 +193,16 @@ cleanbill`, driven by `E2E_BASE` against the real server) · shots in `impl-shot
 **Why a re-run was owed:** the section above closes with *"one real-model pass would still be worth
 it."* This is that pass — and it falsifies two premises the tuning work rested on.
 
-> **Probe honesty note.** Three of my own artefacts polluted the first measurement and were
-> corrected before any conclusion was drawn: (1) the audit's own writer marks
-> (`finding_marks.json`) hid two findings, so the "0 verified badges" first reading was partly mine —
-> the marks were cleared and the measurement re-taken; (2) my one working-copy edit was **undone**
-> at the end (`/edits/undo`) so the project is left writer-neutral; (3) the results file overwrote
-> earlier stages' gaps (`RESULTS["gaps"] = GAPS` replaced instead of merged) — fixed, stages re-run.
+> **Probe honesty note.** Five of my own artefacts polluted early measurements and were corrected
+> before any conclusion was drawn: (1) the audit's own writer marks (`finding_marks.json`) hid two
+> findings, so the "0 verified badges" first reading was partly mine — the marks were cleared and the
+> measurement re-taken; (2) my one working-copy edit was **undone** at the end (`/edits/undo`) so the
+> project is left writer-neutral; (3) the results file overwrote earlier stages' gaps
+> (`RESULTS["gaps"] = GAPS` replaced instead of merged) — fixed, stages re-run; (4) the per-category
+> screenshots silently never fired, because a **lens-scoped locator passed to `has=` is re-rooted
+> against each candidate** (`.dock-section >> .dock-lens >> .dock-section-title` matches nothing) —
+> the inner locator must be page-rooted; (5) after fixing (3), gaps then accumulated forever and a
+> retired gap survived — accumulation is now per-stage (retire-and-replace).
 > `parsed.json` was never touched, which is the point of GAP-7 below.
 
 ## The verdict table — real model
@@ -206,25 +210,28 @@ it."* This is that pass — and it falsifies two premises the tuning work rested
 | # | Row | Verdict | Evidence |
 |---|---|---|---|
 | A | Finding-emitting surfaces (36 findings, 8 categories) | ⚠ **partial** | Cards/ink/chips/ruler/queue render — but **one whole category is missing** (GAP-6) |
+| A2 | **Margin ink** (the "where is the flaw" answer) | ✗ **BROKEN on a real model** | **0 pins** on a script with 9 quoted findings — the 8 dialogue ones are hidden by GAP-6 and the 9th is script-level (GAP-6) |
 | B | Report sections (pacing · dials · reads · logline · coverage · setup/payoff) | ✓ projected | All panels render from real data; the dials are still unreachable (GAP-4, carried) |
 | C | Quote trust readout | ⚠ **self-contradicting** | Strip says **"8 of 36 quotes verified (22%)"**; the board shows **2** verified badges (GAP-6) |
 | D | Failed categories / quiet state | ✓ quiet-state | `failed_categories` empty, `errors: []`, no retry button; retry credited to existing tests |
 | E1 | Escalation · **Sameer** (deep card / fix queue / loop bar) | ✓ escalation | All three gestures pin the quote, open the room, seed the composer; a real reply streams back; the scene gains `.scene-discussed` |
 | E2 | Escalation · **Sushruta** "why" | ✓ escalation | Seeded with category + scene; the reply carries genuine **per-finding** reasoning (names the flaw, explains it, locates Scene 2, quotes the Telugu line) — hypothesis confirmed, no gap |
 | F1 | Arrival strip — browser == server | ✓ exact | Pass line byte-matches the `/edits` payload |
-| F2 | Arrival strip — **arithmetic is true** | ✗ **BROKEN on a real model** | `33 → 4 still live · 29 no longer flagged · 32 new` with **zero writer action** and a byte-identical `parsed.json` (GAP-7) |
+| F2 | Arrival strip — **arithmetic is true** | ✓ **fixed (GAP-7)** | On a byte-identical `parsed.json` the strip now reads `fixed=0 / new=0 / same_input=true` with the churn disclosed as `rewritten` (`33 of the last pass's 36 findings reworded`). Was `33 → 4 still live · 29 no longer flagged · 32 new` on zero writer action |
 | G | Clean bill (synthetic, no zero-finding row occurs naturally) | ✓ graceful | Empty pass reads the clean-bill line, lens not blank, no cards/strip/retry — 6/6 |
+| G2 | Unread-dot lifecycle | ✓ projected | Dot present on a fresh load after a new pass (dock closed), cleared when the Evidence lens opens — asserted live |
 | H | `report.md` | ✓ projected | Exists (29,421 B / 251 lines), opens, matches the desk (3 scenes · 3 characters · 6 pages) — but titled `source.pdf` (carried) |
-| I | **ID stability across passes** | ✗ **BROKEN on a real model** | 4 of 33 ids survive a no-op re-analysis — 75% of ids are keyed on LLM prose (GAP-7) |
+| I | **ID stability across passes** | ⚠ **unchanged by design, no longer deceptive (GAP-7)** | 4 of 33 ids still survive a no-op re-analysis — 75% of ids are keyed on LLM prose. The gate means that churn can no longer be read as progress, but the ids themselves are still not stable |
 
-**Score:** 7 ✓ · 2 ✗ structural · 2 ⚠ partial · 0 unexercised.
+**Score:** 8 ✓ · 3 ✗ structural · 2 ⚠ partial · 0 unexercised.
 **The headline:** the previous session fixed the arrival strip's *copy* on the theory that *"GAP-5 keeps
 ids stable"*. On a deterministic demo engine that is true. On a real model it is false — and the same
-id-instability silently deletes an entire category from the board.
+id-instability silently deletes an entire category from the board. Separately, one matcher disagreement
+(GAP-6) empties the manuscript's margin ink and hides every dialogue finding on a script nobody touched.
 
 ---
 
-## GAP-6 (CRITICAL · trust) — the status engine calls 7 verified quotes "gone", and the board deletes the Dialogue category
+## GAP-6 (CRITICAL · trust) — the status engine calls 7 verified quotes "gone", and the board deletes the Dialogue category · **RESOLVED (Wave 1.5)**
 
 **Symptom.** On a script **nobody edited**, the desk reports 8 findings as *"addressed by you"*, and the
 board loses its **Dialogue** section — the largest category on a dialogue-heavy script.
@@ -276,20 +283,105 @@ neither. So the verifier returns `verified · confidence 1.0` and the status eng
 `quote_present == False`. So the phantom is structural, not a one-off: on **both** real-model passes
 the count was 7 and 8 — **100 % of the dialogue findings, every time.**
 
-**Writer-visible consequence.** The dialogue category — the single most useful surface on a
-dialogue-heavy script — is **deleted** from the board's sections, the category chips and the mass
-strip's own summary; and because the verified tier is dialogue-dominated, the trust surface collapses:
-the strip advertises 8 verified quotes and the board shows 2. That is the product's own N3 law broken
-on the first screen a real writer sees.
+**Writer-visible consequence — all three of the writer's questions break.** The dialogue category —
+the single most useful surface on a dialogue-heavy script — is **deleted** from the board's sections,
+the category chips and the mass strip's own summary. Because the verified tier is dialogue-dominated,
+the trust surface collapses: the strip advertises 8 verified quotes and the board shows 2.
 
-**Fix direction (not done — session-only).** One matcher, one answer: have `quote_present()` normalise
+Worst of all, the **margin ink goes completely blank**. An ink pin requires a finding that is *open*,
+*carries a quote* and *names a scene*. Of the 9 quoted findings, 8 are the phantom-addressed dialogue
+ones, and the 9th (continuity) is script-level (`scene_refs: []`) so it has no scene to anchor to:
+
+```
+.finding-ink (margin pins) total: 0
+inkable (open AND quoted AND scene-anchored): 0 of 9 quoted findings
+```
+
+So on a script the writer never edited, the manuscript shows **no margin pins at all**. The plan's
+audit spine asks the desk to answer three questions — *what did I get? where is the flaw? what do I
+do?* The first is miscounted, and the second is **silent**. That is the product's own N3 law broken on
+the first screen a real writer sees.
+
+**Fix direction — superseded (RESOLVED in Wave 1.5, below).** One matcher, one answer: have `quote_present()` normalise
 the way the verifier does (lowercase + strip punctuation) and compare against the **joined** scene text
 rather than a single element — or better, expose one shared matcher from `screenplay_analyzer.verifier`
 and call it from both places, so the two can never drift again.
 
+### Resolution (Wave 1.5) — the normaliser is shared, the THRESHOLD is not
+
+The fix direction above was right about the normaliser and the haystack, and wrong about "one matcher".
+Sharing the threshold would have traded this bug for a quieter one: verification must be lenient (a model
+paraphrases a real line) while change detection must be strict (a reworded line is what a **writer's edit**
+looks like). Measured at element granularity on normalised text: a dropped character scores **0.979**
+(still present), a swapped word **0.875** and a removed word **0.830** (both edits). Verification's 0.72
+accepts both edits, so a shared threshold would have made every edited line keep reading "still present"
+and silently killed the writer-fix signal.
+
+Shipped: `screenplay_parser/quotematch.py` holds the shared primitives (the normaliser, the scene joiner,
+the windowed comparison). That package imports nothing from the analyzer or the studio, and both
+`revision.py` and `verifier.py` already import it, so the studio never reaches into the analyzer and there
+is no import-failure path that could restore the old matching. `verifier._normalize`,
+`_scene_full_text` and `_best_fuzzy_match` are now **aliases**, not wrappers. `revision.quote_present`
+runs containment over the joined, normalised scene, then a strict per-element ratio at
+`QUOTE_CHANGE_THRESHOLD = 0.95`.
+
+**Measured on the stored project** (`gun_pen_2`, no browser and no model — `finding_statuses` re-reads the
+stored report and working copy):
+
+| | still_present | addressed | unknown | contradictions* | inkable | dialogue open |
+|---|---|---|---|---|---|---|
+| before | 1 | **8** | 27 | **6** | 0 | 0 of 8 |
+| after | **7** | 2 | 27 | **0** | **6** | 6 of 8 |
+
+\* verifier accepted the quote at confidence 1.0 while the status engine called it gone.
+
+The before column reproduces the audit's recorded `8 / 1 / 27` byte-for-byte, so it is the same data this
+section measured. The 6 that flipped are exactly the six the audit identified as verbatim in the script.
+The 2 that stayed "addressed" should have: one is a verifier-accepted paraphrase at 0.82, one a genuine
+`not_found` at 0.56. Neither quote is in the script.
+
+**Browser re-run** (matrix stage, real llama-server on :8080, real report - the same way this section was
+measured the first time):
+
+| | dialogue section | margin ink | mass strip open | phantom addressed | gaps filed |
+|---|---|---|---|---|---|
+| before | **absent** | **0 pins** | 26-28 of 36 | 8 | 7 |
+| after | **present (6 findings)** | **3 pins** | 34 of 36 | 2 | **5** |
+
+Two of GAP-6's four writer-visible consequences are gone: the board renders its Dialogue section, and the
+manuscript carries margin ink again. Two are reduced and honest: 2 findings still read "addressed"
+because their quoted line genuinely is not in the script, so the mass strip counts 34 open of 36 rather
+than 36. `A-dialogue.png` now exists - the missing screenshot was the evidence for this gap.
+
+**The ink needed its own fix, and only running it found that.** After the status fix the findings were
+open and scene-anchored (6 of 9) and the data-layer prediction said the pins would render, but the browser
+still showed **0**. `decorateLineWithInk` required `text.indexOf(quote) !== -1`: the **whole** quote inside
+**one** line. A quote cited across a line wrap can never satisfy that, so every wrapped finding stayed
+invisible on the page even once it was open. Same root cause, fourth surface. The renderer now falls back
+to the quote's longest leading fragment present on the line, with quote marks stripped per word (a model
+writes straight quotes where a script may have curly ones). Measured: 0 pins, then 3. Predicted 6 inkable
+findings do not imply 6 pins - several share a line and collapse into one mark with a count chip.
+
+> **Artifact disclosure.** Re-running the matrix stage regenerated the shots in `impl-shots/`, so those
+> images now show the **fixed** desk - including `A-dialogue.png`, which could not exist before. The
+> pre-fix working-tree images were overwritten by that run (they were themselves uncommitted); the pre-fix
+> *numbers* are preserved in the tables above and in `_qa_bugrepro/audit_results.PREFIX.json`, and
+> `git show HEAD:impl-shots/...` still holds a pre-fix image set. A verdict table whose screenshots get
+> silently replaced by the fix is a small honesty bug of the same family this document exists to catch.
+
+**Rows A, A2 and C above describe the pre-fix walk.** The Dialogue section returns (6 of 8 findings open),
+the manuscript regains 6 inkable quoted findings, and the mass strip's open count tracks the report. The
+rows are left as measured, because a verdict table that quietly rewrites its own history is worth less
+than one that shows what was true when it was taken.
+
+**Residual (flagged, not fixed):** "addressed" is still purely `quote_present == False` and never consults
+the writer's own marks, so the 2 genuinely absent quotes still read as writer progress on a draft nobody
+edited. The contract violation is closed; the **attribution** issue is narrower and is the same root as
+GAP-7.
+
 ---
 
-## GAP-7 (HIGH · trust) — the arrival strip reports LLM run-to-run variance as writer progress
+## GAP-7 (HIGH · trust) — the arrival strip reports LLM run-to-run variance as writer progress · **RESOLVED (2026-09-19)**
 
 **Symptom.** Re-running Analysis on an **unchanged** script reports
 `Pass: 33 → 4 still live · 29 no longer flagged · 32 new`.
@@ -320,6 +412,25 @@ being compared* — but it cannot make a number meaningful that moves 88 % on id
 the arrival arithmetic can mean anything: key the no-quote tier on a **deterministic** signal
 (category + scene + check_id, not the model's sentence), or gate Fixed/New on an actual writer edit.
 
+**RESOLUTION (2026-09-19).** The second option won, because the first cannot pay: a census of the real
+report shows only **3 of 36** findings carry a deterministic key (`check_id: pacing_drag`,
+`rule_id: character_trait_continuity`, `setup_payoff_general`), while the rest carry `rule_id` = the rule
+**title as prose** ("On-the-Nose Dialogue vs. Subtext"), model-chosen and re-worded every run. So the gate
+shipped instead of a re-key:
+`_parsed_signature(m)` fingerprints the analyzer INPUT (parse bytes + report language) and
+`last_pass_snapshot` refuses to read movement as progress when that fingerprint is unchanged: `fixed=0`,
+`new=0`, `same_input=true`, with the churn disclosed as `rewritten` and the previous total in `prev_total`.
+The strip now reads `Pass: 22 → 22 still live · 0 no longer flagged · 0 new` plus
+`33 of the last pass's 36 findings reworded by the model — your script did not change` on the real pass,
+where it used to read `33 → 4 still live · 29 no longer flagged · 32 new`.
+
+**A second defect surfaced while fixing this one, and it had no gap filed against it.** With the gate
+reporting the truth, `last_total` was still the *previous* pass's count, so the strip headlined `Pass: 36`
+while the board beside it counted 22 rows. Two runs over one script filed 36 findings and then 22, so
+"previous pass total" and "board row count" are different quantities that drift on a non-deterministic
+model. On the identical-input path the headline is now the report the desk is holding (rows) and the
+previous total moves into the labelled clause. Ids still churn; they no longer read as progress.
+
 ---
 
 ## Carried over from the 2026-09-18 session (filed in `NOTES.md`, not fixed)
@@ -334,8 +445,11 @@ These were found by the same audit and remain open. Full mechanism + evidence in
   by mouse. 26 of 35 findings have no quote, so the fallback fires for most of them. (MED · UX)
 - **Character dials render into dead chrome** — 15 `.dial-row` nodes exist, but they live in
   `#struct-rail`, which `style.css:3886` declares `display:none`. (LOW · reachability)
-- **The arrival basis can never equal the board basis** — distinct-id arithmetic vs row count. (LOW ·
-  honesty) *Superseded in importance by GAP-7.*
+- ~~**The arrival basis can never equal the board basis** — distinct-id arithmetic vs row count.~~ (LOW ·
+  honesty) **RESOLVED 2026-09-19**, together with GAP-7. On a byte-identical script there is no delta to
+  draw, so the headline is the report the desk is holding (rows) and the previous total is disclosed in the
+  re-wording clause. Check: `pass2: on an unchanged script the arrival 'Pass:' total equals the board's
+  finding count`.
 - **`report.md` is titled after the temp upload name** (`source.pdf`, not `gun_pen`). (cosmetic)
 - **Parse confidence "low" on a PDF with a real text layer.** (cosmetic)
 
@@ -359,6 +473,10 @@ These were found by the same audit and remain open. Full mechanism + evidence in
   `phase14_signoff_journey`.
 - **Clean bill** — no zero-finding row occurs naturally, so the plan's sanctioned synthetic seed was
   used (`tests/_gunpen_clean_bill.py`); 6/6.
+- **Unread-dot lifecycle** — asserted live: the dot is present on a fresh load after a new pass (with
+  the dock closed) and clears when the Evidence lens opens.
+- **Per-category screenshots** — `A-structure.png` and `A-scene_function.png` exist; `A-dialogue.png`
+  **cannot exist**, because GAP-6 removes the section it would photograph. The absence is the evidence.
 - **Intent marks survive a re-analysis** — all three of the audit's marks survived pass 2 (and were
   cleared afterwards to leave the project writer-neutral).
 

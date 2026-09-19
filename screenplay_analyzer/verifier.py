@@ -15,49 +15,29 @@ findings would hide real issues just because the model's memory of exact
 wording was imperfect.
 """
 
-import re
-from difflib import SequenceMatcher
-
 from screenplay_parser.models import ScriptDocument
+from screenplay_parser.quotematch import (
+    find_scene_text as _scene_full_text,
+    normalize_text as _normalize,
+    windowed_similarity as _best_fuzzy_match,
+)
 
+# Verification is LENIENT on purpose: a model paraphrases a real line, and
+# calling a real quote fabricated is the expensive error here.
 FUZZY_MATCH_THRESHOLD = 0.72
 
-
-def _normalize(text: str) -> str:
-    text = text.lower()
-    text = re.sub(r"[^\w\s]", "", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-def _scene_full_text(doc: ScriptDocument, scene_number: int) -> str | None:
-    for scene in doc.scenes:
-        if scene.scene_number == scene_number:
-            return "\n".join(e.text for e in scene.elements)
-    return None
-
-
-def _best_fuzzy_match(quote_norm: str, haystack_norm: str) -> float:
-    """
-    Sliding-window fuzzy match: compares the quote against windows of the
-    haystack roughly its own size, rather than the whole scene at once
-    (SequenceMatcher on very different-length strings underestimates
-    similarity for a short quote inside a long scene).
-    """
-    words = haystack_norm.split()
-    qwords = quote_norm.split()
-    if not qwords:
-        return 0.0
-    window = max(len(qwords), 3)
-    best = 0.0
-    step = max(1, window // 2)
-    for i in range(0, max(1, len(words) - window + 1), step):
-        chunk = " ".join(words[i:i + window + 2])
-        ratio = SequenceMatcher(None, quote_norm, chunk).ratio()
-        best = max(best, ratio)
-    if not words:
-        return 0.0
-    return best
+# _normalize, _scene_full_text and _best_fuzzy_match are ALIASES, not wrappers.
+# The primitives live in screenplay_parser.quotematch so that the studio's
+# status engine (revision.quote_present) shares them: the two engines used to
+# normalise and build the haystack differently, so a quote spanning a line wrap
+# or mixing straight and curly quotes read as `verified` to the analyzer and
+# `gone` to the status engine — which made the desk report unedited findings as
+# "addressed by you". The private names survive because
+# screenplay_cowriter.reply_transforms imports them.
+#
+# The THRESHOLD is deliberately NOT shared. Change detection asks a different
+# question ("did the writer change this line?") and must be strict; see
+# revision.QUOTE_CHANGE_THRESHOLD.
 
 
 def verify_finding(finding: dict, doc: ScriptDocument) -> dict:

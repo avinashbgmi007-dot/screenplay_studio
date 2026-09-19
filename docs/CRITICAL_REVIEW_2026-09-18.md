@@ -18,6 +18,199 @@ So the rankings below aren't an echo chamber, here's what was dropped, discounte
 
 ---
 
+# STATUS BOARD -- done, to be done, verified (updated 2026-09-19)
+
+**This section is authoritative. Everything below it is the catalogue as written on 2026-09-18, i.e.
+history:** section 1 still lists M1/M2/M4/M5/M7 as open (all done), H7 as the number-one bug (fixed), and
+section 2 still says "876/876 green" (the suite is 1090).
+
+**Updated:** 2026-09-19 (corrections pass, gaps pass, GAP-7 pass, then the H1 secure-by-default pass) -- **HEAD:** `2eb817f` plus uncommitted Wave 1.5 work -- **Suite:** 1099 passed / 0 failed (re-run after the H1 pass) -- **Audit:** **0 gaps filed**, `matrix` 18 passed / 0 failed + `pass2` 9 passed / 0 failed -- **H1:** now SECURE BY DEFAULT (`--no-token` is the explicit opt-out)
+
+## How to read the verification column
+
+| tag | meaning |
+|---|---|
+| `[code]` | the current source was read this session and does what the row says |
+| `[test]` | a unit test exists and passed in this session's 1090-green run |
+| `[browser]` | asserted in a real browser against a running studio |
+| `[real-model]` | measured against the stored real report and/or a live llama-server |
+| `[wave]` | asserted by a wave write-up that was NOT re-run this session |
+| `[mutation]` | a mutation test proves the guard fails when the fix is reverted (12 mutations run: 6 of 7 in Wave 1.5, then 5 of 5 on the GAP-7 gate) |
+
+A row without `[test]` or `[browser]` is code-verified only. That distinction is the point: several "done"
+items are done but unguarded, and the two CRITICAL defects the live audit found were committed *before* the
+waves that followed and then went unmentioned by them.
+
+## A. DONE and verified
+
+| Item | Where | Evidence |
+|---|---|---|
+| **H7** chat dead on a real llama-server (two `system` messages -> HTTP 500) | `screenplay_cowriter/engine.py:258-266` (ONE system message; reminder folded into a user role); `llm_client.py` (`enable_thinking=False`, `reasoning_content` fallback) | `[code]` `[test test_h7_chat_fix]` `[real-model]` live Sameer and Sushrutha replies during the audit |
+| **H1** capability token | `webapp_server.py` (`_reject_cross_origin_writes`, `_startup_token`, `main()`), `webapp/app.js` | `[code]` `[test test_capability_token]` (11) `[browser token_mode 3/3]` -- **secure by default**; `--no-token` is the only opt-out |
+| **H4** chat lost-update race | `screenplay_cowriter/store.py:53-90` -- merge-on-save keyed `(branch, role, content)` under the per-path lock | `[code]` `[test test_session_lost_update]` |
+| **M4** dismiss index validation | `webapp_server.py` (out-of-range -> 400) | `[test test_dismiss_index]` |
+| **H2** non-ASCII (Telugu/Hindi) titles | `jsonio.safe_dir_name` -- NFKD fold, hash fallback, display title untouched | `[code]` `[test test_nonascii_titles]` |
+| **M5** atomic report writes; a failed force-reanalyze no longer destroys the good report | `screenplay_analyzer/report.py:14, :381-386` | `[code]` `[test test_report_atomicity]` `[test test_webapp_api]` |
+| **M1** prompt budget ON by default, sized from the model context window | `screenplay_cowriter/context.py:43-73`; `llm_client_base.context_window()` | `[code]` `[test test_prompt_budget_default (57)]` |
+| **S7 P0.3** the co-writer quotes verified against the script | `screenplay_cowriter/reply_transforms.py:133-145` (reuses the verifier own normaliser) | `[code]` `[test test_reply_quote_guard (27)]` |
+| **H3** the fake Sameer composer deleted; craft questions reach the real composer | no `#sameer-panel` in shipped code; `openSameerWith()` prefills the real composer | `[code]` `[test test_fake_composer_removed (12)]` |
+| **M7** the "Stash" popup no longer files a margin note | `app.js` selection popup posts to `/stash` | `[code]` |
+| **S5.8** demo-model disclosure: report banner, EXPORTED banner, partner card | `_md_to_html(md, banner)`, `partnerLabel()` | `[code]` `[test test_demo_banner (16)]` |
+| **S5.4** the report states its evidence depth | `pipeline._tag_evidence` / `evidence_depth`; `report.md`, served `stats.evidence_depth`, Coverage panel | `[code]` `[test test_evidence_depth (25)]` `[real-model]` |
+| **S5.3** cross-rule finding dedup | `screenplay_analyzer/dedupe.py` (direct-edge merge, `merged_rule_ids`) | `[code]` `[test test_cross_rule_dedup (31)]` `[real-model]` 36 -> 21, the voice finding preserved |
+| **GAP-6** the status engine called verified quotes "gone" | new `screenplay_parser/quotematch.py` (shared normaliser + scene joiner); `revision.quote_present` rewritten | `[real-model]` contradictions 6 -> 0, addressed 8 -> 2, inkable 0 -> 6, and the before-column reproduces the audit recorded `8/1/27` byte-for-byte; `[browser]` dialogue section present, ink 0 -> 3 pins, gaps filed 7 -> 5; `[test test_quote_agreement (23)]`; `[mutation]` 6 of 7 caught |
+| GAP-6 last surface: margin ink for a quote spanning a line wrap | `app.js` `inkMatch()` -- falls back to the quote longest leading fragment present on the line | `[browser]` 0 pins -> 3 pins on the real report |
+| **Phase-12** visual/motion discipline + the rotten E2E suites (phase8/9/11/14, `identity_forensics`) | `e2e_browser_phase12_visual_motion.py` (`env < 0.08`, separation `> 0.75`, `ONE_SHOT_MS = 280`, `ATTENTION` allowlist); shared UTF-8 stdout fix; phase14 rewritten against the folded surface | `[code]` `[browser]` phase12 18/18 this session; `[wave]` 403 checks / 0 failed (not re-run) |
+| **S5.8 second half** `script_consultant_examples` | `screenplay_cowriter/personas.py:275` | `[code]` |
+| **Desk status line** -- read "a clean bill" on a 36-finding report | `app.js` `loadScriptData()` now re-runs `refreshDeskToolbar()` once `state.findings` is set (the project-open call at `:1979` runs before the async load resolves, so the line was drawn from an empty array and never corrected) | `[browser]` audit gap retired, 18 checks / 0 failed |
+| **Character dials re-homed** out of the dead `#struct-rail` | `app.js` `renderCharacterDialsPanel()` -- ONE renderer feeding the page-one craft shelf, the dock Evidence lens and the feedback report | `[browser]` "45 dial rows render, 15 of them in the dock, visible=True"; gap retired |
+| **`addressed` was claimed for lines that were never in the script** | `screenplay_studio/revision.py` -- `_load_baseline_doc()` plus the baseline check in `finding_statuses` | `[test tests/test_revision.py (35)]` `[real-model]` addressed 2 -> 0, still_present 7 unchanged, unknown 27 -> 29; 2 gaps retired |
+| **GAP-7**: a no-op re-analysis read as writer progress | `screenplay_studio/revision.py` -- `_parsed_signature(m)` fingerprints the analyzer INPUT (parse-of-record + report language) and `last_pass_snapshot` gates on it: identical input reports `fixed=0, new=0, same_input=true` and discloses the id churn as `rewritten` instead of dressing it as Fixed/New | `[test test_revision (38)]` `[real-model]` the real pass returns `same_input=true, fixed=0, new=0, rewritten=33, prev_total=36` where the old arithmetic read `33 -> 4 still live / 29 gone / 32 new`; `[mutation]` 5 of 5 caught (headline, still_live, prev_total present, prev_total wrong, rewritten) |
+| **The arrival headline contradicted the desk it sits on** (`Pass: 36` over a 22-row board) | `revision.last_pass_snapshot` same_input branch headlines the report the desk is HOLDING (rows), keeping the previous total in `prev_total`; `app.js` `dock-arrival-rewrite` names both | `[test test_revision (38)]` `[browser]` the strip now reads `Pass: 22 -> 22 still live . 0 no longer flagged . 0 new` over a 22-row board; gap retired |
+
+## B. DONE but conditional, partial, or unguarded
+
+| Item | Honest state |
+|---|---|
+| **H1** capability token | **Secure by default (done 2026-09-19).** `main()` mints a per-process token on every launch (`_startup_token`) unless the operator passes `--no-token`; a foreign page can neither read the SameSite=Strict cookie nor set `X-Studio-Token` without CORS, so the blind no-`Origin` `DELETE` is now closed on a fresh install. The harness path that blocked this was changed first: `e2e_browser_common.start_studio()` boots with an explicit `--no-token` (it seeds server-side), and the hardened path is asserted by `e2e_browser_token_mode.py`, which now boots with NO flag. The Flask CLI path (`flask --app ... run`) never calls `main()`, so it is still token-less -- out of the supported launch path, flagged not hidden. |
+| **M2** branch UI (fork / switch / merge-peek) | **Written, uncommitted, untested.** `renderBranches` regains the fork button; `openForkModal` wires the modal `index.html:722` already had orphaned; plus a real `z-index` fix (modals sat at `--z-float` = 50, under the board, drawer and quote float, so their buttons were unclickable). No test covers fork/switch. |
+| **S7 P1.6** the nudge rotation | **Partially addressed.** `peer.py:78` still has `_nudge_index` and `ensure_forward_momentum` is still a deterministic appender -- the anti-pattern the review named. It is now persona-gated (`NUDGE_PERSONAS` / `NO_NUDGE_PERSONAS`), skips a direct question, and never nudges a reply over `STRANDED_THRESHOLD = 120`. |
+| **H6** dead UI surface | `#feedback-view` (about 360 lines) still ships dormant. The hidden persona/mode selects are now **documented as deliberate** (`index.html:158-163`, a `<div hidden>` with a comment that the JS reads them). The duplicate-function half is open, see section C. |
+| **S2** the summary-telephone ceiling | The FACT is disclosed (evidence depth, above). The ceiling is intact: script-level passes still judge from scene summaries, never raw text. |
+| **GAP-6 residual** | **RESOLVED 2026-09-19.** `addressed` is no longer `quote_present == False` alone: the quote must have been present in the parse-of-record AND be gone from the working copy, so "the writer edited this line away" is distinguishable from "this line was never there". Measured on gun_pen_2: 2 of 9 quoted findings read as writer progress on a draft the writer had never touched (one of them with the report own verdict `not_found`, one a 0.82 fuzzy paraphrase). Now `addressed 0`, `still_present 7` unchanged. Two filed gaps retired. The writer own marks are still not consulted -- that remains open, but it is no longer a false claim of progress. |
+| **An id-algorithm change is free today** | Measured 2026-09-19 across every project: **0 writer marks and 0 dismissals** exist on disk (the single `finding_marks.json` is present but empty). Changing `compute_finding_id` orphans nothing now. It stops being free the moment a writer marks a finding, at which point the marks store needs a re-key on load. **Re-measured after the GAP-7 pass: still `{}`.** Caveat found while writing the plan tracker: the audit's own `inbetween` stage set **3 marks** transiently (recorded as `intents` in `impl-shots/audit_results.json`), so this is a point-in-time fact about a store that a single audit run already learned to fill. |
+
+## C. TO BE DONE (ranked)
+
+**Rows 1, 2, 6, 7 and the section B attribution item are DONE as of 2026-09-19** (moved to section A). They
+stay in this table so the row numbers and the C2 cross-references do not shift. What is left:
+
+1. **Nothing is filed.** The audit's own layer sits at **0 gaps** (C2), and GAP-7 -- the last lie the arrival
+   strip told -- is closed and machine-checked.
+2. Then the rest of this list: real work that no machine check covers yet (rows 3, 4, 5, 8-14).
+
+| # | Item | Verified state | Approach |
+|---|---|---|---|
+| 1 | **GAP-7** -- `compute_finding_id` keys the no-quote tier (75% of findings) on `issue[:100]`, so ids churn about 88% per no-op re-run and the arrival strip reports LLM variance as writer progress (`33 -> 4 still live, 29 no longer flagged, 32 new`) | `revision.py:65`; 4 of 33 ids survive a re-analysis at a byte-identical `parsed.json` | **CORRECTED (measured this session).** Deterministic keys exist for only **3 of 36** findings (`check_id: pacing_drag`; `rule_id: character_trait_continuity`; `setup_payoff_general` x2). The other 33 carry `rule_id` = the rule **title as prose** ("On-the-Nose Dialogue vs. Subtext"), which the model rewords every run, and it collides (29 distinct of 35; one title 4x). So the **edit gate is the primary fix**, not an "AND" -- and it needs a per-scene fingerprint at report time, which the report does not store today. Deterministic ids are a partial win on about 8%. **DONE 2026-09-19** -- the edit gate shipped instead of a re-key: `last_pass_snapshot` gates the arithmetic on the analyzer INPUT, so identical input can never be read as progress. Ids still churn; they are now disclosed as `rewritten`, never as Fixed/New. `[test]` `[mutation]` `[browser]` `[real-model]` |
+| 2 | Desk status reads "a clean bill" on a 36-finding project | `refreshDeskToolbar()` is called at `app.js:1979` (defined `:2356`) before `loadScriptData()` (`:3619`, an async definition) populates `state.findings`, and is never re-run on the open path | **DONE 2026-09-19** -- `loadScriptData()` re-runs it after the load; the gap is retired `[browser]` |
+| 3 | The fix loop can cover its own bar | `stepLoop` (`app.js:5311`) -> `jumpToScene` (`:2832`) -> `openCowriteRoom` (`:2834`), masked only when the first loop item is script-level (`:2833` early-returns on `sceneNumber == null`) | Fix the path, then make the audit check deterministic: it **failed on 09-18 and passed on 09-19 with that code unchanged** |
+| 4 | **H1** secure-by-default | see section B | **DONE 2026-09-19** -- `main()` mints a token by default; `--no-token` is the explicit opt-out. The harness was changed first (`start_studio` passes `--no-token`), then the default flipped. `[test test_capability_token (11)]` `[browser token_mode 3/3]` on the bare default |
+| 5 | Confidence tiers: 202 of 263 KB rules tagged `high` | `knowledge_base/index.json` (202 / 40 / 21) | Re-audit against the schema own definition; one JSON pass changes how assertive every report sounds |
+| 6 | Character dials render into dead chrome | 15 `.dial-row` into `#struct-rail` (`.dial-row` styled at `style.css:4201`), measured `visible: false` | **Decision: re-home into the dock, not delete.** `style.css:6053-6054` already styles `.dock-section .dial-row, .dock-craft .dial-row`, so the dock craft panel was the intended home and its CSS shipped. Deleting would remove a feature the docs claim. **DONE 2026-09-19** -- one `renderCharacterDialsPanel()`; the dock renders 15 visible dial rows and the gap is retired `[browser]` |
+| 7 | **Two different bugs were conflated in this row.** (a) Duplicate-id **arithmetic** (GAP-3) -- **DONE**: distinct-count semantics (`test_duplicate_ids_no_phantom_progress`), arrival strip byte-matches on a no-op re-run (0 fixed / 0 new). (b) The filed **pass2 basis** gap -- OPEN: arrival distinct basis (33) against board rows (36), caused by identical **quotes** collapsing in the *quoted* tier (`fnhi8s3`, three dialogue findings), not the no-quote tier | `revision.last_pass_snapshot`; audit gap 1 | **DECIDED and DONE 2026-09-19 -- report what the board reports.** On identical input there is no delta to draw, so the headline is the report the desk is holding (rows) and the previous total rides in a labelled `prev_total` on the re-wording clause. **The measurement that forced the decision:** the earlier framing ("33 distinct vs 36 rows") assumed one report, but two runs over one script filed **36 findings and then 22**, so "previous pass total" and "board row count" are different quantities that drift whenever the model is non-deterministic. The headline can only agree with the board if it *is* the board's total. `[test]` `[browser]` gap retired |
+| 7b | **GAP-7 cross-run churn** is separate again: on a no-op re-analysis the strip read `33 -> 4 still live / 29 gone / 32 new` at a byte-identical `parsed.json` | NOTES G8 | **DONE** (row 1), and it now has the filed gap it never had: `pass2: an unchanged script is disclosed, not reported as progress`, matched against the **whole clause** rather than the bare number |
+| 8 | Duplicate top-level `jumpToScene` (`:775` dead, `:2832` live -- both re-verified 2026-09-19) | classic script, last declaration wins; side effect: the rail scene click also opens the partner drawer | Remove one, then add a structural guard (one top-level definition per symbol) -- the repo own logged learning names this exact hazard |
+| 9 | Branch UI commit and test | see section B | -- |
+| 10 | **Section 1 residual.** **H5** lock ordering (per-path RLocks vs `_analyze_lock`, no discipline); **L1** `jsonio._LOCKS` grows without eviction; **L2** `retry_permission` retries genuine ACL failures; **L3** unjittered `time.sleep(1.5 * attempt)` (`llm_client_base.py:175`); **L4** MAX_PATH against 64-char ids; **L5** project-name TOCTOU (`webapp_server.py:523-528`, check-then-`makedirs(exist_ok=True)`); **L6** `_print_status` still skipped on the error path in `cli.py` (not `finally`); **L7** dead and no-op code | **L1-L6 re-verified open this session.** L7 cited lines have MOVED (`llm_client.py:158` is now the SSE UTF-8 pin, which is load-bearing; `_md_to_html` is now `:1755`), L7 is now **half-resolved**: item 1 is STALE (`llm_client.py:158` is the load-bearing SSE UTF-8 pin, not dead code); item 2 is REAL and re-pinned -- `_md_to_html` still runs a redundant one-span `**` replace at `webapp_server.py:1780` immediately before the regex on the next line converts every `**` span the same way, so the first call is dead work | -- |
+| 11 | **Section 2 and 5 residual:** selective raw-text access for the checkpoint scenes (`S5.2`); the 0.72 verification threshold empirically set (`S5.6` -- note the verifier matcher had **no unit tests at all** until Wave 1.5 added shared-primitive guards); theme / relationship / pitch / revision tier deepening (`S5.5`); multi-genre contracts (`S5.7`); knowledge-graph candidate types (`S5.9`) | Open | -- |
+| 12 | **Section 7 residual:** P1.4 select-to-rewrite diff loop; P1.5 trim the compliance wall (**unverified** -- whether the six "don't" blocks were consolidated was not re-checked); P1.7 voice-drift acts rather than only logs; P2.8 memory felt; P2.9 reply-side language register check; P2.11 CLI memory on by default (**no `--memory-path` exists in `cli.py` or `orchestrator.py` at all**); P3.12 and P3.13 | Open | -- |
+| 13 | **Section 6 brainstorm** -- counter-read pass, finding lifecycle truth, so-what scoring, page-rhythm overlay, dialogue read-aloud score, writer-question-driven audit | All six are untouched proposals | -- |
+| 14 | Doc hygiene: the repo-root `SESSION_SUMMARY.md` (untracked) still describes 09-14 state and lists GAP-1 and GAP-2 as next actions; the audit plan file is untracked | Open | -- |
+
+## C2. The machine-checked layer -- what the audit still rejects
+
+The board above is prose, and prose is how GAP-6 hid across four waves. This part cannot drift silently: the
+gun_pen audit files gaps as machine checks, and a stage that runs retires the gaps it tested. Two passes took it
+from **5 gaps to 0** (`impl-shots/audit_results.json`; `matrix` stage: **18 checks passed, 0 failed**; `pass2`
+stage: **9 passed, 0 failed**).
+
+| filed gap | stage | root | state |
+|---|---|---|---|
+| _none_ | -- | -- | **NOTHING IS FILED.** Every check the audit makes of this script now passes. That is a statement about this script and these checks, not a claim that the product is defect-free (rows C3-C14 are what no machine check covers). |
+
+### Retired in this pass, with the check that proved it
+
+| gap | what fixed it | evidence |
+|---|---|---|
+| `C: the desk status line agrees with the finding count` (it read "a clean bill" on a 36-finding report) | `refreshDeskToolbar()` now re-runs at the end of `loadScriptData()`, after `state.findings` is set. The project-open refresh at `app.js:1979` runs before the async load resolves, so the line was drawn from an empty array and never corrected | `[browser]` gap retired |
+| `C: unedited script -> zero phantom "addressed"` and `C: mass strip reports every finding open` | `finding_statuses` now requires the quote to have existed in the parse-of-record before it may read `addressed` (`revision._load_baseline_doc`). Measured on gun_pen_2: `addressed 2 -> 0`, `still_present 7` unchanged, `unknown 27 -> 29` | `[test]` `[real-model]` `[browser]` two gaps retired |
+| `B/character_dials: the dials are reachable on the live desk` | ONE `renderCharacterDialsPanel()` now feeds the page-one craft shelf, the dock Evidence lens and the feedback report, so the dials are reachable instead of parked in the dead `#struct-rail` | `[browser]` "45 dial rows render, 15 of them in the dock, visible=True" |
+| `pass2: the arrival 'Pass:' total agrees with the board's finding count` (`last_total=36` vs `findings=22`) | the strip headline is now the report the desk holds whenever the input is byte-identical to the last pass (`last_pass_snapshot`, same_input path); the previous total is disclosed in the re-wording clause instead of headlined | `[browser]` "same_input=True arrival last_total=22 vs report findings=22"; strip `Pass: 22 -> 22 still live` over a 22-row board |
+
+**Two audit checks were changed, deliberately, and both changes are recorded inline in the files.**
+
+`B/character_dials` asserted that a `.rail-char-dials` node was visible -- a class that exists only in the dead
+`#struct-rail`, so re-homing the dials could never satisfy it: the check encoded the defect it was meant to
+catch. It now asserts the dial rows inside the dock own Evidence lens, which is strictly stronger.
+
+The `pass2` board-agreement check and its sibling changed for two measured reasons. (a) It compared the arrival
+total against the board row count as though both came from one report; they do not, they are two different
+passes (36 filed, then 22), so it was satisfiable only when the model happened to reproduce its count. It is now
+scoped to the unchanged-input case -- the case this stage can actually produce -- and named for that case.
+(b) Its sibling accepted `str(rewritten) in rw_txt`, a substring test that passes on almost any sentence
+containing a "0", which is exactly what a same-report recompute produces. It now requires the whole clause
+(`"<n> of the last pass's <m>"`), so dropping either number from the strip fails the check. Neither change
+weakens what is asserted; both add claims the original could not make.
+
+## D. Stale claims in the historical tables
+
+- Section 1 lists **M1, M2, M4, M5, M7** as open. All are done (M2 in flight), and its HIGH row **H7** was ranked the number-one bug; it is fixed.
+- Section 2 asserts **"876/876 green"**. The suite is **1090**.
+- `S5.3` (dedup), `S5.4` (evidence depth) and both halves of `S5.8` are done, as are `S7 P0.2` (prompt budget) and `P0.3` (quote verification).
+- Section 8's "top 3 if nothing else gets done": H1 is **opt-in**, the prompt budget **shipped**, the branch UI is **in flight**, and confidence tiers plus raw-text access are **open**. One and a half of three.
+- The audit sections later in this doc set describe GAP-6 as open. It is resolved, with the measured before/after recorded in `FULL_FEEDBACK_AUDIT_VERDICTS.md`.
+
+## E. Verification gaps -- what was NOT confirmed
+
+- **The 26-suite browser sweep ("403 checks passed, 0 failed") is `[wave]`, not re-run.** This session ran the gun_pen audit matrix (twice, real model) and phase12 (18/18). No full sweep, so it is not confirmed here.
+- **The real-model numbers are a re-walk of a stored report**, not a fresh analysis: 36 findings, addressed 8, the `33/4/29/32` arrival payload. `finding_statuses` re-reads the stored report and working copy, which is what scripted the phantom count, so the GAP-6 before/after is measured against real data -- but it is that report, not a new run.
+- **P1.5 (compliance-wall trim) and the "second selection popup" claim are unverified.** No status was guessed for either.
+- **The L1-L7 line references have drifted.** L1-L6 were re-verified explicitly this session; L7 needs a fresh read.
+
+**Added by the 2026-09-19 corrections pass:**
+
+- **The 1090 figure was re-run** in this pass (full suite, `-p no:cacheprovider`), not carried from a wave write-up.
+- **The filed-gap list in C2 was read from the artifact** (`impl-shots/audit_results.json`), not from prose; current
+  as of HEAD `2eb817f`.
+- **The pass2 basis number (33 vs 36) is measured on the stored report** -- `finding_statuses` re-reading stored
+  data, not a fresh analysis of that project.
+- **The id-field census behind row C1 was measured on the real report:** 36 findings, 9 quoted / 27 unquoted, 35
+  carrying a `rule_id`, 1 carrying only a `check_id`, 0 carrying neither; 29 distinct `rule_id` values across 35.
+- **No writer state exists to migrate:** 0 marks and 0 dismissals across every project (section B).
+- **The KB confidence-tier count was re-read** (it had been carried from the review own index read):
+  `knowledge_base/index.json` holds **263 rules -- 202 `high`, 40 `medium`, 21 `low`**. The 202/263 headline is
+  confirmed. **H1 opt-in also re-confirmed:** `_API_TOKEN = None` at `webapp_server.py:61` and the gate only
+  applies `if _API_TOKEN:`, so a default install genuinely still accepts a blind, no-`Origin` DELETE.
+- **P2.11 re-confirmed by absence:** no `--memory-path` (or `memory_path`) exists in `cli.py` or
+  `orchestrator.py` at all, so CLI Sameer is amnesiac as stated.
+
+**Added by the 2026-09-19 gaps pass:**
+
+- **The audit was re-run, not inferred:** `matrix` stage against a live studio on the real llama-server, `18
+  passed / 0 failed`, filed gaps `5 -> 1`.
+- **The suite was re-run after every change:** `1091 passed / 0 failed` (1090 + the new baseline test).
+- **One audit check was changed and the reason is recorded in C2:** `B/character_dials` pinned a class that
+  exists only in dead chrome, so it could not have noticed the fix. It now pins the dock.
+- **Operational:** a running studio must be RESTARTED to pick up Python changes (`revision.py`); `app.js` /
+  `style.css` only need the `?v=` bump. The measurements above were taken on a restarted studio.
+- **A harness-rot fix rode along:** `e2e_browser_phase8_lifecycle.py` opened its seeded probe by clicking
+  `.first()` on the text "Lifecycle", so against a long-lived studio that already held `Lifecycle_Probe`,
+  `_2`, ... it opened a STALE probe whose parse was pending and timed out waiting for the manuscript. It now
+  opens the exact project id `seed()` returned. Verified `13 passed / 0 failed` self-booted.
+
+**Added by the 2026-09-19 GAP-7 pass:**
+
+- **The suite was re-run after every change:** `1094 passed / 0 failed` (1093 + the new headline test).
+- **Both stages that cover this were re-run:** `matrix` 18 / 0 and `pass2` 9 / 0, filed gaps `1 -> 0`.
+- **One number in this pass is a RECOMPUTE, not a fresh 9-minute run, and it is disclosed as such:** the `pass2`
+  stage ran with `GUNPEN_SKIP_ANALYZE=1` against the real analysis the previous pass had already left on disk
+  (that run is the one that produced `rewritten=33`), and the payload was re-derived by moving the report mtime
+  so the guard recomputes. The comparison content is byte-for-byte what the real run produced; the arithmetic is
+  the new arithmetic. The verified `rewritten=0` is a same-report recompute, correctly reported as "nothing
+  moved" -- not a second real pass.
+- **Two bases live in one payload on the same_input path, deliberately:** `last_total`/`still_live` are the
+  board's **rows**, while `rewritten`/`prev_total` count **distinct ids**. The board counts rows and finding
+  identity is distinct ids, so on gun_pen_2 (22 rows, 21 distinct) the two differ. The clause labels both ("N of
+  the last pass's M findings reworded") rather than silently merging them.
+- **`compute_finding_id` was NOT re-keyed.** Section B still says an id-algorithm change is free today (0 marks,
+  0 dismissals), and that is still true -- but the gate made a re-key unnecessary for this defect, so nothing was
+  touched. If a writer ever marks a finding, the marks store still needs a re-key on load.
+
+*Every "open" row above exists in prose only. The audit's gaps retire themselves because they are machine-checked; this catalogue is not, which is exactly how GAP-6 sat unnoticed across four waves.*
+
+
+---
+
 ## 1. Architecture / UI / Backend — issues ranked HIGH → LOW
 
 ### HIGH
@@ -835,6 +1028,153 @@ non-comment code for every deleted id.
   longer exists, and a test pins that.
 - Suite: **1067 passed / 0 failures / 0 errors** (was 1055; +12). Browser gates
   unchanged: smoke 18/18, phase7 15/15, phase6 28/28.
+
+
+
+---
+
+# WAVE 1.5 — GAP-6 closed at the root (the doc set's own CRITICAL finding)
+
+Every wave above fixed things the *review* found. GAP-6 came from the **live audit** instead, was
+committed in `7fc10af` before Waves 2–4, and then went unmentioned by the waves that followed. It is
+the one defect where the desk told a writer, on a script they had never edited, that eight of their
+findings were already addressed.
+
+## The root: two engines, two answers
+
+`verifier.verify_finding` normalised the quote (lowercase, punctuation stripped) and matched it against
+the **joined** scene — and called eight gun_pen findings `verified`, six of them at confidence 1.0.
+`revision.quote_present` substring-matched the raw quote against **one element at a time** and then
+fuzzy-compared the whole quote against that same element, about 35 characters long. Two captured
+elements make both failure modes concrete:
+
+```
+element[7]  'yudhame jarguthundi... “you are the'
+element[8]  'sum of all your choices”'
+finding     '"you are the sum of all your choices"'
+```
+
+The quote spans two line-wrapped elements, and the model wrote straight quotes where the script has
+curly ones. Either alone is enough to miss it. Because `findingPassesFilter` hides any finding whose
+disposition is not `open`, one disagreement emptied **three** surfaces at once: the Dialogue section
+disappeared from the board, the mass strip read "28 open of 36", and the margin ink rendered zero pins
+on a script with nine quoted findings.
+
+## The correction to the recorded fix direction
+
+The audit's fix direction was *"one matcher, one answer ... expose one shared matcher from
+`screenplay_analyzer.verifier` and call it from both places."* That is right about the normaliser and the
+haystack and wrong about the threshold. The two engines ask opposite questions:
+
+- **verification** asks "was this quote real?" — lenient, because a model paraphrases a real line;
+- **change detection** asks "is this cited line still in the draft?" — strict, because a reworded line is
+exactly what a **writer's edit** looks like.
+
+Measured at element granularity on normalised text: a dropped character scores **0.979**, a swapped word
+**0.875**, a removed word **0.830**. Verification's 0.72 accepts both edits — so a shared threshold would
+have made every edited line keep reading "still present" and silently killed the writer-fix signal. Worse
+trade than the bug.
+
+## What shipped
+
+`screenplay_parser/quotematch.py` holds the shared primitives: the normaliser, the scene joiner, the
+windowed comparison. That package imports nothing from `screenplay_analyzer` or `screenplay_studio`
+(verified per file), and both `revision.py` and `verifier.py` already import it — so the studio never
+reaches into the analyzer, and there is no import-failure path that could quietly restore the old
+matching. `verifier._normalize`, `_scene_full_text` and `_best_fuzzy_match` are now **aliases** (identity,
+not wrappers), which keeps `screenplay_cowriter.reply_transforms` importing them unchanged.
+
+`revision.quote_present` runs containment of the normalised quote against the normalised **joined** scene,
+then a strict per-element ratio at `QUOTE_CHANGE_THRESHOLD = 0.95`. Pass B keeps element granularity on
+purpose: a scene-sized window dilutes the ratio until the pass is inert. The accepted consequence is that
+a quote which both spans two elements **and** was edited reads as addressed — the conservative direction.
+
+## Measured on the real stored project
+
+No browser and no model were needed: `finding_statuses` re-reads the stored report and the working copy,
+which is what scripted the phantom count in the first place.
+
+| | still_present | addressed | unknown | contradictions* | inkable | dialogue open |
+|---|---|---|---|---|---|---|
+| before | 1 | **8** | 27 | **6** | 0 | 0 of 8 |
+| after | **7** | 2 | 27 | **0** | **6** | 6 of 8 |
+
+\* verifier accepted the quote at confidence 1.0 while the status engine called it gone.
+
+The before column reproduces the audit's recorded `8 / 1 / 27` byte-for-byte, so this is the same data
+that section measured. All six flips are dialogue findings the audit identified as verbatim in the script.
+The two that stayed "addressed" should have: one is a verifier-accepted paraphrase at 0.82, one a genuine
+`not_found` at 0.56 — neither quote is in the script.
+
+**Verification:** `tests/test_quote_agreement.py` (new, 23), whose load-bearing test is the contract
+*every quote the verifier accepted at 1.0 must be present to the status engine*; the two captured real
+fixtures; the writer-fix trap (a one-word edit and a removed word must still read addressed); the
+revision ledger's second caller; and five "one implementation" guards, including a source scan for a
+second copy of the punctuation-stripping regex. **6 of 7 mutations caught.** The survivor is the
+short-quote floor, which is inert at a 0.95 threshold — kept as defence in depth and labelled
+not-individually-provable rather than claimed as a guard. Suite **1090 passed / 0 failures** (+23).
+
+## The browser run found a fourth surface, after the data said the work was done
+
+The stored-project numbers above made the fix look complete: 6 of 9 quoted findings open and
+scene-anchored, so the pins should have rendered. The browser still showed **0**. `decorateLineWithInk`
+required `text.indexOf(quote) !== -1` — the **whole** quote inside **one** line. A quote cited across a
+line wrap can never satisfy that, so every wrapped finding stayed invisible on the page even once it was
+open. Same root cause, fourth surface, and a data-layer prediction could not have caught it: this is what
+"verify in the browser" is for, and it is the second time in this document's history that the browser found
+what the numbers did not.
+
+Fixed in `app.js`: `inkMatch()` falls back to the quote's longest leading fragment present on the line
+(at least 3 words and 8 characters), with quote marks stripped per word because a model writes straight
+quotes where a script may have curly ones. `app.js?v` bumped `hx1b379` -> `hx1b380`.
+
+**Browser re-run** (matrix stage, real llama-server on :8080, real stored report):
+
+| | gaps filed | dialogue section on the board | margin ink | mass strip open | phantom "addressed" |
+|---|---|---|---|---|---|
+| before | 7 | **absent** | **0 pins** | 26-28 of 36 | 8 |
+| after | **5** | present (6 findings) | **3 pins** | 34 of 36 | 2 |
+
+Two of the audit's filed gaps are retired (the Dialogue category, the margin ink), and `A-dialogue.png`
+now exists — previously its absence *was* the evidence. Six inkable findings do not imply six pins:
+findings that share a line collapse into one mark with a count chip, and a fragment match can land on one
+of a wrapped quote's two lines.
+
+**Not closed by this wave, and not claimed:** the 2 findings that still read "addressed" (their quoted
+line genuinely is not in the script — an attribution problem, not a matching one); the arrival total vs
+board total; the desk status line; the dead character dials; the data-dependent loop-coverage check; and
+everything from GAP-7 down in the ledger below.
+
+**Residual, flagged not fixed:** "addressed" is still purely `quote_present == False` and never consults
+the writer's own marks, so the two genuinely absent quotes still read as writer progress on an untouched
+draft. The contract violation is closed; the **attribution** issue is narrower and shares a root with GAP-7.
+
+
+---
+
+# OPEN ITEMS — the ledger this doc set was missing
+
+This review's own weakness was structural: each wave appended a section, and nothing anywhere said what
+was still broken. GAP-6 was found by the live audit, committed before Waves 2–4, and then never named
+again. This table is the fix for that, and it should be updated by every future wave.
+
+| # | Item | Severity | Evidence / why it is open |
+|---|---|---|---|
+| 1 | **GAP-7 — finding identity is model prose.** `compute_finding_id` keys the no-quote tier (75% of findings) on `issue[:100]`, so ids churn ~88% per no-op re-run and the arrival strip reports LLM variance as writer progress (`33 → 4 still live · 29 no longer flagged · 32 new`). | **HIGH** | `revision.py:65`; 4 of 33 ids survive a re-analysis at byte-identical `parsed.json`. **Decision taken:** deterministic ids (`category + scene + check_id`) **and** an edit gate on `working.json`. |
+| 2 | **Desk status line says "a clean bill" on a 36-finding project.** `refreshDeskToolbar()` runs at `app.js:1979`, before `loadScriptData()` populates `state.findings` at `:2011`, and is never re-run on the open path. | MED · trust | Measured in the 09-19 audit artifact (`desk_status`). Re-run/retry paths already call it after the load. |
+| 3 | **Character dials render into dead chrome.** 15 `.dial-row` nodes build into `#struct-rail`, which `style.css:3912` declares `display:none`. | LOW · reachability | Measured: `dial_rows 15, visible false`. |
+| 4 | **The fix loop can cover its own bar.** `stepLoop` → `jumpToScene` (`app.js:2832`) → `openCowriteRoom` (`:2834`); it is masked only when the loop's first item is script-level, because `jumpToScene` early-returns on `sceneNumber == null` at `:2833`. | MED · UX | The audit's own gap **failed on 09-18 and passed on 09-19 with that code path unchanged**, so the check is data-dependent. Needs a deterministic check before it can be called fixed. |
+| 5 | **Arrival basis can never equal the board basis.** Distinct-id arithmetic (33) against row count (36). | LOW · honesty | Same family as #1; fixing identity fixes it. |
+| 6 | **Duplicate top-level `jumpToScene`** — `app.js:775` is dead, `:2832` wins (classic script, last declaration wins). Its side effect: the structure rail's scene click also opens the partner drawer. | LOW · maintainability | The repo's own logged learning `classic-script-split-hazards` recorded this same two-variant signature in an earlier revision. Wants a structural test asserting one top-level definition per symbol. |
+| 7 | **H1 is opt-in.** The capability token exists but `_API_TOKEN` is `None` unless `--require-token` is passed, so a default install still accepts a blind, no-`Origin` `DELETE /api/projects/<name>`. | MED · security | `webapp_server.py:54, :3089`. |
+| 8 | **Confidence tiers unrecalibrated.** 202 of 263 KB rules are still tagged `high`. | MED · report honesty | `knowledge_base/index.json`: 202 / 40 / 21. |
+| 9 | **Branch UI written but uncommitted and untested.** Fork button, merge-peek tooltips, fork modal wiring, plus a real `z-index` fix (modals sat at `--z-float` = 50, under the board, drawer and quote float, so their buttons were unclickable). | — | Working tree only; no test file covers fork/switch. |
+| 10 | **Never started from §5/§7:** select-to-rewrite diff loop, selective raw-text for checkpoint scenes, theme/relationship tier deepening, counter-read pass, M3 progressive disclosure, M6 touch parity, H5 lock ordering. `app.js` is now **8,738** lines (8,120 at review time), so M8 got worse. | — | — |
+| 11 | **Doc hygiene:** the repo-root `SESSION_SUMMARY.md` (untracked) still describes 2026-09-14 state and lists GAP-1/GAP-2 as next actions; the audit plan file is untracked. | LOW | `SESSION_SUMMARY.md` duplicates `docs/SESSION_SUMMARY.md` and contradicts this document. |
+
+**Still sound, re-checked this pass:** encoding posture, path-traversal defenses, the verifier's
+"flag, don't drop" policy (it survives the quote guard untouched: both captured real-model replies pass
+through byte-identical), and the M1 prompt budget's measured inertness on the model in use.
 
 
 

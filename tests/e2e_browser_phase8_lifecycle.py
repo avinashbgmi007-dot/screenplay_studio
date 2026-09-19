@@ -41,9 +41,14 @@ def seed(base, title):
 def open_project(page, base, name):
     page.goto(base)
     page.wait_for_load_state("networkidle")
-    page.locator("#shelf-trigger").hover()
-    page.wait_for_timeout(400)
-    page.locator(".project-item").filter(has_text=name.split("_")[0]).first.click()
+    # Address the EXACT project id that seed() returned. The previous version
+    # hovered the shelf and clicked .first() on a filter built from
+    # name.split("_")[0] -- just "Lifecycle" -- so against any studio that had
+    # already accumulated Lifecycle_Probe, _2, ... from earlier runs it opened a
+    # STALE probe whose parse was still pending and the manuscript wait timed
+    # out (hit 2026-09-19 while pointing this suite at a long-lived studio).
+    # Idempotent: it opens the project it just seeded, every time.
+    page.evaluate("(n) => openProject(n)", name)
     page.wait_for_selector("#manuscript-container .scene-page", timeout=20000)
 
 

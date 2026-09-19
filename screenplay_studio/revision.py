@@ -28,6 +28,7 @@ import time
 import uuid
 from difflib import SequenceMatcher
 
+from screenplay_parser import quotematch
 from screenplay_parser.models import ScriptDocument
 
 
@@ -139,6 +140,32 @@ def _report_signature(report: dict) -> str:
     return h.hexdigest()
 
 
+def _parsed_signature(m):
+    """Content fingerprint of the analyzer INPUT (the parse-of-record).
+
+    The pass arithmetic compares two analysis passes. Different scripts mean a
+    real draft-over-draft delta. Byte-identical input means every id that moved
+    is the model re-wording its own sentence: the no-quote tier (about 75% of
+    findings) hashes model prose, so a no-op re-analysis churns ~88% of ids on
+    gun_pen_2. Returns None when the parse is unreadable (the gate then stays
+    open rather than inventing a "nothing changed" verdict on no evidence).
+
+    The report language rides along: it is part of the ask, so switching it is a
+    real change of input, not writer progress. The model id deliberately does not:
+    it is resolved per run and would make the fingerprint flicker.
+    """
+    try:
+        with open(m.parsed_path, "rb") as f:
+            body = f.read()
+    except OSError:
+        return None
+    h = hashlib.sha1()
+    h.update(body)
+    h.update(bytes([0]))
+    h.update((getattr(m, "report_language", "") or "").encode("utf-8"))
+    return h.hexdigest()
+
+
 def last_pass_snapshot(m):
     """Diff this pass against the previous one: {last_total, still_live,
     fixed, new, ghosted_marks}. Computed lazily with an mtime+sig guard so
@@ -149,7 +176,22 @@ def last_pass_snapshot(m):
     e.g. two dialogue findings quoting the same line). Duplicate ids in
     either pass are ONE finding for arithmetic: a re-analysis that
     changes nothing must report fixed=0/new=0, never manufacture
-    phantom progress out of duplicate rows."""
+    phantom progress out of duplicate rows.
+
+    GAP-7 gate: two passes are only read as draft-over-draft movement when the
+    analyzer INPUT moved. On identical input the no-quote tier re-words itself,
+    so the payload reports fixed=0, new=0, same_input=True and discloses the
+    movement as `rewritten` — the model re-worded its findings, the writer
+    did not move.
+
+    On that identical-input path `last_total` is the report the desk is HOLDING
+    (rows), not the previous pass's count: there is no delta to draw, and the
+    strip headline has to agree with the board it sits under. Measured on
+    gun_pen_2: one script, two runs, 36 findings then 22, so a "Pass: 36"
+    headline over a 22-row board is the UI contradicting itself. The previous
+    total is kept in `prev_total` for the re-wording clause. On a real diff
+    `last_total` keeps its original meaning: the previous pass's distinct count.
+    """
     report_path = m.report_findings_path if m.stage("analyze").status == "complete" else None
     if not report_path or not os.path.exists(report_path):
         return None
@@ -168,7 +210,20 @@ def last_pass_snapshot(m):
         report = json.load(f)
     report_sig = _report_signature(report)
     if snap and snap.get("report_mtime") == rp_mtime and snap_sig == report_sig:
+        if isinstance(snap, dict) and snap.get("parsed_sig") is None:
+            # Legacy snapshot (written before the GAP-7 gate). Stamp the input
+            # this pass ran on, once, so the NEXT comparison is gated instead of
+            # granting every old project a free pass. No arithmetic here.
+            snap["parsed_sig"] = _parsed_signature(m)
+            try:
+                with open(last_pass_path(m), "w", encoding="utf-8") as f:
+                    json.dump(snap, f)
+            except OSError:
+                pass  # an unwritable snapshot must never break the edits fetch
         return snap.get("payload")
+    # fingerprint the input only when a recompute is actually happening, so the
+    # cached path never pays for a file read
+    parsed_sig = _parsed_signature(m)
     findings = report.get("findings", [])
     new_ids = [compute_finding_id(f) for f in findings]
     issues = {compute_finding_id(f): (f.get("issue") or "") for f in findings}
@@ -178,22 +233,46 @@ def last_pass_snapshot(m):
         old_set, new_set = set(old_ids), set(new_ids)
         still = old_set & new_set
         intents = finding_intents(m)
-        payload = {
-            "computed_at": time.time(),
-            "last_total": len(old_set),
-            "still_live": len(still),
-            "fixed": len(old_set) - len(still),
-            "new": len(new_set) - len(still),
-            "ghosted_marks": [
-                {"finding_id": gid, "issue": (snap.get("issues") or {}).get(gid, ""),
-                 "intent": intents.get(gid)}
-                for gid in old_ids if gid not in new_set and intents.get(gid)
-            ][:50],
-        }
+        # A legacy snapshot carries no parsed_sig, so it cannot answer "did the
+        # input move?". It keeps the old arithmetic for exactly one pass and gets
+        # stamped below; every comparison after that is gated.
+        same_input = bool(parsed_sig) and snap.get("parsed_sig") == parsed_sig
+        if same_input:
+            # Byte-identical script: nothing was fixed and nothing is new. The id
+            # churn is the model re-wording itself — disclose it as such, and
+            # never as writer progress or as a vanished mark.
+            payload = {
+                "computed_at": time.time(),
+                # the desk's own total: identical input means the previous
+                # pass's count is not what the writer is looking at
+                "last_total": len(new_ids),
+                "still_live": len(new_ids),
+                "fixed": 0,
+                "new": 0,
+                "same_input": True,
+                "rewritten": len(old_set - new_set),
+                "prev_total": len(old_set),
+                "ghosted_marks": [],
+            }
+        else:
+            payload = {
+                "computed_at": time.time(),
+                "last_total": len(old_set),
+                "still_live": len(still),
+                "fixed": len(old_set) - len(still),
+                "new": len(new_set) - len(still),
+                "same_input": False,
+                "rewritten": 0,
+                "ghosted_marks": [
+                    {"finding_id": gid, "issue": (snap.get("issues") or {}).get(gid, ""),
+                     "intent": intents.get(gid)}
+                    for gid in old_ids if gid not in new_set and intents.get(gid)
+                ][:50],
+            }
     with open(last_pass_path(m), "w", encoding="utf-8") as f:
         json.dump({"ids": [gid for gid in dict.fromkeys(new_ids)], "issues": issues,
                    "report_mtime": rp_mtime, "report_sig": report_sig,
-                   "payload": payload}, f)
+                   "parsed_sig": parsed_sig, "payload": payload}, f)
     return payload
 
 
@@ -545,31 +624,86 @@ def undismiss_finding(m, index: int, finding_id: str | None = None) -> None:
         json.dump(data, f, indent=2)
 
 
+# Change detection is STRICT on purpose, and it is deliberately NOT the
+# verifier's threshold: a line the writer reworded must read "addressed", not
+# "still present". (GAP-6: sharing one threshold would have traded this bug for
+# a quieter one — the writer-fix signal would stop firing.)
+QUOTE_CHANGE_THRESHOLD = 0.95
+# Below this many words a fuzzy hit is noise, not evidence, so only containment
+# counts. Mirrors the verifier's own `< 3 words -> cannot check` rule.
+SHORT_QUOTE_WORDS = 3
+
+
 def quote_present(doc: ScriptDocument, quote: str | None) -> bool:
     """Is a finding's evidence quote still present in the working copy?
 
-    Exact substring match first; then near-verbatim fuzzy (>= 0.95). The
-    threshold is deliberately strict: a line that was edited at all (even a
-    word changed) should count as 'addressed', not 'still present'."""
+    Both passes run over the JOINED, NORMALISED scene text via `quotematch`, the
+    same primitives the analyzer's verifier uses, so the two engines can no
+    longer disagree about a quote that spans a line wrap or mixes straight and
+    curly quotes. That disagreement was GAP-6: six dialogue findings read
+    `verified` at confidence 1.0 to the verifier and "gone" here, so on a script
+    nobody had edited the desk reported them "addressed by you", the board
+    dropped its Dialogue section and the manuscript lost every margin pin.
+
+      1. containment of the normalised quote in a normalised scene. Settles
+         every genuine quote, wherever it sits and however it is punctuated.
+      2. a strict fuzzy fallback (`QUOTE_CHANGE_THRESHOLD`) against each
+         element, for a quote the writer mistyped or that the parse mangled.
+
+    Strictness is the point: a line edited at all — even one word — counts as
+    'addressed'. Measured separation at ELEMENT granularity, normalised: a
+    dropped character scores 0.979 (still present), a swapped word 0.875 and a
+    removed word 0.830 (both addressed). The price of passing (1) is that a
+    punctuation-only edit reads as still present; a finding's substance is
+    unchanged by a comma.
+
+    Pass B deliberately keeps ELEMENT granularity rather than reusing the
+    verifier's scene-sized window: a ratio wants two strings of similar length,
+    and a scene-sized window dilutes it until the pass is inert. The consequence
+    is that a quote spanning two elements AND edited reads as addressed, which is
+    the conservative direction.
+    """
     if not quote or not quote.strip():
         return False
-    target = quote.strip()
-    all_texts = [el.text for s in doc.scenes for el in s.elements]
-    if any(target in t for t in all_texts):
+    target_norm = quotematch.normalize_text(quote)
+    if not target_norm:
+        return False
+    scenes = [quotematch.normalize_text(t) for t in quotematch.iter_scene_texts(doc)]
+    if any(target_norm in s for s in scenes):
         return True
+    if len(target_norm.split()) < SHORT_QUOTE_WORDS:
+        return False
     return any(
-        SequenceMatcher(None, t, target).ratio() >= 0.95
-        for t in all_texts
-        if t
+        SequenceMatcher(None, quotematch.normalize_text(el.text), target_norm).ratio()
+        >= QUOTE_CHANGE_THRESHOLD
+        for s in doc.scenes
+        for el in s.elements
+        if el.text
     )
+
+
+def _load_baseline_doc(m):
+    """The parse-of-record: the script as it was analyzed.
+
+    The baseline that separates "the writer edited this line away" from "this
+    line was never in the script". None when the parse is unreadable, in which
+    case callers must stay at 'unknown' rather than claim progress -- an
+    unverifiable 'addressed' is the exact failure this exists to prevent.
+    """
+    try:
+        return ScriptDocument.load(m.parsed_path)
+    except (OSError, ValueError):
+        return None
 
 
 def finding_statuses(m) -> dict:
     """Which findings are still live in the working copy vs. addressed by edits.
 
-    A finding is 'addressed' when its evidence quote can no longer be found in
-    the edited script (the problematic line was changed or removed). Findings
-    with no quote can't be auto-checked and are reported as 'unknown'.
+    'addressed' means the writer changed or removed the quoted line: the quote
+    must have been present in the parse-of-record AND be gone from the working
+    copy. A quote the script never contained stays 'unknown' -- absence alone
+    is not evidence of progress. Findings with no quote can't be auto-checked
+    and are reported as 'unknown'.
     """
     try:
         with open(m.report_findings_path, "r", encoding="utf-8") as f:
@@ -578,6 +712,16 @@ def finding_statuses(m) -> dict:
         return {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
 
     doc = load_working(m)
+    # A quote missing from the working copy only proves writer progress if the
+    # line was in the script to begin with. Absence alone is not evidence: the
+    # report's own verifier accepts a paraphrase at 0.72 and reports not_found
+    # for the rest, so "gone from the working copy" can describe a line that was
+    # never there -- measured on gun_pen_2, 2 of 9 quoted findings told the
+    # writer they had fixed a line on a draft they had never touched. The
+    # parse-of-record is the baseline, loaded lazily so a draft with nothing
+    # missing pays nothing for it.
+    baseline = None
+    baseline_loaded = False
     statuses = []
     for idx, f in enumerate(report.get("findings", [])):
         quote = f.get("evidence_quote")
@@ -591,7 +735,12 @@ def finding_statuses(m) -> dict:
         elif quote_present(doc, quote):
             entry["status"] = "still_present"
         else:
-            entry["status"] = "addressed"
+            if not baseline_loaded:
+                baseline = _load_baseline_doc(m)
+                baseline_loaded = True
+            # no readable baseline -> unknown, never a claimed fix
+            entry["status"] = ("addressed" if baseline is not None
+                               and quote_present(baseline, quote) else "unknown")
         statuses.append(entry)
 
     summary = {"addressed": 0, "still_present": 0, "unknown": 0}

@@ -1,30 +1,4 @@
 {
-  "gaps": [
-    {
-      "gap": "escalation/loop: engaging the fix loop does not cover its own bar",
-      "detail": "engaging the loop opened the room drawer over the dock (startLoop -> stepLoop -> jumpToScene -> openCowriteRoom); the loop bar's mark/park/discuss buttons are then unreachable by mouse"
-    },
-    {
-      "gap": "pass2: the arrival 'Pass:' total agrees with the board's finding count",
-      "detail": "arrival last_total=33 vs report findings=36 (distinct-id dedup: colliding finding ids collapse in the arithmetic)"
-    },
-    {
-      "gap": "C: unedited script -> zero phantom 'addressed' findings",
-      "detail": "server observes addressed=8 still_present=1 unknown=27 of 36"
-    },
-    {
-      "gap": "C: mass strip reports every finding open on an unedited script",
-      "detail": "mass strip says '26 open of 36 findings' but the report has 36 findings"
-    },
-    {
-      "gap": "C: the desk status line agrees with the finding count",
-      "detail": "status reads 'Analysis complete — a clean bill. The Evidence lens has the coverage.' while the report has 36 findings"
-    },
-    {
-      "gap": "B/character_dials: the dials are reachable on the live desk",
-      "detail": "15 dial rows render, visible=False (#struct-rail is display:none — dead chrome)"
-    }
-  ],
   "sameer_reply": "The note isn't about that line—it's about the whole scene talking to itself instead of letting us see what happens. You're explaining the mechanics while we should be watching them break down.\n\n\n\n\nWant me to show you where the explanation starts dragging and how much gets cut if you trust the prop work?",
   "sushruta_reply": "The dialogue in Scene 2 fails because it explains the action instead of letting us see it. The finding was flagged for \"on-the-nose\" exposition and redundant narration that tells us what we already know from looking at the screen. Specifically, Pen Guy asks Gun Guy who he is while simultaneously checking a watch—two actions that should tell us everything about his state without needing dialogue to announce them. He also explicitly states his profession (\"Journalist ga inka unna\") and the stakes of the confrontation in direct address. This turns a physical standoff into an informational exchange, robbing it of tension. Do you want to see where these explanatory beats cluster most heavily?",
   "intents": {
@@ -51,24 +25,27 @@
     "unknown": 26
   },
   "arrival_expected": {
-    "computed_at": 1789757766.36562,
-    "last_total": 33,
-    "still_live": 4,
-    "fixed": 29,
-    "new": 32,
+    "computed_at": 1789796653.892013,
+    "last_total": 22,
+    "still_live": 22,
+    "fixed": 0,
+    "new": 0,
+    "same_input": true,
+    "rewritten": 0,
+    "prev_total": 21,
     "ghosted_marks": []
   },
   "findings_status_summary": {
-    "addressed": 8,
-    "still_present": 1,
-    "unknown": 27
+    "addressed": 0,
+    "still_present": 5,
+    "unknown": 17
   },
-  "findings_total": 36,
-  "desk_status": "Analysis complete — a clean bill. The Evidence lens has the coverage.",
+  "findings_total": 22,
+  "desk_status": "22 findings on the desk — the dock's Evidence lens has the ledger.",
   "row_a": [
     [
       "dialogue",
-      false
+      true
     ],
     [
       "theme",
@@ -96,7 +73,7 @@
     ],
     [
       "continuity",
-      false
+      true
     ],
     [
       "principles",
@@ -104,8 +81,8 @@
     ]
   ],
   "badges": {
-    "verified": 0,
-    "unverified": 40
+    "verified": 7,
+    "unverified": 27
   },
   "row_b": {
     "pacing": true,
@@ -113,9 +90,20 @@
     "writer_mirror": true,
     "coverage": true,
     "character_dials": {
-      "dial_rows": 15,
-      "visible": false
+      "dial_rows": 45,
+      "dock_dials": 15,
+      "visible": true
     }
   },
-  "failed_categories": []
+  "failed_categories": [],
+  "ink": {
+    "pins": 2,
+    "inkable": 4,
+    "quoted": 5
+  },
+  "clean_bill": {
+    "synthetic": true,
+    "label": "Clean Bill Probe"
+  },
+  "gaps": []
 }

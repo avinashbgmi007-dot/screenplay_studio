@@ -189,6 +189,31 @@ class TestFindingStatuses:
         # theme/character findings in the mock have evidence_quote=None
         assert any(s["category"] == "theme" for s in unknown)
 
+    def test_never_present_quote_is_not_writer_progress(self, tmp_path, sample_fountain, mock_server):
+        """A quote the tool never located cannot become \"addressed by you\".
+
+        The engine read "addressed" for ANY quote missing from the working copy, so a
+        finding the analyzer itself reported not_found - or accepted only as a fuzzy
+        paraphrase - told the writer they had fixed a line that was never there.
+        Measured on gun_pen_2 before the fix: 2 of 9 quoted findings, on a draft the
+        writer had never touched.
+        """
+        m = self._analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        dialogue = [f for f in report["findings"] if f["category"] == "dialogue"]
+        assert dialogue and dialogue[0]["evidence_quote"]
+        idx = report["findings"].index(dialogue[0])
+        dialogue[0]["evidence_quote"] = "a line this script has never contained"
+        with open(m.report_findings_path, "w", encoding="utf-8") as fh:
+            json.dump(report, fh)
+
+        statuses = revision.finding_statuses(m)
+        by_index = {s["index"]: s for s in statuses["findings"]}
+        assert by_index[idx]["status"] == "unknown"
+        # the whole-draft contract the audit pins: nothing was edited, so nothing
+        # may read as writer progress
+        assert statuses["summary"]["addressed"] == 0
+
     def test_statuses_empty_when_no_report(self, manifest):
         statuses = revision.finding_statuses(manifest)
         assert statuses["findings"] == []
@@ -309,6 +334,32 @@ def _write_report_as_new_pass(m, report):
     os.utime(m.report_findings_path, (st.st_atime, st.st_mtime + 1))
 
 
+
+def _write_parsed_as_new_draft(m, marker=" -- revised in a new draft"):
+    """Make the parse-of-record differ, the way a re-parse or a new draft would.
+
+    The arrival arithmetic is gated on whether the analyzer's INPUT moved (the
+    GAP-7 gate): identical input means every Fixed/New is the model re-wording its
+    own findings, not draft-over-draft movement. So a test that means to exercise
+    real movement has to move the input, not just rewrite the report.
+    """
+    doc = json.load(open(m.parsed_path, encoding="utf-8"))
+    for s in doc.get("scenes") or []:
+        for e in s.get("elements") or []:
+            if e.get("text") and e.get("type") in ("action", "dialogue"):
+                e["text"] = e["text"] + marker
+                with open(m.parsed_path, "w", encoding="utf-8") as f:
+                    json.dump(doc, f)
+                return
+    for s in doc.get("scenes") or []:
+        for e in s.get("elements") or []:
+            if e.get("text"):
+                e["text"] = e["text"] + marker
+                with open(m.parsed_path, "w", encoding="utf-8") as f:
+                    json.dump(doc, f)
+                return
+    raise AssertionError("fixture has no element text to revise")
+
 class TestLastPass:
     def test_first_pass_returns_none(self, tmp_path, sample_fountain, mock_server):
         m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
@@ -328,6 +379,7 @@ class TestLastPass:
         kept = [old[0], old[2]]
         fresh = dict(old[1], issue="A brand new observation entirely.", evidence_quote=None)
         report["findings"] = kept + [fresh]
+        _write_parsed_as_new_draft(m)  # a real second pass follows a re-parse
         json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
         lp = revision.last_pass_snapshot(m)
         assert lp is not None
@@ -335,6 +387,87 @@ class TestLastPass:
         assert lp["still_live"] == 2
         assert lp["fixed"] == distinct - 2  # every distinct finding seeded but not kept
         assert lp["new"] == 1
+
+    def test_same_input_is_not_progress(self, tmp_path, sample_fountain, mock_server):
+        """GAP-7: a no-op re-analysis must not read as a draft-over-draft delta.
+
+        Measured on gun_pen_2: over a byte-identical parse-of-record the strip read
+        "33 -> 4 still live, 29 no longer flagged, 32 new" (about 88% id churn on
+        identical input), because the no-quote tier hashes the model's own sentence.
+        The script did not change, so nothing was fixed and nothing was added: the
+        movement is the model re-wording itself, and it is disclosed as `rewritten`
+        rather than dressed as writer progress.
+        """
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        seed = revision.last_pass_snapshot(m)
+        assert seed is None  # first pass seeds, no arithmetic yet
+        # the SAME script is analyzed again and the no-quote tier is re-worded
+        reworded = 0
+        for f in report["findings"]:
+            if not (f.get("evidence_quote") or "").strip():
+                f["issue"] = "Reworded by the model: " + (f.get("issue") or "")
+                reworded += 1
+        assert reworded, "the fixture must carry no-quote findings"
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        lp = revision.last_pass_snapshot(m)
+        assert lp is not None
+        assert lp["same_input"] is True
+        assert lp["fixed"] == 0 and lp["new"] == 0
+        assert lp["still_live"] == lp["last_total"]  # nothing was moved by the writer
+        assert lp["rewritten"] > 0  # the churn is DISCLOSED, never hidden
+        assert lp["ghosted_marks"] == []  # no false "your marked finding vanished"
+
+    def test_same_input_headline_agrees_with_the_board(self, tmp_path, sample_fountain, mock_server):
+        """On identical input the strip headline must be the board's own total.
+
+        Measured on gun_pen_2: two runs over one byte-identical parse-of-record
+        filed 36 findings, then 22. `last_total` used to be the PREVIOUS pass's
+        count, so the strip read "Pass: 36 → 36 still live" while the board
+        beside it listed 22 rows — the desk contradicting itself. With no delta
+        to draw the headline is the report the desk holds (rows, the number the
+        board counts); the previous total rides in `prev_total` so the re-wording
+        clause can still name it.
+        """
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        prev_distinct = len({revision.compute_finding_id(f) for f in report["findings"]})
+        assert prev_distinct > 2, "the fixture must file enough findings to shrink"
+        assert revision.last_pass_snapshot(m) is None  # first pass seeds
+        # the SAME script analyzed again: the model files FEWER findings and
+        # re-words the survivors (the no-quote tier hashes its own prose)
+        kept = report["findings"][:2]
+        for f in kept:
+            f["issue"] = "Reworded on an identical script: " + (f.get("issue") or "")
+        report["findings"] = kept
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        # A re-worded finding only changes its id on the NO-QUOTE tier; on the
+        # quoted tier the quote IS the identity, so the survivor count is what
+        # the churn is measured against.
+        survivors = len({revision.compute_finding_id(f) for f in kept})
+        lp = revision.last_pass_snapshot(m)
+        assert lp["same_input"] is True
+        assert lp["last_total"] == len(kept)          # the board's row count
+        assert lp["still_live"] == len(kept)          # nothing was fixed
+        assert lp["fixed"] == 0 and lp["new"] == 0
+        assert lp["prev_total"] == prev_distinct      # disclosed, never headlined
+        assert lp["rewritten"] == prev_distinct - survivors  # the ids that moved
+
+    def test_changed_script_reports_the_real_delta(self, tmp_path, sample_fountain, mock_server):
+        """The gate opens when the analyzer input genuinely moved."""
+        m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
+        report = json.load(open(m.report_findings_path, encoding="utf-8"))
+        old = report["findings"]
+        distinct = len({revision.compute_finding_id(f) for f in old})
+        assert revision.last_pass_snapshot(m) is None
+        _write_parsed_as_new_draft(m)  # a revised draft was parsed
+        report["findings"] = [old[0], old[2]]
+        json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
+        lp = revision.last_pass_snapshot(m)
+        assert lp["same_input"] is False
+        assert lp["fixed"] == distinct - 2
+        assert lp["new"] == 0
+
 
     def test_idempotent_reads(self, tmp_path, sample_fountain, mock_server):
         m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
@@ -369,6 +502,7 @@ class TestLastPass:
         gid = revision.compute_finding_id(gone)
         revision.set_finding_intent(m, gid, "addressed")
         report["findings"] = report["findings"][1:]  # the marked finding transformed away
+        _write_parsed_as_new_draft(m)
         json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
         lp = revision.last_pass_snapshot(m)
         assert lp["fixed"] >= 1  # the marked finding is among the transformed
@@ -396,8 +530,15 @@ class TestLastPass:
         _write_report_as_new_pass(m, report)
         lp = revision.last_pass_snapshot(m)
         assert lp is not None
-        assert lp["last_total"] == distinct  # distinct ids, not raw row count
-        assert lp["still_live"] == distinct
+        # GAP-3's real invariant is fixed=0/new=0: duplicate rows must never
+        # manufacture progress. The HEADLINE, though, is the number the board
+        # shows (rows) — on identical input the strip has to agree with the desk
+        # it sits under (test_same_input_headline_agrees_with_the_board), and the
+        # > distinct assertion below keeps this fixture discriminating between
+        # the two bases rather than letting them silently coincide.
+        assert lp["last_total"] == len(report["findings"])  # the board's rows
+        assert lp["still_live"] == lp["last_total"]
+        assert lp["last_total"] > distinct  # identity is still distinct, not rows
         assert lp["fixed"] == 0  # the old bug: rows - distinct = phantom fixes
         assert lp["new"] == 0     # the old bug: same phantom on the new side
 
@@ -415,6 +556,7 @@ class TestLastPass:
         # pass 2: every copy of the duplicated finding is gone
         others = [f for f in report["findings"] if revision.compute_finding_id(f) != gid]
         report["findings"] = others
+        _write_parsed_as_new_draft(m)
         json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
         lp = revision.last_pass_snapshot(m)
         listed = [g["finding_id"] for g in lp["ghosted_marks"]]

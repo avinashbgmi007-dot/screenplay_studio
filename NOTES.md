@@ -1525,3 +1525,229 @@ TESTS: tests/test_fake_composer_removed.py (new, 12).
 Gate: 1067 passed / 0 failures (+12 from 1055); browser smoke 18/18, phase7 15/15,
 phase6 28/28.
 
+
+================================================================================
+2026-09-19 - WAVE 1.5 / GAP-6: one normaliser, two thresholds
+================================================================================
+Item: the audit's CRITICAL finding that the status engine calls verified quotes
+"gone", so on a script nobody had edited the desk reported 8 findings "addressed
+by you", the board dropped its Dialogue section and the manuscript rendered no
+margin ink at all (GAP-6).
+
+MEASURED FIRST, ON THE REAL STORED PROJECT (no browser, no model:
+finding_statuses re-reads the stored report + working copy, which is exactly what
+scripted the phantom count):
+  BEFORE  still_present 1 - addressed 8 - unknown 27   (byte-matches the audit's
+                                                       recorded 8/1/27)
+  AFTER   still_present 7 - addressed 2 - unknown 27
+  contradictions (verifier accepted at 1.0, engine said gone): 6 -> 0
+  6 flipped, ALL dialogue, all verifier-verified at 1.0
+  2 stayed "addressed" and should: one verifier-accepted paraphrase at 0.82, one
+  genuine not_found at 0.56. Neither quote is in the script.
+  inkable findings (open + quoted + scene-anchored): 0 -> 6; dialogue: 0 of 8 ->
+  6 of 8 open, so the board's Dialogue section returns.
+
+THE CORRECTION TO THE RECORDED FIX DIRECTION. The audit says "one matcher, one
+answer ... expose one shared matcher from verifier and call it from both places".
+Sharing the THRESHOLD would have traded this bug for a quieter one. Measured at
+element granularity on normalised text:
+    dropped character       0.979  -> still present
+    swapped word (an edit)  0.875  -> addressed
+    removed word (an edit)  0.830  -> addressed
+Verification's 0.72 accepts both edits, so every edited line would have kept
+reading "still present" and the writer-fix signal would have died silently.
+SHARED: the normaliser and the haystack. NOT SHARED: the threshold (0.72 there,
+0.95 here) because the two engines ask opposite questions.
+
+WHERE THE SHARED CODE LIVES: screenplay_parser/quotematch.py. That package
+imports nothing from screenplay_analyzer or screenplay_studio (verified per
+file), and revision.py + verifier.py already import screenplay_parser, so the
+studio never reaches into the analyzer and there is no import-failure path that
+could quietly restore the old matching. verifier._normalize / _scene_full_text /
+_best_fuzzy_match are now ALIASES (identity, not wrappers) so
+screenplay_cowriter.reply_transforms keeps importing them.
+
+THE FIX
+- quotematch.py: normalize_text, scene_text, find_scene_text, iter_scene_texts,
+  windowed_similarity (moved verbatim; the docstring records why there is no
+  threshold here).
+- revision.quote_present: pass A = containment of the normalised quote in the
+  normalised JOINED scene (fixes line wraps and curly-vs-straight quotes); pass B
+  = the strict per-element ratio at QUOTE_CHANGE_THRESHOLD = 0.95. Pass B keeps
+  ELEMENT granularity on purpose: a scene-sized window dilutes the ratio until
+  the pass is inert. Accepted consequence: a quote that both spans two elements
+  AND was edited reads as addressed - the conservative direction.
+- Short quotes (< 3 words) get containment only.
+
+TESTS: tests/test_quote_agreement.py (new, 23). The load-bearing one is the
+contract: every quote the verifier accepted at confidence 1.0 must be present to
+the status engine. Plus the two captured real fixtures (the wrapped two-element
+quote, the straight-vs-curly pair), the writer-fix trap (a one-word edit and a
+removed word must still read addressed), the revision ledger's second caller
+(diff_findings must not call a wrapped quote "resolved"), and five "one
+implementation" guards including a source scan for a second copy of the
+punctuation-stripping regex.
+
+MUTATIONS: 6 of 7 caught (per-element haystack; un-normalised matching; the
+strict threshold swapped for 0.72; pass B removed; the verifier re-implementing
+its own normaliser; the whole pre-fix quote_present restored). The survivor is
+the short-quote floor, which is INERT at a 0.95 threshold - a 2-word quote cannot
+reach 0.95 without also being a substring. Kept as defence in depth in case that
+threshold is ever lowered, and labelled not-individually-provable rather than
+claimed as a guard.
+
+THE LAST SURFACE, FOUND ONLY BY RUNNING IT. The data-layer numbers said the fix was
+done (6 of 9 quoted findings open and scene-anchored) and the browser still showed
+0 ink pins. decorateLineWithInk required the WHOLE quote inside ONE line
+(text.indexOf(quote) !== -1), and a quote cited across a line wrap can never satisfy
+that - so every wrapped finding stayed invisible on the page even after it was open.
+Same root cause, fourth surface. Fixed in app.js: inkMatch() falls back to the
+quote's longest leading fragment present on the line (>= 3 words and >= 8 chars),
+with quote marks stripped per word because a model writes straight quotes where a
+script may have curly ones. app.js version query bumped hx1b379 -> hx1b380.
+
+BROWSER RE-RUN (matrix stage, real llama-server, real stored report):
+  gaps filed        7 -> 6 -> 5
+  dialogue section  ABSENT -> PRESENT (6 findings)
+  margin ink        0 pins -> 3 pins
+  mass strip        26-28 of 36 -> 34 of 36 open
+  phantom addressed 8 -> 2 (both genuinely absent from the script)
+  A-dialogue.png    could not exist before; it exists now, and its absence WAS the
+                    evidence for this gap
+Retired: two of the audit's filed gaps (the Dialogue category and the margin ink).
+Still filed: arrival total vs board total (GAP-7), the 2 phantom-attributed
+findings, the desk status line, the dead character dials.
+
+HARNESS CAVEAT (cost a 300s timeout): phase6_evidence must NOT be pointed at a
+studio backed by a REAL llama-server - it creates a probe project and fires a full
+analysis (~9 min on the gun_pen model), so the suite times out at 300s while the
+server keeps working on a throwaway project. Suites that need a model want the demo
+studio (_run_e2e_sweep.py boots one). The gun_pen_audit MATRIX stage is safe against
+a real server: it re-walks a stored report and runs no analysis.
+
+Gate: 1090 passed / 0 failures (+23 from 1067); ruff clean on the changed files.
+
+RESIDUAL (flagged, not fixed): "addressed" is still purely quote_present ==
+False, so the 2 findings whose quote is genuinely absent still read as writer
+progress on an untouched draft. The contract violation is closed; the
+ATTRIBUTION issue is narrower but real, and it is the same root as GAP-7.
+
+================================================================================
+2026-09-19 — GAPS PASS: two audit gaps retired, plus the phantom "addressed" fixed
+================================================================================
+Track: docs/CRITICAL_REVIEW_2026-09-18.md (board section C, ranked). Item: "retire two
+audit gaps" — desk status line, character dials, then re-run the gun_pen audit.
+
+WHAT SHIPPED (three changes, each with the check that proves it)
+
+1. DESK STATUS LINE. refreshDeskToolbar() reads state.findings, but at project-open it
+   ran at app.js:1979 — BEFORE loadScriptData() (async) populated them — and was never
+   re-run. So a 36-finding report read "Analysis complete — a clean bill." forever.
+   loadScriptData() now re-runs it once the data is set. Idempotent and state-driven;
+   the analyze path already called it after the load, which is exactly the pattern the
+   open path was missing.
+
+2. CHARACTER DIALS RE-HOMED. They rendered only into #struct-rail (style.css:
+   display:none) and the dormant #feedback-view, so 15 dial rows existed with zero of
+   them reachable. ONE renderCharacterDialsPanel() now feeds three live surfaces: the
+   page-one craft shelf, the dock Evidence lens and the feedback report. The dock was
+   always the intended home — style.css:6053-6054 already styles `.dock-craft .dial-row`;
+   the CSS shipped, the renderer never did. Rail copy left alone (that dormant surface is
+   H6, not this item; its dials also read a different shape, character_tracks).
+
+3. PHANTOM "addressed" FIXED. finding_statuses() read "addressed" for ANY quote missing
+   from the working copy. Absence is not evidence of progress: the report own verifier
+   accepts a paraphrase at 0.72 and reports not_found otherwise, so a finding could tell
+   the writer they had fixed a line that was never there. It now requires the quote to be
+   present in the parse-of-record AND gone from the working copy (_load_baseline_doc,
+   loaded lazily, so an untouched draft pays nothing). Measured on gun_pen_2: addressed
+   2 -> 0, still_present 7 UNCHANGED, unknown 27 -> 29. The two: one carried the report own
+   verdict `not_found` (conf 0.56), the other a 0.82 fuzzy paraphrase. Both on a draft the
+   writer had never touched. New test: test_never_present_quote_is_not_writer_progress
+   (RED first, then GREEN). The sibling test that a genuinely edited line STILL reads
+   addressed is the guard against over-correcting into all-unknown.
+
+MEASURED (live studio, real llama-server on :8080)
+  gaps filed        5 -> 1   (matrix stage: 18 checks passed / 0 failed)
+  retired:          the desk status line; B/character_dials; and both phantom-addressed
+                    gaps (they share one root, so one fix retired two)
+  still filed:      pass2 arrival basis (33 distinct ids vs 36 rows) — a product
+                    decision, not work
+  suite:            1091 passed / 0 failed (1090 + the new test)
+
+AN AUDIT CHECK WAS CHANGED, ON PURPOSE. B/character_dials asserted that a
+.rail-char-dials node was VISIBLE — a class that exists only inside the dead
+#struct-rail, so re-homing the dials could never satisfy it. The check encoded the
+defect it was meant to catch. It now asserts the dial rows inside the dock own
+Evidence lens, which is strictly stronger, and the reasoning sits inline in the file.
+
+GOTCHA WORTH KEEPING: a running studio must be RESTARTED to pick up Python changes
+(revision.py); editing app.js / style.css only needs the ?v= bump. The first
+measurement attempt would have read stale numbers off the old process. Kill by PID
+from psutil, relaunch with nohup, poll /api/projects until 200, THEN measure.
+
+RESIDUAL (flagged, not fixed) -- updated 2026-09-19 by the GAP-7 pass
+- pass2 arrival basis: RESOLVED. On a byte-identical script the strip headlines the report
+  the desk HOLDS (rows), so the Pass: total equals the board row count by construction, and
+  the previous pass's total is disclosed in the re-wording clause instead of headlined. The
+  framing was also wrong: "33 distinct vs 36 rows" assumed ONE report, but two runs over one
+  script filed 36 findings then 22 -- two passes with drifting counts.
+- the writer own marks are still not consulted by "addressed" (no longer a false claim,
+  but a marking a writer made is not what flips it either).
+- GAP-7 (no-quote ids churn ~88% per no-op re-run): RESOLVED by the edit gate, and it now HAS
+  a filed gap. The ids themselves are still unstable -- see the new entry below.
+
+
+ADDENDUM (same pass): e2e_browser_phase8_lifecycle.py opened its seeded probe by
+clicking .first() on the text "Lifecycle", so pointing it at this long-lived studio
+opened a STALE probe (parse still pending) and the manuscript wait timed out. It now
+opens the exact project id seed() returns. 13/13 self-booted. RULE: run these suites
+self-booted (E2E_BASE unset boots a demo studio on a throwaway projects dir) unless you
+specifically want the real-model path; phase6 is the documented case that must NOT be
+pointed at a real server.
+
+
+================================================================================
+2026-09-19 -- GAP-7 PASS: the arrival strip stops reporting model variance as progress
+================================================================================
+Track: docs/CRITICAL_REVIEW_2026-09-18.md (status board, rows C1 / C7 / C7b, C2).
+
+WHAT WAS WRONG -- two layers, one root
+1. `last_pass_snapshot` diffed two analysis passes purely by finding id. The no-quote tier
+   (75% of findings) hashes the MODEL'S OWN SENTENCE, so a no-op re-run churned ~88% of ids
+   and the strip read `33 -> 4 still live / 29 no longer flagged / 32 new` with the writer
+   having done nothing. Re-keying was measured and rejected: only 3 of 36 findings carry a
+   deterministic key, the rest carry the rule TITLE as prose, which the model rewords.
+2. Once the gate told the truth, a SECOND defect appeared that had no gap filed against it:
+   the HEADLINE. `last_total` was the PREVIOUS pass's count, so after a real re-run the strip
+   read `Pass: 36 -> 36 still live` while the board beside it listed 22 rows. The desk was
+   contradicting itself -- the product's own law.
+
+THE FIX
+- `_parsed_signature(m)` fingerprints the analyzer INPUT (parse-of-record bytes + report
+  language). Deliberately NOT the model id: it resolves per run and would flicker.
+- `last_pass_snapshot` gates on it: identical input => `fixed=0, new=0, same_input=true`, and
+  the id movement is disclosed as `rewritten`, with the previous total in `prev_total`.
+- On that path `last_total` / `still_live` are the report the desk is HOLDING (rows), because
+  there is no delta to draw and the headline must agree with the board. `rewritten` and
+  `prev_total` count DISTINCT ids. Two bases in one payload, each labelled in the clause.
+
+GOTCHA WORTH KEEPING: `last_pass.json` stores the ids of the report its payload was computed
+FOR, so a RECOMPUTE of the same report correctly reports `rewritten=0`. The meaningful
+`rewritten=33` only appears on the pass that follows a DIFFERENT report. Reading a recompute
+and concluding "the gate does nothing" is the easy mistake.
+
+GOTCHA 2: `str(rewritten) in clause` is a vacuous assertion when rewritten is 0 -- "0" sits in
+almost any sentence. The audit now matches the WHOLE clause (`<n> of the last pass's <m>`), so
+dropping either number from the strip fails the check.
+
+EVIDENCE: suite `1094 passed / 0 failed` (was 1093); audit `matrix` 18/0 and `pass2` 9/0,
+filed gaps `1 -> 0`; mutations 5/5 caught (headline, still_live, prev_total present, prev_total
+wrong, rewritten); `node --check` + ruff clean. The `pass2` stage was run with
+GUNPEN_SKIP_ANALYZE=1 against the already-completed real analysis, with the payload re-derived
+by moving the report mtime -- the comparison content is what the real run produced, the
+arithmetic is the new arithmetic. Nothing committed.
+
+GOTCHA 3 (tooling): a very large `python - <<'PY'` heredoc gets TRUNCATED in this shell and
+dies with a bogus NameError/SyntaxError. Keep each heredoc small (roughly < 4 kB) or split it.
+

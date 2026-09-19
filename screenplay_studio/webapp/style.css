@@ -300,6 +300,7 @@
   --z-scene-float: 620;     /* scene index above dock sheet (420) + drawer */
   --z-quote: 700;           /* quote float */
   --z-popup: 800;           /* selection text popup */
+  --z-modal: 900;           /* modal overlay — above ALL app chrome, below the grain */
   --z-grain: 9999;          /* body::before film grain, always on top */
 
   /* legacy component palettes (R0.2): these were used for 2,000+ lines as
@@ -2658,7 +2659,12 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-float);
+  /* Was --z-float (50), which put EVERY modal underneath the problem board
+     (510), the room drawer (590), the quote float (700) and the selection popup
+     (800) — so a modal's buttons were unclickable whenever any of those were up.
+     Found by trying to click "Create fork": the click was intercepted by the
+     board's own scene chip. A modal must clear all app chrome. */
+  z-index: var(--z-modal);
 }
 .modal {
   background: linear-gradient(180deg, var(--ink-850), var(--ink-900));

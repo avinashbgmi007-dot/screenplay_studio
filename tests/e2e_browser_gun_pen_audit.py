@@ -37,6 +37,9 @@ RESULTS = {}
 # A GAP is a product promise the desk does not keep (the audit's finding) —
 # distinct from a harness failure. Gaps do not fail the run; they are filed.
 GAPS = []
+# which stage is running — stamped on every gap so a re-run can RETIRE the gaps
+# that stage no longer produces (a plain merge accumulates stale findings forever)
+CURRENT_STAGE = {"name": None}
 
 
 def gap(name, cond, detail=""):
@@ -44,7 +47,7 @@ def gap(name, cond, detail=""):
     holds = bool(cond)
     print(f"  {'ok  ' if holds else 'GAP '} {name}" + (f"  [{detail}]" if detail else ""))
     if not holds:
-        GAPS.append({"gap": name, "detail": detail})
+        GAPS.append({"gap": name, "detail": detail, "stage": CURRENT_STAGE["name"]})
     return holds
 
 
@@ -159,8 +162,11 @@ def step_probe():
 # ---------------------------------------------------------------------------
 
 CATEGORY_LABELS = {
+    # must match app.js CATEGORY_LABELS verbatim, or a label mismatch reads as a
+    # missing category (plot_thread renders as "Plot economy", not "Plot")
     "dialogue": "Dialogue", "structure": "Structure", "scene_function": "Scene function",
-    "character": "Character", "theme": "Theme", "genre": "Genre", "plot_thread": "Plot",
+    "character": "Character", "theme": "Theme", "genre": "Genre",
+    "plot_thread": "Plot economy",
     "continuity": "Continuity", "principles": "Principles", "setup_payoff": "Setup",
 }
 
@@ -232,21 +238,53 @@ def step_matrix():
             label = CATEGORY_LABELS[cat]
             present = label.lower() in titles_join.lower()
             row_a.append((cat, present))
-            check(f"A/{cat}: category section renders", present, titles_join[:160])
+            # A category the report emits but the board does not render is a
+            # PRODUCT gap (the finding never reaches the writer), not a harness
+            # failure — so it is filed, not counted against the run.
+            gap(f"A/{cat}: the category section reaches the board", present,
+                f"{label!r} absent from: {titles_join[:140]}")
         # principles + setup_payoff — the plan's split-matrix rows
         row_a.append(("principles", "Principles" in titles_join))
         check("A/principles: section present (or honestly absent)",
               True, "principles produced no findings on this script")
         RESULTS["row_a"] = row_a
 
-        # per-category screenshot: scroll the section into view
+        # per-category screenshot: scroll the section into view.
+        # NOTE the `has=` locator must be PAGE-rooted, not lens-rooted: Playwright
+        # re-roots `has` against each candidate, so a lens-scoped inner locator
+        # resolves to `.dock-section >> .dock-lens >> .dock-section-title` and
+        # matches nothing (this silently produced zero shots on the first run).
         for cat in ("dialogue", "structure", "scene_function"):
             label = CATEGORY_LABELS[cat]
-            sec = lens.locator(".dock-section", has=lens.locator(".dock-section-title", has_text=label)).first
+            sec = lens.locator(".dock-section",
+                               has=page.locator(".dock-section-title", has_text=label)).first
             if sec.count():
                 sec.scroll_into_view_if_needed()
                 page.wait_for_timeout(300)
                 shot(page, f"A-{cat}.png")
+            else:
+                # not a separate gap — the missing section is already filed above
+                # as "A/<cat>: the category section reaches the board"
+                print(f"    [no shot] {cat}: no section to photograph")
+
+        # -- row A: the margin ink layer (the 'where is the flaw' answer) -----
+        # Ink anchors require an OPEN finding that CARRIES a quote and names a
+        # scene. A quoted finding hidden as "addressed" (GAP-6) therefore loses
+        # its pin, and a script-level finding (scene_refs []) never had one.
+        ink_pins = page.locator(".finding-ink").count()
+        inkable = page.evaluate(
+            """() => (state.findings||[]).filter((f,i) =>
+                   findingOpen(f,i) && (f.evidence_quote||'').trim() && (f.scene_refs||[]).length
+               ).length"""
+        )
+        quoted_total = page.evaluate(
+            """() => (state.findings||[]).filter(f => (f.evidence_quote||'').trim()).length"""
+        )
+        RESULTS["ink"] = {"pins": ink_pins, "inkable": inkable, "quoted": quoted_total}
+        gap("A/ink: the manuscript carries margin ink for its quoted findings",
+            ink_pins > 0,
+            f"{ink_pins} pins rendered; {inkable} of {quoted_total} quoted findings are "
+            f"both open and scene-anchored")
 
         # -- row A: trust chips on deep cards --------------------------------
         verified_badges = lens.locator(".finding-deep-badge.verified").count()
@@ -279,16 +317,22 @@ def step_matrix():
         row_b["coverage"] = lens.locator(".dock-cov-logline").count() > 0
         for k, v in row_b.items():
             check(f"B/{k}: report-section panel renders in the dock", v, craft_join[:200])
-        # the character DIALS specifically — data renders, but where?
+        # the character DIALS specifically — they must render INSIDE the live dock.
+        # The previous assertion pinned `.rail-char-dials` visibility, i.e. the DEAD
+        # #struct-rail: re-homing the dials into the dock could never satisfy it, because
+        # the class it looked for only ever existed in the dead chrome. Pinning the dock
+        # is strictly stronger than "some node carrying the rail class is visible".
         dial_rows = page.locator(".dial-row").count()
-        dials_visible = page.locator(".rail-char-dials").first.is_visible() \
-            if page.locator(".rail-char-dials").count() else False
+        dock_dials = lens.locator(".dial-row")
+        dock_n = dock_dials.count()
+        dials_visible = dock_n > 0 and dock_dials.first.is_visible()
         RESULTS["row_b"] = row_b
-        row_b["character_dials"] = {"dial_rows": dial_rows, "visible": dials_visible}
+        row_b["character_dials"] = {"dial_rows": dial_rows, "dock_dials": dock_n,
+                                    "visible": dials_visible}
         gap("B/character_dials: the dials are reachable on the live desk",
             dial_rows > 0 and dials_visible,
-            f"{dial_rows} dial rows render, visible={dials_visible} "
-            f"(#struct-rail is display:none — dead chrome)")
+            f"{dial_rows} dial rows render, {dock_n} of them in the dock, "
+            f"visible={dials_visible} (the dials rendered only into the dead #struct-rail)")
         shot(page, "B-character-dials.png")
         RESULTS["row_b"] = row_b
         craft = lens.locator(".dock-craft").first
@@ -296,7 +340,8 @@ def step_matrix():
             craft.scroll_into_view_if_needed()
             page.wait_for_timeout(300)
             shot(page, "B-craft-panels.png")
-        cov = lens.locator(".dock-section", has=lens.locator(".dock-section-title", has_text="Coverage")).first
+        cov = lens.locator(".dock-section",
+                           has=page.locator(".dock-section-title", has_text="Coverage")).first
         if cov.count():
             cov.scroll_into_view_if_needed()
             page.wait_for_timeout(300)
@@ -616,8 +661,27 @@ def step_pass2():
     with sync_playwright() as p:
         browser, page, errors = launch(p)
         open_project(page, PROJECT)
+
+        # -- the unread-dot lifecycle (plan step 6) --------------------------
+        # The dot is scheduled only when the client sees a last_pass computed_at
+        # it has not seen before AND the dock is closed. open_project() already
+        # waits past the 700ms peek timer, so the dot is expected to be present
+        # by the time we look; what matters is that it IS there on a fresh load
+        # and that opening the lens clears it.
+        tab = page.locator("#dock-tab-evidence")
+        page.wait_for_timeout(300)
+        dot_present = "has-unread" in (tab.get_attribute("class") or "")
+        dock_closed = page.locator("#context-dock.open").count() == 0
+        check("pass2: the unread dot is present on a fresh load after a new pass",
+              dot_present and dock_closed,
+              f"has-unread={dot_present} dock closed={dock_closed}")
+
         open_dock(page, "evidence")
         lens = page.locator('.dock-lens[data-lens="evidence"]')
+        page.wait_for_timeout(400)
+        cleared = "has-unread" not in (tab.get_attribute("class") or "")
+        check("pass2: opening the Evidence lens clears the unread dot", cleared)
+
         strip = lens.locator(".dock-arrival-strip")
         check("pass2: the arrival strip appears", strip.count() > 0)
         if strip.count():
@@ -639,13 +703,42 @@ def step_pass2():
                   "not your edits" in scope.lower(), scope)
             # the arrival basis vs the board basis — the same desk, two totals
             rep_n = len(api("GET", f"/api/projects/{PROJECT}/report").get("findings") or [])
-            gap("pass2: the arrival 'Pass:' total agrees with the board's finding count",
-                after["last_total"] == rep_n,
-                f"arrival last_total={after['last_total']} vs report findings={rep_n} "
-                f"(distinct-id dedup: colliding finding ids collapse in the arithmetic)")
+            # This stage forces a re-analysis WITHOUT a re-parse, so the script is
+            # byte-identical to the last pass and there is no delta to draw: the
+            # headline must then be the report the BOARD is counting. Measured:
+            # one script, two runs, 36 findings then 22 — a "Pass: 36" over a
+            # 22-row board is the UI pretending, which is what this now pins.
+            # On a genuinely moved script the headline is the PREVIOUS pass's
+            # total and need not match, so the assertion is scoped to this case.
+            gap("pass2: on an unchanged script the arrival 'Pass:' total equals the board's finding count",
+                after.get("same_input") is True and after["last_total"] == rep_n,
+                f"same_input={after.get('same_input')} arrival last_total={after['last_total']} "
+                f"vs report findings={rep_n}")
             ghosted = strip.locator(".dock-ghosted-summary").count()
             check("pass2: ghosted marks render honestly (never red)",
                   ghosted >= 0, f"{ghosted} ghosted block(s)")
+            # GAP-7: a force re-analysis with no re-parse reads the SAME script,
+            # so every id that moved is the model re-wording its own sentence (the
+            # no-quote tier hashes model prose). The arithmetic must not dress that
+            # as progress: fixed/new are 0 and the churn is disclosed on the strip.
+            # This is the gate for a bug that had no filed check before.
+            rw = strip.locator(".dock-arrival-rewrite")
+            rw_txt = rw.inner_text() if rw.count() else ""
+            # Match the WHOLE clause, not just the number: "0" is in almost any
+            # sentence, so a substring test would pass vacuously on a re-run where
+            # nothing moved (measured: rewritten=0 after a same-report recompute).
+            # This fails if the strip drops either the churn count or the
+            # previous pass's total, which is what makes the disclosure readable.
+            rw_expect = (f"{after.get('rewritten', 0)} of the last pass's {after['prev_total']}"
+                         if after.get("prev_total") is not None
+                         else f"{after.get('rewritten', 0)} findings reworded")
+            check("pass2: an unchanged script is disclosed, not reported as progress",
+                  after.get("same_input") is True and after.get("fixed") == 0
+                  and after.get("new") == 0 and rw.count() > 0
+                  and rw_expect in rw_txt,
+                  f"same_input={after.get('same_input')} fixed={after.get('fixed')} "
+                  f"new={after.get('new')} rewritten={after.get('rewritten')} "
+                  f"clause={rw_txt[:60]!r}")
             shot(page, "PASS2-arrival-strip.png")
         check("pass2: no JS errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()
@@ -694,7 +787,6 @@ def main():
         try:
             with open(results_path, encoding="utf-8") as f:
                 RESULTS.update(json.load(f))
-            GAPS[:] = RESULTS.get("gaps") or []
         except (OSError, ValueError):
             pass
     print(f"=== gun_pen feedback audit :: stage={stage} :: base={BASE} :: project={PROJECT} ===")
@@ -702,18 +794,21 @@ def main():
              if stage == "all" else [stage])
     for name in order:
         print(f"\n--- stage: {name} ---")
+        CURRENT_STAGE["name"] = name
         try:
             STAGES[name]()
         except Exception as e:
             import traceback
             traceback.print_exc()
             check(f"stage {name} completed", False, str(e)[:160])
-    # MERGE this stage's gaps into the accumulated file — stages run as separate
-    # processes, so replacing would silently drop every earlier stage's findings
-    # (which is exactly what happened on the first pass2 run).
-    prior = RESULTS.get("gaps") or []
-    seen = {g.get("gap") for g in prior}
-    RESULTS["gaps"] = prior + [g for g in GAPS if g.get("gap") not in seen]
+    # RETIRE-and-replace per stage: drop the prior gaps belonging to the stages
+    # that just ran, then add this run's. A plain merge would keep a gap forever
+    # after the condition stopped failing (a stale entry survived a fix on the
+    # first attempt at this), and replacing wholesale would drop the other
+    # stages' findings (stages run as separate processes).
+    ran = set(order)
+    kept = [g for g in (RESULTS.get("gaps") or []) if g.get("stage") not in ran]
+    RESULTS["gaps"] = kept + GAPS
     with open(os.path.join(SHOTS, "audit_results.json"), "w", encoding="utf-8") as f:
         json.dump(RESULTS, f, indent=2, ensure_ascii=False)
     print(f"\n=== GAPS FILED ({len(RESULTS['gaps'])}) ===")

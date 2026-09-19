@@ -3163,15 +3163,51 @@ function updateRailPositions(container) {
 
 function renderBranches() {
   const wrap = $("#branch-switcher");
+  if (!wrap) return;
   wrap.innerHTML = "";
   for (const name of Object.keys(state.branches)) {
+    const b = state.branches[name] || {};
+    const turns = (b.messages || []).length;
     const pill = el("button", "branch-pill" + (name === state.currentBranch ? " active" : ""), name);
     pill.type = "button";
-    pill.title = name === state.currentBranch ? "Current branch" : `Switch to "${name}"`;
+    // Merge-peek: what a branch holds and where it came from, without switching
+    // to it. `forked_at_index` is the turn the branch was copied at, so "N turns
+    // since the fork" is read from the session rather than inferred.
+    const peek = [`${turns} turn${turns === 1 ? "" : "s"}`];
+    if (b.parent_branch) {
+      const since = Math.max(0, turns - (b.forked_at_index || 0));
+      peek.push(`forked from "${b.parent_branch}" at turn ${b.forked_at_index}`);
+      if (since) peek.push(`${since} new turn${since === 1 ? "" : "s"} since`);
+    }
+    pill.title = (name === state.currentBranch ? "Current branch — " : `Switch to "${name}" — `)
+      + peek.join(" · ");
     pill.addEventListener("click", () => switchBranch(name));
     wrap.appendChild(pill);
   }
-  // (the fork action was removed from the UI per the writer's preference)
+
+  // The fork entry point. It was once removed "per the writer's preference",
+  // which left the flagship branch system with no way to create a second branch —
+  // a switcher with nothing to switch to, which is why M2 read it as unreachable.
+  // Restored deliberately; the review doc records the reversal.
+  //
+  // Projects only: the idea room has no fork or switch route on the server, so a
+  // button there would be the same class of lie this pass is fixing.
+  if (state.currentProject && !state.premise) {
+    // `.add` is the dashed-accent pill style that was already in the stylesheet,
+    // orphaned when the fork button was removed. Reused rather than reinvented.
+    const forkBtn = el("button", "branch-pill add", "＋ fork");
+    forkBtn.type = "button";
+    forkBtn.title = "Fork this conversation — try an alternative without losing this one";
+    forkBtn.addEventListener("click", openForkModal);
+    wrap.appendChild(forkBtn);
+  }
+}
+
+function openForkModal() {
+  const input = $("#fork-name-input");
+  if (input) input.value = "";
+  openModal("#fork-modal");
+  if (input) input.focus();
 }
 
 async function switchBranch(name) {
@@ -3634,6 +3670,11 @@ async function loadScriptData() {
   if (arrived && findings.length) scheduleArrivalPeek();
   renderDraftBar();
   await renderDiffBanner();
+  // The desk status line reads state.findings, which this function just set.
+  // At project-open the toolbar refresh runs BEFORE this async load resolves, so
+  // without this re-render a 36-finding desk read "a clean bill" forever (audit
+  // gap C). Idempotent -- state-driven, so calling it twice is safe.
+  refreshDeskToolbar();
 }
 
 // ---- fix queue / craft panels ----
@@ -3801,6 +3842,39 @@ function renderCharacterPanel(container) {
     panel.appendChild(row);
   }
   addPanel(container, panel);
+}
+
+// ---- character dials: trait scores per main character ----
+// The dials used to render ONLY into #struct-rail (style.css declares the rail
+// display:none -- dead chrome) and into the dormant #feedback-view, so on the live
+// desk 15 dial rows existed with none of them reachable (audit gap
+// B/character_dials). ONE renderer now feeds three reachable surfaces: the page-one
+// craft shelf, the dock Evidence lens and the feedback report.
+function renderCharacterDialsPanel(container) {
+  const dials = state.report && state.report.character_dials;
+  if (!dials || !dials.length) return;
+  const card = el("div", "craft-panel");
+  const head = el("div", "craft-panel-head");
+  head.appendChild(el("span", "craft-panel-title", "Character dials — how each main character reads"));
+  card.appendChild(head);
+  for (const d of dials) {
+    const block = el("div", "dial-block");
+    block.appendChild(el("div", "dial-char-name", d.character));
+    for (const t of (d.traits || [])) {
+      const row = el("div", "dial-row");
+      row.appendChild(el("span", "dial-label", t.trait));
+      const trackEl = el("span", "dial-track");
+      const fill = el("span", "dial-fill");
+      fill.style.width = `${t.score * 10}%`;
+      trackEl.appendChild(fill);
+      row.appendChild(trackEl);
+      row.appendChild(el("span", "dial-score", String(t.score)));
+      if (t.note) row.title = t.note;
+      block.appendChild(row);
+    }
+    card.appendChild(block);
+  }
+  addPanel(container, card);
 }
 
 // ---- writer's mirror: logline test + character-perception read ----
@@ -4477,6 +4551,7 @@ function renderManuscript(container) {
   renderFixQueuePanel(craftPanels);
   renderPacingPanel(craftPanels);
   renderCharacterPanel(craftPanels);
+  renderCharacterDialsPanel(craftPanels);
   renderWriterMirrorPanel(craftPanels);
   if (craftPanels.length) container.appendChild(buildCraftShelf(craftPanels));
 
@@ -5029,6 +5104,7 @@ function renderDockEvidence() {
   const craftWrap = el("div", "dock-section dock-craft");
   renderPacingPanel(craftWrap);
   renderCharacterPanel(craftWrap);
+  renderCharacterDialsPanel(craftWrap);
   renderWriterMirrorPanel(craftWrap);
   if (craftWrap.children.length) lens.appendChild(craftWrap);
 
@@ -5075,13 +5151,39 @@ function inkAnchorsFor(findings) {
 // wrap ONE anchor's first occurrence inline — same technique as
 // highlightMatches; an inline mark inherits the line's font so text never
 // reflows. Returns how many anchors live on this line (the chip count).
+// Where does an anchor's quote sit on THIS line? Requiring the WHOLE quote
+// inside one line is what made the manuscript render zero ink pins on a real
+// report: a quote the model cited across a line wrap (two elements) can never
+// be found whole on any single line, and every one of those findings was also
+// the dialogue category (GAP-6's last surface). So fall back to the quote's
+// longest leading fragment that IS present on the line — a pin's job is to
+// point at the line, and the board card carries the full quote. Quote marks are
+// stripped per word because a model writes straight quotes where a script may
+// have curly ones.
+const INK_MIN_WORDS = 3;
+const INK_MIN_CHARS = 8;
+function inkMatch(text, q) {
+  const whole = text.indexOf(q);
+  if (whole !== -1) return { idx: whole, len: q.length };
+  const words = q.split(/\s+/)
+    .map((w) => w.replace(/^[\u201c\u201d"'\u2018\u2019(\[]+|[\u201c\u201d"'\u2018\u2019)\]]+$/g, ""))
+    .filter(Boolean);
+  for (let n = words.length - 1; n >= INK_MIN_WORDS; n--) {
+    const frag = words.slice(0, n).join(" ");
+    if (frag.length < INK_MIN_CHARS) break;
+    const idx = text.indexOf(frag);
+    if (idx !== -1) return { idx, len: frag.length };
+  }
+  return null;
+}
 function decorateLineWithInk(line, text, anchors) {
-  let hits = 0, first = null;
+  let hits = 0, first = null, firstMatch = null;
   for (const a of anchors) {
-    if (text.indexOf(a.q) !== -1) { hits += 1; if (!first) first = a; }
+    const m = inkMatch(text, a.q);
+    if (m) { hits += 1; if (!first) { first = a; firstMatch = m; } }
   }
   if (!first) return 0;
-  const idx = text.indexOf(first.q);
+  const { idx, len } = firstMatch;
   line.textContent = "";
   line.appendChild(document.createTextNode(text.slice(0, idx)));
   const mark = document.createElement("mark");
@@ -5089,7 +5191,7 @@ function decorateLineWithInk(line, text, anchors) {
   mark.dataset.findingId = first.id;
   mark.setAttribute("aria-hidden", "true"); // the margin pins + board carry semantics
   mark.title = (first.f.issue || "").slice(0, 140);
-  mark.textContent = text.slice(idx, idx + first.q.length);
+  mark.textContent = text.slice(idx, idx + len);
   if (hits > 1) {
     const chip = document.createElement("i");
     chip.className = "ink-chip";
@@ -5098,7 +5200,7 @@ function decorateLineWithInk(line, text, anchors) {
     mark.appendChild(chip);
   }
   line.appendChild(mark);
-  line.appendChild(document.createTextNode(text.slice(idx + first.q.length)));
+  line.appendChild(document.createTextNode(text.slice(idx + len)));
   return hits;
 }
 
@@ -5159,9 +5261,25 @@ function buildArrivalStrip() {
   // read the parse-of-record (orchestrator.py loads m.parsed_path), so writer
   // edits can never move them. Say "Pass:", not "Last pass… Fixed", so the
   // line reads as analyzer drift instead of borrowed writer progress.
+  // GAP-7: when the script is byte-identical to the last pass there is no delta
+  // to draw, so the four numbers collapse to the report the desk is holding
+  // (lp.last_total is the BOARD's row count there, not the previous pass's) and
+  // the re-wording clause below names the previous total. A headline that
+  // disagreed with the board would be the UI pretending.
   head.appendChild(el("span", "dock-arrival-line",
     `Pass: ${lp.last_total} \u2192 ${lp.still_live} still live \u00B7 ${lp.fixed} no longer flagged \u00B7 ${lp.new} new`));
   const scope = el("span", "dock-arrival-scope", "from the last run, not your edits");
+  // GAP-7: on a byte-identical script the pass numbers can only be the model
+  // re-wording its own findings. Say that, so "0 no longer flagged" reads as
+  // what it is instead of as a quiet draft. The churn is disclosed, never hidden.
+  if (lp.same_input) {
+    const rwTxt = lp.prev_total
+      ? `${lp.rewritten} of the last pass's ${lp.prev_total} DISTINCT findings reworded by the model — your script did not change`
+      : `${lp.rewritten} findings reworded by the model — your script did not change`;
+    const rw = el("span", "dock-arrival-rewrite", rwTxt);
+    rw.title = "The analysis re-read the same script. The wording of its findings moved; your draft did not, so none of this is your progress.";
+    head.appendChild(rw);
+  }
   scope.title = "These compare one analysis pass to the previous one. They never respond to your edits \u2014 your own progress rides beside them.";
   head.appendChild(scope);
   // GAP-5's honest counterpart: the working-copy truth the pass line cannot
@@ -5906,32 +6024,10 @@ function renderReportPanel() {
     c.appendChild(paceCard);
   }
 
-  // Character dials — ScreenplayIQ-style trait scores per main character
-  const dials = state.report && state.report.character_dials;
-  if (dials && dials.length) {
-    const dialCard = el("div", "craft-panel");
-    const dialHead = el("div", "craft-panel-head");
-    dialHead.appendChild(el("span", "craft-panel-title", "Character dials — how each main character reads"));
-    dialCard.appendChild(dialHead);
-    dials.forEach((d) => {
-      const block = el("div", "dial-block");
-      block.appendChild(el("div", "dial-char-name", d.character));
-      (d.traits || []).forEach((t) => {
-        const row = el("div", "dial-row");
-        row.appendChild(el("span", "dial-label", t.trait));
-        const trackEl = el("span", "dial-track");
-        const fill = el("span", "dial-fill");
-        fill.style.width = `${t.score * 10}%`;
-        trackEl.appendChild(fill);
-        row.appendChild(trackEl);
-        row.appendChild(el("span", "dial-score", String(t.score)));
-        if (t.note) row.title = t.note;
-        block.appendChild(row);
-      });
-      dialCard.appendChild(block);
-    });
-    c.appendChild(dialCard);
-  }
+  // Character dials -- the ONE shared panel (re-homed out of the dead
+  // #struct-rail by the 2026-09-19 gaps pass; it used to render only here
+  // and in the rail, so the live desk had none).
+  renderCharacterDialsPanel(c);
 
   // Writer's Mirror — how the premise lands in one sentence + how each
   // character reads to a stranger. Same panel as the craft shelf, reused
