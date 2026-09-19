@@ -2129,6 +2129,7 @@ def _load_session_and_engine(project: str, session_id: str):
                             writer_library_text=library_text,
                             mood_text=_mood_fragment(m, session, script_ctx),
                             doctor_case_text=case_file_text,
+                            craft_history_text=_craft_history_provider(m),
                             prompt_budget=_prompt_budget_provider(client))
     return session, engine, store
 
@@ -2757,6 +2758,33 @@ def _shelf_providers(exclude: str | None):
                                     lambda: _build_doctor_case_file(exclude))
 
     return library_text, case_file_text
+
+
+def _craft_history_provider(m):
+    """The writer's own edit history on THIS project, as a zero-arg provider.
+
+    P2.8: the relationship card learns how the writer works but is forbidden to
+    quote itself, so the one class of reference the review permits — the
+    writer's own past decisions on these pages — has to come from somewhere
+    else. It comes from the revision log, which holds only edits still in
+    effect, so every record is a decision the writer kept.
+
+    Deferred for the same reason as the shelf blocks: this reads edits.json, and
+    a request that never builds a prompt (loading a session, switching a branch,
+    deleting a chat) must not pay for it. Scoped by construction — the log
+    belongs to one project, so a callback about this script cannot surface in
+    another. A corrupt or unreadable log yields None, never an exception: this
+    feeds a chat turn.
+    """
+    def craft_history_text():
+        try:
+            hist_mod = _import_cowriter("craft_history")
+            from .revision import edits_log
+            history = hist_mod.build_craft_history(edits_log(m))
+            return hist_mod.craft_history_text(history) or None
+        except Exception:
+            return None
+    return craft_history_text
 
 
 def _prompt_budget_provider(client):

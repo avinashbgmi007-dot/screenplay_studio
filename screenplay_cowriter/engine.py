@@ -139,6 +139,7 @@ class CoWriterEngine:
                  history_window: int = HISTORY_WINDOW, store=None, memory=None, premise: dict | None = None,
                  memory_scope: str | None = None, writer_library_text: str | None = None,
                  mood_text: str | None = None, doctor_case_text: str | None = None,
+                 craft_history_text: str | None = None,
                  prompt_budget: int | None = None):
         self.client = client
         self.script_ctx = script_ctx
@@ -175,6 +176,13 @@ class CoWriterEngine:
         # provider; it is resolved only for the persona that reads it.
         self.mood_text = mood_text
         self.doctor_case_text = doctor_case_text
+        # The writer's own edit history on THIS script (see craft_history.py).
+        # The relationship card learns how the writer works but is forbidden to
+        # quote itself; this is the one class of reference the review permits
+        # (P2.8), and it is sourced from the revision log rather than from
+        # memory. Also accepts a provider — the edit-log read is deferred to
+        # the turn that actually builds a prompt.
+        self.craft_history_text = craft_history_text
         # Global prompt budget (M1). None lets build_system_prompt apply its
         # own default; the server passes a provider that derives the budget
         # from the model's reported context window, so it is resolved on the
@@ -410,6 +418,9 @@ class CoWriterEngine:
         # lens alone, so building it for the other seven personas is a
         # cross-project scan whose output build_system_prompt would discard.
         writer_library_text = _resolve_prompt_block(self.writer_library_text)
+        # Deferred for the same reason as the shelf blocks, and read once per
+        # turn: the edit log is per-project and cannot go stale within a turn.
+        craft_history_text = _resolve_prompt_block(self.craft_history_text)
         doctor_case_text = (
             _resolve_prompt_block(self.doctor_case_text)
             if branch.active_persona == DOCTOR_PERSONA else None
@@ -470,6 +481,7 @@ class CoWriterEngine:
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
                 premise=self.premise, writer_library_text=writer_library_text,
                 mood_text=self.mood_text, doctor_case_text=doctor_case_text,
+                craft_history_text=craft_history_text,
                 budget=prompt_budget,
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
             if lang_note:
@@ -494,6 +506,7 @@ class CoWriterEngine:
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
                 premise=self.premise, writer_library_text=writer_library_text,
                 mood_text=self.mood_text, doctor_case_text=doctor_case_text,
+                craft_history_text=craft_history_text,
                 budget=prompt_budget,
             )
             if lang_note:

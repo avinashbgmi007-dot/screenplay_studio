@@ -451,12 +451,21 @@ def _shed_ladder():
     What is never shed: the persona, the mode, the example dialogue, the voice
     and grounding rules, the findings' `issue` lines, and the writer's own
     relationship card / cold-start line — those are the conversation. What goes
-    first is garnish (room state), then the doctor's case file, then the
-    writer's past work, then the craft principles, then detail inside the map
-    and finally the findings' rationale. Each step keeps the previous one."""
+    first is garnish (room state), then the writer's craft history, then the
+    doctor's case file, then the writer's past work, then the craft principles,
+    then detail inside the map and finally the findings' rationale. Each step
+    keeps the previous one.
+
+    Note the two similarly-named keys, which mean different things: `drop_craft`
+    sheds the report's CRAFT PRINCIPLES (the rules the findings rest on), while
+    `drop_craft_history` sheds the writer's own EDIT HISTORY (P2.8). They are
+    shed at opposite ends of the ladder — history is reference material and goes
+    second, principles are load-bearing for the findings and go fourth.
+    """
     plan: dict = {}
     for key, value in (
         ("drop_mood", True),
+        ("drop_craft_history", True),
         ("drop_case", True),
         ("drop_library", True),
         ("drop_craft", True),
@@ -483,6 +492,7 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
                         relationship_card: str | None = None, cold_start_line: str | None = None,
                         premise: dict | None = None, writer_library_text: str | None = None,
                         mood_text: str | None = None, doctor_case_text: str | None = None,
+                        craft_history_text: str | None = None,
                         budget: int | None = None) -> str:
     examples = persona_examples(persona)
     examples_block = f"\n\n{examples}" if examples else ""
@@ -511,7 +521,7 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
         title = script_ctx.title or report_ctx.title or "this screenplay"
 
         def render(*, drop_mood=False, drop_case=False, drop_library=False, drop_craft=False,
-                   map_chars=0, report_max=0, report_why=True):
+                   drop_craft_history=False, map_chars=0, report_max=0, report_why=True):
             script_map = script_ctx.script_map(max_chars=map_chars)
             map_block = f"\n\nHere is a map of the script itself:\n\n{script_map}" if script_map else ""
             # The rules the findings rest on, so advice is anchored to the craft
@@ -543,6 +553,15 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
                 body += f"\n\n{doctor_case_text}"
             if relationship_card:
                 body += f"\n\n{relationship_card}"
+            if craft_history_text and not drop_craft_history:
+                # Sits AFTER the relationship card on purpose. The card forbids
+                # quoting the memory; this block carves out exactly one
+                # permitted class (the writer's own past edits on THIS script)
+                # and restates the profile prohibition, so the carve-out has the
+                # last word without widening what the card forbids. Put it
+                # before the card and the card's blanket rule would swallow the
+                # one reference the review asked us to permit (P2.8).
+                body += f"\n\n{craft_history_text}"
             if cold_start_line:
                 body += f"\n\n{cold_start_line}"
             if writer_library_text and not drop_library:

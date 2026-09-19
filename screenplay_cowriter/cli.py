@@ -28,6 +28,7 @@ In-chat slash commands:
 """
 
 import argparse
+import os
 import sys
 
 from .models import Session
@@ -54,7 +55,26 @@ def _load_contexts(session: Session):
 
 def run_repl(session: Session, store: SessionStore, client: LlamaServerClient, memory=None):
     script_ctx, report_ctx = _load_contexts(session)
-    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory)
+    # P2.8: the writer's own edit history on this project, so terminal Sameer can
+    # reference decisions the writer already made on these pages. The revision
+    # log sits beside parsed.json in a project directory, so a session pointed at
+    # a bare script file simply has none. Best-effort — a damaged log must not
+    # stop a chat from starting.
+    #
+    # Wired HERE rather than at the caller because this is where the engine the
+    # REPL actually uses is built: screenplay_studio's `_run_chat_repl` passes
+    # only `engine.client` and lets this function construct its own, so an
+    # engine configured upstream is discarded (and the studio CLI's own engine
+    # already was).
+    craft_history_text = None
+    try:
+        from .craft_history import craft_history_for_dir
+        craft_history_text = craft_history_for_dir(
+            os.path.dirname(getattr(session, "script_path", None) or ""))
+    except Exception:
+        craft_history_text = None
+    engine = CoWriterEngine(client, script_ctx, report_ctx, store=store, memory=memory,
+                            craft_history_text=craft_history_text)
 
     print(f"\n[session {session.session_id}] \"{session.title}\" — branch: {session.current_branch}")
     print(f"Model: {session.model_id} @ {session.server_url}")
