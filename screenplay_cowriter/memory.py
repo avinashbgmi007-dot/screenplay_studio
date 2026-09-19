@@ -585,20 +585,20 @@ class WriterMemory:
         if profile is not None:
             changed = _migrate_v2(profile, _entity_scope_map(os.path.dirname(os.path.dirname(path))))
             if changed:
+                from screenplay_studio.jsonio import atomic_write_json
                 with _FILE_LOCK:
                     try:
-                        with open(path, "w", encoding="utf-8") as f:
-                            json.dump(profile, f, indent=2, ensure_ascii=False)
+                        atomic_write_json(path, profile)
                     except OSError:
                         pass
             return cls(path, profile=profile)
         return cls(path)
 
     def save(self):
+        from screenplay_studio.jsonio import atomic_write_json
         with _FILE_LOCK:
             os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-            with open(self.path, "w", encoding="utf-8") as f:
-                json.dump(self.profile, f, indent=2, ensure_ascii=False)
+            atomic_write_json(self.path, self.profile)
 
     def to_dict(self):
         return self.profile

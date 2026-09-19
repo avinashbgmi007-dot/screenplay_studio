@@ -12,9 +12,11 @@ import json
 import re
 import time
 
-import requests
-
-from .llm_client_base import BaseLlamaClient, LlamaServerError, ModelNotFoundError
+from .llm_client_base import (  # noqa: F401 — ModelNotFoundError is re-exported via screenplay_analyzer/__init__
+    BaseLlamaClient,
+    LlamaServerError,
+    ModelNotFoundError,
+)
 
 
 def _extract_json(text: str):

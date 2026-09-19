@@ -586,9 +586,10 @@ def _decide_reply(messages: list) -> str:
         # skips scene_heading elements — a heading "edit" applies on the
         # server yet never shows on the page. Skip anything that looks like
         # a slug line (INT./EXT.) so the demo always moves visible text.
-        _is_slug = lambda ln: ln[:4].upper() in ("INT.", "EXT.") or \
-                              ln[:8].upper() in ("INT/EXT.", "EXT/INT.") or \
-                              ln.upper().startswith(("INT -", "EXT -", "I/E."))
+        def _is_slug(ln):
+            up = ln.upper()
+            return ln[:4].upper() in ("INT.", "EXT.") or ln[:8].upper() in (
+                "INT/EXT.", "EXT/INT.") or up.startswith(("INT -", "EXT -", "I/E."))
         body = [ln for ln in lines if not _is_slug(ln)]
         target = next((ln for ln in body if "tell you everything" in ln),
                       body[0] if body else "")
@@ -605,7 +606,7 @@ def _decide_reply(messages: list) -> str:
         findings = []
         if scene_nums:
             quote = "I'll tell you everything when this is over." if "tell you everything" in user else None
-            findings.append({"category": "dialogue", "issue": "Sample dialogue finding.",
+            findings.append({"category": "dialogue", "issue": "[demo] Sample dialogue finding — the built-in demo model is running, not a real analysis.",
                              "why_it_matters": "Says the feeling instead of dramatizing it.",
                              "severity": "low", "scene_refs": [scene_nums[0]],
                              "evidence_quote": quote, "rule_id": None})
@@ -618,12 +619,12 @@ def _decide_reply(messages: list) -> str:
         return j(significant=False, paid_off=False, reasoning="Ordinary continuity.")
     if "theme and subtext" in system_l:
         refs = scene_nums[:1] if scene_nums else []
-        return j(findings=[{"category": "theme", "issue": "Sample theme finding.",
+        return j(findings=[{"category": "theme", "issue": "[demo] Sample theme finding — demo model, not a real analysis.",
                             "why_it_matters": "Test reasoning.", "severity": "low",
                             "scene_refs": refs, "evidence_quote": None, "rule_id": None}] if refs else [])
     if "character arcs" in system_l:
         refs = scene_nums[-1:] if scene_nums else []
-        return j(findings=[{"category": "character", "issue": "Sample character finding.",
+        return j(findings=[{"category": "character", "issue": "[demo] Sample character finding — demo model, not a real analysis.",
                             "why_it_matters": "Test reasoning.", "severity": "low",
                             "scene_refs": refs, "evidence_quote": None, "rule_id": None}] if refs else [])
     if "structure and pacing" in system_l:
@@ -631,7 +632,7 @@ def _decide_reply(messages: list) -> str:
     if "earns its place" in system_l:
         return j(findings=[])
     if "genre specialist checking whether" in system_l:
-        return j(findings=[{"category": "genre", "issue": "Sample genre finding.",
+        return j(findings=[{"category": "genre", "issue": "[demo] Sample genre finding — demo model, not a real analysis.",
                             "why_it_matters": "Test reasoning.", "severity": "low",
                             "scene_refs": [], "evidence_quote": None, "rule_id": None}])
     if "professional script coverage" in system_l:

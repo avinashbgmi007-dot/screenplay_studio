@@ -6,7 +6,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,7 +18,7 @@ jobs:
         run: ruff check .
 
   test-python:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install tesseract + Indian language packs (OCR fallback tests)
@@ -30,7 +30,9 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        # The package is buildable (build-system pinned), so CI installs the
+        # declared runtime + test extras from one source of truth.
+        run: pip install ".[ci]"
       - name: Run test suite
         run: pytest -q
 

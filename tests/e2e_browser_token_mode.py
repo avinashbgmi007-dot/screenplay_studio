@@ -14,7 +14,8 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from e2e_browser_common import Checks, free_port
-import tempfile, time
+import tempfile
+import time
 from playwright.sync_api import sync_playwright
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -65,9 +66,12 @@ def main():
             c.check("no JS page errors in hardened mode", not errs, "; ".join(errs[:3]))
     finally:
         proc.terminate()
-        try: proc.wait(timeout=8)
-        except Exception: proc.kill()
-        log.close(); tmp.cleanup()
+        try:
+            proc.wait(timeout=8)
+        except Exception:
+            proc.kill()
+        log.close()
+        tmp.cleanup()
     c.finish()
 
 

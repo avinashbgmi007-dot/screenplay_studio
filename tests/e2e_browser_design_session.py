@@ -2,7 +2,8 @@
 DOM/text assertions only (project rule: no screenshots).
 Uses the SHARED :8500 studio deliberately (the console embeds the live app with real
 project data for the design comparison; this suite never mutates project state)."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright  # noqa: E402
 

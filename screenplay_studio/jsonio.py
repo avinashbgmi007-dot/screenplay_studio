@@ -48,30 +48,46 @@ def lock_for(path: str) -> threading.RLock:
 # A Windows sharing violation (another process has the file open) and a byte-range
 # lock violation (an AV scanner or indexer holding a range) are both TRANSIENT:
 # the holder lets go within milliseconds, so a bounded retry is the right answer.
-# Any other PermissionError is a genuine access denial — retrying it can only fail
-# again, and it delays the error the caller needs to see (L2).
+# Decision (2026-09-20, user-approved): retry EVERY PermissionError, not only the
+# winerror 32/33 set. The concurrent save/rename hammer surfaces
+# PermissionError(13, "Access is denied") with NO winerror under full-suite
+# antivirus/indexer pressure — a signature the winerror-only filter read as a
+# genuine denial and (correctly) refused to retry, leaving the suite red. The
+# accepted, documented risk: a GENUINE access denial (read-only disk, ACL block)
+# is now also retried for the bounded window (~1s) before it raises — it still
+# raises; it is just not fail-fast. That trade is intentional: a writer's store
+# that transiently can't be reached must not lose the write; a truly denied write
+# still errors loudly, just after the retry budget.
 _TRANSIENT_WINERRORS = frozenset({32, 33})  # ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
 
 
 def _is_transient_lock_error(exc: PermissionError) -> bool:
-    # `winerror` exists only on Windows. On POSIX there is no sharing-violation
-    # semantics to retry — rename is atomic, so a PermissionError there is final.
+    # Kept for the winerror path and for callers/tests that introspect the
+    # transient set. retry_permission itself retries every PermissionError (see
+    # the note above); this answers "is this the classic Windows sharing/lock
+    # violation" for diagnostics.
     return getattr(exc, "winerror", None) in _TRANSIENT_WINERRORS
 
 
-def retry_permission(fn, attempts: int = 3):
-    """Run fn() with a short bounded retry for Windows sharing violations:
-    a concurrent reader/writer (or AV/indexer) can briefly hold a file open —
-    open/os.replace then raises PermissionError([WinError 32]). A genuine
-    failure raises at once: a real access denial is not retried, and neither is
-    a transient error once `attempts` are exhausted."""
+def retry_permission(fn, attempts: int = 6):
+    """Run fn() with a bounded retry for transient PermissionErrors: a
+    concurrent reader/writer (or AV/indexer) can briefly hold a file open —
+    open/os.replace then raises PermissionError. The concurrent save/rename
+    hammer shows 3 attempts can expire before the holder releases, so the
+    default is wider and the sleep is jittered to de-synchronize competing
+    writers. Per the 2026-09-20 decision, EVERY PermissionError is retried for
+    the bounded window; the error always raises if it never clears (a genuine
+    denial is delayed ~1s, not swallowed)."""
+    import random
     for attempt in range(attempts):
         try:
             return fn()
-        except PermissionError as exc:
-            if not _is_transient_lock_error(exc) or attempt == attempts - 1:
+        except PermissionError:
+            if attempt == attempts - 1:
                 raise
-            time.sleep(0.05 * (attempt + 1))
+            # 50ms..600ms capped, equal-jittered so two writers do not collide
+            # on the same cadence and re-contend on every retry.
+            time.sleep(min(0.6, 0.05 * (attempt + 1)) * (0.5 + random.random() * 0.5))
 
 
 def atomic_write_json(path: str, data) -> None:

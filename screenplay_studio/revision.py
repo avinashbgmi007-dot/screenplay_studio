@@ -113,8 +113,8 @@ def set_finding_intent(m, finding_id: str, intent) -> None:
         data[finding_id] = intent
     else:
         data.pop(finding_id, None)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    from .jsonio import atomic_write_json
+    atomic_write_json(path, data)
 
 
 # ---------- last-pass scorekeeping (R4, one generation back) ----------
@@ -216,8 +216,8 @@ def last_pass_snapshot(m):
             # granting every old project a free pass. No arithmetic here.
             snap["parsed_sig"] = _parsed_signature(m)
             try:
-                with open(last_pass_path(m), "w", encoding="utf-8") as f:
-                    json.dump(snap, f)
+                from .jsonio import atomic_write_json
+                atomic_write_json(last_pass_path(m), snap)
             except OSError:
                 pass  # an unwritable snapshot must never break the edits fetch
         return snap.get("payload")
@@ -269,10 +269,10 @@ def last_pass_snapshot(m):
                     for gid in old_ids if gid not in new_set and intents.get(gid)
                 ][:50],
             }
-    with open(last_pass_path(m), "w", encoding="utf-8") as f:
-        json.dump({"ids": [gid for gid in dict.fromkeys(new_ids)], "issues": issues,
-                   "report_mtime": rp_mtime, "report_sig": report_sig,
-                   "parsed_sig": parsed_sig, "payload": payload}, f)
+    from .jsonio import atomic_write_json
+    atomic_write_json(last_pass_path(m), {"ids": [gid for gid in dict.fromkeys(new_ids)], "issues": issues,
+                 "report_mtime": rp_mtime, "report_sig": report_sig,
+                 "parsed_sig": parsed_sig, "payload": payload})
     return payload
 
 
@@ -304,8 +304,8 @@ def ensure_working(m) -> str:
             )
         with open(m.parsed_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        from .jsonio import atomic_write_json
+        atomic_write_json(path, data)
         return path
 
     # re-parse refreshes the display copy when there's nothing to preserve
@@ -314,8 +314,8 @@ def ensure_working(m) -> str:
             if os.path.getmtime(m.parsed_path) > os.path.getmtime(path):
                 with open(m.parsed_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                with open(path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
+                from .jsonio import atomic_write_json
+                atomic_write_json(path, data)
         except (OSError, ValueError):
             pass  # if the timestamps/parse are unreadable, keep the existing copy
     return path
@@ -332,22 +332,32 @@ def save_working(m, doc: ScriptDocument, record: dict | None = None) -> None:
         if "id" not in record:
             record["id"] = uuid.uuid4().hex[:12]
         log.append(record)
-        with open(edits_log_path(m), "w", encoding="utf-8") as f:
-            json.dump(log, f, indent=2, ensure_ascii=False)
+        from .jsonio import atomic_write_json
+        atomic_write_json(edits_log_path(m), log)
         # a fresh edit invalidates any redo history
         clear_redo(m)
 
 
 def has_edits(m) -> bool:
     """True once any edit has been applied (working copy may exist just from
-    viewing the script — that alone doesn't count as edits)."""
-    if not os.path.exists(edits_log_path(m)):
+    viewing the script — that alone doesn't count as edits).
+
+    A1 (audit 2026-09-20): a truncated/corrupt edit log must NEVER read as
+    "no edits" — that lets ensure_working() overwrite working.json (the only
+    copy of applied edits) with the pre-edit parse. A decode failure or a
+    transient read failure (WinError 32) is treated as edits-present, so the
+    working copy is preserved until the log can be repaired.
+    """
+    path = edits_log_path(m)
+    if not os.path.exists(path):
         return False
     try:
-        with open(edits_log_path(m), "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return len(json.load(f)) > 0
-    except (json.JSONDecodeError, OSError):
-        return False
+    except json.JSONDecodeError:
+        return True  # corrupt log ≠ empty log — preserve the working copy
+    except OSError:
+        return True  # transient read failure ≠ empty log — same reasoning
 
 
 def reset_working(m) -> None:
@@ -368,8 +378,8 @@ def _load_json_list(path: str) -> list:
 
 
 def _save_json_list(path: str, data: list) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    from .jsonio import atomic_write_json
+    atomic_write_json(path, data)
 
 
 def redo_stack(m) -> list[dict]:
@@ -602,8 +612,8 @@ def dismiss_finding(m, index: int, issue: str, finding_id: str | None = None) ->
         entry["finding_id"] = finding_id
     if entry not in data:
         data.append(entry)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    from .jsonio import atomic_write_json
+    atomic_write_json(path, data)
 
 
 def undismiss_finding(m, index: int, finding_id: str | None = None) -> None:
@@ -620,8 +630,8 @@ def undismiss_finding(m, index: int, finding_id: str | None = None) -> None:
         and (d.get("finding_id") == finding_id if finding_id
              else int(d.get("index", -1)) == int(index))
     )]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    from .jsonio import atomic_write_json
+    atomic_write_json(path, data)
 
 
 # Change detection is STRICT on purpose, and it is deliberately NOT the

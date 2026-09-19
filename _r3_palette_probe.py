@@ -2,12 +2,11 @@
 verifies the restyle directly: input rest border, double-glow focus, row
 hover wash, .sel wash, and the modal elevation token applied.
 DOM/computed-style assertions only (project rule: no screenshots)."""
-import re
 import sys
 
 sys.path.insert(0, "tests")
 import playwright.sync_api as pw_sync
-from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio, start_studio
+from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio
 
 checks = Checks()
 check = checks.ok

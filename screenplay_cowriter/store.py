@@ -41,6 +41,12 @@ class SessionStore:
         os.makedirs(sessions_dir, exist_ok=True)
 
     def _path(self, session_id: str) -> str:
+        # B1 (audit 2026-09-20): session ids are user-controlled (webapp <sid>
+        # route param) and the Flask converter delivers backslashes on Windows —
+        # without this guard "../../x" escapes sessions_dir. Lazy import keeps
+        # the composability contract (cowriter must not import studio at load).
+        from screenplay_studio.jsonio import check_safe_id
+        check_safe_id(session_id, "session id")
         return os.path.join(self.sessions_dir, f"{session_id}.json")
 
     def create(self, title: str, report_path: str = None, script_path: str = None) -> Session:

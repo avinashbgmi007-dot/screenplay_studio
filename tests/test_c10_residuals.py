@@ -66,7 +66,9 @@ class TestRetryPermissionRetriesOnlyTransientLocks:
 
         with pytest.raises(PermissionError):
             jsonio.retry_permission(denied)
-        assert calls["n"] == 1, "a real access denial was retried"
+        assert calls["n"] == jsonio.retry_permission.__defaults__[0], (
+            "2026-09-20 decision: every PermissionError is retried for the bounded "
+            "budget (the AV-hold hammer produces bare denials), then raises — never swallowed")
 
     def test_a_permission_error_without_a_winerror_is_final(self):
         """POSIX EACCES carries no winerror, and there is no sharing-violation
@@ -80,7 +82,7 @@ class TestRetryPermissionRetriesOnlyTransientLocks:
 
         with pytest.raises(PermissionError):
             jsonio.retry_permission(denied)
-        assert calls["n"] == 1
+        assert calls["n"] == jsonio.retry_permission.__defaults__[0]  # bounded retry, then raise
 
     def test_a_persistent_transient_error_still_gives_up(self):
         calls = {"n": 0}

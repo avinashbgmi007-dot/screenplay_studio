@@ -1,4 +1,8 @@
-import os, subprocess, sys, glob, time
+import os
+import subprocess
+import sys
+import glob
+import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, "tests", "_e2e_sweep_results.txt")

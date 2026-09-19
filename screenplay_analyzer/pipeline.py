@@ -19,7 +19,6 @@ Returns an AnalysisResult with everything report.py needs.
 
 from __future__ import annotations
 
-import collections
 from dataclasses import dataclass, field
 
 from screenplay_parser.models import ScriptDocument

@@ -121,8 +121,11 @@ class ScriptDocument:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
     def save(self, path: str) -> None:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(self.to_json())
+        # A2 (audit 2026-09-20): this is the chokepoint for working.json — the
+        # only copy of the writer's applied edits. A torn write must never reach
+        # the reader, so persist atomically (tmp + os.replace) via jsonio.
+        from screenplay_studio.jsonio import atomic_write_json
+        atomic_write_json(path, self.to_dict())
 
     @staticmethod
     def from_dict(d: dict) -> "ScriptDocument":

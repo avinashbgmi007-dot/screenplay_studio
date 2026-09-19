@@ -136,8 +136,8 @@ def verify_design(checks, page, base, design_id, opener_sel):
     page.goto(url)
     page.wait_for_timeout(500)
 
-    c = lambda name, cond, detail="": checks.ok(f"{design_id}: {name}",
-                                                cond, detail)
+    def c(name, cond, detail=""):
+        checks.ok(f"{design_id}: {name}", cond, detail)
 
     c("loads with welcome screen active", active_screen(page, "welcome"))
     c("welcome: no horizontal overflow", no_overflow(page),
@@ -206,8 +206,8 @@ def verify_design(checks, page, base, design_id, opener_sel):
 def verify_gallery(checks, page, base):
     page.goto(f"{base}/preview-redesigns/index.html")
     page.wait_for_timeout(600)
-    c = lambda name, cond, detail="": checks.ok(f"gallery: {name}",
-                                                cond, detail)
+    def c(name, cond, detail=""):
+        checks.ok(f"gallery: {name}", cond, detail)
     c("six design cards render", page.locator(".card").count() == 6,
       str(page.locator(".card").count()))
     c("picker lists all six designs",

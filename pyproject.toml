@@ -1,3 +1,11 @@
+[build-system]
+# Make the repo a real, buildable package: `pip install .` and `pip install
+# ".[ci]"` work. setuptools' flat-layout auto-discovery fails here because the
+# root holds non-package dirs (tmp*, preview_shots, extracted_text, …), so the
+# five real packages are pinned explicitly below.
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "script-doctor-studio"
 version = "0.1.0"
@@ -12,6 +20,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["ruff>=0.6", "pytest>=8.0"]
 stt = ["faster-whisper>=1.0.0"]
+# Installed by CI so the full suite is reproducible there, and locally when
+# developing. test_pdf_ocr.py imports pypdfium2 directly (no importorskip
+# guard); playwright drives the 30 e2e_browser_*.py suites (not collected by
+# pytest's default glob). Add pytest-cov when coverage runs are wanted.
+ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "ruff>=0.6"]
+
+[tool.setuptools]
+packages = ["screenplay_parser", "screenplay_analyzer", "screenplay_cowriter", "screenplay_studio", "knowledge_base"]
+
 
 [tool.ruff]
 line-length = 120

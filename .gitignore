@@ -3,6 +3,8 @@ node_modules/
 
 # Build
 dist/
+build/
+*.egg-info/
 coverage/
 
 # Python

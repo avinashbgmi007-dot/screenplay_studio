@@ -8,7 +8,6 @@ works standalone without Piece 2 installed, per the composability goal.
 from __future__ import annotations
 
 import json
-import re
 import time
 
 import requests

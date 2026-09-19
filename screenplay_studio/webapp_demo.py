@@ -1,11 +1,10 @@
-"""
-Demo-mode entrypoint: the webapp WITH the built-in demo craft model, bound to
-0.0.0.0:$PORT (Freebuff-style hosting). Testing/deployment convenience only —
+"""Demo-mode entrypoint: the webapp WITH the built-in demo craft model.
 
     python -m screenplay_studio.webapp_demo
 
-The canonical launch (`python -m screenplay_studio.webapp_server`) is untouched
-and still defaults to your real llama-server on :8080.
+Delegates to `screenplay_studio.webapp_server.main` with `--demo-model` forced
+and the `PORT` env mapped to `--port`. Token minting and the loopback bind come
+from `main()`, so this alias is exactly as safe as the canonical launch.
 """
 
 import os
@@ -13,15 +12,20 @@ import os
 os.environ["SCREENPLAY_STUDIO_DEMO_MODEL"] = "1"
 
 from .webapp_server import _use_demo_model  # noqa: E402
-from .webapp_server import app  # noqa: E402
 
 
 def main():
     _use_demo_model()  # env var alone also triggers it at import; explicit is clearer
-    port = int(os.environ.get("PORT", "8500"))
-    print(f"Demo desk on http://0.0.0.0:{port} — analysis, chat and streaming run "
-          "on the built-in demo craft model (no GGUF needed).")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = os.environ.get("PORT")
+    import sys  # noqa: E402
+    from .webapp_server import main as server_main  # noqa: E402
+    # B2 (audit 2026-09-20): delegate to the canonical launch so the capability
+    # token is minted by default and the bind stays loopback. The old code ran
+    # the Flask app directly on ALL interfaces, skipped main(), left _API_TOKEN
+    # = None, and exposed every route — including DELETE — to the LAN. PORT env
+    # still maps to --port; --demo-model is explicit; the rest passes through.
+    sys.argv = [sys.argv[0], "--demo-model", *(["--port", port] if port else []), *sys.argv[1:]]
+    server_main()
 
 
 if __name__ == "__main__":
