@@ -1842,3 +1842,11 @@ EVIDENCE
 - pytest 1101 passed / 0 failed (unchanged -- the browser suites are not collected).
 - browser: smoke 18/18, phase7 15/15, token_mode 3/3.
 
+PUSH: LANDED (2026-09-19, retry). The first six attempts stalled at the write step with
+zero output while read-only `ls-remote` worked -- the credential helper
+(`git-credential-manager.exe`) was hanging instead of prompting. The plain retry went
+through in 7s: `b4f83dd..3183aef main -> main`, exit 0. Verified against the TRUE remote
+(`git ls-remote origin refs/heads/main` = `3183aef`); tracking ref re-healed by hand.
+main is now fully synced, ahead 0. LESSON: a stalled push is worth ONE plain retry before
+blaming credentials -- the stall was transient, no re-auth was needed.
+
