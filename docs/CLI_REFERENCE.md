@@ -40,11 +40,13 @@ python -m screenplay_studio.webapp_server --demo-model
 
 | Command | Options | Notes |
 |---|---|---|
-| `run [source] --project DIR` | `--title`, `--server`, `--model`, `--categories`, `--only {parse,analyze,chat}`, `--skip-chat`, `--retry-failed`, `--lang {eng,tenglish,hindi,tamil}` | `source` only needed for a new project; existing projects resume. |
-| `resume DIR` | `--server`, `--model`, `--skip-chat`, `--retry-failed`, `--lang` | Skips completed stages. |
+| `run [source] --project DIR` | `--title`, `--server`, `--model`, `--categories`, `--only {parse,analyze,chat}`, `--skip-chat`, `--retry-failed`, `--lang {eng,tenglish,hindi,tamil}`, `--memory-path`, `--no-memory` | `source` only needed for a new project; existing projects resume. |
+| `resume DIR` | `--server`, `--model`, `--skip-chat`, `--retry-failed`, `--lang`, `--memory-path`, `--no-memory` | Skips completed stages. |
 | `status DIR` | — | Prints parse/analyze/chat status + errors. |
 | `watch DIR` | `--projects-dir`, `--server`, `--model`, `--poll SECS`, `--once`, `--categories`, `--lang` | Detects supported extensions; creates one project per file. |
 | `webapp_server` (module) | `--port` (default 8500), `--projects-dir`, `--server`, `--demo-model`, `--no-token` (default: token ON) | Serves the SPA + JSON API. Run as `python -m screenplay_studio.webapp_server`. **Secure by default:** a per-process capability token is minted on every launch and set as a `SameSite=Strict` cookie on `/`; mutating requests must echo it as `X-Studio-Token`. Your browser gets it automatically; scripted clients (curl, the E2E harness) pass `--no-token` on a loopback-only machine. `--require-token` is retained for compatibility but has no effect -- it prints a deprecation notice rather than being silently ignored. |
+
+**Writer memory is ON by default in `run` and `resume` (P2.11).** The chat handoff loads and saves Sameer's writer-level relationship profile at `~/.screenplay_studio/writer_profile.json` — writer-level, not project-level, because the profile's whole purpose is to follow the writer across projects. The chosen path is **printed when a chat starts**, so it is discoverable rather than a hidden side effect; `--no-memory` turns it off for a run, and `--memory-path FILE` points it somewhere else. An unreadable profile degrades to a memoryless session with a notice instead of failing the run. The webapp has always wired its own project-scoped profile (`PROJECTS_DIR/writer_profile.json`) and is unchanged.
 
 ## screenplay_parser — Piece 1 (deterministic, no model)
 

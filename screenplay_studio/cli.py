@@ -25,10 +25,37 @@ from .manifest import ProjectManifest
 from .orchestrator import Orchestrator, OrchestratorError
 
 
-def _run_chat_repl(session, engine, store):
+def _resolve_memory(args):
+    """The writer profile terminal Sameer should use, and the line to say about it.
+
+    Defaulted ON (review section 7, P2.11). The webapp already wires memory by
+    default; the terminal handoff did not, and had no flag to change that — so a
+    month of learning was invisible in every terminal session. `--no-memory` is
+    the explicit opt-out, and the chosen path is PRINTED: a profile of the writer
+    is kept on their disk, so where it lives is something they are told rather
+    than left to discover.
+
+    Returns (memory_or_None, notice_line). Never raises for a bad profile: a CLI
+    must not die because a file is unreadable, and it must not silently forget
+    either — so it degrades to a memoryless session and says so.
+    """
+    from screenplay_cowriter.memory import WriterMemory, default_memory_path
+
+    if getattr(args, "no_memory", False):
+        return None, "Writer memory: off (--no-memory)."
+
+    path = getattr(args, "memory_path", None) or default_memory_path()
+    try:
+        return WriterMemory.load(path), f"Writer memory: {path}  (--no-memory to opt out)"
+    except OSError as e:
+        return None, (f"Writer memory: unavailable at {path} ({e}) — "
+                      f"continuing without it.")
+
+
+def _run_chat_repl(session, engine, store, memory=None):
     """Hands off to the same interactive loop Piece 3's own CLI uses."""
     from screenplay_cowriter.cli import run_repl
-    run_repl(session, store, engine.client)
+    run_repl(session, store, engine.client, memory=memory)
 
 
 def cmd_run(args):
@@ -51,6 +78,13 @@ def cmd_run(args):
     orch = Orchestrator(manifest)
     categories = tuple(args.categories.split(",")) if args.categories else None
 
+    # P2.11: terminal Sameer remembers by default now. Resolved here — a load is
+    # read-only, nothing is written until a turn is observed — but ANNOUNCED only
+    # when a chat will actually run, so `--only analyze` stays quiet.
+    memory, memory_note = _resolve_memory(args)
+    if args.only == "chat" or (args.only is None and not args.skip_chat):
+        print(memory_note)
+
     try:
         if args.only == "parse":
             orch.run_parse()
@@ -60,7 +94,7 @@ def cmd_run(args):
             print("Analyze stage complete.")
         elif args.only == "chat":
             session, engine, store = orch.start_chat()
-            _run_chat_repl(session, engine, store)
+            _run_chat_repl(session, engine, store, memory=memory)
         else:
             orch.run_parse()
             print("Parse stage complete.")
@@ -68,7 +102,7 @@ def cmd_run(args):
             print("Analyze stage complete.")
             if not args.skip_chat:
                 session, engine, store = orch.start_chat()
-                _run_chat_repl(session, engine, store)
+                _run_chat_repl(session, engine, store, memory=memory)
     except OrchestratorError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         print(f"Project state saved at '{args.project}' — fix the issue and rerun to resume from here.", file=sys.stderr)
@@ -90,12 +124,15 @@ def cmd_resume(args):
     manifest.save()
 
     orch = Orchestrator(manifest)
+    # P2.11: same default as cmd_run — resume -> chat is the same terminal Sameer.
+    memory, memory_note = _resolve_memory(args)
     try:
         orch.run_parse()
         orch.run_analyze(report_language=args.lang, retry_failed=args.retry_failed)
         if not args.skip_chat:
+            print(memory_note)
             session, engine, store = orch.start_chat()
-            _run_chat_repl(session, engine, store)
+            _run_chat_repl(session, engine, store, memory=memory)
     except OrchestratorError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
@@ -119,6 +156,23 @@ def _print_status(manifest: ProjectManifest):
         print(line)
 
 
+def _add_memory_args(parser):
+    """The two memory flags `run` and `resume` both take (P2.11).
+
+    Memory is ON by default here, matching the webapp — the flag that exists is
+    the OPT-OUT, not the opt-in. The default path is named in the help text so
+    `--help` alone tells the writer where their profile will be kept.
+    """
+    from screenplay_cowriter.memory import default_memory_path
+    parser.add_argument(
+        "--memory-path", default=None,
+        help=("Writer relationship memory file. Default: "
+              f"{default_memory_path()} (writer-level, follows you across projects)"))
+    parser.add_argument(
+        "--no-memory", action="store_true",
+        help="Don't load or save writer memory this run (Sameer starts cold)")
+
+
 def main():
     parser = argparse.ArgumentParser(prog="screenplay_studio")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -136,6 +190,7 @@ def main():
                       help="Re-run only the categories that failed in the last analyze (merges into the existing report; takes precedence over --categories)")
     p_run.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
                       help="Language of the analysis report (eng, tenglish, hindi, tamil)")
+    _add_memory_args(p_run)
     p_run.set_defaults(func=cmd_run)
 
     p_resume = sub.add_parser("resume", help="Resume an existing project — only reruns incomplete stages")
@@ -147,6 +202,7 @@ def main():
                       help="Re-run only the categories that failed in the last analyze (merges into the existing report)")
     p_resume.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
                       help="Language of the analysis report (eng, tenglish, hindi, tamil)")
+    _add_memory_args(p_resume)
     p_resume.set_defaults(func=cmd_resume)
 
     p_status = sub.add_parser("status", help="Show a project's stage status")

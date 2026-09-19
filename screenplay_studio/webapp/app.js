@@ -5059,10 +5059,18 @@ function renderDockEvidence() {
     // the field existed, so it is rendered only when present.
     const depth = state.report && state.report.stats && state.report.stats.evidence_depth;
     if (depth && depth.total) {
-      const line = el("p", "dock-cov-depth",
-        `Evidence depth — ${depth.full_text} of ${depth.total} from the full script text, `
-        + `${depth.overview} from scene summaries.`);
-      line.title = "Script-level passes reason from scene summaries rather than the raw pages. "
+      const covStats = state.report.stats || {};
+      const mixed = depth.overview_and_checkpoints || 0;
+      let depthTxt = `Evidence depth — ${depth.full_text} of ${depth.total} from the full script text, `
+        + `${depth.overview} from scene summaries`;
+      if (mixed) {
+        const cov2 = covStats.checkpoint_coverage;
+        const where = (cov2 && cov2.scenes && cov2.scenes.length)
+          ? ` (scenes ${cov2.scenes.join(", ")})` : "";
+        depthTxt += `, ${mixed} from scene summaries plus the raw pages of the key scenes${where}`;
+      }
+      const line = el("p", "dock-cov-depth", depthTxt + ".");
+      line.title = "Script-level passes reason mostly from scene summaries rather than the raw pages. "
         + "Treat those findings as a second opinion on structure, not a reading of your pages.";
       sec.appendChild(line);
     }

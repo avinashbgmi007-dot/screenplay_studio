@@ -4,6 +4,8 @@ Verifies the dock's evidence lens against the live app, DOM/text only:
   * unanalyzed project: the empty hint, no crash, manuscript stays primary
   * analyzed project: all seven sections assemble (scene strip, fix queue,
     scene findings, findings by category, coverage, setup/payoff, craft)
+  * the evidence-depth line states the mix, names the scenes read as raw pages
+    (§5 item 2), and keeps the "not a full reading" caveat
   * every finding action survives the move: Locate, Rewrite, Discuss,
     Dismiss, Restore; Addressed rows render addressed
   * the scene strip tracks scrolling (retitles for a different scene)
@@ -15,6 +17,7 @@ Run:  python tests/e2e_browser_phase6_evidence.py   (boots its own demo studio;
       set E2E_BASE to reuse an already-running one)
 """
 import os
+import re
 
 import requests
 from playwright.sync_api import sync_playwright
@@ -132,6 +135,21 @@ def run(base):
         check("coverage section renders",
               "coverage" in cat_text.lower() or
               lens.locator(".dock-cov-logline, .dock-section-title", has_text="Coverage").count() > 0)
+
+        # Evidence depth (§5 item 2): the script-level passes now read the
+        # summaries PLUS the raw pages of the checkpoint scenes, and the dock has
+        # to say so — the middle bucket is the whole point of the change. Rendered
+        # only when the report carries the field, so an older report stays silent.
+        depth_el = lens.locator(".dock-cov-depth")
+        depth_txt = depth_el.first.inner_text() if depth_el.count() else ""
+        check("evidence depth line renders in the coverage section", depth_el.count() > 0, depth_txt)
+        check("it names the raw pages the script-level passes actually read",
+              "raw pages of the key scenes" in depth_txt, depth_txt)
+        check("it names which scenes were read as pages",
+              re.search(r"scenes \d", depth_txt) is not None, depth_txt)
+        check("it still warns this is not a full reading",
+              "not a reading of your pages" in (depth_el.first.get_attribute("title") or "")
+              if depth_el.count() else False, depth_txt)
 
         # -- 6. setup / payoff ------------------------------------------------
         check("setup/payoff section renders (or absent honestly)",

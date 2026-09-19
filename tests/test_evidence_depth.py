@@ -1,13 +1,19 @@
 """The report states how much of it read the pages (Wave 4 / §5 item 4).
 
-The script-level passes judge from the MODEL-WRITTEN scene summaries, never the raw
-pages — a deliberate trade to fit the context window, and the single biggest honest
-limitation of the analysis. §2 called it "the summary-telephone ceiling": a large
-share of findings are about a *description* of the script rather than the script.
+The script-level passes judge from the MODEL-WRITTEN scene summaries — a deliberate
+trade to fit the context window, and the single biggest honest limitation of the
+analysis. §2 called it "the summary-telephone ceiling": a large share of findings
+are about a *description* of the script rather than the script.
 
 Until now the writer could not see the trade's SIZE. The report said "expected for
 theme/character/structure/scene-function findings, which reason from scene
 summaries" — a caveat in prose. "18 of 30 came from a summary" is a scope.
+
+Since §5 item 2 those passes also receive the RAW PAGES of a bounded set of
+checkpoint scenes, which narrows the gap without closing it. That is a third
+bucket, not a rounding of either neighbour — folding a mixed read into
+`full_text` would inflate the trusted side, the one direction this counter exists
+to prevent.
 
 The classification is recorded WHERE EACH PASS RUNS, not inferred from the finding's
 category, and the tests below hold that line: `pacing` emits its drag findings under
@@ -27,6 +33,11 @@ from screenplay_analyzer.pipeline import (
 )
 from screenplay_analyzer.report import render_markdown
 
+# §5 item 2's bucket is reached through the MODULE, never bound at import time: this
+# file must still import on the pre-fix code so each changed test fails on its own
+# assertion (or its own AttributeError) instead of collapsing the whole module into a
+# collection error. That is what makes the stash-based mutation check readable.
+
 FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "fixtures", "pain_tenglish.fountain")
 
@@ -36,14 +47,19 @@ FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # --------------------------------------------------------------------------
 
 class TestEvidenceDepth:
-    def test_it_counts_both_sides(self):
+    def test_it_counts_every_bucket(self):
+        """Three buckets, not two. Since §5 item 2 the script-level passes read
+        the summaries PLUS the raw pages of the checkpoint scenes — a distinct
+        middle case that must not be folded into either neighbour."""
         findings = [
             {"evidence_source": EVIDENCE_FULL_TEXT},
             {"evidence_source": EVIDENCE_OVERVIEW},
             {"evidence_source": EVIDENCE_OVERVIEW},
+            {"evidence_source": pipeline.EVIDENCE_OVERVIEW_AND_CHECKPOINTS},
         ]
         assert evidence_depth(findings) == {
-            "full_text": 1, "overview": 2, "unknown": 0, "total": 3,
+            "full_text": 1, "overview": 2,
+            "overview_and_checkpoints": 1, "unknown": 0, "total": 4,
         }
 
     def test_an_unattributed_finding_is_counted_as_unknown(self):
@@ -55,7 +71,10 @@ class TestEvidenceDepth:
         assert depth["full_text"] == 1
 
     def test_an_empty_report_is_all_zeros(self):
-        assert evidence_depth([]) == {"full_text": 0, "overview": 0, "unknown": 0, "total": 0}
+        assert evidence_depth([]) == {
+            "full_text": 0, "overview": 0,
+            "overview_and_checkpoints": 0, "unknown": 0, "total": 0,
+        }
 
     def test_tagging_stamps_every_finding(self):
         findings = [{}, {"category": "x"}]
@@ -97,10 +116,16 @@ class TestEveryPassDeclaresItsSource:
         src = self._src()
         assert "drag_findings(result.pacing), EVIDENCE_FULL_TEXT)" in src
         assert "run_script_level_category(fn, client, rules_fragment" in src
+        # Scoped to the call itself: `.*?` under re.S will happily run to a later
+        # `EVIDENCE_OVERVIEW)` in the file, so the window is bounded by the tag's
+        # own closing paren. (The loose version of this regex passed on code that
+        # had already stopped matching it — a guard that could not fail.)
         assert re.search(
-            r"_tag_evidence\(\s*run_script_level_category\(.*?\),\s*EVIDENCE_OVERVIEW\)",
+            r"_tag_evidence\(\s*run_script_level_category\([^)]*\),\s*script_level_source\)",
             src, re.S,
-        ), "the script-level categories must be tagged overview"
+        ), "the script-level categories must be tagged with the pass-level source"
+        assert ("script_level_source = (EVIDENCE_OVERVIEW_AND_CHECKPOINTS if checkpoint_scenes"
+                in src), "the source must fall back to overview when no pages were read"
 
     def test_the_summary_based_passes_are_tagged_overview(self):
         src = self._src()
@@ -158,9 +183,10 @@ class TestAFullRunLeavesNothingUnknown:
         )
         assert depth["total"] == len(full_run.findings)
 
-    def test_the_two_sides_account_for_every_finding(self, full_run):
+    def test_the_buckets_account_for_every_finding(self, full_run):
         depth = full_run.stats["evidence_depth"]
-        assert depth["full_text"] + depth["overview"] == depth["total"]
+        assert (depth["full_text"] + depth["overview"]
+                + depth["overview_and_checkpoints"]) == depth["total"]
 
     def test_both_sides_are_non_empty_on_a_real_script(self, full_run):
         """If one side were always 0 the number would carry no information."""
@@ -168,9 +194,21 @@ class TestAFullRunLeavesNothingUnknown:
         assert depth["full_text"] > 0, "no pass read the pages?"
         assert depth["overview"] > 0, "no summary-derived findings?"
 
+    def test_the_script_level_passes_are_mixed_not_pure_overview(self, full_run):
+        """§5 item 2: they now read the summaries AND the raw checkpoint pages,
+        so they must not report as a pure summary read."""
+        depth = full_run.stats["evidence_depth"]
+        assert depth["overview_and_checkpoints"] > 0, (
+            "the script-level passes report as pure overview — either the "
+            "checkpoints did not reach them or the tag regressed"
+        )
+
     def test_every_finding_carries_a_source(self, full_run):
         for f in full_run.findings:
-            assert f.get("evidence_source") in (EVIDENCE_FULL_TEXT, EVIDENCE_OVERVIEW)
+            assert f.get("evidence_source") in (
+                EVIDENCE_FULL_TEXT, EVIDENCE_OVERVIEW,
+                pipeline.EVIDENCE_OVERVIEW_AND_CHECKPOINTS,
+            )
 
 
 # --------------------------------------------------------------------------

@@ -416,6 +416,24 @@ POST_HISTORY_REMINDER = {
     ),
 }
 
+# When the drift detector fires, the closing voice check is REPLACED by a
+# re-prime (review section 7, P1.7). The detector used to log a warning and
+# change nothing — a log line nobody reads is not an action, and the persona
+# system already had the lever: the example dialogue sits in the system prompt
+# and is never shed. This points the model back at it on the turn after the
+# slide is detected.
+#
+# Deliberately ONE text for every persona, naming no character: it refers to
+# "your example dialogue" and "THAT person", so it cannot hand a persona another
+# persona's identity — the exact mistake the fallback note below was written
+# about. A per-persona re-prime would be more specific and more dangerous.
+VOICE_REPRIME_REMINDER = (
+    "[Voice re-prime: your last few replies drifted toward generic assistant "
+    "talk — hedging, signposting, or padding. Re-read your example dialogue in "
+    "the instructions above and answer the way THAT person would: plainer, "
+    "shorter, straight to the point. No lists, no preamble.]"
+)
+
 # One-line trait re-injection placed INSIDE the history at a fixed depth
 # (~6 messages from the end): traits survive long conversations without the
 # system prompt being repeated verbatim.
@@ -444,8 +462,11 @@ FIRST_LINE_ANCHOR = (
 )
 
 
-def post_history_reminder(name: str) -> str:
+def post_history_reminder(name: str, reprime: bool = False) -> str:
     """The voice check that closes the turn.
+
+    `reprime=True` swaps it for the drift re-prime (VOICE_REPRIME_REMINDER) —
+    the drift detector's only way to ACT rather than only log (P1.7).
 
     Falls back to a NEUTRAL reminder, never to another persona's. The dict
     holds only the two desk characters, so the old
@@ -455,6 +476,8 @@ def post_history_reminder(name: str) -> str:
     his voice and overriding their own. Saying nothing about identity is
     strictly better than naming the wrong one.
     """
+    if reprime:
+        return VOICE_REPRIME_REMINDER
     return POST_HISTORY_REMINDER.get(name, _NEUTRAL_VOICE_REMINDER)
 
 

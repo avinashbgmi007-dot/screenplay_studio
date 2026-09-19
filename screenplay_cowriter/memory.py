@@ -533,6 +533,33 @@ def merge_refresh(profile, proposal):
 _FILE_LOCK = threading.RLock()  # module-level: instances are per-request, file I/O must serialize
 
 
+# ---------------------------------------------------------------------------
+# Where terminal Sameer keeps the writer profile when the caller names no path.
+#
+# The webapp already wires memory by default (PROJECTS_DIR/writer_profile.json),
+# so the desk remembers. The terminal handoff did not: screenplay_studio's
+# `run` / `resume` -> chat called run_repl() with NO memory and had no flag to
+# change it, so Sameer was amnesiac in every terminal session and a month of
+# learning was invisible (review section 7, P2.11).
+#
+# Writer-level, not project-level, because the profile IS writer-level — the
+# whole point is that it follows the writer across projects. Hence a home-dir
+# location rather than a project directory.
+# ---------------------------------------------------------------------------
+MEMORY_DIR_NAME = ".screenplay_studio"
+MEMORY_FILE_NAME = "writer_profile.json"
+
+
+def default_memory_path() -> str:
+    """The writer-level profile path used when the caller does not name one.
+
+    Deliberately a plain, predictable dot-directory under the user's home rather
+    than a platform-specific data dir: a path the writer can guess is a path they
+    can read, move, back up or delete.
+    """
+    return os.path.join(os.path.expanduser("~"), MEMORY_DIR_NAME, MEMORY_FILE_NAME)
+
+
 class WriterMemory:
     def __init__(self, path, profile=None):
         self.path = path

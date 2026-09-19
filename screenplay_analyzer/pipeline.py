@@ -19,6 +19,7 @@ Returns an AnalysisResult with everything report.py needs.
 
 from __future__ import annotations
 
+import collections
 from dataclasses import dataclass, field
 
 from screenplay_parser.models import ScriptDocument
@@ -325,6 +326,146 @@ def build_scene_overview_text(doc: ScriptDocument, summaries: dict[int, str]) ->
     return overview
 
 
+# ---------------------------------------------------------------------------
+# Selective raw-text access for the script-level passes (§5 item 2).
+#
+# The script-level categories judge from MODEL-WRITTEN scene summaries — §2's
+# "summary-telephone ceiling": a finding is about a description of the script
+# rather than the script. The trade is deliberate (context window), but it is
+# not free, and it bites hardest exactly where a story turns: the act break,
+# the midpoint, the climax.
+#
+# So the four script-level passes are handed the RAW PAGES for a small,
+# deterministic set of scenes — the structural checkpoints plus the scenes the
+# earlier passes flagged most — inside a bounded budget. Deterministic (no model
+# call: the same script always yields the same set) and DISCLOSED: the report
+# names the scenes, because "we read some of your pages" is a scope the writer
+# is entitled to see.
+# ---------------------------------------------------------------------------
+MAX_CHECKPOINT_CHARS = 5000
+MAX_CHECKPOINT_SCENES = 6
+# The block budget must comfortably exceed one scene's cap (MAX_SCENE_CHARS) or
+# EVERY checkpoint would be dropped and the report would quietly go back to
+# summaries-only. A test holds this ratio so the regression cannot be silent.
+# Where a story's load-bearing turns sit, as a fraction through the script:
+# act-one break, midpoint, act-two break, climax.
+CHECKPOINT_FRACTIONS = (0.25, 0.50, 0.75, 1.0)
+
+SCRIPT_LEVEL_CATEGORIES = ("theme", "character", "structure", "scene_function")
+
+CHECKPOINT_HEADER = (
+    "RAW PAGES OF KEY SCENES (full text, NOT summaries — the structural "
+    "checkpoints and the most-flagged scenes; where these pages disagree with a "
+    "summary above, trust the pages):"
+)
+
+
+def _scene_nearest_fraction(scenes, frac: float) -> int | None:
+    """The scene sitting nearest `frac` of the way through the script.
+
+    Position is measured in PAGES when the parser supplied them — the honest
+    measure of where a turn sits — and in scene index otherwise. Ties break on
+    the lower scene number so the answer never depends on iteration order.
+    """
+    if not scenes:
+        return None
+    total_pages = max((s.page_end for s in scenes if s.page_end is not None), default=None)
+    if total_pages:
+        pool = [s for s in scenes if s.page_end is not None]
+        position = lambda s: s.page_end / total_pages  # noqa: E731
+    else:
+        pool = list(scenes)
+        n = len(pool)
+        position = lambda s: s.scene_number / n  # noqa: E731
+    return min(pool, key=lambda s: (abs(position(s) - frac), s.scene_number)).scene_number
+
+
+def select_checkpoint_scenes(doc: ScriptDocument, findings=None,
+                             limit: int = MAX_CHECKPOINT_SCENES) -> list[int]:
+    """Which scenes the script-level passes get to read as raw pages.
+
+    Deterministic, ordered, bounded, and never returns a scene that is not in
+    the document. Structural checkpoints come first (they are the same for every
+    script), then the most-flagged scenes (which is why this takes the findings
+    collected so far — the deterministic and dialogue passes have already run).
+    """
+    scenes = list(doc.scenes or [])
+    if not scenes or limit <= 0:
+        return []
+
+    known = {s.scene_number for s in scenes}
+    picked: list[int] = []
+
+    def add(n):
+        if n is not None and n in known and n not in picked:
+            picked.append(n)
+
+    for frac in CHECKPOINT_FRACTIONS:
+        if len(picked) >= limit:
+            break
+        add(_scene_nearest_fraction(scenes, frac))
+
+    counts: dict[int, int] = {}
+    for f in findings or []:
+        for ref in (f.get("scene_refs") or []):
+            try:
+                n = int(ref)
+            except (TypeError, ValueError):
+                continue
+            counts[n] = counts.get(n, 0) + 1
+    # Most-flagged first; ties by scene number so the set never depends on the
+    # order the findings happened to arrive in.
+    for n, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        if len(picked) >= limit:
+            break
+        add(n)
+
+    return picked[:limit]
+
+
+def build_checkpoint_text(doc: ScriptDocument, scene_numbers,
+                          budget: int = MAX_CHECKPOINT_CHARS) -> str:
+    """The raw pages of `scene_numbers`, budget-capped.
+
+    The budget is STRICT — a scene that does not fit is left out rather than
+    overrunning it — so this can return "" and the caller must then leave the
+    pass on summaries alone rather than claim a reading that did not happen.
+    Scenes dropped for budget are named in the text instead of vanishing
+    silently, because a quiet omission is the failure this whole counter exists
+    to prevent.
+    """
+    by_number = {s.scene_number: s for s in doc.scenes or []}
+    blocks: list[str] = []
+    used = 0
+    dropped: list[int] = []
+    for n in scene_numbers or []:
+        scene = by_number.get(n)
+        if scene is None:
+            continue
+        block = f"Scene {n} [{scene.heading_raw}]:\n{_scene_full_text(scene)}"
+        if used + len(block) > budget:
+            dropped.append(n)
+            continue
+        blocks.append(block)
+        used += len(block) + 2  # the "\n\n" join
+    if not blocks:
+        return ""
+    text = "\n\n".join(blocks)
+    if dropped:
+        named = ", ".join(str(n) for n in dropped)
+        text += (f"\n\n[{len(dropped)} further checkpoint scene(s) omitted for the "
+                 f"context budget: {named}]")
+    return text
+
+
+def build_script_level_overview(overview: str, checkpoint_text: str) -> str:
+    """The overview the script-level passes actually receive: the summaries,
+    plus the raw pages of the checkpoint scenes when any fit the budget."""
+    if not checkpoint_text:
+        return overview
+    return f"{overview}\n\n{CHECKPOINT_HEADER}\n\n{checkpoint_text}"
+
+
 def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_ctx, chunk_size: int = 3, language: str = "eng") -> tuple[list[dict], list[str]]:
     findings = []
     errors: list[str] = []
@@ -443,10 +584,12 @@ def resolve_categories(run_categories) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 # Evidence depth (§5 item 4).
 #
-# The script-level passes judge from the MODEL-WRITTEN scene summaries, never the
-# raw pages — a deliberate trade to fit the context window, and the single biggest
-# honest limitation of the analysis. The writer cannot see that trade today: a
-# finding is a finding.
+# The script-level passes judge mostly from the MODEL-WRITTEN scene summaries —
+# a deliberate trade to fit the context window, and the single biggest honest
+# limitation of the analysis. The writer cannot see that trade today: a finding
+# is a finding. Since §5 item 2 they also receive the raw pages of a bounded set
+# of checkpoint scenes, which narrows the gap without closing it — hence a third
+# bucket rather than a claim of either kind.
 #
 # So every pass declares what it actually read. This is stamped where the pass
 # RUNS rather than inferred from the finding's category, because a category is not
@@ -456,6 +599,12 @@ def resolve_categories(run_categories) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 EVIDENCE_FULL_TEXT = "full_text"   # read the parsed pages, or facts extracted from them
 EVIDENCE_OVERVIEW = "overview"     # read the model's scene summaries
+# Summaries PLUS the raw pages of the checkpoint scenes (§5 item 2). Its own
+# bucket rather than either neighbour: a pass that read four key scenes as pages
+# and the rest as summaries is neither a full read nor a pure summary read, and
+# folding it into `full_text` would inflate the trusted side — the one direction
+# this counter exists to prevent.
+EVIDENCE_OVERVIEW_AND_CHECKPOINTS = "overview+checkpoints"
 
 
 def _tag_evidence(findings, source: str):
@@ -471,8 +620,11 @@ def evidence_depth(findings) -> dict:
     that forgets to declare its source must not silently read as full-text."""
     full = sum(1 for f in findings if f.get("evidence_source") == EVIDENCE_FULL_TEXT)
     over = sum(1 for f in findings if f.get("evidence_source") == EVIDENCE_OVERVIEW)
+    mixed = sum(1 for f in findings
+                if f.get("evidence_source") == EVIDENCE_OVERVIEW_AND_CHECKPOINTS)
     return {"full_text": full, "overview": over,
-            "unknown": len(findings) - full - over, "total": len(findings)}
+            "overview_and_checkpoints": mixed,
+            "unknown": len(findings) - full - over - mixed, "total": len(findings)}
 
 
 def analyze(
@@ -601,6 +753,32 @@ def analyze(
             result.category_outcomes["summaries"] = "failed"
             result.errors.append(f"Scene summarization failed: {e}")
 
+    # 2b. selective raw-text access for the script-level passes (§5 item 2).
+    # Runs HERE because the checkpoint set depends on the findings the earlier
+    # passes already filed (the most-flagged scenes), and because it is only
+    # needed once the summaries exist to sit alongside it. Deterministic — no
+    # model call — and recorded on the result so the report can name the scenes.
+    script_level_overview = overview
+    checkpoint_scenes: list[int] = []
+    checkpoint_text = ""
+    if overview and any(c in run_categories for c in SCRIPT_LEVEL_CATEGORIES):
+        checkpoint_scenes = select_checkpoint_scenes(doc, all_findings)
+        checkpoint_text = build_checkpoint_text(doc, checkpoint_scenes)
+        if checkpoint_text:
+            script_level_overview = build_script_level_overview(overview, checkpoint_text)
+        else:
+            # Nothing fit the budget — never claim a reading that did not happen.
+            checkpoint_scenes = []
+        result.stats["checkpoint_coverage"] = {
+            "scenes": list(checkpoint_scenes),
+            "of": doc.scene_count,
+            "chars": len(checkpoint_text),
+        }
+    # What the script-level passes are stamped with: the mixed bucket when they
+    # really did read pages, plain overview when they did not.
+    script_level_source = (EVIDENCE_OVERVIEW_AND_CHECKPOINTS if checkpoint_scenes
+                           else EVIDENCE_OVERVIEW)
+
     # 3. scene-level dialogue analysis
     if "dialogue" in run_categories:
         try:
@@ -621,10 +799,10 @@ def analyze(
 
     # 4. script-level categories
     category_prompts = {
-        "theme": (prompts.theme_analysis_prompt, (overview, doc.title)),
-        "character": (prompts.character_analysis_prompt, (overview, doc.title, doc.all_characters)),
-        "structure": (prompts.structure_analysis_prompt, (overview, doc.title, doc.scene_count, doc.estimated_page_count)),
-        "scene_function": (prompts.scene_function_prompt, (overview, doc.title)),
+        "theme": (prompts.theme_analysis_prompt, (script_level_overview, doc.title)),
+        "character": (prompts.character_analysis_prompt, (script_level_overview, doc.title, doc.all_characters)),
+        "structure": (prompts.structure_analysis_prompt, (script_level_overview, doc.title, doc.scene_count, doc.estimated_page_count)),
+        "scene_function": (prompts.scene_function_prompt, (script_level_overview, doc.title)),
     }
     for cat, (fn, args) in category_prompts.items():
         if cat in run_categories and overview:
@@ -633,7 +811,7 @@ def analyze(
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
                 all_findings.extend(_tag_evidence(
                     run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language),
-                    EVIDENCE_OVERVIEW))
+                    script_level_source))
                 emit(cat, "complete")
                 result.category_outcomes[cat] = "ok"
             except LlamaServerError as e:

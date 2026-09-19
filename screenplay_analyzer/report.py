@@ -333,13 +333,27 @@ def render_markdown(result: AnalysisResult) -> str:
         # "18 of 30 came from a summary" is a scope.
         depth = (result.stats or {}).get("evidence_depth") or {}
         if depth.get("total"):
-            lines.append(
+            mixed = depth.get("overview_and_checkpoints", 0)
+            scenes = ((result.stats or {}).get("checkpoint_coverage") or {}).get("scenes") or []
+            line = (
                 f"\n**Evidence depth:** of {depth['total']} findings, "
                 f"**{depth.get('full_text', 0)} came from the full script text** and "
-                f"**{depth.get('overview', 0)} from scene summaries** — a description of the "
-                f"script rather than the script itself. Treat the second group as a second "
-                f"opinion on structure, not as a reading of your pages."
+                f"**{depth.get('overview', 0)} from scene summaries**"
             )
+            if mixed:
+                # §5 item 2: these passes read the summaries AND the raw pages of a
+                # bounded set of key scenes. Named, because "we read some of your
+                # pages" is a scope the writer is entitled to see — and the scene
+                # numbers are the difference between a claim and a check.
+                where = f" (scenes {', '.join(str(n) for n in scenes)})" if scenes else ""
+                line += (f", and **{mixed} from scene summaries plus the raw pages of the "
+                         f"key scenes{where}**")
+            line += (
+                " — a description of the script rather than the script itself. Treat the "
+                "summary-derived groups as a second opinion on structure, not as a reading "
+                "of your pages."
+            )
+            lines.append(line)
             if depth.get("unknown"):
                 # Never fold an unattributed pass into either side: a pass that
                 # forgot to declare its source must not read as full-text.

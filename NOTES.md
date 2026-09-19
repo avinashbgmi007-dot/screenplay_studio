@@ -2041,4 +2041,138 @@ held. One nuance corrected: the midpoint pair (comedy_midpoint_physical_intimacy
 romance_midpoint_no_return) is filed at the SAME tier today (both high -> medium), so the
 duplication is real but the tiers do not diverge there.
 
+=== 2026-09-19 · S5.2 PASS -- the script-level passes now read some of the pages ===
+
+USER DECISION RECORDED FIRST: C5 (confidence tiers) is DEFERRED. No tier was changed and none
+will be in this pass -- the KB still reads 202 high / 40 medium / 21 low. The proposal
+(docs/KB_TIER_REVIEW.md + docs/kb_tier_proposal.csv) stays committed for a later pass. The
+genre-routing work (S5.7) is parked for the same reason: same exercise, and it takes longer
+than this pass allowed.
+
+WHAT SHIPPED (S5.2, "give script-level passes selective raw-text access")
+
+The ceiling section 2 named: theme / character / structure / scene_function judge from
+MODEL-WRITTEN scene summaries, so a share of every report is about a description of the
+script. Those four passes now get the RAW PAGES of a small, DETERMINISTIC set of scenes
+appended to the summary overview:
+
+- the structural checkpoints: 25 / 50 / 75 / 100% through the script, measured in PAGES when
+  the parser supplied them (the honest measure of where a turn sits) and in scene index
+  otherwise. Ties break on the lower scene number, so the set never depends on iteration
+  order;
+- plus the scenes the EARLIER passes flagged most (scene_refs counts off the deterministic +
+  dialogue findings, which have already run by then);
+- bounded at MAX_CHECKPOINT_SCENES = 6 and a STRICT MAX_CHECKPOINT_CHARS = 5000. Strict means
+  a scene that does not fit is left out, and the omitted ones are NAMED in the text -- a quiet
+  omission is the failure this counter exists to prevent. If nothing fits, the block is "" and
+  the pass stays on summaries rather than claiming a reading that did not happen.
+
+No model call anywhere in the selection: the same script always yields the same set.
+
+THE HONESTY PROBLEM THIS CREATED, AND HOW IT WAS SOLVED
+
+The report already counted findings as full_text vs overview. A pass that read four key scenes
+as PAGES and the rest as summaries is neither. Folding it into full_text would have inflated
+the trusted side -- the one direction that counter exists to prevent -- so there is a THIRD
+bucket, EVIDENCE_OVERVIEW_AND_CHECKPOINTS, and both the report and the dock NAME the scenes.
+Live on the demo model: 3 of 8 findings from the pages, 2 pure summary, 3 mixed; the dock line
+reads "Evidence depth -- 3 of 8 from the full script text, 2 from scene summaries, 3 from scene
+summaries plus the raw pages of the key scenes (scenes 2, 3, 4, 6)."
+
+SCOPE, DELIBERATELY NARROW: coverage / genre / logline / setup-payoff / char-reads stay on
+pure summaries. Widening them would move genre detection, which is parked.
+
+S5.6 IS BLOCKED, NOT SKIPPED. "Empirically set the 0.72 verification threshold from logged
+score distributions" cannot be done: NO SCORE IS LOGGED ANYWHERE. verifier.py computes the
+ratio locally and discards it, so the distribution that would set the number was never
+captured. The prerequisite is score capture; the number is a later pass.
+
+SELF-CAUGHT, BEFORE IT SHIPPED
+- My first browser check used "#dock-cov-depth". The element is a CLASS, not an id -- the check
+  went red for the wrong reason. Fixed to ".dock-cov-depth"; then 32/32.
+- The budget check was written so the FIRST block always got in regardless of size, which made
+  "nothing fits" unreachable and the caller's fallback dead code. Made the budget strict so the
+  empty case is real and testable, and added a test pinning
+  MAX_CHECKPOINT_CHARS >= 2 x MAX_SCENE_CHARS so checkpoints can never silently vanish if that
+  constant is retuned.
+- test_evidence_depth.py had a regex guard that had ALREADY stopped matching the code it
+  guarded: `.*?` under re.S ran past the call to a later EVIDENCE_OVERVIEW) in the same file,
+  so it passed vacuously. Now bounded by the call's own closing paren. A guard that cannot fail
+  is not a guard -- the second time this session that pattern has bitten.
+- The new test files reach the new symbols through the MODULE rather than importing them by
+  name, so the pre-fix run fails per-test instead of collapsing into a collection error. That
+  is what makes the mutation count readable.
+
+VERIFICATION
+- tests/test_checkpoint_evidence.py (new, 34) + tests/test_evidence_depth.py (26; 4 updated for
+  the third bucket). 60 tests, and 37 of them FAIL on the pre-fix code (stash-checked).
+- pytest: 1167 passed / 1 failed -- and that one is the PRE-EXISTING flake
+  (test_save_rename_race_never_tears_json, section 6.7: PermissionError(13) on a concurrent
+  save+rename, 1-in-6 standalone, no shared files with this change).
+- browser: phase6_evidence 32/32 (4 new depth-line checks), smoke 18/18, phase7 15/15,
+  branch_ui 11/11, token_mode 3/3.
+- app.js cache-bust hx1b386 -> hx1b387.
+
+ALSO THIS PASS (C14, doc hygiene -- resolved, and half the row was stale)
+- SESSION_SUMMARY.md is gitignored, not untracked-and-pending, and now carries a STALE banner
+  pointing at NOTES.md + the status board + git log. It had already misled a session into
+  treating two closed gaps as open work.
+- The "audit plan file is untracked" claim was WRONG: it is tracked and clean.
+
+STILL OPEN: S5.5 (deepen theme/relationship/pitch/revision), S5.9 (KG candidate types), C12
+(section 7 residual -- P1.4 select-to-rewrite, P1.5 compliance wall, P1.7, P2.8/9, P2.11 CLI
+memory), C13 (section 6 brainstorm), and the parked C5 + S5.7.
+
+=== 2026-09-19 · P2.11 PASS -- terminal Sameer remembers, and the board's claim was wrong ===
+
+THE ROW WAS WRONG, IN A CHECKABLE WAY. It read "no --memory-path exists in cli.py or
+orchestrator.py at all". --memory-path DOES exist: screenplay_cowriter/cli.py:227, honoured at
+:197-200. The row only looked at screenplay_studio/cli.py.
+
+THE REAL DEFECT, which is narrower and worse: screenplay_studio/cli.py:_run_chat_repl called
+run_repl(session, store, engine.client) with NO memory argument, and run/resume had no flag to
+supply one. So the analyzer CLI's chat handoff -- the path a writer reaches by running the
+pipeline and staying for the conversation -- was amnesiac in EVERY terminal session, while the
+webapp wired memory by default. The desk remembered; the terminal never did.
+
+FIXED THE WAY H1 WAS: default ON, explicit opt-out, and it says so.
+- Default path: ~/.screenplay_studio/writer_profile.json (new default_memory_path() in
+  screenplay_cowriter/memory.py). Writer-level, not project-level, because the profile's whole
+  purpose is to follow the writer across projects.
+- --no-memory is the explicit opt-out; --memory-path still names a file.
+- The chosen path is PRINTED when a chat starts. A profile of the writer now lives on their disk
+  by default, so where it lives is disclosed rather than discovered. --only analyze and
+  --skip-chat stay quiet, so a non-interactive run is not handed a notice about a file it never
+  touches.
+- An unreadable profile degrades to a memoryless session WITH a notice, instead of failing the run
+  (a CLI must not die because a profile file is bad) and instead of silently forgetting.
+- The webapp's project-scoped path (PROJECTS_DIR/writer_profile.json) is deliberately untouched:
+  changing it would silently orphan every existing profile.
+
+P1.5 RE-CHECKED, STILL OPEN. The compliance wall is NOT consolidated: personas.py 29, context.py
+16, engine.py 11 occurrences of do-not/don't/never across three modules. Trimming it is a
+prompt-quality change that needs a live model to judge, so it is recorded, not guessed at.
+
+SELF-CAUGHT, AND THIS ONE COST ME. I ran the mutation check with `git checkout HEAD -- <product
+files>` on an UNCOMMITTED change -- which DISCARDS the working tree. The fix was wiped and had to
+be re-applied from scratch. The correct tool for an uncommitted change is `git stash push --
+<paths>` (which preserves); `git checkout HEAD~1 -- <paths>` is only for a change that is ALREADY
+committed, where `git checkout HEAD -- <paths>` restores it. The re-run used stash plus an md5 of
+both files before and after, and the hash matched. Rule now in the skill: never use checkout to
+revert for a mutation check -- the entire point is to get the fix back.
+
+VERIFICATION
+- tests/test_cli_memory_default.py (new, 17): 13 of 17 FAIL on the pre-fix code (stash-checked,
+  hash-verified restore). Includes an end-to-end run through the real argparse entry point
+  (cli.main() with a stubbed orchestrator), asserting the notice prints for a chat run and stays
+  silent for --only analyze / --skip-chat.
+- pytest: 1185 passed / 0 failed (the section 6.7 flake did not fire this run).
+- docs/CLI_REFERENCE.md updated: both subcommands list the flags, plus a paragraph on the default,
+  the opt-out and the printed path.
+
+STILL OPEN: S5.5, S5.9, C12 (P1.4/P1.5/P1.7/P2.8/P2.9/P3.12/P3.13), C13, and the parked C5 + S5.7.
+PUSH: still stranded. Five attempts across two passes, all timing out at the write step with zero
+output while ls-remote returns instantly. Local is 2 ahead; the tracking ref points at the true
+remote, so git status tells the truth.
+
 

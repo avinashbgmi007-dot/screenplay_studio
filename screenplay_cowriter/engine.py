@@ -5,6 +5,8 @@ free operations that don't need a model call — this module handles only the
 "send a message, get a grounded reply" turn.
 """
 
+import re
+
 from .models import Session, Message
 from .llm_client import LlamaServerClient
 from .personas import DOCTOR_PERSONA
@@ -80,46 +82,56 @@ def _resolve_prompt_budget(value):
     except (TypeError, ValueError):
         return None
 
-# Voice drift detection: track AI tells per persona to catch slow drift
-_VOICE_DRIFT_HISTORY = {}  # persona -> list of tell counts per reply
+# ---------------------------------------------------------------------------
+# Voice drift (review section 7, P1.7).
+#
+# The old detector counted AI tells, kept a PROCESS-GLOBAL history, and logged a
+# warning. Two problems, and the second is the one the review named: it never
+# ACTED — a log line nobody reads changes nothing — and the global meant two open
+# projects shared one drift history, so neither was measured against its own
+# conversation.
+#
+# Split into two pure functions plus per-engine state: the thresholds are now
+# testable without constructing an engine, and the history belongs to the
+# conversation that produced it.
+# ---------------------------------------------------------------------------
+VOICE_DRIFT_WINDOW = 5         # replies compared at each end of the history
+VOICE_DRIFT_MIN_HISTORY = 10   # below this there is no "early" to compare against
+VOICE_DRIFT_MARGIN = 1.0       # tells per reply the recent end must exceed
+VOICE_DRIFT_HISTORY_MAX = 20   # replies remembered per persona
 
-def _detect_voice_drift(reply: str, persona: str) -> str:
-    """Detect and log voice drift by counting AI tells in each reply.
-    Returns the reply unchanged but logs drift metrics for monitoring."""
-    import re
-    # Count common AI tells
-    tells = 0
-    # Hedging phrases
-    if re.search(r"\b(?:I think|I feel|maybe|perhaps|it seems like)\b", reply, re.IGNORECASE):
-        tells += 1
-    # Filler words
-    if re.search(r"\b(?:actually|basically|honestly|frankly)\b", reply, re.IGNORECASE):
-        tells += 1
-    # Canned openings
-    if re.search(r"^(?:Great question|Absolutely|I'?d be happy to)", reply, re.IGNORECASE):
-        tells += 2  # weight these heavier
-    # Canned closings
-    if re.search(r"(?:let me know if you need anything else|I hope this helps)\s*$", reply, re.IGNORECASE):
-        tells += 2
-    # Track history
-    if persona not in _VOICE_DRIFT_HISTORY:
-        _VOICE_DRIFT_HISTORY[persona] = []
-    _VOICE_DRIFT_HISTORY[persona].append(tells)
-    # Keep only last 20 replies
-    if len(_VOICE_DRIFT_HISTORY[persona]) > 20:
-        _VOICE_DRIFT_HISTORY[persona] = _VOICE_DRIFT_HISTORY[persona][-20:]
-    # Log warning if drift detected (last 5 replies have higher tell count than first 5)
-    history = _VOICE_DRIFT_HISTORY[persona]
-    if len(history) >= 10:
-        recent_avg = sum(history[-5:]) / 5
-        early_avg = sum(history[:5]) / 5
-        if recent_avg > early_avg + 1.0:
-            import logging as _log
-            _log.getLogger(__name__).warning(
-                f"Voice drift detected for {persona}: recent avg={recent_avg:.1f}, "
-                f"early avg={early_avg:.1f}. Consider reviewing persona prompt."
-            )
-    return reply
+_AI_TELL_PATTERNS = (
+    (1, re.compile(r"\b(?:I think|I feel|maybe|perhaps|it seems like)\b", re.IGNORECASE)),
+    (1, re.compile(r"\b(?:actually|basically|honestly|frankly)\b", re.IGNORECASE)),
+    (2, re.compile(r"^(?:Great question|Absolutely|I'?d be happy to)", re.IGNORECASE)),
+    (2, re.compile(r"(?:let me know if you need anything else|I hope this helps)\s*$",
+                   re.IGNORECASE)),
+)
+
+
+def count_ai_tells(reply: str) -> int:
+    """How many AI tells this reply carries. Deterministic; no model call.
+
+    Weighted: a canned opening or closing is worth two, because either is a whole
+    register slip rather than a word choice.
+    """
+    return sum(weight for weight, pattern in _AI_TELL_PATTERNS
+               if pattern.search(reply or ""))
+
+
+def voice_drift_crossed(history) -> bool:
+    """True when the recent replies carry materially more tells than the early
+    ones — the slow slide the persona examples exist to prevent.
+
+    Compares the two ENDS of the history rather than a running average: a persona
+    that always hedges a little is not drifting, and one that starts clean and
+    ends hedging is, even when the mean barely moves.
+    """
+    if len(history) < VOICE_DRIFT_MIN_HISTORY:
+        return False
+    recent = sum(history[-VOICE_DRIFT_WINDOW:]) / VOICE_DRIFT_WINDOW
+    early = sum(history[:VOICE_DRIFT_WINDOW]) / VOICE_DRIFT_WINDOW
+    return recent > early + VOICE_DRIFT_MARGIN
 
 
 class CoWriterEngine:
@@ -168,6 +180,39 @@ class CoWriterEngine:
         # from the model's reported context window, so it is resolved on the
         # one path that builds a prompt. See _resolve_prompt_budget.
         self.prompt_budget = prompt_budget
+        # Voice drift, per CONVERSATION (P1.7). These used to be a module-level
+        # dict shared by every engine in the process, so two open projects fed one
+        # history and neither was measured against its own replies.
+        self._tell_history: dict = {}      # persona -> list of per-reply tell counts
+        self._voice_reprime: set = set()   # personas whose next turn gets the re-prime
+
+    # -- voice drift -------------------------------------------------------
+
+    def voice_reprime_pending(self, persona: str) -> bool:
+        """Whether the next turn for `persona` should carry the drift re-prime."""
+        return persona in self._voice_reprime
+
+    def _note_voice_tells(self, reply: str, persona: str) -> bool:
+        """Record this reply's AI-tell count; arm a re-prime if the trend crossed.
+
+        Returns whether it armed. This is where the detector ACTS: it used to log
+        a warning and return the reply untouched (P1.7). The re-prime rides the
+        turn AFTER the slide is visible, because the history is only complete once
+        this reply is counted.
+        """
+        history = self._tell_history.setdefault(persona, [])
+        history.append(count_ai_tells(reply))
+        del history[:-VOICE_DRIFT_HISTORY_MAX]
+        if voice_drift_crossed(history):
+            self._voice_reprime.add(persona)
+            return True
+        return False
+
+    def _consume_voice_reprime(self, persona: str) -> None:
+        """Clear the armed re-prime once it has ridden a turn. If the drift is
+        still there, the next reply re-arms it — the detector governs, so this
+        cannot become a permanent nag on its own."""
+        self._voice_reprime.discard(persona)
 
     def _ground_reply_for_room(self, reply: str) -> str:
         """Reply-side hallucination guard, room-aware. In the idea room there
@@ -227,12 +272,15 @@ class CoWriterEngine:
                                 repeat_penalty=self.CHAT_REPEAT_PENALTY)
 
     def _assemble_messages(self, system_prompt, history, prompt_user, persona,
-                           scene_block=None, quote_context=None):
+                           scene_block=None, quote_context=None, reprime=False):
         """Shared turn assembly for both probe and full paths. Order matters:
         system -> scene/quote context -> few-shot examples (budget-permitting)
         -> [history with trait reminder at fixed depth] -> user turn ->
         post-history voice reminder (last word before generation carries the
         most weight -- the SillyTavern post-history lever).
+
+        `reprime=True` swaps that closing reminder for the drift re-prime, which
+        is how the voice-drift detector acts instead of only logging (P1.7).
 
         SINGLE-SYSTEM CONTRACT (H7a): some llama-server builds return HTTP 500
         on any payload carrying two or more `system` messages, and this build is
@@ -270,7 +318,7 @@ class CoWriterEngine:
         # post-history voice reminder: last word before generation, as a user
         # note (was a second system message — the H7a 500 trigger).
         messages.append({"role": "user",
-                         "content": post_history_reminder(persona) + anchor})
+                         "content": post_history_reminder(persona, reprime=reprime) + anchor})
         return messages
 
     def send_message(self, session: Session, user_text: str, quote: dict | None = None,
@@ -282,6 +330,8 @@ class CoWriterEngine:
         branch = session.branch
         user_text = (user_text or "").strip()
         turn_kind = classify_turn(user_text)
+        # P1.7: armed by a previous reply's tell trend; rides exactly one turn.
+        reprime_now = self.voice_reprime_pending(branch.active_persona)
 
         # Select-to-reply: the writer highlighted a passage of the script and
         # asked about it. Normalize the shape so callers can't inject junk, and
@@ -393,7 +443,7 @@ class CoWriterEngine:
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = self._assemble_messages(
                 system_prompt, branch.messages, prompt_user, branch.active_persona,
-                scene_block=scene_block, quote_context=quote_context)
+                scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
             try:
                 reply = clean_reply(self._generate(messages, on_token))
             except Exception:
@@ -415,13 +465,17 @@ class CoWriterEngine:
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = self._assemble_messages(
                 system_prompt, branch.messages, prompt_user, branch.active_persona,
-                scene_block=scene_block, quote_context=quote_context)
+                scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
             reply = clean_reply(self._generate(messages, on_token))
             reply = self._guard_reply(reply, scene_refs)
             reply = cap_suggestions(reply)
 
         reply = persona_register(reply, branch.active_persona)
-        reply = _detect_voice_drift(reply, branch.active_persona)
+        # P1.7: consume the re-prime that just rode this turn, then count this
+        # reply and arm the next one if the trend has crossed. Order matters: the
+        # history is only complete once this reply is counted.
+        self._consume_voice_reprime(branch.active_persona)
+        self._note_voice_tells(reply, branch.active_persona)
 
         reply = ensure_forward_momentum(reply, turn_kind, branch.active_persona)
 
