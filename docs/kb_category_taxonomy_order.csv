@@ -1,0 +1,193 @@
+level_rank,taxonomy_level,band,band_rank,tier_rank,sev_rank,rule_id,name,category,file,confidence_tier,proposed_tier,severity_default,source_type,originator,genre,requires
+0,story_macro,G,0,0,0,romance_theme_love,Theme Must Be Love-Related,theme,romance,high,medium,high,general_craft,K.M. Weiland,romance,knowledge_graph
+0,story_macro,G,0,0,1,mystery_logline_clarity,Mystery Logline Must Be Clear,concept,mystery,high,medium,medium,attributed_principle,David Hohl,mystery,scene_text
+0,story_macro,G,0,0,1,scifi_concept_simplicity,Keep Sci-Fi Concepts Simple,concept,scifi,high,medium,medium,attributed_principle,Scriptshadow/Amber,scifi,scene_text
+0,story_macro,G,0,0,1,scifi_emotional_core,Sci-Fi Must Have Emotional Core,theme,scifi,high,low,medium,general_craft,,scifi,knowledge_graph
+0,story_macro,G,0,0,1,scifi_relationship_to_technology,Sci-Fi Themes Explore Man vs Technology,theme,scifi,high,low,medium,general_craft,Randy Ingermanson,scifi,knowledge_graph
+0,story_macro,G,0,0,1,scifi_simple_logline,Sci-Fi Logline Must Be Understandable,concept,scifi,high,medium,medium,attributed_principle,Scriptshadow/Amber,scifi,scene_text
+0,story_macro,G,0,0,2,thriller_contained_premise,Contained Thriller Structure,concept,thriller,high,medium,low,attributed_principle,Scriptshadow/Amber,thriller,scene_summaries
+0,story_macro,G,0,2,1,controlling_idea,Controlling Idea (Theme as Cause-and-Effect Statement),theme,story_macro,low,low,medium,framework,Robert McKee,,scene_summaries
+0,story_macro,G,0,2,1,theme_contradiction,Theme Contradiction Without Earned Justification,theme,story_macro,low,low,medium,framework,Robert McKee,,scene_summaries
+0,story_macro,S,1,0,0,drama_emotional_authenticity,Emotional Authenticity Over Plot Mechanics,tone,drama,high,low,high,general_craft,Robert McKee,drama,knowledge_graph
+0,story_macro,S,1,0,0,horror_tone_set_immediately,First Page Sets Horror Tone,tone,horror,high,medium,high,attributed_principle,David Hohl,horror,scene_text
+0,story_macro,S,1,0,0,mystery_clue_game,Riddle as Game Between Writer and Audience,structure,mystery,high,medium,high,framework,Ronald Tobias,mystery,scene_summaries
+0,story_macro,S,1,0,0,mystery_solution_satisfying,Mystery Solution Must Be Satisfying,resolution,mystery,high,low,high,general_craft,,mystery,scene_summaries
+0,story_macro,S,1,0,0,romance_satisfying_resolution,Romance Resolution Must Be Satisfying,resolution,romance,high,high,high,general_craft,,romance,scene_summaries
+0,story_macro,S,1,0,0,scifi_rules_established_early,World Rules Must Be Established Early,worldbuilding,scifi,high,medium,high,attributed_principle,Angus Fletcher,scifi,scene_text
+0,story_macro,S,1,0,1,horror_rules_established_early,Horror World Rules Established Early,worldbuilding,horror,high,medium,medium,general_craft,Angus Fletcher,horror,scene_text
+0,story_macro,S,1,0,2,drama_ambiguity_preserved,Drama Preserves Ambiguity,resolution,drama,high,low,low,general_craft,,drama,scene_summaries
+0,story_macro,S,1,0,2,horror_ordinary_world_horror,Ordinary World Must Contrast Horror,contrast,horror,high,medium,low,general_craft,Christopher Vogler,horror,scene_summaries
+0,story_macro,S,1,0,2,romance_adult_children_opening,Lovers Introduced as Adult Children,structure,romance,high,low,low,attributed_principle,Angus Fletcher,romance,scene_summaries
+0,story_macro,S,1,1,1,world_rule_consistency,World-Building Rule Consistency,world_building,story_macro,medium,medium,medium,general_craft,,,knowledge_graph
+0,story_macro,E,2,2,2,genre_convention_fulfillment,Genre Convention Fulfillment,genre,story_macro,low,low,low,general_craft,,,scene_summaries
+1,theme,G,0,0,0,martell_theme_through_characters,Theme Expressed Through Character Choices,theme,theme,high,medium,high,framework,William Martell,,scene_text|knowledge_graph
+1,theme,S,1,0,1,weiland_theme_from_arc,Theme Emerges from the Character's Arc,theme_construction,theme,high,low,medium,framework,K.M. Weiland,,scene_summaries|knowledge_graph
+2,structure_pacing,G,0,0,0,bell_lock_system,"LOCK System: Lead, Objective, Confrontation, Knockout",plot_foundation,structure_pacing,high,medium,high,framework,James Scott Bell,,scene_summaries|knowledge_graph
+2,structure_pacing,G,0,0,0,gulino_sequence_climax,Sequence Approach: Each Sequence Has Its Own Mini-Climax,act_structure,structure_pacing,high,medium,high,framework,Paul Gulino,,scene_summaries|page_estimates
+2,structure_pacing,G,0,0,0,martell_act_two_conflict,Act Two Is the Conflict Act,act_structure,structure_pacing,high,medium,high,framework,William Martell,,scene_summaries
+2,structure_pacing,G,0,0,0,martell_know_your_destination,Know Your Ending Before You Write,ending,structure_pacing,high,low,high,framework,William Martell,,scene_summaries
+2,structure_pacing,G,0,1,1,mckee_five_part_design,Five-Part Story Design,act_structure,structure_pacing,medium,medium,medium,framework,Robert McKee,,scene_summaries
+2,structure_pacing,G,0,1,2,three_act_structure,Three-Act Structure,act_structure,structure_pacing,medium,high,low,framework,Aristotle (Poetics); formalized for screenwriting by Syd Field,,scene_summaries|page_estimates
+2,structure_pacing,S,1,0,0,martell_deadlines_drive_momentum,Deadlines Drive Act Two Momentum,pacing,structure_pacing,high,medium,high,framework,William Martell,,scene_summaries
+2,structure_pacing,S,1,0,0,mystery_reveal_timing,Explanation Before Climax,structure,mystery,high,medium,high,framework,Ronald Tobias,mystery,scene_summaries
+2,structure_pacing,S,1,0,0,romance_midpoint_no_return,Midpoint as Point of No Return,structure,romance,high,medium,high,attributed_principle,David Hohl,romance,scene_summaries
+2,structure_pacing,S,1,0,0,thriller_locked_in_by_act_end,Protagonist Must Be Locked In by Act I End,structure,thriller,high,medium,high,attributed_principle,David Hohl,thriller,scene_summaries
+2,structure_pacing,S,1,0,1,action_pacing_relentless,Action Pacing Is Relentless,pacing,action,high,medium,medium,general_craft,William Martell,action,scene_summaries|page_estimates
+2,structure_pacing,S,1,0,1,bell_midpoint_shift,The Midpoint Shifts the Story from Reaction to Action,midpoint,structure_pacing,high,medium,medium,framework,James Scott Bell,,scene_summaries
+2,structure_pacing,S,1,0,1,comedy_midpoint_physical_intimacy,Rom-Com Midpoint Physical Intimacy,structure,comedy,high,medium,medium,attributed_principle,David Hohl,comedy,scene_summaries
+2,structure_pacing,S,1,0,1,comedy_reel_laugh,Every Reel Needs a Big Laugh,structure,comedy,high,medium,medium,attributed_principle,David Hohl,comedy,scene_summaries|page_estimates
+2,structure_pacing,S,1,0,1,gulino_dramatic_question,Each Sequence Must Raise and Answer a Dramatic Question,structure,structure_pacing,high,medium,medium,framework,Paul Gulino,,scene_summaries
+2,structure_pacing,S,1,0,1,horror_reel_event_requirement,Every Reel Must Have a Horror Payoff,structure,horror,high,medium,medium,attributed_principle,David Hohl,horror,scene_summaries|page_estimates
+2,structure_pacing,S,1,0,1,horror_tension_building,Tension Builds Through Unanswered Questions,tension,horror,high,medium,medium,general_craft,James Scott Bell,horror,scene_summaries
+2,structure_pacing,S,1,0,1,mystery_pacing_controlled,Mystery Pacing Is Controlled,pacing,mystery,high,low,medium,general_craft,,mystery,scene_summaries
+2,structure_pacing,S,1,0,1,romance_third_act_breakup,Third Act Breakup Must Be Earned,structure,romance,high,medium,medium,general_craft,,romance,knowledge_graph
+2,structure_pacing,S,1,0,1,thriller_ticking_clock,Ticking Clock Creates Urgency,urgency,thriller,high,medium,medium,general_craft,Michael Hauge,thriller,scene_summaries
+2,structure_pacing,S,1,1,2,alderson_false_summit,The False Summit Before the True Climax,climax_structure,structure_pacing,medium,medium,low,framework,Martha Alderson,,scene_summaries
+2,structure_pacing,S,1,2,1,pacing_escalation,Escalation of Conflict (Law of Conflict),pacing,structure_pacing,low,medium,medium,framework,Robert McKee,,scene_summaries
+2,structure_pacing,E,2,0,1,comedy_timing_is_everything,Comedic Timing in Scene Length,pacing,comedy,high,low,medium,general_craft,,comedy,scene_text
+2,structure_pacing,E,2,0,2,drama_pacing_meditative,Drama Allows Meditative Pacing,pacing,drama,high,low,low,general_craft,,drama,scene_text
+2,structure_pacing,E,2,0,2,visual_ellipsis_time_passage,Visual Ellipsis for Time Passage,editing,visual_storytelling,high,medium,low,general_craft,,,scene_text
+2,structure_pacing,E,2,1,2,save_the_cat_15_beats,Save the Cat 15-Beat Sheet,beat_sheet,structure_pacing,medium,high,low,framework,Blake Snyder,,scene_summaries|page_estimates
+2,structure_pacing,E,2,2,2,heros_journey_12_stages,Hero's Journey (12 Stages),beat_sheet,structure_pacing,low,medium,low,framework,"Christopher Vogler, adapting Joseph Campbell",,scene_summaries
+2,structure_pacing,E,2,2,2,opening_closing_bookend,Opening/Closing Image Bookend,act_structure,structure_pacing,low,medium,low,framework,Blake Snyder,,scene_summaries
+3,plot_thread,G,0,0,0,horror_monster_defeat,Central Struggle Against Monster,conflict,horror,high,medium,high,general_craft,Randy Ingermanson,horror,knowledge_graph
+3,plot_thread,G,0,0,0,lyons_story_spine,"The Story Spine (Because of That, Not And Then)",causality,plot_thread,high,medium,high,framework,Jeff Lyons,,scene_summaries
+3,plot_thread,G,0,0,1,comedy_relationship_difficulty,"If Boy Can Easily Get Girl, No Story",premise,comedy,high,medium,medium,framework,Michael Hauge,comedy,knowledge_graph
+3,plot_thread,G,0,0,1,drama_internal_conflict_primary,Internal Conflict Drives Drama,conflict_type,drama,high,medium,medium,general_craft,James Scott Bell,drama,knowledge_graph
+3,plot_thread,G,0,0,1,scifi_man_vs_nature,Sci-Fi Can Be Man vs Nature,conflict_type,scifi,high,medium,medium,general_craft,Randy Ingermanson,scifi,scene_summaries
+3,plot_thread,G,0,1,0,egri_character_incontrovertible,Character in Incontrovertible Confrontation,conflict,plot_thread,medium,medium,high,framework,Lajos Egri,,knowledge_graph
+3,plot_thread,G,0,1,0,no_coincidental_resolution,No Coincidental Resolution,causality,plot_thread,medium,medium,high,framework,"Aristotle, widely echoed in modern craft writing",,knowledge_graph
+3,plot_thread,G,0,2,1,progressive_complications_no_repetition,Progressive Complications Without Repetition,causality,plot_thread,low,low,medium,framework,Robert McKee,,scene_summaries
+3,plot_thread,S,1,0,0,action_escalation_constant,Action Escalates Constantly,escalation,action,high,medium,high,attributed_principle,William Martell,action,knowledge_graph
+3,plot_thread,S,1,0,0,action_stakes_physical_death,Physical Death at Stake,stakes,action,high,high,high,general_craft,William Martell,action,scene_summaries
+3,plot_thread,S,1,0,0,action_villain_plan_clear,Villain's Plan Must Be Clear,antagonist_structure,action,high,medium,high,general_craft,William Martell,action,knowledge_graph
+3,plot_thread,S,1,0,0,alderson_cause_and_effect_scenes,Scenes Must Be Linked by Cause and Effect,scene_linking,plot_thread,high,medium,high,framework,Martha Alderson,,scene_summaries
+3,plot_thread,S,1,0,0,comedy_death_stakes,Comedy Stakes Are Psychological Death,stakes,comedy,high,medium,high,general_craft,Randy Ingermanson,comedy,scene_text
+3,plot_thread,S,1,0,0,cron_external_plot_spur,The External Plot Must Spur the Internal Struggle,plot_character_link,plot_thread,high,medium,high,framework,Lisa Cron,,scene_summaries|knowledge_graph
+3,plot_thread,S,1,0,0,drama_consequences_real,Drama Has Real Consequences,consequences,drama,high,medium,high,general_craft,,drama,knowledge_graph
+3,plot_thread,S,1,0,0,horror_stakes_physical_death,Physical Death at Stake,stakes,horror,high,high,high,general_craft,Randy Ingermanson,horror,scene_summaries
+3,plot_thread,S,1,0,0,romance_psychological_death_stakes,Psychological Death as Romance Stakes,stakes,romance,high,medium,high,general_craft,Randy Ingermanson,romance,scene_summaries
+3,plot_thread,S,1,0,0,romance_trivial_stakes_comedy,Romance Stakes Must Feel Life-or-Death,stakes,romance,high,medium,high,attributed_principle,Scriptshadow/Amber,romance,scene_text
+3,plot_thread,S,1,0,0,thriller_physical_death_stakes,Physical Death at Stake,stakes,thriller,high,high,high,general_craft,Randy Ingermanson,thriller,scene_summaries
+3,plot_thread,S,1,0,0,thriller_things_go_wrong,Escalating Things Going Wrong,escalation,thriller,high,medium,high,attributed_principle,Scriptshadow/Amber,thriller,knowledge_graph
+3,plot_thread,S,1,0,1,comedy_escalation_pattern,Comedy Escalates Through Pattern Breaking,escalation,comedy,high,medium,medium,general_craft,,comedy,scene_summaries
+3,plot_thread,S,1,0,1,drama_relationships_drive_plot,Relationships Drive Plot in Drama,plot_mechanics,drama,high,medium,medium,general_craft,,drama,knowledge_graph
+3,plot_thread,S,1,0,1,drama_stakes_personal,Drama Stakes Are Personal,stakes,drama,high,medium,medium,general_craft,,drama,scene_summaries
+3,plot_thread,S,1,0,1,hauge_five_stakes_levels,Five Levels of Stakes,stakes,plot_thread,high,medium,medium,framework,Michael Hauge,,scene_summaries
+3,plot_thread,S,1,0,1,horror_vulnerability_escalation,Vulnerability Escalates Through Isolation,escalation,horror,high,medium,medium,general_craft,,horror,knowledge_graph
+3,plot_thread,S,1,0,1,martell_four_ds,"The Four Ds: Inside Moves (Dilemma, Denial, Decision, Drama)",plot_mechanics,plot_thread,high,medium,medium,framework,William Martell,,scene_summaries
+3,plot_thread,S,1,0,1,mystery_stakes_personal,Mystery Stakes Must Be Personal,stakes,mystery,high,medium,medium,general_craft,,mystery,knowledge_graph
+3,plot_thread,S,1,0,1,scifi_consequences_realistic,Sci-Fi Consequences Must Feel Real,consequences,scifi,high,medium,medium,general_craft,,scifi,knowledge_graph
+3,plot_thread,S,1,0,1,thriller_reversals_escalate,Reversals Must Escalate Stakes,reversals,thriller,high,medium,medium,framework,Robert McKee,thriller,knowledge_graph
+3,plot_thread,S,1,0,1,thriller_unexpected_complications,Every Plan Must Have Unexpected Complications,plot_mechanics,thriller,high,medium,medium,general_craft,James Scott Bell,thriller,knowledge_graph
+3,plot_thread,S,1,0,1,thriller_villain_drives_plot,Villain Drives the Plot,antagonist_structure,thriller,high,medium,medium,framework,Michael Hauge,thriller,knowledge_graph
+3,plot_thread,E,2,0,0,martell_plants_and_payoffs,Plants Must Pay Off,setup_payoff,plot_thread,high,medium,high,framework,William Martell,,knowledge_graph
+3,plot_thread,E,2,0,0,mystery_foreshadowed_surprises,Surprises Must Be Foreshadowed,plot,mystery,high,medium,high,attributed_principle,David Hohl,mystery,scene_text
+3,plot_thread,E,2,0,1,mystery_red_herrings,Red Herrings Must Be Fair,misdirection,mystery,high,low,medium,general_craft,,mystery,scene_text
+3,plot_thread,E,2,0,1,romance_enemies_to_lovers,Enemies-to-Lovers Requires Genuine Friction,subgenre,romance,high,medium,medium,general_craft,,romance,knowledge_graph
+3,plot_thread,E,2,0,1,seger_subplot_resonance,Subplots Must Resonate with Main Plot,subplot,plot_thread,high,medium,medium,framework,Linda Seger,,scene_summaries
+3,plot_thread,E,2,1,1,chekhovs_gun,Chekhov's Gun,setup_payoff,plot_thread,medium,medium,medium,attributed_principle,Anton Chekhov,,knowledge_graph
+3,plot_thread,E,2,2,1,setup_payoff_general,General Setup and Payoff,setup_payoff,plot_thread,low,low,medium,framework,Robert McKee,,knowledge_graph
+3,plot_thread,E,2,2,1,subplot_resonance_or_contradiction,Subplot Function (Resonance or Contradiction),subplot,plot_thread,low,low,medium,framework,Robert McKee,,scene_summaries
+4,character,G,0,0,0,seger_goal_spine,Character Goal as Story Spine,motivation,character,high,medium,high,framework,Linda Seger,,scene_summaries
+4,character,G,0,0,0,weiland_lie_believed,Every Character Arc Is Driven by a Lie the Character Believes,arc_foundation,character,high,medium,high,framework,K.M. Weiland,,knowledge_graph
+4,character,G,0,0,0,weiland_want_vs_need,The Conflict Between What the Character Wants and What They Need,motivation,character,high,low,high,framework,K.M. Weiland,,scene_summaries
+4,character,G,0,2,0,true_character_vs_characterization,True Character vs. Characterization,consistency,character,low,low,high,framework,Robert McKee,,knowledge_graph
+4,character,G,0,2,1,character_arc_change,Character Arc as Value Change,arc,character,low,low,medium,framework,Robert McKee,,knowledge_graph
+4,character,G,0,2,1,want_vs_need,Conscious Want vs. Unconscious Need,motivation,character,low,low,medium,framework,Common across McKee's Object of Desire and Truby-school character theory,,scene_summaries
+4,character,S,1,0,0,action_hero_must_be_active,Hero Must Be Active,protagonist,action,high,medium,high,attributed_principle,William Martell,action,knowledge_graph
+4,character,S,1,0,0,action_villain_strength,Villain Must Be Formidable,antagonist,action,high,low,high,attributed_principle,William Martell,action,knowledge_graph
+4,character,S,1,0,0,drama_transformation_earned,Character Transformation Must Be Earned,character_arc,drama,high,low,high,framework,Robert McKee,drama,knowledge_graph
+4,character,S,1,0,0,hauge_inner_conflict_drives_outer,Inner Conflict Must Drive Outer Conflict,character_arc,character,high,medium,high,framework,Michael Hauge,,knowledge_graph|scene_summaries
+4,character,S,1,0,0,martell_supporting_character_function,Supporting Characters Must Serve the Protagonist,supporting_cast,character,high,medium,high,framework,William Martell,,knowledge_graph
+4,character,S,1,0,0,stc_save_the_cat_scene,Save the Cat Scene,hero_introduction,character,high,medium,high,framework,Blake Snyder,,scene_text
+4,character,S,1,0,0,thriller_villain_strength,Strong Villain Required,antagonist,thriller,high,low,high,attributed_principle,David Hohl,thriller,knowledge_graph
+4,character,S,1,0,1,action_hero_competence,Hero Must Demonstrate Competence,protagonist,action,high,medium,medium,general_craft,,action,scene_summaries
+4,character,S,1,0,1,action_hero_underdog,Hero Must Be Underdog,protagonist,action,high,medium,medium,attributed_principle,William Martell,action,knowledge_graph
+4,character,S,1,0,1,action_hero_villain_flipside,Hero and Villain Are Flip Sides,character_relationship,action,high,medium,medium,attributed_principle,William Martell,action,knowledge_graph
+4,character,S,1,0,1,alderson_character_emotional_development,Track the Character's Emotional Arc Across the Entire Story,emotional_arc,character,high,medium,medium,framework,Martha Alderson,,scene_summaries|knowledge_graph
+4,character,S,1,0,1,drama_moral_complexity,Moral Complexity in Character Choices,moral_dimension,drama,high,low,medium,framework,Robert McKee,drama,knowledge_graph
+4,character,S,1,0,1,horror_final_girl_strength,Final Girl Must Earn Survival,character_arc,horror,high,low,medium,general_craft,,horror,knowledge_graph
+4,character,S,1,0,1,mystery_detective_competence,Detective Must Be Competent,protagonist,mystery,high,medium,medium,general_craft,,mystery,knowledge_graph
+4,character,S,1,0,1,mystery_multiple_suspects,Multiple Suspects Create Depth,cast_design,mystery,high,medium,medium,general_craft,,mystery,knowledge_graph
+4,character,S,1,0,1,romance_emotional_vulnerability,Emotional Vulnerability Required,character_depth,romance,high,medium,medium,general_craft,,romance,scene_text
+4,character,S,1,0,1,scifi_grounding_reality,Sci-Fi Must Ground in Human Reality,character_depth,scifi,high,low,medium,general_craft,,scifi,knowledge_graph
+4,character,S,1,0,1,thriller_active_protagonist,Protagonist Must Be Active,protagonist,thriller,high,medium,medium,attributed_principle,Scriptshadow/Amber,thriller,knowledge_graph
+4,character,S,1,0,1,weiland_ghost_wound,The Ghost Is the Origin of the Lie,backstory,character,high,medium,medium,framework,K.M. Weiland,,knowledge_graph
+4,character,S,1,1,0,seger_transformation_earned,Character Transformation Must Be Earned,character_arc,character,medium,medium,high,framework,Linda Seger,,scene_summaries
+4,character,S,1,1,1,egri_character_contradiction,Character Contradiction as Source of Drama,character_depth,character,medium,medium,medium,framework,Lajos Egri,,knowledge_graph
+4,character,S,1,1,1,hauge_identity_transformation,Six-Stage Character Transformation,character_arc,character,medium,medium,medium,framework,Michael Hauge,,scene_summaries
+4,character,S,1,2,2,cast_polarization,Cast Polarization,cast_design,character,low,low,low,framework,Robert McKee,,knowledge_graph
+4,character,E,2,0,0,comedy_trivial_taken_seriously,Comedy Characters in Tragedy,tone,comedy,high,medium,high,attributed_principle,Scriptshadow/Amber,comedy,scene_text
+4,character,E,2,0,1,comedy_character_flaws_funny,Character Flaws Create Comedy,character_design,comedy,high,low,medium,general_craft,,comedy,knowledge_graph
+4,character,E,2,0,1,comedy_contradictory_characters,Contradictory Character Placements,concept,comedy,high,medium,medium,general_craft,Randy Ingermanson,comedy,knowledge_graph
+4,character,E,2,0,1,drama_ensemble_depth,Ensemble Characters Have Depth,ensemble,drama,high,medium,medium,general_craft,,drama,knowledge_graph
+4,character,E,2,0,1,romance_complementary_flaws,Romantic Leads Have Complementary Flaws,character_design,romance,high,medium,medium,general_craft,,romance,knowledge_graph
+4,character,E,2,0,1,thriller_characters_active,Characters Must Be Active in Contained Thrillers,character_behavior,thriller,high,medium,medium,attributed_principle,Scriptshadow/Amber,thriller,scene_summaries
+4,character,E,2,0,2,action_physical_consequences,Action Has Physical Consequences,realism,action,high,medium,low,general_craft,,action,scene_text
+4,character,E,2,1,2,horror_virgin_archetype,The Virgin Survivor Archetype,archetype,horror,medium,medium,low,attributed_principle,David Hohl,horror,knowledge_graph
+4,character,E,2,1,2,weiland_five_arc_types,"Five Character Arc Types: Positive, Flat, Disillusionment, Fall, Corruption",arc_taxonomy,character,medium,medium,low,framework,K.M. Weiland,,knowledge_graph
+4,character,E,2,2,2,character_necessity,Character Necessity,necessity,character,low,low,low,general_craft,,,knowledge_graph
+5,relationship,G,0,2,1,antagonist_force_balance,Antagonistic Force of Comparable Power,antagonism,relationship,low,low,medium,framework,Robert McKee,,knowledge_graph
+5,relationship,S,1,2,1,relationship_dynamic_consistency,Relationship Dynamic Consistency,consistency,relationship,low,low,medium,general_craft,,,knowledge_graph
+6,revision,G,0,1,2,epps_revision_first_draft,"First Draft Is Discovery, Not Perfection",revision,revision,medium,medium,low,framework,Jack Epps Jr.,,scene_text
+6,revision,S,1,1,2,epps_rewrite_distance,Rewriting Requires Emotional Distance,revision,revision,medium,medium,low,framework,Jack Epps Jr.,,scene_text
+6,revision,E,2,0,1,stein_four_dangers_of_telling,"Four Danger Areas of Telling: Backstory, Description, Setting, Emotion",show_vs_tell,revision,high,high,medium,framework,Sol Stein,,scene_text
+6,revision,E,2,0,1,zinsser_dump_the_clutter,Dump the Clutter—Every Word Must Earn Its Place,prose_economy,revision,high,high,medium,framework,William Zinsser,,scene_text
+7,scene,G,0,0,0,dunne_scene_objective,Every Scene Has a Clear Objective and Obstacle,scene_design,scene_design,high,medium,high,framework,Will Dunne,,scene_text
+7,scene,G,0,0,0,lyons_scene_is_story,Each Scene Is a Mini-Story,scene_design,scene_design,high,medium,high,framework,Jeff Lyons,,scene_text
+7,scene,G,0,1,1,goal_conflict_disaster,"Scene Structure: Goal, Conflict, Disaster",scene_structure,scene,medium,medium,medium,framework,Dwight V. Swain,,scene_text
+7,scene,G,0,1,1,lakin_five_layers,Five Layers of Scene Construction,scene_design,scene_design,medium,medium,medium,framework,C.S. Lakin,,scene_text|scene_summaries
+7,scene,G,0,1,1,scene_must_turn,Every Scene Must Turn,scene_structure,scene,medium,medium,medium,framework,Robert McKee,,scene_text
+7,scene,S,1,0,0,bell_opening_cromise,The Opening Must Make a Promise to the Reader,opening,scene,high,medium,high,framework,James Scott Bell,,scene_text
+7,scene,S,1,0,0,weiland_characteristic_moment,The Characteristic Moment Must Establish the Protagonist Immediately,opening,scene,high,medium,high,framework,K.M. Weiland,,scene_text
+7,scene,S,1,0,1,action_set_pieces_varied,Action Set Pieces Must Be Varied,scene_craft,action,high,medium,medium,general_craft,,action,scene_summaries
+7,scene,S,1,0,1,alderson_dramatic_vs_passive,Prefer Dramatic Action Over Passive Action,scene_energy,scene,high,medium,medium,framework,Martha Alderson,,scene_text
+7,scene,S,1,0,1,horror_atmosphere_over_dialogue,Atmosphere Over Dialogue,scene_craft,horror,high,low,medium,general_craft,,horror,scene_text
+7,scene,S,1,0,1,horror_discovery_phase_no_urgency,Discovery Phase Needs Time to Breathe,pacing,horror,high,medium,medium,attributed_principle,Scriptshadow/Amber,horror,scene_summaries
+7,scene,S,1,0,1,lakin_scene_hook,Scene Must Hook at Start and Leave with Tension,scene_craft,scene,high,medium,medium,framework,C.S. Lakin,,scene_text
+7,scene,S,1,0,1,mystery_atmosphere_tension,Mystery Atmosphere Creates Tension,atmosphere,mystery,high,low,medium,general_craft,,mystery,scene_text
+7,scene,S,1,0,1,romance_grand_gesture,Grand Gesture Must Be Personal,climax,romance,high,low,medium,general_craft,,romance,scene_summaries
+7,scene,S,1,0,1,scifi_exposition_through_action,Sci-Fi Exposition Through Action,exposition,scifi,high,medium,medium,general_craft,,scifi,scene_text
+7,scene,S,1,0,1,scifi_visual_storytelling,Sci-Fi Requires Strong Visual Storytelling,visual_narrative,scifi,high,medium,medium,general_craft,,scifi,scene_text
+7,scene,S,1,0,1,visual_show_dont_tell,Show Don't Tell Through Visuals,visual_narrative,visual_storytelling,high,medium,medium,general_craft,,,scene_text
+7,scene,S,1,0,1,weiland_normal_world,The Normal World Must Demonstrate the Lie in Action,setup,scene,high,medium,medium,framework,K.M. Weiland,,scene_text|knowledge_graph
+7,scene,S,1,2,1,obligatory_scene,The Obligatory Scene,payoff,scene,low,low,medium,framework,Robert McKee,,scene_summaries
+7,scene,E,2,0,1,alderson_scene_tracker_elements,Every Scene Must Track Seven Essential Elements,scene_craft,scene,high,medium,medium,framework,Martha Alderson,,scene_text
+7,scene,E,2,0,1,comedy_exaggeration_mechanism,Exaggeration as Comedic Mechanism,scene_craft,comedy,high,low,medium,general_craft,,comedy,scene_text
+7,scene,E,2,0,1,comedy_start_late_leave_early,"Start Scenes Late, Leave Early",scene_craft,comedy,high,medium,medium,attributed_principle,David Hohl,comedy,scene_text
+7,scene,E,2,0,1,stein_dynamic_description,"Descriptions Should Be Dynamic, Not Static",description_craft,scene,high,medium,medium,framework,Sol Stein,,scene_text
+7,scene,E,2,0,1,thriller_bonding_moment,Ensemble Bonding Scene,ensemble_dynamics,thriller,high,medium,medium,attributed_principle,Scriptshadow/Amber,thriller,scene_summaries
+7,scene,E,2,0,1,visual_camera_angles_convey_perspective,Camera Angles Convey Perspective,cinematography,visual_storytelling,high,medium,medium,general_craft,,,scene_text
+7,scene,E,2,0,1,visual_composition_framing,Composition Frames Character Relationships,composition,visual_storytelling,high,medium,medium,general_craft,,,scene_text
+7,scene,E,2,0,1,visual_movement_choreography,Movement Conveys Character State,choreography,visual_storytelling,high,medium,medium,general_craft,,,scene_text
+7,scene,E,2,0,1,visual_shot_size_emphasis,Shot Size Controls Emphasis,cinematography,visual_storytelling,high,medium,medium,general_craft,,,scene_text
+7,scene,E,2,0,2,visual_lighting_mood,Lighting Establishes Mood,atmosphere,visual_storytelling,high,low,low,general_craft,,,scene_text
+7,scene,E,2,0,2,visual_sound_design_atmosphere,Sound Design Creates Atmosphere,sound,visual_storytelling,high,medium,low,general_craft,,,scene_text
+7,scene,E,2,1,2,visual_color_symbolism,Color Can Symbolize Theme,symbolism,visual_storytelling,medium,medium,low,general_craft,,,scene_text
+7,scene,E,2,1,2,visual_props_meaningful,Props Can Carry Meaning,props,visual_storytelling,medium,medium,low,general_craft,,,scene_text
+7,scene,E,2,2,1,scene_necessity_test,Scene Necessity (Plot / Character / Theme Test),scene_economy,scene,low,low,medium,general_craft,,,scene_summaries
+7,scene,E,2,2,2,enter_late_leave_early,"Enter Late, Leave Early",scene_economy,scene,low,low,low,general_craft,,,scene_text
+8,dialogue,G,0,0,0,dialogue_conflict_essential,Every Dialogue Scene Needs Conflict,conflict,dialogue_advanced,high,medium,high,general_craft,James Scott Bell,,scene_text
+8,dialogue,G,0,0,0,martell_dialogue_is_character,Dialogue Is Character,character_voice,dialogue,high,low,high,framework,William Martell,,scene_text
+8,dialogue,G,0,0,1,dialogue_subtext_layers,Dialogue Contains Multiple Subtext Layers,subtext,dialogue_advanced,high,medium,medium,general_craft,Robert McKee,,scene_text
+8,dialogue,G,0,0,1,martell_say_the_opposite,Say the Opposite (Subtext Through Contradiction),subtext,dialogue,high,medium,medium,framework,William Martell,,scene_text
+8,dialogue,G,0,1,1,on_the_nose_vs_subtext,On-the-Nose Dialogue vs. Subtext,subtext,dialogue,medium,medium,medium,general_craft,,,scene_text
+8,dialogue,S,1,0,0,martell_five_types_bad_exposition,Five Types of Bad Exposition,exposition,dialogue,high,medium,high,framework,William Martell,,scene_text
+8,dialogue,S,1,0,0,martell_see_and_say_rule,See and Say Rule (Don't Repeat What Was Shown),exposition,dialogue,high,medium,high,framework,William Martell,,scene_text
+8,dialogue,S,1,0,0,stc_laying_pipe,Laying Pipe (Exposition Through Action),exposition,dialogue,high,medium,high,framework,Blake Snyder,,scene_text
+8,dialogue,S,1,0,1,comedy_subtext_not_literal,Dialogue Must Have Subtext,dialogue,comedy,high,medium,medium,attributed_principle,Scriptshadow/Amber,comedy,scene_text
+8,dialogue,S,1,0,1,dialogue_emotional_leakage,Emotions Leak Through Dialogue,emotion,dialogue_advanced,high,medium,medium,general_craft,,,scene_text
+8,dialogue,S,1,0,1,dialogue_exposition_disguised,Exposition Must Be Disguised,exposition,dialogue_advanced,high,medium,medium,general_craft,,,scene_text
+8,dialogue,S,1,0,1,dialogue_power_dynamics,Dialogue Reveals Power Dynamics,power,dialogue_advanced,high,medium,medium,general_craft,,,scene_text
+8,dialogue,S,1,0,1,dialogue_purpose_driven,Every Line Must Have Purpose,purpose,dialogue_advanced,high,medium,medium,general_craft,,,scene_text
+8,dialogue,S,1,0,1,dialogue_voice_distinct,Each Character Has Distinct Voice,character_voice,dialogue_advanced,high,low,medium,general_craft,James Scott Bell,,scene_text
+8,dialogue,S,1,0,1,drama_dialogue_subtext,Dramatic Dialogue Contains Subtext,dialogue_craft,drama,high,medium,medium,general_craft,,drama,scene_text
+8,dialogue,S,1,1,1,exposition_as_ammunition,"Exposition as Ammunition, Not Data Dump",exposition,dialogue,medium,medium,medium,framework,Robert McKee,,scene_text
+8,dialogue,E,2,0,1,dialogueGMEMATICultural,Dialogue Reflects Cultural Context,cultural,dialogue_advanced,high,medium,medium,general_craft,,,scene_text
+8,dialogue,E,2,0,1,dialogue_rhythm_pacing,Dialogue Rhythm Affects Pacing,rhythm,dialogue_advanced,high,medium,medium,general_craft,,,scene_text
+8,dialogue,E,2,0,1,dialogue_silence_powerful,Silence Can Be Most Powerful Dialogue,silence,dialogue_advanced,high,low,medium,general_craft,,,scene_text
+8,dialogue,E,2,0,1,martell_three_line_rule,Three Line Rule (Dialogue Brevity),dialogue_craft,dialogue,high,high,medium,framework,William Martell,,scene_text
+8,dialogue,E,2,0,2,dialogue_callbacks_payoffs,Dialogue Callbacks Create Cohesion,cohesion,dialogue_advanced,high,medium,low,general_craft,,,scene_text
+8,dialogue,E,2,0,2,dialogue_interrupts_overlaps,Interruptions and Overlaps Create Realism,realism,dialogue_advanced,high,medium,low,general_craft,,,scene_text
+8,dialogue,E,2,2,2,distinct_character_voice,Distinct Character Voice,voice,dialogue,low,low,low,general_craft,,,scene_text|knowledge_graph
