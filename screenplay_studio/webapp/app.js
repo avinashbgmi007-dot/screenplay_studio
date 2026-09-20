@@ -22,7 +22,14 @@ const state = {
   findingIds: [],         // index -> content-hash finding id (computeFindingId)
   findingDefer: {},       // finding id -> "deferred" (client intent, Phase D) — forward-compat
   ghostedIds: new Set(),  // finding ids the writer saw as stale (Phase E diff) — forward-compat
-  findingFilter: { severities: ["high"], showDeferred: false, category: null }, // ONE filter: drives ink, board, loop, fix queue, counts (R5-b + GAP-1)
+  // ONE filter: drives ink, board, loop, fix queue, counts (R5-b + GAP-1).
+  // Default = ALL severities (2026-09-20 UI audit, defect #1): the dock's mass
+  // strip counts every finding, so a highs-only default made the room read
+  // "6 open of 6 findings" over "0 shown / 6 total" — a self-contradiction that
+  // destroyed trust in every number. Show the ledger whole; the writer narrows
+  // with the chips. Page ink stays naturally sparse because a finding can only
+  // ink when it carries a quote (most findings are no_quote).
+  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, category: null },
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
@@ -505,9 +512,9 @@ function renderConnCard() {
   const stateTxt = demo ? "Demo (built-in stand-in)" : ok ? "Connected" : "Unreachable";
   const cls = demo ? "demo" : ok ? "ok" : "fail";
   card.innerHTML =
-    `<div class="conn-card-row ${cls}"><b>${stateTxt}</b></div>` +
-    `<div class="conn-card-row">model <b>${demo ? "demo craft model" : (mid || "—")}</b></div>` +
-    `<div class="conn-card-row">server <b>${url}</b></div>` +
+    `<div class="conn-card-row ${cls}"><b>${escapeHtml(stateTxt)}</b></div>` +
+    `<div class="conn-card-row">model <b>${escapeHtml(demo ? "demo craft model" : (mid || "—"))}</b></div>` +
+    `<div class="conn-card-row">server <b>${escapeHtml(url)}</b></div>` +
     (demo && state.realServer && state.realServer.available
       ? `<div class="conn-card-row switch">your model is back — click "switch" beside</div>` : "");
 }
@@ -1227,13 +1234,20 @@ function populateIdeaCanvas(idea) {
   updateIdeaSamPill();
 }
 
-// the summon pill only makes sense when there's something to talk ABOUT —
-// on a blank page it hides; the first word typed brings him back
+// The summon pill is the chat's only standing address in the idea room, so it
+// no longer hides on a blank page — that was exactly when a first-time writer
+// had no way to discover Sameer at all (UI audit 2026-09-20, defect #7: "chat
+// is not discoverable"). It always shows: an invitation on a blank page, the
+// usual summon once there are words to talk about.
 function updateIdeaSamPill() {
   const pill = $("#idea-sam-pill");
   if (!pill) return;
   const has = (($("#idea-content") || {}).value || "").trim().length > 0;
-  pill.style.display = has ? "" : "none";
+  pill.textContent = has ? "Sameer" : "Ask Sameer";
+  pill.title = has
+    ? "Talk it through with Sameer — he reads the whole page. Or just press C."
+    : "Talk it through with Sameer about this idea — he reads whatever this page holds. Or just press C.";
+  pill.style.display = "";
 }
 
 let ideaSaveTimer = null;
@@ -2021,6 +2035,19 @@ function openRoomDrawer() {
   const d = $("#room-drawer");
   if (d) d.classList.add("open");
   syncGutter();
+  // Summoning the partner hands the keyboard to the composer: the keys typed
+  // right after a summon must land in the CHAT, not wherever focus happened
+  // to be sitting — on the idea page that meant text silently became canvas
+  // content and re-titled the idea (UI audit 2026-09-20, defect #7). The
+  // deferred focus wins the drawer's render race; the panel guard keeps the
+  // project's feedback room (which has no composer) from focusing nothing.
+  const composer = $("#input");
+  const panel = $("#cowrite-panel");
+  if (composer && panel && panel.style.display !== "none") {
+    setTimeout(() => {
+      if (panel.style.display !== "none") composer.focus();
+    }, 0);
+  }
 }
 function closeRoomDrawer() {
   const d = $("#room-drawer");
@@ -3681,12 +3708,7 @@ function renderFixQueuePanel(container) {
   // severity/category the chips hide stay in the report but out of the
   // writer's to-do view — page, board and queue cannot disagree (N3).
   // Dismissed rows keep their separate toggle; addressed ride as before.
-  const inFilter = (item) => {
-    const sev = (item.severity || "low").toLowerCase();
-    if (!state.findingFilter.severities.includes(sev)) return false;
-    if (state.findingFilter.category && (item.category || "other") !== state.findingFilter.category) return false;
-    return true;
-  };
+  const inFilter = inFindingFilter; // ONE predicate: the queue cannot drift from the strip
   const shown = items.filter((i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed);
   if (!shown.length) {
     if (!items.length && !state.fixQueueShowDismissed) return;
@@ -4172,6 +4194,7 @@ function findingNoteEl(f, index, opts = {}) {
   }
 
   const actions = el("div", "finding-note-actions");
+  if (opts.pin) note.classList.add("finding-pin");
   // writer intent + copy (deep cards only — the loop's home surface; the
   // dock is where the writer's judgment is made, margin pins stay read-only)
   if (opts.deep) {
@@ -4222,8 +4245,14 @@ function findingNoteEl(f, index, opts = {}) {
     discussFinding(f, index);
   });
   actions.appendChild(locateBtn);
-  actions.appendChild(rewriteBtn);
-  actions.appendChild(discussBtn);
+  // R6: the margin pin points, the board/dock judge — Rewrite and Discuss are
+  // the writer's judgment and have one home each (the board's card and the
+  // dock's deep card). Rendering them here too is what made one finding read
+  // as four competing surfaces at once.
+  if (!opts.pin) {
+    actions.appendChild(rewriteBtn);
+    actions.appendChild(discussBtn);
+  }
   note.appendChild(actions);
   return note;
 }
@@ -4411,7 +4440,13 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
     const margin = el("div", "scene-notes");
     for (const { f, index } of findings) {
       const addressed = findingStatusOf(f, index) === "addressed";
-      margin.appendChild(findingNoteEl(f, index, { addressed }));
+      // R6: a margin PIN, not a fourth card. The finding already renders in
+      // the Problem Board and in the dock's Evidence lens; the margin's job is
+      // to say what sits on this line while the writer is reading it, so it
+      // keeps Locate (navigation) and drops the judgment controls
+      // (Rewrite / Discuss) — which is what findingNoteEl's own contract
+      // always claimed ("margin pins stay read-only").
+      margin.appendChild(findingNoteEl(f, index, { addressed, pin: true }));
     }
     if (notes.length) {
       const label = el("div", "notes-mine-label", "your notes");
@@ -5492,6 +5527,33 @@ function findingDisposition(f, index) {
 function findingOpen(f, index) {
   return findingDisposition(f, index) === "open";
 }
+/** The ONE filter predicate (severity + category). The mass strip and the fix
+ *  queue both read it, so the two scopes can never drift apart. Fix-queue items
+ *  carry the same two fields, so they pass through it unchanged. */
+function inFindingFilter(f) {
+  const sev = ((f && f.severity) || "low").toLowerCase();
+  if (!state.findingFilter.severities.includes(sev)) return false;
+  if (state.findingFilter.category && ((f && f.category) || "other") !== state.findingFilter.category) return false;
+  return true;
+}
+/** Scope + disposition counts — the second half of the N3 counting contract.
+ *  `total`/`open` describe the WHOLE script; `shown`/`openShown` describe what
+ *  the ONE filter currently admits. Every surface must print which scope it
+ *  shows, so a whole-script total can never be read as a filtered one (the
+ *  "6 open of 6 findings" over "0 shown / 6 total" contradiction). */
+function findingCounts() {
+  const findings = state.findings || [];
+  const c = { total: findings.length, open: 0, shown: 0, openShown: 0 };
+  findings.forEach((f, index) => {
+    const isOpen = findingOpen(f, index);
+    if (isOpen) c.open += 1;
+    if (inFindingFilter(f)) {
+      c.shown += 1;
+      if (isOpen) c.openShown += 1;
+    }
+  });
+  return c;
+}
 function isFindingDismissed(index, id) {
   const flags = (state.fixQueue && state.fixQueue.dismissed_flags) || [];
   return flags.some((d) => (id && d.finding_id === id) || d.index === index);
@@ -5576,12 +5638,30 @@ function buildScriptMassStrip() {
   });
   if (!openTotal) return strip;
   const head = el("div", "dock-mass-head");
-  head.appendChild(el("span", "dock-mass-total", openTotal + " open of " + findings.length + " findings"));
+  // scope honesty: this strip always describes the WHOLE script. When the ONE
+  // filter narrows the view, it says how much of the total is in view — without
+  // that, "6 open of 6" reads as a claim about the filtered board below it.
+  const mV = findingCounts();
+  const mText = openTotal + " open of " + findings.length + " findings" +
+    (mV.shown < mV.total ? " \u00B7 " + mV.openShown + " shown by filter" : "");
+  head.appendChild(el("span", "dock-mass-total", mText));
+  // Trust readout: only findings that CARRY a quote can be verified, so
+  // `no_quote` findings must not sit in the denominator. Counting them turned
+  // the demo report (every finding no_quote) into a red-looking "0 of 6 quotes
+  // verified (0%)" — which reads as the analysis failing rather than as "there
+  // was nothing to check" (UI audit 2026-09-20, defect #10).
   const vs = state.report && state.report.verification_summary;
   if (vs) {
-    const vTotal = (vs.verified || 0) + (vs.not_found || 0) + (vs.no_quote || 0) + (vs.scene_not_found || 0);
-    if (vTotal) {
-      head.appendChild(el("span", "dock-trust", (vs.verified || 0) + " of " + vTotal + " quotes verified (" + Math.round(100 * (vs.verified || 0) / vTotal) + "%)"));
+    const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
+    const unquoted = vs.no_quote || 0;
+    if (checkable) {
+      const pct = Math.round(100 * (vs.verified || 0) / checkable);
+      head.appendChild(el("span", "dock-trust",
+        (vs.verified || 0) + " of " + checkable + " quotes verified (" + pct + "%)" +
+        (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "")));
+    } else if (unquoted) {
+      head.appendChild(el("span", "dock-trust",
+        unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"));
     }
   }
   strip.appendChild(head);
@@ -6243,15 +6323,18 @@ function renderFeedbackView() {
   var html = '<div class="fv-script-inner">';
   script.scenes.forEach(function(scene, idx) {
     var sceneNum = idx + 1;
-    html += '<div class="fv-scene" data-scene="' + sceneNum + '">';
+    html += '<div class="fv-scene" data-scene="' + escapeHtml(sceneNum) + '">';
     html += '<div class="paper">';
-    html += '<div style="font-weight:bold;text-transform:uppercase;margin-bottom:8px;">' + (scene.heading || 'Scene ' + sceneNum) + '</div>';
-    if (scene.action) html += '<div style="margin-bottom:8px;">' + scene.action + '</div>';
+    // Raw script text — the highest-value payload on the page. Dormant today
+    // (renderFeedbackView has no live caller) but escaped so a future re-enable
+    // cannot resurrect the sink.
+    html += '<div style="font-weight:bold;text-transform:uppercase;margin-bottom:8px;">' + escapeHtml(scene.heading || 'Scene ' + sceneNum) + '</div>';
+    if (scene.action) html += '<div style="margin-bottom:8px;">' + escapeHtml(scene.action) + '</div>';
     if (scene.dialogue) {
       scene.dialogue.forEach(function(d) {
-        if (d.character) html += '<div style="text-align:center;font-weight:bold;margin-top:12px;">' + d.character + '</div>';
-        if (d.parenthetical) html += '<div style="text-align:center;font-style:italic;color:var(--paper-muted);">' + d.parenthetical + '</div>';
-        if (d.text) html += '<div style="text-align:center;padding:0 40px;">' + d.text + '</div>';
+        if (d.character) html += '<div style="text-align:center;font-weight:bold;margin-top:12px;">' + escapeHtml(d.character) + '</div>';
+        if (d.parenthetical) html += '<div style="text-align:center;font-style:italic;color:var(--paper-muted);">' + escapeHtml(d.parenthetical) + '</div>';
+        if (d.text) html += '<div style="text-align:center;padding:0 40px;">' + escapeHtml(d.text) + '</div>';
       });
     }
     html += '</div>';
@@ -6268,7 +6351,7 @@ function renderFeedbackView() {
       if (sevCounts.medium) html += '<span class="sev-dot medium" title="' + sevCounts.medium + ' medium"></span>';
       if (sevCounts.low) html += '<span class="sev-dot low" title="' + sevCounts.low + ' low"></span>';
       html += '<span class="fv-dot-count">' + sceneFindings.length + ' finding' + (sceneFindings.length > 1 ? 's' : '') + '</span>';
-      html += '<button class="fv-dot-expand" onclick="scrollFvBoardToScene(' + sceneNum + ')">view \u2192</button>';
+      html += '<button class="fv-dot-expand" data-fv-scene="' + escapeHtml(sceneNum) + '">view \u2192</button>';
       html += '</div>';
     }
     html += '</div>';
@@ -6308,15 +6391,17 @@ function renderFvBoard() {
     var sev = (f.severity || 'medium').toLowerCase();
     var sceneNum = (f.scene_refs && f.scene_refs[0]) || f.scene || '?';
     var idx = f.index !== undefined ? f.index : 0;
-    html += '<div class="fv-board-row" data-findex="' + idx + '" data-scene="' + sceneNum + '" onclick="fvBoardClick(' + idx + ', ' + sceneNum + ')">';
-    html += '<span class="fv-board-sev ' + sev + '"></span>';
-    html += '<span class="fv-board-scene">Sc ' + sceneNum + '</span>';
+    // Same contract as renderProblemBoard: escaped text, data-* wiring only,
+    // resolved by the delegated listener in init.
+    html += '<div class="fv-board-row" data-findex="' + escapeHtml(idx) + '" data-scene="' + escapeHtml(sceneNum) + '">';
+    html += '<span class="fv-board-sev ' + escapeHtml(sev) + '"></span>';
+    html += '<span class="fv-board-scene">Sc ' + escapeHtml(sceneNum) + '</span>';
     html += '<div class="fv-board-body">';
-    html += '<div class="fv-board-cat">' + (f.category || 'General') + '</div>';
-    html += '<div class="fv-board-issue">' + (f.description || f.issue || '') + '</div>';
+    html += '<div class="fv-board-cat">' + escapeHtml(f.category || 'General') + '</div>';
+    html += '<div class="fv-board-issue">' + escapeHtml(f.description || f.issue || '') + '</div>';
     html += '<div class="fv-board-actions">';
-    html += '<button class="btn-secondary" onclick="event.stopPropagation(); fvBoardDiscuss(' + idx + ')">Discuss</button>';
-    html += '<button class="btn-secondary" onclick="event.stopPropagation(); fvBoardLocate(' + idx + ', ' + sceneNum + ')">Locate</button>';
+    html += '<button class="btn-secondary" data-fv-act="discuss" data-findex="' + escapeHtml(idx) + '">Discuss</button>';
+    html += '<button class="btn-secondary" data-fv-act="locate" data-findex="' + escapeHtml(idx) + '" data-scene="' + escapeHtml(sceneNum) + '">Locate</button>';
     html += '</div></div></div>';
   });
   list.innerHTML = html;
@@ -7295,21 +7380,31 @@ const SHORTCUTS = [
 ];
 
 function paletteCommands() {
-  return [
-    { type: "command", label: "Switch to Co-write", keys: "c", run: () => { openCowriteRoom(); } },
-    { type: "command", label: "Switch to Feedback", keys: "f", run: () => { if (state.currentProject) openFeedbackView(); else openFeedbackRoom(); } },
+  // Project-only commands are HIDDEN without a project, never listed-and-dead.
+  // In the idea room (no pages yet) they used to render as commands that
+  // silently did nothing when clicked (UI audit 2026-09-20, defect #8).
+  const hasProject = !!state.currentProject;
+  const projectOnly = hasProject ? [
     { type: "command", label: "Open the Beat Board", keys: "b", run: () => openBeatboardView() },
-    { type: "command", label: "Compare drafts side by side", keys: "d", run: () => { if (state.currentProject) openCompareView(); } },
-    { type: "command", label: "Open the Revision view", keys: "v", run: () => { if (state.currentProject) openRevisionView(); } },
-    { type: "command", label: "Spotlight mode — nothing but the page", keys: "z", run: () => { if (state.currentProject) toggleSpotlight(); } },
+    { type: "command", label: "Compare drafts side by side", keys: "d", run: () => openCompareView() },
+    { type: "command", label: "Open the Revision view", keys: "v", run: () => openRevisionView() },
+    { type: "command", label: "Spotlight mode — nothing but the page", keys: "z", run: toggleSpotlight },
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
-    { type: "command", label: "Start a new page", keys: "", run: () => { $("#new-project-btn").click(); } },
-    { type: "command", label: "Focus the conversation", keys: "", run: () => { openCowriteRoom(); setTimeout(() => $("#input").focus(), 60); } },
     { type: "command", label: "Toggle the Craft shelf (analysis panels)", keys: "a", run: toggleCraftShelf },
     { type: "command", label: "Toggle the Structure rail", keys: "r", run: () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")) },
-    { type: "command", label: "Toggle the Problem Board", keys: "b", run: toggleProblemBoard },
+    // no key hint: "b" is the Beat Board (see SHORTCUTS + the keydown handler).
+    // This entry advertised "b" too, so the palette showed one shortcut for two
+    // different commands.
+    { type: "command", label: "Toggle the Problem Board", keys: "", run: toggleProblemBoard },
     { type: "command", label: "Search the script", keys: "/", run: () => { if (state.view !== "cowrite" && state.view !== "feedback") openCowriteRoom(); setTimeout(() => $("#script-search").focus(), 80); } },
     { type: "command", label: "Export working draft (.fountain)", keys: "", run: () => $("#export-fountain").click() },
+  ] : [];
+  return [
+    { type: "command", label: "Switch to Co-write", keys: "c", run: () => { openCowriteRoom(); } },
+    { type: "command", label: "Switch to Feedback", keys: "f", run: () => { if (hasProject) openFeedbackView(); else openFeedbackRoom(); } },
+    ...projectOnly,
+    { type: "command", label: "Start a new page", keys: "", run: () => { $("#new-project-btn").click(); } },
+    { type: "command", label: "Focus the conversation", keys: "", run: () => { openCowriteRoom(); setTimeout(() => $("#input").focus(), 60); } },
     { type: "command", label: "Study settings", keys: "", run: () => $("#settings-btn").click() },
     // Nocta craft-first questions — surface craft intelligence first
     { type: "craft", label: "Why doesn't my dialogue land?", hint: "McKee — Gap Analysis", keys: "", run: () => openSameerWith("Analyze my dialogue for subtext gaps. Where am I telling instead of showing?") },
@@ -8486,7 +8581,52 @@ function init() {
   if (pbEdgeTab) pbEdgeTab.addEventListener('click', function() { toggleProblemBoard(); });
   var pbFilter = document.getElementById('pb-filter');
   if (pbFilter) pbFilter.addEventListener('change', function() { renderProblemBoard(); });
-  
+
+  // Problem Board rows: one delegated listener instead of an onclick built
+  // into each row's markup. Rows carry data-* only, so no finding text ever
+  // lands in an attribute — and script-src can stay 'self' (an inline handler
+  // would require 'unsafe-inline', which is exactly what the CSP must not have).
+  var pbList = document.getElementById('pb-list');
+  if (pbList) {
+    pbList.addEventListener('click', function(e) {
+      var row = e.target && e.target.closest ? e.target.closest('.pb-item') : null;
+      if (!row || !pbList.contains(row)) return;
+      var findex = Number(row.dataset.findex);
+      if (!isFinite(findex)) return;
+      pbItemClick(findex, row.dataset.scene);
+    });
+  }
+
+  // Feedback View board rows: same delegation contract (see renderFvBoard).
+  var fvBoardRowList = document.getElementById('fv-board-list');
+  if (fvBoardRowList) {
+    fvBoardRowList.addEventListener('click', function(e) {
+      var act = e.target && e.target.closest ? e.target.closest('[data-fv-act]') : null;
+      if (act && fvBoardRowList.contains(act)) {
+        var actIdx = Number(act.dataset.findex);
+        if (!isFinite(actIdx)) return;
+        if (act.dataset.fvAct === 'discuss') { fvBoardDiscuss(actIdx); return; }
+        if (act.dataset.fvAct === 'locate') { fvBoardLocate(actIdx, act.dataset.scene); return; }
+        return;
+      }
+      var fvRow = e.target && e.target.closest ? e.target.closest('.fv-board-row') : null;
+      if (!fvRow || !fvBoardRowList.contains(fvRow)) return;
+      var fvIdx = Number(fvRow.dataset.findex);
+      if (!isFinite(fvIdx)) return;
+      fvBoardClick(fvIdx, fvRow.dataset.scene);
+    });
+  }
+
+  // Feedback View script: the "view →" jump chips are delegated too.
+  var fvScriptBox = document.getElementById('fv-script');
+  if (fvScriptBox) {
+    fvScriptBox.addEventListener('click', function(e) {
+      var chip = e.target && e.target.closest ? e.target.closest('[data-fv-scene]') : null;
+      if (!chip || !fvScriptBox.contains(chip)) return;
+      scrollFvBoardToScene(chip.dataset.fvScene);
+    });
+  }
+
   $("#fv-board-filter").addEventListener("change", function(e) { fvBoardFilter = e.target.value; renderFvBoard(); });
   $("#revision-script").addEventListener("scroll", updateRevisionStatus);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
@@ -8583,12 +8723,18 @@ function renderProblemBoard() {
     var sev = (f.severity || 'medium').toLowerCase();
     var sceneNum = (f.scene_refs && f.scene_refs[0]) || f.scene || '?';
     var realIdx = findings.indexOf(f);
-    html += '<div class="pb-item" data-findex="' + realIdx + '" data-scene="' + sceneNum + '" onclick="pbItemClick(' + realIdx + ', ' + sceneNum + ')">';
-    html += '<span class="pb-sev ' + sev + '"></span>';
-    html += '<span class="pb-scene">Sc ' + sceneNum + '</span>';
+    // Finding text is MODEL OUTPUT derived from the writer's own script, and a
+    // screenplay is a file a collaborator can send you — so every interpolation
+    // here is escaped. Row wiring is DELEGATED (see the #pb-list listener in
+    // init): building onclick="…" out of data both invites attribute injection
+    // and would force script-src 'unsafe-inline', defeating the CSP that
+    // contains any sink we might still miss.
+    html += '<div class="pb-item" data-findex="' + escapeHtml(realIdx) + '" data-scene="' + escapeHtml(sceneNum) + '">';
+    html += '<span class="pb-sev ' + escapeHtml(sev) + '"></span>';
+    html += '<span class="pb-scene">Sc ' + escapeHtml(sceneNum) + '</span>';
     html += '<div class="pb-body">';
-    html += '<div class="pb-cat">' + (f.category || 'General') + '</div>';
-    html += '<div class="pb-issue">' + (f.description || f.issue || '') + '</div>';
+    html += '<div class="pb-cat">' + escapeHtml(f.category || 'General') + '</div>';
+    html += '<div class="pb-issue">' + escapeHtml(f.description || f.issue || '') + '</div>';
     html += '</div></div>';
   });
   list.innerHTML = html;

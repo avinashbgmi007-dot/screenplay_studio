@@ -25,12 +25,17 @@ def run(base):
         def editor():
             return page.locator("#idea-content")
 
-        # ---- blank idea: pill hidden (#1) -----------------------------------
+        # ---- blank idea: the chat is DISCOVERABLE (UI audit 2026-09-20 #7) ---
+        # The pill used to hide on a blank page ("nothing to talk about yet"),
+        # which left a first-time writer with no chat affordance at all. It
+        # now stands as an invitation until words land.
         page.goto(base, wait_until="networkidle")
         page.locator("#new-idea-btn").click()
         page.wait_for_timeout(400)
         op = page.locator("#idea-sam-pill").evaluate("el => el.style.display")
-        check("pill hidden on blank page", op == "none", f"display={op!r}")
+        check("pill visible on a blank page (standing invitation)", op != "none", f"display={op!r}")
+        label = page.locator("#idea-sam-pill").inner_text().strip()
+        check("blank-page pill invites ('Ask Sameer')", label == "Ask Sameer", label)
 
         # ---- type draft; pill returns (#1) ----------------------------------
         editor().click()
@@ -38,6 +43,8 @@ def run(base):
         page.wait_for_timeout(700)
         op = page.locator("#idea-sam-pill").evaluate("el => el.style.display")
         check("pill visible once the page has words", op != "none", f"display={op!r}")
+        label2 = page.locator("#idea-sam-pill").inner_text().strip()
+        check("pill reads as the summon once the page has words", label2 == "Sameer", label2)
 
         # ---- MID-SENTENCE /sameer (#2): command buried in a sentence ---------
         editor().type(" call /sameer now — I'm stuck on the ending", delay=4)

@@ -90,6 +90,48 @@ def retry_permission(fn, attempts: int = 6):
             time.sleep(min(0.6, 0.05 * (attempt + 1)) * (0.5 + random.random() * 0.5))
 
 
+class StoreUnreadable(RuntimeError):
+    """A store file is there but cannot be read as its documented shape.
+
+    Deliberately NOT folded into the caller's default. "The file is not there"
+    and "the file is damaged" are different facts, and only one of them means
+    the writer never had anything here: collapsing them (the shape A2/A3 were
+    opened for) shows a damaged store as an empty one, and — because every
+    mutator loads before it saves — the next mundane action then overwrites the
+    only recoverable copy of it.
+    """
+
+    def __init__(self, path: str, detail: str = ""):
+        self.path = path
+        self.detail = detail
+        super().__init__(
+            f"{os.path.basename(path)} exists but is unreadable ({detail}); "
+            "it is NOT being treated as empty")
+
+
+def load_json_store(path: str, default):
+    """Read a JSON store. MISSING -> `default`; PRESENT-BUT-UNREADABLE -> raise.
+
+    The one shared reader behind every writer-owned store, so the distinction
+    (and the refusal to overwrite) is a property of the store layer instead of
+    something each module re-decides. Shape checking stays with the caller:
+    a list store handed a dict is just as damaged as a torn file.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        return default
+    except OSError as e:
+        raise StoreUnreadable(path, f"cannot read: {e}") from e
+    if not raw.strip():
+        raise StoreUnreadable(path, "zero-byte")
+    try:
+        return json.loads(raw)
+    except ValueError as e:
+        raise StoreUnreadable(path, f"invalid JSON: {e}") from e
+
+
 def atomic_write_json(path: str, data) -> None:
     """Serialize `data` as JSON to `path` atomically (tmp + os.replace)."""
     lock = _lock_for(path)

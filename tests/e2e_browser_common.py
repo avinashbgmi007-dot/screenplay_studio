@@ -175,7 +175,8 @@ class Studio:
         self.close()
 
 
-def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None):
+def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None,
+                 use_token=False):
     """Boot the real webapp server with the in-process demo craft model.
 
     projects_dir: existing dir to serve from (seed it BEFORE calling), or
@@ -184,6 +185,13 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
                   (drives the status-strip switch-back flow). Passed via
                   --server with the demo ENV TRIGGER OFF, so main() applies
                   it BEFORE demo activation pins real_server_url.
+    use_token:    boot SECURE-BY-DEFAULT (main() mints a capability token and
+                  `/` sets it as a SameSite=Strict cookie) instead of the
+                  harness's usual --no-token opt-out. Suites that seed through
+                  direct server-side requests then need studio_headers() on
+                  every write; suites that only drive the browser get the
+                  cookie for free. Default False keeps every existing suite's
+                  behaviour unchanged.
     Returns a Studio; call .close() (or use `with`) or the child lingers.
     """
     tmp = None
@@ -205,10 +213,12 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
     # direct server-side requests, which the secure-by-default capability token
     # would 403. The harness opts out explicitly (it used to rely on the token
     # being off globally). The hardened path stays covered by
-    # e2e_browser_token_mode.py and test_capability_token.py.
+    # e2e_browser_token_mode.py, test_capability_token.py, and any suite that
+    # asks for use_token=True.
     cmd = [sys.executable, "-m", "screenplay_studio.webapp_server",
-           "--port", str(port), "--projects-dir", projects_dir, "--demo-model",
-           "--no-token"]
+           "--port", str(port), "--projects-dir", projects_dir, "--demo-model"]
+    if not use_token:
+        cmd.append("--no-token")
     if server_url:
         # Drive --server through main() instead: both import-time demo paths
         # (env trigger and the :8080-unreachable fallback) would lock

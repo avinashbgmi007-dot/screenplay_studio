@@ -28,6 +28,10 @@ python -m pytest tests/ -k "resume" # by keyword
 | Webapp API | `test_webapp_api.py`, `test_webapp_revision.py`, `test_ideas.py`, `test_idea_room_v2.py`, `test_idea_room_v3.py`, `test_preview_lab.py`, `test_selection_translate_sloppiness.py`, `test_sidebar_translate_stt.py`, `test_report_export_progress.py`, `test_language_and_human_levers.py`, `test_two_tier_watchdog.py` |
 | Orchestrator / manifest | `test_delete_project.py`, `test_sample.py`, `test_watch.py`, `test_fix_batch.py`, `test_bugfix_batch.py`, `test_feature_batch.py`, `test_audit_hardening.py` |
 | Browser e2e (Playwright) | `tests/e2e_browser_*.py` — smoke, selection/translate/mic, UI fixes, v3, wf (see `e2e_browser_common.py`) |
+| Store fault injection | `test_store_fault_injection.py` — every writer-owned store against a crash-truncated / flipped-byte / zero-byte file (see below) |
+| Packaging | `test_packaging_data_files.py` — builds a real wheel **and** sdist and asserts the craft-rule JSON, the SPA and the fonts are inside (see below) |
+| SPA security | `test_spa_security_headers.py` — the `Content-Security-Policy` on the SPA document, and that it is *not* applied to the preview labs |
+| XSS regression | `e2e_browser_xss_inert.py` — plants text- and attribute-context payloads into a real report and asserts they render inert (see below) |
 
 ## What the key suites verify
 
@@ -44,6 +48,79 @@ python -m pytest tests/ -k "resume" # by keyword
 - Every webapp test should exercise the JSON API through the real Flask app (see `test_webapp_api.py`), not a stubbed client.
 - If you add a new analyzer pass, add a mock branch to `tests/mock_unified_server.py` matched by a distinctive system-prompt phrase.
 - To run against a real llama-server instead of the mock, point `--server` at it — the same CLI tests then exercise the real pipeline (slow; use selectively).
+
+## Store integrity (one contract, every store)
+
+`test_store_fault_injection.py` is not a per-store test file: it is a registry
+(`CASES`) plus generic injectors, so a store is described once and gets the same
+four assertions — MISSING reads as its default, VALID reads as data, DAMAGED
+**never** reads as the default, and a load-modify-write must not replace a damaged
+file's bytes (the damaged copy is often the only recoverable evidence). Writers
+whose loader reports damage rather than raising declare that with `error_marker` /
+`damage_ok`; stores that are regenerable declare it in `EXEMPT` with a reason. The
+suite ends with a discovery check that fails when a module calls
+`atomic_write_json` without a registry entry, so the next store cannot ship
+without fault coverage.
+
+```bash
+python -m pytest tests/test_store_fault_injection.py -q     # 65 checks
+```
+
+## Packaging (the wheel must contain the app, not just the code)
+
+`test_packaging_data_files.py` exists because `pip install .` once produced a
+wheel of `.py` files only: no craft-rule JSON (so `KnowledgeBase()` loaded zero
+rules and `_kb_rule_ids()` returned an empty set — every report silently lost
+its "grounded in rule X" claim) and no `webapp/` at all (so `GET /` 404'd).
+Neither failure raised; both degraded silently.
+
+It asserts in three layers: the declared `package-data` globs must match every
+shippable file on disk (a drift guard — add a new asset type and it fails until
+the pattern list knows about it), and a real wheel and sdist must contain the
+KB, the SPA and the fonts, and must *not* contain the 69 tracked evidence
+screenshots or the orphaned `graph*.json` scratch.
+
+Two traps this suite documents, both found by mutation-testing the guard itself:
+
+- **Build artifacts mask regressions.** setuptools reuses `build/lib` and
+  `egg-info/SOURCES.txt` between runs. Without purging them first, a reverted
+  `package-data` still produces a complete wheel — staged by an earlier build —
+  and the assertions pass for the wrong reason. The fixtures purge `build/` and
+  `*.egg-info/` (never `dist/`, which may hold a real release artifact).
+- **A guard that cannot fail is not a guard.** Verify any change to this file by
+  reverting the packaging fix and confirming the suite goes red.
+
+```bash
+python -m pytest tests/test_packaging_data_files.py -q      # 8 checks, ~50s
+```
+
+## CI gates (what actually runs automatically)
+
+`ruff check .` → `pytest -q` → `node --test tests/js/*.test.js` → the browser suites.
+
+The last one is new (2026-09-20). The `tests/e2e_browser_*.py` suites are standalone
+Playwright scripts, **not** pytest tests — they do not match `test_*.py`, so pytest
+never collected them and nothing ran them, while the shipped SPA (`app.js`, ~9k lines)
+had no other behavioural coverage in CI beyond 7 assertions on `core.js`. They are now
+driven by `tests/run_browser_suites.py`, which runs every suite, prints one summary,
+and exits nonzero on any failure or crash:
+
+```bash
+python tests/run_browser_suites.py               # all runnable suites (~25)
+python tests/run_browser_suites.py phase6 smoke  # by name substring
+python tests/run_browser_suites.py --strict      # also chase the known-broken
+E2E_BASE=http://127.0.0.1:8500 python tests/run_browser_suites.py
+```
+
+Two groups are excluded — and the runner **prints both on every run** rather than
+skipping them quietly, because dead coverage is worse than none (it looks like safety):
+
+| Suite | Why it is not in the gate |
+|---|---|
+| `gun_pen_audit`, `design_session` | drive a studio already running at `E2E_BASE` (default `:8500`); they never boot their own, so a clean checkout gets `ERR_CONNECTION_REFUSED` |
+| `preview_next`, `preview_redesigns` | crash inside the Design-Lab preview pages (`bounding_box()` None / null `.classList`); repair or delete them |
+
+Chromium is required: `python -m playwright install chromium` (CI adds `--with-deps`).
 
 ## Optional: run the real server
 

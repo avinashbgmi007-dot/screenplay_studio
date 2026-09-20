@@ -3,8 +3,32 @@
 > **Generated from source:** 2026-09-06. This is the consolidated "global vs local"
 > state map the UI/UX strategy needs. The app is **file-based** — there is no
 > database, no Redux/Zustand, no in-memory global store. Every persistent slice is a
-> JSON file written atomically via `jsonio.atomic_write_json` (tmp + `os.replace` +
-> per-path lock).
+> JSON file.
+>
+> **Atomicity — corrected 2026-09-20.** Writer-owned stores go through
+> `jsonio.atomic_write_json` (tmp + `os.replace` + per-path lock). The earlier flat
+> claim that *every* slice did was **false**, and it hid the highest-stakes stores:
+> `working.json` / `parsed.json` / `edits.json` / `writer_profile.json` were raw
+> writes until audit item A2, and `premise.json` + `metrics.json` until A3 in the
+> same pass. Both are now closed. What is **deliberately still raw**:
+> `knowledge_graph.save` (the KG is regenerable from the parsed document) and
+> export output (new files, not rewritten state).
+>
+> **Reader side — added 2026-09-20.** Atomic writes only stop a torn file being
+> *produced*; they say nothing about what a reader does with one. Every
+> writer-owned store now reads through `jsonio.load_json_store`, which keeps two
+> facts apart: **MISSING → the store's default**, **PRESENT-BUT-UNREADABLE →
+> `StoreUnreadable`**. That distinction is what stops a damaged file presenting
+> as "you never wrote anything", and — since every mutator loads before it saves —
+> it is also what stops the next mundane action overwriting the one recoverable
+> copy. A store that cannot be read answers the SPA with **503** (`{"unreadable":
+> true, "store": ..., "error": ...}`) from the `StoreUnreadable` handler.
+> `tests/test_store_fault_injection.py` enforces this per store (three injected
+> faults + a "the write must not clobber the damaged bytes" check) and fails the
+> build when a module writes a store without a fault entry. Deliberately
+> fail-soft, with a reason: `progress.json` (transient telemetry) and
+> `parsed.json` / `working.json` (regenerable; the unregenerable edit log is
+> covered by A1).
 >
 > Companion docs: `docs/API_ROUTE_MAP.md` (which endpoints touch which store),
 > `docs/DATA_FORMATS.md` (full JSON schemas), `CONTEXT.md` (entity glossary).

@@ -9,7 +9,6 @@ thoughts.
 
 from __future__ import annotations
 
-import json
 import os
 import time
 import uuid
@@ -22,15 +21,13 @@ def _path(m) -> str:
 
 
 def _load_raw(m) -> list[dict]:
-    path = _path(m)
-    if not os.path.exists(path):
-        return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, list) else []
-    except (json.JSONDecodeError, OSError):
-        return []
+    # A damaged notes.json must NOT read as "you have no margin notes" (and it
+    # must not be overwritten by the next note either): see jsonio.StoreUnreadable.
+    from .jsonio import StoreUnreadable, load_json_store
+    data = load_json_store(_path(m), default=[])
+    if not isinstance(data, list):
+        raise StoreUnreadable(_path(m), f"expected a list, found {type(data).__name__}")
+    return data
 
 
 def _save(m, notes: list[dict]) -> None:

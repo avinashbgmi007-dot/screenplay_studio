@@ -55,6 +55,29 @@ function formatMessageContent(raw) {
   return html;
 }
 
+/** Escape text for ANY HTML context — an element body OR a quoted attribute.
+ *
+ * This is the ONE helper every `innerHTML` sink must route untrusted text
+ * through. It exists because a finding's `issue` is model output derived from
+ * the writer's own script, and a screenplay is a file a collaborator or a
+ * contest can send you: `<img src=x onerror=...>` in a dialogue line used to
+ * reach `innerHTML` raw and execute in the app origin.
+ *
+ * `&` is replaced FIRST so an existing entity cannot be double-decoded back
+ * into markup (`&lt;script&gt;` must stay inert, not become a tag). Quotes are
+ * escaped too, so the result is safe inside `attr="..."` as well as in text.
+ * Non-strings are coerced, and null/undefined become "" rather than "null".
+ */
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function truncate(text, n) {
   text = text.trim().replace(/\s+/g, " ");
   return text.length > n ? text.slice(0, n - 1) + "…" : text;
@@ -79,7 +102,9 @@ function shortModelId(id) {
 
 function _stageStep(label, status) {
   const cls = status === "complete" ? "done" : status === "failed" ? "failed" : status === "running" ? "running" : "";
-  return `<span class="step ${cls}" title="${label}: ${status || "pending"}"><i></i>${label}</span>`;
+  // status lands inside a quoted attribute — it comes from the project
+  // manifest, so it is escaped rather than trusted.
+  return `<span class="step ${cls}" title="${escapeHtml(label)}: ${escapeHtml(status || "pending")}"><i></i>${escapeHtml(label)}</span>`;
 }
 
 // ---- Node test hook (browsers never take this branch) ----
@@ -87,6 +112,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     fuzzyScore,
     formatMessageContent,
+    escapeHtml,
     truncate,
     formatElapsed,
     fmtDuration,

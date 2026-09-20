@@ -6,8 +6,10 @@ Verifies on the live app (DOM/text only, no screenshots):
     is the visual subject (no chrome between the writer and the words)
   * autosave: typed content persists (debounced save fires)
   * title: the idea titles itself from first words / is editable
-  * Sameer on demand: the pill is present and hidden until the page has
-    words (the on-demand contract)
+  * Sameer on demand: the pill always stands — an invitation ('Ask Sameer')
+    on a blank page, the summon ('Sameer') once there are words — and
+    summoning hands the keyboard to the composer: keys land in the CHAT,
+    never in the canvas (UI audit 2026-09-20, defects #6/#7)
   * Premise Doctor on demand: the room toggle exposes the doctor (feedback
     lens routes to the premise doctor in idea mode)
   * structure support: the Structure toggle reveals logline/questions
@@ -58,6 +60,17 @@ def run(base):
         content = page.locator("#idea-content")
         check("idea canvas opens (display flex)", canvas.is_visible())
         check("the page starts empty (blank canvas)", (content.input_value() or "") == "")
+        # defect #6 (UI audit 2026-09-20): the blank canvas was a dead end —
+        # no prompt, no hint, no placeholder. The placeholder IS the onboarding.
+        ph = content.evaluate("el => el.getAttribute('placeholder') || ''")
+        check("blank canvas carries a real prose prompt (placeholder)",
+              "Type the idea" in ph and "Sameer" in ph, ph[:100])
+        # defect #7: the chat must be discoverable BEFORE the first word —
+        # the pill stands on a blank page as an invitation, not a dead corner
+        pill = page.locator("#idea-sam-pill")
+        check("chat discoverable on the BLANK page (pill stands as an invitation)",
+              pill.is_visible() and pill.inner_text().strip() == "Ask Sameer",
+              f"visible={pill.is_visible()} label={pill.inner_text().strip()!r}")
         # the page is the widest element in the room — the subject, not the chrome
         cw = canvas.bounding_box()["width"]
         pw = page.locator("#idea-content").bounding_box()["width"]
@@ -77,6 +90,27 @@ def run(base):
         # --- Sameer on demand -----------------------------------------------------
         pill = page.locator("#idea-sam-pill")
         check("Sameer pill present once the page has words", pill.count() > 0)
+        check("pill flips to the summon label once the page has words",
+              pill.inner_text().strip() == "Sameer", pill.inner_text().strip())
+
+        # --- defect #7, the misroute half: summon routes the keyboard to the
+        # CHAT. The audit's failure: after summoning, typed text was swallowed
+        # by the canvas (and auto-titled the idea) because focus never moved.
+        page.evaluate("() => document.activeElement && document.activeElement.blur()")
+        page.keyboard.press("c")
+        page.wait_for_timeout(400)
+        focused = page.evaluate("() => document.activeElement && document.activeElement.id")
+        check("summon (c) puts the cursor in the composer", focused == "input", focused)
+        page.keyboard.type("a line for the chat, not the page", delay=4)
+        in_composer = page.locator("#input").input_value()
+        on_canvas = page.locator("#idea-content").input_value()
+        check("keys after a summon land in the chat, never the canvas",
+              "for the chat" in in_composer and "garden" in on_canvas
+              and "for the chat" not in on_canvas,
+              f"composer={in_composer[:40]!r} canvas={on_canvas[:40]!r}")
+        page.locator("#input").fill("")   # leave no stray draft
+        page.locator("#drawer-close").click()
+        page.wait_for_timeout(300)
 
         # --- structure support -----------------------------------------------------
         struct_btn = page.locator("#idea-structure-btn")
@@ -114,6 +148,22 @@ def run(base):
         first = requests.get(f"{base}/api/ideas/{idea['id']}", timeout=30).json()
         check("isolation: the first idea's page is untouched",
               "garden" in (first.get("content") or ""))
+
+        # --- F10 (UI audit 2026-09-20, defect #8) ---------------------------------
+        # The palette used to OFFER project-only commands in the idea room, where
+        # clicking them silently did nothing (guarded no-ops). Dead commands are
+        # worse than absent ones: they read as broken. They are now hidden.
+        page.evaluate("() => openPalette(false)")
+        page.wait_for_timeout(500)
+        pal = page.locator("#palette-results").inner_text()
+        dead = [c for c in ("Beat Board", "Compare drafts", "Revision view",
+                            "Spotlight", "Export working draft") if c in pal]
+        check("palette in the idea room hides project-only commands",
+              not dead, "offered but dead: " + ", ".join(dead))
+        check("palette still offers what works without a project",
+              "Switch to Co-write" in pal and "Start a new page" in pal)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
 
         # --- cleanup -------------------------------------------------------------
         for iid in (idea["id"], idea2["id"]):

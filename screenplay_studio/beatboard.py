@@ -10,7 +10,6 @@ board has been saved, the natural order (1..N) is the board.
 
 from __future__ import annotations
 
-import json
 import os
 import time
 
@@ -22,14 +21,14 @@ def _path(m) -> str:
 
 
 def _load(m) -> dict:
-    if not os.path.exists(_path(m)):
-        return {}
-    try:
-        with open(_path(m), "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except (json.JSONDecodeError, OSError):
-        return {}
+    # A damaged beatboard.json used to read as "no saved order" (i.e. the board
+    # silently reverted to natural order) and the next set_order then overwrote
+    # the writer's arrangement. Missing -> {} ; damaged -> StoreUnreadable.
+    from .jsonio import StoreUnreadable, load_json_store
+    data = load_json_store(_path(m), default={})
+    if not isinstance(data, dict):
+        raise StoreUnreadable(_path(m), f"expected an object, found {type(data).__name__}")
+    return data
 
 
 def _save(m, data: dict) -> None:

@@ -6,6 +6,7 @@ import pytest
 
 import screenplay_studio.webapp_server as webapp_server
 
+from screenplay_studio.jsonio import StoreUnreadable
 from screenplay_studio.stash_store import load_stash, add_to_stash, remove_from_stash
 
 
@@ -30,11 +31,20 @@ def test_add_requires_text(tmp_path):
         add_to_stash(str(tmp_path), "   ")
 
 
-def test_load_tolerates_missing_or_bad_file(tmp_path):
-    assert load_stash(str(tmp_path)) == []  # no file yet
+def test_load_distinguishes_missing_from_damaged(tmp_path):
+    """Re-scribed 2026-09-20 (was: "tolerates missing OR bad file", both -> []).
+
+    Reading a damaged stash.json as an empty stash was the silent-loss shape A2/A3
+    opened for: the writer's saved snippets vanished from the UI, and because
+    add_to_stash loads before it saves, the next stashed line overwrote the only
+    copy of the file. Absence and damage are now different answers; the
+    class-level contract lives in tests/test_store_fault_injection.py.
+    """
+    assert load_stash(str(tmp_path)) == []  # no file yet -> genuinely empty
     with open(os.path.join(str(tmp_path), "stash.json"), "w", encoding="utf-8") as f:
         f.write("not json")
-    assert load_stash(str(tmp_path)) == []
+    with pytest.raises(StoreUnreadable):
+        load_stash(str(tmp_path))
 
 
 @pytest.fixture

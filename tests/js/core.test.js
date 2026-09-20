@@ -6,6 +6,7 @@ const assert = require("node:assert");
 const {
   fuzzyScore,
   formatMessageContent,
+  escapeHtml,
   truncate,
   formatElapsed,
   fmtDuration,
@@ -53,4 +54,50 @@ test("truncate: short text untouched, long text ellipsized and whitespace-collap
   assert.strictEqual(truncate("short", 10), "short");
   const out = truncate("a  b\nc", 4);
   assert.strictEqual(out, "a b…"); // collapsed to "a bc"(3)? no: "a b c" -> slice
+});
+
+// ---- escapeHtml: the ONE helper every innerHTML sink must route through ----
+// Regression origin: a finding whose `issue` carried <img src=x onerror=...>
+// executed in the app origin on project open (the Problem Board sink).
+
+test("escapeHtml: neutralises the exact payload that was exploited", () => {
+  const payload = '<img src=x onerror="window.__XSS_FIRED=1">';
+  const out = escapeHtml(payload);
+  assert.ok(!out.includes("<img"), "the tag must not survive as markup");
+  assert.ok(!out.includes("onerror=\""), "no bare quote may survive");
+  assert.ok(out.includes("&lt;img"), "should be escaped");
+});
+
+test("escapeHtml: escapes all five significant characters", () => {
+  assert.strictEqual(escapeHtml("&"), "&amp;");
+  assert.strictEqual(escapeHtml("<"), "&lt;");
+  assert.strictEqual(escapeHtml(">"), "&gt;");
+  assert.strictEqual(escapeHtml('"'), "&quot;");
+  assert.strictEqual(escapeHtml("'"), "&#39;");
+});
+
+test("escapeHtml: ampersand is escaped FIRST so entities cannot be double-decoded", () => {
+  // If & were replaced after <, "&lt;" input would become "&amp;lt;" — correct —
+  // but a naive order would let "&lt;script&gt;" round-trip back into a tag.
+  assert.strictEqual(escapeHtml("&lt;script&gt;"), "&amp;lt;script&amp;gt;");
+});
+
+test("escapeHtml: attribute-context injection is contained", () => {
+  // scene refs land inside onclick="fn(0, <here>)" — a quote must not break out
+  const out = escapeHtml('1" onmouseover="window.__XSS_ATTR=1');
+  assert.ok(!out.includes('"'), "no raw double quote may survive");
+  assert.ok(out.includes("&quot;"), "quotes must be entity-encoded");
+});
+
+test("escapeHtml: is idempotent-safe on plain text and handles non-strings", () => {
+  assert.strictEqual(escapeHtml("Scene 12 — a quiet beat"), "Scene 12 — a quiet beat");
+  assert.strictEqual(escapeHtml(""), "");
+  assert.strictEqual(escapeHtml(null), "");
+  assert.strictEqual(escapeHtml(undefined), "");
+  assert.strictEqual(escapeHtml(42), "42");
+});
+
+test("_stageStep: escapes an untrusted status (attribute context)", () => {
+  const out = _stageStep("Parse", '" onmouseover="window.__XSS_STEP=1');
+  assert.ok(!out.includes('onmouseover="window'), "attribute must not break out");
 });

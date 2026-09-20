@@ -196,6 +196,99 @@ def main():
             page.keyboard.press("Escape")
             page.wait_for_timeout(400)
 
+            # ---- 3b. R6: the margin pins (occlusion + recession contract) --
+            # The same findings, rendered into the manuscript this time. Two
+            # laws came out of the UI walk: the margin NEVER covers the script
+            # (it used to overlap 164px of every line it sat on), and a margin
+            # pin POINTS at a finding instead of being a fourth place to judge
+            # it (Locate only — Rewrite/Discuss live in the board and the dock).
+            # the scroll position is preserved across the re-render on purpose:
+            # the board's scroll observer keys off the active scene, and this
+            # suite seeded findings on scene 1 only, so a reset-to-top would
+            # make it re-decide (and re-show its edge tab) mid-suite.
+            page.evaluate(
+                """() => {
+        const mc = document.getElementById('manuscript-container');
+        const top = mc.scrollTop;
+        renderManuscript(mc);
+        mc.scrollTop = top;
+    }""")
+            page.wait_for_timeout(700)
+            check("R6: the margin renders a pin per finding on its scene",
+                  page.locator(".scene-notes .finding-note").count() == 3,
+                  f"pins={page.locator('.scene-notes .finding-note').count()}")
+
+            MARGIN_GEOM = """() => {
+        const out = {pins: 0, overlapping: 0, worst: 0, position: null,
+                     pin_left: null, page_right: null};
+        for (const m of document.querySelectorAll('.scene-notes')) {
+          const pg = m.closest('.scene-page');
+          const lines = [...pg.querySelectorAll('[class^=el-]')]
+            .map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
+          if (out.position === null) out.position = getComputedStyle(m).position;
+          for (const pin of m.querySelectorAll('.finding-note')) {
+            out.pins += 1;
+            const p = pin.getBoundingClientRect(), pr = pg.getBoundingClientRect();
+            out.pin_left = Math.round(p.left);
+            out.page_right = Math.round(pr.right);
+            let overlap = 0;
+            for (const r of lines) {
+              if (Math.min(p.right, r.right) - Math.max(p.left, r.left) > 0
+                  && Math.min(p.bottom, r.bottom) - Math.max(p.top, r.top) > 0)
+                overlap = Math.max(overlap,
+                                   Math.min(p.right, r.right) - Math.max(p.left, r.left));
+            }
+            if (overlap > 0) {
+              out.overlapping += 1;
+              out.worst = Math.max(out.worst, Math.round(overlap));
+            }
+          }
+        }
+        return out;
+    }"""
+            flow = page.evaluate(MARGIN_GEOM)
+            check("R6: no margin pin covers a line of script (board open: pins in "
+                  "the page's flow)",
+                  bool(flow["pins"] and flow["overlapping"] == 0), str(flow))
+
+            LABELS = """() => {
+        const labels = el => el ? [...el.querySelectorAll(
+            '.finding-note-actions button')].map(b => b.textContent.trim()) : [];
+        const has = (list, word) => list.some(t => t.includes(word));
+        const of = (list, word) => list.filter(t => t.includes(word)).length;
+        const pin = labels(document.querySelector('.scene-notes .finding-note'));
+        return { pin,
+                 pin_has: { Locate: has(pin, 'Locate'), Rewrite: has(pin, 'Rewrite'),
+                            Discuss: has(pin, 'Discuss') } };
+    }"""
+            actions = page.evaluate(LABELS)
+            check("R6: a margin pin points (Locate) but carries no judgment controls",
+                  bool(actions["pin_has"]["Locate"] and not actions["pin_has"]["Rewrite"]
+                       and not actions["pin_has"]["Discuss"]), str(actions))
+            # (the other half of that contract — that Rewrite/Discuss still have
+            # a home — is asserted where they live: phase6's dock evidence lens
+            # walks Locate + Discuss on the deep cards from a REAL analysis. The
+            # dock needs state.report, which this suite does not seed.)
+
+            # slide the board away (not hide/show: that resets the scroll
+            # observer's active scene and the board re-decides later)
+            page.evaluate("() => collapseProblemBoard()")
+            page.wait_for_timeout(700)
+            gutter = page.evaluate(MARGIN_GEOM)
+            check("R6: with the board's overlay gone the pins take the paper's gutter",
+                  bool(gutter["position"] == "absolute"
+                       and gutter["pin_left"] >= gutter["page_right"]), str(gutter))
+            check("R6: the gutter column clears the paper (still zero overlap)",
+                  bool(gutter["overlapping"] == 0), str(gutter))
+            # hand the board back the way the dock step above left it
+            page.evaluate("() => expandProblemBoard()")
+            page.wait_for_timeout(700)
+            check("R6: the board is back open after the margin walk",
+                  bool(page.evaluate(
+                      "() => !document.getElementById('problem-board')"
+                      ".classList.contains('pb-collapsed')"
+                      " && document.getElementById('pb-edge-tab').offsetParent === null")))
+
             # ---- 4. mode swaps: spotlight hides the NEW toolbar row -------
             page.evaluate("() => toggleSpotlight()")
             page.wait_for_timeout(600)

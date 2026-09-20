@@ -137,7 +137,223 @@ class TestDemoHonesty:
             f"unlabelled canned findings: {sample_issues}")
 
 
-# ---- Flake hardening: transient Windows lock errors need enough retries ---
+# ---- UI audit 2026-09-20: the ledger must open showing everything ----------
+class TestFeedbackLedgerDefaults:
+    """Defect #1 (docs/audit/ui_evidence_findings_2026-09-20.md): the dock's mass
+    strip counts EVERY finding while the default filter showed only HIGH ones, so
+    the room read "6 open of 6 findings" above "0 shown / 6 total". A writer whose
+    script produced no highs saw an empty room that claimed six findings. The
+    ledger now defaults to all severities; the chips narrow, the header stays true."""
+
+    def test_default_filter_admits_every_severity(self):
+        import re
+        src = open("screenplay_studio/webapp/app.js", encoding="utf-8").read()
+        m = re.search(r"findingFilter:\s*\{\s*severities:\s*\[([^\]]*)\]", src)
+        assert m, "findingFilter default not found — did the state shape change?"
+        declared = set(re.findall(r'"(\w+)"', m.group(1)))
+        assert declared == {"high", "medium", "low"}, (
+            f"the ledger default hides severities {sorted({'high','medium','low'} - declared)}; "
+            "the dock header counts all findings, so a narrower default contradicts it")
+
+    def test_the_mass_strip_labels_its_scope_when_the_filter_narrows(self):
+        """The contradiction was never that one count was wrong — it was that a
+        WHOLE-script total sat unlabelled above a FILTERED list. The strip must
+        now print which scope it shows whenever the filter narrows it."""
+        import re
+        src = open("screenplay_studio/webapp/app.js", encoding="utf-8").read()
+        assert "function findingCounts()" in src, "the scope counter is gone"
+        assert re.search(r'dock-mass-total",\s*mText', src), (
+            "the mass strip must print its scope via mText — a bare "
+            "'N open of M findings' reads as a claim about the filtered board")
+        assert "shown by filter" in src, "the narrow-scope label is missing"
+
+    def test_the_fix_queue_reuses_the_one_filter_predicate(self):
+        """Two copies of the severity/category test is how the strip and the
+        queue drifted apart in the first place (N3: surfaces cannot disagree)."""
+        import re
+        src = open("screenplay_studio/webapp/app.js", encoding="utf-8").read()
+        assert "function inFindingFilter(" in src, "the ONE filter predicate is gone"
+        assert "const inFilter = inFindingFilter;" in src, (
+            "the fix queue no longer reuses the shared predicate")
+        assert not re.search(r"const inFilter = \(item\) =>", src), (
+            "a second, local filter predicate came back")
+
+
+# ---- R6: the manuscript margin points, it never covers the script ---------
+class TestManuscriptMarginContract:
+    """Defect #1 + #2 (docs/audit/ui_evidence_findings_2026-09-20.md): every
+    per-scene finding card was absolutely positioned at right:-18px, so 196px of
+    the 214px column lay ON the paper — measured overlap was 164px of text per
+    card, i.e. action lines clipped mid-word — and each card carried the full
+    judgment row (Rewrite/Discuss) on top of the board, the dock and the shadow
+    copy, so one finding rendered as four competing surfaces.
+
+    The margin now (a) cannot cover text by construction, and (b) is a PIN: it
+    locates, the board/dock judge. These are the source contracts behind the
+    live geometry checks in e2e_browser_phase13_legacy_cleanup.py."""
+
+    def test_default_layout_is_in_flow_not_an_overlay(self):
+        """In-flow is the safe default: an absolutely positioned margin can only
+        be correct for the widths someone remembered to special-case."""
+        import re
+        css = open("screenplay_studio/webapp/style.css", encoding="utf-8").read()
+        block = re.search(r"\.scene-notes\s*\{([^}]*)\}", css)
+        assert block, ".scene-notes rule not found"
+        assert "position: static" in block.group(1), (
+            "the margin base rule must be in-flow — the gutter column is the "
+            "opt-in, not the default")
+
+    def test_the_gutter_column_is_gated_on_real_room(self):
+        """The overlap survived a viewport media query because the dock takes
+        380px WITHOUT changing the viewport: at 1440px the paper's gutter was
+        already gone. The promotion must key off the container, and must not
+        fire while the Problem Board's absolute overlay holds that gutter."""
+        import re
+        css = open("screenplay_studio/webapp/style.css", encoding="utf-8").read()
+        assert "container: manuscript-column / inline-size" in css, (
+            "#manuscript-container no longer establishes the container context")
+        assert "@container manuscript-column" in css, (
+            "the margin promotion must be a container query, not a media query")
+        assert ":not(:has(#problem-board.visible:not(.pb-collapsed)))" in css, (
+            "the gutter column must stand down while the board overlay is open")
+        assert not re.search(r"\.scene-notes\s*\{[^}]*right:\s*-18px", css), (
+            "the margin is pinned back over the paper")
+
+    def test_margin_pins_are_read_only_pointers(self):
+        """findingNoteEl's own comment has always said "margin pins stay
+        read-only"; the code rendered Rewrite/Discuss on them anyway."""
+        import re
+        src = open("screenplay_studio/webapp/app.js", encoding="utf-8").read()
+        assert "{ addressed, pin: true }" in src, (
+            "renderScenePage no longer renders the margin as pins")
+        gate = src.index("if (!opts.pin)")
+        tail = src[gate:gate + 260]
+        assert "appendChild(rewriteBtn)" in tail and "appendChild(discussBtn)" in tail, (
+            "the judgment controls must be gated on !opts.pin")
+        assert "appendChild(locateBtn)" not in tail, (
+            "Locate is navigation and stays on the pin")
+
+
+# ---- A3: a damaged premise card is reported, never silently emptied -------
+class TestPremiseStoreIntegrity:
+    """A3 (2026-09-20): premise.json was the last writer-owned store still
+    written with a raw open(...,'w') — the same shape A2 fixed elsewhere — and
+    BOTH of its readers collapsed every error into "no premise card". A
+    crash-truncated file therefore erased the writer's title / logline / premise
+    / open-questions from the UI permanently, with no error and no backup.
+    It is now atomic, and UNREADABLE is distinct from MISSING."""
+
+    @pytest.fixture
+    def client(self, tmp_path):
+        import screenplay_studio.webapp_server as webapp_server
+        webapp_server.PROJECTS_DIR = str(tmp_path / "projects")
+        os.makedirs(webapp_server.PROJECTS_DIR, exist_ok=True)
+        webapp_server.app.config["TESTING"] = True
+        return webapp_server.app.test_client()
+
+    def _make_project(self, sample_fountain, raw_card):
+        import screenplay_studio.webapp_server as webapp_server
+        d = os.path.join(webapp_server.PROJECTS_DIR, "Embers")
+        os.makedirs(d, exist_ok=True)
+        m = ProjectManifest.create(d, sample_fountain)
+        m.save()
+        with open(os.path.join(d, "premise.json"), "w", encoding="utf-8") as f:
+            f.write(raw_card)
+        return "Embers"
+
+    def test_premise_writers_are_atomic(self):
+        import re
+        for path in ("screenplay_studio/ideas.py", "screenplay_studio/webapp_server.py"):
+            src = open(path, encoding="utf-8").read()
+            assert not re.search(r'"premise\.json"\)?\s*,\s*"w"', src), (
+                f"{path} still writes premise.json with a raw open(..., 'w')")
+
+    def test_unreadable_premise_is_reported_not_presented_as_absent(
+            self, client, sample_fountain):
+        name = self._make_project(sample_fountain, '{"title": "Embers", "logline": "A ga')
+        data = client.get(f"/api/projects/{name}").get_json()
+        assert data.get("premise_error"), (
+            "a torn premise.json was reported as 'no premise card'")
+        assert "premise" not in data, "a damaged card must not be served as a card"
+
+    def test_unreadable_premise_is_never_silently_overwritten(
+            self, client, sample_fountain, tmp_path):
+        raw = '{"title": "Embers", "logline": "A ga'
+        name = self._make_project(sample_fountain, raw)
+        r = client.post(f"/api/projects/{name}/premise",
+                        json={"card": {"logline": "a NEW logline"}})
+        assert r.status_code == 409, (
+            f"a write over a damaged card must be refused, got {r.status_code}")
+        import screenplay_studio.webapp_server as webapp_server
+        with open(os.path.join(webapp_server.PROJECTS_DIR, name, "premise.json"),
+                  encoding="utf-8") as f:
+            assert f.read() == raw, "the damaged card was overwritten despite the refusal"
+
+
+# ---- B1: CI must actually run the browser suites -------------------------
+def test_ci_runs_the_browser_suite_gate():
+    """B1 (2026-09-20): ~460 browser checks existed and NOTHING ran them — the
+    SPA (app.js, ~9k lines) had no automated coverage in CI beyond 7 assertions
+    on core.js. If this job is deleted, or the runner stops being invoked, that
+    regression comes straight back and looks like a green build."""
+    src = open(".github/workflows/ci.yml", encoding="utf-8").read()
+    assert "tests/run_browser_suites.py" in src, (
+        "ci.yml no longer runs the browser suite gate — the e2e_browser_* suites "
+        "are back to being manual-only")
+    assert "playwright install" in src, "the browser job can't run without chromium"
+    # Assert the DIRECTIVE, not the bare word: ci.yml legitimately *mentions*
+    # ubuntu-latest in a comment explaining why it is avoided (same trap the B2
+    # bind test documents).
+    import re
+    assert not re.search(r"runs-on:\s*ubuntu-latest", src), (
+        "an unpinned runner is back — the 24.04 -> 26.04 migration breaks it silently")
+
+
+def test_browser_gate_runner_never_silently_drops_a_suite():
+    """Every suite the runner cannot execute must be a NAMED entry with a reason.
+    A silently skipped suite is dead coverage, and dead coverage is worse than
+    none because it looks like safety."""
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import run_browser_suites as rbs
+    assert rbs.HARNESS == "e2e_browser_common.py", "the shared harness is not a suite"
+    for key, reason in {**rbs.REQUIRES_LIVE_STUDIO, **rbs.KNOWN_BROKEN}.items():
+        assert reason, f"{key} is excluded without a stated reason"
+    for passing in ("smoke", "phase6_evidence", "phase14_signoff_journey",
+                    "layout_audit", "rewrite_loop"):
+        assert passing not in rbs.REQUIRES_LIVE_STUDIO, f"{passing} is runnable"
+        assert passing not in rbs.KNOWN_BROKEN, f"{passing} is runnable"
+
+
+# ---- B4: the "never off the machine" STT guard must not be prefix-bypassable --
+class TestWhisperUrlGuard:
+    """The external whisper engine is the one place dictation audio could leave
+    this machine. Its guard was `url.startswith(("http://localhost",
+    "http://127.0.0.1"))`, which both "http://127.0.0.1@evil.com" (userinfo: the
+    authority ends at the @) and "http://localhost.evil.com" (suffix) satisfy
+    while resolving to a REMOTE host."""
+
+    @pytest.mark.parametrize("url", [
+        "http://127.0.0.1@evil.com",   # userinfo bypass
+        "http://localhost.evil.com",   # suffix bypass
+        "https://evil.example.com",
+        "http://10.0.0.5:8080",
+    ])
+    def test_remote_looking_urls_are_refused(self, url):
+        from screenplay_studio import stt
+        with pytest.raises(stt.STTUnavailableError):
+            stt._assert_local_whisper(url)
+
+    @pytest.mark.parametrize("url", [
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://[::1]:8081",
+    ])
+    def test_genuinely_local_urls_are_accepted(self, url):
+        from screenplay_studio import stt
+        stt._assert_local_whisper(url)  # must not raise
+
+
 class TestRetryPermissionBudget:
     """test_store_save_serializes_concurrent_writers + test_save_rename_race_never_tears_json
     intermittently surface WinError 32/33 under load: a reader (test_client.get) or AV

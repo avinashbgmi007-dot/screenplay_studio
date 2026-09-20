@@ -1,0 +1,17 @@
+# Source-distribution manifest.
+#
+# The wheel gets its non-.py assets from [tool.setuptools.package-data] in
+# pyproject.toml. A *source* distribution needs the same files listed here, or
+# `pip install` from the sdist would rebuild exactly the broken wheel this file
+# exists to prevent (no craft-rule JSON, no SPA).
+#
+# Screenshots (*.png) are intentionally absent: the repo carries 69 tracked
+# PNGs of UI evidence, and none of them are needed to run the app.
+
+include README.md
+
+recursive-include knowledge_base *.json *.md
+recursive-include screenplay_studio/webapp *.html *.js *.css *.woff2
+
+# Test fixtures that the suite reads by path (mock server + browser harness).
+recursive-include tests *.py *.js

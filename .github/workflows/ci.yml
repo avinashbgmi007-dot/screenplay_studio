@@ -6,7 +6,10 @@ on:
 
 jobs:
   lint:
+    # Pinned, not ubuntu-latest: the 24.04 -> 26.04 migration moves
+    # unattended, and apt package names drift with it.
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,6 +22,7 @@ jobs:
 
   test-python:
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Install tesseract + Indian language packs (OCR fallback tests)
@@ -37,7 +41,8 @@ jobs:
         run: pytest -q
 
   test-js:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,3 +50,25 @@ jobs:
           node-version: "22"
       - name: Run JS unit tests
         run: node --test "tests/js/*.test.js"
+
+  # The SPA is ~9k lines of vanilla app.js (plus 6.5k of CSS) with no build step
+  # and, until 2026-09-20, no automated coverage in CI at all: the 29
+  # tests/e2e_browser_*.py suites were run by hand and are invisible to pytest
+  # (they do not match test_*.py). This job is that missing gate — ~25 suites
+  # and ~460 checks against a real chromium. Keep the runner's exit code honest:
+  # it fails the job on any suite that fails or crashes.
+  test-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ".[ci]"
+      - name: Install chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run browser suites
+        run: python tests/run_browser_suites.py

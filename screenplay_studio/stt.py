@@ -91,14 +91,29 @@ def transcribe(audio_bytes: bytes, filename: str = "audio.webm", language: str =
             pass
 
 
+# The external engine may only ever talk to THIS machine. The original guard
+# was a string prefix and is bypassable twice over: "http://127.0.0.1@evil.com"
+# (userinfo — the authority ends at the @) and "http://localhost.evil.com"
+# (suffix) both match the prefix while resolving to a REMOTE host. Parse the
+# URL and compare the actual hostname instead.
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _assert_local_whisper(url: str) -> None:
+    """Refuse any whisper-server URL that does not resolve to this machine."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or parsed.hostname not in _LOOPBACK_HOSTS:
+        raise STTUnavailableError(
+            "SCREENPLAY_STUDIO_WHISPER_URL must point at a LOCAL whisper server "
+            "(localhost/127.0.0.1/::1) -- this desk never sends audio off the machine."
+        )
+
+
 def _transcribe_external(audio_bytes: bytes, filename: str, lang: str) -> dict:
     """POST multipart audio to a user-run whisper.cpp server (still localhost)."""
     url = EXTERNAL_WHISPER_URL.rstrip("/")
-    if not url.startswith(("http://localhost", "http://127.0.0.1")):
-        raise STTUnavailableError(
-            "SCREENPLAY_STUDIO_WHISPER_URL must point at a LOCAL whisper server "
-            "(localhost/127.0.0.1) -- this desk never sends audio off the machine."
-        )
+    _assert_local_whisper(url)
     try:
         resp = requests.post(f"{url}/inference", files={"file": (filename or "audio.webm", audio_bytes)},
                              data={"response_format": "json"}, timeout=120)

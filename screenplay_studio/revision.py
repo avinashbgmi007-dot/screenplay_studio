@@ -74,14 +74,19 @@ def compute_finding_id(f: dict) -> str:
 
 def dismissed_finding_ids(m) -> set:
     """Set of finding_ids currently dismissed for this project (legacy
-    entries that never carried an id simply don't appear here)."""
-    try:
-        with open(dismissed_path(m), "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {d["finding_id"] for d in data
-                if isinstance(d, dict) and d.get("finding_id")}
-    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
-        return set()
+    entries that never carried an id simply don't appear here).
+
+    Missing -> empty set; DAMAGED -> StoreUnreadable. The lenient version read a
+    torn triage file as "nothing dismissed", so every finding the writer had
+    cleared came back, and the next dismiss overwrote the damaged file.
+    """
+    from .jsonio import StoreUnreadable, load_json_store
+    path = dismissed_path(m)
+    data = load_json_store(path, default=[])
+    if not isinstance(data, list):
+        raise StoreUnreadable(path, f"expected a list, found {type(data).__name__}")
+    return {d["finding_id"] for d in data
+            if isinstance(d, dict) and d.get("finding_id")}
 
 
 # ---------- writer intent (R2-b mark-addressed + R3 defer) ----------
@@ -93,22 +98,27 @@ def finding_marks_path(m) -> str:
 
 
 def finding_intents(m) -> dict:
-    """{finding_id: "addressed" | "deferred"} — the writer's intent marks."""
-    try:
-        with open(finding_marks_path(m), "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {k: v for k, v in data.items() if v in ("addressed", "deferred")}
-    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError, AttributeError):
-        return {}
+    """{finding_id: "addressed" | "deferred"} — the writer's intent marks.
+
+    Missing -> {} ; damaged -> StoreUnreadable. The lenient version dropped every
+    mark the writer had made (they silently reappeared as open findings) and the
+    next mark then overwrote the damaged file.
+    """
+    from .jsonio import StoreUnreadable, load_json_store
+    path = finding_marks_path(m)
+    data = load_json_store(path, default={})
+    if not isinstance(data, dict):
+        raise StoreUnreadable(path, f"expected an object, found {type(data).__name__}")
+    return {k: v for k, v in data.items() if v in ("addressed", "deferred")}
 
 
 def set_finding_intent(m, finding_id: str, intent) -> None:
+    from .jsonio import load_json_store
     path = finding_marks_path(m)
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        data = {}
+    data = load_json_store(path, default={})   # damaged -> raises: no mark is
+    if not isinstance(data, dict):             # written over a damaged store
+        from .jsonio import StoreUnreadable
+        raise StoreUnreadable(path, "expected an object")
     if intent in ("addressed", "deferred"):
         data[finding_id] = intent
     else:
@@ -592,21 +602,20 @@ def dismissed_path(m) -> str:
 
 def dismissed_issues(m) -> set:
     """Set of (index, issue) tuples currently dismissed for this project."""
-    try:
-        with open(dismissed_path(m), "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {(int(d["index"]), d.get("issue") or "") for d in data if isinstance(d, dict)}
-    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
-        return set()
+    from .jsonio import StoreUnreadable, load_json_store
+    path = dismissed_path(m)
+    data = load_json_store(path, default=[])
+    if not isinstance(data, list):
+        raise StoreUnreadable(path, f"expected a list, found {type(data).__name__}")
+    return {(int(d["index"]), d.get("issue") or "") for d in data if isinstance(d, dict)}
 
 
 def dismiss_finding(m, index: int, issue: str, finding_id: str | None = None) -> None:
+    from .jsonio import StoreUnreadable, load_json_store
     path = dismissed_path(m)
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        data = []
+    data = load_json_store(path, default=[])
+    if not isinstance(data, list):
+        raise StoreUnreadable(path, "expected a list")
     entry = {"index": int(index), "issue": issue or ""}
     if finding_id:
         entry["finding_id"] = finding_id
@@ -617,11 +626,10 @@ def dismiss_finding(m, index: int, issue: str, finding_id: str | None = None) ->
 
 
 def undismiss_finding(m, index: int, finding_id: str | None = None) -> None:
+    from .jsonio import load_json_store
     path = dismissed_path(m)
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    data = load_json_store(path, default=[])
+    if not data:
         return
     # Prefer id (survives report regeneration); fall back to legacy index
     # entries that never carried one (old projects).

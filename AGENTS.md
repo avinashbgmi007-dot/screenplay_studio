@@ -5,7 +5,7 @@ Local, privacy-first screenplay analysis & co-writing suite. Parses `.fdx`/`.fou
 ## Tech stack
 
 - **Language:** Python 3 (no build step, stdlib-first)
-- **Package manager:** pip — `requirements.txt` is the source of truth (no `pyproject.toml`)
+- **Packaging:** `pyproject.toml` is the source of truth for the build (setuptools; extras `dev` / `stt` / `ci`). `requirements.txt` is the convenience runtime list and the two agree — do not treat one as authoritative over the other. The app ships **non-`.py` assets** (26 craft-rule JSONs, the no-build-step SPA and its fonts), so `[tool.setuptools.package-data]` + `MANIFEST.in` are load-bearing: without them the wheel installs a silently-empty knowledge base and a 404 frontend. `tests/test_packaging_data_files.py` builds a wheel and an sdist and fails if either stops covering them.
 - **Runtime deps:** `requests`, `flask`, `pdfplumber` (dictation/STT is optional: pip install "faster-whisper>=1.0.0")
 - **Optional:** `pytesseract`/`easyocr` (OCR fallback for text-less PDFs) + `pypdfium2` (lazy-imported PNG rendering for OCR); tesseract lang packs for tel/hin/tam
 - **Frontend:** vanilla JS + CSS SPA in `screenplay_studio/webapp/` — no framework, no bundler, no node
@@ -14,7 +14,8 @@ Local, privacy-first screenplay analysis & co-writing suite. Parses `.fdx`/`.fou
 ## Commands
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt      # runtime only
+pip install ".[ci]"                  # + pytest / playwright / ruff / setuptools (what CI installs)
 
 # Full pipeline: parse -> analyze -> interactive chat
 python -m screenplay_studio run script.fountain --project ./proj --server http://localhost:8080
@@ -64,6 +65,8 @@ Key flows:
 - **Flag, don't drop** — unverifiable findings are flagged, never silently removed.
 - **Evidence-first** — every analyzer quote is verified against the actual script text.
 - **Fail loudly with actionable errors** — e.g. missing OCR engine returns a clear message, not an empty parse.
+- **Ship the data files** — the product is a no-build-step SPA plus a JSON craft knowledge base, so packaging is correctness, not polish. If `package-data`/`MANIFEST.in` stop covering an asset the app needs, the install degrades *silently* (empty KB, 404 frontend) rather than erroring. `tests/test_packaging_data_files.py` builds a real wheel and sdist to prevent that.
+- **Escape at the render boundary** — the SPA has one canonical `escapeHtml()` in `core.js`; every `innerHTML` sink that interpolates finding, script, chat or config text goes through it, and the SPA document carries a strict `script-src 'self'` CSP. Never build event handlers by string-concatenating data (`tests/e2e_browser_xss_inert.py`).
 - **Tests** live in `tests/` and talk to `tests/mock_unified_server.py`; run against the real llama-server only if you have one.
 
 ## Docs index

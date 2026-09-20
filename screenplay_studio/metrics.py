@@ -5,7 +5,6 @@ telemetry the WRITER can see, stored only on this machine; nothing leaves
 the project directory.
 """
 
-import json
 import os
 import time
 
@@ -18,40 +17,57 @@ def metrics_path(m) -> str:
 
 
 def load(m) -> dict:
-    try:
-        with open(metrics_path(m), encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return {}
+    # Missing -> {} ; damaged -> StoreUnreadable. The A3 atomic write only fixed
+    # half the A3 shape: `load` still read a torn file as {} — i.e. the writer's
+    # stats silently reset, and the next record_* wrote over the torn file.
+    from .jsonio import StoreUnreadable, load_json_store
+    data = load_json_store(metrics_path(m), default={})
+    if not isinstance(data, dict):
+        raise StoreUnreadable(metrics_path(m),
+                              f"expected an object, found {type(data).__name__}")
+    return data
 
 
 def _save(m, data: dict) -> None:
-    with open(metrics_path(m), "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    """Atomic (A3, 2026-09-20): this used to be a raw non-atomic write, so a
+    crash mid-write left a torn file that `load` then read back as {} — silently
+    resetting the writer's stats on the next record_*."""
+    from .jsonio import atomic_write_json
+    atomic_write_json(metrics_path(m), data)
+
+
+def _modify(m, apply) -> None:
+    """Load-modify-write under the per-path lock: a racing request cannot
+    clobber a stat it never saw (jsonio's documented contract)."""
+    from .jsonio import lock_for
+    with lock_for(metrics_path(m)):
+        data = load(m)
+        apply(data)
+        _save(m, data)
 
 
 def record_analysis(m, seconds: float) -> None:
-    data = load(m)
-    data["analysis_seconds"] = round(seconds, 1)
-    data["last_analysis_ts"] = time.time()
-    _save(m, data)
+    def apply(data):
+        data["analysis_seconds"] = round(seconds, 1)
+        data["last_analysis_ts"] = time.time()
+    _modify(m, apply)
 
 
 def record_reply(m, seconds: float, quoted: bool = False) -> None:
-    data = load(m)
-    times = data.setdefault("reply_seconds", [])
-    times.append(round(seconds, 2))
-    del times[:-MAX_REPLY_SAMPLES]
-    if quoted:
-        data["discussed"] = data.get("discussed", 0) + 1
-    _save(m, data)
+    def apply(data):
+        times = data.setdefault("reply_seconds", [])
+        times.append(round(seconds, 2))
+        del times[:-MAX_REPLY_SAMPLES]
+        if quoted:
+            data["discussed"] = data.get("discussed", 0) + 1
+    _modify(m, apply)
 
 
 def record_findings(m, open_count: int, total: int) -> None:
-    data = load(m)
-    data["findings_open"] = open_count
-    data["findings_total"] = total
-    _save(m, data)
+    def apply(data):
+        data["findings_open"] = open_count
+        data["findings_total"] = total
+    _modify(m, apply)
 
 
 def summarize(m) -> dict:

@@ -93,24 +93,37 @@ def run(base):
               lens.locator(".dock-evidence-scene").count())
 
         # -- 2. Fix Queue section reuses the legacy panel --------------------
-        # GAP-1 law: the queue follows the ONE filter. At the highs-only
-        # default this fixture has no matching rows, so the PANEL (with its
-        # honest "0 shown" hint) is the default-state contract; row-level
-        # checks move below the widening.
+        # GAP-1 law: the queue follows the ONE filter. The default now shows
+        # every severity (2026-09-20 scope contract), so the queue carries rows
+        # out of the box; the honest "0 shown" state is reached by NARROWING
+        # and is asserted below.
         fq = lens.locator(".dock-section-fixqueue .fix-queue, "
                           ".dock-section .fix-queue")
         check("fix queue panel renders in the dock", fq.count() > 0)
 
         # -- 3. findings (scene-level and/or by category) --------------------
-        # GAP-1 law (R5-b completed): the board list follows the ONE filter.
-        # This fixture's findings are all medium/low, so the DEFAULT board
-        # (highs-only) shows the honest empty-filter hint — then toggling the
-        # chips on must reveal the cards. Both sides are the contract.
+        # GAP-1 law (R5-b completed) + the 2026-09-20 SCOPE contract:
+        # the board list follows the ONE filter, and the DEFAULT shows the
+        # ledger whole (all severities) -- because the mass strip above it
+        # counts every finding, a narrower default made the strip and the queue
+        # contradict each other ("6 open of 6" over "0 shown / 6 total").
+        # The honest empty state is STILL the contract; it is now reached by
+        # the writer narrowing, not by a partial default. Both sides asserted.
         notes = lens.locator(".finding-note")
-        check("board: default filter shows the honest empty hint (no highs)",
+        check("board: default ledger is whole (all severities shown)",
+              notes.count() > 0, f"default notes={notes.count()}")
+        # narrow to High only: turn Medium + Low OFF via the severity chips.
+        # This fixture's findings are all medium/low, so the board empties -- and
+        # must SAY so rather than render blank.
+        for label in ["Medium", "Low"]:
+            chip = lens.locator(".fchip", has_text=label).first
+            if chip.count() and "active" in (chip.get_attribute("class") or ""):
+                chip.click()
+                page.wait_for_timeout(400)
+        check("board: narrowed-to-empty filter shows the honest hint (not blank)",
               lens.locator(".dock-lens-hint", has_text="No findings match").count() > 0,
-              f"default notes={notes.count()}")
-        # widen the filter: turn Medium + Low ON via the severity chips
+              f"notes after narrowing={lens.locator('.finding-note').count()}")
+        # widen back: turn Medium + Low ON again and the cards return
         for label in ["Medium", "Low"]:
             chip = lens.locator(".fchip", has_text=label).first
             if chip.count() and "active" not in (chip.get_attribute("class") or ""):

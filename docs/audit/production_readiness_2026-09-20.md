@@ -244,4 +244,77 @@ Continued greenlight. TDD (RED→GREEN): 4 new behavior tests failed RED before 
 
 **Final state (post-decision):** `ruff check .` → All checks passed; full suite → **1336 passed, 0 failed, 3 warnings** in ~73s. Readiness suite 13/13. All greenlit items closed; nothing pushed.
 
+---
 
+## 10. Third pass (2026-09-20, post-rescan): the fork, the last silent store, and a real CI gate
+
+Triggered by a full re-scan of the tree. Five items, each verified by execution.
+
+| # | Item | Status | Evidence |
+|---|---|---|---|
+| F0 | **The count contradiction resolved as a SCOPE problem, not a default problem** | ✅ DONE | The dock's mass strip said `6 open of 6 findings` (whole script) above a fix queue saying `0 shown / 6 total` (filtered). Neither labelled its scope. The N3 counting contract owned *disposition* but not *scope*: added `inFindingFilter()` (ONE predicate) + `findingCounts()` (`total`/`open`/`shown`/`openShown`), the strip now appends `· N shown by filter` when narrowed, and the fix queue's private predicate was deleted. `e2e_browser_phase6_evidence` **31/1 → 33/0**: its pinned "honest empty hint" check is re-scribed to the *new* contract (default shows the ledger whole; the empty state is reached by narrowing), not deleted. |
+| A3 | **The last writer-owned store with a raw write + a swallowing reader** | ✅ DONE | `premise.json` was still `open(...,"w")` at two sites and BOTH readers collapsed every error into "no premise card", so a torn file erased the writer's title/logline/premise/open-questions silently. Now atomic via `atomic_write_json`; `_load_premise()` distinguishes MISSING from UNREADABLE; `POST /premise` returns **409 and refuses to overwrite** a damaged card; `GET` surfaces `premise_error`. Also `metrics.json` (raw → atomic + load-modify-write under `lock_for`). 3 new tests, each shown to fail against the pre-change source (regex matched OLD=True / NEW=False; the old file had 8 blanket `except Exception: pass`). |
+| B1 | **~460 browser checks were never run by CI** | ✅ DONE | New job `test-browser` in `ci.yml` (install chromium, run `tests/run_browser_suites.py`); `test-js` pinned `ubuntu-latest` → `ubuntu-24.04`; every job given a `timeout-minutes`. New `tests/run_browser_suites.py` runs all runnable suites and fails on any failure/crash. The 4 unrunnable suites are named exclusions printed on every run (2 need a live `E2E_BASE`; 2 crash inside the Design-Lab previews). |
+| B4 | **The STT "never off the machine" guard was prefix-bypassable** | ✅ DONE | `url.startswith(("http://localhost","http://127.0.0.1"))` accepted both `http://127.0.0.1@evil.com` (userinfo) and `http://localhost.evil.com` (suffix), both resolving remotely. Now parsed with `urlparse` and the hostname compared against `{localhost, 127.0.0.1, ::1}`. 7 new tests (4 refused, 3 accepted). |
+| F10 | **Palette offered project-only commands in the idea room** | ✅ DONE | They were listed as guarded no-ops, so clicking did nothing. Now hidden entirely without a project (`hasProject` gate). Also removed a duplicate `b` binding — the palette advertised `b` for both Beat Board and Problem Board while the keydown handler only ever opened the Beat Board. 2 new browser checks in `phase9` (**14 → 16/16**). |
+
+**Deliberately NOT changed (with reasons):**
+- **F2/F3 — one finding rendering 4× and floating cards occluding the manuscript.**
+  > **SUPERSEDED — closed in §11.** The paragraph below records the call made
+  > before anyone measured the geometry. A probe then showed 164px of every
+  > finding card lying on the script, so the "needs visual review" deferral was
+  > withdrawn and the occlusion half was fixed and pinned. Kept for the audit
+  > trail; do not read it as current.
+  `e2e_browser_phase13_legacy_cleanup.py:182-193` **pins** the current design: the
+  Problem Board and the Context Dock are meant to coexist, with the board bowing left
+  of an open dock. Making them mutually exclusive would break two deliberate checks,
+  and the per-scene float lives under the frozen visual system (6.5k lines of CSS).
+  Which surface *wins*, and whether the float becomes ink-only, is a product call that
+  needs visual review — not a blind patch. **Recommended:** desk shows ink only; the
+  board and dock carry the cards; then delete the duplicate float.
+- **B5 — the two prompt-budget warnings** (`rules_context.py:182` 65k chars vs a 40k
+  soft ceiling; `context.py:596` an 8.5k irreducible context over an 8.5k budget).
+  Both are already env-configurable; raising the defaults silently would trade
+  correctness for quiet. Both are now documented in `.env.example` with the exact
+  trade-off, so the operator can decide.
+- **B9 — LICENSE / CHANGELOG.** A licensing choice is the owner's, not an agent's.
+
+**Verified after this pass:** `ruff check .` → All checks passed. Full suite →
+**1351 passed, 0 failed, 3 warnings**. Readiness suite 21/21. Browser gate → all
+**25 runnable suites green, 463 checks, 0 failures** (2 skipped by design, 2
+known-broken), every one of them re-run after the final change in this pass.
+Nothing pushed; working tree still uncommitted.
+
+---
+
+## 11. Fourth pass (2026-09-20, second scan): the occlusion was measurable, and the store class
+
+Two threads. The first closed what §10 deliberately left open (F2/F3) once the
+question was answered with a measurement instead of an opinion; the second
+attacks the *class* of bug behind A2/A3 instead of the next instance.
+
+| # | Item | Status | Evidence |
+|---|---|---|---|
+| R6 | **The floating finding cards occluded the manuscript** | ✅ DONE | `.scene-notes` was `position:absolute; right:-18px`, i.e. 196px of the 214px column lay ON the paper. A Playwright probe at 1440x900 measured **6 of 6 cards overlapping script text, worst 164px** — action lines clipped mid-word, exactly as the UI walk's screenshots showed. The margin is now **in-flow by default** (the failure is impossible by construction) and is promoted to the paper's gutter only when a **container query** says the paper has the room — a container query because the dock takes 380px *without changing the viewport width*, which is why the old `@media (max-width: 1100px)` escape never fired with the dock open. Gated on the Problem Board not being an open overlay (it is a `position:absolute` 300px panel sharing that gutter). Re-measured across four states (board expanded / collapsed / hidden, dock open): **0 overlapping cards, 0px**, and the pin is never under the board. |
+| R6b | **A margin finding was a fourth full card with controls** | ✅ DONE | `e2e_browser_phase13_legacy_cleanup` has pinned board+dock coexistence since Phase 13, so surface *removal* was not the fix. Instead the margin aligned with `findingNoteEl`'s own stated contract — "margin pins stay read-only" — which the code did not honour: a pin now carries `Locate` and nothing else, while Rewrite/Discuss keep their homes on the dock's deep cards (asserted by `phase6_evidence`). 6 new live checks in `phase13` (**26 → 32**), plus source-contract guards in `test_production_readiness.py`. |
+| R7 | **The A2/A3 class: "unreadable" reading as "you have nothing"** | ✅ DONE | New `tests/test_store_fault_injection.py` drives **every** writer-owned store through three injected faults (crash-truncated, flipped-byte, zero-byte) and requires, per store: MISSING → its default, VALID → data, DAMAGED → **an error, never the default**, and a load-modify-write must not replace a damaged file's bytes. It found **6 stores still silently degrading**: margin notes, stash, beat board, metrics, finding intents, dismissed findings — each of which not only hid the writer's data but then *overwrote the damaged file* on the next mundane action (add a note, stash a line). All six now read through one shared `jsonio.load_json_store` / `StoreUnreadable`: MISSING → default, PRESENT-BUT-UNREADABLE → raise, so the load-modify-write refuses instead of finalising the loss. The HTTP half is a `StoreUnreadable` handler answering **503 with the store name and the byte-level reason** instead of an empty list. |
+| R7b | **The old test asserting the defect** | ✅ RE-SCRIBED | `tests/test_stash.py::test_load_tolerates_missing_or_bad_file` pinned "missing OR bad → `[]`" — the exact silent-loss contract. It is now `test_load_distinguishes_missing_from_damaged`, with the rationale in the docstring. This is a deliberate contract change, not a flake fix. |
+| R7c | **Discovery: a new store could ship untested** | ✅ DONE | The harness greps every `atomic_write_json(` caller and fails when a module has no registry entry, so the next store cannot be added without fault coverage. Two exemptions are recorded *with reasons* (`orchestrator.py` progress telemetry — transient and fail-soft; `screenplay_parser/models.py` — regenerable from the source, with the unregenerable part covered by the edit-log case). |
+
+**RED-validity, checked rather than assumed:** the harness was run against the
+pre-fix readers first — **36 checks failed** across exactly the six stores above.
+Then one fixed reader (`stash`) was temporarily reverted with the rest in place:
+**exactly 4 checks failed** (3 faults + the overwrite test) and went green again
+when restored. The suite is not vacuous.
+
+**Verified after this pass:** `ruff check .` → All checks passed. Full suite →
+**1419 passed, 0 failed, 3 warnings**. JS → 7/7. Browser gate (`tests/run_browser_suites.py`)
+→ **25 suites, 0 failed, 2 skipped by design, 2 known-broken** (the Design-Lab
+previews, named on every run). Nothing pushed; working tree uncommitted.
+
+**Still open from §10:** B5 (the two prompt-budget warnings — documented in
+`.env.example`, defaults not raised), B9 (LICENSE/CHANGELOG — an owner decision), and
+the UI-walk items that are layout/idea-room work rather than defects: dock density
+(#4), the cryptic scene rail (#5), the idea canvas dead end (#6), idea-room chat
+discovery and input routing (#7), and the narrow-width drawer (#9). See
+`ui_evidence_findings_2026-09-20.md` for the per-defect table.

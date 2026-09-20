@@ -366,8 +366,10 @@
              dead-end toggle. Field ids unchanged. -->
 
         <!-- Idea canvas: a blank page, not a form. The idea phase is free-form
-             — you type whatever comes; it autosaves and titles itself. Sameer is
-             OPTIONAL: the floating pill (or /sameer) summons a chat dedicated to
+             — you type whatever comes; it autosaves and titles itself. The
+             placeholder IS the onboarding: a first-time writer must never face
+             a dead page (UI audit 2026-09-20, defect #6). Sameer is OPTIONAL:
+             the standing pill (or /sameer, or C) summons a chat dedicated to
              this idea alone. The structured logline/questions live behind the
              Structure toggle, out of the way. No doctor, no scripts, no shelf
              here. -->
@@ -379,7 +381,7 @@
             <button id="idea-graduate-btn" class="btn-primary btn-small" type="button" title="Upload the first pages and turn this idea into a script — the wall grows up">✦ Grow into pages</button>
             <input type="file" id="idea-file-input" accept=".fdx,.pdf,.txt,.fountain,.md" hidden>
           </div>
-          <textarea id="idea-content" class="idea-content" spellcheck="false" aria-label="The idea page"></textarea>
+          <textarea id="idea-content" class="idea-content" spellcheck="false" aria-label="The idea page" placeholder="Type the idea in whatever shape it arrived — a scene, a line of dialogue, a question you can't shake. The page saves itself and takes its title from your first words. Press C — or tap Ask Sameer — to talk it through."></textarea>
           <div id="idea-structure-panel" class="idea-structure-panel" style="display:none;">
             <label class="premise-field">Logline
               <textarea id="idea-logline" rows="2" placeholder="One or two sentences that sell the idea."></textarea>
@@ -760,8 +762,8 @@
   <button class="text-popup-item" data-action="locate" style="display:none;"><span class="tp-icon">📍</span> Locate finding</button>
 </div>
 
-<script src="core.js?v=hx1b112"></script>
-<script src="app.js?v=hx1b388"></script>
+<script src="core.js?v=hx1b113"></script>
+<script src="app.js?v=hx1b389"></script>
 <div id="river-current" aria-hidden="true"></div>
 <div class="dawn-wash" aria-hidden="true"></div>
 </body>

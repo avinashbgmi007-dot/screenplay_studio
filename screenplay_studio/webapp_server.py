@@ -28,7 +28,8 @@ from functools import lru_cache
 
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 
-from .jsonio import check_safe_id, safe_dir_name, suffixed_id
+from .jsonio import (StoreUnreadable, atomic_write_json, check_safe_id, lock_for,
+                     safe_dir_name, suffixed_id)
 
 from .ideas import IdeaStore
 from .manifest import ProjectManifest
@@ -37,6 +38,52 @@ from .orchestrator import Orchestrator, OrchestratorError
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 
 app = Flask(__name__, static_folder=None)
+
+
+# ---------------------------------------------------------------------------
+# Content-Security-Policy for the SPA document.
+#
+# Containment layer behind the 2026-09-21 escaping fix (finding FE-C1: finding
+# text — model output derived from the writer's own script — reached innerHTML
+# raw and executed in the app origin). Escaping is the fix; this is the backstop
+# so that a sink we miss, or add later, still cannot run script.
+#
+# The policy can be this strict because the SPA makes ZERO external requests:
+# no CDN, no font host, no analytics, and its two scripts are external files
+# (`<script src="core.js">`, `<script src="app.js">`). So `script-src 'self'`
+# with neither 'unsafe-inline' nor 'unsafe-eval' is achievable — and the inline
+# `onclick="…"` handlers that used to be built from finding data had to be
+# replaced with delegated listeners to keep it that way.
+#
+# `style-src` DOES need 'unsafe-inline': index.html carries ~43 style=""
+# attributes and app.js builds a few more. Style injection is not a script
+# execution vector, so that trade is deliberate rather than an oversight.
+#
+# Applied to the SPA DOCUMENT only. CSP travels with the document and governs
+# everything it loads, so nothing else needs the header — which is also what
+# keeps the abandoned design labs (webapp/preview-*/, separate documents with
+# their own inline scripts) working. They are not product surface.
+# ---------------------------------------------------------------------------
+_SPA_CSP = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
+def _harden_spa_document(resp):
+    """Attach the CSP and companion hardening headers to the SPA document."""
+    resp.headers["Content-Security-Policy"] = _SPA_CSP
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +204,24 @@ def _value_error(e):
 app.config["MAX_CONTENT_LENGTH"] = 256 * 1024 * 1024
 
 
+@app.errorhandler(StoreUnreadable)
+def _store_unreadable(e):
+    """A damaged store is reported as damage (503), never as "you have none".
+
+    Every writer-owned store now distinguishes MISSING from UNREADABLE
+    (jsonio.load_json_store). This is the HTTP half of that contract: the SPA
+    gets a named error plus the byte-level reason instead of an empty list that
+    looks like the writer never saved anything — and, because every mutator
+    loads before it saves, the write behind it is refused rather than finalising
+    the loss over a file that could still be recovered by hand.
+    """
+    name = os.path.basename(getattr(e, "path", "") or "store")
+    return jsonify({"error": f"{name} is damaged and was not touched: "
+                             f"{getattr(e, 'detail', '')}",
+                    "store": name,
+                    "unreadable": True}), 503
+
+
 @app.errorhandler(413)
 def _too_large(e):
     return jsonify({"error": "Upload too large (limit 256MB). "
@@ -173,7 +238,7 @@ def index():
         # SameSite=Strict so a foreign page's request never carries it; the SPA
         # reads it and echoes it back as the X-Studio-Token header.
         resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
-    return resp
+    return _harden_spa_document(resp)
 
 
 @app.route("/<path:filename>")
@@ -182,6 +247,11 @@ def static_files(filename):
     # No-build-step app: always revalidate JS/CSS so edits show up on reload
     # instead of serving a stale cached copy.
     resp.headers["Cache-Control"] = "no-cache"
+    # The SPA document is also reachable as /index.html — harden it there too,
+    # and only there: the preview-* design labs are separate documents with
+    # their own inline scripts and are deliberately left alone.
+    if filename == "index.html":
+        _harden_spa_document(resp)
     return resp
 
 
@@ -349,6 +419,28 @@ def _load_report_sanitized(m: ProjectManifest) -> dict:
 
 def _error(message: str, status: int = 400):
     return jsonify({"error": message}), status
+
+
+def _load_premise(project_dir: str):
+    """Read premise.json, distinguishing MISSING from UNREADABLE.
+
+    A3 (2026-09-20): the previous shape swallowed every exception and treated
+    the result as "no premise card" — so a torn file (which the raw, non-atomic
+    write could produce) silently erased the writer's title/logline/premise/
+    open-questions from the UI, permanently and without a word. Missing is a
+    legitimate empty; damage is reported.
+
+    Returns (card, error): card is the parsed dict or None; error is a
+    human-readable string when the file exists but cannot be read.
+    """
+    path = os.path.join(project_dir, "premise.json")
+    if not os.path.exists(path):
+        return None, None
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f), None
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        return None, f"premise.json is unreadable ({type(e).__name__})"
 
 
 class CowriterUnavailableError(Exception):
@@ -584,12 +676,13 @@ def get_project(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
     data = _manifest_summary(m)
-    # An idea that graduated carries its premise card alongside the pages
-    try:
-        with open(os.path.join(m.project_dir, "premise.json"), "r", encoding="utf-8") as f:
-            data["premise"] = json.load(f)
-    except Exception:
-        pass
+    # An idea that graduated carries its premise card alongside the pages.
+    # Missing is a legitimate empty; UNREADABLE is damage and says so (A3).
+    card, perr = _load_premise(m.project_dir)
+    if card is not None:
+        data["premise"] = card
+    if perr:
+        data["premise_error"] = perr
     return jsonify(data)
 
 
@@ -917,17 +1010,22 @@ def save_project_premise(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
     card = (request.get_json() or {}).get("card") or {}
-    stored = {}
-    try:
-        with open(os.path.join(m.project_dir, "premise.json"), "r", encoding="utf-8") as f:
-            stored = json.load(f)
-    except Exception:
-        pass
-    for key in ("title", "logline", "premise", "questions"):
-        if key in card:
-            stored[key] = card[key]
-    with open(os.path.join(m.project_dir, "premise.json"), "w", encoding="utf-8") as f:
-        json.dump(stored, f, ensure_ascii=False, indent=2)
+    path = os.path.join(m.project_dir, "premise.json")
+    # Hold the per-path lock across the load-modify-write so a racing save
+    # cannot clobber a field it never saw (jsonio's documented contract).
+    with lock_for(path):
+        stored, perr = _load_premise(m.project_dir)
+        if perr:
+            # A3: never treat a damaged card as empty. Writing on would replace
+            # the writer's logline/premise with a partial card, silently.
+            return _error(
+                f"{perr}. Refusing to overwrite it — repair or remove the file first.",
+                409)
+        stored = stored or {}
+        for key in ("title", "logline", "premise", "questions"):
+            if key in card:
+                stored[key] = card[key]
+        atomic_write_json(path, stored)
     return jsonify({"premise": stored})
 
 

@@ -11,7 +11,6 @@ pull them back later.
 
 from __future__ import annotations
 
-import json
 import os
 import time
 import uuid
@@ -22,14 +21,14 @@ def stash_path(project_dir: str) -> str:
 
 
 def load_stash(project_dir: str) -> list[dict]:
-    try:
-        with open(stash_path(project_dir), "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, list):
-            return [e for e in data if isinstance(e, dict) and e.get("text")]
-    except (OSError, ValueError):
-        pass
-    return []
+    # missing -> [] ; damaged -> StoreUnreadable (never [] — that read as "your
+    # stash is empty" and the next add_to_stash then overwrote the damaged file)
+    from .jsonio import StoreUnreadable, load_json_store
+    path = stash_path(project_dir)
+    data = load_json_store(path, default=[])
+    if not isinstance(data, list):
+        raise StoreUnreadable(path, f"expected a list, found {type(data).__name__}")
+    return [e for e in data if isinstance(e, dict) and e.get("text")]
 
 
 def add_to_stash(project_dir: str, text: str, title: str = "", scene_number: int | None = None) -> dict:

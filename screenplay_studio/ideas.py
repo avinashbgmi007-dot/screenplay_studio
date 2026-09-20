@@ -181,8 +181,10 @@ class IdeaStore:
         # the blank page is the primary material — carry it too, so the script
         # desk keeps the notes the idea grew from
         card["content"] = meta.get("content") or ""
-        with open(os.path.join(project_dir, "premise.json"), "w", encoding="utf-8") as f:
-            json.dump(card, f, ensure_ascii=False, indent=2)
+        # A3 (2026-09-20): atomic like every other writer-owned store — a torn
+        # premise.json used to read back as "no card" and silently lose the
+        # writer's logline/premise on graduation.
+        atomic_write_json(os.path.join(project_dir, "premise.json"), card)
         src = self.sessions_dir(idea_id)
         dst = os.path.join(project_dir, "sessions")
         os.makedirs(dst, exist_ok=True)

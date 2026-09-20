@@ -23,11 +23,40 @@ stt = ["faster-whisper>=1.0.0"]
 # Installed by CI so the full suite is reproducible there, and locally when
 # developing. test_pdf_ocr.py imports pypdfium2 directly (no importorskip
 # guard); playwright drives the 30 e2e_browser_*.py suites (not collected by
-# pytest's default glob). Add pytest-cov when coverage runs are wanted.
-ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "ruff>=0.6"]
+# pytest's default glob). setuptools is here because
+# test_packaging_data_files.py *builds* a wheel and an sdist and asserts their
+# contents — it needs the build backend importable, not just available to pip's
+# isolated build env. Add pytest-cov when coverage runs are wanted.
+ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "ruff>=0.6", "setuptools>=68"]
 
 [tool.setuptools]
 packages = ["screenplay_parser", "screenplay_analyzer", "screenplay_cowriter", "screenplay_studio", "knowledge_base"]
+# Ship the non-.py assets too. `packages` alone yields a wheel with ZERO data
+# files: no craft-rule JSON (the KB degrades *silently* to empty — every report
+# loses its "grounded in rule X" claim with no error) and no SPA at all (the
+# `/` route 404s). Both are required for `pip install .` to produce a working
+# app, so this is a correctness fix, not packaging polish. The setting also
+# carries anything MANIFEST.in lists into the wheel, keeping sdist and wheel in
+# agreement.
+include-package-data = true
+
+[tool.setuptools.package-data]
+# 263 attributed craft rules across 26 files, plus the index/schema the loader
+# globs for at import time.
+knowledge_base = ["*.json", "*.md", "rules/*.json"]
+# The SPA and its fonts. There is no build step — these files ARE the artifact,
+# so each extension is listed explicitly. `webapp/**/*.<ext>` is recursive: the
+# preview-* design labs are still served by the `/<path:filename>` route and are
+# exercised by test_preview_lab.py, and they nest two levels deep
+# (preview-r4/v2/*.html), so a single-level glob silently drops them.
+# Screenshots (*.png) are deliberately excluded: they are evidence artifacts,
+# not app assets.
+screenplay_studio = [
+    "webapp/**/*.html",
+    "webapp/**/*.js",
+    "webapp/**/*.css",
+    "webapp/**/*.woff2",
+]
 
 
 [tool.ruff]
