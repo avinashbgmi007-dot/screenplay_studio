@@ -233,3 +233,44 @@ disease), export/share reports (out of scope, privacy-first product), AI "fix it
 me" auto-apply (diagnose/prescribe split is a load-bearing convention; Rewrite modal
 already exists for the writer-initiated case).
 
+
+## 15. Analysis-run UX + user-approved backend additions (P2 phase)
+
+### 15.1 Progress storytelling (upgrade of the existing chip + stage hover map)
+The progress data (stage events + `ts` heartbeat in `progress.json`) already exists;
+this is presentation only. The running state shows a **stage ladder** (the 12 passes as
+a vertical rail: done ✓ / current ● with elapsed seconds / pending ○), the current
+stage's plain-language caption ("Reading dialogue — who sounds like whom"), and a live
+heartbeat ("working… 34s on this pass") so a long pass reads as *working*, never
+*stuck*. Hover/focus on any stage shows what it does and what it produced so far.
+Creative-but-honest constraint: no fake percentages — only real stage events; elapsed
+time, not invented progress.
+
+### 15.2 Retry: failed-only vs full re-run — BOTH offered, honestly labeled
+Endpoint semantics (verified `orchestrator.py:53–87`, ARCHITECTURE §5):
+`retry_failed=True` re-runs ONLY failed categories and merges (`AnalysisResult.merge`);
+`genre`/`logline_test` retries auto-pull `coverage` (their prerequisite); a failed
+retry preserves the previous partial record. UI copy:
+- **"Rerun the 2 failed passes"** — *fast, and your good findings stay worded exactly
+  as they were.* (Default action.)
+- **"Rerun the whole analysis"** — *fresh eyes on everything; note: the model may
+  re-word findings it already gave you, so 'fixed/new' counts get noisy unless you've
+  edited the script.* (Secondary.)
+Rule of thumb surfaced in the banner: **edited the script → full; just want the missing
+passes → failed-only.**
+
+### 15.3 (A) Live deterministic lint on edit — `POST /projects/<n>/quickcheck` (NEW)
+On inline edit / rewrite apply / undo / redo: re-run the DETERMINISTIC passes only
+(`continuity.py` + `formatting_check.py` — no LLM, milliseconds), refresh ink + counts.
+Results are **provisional and labeled** ("live check — full pass pending") until the
+next model analysis, preserving the honesty contract. The deterministic doctor never
+sleeps; the model stays on-demand.
+
+### 15.4 (B) Pass history + convergence line (NEW)
+Append-only `pass_history.json` store (one entry per completed/partial analysis:
+timestamp, totals, addressed, still_live, categories ok/failed — the numbers
+`last_pass` already computes, kept beyond one generation). Ledger shows one line:
+*"Pass 5 · 62 → 19 open · converging"* with a hover sparkline. One line, not a
+dashboard. Written inside the existing store conventions (`atomic_write_json` +
+`lock_for`, one lock).
+
