@@ -4,9 +4,9 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 3 — T1 closed + widened; T1b/T1c found and
+**Last updated:** 2026-09-21 (pass 3 — T1 closed + widened; T1b/T1c/T1d found and
 fixed; T2 verified and downgraded; a gate flake found and retired)
-**HEAD:** `812299a` (pushed; `git ls-remote origin main` agrees)
+**HEAD:** `4df05a5` (pushed; `git ls-remote origin main` agrees)
 **Baseline for this pass:** `812299a`
 
 ---
