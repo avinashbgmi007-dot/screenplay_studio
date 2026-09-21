@@ -107,6 +107,7 @@ ledger**.
 | `model_used` | Report/dock header (status strip shows config model — possibly not the analyzing model) |
 | `coverage.genre/tone/strengths/comparable_films` | Coverage section of the dock (collapsed by default) |
 | `/fixqueue` stripped fields (`evidence_quote`, `verification`) | Add to server allowlist (`webapp_server.py:1867–1879`) so queue rows carry verification state |
+| `formatting_findings[]` (separate report array; today rendered only into `report.md`, app.js never reads it) | Dock "Formatting" section (collapsed by default; labeled as deterministic checks, not model judgment) |
 
 Rider (red-team): every count in the banner/queue/dock is computed through
 `findingDisposition` — no exceptions.
