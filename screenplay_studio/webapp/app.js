@@ -1991,20 +1991,6 @@ function restoreSession() {
 
 function goHome() {
 
-  // Clean up the feedback view if we were in it -- otherwise state.view stays
-  // "fv" and the scroll observer leaks, causing screen overlap on next open.
-  if (state.view === "fv") {
-    var fvEl = document.getElementById("feedback-view");
-    if (fvEl) fvEl.style.display = "none";
-    if (typeof fvScrollObserver !== "undefined" && fvScrollObserver) {
-      fvScrollObserver.disconnect(); fvScrollObserver = null;
-    }
-    fvCurrentScene = -1;
-    var cowriteBtn = document.getElementById("room-cowrite-btn");
-    var feedbackBtn = document.getElementById("room-feedback-btn");
-    if (cowriteBtn) { cowriteBtn.classList.add("active"); cowriteBtn.setAttribute("aria-selected", "true"); }
-    if (feedbackBtn) { feedbackBtn.classList.remove("active"); feedbackBtn.setAttribute("aria-selected", "false"); }
-  }
   // Hide the problem board -- it belongs to a project that's going away
   hideProblemBoard();
   state.view = "cowrite";
@@ -2228,10 +2214,6 @@ function setRoom(room) {
   $("#compare-view").style.display = "none";
   $("#revision-view").style.display = "none";
   $("#premise-view").style.display = "none";
-  // the Feedback View is also a full-screen surface: leaving it via a room
-  // switch (cowrite btn, gutter tab, palette) must hide it too, or it stacks
-  // on top of the workspace and both render at half height
-  $("#feedback-view").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "flex";
   saveSession();
@@ -3012,8 +2994,8 @@ function locateFinding(f, index) {
   if (scene == null) { showError("This finding isn't tied to a specific scene."); return; }
   // in the revision view, stay inside it — jump the revision column instead
   // of yanking the writer back to the workspace
-  if (state.view === "revision" || state.view === "fv") {
-    if (state.view === "revision") jumpRevisionScene(scene);
+  if (state.view === "revision") {
+    jumpRevisionScene(scene);
     const quote = (f.evidence_quote || "").trim();
     if (quote) {
       const q = normText(quote);
@@ -3967,7 +3949,7 @@ function renderCharacterPanel(container) {
 
 // ---- character dials: trait scores per main character ----
 // The dials used to render ONLY into #struct-rail (style.css declares the rail
-// display:none -- dead chrome) and into the dormant #feedback-view, so on the live
+// display:none -- dead chrome) and into the since-deleted #feedback-view clone, so on the live
 // desk 15 dial rows existed with none of them reachable (audit gap
 // B/character_dials). ONE renderer now feeds three reachable surfaces: the page-one
 // craft shelf, the dock Evidence lens and the feedback report.
@@ -5926,25 +5908,27 @@ function adoptChatIntoDock(lens) {
   const fallback = slot.parentElement.querySelector(".dock-chat-fallback");
   if (!state.currentProject) {
     if (fallback) fallback.hidden = false;
+    // P0.1: the consult column lives in the sushruta slot permanently — with
+    // no project the lens shows its honest hint, not empty doctor chrome
+    const parked = slot.querySelector(".fv-consult");
+    if (parked) parked.style.display = "none";
     return; // no project: the lens keeps its honest hint
   }
   if (fallback) fallback.hidden = true;
 
-  // Sameer lens adopts the co-write conversation (messages + rail + composer);
-  // Sushruta lens adopts the consultant chat from the Feedback View.
+  // Sameer lens adopts the co-write conversation (messages + rail + composer).
+  // The Sushruta lens needs no adoption: the consultant's chat column lives
+  // permanently in the dock's sushruta slot — P0.1 deleted its old host, the
+  // dormant #feedback-view clone.
   if (lens === "sameer") {
     const panel = document.getElementById("cowrite-panel");
     if (!panel) return;
     slot.appendChild(panel); // the whole panel moves; IDs + listeners ride along
     panel.classList.add("dock-adopted-away");
   } else if (lens === "sushruta") {
-    const consult = document.querySelector("#feedback-view .fv-consult");
-    if (!consult) return;
-    // the doctor's whole chat column (head + messages + composer) moves as
-    // one unit — the Feedback View keeps its script/board panes untouched
-    slot.appendChild(consult);
-    consult.classList.add("dock-adopted-away");
-    renderFvChat("fv-consult-messages", "consult"); // refresh after the move
+    const consult = slot.querySelector(".fv-consult");
+    if (consult) consult.style.display = ""; // un-parked (see the no-project branch)
+    renderFvChat("fv-consult-messages", "consult"); // refresh on lens entry
   }
   _dockChatAdopted = lens;
   // persona contract: the lens IS the partner — Sameer lens speaks as the
@@ -5973,14 +5957,7 @@ function returnChatFromDock() {
       panel.style.display = ""; // setRoom decides visibility again
     }
   } else if (lens === "sushruta") {
-    const consult = document.querySelector(".dock-chat-slot .fv-consult") ||
-                    document.querySelector("#feedback-view .fv-consult");
-    if (consult) {
-      consult.classList.remove("dock-adopted-away");
-      const fvBody = document.querySelector("#feedback-view .fv-body");
-      if (fvBody) fvBody.insertBefore(consult, fvBody.firstChild);
-      renderFvChat("fv-consult-messages", "consult");
-    }
+    // the consult column's home IS the dock slot (P0.1) — nothing moves back
   }
   _dockChatAdopted = null;
 }
@@ -6004,7 +5981,6 @@ async function hideAllViews() {
   $("#beatboard-view").style.display = "none";
   $("#compare-view").style.display = "none";
   $("#revision-view").style.display = "none";
-  $("#feedback-view").style.display = "none";
   $("#premise-view").style.display = "none";
   const ws = document.querySelector(".workspace");
   if (ws) ws.style.display = "none";
@@ -6359,341 +6335,15 @@ function closeRevisionView() {
   setRoom(revisionPrevRoom);
 }
 
-// Feedback View - 3-panel layout: Sushruta left, script center, Problem Board/Sameer right
-var fvPrevRoom = "cowrite";
-var fvCurrentScene = -1;
-var fvBoardFilter = "all";
-
+// "Feedback" opens the Evidence dock: the dock's Evidence lens IS the ledger
+// and the dock carries both partners — one real manuscript, no shrunken
+// clone, one ledger. The old 3-panel #feedback-view was deleted in P0.1.
 async function openFeedbackView() {
-  // FV folded into the room (GO 2, ratified 1A): the dock's Evidence lens IS
-  // the Problem Board and the dock carries both partners — one real
-  // manuscript, no shrunken clone, one ledger. The old 3-panel view
-  // (#feedback-view) stays dormant: setRoom hides it and no reachable path
-  // selects the fv view any more (grep gate in the layout audit).
   if (state.view !== "cowrite") setRoom("cowrite");
   if (state.currentProject && !state.script) {
     try { await loadScriptData(); } catch (e) { showError("Could not load the script: " + e.message); }
   }
   openDock("evidence");
-}
-
-function closeFeedbackView() {
-  var fv = document.getElementById("feedback-view");
-  if (fv) {
-    fv.style.display = "none";
-    fv.classList.remove("fv-maximized");
-  }
-  var maxBtn = document.getElementById("fv-maximize");
-  if (maxBtn) { maxBtn.textContent = "\u29A2 Maximize script"; maxBtn.title = "Give the script the whole room \u2014 hide both side panels"; }
-  if (fvScrollObserver) { fvScrollObserver.disconnect(); fvScrollObserver = null; }
-  fvCurrentScene = -1;
-  // Hide the Problem Board — it will re-show via scroll sync when the
-  // workspace re-renders, starting from the top scene cleanly.
-  hideProblemBoard();
-  var cowriteBtn = document.getElementById("room-cowrite-btn");
-  var feedbackBtn = document.getElementById("room-feedback-btn");
-  if (cowriteBtn) { cowriteBtn.classList.add("active"); cowriteBtn.setAttribute("aria-selected", "true"); }
-  if (feedbackBtn) { feedbackBtn.classList.remove("active"); feedbackBtn.setAttribute("aria-selected", "false"); }
-  // Restore project bar and workspace visibility
-  if (state.currentProject) {
-    document.getElementById("project-bar").style.display = "flex";
-    document.getElementById("welcome-view").style.display = "none";
-    var ws = document.querySelector(".workspace");
-    if (ws) ws.style.display = "flex";
-  }
-  setRoom(fvPrevRoom);
-}
-
-function renderFeedbackView() {
-  var box = document.getElementById("fv-script");
-  if (!box) return;
-  var script = state.script;
-  var findings = state.findings || [];
-  if (!script || !script.scenes) {
-    box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">No script loaded.</div>';
-    return;
-  }
-  var html = '<div class="fv-script-inner">';
-  script.scenes.forEach(function(scene, idx) {
-    var sceneNum = idx + 1;
-    html += '<div class="fv-scene" data-scene="' + escapeHtml(sceneNum) + '">';
-    html += '<div class="paper">';
-    // Raw script text — the highest-value payload on the page. Dormant today
-    // (renderFeedbackView has no live caller) but escaped so a future re-enable
-    // cannot resurrect the sink.
-    html += '<div style="font-weight:bold;text-transform:uppercase;margin-bottom:8px;">' + escapeHtml(scene.heading || 'Scene ' + sceneNum) + '</div>';
-    if (scene.action) html += '<div style="margin-bottom:8px;">' + escapeHtml(scene.action) + '</div>';
-    if (scene.dialogue) {
-      scene.dialogue.forEach(function(d) {
-        if (d.character) html += '<div style="text-align:center;font-weight:bold;margin-top:12px;">' + escapeHtml(d.character) + '</div>';
-        if (d.parenthetical) html += '<div style="text-align:center;font-style:italic;color:var(--paper-muted);">' + escapeHtml(d.parenthetical) + '</div>';
-        if (d.text) html += '<div style="text-align:center;padding:0 40px;">' + escapeHtml(d.text) + '</div>';
-      });
-    }
-    html += '</div>';
-    var sceneFindings = findings.filter(function(f) {
-      if (f.scene_refs && f.scene_refs.indexOf(sceneNum) !== -1) return true;
-      if (f.scene === sceneNum) return true;
-      return false;
-    });
-    if (sceneFindings.length > 0) {
-      var sevCounts = { high: 0, medium: 0, low: 0 };
-      sceneFindings.forEach(function(f) { var s = (f.severity || 'medium').toLowerCase(); sevCounts[s] = (sevCounts[s] || 0) + 1; });
-      html += '<div class="fv-finding-dots">';
-      if (sevCounts.high) html += '<span class="sev-dot high" title="' + sevCounts.high + ' high"></span>';
-      if (sevCounts.medium) html += '<span class="sev-dot medium" title="' + sevCounts.medium + ' medium"></span>';
-      if (sevCounts.low) html += '<span class="sev-dot low" title="' + sevCounts.low + ' low"></span>';
-      html += '<span class="fv-dot-count">' + sceneFindings.length + ' finding' + (sceneFindings.length > 1 ? 's' : '') + '</span>';
-      html += '<button class="fv-dot-expand" data-fv-scene="' + escapeHtml(sceneNum) + '">view \u2192</button>';
-      html += '</div>';
-    }
-    html += '</div>';
-  });
-  // the fin: an explicit end-of-script marker so the script column reads as a
-  // finished document — the board beside it is a panel with its own scroll,
-  // and this cap makes that relationship visually honest
-  html += '<div class="fv-fin" aria-hidden="true"><span class="fv-fin-rule"></span><span class="fv-fin-mark">fin</span><span class="fv-fin-rule"></span></div>';
-  html += '</div>';
-  box.innerHTML = html;
-  renderFvChat('fv-consult-messages', 'consult');
-  renderFvBoard();
-  if (findings.length > 0) { switchFvTab('board'); } else { switchFvTab('sameer'); }
-  var statusEl = document.getElementById('fv-status');
-  if (statusEl) {
-    if (findings.length > 0) {
-      statusEl.textContent = findings.length + ' finding' + (findings.length > 1 ? 's' : '') + ' across ' + script.scenes.length + ' scenes';
-    } else {
-      statusEl.textContent = 'No findings yet \u2014 Run Analysis...';
-    }
-  }
-}
-
-function renderFvBoard() {
-  var list = document.getElementById('fv-board-list');
-  if (!list) return;
-  var findings = state.findings || [];
-  var filtered = fvBoardFilter === 'all' ? findings : findings.filter(function(f) { return (f.severity || 'medium').toLowerCase() === fvBoardFilter; });
-  var title = document.getElementById('fv-board-title');
-  if (title) title.textContent = 'Problem Board \u2014 ' + filtered.length + ' finding' + (filtered.length !== 1 ? 's' : '');
-  if (!filtered.length) {
-    list.innerHTML = '<div class="fv-board-empty">No findings to show.<br>Run Analysis to generate findings.</div>';
-    return;
-  }
-  var html = '';
-  filtered.forEach(function(f) {
-    var sev = (f.severity || 'medium').toLowerCase();
-    var sceneNum = (f.scene_refs && f.scene_refs[0]) || f.scene || '?';
-    var idx = f.index !== undefined ? f.index : 0;
-    // Same contract as renderProblemBoard: escaped text, data-* wiring only,
-    // resolved by the delegated listener in init.
-    html += '<div class="fv-board-row" data-findex="' + escapeHtml(idx) + '" data-scene="' + escapeHtml(sceneNum) + '">';
-    html += '<span class="fv-board-sev ' + escapeHtml(sev) + '"></span>';
-    html += '<span class="fv-board-scene">Sc ' + escapeHtml(sceneNum) + '</span>';
-    html += '<div class="fv-board-body">';
-    html += '<div class="fv-board-cat">' + escapeHtml(f.category || 'General') + '</div>';
-    html += '<div class="fv-board-issue">' + escapeHtml(f.description || f.issue || '') + '</div>';
-    html += '<div class="fv-board-actions">';
-    html += '<button class="btn-secondary" data-fv-act="discuss" data-findex="' + escapeHtml(idx) + '">Discuss</button>';
-    html += '<button class="btn-secondary" data-fv-act="locate" data-findex="' + escapeHtml(idx) + '" data-scene="' + escapeHtml(sceneNum) + '">Locate</button>';
-    html += '</div></div></div>';
-  });
-  list.innerHTML = html;
-  updateFvBoardHighlight();
-}
-
-function fvBoardClick(findex, sceneNum) {
-  var box = document.getElementById('fv-script');
-  if (!box) return;
-  var scene = box.querySelector('.fv-scene[data-scene="' + sceneNum + '"]');
-  if (scene) scene.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function fvBoardLocate(findex, sceneNum) { fvBoardClick(findex, sceneNum); }
-
-function fvBoardDiscuss(findex) {
-  var finding = (state.findings || [])[findex];
-  if (!finding) return;
-  switchFvTab('sameer');
-  var input = document.getElementById('fv-cowrite-input');
-  if (input) {
-    var refs = (finding.scene_refs || []).map(function(n) { return 'Scene ' + n; }).join(', ') || 'the whole script';
-    input.value = 'About the note on ' + refs + ': ' + (finding.description || finding.issue || '').substring(0, 180);
-    input.focus();
-  }
-}
-
-function scrollFvBoardToScene(sceneNum) {
-  switchFvTab('board');
-  var list = document.getElementById('fv-board-list');
-  if (!list) return;
-  var firstRow = list.querySelector('.fv-board-row[data-scene="' + sceneNum + '"]');
-  if (firstRow) firstRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function switchFvTab(tab) {
-  var boardTab = document.getElementById('fv-tab-board');
-  var sameerTab = document.getElementById('fv-tab-sameer');
-  var boardPane = document.getElementById('fv-board-pane');
-  var sameerPane = document.getElementById('fv-sameer-pane');
-  if (tab === 'board') {
-    if (boardTab) boardTab.classList.add('active');
-    if (sameerTab) sameerTab.classList.remove('active');
-    if (boardPane) boardPane.style.display = 'flex';
-    if (sameerPane) sameerPane.style.display = 'none';
-    renderFvBoard();
-  } else {
-    if (sameerTab) sameerTab.classList.add('active');
-    if (boardTab) boardTab.classList.remove('active');
-    if (sameerPane) sameerPane.style.display = 'flex';
-    if (boardPane) boardPane.style.display = 'none';
-    renderFvChat('fv-cowrite-messages', 'sameer');
-  }
-}
-
-function toggleFvRight() {
-  var right = document.querySelector('#feedback-view .fv-right');
-  var edgeTab = document.getElementById('fv-right-edge-tab');
-  if (!right) return;
-  if (right.classList.contains('fv-right-collapsed')) {
-    right.classList.remove('fv-right-collapsed');
-    if (edgeTab) edgeTab.style.display = 'none';
-  } else {
-    right.classList.add('fv-right-collapsed');
-    if (edgeTab) edgeTab.style.display = '';
-  }
-}
-
-// ---- FV pane resizing: draggable dividers + maximize (breathing room) ----
-// Dividers set flex-basis on the side panels (Sushruta left, board right);
-// the script pane flexes to fill the rest. Double-click resets to default.
-function fvApplyPanelWidth(panel, px) {
-  var body = document.querySelector('#feedback-view .fv-body');
-  if (!body) return;
-  var min = 220;
-  var max = Math.round(body.clientWidth * 0.42);
-  px = Math.max(min, Math.min(px, max));
-  panel.style.flex = '0 0 ' + px + 'px';
-  panel.style.width = px + 'px';
-  return px;
-}
-function fvPanelWidth(panel) {
-  return panel.getBoundingClientRect().width;
-}
-function initFvDividers() {
-  var body = document.querySelector('#feedback-view .fv-body');
-  var consult = document.querySelector('#feedback-view .fv-consult');
-  var right = document.querySelector('#feedback-view .fv-right');
-  var dLeft = document.getElementById('fv-divider-left');
-  var dRight = document.getElementById('fv-divider-right');
-  if (!body || !dLeft || !dRight) return;
-
-  function wire(divider, panel, direction) {
-    var dragging = false;
-    divider.addEventListener('mousedown', function(e) {
-      e.preventDefault();
-      dragging = true;
-      document.body.classList.add('fv-resizing');
-    });
-    window.addEventListener('mousemove', function(e) {
-      if (!dragging || !panel) return;
-      var bodyRect = body.getBoundingClientRect();
-      var px;
-      if (direction === 'left') {
-        // left panel: width = pointer - body left edge
-        px = e.clientX - bodyRect.left;
-      } else {
-        // right panel: width = body right edge - pointer
-        px = bodyRect.right - e.clientX;
-      }
-      fvApplyPanelWidth(panel, px);
-    });
-    window.addEventListener('mouseup', function() {
-      if (!dragging) return;
-      dragging = false;
-      document.body.classList.remove('fv-resizing');
-    });
-    divider.addEventListener('dblclick', function() {
-      if (!panel) return;
-      panel.style.flex = '';
-      panel.style.width = '';
-    });
-  }
-  wire(dLeft, consult, 'left');
-  wire(dRight, right, 'right');
-}
-
-function toggleFvMaximize() {
-  var fv = document.getElementById('feedback-view');
-  if (!fv) return;
-  fv.classList.toggle('fv-maximized');
-  var btn = document.getElementById('fv-maximize');
-  var on = fv.classList.contains('fv-maximized');
-  if (btn) {
-    btn.textContent = on ? '\u21C4 Restore panels' : '\u29A2 Maximize script';
-    btn.title = on ? 'Bring the consultant and the board back' : 'Give the script the whole room \u2014 hide both side panels';
-  }
-}
-
-var fvScrollObserver = null;
-
-function initFvScrollSync() {
-  if (fvScrollObserver) fvScrollObserver.disconnect();
-  var box = document.getElementById('fv-script');
-  if (!box) return;
-  fvScrollObserver = new IntersectionObserver(function(entries) {
-    for (var i = 0; i < entries.length; i++) {
-      if (entries[i].isIntersecting) {
-        var sceneNum = parseInt(entries[i].target.dataset.scene);
-        if (sceneNum && sceneNum !== fvCurrentScene) {
-          fvCurrentScene = sceneNum;
-          updateFvSceneHighlight();
-          updateFvBoardHighlight();
-          updateFvStatus(sceneNum);
-        }
-        break;
-      }
-    }
-  }, { root: box, threshold: 0.3 });
-  var scenes = box.querySelectorAll('.fv-scene');
-  for (var j = 0; j < scenes.length; j++) { fvScrollObserver.observe(scenes[j]); }
-}
-
-function updateFvSceneHighlight() {
-  var box = document.getElementById('fv-script');
-  if (!box) return;
-  var scenes = box.querySelectorAll('.fv-scene');
-  for (var i = 0; i < scenes.length; i++) {
-    scenes[i].classList.toggle('active', parseInt(scenes[i].dataset.scene) === fvCurrentScene);
-  }
-}
-
-function updateFvBoardHighlight() {
-  var list = document.getElementById('fv-board-list');
-  if (!list) return;
-  var rows = list.querySelectorAll('.fv-board-row');
-  for (var i = 0; i < rows.length; i++) {
-    var sceneNum = parseInt(rows[i].dataset.scene);
-    rows[i].classList.toggle('highlighted', sceneNum === fvCurrentScene);
-    rows[i].classList.toggle('dimmed', fvCurrentScene > 0 && sceneNum !== fvCurrentScene);
-  }
-  var highlighted = list.querySelector('.fv-board-row.highlighted');
-  if (highlighted) highlighted.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function updateFvStatus(sceneNum) {
-  var status = document.getElementById('fv-status');
-  if (!status) return;
-  var script = state.script;
-  if (!script || !script.scenes) return;
-  var scene = script.scenes[sceneNum - 1];
-  var heading = scene ? (scene.heading || 'Scene ' + sceneNum) : 'Scene ' + sceneNum;
-  var findings = (state.findings || []).filter(function(f) {
-    if (f.scene_refs && f.scene_refs.indexOf(sceneNum) !== -1) return true;
-    if (f.scene === sceneNum) return true;
-    return false;
-  });
-  status.textContent = 'Scene ' + sceneNum + ' of ' + script.scenes.length + ' \u2014 ' + heading;
-  if (findings.length) status.textContent += ' \u2014 ' + findings.length + ' finding' + (findings.length > 1 ? 's' : '');
 }
 
 // tiny escape for the legacy FV bubbles (innerHTML path) — messages are
@@ -6743,18 +6393,6 @@ function renderFvChat(containerId, room) {
   });
   container.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:var(--fs-sm);">Start a conversation...</div>';
   container.scrollTop = container.scrollHeight;
-}
-
-function discussFvFinding(findex) {
-  var finding = (state.findings || [])[findex];
-  if (!finding) return;
-  switchFvTab('sameer');
-  var input = document.getElementById('fv-cowrite-input');
-  if (input) {
-    var refs = (finding.scene_refs || []).map(function(n) { return 'Scene ' + n; }).join(', ') || 'the whole script';
-    input.value = 'About the note on ' + refs + ': ' + (finding.description || finding.issue || '').substring(0, 180);
-    input.focus();
-  }
 }
 
 async function sendFvMessage(partner) {
@@ -7684,7 +7322,6 @@ function bindGlobalShortcuts() {
       if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
       if (state.view === "revision") { closeRevisionView(); return; }
       if (state.view === "premise") { closePremiseView(); return; }
-      if (state.view === "fv") { closeFeedbackView(); return; }
       if (state.view === "compare") { closeCompareView(); return; }
       if (state.view === "beatboard") { closeBeatboardView(); return; }
       // (open modals already returned above — dock/drawer/shelf/rail are safe)
@@ -8648,31 +8285,9 @@ function init() {
   $("#compare-icon").addEventListener("click", () => { closeOverflow(); openCompareView(); });
   $("#revise-btn").addEventListener("click", openRevisionView);
   $("#revision-close").addEventListener("click", closeRevisionView);
-  $("#fv-close").addEventListener("click", closeFeedbackView);
-  // Feedback View: right panel toggle
-  var fvRightEdgeTab = document.getElementById("fv-right-edge-tab");
-  if (fvRightEdgeTab) fvRightEdgeTab.addEventListener("click", toggleFvRight);
-  // Feedback View: chat form submission
+  // Consultant chat composer (the doctor's column lives in the dock's
+  // sushruta slot — P0.1)
   $("#fv-consult-composer").addEventListener("submit", function(e) { e.preventDefault(); sendFvMessage("consultant"); });
-  $("#fv-cowrite-composer").addEventListener("submit", function(e) { e.preventDefault(); sendFvMessage("sameer"); });
-  // Feedback View: maximize toggle (script gets the whole room)
-  var fvMaxBtn = document.getElementById("fv-maximize");
-  if (fvMaxBtn) fvMaxBtn.addEventListener("click", toggleFvMaximize);
-  // Feedback View: tab switching
-  $("#fv-tab-board").addEventListener("click", function() { switchFvTab("board"); });
-  $("#fv-tab-sameer").addEventListener("click", function() { switchFvTab("sameer"); });
-  // Feedback View: board severity filter
-  // Problem Board collapse/expand toggle
-  var fvBoardToggle = document.getElementById('fv-board-toggle');
-  var fvBoardList = document.getElementById('fv-board-list');
-  if (fvBoardToggle && fvBoardList) {
-    fvBoardToggle.addEventListener('click', function() {
-      var collapsed = fvBoardList.style.display === 'none';
-      fvBoardList.style.display = collapsed ? '' : 'none';
-      fvBoardToggle.textContent = collapsed ? '▾' : '▸';
-      fvBoardToggle.title = collapsed ? 'Collapse the Problem Board' : 'Expand the Problem Board';
-    });
-  }
   // Problem Board toggle and filter
   var pbToggle = document.getElementById('pb-toggle');
   if (pbToggle) pbToggle.addEventListener('click', toggleProblemBoard);
@@ -8696,37 +8311,6 @@ function init() {
     });
   }
 
-  // Feedback View board rows: same delegation contract (see renderFvBoard).
-  var fvBoardRowList = document.getElementById('fv-board-list');
-  if (fvBoardRowList) {
-    fvBoardRowList.addEventListener('click', function(e) {
-      var act = e.target && e.target.closest ? e.target.closest('[data-fv-act]') : null;
-      if (act && fvBoardRowList.contains(act)) {
-        var actIdx = Number(act.dataset.findex);
-        if (!isFinite(actIdx)) return;
-        if (act.dataset.fvAct === 'discuss') { fvBoardDiscuss(actIdx); return; }
-        if (act.dataset.fvAct === 'locate') { fvBoardLocate(actIdx, act.dataset.scene); return; }
-        return;
-      }
-      var fvRow = e.target && e.target.closest ? e.target.closest('.fv-board-row') : null;
-      if (!fvRow || !fvBoardRowList.contains(fvRow)) return;
-      var fvIdx = Number(fvRow.dataset.findex);
-      if (!isFinite(fvIdx)) return;
-      fvBoardClick(fvIdx, fvRow.dataset.scene);
-    });
-  }
-
-  // Feedback View script: the "view →" jump chips are delegated too.
-  var fvScriptBox = document.getElementById('fv-script');
-  if (fvScriptBox) {
-    fvScriptBox.addEventListener('click', function(e) {
-      var chip = e.target && e.target.closest ? e.target.closest('[data-fv-scene]') : null;
-      if (!chip || !fvScriptBox.contains(chip)) return;
-      scrollFvBoardToScene(chip.dataset.fvScene);
-    });
-  }
-
-  $("#fv-board-filter").addEventListener("change", function(e) { fvBoardFilter = e.target.value; renderFvBoard(); });
   $("#revision-script").addEventListener("scroll", updateRevisionStatus);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
   $("#clear-chat-btn").addEventListener("click", clearChat);

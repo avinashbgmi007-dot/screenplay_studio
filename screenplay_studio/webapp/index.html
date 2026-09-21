@@ -297,8 +297,23 @@
                 <p class="dock-lens-hint dock-chat-fallback">Sameer — the co-writer beside the page. Open a project and the conversation arrives here.</p>
               </div>
               <div class="dock-lens" id="dock-lens-sushruta" role="tabpanel" aria-labelledby="dock-tab-sushruta" data-lens="sushruta" hidden>
-                <!-- Phase 7: the consultant's chat adopts into this slot -->
-                <div class="dock-chat-slot" data-chat-slot="sushruta"></div>
+                <!-- P0.1: the consultant's chat column lives in this slot
+                     permanently — its old host, the dormant #feedback-view
+                     clone, is deleted (the dock used to adopt it at runtime;
+                     now there is nothing to adopt). Same ids, same handlers. -->
+                <div class="dock-chat-slot" data-chat-slot="sushruta">
+                  <div class="fv-panel fv-consult">
+                    <div class="fv-panel-head">
+                      <div class="fv-avatar consult">D</div>
+                      <div><div class="fv-name">Dr. Sushruta</div><div class="fv-role">script consultant</div></div>
+                    </div>
+                    <div id="fv-consult-messages" class="fv-messages"></div>
+                    <form id="fv-consult-composer" class="fv-composer">
+                      <input id="fv-consult-input" type="text" aria-label="Message Dr. Sushruta" placeholder="Ask Dr. Sushruta..." class="inp">
+                      <button type="submit" class="btn-primary btn-small">&raquo;</button>
+                    </form>
+                  </div>
+                </div>
                 <p class="dock-lens-hint dock-chat-fallback">Dr. Sushruta — the consultant's diagnosis beside the page. Open a project and ask him anything.</p>
               </div>
               <div class="dock-lens dock-notes-lens" id="dock-lens-notes" role="tabpanel" aria-labelledby="dock-tab-notes" data-lens="notes" hidden>
@@ -576,68 +591,6 @@
         <aside id="revision-findings" class="revision-findings" aria-label="Findings queue"></aside>
       </div>
       <footer id="revision-status" class="revision-status"></footer>
-    </section>
-
-    <!-- Feedback View: 3-panel layout: Sushruta left, script center, Problem Board/Sameer right -->
-    <section id="feedback-view" class="view" style="display:none;">
-      <div class="fv-header">
-        <span class="fv-title">Feedback View</span>
-        <span class="fv-sub" id="fv-status">Findings on the page, both partners at hand.</span>
-        <button id="fv-maximize" class="btn-secondary" type="button" title="Give the script the whole room — hide both side panels (click again to restore)">⤢ Maximize script</button>
-        <button id="fv-close" class="btn-secondary" type="button">&larr; Back to the page</button>
-      </div>
-      <div class="fv-body">
-        <!-- Left: Sushruta (consultant) chat -->
-        <div class="fv-panel fv-consult">
-          <div class="fv-panel-head">
-            <div class="fv-avatar consult">D</div>
-            <div><div class="fv-name">Dr. Sushruta</div><div class="fv-role">script consultant</div></div>
-          </div>
-          <div id="fv-consult-messages" class="fv-messages"></div>
-          <form id="fv-consult-composer" class="fv-composer">
-            <input id="fv-consult-input" type="text" aria-label="Message Dr. Sushruta" placeholder="Ask Dr. Sushruta..." class="inp">
-            <button type="submit" class="btn-primary btn-small">&raquo;</button>
-          </form>
-        </div>
-        <div id="fv-divider-left" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the consultant panel — double-click to reset"></div>
-        <!-- Center: Script with compact finding dots -->
-        <div class="fv-script" id="fv-script"></div>
-        <div id="fv-divider-right" class="fv-divider" role="separator" aria-orientation="vertical" title="Drag to resize the board panel — double-click to reset"></div>
-        <!-- Right: Problem Board / Sameer toggle -->
-        <div class="fv-panel fv-right">
-          <div class="fv-right-tabs">
-            <button class="fv-tab active" data-tab="board" id="fv-tab-board">&#128203; Board</button>
-            <button class="fv-tab" data-tab="sameer" id="fv-tab-sameer">&#128172; Sameer</button>
-          </div>
-          <!-- Problem Board -->
-          <div class="fv-right-pane" id="fv-board-pane">
-            <div class="fv-board-head">
-              <button id="fv-board-toggle" class="fv-board-toggle" type="button" title="Collapse/expand the Problem Board">▾</button>
-              <span class="fv-board-title" id="fv-board-title">Problem Board</span>
-              <select id="fv-board-filter" class="fv-board-filter">
-                <option value="all">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div id="fv-board-list" class="fv-board-list"></div>
-          </div>
-          <!-- Sameer chat (hidden by default when findings exist) -->
-          <div class="fv-right-pane" id="fv-sameer-pane" style="display:none;">
-            <div class="fv-panel-head">
-              <div class="fv-avatar cowrite">S</div>
-              <div><div class="fv-name">Sameer</div><div class="fv-role">co-writer</div></div>
-            </div>
-            <div id="fv-cowrite-messages" class="fv-messages"></div>
-            <form id="fv-cowrite-composer" class="fv-composer">
-              <input id="fv-cowrite-input" type="text" aria-label="Suggest a rewrite" placeholder="Rewrite suggestion..." class="inp">
-              <button type="submit" class="btn-primary btn-small">&raquo;</button>
-            </form>
-          </div>
-        </div>
-        <button id="fv-right-edge-tab" class="fv-right-edge-tab" type="button" title="Open the Problem Board">☰ Board</button>
-      </div>
     </section>
 
   </main>

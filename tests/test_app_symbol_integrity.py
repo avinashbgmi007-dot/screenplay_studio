@@ -53,3 +53,18 @@ def test_jump_to_scene_is_locate_only():
     assert len(bodies) == 1, "jumpToScene must have exactly one definition"
     assert "openCowriteRoom" not in bodies[0], \
         "jumpToScene must not open the co-write room -- it is a locate, not a discuss"
+
+
+_INDEX_HTML = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "screenplay_studio", "webapp", "index.html")
+
+
+def test_feedback_view_clone_is_gone():
+    # P0.1: the dormant Feedback View clone (the renderFvBoard family in app.js
+    # plus the #feedback-view markup in index.html) is deleted; the Evidence
+    # dock is the canonical feedback surface.
+    assert "renderFvBoard" not in _source()
+    with open(_INDEX_HTML, encoding="utf-8") as f:
+        # the element id, not the historical phrase in comments
+        assert 'id="feedback-view"' not in f.read()
