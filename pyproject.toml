@@ -93,3 +93,8 @@ testpaths = ["tests"]
 # that passed. 3 skips are expected (test_store_fault_injection's non
 # load-modify-write cases, which are structurally inapplicable).
 addopts = "-rs"
+markers = [
+    # Route-coverage tests report on the REST of the suite, so conftest moves
+    # them to the end (pytest_collection_modifyitems).
+    "route_coverage: asserts every HTTP route was exercised by the whole suite",
+]

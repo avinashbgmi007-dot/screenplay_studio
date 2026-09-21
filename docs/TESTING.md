@@ -94,6 +94,54 @@ Two traps this suite documents, both found by mutation-testing the guard itself:
 python -m pytest tests/test_packaging_data_files.py -q      # 8 checks, ~50s
 ```
 
+## Route coverage (every route is exercised or declared)
+
+`test_route_coverage.py` exists because a hand sweep for untested routes was
+wrong in **both** directions. It reported
+`/api/projects/<name>/beatboard/reset` as unreached when
+`test_beatboard.py::test_reset_endpoint` drives it (the test composes the path as
+`f"{base}/reset"`, so the literal never appears in the source), and it credited
+`screenplay_cowriter/server.py` with the *webapp's* `/api/…/chat/sessions` paths —
+making a module with **zero** coverage look 6/7 covered. That is how a whole HTTP
+surface sat untested. A sweep is a snapshot; this is a gate.
+
+**What it asserts.** Every route in each app's *authoritative* URL map
+(`app.url_map`, not a regex over decorators) must be either
+
+1. **exercised** by the pytest suite, or
+2. **declared** in `UNEXERCISED` with a reason and a pointer to what does cover it.
+
+An undeclared, unexercised route fails the build. So does a **stale** declaration:
+if a declared route later becomes exercised, the entry must be deleted, or the
+registry quietly stops describing reality. This mirrors the store registry's
+discovery check and the browser runner's named-exclusion list — the same rule
+three times: dead coverage must be visible.
+
+**How "exercised" is measured.** `tests/route_recorder.py` attaches a
+`before_request` hook to both module-level Flask apps. Every test drives those
+same app objects, so the hook sees every request the session makes — no grepping
+for path strings, which is the heuristic that failed above. A third test asserts
+the hook is actually attached, so a detached recorder reports *itself* rather
+than 85 phantom "undeclared" routes.
+
+The tests are marked `route_coverage` and `conftest.py` moves them **last**, since
+they report on the rest of the run.
+
+> ⚠️ The gate is **run-scoped** by design: it asserts "every route was exercised by
+> *this* session". Running only a subset of the suite fails it legitimately — it
+> names the routes that subset never touched. It is green in CI, which runs the
+> whole suite.
+
+```bash
+python -m pytest tests/test_route_coverage.py tests/test_route_smoke.py -q
+```
+
+`test_route_smoke.py` drives the six routes the rest of the suite never touched,
+at their real contracts (a health probe that reflected nothing; the metrics view
+behind the status strip; the finding-intent store; and the validation paths of the
+two SSE routes and translate — empty text, unknown project, unknown session). Their
+*generation* paths need a live model and stay browser-covered.
+
 ## CI gates (what actually runs automatically)
 
 `ruff check .` → `pytest -q` → `node --test tests/js/*.test.js` → the browser suites.

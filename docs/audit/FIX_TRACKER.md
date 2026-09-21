@@ -4,10 +4,10 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 3 — T1 closed + widened; T1b/T1c/T1d found and
-fixed; T2 verified and downgraded; a gate flake found and retired)
-**HEAD:** `4df05a5` (pushed; `git ls-remote origin main` agrees)
-**Baseline for this pass:** `812299a`
+**Last updated:** 2026-09-21 (pass 5 — R9 closed; T2c closed with a real
+route-coverage gate; the hand sweep that misled pass 4 is now a permanent guard)
+**HEAD:** `c6656df` (pushed; `git ls-remote origin main` agrees)
+**Baseline for this pass:** `c6656df`
 
 ---
 
@@ -15,7 +15,7 @@ fixed; T2 verified and downgraded; a gate flake found and retired)
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1544 passed, 3 skipped, 0 failed** |
+| Unit + integration | `python -m pytest tests/` | **1559 passed, 3 skipped, 0 failed** |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
 | Browser E2E | `python tests/run_browser_suites.py` | **32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken** |
@@ -51,6 +51,25 @@ fixed; T2 verified and downgraded; a gate flake found and retired)
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 5)
+
+| ID | Item | Proof | Mutation |
+|---|---|---|---|
+| **R9** | The audit's *"45-min CI budget vs a 125-min worst case"* was an **unverified teammate figure**, and the wrong thing was being watched | Measured: the browser gate is **303 s (5.05 min) for 28 suites**, sequential, against the job's `timeout-minutes: 45` — ~9× headroom. The "125 min" is unreachable **by construction**: a job-level `timeout-minutes` is a hard cap, so no run can exceed 45 min; 125 reads as a sum of per-suite worst-case *waits*, which the job timeout pre-empts. The actual hole was that **nothing guarded the declaration** — a job without `timeout-minutes` inherits GitHub's **360-minute** default, so one hung suite burns six hours. `test_every_ci_job_declares_a_timeout` now parses `ci.yml`'s `jobs:` block and refuses an unbounded job. | ✅ **2/2** — removing the browser job's timeout, then the lint job's, each turns the guard red. It is **per-job**: it does not settle for "at least one job has one" |
+| **T2c** | No test enforced route coverage, so the next untested route would be found only by another hand sweep — and the pass-4 sweep was **wrong in both directions** (it missed a composed path, and credited the cowriter server with the webapp's paths) | New gate: `tests/route_recorder.py` (a `before_request` hook on both module-level Flask apps) + `tests/test_route_coverage.py`, which requires every route in the **authoritative** `app.url_map` to be exercised **or** declared with a reason, and rejects **stale** declarations. It found **7 blind spots on its first run** (6 webapp + the cowriter's auto `/static`). `tests/test_route_smoke.py` (11 tests) now drives 6 of them at their real contracts — the health probe, the metrics view behind the status strip, the finding-intent store, and the validation paths of the two SSE routes and translate. The 7th is declared: Flask auto-registers it against a `static/` folder that does not exist. | ✅ **4/4, delta-verified** — a route loses its only test → reported undeclared; a **new** route added with no test → caught; the recorder detached → the wiring check reports itself; a **stale** declaration → the registry-rot check fires |
+
+**The pass-5 harness lesson (worth keeping).** The first mutation run reported
+"4/4 caught" and was **not trustworthy**: it ran only a two-file subset, and the
+gate legitimately fails a partial run (it asserts *"every route was exercised by
+this session"*), so `rc != 0` was already true at baseline. The verdict was
+rewritten to a **delta** — each mutation's signature must be **absent in the
+baseline run of the same scope and present under the mutation** — which also
+revealed that one mutation (a stale declaration) *cannot* be observed in a subset
+at all, because the undeclared-route assertion fires first. It now runs the full
+suite. `rc != 0` is not evidence; a signature that moved is.
 
 ---
 
@@ -217,10 +236,8 @@ this whole section is about.
 |---|---|---|---|
 | R7b | No lockfile (deps use `>=` floors) | supply chain | **owner decision** — changes the dependency workflow |
 | R6 | No LICENSE / CHANGELOG | release | **owner decision** |
-| R9 | 45-min CI budget vs a 125-min worst case | CI | open |
 | R10 | Root scratch files tracked in git | hygiene | open |
 | R11–R14 | 69 PNGs in `docs/audit/`; `.git` 78 MB from 22 cline checkpoint refs | hygiene | open |
-| **T2c** | The route-reach sweep is a **heuristic that was wrong in both directions** (it missed a composed path, and it credited the cowriter server with the webapp's paths). No test enforces route coverage, so the next untested route will be found only by another hand sweep | test integrity | open |
 | **T1e** | The 10 step markers above (documented, not defects) + the 2 in `gun_pen_audit` (need a live `llama-server`) | test integrity | open |
 | **T3b** | `library_delete`'s flake is retired by the T1c rewrite, but no other suite was audited for the same throwing-wait shape | test integrity | open |
 

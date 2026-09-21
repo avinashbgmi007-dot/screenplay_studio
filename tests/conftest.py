@@ -6,8 +6,34 @@ import pytest
 from werkzeug.serving import make_server
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # tests/ (route_recorder)
 
 MOCK_PORT = 8196
+
+
+def pytest_configure(config):
+    """Install the route-exercise recorder (T2c).
+
+    Attached once, before any test runs. Every test drives the same module-level
+    Flask app objects, so this sees every request the suite makes -- which is how
+    tests/test_route_coverage.py asserts real exercise instead of grepping for
+    path strings.
+    """
+    import route_recorder
+    route_recorder.install()
+
+
+def pytest_collection_modifyitems(session, config, items):
+    """Run `route_coverage`-marked tests LAST.
+
+    They assert that every route was exercised by *the rest of the suite*, so
+    they are only meaningful once everything else has run.
+    """
+    last = [i for i in items if i.get_closest_marker("route_coverage")]
+    if not last:
+        return
+    last_ids = {id(i) for i in last}
+    items[:] = [i for i in items if id(i) not in last_ids] + last
 
 
 class ServerThread(threading.Thread):

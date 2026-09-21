@@ -361,6 +361,41 @@ def test_ci_pins_its_linter_to_the_version_the_repo_uses():
         "a floating `ruff>=` is back in pyproject; the pin is the point")
 
 
+def test_every_ci_job_declares_a_timeout():
+    """R9 (2026-09-21): a GitHub job with no `timeout-minutes` inherits the
+    platform default of **360 minutes**, so one hung suite can burn six hours of
+    CI before anything notices. All four jobs do declare one today — which is
+    exactly why nothing was watching it.
+
+    The per-job timeouts are also what makes the "is the budget big enough?"
+    question answerable at all. Measured 2026-09-21: the browser gate is
+    **303 s (5.05 min) for 28 suites**, sequential, against a 45-minute budget —
+    roughly 9x headroom, so the audit's "125-minute worst case" reads as a sum of
+    per-suite worst-case waits, not an expected runtime.
+
+    This asserts the DECLARATION, not a duration: it cannot know how fast a
+    runner is, but it can refuse a job that is unbounded.
+    """
+    import re
+    src = open(".github/workflows/ci.yml", encoding="utf-8").read()
+    assert "\njobs:" in src, "ci.yml no longer has a jobs: block"
+    body = src.split("\njobs:", 1)[1]
+    # job ids sit at two-space indent, their keys at four
+    starts = [m.start() for m in re.finditer(r"^  ([A-Za-z][\w-]*):[ \t]*$", body, re.M)]
+    assert starts, "no jobs parsed out of ci.yml — the file's shape changed"
+    jobs = []
+    for i, at in enumerate(starts):
+        end = starts[i + 1] if i + 1 < len(starts) else len(body)
+        block = body[at:end]
+        name = re.match(r"^  ([A-Za-z][\w-]*)", block).group(1)
+        jobs.append((name, block))
+    assert len(jobs) >= 4, f"expected the four CI jobs, parsed {[n for n, _ in jobs]}"
+    unbounded = [n for n, block in jobs if "timeout-minutes:" not in block]
+    assert not unbounded, (
+        f"CI job(s) {unbounded} declare no timeout-minutes — a hang there runs to "
+        f"the 360-minute platform default")
+
+
 def test_browser_gate_runner_never_silently_drops_a_suite():
     """Every suite the runner cannot execute must be a NAMED entry with a reason.
     A silently skipped suite is dead coverage, and dead coverage is worse than

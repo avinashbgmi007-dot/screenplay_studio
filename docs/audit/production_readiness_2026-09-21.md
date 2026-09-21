@@ -562,9 +562,11 @@ skip, 2 known-broken) — no frontend file was touched.
 
 **Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/BE-M2 were the last two open instances of the A2/A3 shape.
 
-**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R9 (45-min CI budget vs a 125-min worst case), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), **T2** (source-text assertions in the unit suite — still unverified, still the highest-value remaining check), and **T1b** (the two `>= 0` checks inside `gun_pen_audit`, which needs a live `llama-server` to run; located and left unedited rather than fixed blind).
+**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), **T1e** (the 10 step markers, documented rather than churned, plus the two `>= 0` checks inside `gun_pen_audit` which needs a live `llama-server`), and **T3b** (no other suite audited for the `library_delete` throwing-wait shape).
 
 **Closed in pass 3:** **T1** — all four vacuous browser checks rewritten as real assertions and mutation-verified 4/4; the honest browser-check count is now **476 total, all failable** (was 472 failable of 476).
+
+**Closed in pass 5:** **R9** — the "125-min worst case" was an unverified figure and unreachable by construction (a job-level `timeout-minutes` is a hard cap; measured runtime is **5.05 min for 28 suites** against a 45-min budget). The real hole — nothing guarded the *declaration*, so a job without one inherits GitHub's **360-minute** default — is now a test. **T2c** — route coverage is now a **gate**, not a hand sweep: `test_route_coverage.py` requires every route in `app.url_map` to be exercised (measured by a `before_request` recorder, not a source grep) or declared with a reason, and rejects stale declarations. It found 7 blind spots on its first run; `test_route_smoke.py` now drives 6 of them.
 
 **Live tracker:** `docs/audit/FIX_TRACKER.md` — kept current so the state of play is readable without re-deriving it from `git log`.
 
