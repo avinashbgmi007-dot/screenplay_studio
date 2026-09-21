@@ -14,21 +14,35 @@
 > `knowledge_graph.save` (the KG is regenerable from the parsed document) and
 > export output (new files, not rewritten state).
 >
-> **Reader side — added 2026-09-20.** Atomic writes only stop a torn file being
-> *produced*; they say nothing about what a reader does with one. Every
-> writer-owned store now reads through `jsonio.load_json_store`, which keeps two
-> facts apart: **MISSING → the store's default**, **PRESENT-BUT-UNREADABLE →
-> `StoreUnreadable`**. That distinction is what stops a damaged file presenting
-> as "you never wrote anything", and — since every mutator loads before it saves —
-> it is also what stops the next mundane action overwriting the one recoverable
-> copy. A store that cannot be read answers the SPA with **503** (`{"unreadable":
-> true, "store": ..., "error": ...}`) from the `StoreUnreadable` handler.
+> **Reader side — added 2026-09-20; completed 2026-09-21.** Atomic writes only
+> stop a torn file being *produced*; they say nothing about what a reader does
+> with one. Every writer-owned store now reads through `jsonio.load_json_store`,
+> which keeps two facts apart: **MISSING → the store's default**,
+> **PRESENT-BUT-UNREADABLE → `StoreUnreadable`**. That distinction is what stops
+> a damaged file presenting as "you never wrote anything", and — since every
+> mutator loads before it saves — it is also what stops the next mundane action
+> overwriting the one recoverable copy. A store that cannot be read answers the
+> SPA with **503** (`{"unreadable": true, "store": ..., "error": ...}`) from the
+> `StoreUnreadable` handler.
 > `tests/test_store_fault_injection.py` enforces this per store (three injected
 > faults + a "the write must not clobber the damaged bytes" check) and fails the
 > build when a module writes a store without a fault entry. Deliberately
 > fail-soft, with a reason: `progress.json` (transient telemetry) and
 > `parsed.json` / `working.json` (regenerable; the unregenerable edit log is
 > covered by A1).
+>
+> **The last two hold-outs — BE-M1 / BE-M2, closed 2026-09-21.** The undo log and
+> the redo stack were the exception to the paragraph above: `revision._load_json_list`
+> answered `[]` for a corrupt file and `revision.edits_log` read the file raw, so
+> a damaged `edits.redo.json` produced **`400 {"error": "Nothing to redo."}`** —
+> a confident lie about a stack that was on disk — and `undo_last_edit` then
+> appended to that phantom empty list and overwrote the only recoverable copy.
+> Both now go through `load_json_store` plus a shape check (a dict where a list
+> belongs is just as damaged as a torn file), and both `undo_last_edit` and
+> `redo_last_edit` pre-flight the *other* store **before** mutating, so damage
+> declines the operation instead of half-applying it. `has_edits` stays the one
+> deliberate coarse reader: it answers "is there anything I must not overwrite?",
+> so damage reads as a conservative `True`.
 >
 > **Concurrency — added 2026-09-21.** A per-path lock used to be a
 > `threading.RLock`, which cannot serialize two *processes* — and `AGENTS.md`
@@ -43,8 +57,18 @@
 > name is unique per write (`<store>.<pid>.<hex>.tmp`, fsynced before the
 > rename). Stores that do a load-modify-write must hold `lock_for` across the
 > **read** as well as the write — `notes`, `stash_store`, `metrics`, `ideas`,
-> `revision` (marks / edit log / dismissals) and the cowriter's `SessionStore`
-> all do. The sidecars are plumbing, not data: `*.json` globs skip them, the
+> `revision` (marks / dismissals) and the cowriter's `SessionStore` all do.
+> **Known exception — BE-M3 (proven 2026-09-21, deliberately not fixed):**
+> `revision.undo_last_edit` / `redo_last_edit` lock each read and each write but
+> **not the cycle between them**, so two *simultaneous* undos of one project can
+> both read the same head and both write back the same truncated list.
+> Instrumented with three real children behind a file barrier: two read `len=7`
+> and both wrote `len=6`, so the log loses an entry relative to the reversals the
+> working copy actually got. Left open because closing it needs either two locks
+> held at once (forbidden — see the next sentence) or a CAS retry loop; the harm
+> is narrow and the working copy itself stays correct — only the history
+> bookkeeping drifts. Evidence: `docs/audit/FIX_TRACKER.md`.
+> The sidecars are plumbing, not data: `*.json` globs skip them, the
 > shelf scan requires a directory, and `/backup` excludes `.lock` / `.tmp`.
 > **Never hold two `lock_for` locks at once** — that is the one way to deadlock
 > them. `tests/test_store_concurrency.py` proves all of this with real child

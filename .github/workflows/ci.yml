@@ -16,7 +16,12 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install ruff
-        run: pip install ruff
+        # PINNED, for the same reason `runs-on` is pinned below: a floating
+        # linter means a new ruff release can add a rule and turn a green build
+        # red with no code change — or, worse, the lint gate starts disagreeing
+        # with the developer's own `ruff check .`. Keep this in step with the
+        # `ruff` pin in pyproject.toml's `dev` / `ci` extras.
+        run: pip install "ruff==0.16.8"
       - name: Lint
         run: ruff check .
 

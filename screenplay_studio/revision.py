@@ -388,14 +388,22 @@ def reset_working(m) -> None:
 
 
 def _load_json_list(path: str) -> list:
-    if not os.path.exists(path):
-        return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, list) else []
-    except (json.JSONDecodeError, OSError):
-        return []
+    """Read a list-shaped store: MISSING -> `[]`, PRESENT-BUT-UNREADABLE -> raise.
+
+    BE-M1. This used to answer `[]` for a corrupt file, collapsing "damaged"
+    into "empty" — the A2/A3 shape, on the redo stack, where it has a sting: the
+    writer was told "Nothing to redo" about a stack that was sitting right there,
+    and `undo_last_edit`'s load-modify-write then appended to that phantom empty
+    list and overwrote the only recoverable copy.
+
+    Shape checking stays with the caller (as `jsonio.load_json_store` documents):
+    a dict where a list belongs is just as damaged as a torn file.
+    """
+    from .jsonio import StoreUnreadable, load_json_store
+    data = load_json_store(path, [])
+    if not isinstance(data, list):
+        raise StoreUnreadable(path, f"expected a list, found {type(data).__name__}")
+    return data
 
 
 def _save_json_list(path: str, data: list) -> None:
@@ -431,6 +439,12 @@ def undo_last_edit(m) -> dict:
     if not log:
         raise ValueError("Nothing to undo.")
     record = log[-1]
+    # Pre-flight the redo stack BEFORE anything moves. It raises on a damaged
+    # stack (BE-M1), and reading it up here rather than after the working copy
+    # and the edit log have already been rewritten is what makes the refusal
+    # clean: a corrupt edits.redo.json declines the undo instead of silently
+    # consuming it and leaving a half-applied reversal behind.
+    redo = redo_stack(m)
     doc = load_working(m)
     restored, failed = [], []
     for rep in record.get("applied", []):
@@ -443,7 +457,6 @@ def undo_last_edit(m) -> dict:
     # move the record: undo log -> redo stack
     log.pop()
     _save_json_list(edits_log_path(m), log)
-    redo = redo_stack(m)
     redo.append(record)
     _save_json_list(edits_redo_path(m), redo)
     return {
@@ -462,6 +475,9 @@ def redo_last_edit(m) -> dict:
     if not redo:
         raise ValueError("Nothing to redo.")
     record = redo[-1]
+    # Same pre-flight as undo_last_edit: a damaged edits.json refuses the redo
+    # before the working copy is rewritten, instead of after.
+    log = edits_log(m)
     doc = load_working(m)
     applied, failed = [], []
     for rep in record.get("applied", []):
@@ -473,7 +489,6 @@ def redo_last_edit(m) -> dict:
     doc.save(working_path(m))
     redo.pop()
     _save_json_list(edits_redo_path(m), redo)
-    log = edits_log(m)
     log.append(record)
     _save_json_list(edits_log_path(m), log)
     return {
@@ -486,10 +501,16 @@ def redo_last_edit(m) -> dict:
 
 
 def edits_log(m) -> list[dict]:
-    if not os.path.exists(edits_log_path(m)):
-        return []
-    with open(edits_log_path(m), "r", encoding="utf-8") as f:
-        return json.load(f)
+    """The applied-edit log: MISSING -> `[]`, DAMAGED -> raise.
+
+    BE-M2 — the sibling of BE-M1. This read the file raw, so a corrupt
+    `edits.json` escaped as a bare `json.JSONDecodeError`, which is a
+    `ValueError`: the webapp's ValueError handler then answered the writer with
+    **400 "bad request"** and a Python message about line 1 column 1, for what is
+    really a damaged disk. Same store contract as every other writer-owned
+    store, so the answer is now 503 "damaged and was not touched".
+    """
+    return _load_json_list(edits_log_path(m))
 
 
 def scene_elements(doc: ScriptDocument, scene_number: int) -> list:

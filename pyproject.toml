@@ -18,7 +18,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.6", "pytest>=8.0"]
+# `ruff` is pinned EXACTLY in both extras, and the same pin is repeated in
+# .github/workflows/ci.yml (a test asserts the two agree). A floating linter is
+# a reproducibility hole of the same kind the pinned `runs-on` guards against: a
+# new ruff release can add a rule and fail a green build with no code change, and
+# the CI gate can silently disagree with the developer's own `ruff check .`.
+dev = ["ruff==0.16.8", "pytest>=8.0"]
 stt = ["faster-whisper>=1.0.0"]
 # Installed by CI so the full suite is reproducible there, and locally when
 # developing. test_pdf_ocr.py imports pypdfium2 directly (no importorskip
@@ -27,7 +32,7 @@ stt = ["faster-whisper>=1.0.0"]
 # test_packaging_data_files.py *builds* a wheel and an sdist and asserts their
 # contents — it needs the build backend importable, not just available to pip's
 # isolated build env. Add pytest-cov when coverage runs are wanted.
-ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "ruff>=0.6", "setuptools>=68"]
+ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "ruff==0.16.8", "setuptools>=68"]
 
 [tool.setuptools]
 packages = ["screenplay_parser", "screenplay_analyzer", "screenplay_cowriter", "screenplay_studio", "knowledge_base"]

@@ -163,6 +163,23 @@ CASES = [
         load_modify_write=False,
     ),
     StoreCase(
+        name="redo stack",
+        module="screenplay_studio/revision.py",
+        path=lambda m: revision.edits_redo_path(m),
+        read=lambda m: revision.redo_stack(m),
+        seed=lambda m: _write_raw(revision.edits_redo_path(m),
+                                 json.dumps([{"id": "bb22", "scene_number": 1,
+                                              "applied": [{"old": "a", "new": "b"}]}])),
+        # The redo stack's own load-modify-write cycle is `undo_last_edit`:
+        # it reads the stack, appends the undone record, and saves it back.
+        mutate=lambda m: revision.undo_last_edit(m),
+        missing_default=[],
+        setup=lambda m: _redo_setup(m),
+        status="guarded",
+        why="BE-M1: a damaged edits.redo.json is reported, and the undo behind it "
+            "refuses rather than overwriting the only recoverable copy",
+    ),
+    StoreCase(
         name="premise card",
         module="screenplay_studio/webapp_server.py",
         path=lambda m: os.path.join(m.project_dir, "premise.json"),
@@ -243,6 +260,17 @@ def _working_copy(m) -> None:
         f.write(_sample_text())
     parse_fountain(src).save(m.parsed_path)
     revision.ensure_working(m)
+
+
+def _redo_setup(m) -> None:
+    """An undo needs something to undo: a working copy plus one applied edit.
+
+    The redo stack the case is actually about is then written by the case's own
+    `seed`, so the setup stops at the edit log.
+    """
+    _working_copy(m)
+    _write_raw(revision.edits_log_path(m),
+               json.dumps([{"id": "aa11", "scene_number": 1, "applied": []}]))
 
 
 def _memory_path(m) -> str:

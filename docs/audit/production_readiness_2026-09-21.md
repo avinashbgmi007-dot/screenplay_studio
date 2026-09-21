@@ -416,9 +416,30 @@ Things I got wrong, or could not establish, stated plainly:
 | 7 | **Fix the cache-bust guard** to cover `app.js` | Restores the stale-SPA guarantee | ✅ **done** — tokens are now derived from content, so there is nothing left to bump |
 | 8 | **Push; add LICENSE + CHANGELOG; untrack the 5 root scratch files** | Release hygiene; unblocks everything downstream | 🟡 **partly** — everything through #7 is pushed; LICENSE/CHANGELOG (R6) and root scratch (R10) are open, and both are owner calls |
 
-**Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/`_load_json_list` remains open.
+### Pass 2 (2026-09-21) — the store-contract leftovers
 
-**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7 (no lockfile, unpinned `ruff` in CI), R9 (45-min CI budget vs a 125-min worst case), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), F5-adjacent `revision._load_json_list` swallowing a corrupt `edits.redo.json`, and the two vacuous browser checks (T1) that inflate the check count by 4.
+| ID | Action | Status |
+|---|---|---|
+| **BE-M1** | `revision._load_json_list` collapsed a damaged `edits.redo.json` into `[]` | ✅ **done** — `load_json_store` + shape check; MISSING → `[]`, DAMAGED → `StoreUnreadable` (503). The executed pre-fix symptom was `400 {"error":"Nothing to redo."}` about a stack sitting on disk |
+| **BE-M2** | `revision.edits_log` read raw → bare `JSONDecodeError` → **400 "bad request"** for a damaged disk | ✅ **done** — same reader; now 503 + `unreadable: true` |
+| **BE-M1b** | Undo/redo mutated the working copy before discovering the other store was damaged | ✅ **done** — both pre-flight the other store first, so damage *declines* the operation instead of consuming it |
+| **R7** | CI ran `pip install ruff` unpinned | ✅ **done** — `ruff==0.16.8` in `ci.yml` + both extras, guarded by a test asserting all three agree. The **lockfile** half is an owner decision |
+| **BE-M3** | Undo/redo read-modify-write without holding `lock_for` across the cycle | 🔵 **proven, deliberately NOT fixed** — 3 real children: two read `len=7`, both wrote `len=6`. The fix needs two locks at once (forbidden) or a CAS loop. Evidence in `FIX_TRACKER.md` |
+
+**Guards added this pass:** 7 in `tests/test_undo_redo.py`, 1 `StoreCase` in
+`tests/test_store_fault_injection.py` (flipped `silent` → `guarded`), 1 in
+`tests/test_production_readiness.py`. **Mutation-verified: 6 mutations, 6 caught**
+(4 for the store contract, 2 for the ruff pin).
+
+**Gates after pass 2:** pytest **1520 passed / 3 skipped / 0 failed**, ruff clean,
+`node --test` **16/16**. Browser gate unchanged (32 suites: 28 pass, 0 fail, 2
+skip, 2 known-broken) — no frontend file was touched.
+
+**Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/BE-M2 were the last two open instances of the A2/A3 shape.
+
+**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R9 (45-min CI budget vs a 125-min worst case), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), and the vacuous browser checks (T1) that inflate the check count by 4.
+
+**Live tracker:** `docs/audit/FIX_TRACKER.md` — kept current so the state of play is readable without re-deriving it from `git log`.
 
 **Explicitly out of scope / owner decisions:** the licensing choice; the dock-density and idea-room design passes; the `app.js` module split and hash router; the two known-broken preview suites (repair or delete); the two prompt-budget defaults (documented in `.env.example`, currently left at their working values).
 

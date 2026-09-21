@@ -132,6 +132,178 @@ def _upload(http_client):
     )
 
 
+class TestDamagedHistoryStores:
+    """BE-M1 / BE-M2 — the undo/redo stores are writer-owned, so they follow the
+    store contract: MISSING -> empty, PRESENT-BUT-UNREADABLE -> an error.
+
+    The redo stack used to collapse damage into `[]` (the A2/A3 shape), which is
+    worse than it sounds: the writer was told "Nothing to redo" about a stack
+    that was sitting right there, and `undo_last_edit`'s load-modify-write then
+    appended to that phantom empty list and overwrote the only recoverable copy.
+    """
+
+    def test_damaged_redo_stack_is_reported_not_read_as_empty(self, tmp_path):
+        from screenplay_studio.jsonio import StoreUnreadable
+        m = _make_project(tmp_path)
+        _seed_redo(m)
+        _damage(revision.edits_redo_path(m))
+
+        # the reader reports damage instead of answering "nothing here"
+        with pytest.raises(StoreUnreadable):
+            revision.redo_stack(m)
+
+        # and redo says "damaged", never the false "Nothing to redo."
+        with pytest.raises(StoreUnreadable):
+            revision.redo_last_edit(m)
+
+    def test_damaged_redo_stack_survives_an_undo(self, tmp_path):
+        """The load-modify-write behind undo must not finalise the loss."""
+        from screenplay_studio.jsonio import StoreUnreadable
+        m = _make_project(tmp_path)
+        _seed_one_edit(m)
+        _seed_redo(m)
+        path = revision.edits_redo_path(m)
+        _damage(path)
+        with open(path, encoding="utf-8") as f:
+            damaged = f.read()
+
+        with pytest.raises(StoreUnreadable):
+            revision.undo_last_edit(m)
+
+        with open(path, encoding="utf-8") as f:
+            assert f.read() == damaged, "the damaged redo stack was overwritten"
+
+    def test_damaged_redo_stack_refuses_before_consuming_the_undo(self, tmp_path):
+        """A refusal must leave the writer exactly where they were. Reading the
+        redo stack up front is what buys this: detect the damage, then decline —
+        rather than rewriting the working copy and popping the edit log first."""
+        from screenplay_studio.jsonio import StoreUnreadable
+        m = _make_project(tmp_path)
+        _seed_one_edit(m)
+        _seed_redo(m)
+        _damage(revision.edits_redo_path(m))
+
+        with pytest.raises(StoreUnreadable):
+            revision.undo_last_edit(m)
+
+        assert len(revision.edits_log(m)) == 1, (
+            "the undo was consumed by an operation that then failed — the writer "
+            "lost an edit they never got to undo")
+
+    def test_damaged_edit_log_is_reported_not_read_as_empty(self, tmp_path):
+        """BE-M2: the sibling file. A damaged edits.json must not surface as a
+        bare JSONDecodeError (which the webapp turns into a 400 'bad request'
+        for what is really a damaged disk)."""
+        from screenplay_studio.jsonio import StoreUnreadable
+        m = _make_project(tmp_path)
+        _seed_one_edit(m)
+        _damage(revision.edits_log_path(m))
+
+        with pytest.raises(StoreUnreadable):
+            revision.edits_log(m)
+
+    def test_damaged_edit_log_refuses_before_consuming_the_redo(self, tmp_path):
+        """The mirror of the undo case: a damaged edits.json must not let the
+        redo run half-way and then fail, consuming the redo record."""
+        from screenplay_studio.jsonio import StoreUnreadable
+        m = _make_project(tmp_path)
+        _seed_redo(m)
+        _seed_one_edit(m)
+        _damage(revision.edits_log_path(m))
+
+        with pytest.raises(StoreUnreadable):
+            revision.redo_last_edit(m)
+
+        assert len(revision.redo_stack(m)) == 1, (
+            "the redo record was consumed by an operation that then failed")
+
+    def test_missing_and_valid_stores_still_behave(self, tmp_path):
+        """The distinction is the point — an absent store is NOT damage."""
+        m = _make_project(tmp_path)
+        assert revision.redo_stack(m) == []
+        assert revision.edits_log(m) == []
+        with pytest.raises(ValueError, match="Nothing to redo"):
+            revision.redo_last_edit(m)
+
+    def test_healthy_undo_redo_cycle_still_works(self, tmp_path):
+        """Guard against over-correcting: the ordinary cycle is untouched."""
+        m = _make_project(tmp_path)
+        _seed_one_edit(m, scene_number=1, applied=[
+            {"old": "MARA takes out an old REVOLVER, setting it on the desk.",
+             "new": "MARA lays the REVOLVER on the desk."}])
+        undone = revision.undo_last_edit(m)
+        assert undone["undone"]["id"] == "aa11"
+        assert len(revision.redo_stack(m)) == 1
+        redone = revision.redo_last_edit(m)
+        assert redone["redone"]["id"] == "aa11"
+        assert revision.redo_stack(m) == []
+
+
+def _damage(path: str) -> None:
+    """Crash-truncate a store, written outside the store API (a crash/AV/disk
+    fault, not something the store layer would ever produce)."""
+    with open(path, encoding="utf-8") as f:
+        good = f.read()
+    assert good, f"{path} was empty — nothing to truncate"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(good[: max(1, len(good) // 2)])
+
+
+def _seed_redo(m) -> None:
+    """A valid redo stack on disk, written directly (no undo needed to get one)."""
+    import json as _json
+    with open(revision.edits_redo_path(m), "w", encoding="utf-8") as f:
+        _json.dump([{"id": "bb22", "scene_number": 1,
+                     "applied": [{"old": "a", "new": "b"}]}], f)
+
+
+def _seed_one_edit(m, scene_number=1, applied=None) -> None:
+    """Put the project in the state an undo expects: a working copy plus one
+    applied edit in the log.
+
+    Written directly rather than through `save_working`, because that calls
+    `clear_redo()` — which would delete the very stack these tests damage.
+    `_make_project` has already produced the working copy via `ensure_working`.
+    """
+    import json as _json
+    with open(revision.edits_log_path(m), "w", encoding="utf-8") as f:
+        _json.dump([{"id": "aa11", "scene_number": scene_number,
+                     "applied": applied if applied is not None else [],
+                     "skipped": [], "applied_at": 1}], f)
+
+
+class TestDamagedHistoryAPI:
+    """The damage has to reach the writer, not just the loader."""
+
+    def test_damaged_redo_stack_answers_503_not_400(self, http_client):
+        project = _upload(http_client).get_json()["project"]
+        base = f"/api/projects/{project}"
+
+        http_client.post(f"{base}/edits/apply", json={
+            "scene_number": 1,
+            "replacements": [{"old": "MARA takes out an old REVOLVER, setting it on the desk.",
+                              "new": "MARA sets the REVOLVER down."}],
+        })
+        assert http_client.post(f"{base}/edits/undo").status_code == 200
+
+        import screenplay_studio.webapp_server as webapp_server
+        redo_path = os.path.join(webapp_server.PROJECTS_DIR, project, "edits.redo.json")
+        assert os.path.exists(redo_path), "the undo should have left a redo stack"
+        _damage(redo_path)
+        with open(redo_path, encoding="utf-8") as f:
+            damaged = f.read()
+
+        resp = http_client.post(f"{base}/edits/redo")
+        assert resp.status_code == 503, (
+            f"a damaged redo stack answered {resp.status_code}: {resp.data[:200]}")
+        body = resp.get_json()
+        assert body.get("unreadable") is True
+        assert "edits.redo.json" in body.get("error", ""), body
+
+        with open(redo_path, encoding="utf-8") as f:
+            assert f.read() == damaged, "the damaged redo stack was overwritten"
+
+
 class TestUndoRedoAPI:
     def test_undo_redo_flow(self, http_client):
         project = _upload(http_client).get_json()["project"]

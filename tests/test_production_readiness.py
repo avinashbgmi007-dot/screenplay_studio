@@ -309,6 +309,34 @@ def test_ci_runs_the_browser_suite_gate():
         "an unpinned runner is back — the 24.04 -> 26.04 migration breaks it silently")
 
 
+def test_ci_pins_its_linter_to_the_version_the_repo_uses():
+    """R7 (2026-09-21): the lint job ran `pip install ruff` — unpinned.
+
+    That is the same class of hole the `runs-on` guard above covers: a floating
+    tool means a new release can fail a green build with no code change, and the
+    CI gate can silently disagree with the developer's own `ruff check .`. The
+    version lives in three places (ci.yml, the `dev` extra, the `ci` extra), so
+    this asserts all three agree rather than trusting them to.
+    """
+    import re
+    ci = open(".github/workflows/ci.yml", encoding="utf-8").read()
+    m = re.search(r'pip install "ruff==([0-9][^"]*)"', ci)
+    assert m, (
+        "ci.yml no longer pins ruff — `pip install ruff` floats, so a new ruff "
+        "release can break the lint gate with no code change")
+    ci_version = m.group(1)
+
+    pyproject = open("pyproject.toml", encoding="utf-8").read()
+    pinned = re.findall(r'"ruff==([0-9][^"]*)"', pyproject)
+    assert pinned, "pyproject no longer pins ruff in its dev/ci extras"
+    assert len(set(pinned)) == 1, f"the extras disagree with each other: {pinned}"
+    assert pinned[0] == ci_version, (
+        f"ci.yml pins ruff=={ci_version} but pyproject pins ruff=={pinned[0]} — "
+        f"the CI gate and the local toolchain would lint with different rules")
+    assert "ruff>=" not in pyproject, (
+        "a floating `ruff>=` is back in pyproject; the pin is the point")
+
+
 def test_browser_gate_runner_never_silently_drops_a_suite():
     """Every suite the runner cannot execute must be a NAMED entry with a reason.
     A silently skipped suite is dead coverage, and dead coverage is worse than
