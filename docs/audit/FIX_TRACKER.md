@@ -8,8 +8,8 @@ without re-deriving it from `git log`. Source audit:
 checks fixed and mutation-verified, the sweep now returns 0. The gate's check
 count *falls*, and is finally true. Fixing them exposed two more crash-shaped
 failure modes, both fixed.)
-**HEAD:** `27ba81e` (pass 9's tracker stamp) — **pushed**; `git ls-remote origin main`
-agrees. This pass's commit hash is stamped at the bottom.
+**HEAD:** `893a943` (pass 10's work commit) — **pushed**; `git ls-remote origin main`
+agrees. The tracker-stamp commit that follows it carries the same content.
 **Baseline for this pass:** `27ba81e`
 
 ---
