@@ -209,12 +209,37 @@ No `LICENSE`, no `CHANGELOG`, no `COPYING` (all three verified absent). Version 
 ### REL-H2 (HIGH) — the work is not pushed
 `git rev-list --left-right --count origin/main...main` → `0  2` — **2 commits ahead**, plus **31 uncommitted working-tree entries**. The repo's own `NOTES.md` records the push blocker persisting across ≥8 attempts. ✅ executed. *(Note: earlier notes claimed 7 unpushed; it is now 2 — some did land.)*
 
-### REL-M1 (MEDIUM) — scratch files are tracked at repo root
+### REL-M1 (MEDIUM) — scratch files are tracked at repo root — **CLOSED, and it hid two real defects**
 `_gen_wf.py`, `_wf_gen.py`, `_r2_a11y_guard.py`, `_r3_palette_probe.py`, `_p12_junit.xml` are all `git ls-files`-tracked, and the CI `lint` job runs `ruff check .` over the whole tree. ✅ executed.
 
-### REL-M2 (MEDIUM) — repo bloat
+**Root cause (found while fixing):** `.gitignore` already *intended* to ignore root scratch — it enumerated `/_*.png`, `/_*.log`, `/_*.json`, `/_*.txt` and had never been given `/_*.py` or `/_*.xml`. The list fell behind the shapes actually used. Fixed with one extension-agnostic rule, `/_*`; the five are untracked; `tests/test_repo_hygiene.py` holds it (3 checks, mutation-verified).
+
+**Two of the five were not clutter — they were broken guards, and neither could be found by reading them:**
+
+| File | Defect |
+|---|---|
+| `_r2_a11y_guard.py` | Called a *"permanent gate"* by `docs/design/R2_PRIMITIVES_SPEC.md`, but **nothing ran it** (not CI, not pytest, not the browser gate) **and it could not fail**. Its third compensation branch read `if re.search(re.escape(base), css) and ":focus-within" in css:` — but `base` IS the rule's own selector, so the first conjunct is always true and the branch collapses to `":focus-within" in css`, true because the sheet contains 13 of them. Executed proof: injecting `.zz-injected-bare-suppressor { outline: none; }` still printed `clean — 18 outline:none sites, all compensated/whitelisted`. |
+| `_r3_palette_probe.py` | Nothing ran it (not named `e2e_browser_*.py`, so the gate never discovered it), and it **crashed rather than failed**: it filtered on `"script"`, which in a project-less studio matches nothing (the only such label, *"Search the script"*, is project-only by design), so `.palette-row` never rendered and `rows.first.evaluate()` raised a TimeoutError. It also hardcoded the **nocta** violet `rgb(126, 107, 255)` while `tungsten.css` — a cascade layer loading *after* `style.css` — re-pins the lamp to gold `#e8c56a`. |
+
+Both were **promoted into the gates** rather than deleted: `tests/test_a11y_outline_guard.py` (5 checks, mutation-verified 4/4) and `tests/e2e_browser_palette_restyle.py` (11 checks, auto-discovered by the browser gate, mutation-verified 4/4).
+
+### REL-M2 (MEDIUM) — repo bloat — **measured, and it is ONE stale branch**
 **476** tracked files, of which **69 are PNGs**; `.git` is **78 MB**; 38 untracked `tmp*` directories sit at the root (gitignored via `/tmp*/`). ✅ executed.
 > **Self-correction:** I initially suspected the test suite leaked these. The only code path that creates a repo-root temp dir is `tests/test_writer_memory.py:502` (`tempfile.mkdtemp(dir=os.getcwd())`), and it **does** clean up in a `finally: shutil.rmtree(...)`. So the likely cause is interrupted runs, not a systematic leak. Downgraded to hygiene.
+
+**Follow-up measurement (2026-09-21) — the headline number was right but attributed to the wrong thing.** `.git` is now **82 MB**, and **69.24 MB of it (84%) is two blobs**:
+
+| Blob | Size | Path |
+|---|---|---|
+| `46fce9b0…` | **36.61 MB** | `.freebuff/desktop-v2.db` |
+| `edc5d3a4…` | **32.63 MB** | `.freebuff/desktop-v2.db-wal` |
+
+`.freebuff/` is runtime data and **is** gitignored now — but it was committed before that rule existed (`7aaaafa`, `34b3087`). Crucially, **it is not on `main` at all** (`git rev-list --objects main | grep .freebuff` → 0). It is reachable **only** from `refs/remotes/origin/legacy/pre-recovery`, and that branch **still exists on the remote** (`4f8d120`).
+
+So the 69 MB is not history debt on the project's own line — it is one dead branch. The 69 PNGs (13.94 MB in the working tree) are **intentional** evidence, documented in `.gitignore` itself, and untracking them would not shrink `.git` anyway since history retains them. The 22 local `refs/cline/checkpoints/*` refs hold 1687 objects but **no large blobs**.
+
+**Recommended (owner decision — it deletes a remote branch):**
+`git push origin --delete legacy/pre-recovery` → `git update-ref -d refs/remotes/origin/legacy/pre-recovery` → `git reflog expire --expire=now --all && git gc --prune=now`. Reclaims ~69 MB, leaves `main`'s history untouched (no force-push, no rewritten commits). Deliberately **not executed**: it destroys a shared branch and is irreversible for those objects.
 
 ### REL-M3 (MEDIUM) — the CI browser gate is narrower than "~460 checks green" implies
 `tests/run_browser_suites.py` excludes **4** suites, loudly:

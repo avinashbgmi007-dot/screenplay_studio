@@ -47,11 +47,15 @@ film_books/
 Cursors/
 .opencode/
 
-# Scratch artifacts at repo root
-/_*.png
-/_*.log
-/_*.json
-/_*.txt
+# Scratch artifacts at repo root. `_*` is the repo's convention for local
+# scratch (captures, probes, logs, one-off generators) and it is deliberately
+# extension-agnostic. This block used to enumerate extensions
+# (`/_*.png`, `/_*.log`, `/_*.json`, `/_*.txt`) and the list fell behind:
+# `/_*.py` and `/_*.xml` were never added, so `_gen_wf.py`, `_wf_gen.py`,
+# `_r2_a11y_guard.py`, `_r3_palette_probe.py` and `_p12_junit.xml` were
+# tracked (REL-M1). A rule that enumerates extensions is a rule that goes
+# stale; guard: tests/test_repo_hygiene.py.
+/_*
 
 # Local env / secrets
 .env

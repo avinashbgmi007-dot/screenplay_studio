@@ -17,15 +17,16 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1564 passed, 3 skipped, 0 failed** (+5 new lockfile guards) |
+| Unit + integration | `python -m pytest tests/` | **1572 passed, 3 skipped, 0 failed** (+8: 5 a11y + 3 hygiene) |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | **32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken** — **522 checks** (measured; 504 of them genuinely failable) |
+| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 29 pass, 0 fail, 2 skip, 2 known-broken** — **533 checks** (+11, the promoted palette suite, auto-discovered) |
 
-> Pass 7 changed no file under `screenplay_studio/webapp/` (config, docs, tests,
-> `LICENSE`, `CHANGELOG.md` only), so the JS and browser rows are carried forward
-> from pass 6 rather than re-run. The wheel/sdist build test *was* re-run, because
-> `MANIFEST.in` changed — 49 passed.
+> Pass 8 added a browser suite (`e2e_browser_palette_restyle`, 11 checks), so the
+> browser gate *was* re-run: 33 suites, exit 0. No file under
+> `screenplay_studio/webapp/` changed (`git diff --stat` on the package tree is
+> empty), so the JS row is carried forward — it is 16/16 and nothing it covers
+> moved.
 
 > Re-run all four after any code change. A row above is only true for the
 > commit named in "Last updated".
@@ -58,6 +59,57 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 8)
+
+**R10 — filed as "scratch files tracked at the repo root". It was not hygiene.**
+
+The root cause was a `.gitignore` rule that enumerated extensions
+(`/_*.png`, `/_*.log`, `/_*.json`, `/_*.txt`) and had never been given
+`/_*.py` or `/_*.xml`. The list fell behind the shapes actually used, and five
+files leaked. Fixed with one extension-agnostic rule, `/_*`.
+
+**Two of the five were broken guards, and neither defect is visible by reading the file:**
+
+| ID | What it was | Executed proof |
+|---|---|---|
+| **REL-M1a** | `_r2_a11y_guard.py` — a WCAG 2.4.7 focus-visibility guard that `docs/design/R2_PRIMITIVES_SPEC.md` calls a *"permanent gate"*. **Nothing ran it**, and **it could not fail**: its third compensation branch was `if re.search(re.escape(base), css) and ":focus-within" in css:`, where `base` IS the rule's own selector, so the first conjunct is always true and the branch collapses to `":focus-within" in css` — true, because the sheet has 13. | Injecting `.zz-injected-bare-suppressor { outline: none; }` still printed `clean — 18 outline:none sites, all compensated/whitelisted`. |
+| **REL-M1b** | `_r3_palette_probe.py` — a Ctrl+K palette restyle probe. **Nothing ran it** (not named `e2e_browser_*.py`, so the gate never discovered it), and it **crashed rather than failed**: it filtered on `"script"`, which matches nothing in a project-less studio (the only such label, *"Search the script"*, is project-only by design), so `.palette-row` never rendered and `rows.first.evaluate()` raised a TimeoutError. It also hardcoded the **nocta** violet `rgb(126, 107, 255)` while `tungsten.css` — a cascade layer loading *after* `style.css` — re-pins the lamp to gold `#e8c56a`. | Reproduced: `TimeoutError: Locator.evaluate: Timeout 30000ms exceeded … waiting for locator(".palette-row").first` |
+
+**Both were promoted into real gates rather than deleted:**
+
+| New gate | Checks | Mutation-verified |
+|---|---|---|
+| `tests/test_a11y_outline_guard.py` | 5 (the gate, a parser-sanity check so a silent parse failure cannot make it vacuous, an anti-stale whitelist check, an injection self-test, and an inverse check that a *compensated* suppressor is not flagged) | ✅ **4/4** |
+| `tests/e2e_browser_palette_restyle.py` | 11 — auto-discovered by the browser gate | ✅ **4/4** |
+
+The palette suite is now **theme-independent**: instead of naming a colour it compares the
+focus ring against the input's own `border-color`, which the same rule sets to `var(--accent)`.
+
+**R11–R14 — measured, and reduced to one owner decision.** `.git` is 82 MB, and **69.24 MB
+of it (84%) is two blobs**: `.freebuff/desktop-v2.db` (36.61 MB) and `.freebuff/desktop-v2.db-wal`
+(32.63 MB). They are **not on `main`** — `git rev-list --objects main | grep .freebuff` returns 0 —
+and are reachable only from `refs/remotes/origin/legacy/pre-recovery`, which still exists on the
+remote. So the bloat is one dead branch, not history debt on the project's own line. Not executed:
+deleting a shared remote branch is irreversible and is the owner's call. Full detail and the exact
+commands are in §REL-M2 of the audit.
+
+### The harness bug this pass, worth keeping
+
+The first M4 mutation removed *both* focus mechanisms (the palette's own `input.focus()` and
+`openModal`'s), yet the suite still passed — and the mutation harness printed `GUARD MISSED`.
+It was the **harness** that was wrong: it wrote `ORIG[path].replace(old, new)` once per edit, so
+the second write **discarded the first**, silently reducing a two-edit mutation to one. Edits are
+now applied cumulatively to an in-memory copy and written once.
+
+Two more traps this pass, both the same shape as ones already recorded:
+* **Check your mutation is a violation.** The first attempt removed only `openPalette`'s
+  `input.focus()`. `openModal` already focuses the first `input|textarea|select` in the overlay
+  (`app.js:7653-7655`), so that alone is a **behavioural no-op** and the suite was right to pass.
+* **A crash is not a caught mutation, and a pass is not a guarded check** — the promoted palette
+  suite had to be verified *both* ways.
 
 ---
 
@@ -400,9 +452,11 @@ whole section is about.
 
 | ID | Item | Class | Owner |
 |---|---|---|---|
-| R10 | Root scratch files tracked in git | hygiene | open |
-| R11–R14 | 69 PNGs in `docs/audit/`; `.git` 78 MB from 22 cline checkpoint refs | hygiene | open |
+| **R11–R14** | **Reduced to ONE decision.** `.git` is 82 MB, of which **69.24 MB (84%) is two blobs**: `.freebuff/desktop-v2.db` (36.61 MB) + `.db-wal` (32.63 MB). They are **not on `main`** — reachable only from `legacy/pre-recovery`, which still exists on the remote. Reclaiming it means deleting a **shared remote branch**, so it is the owner's call; the exact commands are in §REL-M2 of the audit. The 69 PNGs (13.94 MB) are *intentional* evidence and the 22 cline checkpoint refs hold no large blobs. | hygiene | **owner decision** |
 | **T1e** | The 10 step markers above (documented, not defects) + the 2 in `gun_pen_audit` (need a live `llama-server`) | test integrity | open |
+
+**R10 is closed** — see the pass-8 section below. It was filed as hygiene and turned out to
+hide two broken guards.
 
 ---
 
