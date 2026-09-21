@@ -1036,41 +1036,49 @@ def analyze_project(name):
         lock.release()
 
 
-def _clear_progress(m) -> None:
-    """Drop the transient analysis heartbeat, if it is there.
+def _start_progress_heartbeat(m) -> None:
+    """Replace the previous run's final progress state with a fresh "running" one.
 
-    Deliberately NON-FATAL. progress.json is a heartbeat, not the writer's data:
-    the pipeline's first event overwrites it within seconds of a run starting
-    (orchestrator.py writes it with atomic_write_json, which never needs the old
-    file to be gone first). So a delete that fails costs nothing — while failing
-    a whole re-analysis over a transient cache file would cost the writer a run
-    and tell them nothing useful.
+    This used to be `os.remove(m.progress_path)`, so a poller could not read the
+    PREVIOUS run's `done` while this one was starting. Deleting was the wrong
+    tool, twice over:
 
-    It can fail for reasons that have nothing to do with this app: on Windows a
-    delete races any open handle, and an instrumented or sandboxed environment
-    can refuse it outright. Measured: exactly that produced a dropped connection
-    (see `_analyze_locked`) and a caller left waiting on a progress file that
-    could never change. A stale `done` is harmless too — every poller keys on a
-    NEWER timestamp, so the previous run's final state cannot pass for this
-    one's.
+    * **It is unnecessary.** `progress.json` is a heartbeat, and the pipeline's
+      first event overwrites it within seconds (orchestrator.py writes it with
+      `atomic_write_json`, which never needs the old file gone).
+    * **It can fail, and failing is expensive.** On Windows a delete races any
+      open handle, and an instrumented or sandboxed environment can refuse it
+      outright. Measured: a refused delete escaped this handler's pre-flight
+      (which had no `try`), and a Flask dev server answers a throwable it cannot
+      convert by closing the connection with **no reply** — the client saw
+      `RemoteDisconnected`, indistinguishable from a network fault, while the
+      run never started and the caller waited on a progress file that could
+      never change.
+
+    Writing achieves the same guarantee without the failure mode: the file says
+    `running`, so no poller can read the old `done`, and there is no window in
+    which it is missing. `atomic_write_json` is the same write the pipeline
+    itself uses, so this adds no new failure mode of its own.
     """
-    try:
-        if os.path.exists(m.progress_path):
-            os.remove(m.progress_path)
-    except Exception as e:
-        # Reported, never silent ("flag, don't drop") — and never fatal.
-        print(f"[analyze] could not clear {m.progress_path} — continuing: {e}")
+    atomic_write_json(m.progress_path, {
+        "stage": "analyze",
+        "status": "running",
+        "detail": "Starting the analysis…",
+        "ts": time.time(),
+    })
 
 
 def _analyze_locked(m):
     # The pre-flight lives OUTSIDE the pipeline's try below, and it does real
-    # work: it rewrites the manifest and clears the heartbeat. An exception here
-    # used to escape the handler entirely, and a Flask dev server that raises
-    # before it can write a response closes the connection with NO reply — so
-    # the caller saw a dead socket instead of a reason. Measured: a blocked
-    # os.remove() below did exactly that, and the run never started while the
+    # work: it rewrites the manifest and resets the progress heartbeat. An
+    # exception here used to escape the handler entirely, and a Flask dev server
+    # that raises before it can write a response closes the connection with NO
+    # reply — so the caller saw a dead socket instead of a reason. Measured: a
+    # refused delete below did exactly that, and the run never started while the
     # caller waited on a progress file that could never change. Fail loudly
-    # instead, with an error the front-end can actually show.
+    # instead, with an error the front-end can actually show. (The delete itself
+    # is gone — see `_start_progress_heartbeat` — but the guard stays: this is
+    # the one part of the handler the pipeline's try does not cover.)
     body = {}
     try:
         _adopt_connection(m)
@@ -1094,7 +1102,7 @@ def _analyze_locked(m):
             # real data. They are left in place: a successful run overwrites them via
             # save_report(), and a failed one leaves the last good report readable.
             m.stages["analyze"] = StageStatus()
-            _clear_progress(m)
+            _start_progress_heartbeat(m)
             m.save()
     except OSError as e:
         traceback.print_exc()

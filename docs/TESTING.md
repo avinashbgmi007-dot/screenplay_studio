@@ -210,17 +210,26 @@ Measured 2026-09-21 (pass 14b). Two different shapes, one cause:
   "targets":["…\\studio_projects\\gun_pen_2\\progress.json"],"targetCount":1}
 ```
 
-1. **A booted studio's `os.remove()` gets refused.** `POST /api/projects/<name>/analyze
-   {"force": true}` clears the progress heartbeat, and the refusal escaped the handler's `try` (now
-   guarded — see `tests/test_analyze_preflight.py`). Read the resulting `RemoteDisconnected`
-   carefully: a Flask dev server converts an unhandled **`Exception`** into a **500**, and closes the
-   connection with no reply only for a throwable *outside* `Exception` — so `RemoteDisconnected`
-   means a **BaseException**, not an ordinary error. That is why the refusal was not an `OSError`,
-   and why `except OSError` cannot catch it. Verify the transport behaviour with a throwaway
-   three-route Flask app before theorising about which exception escaped.
-2. **pytest's own tmp-directory garbage collection gets refused**, which kills the session during
-   teardown. The run reported `EEEEE` + `F` with its failure summary **never written** — and a clean
-   re-run of the same tree was green.
+1. **A booted studio's file DELETES get refused.** `POST /api/projects/<name>/analyze
+   {"force": true}` used to `os.remove(progress.json)` to reset the heartbeat; the refusal escaped
+   the handler's pre-flight and the request died. **The delete is gone** — the pre-flight now
+   *writes* a fresh `running` heartbeat instead (`_start_progress_heartbeat`), which gives the same
+   guarantee (no poller can read the old `done`) with nothing for an environment to refuse. The
+   pre-flight also returns a clear JSON 500 if anything else in it fails
+   (`tests/test_analyze_preflight.py`).
+2. **The same hook aborts ordinary tests with `SystemExit: 1`.** It is a `BaseException`, so it is
+   *not* a test failure — it is the environment stopping the process, and it lands on any test that
+   builds or deletes. Measured: a full run reported
+   `ERROR test_sdist_ships_the_data_files` and `FAILURE test_entity_scope_map_resolves_relative_projects_dir`,
+   both `SystemExit: 1`; run in isolation the first **skips** (no `setuptools`) and the second
+   **passes**. It also killed a session during teardown so the failure summary was never written.
+
+Read `RemoteDisconnected` carefully, because it is a **specific** signal: a Flask dev server converts
+an unhandled **`Exception`** into a **500**, and closes the connection with no reply only for a
+throwable *outside* `Exception`. So `RemoteDisconnected` means a **BaseException** — here,
+`SystemExit` — not an ordinary error. That is why the refusal was not an `OSError` and why
+`except OSError` cannot catch it. Verify the transport behaviour with a throwaway three-route Flask
+app before theorising about which exception escaped.
 
 So:
 

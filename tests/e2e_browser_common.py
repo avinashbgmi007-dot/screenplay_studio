@@ -34,6 +34,30 @@ for _stream in (sys.stdout, sys.stderr):
     except (AttributeError, ValueError):  # non-reconfigurable stream (pytest capture)
         pass
 
+# ---------------------------------------------------------------------------
+# Loopback must never go through a proxy — and `requests` disagrees with `curl`
+# about that.
+#
+# curl bypasses localhost automatically. `requests` does NOT: it honours
+# HTTP_PROXY/HTTPS_PROXY for every host unless `no_proxy` says otherwise. In a
+# sandboxed or instrumented environment those variables point at a local proxy,
+# so every call this harness makes to the studio it just booted on 127.0.0.1
+# goes out through it — and when that proxy refuses, the failure reads as
+# "Max retries exceeded … ProxyError", which looks exactly like a product fault.
+# Measured: the full gun_pen audit failed `pass2: force re-analysis accepted`
+# with a ProxyError against 127.0.0.1:8517, a studio that was answering every
+# other request fine.
+#
+# Every studio here is on loopback by construction, so bypass the proxy for
+# loopback unconditionally. Set at import, before any suite makes a request.
+# ---------------------------------------------------------------------------
+for _var in ("NO_PROXY", "no_proxy"):
+    _hosts = [h for h in os.environ.get(_var, "").split(",") if h.strip()]
+    for _h in ("127.0.0.1", "localhost", "::1"):
+        if _h not in _hosts:
+            _hosts.append(_h)
+    os.environ[_var] = ",".join(_hosts)
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 

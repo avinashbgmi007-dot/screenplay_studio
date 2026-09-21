@@ -110,6 +110,98 @@ tracker-stamp commit that follows carries the same content.
 
 ---
 
+## Closed in this pass (2026-09-21, pass 14c) — the audit's own output was lying in three more places
+
+Once the harness stopped hanging, the full `gun_pen_audit` ran to completion against a live model and
+reported `41 passed, 1 failed, 2 gaps`. **All three were the harness's fault, and all three have the
+same shape: a check asserting something the product never promised.**
+
+### The failure: loopback was going through a proxy
+
+```
+FAIL  pass2: force re-analysis accepted
+      [HTTPConnectionPool(host='127.0.0.1', port=38949): Max retries exceeded
+       with url: http://127.0.0.1:8517/api/projects/gun_pen_2/analyze (ProxyError)]
+```
+
+The environment exports `HTTP_PROXY`/`HTTPS_PROXY` pointing at a local proxy, and **`requests`
+honours them for loopback** — unlike `curl`, which bypasses localhost automatically. So every call
+this harness made to the studio it had just booted on `127.0.0.1` went out through a proxy that
+refuses under load. I had dismissed this theory an hour earlier because three GETs through it
+happened to succeed. That was wrong, and the failure mode is worth naming: **a `ProxyError` against a
+studio that is answering every other request looks exactly like a product fault.**
+
+`e2e_browser_common.py` now adds `127.0.0.1,localhost,::1` to `no_proxy`/`NO_PROXY` at import, before
+any suite makes a request. Proof: `Session().merge_environment_settings(...)['proxies']` is
+`OrderedDict()` for a loopback URL.
+
+**And the guard added in pass 14b did its job:** the trigger was not accepted, so the stage failed in
+seconds and skipped its derived assertions — instead of waiting 3600 s for a run that never started.
+That is precisely the behaviour the earlier version lacked.
+
+### The mechanism, confirmed: the hook raises `SystemExit`
+
+The proxy was the *transport* problem. The refusal underneath it was the sandbox hook, and its
+exception type is now known: the same hook landed on two ordinary tests as **`SystemExit: 1`**
+(`test_sdist_ships_the_data_files` errored on setup; `test_entity_scope_map_resolves_relative_projects_dir`
+failed) — and run in isolation the first **skips** (no `setuptools` installed) and the second
+**passes**. `SystemExit` is a `BaseException`, which is exactly consistent with the dropped
+connection (an unhandled `Exception` would have been converted into a 500) and exactly why the
+`except OSError` guard could not catch it. It also explains the earlier `EEEEE` + `F` run whose
+failure summary was never written: the hook killed the session during teardown.
+
+**So the fix is to stop deleting.** `_start_progress_heartbeat(m)` now *writes* a fresh `running`
+heartbeat where `os.remove(progress.json)` used to be. The delete was never load-bearing — the
+pipeline's first event overwrites the file within seconds — so this keeps the whole guarantee (no
+poller can read the previous run's `done`) and removes the failure mode, using the same
+`atomic_write_json` the pipeline itself uses. Mutation-verified **3/3** (the write removed, the
+timestamp made stale, the pre-flight's exception type swapped), source restored byte-identical.
+
+### Gap 1 (false): "the mass strip says 29 open of 31"
+
+The check demanded `open == total` on the grounds that the script was unedited. But **an unedited
+script can still carry the writer's MARKS** — edits and marks are different stores, and the server's
+`findings_status` counts *edits* (`addressed=0` here) while the strip counts *marks*. The project had
+2 findings marked `addressed`, so `29 = 31 - 2` is exactly right. The check now asserts the two things
+that are actually true: the total equals the report's finding count, and the open count agrees with
+the counting contract the strip is built from.
+
+### Gap 2 (false): "the 'Continuity' section is absent from the board"
+
+Filed as a PRODUCT gap — a finding the writer never sees. It is not one. The dock's section list is
+**dynamic** (`app.js` groups `state.report.findings` through `findingPassesFilter`), and that filter
+drops any finding whose disposition is not `open` (or `deferred` with that toggle on). Measured live
+in the page:
+
+```
+excluded by the filter: 3 of 31
+  index=0 cat=continuity sev=low    disp=addressed id=f1atq8x7
+  index=1 cat=structure  sev=medium disp=addressed id=fc8epm4
+  index=2 cat=dialogue   sev=high   disp=deferred  id=f3etlxt
+```
+
+The single continuity finding is one of the two the writer marked `addressed` (`f1atq8x7` is in
+`finding_marks.json`), and all three severity chips were already ON — so the filter was wide open and
+the absence is correct. The check now asks the app which categories the **active filter admits** and
+requires a section only for those, so it still catches a render that drops an admitted category
+without inventing gaps for findings the writer has closed.
+
+### And one more: a check that could never fail
+
+`widen: Medium+Low reveal every finding card` asserts `wide_cards >= default_cards`. On a project
+whose default filter already admits every severity the widen is a **no-op**, so it asserted `x >= x`.
+`widen_filter` now returns what it toggled — read from the chips' own `aria-pressed`, not guessed from
+a card count — and the suite **says so** when it did nothing, instead of passing quietly.
+
+### Verified
+The full suite now runs to completion against the live model: **`51 passed, 0 failed, 0 gaps filed`**
+(was `41 passed, 1 failed, 2 gaps`), with **zero `safe-delete` events** in the studio log — removing
+the delete removed the hook's trigger entirely. The four `NOTE`s are the suite volunteering what it
+did *not* exercise: the widen was a no-op, no continuity section was expected, no Principles section
+appeared, and `ghosted marks` were not rendered (so "never red" went untested).
+
+---
+
 ## Closed in this pass (2026-09-21, pass 14b) — a dropped connection was hiding a missing error message
 
 **How it was found is the finding.** A `pass2` re-run sat for 20 minutes producing nothing at all.

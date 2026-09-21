@@ -1,30 +1,36 @@
 """The analyze pre-flight is the one part of the handler OUTSIDE its try block.
 
-It does real work — rewrites the manifest, clears the transient progress
-heartbeat — and if it raised, the exception escaped the handler entirely. A Flask
-dev server that raises before it can write a response closes the connection with
-NO reply, so the caller saw a dead socket (`requests`: `RemoteDisconnected`)
-instead of a reason.
+It does real work — rewrites the manifest, resets the progress heartbeat — and if
+it raised, the exception escaped the handler entirely. A Flask dev server answers
+a throwable it cannot convert by closing the connection with **no reply**, so the
+caller saw a dead socket (`requests`: `RemoteDisconnected`) instead of a reason.
+Measured on the E2E harness: the studio's own log carried
+`[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] … progress.json`, the audit's
+force-trigger recorded "not accepted", and the stage then waited its full 3600 s
+budget for a run that had never started.
 
-That is not hypothetical. Measured on the E2E harness: a refused
-`os.remove(progress.json)` in the pre-flight dropped the connection, the audit's
-force-trigger recorded "not accepted", and the stage then waited its full
-3600 s budget for a run that had never started — 20 minutes of silence that read
-exactly like a slow 35B model. Two separate defects, both pinned here:
+Two things are pinned here:
 
-1. a failed heartbeat clear must not cost the writer an analysis at all
-   (`progress.json` is a heartbeat, not their data; the pipeline's first event
-   overwrites it within seconds), and
-2. anything else that fails in the pre-flight must return a clear JSON error,
-   never a dropped connection.
+1. the heartbeat reset **writes** rather than **deletes**, so there is nothing
+   for a handle race or an instrumented environment to refuse; and
+2. anything else that fails in the pre-flight returns a clear JSON error, never
+   a dropped connection.
+
+Why writing is the right shape, not just a workaround: `progress.json` is a
+heartbeat the pipeline's first event overwrites within seconds, so the delete was
+never load-bearing. Replacing it with a `running` write gives the same guarantee
+(no poller can read the old `done`) and removes the failure mode entirely.
 """
 
 import io
+import json
 import os
+from pathlib import Path
 
 import pytest
 
 from screenplay_studio import webapp_server
+from screenplay_studio.jsonio import atomic_write_json
 from screenplay_studio.manifest import ProjectManifest
 
 SAMPLE_SCRIPT = b"""Title: Preflight Test
@@ -54,6 +60,10 @@ def _manifest(tmp_path):
                            source_filename="s.fountain", source_format=".fountain")
 
 
+def _heartbeat(m):
+    return json.loads(Path(m.progress_path).read_text(encoding="utf-8"))
+
+
 def _upload(http_client):
     return http_client.post(
         "/api/projects",
@@ -62,43 +72,42 @@ def _upload(http_client):
     )
 
 
-class TestHeartbeatClearIsNeverFatal:
-    def test_a_refused_delete_is_reported_and_survived(self, tmp_path, monkeypatch, capsys):
-        """The clear exists so a poller can't read the PREVIOUS run's `done`.
+class TestTheHeartbeatIsResetByWritingNotDeleting:
+    def test_a_stale_done_is_replaced_by_running(self, tmp_path):
+        m = _manifest(tmp_path)
+        atomic_write_json(m.progress_path, {"stage": "done", "status": "complete",
+                                            "detail": "Analysis complete", "ts": 1.0})
+        webapp_server._start_progress_heartbeat(m)
+        data = _heartbeat(m)
+        assert data["status"] == "running", data
+        assert data["stage"] == "analyze", data
+        assert data["ts"] > 1.0, (
+            "the heartbeat must be NEWER — every poller keys on `ts`, so a "
+            "same-or-older stamp would let the previous run's state pass for this one's")
 
-        But it is a heartbeat, not the writer's data, and the pipeline's first
-        event overwrites it within seconds — so a refusal must be reported and
-        then shrugged off, never turned into a lost analysis. (Windows races an
-        open handle; an instrumented or sandboxed environment can refuse
-        outright. Both measured.)
+    def test_the_file_is_written_not_removed(self, tmp_path):
+        """The whole point of the change: no delete, so nothing to refuse."""
+        m = _manifest(tmp_path)
+        webapp_server._start_progress_heartbeat(m)
+        assert os.path.exists(m.progress_path)
+
+    def test_a_refused_delete_cannot_break_it(self, tmp_path, monkeypatch):
+        """Pin the SHAPE, not just the behaviour.
+
+        `os.remove` is made to raise, which is what a Windows handle race or an
+        instrumented environment does. The reset must still work — this is the
+        exact failure that dropped the connection and cost 20 minutes of silence
+        on the harness.
         """
         m = _manifest(tmp_path)
-        with open(m.progress_path, "w", encoding="utf-8") as f:
-            f.write('{"stage": "done", "status": "complete", "ts": 1}')
+        atomic_write_json(m.progress_path, {"stage": "done", "status": "complete", "ts": 1.0})
 
-        real_remove = os.remove
+        def refuse(path, *a, **kw):
+            raise PermissionError(13, "Access is denied")
 
-        def refuse_only_the_heartbeat(path, *a, **kw):
-            if os.path.abspath(str(path)) == os.path.abspath(m.progress_path):
-                raise PermissionError(13, "Access is denied")
-            return real_remove(path, *a, **kw)
-
-        monkeypatch.setattr(os, "remove", refuse_only_the_heartbeat)
-        webapp_server._clear_progress(m)  # must not raise
-        assert os.path.exists(m.progress_path), "it must not pretend the clear worked"
-        assert "could not clear" in capsys.readouterr().out, (
-            "a refusal must be visible in the log, not swallowed")
-
-    def test_the_clear_still_happens_when_it_can(self, tmp_path):
-        m = _manifest(tmp_path)
-        with open(m.progress_path, "w", encoding="utf-8") as f:
-            f.write("{}")
-        webapp_server._clear_progress(m)
-        assert not os.path.exists(m.progress_path)
-
-    def test_an_absent_heartbeat_is_not_an_error(self, tmp_path, capsys):
-        webapp_server._clear_progress(_manifest(tmp_path))
-        assert capsys.readouterr().out == "", "nothing to clear is the normal case"
+        monkeypatch.setattr(os, "remove", refuse)
+        webapp_server._start_progress_heartbeat(m)  # must not raise
+        assert _heartbeat(m)["status"] == "running"
 
 
 class TestPreflightFailsLoudly:

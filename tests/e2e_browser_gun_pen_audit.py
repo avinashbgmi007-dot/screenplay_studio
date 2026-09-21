@@ -123,12 +123,24 @@ def open_dock(page, lens="evidence"):
 
 
 def widen_filter(page, lens):
-    """Turn Medium + Low severity chips ON so every finding card shows."""
+    """Turn Medium + Low severity chips ON so every finding card shows.
+
+    Returns the labels it actually toggled. `aria-pressed` is the app's own
+    statement of the filter state, so that is what is read — a click that
+    silently no-ops is otherwise invisible, and the check that follows
+    (`wide >= default`) passes for `x >= x`.
+    """
+    toggled = []
     for label in ("Medium", "Low"):
         chip = lens.locator(".fchip", has_text=label).first
-        if chip.count() and "active" not in (chip.get_attribute("class") or ""):
-            chip.click()
-            page.wait_for_timeout(450)
+        if not chip.count():
+            continue
+        if chip.get_attribute("aria-pressed") == "true":
+            continue
+        chip.click()
+        page.wait_for_timeout(450)
+        toggled.append(label)
+    return toggled
 
 
 # ---------------------------------------------------------------------------
@@ -209,10 +221,25 @@ def step_matrix():
             fsum.get("addressed", 0) == 0,
             f"server observes addressed={fsum.get('addressed')} still_present={fsum.get('still_present')} "
             f"unknown={fsum.get('unknown')} of {n_findings}")
+        # What does the counting contract say is open? Asked of the app, because
+        # "open" is decided by the writer's MARKS (`findingDisposition`) while
+        # the server's `findings_status` above counts EDITS. Two different
+        # stores — and conflating them is exactly what made the next check file
+        # a false gap: it demanded open == total on the grounds that the script
+        # was unedited, when an unedited script can still carry marks.
+        # Measured: "29 open of 31" with 2 findings marked addressed. Correct.
+        open_count = page.evaluate(
+            """() => ((state.report && state.report.findings) || [])
+                       .filter((f, i) => findingDisposition(f, i) === 'open').length""")
         m = re.search(r"(\d+) open of (\d+) findings", mass_text)
-        gap("C: mass strip reports every finding open on an unedited script",
-            bool(m) and int(m.group(1)) == int(m.group(2)),
-            f"mass strip says '{m.group(0)}' but the report has {n_findings} findings"
+        # Two claims, and only the first is independent of the app's own
+        # arithmetic: the total must be the report's finding count, and the open
+        # count must agree with the contract the strip is built from.
+        gap("C: the mass strip's counts agree with the report and the counting contract",
+            bool(m) and int(m.group(2)) == n_findings and int(m.group(1)) == open_count,
+            f"mass strip says '{m.group(0)}' but the report has {n_findings} findings "
+            f"and the contract reports {open_count} open (the difference is the writer's "
+            f"marks, not their edits)"
             if m else mass_text[:60])
         shot(page, "C00-phantom-addressed.png")
         # the desk's own status line vs the finding count (refreshDeskToolbar
@@ -225,27 +252,69 @@ def step_matrix():
             f"status reads {ds_txt[:90]!r} while the report has {n_findings} findings")
         shot(page, "C01-desk-status.png")
 
-        widen_filter(page, lens)
+        widened = widen_filter(page, lens)
         page.wait_for_timeout(500)
         wide_cards = lens.locator(".finding-note").count()
         check("widen: Medium+Low reveal every finding card", wide_cards >= default_cards,
               f"{default_cards} -> {wide_cards}")
+        if not widened:
+            # Said out loud rather than passing quietly: on a project whose
+            # default filter already admits every severity, the click above is a
+            # no-op and this check is satisfied by `x >= x`. That is not a
+            # failure — it is a check that did not get to do its job, which is
+            # worth seeing in the output.
+            note("widen: the default filter already admitted Medium+Low",
+                 "the widen was a no-op, so 'wide >= default' asserted nothing here")
         shot(page, "A01-widened-board.png")
 
         # -- row A: finding-emitting categories ------------------------------
         titles = lens.locator(".dock-section-title").all_inner_texts()
         titles_join = " | ".join(titles)
+        # Which categories SHOULD have a section? The ones the ACTIVE FILTER
+        # ADMITS — asked of the app, not assumed, because the dock's section list
+        # is dynamic (`app.js` groups `state.report.findings` through
+        # `findingPassesFilter`) and a category whose only finding the writer has
+        # marked `addressed`, or left `deferred` while that toggle is off, is
+        # CORRECTLY absent.
+        #
+        # Measured: requiring a section for every emitted category filed a false
+        # PRODUCT gap for `continuity` — its one finding is `addressed`
+        # (id f1atq8x7, from the writer's own marks), so the board is right to
+        # hide it, and the strip's "29 open of 31" is right for the same reason
+        # (31 - 2 addressed). What this row is for is the RENDER: an admitted
+        # finding whose category gets no section is a finding the writer cannot
+        # see. The filter itself has its own checks.
+        admitted = page.evaluate(
+            """() => {
+                 const fs = (state.report && state.report.findings) || [];
+                 const out = {};
+                 fs.forEach((f, i) => {
+                   if (findingPassesFilter(f, i)) {
+                     const c = f.category || 'other';
+                     out[c] = (out[c] || 0) + 1;
+                   }
+                 });
+                 return out;
+               }""")
         row_a = []
         for cat in ("dialogue", "theme", "character", "structure",
                     "scene_function", "genre", "plot_thread", "continuity"):
             label = CATEGORY_LABELS[cat]
+            if cat not in admitted:
+                row_a.append((cat, None))
+                note(f"A/{cat}: no section expected",
+                     "the filter admits no finding in this category "
+                     "(every one is marked addressed/dismissed, or deferred with that toggle off)")
+                continue
             present = label.lower() in titles_join.lower()
             row_a.append((cat, present))
-            # A category the report emits but the board does not render is a
-            # PRODUCT gap (the finding never reaches the writer), not a harness
-            # failure — so it is filed, not counted against the run.
+            # A category the report emits AND the filter admits, but the board
+            # does not render, is a PRODUCT gap (the finding never reaches the
+            # writer), not a harness failure — so it is filed, not counted
+            # against the run.
             gap(f"A/{cat}: the category section reaches the board", present,
-                f"{label!r} absent from: {titles_join[:140]}")
+                f"{label!r} absent from: {titles_join[:140]} "
+                f"({admitted[cat]} admitted finding(s) would go unseen)")
         # principles + setup_payoff — the plan's split-matrix rows
         row_a.append(("principles", "Principles" in titles_join))
         # The row above already records the truth. `check(name, True, "principles
