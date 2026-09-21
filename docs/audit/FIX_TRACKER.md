@@ -4,15 +4,23 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 13 — **the last "skipped" suite was not gated on an
-environment, it was impossible**: `design_session` framed an SPA that ships
-`frame-ancestors 'none'`, so no port could ever have made it pass. It boots its own
-studio now and pins the deliberate block as a check. Only `gun_pen_audit` remains
-excluded, and it genuinely needs a model server. **Verified against the gate's own
-output this time, not against this table.**)
-**HEAD:** `aab3d8f` (pass 13's work commit) — **pushed**; `git ls-remote origin main`
-agrees. The tracker-stamp commit that follows it carries the same content.
-**Baseline for this pass:** `0645610`
+**Last updated:** 2026-09-21 (pass 14b — **a dropped connection was hiding a missing error
+message.** The analyze pre-flight sat OUTSIDE the handler's `try`, so a refused
+`os.remove(progress.json)` escaped it — and Werkzeug answers an exception it cannot convert by
+closing the connection with **no reply**, which the caller sees as `RemoteDisconnected` and cannot
+tell apart from a network fault. The pre-flight is guarded now and the heartbeat clear is
+deliberately non-fatal. The audit's wait loop, which **manufactured an hour-long timeout** because
+it waited on a trigger that had never been accepted, now fails fast and is bounded in both
+directions. Found with `py-spy dump` after two wrong guesses.)
+**Last updated (pass 14):** **the blocked frame is FIXED, not pinned**, and the desk
+now has one Settings form for a local model *or* a remote API with a token. `_SPA_CSP` is
+`frame-ancestors 'self'`: a foreign page still cannot frame the desk, which is what the directive
+is for, and the app's own console can. The design-session suite asserts the frame **renders** and
+that **zero** CSP refusals are logged. Remote access gained a real bearer token, threaded into
+every client, never echoed back — and the mode stays a launch-time decision, not a permission.
+**HEAD:** `fdf431c` (pass 13's tracker stamp) — **pushed**; the pass-14 work is committed and
+pushed with this stamp.
+**Baseline for this pass:** `fdf431c`
 
 ---
 
@@ -20,10 +28,23 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1576 passed, 3 skipped, 0 failed** (+4: 2 endpoint tests for the Windows lock, 2 for the idea-store site) |
+| Unit + integration | `python -m pytest tests/` | **1614 passed, 4 skipped, 0 failed** (1618 collected; +4 in pass 14b: `tests/test_analyze_preflight.py`) |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 32 pass, 0 fail, 1 skip, 0 known-broken** — **670 checks** (pass 13: `design_session` stopped being skipped and contributed **20 real checks**; 650 → 670) |
+| Browser E2E | `python tests/run_browser_suites.py` | **34 suites: 33 pass, 0 fail, 1 skip, 0 known-broken** — **702 checks** (pass 14: +1 suite, +32 checks). **Re-run in pass 14b** after the product change: unchanged, `GATE-EXIT=0` — the pre-flight guard only alters failure paths. `gun_pen_audit` remains the one skip, and its label was re-tested this pass and held. |
+
+> **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
+> correctly found that `design_session`'s exclusion label was false — the console frames the SPA
+> and the SPA shipped `frame-ancestors 'none'`, so no port could ever have made it pass — and then
+> chose to **pin the block as a check**. Pinning a broken product surface documents the failure; it
+> does not fix it. The directive's job is to stop a **foreign** page framing the desk and overlaying
+> it with decoy controls, and `'self'` keeps every bit of that: the only origin allowed to frame the
+> app is the app's own origin, which the writer already fully trusts (it is the same server handing
+> out the capability token). So the relaxation is exactly one word wide, and
+> `test_spa_security_headers.py` pins it as its own value (`== ["frame-ancestors 'self'"]`) and
+> asserts it is not `*`/`http:`/`https:`/`data:`. The suite now asserts the frame **renders** — and
+> covers the half that was dead for as long as the frame was blank: the dawn sync reaching the live
+> app inside it.
 
 > **Pass 13 un-skipped the last suite, and it was not gated on an environment — it was
 > impossible.** `design_session` was excluded as *"drives a studio already running at
@@ -86,6 +107,151 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 14b) — a dropped connection was hiding a missing error message
+
+**How it was found is the finding.** A `pass2` re-run sat for 20 minutes producing nothing at all.
+The first two explanations were both wrong — a dead sandbox proxy (it forwards fine) and the
+unguarded `os.remove`. `py-spy dump` on the hung process ended it in one line:
+
+```
+_start_analysis_and_wait (e2e_browser_gun_pen_audit.py:705)   # time.sleep(10)
+step_pass2 (e2e_browser_gun_pen_audit.py:734)
+```
+
+It was inside the 3600 s wait **added in pass 14**, waiting on a trigger that had never been
+accepted.
+
+### The product defect: an exception the handler could not convert
+
+`POST /api/projects/<name>/analyze` with `{"force": true}` closed the connection with **no reply**
+(`RemoteDisconnected`, 0.17 s), while the identical POST with no body returned 200. The studio's own
+stderr said why:
+
+```
+[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":4719,"threshold":50,"scope":"turn",
+  "targets":["...\gun_pen_2\progress.json"],"targetCount":1}
+```
+
+`_analyze_locked`'s pre-flight — manifest rewrite, stage reset, heartbeat clear — sat **outside** the
+handler's `try`. The refusal escaped it, and a Flask dev server answers an exception it cannot
+convert by dropping the socket. Proof the delete never ran: `progress.json` still held its old
+21:12:08 stamp and the stage reset was never persisted.
+
+Two changes:
+- the pre-flight is inside its own `try` and returns a clear JSON 500
+  (`"Could not start the analysis: …"`), which the front-end can show;
+- `_clear_progress(m)` drops the heartbeat **non-fatally**. `progress.json` is a heartbeat, not the
+  writer's data: the pipeline's first event overwrites it within seconds, and failing a whole
+  re-analysis over a transient cache file costs the writer a run and tells them nothing. It
+  **prints** the refusal rather than swallowing it.
+
+### The harness defect: a wait loop that manufactured the timeout it was built to prevent
+
+`_start_analysis_and_wait` was added in pass 14 so the stage could not report findings against a
+baseline that had never been verified. It did that — and then waited the full 3600 s for a run that
+never started. **A wait loop whose precondition failed does not wait for completion, it manufactures
+a timeout** — and a timeout is indistinguishable from a slow model, so the real error stays hidden
+for the entire budget. Now:
+- a trigger that is not accepted returns **immediately**;
+- an accepted trigger must produce a heartbeat within `FIRST_BEAT_S = 300`;
+- a running one must not go quiet for `STALL_S = 1200`.
+
+"Still working" and "never started" are different failures and now say so differently.
+
+### Verified
+- pytest **1614 passed / 4 skipped / 0 failed** (1618 collected), ruff clean.
+- `tests/test_analyze_preflight.py` (new, 4 tests) — mutation-verified **2/2** as **named** failures,
+  source restored byte-identical (`.workbuddy-ai/scratch/preflight_mutation.py`).
+- The trigger now holds: `POST /analyze {"force": true}` keeps the connection open and the run
+  actually starts (`stage: dialogue` → `theme` → `character` → `coverage` → `logline_test`, with live
+  model connections).
+- **`pass2` is GREEN: `9 passed, 0 failed`, 0 gaps filed** — against a real 12-pass analysis on the
+  live 35B model, and with the arrival arithmetic **exact** (`Pass: 31 → 31 still live · 0 no longer
+  flagged · 0 new` vs the board's own count of 31). That is the check that reported a false failure
+  before the harness bugs were fixed. One honest note from the suite: `ghosted marks not rendered —
+  no moved marks on this run, so 'never red' was NOT exercised`.
+
+**Caveat, and it matters for reading any gate result from this session:** the first full-suite run
+reported `EEEEE` + `F` with its output truncated mid-progress, and a clean re-run of the *same* tree
+was green. The cause is the same environment hook — it fires on pytest's own tmp-directory garbage
+collection (`[safe-delete] … targets:["…\\Temp\\pytest-of-…\\garbage-…"]`), and it killed the
+session during teardown so the failure summary was never written. **A red run from inside the agent
+sandbox is not evidence of a regression, and neither is a green one** — which is precisely why this
+pass records the *mechanism* and not just the verdict.
+
+### Also answered: `gun_pen_audit`'s exclusion label is TRUE
+Its reason — *"runs a real analyze — needs a llama-server"* — was tested against a live model on
+`:8080` and held: the suite drives a real 12-pass analysis. Unlike `design_session`'s label (pass 13),
+this one is honest, so the exclusion stays.
+
+---
+
+## Closed in this pass (2026-09-21, pass 14) — the blocked frame is FIXED, and the desk speaks both local and remote
+
+### Two requested items
+
+**1. The design console's blank cell.** Pass 13 found that `design_session`'s exclusion label was
+false and responded by **pinning the block as a check**. That documented the failure instead of
+fixing it. The directive's purpose is to stop a **foreign** page framing the desk; the only origin
+allowed to frame it under `'self'` is the app's own origin — which the writer already fully trusts,
+because it is the same server handing out the capability token. So:
+
+- `_SPA_CSP`: `frame-ancestors 'none'` → `'self'`. Exactly one word wide, and pinned as its own
+  value so a future edit has to argue with an assertion.
+- `webapp/design_session.html`: its live frame was pinned to `http://127.0.0.1:8500/` — the **only**
+  hardcoded host:port anywhere in `webapp/` — while the three prototype frames beside it were
+  relative. It is `src="/"` (pass 13) and the stale `:8500` cell label is now gone too.
+- The console drives the live app through the app's **own** `applyDawn()` instead of toggling
+  `body.dawn` behind its back. The old shortcut repainted the frame correctly while leaving the
+  framed app's button label and internal state believing the opposite theme — the console's headline
+  claim is "across ALL four surfaces", and a frame that looks right while disagreeing with itself
+  is not that.
+- The suite now asserts the frame **renders** (`contentDocument` non-null **and** the document
+  carries the SPA's own chrome, so a same-origin 404 cannot satisfy it), that **zero** CSP refusals
+  are logged, and — new coverage for the half that was dead for as long as the frame was blank —
+  that the dawn sync reaches the live studio inside it.
+
+**2. Local model OR remote API, through one form.** The desk was loopback-only, which is a real
+privacy property, but it had **no bearer header anywhere in the codebase** — so a token-protected
+endpoint was not a supported setup, it was a setup that half-worked and then 401'd in a way that
+looked like the model was broken.
+
+| Concern | Decision |
+|---|---|
+| Where the header format lives | `auth_headers()` in `screenplay_analyzer/llm_client_base.py` — the shared base `screenplay_cowriter` **already** imports, so there is no new studio→analyzer dependency and no second copy to drift. `webapp_server._auth_headers` is a lazy, short-circuiting accessor. |
+| Every call site | 9 client constructions in the webapp, both in the orchestrator, and both standalone CLIs. |
+| Where the token is stored | `ServerConfig["api_key"]` **and** `ProjectManifest.api_key`. It rides in the manifest for the same reason `server_url` does — so `resume` and the CLI reach the same endpoint without the writer re-typing it. |
+| How a manifest gets it | `_adopt_connection(m)` at every creation point, plus the existing settings sync (which now fires on a token change alone — rotating a credential used to leave every project holding the old one, which is exactly the shape of a silent auth failure that looks like the endpoint went down). |
+| Is the mode a permission? | **No.** `connection_mode` is *derived* from the URL (`local`/`remote`), never stored, so it cannot drift. It is accepted as an INPUT only so "go local" can reset the URL and clear the token, and so "go remote" is refused loudly while the process opt-in is off — the opt-in stays a launch-time decision, because a request that could grant it would authorise sending the script to the host it names. |
+| Does the token come back? | **Never.** `/api/config` reports `api_key_set` (bool) + `connection_mode` + `allow_remote`. A page that can read config still cannot read the secret out of it. |
+| Is the token field hidden in local mode? | **No** — a local llama-server can legitimately require one (`--api-key`). Hiding the field would make that setup unreachable while a stored token kept being sent anyway. |
+
+### Two real defects the new browser suite found — neither by review
+
+- The disabled Remote option carried its reason **only in a hover `title`**. A greyed-out control
+  with no visible explanation is indistinguishable from a broken one; the hint now states it in text.
+- Reopening Settings after saving showed the **pre-save world**, because the form was only filled at
+  page load. "I saved a token" read as "my save didn't work". `fillSettingsForm()` now runs on open.
+
+### Evidence
+
+The transport proof is a **real loopback HTTP server that records what it was sent** — not a mocked
+`requests`, which would prove the call was made and prove nothing about the header. The browser
+suite boots the studio **twice**, with and without the opt-in, because "remote is refused" and
+"remote works" are two genuinely different states of the same product.
+
+**Gates:** pytest **1610 passed / 4 skipped / 0 failed** (+34), ruff clean, node **16/16**, browser
+gate **34 suites — 33 pass, 0 fail, 1 skip, 0 known-broken — 702 checks** (was 33/32/1/670).
+
+### The lesson
+
+Pass 13 was right about the *label* and wrong about what to do with it. Documenting a dead surface
+is not a fix — it is a more honest-looking version of the same failure. When the blocker is a
+security header protecting the *shipped* app and the thing it blocks is the app's **own** page, the
+answer is the narrow relaxation, not a pinned assertion.
 
 ---
 
@@ -832,6 +998,8 @@ whole section is about.
 | **T1e** | ~~The 21 remaining vacuous browser checks~~ — **CLOSED (pass 10).** All 21 audited, fixed, and mutation-verified: **0 vacuous checks remain** (the sweep that found 21 now returns 0). See the pass-10 section. | test integrity | ✅ done |
 | **NEW (pass 10)** | **CLOSED (pass 12).** `library_delete` flaked in the gate once (`shelf delete emptied the disk`, 30/31 suites green), then passed **3/3 standalone** and on the gate's second run. Pass 10 filed it open because the flake was not reproducible and a production fix would have shipped unverified — the right call at the time. It turned out to be a **real defect, not a slow poll**: `delete_project` called `shutil.rmtree(project_dir, ignore_errors=False)` with **no retry**, and on Windows that raises `PermissionError` (errno=13, **winerror=32**) while any handle to a file inside the tree is open. And because `rmtree` deletes as it walks, the failure did **not** fail cleanly — it left the project **HALF-DELETED**. Reproduced deterministically by holding one real `open()` on one file of a two-file tree: `['project.json']` remained while `parsed.json` was gone — which is exactly the observed symptom (the shelf row survives, so the disk never "empties"). Both `rmtree` sites — `delete_project` *and* `IdeaStore.delete`, which the item never named — now go through **`jsonio.retry_permission`** and answer with a clear JSON error instead of a raw 500. | robustness | ✅ **done — pass 12** |
 | **NEW (pass 9)** | **CLOSED (pass 11).** The 25 orphaned `preview-redesigns/shots/` PNGs were untracked via index-only `git rm --cached -r` (after a `git rm -r` incident that wiped 91 sibling files and was recovered with `git reset --hard`), committed + pushed in `91a11b1`. The dead `.gitignore` rule was fixed to the real nested path. Disk copies remain, now gitignored. | hygiene | **closed — pass 11** |
+| **NEW (pass 13)** | **CLOSED (pass 14).** Pass 13 "closed" `design_session` by **pinning** the `frame-ancestors 'none'` block as a check — which documented a dead product surface instead of fixing it. Pass 14 relaxed the directive to `'self'` (a foreign page still cannot frame the desk; the app's own origin can), removed the console's last hardcoded host:port, made it drive the framed app through the app's **own** `applyDawn()`, and flipped the suite to assert the frame **renders** with **zero** CSP refusals. | product surface | ✅ **done — pass 14** |
+| **NEW (pass 14)** | **CLOSED (pass 14).** The desk had **no bearer header anywhere in the codebase**, so a token-protected OpenAI-compatible endpoint was not a supported setup — it half-worked and then 401'd in a way that looked like the model was broken. Now one Settings form covers both (Local / Remote over shared fields), with the mode *derived* from the URL, `api_key` on `ServerConfig` + `ProjectManifest`, `auth_headers()` threaded into every client, `--api-key`/`$SCREENPLAY_STUDIO_API_KEY` on the studio and both CLIs, and the token **never** echoed back over HTTP. Remote stays a launch-time opt-in. | feature / security | ✅ **done — pass 14** |
 
 **R10 is closed** — see the pass-8 section below. It was filed as hygiene and turned out to
 hide two broken guards.

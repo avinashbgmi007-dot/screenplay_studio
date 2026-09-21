@@ -324,13 +324,35 @@ const FALLBACK_MODE_LABELS = {
   character_interview: "Character Interview",
 };
 
+// ---- the settings form, filled from whatever the desk currently believes ----
+// Split out of loadConfig so OPENING the modal refreshes it too. Without that,
+// the form showed the state from page load: saving a token and reopening the
+// dialog still said "no token saved", which reads as "my save didn't work".
+function fillSettingsForm() {
+  const cfg = state.config || {};
+  $("#server-url-input").value = cfg.server_url || "";
+  $("#timeout-input").value = cfg.timeout || 600;
+  $("#model-input").value = cfg.model || "";
+  $("#fast-model-input").value = cfg.fast_model || "";
+  $("#turn-timeout-input").value = cfg.turn_timeout || 120;
+  // The token never comes back over the wire — only whether one is set — so the
+  // field stays empty and says so in the placeholder. Typing a new value
+  // replaces it; leaving it empty keeps whatever is already stored.
+  const keyInput = $("#api-key-input");
+  keyInput.value = "";
+  keyInput.placeholder = cfg.api_key_set
+    ? "•••••••• (a token is saved — type a new one to replace it)"
+    : "sk-… (stored on this machine, never sent anywhere else)";
+  // keepUrl: the URL came from the server, so the "Local fills in the local
+  // info" reset must not overwrite it (a local server on a non-default port is
+  // a perfectly ordinary setup).
+  setConnectionMode(cfg.connection_mode || "local", { keepUrl: true });
+}
+
 async function loadConfig() {
   try {
     state.config = await api("/config");
-    $("#server-url-input").value = state.config.server_url || "";
-    $("#timeout-input").value = state.config.timeout || 600;
-    $("#fast-model-input").value = state.config.fast_model || "";
-    $("#turn-timeout-input").value = state.config.turn_timeout || 120;
+    fillSettingsForm();
   } catch (e) {
     console.warn("Could not load config:", e);
   }
@@ -339,16 +361,100 @@ async function loadConfig() {
   checkConnection();
 }
 
+// ---- the one form, two modes (local model / remote API) ----
+// The mode decides which fields are filled in and which are required; the
+// fields themselves are shared, so switching never loses what was typed. The
+// server derives the mode from the URL it holds, so this is presentation plus
+// one request-time validation, not a second source of truth.
+let connectionMode = "local";
+// Set only when the writer CLICKS "Local model": that is a deliberate move back
+// to a local server, and it must clear any remote credential rather than leave
+// it pointed at localhost. A blank field is otherwise "leave the saved token
+// alone", because a local llama-server can legitimately have one.
+let clearTokenOnSave = false;
+
+function setConnectionMode(mode, opts = {}) {
+  connectionMode = mode === "remote" ? "remote" : "local";
+  const local = connectionMode === "local";
+  document.querySelectorAll(".mode-opt").forEach((b) => {
+    b.setAttribute("aria-checked", String(b.dataset.mode === connectionMode));
+  });
+  $("#api-key-row").style.display = "block";
+  // The token field is shared by both modes and stays visible: a local
+  // llama-server CAN require one (it is started with --api-key), and hiding the
+  // field would make that setup unreachable from the UI while the stored token
+  // silently kept being sent. Only the hint changes.
+  $("#api-key-hint").innerHTML = local
+    ? "A local llama-server needs no token unless you started it with " +
+      "<code>--api-key</code>. Leave this blank unless yours does."
+    : "Sent as <code>Authorization: Bearer …</code> to that URL only. Saved in this " +
+      "studio's settings and in each project's manifest, so a resumed project can " +
+      "still reach the same endpoint. It is never returned to the browser.";
+  // A mode the server would refuse is not offered: the remote option is disabled
+  // (with the reason in the hint below) until the studio is launched with
+  // --allow-remote-server. The server refuses it too — this is the honest UI for
+  // that refusal, not the enforcement of it.
+  const remoteBlocked = !!(state.config && state.config.allow_remote === false);
+  $("#mode-remote").disabled = remoteBlocked;
+  $("#mode-remote").title = remoteBlocked
+    ? "Restart the studio with --allow-remote-server to enable this"
+    : "";
+  $("#server-url-label").textContent = local ? "llama-server URL" : "API base URL";
+  $("#server-url-input").placeholder = local
+    ? "http://localhost:8080"
+    : "https://api.example.com/v1";
+  if (local && !opts.keepUrl) {
+    // "Local" fills the local info in for you — the same reset the server does,
+    // so the form never shows a remote URL while Local is selected.
+    $("#server-url-input").value = "http://localhost:8080";
+    $("#api-key-input").value = "";
+  }
+  const hint = $("#mode-hint");
+  let text = "";
+  if (local) {
+    text = "Everything stays on this machine: your script is sent only to " +
+      "localhost, and no token is needed.";
+  } else {
+    text = "Your script leaves this machine on every analysis and chat turn. " +
+      "Use a base URL ending in /v1 for an OpenAI-compatible endpoint.";
+  }
+  if (remoteBlocked) {
+    // The disabled Remote option needs its reason IN TEXT, not only in a
+    // hover tooltip: a greyed-out control with no visible explanation is
+    // indistinguishable from a broken one.
+    text += " Remote API is unavailable because this studio was started without " +
+      "remote access — restart it with --allow-remote-server (or set " +
+      "SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1). That has to be a launch-time " +
+      "decision, because an HTTP request must not be able to send your script " +
+      "off this machine.";
+  }
+  hint.textContent = text;
+}
+
+document.querySelectorAll(".mode-opt").forEach((btn) => {
+  btn.onclick = () => {
+    if (btn.disabled) return;
+    if (btn.dataset.mode === "local") clearTokenOnSave = true;
+    setConnectionMode(btn.dataset.mode);
+  };
+});
+
 async function saveConfig() {
   const server_url = $("#server-url-input").value.trim();
   const timeout = parseInt($("#timeout-input").value, 10) || 600;
+  const model = $("#model-input").value.trim();
   const fast_model = $("#fast-model-input").value.trim();
   const turn_timeout = parseInt($("#turn-timeout-input").value, 10) || 120;
+  const body = { connection_mode: connectionMode, server_url, timeout,
+                 model, fast_model, turn_timeout };
+  // A typed token always wins. A blank field means "leave the saved one alone"
+  // — except after an explicit switch to Local, which clears it.
+  const typed = $("#api-key-input").value.trim();
+  if (typed) body.api_key = typed;
+  else if (clearTokenOnSave) body.api_key = "";
   try {
-    state.config = await api("/config", {
-      method: "POST",
-      body: JSON.stringify({ server_url, timeout, fast_model, turn_timeout }),
-    });
+    state.config = await api("/config", { method: "POST", body: JSON.stringify(body) });
+    clearTokenOnSave = false;
     closeModal("#settings-modal");
     applyDemoDisclosure();
     checkConnection();
@@ -361,11 +467,14 @@ async function testConnection() {
   const btn = $("#test-connection-btn");
   const resultEl = $("#test-connection-result");
   const url = $("#server-url-input").value.trim();
+  const typed = $("#api-key-input").value.trim();
+  const body = { server_url: url };
+  if (typed) body.api_key = typed;
   btn.disabled = true;
   resultEl.className = "test-connection-result";
   resultEl.textContent = "Checking…";
   try {
-    const res = await api("/test-connection", { method: "POST", body: JSON.stringify({ server_url: url }) });
+    const res = await api("/test-connection", { method: "POST", body: JSON.stringify(body) });
     resultEl.textContent = res.message;
     resultEl.classList.add(res.ok ? "ok" : "fail");
   } catch (e) {
@@ -8501,7 +8610,13 @@ function init() {
   $("#mode-select").addEventListener("change", updateSettings);
 
   // settings modal
-  $("#settings-btn").addEventListener("click", () => { $("#test-connection-result").textContent = ""; openModal("#settings-modal"); });
+  $("#settings-btn").addEventListener("click", () => {
+    $("#test-connection-result").textContent = "";
+    // Re-fill from the desk's current state: the modal outlives a save, and a
+    // form that still shows the pre-save world reads as a failed save.
+    fillSettingsForm();
+    openModal("#settings-modal");
+  });
   $("#settings-cancel").addEventListener("click", () => closeModal("#settings-modal"));
   $("#settings-save").addEventListener("click", saveConfig);
   $("#test-connection-btn").addEventListener("click", testConnection);

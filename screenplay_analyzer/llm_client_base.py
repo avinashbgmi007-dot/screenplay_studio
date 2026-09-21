@@ -32,6 +32,29 @@ class ModelNotFoundError(LlamaServerError):
     pass
 
 
+def auth_headers(api_key: str | None) -> dict:
+    """Bearer header for a token-protected endpoint; ``{}`` for a local server.
+
+    A llama-server on this machine authenticates nothing; a remote
+    OpenAI-compatible endpoint (a hosted API, a LAN box, a gateway) usually
+    wants a bearer token. Both clients here thread `extra_headers` through every
+    request they make — /v1/models, /props, /v1/chat/completions — so this is the
+    whole plumbing.
+
+    It lives in the shared base rather than in either consumer for the same
+    reason ``net_guard.py`` exists in the studio: two independent constructions
+    of one wire format drift, and they drift *silently*, because a malformed
+    auth header is indistinguishable from a wrong token.
+
+    An empty/whitespace/absent token yields NO header rather than
+    ``Authorization: Bearer `` — some gateways reject a malformed credential
+    outright, which would turn "the writer cleared the token" into "every call
+    401s" on a server that never needed one.
+    """
+    key = (api_key or "").strip()
+    return {"Authorization": f"Bearer {key}"} if key else {}
+
+
 def busy_retry_delay(attempt: int, base: float = 1.5) -> float:
     """Equal jitter for the busy-retry backoff (L3).
 

@@ -96,6 +96,7 @@ class Orchestrator:
             from screenplay_parser.models import ScriptDocument
             from screenplay_analyzer.pipeline import analyze
             from screenplay_analyzer.llm_client import LlamaServerClient
+            from screenplay_analyzer.llm_client_base import auth_headers
             from screenplay_analyzer.report import save_report
 
             def progress_cb(event):
@@ -110,7 +111,8 @@ class Orchestrator:
 
             doc = ScriptDocument.load(m.parsed_path)
             client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
-                                       fallback_to_loaded=True, fast_model=m.fast_model)
+                                       fallback_to_loaded=True, fast_model=m.fast_model,
+                                       extra_headers=auth_headers(m.api_key))
 
             kwargs = {"report_language": language}
             if categories:
@@ -202,6 +204,7 @@ class Orchestrator:
             from screenplay_cowriter.discovery import resolve_model
             from screenplay_cowriter.engine import CoWriterEngine
             from screenplay_cowriter.llm_client import LlamaServerClient
+            from screenplay_analyzer.llm_client_base import auth_headers
 
             report_path = m.report_findings_path if m.stage("analyze").status == "complete" else None
 
@@ -219,7 +222,8 @@ class Orchestrator:
                 session = store.create(title=m.title, report_path=report_path, script_path=m.parsed_path)
                 m.cowriter_session_id = session.session_id
 
-            client = LlamaServerClient(base_url=m.server_url, timeout=m.timeout, fallback_to_loaded=True)
+            client = LlamaServerClient(base_url=m.server_url, timeout=m.timeout, fallback_to_loaded=True,
+                                       extra_headers=auth_headers(m.api_key))
             report_ctx = ReportContext(load_json(report_path) if report_path else None)
             model_id = resolve_model(client, report_ctx, explicit_model=m.model_id)
 

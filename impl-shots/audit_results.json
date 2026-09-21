@@ -1,6 +1,6 @@
 {
-  "sameer_reply": "You're explaining the gun swap instead of letting us watch it happen. The note is right: we see the dummy barrel and the jam. We don't need him to announce the mechanics or the victory in that same beat.\n\n\n\n\nWant me to show you where that explanation starts dragging?",
-  "sushruta_reply": "The dialogue is flagged because it explains the visual twist instead of letting us watch it happen. You just showed us the gun jam and the dummy barrel reveal. Then Pen Guy immediately announces \"Nu a vaadni nak odleyi\" (I will not give you my work). He has already demonstrated he won't yield by swapping the weapon. The line tells us what we just saw, killing the tension of the standoff in favor of exposition. You're asking about this specific passage because it's the moment the scene stops being a thriller and starts feeling like a lecture. You want to keep that beat or trust the action?",
+  "sameer_reply": "That line is doing too much heavy lifting—time check mixed with threat. It’s telling us the stakes instead of letting the gun do the work.\n\n\n\n\nWant my honest take on how to tighten it?",
+  "sushruta_reply": "The dialogue in this beat fails because it explains the resolution instead of letting us watch it happen. You have just shown us two concrete visual facts: Gun Guy’s weapon jams and Pen Guy reveals a dummy barrel swap. Immediately after, Pen Guy states \"Nu a vaadni nak odleyi\" (I will not give you my work). He has already demonstrated he is standing his ground by swapping the gun; announcing it verbally tells the audience what they just saw with their own eyes. It robs the scene of subtext and kills the tension by turning a physical standoff into an informational exchange. The script violates the \"See and Say Rule\" here: we see the jam, but then he says he won't yield, instead of letting the gun’s silence do that work for him. You want to cut the line entirely, or does it need to stay because you have a reason? (One honest flag: I quoted \"See and Say Rule\" — I can't find that wording in the pages I'm holding. If it's a paraphrase, or it came from somewhere else, ignore me; if it should be in the script, point me at the scene. )",
   "intents": {
     "f1atq8x7": "addressed",
     "fc8epm4": "addressed",
@@ -20,19 +20,19 @@
     "skipped": []
   },
   "status_after_edit": {
-    "addressed": 7,
-    "still_present": 2,
-    "unknown": 26
+    "addressed": 0,
+    "still_present": 5,
+    "unknown": 17
   },
   "arrival_expected": {
-    "computed_at": 1789796653.892013,
-    "last_total": 22,
-    "still_live": 22,
+    "computed_at": 1790007786.9414334,
+    "last_total": 31,
+    "still_live": 31,
     "fixed": 0,
     "new": 0,
     "same_input": true,
-    "rewritten": 0,
-    "prev_total": 21,
+    "rewritten": 23,
+    "prev_total": 26,
     "ghosted_marks": []
   },
   "findings_status_summary": {

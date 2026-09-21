@@ -45,9 +45,11 @@ DEFAULT_TIMEOUT = 300
 #
 # `design_session` used to be listed here and did not belong: it was not gated on
 # a live studio, it was IMPOSSIBLE to pass. Its console frames the SPA, and the
-# SPA ships `frame-ancestors 'none'`, so that cell was blank on every port and
-# the suite could never have gone green. It now boots its own studio like the
-# rest of the gate and pins the deliberate block as a check. (pass 13)
+# SPA shipped `frame-ancestors 'none'`, so that cell was blank on every port and
+# the suite could never have gone green. Pass 13 self-hosted the suite but pinned
+# the block as a check, which documented the dead surface instead of fixing it;
+# pass 14 relaxed the directive to 'self' (a foreign page still cannot frame the
+# desk) and the suite now asserts the frame RENDERS. (passes 13-14)
 #
 # `gun_pen_audit` genuinely belongs: it runs a real analyze and needs a
 # llama-server, which the gate does not have.

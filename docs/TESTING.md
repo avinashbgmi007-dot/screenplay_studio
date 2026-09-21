@@ -154,7 +154,7 @@ driven by `tests/run_browser_suites.py`, which runs every suite, prints one summ
 and exits nonzero on any failure or crash:
 
 ```bash
-python tests/run_browser_suites.py               # all runnable suites (~25)
+python tests/run_browser_suites.py               # all runnable suites (34)
 python tests/run_browser_suites.py phase6 smoke  # by name substring
 python tests/run_browser_suites.py --strict      # also chase the known-broken
 E2E_BASE=http://127.0.0.1:8500 python tests/run_browser_suites.py
@@ -172,9 +172,21 @@ safety). As of 2026-09-21 only one suite is actually excluded:
 (both had been excluded as "crashes" — one of them had never exercised four of its
 six worlds). `design_session` was **self-hosted**: its old entry said it needed a
 studio on `:8500`, but that label was false — the console frames the SPA, and the SPA
-sends `frame-ancestors 'none'`, so **no port would ever have made it pass**. It boots
-its own studio now and pins the deliberate block as a check instead of working around
-it.
+sent `frame-ancestors 'none'`, so **no port would ever have made it pass**. Pass 13
+self-hosted the suite but *pinned the block as a check*, which documented a dead
+surface instead of fixing it; pass 14 relaxed the directive to `'self'` (a foreign
+page still cannot frame the desk, which is the whole point of the directive) and the
+suite now asserts the frame **renders** — including the half that was silently dead
+for as long as the frame was blank: the dawn sync reaching the live app inside it.
+
+### The two model-connection suites (pass 14)
+
+The desk supports a model in two places, through **one** Settings form:
+
+| Suite | What it proves |
+|---|---|
+| `tests/test_connection_modes.py` | server side: the mode is not a permission (remote is refused over HTTP while the process opt-in is off), a saved token becomes a real `Authorization: Bearer …` on the wire (proved against a loopback HTTP server that records what it was sent, not a mocked client), and the token never comes back in a response |
+| `tests/e2e_browser_connection_modes.py` | desk side: boots the studio twice — without the opt-in (local works, Remote is disabled *with its reason in visible text*, not just a hover tooltip) and with it (Remote selectable, the shared fields keep their values across a mode switch, the token round-trips without ever appearing in the field or the response) |
 
 Chromium is required: `python -m playwright install chromium` (CI adds `--with-deps`).
 

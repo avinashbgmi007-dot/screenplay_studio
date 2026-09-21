@@ -14,6 +14,7 @@ instances/ports).
 """
 
 import argparse
+import os
 import sys
 
 from screenplay_parser.models import ScriptDocument
@@ -28,13 +29,20 @@ def main():
     parser.add_argument("input", help="Path to a ScriptDocument JSON file (output of Piece 1)")
     parser.add_argument("--server", default="http://localhost:8080", help="llama-server base URL")
     parser.add_argument("--model", default=None, help="Model id (default: whatever is loaded)")
+    parser.add_argument("--api-key", default=None,
+                        help="Bearer token, for a remote OpenAI-compatible endpoint. "
+                             "Not needed for a local llama-server. Falls back to "
+                             "SCREENPLAY_STUDIO_API_KEY.")
     parser.add_argument("-o", "--output", default=None, help="Output .md path (default: <input>.report.md)")
     parser.add_argument("--categories", default="dialogue,theme,character,structure,scene_function,coverage",
                          help="Comma-separated categories to run")
     args = parser.parse_args()
 
     doc = ScriptDocument.load(args.input)
-    client = LlamaServerClient(base_url=args.server, model=args.model)
+    from .llm_client_base import auth_headers
+    _key = args.api_key or os.environ.get("SCREENPLAY_STUDIO_API_KEY")
+    client = LlamaServerClient(base_url=args.server, model=args.model,
+                               extra_headers=auth_headers(_key))
 
     try:
         client.resolve_model()

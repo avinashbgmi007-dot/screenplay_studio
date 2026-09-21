@@ -246,6 +246,27 @@ state each endpoint reads/writes is cataloged in `docs/STATE_STORES.md`. Quick i
 | Dictation | `/stt`, `/stt/languages` | GET/POST |
 | Design Lab | `/preview/projects`, `/preview/data/<name>`, `/preview/chat/<name>` | GET/POST/DELETE |
 
+#### Where the model lives: local, or remote with a token
+
+Two setups, one Settings form. `connection_mode(url)` **derives** `"local"` (a llama-server on this
+machine) or `"remote"` (any OpenAI-compatible endpoint) from the URL rather than storing it, so the
+mode cannot drift from the thing it describes; `GET /api/config` reports it alongside
+`api_key_set` and `allow_remote`. The same config keys serve both — `server_url`, `model`,
+`fast_model`, `timeout` — with `api_key` simply empty in the local case.
+
+- **Auth.** `auth_headers(api_key)` (`screenplay_analyzer/llm_client_base.py`) is the ONE
+  construction of the credential and is threaded through the clients' `extra_headers` on every
+  request (`/v1/models`, `/props`, `/v1/chat/completions`). It lives in the shared client base
+  because both pieces already depend on that module — no new cross-package edge, no second copy.
+- **The token never leaves the server.** `GET /api/config` reports `api_key_set`, never the value.
+- **Remote is a launch-time decision, not a permission.** `_validate_server_url` stays
+  loopback-only unless the operator passed `--allow-remote-server` / set
+  `SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1`. `POST /api/config {"connection_mode": "remote"}` is
+  **refused** while that is off, because a request that could grant the opt-in would be the same
+  request that names the remote host — and the guard would be decorative.
+- **Projects carry the connection** (`server_url`, `api_key`) via `_adopt_connection(m)`, so
+  `resume` and the CLI reach the same endpoint without re-typing anything.
+
 ### Data Models
 
 **Piece 1 — Parser (`models.py`)**

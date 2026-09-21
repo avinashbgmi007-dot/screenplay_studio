@@ -53,6 +53,12 @@ class ProjectManifest:
     model_id: str = None
     fast_model: str = None  # optional cheap tier: summaries/refresh route here
     timeout: int = 600
+    # Bearer token for a remote OpenAI-compatible endpoint; None for a local
+    # llama-server, which authenticates nothing. It rides in the manifest for
+    # the same reason server_url does — so `resume` and the CLI can reach the
+    # same model without the writer re-typing it — and it lives in the writer's
+    # own project directory, the same trust boundary as the script itself.
+    api_key: str = None
     stages: dict = field(default_factory=lambda: {
         "parse": StageStatus(), "analyze": StageStatus(), "chat": StageStatus(),
     })
@@ -128,6 +134,7 @@ class ProjectManifest:
             "model_id": self.model_id,
             "fast_model": self.fast_model,
             "timeout": self.timeout,
+            "api_key": self.api_key,
             "stages": {k: v.to_dict() for k, v in self.stages.items()},
             "cowriter_session_id": self.cowriter_session_id,
             "drafts": self.drafts,
@@ -146,6 +153,7 @@ class ProjectManifest:
             model_id=d.get("model_id"),
             fast_model=d.get("fast_model"),
             timeout=d.get("timeout", 600),
+            api_key=d.get("api_key"),
             cowriter_session_id=d.get("cowriter_session_id"),
             drafts=d.get("drafts", []),
             active_draft=d.get("active_draft"),

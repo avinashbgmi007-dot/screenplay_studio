@@ -244,6 +244,8 @@ So the 69 MB is not history debt on the project's own line — it is one dead br
 ### REL-M3 (MEDIUM) — the CI browser gate is narrower than "~460 checks green" implies
 `tests/run_browser_suites.py` excludes **4** suites, loudly:
 - **Skipped unless `E2E_BASE` is set** (`REQUIRES_LIVE_STUDIO`): `gun_pen_audit`, `design_session`.
+  *(`design_session` no longer belongs here — see the pass-13/pass-14 notes below. It was not gated
+  on an environment at all: it was impossible.)*
 - **Known-broken** (`KNOWN_BROKEN`): `preview_next` ("crashes — `bounding_box()` is None for `[data-lab-composer-input]`"), `preview_redesigns` ("crashes — `page.evaluate` hits a null element").
 
 So the 2 known-broken suites are dead coverage today, and the 2 live-only suites never run in CI. ✅ executed.
@@ -655,6 +657,27 @@ skip, 2 known-broken) — no frontend file was touched.
 **Closed in pass 6:** **T3b** — all 33 browser suites audited for the `library_delete` throwing-wait shape. Of 22 vacuous checks found, exactly **one was genuinely unbacked** (`phase14:87`, "the structure card saves beside the idea", backed by nothing but a 600 ms sleep) and now asserts the button's own `"Saved ✓"` confirmation — mutation-verified. The other 21 are classified by class in the tracker rather than churned. **Two corrections to this report's own numbers came out of it:** the gate runs **28 suites / 522 checks** (not 25 / 476), and "all 476 failable" is false — the measured composition is **504 failable of 522**, with the property this section was chasing (unbacked *and* unfailable) now at **zero** in every gate suite.
 
 **Live tracker:** `docs/audit/FIX_TRACKER.md` — kept current so the state of play is readable without re-deriving it from `git log`.
+
+> **Superseded 2026-09-21 (pass 14). The blocked frame is FIXED, not pinned — and the desk speaks
+> both local and remote.** Pass 13 correctly found that `design_session`'s exclusion label was false
+> (the console frames the SPA; the SPA shipped `frame-ancestors 'none'`, so no port could ever have
+> made it pass) and then chose to **pin the block as a check** — which documents a broken surface
+> instead of fixing it. Pass 14 relaxed the directive to `'self'`: the directive exists to stop a
+> **foreign** page framing the desk, and the only origin it now admits is the app's own, which the
+> writer already fully trusts. The suite asserts the frame **renders** and that **zero** CSP refusals
+> are logged, and it now covers the half that was dead for as long as the frame was blank (the dawn
+> sync reaching the live app inside it). **Also closed here:** the desk had **no bearer header
+> anywhere in the codebase**, so a token-protected endpoint was not a supported setup — it
+> half-worked and then 401'd in a way that looked like the model was broken. `auth_headers()` now
+> builds the ONE credential format (shared client base, threaded into every client), `ServerConfig`
+> and `ProjectManifest` carry `api_key`, `--api-key` / `$SCREENPLAY_STUDIO_API_KEY` exist on the
+> studio and both CLIs, and the Settings modal is **one form for two modes** (Local / Remote) with
+> the mode *derived* from the URL. The token is **never** returned over HTTP, and remote stays a
+> launch-time opt-in — `POST /api/config {"connection_mode":"remote"}` is refused while it is off,
+> because a request that could grant it would be the request naming the remote host. Gates: pytest
+> **1610 passed / 4 skipped**, ruff clean, node **16/16**, browser gate **34 suites — 33 pass, 0
+> fail, 1 skip, 0 known-broken — 702 checks** (was 33/32/1/670). The remaining skip is
+> `gun_pen_audit`, and its reason was verified against a live llama-server rather than assumed.
 
 **Explicitly out of scope / owner decisions:** the licensing choice; the dock-density and idea-room design passes; the `app.js` module split and hash router; the two prompt-budget defaults (documented in `.env.example`, currently left at their working values). *The two known-broken preview suites were on this list and have since been **repaired** (pass 9) — see the REL-M3 superseding note above.*
 

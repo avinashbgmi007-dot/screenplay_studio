@@ -65,6 +65,17 @@ app = Flask(__name__, static_folder=None)
 # everything it loads, so nothing else needs the header — which is also what
 # keeps the abandoned design labs (webapp/preview-*/, separate documents with
 # their own inline scripts) working. They are not product surface.
+#
+# `frame-ancestors` was 'none' and is now 'self'. The directive exists to stop
+# a FOREIGN page embedding this desk and overlaying it with decoy controls
+# (clickjacking); 'self' keeps every bit of that protection, because the only
+# origin allowed to frame the app is the app's own origin — which the writer
+# already fully trusts, since it is the same server handing out the capability
+# token. What 'none' additionally blocked was the same-origin design console
+# (webapp/design_session.html), whose fourth cell frames the live desk: it was
+# blank on every port, and because its browser suite was skipped in every gate
+# run, nothing ever said so. See tests/e2e_browser_design_session.py, which now
+# asserts the frame RENDERS instead of asserting it is refused.
 # ---------------------------------------------------------------------------
 _SPA_CSP = (
     "default-src 'self'; "
@@ -76,7 +87,7 @@ _SPA_CSP = (
     "object-src 'none'; "
     "base-uri 'self'; "
     "form-action 'self'; "
-    "frame-ancestors 'none'"
+    "frame-ancestors 'self'"
 )
 
 
@@ -248,8 +259,14 @@ class ServerConfig:
     # exceeds it surfaces a "still working?" prompt instead of a silent
     # multi-minute hang. Analysis calls keep the long `timeout` — only chat
     # turns run on the short clock.
+    #
+    # api_key: bearer token for a remote OpenAI-compatible endpoint. None for a
+    # local llama-server, which authenticates nothing. It lives HERE and in the
+    # project manifest, and is never echoed back over the API — GET /api/config
+    # reports `api_key_set` instead, so a page that can read config still cannot
+    # read the secret out of it.
     _DEFAULTS = {"server_url": "http://localhost:8080", "model": None, "timeout": 600,
-                 "fast_model": None, "turn_timeout": 120}
+                 "fast_model": None, "turn_timeout": 120, "api_key": None}
 
     def __init__(self):
         self._data = dict(self._DEFAULTS)
@@ -277,6 +294,11 @@ class ServerConfig:
                 value = _validate_server_url(str(value).rstrip("/"))
         if key in ("model", "fast_model") and value == "":
             value = None
+        if key == "api_key":
+            # "" is how the writer CLEARS a token, and it must land as None
+            # rather than an empty bearer header (which some gateways reject
+            # outright, turning "forgot to clear it" into "everything 401s").
+            value = (str(value).strip() or None) if value else None
         if key == "turn_timeout":
             try:
                 value = int(value)
@@ -294,6 +316,66 @@ class ServerConfig:
 
 
 CONFIG = ServerConfig()
+
+
+# ---------------------------------------------------------------------------
+# One desk, two places a model can live.
+#
+# "Local" is a llama-server on this machine: no auth, nothing leaves the box.
+# "Remote" is any OpenAI-compatible endpoint (a hosted API, a box on the LAN, a
+# gateway in front of one) reached with a custom base URL, a bearer token and
+# the model names that endpoint publishes. The SAME config keys serve both —
+# `server_url`, `model`, `fast_model`, `timeout` — and `api_key` is simply empty
+# in the local case. The UI does not have two forms; it has one form whose
+# remote-only fields appear when the mode is remote.
+#
+# The mode is DERIVED from the URL rather than stored, so it cannot drift out of
+# step with the thing it describes. It is accepted as an INPUT (see
+# set_config) only so the UI can express "go local" (reset to the default) and
+# so "go remote" can be refused loudly while the process opt-in is off.
+# ---------------------------------------------------------------------------
+def connection_mode(url: str | None = None) -> str:
+    """'local' when the model server is on this machine, else 'remote'."""
+    return "local" if is_loopback_url(url if url is not None else CONFIG["server_url"]) else "remote"
+
+
+def _auth_headers(api_key: str | None) -> dict:
+    """Bearer header for a token-protected endpoint; {} for a local server.
+
+    The format itself lives in the shared client base (``llm_client_base``),
+    next to the clients that actually send it, so the studio and the standalone
+    CLI can never disagree about what a token looks like on the wire. Imported
+    lazily, and short-circuited for the local case, because the studio is not
+    allowed to hard-depend on the analyzer at module load (the pieces are
+    independently usable — see AGENTS.md).
+    """
+    if not (api_key or "").strip():
+        return {}
+    from screenplay_analyzer.llm_client_base import auth_headers
+    return auth_headers(api_key)
+
+
+def _api_key_for(manifest=None) -> str | None:
+    """The token to authenticate with, project-first then process-wide.
+
+    Mirrors the server_url precedence in `_engine_base_url`: a project carries
+    the connection it was set up for, and the global config is the fallback.
+    """
+    return (getattr(manifest, "api_key", None) or CONFIG.get("api_key") or "").strip() or None
+
+
+def _require_remote_optin() -> None:
+    """Raise the actionable refusal for "remote without the process opt-in"."""
+    if _ALLOW_REMOTE_SERVER:
+        return
+    raise ValueError(
+        "Refusing to use a remote model server: this desk only talks to a model "
+        "on THIS machine (localhost / 127.0.0.1 / ::1), so your script never "
+        "leaves it. To use a remote API, restart the studio with "
+        "--allow-remote-server (or set SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1) "
+        "— it is a launch-time decision on purpose, because an HTTP request must "
+        "not be able to send your script off this machine."
+    )
 
 
 @app.errorhandler(ValueError)
@@ -430,14 +512,29 @@ def _make_client(m: ProjectManifest):
     # by hand. Re-check at the point of no return: the request, not the setting.
     base_url = _validate_server_url(m.server_url)
     return LlamaServerClient(base_url=base_url, model=m.model_id, timeout=m.timeout,
-                             fast_model=m.fast_model)
+                             fast_model=m.fast_model,
+                             extra_headers=_auth_headers(_api_key_for(m)))
+
+
+def _adopt_connection(m: ProjectManifest) -> ProjectManifest:
+    """Stamp the desk's current connection onto a project manifest.
+
+    A project records where its model lives (and how to reach it) so that
+    `resume` and the CLI can run it later without the writer re-typing
+    anything. One helper rather than the same assignment repeated at every
+    creation site — the token is easy to forget, and forgetting it fails at
+    the far end with a 401 that looks like the project is broken.
+    """
+    m.server_url = CONFIG["server_url"]
+    m.api_key = CONFIG.get("api_key")
+    return m
 
 
 # sentinel: "model not provided in this request" (None is a real value = clear it)
 _UNSET = object()
 
 
-def _sync_server_url_to_projects(server_url: str, model=_UNSET) -> None:
+def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) -> None:
     """Carry a settings change to every existing project manifest.
 
     Projects snapshot server_url at creation time. Without this sync, a project
@@ -464,6 +561,11 @@ def _sync_server_url_to_projects(server_url: str, model=_UNSET) -> None:
                 new_model = model or None
                 if m.model_id != new_model:
                     m.model_id = new_model
+                    changed = True
+            if api_key is not _UNSET:
+                new_key = api_key or None
+                if m.api_key != new_key:
+                    m.api_key = new_key
                     changed = True
             if changed:
                 m.save()
@@ -582,7 +684,11 @@ def test_connection():
     _validate_server_url(url)
     from screenplay_analyzer.llm_client import LlamaServerClient, LlamaServerError
 
-    client = LlamaServerClient(base_url=url, timeout=15)
+    # The token typed into the form (not yet saved) wins, so "Test Connection"
+    # answers the question the writer is actually asking — does THIS URL, with
+    # THIS token, work — instead of testing the last saved one.
+    key = body["api_key"] if "api_key" in body else CONFIG.get("api_key")
+    client = LlamaServerClient(base_url=url, timeout=15, extra_headers=_auth_headers(key))
     try:
         models = client.list_models()
     except LlamaServerError as e:
@@ -592,7 +698,9 @@ def test_connection():
     ids = [i for i in ids if i]
     if not ids:
         return jsonify({"ok": False, "message": f"Connected to {url}, but it reports no loaded model."})
-    return jsonify({"ok": True, "message": f"Connected — model loaded: {ids[0]}", "models": ids})
+    mode = connection_mode(url)
+    return jsonify({"ok": True, "message": f"Connected ({mode}) — model loaded: {ids[0]}",
+                    "models": ids, "mode": mode})
 
 
 @app.route("/api/real-server-check", methods=["GET"])
@@ -606,7 +714,8 @@ def real_server_check():
         return jsonify({"demo": True, "available": False})
     from screenplay_analyzer.llm_client import LlamaServerClient
     try:
-        models = LlamaServerClient(base_url=url, timeout=5).list_models()
+        models = LlamaServerClient(base_url=url, timeout=5,
+                                   extra_headers=_auth_headers(CONFIG.get("api_key"))).list_models()
         ids = [m.get("id") or m.get("name") for m in models if isinstance(m, dict)]
         return jsonify({"demo": True, "available": bool(ids),
                         "url": url, "models": [i for i in ids if i]})
@@ -623,6 +732,13 @@ def health():
 @app.route("/api/config", methods=["GET"])
 def get_config():
     cfg = CONFIG.to_dict()
+    # The token is a secret and this response is readable by any page that can
+    # reach the desk. Report only WHETHER one is set; the value never leaves.
+    cfg["api_key_set"] = bool(cfg.pop("api_key", None))
+    cfg["connection_mode"] = connection_mode()
+    # Whether a remote URL is permitted at all is a launch-time decision, and the
+    # form has to know it to enable or explain the Remote API option.
+    cfg["allow_remote"] = bool(_ALLOW_REMOTE_SERVER)
     # Personas/modes come from the co-writer so the frontend dropdown never
     # drifts from the server's canonical list (falls back to empty when the
     # co-writer isn't installed; the UI then shows its built-in defaults).
@@ -647,18 +763,35 @@ def get_config():
 def set_config():
     global _DEMO_MODEL_ACTIVE
     body = request.get_json() or {}
+    # ---- the mode switch (see `connection_mode` above) ---------------------
+    # "remote" is refused while the process opt-in is off. That is the whole
+    # point of keeping the opt-in at launch: if this request could grant it,
+    # the request that names the remote host would authorise sending the script
+    # there, and the guard would be decorative.
+    if "connection_mode" in body:
+        mode = str(body.get("connection_mode") or "").strip().lower()
+        if mode not in ("local", "remote"):
+            raise ValueError("connection_mode must be 'local' or 'remote'")
+        if mode == "remote":
+            _require_remote_optin()
+            if not body.get("server_url"):
+                raise ValueError(
+                    "A remote connection needs its API base URL — e.g. "
+                    "https://api.example.com/v1 for an OpenAI-compatible endpoint.")
+        elif "server_url" not in body:
+            # "Go local" fills the local info in for you: back to the default
+            # llama-server, token cleared, so switching modes is one click and
+            # never leaves a remote URL pointed at a local-only desk.
+            CONFIG["server_url"] = ServerConfig._DEFAULTS["server_url"]
+            CONFIG["api_key"] = None
     if "server_url" in body:
         CONFIG["server_url"] = body["server_url"]
         # pointing at anything other than the demo IS the switch back:
         # the demo thread keeps running but stops answering the desk
         if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
             _DEMO_MODEL_ACTIVE = False
-        # the writer changed where the model lives — carry that to every
-        # existing project too. Without this, projects keep a stale per-project
-        # server_url (e.g. an old port) and every LLM call (chat, rewrite,
-        # analyze) silently hits a dead server while the status strip shows
-        # green (it tests the global URL, not the manifest's).
-        _sync_server_url_to_projects(CONFIG["server_url"], body["model"] if "model" in body else _UNSET)
+    if "api_key" in body:
+        CONFIG["api_key"] = body["api_key"]
     if "model" in body:
         CONFIG["model"] = body["model"] or None
     if "fast_model" in body:
@@ -670,7 +803,22 @@ def set_config():
             CONFIG["timeout"] = int(body["timeout"])
         except (TypeError, ValueError):
             pass  # invalid timeout ignored — keep the current value
-    return jsonify(CONFIG.to_dict())
+    if "server_url" in body or "api_key" in body or "model" in body:
+        # the writer changed WHERE the model lives or HOW to reach it — carry
+        # that to every existing project too. Without this, projects keep a
+        # stale per-project server_url (e.g. an old port) and every LLM call
+        # (chat, rewrite, analyze) silently hits a dead server while the status
+        # strip shows green (it tests the global URL, not the manifest's).
+        _sync_server_url_to_projects(
+            CONFIG["server_url"],
+            body["model"] if "model" in body else _UNSET,
+            api_key=body["api_key"] if "api_key" in body else _UNSET,
+        )
+    cfg = CONFIG.to_dict()
+    cfg["api_key_set"] = bool(cfg.pop("api_key", None))
+    cfg["connection_mode"] = connection_mode()
+    cfg["allow_remote"] = bool(_ALLOW_REMOTE_SERVER)
+    return jsonify(cfg)
 
 
 # ---------- projects ----------
@@ -742,7 +890,7 @@ def create_sample_project():
 
     try:
         manifest = ProjectManifest.create(project_dir, tmp_path, title=SAMPLE_TITLE)
-        manifest.server_url = CONFIG["server_url"]
+        manifest = _adopt_connection(manifest)
         manifest.timeout = CONFIG["timeout"]
         manifest.model_id = CONFIG["model"]
         manifest.save()
@@ -775,7 +923,7 @@ def create_project():
 
     try:
         manifest = ProjectManifest.create(project_dir, tmp_path, title=title)
-        manifest.server_url = CONFIG["server_url"]
+        manifest = _adopt_connection(manifest)
         manifest.timeout = CONFIG["timeout"]
         manifest.model_id = CONFIG["model"]
         manifest.save()
@@ -888,34 +1036,69 @@ def analyze_project(name):
         lock.release()
 
 
-def _analyze_locked(m):
-    m.server_url = CONFIG["server_url"]
-    m.model_id = CONFIG["model"]
-    m.fast_model = CONFIG["fast_model"]
-    m.timeout = CONFIG["timeout"]
-    m.save()
+def _clear_progress(m) -> None:
+    """Drop the transient analysis heartbeat, if it is there.
 
-    # "Re-run Analysis" must actually re-run, even when a previous run
-    # completed — the orchestrator short-circuits on complete by design
-    # (so resume/retry never redoes finished work), so an explicit request
-    # to re-analyze resets the stage first.
-    body = request.get_json(silent=True) or {}
-    if body.get("force"):
-        from .manifest import StageStatus
-        # Resetting the stage to pending is what forces the re-run: the
-        # orchestrator short-circuits on `stage.status == "complete"`, not on the
-        # report files existing. The report files used to be deleted here too,
-        # which meant a re-run that then FAILED (dead llama-server) destroyed the
-        # writer's previous good analysis — M5, the one path that could lose
-        # real data. They are left in place: a successful run overwrites them via
-        # save_report(), and a failed one leaves the last good report readable.
-        m.stages["analyze"] = StageStatus()
-        # progress.json is a transient heartbeat, not the writer's data — clear
-        # it so the poller can't report the previous run's final state while this
-        # one is starting.
+    Deliberately NON-FATAL. progress.json is a heartbeat, not the writer's data:
+    the pipeline's first event overwrites it within seconds of a run starting
+    (orchestrator.py writes it with atomic_write_json, which never needs the old
+    file to be gone first). So a delete that fails costs nothing — while failing
+    a whole re-analysis over a transient cache file would cost the writer a run
+    and tell them nothing useful.
+
+    It can fail for reasons that have nothing to do with this app: on Windows a
+    delete races any open handle, and an instrumented or sandboxed environment
+    can refuse it outright. Measured: exactly that produced a dropped connection
+    (see `_analyze_locked`) and a caller left waiting on a progress file that
+    could never change. A stale `done` is harmless too — every poller keys on a
+    NEWER timestamp, so the previous run's final state cannot pass for this
+    one's.
+    """
+    try:
         if os.path.exists(m.progress_path):
             os.remove(m.progress_path)
+    except Exception as e:
+        # Reported, never silent ("flag, don't drop") — and never fatal.
+        print(f"[analyze] could not clear {m.progress_path} — continuing: {e}")
+
+
+def _analyze_locked(m):
+    # The pre-flight lives OUTSIDE the pipeline's try below, and it does real
+    # work: it rewrites the manifest and clears the heartbeat. An exception here
+    # used to escape the handler entirely, and a Flask dev server that raises
+    # before it can write a response closes the connection with NO reply — so
+    # the caller saw a dead socket instead of a reason. Measured: a blocked
+    # os.remove() below did exactly that, and the run never started while the
+    # caller waited on a progress file that could never change. Fail loudly
+    # instead, with an error the front-end can actually show.
+    body = {}
+    try:
+        _adopt_connection(m)
+        m.model_id = CONFIG["model"]
+        m.fast_model = CONFIG["fast_model"]
+        m.timeout = CONFIG["timeout"]
         m.save()
+
+        # "Re-run Analysis" must actually re-run, even when a previous run
+        # completed — the orchestrator short-circuits on complete by design
+        # (so resume/retry never redoes finished work), so an explicit request
+        # to re-analyze resets the stage first.
+        body = request.get_json(silent=True) or {}
+        if body.get("force"):
+            from .manifest import StageStatus
+            # Resetting the stage to pending is what forces the re-run: the
+            # orchestrator short-circuits on `stage.status == "complete"`, not on the
+            # report files existing. The report files used to be deleted here too,
+            # which meant a re-run that then FAILED (dead llama-server) destroyed the
+            # writer's previous good analysis — M5, the one path that could lose
+            # real data. They are left in place: a successful run overwrites them via
+            # save_report(), and a failed one leaves the last good report readable.
+            m.stages["analyze"] = StageStatus()
+            _clear_progress(m)
+            m.save()
+    except OSError as e:
+        traceback.print_exc()
+        return _error(f"Could not start the analysis: {e}", 500)
 
     # report language: eng | tenglish | hindi | tamil — how the report reads
     report_language = body.get("report_language") or m.report_language or "eng"
@@ -963,7 +1146,7 @@ def retry_failed_categories(name):
 
 
 def _retry_failed_locked(m):
-    m.server_url = CONFIG["server_url"]
+    _adopt_connection(m)
     m.model_id = CONFIG["model"]
     m.fast_model = CONFIG["fast_model"]
     m.timeout = CONFIG["timeout"]
@@ -2290,7 +2473,7 @@ def start_chat(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
 
-    m.server_url = CONFIG["server_url"]
+    _adopt_connection(m)
     m.timeout = CONFIG["timeout"]
     orch = Orchestrator(m)
     try:
@@ -2358,7 +2541,8 @@ def _load_session_and_engine(project: str, session_id: str):
     # multi-minute hang. Analysis calls keep the long timeout; only chat
     # turns use turn_timeout.
     client = LlamaServerClient(base_url=_engine_base_url(session, m), model=session.model_id,
-                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
+                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True,
+                               extra_headers=_auth_headers(_api_key_for(m)))
     memory = None
     try:
         mem_mod = _import_cowriter("memory")
@@ -2601,9 +2785,13 @@ def refresh_writer_memory():
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
     llm_mod = _import_cowriter("llm_client")
+    # No manifest in scope on this route (`m` below is a comprehension
+    # variable), so the token comes from the desk's saved settings — which is
+    # where `_load_session_and_engine` reads the session's own URL from too.
     client = llm_mod.LlamaServerClient(base_url=session.server_url or CONFIG["server_url"],
                                        model=session.model_id, timeout=CONFIG["timeout"],
-                                       fallback_to_loaded=True)
+                                       fallback_to_loaded=True,
+                                       extra_headers=_auth_headers(CONFIG.get("api_key")))
     recent = [m.to_dict() for m in session.branch.messages[-16:]]
     mem.refresh(client, recent, scope=engine.memory_scope, entities=engine._memory_entities())
     return jsonify({"profile": mem.to_dict(), "card": mem.card_text(scope=engine.memory_scope)})
@@ -2669,7 +2857,8 @@ def _load_idea_session_and_engine(idea_id: str, sid: str):
     report_ctx = ReportContext(None)
     # Idea chats run on the same short turn clock as script chats (watchdog).
     client = LlamaServerClient(base_url=_engine_base_url(session), model=session.model_id,
-                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True)
+                               timeout=CONFIG["turn_timeout"], fallback_to_loaded=True,
+                               extra_headers=_auth_headers(CONFIG.get("api_key")))
     # Isolation (writer-first rule): the idea chat knows ONLY this idea — the
     # free-form page + the conversation. The past-scripts library digest is
     # deliberately NOT injected (no cross-idea content leakage until the
@@ -3153,7 +3342,9 @@ def start_idea_chat(idea_id):
     ReportContext = context_mod.ReportContext
     try:
         from screenplay_cowriter.discovery import resolve_model
-        client = LlamaServerClient(base_url=CONFIG["server_url"], timeout=CONFIG["timeout"], fallback_to_loaded=True)
+        client = LlamaServerClient(base_url=CONFIG["server_url"], timeout=CONFIG["timeout"],
+                                   fallback_to_loaded=True,
+                                   extra_headers=_auth_headers(CONFIG.get("api_key")))
         model_id = resolve_model(client, ReportContext(None), explicit_model=CONFIG["model"])
     except Exception:
         model_id = CONFIG["model"]
@@ -3395,7 +3586,7 @@ def graduate_idea(idea_id):
     upload.save(tmp_path)
     try:
         manifest = ProjectManifest.create(project_dir, tmp_path, title=title)
-        manifest.server_url = CONFIG["server_url"]
+        manifest = _adopt_connection(manifest)
         manifest.timeout = CONFIG["timeout"]
         manifest.model_id = CONFIG["model"]
         manifest.save()
@@ -3450,6 +3641,12 @@ def main():
     parser.add_argument("--port", type=int, default=8500)
     parser.add_argument("--projects-dir", default="./studio_projects")
     parser.add_argument("--server", default="http://localhost:8080", help="Default llama-server URL")
+    parser.add_argument("--api-key", default=None,
+                        help="Bearer token for a remote OpenAI-compatible endpoint. Not needed "
+                             "for a local llama-server. Only takes effect together with "
+                             "--allow-remote-server, since a token is what you need on the far "
+                             "side of a connection this desk will not otherwise make. Same as "
+                             "SCREENPLAY_STUDIO_API_KEY.")
     parser.add_argument("--allow-remote-server", action="store_true",
                         help="Permit a model server that is NOT on this machine. Off by "
                              "default, because every analysis and chat turn sends your "
@@ -3494,8 +3691,18 @@ def main():
     if args.demo_model:
         _use_demo_model()
 
+    # The token can also come from the environment, so a launcher script does not
+    # have to put a secret on a command line (where it lands in shell history and
+    # in `ps`). The flag wins when both are present.
+    _api_key_env = os.environ.get("SCREENPLAY_STUDIO_API_KEY", "").strip()
+    if args.api_key or _api_key_env:
+        CONFIG["api_key"] = args.api_key or _api_key_env
+
     print(f"Projects directory: {os.path.abspath(PROJECTS_DIR)}")
-    print(f"Default model server: {CONFIG['server_url']}")
+    print(f"Default model server: {CONFIG['server_url']} ({connection_mode()})")
+    if CONFIG.get("api_key"):
+        print("Model server auth: bearer token set (from "
+              + ("--api-key" if args.api_key else "SCREENPLAY_STUDIO_API_KEY") + ")")
     print(f"Open http://localhost:{args.port} in your browser.")
     if _API_TOKEN:
         print("Writes require the capability token. Your browser gets it automatically "
@@ -3543,7 +3750,10 @@ else:
     def _server_reachable(url: str) -> bool:
         try:
             from screenplay_analyzer.llm_client import LlamaServerClient
-            return LlamaServerClient(base_url=url).is_reachable()
+            return LlamaServerClient(
+                base_url=url,
+                extra_headers=_auth_headers(CONFIG.get("api_key")),
+            ).is_reachable()
         except Exception:
             return False
 

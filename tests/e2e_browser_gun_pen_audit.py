@@ -635,37 +635,169 @@ def _expected_arrival():
     return snap.get("payload") or {}
 
 
+def _progress():
+    """The project's progress.json, or {} when it cannot be read."""
+    try:
+        return api("GET", f"/api/projects/{PROJECT}/progress", timeout=15)
+    except Exception:
+        return {}
+
+
+# A run that starts must say so quickly: the pipeline writes its first heartbeat
+# at the top of stage 1, long before the model is asked anything. Silence past
+# this means the run never began — a different failure from a slow model.
+FIRST_BEAT_S = 300
+# ...and once it IS running, a gap this long with no new heartbeat is a stall,
+# not thinking. The whole script analyses in ~9-16 min on the 35B model.
+STALL_S = 1200
+
+
+def _start_analysis_and_wait():
+    """Force a re-analysis and wait for THAT run to land. Returns True on success.
+
+    Three traps, all measured against a 35B model (pass 14). Together they made
+    this stage report three FALSE failures and one FALSE product gap, so they are
+    worth the space:
+
+    1. `POST /analyze` BLOCKS for the whole run, and on a real model a run can
+       exceed any timeout we pick (measured: **15 min 38 s** for this 6-scene
+       script on `qwen3.6-35b`, against a 900 s client timeout). A client-side
+       read timeout therefore means **the run is still going**, not that it
+       failed — the old code recorded it as a product failure and moved on.
+
+    2. The completion poll exited on `status == "complete" or stage == "done"`,
+       which the PREVIOUS run's `progress.json` still satisfies on disk, because
+       nothing clears it between runs. So a run that never started would be
+       declared complete instantly. It is anchored to a timestamp now: only a
+       completion NEWER than the run we triggered counts.
+
+    3. **The completion flag and the snapshot are written ~1 s apart.**
+       `progress.json` says `done` at 21:12:08 and `last_pass.json` is refreshed
+       at 21:12:09. So reading the expected snapshot the moment the flag flips
+       returns the PREVIOUS pass's numbers while the browser — a second later —
+       reads the new ones. Measured exactly that: expected `last_total=22` vs the
+       strip's `27`, reported as an arithmetic mismatch and a product gap when
+       nothing was wrong. `step_pass2` therefore waits for a NEW `computed_at`
+       too; see `_wait_for_new_snapshot`.
+
+    Returning False makes the caller fail the stage and SKIP the derived
+    assertions, rather than emit product findings computed against a baseline
+    that was never verified.
+    """
+    before_ts = _progress().get("ts") or 0
+    started = os.environ.get("GUNPEN_SKIP_ANALYZE") == "1"
+    if started:
+        print("    (trigger skipped — asserting against the in-flight run)")
+    else:
+        try:
+            r = requests.post(f"{BASE}/api/projects/{PROJECT}/analyze",
+                              json={"force": True}, timeout=3600,
+                              headers=studio_headers(BASE))
+            if r.status_code in (200, 201):
+                started = True
+                check("pass2: force re-analysis accepted", True)
+            else:
+                # NOT accepted -> return WITHOUT waiting. Trap 4, and the one
+                # this function learned the hard way: a wait loop whose trigger
+                # failed does not "wait for completion", it MANUFACTURES a
+                # timeout — and a timeout is indistinguishable from a slow
+                # model, so the real error stays hidden for the whole budget.
+                # Measured: a sandbox-blocked os.remove() inside the handler
+                # dropped the connection, this check recorded the failure, and
+                # the stage then sat in time.sleep(10) for 20 minutes with
+                # nothing to tell it apart from a 35B model thinking.
+                check("pass2: force re-analysis accepted", False,
+                      f"HTTP {r.status_code}: {r.text[:120]}")
+                return False
+        except requests.exceptions.ReadTimeout:
+            # Expected on a real model: the run outlived the client. Not a
+            # failure — the wait below is the actual gate.
+            started = True
+            note("pass2: the analyze call outlived the client timeout",
+                 "the run is still going; waiting for its progress stamp")
+        except Exception as e:
+            # A dropped connection lands here too (RemoteDisconnected is a
+            # ConnectionError, not a ReadTimeout), and it is NOT a reason to
+            # wait: nothing was accepted.
+            check("pass2: force re-analysis accepted", False, str(e)[:140])
+            return False
+
+    if not started:
+        return False
+
+    # Bounded in BOTH directions: an accepted trigger must produce a heartbeat
+    # quickly, and a running one must not go quiet. "Still working" and "never
+    # started" are different failures and now say so differently.
+    deadline = time.time() + 3600
+    first_beat_by = time.time() + FIRST_BEAT_S
+    last_ts, last_change = before_ts, time.time()
+    pr = {}
+    while time.time() < deadline:
+        pr = _progress()
+        ts = pr.get("ts") or 0
+        if ts > last_ts:
+            last_ts, last_change = ts, time.time()
+        # A NEW completion only: `ts` strictly after the run we started.
+        if ts > before_ts and (pr.get("status") == "complete"
+                               or pr.get("stage") == "done"):
+            check("pass2: analysis completed", True)
+            return True
+        if last_ts <= before_ts and time.time() > first_beat_by:
+            check("pass2: analysis completed", False,
+                  f"no heartbeat within {FIRST_BEAT_S}s of an accepted trigger — "
+                  "the run never started")
+            return False
+        if last_ts > before_ts and time.time() - last_change > STALL_S:
+            check("pass2: analysis completed", False,
+                  f"progress went silent for {STALL_S}s "
+                  f"(stage={pr.get('stage')} status={pr.get('status')})")
+            return False
+        time.sleep(10)
+    check("pass2: analysis completed", False,
+          f"no NEW completion within the deadline (progress={json.dumps(pr)[:160]})")
+    return False
+
+
+def _wait_for_new_snapshot(before, deadline_s=180):
+    """Wait until last_pass.json carries a NEW computed_at. Returns the snapshot.
+
+    Trap 3 in `_start_analysis_and_wait`: `progress.json` flips to `done` about a
+    second before the arrival snapshot is rewritten, so reading the snapshot the
+    instant the flag flips yields the PREVIOUS pass's numbers and makes the
+    strip look wrong by exactly one pass. Anchored on `computed_at`, the same way
+    the completion wait is anchored on `ts`.
+    """
+    before_at = before.get("computed_at")
+    deadline = time.time() + deadline_s
+    snap = before
+    while time.time() < deadline:
+        snap = _expected_arrival()
+        if snap.get("computed_at") != before_at:
+            return snap
+        time.sleep(5)
+    return snap
+
+
 def step_pass2():
     before = _expected_arrival()
     print("    pre-pass2 baseline:", before)
-    # POST /analyze BLOCKS until the whole run completes (~9 min on the real
-    # model), so the timeout must cover the run. GUNPEN_SKIP_ANALYZE=1 asserts
-    # against an already in-flight run instead of starting another.
-    if os.environ.get("GUNPEN_SKIP_ANALYZE") != "1":
-        try:
-            r = requests.post(f"{BASE}/api/projects/{PROJECT}/analyze",
-                              json={"force": True}, timeout=900,
-                              headers=studio_headers(BASE))
-            check("pass2: force re-analysis accepted", r.status_code in (200, 201),
-                  str(r.status_code))
-        except Exception as e:
-            check("pass2: force re-analysis accepted", False, str(e)[:140])
-    else:
-        print("    (trigger skipped — asserting against the in-flight run)")
-    deadline = time.time() + 1800
-    pr = {}
-    while time.time() < deadline:
-        try:
-            pr = api("GET", f"/api/projects/{PROJECT}/progress", timeout=15)
-        except Exception:
-            pr = {}
-        if pr.get("status") == "complete" or pr.get("stage") == "done":
-            break
-        time.sleep(10)
-    check("pass2: analysis completed", pr.get("status") == "complete" or pr.get("stage") == "done",
-          json.dumps(pr)[:160])
+    if not _start_analysis_and_wait():
+        # Fail the stage and STOP. Everything below compares the arrival strip
+        # against a snapshot, so running it on a baseline that was never
+        # verified produces confident product findings about a run that had not
+        # finished — which is precisely what happened before this guard existed
+        # (measured: 3 FAILs and 1 GAP, all false, from reading the desk
+        # mid-flight).
+        print("    !! the re-analysis did not land — skipping the arrival assertions")
+        return
 
-    after = _expected_arrival()
+    after = _wait_for_new_snapshot(before)
+    if after.get("computed_at") == before.get("computed_at"):
+        check("pass2: the new pass wrote a fresh arrival snapshot", False,
+              f"computed_at unchanged ({after.get('computed_at')}) — the strip would "
+              "be compared against the previous pass")
+        return
+    check("pass2: the new pass wrote a fresh arrival snapshot", True)
     RESULTS["arrival_expected"] = after
     print("    post-pass2 expected arrival:", after)
 

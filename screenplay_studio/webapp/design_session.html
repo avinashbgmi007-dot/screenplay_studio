@@ -181,7 +181,7 @@ button{cursor:pointer;background:none;border:none;color:inherit;font:inherit}
       <div class="cell-head">
         <span class="dot" style="background:#e8a24f"></span>
         <span class="name">Live Studio</span>
-        <span class="tag">shipping app · :8500 · current identity</span>
+        <span class="tag">shipping app · same origin · current identity</span>
         <span class="grow"></span>
         <button class="icon-btn" title="Focus this surface" onclick="solo('live')">⛶</button>
       </div>
@@ -312,8 +312,17 @@ function syncDawn(){
   // Beatwall: LIGHT is its default; night = body.dark (inverted convention).
   try { const b = protoFrames.beatwall.contentDocument.body;
     b.classList.toggle('dark', dawn); b.classList.remove('dawn'); } catch(e) {}
-  // Live studio: drive its own dawn class inside the frame (same class its toggle uses).
-  try { liveFrame.contentDocument.body.classList.toggle('dawn', dawn); } catch(e) {}
+  // Live studio: drive its OWN dawn function when it has one, so the app's
+  // button label and internal state stay in step with what the console did.
+  // Falling back to the raw class toggle repaints the frame but leaves the app
+  // believing it is still in the other theme — the console's headline claim is
+  // "across ALL four surfaces", and a frame that looks right while disagreeing
+  // with itself is not that.
+  try {
+    const w = liveFrame.contentWindow;
+    if (w && typeof w.applyDawn === 'function') w.applyDawn(dawn);
+    else liveFrame.contentDocument.body.classList.toggle('dawn', dawn);
+  } catch(e) {}
   const btn = document.getElementById('syncDawn');
   btn.classList.toggle('on', dawn);
   btn.textContent = dawn ? '🌙 Night sync: all four' : '☀ Dawn sync: all four';

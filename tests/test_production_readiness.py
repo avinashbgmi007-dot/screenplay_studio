@@ -554,9 +554,9 @@ def test_browser_gate_runner_never_silently_drops_a_suite():
                     "preview_next", "preview_redesigns",
                     # self-hosted 2026-09-21 (pass 13) — it was in
                     # REQUIRES_LIVE_STUDIO, but the label was false: the console
-                    # frames the SPA and the SPA sends `frame-ancestors 'none'`,
-                    # so no port would ever have made it pass. It boots its own
-                    # studio now and pins the deliberate block as a check.
+                    # frames the SPA and the SPA sent `frame-ancestors 'none'`,
+                    # so no port would ever have made it pass. Pass 14 relaxed
+                    # the directive to 'self' so the live cell actually renders.
                     "design_session"):
         assert passing not in rbs.REQUIRES_LIVE_STUDIO, f"{passing} is runnable"
         assert passing not in rbs.KNOWN_BROKEN, f"{passing} is runnable"

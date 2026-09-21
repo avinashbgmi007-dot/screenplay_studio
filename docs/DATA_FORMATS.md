@@ -284,6 +284,10 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
   "model_id": null,                       // set after first successful analyze
   "fast_model": null,                     // optional fast model for short calls
   "timeout": 600,
+  "api_key": null,                        // bearer token for a remote OpenAI-compatible
+                                          // endpoint; null for a local llama-server.
+                                          // Rides in the manifest so `resume`/CLI reach the
+                                          // same endpoint. Never returned over HTTP.
   "stages": {
     "parse":   {"status": "complete", "output_paths": {"parsed": "./proj/parsed.json", "kg": "./proj/parsed.kg.json"}, "error": null, "updated_at": 0.0},
     "analyze": {"status": "complete", "output_paths": {"report_md": "./proj/report.md", "report_findings": "./proj/report.findings.json", "category_outcomes": {...}, "failed_categories": []}, "error": null, "updated_at": 0.0},

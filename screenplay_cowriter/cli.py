@@ -219,7 +219,9 @@ def cmd_chat(args):
         sys.exit(1)
 
     server_url = args.server or session.server_url or "http://localhost:8080"
-    client = LlamaServerClient(base_url=server_url, model=args.model)
+    from screenplay_analyzer.llm_client_base import auth_headers
+    client = LlamaServerClient(base_url=server_url, model=args.model,
+                               extra_headers=auth_headers(args.api_key or os.environ.get("SCREENPLAY_STUDIO_API_KEY")))
 
     _, report_ctx = _load_contexts(session)
     try:
@@ -261,6 +263,10 @@ def main():
     p_chat.add_argument("--script", help="Path to Piece 1 ScriptDocument JSON")
     p_chat.add_argument("--server", help="llama-server base URL (default: http://localhost:8080)")
     p_chat.add_argument("--model", help="Explicit model id override")
+    p_chat.add_argument("--api-key", default=None,
+                        help="Bearer token, for a remote OpenAI-compatible endpoint. "
+                             "Not needed for a local llama-server. Falls back to "
+                             "SCREENPLAY_STUDIO_API_KEY.")
     p_chat.add_argument("--sessions-dir", default="./sessions", help="Where session files live")
     p_chat.add_argument("--memory-path", default=None, help="Optional writer relationship memory file")
     p_chat.set_defaults(func=cmd_chat)

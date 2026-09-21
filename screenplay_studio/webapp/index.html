@@ -663,8 +663,44 @@
 <div id="settings-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" style="display:none;">
   <div class="modal">
     <h3 id="settings-modal-title">Server &amp; Model</h3>
-    <label class="modal-label" for="server-url-input">llama-server URL</label>
+
+    <!-- One form, two places a model can live. The mode only decides which
+         fields are filled in and which are required; every field below is
+         shared, so switching modes never loses what you typed. -->
+    <fieldset class="mode-switch" id="mode-switch">
+      <legend class="modal-label">Where the model lives</legend>
+      <div class="mode-opts" role="radiogroup" aria-label="Where the model lives">
+        <button type="button" id="mode-local" class="mode-opt" role="radio"
+                aria-checked="true" data-mode="local">
+          <b>Local model</b>
+          <span>llama-server on this machine — nothing leaves your computer</span>
+        </button>
+        <button type="button" id="mode-remote" class="mode-opt" role="radio"
+                aria-checked="false" data-mode="remote">
+          <b>Remote API</b>
+          <span>Any OpenAI-compatible endpoint, with an API token</span>
+        </button>
+      </div>
+    </fieldset>
+    <p class="modal-hint" id="mode-hint"></p>
+
+    <label class="modal-label" for="server-url-input" id="server-url-label">llama-server URL</label>
     <input type="text" id="server-url-input" placeholder="http://localhost:8080">
+
+    <div id="api-key-row">
+      <label class="modal-label" for="api-key-input">API token</label>
+      <input type="password" id="api-key-input" autocomplete="off" spellcheck="false"
+             placeholder="sk-… (stored on this machine, never sent anywhere else)">
+      <p class="modal-hint" id="api-key-hint">Sent as <code>Authorization: Bearer …</code> to
+        that URL only. Saved in this studio's settings and in each project's manifest, so a
+        resumed project can still reach the same endpoint. It is never returned to the
+        browser.</p>
+    </div>
+
+    <label class="modal-label" for="model-input">Model name</label>
+    <input type="text" id="model-input" placeholder="leave blank to use whatever the endpoint reports">
+    <p class="modal-hint">A remote endpoint usually publishes several — type the one you want
+      (e.g. <code>gpt-4o-mini</code>). Blank picks the first the endpoint reports.</p>
 
     <label class="modal-label" for="timeout-input">Response timeout (seconds)</label>
     <input type="number" id="timeout-input" placeholder="600" min="30" max="7200" step="10">

@@ -60,7 +60,33 @@ def test_policy_blocks_the_dangerous_defaults(monkeypatch, tmp_path):
     assert "default-src 'self'" in csp
     assert "object-src 'none'" in csp
     assert "base-uri 'self'" in csp
-    assert "frame-ancestors 'none'" in csp
+    # 'self', not 'none'. The directive's job is to stop a FOREIGN page framing
+    # this desk and overlaying it with decoy controls; 'self' keeps all of that,
+    # because the only origin allowed to frame the app is the app's own origin —
+    # which the writer already fully trusts (it is the same server handing out
+    # the capability token). 'none' additionally blanked the same-origin design
+    # console (webapp/design_session.html), and because its browser suite was
+    # skipped in every gate run, nothing ever said so. See the dedicated test
+    # below; the console's own suite asserts the frame actually renders.
+    assert "frame-ancestors 'self'" in csp
+    assert "frame-ancestors 'none'" not in csp
+
+
+def test_frame_ancestors_allows_only_this_origin(monkeypatch, tmp_path):
+    """The relaxation is exactly one word wide, and no wider.
+
+    `frame-ancestors *` (or `http:`/`https:`) would let any site on the internet
+    frame the desk; the point of the change was to unblock the app's own design
+    console and nothing else. Pinned as its own value so a future edit has to
+    argue with this assertion rather than quietly widen it.
+    """
+    _ws, client = _client(monkeypatch, tmp_path)
+    csp = client.get("/").headers["Content-Security-Policy"]
+    directive = [d.strip() for d in csp.split(";")
+                 if d.strip().startswith("frame-ancestors")]
+    assert directive == ["frame-ancestors 'self'"], directive
+    for too_wide in ("*", "http:", "https:", "data:"):
+        assert too_wide not in directive[0], f"{too_wide} would allow third-party framing"
 
 
 def test_style_inline_is_allowed_deliberately(monkeypatch, tmp_path):

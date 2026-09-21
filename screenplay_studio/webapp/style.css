@@ -2730,7 +2730,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   color: var(--text);
 }
 .modal-label { display: block; font-size: var(--fs-sm); color: var(--text-muted); margin-bottom: var(--sp-3); }
-.modal input[type="text"], .modal input[type="number"] {
+.modal input[type="text"], .modal input[type="number"], .modal input[type="password"] {
   width: 100%;
   background: var(--ink-800);
   border: 1px solid var(--line);
@@ -2739,12 +2739,37 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   margin-bottom: var(--sp-4);
   color: var(--text);
 }
-.modal input[type="text"]:focus {
+.modal input[type="text"]:focus, .modal input[type="password"]:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 .modal-hint { font-size: var(--fs-xs); color: var(--text-faint); margin: var(--sp-2) 0 var(--sp-8); line-height: 1.5; }
+.modal-hint code { font-family: var(--mono, monospace); font-size: 0.95em; color: var(--text-muted); }
+
+/* Where-the-model-lives switch: one form, two modes. Both options are real
+   buttons (not a styled radio) so the whole card is the hit target and the
+   keyboard/AT story is a plain radiogroup. */
+.mode-switch { border: 0; padding: 0; margin: 0 0 var(--sp-4); }
+.mode-opts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.mode-opt {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  background: var(--ink-800); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: var(--sp-4) var(--sp-5);
+  color: var(--text-muted); cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+.mode-opt b { color: var(--text); font-size: var(--fs-sm); }
+.mode-opt span { font-size: var(--fs-xs); color: var(--text-faint); line-height: 1.45; }
+.mode-opt:hover { border-color: var(--line-strong, var(--line)); }
+.mode-opt[aria-checked="true"] {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 12%, var(--ink-800));
+  color: var(--text);
+}
+.mode-opt[aria-checked="true"] span { color: var(--text-muted); }
+.mode-opt:disabled { opacity: 0.5; cursor: not-allowed; }
+.mode-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: var(--sp-4); margin-top: var(--sp-6); }
 .modal-wide { width: 560px; max-width: 92vw; }
 
