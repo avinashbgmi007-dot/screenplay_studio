@@ -202,3 +202,34 @@ Backend pipeline passes, KB rules, personas' prompts, new endpoints beyond the
    with real Gun_Pen data and screenshot-review it (night AND dawn) BEFORE the P1
    rebuild is called done. The ~15% layout uncertainty is retired by pixels, not prose.
 
+
+## 14. Productivity additions (writer + doctor POV — filtered hard)
+
+Admission rule: uses data the backend ALREADY sends, needs NO new surface, shortens
+the path from reading feedback to acting on it. Four passed; everything else rejected
+(see bottom).
+
+1. **"What's working" leads the ledger** (doctor POV: a good consultant names the
+   healthy organs before the sick ones). A thin collapsed line directly under the
+   arrival strip — *"What's working (3)"* — fed by `coverage.strengths` (already
+   computed, currently dropped). Writer opens feedback to encouragement + orientation,
+   not a wall of problems. Cost: one section, zero backend change.
+2. **Finding → my note, one click** (writer POV: triage becomes action). A "📝 pin to
+   notes" verb on finding cards creates a margin note carrying the finding's scene +
+   quote via the EXISTING notes API. The writer can park a finding into their own
+   to-do-in-margin without learning the Dismiss/⏭/✓ taxonomy first. Cost: one button +
+   one POST to an existing endpoint.
+3. **Clean-scene ✓ on the scene rail** (writer POV: progress you can feel). A scene
+   with zero live findings shows a quiet ✓ where severity dots would be. Turns the rail
+   from "map of problems" into "map of progress" — the dawn-meter instinct at scene
+   granularity. Cost: one conditional glyph off the existing aggregate.
+4. **Character-read confidence + scene_refs on cards** (doctor POV, honesty sweep
+   completion). The audit flagged these as dropped; §7 already surfaces the same class
+   of fields for findings — reads get parity. Cost: two fields on an existing card.
+
+**Rejected (with reasons, so they stay rejected):** gamified streaks/scores (noise;
+dawn meter already does morale honestly), an analytics dashboard (a new surface — the
+disease), export/share reports (out of scope, privacy-first product), AI "fix it for
+me" auto-apply (diagnose/prescribe split is a load-bearing convention; Rewrite modal
+already exists for the writer-initiated case).
+
