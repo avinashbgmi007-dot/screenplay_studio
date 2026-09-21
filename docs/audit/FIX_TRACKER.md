@@ -7,8 +7,8 @@ without re-deriving it from `git log`. Source audit:
 **Last updated:** 2026-09-21 (pass 7 — the three owner decisions landed: R6
 closed as proprietary, R7b closed with a real lockfile + CI wiring, BE-M3
 accepted as-is with the fix shape recorded)
-**HEAD:** `e37d77b` at the start of this pass (pushed; `git ls-remote` agrees) —
-this pass's commit hash is stamped at the bottom
+**HEAD:** `1d1c7de` (pass 7's work commit) — **pushed**; `git ls-remote origin main`
+agrees. The tracker-stamp commit that follows it carries the same content.
 **Baseline for this pass:** `e37d77b`
 
 ---
