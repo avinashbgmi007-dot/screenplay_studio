@@ -5,7 +5,8 @@ without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
 **Last updated:** 2026-09-21 (pass 2 — BE-M1/BE-M2/R7 closed, BE-M3 proven)
-**Baseline commit:** `efb3dd5` (pushed; `git ls-remote origin main` agrees)
+**HEAD:** `a5742d5` (pushed; `git ls-remote origin main` agrees)
+**Previous baseline:** `efb3dd5`
 
 ---
 
@@ -13,7 +14,7 @@ without re-deriving it from `git log`. Source audit:
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1520 passed, 3 skipped, 0 failed** |
+| Unit + integration | `python -m pytest tests/` | **1521 passed, 3 skipped, 0 failed** |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
 | Browser E2E | `python tests/run_browser_suites.py` | 32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken |
@@ -51,6 +52,8 @@ without re-deriving it from `git log`. Source audit:
 | **BE-M2** | `revision.edits_log` read raw → bare `JSONDecodeError` (a `ValueError`) → **400 "bad request"** for a damaged disk | `test_damaged_edit_log_is_reported_not_read_as_empty` + the 503 API assertion | ✅ raw read restored → **2 red** |
 | **BE-M1b** | Undo/redo mutated the working copy *before* discovering the other store was damaged, leaving a half-applied reversal | `test_damaged_redo_stack_refuses_before_consuming_the_undo`, `test_damaged_edit_log_refuses_before_consuming_the_redo` | ✅ pre-flight moved back → **1 red** each (M3, M4) |
 | **R7** | CI ran `pip install ruff` unpinned — a floating linter can fail a green build, or disagree with the local `ruff check .` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` (asserts ci.yml + both extras agree) | ✅ both directions → red |
+
+**All of the above landed in `a5742d5`** (pushed). 6 mutations, 6 caught.
 
 ---
 
