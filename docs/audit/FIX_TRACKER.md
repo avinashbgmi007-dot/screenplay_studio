@@ -4,14 +4,14 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 11 — **non-code cleanup closed**: the 25
-orphaned `preview-redesigns/shots/` PNGs untracked (committed + pushed), and the
-stale `legacy/pre-recovery` remote branch deleted. Local `.git` reclaimed
-**83M → 22M**. No code touched — `library_delete` is the only open item left.)
-**HEAD:** `91a11b1` (pass 11's shots commit) — **pushed**; `git ls-remote origin main`
-agrees (remote `main` = `91a11b1`, and `legacy/pre-recovery` is gone from the
-remote). Local stray refs also dropped + `git gc --prune=now`.
-**Baseline for this pass:** `27ba81e`
+**Last updated:** 2026-09-21 (pass 12 — **the last open item is CLOSED, and it was
+a real defect**: the Windows `rmtree` lock race that made `delete_project` answer a
+raw 500 *and leave the project half-deleted*. Both `rmtree` sites now run inside
+`jsonio.retry_permission`, the retry the store paths already used. Production code,
+mutation-verified **4/4**. **Nothing is left open that this audit can decide.**)
+**HEAD:** `44f18b3` (pass 11's tracker stamp) — **pushed**; `git ls-remote origin main`
+agrees. This pass's commit hash is stamped at the bottom.
+**Baseline for this pass:** `44f18b3`
 
 ---
 
@@ -19,7 +19,7 @@ remote). Local stray refs also dropped + `git gc --prune=now`.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1572 passed, 3 skipped, 0 failed** |
+| Unit + integration | `python -m pytest tests/` | **1576 passed, 3 skipped, 0 failed** (+4: 2 endpoint tests for the Windows lock, 2 for the idea-store site) |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
 | Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 31 pass, 0 fail, 2 skip, 0 known-broken** — **650 checks** (was 660; the count *falls* because 11 checks that asserted nothing are gone) |
@@ -30,10 +30,10 @@ remote). Local stray refs also dropped + `git gc --prune=now`.
 > asserted nothing became checks that can fail. Mutation-verified **6/6**, every
 > mutated file restored byte-identical.
 >
-> ⚠️ The gate is **intermittently red on `library_delete`**, a suite this pass did
-> not touch. It failed once in the gate (`shelf delete emptied the disk`) and
-> passed **3/3 standalone** and on the gate's second run. Root cause is narrowed
-> but **not fixed** — see the open-items table.
+> ✅ **Pass 12 closed the `library_delete` flake, and it was a defect rather than a
+> timing artefact** — a Windows sharing violation that left the project
+> half-deleted. Both `rmtree` sites now use `jsonio.retry_permission`. See the
+> pass-12 section and the open-items table. No known-broken suites remain.
 
 > Pass 9 repaired the two suites that were excluded as `KNOWN_BROKEN`, so the gate
 > now *runs* them: **+2 suites, +127 checks** (`preview_next` 14 → 92 checks,
@@ -74,6 +74,95 @@ remote). Local stray refs also dropped + `git gc --prune=now`.
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 12) — the Windows `rmtree` race, and a duplicate helper caught before it shipped
+
+**The last open item was a defect, not a flake.** `library_delete` had failed one gate run and
+then passed 3/3 standalone, so pass 10 filed it open with its fix shape but not the fix: a
+production change for a flake that could not be reproduced would have shipped unverified. That was
+the right call. What changed is that the mechanism turned out to be **deterministically
+reproducible** — and reproducing it turned "a slow poll" into a corrupted project.
+
+### The reproduction (measured, not reasoned)
+
+Hold one real `open()` on one file of a two-file tree, then `shutil.rmtree` it:
+
+| | |
+|---|---|
+| Exception | `PermissionError`, `errno=13`, **`winerror=32`** — "being used by another process" |
+| Tree afterwards | **`['project.json']`** — `parsed.json` was already deleted |
+| After releasing the handle | `rmtree` **succeeds** (so the lock really is transient) |
+
+`rmtree` deletes as it walks, so the failure **does not fail cleanly**. For a project that means
+`parsed.json` gone while `project.json` stays — and `delete_project`'s own guard requires
+`project.json`, so **the shelf keeps listing the script while the writer's library has silently
+dropped it**. That is exactly the observed symptom: the row survives, so the disk never "empties"
+and the suite's check stays red. **It was never a timing artefact.**
+
+### Two call sites, not one
+
+The item named `delete_project`. A sweep of every route for destructive filesystem calls (done by
+parsing the handler bodies with `ast`, not by grepping) found the same unbounded call one module
+away:
+
+| line | route | call | guard |
+|---|---|---|---|
+| `webapp_server.py:822` | `DELETE /api/projects/<name>` | `shutil.rmtree(project_dir, ignore_errors=False)` | **unguarded** |
+| `ideas.py:172` (`IdeaStore.delete`) | `DELETE /api/ideas/<id>` | `shutil.rmtree(self._dir(idea_id))` | **unguarded** |
+| `webapp_server.py:1038`, `:2186` | reparse / drafts | `os.remove(tmp_path)` | unguarded, but **single file** — noted, not changed |
+| `:749`, `:782`, `:1574`, `:3377` | sample / upload / progress / graduate | `os.remove(...)` | already inside a `try` |
+
+Only the two `rmtree` calls can leave a **partial** result; a single-file `os.remove` either
+happens or raises. So those two are fixed and the rest are recorded.
+
+### The fix is a REUSE — and that is the part worth reading
+
+The first version of this fix added a new helper, `fsutil.rmtree_with_retry`, whose rule was
+*"retry only `winerror` 32/33"*. **That was wrong twice over.** `jsonio.retry_permission` already
+exists — the project's ONE bounded retry for this race, already used by the store paths and
+already tested — and `jsonio.py` carries an explicit **2026-09-20 user-approved decision**:
+
+> retry EVERY PermissionError, not only the winerror 32/33 set. The concurrent save/rename hammer
+> surfaces `PermissionError(13, "Access is denied")` with **NO winerror** under full-suite
+> antivirus/indexer pressure — a signature the winerror-only filter read as a genuine denial and
+> (correctly) refused to retry, leaving the suite red.
+
+So the new helper was **the rejected filter, re-introduced**, and one of its tests
+(`test_a_real_permission_error_is_not_retried`) **pinned the rejected behaviour as correct**. Both
+were deleted. What shipped is a one-line reuse per site plus a clear error:
+
+```python
+try:
+    retry_permission(lambda: shutil.rmtree(project_dir))
+except OSError as exc:
+    return _error("Could not remove the project — it may be only partly removed. "
+                  f"Close anything using it and try again. ({exc})", 500)
+```
+
+The message says "may be only partly removed" because that is what a mid-walk failure leaves. The
+old shape returned Flask's HTML traceback; the front-end reads `error` off the body.
+
+### Tests — 4 new, all mutation-verified
+
+`tests/test_delete_project.py` (2): a **real held handle**, released mid-flight, still deletes
+(Windows-only — POSIX unlinks open files, so the race does not exist there); and a lock that never
+clears answers **500 with JSON** naming the partial state, having used its whole retry budget.
+`tests/test_delete_retry.py` (2): the **idea-store** site retries, and a denial that never clears
+still raises after the budget. Both use a `PermissionError` with **no winerror** — deliberately,
+because that is the real-world AV signature, and a test written against `winerror=32` would pass
+under the rejected filter and prove nothing.
+
+**Mutation-verified 4/4**, every one a **named** failure, every mutated file restored
+byte-identical: retry dropped at either site, the error contract removed, and the retry neutered
+(`attempts=1`).
+
+### Gates after pass 12
+
+pytest **1576 passed / 3 skipped / 0 failed** (+4), ruff clean, node **16/16**, browser gate
+**33 suites — 31 pass, 0 fail, 2 skip, 0 known-broken — 650 checks**, with **`library_delete`
+8 passed**. `GATE-EXIT=0`.
 
 ---
 
@@ -666,7 +755,7 @@ whole section is about.
 |---|---|---|---|
 | **R11–R14** | **CLOSED (pass 11).** The stale `legacy/pre-recovery` remote branch was deleted (`git push origin --delete`); the local stale tracking ref was dropped and `git gc --prune=now` reclaimed **83M → 22M** (~61 MB). Before deletion `.git` was 82 MB with 69.24 MB (84%) in two blobs reachable only from that branch. The 22 cline checkpoint refs hold no large blobs. | hygiene | **closed — pass 11** |
 | **T1e** | ~~The 21 remaining vacuous browser checks~~ — **CLOSED (pass 10).** All 21 audited, fixed, and mutation-verified: **0 vacuous checks remain** (the sweep that found 21 now returns 0). See the pass-10 section. | test integrity | ✅ done |
-| **NEW (pass 10)** | **`library_delete` flakes in the gate.** It failed `shelf delete emptied the disk` in one gate run (30/31 suites green), then passed **3/3 standalone** and on the gate's **second run** (31/31). Not caused by this pass: the suite imports none of the changed helpers and no production code was touched. Root cause narrowed to two candidates, now **distinguished by the check's own detail** (which was rewritten to report the HTTP status): (a) the removal is slow under load — a project dir is O(files) to delete — and the old poll budget was a fixed **5 s**; or (b) the server **errored**: `delete_project` calls `shutil.rmtree(project_dir, ignore_errors=False)` with **no retry**, and on Windows that raises `WinError 32` whenever any handle is still open, which surfaces as a **500** and leaves the row in place. The poll budget is now time-based (30 s) and the status is reported, so the next occurrence is self-diagnosing. **The (b) fix — a retry around the `rmtree`, and a clear error instead of a raw 500 — is a PRODUCTION change and is deliberately NOT made blind**: the flake could not be reproduced locally, so any fix would ship unverified. | test integrity / robustness | **open** |
+| **NEW (pass 10)** | **CLOSED (pass 12).** `library_delete` flaked in the gate once (`shelf delete emptied the disk`, 30/31 suites green), then passed **3/3 standalone** and on the gate's second run. Pass 10 filed it open because the flake was not reproducible and a production fix would have shipped unverified — the right call at the time. It turned out to be a **real defect, not a slow poll**: `delete_project` called `shutil.rmtree(project_dir, ignore_errors=False)` with **no retry**, and on Windows that raises `PermissionError` (errno=13, **winerror=32**) while any handle to a file inside the tree is open. And because `rmtree` deletes as it walks, the failure did **not** fail cleanly — it left the project **HALF-DELETED**. Reproduced deterministically by holding one real `open()` on one file of a two-file tree: `['project.json']` remained while `parsed.json` was gone — which is exactly the observed symptom (the shelf row survives, so the disk never "empties"). Both `rmtree` sites — `delete_project` *and* `IdeaStore.delete`, which the item never named — now go through **`jsonio.retry_permission`** and answer with a clear JSON error instead of a raw 500. | robustness | ✅ **done — pass 12** |
 | **NEW (pass 9)** | **CLOSED (pass 11).** The 25 orphaned `preview-redesigns/shots/` PNGs were untracked via index-only `git rm --cached -r` (after a `git rm -r` incident that wiped 91 sibling files and was recovered with `git reset --hard`), committed + pushed in `91a11b1`. The dead `.gitignore` rule was fixed to the real nested path. Disk copies remain, now gitignored. | hygiene | **closed — pass 11** |
 
 **R10 is closed** — see the pass-8 section below. It was filed as hygiene and turned out to

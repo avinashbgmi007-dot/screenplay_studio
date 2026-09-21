@@ -30,7 +30,7 @@ from functools import lru_cache
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 
 from .jsonio import (StoreUnreadable, atomic_write_json, check_safe_id, lock_for,
-                     safe_dir_name, suffixed_id)
+                     retry_permission, safe_dir_name, suffixed_id)
 
 from .ideas import IdeaStore
 from .manifest import ProjectManifest
@@ -819,7 +819,25 @@ def delete_project(name):
         return _error("Invalid project path.", 400)
     if not os.path.isdir(project_dir) or not os.path.exists(os.path.join(project_dir, "project.json")):
         return _error("Project not found.", 404)
-    shutil.rmtree(project_dir, ignore_errors=False)
+    try:
+        # retry_permission is jsonio's ONE bounded retry for the Windows sharing
+        # violation (see its docstring, and the 2026-09-20 decision above it),
+        # and this is the same race the store paths already survive: any open
+        # handle on any file inside the tree makes os.unlink fail. It matters
+        # more here than for a store file, because rmtree deletes as it walks —
+        # a failure part-way leaves the project HALF-DELETED (measured:
+        # parsed.json gone, project.json still there), so the shelf goes on
+        # listing a script the writer's library has silently dropped.
+        retry_permission(lambda: shutil.rmtree(project_dir))
+    except OSError as exc:
+        # A clear JSON error instead of Flask's HTML traceback — the front-end
+        # reads `error` off the body, so the writer is told what happened. Told
+        # the truth, too: rmtree deletes as it walks, so a failure here may have
+        # left the directory PARTLY removed (measured: parsed.json gone while
+        # project.json remains), which is not the same as "nothing happened".
+        return _error(
+            "Could not remove the project — it may be only partly removed. "
+            f"Close anything using it and try again. ({exc})", 500)
     return jsonify({"ok": True, "project": name})
 
 
@@ -3110,7 +3128,14 @@ def delete_idea(idea_id):
         _load_idea(idea_id)
     except FileNotFoundError:
         return _error("Idea not found.", 404)
-    IdeaStore(_ideas_dir()).delete(idea_id)
+    try:
+        IdeaStore(_ideas_dir()).delete(idea_id)
+    except OSError as exc:
+        # Same contract as the project shelf (see delete_project): a clear JSON
+        # error, and honest about the partial state a mid-walk failure leaves.
+        return _error(
+            "Could not remove the idea — it may be only partly removed. "
+            f"Close anything using it and try again. ({exc})", 500)
     return jsonify({"deleted": idea_id})
 
 

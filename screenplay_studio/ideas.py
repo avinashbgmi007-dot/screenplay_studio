@@ -22,7 +22,7 @@ import shutil
 import time
 import uuid
 
-from .jsonio import atomic_write_json, check_safe_id, lock_for
+from .jsonio import atomic_write_json, check_safe_id, lock_for, retry_permission
 
 EMPTY_CARD = {"title": "", "logline": "", "premise": "", "questions": []}
 
@@ -169,7 +169,10 @@ class IdeaStore:
         return out
 
     def delete(self, idea_id: str) -> None:
-        shutil.rmtree(self._dir(idea_id))
+        # Same Windows race as the project shelf (see delete_project): an open
+        # handle on any file inside makes os.unlink fail, and rmtree deletes as
+        # it walks, so an unretried failure leaves the idea PARTLY removed.
+        retry_permission(lambda: shutil.rmtree(self._dir(idea_id)))
 
     # ---- graduation ----
 

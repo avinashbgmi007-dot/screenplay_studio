@@ -613,7 +613,7 @@ skip, 2 known-broken) — no frontend file was touched.
 
 **Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/BE-M2 were the last two open instances of the A2/A3 shape.
 
-**Still open, and none of it destructive or exploitable:** R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs) and **T1e** (the 21 remaining vacuous browser checks, all classified by class in the tracker's §T3b — 9 backed by something that can fail, 6 diagnostic dumps, 3 timing/nothing-conditional, 3 in the gate-excluded `gun_pen_audit`).
+**Still open at the time of writing, and none of it destructive or exploitable:** R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs) and **T1e** (the 21 remaining vacuous browser checks). **Both are now closed** — see the two notes that follow and the tracker's open-items table.
 
 > **Superseded 2026-09-21 (pass 10). T1e is CLOSED.** All 21 are fixed and mutation-verified
 > **6/6**, and the sweep that found them now returns **0**. The conversions assert the half of
@@ -628,6 +628,23 @@ skip, 2 known-broken) — no frontend file was touched.
 > — are now distinguishable in the check's own detail; the `rmtree` retry is a production change
 > left **open** rather than shipped unverified. See the tracker's pass-10 section and
 > open-items table.
+
+> **Superseded 2026-09-21 (pass 12). The `library_delete` defect is CLOSED — and it was a real
+> defect, not a slow poll.** The pass-10 note left the `rmtree` retry open rather than ship it
+> unverified, which was the right call at the time. It is now fixed and mutation-verified **4/4**,
+> because the mechanism turned out to be **deterministically reproducible** after all: hold one
+> `open()` on one file inside the tree and `shutil.rmtree` raises `PermissionError` (errno=13,
+> `winerror=32`) — and, crucially, it does **not** fail cleanly. `rmtree` deletes as it walks, so
+> the measured result was `['project.json']` remaining while `parsed.json` was gone: the shelf
+> goes on listing the script while the writer's library has silently dropped it. That is exactly
+> the observed symptom (the row survives, so the disk never "empties"). Both `rmtree` sites —
+> `delete_project`, and `IdeaStore.delete`, which the original item never named — now run inside
+> `jsonio.retry_permission`, the project's ONE bounded retry for this race, and answer with a clear
+> JSON error instead of a raw 500. **R10–R14 are closed as well** (pass 8 and pass 11): the stale
+> `legacy/pre-recovery` remote branch was deleted (`.git` 83M → 22M) and the 25 orphaned
+> `preview-redesigns/shots/` PNGs were untracked. **Nothing this report opened is left open** —
+> what remains is owner decisions (licensing, the dock-density and idea-room design passes, the
+> `app.js` split and hash router, two prompt-budget defaults), not defects.
 
 **Closed in pass 7 (the three owner decisions):** **R6** — decided **private**, so the artifact is a proprietary `LICENSE` (no rights granted, scoped so it does not appear to cover third-party dependencies) plus a `CHANGELOG.md`; both in `MANIFEST.in`. **R7b** — decided **lock it**: `requirements.lock.txt` pins the whole declared closure (32 packages) and CI installs with it as a **constraints** file (`-c`), which is the correct shape here because the lock is derived on Windows/3.13 while CI runs ubuntu-24.04/3.12. Five guards, **mutation-verified 7/7**, including the anti-decoration check that CI actually applies it. **BE-M3** — decided **not required**; recorded as accepted-as-is with the fix shape (CAS retry loop, never two `lock_for` locks) so it is not re-litigated. Also fixed, while doing R7b, **three stale doc claims** this report's §4 had flagged as drifting (`ARCHITECTURE.md`, `DEVELOPMENT.md`, `NOTES.md` all asserted "there is no `pyproject.toml`").
 
