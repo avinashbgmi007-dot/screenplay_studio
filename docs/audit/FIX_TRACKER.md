@@ -18,8 +18,8 @@ now has one Settings form for a local model *or* a remote API with a token. `_SP
 is for, and the app's own console can. The design-session suite asserts the frame **renders** and
 that **zero** CSP refusals are logged. Remote access gained a real bearer token, threaded into
 every client, never echoed back — and the mode stays a launch-time decision, not a permission.
-**HEAD:** `fdf431c` (pass 13's tracker stamp) — **pushed**; the pass-14 work is committed and
-pushed with this stamp.
+**HEAD:** `7cb4b44` (passes 14 + 14b) — **pushed**; `git ls-remote origin main` agrees. The
+tracker-stamp commit that follows carries the same content.
 **Baseline for this pass:** `fdf431c`
 
 ---
