@@ -266,6 +266,18 @@ mode cannot drift from the thing it describes; `GET /api/config` reports it alon
   request that names the remote host — and the guard would be decorative.
 - **Projects carry the connection** (`server_url`, `api_key`) via `_adopt_connection(m)`, so
   `resume` and the CLI reach the same endpoint without re-typing anything.
+- **Every failure answers as JSON.** `_error(msg, status)` returns `{"error": …}` and is what each
+  route's own failure path uses, because the SPA reads `error` off the body. `@app.errorhandler(Exception)`
+  (`_unhandled`) is the floor beneath them: an unhandled error anywhere also answers as JSON rather than
+  Flask's HTML 500, with `HTTPException` passed through untouched so 404/405/413 keep their codes and
+  their own handlers. Measured: an `OSError` from an unguarded `os.remove` reached the client as an HTML
+  page and the front-end told the writer nothing (`tests/test_destructive_paths.py`).
+- **A raise from a `finally` is a different hazard.** Splitting destructive calls by blast radius (can
+  this leave a PARTIAL result?) is right for judging state and wrong for judging reporting. Where a
+  cleanup sits in a `finally`, a raise **replaces the in-flight exception** — measured in `upload_draft`,
+  where a refused temp-file removal discarded a clear `"Could not connect to llama-server."` and the
+  writer saw a generic 500. The operation fails loudly with a JSON error naming what failed; housekeeping
+  is non-fatal and reports the refusal.
 
 ### Data Models
 
