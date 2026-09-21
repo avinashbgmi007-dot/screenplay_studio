@@ -168,14 +168,16 @@ async function reloadFixQueue() {
 // The share of findings you've resolved IS the dawn: the whole room warms as
 // the number climbs. Quiet, ambient, honest — derived only from fix-queue state.
 function updateDawnMeter() {
-  const items = (state.fixQueue && state.fixQueue.items) || [];
-  const open = items.filter((i) => i.status !== "addressed" && !i.dismissed).length;
-  const done = items.filter((i) => i.status === "addressed").length;
-  const total = open + done;
-  const pct = total ? Math.round((done / total) * 100) : 0;
+  // ONE counting path (N3): the dawn reads the same queueCounts() ledger the
+  // queue header prints — the writer's intent (findingMarks) warms the room
+  // exactly as much as it shrinks the queue, never via raw item.status.
+  const c = queueCounts();
+  const done = c.total - c.open;
+  const pct = c.total ? Math.round((done / c.total) * 100) : 0;
   document.documentElement.style.setProperty("--spark-dawn", String(pct / 100));
   document.querySelectorAll(".dawn-fill").forEach((f) => { f.style.width = pct + "%"; });
   document.querySelectorAll(".dawn-pct").forEach((p) => { p.textContent = pct + "%"; });
+  return pct; // builders of not-yet-mounted meters stamp the same value
 }
 
 // ---- retry only the failed analysis categories (partial-report recovery) ----
@@ -3806,27 +3808,36 @@ function renderFixQueuePanel(container) {
   // Dismissed rows keep their separate toggle; addressed ride as before.
   const inFilter = inFindingFilter; // ONE predicate: the queue cannot drift from the strip
   const shown = items.filter((i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed);
+  // ONE counter (N3): the header's open/total come from queueCounts() — the
+  // writer's intent (findingMarks) moves this header exactly like the chips
+  // and the dawn meter; the raw server-observed item.status never counts.
+  const counts = queueCounts();
+  const shownCounts = queueCounts(shown);
   if (!shown.length) {
     if (!items.length && !state.fixQueueShowDismissed) return;
     const panel = el("div", "craft-panel fix-queue");
     const head = el("div", "craft-panel-head");
-    head.appendChild(el("span", "craft-panel-title", "Fix queue — 0 shown / " + (state.fixQueue && (state.fixQueue.total_count != null ? state.fixQueue.total_count : items.length) || items.length) + " total"));
+    head.appendChild(el("span", "craft-panel-title", "Fix queue — 0 shown / " + counts.total + " total"));
     panel.appendChild(head);
     const hint = el("p", "fix-row-why", "No rows match the current filter — toggle a severity or category chip on the Evidence board to widen the to-do.");
     panel.appendChild(hint);
     addPanel(container, panel); // container may be an array (craft shelf) or a node
     return;
   }
-  const total = (state.fixQueue && (state.fixQueue.total_count != null ? state.fixQueue.total_count : items.length)) || items.length;
-  const openShown = shown.filter((i) => i.status !== "addressed").length;
-
   const panel = el("div", "craft-panel fix-queue");
   const head = el("div", "craft-panel-head");
-  head.appendChild(el("span", "craft-panel-title", `Fix queue — ${openShown} open / ${shown.length} shown / ${total} total`));
+  head.appendChild(el("span", "craft-panel-title", `Fix queue — ${shownCounts.open} open / ${shown.length} shown / ${counts.total} total`));
   // dawn meter: night → dawn as findings get resolved (the room literally warms)
   const dm = el("div", "dawn-meter");
   dm.title = "The dawn meter — the share of findings you've resolved. The room warms as it climbs.";
   dm.innerHTML = '<span class="dawn-cap">night</span><span class="dawn-track"><span class="dawn-fill"></span></span><span class="dawn-pct">0%</span>';
+  // this panel may be built into an array (the craft shelf) and mounted AFTER
+  // this function returns, when document.querySelectorAll can't reach it — so
+  // stamp its own fill/pct from the same updateDawnMeter() value, not a copy
+  // of the formula
+  const dawnPct = updateDawnMeter();
+  dm.querySelector(".dawn-fill").style.width = dawnPct + "%";
+  dm.querySelector(".dawn-pct").textContent = dawnPct + "%";
   head.appendChild(dm);
   // triage: dismissed findings stay in the report but out of the writer's way
   const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
@@ -4076,9 +4087,10 @@ function buildCraftShelf(panels) {
   head.setAttribute("aria-expanded", craftOpen ? "true" : "false");
   head.appendChild(el("span", "craft-shelf-title", "Craft"));
   const bits = [];
-  const items = (state.fixQueue && state.fixQueue.items) || [];
-  const open = items.filter((i) => i.status !== "addressed");
-  if (items.length) bits.push(`${open.length} open · ${items.length} total`);
+  // the shelf lid prints the SAME queueCounts() ledger as the queue header it
+  // covers (N3) — a collapsed shelf can never disagree with the panel inside
+  const qc = queueCounts();
+  if (qc.total) bits.push(`${qc.open} open · ${qc.total} total`);
   const pacing = state.reportStats && state.reportStats.pacing;
   if (pacing && pacing.segments && pacing.segments.length) bits.push(`${pacing.total_pages}-page pacing`);
   if (state.report && (state.report.logline_test || (state.report.character_reads || []).length)) bits.push("mirror");
@@ -4242,17 +4254,6 @@ async function renderDiffBanner() {
   });
 
   banner.style.display = "block";
-}
-
-function findingStatusSummary() {
-  const summary = { addressed: 0, open: 0 };
-  (state.findings || []).forEach((f, index) => {
-    if (f.category === "formatting") return;
-    const d = findingDisposition(f, index);
-    if (d === "addressed") summary.addressed += 1;
-    else summary.open += 1;
-  });
-  return summary;
 }
 
 function findingNoteEl(f, index, opts = {}) {
@@ -4743,8 +4744,10 @@ function renderManuscript(container) {
   // here, so the dock never shows a stale ledger.
   refreshDockEvidence();
 
-  // finding summary chips
-  const summary = findingStatusSummary();
+  // finding summary chips — the ONE counting path (N3): findingCounts() reads
+  // findingDisposition, so the writer's marks move these chips exactly like
+  // the queue header, the dawn meter and the revision strip
+  const summary = findingCounts();
   const summaryEl = $("#finding-summary");
   summaryEl.innerHTML = "";
   summaryEl.appendChild(el("span", "fs-chip open", `${summary.open} open`));
@@ -5416,7 +5419,7 @@ function buildArrivalStrip() {
   // number agrees with every other surface. Sits with the pass line (left) so
   // "what the passes say / what you've done" reads in one breath; the
   // secondary quote-trust metric stays pushed right.
-  const prog = findingStatusSummary();
+  const prog = findingCounts();
   if (prog.addressed || prog.open) {
     head.appendChild(el("span", "dock-arrival-draft",
       `${prog.addressed} of ${prog.addressed + prog.open} addressed by you`));
@@ -5617,16 +5620,21 @@ function inFindingFilter(f) {
   return true;
 }
 /** Scope + disposition counts — the second half of the N3 counting contract.
- *  `total`/`open` describe the WHOLE script; `shown`/`openShown` describe what
- *  the ONE filter currently admits. Every surface must print which scope it
- *  shows, so a whole-script total can never be read as a filtered one (the
- *  "6 open of 6 findings" over "0 shown / 6 total" contradiction). */
+ *  `total`/`open`/`addressed` describe the WHOLE script; `shown`/`openShown`
+ *  describe what the ONE filter currently admits. Every surface must print
+ *  which scope it shows, so a whole-script total can never be read as a
+ *  filtered one (the "6 open of 6 findings" over "0 shown / 6 total"
+ *  contradiction). Only disposition "open" is open and only "addressed" is
+ *  addressed — deferred/dismissed/ghosted are parked out of both, so the
+ *  writer's intent moves every surface that reads this. */
 function findingCounts() {
   const findings = state.findings || [];
-  const c = { total: findings.length, open: 0, shown: 0, openShown: 0 };
+  const c = { total: findings.length, open: 0, addressed: 0, shown: 0, openShown: 0 };
   findings.forEach((f, index) => {
-    const isOpen = findingOpen(f, index);
+    const d = findingDisposition(f, index);
+    const isOpen = d === "open";
     if (isOpen) c.open += 1;
+    else if (d === "addressed") c.addressed += 1;
     if (inFindingFilter(f)) {
       c.shown += 1;
       if (isOpen) c.openShown += 1;
@@ -5637,6 +5645,41 @@ function findingCounts() {
 function isFindingDismissed(index, id) {
   const flags = (state.fixQueue && state.fixQueue.dismissed_flags) || [];
   return flags.some((d) => (id && d.finding_id === id) || d.index === index);
+}
+/** A /fixqueue item's report-finding index — the SAME id-first, index-fallback
+ *  mapping isFindingDismissed uses (d.finding_id === id || d.index === index),
+ *  so a queue row can never resolve to a different disposition than the
+ *  finding it came from. */
+function queueItemFindingIndex(item) {
+  if (!item) return null;
+  const ids = state.findingIds || [];
+  if (item.finding_id) {
+    const byId = ids.indexOf(item.finding_id);
+    if (byId >= 0) return byId;
+  }
+  const idx = item.index;
+  return (typeof idx === "number" && idx >= 0 && idx < (state.findings || []).length) ? idx : null;
+}
+/** The queue's half of the counting contract (N3): every /fixqueue item is
+ *  counted through findingDisposition — the writer's intent (findingMarks)
+ *  moves the queue header and the dawn meter exactly like the chips — never
+ *  through the raw server-observed item.status. Dismissed rows are triage
+ *  (flag-don't-drop keeps them behind their own toggle), so they sit out of
+ *  the ledger's totals. `items` defaults to the whole queue; a caller passes
+ *  a filtered subset to count a narrower scope — still the ONE counter. */
+function queueCounts(items) {
+  const all = items || (state.fixQueue && state.fixQueue.items) || [];
+  const c = { open: 0, total: 0 };
+  for (const item of all) {
+    const index = queueItemFindingIndex(item);
+    const d = index == null
+      ? (item.dismissed ? "dismissed" : (item.status === "addressed" ? "addressed" : "open"))
+      : findingDisposition((state.findings || [])[index], index);
+    if (d === "dismissed") continue;
+    c.total += 1;
+    if (d === "open") c.open += 1;
+  }
+  return c;
 }
 // the module's status read, exposed for surfaces that need the raw
 // addressed/still_present/unknown judgment (never for counting — count via
@@ -6615,7 +6658,7 @@ function updateRevisionStatus() {
   });
   const scenes = (state.script && state.script.scenes) || [];
   const words = scenes.reduce((a, s) => a + (s.word_count || 0), 0);
-  const sum = findingStatusSummary();
+  const sum = findingCounts(); // the ONE ledger (N3) — same numbers as the desk chips
   const strip = $("#revision-status");
   if (!strip) return;
   strip.innerHTML = "";
