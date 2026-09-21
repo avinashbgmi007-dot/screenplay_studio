@@ -110,6 +110,88 @@ tracker-stamp commit that follows carries the same content.
 
 ---
 
+## Closed in this pass (2026-09-21, pass 14h) — the audit was overwriting the evidence its own verdict tables cite
+
+`docs/FULL_FEEDBACK_AUDIT_VERDICTS.md` filed this itself, as an aside:
+
+> A verdict table whose screenshots get silently replaced by the fix is a small honesty bug of the
+> same family this document exists to catch.
+
+It was disclosed and never fixed. Re-running `e2e_browser_gun_pen_audit.py` wrote its shots straight
+into the top-level `impl-shots/` — the **versioned evidence set** the verdict tables and `docs/audit/`
+cite by exact filename. So the ordinary act of re-running the audit replaced a table's screenshots with
+post-fix images, and `impl-shots/audit_results.json` (also cited, also tracked) with it. The only thing
+standing between a citation and a lie was someone remembering `git show HEAD:impl-shots/...`.
+
+The repo already had the right pattern and the audit did not follow it: `tests/_ui_capture.py` writes to
+gitignored `impl-shots/ui_audit/` ("regenerate on demand"), and `tests/test_repo_hygiene.py` exists to
+keep local scratch out of the index. The audit was the one harness writing into a tracked directory.
+
+**The fix is the rule, not the instance:** a run writes to gitignored `impl-shots/runs/latest/` — shots
+*and* `audit_results.json`, so the two can never disagree about which pass they describe — and reaching
+the versioned set is the explicit act `AUDIT_PROMOTE=1`, which prints that it is replacing cited
+evidence. The scratch path is deliberately **stable** rather than timestamped: stages are separate
+processes that accumulate through `audit_results.json`, so a per-run directory would make a later stage
+silently start from nothing.
+
+### The guard was wrong twice before it was right
+
+`tests/test_repo_hygiene.py` gains three tests, and two of them were bugs first:
+
+- **The mutation harness could not apply its own mutations.** The audit file is CRLF and `.gitignore` is
+  LF; anchors written with the wrong endings silently failed to match, so two of three mutations reported
+  `ANCHOR NOT FOUND` — which the harness printed as a skip rather than a pass, and which would have
+  looked like a clean 1/1. Fixed to normalize each anchor to its file's endings.
+- **The guard used the wrong git flag, and was vacuous.** `_is_ignored` called plain
+  `git check-ignore`, which reports a **tracked** file as *not* ignored — the index wins. So the test
+  could not fail until after the damage (the evidence already untracked), and was blind to the
+  `.gitignore` rule that causes it. Mutation M8 proved it: the tempting wrong fix — gitignore the whole
+  `impl-shots/` — **SURVIVED**. With `--no-index` (ask the *rules*, not the index) it is caught.
+
+Both are the same failure as the rest of this session: the instrument answered a subtly different
+question than the one asked.
+
+### Verified
+
+- `tests/test_repo_hygiene.py` 6 passed (3 new) — **mutation-verified 3/3**, each a named failure with
+  the source restored byte-identical: M7 the audit writes into the versioned set again; M8 gitignore the
+  whole evidence set (the tempting wrong fix); M9 promotion becomes impossible.
+- The three tests cover the rule's three halves: the default is ignored, promotion still reaches the
+  versioned set, and the evidence itself is never untracked.
+- `ruff` clean.
+
+### Also found: `git add -A` swept a concurrent session's files into a commit
+
+`4fb3a73` ("pass 14g (cont.): retry the Playwright driver once") contains 309 lines it should not:
+`docs/superpowers/specs/_expert-ux-critique.md` (248) and `_expert-dataflow-audit.md` (61), written by
+another session working in this same repo minutes earlier. `git add -A` had a wider blast radius than the
+intent — the identical defect class to the `rmtree` sites and the AST walk's glob, this time in the
+staging step. Those files are left in place (deleting another session's work would be worse than the
+misattribution); commits from here stage explicitly. `_expert-redteam-optionA.md` remains untracked and
+untouched.
+
+### Also closed: the 3 checks in `gun_pen_audit` the readiness report left "located and still open"
+
+That report left three hardcoded-`True` checks unedited on the grounds that the suite *"needs a live
+studio against a real `llama-server` and cannot be executed here"*. It has now been executed — **51
+passed, 0 failed, 0 gaps** — so the blocker that justified leaving them is itself retired.
+
+Read rather than counted, all three are the **success arm of an `if`/`else` pair**: `check(name, True)`
+on the accepted branch with `check(name, False, …)` on every failure branch (`:782`↔`:793`, `:827`↔`:830`
+and `:835`, `:884`↔`:880`). They can fail, so none is vacuous.
+
+My sweep reported them anyway, because it did not model the pairing — a bare `check(name, True)` is
+indistinguishable from a tautology until you look for a `False` under the same name. Fixed, it reports
+**zero**, while an injected bare `check(name, True)` is still caught: verified in both directions. A
+sweep that cries wolf three times is a sweep an auditor stops believing.
+
+While here, one candidate from the same sweep was checked and cleared: `e2e_browser_layout_audit.py`'s
+`stepped: pos1 >= 0` looks like a tautology but is a real assertion — `loopState.pos` is initialised to
+**-1**, so the check verifies that `startLoop()` actually advanced it. Reading the code the check points
+at is what settled it, as it has every time this session.
+
+---
+
 ## Closed in this pass (2026-09-21, pass 14g) — "flag, don't drop", swept repo-wide
 
 The project states the rule — *"Flag, don't drop"* — and lint enforces only its crudest form (`E722`,

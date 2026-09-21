@@ -8,7 +8,10 @@ model — the audit's whole point is real-findings depth).
   E2E_BASE=http://127.0.0.1:8500 python tests/e2e_browser_gun_pen_audit.py [stage]
   stage = matrix | escalation | inbetween | pass2 | all   (default all)
 
-Screenshots -> impl-shots/ ; results -> impl-shots/audit_results.json.
+Screenshots and results land in gitignored scratch:
+`impl-shots/runs/latest/` (audit_results.json included). Set AUDIT_PROMOTE=1 to
+write into the versioned `impl-shots/` instead — see the note at SHOTS below for
+why that is a deliberate act and not the default.
 No production code changes; gaps are filed in NOTES.md by the operator.
 """
 import json
@@ -28,7 +31,19 @@ from e2e_browser_common import Checks, launch, note, studio_headers  # noqa: E40
 
 BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8500").rstrip("/")
 PROJECT = os.environ.get("GUNPEN_PROJECT", "gun_pen_2")
-SHOTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "impl-shots")
+# Where this run writes. Top-level `impl-shots/` is EVIDENCE: the verdict tables
+# in docs/ cite those exact filenames, and a run used to write straight over them
+# — so a table's screenshots were silently swapped for post-fix images, which
+# FULL_FEEDBACK_AUDIT_VERDICTS.md filed as "a small honesty bug of the same family
+# this document exists to catch". A run now lands in gitignored scratch, and
+# refreshing the versioned set is the explicit act AUDIT_PROMOTE=1.
+#
+# The scratch path is deliberately STABLE ("latest") rather than timestamped:
+# stages are separate processes that accumulate through audit_results.json, so a
+# per-run directory would make a later stage silently start from nothing.
+PROMOTE = os.environ.get("AUDIT_PROMOTE") == "1"
+SHOTS = (os.path.join(_REPO_ROOT, "impl-shots") if PROMOTE
+         else os.path.join(_REPO_ROOT, "impl-shots", "runs", "latest"))
 os.makedirs(SHOTS, exist_ok=True)
 
 checks = Checks()
@@ -1029,6 +1044,12 @@ def main():
         except (OSError, ValueError):
             pass
     print(f"=== gun_pen feedback audit :: stage={stage} :: base={BASE} :: project={PROJECT} ===")
+    rel = os.path.relpath(SHOTS, _REPO_ROOT).replace(os.sep, "/")
+    if PROMOTE:
+        print(f"    AUDIT_PROMOTE=1 — writing to the VERSIONED set {rel}/ "
+              f"(this REPLACES evidence the docs cite)")
+    else:
+        print(f"    output -> {rel}/ (scratch; AUDIT_PROMOTE=1 to refresh impl-shots/)")
     order = (["matrix", "escalation", "inbetween", "pass2", "cleanbill"]
              if stage == "all" else [stage])
     for name in order:

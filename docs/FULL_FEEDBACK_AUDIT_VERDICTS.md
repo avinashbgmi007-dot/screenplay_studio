@@ -368,6 +368,12 @@ findings do not imply 6 pins - several share a line and collapse into one mark w
 > *numbers* are preserved in the tables above and in `_qa_bugrepro/audit_results.PREFIX.json`, and
 > `git show HEAD:impl-shots/...` still holds a pre-fix image set. A verdict table whose screenshots get
 > silently replaced by the fix is a small honesty bug of the same family this document exists to catch.
+>
+> **Fixed (pass 14h).** The mechanism, not just the instance: a `gun_pen` audit run now writes to
+> gitignored `impl-shots/runs/latest/`, and reaching the versioned set is the explicit act
+> `AUDIT_PROMOTE=1`. So the images this table cites can no longer be swapped out from under it by
+> someone merely re-running the audit. See `docs/TESTING.md`; the rule is pinned in
+> `tests/test_repo_hygiene.py`.
 
 **Rows A, A2 and C above describe the pre-fix walk.** The Dialogue section returns (6 of 8 findings open),
 the manuscript regains 6 inkable quoted findings, and the mass strip's open count tracks the report. The

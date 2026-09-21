@@ -464,6 +464,21 @@ tests/e2e_browser_phase6_evidence.py:222   lens.locator(".fix-row").count() >= 0
 >     (`adopted_any` — the reopened lens is never empty), so the check was **deleted rather than
 >     converted**, which is the honest outcome: the count drops by one and the coverage does not.
 >
+> **✅ CLOSED (pass 14h) — the 3 in `gun_pen_audit` are not a defect, and the reason they sat "still
+> open" is itself retired.** They were deliberately left unedited because that suite "needs a live
+> studio against a real `llama-server` and cannot be executed here" (above). It has now been
+> executed — **51 passed, 0 failed, 0 gaps** — so the blocker that justified leaving them is gone.
+> Classified by reading each site rather than by counting: all three are the **success arm of an
+> `if`/`else` pair** — `check(name, True)` on the accepted branch, with `check(name, False, …)` on
+> every failure branch (`:782` pairs with `:793`; `:827` with `:830` and `:835`; `:884` with `:880`).
+> They **can** fail, so none is vacuous.
+>
+> The sweep reported them only because it did not model the pairing: a bare `check(name, True)` is
+> indistinguishable from a tautology until you look for a `False` under the *same name*. It now
+> does, and reports **zero** — while an injected bare `check(name, True)` is still caught, so the
+> improved sweep is verified in both directions. That matters beyond this suite: a sweep that cries
+> wolf three times is a sweep an auditor stops believing.
+>
 > **✅ Also found and fixed — the failure that exposed it.** `library_delete` failed the 32-suite
 > gate with `wait_for_selector("#library-list .empty-hint")` timing out, then passed **2/2
 > standalone** — a flake, not a regression (no production code was touched in this pass). It

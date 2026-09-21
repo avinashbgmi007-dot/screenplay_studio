@@ -131,3 +131,92 @@ def test_the_hygiene_rule_is_not_vacuous():
         assert not ignored(real), (
             f"{real!r} matches a root ignore pattern — the scratch rule is too "
             f"broad and would silently untrack a real repo file")
+
+
+# --- the same class of bug, one level up: a harness must not write over evidence ---
+#
+# Top-level `impl-shots/` is EVIDENCE — the verdict tables in docs/ cite those
+# exact filenames. `e2e_browser_gun_pen_audit.py` wrote its shots straight into
+# it, so re-running the audit silently replaced a table's screenshots with
+# post-fix images. FULL_FEEDBACK_AUDIT_VERDICTS.md filed that as "a small honesty
+# bug of the same family this document exists to catch"; these tests hold the
+# fix, which is the same shape as REL-M1: the default must be ignored scratch,
+# and touching the versioned set must be a deliberate act.
+
+AUDIT_MODULE = "e2e_browser_gun_pen_audit"
+
+
+def _audit_shots(monkeypatch, *, promote: bool) -> str:
+    """The audit's resolved SHOTS path, with AUDIT_PROMOTE forced either way.
+
+    Reloaded because SHOTS is computed once at import — the point is to test the
+    value the harness actually resolves, not a re-derivation of its formula.
+    """
+    import importlib
+
+    if promote:
+        monkeypatch.setenv("AUDIT_PROMOTE", "1")
+    else:
+        monkeypatch.delenv("AUDIT_PROMOTE", raising=False)
+    module = importlib.import_module(AUDIT_MODULE)
+    return importlib.reload(module).SHOTS
+
+
+def _is_ignored(path: str) -> bool:
+    """Ask git's RULES whether this path would be ignored.
+
+    `--no-index` is load-bearing, not decoration. Plain `git check-ignore` treats
+    a TRACKED file as not-ignored (the index wins), so a guard built on it can
+    only notice an untracking that has ALREADY happened — it is blind to the
+    .gitignore rule that causes it. `--no-index` asks the question actually
+    meant: "would this path be ignored?".
+    """
+    proc = _git("check-ignore", "--no-index", "-q", path)
+    return proc.returncode == 0
+
+
+def test_the_audit_writes_to_ignored_scratch_by_default(monkeypatch):
+    """A run must not write into the versioned evidence set.
+
+    The invariant is not "SHOTS ends with runs/" (a path shape that could be
+    renamed); it is that whatever the default is, git ignores it.
+    """
+    if not _in_work_tree():
+        pytest.skip("no git work tree here — there is no index to inspect")
+
+    shots = _audit_shots(monkeypatch, promote=False)
+    rel = os.path.relpath(shots, ROOT).replace(os.sep, "/")
+    assert rel != "impl-shots", (
+        "the audit writes into the versioned evidence set by default — a run "
+        "would silently replace the screenshots the verdict tables cite")
+    assert _is_ignored(rel + "/probe.png"), (
+        f"the audit's default output {rel}/ is NOT gitignored, so every run "
+        f"dirties the tree with regenerated binaries")
+
+
+def test_promote_is_the_only_way_into_the_versioned_set(monkeypatch):
+    """The deliberate path must still reach the versioned set.
+
+    Without this, `SHOTS` could be hard-coded to scratch and promotion would be
+    silently impossible — the evidence set could never be refreshed.
+    """
+    shots = _audit_shots(monkeypatch, promote=True)
+    rel = os.path.relpath(shots, ROOT).replace(os.sep, "/")
+    assert rel == "impl-shots", f"AUDIT_PROMOTE=1 resolved to {rel!r}, not impl-shots/"
+
+
+def test_the_versioned_evidence_set_is_still_tracked():
+    """Guard the guard: the fix must not untrack the evidence itself.
+
+    The tempting wrong fix is to add `impl-shots/` to .gitignore. That would
+    stop the churn and silently drop the evidence the docs cite from the repo —
+    a worse bug than the one being fixed.
+    """
+    if not _in_work_tree():
+        pytest.skip("no git work tree here — there is no index to inspect")
+
+    assert not _is_ignored("impl-shots/A-dialogue.png"), (
+        "impl-shots/ is now ignored — the evidence the verdict tables cite has "
+        "been silently untracked")
+    assert _git("ls-files", "impl-shots").stdout.strip(), (
+        "no impl-shots/ evidence is tracked any more")

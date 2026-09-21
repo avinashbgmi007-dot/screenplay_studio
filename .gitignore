@@ -82,3 +82,8 @@ Cursors/
 
 # UI evidence shots (regenerate with tests/_ui_capture.py; never versioned - repo already carries 69 PNGs)
 /impl-shots/ui_audit/
+# A gun_pen audit RUN writes here (gitignored scratch). Top-level impl-shots/ is
+# the versioned evidence set the verdict tables cite, so a run must not overwrite
+# it in place; refreshing it is the explicit act AUDIT_PROMOTE=1.
+# Guard: tests/test_repo_hygiene.py
+/impl-shots/runs/

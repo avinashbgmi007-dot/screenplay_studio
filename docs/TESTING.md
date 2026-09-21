@@ -180,6 +180,27 @@ page still cannot frame the desk, which is the whole point of the directive) and
 suite now asserts the frame **renders** — including the half that was silently dead
 for as long as the frame was blank: the dawn sync reaching the live app inside it.
 
+### Where a `gun_pen` audit writes — and why it is not `impl-shots/`
+
+Top-level `impl-shots/` is **evidence**: the verdict tables in
+`FULL_FEEDBACK_AUDIT_VERDICTS.md` and `docs/audit/` cite those exact filenames. A run
+used to write straight into it, so re-running the audit silently replaced a table's
+screenshots with post-fix images — filed in that document as *"a small honesty bug of
+the same family this document exists to catch"*. The rule now:
+
+| | path | versioned? |
+|---|---|---|
+| a run (the default) | `impl-shots/runs/latest/` | no — gitignored scratch |
+| `AUDIT_PROMOTE=1` | `impl-shots/` | yes — **replaces cited evidence** |
+
+Both the shots and `audit_results.json` follow the same rule, so they can never
+disagree about which pass they describe. The scratch path is deliberately **stable**
+rather than timestamped: stages are separate processes that accumulate through
+`audit_results.json`, so a per-run directory would make a later stage silently start
+from nothing. `tests/test_repo_hygiene.py` holds all three halves of the rule — the
+default is ignored, promotion still reaches the versioned set, and the evidence itself
+is never untracked.
+
 ### The two model-connection suites (pass 14)
 
 The desk supports a model in two places, through **one** Settings form:
