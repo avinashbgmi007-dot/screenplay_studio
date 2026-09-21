@@ -1,0 +1,34 @@
+Copyright (c) 2026 avinash_bgmi007. All rights reserved.
+
+PROPRIETARY AND CONFIDENTIAL — NOT LICENSED FOR USE, COPYING, OR DISTRIBUTION
+
+This repository and everything in it — the source code, the craft-rule
+knowledge base, the user interface, the documentation, and any generated
+artifacts — is private, unpublished work.
+
+No licence or right of any kind is granted, whether by implication, estoppel,
+or otherwise. Specifically, and without limitation, you may not:
+
+  * copy, reproduce, or redistribute this work in whole or in part;
+  * modify, adapt, translate, or create derivative works from it;
+  * publish, sublicense, sell, rent, or otherwise make it available to any
+    third party;
+  * use it to train, fine-tune, evaluate, or otherwise develop any machine
+    learning model.
+
+The absence of a licence is deliberate: this is not open-source software, and
+no rights are conveyed by the fact that the source may be readable.
+
+SCOPE. This notice covers original work in this repository only. It does not
+extend to third-party dependencies (for example Flask, Requests, pdfplumber,
+pdfminer.six, pypdfium2, Playwright), each of which remains under its own
+licence as declared in requirements.txt, pyproject.toml, and
+requirements.lock.txt.
+
+NO WARRANTY. This software is provided "as is", without warranty of any kind,
+express or implied, including but not limited to the warranties of
+merchantability, fitness for a particular purpose, and non-infringement. In no
+event shall the copyright holder be liable for any claim, damages, or other
+liability arising from, out of, or in connection with the software or its use.
+
+For permission, contact the copyright holder.

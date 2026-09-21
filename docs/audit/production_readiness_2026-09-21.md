@@ -49,7 +49,7 @@ The 2 warnings are the long-documented prompt-budget ceilings (`rules_context.py
 | Data safety | 🟠 Moderate | Atomic *within* a process; **not** across processes; no `fsync`; lost-update in notes/stash |
 | **Packaging** | 🔴 **Broken** | Wheel ships no data files (§4) |
 | Release hygiene | 🟠 Weak | Unpushed, no LICENSE/CHANGELOG, 69 PNGs + 5 scratch files tracked |
-| Docs | 🟡 Drifting | Rich, but several "source of truth" claims are now false (§4) |
+| Docs | 🟡 Drifting | Rich, but several "source of truth" claims are now false — see §8 (three of them were fixed in pass 7: `ARCHITECTURE.md`, `DEVELOPMENT.md` and `NOTES.md` all asserted "there is no `pyproject.toml`") |
 | Ops / observability | 🔴 Weak | Almost no logging; no metrics; 600 s default LLM timeout |
 | Frontend architecture | 🟠 Weak | 9,046-line `app.js`, no router, two theme authorities |
 
@@ -572,7 +572,9 @@ skip, 2 known-broken) — no frontend file was touched.
 
 **Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/BE-M2 were the last two open instances of the A2/A3 shape.
 
-**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), and **T1e** (the 21 remaining vacuous browser checks, all classified by class in the tracker's §T3b — 9 backed by something that can fail, 6 diagnostic dumps, 3 timing/nothing-conditional, 3 in the gate-excluded `gun_pen_audit`).
+**Still open, and none of it destructive or exploitable:** R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs) and **T1e** (the 21 remaining vacuous browser checks, all classified by class in the tracker's §T3b — 9 backed by something that can fail, 6 diagnostic dumps, 3 timing/nothing-conditional, 3 in the gate-excluded `gun_pen_audit`).
+
+**Closed in pass 7 (the three owner decisions):** **R6** — decided **private**, so the artifact is a proprietary `LICENSE` (no rights granted, scoped so it does not appear to cover third-party dependencies) plus a `CHANGELOG.md`; both in `MANIFEST.in`. **R7b** — decided **lock it**: `requirements.lock.txt` pins the whole declared closure (32 packages) and CI installs with it as a **constraints** file (`-c`), which is the correct shape here because the lock is derived on Windows/3.13 while CI runs ubuntu-24.04/3.12. Five guards, **mutation-verified 7/7**, including the anti-decoration check that CI actually applies it. **BE-M3** — decided **not required**; recorded as accepted-as-is with the fix shape (CAS retry loop, never two `lock_for` locks) so it is not re-litigated. Also fixed, while doing R7b, **three stale doc claims** this report's §4 had flagged as drifting (`ARCHITECTURE.md`, `DEVELOPMENT.md`, `NOTES.md` all asserted "there is no `pyproject.toml`").
 
 **Closed in pass 3:** **T1** — all four vacuous browser checks rewritten as real assertions and mutation-verified 4/4; the honest browser-check count is now **476 total, all failable** (was 472 failable of 476).
 

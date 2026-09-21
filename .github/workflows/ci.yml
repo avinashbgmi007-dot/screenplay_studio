@@ -40,8 +40,14 @@ jobs:
           cache: pip
       - name: Install dependencies
         # The package is buildable (build-system pinned), so CI installs the
-        # declared runtime + test extras from one source of truth.
-        run: pip install ".[ci]"
+        # declared runtime + test extras from one source of truth. The lock is
+        # applied as a CONSTRAINTS file (`-c`), not a second requirements list:
+        # pyproject decides which packages exist, requirements.lock.txt decides
+        # which versions. Without this the declared `>=` floors mean CI and a
+        # developer can install different versions of the same dependency and
+        # disagree about a green build — the same class of hole as the floating
+        # ruff pin in the `lint` job above.
+        run: pip install ".[ci]" -c requirements.lock.txt
       - name: Run test suite
         run: pytest -q
 
@@ -72,7 +78,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
-        run: pip install ".[ci]"
+        run: pip install ".[ci]" -c requirements.lock.txt
       - name: Install chromium
         run: python -m playwright install --with-deps chromium
       - name: Run browser suites

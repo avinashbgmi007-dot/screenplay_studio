@@ -5,7 +5,8 @@ Local, privacy-first screenplay analysis & co-writing suite. Parses `.fdx`/`.fou
 ## Tech stack
 
 - **Language:** Python 3 (no build step, stdlib-first)
-- **Packaging:** `pyproject.toml` is the source of truth for the build (setuptools; extras `dev` / `stt` / `ci`). `requirements.txt` is the convenience runtime list and the two agree — do not treat one as authoritative over the other. The app ships **non-`.py` assets** (26 craft-rule JSONs, the no-build-step SPA and its fonts), so `[tool.setuptools.package-data]` + `MANIFEST.in` are load-bearing: without them the wheel installs a silently-empty knowledge base and a 404 frontend. `tests/test_packaging_data_files.py` builds a wheel and an sdist and fails if either stops covering them.
+- **Packaging:** `pyproject.toml` is the source of truth for the build (setuptools; extras `dev` / `stt` / `ci`). `requirements.txt` is the convenience runtime list and the two agree — do not treat one as authoritative over the other. `requirements.lock.txt` pins exact versions for the whole declared closure and is applied as a **constraints** file (`-c`), never as a second requirements list — regenerate it from a real environment when a dependency changes rather than retyping pins. The app ships **non-`.py` assets** (26 craft-rule JSONs, the no-build-step SPA and its fonts), so `[tool.setuptools.package-data]` + `MANIFEST.in` are load-bearing: without them the wheel installs a silently-empty knowledge base and a 404 frontend. `tests/test_packaging_data_files.py` builds a wheel and an sdist and fails if either stops covering them.
+- **Licence:** **private, proprietary** — see `LICENSE`. No rights are granted; this is not open-source software.
 - **Runtime deps:** `requests`, `flask`, `pdfplumber` (dictation/STT is optional: pip install "faster-whisper>=1.0.0")
 - **Optional:** `pytesseract`/`easyocr` (OCR fallback for text-less PDFs) + `pypdfium2` (lazy-imported PNG rendering for OCR); tesseract lang packs for tel/hin/tam
 - **Frontend:** vanilla JS + CSS SPA in `screenplay_studio/webapp/` — no framework, no bundler, no node
@@ -14,8 +15,8 @@ Local, privacy-first screenplay analysis & co-writing suite. Parses `.fdx`/`.fou
 ## Commands
 
 ```bash
-pip install -r requirements.txt      # runtime only
-pip install ".[ci]"                  # + pytest / playwright / ruff / setuptools (what CI installs)
+pip install -r requirements.txt -c requirements.lock.txt   # runtime, at the locked versions
+pip install ".[ci]" -c requirements.lock.txt               # + pytest / playwright / ruff / setuptools (what CI installs)
 
 # Full pipeline: parse -> analyze -> interactive chat
 python -m screenplay_studio run script.fountain --project ./proj --server http://localhost:8080

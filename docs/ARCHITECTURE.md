@@ -100,7 +100,11 @@ screenplay-studio_1/
 │   ├── rules/                  # Per-category rule JSON
 │   └── schema.json
 ├── tests/                      # pytest suite (mock llama-server)
-├── requirements.txt            # requests, flask, pdfplumber
+├── requirements.txt            # declared runtime deps (floors: requests, flask, pdfplumber)
+├── requirements.lock.txt       # exact pins for the whole closure (CI installs with `-c`)
+├── pyproject.toml              # build + package config, extras (dev/stt/ci), package-data
+├── LICENSE                     # proprietary, all rights reserved (private project)
+├── CHANGELOG.md                # notable changes
 ├── AGENTS.md                   # AI-agent project context
 └── NOTES.md                    # handoff log (Completed/Decisions/Open Questions/Next Steps)
 ```
@@ -347,7 +351,9 @@ genre, logline_test) plus deterministic passes. Actual order in `analyze()`:
 - **llama-server** — external process; no Python binding required. All LLM calls go over HTTP.
 
 ### Internal Package Configurations
-- **requirements.txt** — project dependencies (no `pyproject.toml`).
+- **pyproject.toml** — the build's source of truth (setuptools; `dev` / `stt` / `ci` extras; `[tool.setuptools.package-data]` for the craft rules and the SPA).
+- **requirements.txt** — the declared runtime list, by floor (`requests>=2.31.0`, …). It and `pyproject.toml` agree; neither is authoritative over the other.
+- **requirements.lock.txt** — exact pins for the entire declared dependency closure, derived rather than hand-written. Applied as a **constraints** file (`pip install ".[ci]" -c requirements.lock.txt`), never as a second requirements list: `pyproject.toml` decides *which* packages exist, the lock decides *which versions*. Without it the `>=` floors let CI and a developer resolve different versions of the same dependency and disagree about a green build. `tests/test_production_readiness.py` enforces that every line is an exact pin, every declared dependency is pinned or on a documented exception list, no pin is older than the floor it must satisfy, and CI actually applies it.
 - **No virtual environment committed** — users create their own.
 - **Model-agnostic** — works with any llama.cpp-compatible model served by llama-server.
 

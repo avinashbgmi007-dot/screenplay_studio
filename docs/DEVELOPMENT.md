@@ -5,7 +5,7 @@ How to set up, work on, and extend Screenplay Studio. Read [ARCHITECTURE.md](ARC
 ## Setup
 
 ```bash
-pip install -r requirements.txt          # requests, flask, pdfplumber
+pip install -r requirements.txt -c requirements.lock.txt   # runtime, at the locked versions
 python -m pytest tests/                  # full suite (uses an in-process mock llama-server, no model needed)
 ```
 
@@ -17,7 +17,9 @@ pip install pytesseract pypdfium2        # pypdfium2 is lazy-imported when OCR i
 export SCRIPT_DOCTOR_OCR=tesseract       # or easyocr; default: auto-detect
 ```
 
-There is no `pyproject.toml` — `requirements.txt` is the source of truth. No virtual environment is committed; create your own.
+`pyproject.toml` is the source of truth for the build and declares the runtime dependencies plus the `dev` / `stt` / `ci` extras; `requirements.txt` is the convenience runtime list, and the two agree. `requirements.lock.txt` pins exact versions for the whole closure and is applied as a **constraints** file (`-c`) — regenerate it from a real environment when a dependency changes rather than retyping pins. No virtual environment is committed; create your own.
+
+> Installing *without* `-c requirements.lock.txt` is how a "works on my machine" divergence starts: the declared floors (`>=`) let your resolution and CI's drift apart with no code change.
 
 ## Repository layout
 

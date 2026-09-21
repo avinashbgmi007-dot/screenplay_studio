@@ -9,6 +9,9 @@
 # PNGs of UI evidence, and none of them are needed to run the app.
 
 include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.lock.txt
 
 recursive-include knowledge_base *.json *.md
 recursive-include screenplay_studio/webapp *.html *.js *.css *.woff2

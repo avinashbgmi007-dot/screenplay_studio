@@ -4,12 +4,12 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 6 — T3b closed: all 33 browser suites audited
-for the vacuous-check shape; the one genuinely unbacked check fixed; two of the
-audit's own headline numbers corrected)
-**HEAD:** `fa6e952` — **pushed**; `git ls-remote origin main` agrees (the push
-needed the credential-helper workaround below)
-**Baseline for this pass:** `c6656df`
+**Last updated:** 2026-09-21 (pass 7 — the three owner decisions landed: R6
+closed as proprietary, R7b closed with a real lockfile + CI wiring, BE-M3
+accepted as-is with the fix shape recorded)
+**HEAD:** `e37d77b` at the start of this pass (pushed; `git ls-remote` agrees) —
+this pass's commit hash is stamped at the bottom
+**Baseline for this pass:** `e37d77b`
 
 ---
 
@@ -17,10 +17,15 @@ needed the credential-helper workaround below)
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1559 passed, 3 skipped, 0 failed** |
+| Unit + integration | `python -m pytest tests/` | **1564 passed, 3 skipped, 0 failed** (+5 new lockfile guards) |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
 | Browser E2E | `python tests/run_browser_suites.py` | **32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken** — **522 checks** (measured; 504 of them genuinely failable) |
+
+> Pass 7 changed no file under `screenplay_studio/webapp/` (config, docs, tests,
+> `LICENSE`, `CHANGELOG.md` only), so the JS and browser rows are carried forward
+> from pass 6 rather than re-run. The wheel/sdist build test *was* re-run, because
+> `MANIFEST.in` changed — 49 passed.
 
 > Re-run all four after any code change. A row above is only true for the
 > commit named in "Last updated".
@@ -53,6 +58,91 @@ needed the credential-helper workaround below)
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 7)
+
+Three items had been sitting on the list marked *owner decision* rather than
+*engineering*. The owner decided all three in one go.
+
+| ID | Decision | What landed |
+|---|---|---|
+| **R6** | **Keep it private** | `LICENSE` — a proprietary, all-rights-reserved notice. This is the private answer *made explicit*: with no file at all the position is ambiguous (and some tooling and would-be readers assume "no licence" means "open source"), whereas the notice states plainly that no rights are granted, names the four things that are not permitted, and scopes itself so it does **not** appear to cover third-party dependencies. `CHANGELOG.md` — a Keep-a-Changelog file, dated rather than versioned (there are no release tags), summarising the audit work at product level and pointing at `docs/audit/` for the evidence. Both added to `MANIFEST.in` so the sdist carries them. |
+| **R7b** | **Lock it** | `requirements.lock.txt` — exact pins for the **entire declared dependency closure** (32 packages), and CI now installs with it as a **constraints** file. |
+| **BE-M3** | **Not required** — accepted as-is, with the fix shape recorded | No code change. See below. |
+
+### R7b in detail — why a *constraints* file and not a `pip freeze` dump
+
+`requirements.txt` and `pyproject.toml` declare **floors** (`requests>=2.31.0`).
+Two people installing the same repo can therefore resolve different versions of
+the same dependency, and "green on my machine" stops meaning anything — the same
+class of hole as the floating `ruff` pin closed in pass 2.
+
+The lock is applied with `-c`, never as a second requirements list:
+
+```
+pip install ".[ci]" -c requirements.lock.txt        # CI + dev
+pip install -r requirements.txt -c requirements.lock.txt
+```
+
+The distinction matters because this file is **derived on Windows / Python 3.13
+while CI runs ubuntu-24.04 / Python 3.12**. `-c` only constrains packages pip
+was already going to install, so an entry nothing needs is inert — `colorama`
+(pytest's win32 dependency) is a genuine pin here that simply never installs on
+the runner. A flat `pip freeze` would have hard-coded this machine's resolution
+and, in the other direction, would have dragged in every package's *own* dev
+extras (walking `requires_dist` naively pulls in setuptools' sphinx / tox /
+mypy / jaraco-\* test stack — 127 names instead of 32).
+
+**Five guards** in `tests/test_production_readiness.py`:
+
+| Guard | The promise it enforces |
+|---|---|
+| `test_the_lockfile_is_a_lock_and_not_a_wish_list` | every line is an exact `==` pin — a `>=` here re-opens the drift the file exists to close |
+| `test_every_declared_dependency_is_pinned_or_explained` | every declared dep is pinned **or** on a documented exception list, and the list may not go stale |
+| `test_no_pin_is_older_than_the_floor_it_has_to_satisfy` | no pin contradicts its own declared floor |
+| `test_the_lockfile_has_no_duplicate_entries` | the file does not say two things about one package |
+| `test_ci_installs_from_the_lockfile` | **the anti-decoration check** — wherever CI installs the full environment it must apply the lock |
+
+**Mutation-verified 7/7**, all restored byte-identical: a `>=` sneaks in · a
+declared dep loses its pin · a pin drops below its floor · a package is pinned
+twice · the test-python job stops applying the lock · the test-browser job
+stops applying the lock · a pin is added for something still listed as an
+exception.
+
+**Honestly not pinned** (stated in the file's header, not hidden): `faster-whisper`
+(the opt-in `stt` extra — no measured version exists) and `pytest-cov` (CI installs
+it, no development environment here has, so any pin would have been *invented*).
+Four more names are absent for a good reason: `importlib-metadata`,
+`exceptiongroup`, `tomli`, and `backports-asyncio-runner` are all gated by
+`python_version < "3.10"` / `< "3.11"` markers and are correctly not installed on
+3.12+.
+
+### BE-M3 — accepted, not fixed (owner call: *"not required"*)
+
+Recorded so a future session does not re-litigate it: **if** it is ever fixed,
+the shape is a **CAS retry loop** (read, re-check the store is unchanged, write,
+retry on conflict) — *not* two `lock_for` locks held at once, which
+`jsonio.lock_for`'s one-lock-at-a-time invariant forbids because that is the one
+way to deadlock them. The defect stays proven and reproducible
+(`.workbuddy-ai/scratch/be_m3_instrument.py`: two children read `len=7`, both
+write `len=6`); the harm is narrow (two *simultaneous* undos of one project) and
+non-destructive (the working copy stays correct, only history bookkeeping drifts).
+
+### Found while doing R7b: three stale doc claims
+
+The audit's §4 rated Docs **🟡 Drifting** for "source-of-truth claims that are now
+false". Two of them were the same sentence in two files, and fixing them was
+one line each — so they are done rather than re-listed:
+
+- `docs/ARCHITECTURE.md` §4 said *"requirements.txt — project dependencies (no
+  `pyproject.toml`)"*. `pyproject.toml` exists and is the build's source of truth.
+- `docs/DEVELOPMENT.md` said *"There is no `pyproject.toml` — `requirements.txt`
+  is the source of truth."* Same fix, plus the lock in the install command.
+- `NOTES.md`'s **Decisions** section still carried the original false decision.
+  Left in place with a *superseded* note rather than deleted, so the correction
+  is visible — the same treatment the audit's own "hollow core" sentence got.
 
 ---
 
@@ -302,7 +392,7 @@ whole section is about.
 
 | ID | Item | Evidence | Why deferred |
 |---|---|---|---|
-| **BE-M3** | `undo_last_edit` / `redo_last_edit` read-modify-write `edits.json` + `edits.redo.json` **without holding `lock_for` across the cycle** (each read and each write is locked; the gap between them is not) | 3 real children behind a file barrier: **two read `len=7`, both wrote `len=6`** — the log loses an entry relative to the reversals the working copy actually got. Script: `.workbuddy-ai/scratch/be_m3_instrument.py` | The fix needs either **two store locks held at once** (forbidden by `jsonio.lock_for`'s one-lock-at-a-time invariant, which exists to prevent deadlock) or a **CAS retry loop**. Both are design decisions. Harm is narrow (two *simultaneous* undos of one project) and non-destructive: the working copy is correct, only the history bookkeeping drifts. |
+| **BE-M3** | `undo_last_edit` / `redo_last_edit` read-modify-write `edits.json` + `edits.redo.json` **without holding `lock_for` across the cycle** (each read and each write is locked; the gap between them is not) | 3 real children behind a file barrier: **two read `len=7`, both wrote `len=6`** — the log loses an entry relative to the reversals the working copy actually got. Script: `.workbuddy-ai/scratch/be_m3_instrument.py` | **Owner decision (pass 7): not required.** Accepted as-is, and the fix shape is now recorded so it is not re-litigated: a **CAS retry loop** (read → re-check the store is unchanged → write → retry on conflict), *not* two `lock_for` locks held at once (forbidden by the one-lock-at-a-time invariant, which exists to prevent deadlock). Harm is narrow (two *simultaneous* undos of one project) and non-destructive: the working copy is correct, only the history bookkeeping drifts. |
 
 ---
 
@@ -310,8 +400,6 @@ whole section is about.
 
 | ID | Item | Class | Owner |
 |---|---|---|---|
-| R7b | No lockfile (deps use `>=` floors) | supply chain | **owner decision** — changes the dependency workflow |
-| R6 | No LICENSE / CHANGELOG | release | **owner decision** |
 | R10 | Root scratch files tracked in git | hygiene | open |
 | R11–R14 | 69 PNGs in `docs/audit/`; `.git` 78 MB from 22 cline checkpoint refs | hygiene | open |
 | **T1e** | The 10 step markers above (documented, not defects) + the 2 in `gun_pen_audit` (need a live `llama-server`) | test integrity | open |

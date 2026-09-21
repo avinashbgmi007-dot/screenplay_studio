@@ -396,6 +396,145 @@ def test_every_ci_job_declares_a_timeout():
         f"the 360-minute platform default")
 
 
+# ---- R7b: dependencies are pinned, and CI actually installs from the lock ----
+LOCKFILE = "requirements.lock.txt"
+
+# Deliberately unpinned, each with a reason. Keeping this list SHORT is the
+# point: a lock with a long exception list is not a lock. Every entry must name
+# a dependency that is genuinely not installed in the environment the lock was
+# derived from — otherwise the honest move is to pin it.
+_LOCK_EXCEPTIONS = {
+    "faster-whisper": "opt-in `stt` extra: never installed by default, so there "
+                      "is no measured version to record",
+    "pytest-cov": "`ci` extra: CI installs it but no development environment has, "
+                  "so any pin would be invented rather than measured",
+    "importlib-metadata": 'gated by `python_version < "3.10"`; correctly absent',
+    "exceptiongroup": 'gated by `python_version < "3.11"`; correctly absent',
+    "tomli": 'gated by `python_version < "3.11"`; correctly absent',
+    "backports-asyncio-runner": 'gated by `python_version < "3.11"`; correctly absent',
+}
+
+
+def _canon(name):
+    import re
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _lock_pins():
+    """name -> version for every non-comment line of the lock."""
+    pins = {}
+    with open(LOCKFILE, encoding="utf-8") as f:
+        for line in f:
+            line = line.split("#")[0].strip()
+            if not line:
+                continue
+            name, _, version = line.partition("==")
+            pins[_canon(name.strip())] = version.strip()
+    return pins
+
+
+def _declared_requirements():
+    """name -> specifier, from requirements.txt + pyproject's dependencies/extras."""
+    import re
+    declared = {}
+    with open("requirements.txt", encoding="utf-8") as f:
+        for line in f:
+            line = line.split("#")[0].strip()
+            if not line:
+                continue
+            name = re.split(r"[<>=!~\[;]", line)[0].strip()
+            declared[_canon(name)] = line[len(name):].strip()
+    with open("pyproject.toml", encoding="utf-8") as f:
+        for line in f:
+            for m in re.finditer(r'"([A-Za-z0-9_.\-]+)\s*([<>=!~][^"]*)"',
+                                 line.split("#")[0]):
+                declared.setdefault(_canon(m.group(1)), m.group(2))
+    return declared
+
+
+def test_the_lockfile_is_a_lock_and_not_a_wish_list():
+    """Every line must be an exact `==` pin. A `>=` in a lock file is a floor
+    wearing a lock's clothes: it re-opens exactly the drift the file exists to
+    close."""
+    import re
+    offenders = []
+    with open(LOCKFILE, encoding="utf-8") as f:
+        for n, line in enumerate(f, 1):
+            body = line.split("#")[0].strip()
+            if not body:
+                continue
+            if not re.fullmatch(r"[A-Za-z0-9_.\-]+==[^\s,;]+", body):
+                offenders.append(f"line {n}: {body!r}")
+    assert not offenders, (
+        f"{LOCKFILE} has non-exact entries, so it is not a lock: {offenders}")
+
+
+def test_every_declared_dependency_is_pinned_or_explained():
+    """A dependency nobody pinned is a dependency that can change under a green
+    build. Each miss must be on the documented exception list, with a reason."""
+    pins = _lock_pins()
+    missing = sorted(n for n in _declared_requirements()
+                     if n not in pins and n not in _LOCK_EXCEPTIONS)
+    assert not missing, (
+        f"declared but not pinned in {LOCKFILE}: {missing}. Either pin them "
+        f"(regenerate, do not retype) or add them to _LOCK_EXCEPTIONS with a "
+        f"reason — an unexplained gap is how the lock silently stops being one.")
+    stale = sorted(n for n in _LOCK_EXCEPTIONS if n in pins)
+    assert not stale, (
+        f"{stale} are pinned in {LOCKFILE} but still listed as exceptions; the "
+        f"exception list has drifted out of date")
+
+
+def test_no_pin_is_older_than_the_floor_it_has_to_satisfy():
+    """The lock and the declarations must agree. Pinning below a declared floor
+    would make CI install a version the project explicitly rejects — a lock that
+    contradicts its own requirements is worse than no lock, because it looks
+    authoritative."""
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+    pins = _lock_pins()
+    violations = []
+    for name, spec in sorted(_declared_requirements().items()):
+        if not spec or name not in pins:
+            continue
+        if Version(pins[name]) not in SpecifierSet(spec):
+            violations.append(f"{name}: locked {pins[name]} but declared {spec!r}")
+    assert not violations, (
+        "the lock contradicts the declared requirements:\n  " + "\n  ".join(violations))
+
+
+def test_the_lockfile_has_no_duplicate_entries():
+    """Two pins for one package is a file that says two different things."""
+    import re
+    seen, dupes = set(), []
+    with open(LOCKFILE, encoding="utf-8") as f:
+        for line in f:
+            body = line.split("#")[0].strip()
+            if not body:
+                continue
+            name = _canon(body.split("==")[0].strip())
+            if name in seen:
+                dupes.append(name)
+            seen.add(name)
+    assert not dupes, f"duplicate entries in {LOCKFILE}: {sorted(set(dupes))}"
+
+
+def test_ci_installs_from_the_lockfile():
+    """The anti-decoration check. A lock file nothing installs from changes no
+    version on any machine — it just looks like reproducibility. Wherever CI
+    installs the full environment, the lock must be applied as a constraint."""
+    import re
+    src = open(".github/workflows/ci.yml", encoding="utf-8").read()
+    installs = re.findall(r"^\s*run:\s*pip install .*$", src, re.M)
+    assert installs, "no `pip install` steps parsed out of ci.yml"
+    unconstrained = [line.strip() for line in installs
+                     if ".[ci]" in line and "-c requirements.lock.txt" not in line]
+    assert not unconstrained, (
+        f"CI installs the full environment without the lock: {unconstrained}. "
+        f"The declared `>=` floors mean CI and a developer can then resolve "
+        f"different versions of the same dependency.")
+
+
 def test_browser_gate_runner_never_silently_drops_a_suite():
     """Every suite the runner cannot execute must be a NAMED entry with a reason.
     A silently skipped suite is dead coverage, and dead coverage is worse than
