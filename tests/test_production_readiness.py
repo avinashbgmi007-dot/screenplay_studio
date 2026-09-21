@@ -551,7 +551,13 @@ def test_browser_gate_runner_never_silently_drops_a_suite():
                     # for long enough that preview_next's other four worlds were
                     # never exercised. Re-adding either to KNOWN_BROKEN would
                     # silence real coverage, so pin them as runnable.
-                    "preview_next", "preview_redesigns"):
+                    "preview_next", "preview_redesigns",
+                    # self-hosted 2026-09-21 (pass 13) — it was in
+                    # REQUIRES_LIVE_STUDIO, but the label was false: the console
+                    # frames the SPA and the SPA sends `frame-ancestors 'none'`,
+                    # so no port would ever have made it pass. It boots its own
+                    # studio now and pins the deliberate block as a check.
+                    "design_session"):
         assert passing not in rbs.REQUIRES_LIVE_STUDIO, f"{passing} is runnable"
         assert passing not in rbs.KNOWN_BROKEN, f"{passing} is runnable"
 

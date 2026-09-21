@@ -4,14 +4,15 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 12 — **the last open item is CLOSED, and it was
-a real defect**: the Windows `rmtree` lock race that made `delete_project` answer a
-raw 500 *and leave the project half-deleted*. Both `rmtree` sites now run inside
-`jsonio.retry_permission`, the retry the store paths already used. Production code,
-mutation-verified **4/4**. **Nothing is left open that this audit can decide.**)
-**HEAD:** `4786175` (pass 12's work commit) — **pushed**; `git ls-remote origin main`
-agrees. The tracker-stamp commit that follows it carries the same content.
-**Baseline for this pass:** `44f18b3`
+**Last updated:** 2026-09-21 (pass 13 — **the last "skipped" suite was not gated on an
+environment, it was impossible**: `design_session` framed an SPA that ships
+`frame-ancestors 'none'`, so no port could ever have made it pass. It boots its own
+studio now and pins the deliberate block as a check. Only `gun_pen_audit` remains
+excluded, and it genuinely needs a model server. **Verified against the gate's own
+output this time, not against this table.**)
+**HEAD:** `0645610` (pass 12's tracker stamp) — **pushed**; `git ls-remote origin main`
+agrees. This pass's commit hash is stamped at the bottom.
+**Baseline for this pass:** `0645610`
 
 ---
 
@@ -22,7 +23,18 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 | Unit + integration | `python -m pytest tests/` | **1576 passed, 3 skipped, 0 failed** (+4: 2 endpoint tests for the Windows lock, 2 for the idea-store site) |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 31 pass, 0 fail, 2 skip, 0 known-broken** — **650 checks** (was 660; the count *falls* because 11 checks that asserted nothing are gone) |
+| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 32 pass, 0 fail, 1 skip, 0 known-broken** — **670 checks** (pass 13: `design_session` stopped being skipped and contributed **20 real checks**; 650 → 670) |
+
+> **Pass 13 un-skipped the last suite, and it was not gated on an environment — it was
+> impossible.** `design_session` was excluded as *"drives a studio already running at
+> `E2E_BASE` (default `:8500`)"*. The console frames the SPA, and the SPA ships
+> `frame-ancestors 'none'`, so Chrome refused that frame on **every** port. It boots its own
+> studio now, reports through named `check()`s instead of bare `assert`, and **pins the
+> deliberate block** — if anyone relaxes `_SPA_CSP` to `'self'`, the suite fails and forces the
+> decision into the open. The one remaining skip is `gun_pen_audit`, which genuinely needs a
+> llama-server. **The lesson was about verification:** pass 12 claimed "everything is closed" and
+> checked it by grepping this table — which compares the tracker against the tracker. The gate's
+> own output is the evidence.
 
 > Pass 10 closed **T1e**: the 21 vacuous browser checks are fixed, and the sweep
 > that found them now returns **0**. The gate's check total went **660 → 650** —
@@ -74,6 +86,69 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 13) — the last skipped suite was not gated on an environment, it was impossible
+
+Pass 12 signed off with "every item this audit opened is closed" and verified it by grepping the
+open-items table. **That check was circular** — it compared the tracker against the tracker. The
+gate has a second exclusion list that no tracker row ever covered:
+
+```
+KNOWN_BROKEN = {}                                          # emptied in pass 9
+REQUIRES_LIVE_STUDIO = {"gun_pen_audit", "design_session"}  # skipped every run
+```
+
+So `33 suites: 31 passed, 0 failed, 2 skipped, 0 known-broken` counted **31 of 33 suites**. The
+coverage gap had not closed in pass 9 — it had **moved from one list to the other**, which is the
+same "dead coverage looks like safety" failure that pass was written to fix.
+
+### The label was false, and that is the whole finding
+
+`design_session` was excluded with the reason *"drives a studio already running at `E2E_BASE`
+(default `:8500`)"*, which reads as an environment requirement. It was not one. The console's fourth
+cell frames the studio's own SPA, and the SPA ships `frame-ancestors 'none'`, so Chrome refuses the
+frame outright:
+
+```
+Framing 'http://127.0.0.1:<port>/' violates the following Content Security Policy
+directive: "frame-ancestors 'none'". The request has been blocked.
+```
+
+**No port would ever have made it pass.** The live cell has been blank for as long as that header has
+existed, and because the suite was skipped in every gate run, nothing ever said so.
+
+### The fix is NOT to relax the header
+
+`docs/CRITICAL_REVIEW_2026-09-18.md` already classifies the console as a **lab artifact, not shipped
+surface** — nothing in the app links to it, and no product doc mentions it.
+`frame-ancestors 'none'` protects the *shipped* SPA, and the only thing it blocks is that unlinked
+lab page. **Trading a real security property for a dead artifact is the wrong direction**, so the
+header is untouched and the block is **pinned as a check**: if anyone ever relaxes `_SPA_CSP` to
+`'self'` so the console can frame the app, the suite fails and forces that decision into the open.
+
+One small production fix did land: `design_session.html` pinned its live frame to
+`src="http://127.0.0.1:8500/"` — the **only** hardcoded host:port anywhere in `webapp/` — while the
+three prototype frames beside it used relative paths. It is `src="/"` now, so the lab works on
+whatever port the studio actually runs on.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `tests/e2e_browser_design_session.py` | boots its own studio (`open_studio`) like the rest of the gate; every bare `assert` became a named `check()`; **20 checks**, was 0 |
+| `tests/run_browser_suites.py` | `design_session` removed from `REQUIRES_LIVE_STUDIO`; `gun_pen_audit`'s reason corrected — it is excluded because it needs a **llama-server**, not because it needs a port |
+| `tests/test_production_readiness.py` | `design_session` pinned as runnable, so re-adding it to either exclusion list is itself a test failure |
+| `screenplay_studio/webapp/design_session.html` | the hardcoded `http://127.0.0.1:8500/` frame → `src="/"` |
+| `docs/TESTING.md`, `tests/_run_e2e_sweep.py` | the stale "needs a studio on :8500" claim corrected in both |
+
+### The lesson, and it is about verification
+
+**Verify a closure claim against the artefact that decides, not against the list you wrote.** A
+tracker table is a summary; the gate's own output is the evidence — and a summary can be complete
+about what it lists while being silent about a second list. Grep the thing that makes the decision,
+then compare its count to the count you are claiming.
 
 ---
 

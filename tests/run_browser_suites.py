@@ -42,9 +42,17 @@ DEFAULT_TIMEOUT = 300
 # and never boot one, so a clean checkout dies with ERR_CONNECTION_REFUSED and
 # prints "0 passed, 5 failed" — indistinguishable, at a glance, from a real
 # regression. They are skipped LOUDLY unless E2E_BASE is set.
+#
+# `design_session` used to be listed here and did not belong: it was not gated on
+# a live studio, it was IMPOSSIBLE to pass. Its console frames the SPA, and the
+# SPA ships `frame-ancestors 'none'`, so that cell was blank on every port and
+# the suite could never have gone green. It now boots its own studio like the
+# rest of the gate and pins the deliberate block as a check. (pass 13)
+#
+# `gun_pen_audit` genuinely belongs: it runs a real analyze and needs a
+# llama-server, which the gate does not have.
 REQUIRES_LIVE_STUDIO = {
-    "gun_pen_audit": "drives a studio already running at E2E_BASE (default :8500)",
-    "design_session": "drives a studio already running at E2E_BASE (default :8500)",
+    "gun_pen_audit": "runs a real analyze — needs a llama-server, so E2E_BASE must point at a studio that has one",
 }
 
 # Known-red suites with their reason. Never silently skipped: every run prints

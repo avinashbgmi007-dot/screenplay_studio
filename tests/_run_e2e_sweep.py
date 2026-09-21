@@ -11,7 +11,10 @@ OUT = os.path.join(REPO, "tests", "_e2e_sweep_results.txt")
 # They are not shipped-app surface, so a non-zero exit there is not a product
 # failure — reported separately rather than counted as a gate failure.
 LAB_ONLY = {
-    "e2e_browser_design_session.py",       # needs a shared studio already on :8500
+    # lab console; self-hosts since pass 13 (it used to need a studio on :8500,
+    # but it frames the SPA and the SPA sends frame-ancestors 'none', so no port
+    # could ever have made it pass)
+    "e2e_browser_design_session.py",
     "e2e_browser_preview_next.py",         # design gallery (preview-next/)
     "e2e_browser_preview_redesigns.py",    # design gallery (preview-*)
 }

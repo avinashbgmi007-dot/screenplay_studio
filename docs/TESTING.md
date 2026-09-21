@@ -160,13 +160,21 @@ python tests/run_browser_suites.py --strict      # also chase the known-broken
 E2E_BASE=http://127.0.0.1:8500 python tests/run_browser_suites.py
 ```
 
-Two groups are excluded — and the runner **prints both on every run** rather than
-skipping them quietly, because dead coverage is worse than none (it looks like safety):
+Two groups *can* be excluded — and the runner **prints both on every run** rather
+than skipping them quietly, because dead coverage is worse than none (it looks like
+safety). As of 2026-09-21 only one suite is actually excluded:
 
 | Suite | Why it is not in the gate |
 |---|---|
-| `gun_pen_audit`, `design_session` | drive a studio already running at `E2E_BASE` (default `:8500`); they never boot their own, so a clean checkout gets `ERR_CONNECTION_REFUSED` |
-| `preview_next`, `preview_redesigns` | crash inside the Design-Lab preview pages (`bounding_box()` None / null `.classList`); repair or delete them |
+| `gun_pen_audit` | runs a real analyze, so it needs a llama-server; `E2E_BASE` must point at a studio that has one |
+
+`KNOWN_BROKEN` is **empty**. `preview_next` and `preview_redesigns` were repaired
+(both had been excluded as "crashes" — one of them had never exercised four of its
+six worlds). `design_session` was **self-hosted**: its old entry said it needed a
+studio on `:8500`, but that label was false — the console frames the SPA, and the SPA
+sends `frame-ancestors 'none'`, so **no port would ever have made it pass**. It boots
+its own studio now and pins the deliberate block as a check instead of working around
+it.
 
 Chromium is required: `python -m playwright install chromium` (CI adds `--with-deps`).
 
