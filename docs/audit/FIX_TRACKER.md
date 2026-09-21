@@ -7,8 +7,8 @@ without re-deriving it from `git log`. Source audit:
 **Last updated:** 2026-09-21 (pass 6 — T3b closed: all 33 browser suites audited
 for the vacuous-check shape; the one genuinely unbacked check fixed; two of the
 audit's own headline numbers corrected)
-**HEAD:** `de53ca1` (pass-5 work commit) + `c6e3891` (tracker) — **committed locally,
-NOT pushed** (the sandbox's credential helper hangs; see the pass-6 note below)
+**HEAD:** `fa6e952` — **pushed**; `git ls-remote origin main` agrees (the push
+needed the credential-helper workaround below)
 **Baseline for this pass:** `c6656df`
 
 ---
@@ -318,25 +318,54 @@ whole section is about.
 
 ---
 
-## ⚠️ Pass-6 blocker: pushes cannot land from this session
+## Pushes from this sandbox: diagnosed, and worked around
 
-Passes 5 and 6 are **committed locally and unpushed**. The remote sits at `c6656df`
-while local HEAD is ahead of it. This is an **environment** failure, diagnosed
-precisely after four hangs of 3–12 minutes each:
+Passes 5 and 6 hung on push for **3–12 minutes each, four times**, with `git push -v`
+printing `Pushing to …` and nothing more. It is an **environment** fault, not the
+repo. Bisected to the line:
 
 | Probe | Result |
 |---|---|
 | `git ls-remote origin main` (upload-pack) | **200** in 0.4 s — the network is fine |
 | `curl` GET / POST to github.com | 200 / 404, both < 0.4 s — **outbound POST is not blocked** |
-| `/info/refs?service=git-receive-pack` | **401** in 0.3 s — reachable; the stall is **auth** |
-| `printf 'protocol=https\nhost=github.com\n\n' \| git credential fill` | **exit 124 (timeout), zero output** |
+| `/info/refs?service=git-receive-pack` | **401** in 0.3 s — reachable; the stall is **auth**, not transport |
+| `printf 'protocol=https\nhost=github.com\n\n' \| git credential fill` | exit **0** — the helper *does* answer `fill` |
+| `GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push` | **the smoking gun** — see below |
 
-The last row is the cause: the credential helper (`helper-selector` + PortableGit's
-GCM) **hangs forever instead of failing**, and neither `GCM_INTERACTIVE=never` nor
-`GIT_TERMINAL_PROMPT=0` prevents it — git waits on a helper that never answers.
-Earlier pushes in this session *did* land (`c6656df`), so the cached credential
-expired mid-session. **No repo-side fix exists.** `git push origin main` from a
-normal shell lands both commits.
+The trace ends like this:
+
+```
+=> Send header: Authorization: Basic <redacted>
+<= Recv header: HTTP/1.1 200 OK
+<= Recv header: Content-Type: application/x-git-receive-pack-advertisement
+== Info: Connection #0 to host github.com:443 left intact
+trace: run_command: 'git credential-helper-selector store'      <-- never returns
+```
+
+So: the 401 is answered, the helper supplies a credential, GitHub returns **200 with
+the ref advertisement** — and then git calls the helper's **`store`** action, which
+**hangs forever**. The pack POST is never sent. `fill` works; `store` blocks. Neither
+`GCM_INTERACTIVE=never` nor `GIT_TERMINAL_PROMPT=0` prevents it. A push can also land
+early in a session and stop later (the cached credential expires mid-session — here
+`c6656df` pushed fine, then everything after it hung).
+
+**The workaround: intercept the helper so `store` is a no-op and everything else
+passes through.** Nothing about the credential changes — the `fill` path is untouched
+and nothing is printed.
+
+```bash
+HELPER="C:/Users/<you>/.workbuddy-ai/binaries/PortableGit/versions/<v>/mingw64/bin/git-credential-helper-selector.exe"
+git -c credential.helper= \
+    -c "credential.helper=!f() { [ \"\$1\" = store ] || \"$HELPER\" \"\$@\"; }; f" \
+    push origin main
+```
+
+With it, the same push that had hung for 12 minutes completed in **11 seconds**
+(`c6656df..fa6e952  main -> main`). A ready-made script is at
+`.workbuddy-ai/scratch/push_wrapper.sh`.
+
+**Verify with `git ls-remote`, never with the push output** — see the repo's
+long-standing tracking-ref caveat at the top of this file.
 
 ---
 
