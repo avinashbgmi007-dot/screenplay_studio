@@ -18,6 +18,8 @@ import tempfile
 
 import requests
 
+from .net_guard import is_loopback_url
+
 # "auto" lets whisper detect the spoken language per utterance
 _LANG_CODES = {"auto": None, "en": "en", "hi": "hi", "te": "te"}
 
@@ -91,19 +93,15 @@ def transcribe(audio_bytes: bytes, filename: str = "audio.webm", language: str =
             pass
 
 
-# The external engine may only ever talk to THIS machine. The original guard
-# was a string prefix and is bypassable twice over: "http://127.0.0.1@evil.com"
-# (userinfo — the authority ends at the @) and "http://localhost.evil.com"
-# (suffix) both match the prefix while resolving to a REMOTE host. Parse the
-# URL and compare the actual hostname instead.
-_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
-
-
+# The external engine may only ever talk to THIS machine — the same rule the
+# model server obeys, so the answer lives in net_guard rather than here. The
+# original guard was a string prefix and was bypassable twice over:
+# "http://127.0.0.1@evil.com" (userinfo — the authority ends at the @) and
+# "http://localhost.evil.com" (suffix) both matched the prefix while resolving
+# to a REMOTE host. net_guard parses the URL and compares the real hostname.
 def _assert_local_whisper(url: str) -> None:
     """Refuse any whisper-server URL that does not resolve to this machine."""
-    from urllib.parse import urlparse
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or parsed.hostname not in _LOOPBACK_HOSTS:
+    if not is_loopback_url(url):
         raise STTUnavailableError(
             "SCREENPLAY_STUDIO_WHISPER_URL must point at a LOCAL whisper server "
             "(localhost/127.0.0.1/::1) -- this desk never sends audio off the machine."

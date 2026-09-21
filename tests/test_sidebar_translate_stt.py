@@ -211,7 +211,9 @@ def test_plain_module_launch_keeps_server_arg(tmp_path, monkeypatch):
     from screenplay_studio import webapp_server as ws
     monkeypatch.setattr(ws, "_API_TOKEN", None)
     monkeypatch.setattr(ws, "_DEMO_MODEL_ACTIVE", False)
-    monkeypatch.setitem(ws.CONFIG, "server_url", "http://stale.example:1")
+    # A stale LOOPBACK value: its only job is to differ from --server, and the
+    # model-server guard refuses a remote URL outright (test_server_url_guard.py).
+    monkeypatch.setitem(ws.CONFIG, "server_url", "http://127.0.0.1:1")
     monkeypatch.setattr(ws.app, "run", lambda **kw: None)
     monkeypatch.setattr(sys, "argv",
                         ["webapp_server", "--port", "8599", "--projects-dir", str(tmp_path),

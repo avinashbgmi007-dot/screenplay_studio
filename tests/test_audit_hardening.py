@@ -255,17 +255,20 @@ def test_config_exposes_demo_flag_and_switch_back(client):
 
 
 def test_engine_base_ignores_stale_demo_pin(client):
+    # Distinct LOOPBACK urls on purpose: this asserts precedence (config beats a
+    # demo-era pin), not locality — and the model-server guard refuses a remote
+    # URL outright now (see test_server_url_guard.py).
     webapp_server._DEMO_URL = "http://127.0.0.1:59998"
-    webapp_server.CONFIG["server_url"] = "http://real:8080"
+    webapp_server.CONFIG["server_url"] = "http://127.0.0.1:8080"
     try:
         class DemoPinned:
             server_url = "http://127.0.0.1:59998"
-        assert webapp_server._engine_base_url(DemoPinned()) == "http://real:8080", \
+        assert webapp_server._engine_base_url(DemoPinned()) == "http://127.0.0.1:8080", \
             "sessions created during demo must not pin the dead demo port"
 
         class Other:
-            server_url = "http://other:9999"
-        assert webapp_server._engine_base_url(Other()) == "http://other:9999"
+            server_url = "http://127.0.0.1:9999"
+        assert webapp_server._engine_base_url(Other()) == "http://127.0.0.1:9999"
     finally:
         webapp_server._DEMO_URL = None
 

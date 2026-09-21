@@ -234,16 +234,20 @@ So the 2 known-broken suites are dead coverage today, and the 2 live-only suites
 
 ## 5. BACKEND — bugs, high → low
 
-### 🟠 BE-H1 (HIGH) — `POST /api/config` accepts an arbitrary `server_url` with zero validation, and propagates it to every project
+### ✅ BE-H1 (HIGH) — CLOSED 2026-09-21 — `POST /api/config` accepted an arbitrary `server_url` with zero validation, and propagated it to every project
 
 ```python
-# webapp_server.py:487-498
+# webapp_server.py:487-498  (BEFORE)
 if "server_url" in body:
     CONFIG["server_url"] = body["server_url"]          # ← no scheme/host check
     ...
     _sync_server_url_to_projects(CONFIG["server_url"], ...)   # ← written into EVERY manifest
 ```
-`_sync_server_url_to_projects` (`:283-301`) persists it into each `project.json`; `:419` then uses it as the base URL for LLM calls. **Blast radius:** one POST silently redirects every subsequent `analyze`/`chat`/`rewrite` — i.e. the writer's entire screenplay — to that host, permanently. A simple typo becomes a silent remote destination; there is no warning and no confirmation. This is the exfiltration primitive in the FE-C1 chain. **Confidence:** ✅ code-verified (all three sites read). **Fix:** default to loopback-only (`urlparse` + hostname allowlist `{localhost,127.0.0.1,::1}`), reject `file://`/`gopher://`/userinfo URLs, and require an explicit opt-in flag that prints a warning.
+`_sync_server_url_to_projects` (`:283-301`) persists it into each `project.json`; `:419` then uses it as the base URL for LLM calls. **Blast radius:** one POST silently redirects every subsequent `analyze`/`chat`/`rewrite` — i.e. the writer's entire screenplay — to that host, permanently. A simple typo becomes a silent remote destination; there is no warning and no confirmation. This is the exfiltration primitive in the FE-C1 chain. **Confidence:** ✅ executed — the probe `.workbuddy-ai/scratch/server_url_probe.py` showed `HTTP 200`, `CONFIG` poisoned, the manifest rewritten to `http://192.0.2.1:1`, and `/api/test-connection` issuing a real outbound request (the sandbox proxy answered `502 Bad Gateway`, proving the request left the process).
+
+**Fixed.** One shared predicate (`screenplay_studio/net_guard.py`: `urlparse` + `ipaddress.is_loopback`, so `127.0.0.2` and `::1` are local while `127.0.0.1@evil.com` and `localhost.evil.com` are not) enforced at **every** point a `server_url` can enter or be used: the `ServerConfig` setter, `POST /api/config`, `POST /api/test-connection`, `_sync_server_url_to_projects`, `_make_client`, and `_engine_base_url`. The last two cover state poisoned *before* the fix — a manifest already pointing at a remote host now fails loudly instead of quietly POSTing the script there. The opt-in (`--allow-remote-server` / `SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1`) is process-level and **cannot be granted over HTTP**, so the guarded request cannot authorise itself. The same three-line localhost check had been copy-pasted three times (here, in `stt.py`, and in the `Origin` guard); all three now call the one predicate.
+
+Re-running the same probe: `HTTP 400`, `CONFIG` unchanged, manifest unchanged, **no outbound request**. Verified by `tests/test_server_url_guard.py` (48 checks, mutation-checked: disabling the guard turns 19 red) and `tests/e2e_browser_server_url_guard.py` (14 checks — the writer is actually *told* the URL was refused, and a loopback URL still connects).
 
 ### 🟠 BE-H2 (HIGH) — writes are atomic within a process but **not** across processes, and never durable
 

@@ -67,6 +67,7 @@ Key flows:
 - **Fail loudly with actionable errors** — e.g. missing OCR engine returns a clear message, not an empty parse.
 - **Ship the data files** — the product is a no-build-step SPA plus a JSON craft knowledge base, so packaging is correctness, not polish. If `package-data`/`MANIFEST.in` stop covering an asset the app needs, the install degrades *silently* (empty KB, 404 frontend) rather than erroring. `tests/test_packaging_data_files.py` builds a real wheel and sdist to prevent that.
 - **Escape at the render boundary** — the SPA has one canonical `escapeHtml()` in `core.js`; every `innerHTML` sink that interpolates finding, script, chat or config text goes through it, and the SPA document carries a strict `script-src 'self'` CSP. Never build event handlers by string-concatenating data (`tests/e2e_browser_xss_inert.py`).
+- **Nothing leaves the machine** — the model server and the dictation engine must both point at loopback. One predicate decides it (`net_guard.is_loopback_url` — parsed, never prefix-matched); never hand-roll a third `_LOOPBACK_HOSTS`. Every URL that reaches an outbound request goes through `webapp_server._validate_server_url`, and the opt-in for a LAN model server is process-level (`--allow-remote-server` / `SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1`), never grantable over HTTP (`tests/test_server_url_guard.py`).
 - **Tests** live in `tests/` and talk to `tests/mock_unified_server.py`; run against the real llama-server only if you have one.
 
 ## Docs index

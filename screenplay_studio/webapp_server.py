@@ -33,6 +33,7 @@ from .jsonio import (StoreUnreadable, atomic_write_json, check_safe_id, lock_for
 
 from .ideas import IdeaStore
 from .manifest import ProjectManifest
+from .net_guard import is_loopback_host, is_loopback_url
 from .orchestrator import Orchestrator, OrchestratorError
 
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
@@ -96,8 +97,6 @@ def _harden_spa_document(resp):
 # no Origin header (curl, the test client, same-origin form posts) are allowed:
 # the threat model is a foreign *page*, not a local tool.
 # ---------------------------------------------------------------------------
-_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
-
 # H1: capability token. SECURE BY DEFAULT — main() mints one on every launch and
 # hands it to the SPA as a SameSite=Strict cookie on `/`; mutating requests must
 # echo it back as X-Studio-Token. A foreign page can neither read the cookie nor
@@ -120,7 +119,10 @@ def _reject_cross_origin_writes():
     origin = request.headers.get("Origin")
     if origin:
         from urllib.parse import urlparse
-        if urlparse(origin).hostname not in _LOOPBACK_HOSTS:
+        # Same "is this local?" rule the model server and dictation use — see
+        # net_guard. A missing/garbage Origin host resolves to None, which the
+        # predicate reports as not-local, so a `null` origin is still refused.
+        if not is_loopback_host(urlparse(origin).hostname):
             return jsonify({"error": "cross-origin request rejected"}), 403
     if _API_TOKEN:
         # Token configured: require it, using the constant-time compare.
@@ -132,6 +134,49 @@ def _reject_cross_origin_writes():
 # Set by main() at startup — kept module-level for simplicity, matching
 # the same pattern already used in screenplay_cowriter/server.py.
 PROJECTS_DIR = "./studio_projects"
+
+
+# ---------------------------------------------------------------------------
+# BE-H1: the model server is a trust boundary.
+#
+# Every analysis, chat turn and rewrite POSTs the writer's actual script to
+# whatever this URL names, so accepting an arbitrary one is the single request
+# that turns "nothing leaves this machine" into a lie. It used to be unguarded
+# at three entry points at once — the config setter, the connection probe, and
+# the propagation into every project manifest — which also made it sticky: one
+# request redirected every project the writer owned, permanently.
+#
+# The opt-in is process-level ON PURPOSE. If an HTTP request could grant it,
+# the same request that names the remote host would authorise it, and the guard
+# would be decorative.
+# ---------------------------------------------------------------------------
+_ALLOW_REMOTE_SERVER_ENV = "SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER"
+
+
+def _env_flag(name: str) -> bool:
+    """Boolean env switch. Matches the convention the demo trigger uses:
+    unset, "0" and "false" are off, anything else is on."""
+    return os.environ.get(name, "").strip() not in ("", "0", "false")
+
+
+_ALLOW_REMOTE_SERVER = _env_flag(_ALLOW_REMOTE_SERVER_ENV)
+
+
+def _validate_server_url(url: str) -> str:
+    """Return `url` when this desk may talk to it; raise ValueError when not.
+
+    Raises ValueError rather than a bespoke type so the registered handler
+    answers a bad URL with the app's JSON 400 shape, exactly like a bad id.
+    """
+    if is_loopback_url(url) or _ALLOW_REMOTE_SERVER:
+        return url
+    raise ValueError(
+        f"Refusing to point the model server at {url!r}: this desk only talks to "
+        "a model on THIS machine (localhost / 127.0.0.1 / ::1), so your script "
+        "never leaves it. If your llama-server really runs on another machine, "
+        "restart the studio with --allow-remote-server (or set "
+        "SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1) to opt in deliberately."
+    )
 
 
 class ServerConfig:
@@ -165,13 +210,16 @@ class ServerConfig:
                 raise ValueError("timeout must be an integer number of seconds")
             if value <= 0:
                 raise ValueError("timeout must be positive")
-        if key == "server_url":
+        if key in ("server_url", "real_server_url"):
             # None/empty means "not set" — keep the default rather than
             # storing a truthy "None" string.
             if value is None or value == "":
-                value = self._DEFAULTS["server_url"]
+                value = self._DEFAULTS["server_url"] if key == "server_url" else None
             else:
-                value = str(value).rstrip("/")
+                # Both keys are outbound targets: `server_url` receives every
+                # analysis and chat turn, `real_server_url` is probed by the
+                # status strip. Neither may name a remote host.
+                value = _validate_server_url(str(value).rstrip("/"))
         if key in ("model", "fast_model") and value == "":
             value = None
         if key == "turn_timeout":
@@ -323,7 +371,10 @@ def _manifest_summary(m: ProjectManifest) -> dict:
 
 def _make_client(m: ProjectManifest):
     from screenplay_analyzer.llm_client import LlamaServerClient
-    return LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
+    # The manifest is a file on disk, so it can predate this guard or be edited
+    # by hand. Re-check at the point of no return: the request, not the setting.
+    base_url = _validate_server_url(m.server_url)
+    return LlamaServerClient(base_url=base_url, model=m.model_id, timeout=m.timeout,
                              fast_model=m.fast_model)
 
 
@@ -339,6 +390,9 @@ def _sync_server_url_to_projects(server_url: str, model=_UNSET) -> None:
     and analyze all hit the dead URL while the connection strip shows green
     (it tests the global config, not the manifest). Called when settings save.
     """
+    # Checked here as well as in the setter: this is the call that makes a bad
+    # URL *sticky*, and it is reachable on its own.
+    _validate_server_url(server_url)
     if not os.path.isdir(PROJECTS_DIR):
         return
     for name in os.listdir(PROJECTS_DIR):
@@ -468,6 +522,9 @@ def _import_cowriter(name: str):
 def test_connection():
     body = request.get_json() or {}
     url = (body.get("server_url") or CONFIG["server_url"]).rstrip("/")
+    # This route GETs {url}/v1/models for whatever it is handed, so it is an
+    # outbound primitive in its own right — guard it before the probe, not after.
+    _validate_server_url(url)
     from screenplay_analyzer.llm_client import LlamaServerClient, LlamaServerError
 
     client = LlamaServerClient(base_url=url, timeout=15)
@@ -2166,18 +2223,25 @@ def _engine_base_url(session, manifest=None):
     to the real server must win), and the project manifest's URL — the manifest
     is synced whenever settings change, so a session pinned to a retired
     server/port never keeps pointing at a dead URL while the desk shows green.
+
+    The winner is then put through the same trust check as every other entry
+    point: a session file written before the guard existed (or a hand-edited
+    manifest) must fail loudly here rather than quietly POST the script to a
+    remote host.
     """
     if _DEMO_MODEL_ACTIVE:
-        return CONFIG["server_url"]
+        url = CONFIG["server_url"]
     # a session created during demo mode pins the demo port; once the writer
     # switches back to their real server, that pin must not win
-    if session.server_url and _DEMO_URL and session.server_url == _DEMO_URL:
-        return CONFIG["server_url"]
-    if manifest is not None and session.server_url and manifest.server_url != session.server_url:
+    elif session.server_url and _DEMO_URL and session.server_url == _DEMO_URL:
+        url = CONFIG["server_url"]
+    elif manifest is not None and session.server_url and manifest.server_url != session.server_url:
         # the project moved servers since this session was created (settings
         # sync rewrote the manifest) — follow the project
-        return manifest.server_url
-    return session.server_url or (CONFIG["server_url"] if manifest is None else manifest.server_url)
+        url = manifest.server_url
+    else:
+        url = session.server_url or (CONFIG["server_url"] if manifest is None else manifest.server_url)
+    return _validate_server_url(url)
 
 
 def _load_session_and_engine(project: str, session_id: str):
@@ -3283,7 +3347,7 @@ def _startup_token(no_token: bool):
 
 
 def main():
-    global PROJECTS_DIR, CONFIG, _API_TOKEN
+    global PROJECTS_DIR, CONFIG, _API_TOKEN, _ALLOW_REMOTE_SERVER
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-token", action="store_true",
                         help="(Deprecated -- now the default.) Require a per-process "
@@ -3294,6 +3358,11 @@ def main():
     parser.add_argument("--port", type=int, default=8500)
     parser.add_argument("--projects-dir", default="./studio_projects")
     parser.add_argument("--server", default="http://localhost:8080", help="Default llama-server URL")
+    parser.add_argument("--allow-remote-server", action="store_true",
+                        help="Permit a model server that is NOT on this machine. Off by "
+                             "default, because every analysis and chat turn sends your "
+                             "script to that URL. Same as "
+                             "SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER=1.")
     parser.add_argument("--demo-model", action="store_true",
                         help="Run with the built-in demo craft model instead of a real "
                              "llama-server — the whole desk (analysis, chat, streaming) "
@@ -3313,12 +3382,23 @@ def main():
     # flags are passed (never silently harden, never silently expose).
     _API_TOKEN = _startup_token(args.no_token)
 
+    # BE-H1: a startup decision, settled before any URL is applied. The env var
+    # is read at import (so the `flask --app ... run` path honours it too) and
+    # again here, so it works on the ordinary launch path as well.
+    _ALLOW_REMOTE_SERVER = (_ALLOW_REMOTE_SERVER or bool(args.allow_remote_server)
+                            or _env_flag(_ALLOW_REMOTE_SERVER_ENV))
+
     PROJECTS_DIR = args.projects_dir
     os.makedirs(PROJECTS_DIR, exist_ok=True)
     # env-var demo trigger already pointed CONFIG at the demo server at import
     # time -- don't clobber it back to :8080 (keeps flag/env parity honest).
     if not _DEMO_MODEL_ACTIVE:
-        CONFIG["server_url"] = args.server
+        try:
+            CONFIG["server_url"] = args.server
+        except ValueError as e:
+            # Loud and actionable, not a traceback: a --server the guard refuses
+            # is a launch decision the operator has to make explicitly.
+            parser.error(str(e))
     if args.demo_model:
         _use_demo_model()
 
@@ -3365,8 +3445,7 @@ def _use_demo_model() -> str:
 #   2. Auto-fallback: the configured model server is unreachable at startup,
 #      so instead of a dead desk, run on the built-in demo craft model.
 # A reachable llama-server ALWAYS wins — the real flow is never hijacked.
-_DEMO_ENV = os.environ.get("SCREENPLAY_STUDIO_DEMO_MODEL", "").strip()
-if _DEMO_ENV not in ("", "0", "false"):
+if _env_flag("SCREENPLAY_STUDIO_DEMO_MODEL"):
     _use_demo_model()
 else:
     def _server_reachable(url: str) -> bool:
