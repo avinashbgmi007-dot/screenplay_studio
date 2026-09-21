@@ -9,7 +9,8 @@ import re
 
 from playwright.sync_api import expect, sync_playwright
 
-from e2e_browser_common import Checks, assert_no_js_errors, last_reply, launch, open_studio, send_chat
+from e2e_browser_common import (Checks, assert_no_js_errors, clicked, last_reply,
+                                launch, open_studio, seen_visible, send_chat)
 L1 = "A courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from regret."
 L2 = "She keeps one swapped item: a brass key nobody has claimed."
 
@@ -29,8 +30,15 @@ def run(base):
         ed.click()
         ed.type(L1 + "\n" + L2 + "\n/sameer", delay=3)
         page.wait_for_timeout(1100)
-        expect(page.locator(".idea-context-card").first).to_be_visible(timeout=15000)
-        check("room opens via summon", True)
+        # "room opens via summon" — assert the ROOM actually opened. The throwing
+        # wait only proved a context card appeared, and `check(name, True)`
+        # asserted nothing, so a summon that painted a card but never opened the
+        # drawer passed. `#room-drawer.open` is the app's own definition of open
+        # (the same test the auto-hide check below uses).
+        card_ok = seen_visible(page.locator(".idea-context-card").first, timeout=15000)
+        room_open = "open" in (page.locator("#room-drawer").get_attribute("class") or "")
+        check("room opens via summon", card_ok and room_open,
+              f"contextCard={card_ok} drawerOpen={room_open}")
 
         # ---- auto-hide: clicking the editor dismisses the drawer -------------
         ed.click(position={"x": 10, "y": 10})
@@ -57,11 +65,25 @@ def run(base):
               return true;
             }""",
             [sel_text])
-        assert ok, "needle line not found on the page"
+        # A bare `assert` here was a CRASH-shaped guard: it aborted the run and
+        # masked every later check — and because `finish()` sits at the END of
+        # run(), a plain `return` would have exited 0 and SWALLOWED the failure.
+        # finish() exits 1, so the gap is named and the run stays honest.
+        if not ok:
+            check("selection: the target line is present to select", False,
+                  "needle line not found on the page — the selection contract "
+                  "was NOT exercised")
+            checks.finish()
         page.wait_for_timeout(400)
         chip = page.locator("#idea-quote-float")
-        expect(chip).to_be_visible(timeout=5000)
-        check("selection chip floats over the idea page", True)
+        # "floats OVER the idea page" — assert it is POSITIONED, not merely
+        # present. `to_be_visible()` is satisfied by a zero-size element, and the
+        # old `check(name, True)` was satisfied by anything at all.
+        chip_ok = seen_visible(chip, timeout=5000)
+        box = chip.bounding_box() or {}
+        floats = box.get("width", 0) > 0 and box.get("height", 0) > 0
+        check("selection chip floats over the idea page", chip_ok and floats,
+              f"visible={chip_ok} box={box}")
 
         # ---- Ask Sameer: quote card + grounded reply --------------------------
         got = chip.get_attribute("data-text")
@@ -73,7 +95,13 @@ def run(base):
         check("ask pre-filled referencing the selection",
               "brass key" in composer_txt.lower() or "part" in composer_txt.lower(),
               composer_txt[:80])
-        send_chat(page, "yes -- that exact line. what does it mean for her?")
+        # Bounded: if the drawer never opened the composer is display:none, and an
+        # unguarded fill() would time out and ABORT the run — masking the named
+        # failure above and every check below (mutation-verified with the
+        # drawer-open class removed).
+        sent = send_chat(page, "yes -- that exact line. what does it mean for her?")
+        check("ask: the composer accepted the turn", sent,
+              "the composer was not usable — the room drawer never opened")
         page.wait_for_timeout(2000)
         r1 = last_reply(page).lower()
         check("reply grounds on the selected passage",
@@ -86,15 +114,25 @@ def run(base):
         # count in its detail but never asserted anything about it).
         turns_before = page.locator(".msg.assistant").count()
         globe = page.locator(".msg.assistant .translate-btn").last
-        globe.scroll_into_view_if_needed()
-        globe.hover()   # the icon floats the language menu; click picks one
-        menu = page.locator(".lang-menu").last
-        expect(menu).to_be_visible(timeout=8000)
-        menu.locator(".lang-menu-item", has_text=re.compile(r"^English$")).click()
-        panel = page.locator(".msg-translation-text").last
-        expect(panel).to_be_visible(timeout=15000)
-        tr_txt = panel.inner_text().lower()
-        check("translation renders inline in English", len(tr_txt) > 5, tr_txt[:120])
+        # Bounded end-to-end: with no assistant reply there is no translate button,
+        # and the old scroll_into_view / hover / expect chain RAISED — aborting the
+        # run and masking every later check (mutation-verified: with the drawer-open
+        # class removed, the suite died here before printing its summary).
+        try:
+            globe.scroll_into_view_if_needed(timeout=4000)
+            globe.hover(timeout=4000)
+            menu_open = seen_visible(page, ".lang-menu", timeout=8000)
+        except Exception:
+            menu_open = False
+        picked = menu_open and clicked(
+            page.locator(".lang-menu").last.locator(
+                ".lang-menu-item", has_text=re.compile(r"^English$")), timeout=4000)
+        panel_ok = picked and seen_visible(page, ".msg-translation-text", timeout=15000)
+        tr_txt = (page.locator(".msg-translation-text").last.inner_text().lower()
+                  if panel_ok else "")
+        check("translation renders inline in English",
+              panel_ok and len(tr_txt) > 5,
+              f"menuOpen={menu_open} picked={picked} text={tr_txt[:120]}")
         # display-only: history count unchanged
         msgs = page.locator(".msg.assistant").count()
         check("translation adds no new chat turns", msgs == turns_before,

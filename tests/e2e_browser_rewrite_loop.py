@@ -28,7 +28,7 @@ import requests
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from e2e_browser_common import Checks, launch, start_studio
+from e2e_browser_common import Checks, launch, seen_visible, start_studio
 
 FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "fixtures", "pain_tenglish.fountain")
@@ -142,8 +142,17 @@ def _run_loop(page, base, name):
 
     note = page.locator("#manuscript-container .finding-note").first
     note.locator("button", has_text="Rewrite").click()
-    page.wait_for_selector("#rewrite-modal", state="visible", timeout=8000)
-    check("loop: the rewrite modal opens from the finding card", True)
+    # "the rewrite modal OPENS FROM THE FINDING CARD" — assert it opened AND is
+    # armed (its generate control exists), so an empty modal shell cannot pass.
+    # The throwing wait proved only visibility; `check(name, True)` proved
+    # nothing, and a failure was a crash rather than a named check.
+    modal_ok = seen_visible(page, "#rewrite-modal", timeout=8000)
+    # is_visible, not count()>0: PRESENCE is satisfied by a hidden button, so an
+    # empty modal shell would still pass. This is the half of the claim the
+    # throwing wait never covered.
+    armed = page.locator("#rewrite-generate").is_visible()
+    check("loop: the rewrite modal opens from the finding card", modal_ok and armed,
+          f"modalVisible={modal_ok} generateVisible={armed}")
 
     page.locator("#rewrite-generate").click()
     page.wait_for_selector("#rewrite-candidates .rewrite-candidate", timeout=30000)

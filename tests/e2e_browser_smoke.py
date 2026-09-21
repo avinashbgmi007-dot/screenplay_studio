@@ -29,7 +29,8 @@ import sys
 
 from playwright.sync_api import sync_playwright, expect
 
-from e2e_browser_common import Checks, assert_no_js_errors, last_reply, launch, start_studio
+from e2e_browser_common import (Checks, assert_no_js_errors, last_reply, launch,
+                                seen_visible, start_studio)
 
 STREAM_OBSERVER = """() => {
   const c = document.querySelector('#messages-scroll');
@@ -81,8 +82,11 @@ def run():
             # ---- 1. the studio opens --------------------------------
             page.goto(BASE, wait_until="networkidle")
             checks.ok("app loads", page.title() == "Script Doctor Studio", page.title())
-            expect(page.locator("#welcome-view")).to_be_visible(timeout=10000)
-            checks.ok("welcome desk shown", True)
+            # T1c shape: the throwing `expect(...).to_be_visible()` below used to
+            # be followed by `checks.ok("welcome desk shown", True)`, so a failure
+            # was a CRASH that aborted the run — not a named check. Poll, assert.
+            ok = seen_visible(page, "#welcome-view", timeout=10000)
+            checks.ok("welcome desk shown", ok, "welcome view never became visible")
 
             # ---- 2. the demo model is live --------------------------
             cfg = page.evaluate("fetch('/api/config').then(r => r.json())")
@@ -138,9 +142,16 @@ def run():
                 page.locator("#input").fill("Give me your honest take on scene 1.")
                 page.locator("#send-btn").click()
 
-            # user's own message echoes into the transcript
-            expect(page.locator(".msg.user").last).to_be_visible(timeout=10000)
-            checks.ok("user message rendered", True)
+            # user's own message echoes into the transcript — and it echoes the
+            # TEXT THAT WAS SENT, not merely "some user bubble exists". The old
+            # shape was a throwing `expect(...).to_be_visible()` plus
+            # `checks.ok("user message rendered", True)`: the wait could crash the
+            # suite, and the check asserted nothing about the echo.
+            ok = seen_visible(page.locator(".msg.user").last, timeout=10000)
+            echoed = page.locator(".msg.user").last.inner_text().strip()
+            checks.ok("user message rendered",
+                      ok and "honest take on scene 1" in echoed,
+                      f"visible={ok} text={echoed[:70]!r}")
 
             # the turn finishes when Send re-enables (finishTurn)
             expect(page.locator("#send-btn")).to_be_enabled(timeout=45000)

@@ -1,7 +1,17 @@
 """Forensic probe: the SHIPPED app's actual identity, as computed in the
 browser — palette tokens, ambient tints, font-family chain on key surfaces,
 compared live against the two design docs' claims (midnight-desk-preview
-amber/steel vs DESIGN.md Nocta violet/cyan)."""
+amber/steel vs DESIGN.md Nocta violet/cyan).
+
+**This suite is a diagnostic dump, not a test of the identity.** Every section
+`print()`s its payload for a human to read; the only assertion is the JS-error
+guard at the end. It previously carried five `CHECKS.ok("<x> dumped", True)`
+markers — one per dump — which asserted nothing and only inflated the passed
+count (and whose `detail` was never printed anyway, since `Checks.ok` prints
+detail on failure only). They are gone: the payload is the product, and the
+count is now honest. Do not re-add a marker to "record that a dump ran" — if a
+dump breaks, its `page.evaluate` raises and the suite fails loudly.
+"""
 import os
 import sys
 
@@ -56,8 +66,6 @@ def _run(base):
         print("=== shipped token truth (computed) ===")
         for k, v in tokens.items():
             print(f"  --{k}: {v}")
-        CHECKS.ok("token truth dumped", True)
-
         # ---- 2. surface census: what each key surface actually wears -----
         surfaces = page.evaluate(
             """() => {
@@ -87,8 +95,6 @@ def _run(base):
             if s:
                 print(f"  {name:12s} bg={s['bg']:24s} color={s['color']:22s} "
                       f"font={s['font']}")
-        CHECKS.ok("surface census dumped", True)
-
         # ---- 3. which fonts ACTUALLY render (loaded AND used) -----------
         usage = page.evaluate(
             """() => {
@@ -111,8 +117,6 @@ def _run(base):
         print("=== first-family in computed chains ===")
         for k, v in usage.items():
             print(f"  {k}: {v}")
-        CHECKS.ok("font chain dumped", True)
-
         # ---- 4. warm-vs-cool verdict on the furniture --------------------
         # sample the actual rendered bg colors: is the shell warm-brown
         # (Midnight Desk) or cool void (Spark Wall/Nocta)?
@@ -145,8 +149,6 @@ def _run(base):
         print("=== furniture temperature ===")
         for k, v in verdict.items():
             print(f"  {k}: {v}")
-        CHECKS.ok("temperature dumped", True)
-
         # ---- 5. accent hue used on the primary CTA right now -------------
         cta = page.evaluate(
             """() => {
@@ -159,8 +161,6 @@ def _run(base):
             }"""
         )
         print("=== primary CTA (#idea-btn) ===", cta)
-        CHECKS.ok("cta dumped", True)
-
         CHECKS.ok("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         CHECKS.finish()
 

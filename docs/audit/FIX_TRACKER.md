@@ -4,12 +4,13 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 9 — the two "known-broken" browser suites are
-repaired and `KNOWN_BROKEN` is now **empty**; repairing them found four real
-defects that a crash had been hiding)
-**HEAD:** `3761747` (pass 9's work commit) — **pushed**; `git ls-remote origin main`
-agrees. The tracker-stamp commit that follows it carries the same content.
-**Baseline for this pass:** `f36e039`
+**Last updated:** 2026-09-21 (pass 10 — **T1e closed**: all 21 vacuous browser
+checks fixed and mutation-verified, the sweep now returns 0. The gate's check
+count *falls*, and is finally true. Fixing them exposed two more crash-shaped
+failure modes, both fixed.)
+**HEAD:** `27ba81e` (pass 9's tracker stamp) — **pushed**; `git ls-remote origin main`
+agrees. This pass's commit hash is stamped at the bottom.
+**Baseline for this pass:** `27ba81e`
 
 ---
 
@@ -20,7 +21,18 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 | Unit + integration | `python -m pytest tests/` | **1572 passed, 3 skipped, 0 failed** |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 31 pass, 0 fail, 2 skip, 0 known-broken** — **660 checks** (was 29 pass / 2 known-broken / 533 checks) |
+| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 31 pass, 0 fail, 2 skip, 0 known-broken** — **650 checks** (was 660; the count *falls* because 11 checks that asserted nothing are gone) |
+
+> Pass 10 closed **T1e**: the 21 vacuous browser checks are fixed, and the sweep
+> that found them now returns **0**. The gate's check total went **660 → 650** —
+> *down*, and finally true: 11 checks that asserted nothing are deleted, 9 that
+> asserted nothing became checks that can fail. Mutation-verified **6/6**, every
+> mutated file restored byte-identical.
+>
+> ⚠️ The gate is **intermittently red on `library_delete`**, a suite this pass did
+> not touch. It failed once in the gate (`shelf delete emptied the disk`) and
+> passed **3/3 standalone** and on the gate's second run. Root cause is narrowed
+> but **not fixed** — see the open-items table.
 
 > Pass 9 repaired the two suites that were excluded as `KNOWN_BROKEN`, so the gate
 > now *runs* them: **+2 suites, +127 checks** (`preview_next` 14 → 92 checks,
@@ -61,6 +73,132 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 10)
+
+**T1e — the 21 vacuous browser checks. Closed: the sweep now returns 0.**
+
+Pass 9's closing note said the remaining queue was "decisions and cosmetics". That
+was wrong about one entry, and it was the only item still *mine*. Those 21 checks
+could not fail, and they sat **inside** the "660 checks" number this tracker
+quotes — so every citation of that number was ~3% fiction. Fixing it makes the
+number *smaller* and true.
+
+**The sweep was rebuilt, and independently reproduced the 21.** The pass-5 sweep
+could not be trusted as-is: it matched `check(...)`/`ok(...)` by regex and missed
+every **bare** `check(name, True)` — no leading `checks.` — which is how two of the
+suites import the helper. The rebuilt sweep parses the call and inspects the
+**second positional argument**, then applies all three known false-positive
+corrections: `>= 0(?![.\d])` so `>= 0.7` is not a tautology; comment lines are
+blanked; and **docstrings are blanked via `ast`** (the new helpers document the
+anti-pattern with `check(name, True)` examples, and a naive sweep reports its own
+documentation as a defect). It returns **21** — the same number, now from a method
+that cannot miss the bare form.
+
+**The 21, by what actually backed them:**
+
+| Class | Sites | Action |
+|---|---|---|
+| Backed by a **throwing** wait (`wait_for_selector` / `expect().to_be_visible()`) | 9 | **converted** → bounded poll (`seen_visible`) + a real assertion |
+| **Diagnostic dumps** — payload `print()`ed, check asserted nothing | 6 | **deleted / demoted** to `note()` |
+| **Timing-conditional** — inside `if running_seen:` | 2 | **demoted** to `note()` |
+| Conditional on **nothing happening** — and **dead** in the gate | 1 | **deleted**, the coverage gap recorded as a `note()` |
+| In the gate-excluded `gun_pen_audit` | 3 | 2 demoted to `note()`, 1 **converted** (flagged unverified) |
+
+**Each conversion now asserts the half its NAME promised, not just visibility.**
+A throwing wait proves an element appeared; the check claimed more:
+
+| Check | The half the wait never covered |
+|---|---|
+| `idea: blank page opens (writing-first)` | the editor is **blank** |
+| `sameer: one streamed turn answers` | the reply is **substantive**, not error copy |
+| `script: idea graduates into a script` | the scene page **has rendered text** |
+| `inline edit: rewrite modal opens from the finding card` | the modal is **armed** — `is_visible()`, *not* `count() > 0`, since presence is satisfied by a hidden button |
+| `room opens via summon` | the **drawer** is open, not just that a context card painted |
+| `selection chip floats over the idea page` | the chip is **positioned** (non-zero box), not merely present |
+| `user message rendered` | the bubble **echoes the text that was sent** |
+| `pass2: ghosted marks render honestly (never red)` | the computed colour is not `--danger`, **resolved through the browser** so both sides are `rgb()` |
+
+**The diagnostic dumps were worse than the tracker thought.** `Checks.ok` prints
+`detail` **only on failure** — so those 6 checks showed neither the payload nor an
+assertion on a green run. The `layout_audit` census ran **6 times per suite run**
+and was invisible every time. `note()` prints unconditionally, so demoting them
+*adds* information while removing the inflation.
+
+**One more site, found while fixing them.** `selection_translate` guarded its
+needle with a bare `assert ok, "needle line not found on the page"` — a crash-shaped
+precondition. The trap: `finish()` sits at the **END** of `run()`, so the obvious
+fix (a plain `return`) would have exited **0** and *swallowed* the failure. It now
+records a named failure and calls `finish()`.
+
+### A crash is not a verdict — and the mutations proved these suites still had one
+
+Mutation verification started at **4/6**: two mutations produced a *crash* instead
+of a named failure. Both were the pass-9 pattern, and both were real defects in
+the **tests**:
+
+1. **An unarmed modal left the overlay up.** With `#rewrite-generate` hidden, the
+   check correctly FAILED — then `page.locator("#rewrite-generate").click()` timed
+   out, aborted the run, and **the named failure never printed**. Worse, the
+   never-completed modal stayed open and blocked the *next* section, which died on
+   a dock click. Fixed with a bounded `clicked()` helper, an `Escape` on the
+   un-armed path, and a bounded notes step.
+2. **`last_reply()` raised when no bubble existed.** With the drawer-open class
+   removed, the send failed, so there was no assistant bubble and
+   `.last.inner_text()` raised — killing the suite before its summary. `send_chat`
+   was unbounded for the same reason (a hidden composer). Both are now bounded and
+   return a bool/`""`.
+
+**Final verdict: 6/6 caught as NAMED failures, zero crashes, every mutated file
+restored byte-identical** (sha256 compared after each restore). Three shared
+helpers were made non-raising to get there — `clicked()`, `filled()`, `send_chat()`,
+`last_reply()` — each returning a value the caller can assert, because *an action
+whose precondition failed is a fact to check, not a timeout that aborts the run.*
+
+### The count, honestly
+
+| | Before | After |
+|---|---|---|
+| Vacuous checks (the sweep) | **21** | **0** |
+| `identity_forensics` | 6 checks (5 vacuous) | **1 check** (all 5 markers deleted; the payload is the `print`) |
+| `layout_audit` | 30 checks | **24** (the 6-run census is now a `note`) |
+| `selection_translate` | 9 checks | **10** (the 9 include one *new* real check) |
+| In-gate browser total | **660** | **650** |
+
+The total *falls* by 10 and is now true. Eleven checks that asserted nothing are
+gone; nine that asserted nothing became checks that can fail.
+
+### The gate run also caught a flake — in a suite this pass never touched
+
+The first full gate after these changes came back **30/31, exit 1**: `library_delete`
+failed `shelf delete emptied the disk`, with the doomed project still listed.
+
+**It is not this pass's doing.** That suite imports `Checks, assert_no_js_errors,
+launch, open_studio` — none of the helpers changed here — and `git status` shows no
+production file touched. It then passed **3/3 standalone** and the gate's **second
+run was clean (31/31, exit 0)**.
+
+It is, however, the **second** time this suite has flaked in the gate (pass 3's T3
+was the first), so it was worth narrowing rather than shrugging at. Two candidates,
+and the old failure detail could not tell them apart:
+
+1. **The budget was too thin.** The poll allowed `20 × 250 ms = 5 s` for a
+   **directory removal** that is O(files), with 33 suites running back-to-back.
+2. **The server errored.** `delete_project` calls
+   `shutil.rmtree(project_dir, ignore_errors=False)` with **no retry** — and on
+   Windows that raises `WinError 32` whenever a handle is still open, which
+   surfaces as a **500** and leaves the row exactly as observed.
+
+Both are now *distinguishable*: the poll is time-based (30 s) and the check's
+detail reports the **HTTP status**, so the next occurrence names its own cause.
+**The (2) fix is a production change and was deliberately not made blind** — the
+flake could not be reproduced locally, so a retry loop around the `rmtree` would
+ship unverified. It is filed as open, with the evidence and the fix shape.
+
+That is the honest trade: make the *diagnosis* better now, and refuse to guess at
+a *fix* that cannot be tested.
 
 ---
 
@@ -455,6 +593,15 @@ Redone as a clean `502 → 500` change it fails properly (`assert 500 == 502`).
 
 ## The check count, honestly
 
+> **SUPERSEDED 2026-09-21 (pass 10).** Every vacuous check below is now **fixed**:
+> the sweep returns **0**, and the two suites whose totals were inflated
+> (`identity_forensics` 6 → **1**, `layout_audit` 30 → **24**) shrank. The gate's
+> browser total went **660 → 650** — *down*, because 11 checks that asserted
+> nothing are gone and 9 that asserted nothing became checks that can fail.
+> See the pass-10 section. The analysis below is kept because its classification
+> is what decided each action, and because the reasoning it corrects is the
+> reason this took three passes to close.
+
 The audit's headline correction was "4 of 476 browser checks cannot fail → 472".
 Sweeping for the same shape found **more than four**, and they are **not all the
 same defect** — the difference decides the action.
@@ -517,7 +664,8 @@ whole section is about.
 | ID | Item | Class | Owner |
 |---|---|---|---|
 | **R11–R14** | **Reduced to ONE decision.** `.git` is 82 MB, of which **69.24 MB (84%) is two blobs**: `.freebuff/desktop-v2.db` (36.61 MB) + `.db-wal` (32.63 MB). They are **not on `main`** — reachable only from `legacy/pre-recovery`, which still exists on the remote. Reclaiming it means deleting a **shared remote branch**, so it is the owner's call; the exact commands are in §REL-M2 of the audit. The 69 PNGs (13.94 MB) are *intentional* evidence and the 22 cline checkpoint refs hold no large blobs. | hygiene | **owner decision** |
-| **T1e** | The 21 remaining vacuous browser checks, all classified by class in §T3b — 9 backed by something that can fail, 6 diagnostic dumps, 3 timing/nothing-conditional, 3 in the gate-excluded `gun_pen_audit`. Documented rather than churned: converting a *backed* marker into a DOM re-read adds a flake risk for no added assurance. | test integrity | open |
+| **T1e** | ~~The 21 remaining vacuous browser checks~~ — **CLOSED (pass 10).** All 21 audited, fixed, and mutation-verified: **0 vacuous checks remain** (the sweep that found 21 now returns 0). See the pass-10 section. | test integrity | ✅ done |
+| **NEW (pass 10)** | **`library_delete` flakes in the gate.** It failed `shelf delete emptied the disk` in one gate run (30/31 suites green), then passed **3/3 standalone** and on the gate's **second run** (31/31). Not caused by this pass: the suite imports none of the changed helpers and no production code was touched. Root cause narrowed to two candidates, now **distinguished by the check's own detail** (which was rewritten to report the HTTP status): (a) the removal is slow under load — a project dir is O(files) to delete — and the old poll budget was a fixed **5 s**; or (b) the server **errored**: `delete_project` calls `shutil.rmtree(project_dir, ignore_errors=False)` with **no retry**, and on Windows that raises `WinError 32` whenever any handle is still open, which surfaces as a **500** and leaves the row in place. The poll budget is now time-based (30 s) and the status is reported, so the next occurrence is self-diagnosing. **The (b) fix — a retry around the `rmtree`, and a clear error instead of a raw 500 — is a PRODUCTION change and is deliberately NOT made blind**: the flake could not be reproduced locally, so any fix would ship unverified. | test integrity / robustness | **open** |
 | **NEW (pass 9)** | `preview-redesigns/shots/` holds **25 tracked PNGs** — `*-welcome/-cowrite/-feedback/-desk.png` × six designs plus `gallery-live.png`. They are screenshots of the screen model the worlds **no longer have**, orphaned now that the old suite (which regenerated them) is gone and the new one writes no artifacts. Excluded from the wheel by design, so not product bloat — but misleading as evidence. | hygiene | **owner decision** (`git rm -r screenplay_studio/webapp/preview-redesigns/shots/`) |
 
 **R10 is closed** — see the pass-8 section below. It was filed as hygiene and turned out to

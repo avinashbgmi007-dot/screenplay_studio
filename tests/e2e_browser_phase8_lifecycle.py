@@ -21,7 +21,7 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, launch, start_studio
+from e2e_browser_common import Checks, launch, note, start_studio
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -78,7 +78,13 @@ def run(base):
         # running window must show the chip if the run is still in flight
         running_seen = chip.is_visible()
         if running_seen:
-            check("running: progress chip on the desk", True)
+            # A RACE, not a contract: on a fast demo run the analysis finishes
+            # inside the 800 ms poll and the chip is legitimately gone, so this
+            # branch may not be taken at all. `check(name, True)` asserted
+            # nothing while claiming the chip was on the desk; asserting it for
+            # real would be flaky. Note it, and let the real checks below run
+            # only when the chip was actually caught.
+            note("running: progress chip caught on the desk")
             pct_txt = chip.locator(".ap-pct").inner_text()
             check("running: percentage renders", pct_txt.strip().endswith("%"), pct_txt)
             check("running: popover available on hover",

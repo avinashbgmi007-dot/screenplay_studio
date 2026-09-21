@@ -615,6 +615,20 @@ skip, 2 known-broken) — no frontend file was touched.
 
 **Still open, and none of it destructive or exploitable:** R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs) and **T1e** (the 21 remaining vacuous browser checks, all classified by class in the tracker's §T3b — 9 backed by something that can fail, 6 diagnostic dumps, 3 timing/nothing-conditional, 3 in the gate-excluded `gun_pen_audit`).
 
+> **Superseded 2026-09-21 (pass 10). T1e is CLOSED.** All 21 are fixed and mutation-verified
+> **6/6**, and the sweep that found them now returns **0**. The conversions assert the half of
+> each check's *name* that the throwing wait never covered (the editor is blank; the scene page
+> has rendered text; the modal is *armed*; the drawer is open; the chip is *positioned*; the
+> bubble echoes the sent text; the ghosted mark's colour is not `--danger`). The gate's browser
+> total went **660 → 650** — **down**, because 11 checks that asserted nothing are deleted and 9
+> that asserted nothing became checks that can fail. Two more crash-shaped failure modes were
+> found by the mutations and fixed. Separately, the gate surfaced an **intermittent
+> `library_delete` failure** (not caused by this pass) whose two candidate causes — a 5 s poll
+> budget, or a `shutil.rmtree(..., ignore_errors=False)` returning 500 on Windows `WinError 32`
+> — are now distinguishable in the check's own detail; the `rmtree` retry is a production change
+> left **open** rather than shipped unverified. See the tracker's pass-10 section and
+> open-items table.
+
 **Closed in pass 7 (the three owner decisions):** **R6** — decided **private**, so the artifact is a proprietary `LICENSE` (no rights granted, scoped so it does not appear to cover third-party dependencies) plus a `CHANGELOG.md`; both in `MANIFEST.in`. **R7b** — decided **lock it**: `requirements.lock.txt` pins the whole declared closure (32 packages) and CI installs with it as a **constraints** file (`-c`), which is the correct shape here because the lock is derived on Windows/3.13 while CI runs ubuntu-24.04/3.12. Five guards, **mutation-verified 7/7**, including the anti-decoration check that CI actually applies it. **BE-M3** — decided **not required**; recorded as accepted-as-is with the fix shape (CAS retry loop, never two `lock_for` locks) so it is not re-litigated. Also fixed, while doing R7b, **three stale doc claims** this report's §4 had flagged as drifting (`ARCHITECTURE.md`, `DEVELOPMENT.md`, `NOTES.md` all asserted "there is no `pyproject.toml`").
 
 **Closed in pass 3:** **T1** — all four vacuous browser checks rewritten as real assertions and mutation-verified 4/4; the honest browser-check count is now **476 total, all failable** (was 472 failable of 476).

@@ -31,7 +31,8 @@ import zipfile
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, launch, start_studio
+from e2e_browser_common import (Checks, clicked, filled, launch, note,
+                                seen_visible, start_studio)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 checks = Checks()
@@ -56,8 +57,14 @@ def run(base):
 
         # ================= 2. IDEA -> WRITE =================
         page.locator("#new-idea-btn").click()
-        page.wait_for_selector("#idea-content", state="visible", timeout=8000)
-        check("idea: blank page opens (writing-first)", True)
+        # "blank page opens (writing-first)" promises TWO things the throwing wait
+        # never checked: that the editor opened, AND that it is BLANK — the
+        # writing-first contract is a fresh empty page, not a prefilled one. The
+        # old `check(name, True)` earned neither, and a failure was a crash.
+        ok = seen_visible(page, "#idea-content", timeout=8000)
+        blank = (page.locator("#idea-content").input_value() or "").strip() == ""
+        check("idea: blank page opens (writing-first)", ok and blank,
+              f"visible={ok} blank={blank}")
         page.locator("#idea-content").fill(
             "A courier story about regret. The last package is a letter she wrote to herself.")
         page.wait_for_selector("#idea-save-state:not(:empty)", timeout=8000)
@@ -71,8 +78,14 @@ def run(base):
               "open" in (page.locator("#room-drawer").get_attribute("class") or ""))
         page.locator("#input").fill("What's missing from this premise?")
         page.locator("#input").press("Enter")
-        page.wait_for_selector(".msg.assistant:not(.msg-pending)", timeout=20000)
-        check("sameer: one streamed turn answers", True)
+        # "one streamed turn ANSWERS" — so assert the answer is a real one: the
+        # turn landed AND its text is substantive (not an empty bubble, not the
+        # unreachable-model copy). The throwing wait only proved a bubble existed.
+        ok = seen_visible(page, ".msg.assistant:not(.msg-pending)", timeout=20000)
+        answer = page.locator(".msg.assistant:not(.msg-pending)").last.inner_text().strip()
+        check("sameer: one streamed turn answers",
+              ok and len(answer) > 40 and "couldn't be reached" not in answer,
+              f"visible={ok} chars={len(answer)} head={answer[:60]!r}")
         page.locator("#drawer-close").click()   # proven dismiss (not Escape —
         page.wait_for_timeout(500)              # the chat consumes it)
 
@@ -106,8 +119,14 @@ def run(base):
             page.locator("#idea-file-input").set_input_files(
                 {"name": "pain.fountain", "mimeType": "text/plain",
                  "buffer": f.read()})
-        page.wait_for_selector("#manuscript-container .scene-page", timeout=25000)
-        check("script: idea graduates into a script on the desk", True)
+        # "idea GRADUATES INTO A SCRIPT on the desk" — assert the scene page has
+        # real rendered text, so an empty manuscript shell cannot pass. The
+        # throwing wait only proved a `.scene-page` element appeared.
+        ok = seen_visible(page, "#manuscript-container .scene-page", timeout=25000)
+        first_page = page.locator("#manuscript-container .scene-page").first.inner_text().strip()
+        check("script: idea graduates into a script on the desk",
+              ok and len(first_page) > 20,
+              f"visible={ok} firstPageChars={len(first_page)}")
         check("script: project bar shows the title",
               page.locator("#project-title").inner_text().strip() not in ("", "—"))
 
@@ -133,7 +152,14 @@ def run(base):
         chip = page.locator("#desk-analyze-progress")
         running_seen = chip.is_visible()
         if running_seen:
-            check("progress: chip live on the desk", True)
+            # The chip being visible is a RACE with the demo model, not a
+            # contract: on a fast run the whole analysis finishes inside the
+            # 800 ms poll and the chip is legitimately gone. `check(name, True)`
+            # claimed the chip was "live on the desk" while asserting nothing,
+            # and asserting it for real would be flaky — the `library_delete`
+            # trap in reverse. So it is a note; the real checks below run only
+            # when the chip was actually caught.
+            note("progress: chip caught live on the desk")
             pct = chip.locator(".ap-pct").inner_text()
             check("progress: percentage renders", pct.strip().endswith("%"), pct)
         deadline = time.time() + 300
@@ -203,20 +229,37 @@ def run(base):
         # only fires in cowrite/feedback)
         page.evaluate("() => openScriptView()")
         page.wait_for_timeout(800)
-        note = page.locator("#manuscript-container .finding-note").first
-        note.locator("button", has_text="Rewrite").click()
-        page.wait_for_selector("#rewrite-modal", state="visible", timeout=5000)
-        check("inline edit: rewrite modal opens from the finding card", True)
-        page.locator("#rewrite-generate").click()
-        page.wait_for_selector("#rewrite-candidates .rewrite-candidate", timeout=30000)
+        # NOTE: `note` is the imported diagnostic helper — do NOT shadow it with a
+        # locator, or Python makes `note` local for the whole function and the
+        # earlier `note(...)` call raises UnboundLocalError (ruff F823 caught it).
+        note_el = page.locator("#manuscript-container .finding-note").first
+        note_el.locator("button", has_text="Rewrite").click()
+        # "rewrite modal OPENS FROM THE FINDING CARD" — assert it opened AND is
+        # armed (its generate control exists), so an empty modal shell cannot
+        # pass. The throwing wait proved only that the element became visible.
+        ok = seen_visible(page, "#rewrite-modal", timeout=5000)
+        # is_visible, not count()>0: PRESENCE is satisfied by a hidden button, so a
+        # modal that opened as an empty shell would still pass. This is the half of
+        # the claim the throwing wait never covered.
+        armed = page.locator("#rewrite-generate").is_visible()
+        check("inline edit: rewrite modal opens from the finding card", ok and armed,
+              f"modalVisible={ok} generateVisible={armed}")
+        # Bounded follow-on actions. With the modal unarmed, the old code walked
+        # straight into `page.locator("#rewrite-generate").click()`, which TIMES
+        # OUT and aborts the run — so the named failure above never printed and
+        # every later check was masked. Mutation-verified.
+        gen_clicked = clicked(page, "#rewrite-generate")
+        cands_seen = gen_clicked and seen_visible(
+            page, "#rewrite-candidates .rewrite-candidate", timeout=30000)
         cand = page.locator("#rewrite-candidates .rewrite-candidate")
         check("inline edit: the model proposes a targeted change",
-              cand.count() > 0, f"candidates={cand.count()}")
-        page.locator("#rewrite-apply").click()
+              cands_seen and cand.count() > 0,
+              f"generateClicked={gen_clicked} candidates={cand.count()}")
+        apply_clicked = clicked(page, "#rewrite-apply")
         page.wait_for_timeout(2500)
         demo_line = page.locator("#manuscript-container", has_text="[demo] The line lands quieter")
         check("inline edit: the change lands in the manuscript",
-              demo_line.count() > 0)
+              apply_clicked and demo_line.count() > 0, f"applyClicked={apply_clicked}")
         # keyboard parity: Ctrl+Z unwinds, Ctrl+Shift+Z restores
         page.keyboard.press("Control+z")
         page.wait_for_timeout(1800)
@@ -231,14 +274,25 @@ def run(base):
             ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
         check("redo: Ctrl+Shift+Z restores it", back)
 
+        if not armed:
+            # An armed-modal failure leaves the modal OPEN, and an open overlay
+            # intercepts every later click — so the rest of the journey would die
+            # on a click timeout instead of reporting. Close it and carry on.
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+
         # ================= 13. NOTES (margin) =================
         page.evaluate("() => openDock('notes')")
         page.wait_for_timeout(500)
-        page.locator("#dock-note-input").fill("journey: pin this thought")
-        page.locator("#dock-note-form button[type=submit]").click()
+        # Bounded: if the dock never opened (an overlay still up, a failed prior
+        # step), an unguarded fill()/click() times out and ABORTS the run —
+        # masking every later check. Mutation-verified via the un-armed modal.
+        typed = filled(page, "#dock-note-input", "journey: pin this thought")
+        submitted = typed and clicked(page, "#dock-note-form button[type=submit]")
         page.wait_for_timeout(900)
         check("notes: margin note pins into the rail",
-              page.locator("#rail-notes .rail-note").count() > 0)
+              submitted and page.locator("#rail-notes .rail-note").count() > 0,
+              f"typed={typed} submitted={submitted}")
         page.keyboard.press("Escape")
         page.wait_for_timeout(400)
 

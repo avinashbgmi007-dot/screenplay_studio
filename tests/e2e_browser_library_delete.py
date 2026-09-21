@@ -18,6 +18,7 @@ Run:  python tests/e2e_browser_library_delete.py   (boots its own demo studio;
 Needs: pip install playwright && python -m playwright install chromium
 """
 import os
+import time
 
 import requests
 from playwright.sync_api import sync_playwright
@@ -93,13 +94,30 @@ def run(base):
         second.hover()
         second.locator(".project-delete").click()
         # judge the source of truth first: the disk must be empty
-        remaining = None
-        for _ in range(20):
-            remaining = requests.get(f"{base}/api/projects", timeout=15).json()
+        #
+        # BUDGET, not iterations. The old loop allowed 20 x 250 ms = 5 s, and this
+        # is the check that has flaked TWICE in the gate (pass 3, and again in
+        # pass 10 — 30/31 suites green, this the only failure, then 3/3 standalone).
+        # Two causes are possible and the old detail could not tell them apart, so
+        # it now reports which:
+        #   * the removal is merely SLOW under gate load — a project dir is
+        #     O(files) to delete and 33 suites run back-to-back, or
+        #   * the server returned an ERROR. `delete_project` calls
+        #     `shutil.rmtree(..., ignore_errors=False)` with NO retry, and on
+        #     Windows that raises WinError 32 whenever any handle is still open —
+        #     which surfaces as a 500 and leaves the row in place.
+        # The status code makes the next occurrence self-diagnosing.
+        deadline = time.time() + 30
+        remaining, status = None, None
+        while time.time() < deadline:
+            resp = requests.get(f"{base}/api/projects", timeout=15)
+            status = resp.status_code
+            remaining = resp.json() if status == 200 else remaining
             if not remaining:
                 break
             page.wait_for_timeout(250)
-        check("shelf delete emptied the disk", not remaining, f"{remaining}")
+        check("shelf delete emptied the disk", not remaining,
+              f"after 30s: status={status} remaining={remaining}")
         page.hover("#library-trigger")        # peek into Your library again
         # Poll instead of wait_for_selector: the flyout re-render can lag on a
         # loaded machine (this suite timed out once inside the 32-suite gate and
@@ -108,7 +126,12 @@ def run(base):
         # -- it used to be a hardcoded True behind that wait, so the ghost-entry
         # guarantee was never actually asserted.
         empty_hints, rows = 0, 0
-        for _ in range(30):
+        # Same budget reasoning as above — and this check DEPENDS on it: if the
+        # shelf delete did not land, the library legitimately still has a row, so
+        # this fails as a CONSEQUENCE rather than as an independent defect. Both
+        # are real failures; the status code above says which came first.
+        deadline = time.time() + 30
+        while time.time() < deadline:
             empty_hints = page.locator("#library-list .empty-hint").count()
             rows = page.locator("#library-list .idea-item").count()
             if empty_hints and not rows:

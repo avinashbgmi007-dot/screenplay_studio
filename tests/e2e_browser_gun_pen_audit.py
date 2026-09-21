@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)  # for screenplay_studio / screenplay_cowriter imports
-from e2e_browser_common import Checks, launch, studio_headers  # noqa: E402
+from e2e_browser_common import Checks, launch, note, studio_headers  # noqa: E402
 
 BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8500").rstrip("/")
 PROJECT = os.environ.get("GUNPEN_PROJECT", "gun_pen_2")
@@ -248,8 +248,12 @@ def step_matrix():
                 f"{label!r} absent from: {titles_join[:140]}")
         # principles + setup_payoff — the plan's split-matrix rows
         row_a.append(("principles", "Principles" in titles_join))
-        check("A/principles: section present (or honestly absent)",
-              True, "principles produced no findings on this script")
+        # The row above already records the truth. `check(name, True, "principles
+        # produced no findings on this script")` asserted nothing and its detail
+        # was never printed (Checks.ok prints detail on FAILURE only), so it was
+        # an invisible no-op that inflated the passed count.
+        note("A/principles: section present (or honestly absent)",
+             f"Principles in titles={row_a[-1][1]}")
         RESULTS["row_a"] = row_a
 
         # per-category screenshot: scroll the section into view.
@@ -307,8 +311,11 @@ def step_matrix():
         # -- orientation surfaces -------------------------------------------
         check("C: script ruler renders (diagnostic weight by scene)",
               lens.locator(".dock-ruler-track").count() > 0)
-        check("C: setup/payoff spine renders (or absent honestly)",
-              lens.locator(".dock-sp-spine").count() >= 0)
+        # A census, not an invariant: the spine may legitimately be absent, so
+        # `count() >= 0` was a tautology dressed as a render check. The count is
+        # the payload — print it.
+        note("C: setup/payoff spine",
+             f"{lens.locator('.dock-sp-spine').count()} spine element(s)")
 
         # -- row B: report-section panels ------------------------------------
         craft_titles = lens.locator(".dock-craft .craft-panel-title").all_inner_texts()
@@ -719,8 +726,35 @@ def step_pass2():
                 f"same_input={after.get('same_input')} arrival last_total={after['last_total']} "
                 f"vs report findings={rep_n}")
             ghosted = strip.locator(".dock-ghosted-summary").count()
-            check("pass2: ghosted marks render honestly (never red)",
-                  ghosted >= 0, f"{ghosted} ghosted block(s)")
+            # app.js states the contract at its render site: "ghosted: the
+            # writer's marks that transformed — muted, expandable, never red" —
+            # and it renders the block only `if (ghosted.length)`. So `>= 0`
+            # asserted neither half: it is true when there are zero ghosted
+            # marks, which is precisely when nothing renders at all. Assert the
+            # COLOUR, which is the actual claim.
+            #
+            # The danger token is resolved THROUGH the browser so both sides are
+            # in the same `rgb()` form — comparing `getComputedStyle().color`
+            # against the raw `--danger` string would differ by format alone and
+            # be vacuous again.
+            if ghosted:
+                gcol = strip.locator(".dock-ghosted-summary").first.evaluate(
+                    "el => getComputedStyle(el).color")
+                dcol = page.evaluate(
+                    """() => {
+                      const probe = document.createElement('span');
+                      probe.style.color = 'var(--danger)';
+                      document.body.appendChild(probe);
+                      const c = getComputedStyle(probe).color;
+                      probe.remove();
+                      return c;
+                    }""")
+                check("pass2: ghosted marks render honestly (never red)",
+                      bool(dcol) and gcol != dcol,
+                      f"ghosted={ghosted} colour={gcol} danger={dcol}")
+            else:
+                note("pass2: ghosted marks not rendered",
+                     "no moved marks on this run — 'never red' was NOT exercised")
             # GAP-7: a force re-analysis with no re-parse reads the SAME script,
             # so every id that moved is the model re-wording its own sentence (the
             # no-quote tier hashes model prose). The arithmetic must not dress that

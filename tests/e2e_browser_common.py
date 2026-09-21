@@ -68,6 +68,64 @@ class Checks:
         sys.exit(1 if self.failed else 0)
 
 
+def seen_visible(target, selector=None, timeout=8000):
+    """Bounded poll: True if the target becomes visible within `timeout`.
+
+    Never raises. This is the T1c shape. A throwing `wait_for_selector` followed
+    by `check(name, True)` does enforce the guarantee — but it reports a failure
+    as a CRASH, and a crash aborts the run and masks every later check (pass 9:
+    that is how four of six preview worlds hid behind one). Poll, then assert:
+
+        ok = seen_visible(page, "#idea-content")
+        check("idea: blank page opens", ok and blank, f"visible={ok} blank={blank}")
+
+    `target` is a Page (pass `selector`) or a Locator — the latter for a
+    `.last` / `.first` target, which a bare selector cannot express:
+
+        ok = seen_visible(page.locator(".msg.user").last, timeout=10000)
+    """
+    try:
+        if selector is None:
+            target.wait_for(state="visible", timeout=timeout)
+        else:
+            target.wait_for_selector(selector, state="visible", timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def clicked(target, selector=None, timeout=4000):
+    """Bounded click: True if the click landed, False if it never could.
+
+    Never raises. Same reasoning as `seen_visible`: once a precondition has
+    failed, an unguarded `locator(...).click()` waits out its timeout and RAISES
+    — aborting the run and masking every later check (pass 9). A click that could
+    not happen is a fact to assert, not a crash.
+
+        if not clicked(page, "#rewrite-generate"):
+            check("inline edit: the rewrite section was exercised", False, "...")
+    """
+    try:
+        if selector is None:
+            target.click(timeout=timeout)
+        else:
+            target.locator(selector).click(timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def note(label, value=""):
+    """Print a diagnostic that is deliberately NOT a check.
+
+    `check(name, True, detail)` is worse than a no-op: it inflates the passed
+    count, and `Checks.ok` prints `detail` only on FAILURE — so on a green run
+    the payload is invisible *and* nothing was asserted. Diagnostics belong in
+    stdout, where they are actually readable, not in the count.
+    """
+    print(f"  NOTE  {label}" + (f"  [{value}]" if value else ""))
+
+
 # ---------- studio boot ------------------------------------------------------
 
 def free_port():
@@ -314,18 +372,56 @@ def assert_no_js_errors(checks, errors, name="no JS page errors"):
 # ---------- chat helpers -------------------------------------------------------
 
 def last_reply(page):
-    """Text of the most recent finished assistant bubble."""
-    return page.locator(".msg.assistant .msg-bubble").last.inner_text().strip()
+    """Text of the most recent finished assistant bubble, or "" if there is none.
+
+    Bounded and never raises. After a failed send there IS no assistant bubble, and
+    `.last.inner_text()` on a missing locator waits out its timeout and RAISES —
+    aborting the run and masking every later check. An absent reply is a fact for
+    the reply checks to assert, not a crash (mutation-verified: with the
+    drawer-open class removed, this raised and killed the suite before its summary).
+    """
+    try:
+        return page.locator(".msg.assistant .msg-bubble").last.inner_text(
+            timeout=8000).strip()
+    except Exception:
+        return ""
+
+
+def filled(target, selector, text, timeout=8000):
+    """Bounded fill: True if the text landed, False if the field was unreachable.
+
+    Same reasoning as `clicked`: an unreachable field is a precondition failure to
+    assert by name, not a `fill()` timeout that aborts the run.
+    """
+    try:
+        if selector is None:
+            target.fill(text, timeout=timeout)
+        else:
+            target.locator(selector).fill(text, timeout=timeout)
+        return True
+    except Exception:
+        return False
 
 
 def send_chat(page, text):
-    """Type into the Sameer composer and hit Send.
+    """Type into the Sameer composer and hit Send. Returns True if the turn was
+    sent, False if the composer was never usable.
+
+    BOUNDED and never raises. A hidden composer means an earlier precondition
+    failed (e.g. the room drawer never opened, so the pane carrying #input is
+    display:none) — and an unguarded `fill()` waits out its timeout and RAISES,
+    aborting the run and masking every later check. Mutation-verified: with the
+    drawer-open class removed, the old body died in `fill()` and the named
+    failure above it never printed (pass 9's lesson, re-proved).
 
     exact=True still matters even though the off-canvas #sameer-send panel is gone
     (H3): the composer's own button is named exactly "Send", and any future control
     whose accessible name merely CONTAINS "Send" would make a substring match
     resolve to two buttons, which strict mode refuses.
     """
-    box = page.locator("#input")
-    box.fill(text)
-    page.get_by_role("button", name="Send", exact=True).click()
+    try:
+        page.locator("#input").fill(text, timeout=8000)
+        page.get_by_role("button", name="Send", exact=True).click(timeout=8000)
+        return True
+    except Exception:
+        return False

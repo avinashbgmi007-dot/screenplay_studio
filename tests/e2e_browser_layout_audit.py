@@ -18,7 +18,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from e2e_browser_common import Checks, open_studio  # noqa: E402
+from e2e_browser_common import Checks, note, open_studio  # noqa: E402
 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
@@ -211,9 +211,12 @@ def main():
                                   over_w <= 0 and over_h <= 0,
                                   f"w+{over_w} h+{over_h}")
                     else:
-                        # scrollable panes may legitimately scroll; census only
-                        CHECKS.ok(f"scroll census: {sel}", True,
-                                  f"w+{over_w} h+{over_h}")
+                        # Scrollable panes may legitimately scroll, so there is no
+                        # invariant to assert — this is a census, not a check. It
+                        # used to be `CHECKS.ok(..., True, f"w+{over_w} h+{over_h}")`,
+                        # whose detail prints only on FAILURE: the census was
+                        # invisible on every green run. note() actually prints it.
+                        note(f"scroll census: {sel}", f"w+{over_w} h+{over_h}")
 
             # ---- 8. workspace surfaces (open first project) -----------------
             cards = page.locator("#dash-grid .dash-card")
@@ -314,7 +317,15 @@ def main():
                               f"active={after['active']} dockOpen={after['dock']}")
                     page.evaluate("() => { if (typeof closeDock === 'function') closeDock(); }")
                 elif loop and loop.get("skipped"):
-                    CHECKS.ok("fix loop skips cleanly with no findings", True)
+                    # The project has no findings, so the loop has nothing to step
+                    # through. This branch used to record
+                    # `CHECKS.ok("fix loop skips cleanly with no findings", True)` —
+                    # vacuously true by construction (a "skips cleanly" claim is
+                    # satisfied by never entering), so it asserted nothing while
+                    # hiding a COVERAGE GAP: the engage + Esc contract above is only
+                    # exercised on a project that HAS findings. A note, not a check.
+                    note("fix loop not exercised",
+                         "no findings on this project — engage/Esc contract untested")
 
             CHECKS.ok("no JS page errors", len(errors) == 0,
                       "; ".join(errors[:3]))
