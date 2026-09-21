@@ -193,6 +193,22 @@ whose default filter already admits every severity the widen is a **no-op**, so 
 `widen_filter` now returns what it toggled — read from the chips' own `aria-pressed`, not guessed from
 a card count — and the suite **says so** when it did nothing, instead of passing quietly.
 
+### And the gate itself was flaky by construction
+
+Re-running the 34-suite browser gate after the shared-harness change came back
+`34 suites: 32 passed, 1 failed, 1 skipped` — with the failure being:
+
+```
+ERROR   smoke   Page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:2049/
+```
+
+Nothing to do with the change. `free_port()` picked a random free ephemeral port, and **Chromium
+refuses to navigate to a list of ports it considers unsafe for the web** (2049 is the NFS port). The
+port was free and unusable, and the suite died with a message that reads like a broken product.
+`free_port()` now draws until it gets a port that is free **and** not on Chromium's blocked list —
+200 draws verified safe. Same failure shape as everything else in this pass: **a harness accident
+wearing the costume of a product defect.**
+
 ### Verified
 The full suite now runs to completion against the live model: **`51 passed, 0 failed, 0 gaps filed`**
 (was `41 passed, 1 failed, 2 gaps`), with **zero `safe-delete` events** in the studio log — removing

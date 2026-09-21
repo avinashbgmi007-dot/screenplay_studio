@@ -152,12 +152,43 @@ def note(label, value=""):
 
 # ---------- studio boot ------------------------------------------------------
 
+# Chromium refuses to NAVIGATE to a list of ports it considers unsafe for the web
+# (`net/base/port_util.cc`). `free_port` below picks a random free port, and when
+# it lands on one of these the suite dies with
+#
+#     Page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:2049/
+#
+# which reads exactly like a broken product and is really an unlucky draw.
+# Measured: the `smoke` suite failed the whole 34-suite gate that way, on port
+# 2049. The overlap with the ephemeral range is small but real — 2049, 3659, 4045,
+# 5060, 6000, 6566, 6697, 10080 and the 6665-6669 block all sit in or near it.
+_CHROMIUM_BLOCKED_PORTS = frozenset({
+    1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79,
+    87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137,
+    139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+    540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723,
+    2049, 3659, 4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697,
+    10080,
+})
+
+
 def free_port():
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
+    """A free port Chromium will actually navigate to.
+
+    The port must be free AND not on Chromium's blocked list — a plain
+    `bind(("127.0.0.1", 0))` satisfies only the first, and the second failure
+    mode looks like a product bug rather than a harness accident.
+    """
+    for _ in range(50):
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        finally:
+            s.close()
+        if port not in _CHROMIUM_BLOCKED_PORTS:
+            return port
+    raise RuntimeError("no Chromium-safe free port found in 50 attempts")
 
 
 _TOKEN_CACHE = {}

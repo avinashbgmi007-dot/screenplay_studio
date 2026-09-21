@@ -217,12 +217,22 @@ Measured 2026-09-21 (pass 14b). Two different shapes, one cause:
    guarantee (no poller can read the old `done`) with nothing for an environment to refuse. The
    pre-flight also returns a clear JSON 500 if anything else in it fails
    (`tests/test_analyze_preflight.py`).
-2. **The same hook aborts ordinary tests with `SystemExit: 1`.** It is a `BaseException`, so it is
-   *not* a test failure — it is the environment stopping the process, and it lands on any test that
-   builds or deletes. Measured: a full run reported
+2. **The same hook aborts ordinary tests with `SystemExit: 1` — and it is not the OS sandbox.**
+   It is a `BaseException`, so it is *not* a test failure: it is the environment stopping the
+   process, and it lands on any test that builds or deletes. Measured: a full run reported
    `ERROR test_sdist_ships_the_data_files` and `FAILURE test_entity_scope_map_resolves_relative_projects_dir`,
    both `SystemExit: 1`; run in isolation the first **skips** (no `setuptools`) and the second
-   **passes**. It also killed a session during teardown so the failure summary was never written.
+   **passes**.
+
+   **This is reproducible, not flaky, and the full suite therefore cannot complete in this session.**
+   The hook carries a cumulative counter with `threshold: 50` and it reached `count: 14755`, so it
+   fires every run once the suite has churned enough temp files — and the run gets *worse* with the
+   OS sandbox disabled (`1 error` → `5 errors`), because the hook is not the OS sandbox. Treat a
+   full-suite red here as unread until each failure is re-run **in isolation**; a `SystemExit`
+   failure that passes or skips alone is the environment, not the code.
+
+   It also killed a session during teardown, so the failure summary was never written — which is why
+   results should be captured with `--junitxml` rather than read off stdout.
 
 Read `RemoteDisconnected` carefully, because it is a **specific** signal: a Flask dev server converts
 an unhandled **`Exception`** into a **500**, and closes the connection with no reply only for a
@@ -243,4 +253,9 @@ So:
 - When a harness goes silent, ask it for its stack (`pip install py-spy; py-spy dump --pid <pid>`)
   rather than inferring from sockets. `netstat` sent this pass chasing two wrong theories before one
   stack dump named the line.
+- **A free port is not necessarily a usable one.** The suite helper draws a random ephemeral port,
+  and Chromium refuses to navigate to a list of ports it deems unsafe for the web — the gate went red
+  once with `Page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:2049/`, which reads like a broken
+  product and was an unlucky draw. `e2e_browser_common.free_port()` now skips Chromium's blocked
+  list. If a suite dies on `ERR_UNSAFE_PORT`, that is the harness, not the app.
 
