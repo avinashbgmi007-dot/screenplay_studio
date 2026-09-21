@@ -7,8 +7,8 @@ without re-deriving it from `git log`. Source audit:
 **Last updated:** 2026-09-21 (pass 9 — the two "known-broken" browser suites are
 repaired and `KNOWN_BROKEN` is now **empty**; repairing them found four real
 defects that a crash had been hiding)
-**HEAD:** `f36e039` (pass 8's tracker stamp) — **pushed**; `git ls-remote origin main`
-agrees. This pass's commit hash is stamped at the bottom.
+**HEAD:** `3761747` (pass 9's work commit) — **pushed**; `git ls-remote origin main`
+agrees. The tracker-stamp commit that follows it carries the same content.
 **Baseline for this pass:** `f36e039`
 
 ---
