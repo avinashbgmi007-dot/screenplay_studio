@@ -14,6 +14,7 @@ Then open http://localhost:8500 in a browser.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -85,6 +86,60 @@ def _harden_spa_document(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "no-referrer"
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Cache-bust tokens (F5).
+#
+# index.html asks for its assets as `app.js?v=<token>`. The token used to be
+# hand-maintained, which meant a forgotten bump shipped a stale sheet — and a
+# forgotten bump is invisible, because the page still loads. The guard meant to
+# catch it matched one of the four token shapes, so it did not catch anything.
+#
+# The token is now the asset's own content hash, stamped in when the document is
+# served. If a file changes, its URL changes, with no build step and no human
+# step. `Cache-Control: no-cache` remains the primary mechanism (it forces
+# revalidation); this is the belt to that braces, and it is now a real one.
+# ---------------------------------------------------------------------------
+_ASSET_VERSION_RE = re.compile(
+    r"(?P<asset>[A-Za-z0-9_/-]+\.(?:js|css))\?v=[A-Za-z0-9._-]+"
+)
+
+
+def _asset_version(filename: str) -> str:
+    """The cache-bust token for one asset: the hash of its bytes.
+
+    Cost is a read per page load (the SPA's four assets total ~500KB, a few ms),
+    paid once per document rather than per request for a resource — so it is
+    left uncached rather than carrying an invalidation bug of its own.
+    """
+    if ".." in filename:  # the regex charset allows `.`; never leave the dir
+        return "0"
+    try:
+        with open(os.path.join(WEBAPP_DIR, filename), "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()[:10]
+    except OSError:
+        return "0"
+
+
+def _stamp_asset_versions(resp):
+    """Rewrite every `?v=` in a served SPA document to the asset's hash."""
+    if resp.status_code != 200:
+        return resp  # a 304 carries no body to rewrite
+    if resp.direct_passthrough:  # send_from_directory streams the file
+        resp.direct_passthrough = False
+    body = resp.get_data(as_text=True)
+    stamped = _ASSET_VERSION_RE.sub(
+        lambda m: f"{m.group('asset')}?v={_asset_version(m.group('asset'))}", body
+    )
+    if stamped != body:
+        resp.set_data(stamped)
+    return resp
+
+
+def _serve_spa_document(resp):
+    """Everything the SPA document needs on the way out: headers + real tokens."""
+    return _stamp_asset_versions(_harden_spa_document(resp))
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +341,7 @@ def index():
         # SameSite=Strict so a foreign page's request never carries it; the SPA
         # reads it and echoes it back as the X-Studio-Token header.
         resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
-    return _harden_spa_document(resp)
+    return _serve_spa_document(resp)
 
 
 @app.route("/<path:filename>")
@@ -299,7 +354,7 @@ def static_files(filename):
     # and only there: the preview-* design labs are separate documents with
     # their own inline scripts and are deliberately left alone.
     if filename == "index.html":
-        _harden_spa_document(resp)
+        _serve_spa_document(resp)
     return resp
 
 

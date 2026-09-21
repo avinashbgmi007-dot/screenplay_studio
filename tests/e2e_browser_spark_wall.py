@@ -8,7 +8,7 @@ This suite now asserts the decor is GONE while the functional mounts
 
 Walks the shipped surfaces in a real Chromium:
 
-  0. fresh assets      -> hx1b10x actually served (cache lie detector)
+  0. fresh assets      -> each token IS its asset's content hash (cache lie detector)
   1. new DOM at boot   -> #flow-btn, .dawn-wash, #river-current (decor ABSENT)
   2. the idea page     -> writing-first: no ambience, pill, graduate text
   3. chips contract    -> SVG icons; collapse to icons on first input, un-collapse on clear
@@ -23,9 +23,12 @@ otherwise boots a private throwaway studio.
 
 Run:  python tests/e2e_browser_spark_wall.py
 """
+import hashlib
 import json
 import os
+import re
 import sys
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio  # noqa: E402
@@ -44,21 +47,29 @@ def main():
         os.makedirs("preview_shots", exist_ok=True)
 
         # ---- 0. fresh assets: the cache lie detector -----------------------
+        # Each asset URL's token must be that asset's CONTENT HASH, verified
+        # against a hash computed here over the bytes the server actually sends
+        # — never against the server's own helper. A hand-maintained token
+        # nobody bumped passes a shape check and fails this one. (Finding F5:
+        # the previous guard matched one of the four token shapes and asserted
+        # nothing at all about the other three.)
         page.goto(base, wait_until="networkidle")
         page.wait_for_timeout(600)
-        assets = page.evaluate("""async () => {
-            const html = await (await fetch('/', {cache: 'reload'})).text();
-            return {
-                htmlBust: /v=hx1b1\\d\\d/.test(html),
-                cssLink: (html.match(/style\\.css\\?v=([a-z0-9]+)/) || [])[1] || null,
-                noAmbience: !html.includes('spark-ambience'),
-                hasFlowBtn: html.includes('flow-btn'),
-            };
-        }""")
-        c.check("index.html serves the hx1b10x cache-bust", assets["htmlBust"],
-                json.dumps(assets))
-        c.check("Phase 9: index.html no longer ships spark-ambience markup", assets["noAmbience"])
-        c.check("index.html ships the flow button", assets["hasFlowBtn"])
+        html = page.evaluate("async () => await (await fetch('/', {cache: 'reload'})).text()")
+        tokens = dict(re.findall(
+            r"([A-Za-z0-9_/-]+\.(?:js|css))\?v=([A-Za-z0-9._-]+)", html))
+        for asset in ("style.css", "tungsten.css", "core.js", "app.js"):
+            with urllib.request.urlopen(f"{base}/{asset}", timeout=30) as r:
+                served = r.read()
+            want = hashlib.sha256(served).hexdigest()[:10]
+            c.check(f"{asset} is served under its own content hash",
+                    tokens.get(asset) == want,
+                    f"token={tokens.get(asset)} content-hash={want}")
+        c.check("the assets do not all share one token",
+                len(set(tokens.values())) == len(tokens), json.dumps(tokens))
+        c.check("Phase 9: index.html no longer ships spark-ambience markup",
+                "spark-ambience" not in html)
+        c.check("index.html ships the flow button", "flow-btn" in html)
 
         # ---- 1. new DOM at boot --------------------------------------------
         boot = page.evaluate("""() => ({

@@ -123,7 +123,7 @@ They agree only inside the BMP. The comment directly above the JS (`app.js:5484-
 
 ---
 
-### 🟠 FE-H2 (HIGH) — The cache-bust guard no longer covers `app.js`
+### ✅ FE-H2 (HIGH) — CLOSED 2026-09-21 — the cache-bust guard was vacuous (it matched one of four token shapes)
 
 `tests/e2e_browser_spark_wall.py:52` asserts:
 ```python
@@ -133,7 +133,8 @@ But the shipped tokens have moved on: `index.html:12` → `style.css?v=hx1b397`,
 
 **Blast radius.** The guard that is supposed to guarantee a writer never receives a stale SPA is now vacuous for the one asset that carries all the behaviour. A stale `app.js` in a browser cache becomes possible and undetected.
 **Confidence:** ✅ executed + code-verified.
-**Fix direction:** assert each asset's token explicitly and require all three to share one token (or derive the expected token from a single source).
+
+**Closed.** Widening the regex would have fixed the symptom; the cause is that a token nobody can be forced to bump is not a guarantee. `webapp_server._stamp_asset_versions` now rewrites every `?v=` in the served document to the asset's own content hash (`_asset_version`, sha256[:10]), so **editing a file invalidates its URL with no human step** — no build step, no discipline. Both guards now assert the token equals a hash computed independently from the bytes the server actually sends: `tests/test_asset_cache_bust.py` (5 checks, no browser, runs in CI) and the rewritten step 0 of `e2e_browser_spark_wall.py`. Mutation-verified: making the stamping a no-op turns the pytest guard red and the browser guard's four asset checks red — with the failure output being the exact pre-fix tokens (`hx1b397`, `ht4`, `hx1b114`, `hx1b390`). `Cache-Control: no-cache` remains the primary mechanism; this is the belt to that braces.
 
 ---
 
@@ -402,18 +403,22 @@ Things I got wrong, or could not establish, stated plainly:
 
 ---
 
-## 8. Recommended sequence (no code written — awaiting your go)
+## 8. Recommended sequence — and where it stands
 
-| # | Action | Why first |
-|---|---|---|
-| 1 | **Fix the XSS** — one `escapeHtml()` at every interpolating sink, then a browser check that a `<script>`-bearing finding renders inert | It is the root of the only CRITICAL chain; nothing else security-wise matters until it is closed |
-| 2 | **Fix wheel packaging** — `package-data` / `MANIFEST.in` + a packaging test asserting ≥26 rule files and `app.js` in the wheel | Converts a broken `pip install` into a real one; also correct the §7 "C3 DONE ✅" record |
-| 3 | **Restrict `/api/config` `server_url` to loopback** by default | Removes the exfiltration destination; closes the chain's second half |
-| 4 | **Close cross-process write safety** — unique temp name + `fsync`; a cross-process lock or a documented single-writer rule | Protects `working.json`, the only copy of the writer's edits |
-| 5 | **Fix the notes/stash lost update** — hold `lock_for` across load-modify-write (mirror `ideas.py`) | Silent data loss on ordinary actions |
-| 6 | **Fix the finding-id hash divergence** (`charCodeAt` → code points, or server-authoritative) | Silent loss of the writer's marks |
-| 7 | **Fix the cache-bust guard** to cover `app.js` | Restores the stale-SPA guarantee |
-| 8 | **Push; add LICENSE + CHANGELOG; untrack the 5 root scratch files** | Release hygiene; unblocks everything downstream |
+| # | Action | Why first | Status |
+|---|---|---|---|
+| 1 | **Fix the XSS** — one `escapeHtml()` at every interpolating sink, then a browser check that a `<script>`-bearing finding renders inert | It is the root of the only CRITICAL chain; nothing else security-wise matters until it is closed | ✅ **done** `e3b283f` — `tests/e2e_browser_xss_inert.py` (21 checks) + a strict `script-src 'self'` CSP |
+| 2 | **Fix wheel packaging** — `package-data` / `MANIFEST.in` + a packaging test asserting ≥26 rule files and `app.js` in the wheel | Converts a broken `pip install` into a real one; also correct the §7 "C3 DONE ✅" record | ✅ **done** `e3b283f` — 163 files / 1.3 MB, 263 rules, `GET /` 200; mutation-verified |
+| 3 | **Restrict `/api/config` `server_url` to loopback** by default | Removes the exfiltration destination; closes the chain's second half | ✅ **done** `725e296` — one predicate (`net_guard`), six entry points, process-level opt-in only |
+| 4 | **Close cross-process write safety** — unique temp name + `fsync`; a cross-process lock or a documented single-writer rule | Protects `working.json`, the only copy of the writer's edits | ✅ **done** `b60fc45` — OS byte-range lock + unique temp + `fsync`; `tests/test_store_concurrency.py` spawns real processes |
+| 5 | **Fix the notes/stash lost update** — hold `lock_for` across load-modify-write (mirror `ideas.py`) | Silent data loss on ordinary actions | ✅ **done** `b60fc45` — plus `revision`'s four cycles, which had the same shape |
+| 6 | **Fix the finding-id hash divergence** (`charCodeAt` → code points, or server-authoritative) | Silent loss of the writer's marks | ✅ **done** `17f0757` — one line; ids that already agreed are unchanged |
+| 7 | **Fix the cache-bust guard** to cover `app.js` | Restores the stale-SPA guarantee | ✅ **done** — tokens are now derived from content, so there is nothing left to bump |
+| 8 | **Push; add LICENSE + CHANGELOG; untrack the 5 root scratch files** | Release hygiene; unblocks everything downstream | 🟡 **partly** — everything through #7 is pushed; LICENSE/CHANGELOG (R6) and root scratch (R10) are open, and both are owner calls |
+
+**Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/`_load_json_list` remains open.
+
+**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7 (no lockfile, unpinned `ruff` in CI), R9 (45-min CI budget vs a 125-min worst case), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), F5-adjacent `revision._load_json_list` swallowing a corrupt `edits.redo.json`, and the two vacuous browser checks (T1) that inflate the check count by 4.
 
 **Explicitly out of scope / owner decisions:** the licensing choice; the dock-density and idea-room design passes; the `app.js` module split and hash router; the two known-broken preview suites (repair or delete); the two prompt-budget defaults (documented in `.env.example`, currently left at their working values).
 

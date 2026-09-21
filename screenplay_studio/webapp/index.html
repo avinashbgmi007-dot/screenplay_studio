@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Script Doctor Studio</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23201a14'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z' fill='none' stroke='%23e8a24f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<!-- v2e607ed — bump the version query whenever style.css/app.js/core.js change so
-     browsers never revalidate into a stale sheet (no-cache only revalidates
-     against the browser's own copy; a versioned URL forces a fresh fetch).
+<!-- The ?v= tokens below are placeholders. webapp_server._stamp_asset_versions
+     rewrites each one to its asset's own content hash as the document is served,
+     so editing style.css/app.js/core.js invalidates its URL with no manual bump
+     (finding F5). The literal values here only matter when this file is opened
+     directly off disk, without the server.
      Fonts are SELF-HOSTED (webapp/fonts/, @font-face atop style.css) — this
      page makes zero external requests. -->  <link rel="stylesheet" href="style.css?v=hx1b397"><link rel="stylesheet" href="tungsten.css?v=ht4">
 </head>
