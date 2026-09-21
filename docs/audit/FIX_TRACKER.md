@@ -4,9 +4,10 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 2 — BE-M1/BE-M2/R7 closed, BE-M3 proven)
-**HEAD:** `a5742d5` (pushed; `git ls-remote origin main` agrees)
-**Previous baseline:** `efb3dd5`
+**Last updated:** 2026-09-21 (pass 3 — T1 closed + widened; T1b/T1c found and
+fixed; T2 verified and downgraded; a gate flake found and retired)
+**HEAD:** `812299a` (pushed; `git ls-remote origin main` agrees)
+**Baseline for this pass:** `812299a`
 
 ---
 
@@ -14,10 +15,10 @@ without re-deriving it from `git log`. Source audit:
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1521 passed, 3 skipped, 0 failed** |
+| Unit + integration | `python -m pytest tests/` | **1524 passed, 3 skipped, 0 failed** |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | 32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken |
+| Browser E2E | `python tests/run_browser_suites.py` | **32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken** |
 
 > Re-run all four after any code change. A row above is only true for the
 > commit named in "Last updated".
@@ -25,6 +26,11 @@ without re-deriving it from `git log`. Source audit:
 > ⚠️ `node --test tests/js/` (a bare directory) fails with `MODULE_NOT_FOUND`
 > on Node 22 — it must be the file glob `tests/js/*.test.js`. That is an
 > invocation trap, not a failing test.
+>
+> ⚠️ The browser suites spawn a **child process**, so `PYTHONPATH` must be
+> exported for the child too — without it the suite dies with
+> `ModuleNotFoundError: No module named 'flask'`, which looks like a product
+> failure and is not.
 
 ---
 
@@ -41,19 +47,90 @@ without re-deriving it from `git log`. Source audit:
 | BE-H4 | Transient read error reported as permanent damage | `b60fc45` | `load_json_store` retry budget (785 escalations → 0) |
 | F4 | Finding-id hash divergence (UTF-16 vs code points) | `17f0757` | `tests/e2e_browser_finding_id_parity.py` (19 vectors) + `core.test.js` |
 | F5 | Cache-bust guard matched 1 of 4 token shapes | `efb3dd5` | `tests/test_asset_cache_bust.py` (5) + rewritten browser step |
+| BE-M1 | Corrupt `edits.redo.json` read as empty → 400 "Nothing to redo", then overwritten | `a5742d5` | `TestDamagedHistoryStores` (6) + `TestDamagedHistoryAPI` (1) + StoreCase `silent`→`guarded` |
+| BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
+| BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
+| R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
 
 ---
 
-## Closed in this pass (2026-09-21, pass 2)
+## Closed in this pass (2026-09-21, pass 3)
 
 | ID | Item | Proof | Mutation |
 |---|---|---|---|
-| **BE-M1** | `revision._load_json_list` swallowed a corrupt `edits.redo.json` into `[]` — the writer was told **400 "Nothing to redo."** about a stack on disk, and `undo_last_edit` then overwrote the only recoverable copy | `TestDamagedHistoryStores` (6) + `TestDamagedHistoryAPI` (1) + `redo stack` StoreCase flipped `silent`→`guarded` | ✅ lenient reader restored → **10 red** |
-| **BE-M2** | `revision.edits_log` read raw → bare `JSONDecodeError` (a `ValueError`) → **400 "bad request"** for a damaged disk | `test_damaged_edit_log_is_reported_not_read_as_empty` + the 503 API assertion | ✅ raw read restored → **2 red** |
-| **BE-M1b** | Undo/redo mutated the working copy *before* discovering the other store was damaged, leaving a half-applied reversal | `test_damaged_redo_stack_refuses_before_consuming_the_undo`, `test_damaged_edit_log_refuses_before_consuming_the_redo` | ✅ pre-flight moved back → **1 red** each (M3, M4) |
-| **R7** | CI ran `pip install ruff` unpinned — a floating linter can fail a green build, or disagree with the local `ruff check .` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` (asserts ci.yml + both extras agree) | ✅ both directions → red |
+| **T1** | 4 browser checks that could not fail: `ideas.py` (`... or True`, and the literal was the *wrong project's* title), `ideas_v3.py` (`... or True`), `phase6_evidence.py` ×2 (`count() >= 0`) | rewritten as real assertions with the precondition folded in; suites green (14 / 14 / 33) | ✅ **4/4** — title never grows (`title='Untitled idea'`); summon doesn't open the drawer (`room-drawer class='drawer'`); Setup/Payoff never renders (`report.setup_payoff=True sections=0`); dismiss is a no-op (`before=8 after=8`) |
+| **T1b** | `selection_translate.py` — *"translation adds no new chat turns"* computed the count, printed it in the detail, and asserted **nothing** (`check(name, True, …)`). The comparison was never written | captures the count before the action, asserts equality | ✅ making translation append a turn → red (`before=1 after=2`) |
+| **T1c** | `library_delete.py` — the ghost-entry guarantee rested entirely on a `wait_for_selector`; the check behind it was `check(name, True)`. **This is the suite that failed the gate** (timeout) and then passed 2/2 standalone | bounded poll + real assertion; a slow re-render now yields a clean FAIL, not a crash | ✅ dropping `loadLibrary()` from `deleteProjectFlow` → red (`empty_hints=0 library_rows=2`) |
+| **T1d** | `phase7_chat_lenses.py` — *"reopen re-adopts the SAMEER conversation"* was `check(name, True)` naming a contract the app does not promise; the real contract is asserted 6 lines below (`adopted_any`) | **deleted**, not converted — coverage unchanged, count honest | n/a (deletion) |
+| **T3** | `library_delete` flaked in the 32-suite gate (1 failure) and passed **2/2 standalone** — a flake, not a regression (no production code changed this pass) | fixed by the T1c rewrite: the throwing `wait_for_selector` became a bounded poll | ✅ re-ran the full gate: **28 pass, 0 fail** |
+| **T2** | *"~8 test files assert on source text, not behaviour"* — the audit called this the highest-value unverified claim | **verified and downgraded** — see below | ✅ for the one hollow check (4/4) |
 
-**All of the above landed in `a5742d5`** (pushed). 6 mutations, 6 caught.
+**All of the above is test-only** — no production code was touched in pass 3
+(`git diff --stat screenplay_studio/` is empty). 6 mutations, 6 caught; every
+mutated file restored byte-identical.
+
+---
+
+## T2 — the verdict (this was the audit's highest-value open claim)
+
+The audit reported that ~8 test files, including `test_production_readiness.py`,
+"assert on the *text of the source file* rather than runtime behaviour", and
+called it the single highest-value thing to check before trusting the suite.
+**I read the file in full and classified every source-text assertion.** The claim
+is true in form and materially overstated in implication:
+
+- **Legitimate structural guards** that *cannot* be behavioural — asserting the
+  **absence** of a dangerous pattern (no live `app.run(host="0.0.0.0")`; no raw
+  `open("premise.json", "w")`), a CSS `@container` contract, and a duplication
+  guard ("there is ONE `inFindingFilter` predicate"). You cannot exercise a
+  non-existent call; a CSS rule has no runtime.
+- **Already behavioural** — `TestAtomicWrites` patches `jsonio.atomic_write_json`
+  and asserts the real code path called it. That is not a source read.
+- **Source-side companions** to real browser checks, and they say so in their own
+  docstrings (`TestManuscriptMarginContract` names
+  `e2e_browser_phase13_legacy_cleanup.py` as the behavioural counterpart).
+- **Exactly one genuinely hollow check** — `TestDemoHonesty` regexed
+  `demo_model.py` for `"issue": "…"` literals, proving a label string exists in a
+  file, not that the model emits it. **Now behavioural:** it drives the model's
+  own dispatch (`_decide_reply`) with the four trigger phrases the analyzer
+  actually sends (confirmed against `screenplay_analyzer/prompts.py`) and asserts
+  every emitted finding is labelled and correctly categorised. 1 test → 4.
+  Mutation-verified 4/4, each failure hitting **one case** (so it is per-pass,
+  not aggregate).
+  *Honest note:* my first mutation dropped only the `[demo]` tag and the check
+  still passed — the label contract is an **OR** (`[demo]` **or** "demo model"),
+  and the sentence still carried "demo model". The mutation was wrong, not the
+  test.
+- **Still unverified, and staying open:** the "two silent skips" and the thin
+  HTTP reach (~85 routes, only a minority driven).
+
+---
+
+## The check count, honestly
+
+The audit's headline correction was "4 of 476 browser checks cannot fail → 472".
+Sweeping for the same shape found **more than four**, but they are **not all the
+same defect**, and the difference decides the action:
+
+| Kind | Count | Action |
+|---|---|---|
+| Value-shaped tautologies (`x or True`, `count() >= 0`) — *look* like assertions on a value | 4 | ✅ **fixed**, 1:1, mutation-verified |
+| Unbacked `check(name, True)` — the assertion was never written | 2 | ✅ **fixed** (1 converted, 1 deleted) |
+| `check(name, True)` behind a throwing wait, where the wait *was* the assertion | 1 | ✅ **fixed** (T1c) |
+| **Step markers** — `check(name, True)` immediately after a throwing `expect()`/`wait_for_selector()`, so the guarantee **is** enforced | 10 | ⬜ **documented, deliberately not churned** |
+| In `gun_pen_audit` (skipped without a live `E2E_BASE` studio + real `llama-server`) | 2 | ⬜ **located, left unedited** |
+
+**Why the 10 markers are left alone:** they cannot hide a regression — the
+preceding throwing call fails the suite — so converting them adds no assurance,
+while turning a marker into a DOM re-read introduces a *new* flake risk (the
+element can re-render between the wait and the check). The **latent trap is
+recorded**: if the preceding `wait_for_selector` is ever deleted, the marker
+silently becomes the only guard, and it is vacuous.
+
+**Why the 2 in `gun_pen_audit` are not fixed blind:** that suite requires a live
+studio pointed at a real `llama-server` and a pre-seeded `gun_pen_2` project, so
+it cannot be executed here. An unverified test edit is exactly the failure mode
+this whole section is about.
 
 ---
 
@@ -61,7 +138,7 @@ without re-deriving it from `git log`. Source audit:
 
 | ID | Item | Evidence | Why deferred |
 |---|---|---|---|
-| **BE-M3** | `undo_last_edit` / `redo_last_edit` read-modify-write `edits.json` + `edits.redo.json` **without holding `lock_for` across the cycle** (each read and each write is locked; the gap between them is not) | 3 real children behind a file barrier: **two read `len=7`, both wrote `len=6`** — the log loses an entry relative to the reversals the working copy actually got. Instrumented script: `.workbuddy-ai/scratch/be_m3_instrument.py` | The fix needs either **two store locks held at once** (forbidden by `jsonio.lock_for`'s one-lock-at-a-time invariant, which exists to prevent deadlock) or a **CAS retry loop**. Both are design decisions. Harm is narrow (two *simultaneous* undos of one project) and non-destructive: the working copy is correct, only the history bookkeeping drifts. |
+| **BE-M3** | `undo_last_edit` / `redo_last_edit` read-modify-write `edits.json` + `edits.redo.json` **without holding `lock_for` across the cycle** (each read and each write is locked; the gap between them is not) | 3 real children behind a file barrier: **two read `len=7`, both wrote `len=6`** — the log loses an entry relative to the reversals the working copy actually got. Script: `.workbuddy-ai/scratch/be_m3_instrument.py` | The fix needs either **two store locks held at once** (forbidden by `jsonio.lock_for`'s one-lock-at-a-time invariant, which exists to prevent deadlock) or a **CAS retry loop**. Both are design decisions. Harm is narrow (two *simultaneous* undos of one project) and non-destructive: the working copy is correct, only the history bookkeeping drifts. |
 
 ---
 
@@ -74,8 +151,9 @@ without re-deriving it from `git log`. Source audit:
 | R9 | 45-min CI budget vs a 125-min worst case | CI | open |
 | R10 | Root scratch files tracked in git | hygiene | open |
 | R11–R14 | 69 PNGs in `docs/audit/`; `.git` 78 MB from 22 cline checkpoint refs | hygiene | open |
-| T1 | 4 vacuous browser checks inflate the check count (476 → honest 472) | test integrity | open |
-| T2 | `tests/test_production_readiness.py` asserts on **source text** in places; the audit calls it the highest-value thing to verify before trusting the readiness suite | test integrity | open |
+| **T2b** | "Two triage tests skip rather than fail" and "only a minority of ~85 routes are driven by a real Flask test client" — the unverified remainder of T2 | test integrity | open |
+| **T1e** | The 10 step markers above (documented, not defects) + the 2 in `gun_pen_audit` (need a live `llama-server`) | test integrity | open |
+| **T3b** | `library_delete`'s flake is retired by the T1c rewrite, but no other suite was audited for the same throwing-wait shape | test integrity | open |
 
 ---
 
@@ -89,3 +167,5 @@ without re-deriving it from `git log`. Source audit:
   silently into the item that surfaced them.
 - An item that is real but needs a design decision goes to **Proven, deliberately
   NOT fixed** with its evidence — never quietly implemented inside another fix.
+- A check that cannot fail is a **defect**, not a style nit: it inflates the
+  count and silently retires the guarantee.

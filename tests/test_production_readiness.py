@@ -123,18 +123,42 @@ class TestAtomicWrites:
 
 # ---- D: demo-mode findings are labelled, not fabricated as real notes ----
 class TestDemoHonesty:
-    def test_demo_findings_are_labelled_as_demo(self):
-        """The canned fallback findings must not read as real analysis: each is
-        tagged so the fix queue cannot pass it off as the doctor's note. The
-        observable contract is the issue string in demo_model.py."""
-        import re as _re
-        src = open("screenplay_studio/demo_model.py", encoding="utf-8").read()
-        issues = _re.findall(r'"issue":\s*"([^"]+)"', src)
-        # the canned fallback findings carry the "Sample X finding" shape
-        sample_issues = [i for i in issues if "Sample" in i and "finding" in i]
-        assert sample_issues, "expected canned demo findings to exist in demo_model"
-        assert all("[demo]" in i or "demo model" in i.lower() for i in sample_issues), (
-            f"unlabelled canned findings: {sample_issues}")
+    """The canned fallback findings must not read as real analysis: each is
+    tagged so the fix queue cannot pass it off as the doctor's note.
+
+    Behavioural, not textual. The old check regexed demo_model.py's source for
+    `"issue": "..."` literals, which proved a label STRING existed in the file —
+    not that the model emits it. This drives the model's own dispatch (the same
+    `_decide_reply` the demo server's /v1/chat/completions calls) with the
+    trigger phrases the analyzer actually sends (screenplay_analyzer/prompts.py)
+    and inspects the findings it really returns.
+    """
+
+    # (analyzer trigger phrase, user turn, the category that pass emits)
+    _FINDING_PASSES = [
+        ("on-the-nose dialogue",
+         "Scene 1\nMARA: I'll tell you everything when this is over.", "dialogue"),
+        ("theme and subtext", "Scene 1\nMARA: The rain again.", "theme"),
+        ("character arcs", "Scene 1\nMARA: The rain again.", "character"),
+        ("genre specialist checking whether", "Scene 1\nMARA: The rain again.", "genre"),
+    ]
+
+    @pytest.mark.parametrize("trigger,user,expected_category", _FINDING_PASSES)
+    def test_every_finding_pass_labels_its_output_as_demo(
+            self, trigger, user, expected_category):
+        from screenplay_studio.demo_model import _decide_reply
+        raw = _decide_reply([{"role": "system", "content": trigger},
+                             {"role": "user", "content": user}])
+        findings = json.loads(raw).get("findings") or []
+        assert findings, f"the {trigger!r} pass emitted no finding to inspect"
+        assert any(f.get("category") == expected_category for f in findings), (
+            f"{trigger!r} emitted categories "
+            f"{[f.get('category') for f in findings]}, expected {expected_category!r}")
+        unlabelled = [f.get("issue") for f in findings
+                      if "[demo]" not in (f.get("issue") or "")
+                      and "demo model" not in (f.get("issue") or "").lower()]
+        assert not unlabelled, (
+            f"{trigger!r} emitted findings that could pass as a real analysis: {unlabelled}")
 
 
 # ---- UI audit 2026-09-20: the ledger must open showing everything ----------

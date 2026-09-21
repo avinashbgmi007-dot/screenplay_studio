@@ -80,6 +80,11 @@ def run(base):
               "key" in r1 or "claimed" in r1 or "brass" in r1, r1[:140])
 
         # ---- translate button (hover menu UX) ---------------------------------
+        # translating is DISPLAY-ONLY: it must not add a chat turn. Capture the
+        # turn count before the action so the check below can actually compare
+        # (it used to be `check(name, True)` — a hardcoded pass that carried the
+        # count in its detail but never asserted anything about it).
+        turns_before = page.locator(".msg.assistant").count()
         globe = page.locator(".msg.assistant .translate-btn").last
         globe.scroll_into_view_if_needed()
         globe.hover()   # the icon floats the language menu; click picks one
@@ -92,7 +97,8 @@ def run(base):
         check("translation renders inline in English", len(tr_txt) > 5, tr_txt[:120])
         # display-only: history count unchanged
         msgs = page.locator(".msg.assistant").count()
-        check("translation adds no new chat turns", True, f"{msgs} assistant msgs")
+        check("translation adds no new chat turns", msgs == turns_before,
+              f"before={turns_before} after={msgs}")
 
         assert_no_js_errors(checks, errors)
         page.screenshot(path="_browser_sel_tr.png", full_page=True)

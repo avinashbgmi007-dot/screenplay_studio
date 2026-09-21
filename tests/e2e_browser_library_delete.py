@@ -101,8 +101,22 @@ def run(base):
             page.wait_for_timeout(250)
         check("shelf delete emptied the disk", not remaining, f"{remaining}")
         page.hover("#library-trigger")        # peek into Your library again
-        page.wait_for_selector("#library-list .empty-hint", timeout=8000)
-        check("no ghost entry -- library empties after a shelf delete", True)
+        # Poll instead of wait_for_selector: the flyout re-render can lag on a
+        # loaded machine (this suite timed out once inside the 32-suite gate and
+        # then passed 2/2 standalone), and a wait_for_selector timeout reads as a
+        # CRASH rather than a failed check. The assertion is the check itself now
+        # -- it used to be a hardcoded True behind that wait, so the ghost-entry
+        # guarantee was never actually asserted.
+        empty_hints, rows = 0, 0
+        for _ in range(30):
+            empty_hints = page.locator("#library-list .empty-hint").count()
+            rows = page.locator("#library-list .idea-item").count()
+            if empty_hints and not rows:
+                break
+            page.wait_for_timeout(250)
+        check("no ghost entry -- library empties after a shelf delete",
+              empty_hints >= 1 and rows == 0,
+              f"empty_hints={empty_hints} library_rows={rows}")
 
         assert_no_js_errors(checks, errors)
         browser.close()

@@ -50,7 +50,13 @@ def run(base):
         editor().type(" call /sameer now — I'm stuck on the ending", delay=4)
         page.wait_for_timeout(1100)   # let the debounced summon fire
         page_value = editor().input_value()
-        check("mid-line /sameer triggers", "Sameer co-writer" in page.content() or True)
+        # the summon's observable effect: the partner's drawer takes the stage
+        # (openRoomDrawer adds `.open` to #room-drawer; the context card asserted
+        # just below lives inside it). Was `... in page.content() or True` —
+        # always true, so it could not fail.
+        check("mid-line /sameer triggers the summon",
+              page.locator("#room-drawer.open").count() >= 1,
+              f"room-drawer class={page.locator('#room-drawer').get_attribute('class')!r}")
         check("command+ask consumed, the sentence it sat in stays",
               "/sameer" not in page_value and "I'm stuck" not in page_value
               and "call" in page_value,

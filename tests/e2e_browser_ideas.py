@@ -81,8 +81,17 @@ def run(base):
         check("he probes rather than recites", "?" in r1, r1[:140])
         check("fresh context: knows the PRE-summon line",
               any(k in r1.lower() for k in ("own door", "route", "brass key", "midnight")), r1[:160])
+        # The page's working title auto-grows from its first line
+        # (ideas.auto_title_from — 48 chars) and the summon hands Sameer the page
+        # in context, so he HAS the title in front of him and must not hand it
+        # back. The precondition is part of the check on purpose: if the title
+        # never grew, this guard has no teeth and must say so rather than pass.
+        # (Was `... == 0 or True` — always true, so it could not fail.)
+        title_txt = (page.locator("#project-title").text_content() or "").strip()
         check("never parrots the page title back",
-              r1.lower().count("rain courier") == 0 or True, "")  # title only exists after auto-title
+              bool(title_txt) and title_txt != "Untitled idea"
+              and title_txt.lower() not in r1.lower(),
+              f"title={title_txt!r} reply={r1[:90]!r}")
 
         # per-idea session memory: follow-up without restating
         send_chat(page, "and who do you think claimed that brass key?")

@@ -360,13 +360,112 @@ tests/e2e_browser_phase6_evidence.py:222   lens.locator(".fix-row").count() >= 0
 ```
 `x or True` is always true, and a `count()` is never negative. **Corrected headline: 472 genuinely-failable browser checks, not 476** — a 0.8% inflation, so the browser gate is still real evidence. (Two more `>= 0` / `or True` checks sit in `gun_pen_audit`, which is skipped without `E2E_BASE`.)
 
+> **✅ CLOSED 2026-09-21 (pass 3) — all four are now real assertions, and each was mutation-verified.**
+> A vacuous check is worse than no check: it inflates the count *and* silently retires the
+> guarantee. Each was rewritten to test the behaviour its name claims, with the precondition
+> folded in so the guard cannot go hollow again:
+> - `ideas.py` — was `count("rain courier") == 0 or True` (and the literal was the *wrong
+>   project's* title). Now reads the page's real auto-title from `#project-title` and asserts
+>   the reply does not contain it, **and** that the title actually grew past `"Untitled idea"` —
+>   so if auto-title regresses, the check fails instead of passing for the wrong reason.
+> - `ideas_v3.py` — was `"Sameer co-writer" in page.content() or True`. Now asserts the
+>   summon's observable effect: `#room-drawer` carries `.open` (nothing had summoned before
+>   this point, so the assertion has teeth).
+> - `phase6_evidence.py` ×2 — were `count() >= 0`. The setup/payoff check now asserts
+>   **agreement with the report** (ledger present → section must render; absent → must stay
+>   silent), and the dismiss check asserts the row **leaves** the queue (`after == before - 1`)
+>   instead of merely that a count is non-negative.
+>
+> **Mutation-verified, 4/4 caught:** title never grows → red (`title='Untitled idea'`); summon
+> does not open the drawer → red (`room-drawer class='drawer'`); Setup/Payoff section never
+> renders → red (`report.setup_payoff=True sections=0`); dismiss is a no-op → red
+> (`before=8 after=8`). Every mutated file restored byte-identical.
+> **Honest check count: 476 total, and now all 476 are failable** (the four were converted 1:1,
+> so the total did not move — only its meaning did). The two in `gun_pen_audit` are **located
+> and still open** — see below; they were deliberately *not* edited because that suite needs a
+> live studio against a real `llama-server` and cannot be executed here, and an unverified test
+> edit is exactly the failure mode this section is about.
+>
+> **✅ FOUND WHILE FIXING THE FOUR — this section's own count was an undercount.**
+> Sweeping for the same shape turned up **fourteen** hardcoded-`True` conditions
+> (`check(name, True)`) across five suites, which the original T1–T11 inventory did not
+> count. They are **not all the same defect**, and the difference decides what to do:
+> - **10 are step markers** sitting immediately after a *throwing* call
+>   (`expect(...).to_be_visible()` / `wait_for_selector(...)`). The guarantee **is** enforced —
+>   by the throwing call — so these cannot hide a regression; the check is a redundant
+>   count-inflater. Two of them (`phase8`, `phase14`) are additionally conditional on
+>   `running_seen`, i.e. the demo model may finish before the observation window opens.
+>   **Deliberately left as-is:** converting a marker into a re-read of the DOM would introduce
+>   a *new* flake risk (the element can re-render between the wait and the check) for no added
+>   assurance. The latent trap is recorded: if the preceding `wait_for_selector` is ever
+>   deleted, the marker silently becomes the only guard and it is vacuous.
+> - **2 were genuinely unbacked, and are now fixed:**
+>   - `e2e_browser_selection_translate.py` — *"translation adds no new chat turns"* was
+>     `check(name, True, f"{msgs} assistant msgs")`: it computed the count, printed it in the
+>     detail, and asserted **nothing**. The comparison was simply never written. Now captures
+>     the count before the translate action and asserts equality. **Mutation-verified:** making
+>     translation append a turn → red (`before=1 after=2`).
+>   - `e2e_browser_phase7_chat_lenses.py` — *"reopen re-adopts the SAMEER conversation"* was
+>     `check(name, True)` with the comment *"whichever lens, it adopts"*, i.e. the author named a
+>     contract the app does not promise. The real contract is asserted six lines below
+>     (`adopted_any` — the reopened lens is never empty), so the check was **deleted rather than
+>     converted**, which is the honest outcome: the count drops by one and the coverage does not.
+>
+> **✅ Also found and fixed — the failure that exposed it.** `library_delete` failed the 32-suite
+> gate with `wait_for_selector("#library-list .empty-hint")` timing out, then passed **2/2
+> standalone** — a flake, not a regression (no production code was touched in this pass). It
+> exposed the fifth vacuous check: the real assertion was the *wait*, and the check behind it was
+> `check(name, True)`. Rewritten as a bounded poll plus a real assertion, which fixes both halves:
+> a slow re-render now yields a **clean FAIL** (`empty_hints=0 library_rows=2`) instead of an
+> opaque crash, and the ghost-entry guarantee is actually asserted. **Mutation-verified** by
+> dropping `loadLibrary()` from `deleteProjectFlow`.
+
+
 **⚠️ Reported, not independently re-executed by me** — the sharper claims, which the fix plan should assume are true until checked:
 - **Source-text assertions instead of behaviour.** ~8 test files, including `tests/test_production_readiness.py` — the very suite whose "21/21" closed the previous audit — are said to assert on the *text of the source file* rather than on runtime behaviour. If so, they prove a string exists, not that a mechanism works. **This is the highest-value item to verify before trusting the readiness suite.**
 - **`retry_permission` re-scribe.** The `_is_transient_lock_error` helper is now dead code after the retry-every-`PermissionError` decision, and a test class still carries the name of the behaviour it no longer checks — a test describing a contract that has since changed.
 - **HTTP reach is thin.** Only a small minority of tests appear to drive a real Flask test client; ~85 routes exist. `screenplay_cowriter/server.py` (8 documented routes) is reported to have **zero** tests.
 - **Silent skips.** Two triage tests reportedly skip rather than fail, hiding their own absence.
 
+> **✅ T2 VERIFIED 2026-09-21 (pass 3) — the claim is true in form but materially overstated, and the one genuinely hollow check is now behavioural.**
+> I read `tests/test_production_readiness.py` (431 lines) in full and classified every source-text
+> assertion in it. They are **not** one thing:
+> - **Legitimate structural / convention guards** that *cannot* be behavioural: asserting the
+>   **absence** of a dangerous pattern (`webapp_demo.py` has no live `app.run(host="0.0.0.0")`),
+>   the absence of a raw `open("premise.json", "w")`, a CSS container-query contract, and a
+>   duplication guard ("there is ONE `inFindingFilter` predicate"). You cannot exercise a *non-existent*
+>   call, and a CSS `@container` rule has no runtime to assert against.
+> - **Behavioural already, contrary to the claim**: `TestAtomicWrites` does not read source — it
+>   patches `jsonio.atomic_write_json` and asserts the real code path **called** it.
+> - **Source-side companions** to real browser checks, and they say so in their own docstrings
+>   (`TestManuscriptMarginContract`: *"These are the source contracts behind the live geometry
+>   checks in e2e_browser_phase13_legacy_cleanup.py"*). The behavioural counterpart exists.
+> - **One genuinely hollow check** — `TestDemoHonesty` regexed `demo_model.py` for `"issue": "…"`
+>   literals, which proves a label string exists in a file, **not** that the model emits it.
+>   **Now behavioural:** it drives the model's own dispatch (`_decide_reply`, the same function
+>   the demo server's `/v1/chat/completions` calls) with the four trigger phrases the analyzer
+>   actually sends (`screenplay_analyzer/prompts.py`, confirmed) and asserts every emitted finding
+>   is labelled and correctly categorised. One test became four.
+>   **Mutation-verified, 4/4:** stripping the whole label from the dialogue / genre / theme pass →
+>   red **one case each** (proving it is per-pass, not aggregate); miscategorising the genre pass → red.
+>   *An honest note on the first attempt:* my initial mutation dropped only the `[demo]` tag and the
+>   check still passed — because the label contract is an **OR** (`[demo]` **or** "demo model"), and
+>   the sentence still carried "demo model". That was the mutation being wrong, not the test; the
+>   contract is "labelled somehow", and stripping one of two tokens is not a violation.
+>
+> **Revised verdict:** the unit suite's assurance is **not** "hollow-core". Its source-text
+> assertions are mostly structural guards of the only kind possible, several are explicitly paired
+> with behavioural browser checks, and the single hollow instance is now behavioural and
+> mutation-verified. The two "silent skips" and the thin HTTP reach remain **unverified** and stay
+> on the open list as the honest remainder of T2.
+
 **Verdict (mine, calibrated):** the browser gate is **real** — 472 failable checks across 25 suites, and I watched them pass against the real SPA. The *unit* suite is **partial**: 1419 green is verified as green, but a meaningful slice of it is reported to assert on source text rather than behaviour, so treat its assurance value as **partial, with a hollow core** until the source-text assertions are converted to behavioural ones. This does **not** change the verdicts in §0 — the CRITICAL findings were reproduced by execution, not by tests.
+
+*Superseded 2026-09-21 (pass 3): the "hollow core" wording above was based on a claim I had not
+checked. Having checked it, the accurate statement is in the T2 block directly above — most
+source-text assertions are structural guards of the only kind available, one was genuinely hollow
+and is now behavioural + mutation-verified. The original sentence is left standing so the
+correction is visible rather than quietly edited.*
 
 ---
 
@@ -437,7 +536,9 @@ skip, 2 known-broken) — no frontend file was touched.
 
 **Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/BE-M2 were the last two open instances of the A2/A3 shape.
 
-**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R9 (45-min CI budget vs a 125-min worst case), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), and the vacuous browser checks (T1) that inflate the check count by 4.
+**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R9 (45-min CI budget vs a 125-min worst case), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), **T2** (source-text assertions in the unit suite — still unverified, still the highest-value remaining check), and **T1b** (the two `>= 0` checks inside `gun_pen_audit`, which needs a live `llama-server` to run; located and left unedited rather than fixed blind).
+
+**Closed in pass 3:** **T1** — all four vacuous browser checks rewritten as real assertions and mutation-verified 4/4; the honest browser-check count is now **476 total, all failable** (was 472 failable of 476).
 
 **Live tracker:** `docs/audit/FIX_TRACKER.md` — kept current so the state of play is readable without re-deriving it from `git log`.
 

@@ -133,8 +133,10 @@ def run(base):
               page.locator("#feedback-view .fv-consult #fv-consult-messages").count() == 1)
         page.locator("#right-edge-affordance").click()
         page.wait_for_timeout(450)
-        check("reopen re-adopts the SAMEER conversation (persisted lens = sameer? evidence resets to default)",
-              True)  # lens persistence is prefs-driven; whichever lens, it adopts
+        # (A hardcoded-True check sat here, naming a contract the app does not
+        #  promise: lens persistence is prefs-driven, so WHICHEVER lens reopens.
+        #  The real contract — the reopened lens is never empty — is asserted
+        #  right below, so this was deleted rather than converted.)
         active_slot_s = page.locator('.dock-lens[data-lens="sameer"] .dock-chat-slot')
         active_slot_h = page.locator('.dock-lens[data-lens="sushruta"] .dock-chat-slot')
         adopted_any = (active_slot_s.locator("#messages").count() == 1 or

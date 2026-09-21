@@ -22,7 +22,7 @@ import re
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, launch, open_studio
+from e2e_browser_common import Checks, launch, open_studio, studio_headers
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -165,8 +165,17 @@ def run(base):
               if depth_el.count() else False, depth_txt)
 
         # -- 6. setup / payoff ------------------------------------------------
-        check("setup/payoff section renders (or absent honestly)",
-              lens.locator(".dock-section-title", has_text="Setup").count() >= 0)
+        # The section renders IFF the report carries the ledger (app.js gates on
+        # state.report.setup_payoff). Assert the AGREEMENT, not a tautology: a
+        # report with the ledger MUST show the section, one without it MUST stay
+        # silent. (Was `count() >= 0` — a count is never negative.)
+        _rep = requests.get(f"{base}/api/projects/{analyzed}/report",
+                            headers=studio_headers(base), timeout=30).json()
+        _has_ledger = bool((_rep or {}).get("setup_payoff"))
+        _setup_secs = lens.locator(".dock-section-title", has_text="Setup").count()
+        check("setup/payoff section agrees with the report",
+              (_setup_secs >= 1) if _has_ledger else (_setup_secs == 0),
+              f"report.setup_payoff={_has_ledger} sections={_setup_secs}")
 
         # -- 7. craft panels (pacing/characters/mirror reuse) ------------------
         check("craft panels render into the dock section",
@@ -216,10 +225,15 @@ def run(base):
         # Dismiss / Restore through the fix queue rows
         dismiss = lens.locator(".fix-row-actions .fq-dismiss").first
         if dismiss.count():
+            rows_before = lens.locator(".fix-row").count()
             dismiss.click()
             page.wait_for_timeout(1200)  # api + re-render
+            # the dismissed row must LEAVE the queue. (Was `count() >= 0`, which
+            # a count can never violate — so a dismiss that did nothing passed.)
+            rows_after = lens.locator(".fix-row").count()
             check("Dismiss removes the row from the dock queue",
-                  lens.locator(".fix-row").count() >= 0)  # re-rendered: queue still coherent
+                  rows_after == rows_before - 1,
+                  f"before={rows_before} after={rows_after}")
             restore = lens.locator(".fix-row-actions .fq-undismiss").first
             if restore.count():
                 restore.click()
