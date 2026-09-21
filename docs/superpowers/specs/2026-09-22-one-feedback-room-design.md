@@ -64,7 +64,7 @@ writer intent moves one lens but not the queue header or dawn meter.
 | Remove | Why (evidence) |
 |---|---|
 | **Problem Board retired** (`app.js:2118–2121` auto-open, `#pb-filter`, `renderProblemBoard`, `pb-*`) | Ignores `findingDisposition`/`findingPassesFilter`; counts contradict the dock; slides during reading. Retired outright — its one honest feature (scene-severity overview) is already the scene rail's job. |
-| **Second "Pacing" chart** (`renderReportPanel` 6163–6195) | Same name, different data than `renderPacingPanel`. One pacing renderer, one home. |
+| **Second "Pacing" chart** (`renderReportPanel` 6163–6195) | Same name, different data than `renderPacingPanel`. Fix = **merge, don't delete data**: one dock Pacing section holding BOTH metrics (page-segment word density AND per-scene `pace_score` drag), clearly labeled. The chart duplication dies; both datasets live. |
 | **Dormant `#feedback-view` clone** (`index.html:582–639`, `renderFvBoard` 6471, ~700 lines) | Dead parallel UI; invitation to resurrect a fourth board. Delete from bundle. |
 | **Craft shelf fix-queue copy** | Shelf keeps pacing/dials/mirror collapsed summary; the queue's canonical home is the dock. Shelf header links to dock instead of embedding the queue. |
 | **Duplicate "Retry failed" buttons** (desk toolbar, arrival strip, drawer header → 1) | One banner (§2.3), one affordance. |
