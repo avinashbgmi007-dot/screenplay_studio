@@ -370,9 +370,36 @@
     renderPanes();
     wirePaneControls();
     wireFeedbackToggle();
-    wireComposer("[data-lab-composer-input]", "[data-lab-composer-send]", "[data-lab-thread]");
-    // any [data-open-desk] affordance the world declares opens the desk
-    $$("[data-open-desk]").forEach(b => b.addEventListener("click", () => Lab.showDesk(true)));
+    // The desk's composer writes to the DESK's thread. Scoped deliberately: a
+    // bare document-order selector resolved to whichever composer/thread came
+    // first in the DOM, which for a world that ships its own landing (chat-first
+    // has both) is the LANDING one — so the desk's composer was bound to the
+    // wrong thread, or in chat-first's case left with no listener at all.
+    wireComposer("[data-desk] [data-lab-composer-input]",
+                 "[data-desk] [data-lab-composer-send]", "#lab-thread");
+    // A world's own landing composer keeps working, bound to its own thread.
+    // A no-op for worlds that declare none (wireComposer returns early).
+    wireComposer("[data-ia-landing] [data-lab-composer-input]",
+                 "[data-ia-landing] [data-lab-composer-send]",
+                 "[data-ia-landing] [data-lab-thread]");
+    // The desk's findings pane is shared chrome ("injected identically into
+    // every world"), so its verbs are wired HERE rather than per world. Only
+    // report-first ever did it, which left the desk's dismiss / locate / discuss
+    // buttons inert in the other five worlds — the buttons rendered, so it
+    // looked wired.
+    wireFindingVerbs("[data-desk]",
+                     () => renderFindingsInto("#lab-desk-findings"));
+    // Any [data-open-desk] affordance the world declares opens the desk.
+    // DELEGATED, not bound per element: worlds inject their own affordances
+    // during boot(), which runs AFTER mountDesk — canvas-first builds its
+    // scene cards (each carrying data-open-desk) at that point. A one-shot
+    // `$$(...).forEach(bind)` only ever saw the static markup, so every
+    // injected affordance was silently dead.
+    document.addEventListener("click", (e) => {
+      if (e.target instanceof Element && e.target.closest("[data-open-desk]")) {
+        Lab.showDesk(true);
+      }
+    });
   }
 
   function showDesk(show) {

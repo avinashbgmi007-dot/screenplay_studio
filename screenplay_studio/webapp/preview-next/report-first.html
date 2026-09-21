@@ -113,9 +113,9 @@
   Lab.boot({
     render(){
       renderLanding();
-      Lab.wireFindingVerbs("[data-desk]", () => Lab.renderFindingsInto("#lab-desk-findings"));
+      // The desk's findings verbs and the [data-open-desk] affordances are wired
+      // by mountDesk (shared chrome) — wiring them again here would double-fire.
       Lab.chatHistory().then(h => Lab.renderThread($("#lab-thread"), h.messages)).catch(() => {});
-      $$("[data-open-desk]").forEach(b => b.addEventListener("click", () => Lab.showDesk(true)));
     }
   });
 })();

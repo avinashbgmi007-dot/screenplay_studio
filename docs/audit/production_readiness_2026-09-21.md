@@ -249,6 +249,22 @@ So the 69 MB is not history debt on the project's own line — it is one dead br
 So the 2 known-broken suites are dead coverage today, and the 2 live-only suites never run in CI. ✅ executed.
 *(Credit: the harness prints all four on every run — the repo is honest about this. The defect is the coverage gap, not concealment.)*
 
+> **Superseded 2026-09-21 (pass 9).** Both known-broken suites are **repaired**, and `KNOWN_BROKEN` is
+> now **empty** — the gate runs **33 suites: 31 pass, 0 fail, 2 skip, 0 known-broken**, **660 checks**
+> (was 29 / 0 / 2 / **2** at 533). The word *"crashes"* understated the damage in both cases: one died
+> on its **second of six worlds**, so the crash aborted the run and **four worlds were never exercised
+> at all** (14 checks reached → 92); the other was not "one bug" but a **wholly dead contract** — it
+> walked `welcome → desk → cowrite → feedback` via `.edge-tab` / `.spine-tab` / `.pane-pop`, and **zero
+> of those selectors exist in any of the six worlds** any more, so it was rewritten around invariants
+> that survive a redesign (35 checks). Repairing them surfaced **four real defects**, all fixed: the
+> desk's composer bound to the landing thread (or left unwired) by document-order selectors; the desk's
+> findings verbs wired by **one of six** worlds, leaving dismiss/locate/discuss inert in the other five;
+> the Workbench button sitting under the review bar in three worlds; and a gallery script that died on
+> `getElementById('viewbar')` because the markup carried only a *class*, killing the view switcher,
+> the picker and the frame view. Both suites now fail with a **named check** instead of aborting.
+> Mutation-verified 5/5. The 2 live-only suites remain the only exclusions, and they need a studio at
+> `E2E_BASE`. Full detail: `docs/audit/FIX_TRACKER.md` §pass 9.
+
 ### REL-L1 (LOW) — no lockfile and no upper bounds; GitHub Actions pinned by major tag only. ✅ executed.
 ### REL-L2 (LOW) — docs drift (safety-critical for a rebuild)
 - `docs/UI_UX_SPECIFICATION.md` documents a Sameer panel as *"⚠ Currently a visual mock"* while `app.js:8801` states that panel **was retired** — the spec documents a fake feature.
@@ -609,7 +625,7 @@ skip, 2 known-broken) — no frontend file was touched.
 
 **Live tracker:** `docs/audit/FIX_TRACKER.md` — kept current so the state of play is readable without re-deriving it from `git log`.
 
-**Explicitly out of scope / owner decisions:** the licensing choice; the dock-density and idea-room design passes; the `app.js` module split and hash router; the two known-broken preview suites (repair or delete); the two prompt-budget defaults (documented in `.env.example`, currently left at their working values).
+**Explicitly out of scope / owner decisions:** the licensing choice; the dock-density and idea-room design passes; the `app.js` module split and hash router; the two prompt-budget defaults (documented in `.env.example`, currently left at their working values). *The two known-broken preview suites were on this list and have since been **repaired** (pass 9) — see the REL-M3 superseding note above.*
 
 ---
 

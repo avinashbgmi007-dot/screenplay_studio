@@ -4,12 +4,12 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 8 — R10 closed, and it was not hygiene: it
-hid two dead guards, both now promoted into real gates. R11–R14 measured down
-to a single owner decision: one stale remote branch is 84% of `.git`)
-**HEAD:** `b8314fc` (pass 8's work commit) — **pushed**; `git ls-remote origin main`
-agrees. The tracker-stamp commit that follows it carries the same content.
-**Baseline for this pass:** `33bb37f`
+**Last updated:** 2026-09-21 (pass 9 — the two "known-broken" browser suites are
+repaired and `KNOWN_BROKEN` is now **empty**; repairing them found four real
+defects that a crash had been hiding)
+**HEAD:** `f36e039` (pass 8's tracker stamp) — **pushed**; `git ls-remote origin main`
+agrees. This pass's commit hash is stamped at the bottom.
+**Baseline for this pass:** `f36e039`
 
 ---
 
@@ -17,16 +17,18 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1572 passed, 3 skipped, 0 failed** (+8: 5 a11y + 3 hygiene) |
+| Unit + integration | `python -m pytest tests/` | **1572 passed, 3 skipped, 0 failed** |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 29 pass, 0 fail, 2 skip, 2 known-broken** — **533 checks** (+11, the promoted palette suite, auto-discovered) |
+| Browser E2E | `python tests/run_browser_suites.py` | **33 suites: 31 pass, 0 fail, 2 skip, 0 known-broken** — **660 checks** (was 29 pass / 2 known-broken / 533 checks) |
 
-> Pass 8 added a browser suite (`e2e_browser_palette_restyle`, 11 checks), so the
-> browser gate *was* re-run: 33 suites, exit 0. No file under
-> `screenplay_studio/webapp/` changed (`git diff --stat` on the package tree is
-> empty), so the JS row is carried forward — it is 16/16 and nothing it covers
-> moved.
+> Pass 9 repaired the two suites that were excluded as `KNOWN_BROKEN`, so the gate
+> now *runs* them: **+2 suites, +127 checks** (`preview_next` 14 → 92 checks,
+> `preview_redesigns` rewritten at 35). The only remaining exclusions are the two
+> `REQUIRES_LIVE_STUDIO` suites, which need a studio already running at `E2E_BASE`.
+> `KNOWN_BROKEN` is **empty** — and `test_browser_gate_runner_never_silently_drops_a_suite`
+> now pins both repaired suites as runnable, so a future failure cannot be silenced
+> by re-adding them.
 
 > Re-run all four after any code change. A row above is only true for the
 > commit named in "Last updated".
@@ -59,6 +61,68 @@ agrees. The tracker-stamp commit that follows it carries the same content.
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+
+---
+
+## Closed in this pass (2026-09-21, pass 9)
+
+**The two "known-broken" browser suites are repaired. `KNOWN_BROKEN` is empty.**
+
+The gate's own comment was the mandate: *"a skipped suite is dead coverage — and dead
+coverage is worse than none, since it looks like safety. Repair or delete them."* Both
+entries were excluded as *"crashes"*, and the word hid the real damage.
+
+| Suite | What it actually was | Disposition |
+|---|---|---|
+| `preview_next` | Died on its **second of six worlds** (`bounding_box()` was `None`). The crash aborted the run, so **four worlds were never exercised at all** — and once it ran, every one of them failed a different way. | **Repaired.** 14 checks reached before the crash → **92 checks across all six worlds.** |
+| `preview_redesigns` | **Not "one bug".** It walked `welcome → desk → cowrite → feedback` via `.edge-tab` / `.spine-tab` / `.pane-pop` and read `a.card` in the gallery. **Every one of those selectors is absent from all six worlds** — the worlds were redesigned to `upload/pages/verdict/debate/spark`, the pane mechanism was replaced, and the gallery became a JS-built card grid. | **Rewritten** around the invariants that survive a redesign. **35 checks.** |
+
+**Why `preview_redesigns` was rewritten rather than repaired 1:1:** 48
+selector-coupled checks against a frozen prototype would recreate the same trap for the
+next redesign. The new suite asserts only what a redesign cannot invalidate — exactly one
+active screen, no inactive screen left visible, no horizontal overflow, zero uncaught JS
+exceptions, real `[data-go]` navigation (or, for a single-screen world, that it declares
+none), and gallery ↔ `DESIGNS` agreement so the two cannot drift silently. Screen *names*
+are deliberately not asserted.
+
+### Four real defects the repair surfaced — all fixed
+
+| # | Defect | Root cause |
+|---|---|---|
+| 1 | The desk's composer wrote to the **wrong thread** — in chat-first it had **no listener at all** | `wireComposer` used document-order `$()` selectors. A world shipping its own landing (chat-first) precedes the desk in the DOM, so the bare selectors bound the *landing* composer/thread. Now scoped: the desk's composer → `#lab-thread`, the landing's → its own. |
+| 2 | The desk's findings verbs (dismiss / locate / discuss) were **inert in five of six worlds** | Only `report-first` called `wireFindingVerbs("[data-desk]", …)`. The pane is shared chrome — *"injected identically into every world"* — so the wiring now lives in `mountDesk`, and report-first's duplicate call was removed (it would have double-fired). |
+| 3 | The Workbench button sat **under the review bar** in three worlds | `#pv` is a full-width bottom bar (`position:fixed; bottom:0; z-index:950`, ~51px). The button was at `bottom:18px` with `z-index:520`, so its centre was covered and Playwright's click was intercepted. chat-first's working `bottom:60px` proved the intended clearance; the three outliers were raised to match. |
+| 4 | The gallery's view-switching script **died on load** | The markup had `<div class="viewbar">` (a *class*) while the script called `getElementById('viewbar')` — so the Cards/Live switcher, the design picker **and** the frame view were all dead, and the failure was an uncaught `TypeError` on a page that otherwise looked fine. Added the id. |
+
+Also: `[data-open-desk]` is now **delegated** on `document` rather than bound per element.
+A one-shot `$$(...).forEach(bind)` only ever saw the static markup, so canvas-first's
+boot-injected scene cards — each carrying `data-open-desk` — were silently dead.
+
+### Both suites now fail cleanly
+
+The old suites **crashed on the first break**, which aborts the run and masks every later
+check — precisely how four worlds hid behind one. Each interactive step is now bounded and
+guarded, so a break is a **named `FAILED:` line** and the remaining worlds still run. If a
+desk never opens, the suite records two named failures and moves on rather than dying.
+
+**Mutation-verified 5/5, each a named check failure (not a crash), every file restored
+byte-identical:** one-shot `[data-open-desk]` → `canvas-first: desk reachable + both-open`;
+bare composer selectors → `chat-first: REAL Sameer reply arrived`; unwired desk verbs →
+`canvas-first: dismiss persists across reload`; `#viewbar` id removed → `gallery: Live view
+swaps the grid for the frame`; a second active screen → `noir: exactly one active screen`.
+
+**One thing found and deliberately NOT done.** `preview-redesigns/shots/` still holds **25
+tracked PNGs** — `*-welcome.png`, `*-cowrite.png`, `*-feedback.png`, `*-desk.png` × six
+designs, plus `gallery-live.png`. Those are screenshots of the **screen model the worlds no
+longer have**. The old suite regenerated them on every run; the new one deliberately writes
+no artifacts (a test should assert, not churn tracked files). They are excluded from the
+wheel by design (*"evidence artifacts, not app assets"*), so this is not product bloat — but
+they are now orphaned, and a reader would reasonably take `noir-welcome.png` for a current
+screen. Deleting tracked files is the owner's call:
+
+```bash
+git rm -r screenplay_studio/webapp/preview-redesigns/shots/
+```
 
 ---
 
@@ -453,10 +517,14 @@ whole section is about.
 | ID | Item | Class | Owner |
 |---|---|---|---|
 | **R11–R14** | **Reduced to ONE decision.** `.git` is 82 MB, of which **69.24 MB (84%) is two blobs**: `.freebuff/desktop-v2.db` (36.61 MB) + `.db-wal` (32.63 MB). They are **not on `main`** — reachable only from `legacy/pre-recovery`, which still exists on the remote. Reclaiming it means deleting a **shared remote branch**, so it is the owner's call; the exact commands are in §REL-M2 of the audit. The 69 PNGs (13.94 MB) are *intentional* evidence and the 22 cline checkpoint refs hold no large blobs. | hygiene | **owner decision** |
-| **T1e** | The 10 step markers above (documented, not defects) + the 2 in `gun_pen_audit` (need a live `llama-server`) | test integrity | open |
+| **T1e** | The 21 remaining vacuous browser checks, all classified by class in §T3b — 9 backed by something that can fail, 6 diagnostic dumps, 3 timing/nothing-conditional, 3 in the gate-excluded `gun_pen_audit`. Documented rather than churned: converting a *backed* marker into a DOM re-read adds a flake risk for no added assurance. | test integrity | open |
+| **NEW (pass 9)** | `preview-redesigns/shots/` holds **25 tracked PNGs** — `*-welcome/-cowrite/-feedback/-desk.png` × six designs plus `gallery-live.png`. They are screenshots of the screen model the worlds **no longer have**, orphaned now that the old suite (which regenerated them) is gone and the new one writes no artifacts. Excluded from the wheel by design, so not product bloat — but misleading as evidence. | hygiene | **owner decision** (`git rm -r screenplay_studio/webapp/preview-redesigns/shots/`) |
 
 **R10 is closed** — see the pass-8 section below. It was filed as hygiene and turned out to
 hide two broken guards.
+
+**The two `KNOWN_BROKEN` suites are closed** — see the pass-9 section above. Both were filed
+as *"crashes"*, and in both cases the crash was concealing far more than itself.
 
 ---
 

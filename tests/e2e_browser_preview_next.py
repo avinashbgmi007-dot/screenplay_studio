@@ -78,11 +78,26 @@ def walk_world(checks, page, errors, base, w):
     # the shared tri-pane desk: reveal it if the world's IA hides it on landing
     desk = page.locator("[data-desk]")
     if not desk.is_visible():
-        page.locator("[data-open-desk]").first.click()
-        page.wait_for_timeout(400)
+        # VISIBLE first: a world may declare several openers (canvas-first puts
+        # data-open-desk on its scene cards too), and a hidden one must never be
+        # the click target. Bounded and guarded so an unwired opener reports as
+        # a failed check rather than a click timeout that aborts the whole run.
+        try:
+            page.locator("[data-open-desk]").locator("visible=true").first.click(timeout=5000)
+            page.wait_for_timeout(400)
+        except Exception:
+            pass
+    desk_open = desk.is_visible()
     checks.check(f"{tag}: desk reachable + both-open",
-                 desk.is_visible()
+                 desk_open
                  and page.locator('[data-desk][data-desk-state="both-open"]').count() == 1)
+    if not desk_open:
+        # Everything below lives inside the desk. Say so once, by name, and move
+        # on to the next world: aborting here is what used to hide five worlds
+        # behind the first broken one.
+        checks.check(f"{tag}: rest of the world exercised", False,
+                     "the desk never opened — pane toggles, composer and findings skipped")
+        return
     checks.check(f"{tag}: real script pages in center",
                  page.locator("[data-scene]").count() >= 3)
 
@@ -96,16 +111,28 @@ def walk_world(checks, page, errors, base, w):
     page.locator("[data-panes-master]").first.click()
     checks.check(f"{tag}: master restores", page.locator('[data-desk][data-desk-state="both-open"]').count() == 1)
 
-    # REAL Sameer turn through the preview endpoint (demo model)
-    box = page.locator("[data-lab-composer-input]").first
+    # REAL Sameer turn through the preview endpoint (demo model).
+    # VISIBLE: chat-first ships its own composer inside [data-ia-landing], which
+    # showDesk() hides — so there are two, and `.first` picked the hidden one,
+    # giving bounding_box() == None.
+    box = page.locator("[data-lab-composer-input]").locator("visible=true").first
     before = box.bounding_box()["height"]
     box.fill("In one sentence: what is this script's biggest problem?")
-    page.locator("[data-lab-composer-send]").first.click()
-    page.wait_for_selector("#desk-thread .lab-sam, [data-lab-thread] .lab-sam", timeout=45000)
+    page.locator("[data-lab-composer-send]").locator("visible=true").first.click()
+    # #lab-thread is the DESK's thread (injected by _lab.js). The old selector
+    # led with `#desk-thread`, which exists nowhere, so it fell through to a bare
+    # `[data-lab-thread] .lab-sam` — matching the world's own (hidden) landing
+    # thread first and waiting on it forever.
+    try:
+        page.wait_for_selector("#lab-thread .lab-sam", timeout=45000)
+        replied = True
+    except Exception:
+        replied = False
     checks.check(f"{tag}: composer grows", box.bounding_box()["height"] > before + 5)
-    thread_text = page.locator("[data-lab-thread]").first.inner_text()
+    thread_text = page.locator("#lab-thread").inner_text()
     checks.check(f"{tag}: REAL Sameer reply arrived",
-                 len(thread_text.strip()) > 40 and "couldn't be reached" not in thread_text[-300:])
+                 replied and len(thread_text.strip()) > 40
+                 and "couldn't be reached" not in thread_text[-300:])
 
     # real dismiss persistence (reload the page — dismissal survives)
     dismiss_btn = page.locator('[data-verb="dismiss"]').locator("visible=true").first
@@ -114,6 +141,14 @@ def walk_world(checks, page, errors, base, w):
         page.wait_for_timeout(800)
         page.reload()
         page.wait_for_timeout(1800)
+        # A reload restores the world's LANDING state, and every world mounts the
+        # desk folded (mountDesk(true)), so the desk has to be revealed again
+        # before its findings surface — where the restore verb lives — is
+        # visible. report-first only ever passed this because its landing IS the
+        # report, so the verb happened to be on screen already.
+        if not page.locator("[data-desk]").is_visible():
+            page.locator("[data-open-desk]").locator("visible=true").first.click()
+            page.wait_for_timeout(500)
         restore = page.locator('[data-verb="undismiss"]').locator("visible=true").first
         checks.check(f"{tag}: dismiss persists across reload", restore.count() >= 1)
         if restore.count():

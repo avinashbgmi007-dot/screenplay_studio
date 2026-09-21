@@ -50,10 +50,18 @@ REQUIRES_LIVE_STUDIO = {
 # Known-red suites with their reason. Never silently skipped: every run prints
 # them, because a skipped suite is dead coverage — and dead coverage is worse
 # than none, since it looks like safety. Repair or delete them.
-KNOWN_BROKEN = {
-    "preview_next": "crashes — bounding_box() is None for [data-lab-composer-input]",
-    "preview_redesigns": "crashes — page.evaluate hits a null element (.classList)",
-}
+#
+# EMPTY as of 2026-09-21: the last two entries (preview_next, preview_redesigns)
+# were REPAIRED rather than tolerated. Both had been excluded as "crashes", which
+# hid far more than a crash — preview_next died on its second of six worlds, so
+# the other four were never exercised at all, and preview_redesigns was asserting
+# a screen model (welcome/desk/cowrite/feedback, .edge-tab, .pane-pop) that no
+# longer exists anywhere in the lab. Repairing them immediately surfaced four
+# real defects: the desk composer bound to the wrong thread, the desk's findings
+# verbs wired by only one of six worlds, the Workbench button sitting under the
+# review bar in three worlds, and a gallery script dying on a null
+# getElementById. Keep this dict empty; a new entry needs a reason AND an issue.
+KNOWN_BROKEN = {}
 
 _SUMMARY_RE = re.compile(r"^=== (\d+) passed, (\d+) failed ===", re.M)
 

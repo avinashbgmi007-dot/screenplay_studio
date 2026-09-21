@@ -1,24 +1,48 @@
-"""PREVIEW-REDESIGNS e2e — verify the six UIUX mockups + gallery, via Playwright.
+"""PREVIEW-REDESIGNS e2e — the six concept worlds + gallery, via Playwright.
 
-SELF-CONTAINED like every e2e_browser_* suite (see e2e_browser_common): no
-Flask studio needed here — the previews are pure static files, so this suite
-boots a plain http.server over screenplay_studio/webapp/ on a free port and
-drives each mockup at 1440x900:
+SELF-CONTAINED like every e2e_browser_* suite (see e2e_browser_common): the
+previews are pure static files, so this suite boots a plain http.server over
+screenplay_studio/webapp/ on a free port and drives each world at 1440x900.
 
-Per design (noir, paper, brutal, swiss, terminal, organic):
-  1. loads, welcome screen active
-  2. journey walk: welcome -> desk -> cowrite -> feedback, each reachable
-     via its [data-go] buttons with NO horizontal overflow
-  3. pane summon: opener click (.edge-tab / .spine-tab) -> some .pane-pop.open
-  4. click-outside dismissal: body click -> no .pane-pop.open
-  5. explore chips: expanded before typing, .collapsed after first composer input
-  6. composer auto-grows on multi-line input
-  7. zero console/page errors (Google-Fonts network failures are reported
-     separately as environmental, not design failures)
-  8. screenshots of every screen -> preview-redesigns/shots/<id>-<screen>.png
+WHAT THIS SUITE DELIBERATELY DOES *NOT* ASSERT
+---------------------------------------------
+Its predecessor named a screen model that no longer exists. It walked
+`welcome -> desk -> cowrite -> feedback`, summoned panes via `.edge-tab` /
+`.spine-tab` and `.pane-pop`, and read a gallery of `a.card`. Every one of those
+selectors is now absent from all six worlds — the worlds were redesigned to
+`upload/pages/verdict/debate/spark` (and brutal to
+`wall/verdict/debate/grad/river/drop`), the pane mechanism was replaced, and the
+gallery became a JS-built card grid. So that suite was not "one bug"; its entire
+contract was obsolete, and it crashed on the first world it tried to inspect.
 
-Gallery (index.html): 6 cards, live switcher opens the frame view, picker
-lists all six, zero console errors, screenshot -> shots/gallery.png.
+Rewriting 48 selector-coupled checks against a frozen prototype would recreate
+the same trap for the next redesign. This suite instead asserts the invariants
+that SURVIVE a redesign:
+
+  per world
+    1. loads with EXACTLY ONE active screen
+    2. no inactive screen is left computed-visible (the
+       `.s-x{display:flex}`-beats-`[data-screen]{display:none}` cascade bug)
+    3. no horizontal overflow
+    4. zero uncaught JS exceptions
+    5. `[data-go]` navigation really switches the active screen — or, for a
+       single-screen world, that it declares no navigation at all
+  gallery
+    6. a card per design, and every design reachable by link
+    7. zero uncaught JS exceptions  (this is the check that catches a gallery
+       script dying on a null getElementById — see below)
+    8. Live view swaps the card grid for the frame view
+    9. opening a card points the frame at that design
+
+Screen NAMES are intentionally not asserted: a redesign renames them, and the
+gallery is the one place that enumerates designs, so the two cannot drift
+silently (check 6 compares the links against this file's own DESIGNS list).
+
+No screenshots are written. The predecessor dumped 25 PNGs into
+preview-redesigns/shots/, which is why that directory still holds
+`*-welcome.png` / `*-cowrite.png` evidence for screens the worlds no longer
+have. Assertions belong in a test; regenerating tracked artifacts on every run
+only produces review churn.
 
 Run:  python tests/e2e_browser_preview_redesigns.py
 Needs: playwright (+ chromium) installed; nothing else.
@@ -27,29 +51,34 @@ import os
 import subprocess
 import sys
 import time
+import urllib.request
 
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, REPO_ROOT, free_port, launch
+from e2e_browser_common import Checks, REPO_ROOT, assert_no_js_errors, free_port, launch
 
 WEBAPP_DIR = os.path.join(REPO_ROOT, "screenplay_studio", "webapp")
-SHOTS_DIR = os.path.join(WEBAPP_DIR, "preview-redesigns", "shots")
 
-DESIGNS = {
-    "noir": ".edge-tab",
-    "paper": ".spine-tab",
-    "brutal": ".edge-tab",
-    "swiss": ".edge-tab",
-    "terminal": ".edge-tab",
-    "organic": ".edge-tab",
-}
-SCREENS = ["welcome", "desk", "cowrite", "feedback"]
+# The six concept worlds, in gallery order. Check 6 asserts the gallery links
+# match this list exactly, so adding a world means updating both.
+DESIGNS = ["noir", "paper", "brutal", "swiss", "organic", "terminal"]
 
-# a long multi-line draft to prove the composer grows past its one-line height
-MULTILINE = ("What if Rishi keeps the diary but never opens it —\n"
-              "the audience sees him hide it twice,\n"
-              "and the doctor only finds it after the fire,\n"
-              "when the burn marks make the last page unreadable?")
+# Reads every invariant that is independent of a world's screen names.
+PROBE = """() => {
+  const secs = [...document.querySelectorAll('[data-screen]')];
+  const active = secs.filter(e => e.classList.contains('active'));
+  const visibleInactive = secs.filter(e =>
+      !e.classList.contains('active') && getComputedStyle(e).display !== 'none');
+  return {
+    n_screens: secs.length,
+    n_active: active.length,
+    activeName: active.length === 1 ? active[0].dataset.screen : null,
+    n_visible_inactive: visibleInactive.length,
+    scroll_w: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+    inner_w: window.innerWidth,
+    go: [...document.querySelectorAll('[data-go]')].map(b => b.dataset.go),
+  };
+}"""
 
 
 def serve_webapp():
@@ -60,7 +89,6 @@ def serve_webapp():
         cwd=WEBAPP_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     base = f"http://127.0.0.1:{port}"
     deadline = time.time() + 15
-    import urllib.request
     while time.time() < deadline:
         try:
             urllib.request.urlopen(base + "/preview-redesigns/index.html",
@@ -72,182 +100,111 @@ def serve_webapp():
     raise RuntimeError("static server never came up")
 
 
-def no_overflow(page):
-    return page.evaluate(
-        "() => Math.max(document.documentElement.scrollWidth,"
-        "              document.body.scrollWidth) <= window.innerWidth")
+def verify_world(checks, page, errors, base, design):
+    page.goto(f"{base}/preview-redesigns/{design}.html")
+    page.wait_for_timeout(700)
+    info = page.evaluate(PROBE)
+
+    checks.check(f"{design}: exactly one active screen",
+                 info["n_active"] == 1,
+                 f"{info['n_active']} active of {info['n_screens']} "
+                 f"(active={info['activeName']!r})")
+    checks.check(f"{design}: no inactive screen left visible",
+                 info["n_visible_inactive"] == 0,
+                 f"{info['n_visible_inactive']} inactive screen(s) still displayed")
+    checks.check(f"{design}: no horizontal overflow",
+                 info["scroll_w"] <= info["inner_w"],
+                 f"{info['scroll_w']} > {info['inner_w']}")
+
+    # Navigation: a multi-screen world must actually navigate; a single-screen
+    # world must not pretend to. Both branches assert something real, so neither
+    # is a skip that could hide a regression.
+    targets = [t for t in info["go"] if t != info["activeName"]]
+    if targets:
+        want = targets[0]
+        page.locator(f'[data-go="{want}"]').first.click()
+        page.wait_for_timeout(450)
+        after = page.evaluate(PROBE)
+        checks.check(f"{design}: data-go navigation switches screens",
+                     after["activeName"] == want and after["n_active"] == 1,
+                     f"asked for {want!r}, active is {after['activeName']!r} "
+                     f"({after['n_active']} active)")
+    else:
+        checks.check(f"{design}: single-screen world declares no navigation",
+                     info["n_screens"] == 1,
+                     f"{info['n_screens']} screens but no [data-go] to reach them")
+
+    assert_no_js_errors(checks, errors, f"{design}: zero JS errors")
 
 
-def active_screen(page, name):
-    return page.evaluate(
-        "n => document.querySelector(`section[data-screen=\"${n}\"]`)"
-        ".classList.contains('active')", name)
-
-
-def one_screen_only(page):
-    """The screen-switch contract: exactly one active section, every
-    inactive section computed display:none, and the page is exactly one
-    viewport tall (no stacked screens). Catches the
-    `.s-x{display:flex}`-beats-`[data-screen]{display:none}` cascade bug."""
-    info = page.evaluate(
-        "() => {"
-        " const secs = [...document.querySelectorAll('[data-screen]')];"
-        " const active = secs.filter(e => e.classList.contains('active'));"
-        " const visible_inactive = secs.filter(e =>"
-        "     !e.classList.contains('active') &&"
-        "     getComputedStyle(e).display !== 'none');"
-        " return {n_active: active.length,"
-        "         n_visible_inactive: visible_inactive.length,"
-        "         body_h: document.body.scrollHeight,"
-        "         win_h: window.innerHeight};"
-        "}")
-    return (info["n_active"] == 1
-            and info["n_visible_inactive"] == 0
-            and info["body_h"] <= info["win_h"] + 4), info
-
-
-def open_panes_count(page):
-    return page.evaluate(
-        "() => document.querySelectorAll('.pane-pop.open').length")
-
-
-def go(page, screen):
-    page.locator(f'button[data-go="{screen}"]').first.click()
-    page.wait_for_timeout(350)  # let screen transitions settle
-
-
-def verify_design(checks, page, base, design_id, opener_sel):
-    console_errs, font_errs = [], []
-
-    def on_console(msg):
-        if msg.type != "error":
-            return
-        text = msg.text
-        # Google Fonts CDN unreachable is environmental (offline sandbox),
-        # the mockups degrade to system stacks by design.
-        if "Failed to load resource" in text and "fonts.g" in text:
-            font_errs.append(text)
-        else:
-            console_errs.append(text)
-
-    page.on("console", on_console)
-
-    url = f"{base}/preview-redesigns/{design_id}.html"
-    page.goto(url)
-    page.wait_for_timeout(500)
-
-    def c(name, cond, detail=""):
-        checks.ok(f"{design_id}: {name}", cond, detail)
-
-    c("loads with welcome screen active", active_screen(page, "welcome"))
-    c("welcome: no horizontal overflow", no_overflow(page),
-      page.evaluate("() => document.documentElement.scrollWidth"))
-
-    # --- journey walk: desk -> cowrite -> feedback --------------------------
-    for screen in SCREENS[1:]:
-        go(page, screen)
-        c(f"{screen}: reachable via preview bar",
-          active_screen(page, screen))
-        ok, info = one_screen_only(page)
-        c(f"{screen}: exactly one screen visible, page fits viewport", ok,
-          str(info))
-        c(f"{screen}: no horizontal overflow", no_overflow(page))
-
-    # --- behaviors on the desk screen ---------------------------------------
-    go(page, "desk")
-    desk = page.locator('section[data-screen="desk"]')
-
-    # script-first: pages are the hero, partner tools hidden until summoned
-    c("desk: script pages visible",
-      desk.locator(".scene-page, .pages").first.is_visible())
-
-    # pane summon + click-outside dismissal (the idea-room model)
-    opener = page.locator(f'{opener_sel} >> nth=0')
-    if opener.count() == 0:  # openers may live outside the section
-        opener = page.locator(f'{opener_sel} >> nth=0')
-    opener.click()
-    page.wait_for_timeout(300)
-    c("pane summons via edge tab", open_panes_count(page) > 0)
-
-    page.evaluate("() => document.body.click()")  # a click outside any pane
-    page.wait_for_timeout(250)
-    c("pane dismisses on outside click", open_panes_count(page) == 0)
-
-    # explore chips lifecycle
-    chips = page.locator('section[data-screen="desk"] .explore-chips').first
-    composer = page.locator('section[data-screen="desk"] .composer').first
-    c("chips expanded before first input",
-      chips.is_visible() and "collapsed" not in (chips.get_attribute("class")
-                                                 or ""))
-
-    h0 = composer.bounding_box()["height"]
-    composer.fill(MULTILINE)
-    page.wait_for_timeout(250)
-    c("chips collapse after first input",
-      "collapsed" in (chips.get_attribute("class") or ""))
-    h1 = composer.bounding_box()["height"]
-    c("composer grows with multi-line input", h1 > h0 + 20,
-      f"{h0:.0f}px -> {h1:.0f}px")
-
-    # --- screenshots of every screen ----------------------------------------
-    for screen in SCREENS:
-        go(page, screen)
-        page.screenshot(path=os.path.join(
-            SHOTS_DIR, f"{design_id}-{screen}.png"))
-
-    if font_errs:
-        print(f"  note  {design_id}: {len(font_errs)} Google-Fonts network "
-              f"error(s) (environmental, graceful fallback by design)")
-    c("zero console/page errors", len(console_errs) == 0,
-      "; ".join(console_errs[:3]))
-    page.remove_listener("console", on_console)
-
-
-def verify_gallery(checks, page, base):
+def verify_gallery(checks, page, errors, base):
     page.goto(f"{base}/preview-redesigns/index.html")
-    page.wait_for_timeout(600)
-    def c(name, cond, detail=""):
-        checks.ok(f"gallery: {name}", cond, detail)
-    c("six design cards render", page.locator(".card").count() == 6,
-      str(page.locator(".card").count()))
-    c("picker lists all six designs",
-      page.locator("#pick option").count() == 6)
-    c("no horizontal overflow", no_overflow(page))
-    page.locator(".card").first.click()
-    page.wait_for_timeout(600)
-    frame = page.locator("#frameView")
-    c("card click opens live frame view", "on" in (frame.get_attribute("class")
-                                                   or ""))
-    src = page.locator("#live").get_attribute("src") or ""
-    c("live frame points at a design", src.endswith(".html"), src)
-    page.screenshot(path=os.path.join(SHOTS_DIR, "gallery-live.png"))
+    page.wait_for_timeout(700)
 
+    links = page.evaluate(
+        "() => [...document.querySelectorAll('.card .open-link')]"
+        ".map(a => a.getAttribute('href'))")
+    got = sorted(h[:-len(".html")] for h in links if h and h.endswith(".html"))
+    checks.check("gallery: one card per design, all six reachable",
+                 got == sorted(DESIGNS),
+                 f"links={got} expected={sorted(DESIGNS)}")
+    checks.check("gallery: card grid rendered",
+                 page.locator("#cards .card").count() == len(DESIGNS),
+                 f"{page.locator('#cards .card').count()} card(s)")
 
-def main():
-    os.makedirs(SHOTS_DIR, exist_ok=True)
-    checks = Checks()
-    base, server = serve_webapp()
-    try:
-        with sync_playwright() as pw:
-            browser, page, errors = launch(pw)
-            try:
-                for design_id, opener_sel in DESIGNS.items():
-                    print(f"\n--- {design_id} ---")
-                    verify_design(checks, page, base, design_id, opener_sel)
-                print("\n--- gallery ---")
-                verify_gallery(checks, page, base)
-                checks.ok("gallery-run: no JS page errors", len(errors) == 0,
-                          "; ".join(errors[:3]))
-            finally:
-                browser.close()
-    finally:
-        server.terminate()
+    # BEFORE interacting: if the gallery script died early, this is the check
+    # that says so by name. It is the one that catches a null getElementById —
+    # the buttons still exist and still look clickable, so the only visible
+    # symptom is the uncaught exception (and the controls doing nothing).
+    assert_no_js_errors(checks, errors, "gallery: zero JS errors")
+
+    # Live view: the switcher must swap the grid for the frame. Guarded so a
+    # dead script reports as a named failure rather than a click timeout that
+    # aborts the suite before the remaining checks run.
+    def _click(locator):
         try:
-            server.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            server.kill()
-    checks.finish()
+            locator.click(timeout=4000)
+            page.wait_for_timeout(300)
+            return True
+        except Exception:
+            return False
+
+    clicked = _click(page.locator('#viewbar button[data-view="fr"]'))
+    frame_on = page.evaluate(
+        "() => document.getElementById('frameView').classList.contains('on')")
+    cards_hidden = page.evaluate(
+        "() => getComputedStyle(document.getElementById('cards')).display === 'none'")
+    checks.check("gallery: Live view swaps the grid for the frame",
+                 clicked and frame_on and cards_hidden,
+                 f"switcherClickable={clicked} frameView.on={frame_on} "
+                 f"cardsHidden={cards_hidden}")
+
+    # Opening a card must point the frame at that design. `.first` matters: the
+    # grid holds one card per design, and a bare `#cards .card` locator trips
+    # Playwright's strict mode instead of clicking anything.
+    _click(page.locator('#viewbar button[data-view="cards"]'))
+    card_clicked = _click(page.locator("#cards .card").first)
+    state = page.evaluate(
+        "() => ({src: document.getElementById('live').getAttribute('src'),"
+        "        pick: document.getElementById('pick').value})")
+    checks.check("gallery: opening a card points the frame at that design",
+                 card_clicked and state["src"] == f"{DESIGNS[0]}.html"
+                 and state["pick"] == DESIGNS[0],
+                 f"clicked={card_clicked} src={state['src']!r} pick={state['pick']!r}")
 
 
 if __name__ == "__main__":
-    main()
+    checks = Checks()
+    base, proc = serve_webapp()
+    try:
+        with sync_playwright() as pw:
+            browser, page, errors = launch(pw)
+            for design in DESIGNS:
+                errors.clear()
+                verify_world(checks, page, errors, base, design)
+            errors.clear()
+            verify_gallery(checks, page, errors, base)
+            browser.close()
+    finally:
+        proc.terminate()
+    checks.finish()

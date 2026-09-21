@@ -546,7 +546,12 @@ def test_browser_gate_runner_never_silently_drops_a_suite():
     for key, reason in {**rbs.REQUIRES_LIVE_STUDIO, **rbs.KNOWN_BROKEN}.items():
         assert reason, f"{key} is excluded without a stated reason"
     for passing in ("smoke", "phase6_evidence", "phase14_signoff_journey",
-                    "layout_audit", "rewrite_loop"):
+                    "layout_audit", "rewrite_loop",
+                    # repaired 2026-09-21 — these two were excluded as "crashes"
+                    # for long enough that preview_next's other four worlds were
+                    # never exercised. Re-adding either to KNOWN_BROKEN would
+                    # silence real coverage, so pin them as runnable.
+                    "preview_next", "preview_redesigns"):
         assert passing not in rbs.REQUIRES_LIVE_STUDIO, f"{passing} is runnable"
         assert passing not in rbs.KNOWN_BROKEN, f"{passing} is runnable"
 
