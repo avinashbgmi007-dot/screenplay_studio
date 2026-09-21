@@ -85,30 +85,60 @@ def discover():
             if f.startswith("e2e_browser_") and f.endswith(".py") and f != HARNESS]
 
 
-def run_one(filename: str, timeout: int):
-    """Returns (status, detail, seconds). status in PASS / FAIL / ERROR / TIMEOUT."""
-    path = os.path.join(TESTS_DIR, filename)
+# Playwright's driver can die between suites — "Connection closed while reading
+# from the driver" / "Connection.init" — before a single check has run. That is a
+# harness fault, not a product one: measured, `phase14_signoff_journey` ERRORed in
+# a gate run and then passed **47/47 when run alone**. A red gate for this reason
+# costs an operator a real investigation, so it gets ONE retry.
+#
+# Narrow on purpose. Only a failure that matches these markers AND produced no
+# check summary is retried, so a genuine failure is never retried away — and the
+# retry is REPORTED in the detail, so a retried pass can never be mistaken for a
+# first-time pass.
+_DRIVER_INIT_MARKERS = (
+    "Connection closed while reading from the driver",
+    "Connection.init",
+)
+
+
+def _looks_like_driver_init_failure(out: str) -> bool:
+    return any(marker in out for marker in _DRIVER_INIT_MARKERS)
+
+
+def _attempt(path: str, timeout: int):
     started = time.time()
     try:
         proc = subprocess.run(
             [sys.executable, path], cwd=REPO_ROOT, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=timeout)
     except subprocess.TimeoutExpired:
-        return "TIMEOUT", f"exceeded {timeout}s", time.time() - started
+        return "TIMEOUT", f"exceeded {timeout}s", time.time() - started, ""
     elapsed = time.time() - started
     out = (proc.stdout or "") + (proc.stderr or "")
     hits = _SUMMARY_RE.findall(out)
     if not hits:
         tail = "\n".join([line for line in out.strip().splitlines()[-6:] if line.strip()])
-        return "ERROR", tail or f"no summary; exit {proc.returncode}", elapsed
+        return "ERROR", tail or f"no summary; exit {proc.returncode}", elapsed, out
     passed, failed = (int(x) for x in hits[-1])
     if failed or proc.returncode != 0:
         fails = [line for line in out.splitlines() if line.startswith("FAILED")]
         detail = f"{passed} passed, {failed} failed"
         if fails:
             detail += " | " + " ; ".join(fails[:3])
-        return "FAIL", detail, elapsed
-    return "PASS", f"{passed} passed", elapsed
+        return "FAIL", detail, elapsed, out
+    return "PASS", f"{passed} passed", elapsed, out
+
+
+def run_one(filename: str, timeout: int):
+    """Returns (status, detail, seconds). status in PASS / FAIL / ERROR / TIMEOUT."""
+    path = os.path.join(TESTS_DIR, filename)
+    status, detail, elapsed, out = _attempt(path, timeout)
+    if status == "ERROR" and _looks_like_driver_init_failure(out):
+        status, detail, again, _ = _attempt(path, timeout)
+        elapsed += again
+        detail = (f"{detail} (after one Playwright driver-init retry)" if status == "PASS"
+                  else f"{detail} (retried once after a driver-init failure)")
+    return status, detail, elapsed
 
 
 def main() -> int:

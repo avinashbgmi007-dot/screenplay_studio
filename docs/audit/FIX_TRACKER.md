@@ -132,10 +132,31 @@ The other 16 are **reported, not changed**. Each is a deliberate best-effort pat
 saying why, and turning them into failures would break the shelf scan or the request they exist to
 protect. Recorded here so the count is a known number rather than an unknown one.
 
+### And the gate went red for a fifth unrelated reason
+
+Verifying the above, the 34-suite gate came back `32 passed, 1 failed, 1 skipped` with:
+
+```
+ERROR   phase14_signoff_journey   Exception: Connection.init: Connection closed
+                                  while reading from the driver  (2s)
+```
+
+The suite ran **zero** checks in 2 seconds — Playwright's driver died on startup. Run alone it passed
+**47/47**. So the gate can go red for a reason that has nothing to do with the code, and an operator
+would spend real time investigating it. `run_browser_suites.run_one` now retries **once** when, and
+only when, the failure matches a driver-init marker *and* produced no check summary — so a genuine
+failure is never retried away — and the retry is **reported in the detail**
+(`47 passed (after one Playwright driver-init retry)`), so a retried pass can never be mistaken for a
+first-time pass. Both halves are pinned in `tests/test_production_readiness.py`.
+
+**That is the fifth instrument to lie in this session**: a sandbox proxy, a Chromium-blocked port, my
+own AST walk, that walk's glob, and now the browser driver. None of them was the product.
+
 ### Verified
 - `tests/test_humanization_v2.py` +1 pinning the disclosure — including that it **names** the script —
   **mutation-verified** as a named failure with the source restored byte-identical.
-- 267 tests across the ten affected suites pass (3 expected structural skips).
+- 267 tests across the ten affected suites pass (3 expected structural skips); the retry's two halves
+  are pinned in `test_production_readiness.py`.
 
 ---
 

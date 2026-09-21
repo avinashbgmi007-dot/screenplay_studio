@@ -562,6 +562,55 @@ def test_browser_gate_runner_never_silently_drops_a_suite():
         assert passing not in rbs.KNOWN_BROKEN, f"{passing} is runnable"
 
 
+def test_the_gate_retries_a_driver_init_failure_and_says_it_did(monkeypatch):
+    """Playwright's driver can die between suites, before a single check runs.
+
+    Measured: `phase14_signoff_journey` ERRORed inside a gate run with
+    "Connection.init: Connection closed while reading from the driver", then passed
+    **47/47 when run alone**. A red gate for that reason costs a real
+    investigation, so it gets ONE retry — but a retried pass must never look like a
+    first-time pass, or the retry becomes a way to hide a genuine flake.
+    """
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import run_browser_suites as rbs
+
+    calls = []
+
+    def fake_attempt(path, timeout):
+        calls.append(path)
+        if len(calls) == 1:
+            driver = "Exception: Connection.init: Connection closed while reading from the driver"
+            return "ERROR", driver, 2.0, driver
+        return "PASS", "47 passed", 30.0, "=== 47 passed, 0 failed ==="
+
+    monkeypatch.setattr(rbs, "_attempt", fake_attempt)
+    status, detail, elapsed = rbs.run_one("e2e_browser_x.py", 60)
+
+    assert status == "PASS"
+    assert "driver-init retry" in detail, f"a retried pass must say so: {detail!r}"
+    assert elapsed == 32.0, "the retry's time must be counted, not dropped"
+    assert len(calls) == 2
+
+
+def test_the_gate_does_not_retry_a_real_failure(monkeypatch):
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import run_browser_suites as rbs
+
+    calls = []
+
+    def fake_attempt(path, timeout):
+        calls.append(path)
+        return "FAIL", "3 passed, 1 failed", 5.0, "FAILED  some check"
+
+    monkeypatch.setattr(rbs, "_attempt", fake_attempt)
+    status, detail, _ = rbs.run_one("e2e_browser_x.py", 60)
+
+    assert status == "FAIL"
+    assert len(calls) == 1, "a genuine failure must never be retried away"
+
+
 # ---- B4: the "never off the machine" STT guard must not be prefix-bypassable --
 class TestWhisperUrlGuard:
     """The external whisper engine is the one place dictation audio could leave
