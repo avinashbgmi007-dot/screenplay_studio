@@ -2,6 +2,8 @@
 
 Scratch analysis document — product-design critique of feedback presentation in the
 Screenplay Studio SPA. Read-only analysis; no code edited.
+(Reassembled 2026-09-21: the original chunked write left §1 items H–K and three
+sentence-fragments orphaned after the Bottom line; content unchanged, order repaired.)
 
 Scope: `screenplay_studio/webapp/app.js` (9,201 lines), `index.html`,
 `docs/UI_UX_SPECIFICATION.md` §1/§4.4/§4.4b/§4.4c/§4.9/§7, NOTES.md (craft-shelf
@@ -53,6 +55,22 @@ setup/payoff spine + text rows (5228–5242), then the four craft panels *verbat
 (`switchFeedbackTab` 6106); Report pane (`renderReportPanel` 6123) = coverage card,
 setup/payoff card, a **second, different "Pacing" chart** (6165 — per-scene `pace_score`
 drag bars), dials, mirror, findings-by-category read-only rows; Fix Queue pane =
+`renderFixQueuePanel` a fourth time. Reachable for projects via session-restore of a
+stored `view:"feedback"` (8410) and `openFeedbackRoom` (2248).
+
+**H. Revision view** (6338, 6950): scene navigator with severity dots, the fix queue yet
+again, mono status strip "A open / B addressed" (6981).
+
+**I. Diff banner** (`renderDiffBanner` 4186): "N resolved · N new · N carried · N still
+open" chips after draft activation.
+
+**J. Status strip**: "⚡ Ns · X/Y fixed" metrics (`index.html` §6; spec line 478).
+
+**K. Dormant-but-shipped**: the full 3-panel Feedback View clone (`#feedback-view`,
+`index.html:582–639`; `renderFvBoard` 6471 etc.) — grep-gated unreachable, but ~700 lines
+of parallel board/sev-dot/chat code still in the bundle. Plus the Beat Board's per-scene
+finding flags (7051–7066).
+
 ---
 
 ## 2. Per-surface clutter/confusion risks
@@ -124,6 +142,9 @@ drag bars), dials, mirror, findings-by-category read-only rows; Fix Queue pane =
 - **K — Dormant FV**: ~700 lines of dead parallel UI (its own board, its own severity
   filter, its own scroll sync) shipped to every user. Not visible clutter — but it's why
   `renderFvBoard`'s `f.description || f.issue` and the Problem Board's identical
+  expression (8836) still exist as divergent copies, and it's a standing invitation for
+  someone to resurrect a fourth board.
+
 ---
 
 ## 3. Duplication map
@@ -158,6 +179,11 @@ drag bars), dials, mirror, findings-by-category read-only rows; Fix Queue pane =
    but I only fixed 3. Did the doctor change its mind, or did I?"* The app knows the
    answer (the `same_input` rewrite clause) but buries it under the headline numbers.
 3. **"Where do I actually work?"** — After analysis, feedback is simultaneously: a
+   collapsed shelf summary, ink on the page, margin pins, an auto-opened side board, two
+   toolbar chips, and a hidden dock that the status text calls "the ledger." Five doors,
+   no map, and the door the app itself calls canonical ("the dock's Evidence lens has the
+   ledger") is behind a button labeled "Context." The writer's moment: *"Do I fix things
+   from the shelf, the board, the margin, or this Context thing?"*
 4. **"Dismiss, next pass, or ✓ — what's the difference?"** — Three writer gestures that
    all remove a finding from view, with distinct persistence semantics (dismiss =
    queue-only hidden; defer = parked, returns next pass; ✓ = my-call-fixed, survives
@@ -222,27 +248,3 @@ subtraction and consolidation — route the Problem Board and drawer through
 sections for real, invert the arrival strip so the writer's number leads — not another
 surface.
 
-   collapsed shelf summary, ink on the page, margin pins, an auto-opened side board, two
-   toolbar chips, and a hidden dock that the status text calls "the ledger." Five doors,
-   no map, and the door the app itself calls canonical ("the dock's Evidence lens has the
-   ledger") is behind a button labeled "Context." The writer's moment: *"Do I fix things
-   from the shelf, the board, the margin, or this Context thing?"*
-
-  expression (8836) still exist as divergent copies, and it's a standing invitation for
-  someone to resurrect a fourth board.
-
-`renderFixQueuePanel` a fourth time. Reachable for projects via session-restore of a
-stored `view:"feedback"` (8410) and `openFeedbackRoom` (2248).
-
-**H. Revision view** (6338, 6950): scene navigator with severity dots, the fix queue yet
-again, mono status strip "A open / B addressed" (6981).
-
-**I. Diff banner** (`renderDiffBanner` 4186): "N resolved · N new · N carried · N still
-open" chips after draft activation.
-
-**J. Status strip**: "⚡ Ns · X/Y fixed" metrics (`index.html` §6; spec line 478).
-
-**K. Dormant-but-shipped**: the full 3-panel Feedback View clone (`#feedback-view`,
-`index.html:582–639`; `renderFvBoard` 6471 etc.) — grep-gated unreachable, but ~700 lines
-of parallel board/sev-dot/chat code still in the bundle. Plus the Beat Board's per-scene
-finding flags (7051–7066).
