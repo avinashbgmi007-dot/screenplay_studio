@@ -6,7 +6,7 @@ without re-deriving it from `git log`. Source audit:
 
 **Last updated:** 2026-09-21 (pass 5 — R9 closed; T2c closed with a real
 route-coverage gate; the hand sweep that misled pass 4 is now a permanent guard)
-**HEAD:** `c6656df` (pushed; `git ls-remote origin main` agrees)
+**HEAD:** `de53ca1` (this pass's work commit)
 **Baseline for this pass:** `c6656df`
 
 ---
