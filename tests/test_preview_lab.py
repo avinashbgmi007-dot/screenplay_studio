@@ -123,8 +123,12 @@ class TestPreviewVerbs:
         dismissed_findings.json the main app reads."""
         body = lab.get("/api/preview/data/Lab_Test").get_json()
         fq = body.get("fixqueue") or {}
-        if not fq.get("items"):
-            pytest.skip("project has no findings — nothing to dismiss")
+        # NOT a skip: the Lab seeds a deterministic project, so an empty fixqueue
+        # means the analysis or its knowledge base broke — the same signature as
+        # the R1 bug (a wheel that shipped zero craft rules). Fail loudly instead
+        # of reporting the round-trip as "not run".
+        assert fq.get("items"), ("the Lab's project produced no findings, so the "
+                                 "dismiss round-trip cannot be exercised")
         item = fq["items"][0]
         r = lab.post(f"/api/projects/Lab_Test/findings/{item['index']}/dismiss",
                      json={"issue": item["issue"]})

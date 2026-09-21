@@ -86,3 +86,10 @@ select = ["E4", "E7", "E9", "F"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# -rs: itemise skips in the summary on EVERY run. This repo's rule for the
+# browser gate is "a skipped suite is never hidden" (run_browser_suites.py
+# prints every exclusion loudly); pytest was the one place a skip showed up as
+# a bare count, so a test that quietly stopped running looked identical to one
+# that passed. 3 skips are expected (test_store_fault_injection's non
+# load-modify-write cases, which are structurally inapplicable).
+addopts = "-rs"

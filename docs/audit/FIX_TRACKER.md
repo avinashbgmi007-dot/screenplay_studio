@@ -15,7 +15,7 @@ fixed; T2 verified and downgraded; a gate flake found and retired)
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1524 passed, 3 skipped, 0 failed** |
+| Unit + integration | `python -m pytest tests/` | **1544 passed, 3 skipped, 0 failed** |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
 | Browser E2E | `python tests/run_browser_suites.py` | **32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken** |
@@ -106,6 +106,75 @@ is true in form and materially overstated in implication:
 
 ---
 
+## T2b — the two remaining claims, adjudicated
+
+The audit left two claims in this section unverified. Both are now measured.
+
+### Claim 1 — *"two triage tests skip rather than fail, hiding their own absence"* → **DISPROVEN**
+
+Measured with `-rs`: the only 3 skips in the entire suite come from **one** site —
+`test_store_fault_injection.py:489` — and they are deliberate and justified: a store
+that is not load-modify-write structurally cannot clobber what it never read, so the
+overwrite scenario does not apply to those cases. **Zero triage tests skip.**
+
+But the three triage guards were a **latent trap**: `pytest.skip("mock analysis
+produced no findings")` in `test_feature_batch.py` ×2 and `test_preview_lab.py`. They
+do not fire today — but *"the analysis produced no findings"* is exactly the signature
+of the **R1 bug** (a wheel that shipped zero craft rules, so every report came back
+empty). A silent skip there would hide that whole class of regression as "not run".
+All three now `assert` instead, with the reason in the message.
+**Mutation-verified 3/3** by forcing an empty fixqueue: each fails loudly with the
+assertion text, and **none** reports SKIPPED.
+
+Also: `pyproject.toml` gained `addopts = "-rs"`, so skips are itemised on every run
+with their reason. This repo's rule for the browser gate is already "a skipped suite is
+never hidden" (`run_browser_suites.py` prints every exclusion loudly); pytest was the
+one place a skip showed up as a bare count.
+
+### Claim 2 — *"only a minority of ~85 routes are driven by a real Flask test client; `screenplay_cowriter/server.py` has zero tests"* → **HALF FALSE, HALF TRUE**
+
+A route-reach sweep (regex per route, `<placeholder>` → one path segment, searched
+across `tests/`) gives:
+
+- **`webapp_server.py`: 71 distinct routes, 64 referenced by tests (90%).** Not a minority.
+- **`screenplay_cowriter/server.py`: 7 distinct routes, 0 reachable.** The "zero tests" claim is **TRUE**.
+
+**Self-correction — the sweep produced false positives in BOTH directions, and I
+checked each rather than trusting the number:**
+
+- `/api/projects/<name>/beatboard/reset` showed as *unreached*, but
+  `test_beatboard.py::test_reset_endpoint` **does** drive it — the test composes the
+  path as `f"{base}/reset"`, so the full string never appears contiguously.
+- Conversely the sweep's "6/7 cowriter routes reached" was **false**: those matches were
+  the *webapp's* own `/api/…/chat/sessions` paths. Nothing in the repo imports
+  `screenplay_cowriter.server` — only its own docstring names the module.
+
+So the heuristic was wrong in the *optimistic* direction for exactly the module the
+audit was right about. Treat "reached" as a question, not a finding.
+
+### The one true finding — closed
+
+`screenplay_cowriter/server.py` is a documented entry point (`python -m
+screenplay_cowriter.server`; AGENTS.md's "each piece runs its own local server"
+architecture) with **zero coverage** — no test, and no other module imports it, so a
+break would ship silently. New `tests/test_cowriter_server.py` (**20 tests**) drives
+all 7 routes through the Flask test client, with the two model-dependent ones
+(`POST /sessions`, `POST /sessions/<id>/messages`) pointed at the repo's shared mock
+llama-server — no real model needed. Error paths included: 502 for a dead model
+server, 404 for unknown sessions, and 400 for a missing fork name / unknown branch /
+unknown persona / empty message text.
+
+**Mutation-verified 6/6:** wrong `/health` payload; 502 → 500; empty text accepted;
+`/fork` leaking `ValueError` as a 500 instead of translating it to 400; `/switch` the
+same; persona validation removed.
+
+*Honest note:* the first 502 mutation deleted the `except` clause outright, leaving a
+dangling `try` — a SyntaxError, so pytest reported a **collection error** (rc=4) and my
+harness scored it "caught". That was the mutation being wrong, not the guard holding.
+Redone as a clean `502 → 500` change it fails properly (`assert 500 == 502`).
+
+---
+
 ## The check count, honestly
 
 The audit's headline correction was "4 of 476 browser checks cannot fail → 472".
@@ -151,7 +220,7 @@ this whole section is about.
 | R9 | 45-min CI budget vs a 125-min worst case | CI | open |
 | R10 | Root scratch files tracked in git | hygiene | open |
 | R11–R14 | 69 PNGs in `docs/audit/`; `.git` 78 MB from 22 cline checkpoint refs | hygiene | open |
-| **T2b** | "Two triage tests skip rather than fail" and "only a minority of ~85 routes are driven by a real Flask test client" — the unverified remainder of T2 | test integrity | open |
+| **T2c** | The route-reach sweep is a **heuristic that was wrong in both directions** (it missed a composed path, and it credited the cowriter server with the webapp's paths). No test enforces route coverage, so the next untested route will be found only by another hand sweep | test integrity | open |
 | **T1e** | The 10 step markers above (documented, not defects) + the 2 in `gun_pen_audit` (need a live `llama-server`) | test integrity | open |
 | **T3b** | `library_delete`'s flake is retired by the T1c rewrite, but no other suite was audited for the same throwing-wait shape | test integrity | open |
 

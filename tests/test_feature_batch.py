@@ -290,8 +290,13 @@ class TestFindingDismissal:
         base = f"/api/projects/{project}"
         full = http_client.get(f"{base}/fixqueue?include_dismissed=1").get_json()
         items = full["items"]
-        if not items:  # mock analysis produced no findings here — nothing to triage
-            pytest.skip("mock analysis produced no findings")
+        # NOT a skip: the mock is deterministic, so "no findings" means the
+        # analysis pipeline — or the knowledge base behind it — broke. That is
+        # exactly the signature of the R1 bug (a wheel that shipped zero craft
+        # rules, so every report came back empty). A silent skip here would hide
+        # that class of regression as "not run".
+        assert items, ("the mock analysis produced no findings, so the dismissal "
+                       "path cannot be exercised — the pipeline or its KB is broken")
 
         target = items[0]
         resp = http_client.post(f"{base}/findings/{target['index']}/dismiss",
@@ -316,8 +321,10 @@ class TestFindingDismissal:
         http_client.post(f"/api/projects/{project}/analyze", json={})
         base = f"/api/projects/{project}"
         items = http_client.get(f"{base}/fixqueue?include_dismissed=1").get_json()["items"]
-        if not items:
-            pytest.skip("mock analysis produced no findings")
+        # see the note on the sibling test: no findings is a broken precondition,
+        # not an acceptable outcome to skip past
+        assert items, ("the mock analysis produced no findings, so the dismissal "
+                       "path cannot be exercised — the pipeline or its KB is broken")
         target = items[0]
         http_client.post(f"{base}/findings/{target['index']}/dismiss", json={"issue": target["issue"] or ""})
 

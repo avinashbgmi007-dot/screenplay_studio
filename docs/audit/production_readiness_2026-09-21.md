@@ -459,6 +459,32 @@ tests/e2e_browser_phase6_evidence.py:222   lens.locator(".fix-row").count() >= 0
 > mutation-verified. The two "silent skips" and the thin HTTP reach remain **unverified** and stay
 > on the open list as the honest remainder of T2.
 
+> **✅ T2b ADJUDICATED 2026-09-21 (pass 4) — both remaining claims are now measured. One is disproven, the other is half-true and its true half is closed.**
+> **"Two triage tests skip rather than fail, hiding their own absence" → DISPROVEN.** Measured
+> with `-rs`: the only 3 skips in the whole suite come from **one** site,
+> `test_store_fault_injection.py:489`, and they are deliberate — a store that is not
+> load-modify-write structurally cannot clobber what it never read. **Zero triage tests skip.**
+> The three triage guards were nonetheless a **latent trap** (`pytest.skip` on "the analysis
+> produced no findings"), and that is precisely the signature of the R1 bug — a wheel with zero
+> craft rules, hence empty reports. A silent skip would have hidden that class of regression as
+> "not run". All three now `assert`; **mutation-verified 3/3** (each fails loudly, none SKIPs).
+> `pyproject.toml` also gained `addopts = "-rs"` so a skip is never a bare count again.
+> **"Only a minority of ~85 routes are driven; `screenplay_cowriter/server.py` has zero tests"
+> → HALF FALSE, HALF TRUE.** The webapp is **not** thin: 71 distinct routes, **64 referenced by
+> tests (90%)**. The cowriter's standalone server, however, genuinely has **zero** coverage —
+> nothing in the repo imports it but its own docstring.
+> **Self-correction worth recording:** the route-reach sweep was wrong in *both* directions. It
+> flagged `/beatboard/reset` as unreached when `test_beatboard.py::test_reset_endpoint` drives it
+> (the path is composed as `f"{base}/reset"`), and it credited the cowriter server with the
+> webapp's `/api/…/chat/sessions` paths. It was wrong in the *optimistic* direction for exactly
+> the module the audit was right about.
+> **Closed:** new `tests/test_cowriter_server.py` (**20 tests**) drives all 7 routes through the
+> Flask test client, the two model-dependent ones against the repo's shared mock llama-server.
+> **Mutation-verified 6/6.** *Honest note:* the first 502 mutation deleted the `except` clause,
+> leaving a dangling `try` — a SyntaxError, so pytest reported a **collection error** (rc=4) that
+> my harness mis-scored as "caught". Redone as `502 → 500` it fails properly (`assert 500 == 502`).
+
+
 **Verdict (mine, calibrated):** the browser gate is **real** — 472 failable checks across 25 suites, and I watched them pass against the real SPA. The *unit* suite is **partial**: 1419 green is verified as green, but a meaningful slice of it is reported to assert on source text rather than behaviour, so treat its assurance value as **partial, with a hollow core** until the source-text assertions are converted to behavioural ones. This does **not** change the verdicts in §0 — the CRITICAL findings were reproduced by execution, not by tests.
 
 *Superseded 2026-09-21 (pass 3): the "hollow core" wording above was based on a claim I had not
