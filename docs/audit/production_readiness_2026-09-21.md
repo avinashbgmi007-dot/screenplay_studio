@@ -386,6 +386,16 @@ tests/e2e_browser_phase6_evidence.py:222   lens.locator(".fix-row").count() >= 0
 > live studio against a real `llama-server` and cannot be executed here, and an unverified test
 > edit is exactly the failure mode this section is about.
 >
+> **⚠️ SUPERSEDED (pass 5, 2026-09-21) — both numbers in that sentence were wrong.** The gate now
+> runs **28 suites / 522 checks**, not 25 / 476 (three suites entered the gate after this report).
+> And "all 476 are failable" is false: a full sweep of every suite found **22 vacuous checks**, of
+> which one was genuinely unbacked (now fixed) and **21 remain** — 9 backed by a throwing call or a
+> branch condition, 6 diagnostic dumps whose payload is the check's *detail* string, 3 conditional
+> on a timing window or on nothing happening, and 3 in the gate-excluded `gun_pen_audit`. Measured
+> composition: **504 failable of 522**. The property this section was actually chasing — a check
+> that is unbacked *and* cannot fail — is now **zero** in every suite the gate runs. See
+> `FIX_TRACKER.md` §T3b and §"The check count, honestly".
+>
 > **✅ FOUND WHILE FIXING THE FOUR — this section's own count was an undercount.**
 > Sweeping for the same shape turned up **fourteen** hardcoded-`True` conditions
 > (`check(name, True)`) across five suites, which the original T1–T11 inventory did not
@@ -562,11 +572,13 @@ skip, 2 known-broken) — no frontend file was touched.
 
 **Closed beyond the original list:** BE-H4 (a *transient* read error reported as permanent damage) was found while fault-injecting #4, and BE-M1/BE-M2 were the last two open instances of the A2/A3 shape.
 
-**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), **T1e** (the 10 step markers, documented rather than churned, plus the two `>= 0` checks inside `gun_pen_audit` which needs a live `llama-server`), and **T3b** (no other suite audited for the `library_delete` throwing-wait shape).
+**Still open, and none of it destructive or exploitable:** R6 (LICENSE/CHANGELOG), R7b (no lockfile), R10–R14 (repo hygiene: tracked scratch, 69 PNGs, 78 MB `.git` from 22 cline checkpoint refs), **BE-M3** (concurrent undos drift the history log — proven, needs a design decision), and **T1e** (the 21 remaining vacuous browser checks, all classified by class in the tracker's §T3b — 9 backed by something that can fail, 6 diagnostic dumps, 3 timing/nothing-conditional, 3 in the gate-excluded `gun_pen_audit`).
 
 **Closed in pass 3:** **T1** — all four vacuous browser checks rewritten as real assertions and mutation-verified 4/4; the honest browser-check count is now **476 total, all failable** (was 472 failable of 476).
 
 **Closed in pass 5:** **R9** — the "125-min worst case" was an unverified figure and unreachable by construction (a job-level `timeout-minutes` is a hard cap; measured runtime is **5.05 min for 28 suites** against a 45-min budget). The real hole — nothing guarded the *declaration*, so a job without one inherits GitHub's **360-minute** default — is now a test. **T2c** — route coverage is now a **gate**, not a hand sweep: `test_route_coverage.py` requires every route in `app.url_map` to be exercised (measured by a `before_request` recorder, not a source grep) or declared with a reason, and rejects stale declarations. It found 7 blind spots on its first run; `test_route_smoke.py` now drives 6 of them.
+
+**Closed in pass 6:** **T3b** — all 33 browser suites audited for the `library_delete` throwing-wait shape. Of 22 vacuous checks found, exactly **one was genuinely unbacked** (`phase14:87`, "the structure card saves beside the idea", backed by nothing but a 600 ms sleep) and now asserts the button's own `"Saved ✓"` confirmation — mutation-verified. The other 21 are classified by class in the tracker rather than churned. **Two corrections to this report's own numbers came out of it:** the gate runs **28 suites / 522 checks** (not 25 / 476), and "all 476 failable" is false — the measured composition is **504 failable of 522**, with the property this section was chasing (unbacked *and* unfailable) now at **zero** in every gate suite.
 
 **Live tracker:** `docs/audit/FIX_TRACKER.md` — kept current so the state of play is readable without re-deriving it from `git log`.
 

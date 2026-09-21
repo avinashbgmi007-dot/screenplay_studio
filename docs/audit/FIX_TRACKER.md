@@ -4,9 +4,11 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 5 — R9 closed; T2c closed with a real
-route-coverage gate; the hand sweep that misled pass 4 is now a permanent guard)
-**HEAD:** `de53ca1` (this pass's work commit)
+**Last updated:** 2026-09-21 (pass 6 — T3b closed: all 33 browser suites audited
+for the vacuous-check shape; the one genuinely unbacked check fixed; two of the
+audit's own headline numbers corrected)
+**HEAD:** `de53ca1` (pass-5 work commit) + `c6e3891` (tracker) — **committed locally,
+NOT pushed** (the sandbox's credential helper hangs; see the pass-6 note below)
 **Baseline for this pass:** `c6656df`
 
 ---
@@ -18,7 +20,7 @@ route-coverage gate; the hand sweep that misled pass 4 is now a permanent guard)
 | Unit + integration | `python -m pytest tests/` | **1559 passed, 3 skipped, 0 failed** |
 | Lint | `ruff check .` | **clean** |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | **32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken** |
+| Browser E2E | `python tests/run_browser_suites.py` | **32 suites: 28 pass, 0 fail, 2 skip, 2 known-broken** — **522 checks** (measured; 504 of them genuinely failable) |
 
 > Re-run all four after any code change. A row above is only true for the
 > commit named in "Last updated".
@@ -61,6 +63,8 @@ route-coverage gate; the hand sweep that misled pass 4 is now a permanent guard)
 | **R9** | The audit's *"45-min CI budget vs a 125-min worst case"* was an **unverified teammate figure**, and the wrong thing was being watched | Measured: the browser gate is **303 s (5.05 min) for 28 suites**, sequential, against the job's `timeout-minutes: 45` — ~9× headroom. The "125 min" is unreachable **by construction**: a job-level `timeout-minutes` is a hard cap, so no run can exceed 45 min; 125 reads as a sum of per-suite worst-case *waits*, which the job timeout pre-empts. The actual hole was that **nothing guarded the declaration** — a job without `timeout-minutes` inherits GitHub's **360-minute** default, so one hung suite burns six hours. `test_every_ci_job_declares_a_timeout` now parses `ci.yml`'s `jobs:` block and refuses an unbounded job. | ✅ **2/2** — removing the browser job's timeout, then the lint job's, each turns the guard red. It is **per-job**: it does not settle for "at least one job has one" |
 | **T2c** | No test enforced route coverage, so the next untested route would be found only by another hand sweep — and the pass-4 sweep was **wrong in both directions** (it missed a composed path, and credited the cowriter server with the webapp's paths) | New gate: `tests/route_recorder.py` (a `before_request` hook on both module-level Flask apps) + `tests/test_route_coverage.py`, which requires every route in the **authoritative** `app.url_map` to be exercised **or** declared with a reason, and rejects **stale** declarations. It found **7 blind spots on its first run** (6 webapp + the cowriter's auto `/static`). `tests/test_route_smoke.py` (11 tests) now drives 6 of them at their real contracts — the health probe, the metrics view behind the status strip, the finding-intent store, and the validation paths of the two SSE routes and translate. The 7th is declared: Flask auto-registers it against a `static/` folder that does not exist. | ✅ **4/4, delta-verified** — a route loses its only test → reported undeclared; a **new** route added with no test → caught; the recorder detached → the wiring check reports itself; a **stale** declaration → the registry-rot check fires |
 
+| **T3b** | The audit's last test-integrity item — *"no other suite was audited for the same throwing-wait shape"* | Audited all 33 browser suites: **21 vacuous checks remain**, classified by class (see the T3b section). The one genuinely unbacked check — `phase14:87`, "the structure card saves beside the idea", backed by nothing but a 600 ms sleep — now asserts the button's own `"Saved ✓"` confirmation. | ✅ making the save never confirm turns the check **FAIL** (`the save button never showed its confirmation`); suite green at baseline (47 passed), `app.js` restored byte-identical |
+
 **The pass-5 harness lesson (worth keeping).** The first mutation run reported
 "4/4 caught" and was **not trustworthy**: it ran only a two-file subset, and the
 gate legitimately fails a partial run (it asserts *"every route was exercised by
@@ -70,6 +74,55 @@ baseline run of the same scope and present under the mutation** — which also
 revealed that one mutation (a stale declaration) *cannot* be observed in a subset
 at all, because the undeclared-route assertion fires first. It now runs the full
 suite. `rc != 0` is not evidence; a signature that moved is.
+
+---
+
+## T3b — the throwing-wait shape, audited across all 33 browser suites
+
+The audit's last test-integrity item: `library_delete`'s flake was retired in pass
+3, but *no other suite had been audited for the same shape*. Swept every suite for
+checks whose condition cannot fail (literal `True`, `>= 0`, `or True`,
+`isinstance`) and classified each by what actually backs it.
+
+**The sweep needed two corrections before its numbers could be trusted — both
+false positives, both in the direction of over-reporting:**
+
+- `>=\s*0\b` also matches `>= 0.7` (a digit→dot transition *is* a word boundary),
+  so real width assertions (`pw / cw >= 0.7`, the manuscript-width checks) were
+  flagged as tautologies. Fixed with `(?![.\d])`.
+- A `check(name, True)` sitting inside a **comment** was counted as a check.
+  Fixed by skipping comment lines.
+
+**Result: 21 vacuous checks remain across 8 suites.** They are not one defect, and
+the difference decides the action:
+
+| Class | Count | Where | Action |
+|---|---|---|---|
+| Backed by a **throwing** call | 9 | `phase14` ×4, `smoke` ×2, `selection_translate` ×2, `rewrite_loop` | benign — the wait throws, so the guarantee **is** enforced; a count-inflater, same class as the 10 documented in pass 3 |
+| **Diagnostic dumps** | 6 | `identity_forensics` ×5, `layout_audit:215` | the payload is in the check's *detail* string ("token truth dumped", "scroll census: …"). Not assertions by intent |
+| **Timing-conditional markers** | 2 | `phase14:121`, `phase8:81` | inside `if running_seen:` — the branch condition **is** the observation. Asserting harder would be **flaky** (the demo model is fast; the running window can be missed) — the `library_delete` trap in reverse |
+| **Conditional on nothing happening** | 1 | `layout_audit:317` | "fix loop skips cleanly with no findings" — vacuously true when there are no findings |
+| In a suite the gate **does not run** | 3 | `gun_pen_audit` ×3 | needs a live `llama-server` (T1e, unchanged) |
+| **Genuinely unbacked — FIXED** | 1 | `phase14:87` | below |
+
+**The one real gap.** `check("premise: structure card saves beside the idea", True)`
+was backed by nothing but `page.wait_for_timeout(600)`. A sleep cannot fail, so the
+check passed **even if the POST never happened** — while its name made a specific,
+checkable promise. `saveIdeaStructure()` sets the button to `"Saved ✓"` and reverts
+it 1400 ms later, so the confirmation *is* observable. The check now waits for that
+confirmation and asserts it (the button's resting text is `"Save structure"`, so the
+"Saved" prefix cannot be satisfied by the idle state). **Mutation-verified:** making
+the save never confirm turns the check **FAIL** with
+`the save button never showed its confirmation`; the suite is green at baseline
+(47 passed) and `app.js` was restored byte-identical.
+
+**Why this stays an audit and does not become a third gate.** "Backed by a throwing
+call" measures **proximity, not semantics** — a `wait_for_selector` for element A
+five lines earlier does not back a claim about element B. So the count of
+genuinely-unbacked checks *cannot* be settled by a sweep, and the classification
+above required reading all 21 sites. Route coverage could become a gate because "was
+this route exercised" is a runtime fact the recorder answers objectively; "is this
+check meaningful" is a judgement, and a gate over a judgement is a gate that lies.
 
 ---
 
@@ -197,28 +250,51 @@ Redone as a clean `502 → 500` change it fails properly (`assert 500 == 502`).
 ## The check count, honestly
 
 The audit's headline correction was "4 of 476 browser checks cannot fail → 472".
-Sweeping for the same shape found **more than four**, but they are **not all the
-same defect**, and the difference decides the action:
+Sweeping for the same shape found **more than four**, and they are **not all the
+same defect** — the difference decides the action.
+
+**Pass 3 fixed 7 of them:**
 
 | Kind | Count | Action |
 |---|---|---|
-| Value-shaped tautologies (`x or True`, `count() >= 0`) — *look* like assertions on a value | 4 | ✅ **fixed**, 1:1, mutation-verified |
-| Unbacked `check(name, True)` — the assertion was never written | 2 | ✅ **fixed** (1 converted, 1 deleted) |
-| `check(name, True)` behind a throwing wait, where the wait *was* the assertion | 1 | ✅ **fixed** (T1c) |
-| **Step markers** — `check(name, True)` immediately after a throwing `expect()`/`wait_for_selector()`, so the guarantee **is** enforced | 10 | ⬜ **documented, deliberately not churned** |
-| In `gun_pen_audit` (skipped without a live `E2E_BASE` studio + real `llama-server`) | 2 | ⬜ **located, left unedited** |
+| Value-shaped tautologies (`x or True`, `count() >= 0`) — *look* like assertions on a value | 4 | ✅ fixed 1:1, mutation-verified |
+| Unbacked `check(name, True)` — the assertion was never written | 2 | ✅ fixed (1 converted, 1 deleted) |
+| `check(name, True)` behind a throwing wait, where the wait *was* the assertion | 1 | ✅ fixed (T1c) |
 
-**Why the 10 markers are left alone:** they cannot hide a regression — the
-preceding throwing call fails the suite — so converting them adds no assurance,
-while turning a marker into a DOM re-read introduces a *new* flake risk (the
-element can re-render between the wait and the check). The **latent trap is
-recorded**: if the preceding `wait_for_selector` is ever deleted, the marker
-silently becomes the only guard, and it is vacuous.
+**Pass 5 widened the sweep to every suite** (see T3b): **22 vacuous checks in
+total, 1 of them genuinely unbacked and now fixed.** The remaining 21 are classified
+by what backs them, and only 18 of those are in suites the gate actually runs
+(`gun_pen_audit`'s 3 are excluded without `E2E_BASE`).
 
-**Why the 2 in `gun_pen_audit` are not fixed blind:** that suite requires a live
-studio pointed at a real `llama-server` and a pre-seeded `gun_pen_2` project, so
-it cannot be executed here. An unverified test edit is exactly the failure mode
-this whole section is about.
+**And the headline total itself was wrong — in the *conservative* direction.** The
+gate now reports **28 suites / 522 checks / 0 failed** (measured from
+`run_browser_suites.py`), not the audit's "25 suites / 476 checks", which predates
+three suites entering the gate. The honest composition:
+
+| Kind | Count | Failable? |
+|---|---|---|
+| Real assertions | ~504 | ✅ yes |
+| Step markers whose guarantee is enforced by a **throwing** call or a **branch condition** | 9 (in-gate) + 10 (documented in pass 3) | ⚠️ the *guarantee* is real; the check itself cannot fail |
+| Diagnostic dumps — the payload is the check's *detail* string | 6 | ❌ no |
+| Conditional on a timing window / on nothing happening | 3 | ❌ no |
+| In `gun_pen_audit` (the gate does not run it) | 3 | n/a |
+
+So the audit's "476, all failable" became "472 failable of 476" and is now, measured,
+**504 failable of 522**. The number the audit was really chasing — a check that is
+**unbacked *and* cannot fail** — is **zero** across every suite the gate runs. The
+remaining 18 are backed by something that can fail, or are reporting steps by design.
+
+**Why the 10 markers from pass 3 are left alone:** they cannot hide a regression —
+the preceding throwing call fails the suite — so converting them adds no assurance,
+while turning a marker into a DOM re-read introduces a *new* flake risk (the element
+can re-render between the wait and the check). The **latent trap is recorded**: if
+the preceding `wait_for_selector` is ever deleted, the marker silently becomes the
+only guard, and it is vacuous.
+
+**Why the 3 in `gun_pen_audit` are not fixed blind:** that suite requires a live
+studio pointed at a real `llama-server` and a pre-seeded `gun_pen_2` project, so it
+cannot be executed here. An unverified test edit is exactly the failure mode this
+whole section is about.
 
 ---
 
@@ -239,7 +315,28 @@ this whole section is about.
 | R10 | Root scratch files tracked in git | hygiene | open |
 | R11–R14 | 69 PNGs in `docs/audit/`; `.git` 78 MB from 22 cline checkpoint refs | hygiene | open |
 | **T1e** | The 10 step markers above (documented, not defects) + the 2 in `gun_pen_audit` (need a live `llama-server`) | test integrity | open |
-| **T3b** | `library_delete`'s flake is retired by the T1c rewrite, but no other suite was audited for the same throwing-wait shape | test integrity | open |
+
+---
+
+## ⚠️ Pass-6 blocker: pushes cannot land from this session
+
+Passes 5 and 6 are **committed locally and unpushed**. The remote sits at `c6656df`
+while local HEAD is ahead of it. This is an **environment** failure, diagnosed
+precisely after four hangs of 3–12 minutes each:
+
+| Probe | Result |
+|---|---|
+| `git ls-remote origin main` (upload-pack) | **200** in 0.4 s — the network is fine |
+| `curl` GET / POST to github.com | 200 / 404, both < 0.4 s — **outbound POST is not blocked** |
+| `/info/refs?service=git-receive-pack` | **401** in 0.3 s — reachable; the stall is **auth** |
+| `printf 'protocol=https\nhost=github.com\n\n' \| git credential fill` | **exit 124 (timeout), zero output** |
+
+The last row is the cause: the credential helper (`helper-selector` + PortableGit's
+GCM) **hangs forever instead of failing**, and neither `GCM_INTERACTIVE=never` nor
+`GIT_TERMINAL_PROMPT=0` prevents it — git waits on a helper that never answers.
+Earlier pushes in this session *did* land (`c6656df`), so the cached credential
+expired mid-session. **No repo-side fix exists.** `git push origin main` from a
+normal shell lands both commits.
 
 ---
 

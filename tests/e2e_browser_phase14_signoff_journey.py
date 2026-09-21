@@ -83,8 +83,23 @@ def run(base):
         page.locator("#idea-logline").fill(
             "A courier must deliver a letter she wrote to herself ten years ago — before she reads it.")
         page.locator("#idea-structure-save").click()
-        page.wait_for_timeout(600)
-        check("premise: structure card saves beside the idea", True)
+        # The save confirms on the button itself: saveIdeaStructure() sets
+        # textContent to "Saved ✓" and reverts it 1400ms later. The check's name
+        # claims the card SAVES, so assert the confirmation rather than sleeping
+        # 600ms and passing unconditionally -- the old form could not fail even
+        # if the POST never happened. (Initial text is "Save structure", so
+        # matching the "Saved" prefix cannot be satisfied by the resting state.)
+        confirmed = False
+        try:
+            page.wait_for_function(
+                "() => { const b = document.querySelector('#idea-structure-save');"
+                " return !!b && b.textContent.indexOf('Saved') === 0; }",
+                timeout=5000)
+            confirmed = True
+        except Exception:
+            confirmed = False
+        check("premise: structure card saves beside the idea", confirmed,
+              "the save button never showed its confirmation")
 
         # ================= 5. SCRIPT (graduate) =================
         with open(FIXTURE, "rb") as f:
