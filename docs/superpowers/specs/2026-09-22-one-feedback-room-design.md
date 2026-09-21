@@ -30,8 +30,10 @@ writer intent moves one lens but not the queue header or dawn meter.
 3. **New script** — Run Analysis sits centered on the empty manuscript (hero position).
    Progress chip + 20-stage hover map stays. Partial failure → one banner:
    *"N passes failed (e.g. Plot) — rerun just those"* driving the existing
-   `retry-failed-categories` endpoint. All green → **soft-land**: the Feedback desk
-   state with the arrival strip on top; the writer is not hard-redirected.
+   `retry-failed-categories` endpoint. All green → **soft-land**: the desk shows the
+   arrival peek (halo + unread dot — the existing `scheduleArrivalPeek` behavior); the
+   dock does NOT spring open unprompted. Page-first wins over report-first: the writer
+   sees their pages and one calm "what changed" signal, and opens the ledger when ready.
 4. **Analyzed script** — opens directly into the desk state below.
 
 ## 3. The desk layout — "One Desk, One Ledger"
@@ -101,7 +103,7 @@ ledger**.
 
 | Field | New home |
 |---|---|
-| `verification.note` + `rule_id` | Finding card body (not hover-only); `rule_id` deep-links to the KB rule's attribution |
+| `verification.note` + `rule_id` | Finding card body (not hover-only); `rule_id` shows a popover with rule name + craft source (a full KB browser is a deferred feature — do not deep-link into a surface that doesn't exist) |
 | `check_id` | Rendered alongside `rule_id` when present |
 | `errors[]` (report) | The §2.3 partial-failure banner |
 | `model_used` | Report/dock header (status strip shows config model — possibly not the analyzing model) |
@@ -171,4 +173,32 @@ Rider (red-team): every count in the banner/queue/dock is computed through
 
 Backend pipeline passes, KB rules, personas' prompts, new endpoints beyond the
 `/fixqueue` allowlist widening, margin threads (Phase 2), mobile-specific layouts.
+
+
+## 13. Self-critique resolutions (risks found by attacking this spec)
+
+1. **Big-bang risk.** This touches `app.js` (9,201 lines), `index.html`, `style.css`,
+   `webapp_server.py`, and the e2e suites at once. The implementation plan MUST phase
+   it, each phase independently green:
+   - **P0 — Subtractions + one counting path** (kill list, `findingDisposition`
+     everywhere, metrics refresh). Pure deletion + rewiring; biggest clutter win,
+     lowest risk.
+   - **P1 — Ledger rebuild** (real collapse, live-highs default + "this scene" chip,
+     one-rendering-per-finding, arrival inversion + fix-loop CTA).
+   - **P2 — Honesty surfacing + failure banner + soft-land** (§7, §2.3).
+   - **P3 — Layout polish** (floating cards off the page text, unified ink/click
+     matcher, persona-beside-dock width rule below).
+2. **Width budget (script-first ≥50% can be violated).** Dock + persona drawer open
+   together can squeeze the manuscript below 50% — the exact failure the audits
+   photographed. Rule: **below ~1600px viewport, the persona drawer takes the dock's
+   zone** (dock collapses to its edge button; the originating finding card stays pinned
+   atop the chat); at ≥1600px they may sit side by side. Manuscript never drops under
+   50% — enforced in the layout audit tests.
+3. **Legacy stored state can resurrect retired surfaces.** Session restore
+   (`view:"feedback"`, Problem Board open flags, old prefs) must be sanitized on load:
+   retired view → desk; unknown/removed surface keys ignored, logged, never rendered.
+4. **Visual truth gate.** Acceptance criteria are functional; "clutter-free and
+   graceful" is visual. First task of the implementation plan: render the new desk
+   with real Gun_Pen data and screenshot-review it (night AND dawn) BEFORE the P1
+   rebuild is called done. The ~15% layout uncertainty is retired by pixels, not prose.
 
