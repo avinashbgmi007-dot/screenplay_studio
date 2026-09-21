@@ -1243,8 +1243,19 @@ def reparse_project(name):
     m.stages["analyze"] = StageStatus()
     m.save()
     for p in (m.report_findings_path, m.report_md_path, m.progress_path):
-        if os.path.exists(p):
-            os.remove(p)
+        # A refusal here must not escape. The front-end reads `error` off the
+        # body, so an unguarded raise answers with Flask's HTML 500 instead and
+        # the writer is told nothing they can act on. Failing LOUDLY is still the
+        # right call — the parse succeeded, so continuing would leave a stale
+        # report on screen against a fresh parse, which is the "stale state shown
+        # as current" lie this desk is built not to tell. The message says which
+        # of the two things happened.
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+        except OSError as e:
+            return _error(f"Re-parsed, but could not drop the stale analysis file "
+                          f"{os.path.basename(p)}: {e}", 500)
 
     # Refresh the display copy from the fresh parse. revision.ensure_working
     # self-heals a stale working copy only when the writer has NO edits; if
@@ -2391,8 +2402,17 @@ def upload_draft(name):
     except Exception as e:
         return _error(f"Could not process new draft: {e}", 500)
     finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        # Cleanup is NOT the operation, and a `finally` is the worst place to
+        # raise from: an exception here REPLACES any in-flight one, so a failed
+        # temp-file removal would discard the clear "Could not process new draft"
+        # error returned just above and escape as a generic 500 — the writer
+        # loses the real reason and learns nothing. Report it and move on; the
+        # file is a temp upload they never see, and the next upload overwrites it.
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError as e:
+            print(f"[drafts] could not remove {tmp_path} — continuing: {e}")
 
     return jsonify(_manifest_summary(m))
 

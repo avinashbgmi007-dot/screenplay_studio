@@ -110,6 +110,50 @@ tracker-stamp commit that follows carries the same content.
 
 ---
 
+## Closed in this pass (2026-09-21, pass 14e) — the last two unguarded destructive calls, and a bug in the sweep that found them
+
+Pass 12 swept every destructive filesystem call with an AST and split them by **blast radius**: the
+two multi-file `rmtree` sites could leave a PARTIAL result, so they were fixed; the single-file
+`os.remove` sites *"either happen or raise"*, so they were recorded and left alone. **That split was
+right about state and wrong about reporting.** A raise is not free — the front-end reads `error` off
+the response body, so an unguarded raise answers with Flask's HTML 500 and the writer is told nothing
+they can act on. Both remaining sites are now guarded, and one was worse than recorded:
+
+| site | call | what it did before |
+|---|---|---|
+| `reparse_project` | `os.remove(p)` over the stale analyze artifacts | escaped the handler → an HTML 500 instead of a sentence naming the file |
+| `upload_draft` | `os.remove(tmp_path)` in a **`finally`** | **an exception in a `finally` REPLACES the in-flight exception** — so a failed temp-file cleanup discarded the clear `"Could not process new draft: …"` error returned just above and escaped as a generic 500. The writer lost the real reason. |
+
+The two treatments differ on purpose, and the difference is the point:
+
+- **`reparse_project` fails LOUDLY** (`"Re-parsed, but could not drop the stale analysis file
+  report.md: …"`). The parse succeeded, so silently continuing would leave a stale report on screen
+  against a fresh parse — the "stale state shown as current" lie this desk is built not to tell.
+- **`upload_draft` is non-fatal** — cleanup is not the operation, the file is a temp upload the writer
+  never sees, and the next upload overwrites it. It reports the refusal and carries on.
+
+### And the sweep that produced the pass-12 table was itself buggy
+
+Re-running the sweep flagged **five** route-handler sites as unguarded. Reading them showed **three
+were already inside `try` blocks**. The bug: the guard test asked whether the line fell inside the
+**first statement** of a `try` body (`in_span(lineno, sub.body[0])`) rather than inside the body's
+span — and the first statement of a try body is one line, so only calls on that exact line looked
+covered. Fixed, the sweep agrees with the pass-12 table exactly: **two** unguarded sites, the two
+fixed here.
+
+**That is the third instrument to lie in this session** — a proxy, a blocked port, and now my own AST
+walk. Each correction came from reading the code the instrument pointed at, which is worth noting as
+the habit rather than the exception.
+
+### Verified
+- `tests/test_destructive_paths.py` (new, 3 tests), **mutation-verified 2/2** as named failures with
+  the source restored byte-identical (`.workbuddy-ai/scratch/destructive_mutation.py`).
+- The `finally` test pins the information-loss property, not just the status code: it asserts the
+  response still carries `Could not connect to llama-server`, which is exactly what the unguarded
+  version discarded.
+
+---
+
 ## Closed in this pass (2026-09-21, pass 14c) — the audit's own output was lying in three more places
 
 Once the harness stopped hanging, the full `gun_pen_audit` ran to completion against a live model and
@@ -193,7 +237,7 @@ whose default filter already admits every severity the widen is a **no-op**, so 
 `widen_filter` now returns what it toggled — read from the chips' own `aria-pressed`, not guessed from
 a card count — and the suite **says so** when it did nothing, instead of passing quietly.
 
-### And the gate itself was flaky by construction
+### And the gate itself was flaky by construction (pass 14d)
 
 Re-running the 34-suite browser gate after the shared-harness change came back
 `34 suites: 32 passed, 1 failed, 1 skipped` — with the failure being:
@@ -484,11 +528,20 @@ away:
 |---|---|---|---|
 | `webapp_server.py:822` | `DELETE /api/projects/<name>` | `shutil.rmtree(project_dir, ignore_errors=False)` | **unguarded** |
 | `ideas.py:172` (`IdeaStore.delete`) | `DELETE /api/ideas/<id>` | `shutil.rmtree(self._dir(idea_id))` | **unguarded** |
-| `webapp_server.py:1038`, `:2186` | reparse / drafts | `os.remove(tmp_path)` | unguarded, but **single file** — noted, not changed |
+| `webapp_server.py:1038`, `:2186` | reparse / drafts | `os.remove(tmp_path)` | unguarded, but **single file** — noted in pass 12, **fixed in pass 14e** |
 | `:749`, `:782`, `:1574`, `:3377` | sample / upload / progress / graduate | `os.remove(...)` | already inside a `try` |
 
 Only the two `rmtree` calls can leave a **partial** result; a single-file `os.remove` either
 happens or raises. So those two are fixed and the rest are recorded.
+
+**That split was right about STATE and wrong about REPORTING — corrected in pass 14e.** "Either
+happens or raises" is not the same as "raises safely": the front-end reads `error` off the response
+body, so an unguarded raise answers with Flask's HTML 500 and the writer is told nothing they can act
+on. Worse, one of the two was a `finally`, where a raise **replaces the in-flight exception** — so a
+failed temp-file cleanup discarded the real error and escaped instead. Both are now guarded, and the
+pass-12 sweep that produced this table turned out to have a bug of its own (it tested whether a line
+fell inside the FIRST statement of a `try` body rather than inside the body's span, so it reported
+four *already-guarded* call sites as unguarded).
 
 ### The fix is a REUSE — and that is the part worth reading
 
