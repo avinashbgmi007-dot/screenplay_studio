@@ -196,3 +196,42 @@ Chromium is required: `python -m playwright install chromium` (CI adds `--with-d
 llama-server -m your-model.gguf --port 8080 --jinja
 python -m screenplay_studio run sample.fountain --project ./demo --server http://localhost:8080 --skip-chat
 ```
+
+## Running the gates from inside an agent sandbox (read before trusting a red *or* green run)
+
+If the test process — **or the studio it boots** — is a child of an agent shell, its file deletions
+can be intercepted by the agent's own safety hook, and every result becomes suspect in both
+directions.
+
+Measured 2026-09-21 (pass 14b). Two different shapes, one cause:
+
+```
+[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":4719,"threshold":50,"scope":"turn",
+  "targets":["…\\studio_projects\\gun_pen_2\\progress.json"],"targetCount":1}
+```
+
+1. **A booted studio's `os.remove()` gets refused.** `POST /api/projects/<name>/analyze
+   {"force": true}` clears the progress heartbeat, and the refusal escaped the handler's `try` (now
+   guarded — see `tests/test_analyze_preflight.py`). Read the resulting `RemoteDisconnected`
+   carefully: a Flask dev server converts an unhandled **`Exception`** into a **500**, and closes the
+   connection with no reply only for a throwable *outside* `Exception` — so `RemoteDisconnected`
+   means a **BaseException**, not an ordinary error. That is why the refusal was not an `OSError`,
+   and why `except OSError` cannot catch it. Verify the transport behaviour with a throwaway
+   three-route Flask app before theorising about which exception escaped.
+2. **pytest's own tmp-directory garbage collection gets refused**, which kills the session during
+   teardown. The run reported `EEEEE` + `F` with its failure summary **never written** — and a clean
+   re-run of the same tree was green.
+
+So:
+
+- **A red run from inside the sandbox is not evidence of a regression, and neither is a green one.**
+  Re-run anything surprising, and start the studio from a normal terminal when the verdict matters —
+  especially for anything that deletes.
+- Capture results somewhere a dying process cannot take with it: `pytest tests/ --junitxml=out.xml`,
+  not stdout alone, because a killed session loses the summary section entirely.
+- Boot long-running servers **with a log** (`-u … > studio.log 2>&1`). The cause of a dropped
+  connection is in the *server's* stderr, and a background task with no log has no stderr to read.
+- When a harness goes silent, ask it for its stack (`pip install py-spy; py-spy dump --pid <pid>`)
+  rather than inferring from sockets. `netstat` sent this pass chasing two wrong theories before one
+  stack dump named the line.
+

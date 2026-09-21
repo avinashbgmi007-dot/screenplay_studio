@@ -124,7 +124,7 @@ step_pass2 (e2e_browser_gun_pen_audit.py:734)
 It was inside the 3600 s wait **added in pass 14**, waiting on a trigger that had never been
 accepted.
 
-### The product defect: an exception the handler could not convert
+### The product defect: an unguarded pre-flight
 
 `POST /api/projects/<name>/analyze` with `{"force": true}` closed the connection with **no reply**
 (`RemoteDisconnected`, 0.17 s), while the identical POST with no body returned 200. The studio's own
@@ -136,17 +136,40 @@ stderr said why:
 ```
 
 `_analyze_locked`'s pre-flight — manifest rewrite, stage reset, heartbeat clear — sat **outside** the
-handler's `try`. The refusal escaped it, and a Flask dev server answers an exception it cannot
-convert by dropping the socket. Proof the delete never ran: `progress.json` still held its old
-21:12:08 stamp and the stage reset was never persisted.
+handler's `try`, and the refusal escaped it. Proof the delete never ran: `progress.json` still held
+its old 21:12:08 stamp and the stage reset was never persisted.
 
-Two changes:
-- the pre-flight is inside its own `try` and returns a clear JSON 500
-  (`"Could not start the analysis: …"`), which the front-end can show;
+**Correction, made in the same pass after the fix was already written — and it changes what the fix
+is worth.** I first wrote this up as "an exception the handler could not convert", assuming an
+`OSError`. A three-route probe settles what a Flask dev server actually does:
+
+| route raises | `curl` | `requests` |
+|---|---|---|
+| `OSError` (an `Exception`) | **HTTP 500** | HTTP 500, HTML body |
+| `SystemExit` (a `BaseException`) | **HTTP 000** | `RemoteDisconnected` |
+
+An ordinary error is **already** converted into a 500 — Flask's handler catches `Exception`. Only a
+throwable *outside* `Exception` reaches Werkzeug and closes the socket. So **`RemoteDisconnected`
+from a Flask dev server means a BaseException, not a normal error** — which means the refusal was
+**not** an `OSError`, and `except OSError` / `except Exception` do **not** catch it. The guard below
+is real and worth keeping, but it is **not** what made the re-run pass: the refusal simply stopped
+recurring (a fresh studio process, a fresh delete counter), so the live path never exercised it. What
+proves the guard is its **unit test**, not the green run — and the underlying drop is an environment
+behaviour the product cannot legitimately catch, because the only way to catch a BaseException is to
+swallow `SystemExit` and `KeyboardInterrupt` with it.
+
+Two changes (kept, with their justification corrected):
+- the pre-flight is inside its own `try` and returns a **JSON** 500. Flask's own 500 is an HTML page
+  and the front-end reads `error` off the body, so this is about the writer getting a sentence they
+  can act on rather than a stack trace they cannot;
 - `_clear_progress(m)` drops the heartbeat **non-fatally**. `progress.json` is a heartbeat, not the
   writer's data: the pipeline's first event overwrites it within seconds, and failing a whole
   re-analysis over a transient cache file costs the writer a run and tells them nothing. It
   **prints** the refusal rather than swallowing it.
+
+**What actually made the re-run green** was neither of the above: it was the harness fix below plus
+the trigger simply not being refused again. Recorded plainly because the difference matters — a green
+run that does not exercise the fix is not evidence for the fix.
 
 ### The harness defect: a wait loop that manufactured the timeout it was built to prevent
 
@@ -165,9 +188,10 @@ for the entire budget. Now:
 - pytest **1614 passed / 4 skipped / 0 failed** (1618 collected), ruff clean.
 - `tests/test_analyze_preflight.py` (new, 4 tests) — mutation-verified **2/2** as **named** failures,
   source restored byte-identical (`.workbuddy-ai/scratch/preflight_mutation.py`).
-- The trigger now holds: `POST /analyze {"force": true}` keeps the connection open and the run
-  actually starts (`stage: dialogue` → `theme` → `character` → `coverage` → `logline_test`, with live
-  model connections).
+- The trigger holds **in practice**: `POST /analyze {"force": true}` keeps the connection open and the
+  run actually starts (`stage: dialogue` → `theme` → `character` → `coverage` → `logline_test`, with
+  live model connections). **But per the correction above, this run never hit the refusal** — so it
+  is evidence the path works, not evidence the guard works.
 - **`pass2` is GREEN: `9 passed, 0 failed`, 0 gaps filed** — against a real 12-pass analysis on the
   live 35B model, and with the arrival arithmetic **exact** (`Pass: 31 → 31 still live · 0 no longer
   flagged · 0 new` vs the board's own count of 31). That is the check that reported a false failure
