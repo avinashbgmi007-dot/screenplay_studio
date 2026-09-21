@@ -338,26 +338,6 @@
             </div>
           </aside>
           <button id="right-edge-affordance" type="button" title="Open the context dock — evidence and partners beside the page">Context</button>
-          <!-- Phase 13: the Problem Board moved to the live workspace row —
-               its legacy home inside .desk has been display:none in script
-               mode since Stage 3B, so the board (and its edge tab) were
-               unreachable: toggling "open" stretched it to 0x0 inside the
-               hidden desk. Same ids, same handlers; the sibling order keeps
-               the collapsed-board + edge-tab pairing intact. -->
-          <aside id="problem-board" class="problem-board" style="display:none;">
-            <div class="pb-head">
-              <button id="pb-toggle" class="pb-toggle" type="button" title="Collapse/expand the Problem Board">▾</button>
-              <span class="pb-title">Problem Board</span>
-              <select id="pb-filter" class="pb-filter">
-                <option value="all">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div id="pb-list" class="pb-list"></div>
-          </aside>
-          <button id="pb-edge-tab" class="pb-edge-tab" type="button" title="Open the Problem Board — findings for the current scene">☰ Board</button>
         </div>
         <!-- Phase 13: the diff chips (what changed vs the previous draft)
              live under the desk toolbar now — the legacy home inside .desk

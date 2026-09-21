@@ -68,3 +68,16 @@ def test_feedback_view_clone_is_gone():
     with open(_INDEX_HTML, encoding="utf-8") as f:
         # the element id, not the historical phrase in comments
         assert 'id="feedback-view"' not in f.read()
+
+
+def test_problem_board_is_gone():
+    # P0.2: the Problem Board (a fifth findings surface that ignored
+    # findingDisposition/findingPassesFilter, contradicted the dock's counts,
+    # and slid over the page during reading) is retired outright. The scene
+    # rail's severity dots and the Evidence dock are the canonical surfaces.
+    src = _source()
+    assert "renderProblemBoard" not in src
+    assert "pbItemClick" not in src
+    with open(_INDEX_HTML, encoding="utf-8") as f:
+        # the element id, not the historical phrase in comments
+        assert 'id="problem-board"' not in f.read()

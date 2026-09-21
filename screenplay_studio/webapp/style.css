@@ -290,9 +290,8 @@
   --z-banner: 100;          /* error banner, overflow dropdown */
   --z-badge: 300;           /* level badge */
   --z-dock-sheet: 420;      /* context dock mobile sheet */
-  --z-board: 510;           /* problem board */
-  --z-board-tab: 515;       /* problem board + rail edge tabs */
-  --z-rail: 520;            /* struct rail, desk toolbar above the board */
+  --z-board-tab: 515;       /* rail edge tab */
+  --z-rail: 520;            /* struct rail, desk toolbar */
   --z-drawer: 590;          /* room drawer (chat) */
   --z-above-drawer: 600;    /* desk gutter, lang menu, conn card — clear 590 */
   --z-edge-affordance: 610; /* right-edge affordance above drawer + panels */
@@ -344,7 +343,7 @@
   --elev-modal: 0 14px 44px var(--shadow-a55);         /* modals, palette */
   --elev-float: 0 12px 32px -8px var(--shadow-a60);   /* pop-overs: banner, text-popup */
   --elev-fab: 0 8px 22px -8px var(--shadow-a60);      /* quote-float */
-  --elev-tab: -6px 0 18px var(--shadow-a30);          /* pb-edge-tab */
+  --elev-tab: -6px 0 18px var(--shadow-a30);          /* right-edge affordance */
   --blur-glass: 14px;                                  /* glass panels + pop-overs */
   --wash-w06: rgba(255, 255, 255, 0.06);
   --wash-w05: rgba(255, 255, 255, 0.05);
@@ -1555,17 +1554,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 /* wide desk: promote the margin to the gutter right of the 700px paper. 1236px
    is page(700) + both gutters(236 x2) + the container's 32px padding, i.e. the
    first width at which the paper's right edge leaves room for the column.
-   Gated on the Problem Board NOT being an open overlay: the board is a
-   position:absolute 300px panel in this same row, so promoting the column while
-   the board is open would just park the pins underneath it (findings you cannot
-   see beat findings that cover the script, but only just). With the board open
-   the pins stay in the page's flow instead, and the margin column appears as
-   soon as the writer gives the paper its gutter back. */
+   (P0.2: this used to be gated on the Problem Board NOT being open — the board
+   is retired, so the gutter promotion is unconditional at this width.) */
 @container manuscript-column (min-width: 1236px) {
-  /* the subject of every rule below is the margin itself; only the QUERY is
-     answered by #manuscript-container, so gating on the row's board state
-     (an ancestor of the container) is legal here. */
-  .manuscript-workspace-layout:not(:has(#problem-board.visible:not(.pb-collapsed))) .scene-notes {
+  .manuscript-workspace-layout .scene-notes {
     position: absolute;
     left: 100%;
     right: auto;
@@ -1582,9 +1574,9 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
     z-index: 2;
     overflow-y: auto;
   }
-  .manuscript-workspace-layout:not(:has(#problem-board.visible:not(.pb-collapsed))) .scene-notes > .finding-note { flex: 0 0 auto; }
+  .manuscript-workspace-layout .scene-notes > .finding-note { flex: 0 0 auto; }
   /* the gutter column clears the paper, so the pin can float again */
-  .manuscript-workspace-layout:not(:has(#problem-board.visible:not(.pb-collapsed))) .finding-pin { box-shadow: 0 3px 10px var(--shadow-a40); }
+  .manuscript-workspace-layout .finding-pin { box-shadow: 0 3px 10px var(--shadow-a40); }
 }
 
 .finding-note {
@@ -3343,8 +3335,6 @@ body.idea-mode #rail-edge-tab { display: none !important; }
 .spotlight-mode .gutter,
 .spotlight-mode #room-drawer,
 .spotlight-mode .craft-shelf,
-.spotlight-mode #problem-board,
-.spotlight-mode #pb-edge-tab,
 .spotlight-mode .script-level-notes { display: none !important; }
 
 /* the manuscript breathes — wider pages, no toolbar crowding above */
@@ -3465,189 +3455,6 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 
 
 /* ============================================================
-   Problem Board: findings panel on the right side of the workspace
-   ============================================================ */
-
-.problem-board {
-  position: absolute;
-  top: 0; right: 38px; bottom: 0;
-  width: 300px;
-  min-width: 250px;
-  max-width: 350px;
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, var(--ink-900), var(--ink-950));
-  border-left: 1px solid var(--line-soft);
-  box-shadow: var(--elev-lean-right);
-  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1);
-  overflow: hidden;
-  z-index: var(--z-board);
-}
-.problem-board.pb-collapsed {
-  /* 100% of the board + its 38px inset from the row's right edge — the slide
-     must clear BOTH, or the collapsed board parks inside the row (the row
-     clips it, so this is belt-and-braces against a mid-transition flash) */
-  transform: translateX(calc(100% + 38px));
-  border-left: none;
-  box-shadow: none;
-}
-
-.pb-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-5) var(--sp-6);
-  border-bottom: 1px solid var(--line-soft);
-  flex-shrink: 0;
-}
-
-.pb-toggle {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  padding: var(--sp-1) var(--sp-3);
-  border-radius: var(--r-sm);
-  transition: color 0.15s, background 0.15s;
-}
-.pb-toggle:hover { color: var(--text); background: var(--surface2); }
-
-.pb-title {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  flex: 0 0 auto;
-}
-
-.pb-filter {
-  margin-left: auto;
-  appearance: none;
-  -webkit-appearance: none;
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 0h8L4 4z' fill='%236b6880'/%3E%3C/svg%3E") no-repeat right var(--sp-3) center;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-sm);
-  padding: var(--sp-1) calc(var(--sp-5) + var(--sp-3)) var(--sp-1) var(--sp-3);
-  cursor: pointer;
-}
-.pb-filter:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in oklab, var(--accent) 35%, transparent);
-}
-
-.pb-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--sp-4) var(--sp-6);
-}
-
-.pb-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-4);
-  padding: var(--sp-4) 0;
-  border-bottom: 1px solid var(--line-soft);
-  cursor: pointer;
-  transition: background 0.12s;
-}
-.pb-item:hover { background: var(--surface2); }
-.pb-item.active {
-  background: var(--glow-lamp-08);
-  border-left: 2px solid var(--accent);
-  padding-left: var(--sp-3);
-}
-
-.pb-sev {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: var(--sp-2);
-}
-.pb-sev.high { background: var(--danger); }
-.pb-sev.medium { background: var(--lamp); }
-.pb-sev.low { background: var(--ok); }
-
-.pb-scene {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  flex-shrink: 0;
-  min-width: 36px;
-}
-
-.pb-body { flex: 1; min-width: 0; }
-
-.pb-cat {
-  font-family: var(--font-mono);
-  font-size: var(--fs-3xs);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.pb-issue {
-  font-size: var(--fs-sm);
-  color: var(--text);
-  line-height: 1.4;
-  margin-top: var(--sp-1);
-}
-
-.pb-empty {
-  text-align: center;
-  padding: 24px var(--sp-6);
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  font-family: var(--font-mono);
-}
-
-/* Problem Board visible state */
-.problem-board.visible {
-  display: flex;
-}
-.problem-board.visible:not(.pb-collapsed) {
-  animation: pbSlideIn 0.25s ease-out;
-}
-
-@keyframes pbSlideIn {
-  from { opacity: 0; transform: translateX(16px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-/* Right-edge tab that summons the Problem Board when collapsed.
-   Phase 13: it now shares the row's right edge with the dock affordance
-   ("Context", ~33px, always flush right) — at right:0 the Board tab sat
-   exactly on top of it and swallowed its clicks, making the dock
-   unopenable. The clearance keeps both handles usable. */
-.pb-edge-tab {
-  display: none;
-  position: absolute;
-  right: 38px; top: 50%;
-  transform: translateY(-50%);
-  z-index: var(--z-board-tab);
-  writing-mode: vertical-rl;
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  background: var(--ink-900);
-  border: 1px solid var(--line-soft);
-  border-right: none;
-  padding: var(--sp-7) var(--sp-4);
-  cursor: pointer;
-  border-radius: var(--r-md) 0 0 var(--r-md);
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-.pb-edge-tab:hover { color: var(--accent); border-color: var(--accent-deep); }
-.problem-board.pb-collapsed + .pb-edge-tab { display: block; }
-/* ============================================================
    Responsive
    ============================================================ */
 
@@ -3712,8 +3519,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
   #cowrite-panel, #feedback-panel, #struct-rail, #status-strip,
   .drawer, .gutter, .rail-edge-tab, .desk,
-  #context-dock, #right-edge-affordance, #scene-index,
-  #problem-board, .pb-edge-tab {
+  #context-dock, #right-edge-affordance, #scene-index {
     display: none !important;
   }
   #manuscript-workspace { display: block !important; }
@@ -5721,15 +5527,6 @@ body:not(.idea-mode) #manuscript-workspace {
 @media (min-width: 901px) {
   body.shelf-open .manuscript-workspace-layout { padding-left: calc(var(--sidebar-w) + 44px); }
 }
-/* the board bows to an open dock — both are right-edge surfaces, and the
-   board would otherwise bury 300 of the dock's 380px (and the dock's
-   affordance). The board is a sibling of the dock, so CSS can see it. */
-#context-dock.open ~ #problem-board { right: 380px; }
-/* ...and its collapsed slide must clear that offset too, or translateX(105%)
-   parks it ON the dock instead of off the row (300px board + 380px bow). */
-#context-dock.open ~ #problem-board.pb-collapsed {
-  transform: translateX(calc(100% + 380px));
-}
 @media (max-width: 900px) {
   /* narrow desks: the rail's 44px RESERVATION is revoked so the manuscript
      takes the full width — the rail itself stays (compact 40px overlay at
@@ -6269,10 +6066,6 @@ body.river-read #right-edge-affordance { display: none; }
   .dock-body { padding: var(--sp-6); }
   .dock-lens-tab { padding: var(--sp-3) var(--sp-6); } /* ≥44px hit zone via font+padding row */
   .dock-close { min-width: 44px; min-height: 44px; }
-  /* the dock is a full-width bottom sheet here — there is no 380px side
-     column for the board to bow to, so it reclaims the right edge.
-     The Board tab keeps its affordance clearance either way. */
-  #context-dock.open ~ #problem-board { right: 0; }
 }
 
 /* the legacy desk row is retired in script mode: the manuscript workspace

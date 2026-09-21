@@ -230,16 +230,20 @@ class TestManuscriptMarginContract:
     def test_the_gutter_column_is_gated_on_real_room(self):
         """The overlap survived a viewport media query because the dock takes
         380px WITHOUT changing the viewport: at 1440px the paper's gutter was
-        already gone. The promotion must key off the container, and must not
-        fire while the Problem Board's absolute overlay holds that gutter."""
+        already gone. The promotion must key off the container. (P0.2: the
+        Problem Board overlay that used to hold the gutter is retired, so the
+        old "stand down while the board is open" gate must be GONE — a gate on
+        a deleted element is dead weight that also breaks :has()-less
+        engines.)"""
         import re
         css = open("screenplay_studio/webapp/style.css", encoding="utf-8").read()
         assert "container: manuscript-column / inline-size" in css, (
             "#manuscript-container no longer establishes the container context")
         assert "@container manuscript-column" in css, (
             "the margin promotion must be a container query, not a media query")
-        assert ":not(:has(#problem-board.visible:not(.pb-collapsed)))" in css, (
-            "the gutter column must stand down while the board overlay is open")
+        assert ":not(:has(#problem-board" not in css, (
+            "the gutter column must not gate on the retired Problem Board — "
+            "the board is gone, so the gate is vacuous and only costs :has()")
         assert not re.search(r"\.scene-notes\s*\{[^}]*right:\s*-18px", css), (
             "the margin is pinned back over the paper")
 

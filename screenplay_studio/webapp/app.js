@@ -1653,8 +1653,18 @@ async function uploadFile(file) {
 const SESSION_KEY = "screenplay_studio.session.v1";
 const PREFS_KEY = "screenplay_studio.prefs.v1";
 
+// P0.2: stored state can name surfaces that no longer exist (a refresh after
+// an upgrade would otherwise resurrect them). One predicate sanitizes both
+// prefs and the saved session before either is used.
+function _sanitizeLegacyState(p) {
+  const out = { ...(p || {}) };
+  if (out.view === "feedback") out.view = "desk"; // retired drawer state -> desk
+  delete out.pbOpen; delete out.problem_board;    // retired board prefs
+  return out;
+}
+
 function loadPrefs() {
-  try { return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); } catch (_) { return {}; }
+  try { return _sanitizeLegacyState(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")); } catch (_) { return {}; }
 }
 
 function savePrefs(patch) {
@@ -1978,7 +1988,8 @@ function saveSession() {
 
 function restoreSession() {
   try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    return saved ? _sanitizeLegacyState(saved) : null;
   } catch (_) {
     return null;
   }
@@ -1991,8 +2002,6 @@ function restoreSession() {
 
 function goHome() {
 
-  // Hide the problem board -- it belongs to a project that's going away
-  hideProblemBoard();
   state.view = "cowrite";
   state.currentProject = null;
   state.currentSession = null;
@@ -2101,10 +2110,6 @@ async function openProject(name) {
     try { await loadScriptData(); } catch (_) { /* no parse yet — pane shows its hint */ }
     renderManuscript(document.getElementById('manuscript-container'));
     maybeShowWelcome();
-    // Show Problem Board if analysis exists
-    if (state.findings && state.findings.length > 0) {
-      showProblemBoard();
-    }
 
     setRoom("cowrite");
     // a project opens with the manuscript center stage — the partner drawer
@@ -7123,10 +7128,9 @@ function paletteCommands() {
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
     { type: "command", label: "Toggle the Craft shelf (analysis panels)", keys: "a", run: toggleCraftShelf },
     { type: "command", label: "Toggle the Structure rail", keys: "r", run: () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")) },
-    // no key hint: "b" is the Beat Board (see SHORTCUTS + the keydown handler).
-    // This entry advertised "b" too, so the palette showed one shortcut for two
-    // different commands.
-    { type: "command", label: "Toggle the Problem Board", keys: "", run: toggleProblemBoard },
+    // no key hint: "b" already opens the Beat Board (see SHORTCUTS + the
+    // keydown handler) — this entry must not advertise it a second time.
+    { type: "command", label: "Toggle the Beat Board", keys: "", run: () => openBeatboardView() },
     { type: "command", label: "Search the script", keys: "/", run: () => { if (state.view !== "cowrite" && state.view !== "feedback") openCowriteRoom(); setTimeout(() => $("#script-search").focus(), 80); } },
     { type: "command", label: "Export working draft (.fountain)", keys: "", run: () => $("#export-fountain").click() },
   ] : [];
@@ -8288,29 +8292,6 @@ function init() {
   // Consultant chat composer (the doctor's column lives in the dock's
   // sushruta slot — P0.1)
   $("#fv-consult-composer").addEventListener("submit", function(e) { e.preventDefault(); sendFvMessage("consultant"); });
-  // Problem Board toggle and filter
-  var pbToggle = document.getElementById('pb-toggle');
-  if (pbToggle) pbToggle.addEventListener('click', toggleProblemBoard);
-  var pbEdgeTab = document.getElementById('pb-edge-tab');
-  if (pbEdgeTab) pbEdgeTab.addEventListener('click', function() { toggleProblemBoard(); });
-  var pbFilter = document.getElementById('pb-filter');
-  if (pbFilter) pbFilter.addEventListener('change', function() { renderProblemBoard(); });
-
-  // Problem Board rows: one delegated listener instead of an onclick built
-  // into each row's markup. Rows carry data-* only, so no finding text ever
-  // lands in an attribute — and script-src can stay 'self' (an inline handler
-  // would require 'unsafe-inline', which is exactly what the CSP must not have).
-  var pbList = document.getElementById('pb-list');
-  if (pbList) {
-    pbList.addEventListener('click', function(e) {
-      var row = e.target && e.target.closest ? e.target.closest('.pb-item') : null;
-      if (!row || !pbList.contains(row)) return;
-      var findex = Number(row.dataset.findex);
-      if (!isFinite(findex)) return;
-      pbItemClick(findex, row.dataset.scene);
-    });
-  }
-
   $("#revision-script").addEventListener("scroll", updateRevisionStatus);
   $("#reset-partner-btn").addEventListener("click", resetToPartner);
   $("#clear-chat-btn").addEventListener("click", clearChat);
@@ -8381,174 +8362,6 @@ function init() {
 }
 
 
-
-// ============================================================
-// Problem Board: findings panel synced with script scroll
-// ============================================================
-
-let pbCurrentScene = -1;
-let pbScrollObserver = null;
-
-function renderProblemBoard() {
-  var list = document.getElementById('pb-list');
-  if (!list) return;
-  var findings = state.findings || [];
-  var filter = (document.getElementById('pb-filter') || {}).value || 'all';
-  var filtered = filter === 'all' ? findings : findings.filter(function(f) { return (f.severity || 'medium').toLowerCase() === filter; });
-  
-  if (!filtered.length) {
-    list.innerHTML = '<div class="pb-empty">No findings to show.<br>Run Analysis to generate findings.</div>';
-    return;
-  }
-  
-  var html = '';
-  filtered.forEach(function(f, idx) {
-    var sev = (f.severity || 'medium').toLowerCase();
-    var sceneNum = (f.scene_refs && f.scene_refs[0]) || f.scene || '?';
-    var realIdx = findings.indexOf(f);
-    // Finding text is MODEL OUTPUT derived from the writer's own script, and a
-    // screenplay is a file a collaborator can send you — so every interpolation
-    // here is escaped. Row wiring is DELEGATED (see the #pb-list listener in
-    // init): building onclick="…" out of data both invites attribute injection
-    // and would force script-src 'unsafe-inline', defeating the CSP that
-    // contains any sink we might still miss.
-    html += '<div class="pb-item" data-findex="' + escapeHtml(realIdx) + '" data-scene="' + escapeHtml(sceneNum) + '">';
-    html += '<span class="pb-sev ' + escapeHtml(sev) + '"></span>';
-    html += '<span class="pb-scene">Sc ' + escapeHtml(sceneNum) + '</span>';
-    html += '<div class="pb-body">';
-    html += '<div class="pb-cat">' + escapeHtml(f.category || 'General') + '</div>';
-    html += '<div class="pb-issue">' + escapeHtml(f.description || f.issue || '') + '</div>';
-    html += '</div></div>';
-  });
-  list.innerHTML = html;
-  update_pb_highlight();
-}
-
-function pbItemClick(findex, sceneNum) {
-  // Scroll the script pane to the scene
-  var page = document.getElementById('scene-page-' + sceneNum);
-  if (page) {
-    page.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    page.classList.remove('flash');
-    void page.offsetWidth;
-    page.classList.add('flash');
-    setTimeout(function() { page.classList.remove('flash'); }, 1600);
-  }
-}
-
-function update_pb_highlight() {
-  var list = document.getElementById('pb-list');
-  if (!list) return;
-  var items = list.querySelectorAll('.pb-item');
-  for (var i = 0; i < items.length; i++) {
-    var sceneNum = parseInt(items[i].dataset.scene);
-    items[i].classList.toggle('active', sceneNum === pbCurrentScene);
-  }
-}
-
-function initProblemBoardScrollSync() {
-  if (pbScrollObserver) pbScrollObserver.disconnect();
-  var container = getManuscriptContainer();
-  if (!container) return;
-
-  // Build a set of scene numbers that have findings for auto-hide/show
-  var scenesWithFindings = {};
-  (state.findings || []).forEach(function(f) {
-    var refs = f.scene_refs || [];
-    if (f.scene) refs = refs.concat([f.scene]);
-    refs.forEach(function(n) { scenesWithFindings[n] = true; });
-  });
-
-  pbScrollObserver = new IntersectionObserver(function(entries) {
-    for (var i = 0; i < entries.length; i++) {
-      if (entries[i].isIntersecting) {
-        var sceneNum = parseInt(entries[i].target.dataset.sceneNumber);
-        if (sceneNum && sceneNum !== pbCurrentScene) {
-          pbCurrentScene = sceneNum;
-          update_pb_highlight();
-          // Auto-scroll the Problem Board to show the active finding
-          var activeItem = document.querySelector('.pb-item[data-scene="' + sceneNum + '"]');
-          if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          // Auto-expand/collapse: the board slides in when the active scene
-          // has findings, and slides away when it doesn’t.
-          var board = document.getElementById('problem-board');
-          if (board && board.classList.contains('visible')) {
-            if (scenesWithFindings[sceneNum]) {
-              expandProblemBoard();
-            } else {
-              collapseProblemBoard();
-            }
-          }
-        }
-        break;
-      }
-    }
-  }, { root: container, threshold: 0.3 });
-
-  var scenes = container.querySelectorAll('.scene-page');
-  for (var j = 0; j < scenes.length; j++) {
-    pbScrollObserver.observe(scenes[j]);
-  }
-}
-
-function showProblemBoard() {
-  var board = document.getElementById('problem-board');
-  if (board) {
-    board.style.display = 'flex';
-    board.classList.add('visible');
-    board.classList.remove('pb-collapsed');
-    var edgeTab = document.getElementById('pb-edge-tab');
-    if (edgeTab) edgeTab.style.display = 'none';
-    renderProblemBoard();
-    initProblemBoardScrollSync();
-  }
-}
-
-function hideProblemBoard() {
-  var board = document.getElementById('problem-board');
-  if (board) {
-    board.classList.remove('visible');
-    board.classList.remove('pb-collapsed');
-    board.style.display = 'none';
-  }
-  if (pbScrollObserver) { pbScrollObserver.disconnect(); pbScrollObserver = null; }
-  pbCurrentScene = -1;
-}
-
-function toggleProblemBoard() {
-  var board = document.getElementById('problem-board');
-  if (!board) return;
-  if (!board.classList.contains('visible')) {
-    // Board not shown at all yet -- show it expanded
-    showProblemBoard();
-  } else if (board.classList.contains('pb-collapsed')) {
-    // Board is collapsed -- expand it (slide in from right)
-    board.classList.remove('pb-collapsed');
-    var edgeTab = document.getElementById('pb-edge-tab');
-    if (edgeTab) edgeTab.style.display = 'none';
-  } else {
-    // Board is visible and expanded -- collapse it (slide out to right)
-    board.classList.add('pb-collapsed');
-    var edgeTab2 = document.getElementById('pb-edge-tab');
-    if (edgeTab2) edgeTab2.style.display = '';
-  }
-}
-
-function collapseProblemBoard() {
-  var board = document.getElementById('problem-board');
-  if (!board || !board.classList.contains('visible')) return;
-  board.classList.add('pb-collapsed');
-  var edgeTab = document.getElementById('pb-edge-tab');
-  if (edgeTab) edgeTab.style.display = '';
-}
-
-function expandProblemBoard() {
-  var board = document.getElementById('problem-board');
-  if (!board) return;
-  board.classList.remove('pb-collapsed');
-  var edgeTab = document.getElementById('pb-edge-tab');
-  if (edgeTab) edgeTab.style.display = 'none';
-}
 
 // ============================================================
 // NOCTA DESIGN SYSTEM — Craft Precision
