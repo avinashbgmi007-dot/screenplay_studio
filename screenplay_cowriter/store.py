@@ -125,7 +125,15 @@ class SessionStore:
                     "current_branch": s.current_branch,
                     "updated_at": s.updated_at,
                 })
-            except Exception:
+            except Exception as e:
+                # Skip it — one damaged file must not break the whole list — but
+                # never SILENTLY. Otherwise the writer's session list is simply
+                # missing a conversation and they cannot tell that from never
+                # having had one; "missing is a legitimate empty; damage is
+                # reported" is the rule the writer's stores already follow. The
+                # file is left untouched, so a hand-recovery stays possible.
+                print(f"[sessions] skipping unreadable session "
+                      f"{os.path.basename(path)}: {e}")
                 continue
         return sorted(out, key=lambda x: -x["updated_at"])
 

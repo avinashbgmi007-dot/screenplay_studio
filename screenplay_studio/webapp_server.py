@@ -3141,6 +3141,7 @@ def _build_doctor_case_file(exclude: str | None = None) -> str | None:
         from .revision import finding_statuses
 
         per_script = []
+        skipped: list[str] = []
         category_hits: dict = {}
         total_open = total_addressed = 0
         for name in sorted(os.listdir(root)):
@@ -3150,6 +3151,9 @@ def _build_doctor_case_file(exclude: str | None = None) -> str | None:
             try:
                 m = _PM.load(pdir)
             except Exception:
+                # A script whose manifest cannot be READ is not the same as one
+                # that was never analyzed — see the disclosure below.
+                skipped.append(name)
                 continue
             if m.stage("analyze").status != "complete" or not os.path.exists(m.report_findings_path):
                 continue
@@ -3170,6 +3174,7 @@ def _build_doctor_case_file(exclude: str | None = None) -> str | None:
                     category_hits[c] = category_hits.get(c, 0) + 1
                 per_script.append((name, addressed, len(findings), open_highs))
             except Exception:
+                skipped.append(name)
                 continue
 
         if not per_script:
@@ -3180,6 +3185,18 @@ def _build_doctor_case_file(exclude: str | None = None) -> str | None:
             "(patterns and numbers only; never invent beyond this, never quote passages):",
             f"- Scripts analyzed on the shelf: {len(per_script)}.",
         ]
+        if skipped:
+            # "Missing is a legitimate empty; damage is reported" — the A3 rule the
+            # writer's own stores follow, applied here because the consumer is the
+            # MODEL. This file is handed over as the writer's "whole shelf", so a
+            # silent skip does not just lose a row: it makes every number below it
+            # wrong while looking authoritative, and the doctor would reason from
+            # an incomplete history without knowing. A script that was never
+            # analyzed is legitimately absent; one that could not be READ is not.
+            lines.append(
+                f"- NOTE: {len(skipped)} script(s) on the shelf could not be read "
+                f"({', '.join(sorted(skipped)[:3])}) and are NOT counted above. "
+                f"If that matters to your read, say so — do not assume the shelf is complete.")
         reviewed = total_open + total_addressed
         if reviewed:
             pct = round(100 * total_addressed / reviewed)
@@ -3651,8 +3668,12 @@ def graduate_idea(idea_id):
 
     try:
         IdeaStore(_ideas_dir()).carry_into_project(idea_id, project_dir)
-    except Exception:
-        pass  # the pages are the point; a failed carry never blocks graduation
+    except Exception as e:
+        # Never blocks graduation — the pages are the point — but it must not be
+        # SILENT either: the writer would find the idea's conversation simply
+        # absent and have no way to tell that from "there was nothing to carry".
+        print(f"[graduate] could not carry the idea's conversation into "
+              f"{os.path.basename(project_dir)}: {e}")
 
     # pin the carried conversation so the script desk opens on the same thread
     try:
@@ -3663,8 +3684,10 @@ def graduate_idea(idea_id):
             latest = max(sessions, key=lambda fn: os.path.getmtime(os.path.join(project_dir, "sessions", fn)))
             manifest.cowriter_session_id = os.path.splitext(latest)[0]
             manifest.save()
-    except Exception:
-        pass
+    except Exception as e:
+        # Same rule as the carry above: harmless, but not silent — the desk would
+        # just open on a fresh thread with no explanation.
+        print(f"[graduate] could not pin the carried conversation: {e}")
 
     return jsonify(_manifest_summary(manifest)), 201
 

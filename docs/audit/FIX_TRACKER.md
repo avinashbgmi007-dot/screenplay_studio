@@ -110,6 +110,35 @@ tracker-stamp commit that follows carries the same content.
 
 ---
 
+## Closed in this pass (2026-09-21, pass 14g) — "flag, don't drop", swept repo-wide
+
+The project states the rule — *"Flag, don't drop"* — and lint enforces only its crudest form (`E722`,
+bare `except:`). A new sweep for handlers whose body is **only** `pass` / `continue` / a bare
+`return` found **21 broad-and-silent handlers** across the four packages. Most are defensible —
+optional-module imports, telemetry, skipping an unreadable project during a shelf scan — and they
+carry comments saying so. **Four were not**, and in all four the *consumer* is misled:
+
+| site | who is misled, and how |
+|---|---|
+| `_build_doctor_case_file` | **the model.** The file is handed over as the writer's *"whole shelf"*, and a script whose manifest or report could not be READ was dropped without a word — so every number below it was wrong while looking authoritative, and the doctor reasoned from an incomplete history without knowing. It now discloses: `NOTE: N script(s) on the shelf could not be read (…) and are NOT counted above`. |
+| `SessionStore.list()` | **the writer.** A damaged session file made a conversation vanish from the list, and *"never had one"* is indistinguishable from *"it's gone"*. |
+| `graduate_idea` (×2) | **the writer.** A failed carry, and a failed session pin, both left the conversation silently absent after graduation. |
+
+The distinction the sweep encodes: **a script that was never ANALYZED is legitimately absent; one that
+could not be READ is damage** — the rule the writer's stores already follow (A3: *"missing is a
+legitimate empty; damage is reported"*).
+
+The other 16 are **reported, not changed**. Each is a deliberate best-effort path with a comment
+saying why, and turning them into failures would break the shelf scan or the request they exist to
+protect. Recorded here so the count is a known number rather than an unknown one.
+
+### Verified
+- `tests/test_humanization_v2.py` +1 pinning the disclosure — including that it **names** the script —
+  **mutation-verified** as a named failure with the source restored byte-identical.
+- 267 tests across the ten affected suites pass (3 expected structural skips).
+
+---
+
 ## Closed in this pass (2026-09-21, pass 14f) — the sweep only walked one package, and the app had no JSON backstop
 
 Two things the pass-14e sweep could not have told me, because it only looked at `screenplay_studio/`.

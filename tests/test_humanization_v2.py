@@ -198,6 +198,31 @@ def test_case_file_excludes_current_project_and_empty_shelf(tmp_path):
     assert webapp_server._doctor_case_file(exclude="Gamma") is None  # excluded -> nothing left
 
 
+def test_case_file_discloses_a_script_it_could_not_read(tmp_path):
+    """The case file is handed to the MODEL as the writer's "whole shelf".
+
+    A silent skip does not just lose a row — it makes every number below it wrong
+    while looking authoritative, and the doctor reasons from an incomplete history
+    without knowing. A script that was never ANALYZED is legitimately absent; one
+    that could not be READ is not. (Same rule as the writer's stores: "missing is a
+    legitimate empty; damage is reported".)
+    """
+    webapp_server.PROJECTS_DIR = str(tmp_path / "shelf3")
+    os.makedirs(webapp_server.PROJECTS_DIR)
+    _make_project(webapp_server.PROJECTS_DIR, "Readable", [("theme", "low", "Thin", None)])
+
+    # damaged, not absent: the directory is there and the manifest will not parse
+    damaged = os.path.join(webapp_server.PROJECTS_DIR, "Damaged")
+    os.makedirs(damaged)
+    with open(os.path.join(damaged, "project.json"), "w", encoding="utf-8") as f:
+        f.write("{ this is not json")
+
+    case = webapp_server._doctor_case_file()
+    assert case and "Scripts analyzed on the shelf: 1" in case, case
+    assert "could not be read" in case, f"the skip must be disclosed:\n{case}"
+    assert "Damaged" in case, f"the disclosure should name the script:\n{case}"
+
+
 # ------------------------------------------------- demo model personas
 
 def test_demo_replies_are_persona_distinct():
