@@ -4,12 +4,13 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
-**Last updated:** 2026-09-21 (pass 10 — **T1e closed**: all 21 vacuous browser
-checks fixed and mutation-verified, the sweep now returns 0. The gate's check
-count *falls*, and is finally true. Fixing them exposed two more crash-shaped
-failure modes, both fixed.)
-**HEAD:** `893a943` (pass 10's work commit) — **pushed**; `git ls-remote origin main`
-agrees. The tracker-stamp commit that follows it carries the same content.
+**Last updated:** 2026-09-21 (pass 11 — **non-code cleanup closed**: the 25
+orphaned `preview-redesigns/shots/` PNGs untracked (committed + pushed), and the
+stale `legacy/pre-recovery` remote branch deleted. Local `.git` reclaimed
+**83M → 22M**. No code touched — `library_delete` is the only open item left.)
+**HEAD:** `91a11b1` (pass 11's shots commit) — **pushed**; `git ls-remote origin main`
+agrees (remote `main` = `91a11b1`, and `legacy/pre-recovery` is gone from the
+remote). Local stray refs also dropped + `git gc --prune=now`.
 **Baseline for this pass:** `27ba81e`
 
 ---
@@ -663,10 +664,10 @@ whole section is about.
 
 | ID | Item | Class | Owner |
 |---|---|---|---|
-| **R11–R14** | **Reduced to ONE decision.** `.git` is 82 MB, of which **69.24 MB (84%) is two blobs**: `.freebuff/desktop-v2.db` (36.61 MB) + `.db-wal` (32.63 MB). They are **not on `main`** — reachable only from `legacy/pre-recovery`, which still exists on the remote. Reclaiming it means deleting a **shared remote branch**, so it is the owner's call; the exact commands are in §REL-M2 of the audit. The 69 PNGs (13.94 MB) are *intentional* evidence and the 22 cline checkpoint refs hold no large blobs. | hygiene | **owner decision** |
+| **R11–R14** | **CLOSED (pass 11).** The stale `legacy/pre-recovery` remote branch was deleted (`git push origin --delete`); the local stale tracking ref was dropped and `git gc --prune=now` reclaimed **83M → 22M** (~61 MB). Before deletion `.git` was 82 MB with 69.24 MB (84%) in two blobs reachable only from that branch. The 22 cline checkpoint refs hold no large blobs. | hygiene | **closed — pass 11** |
 | **T1e** | ~~The 21 remaining vacuous browser checks~~ — **CLOSED (pass 10).** All 21 audited, fixed, and mutation-verified: **0 vacuous checks remain** (the sweep that found 21 now returns 0). See the pass-10 section. | test integrity | ✅ done |
 | **NEW (pass 10)** | **`library_delete` flakes in the gate.** It failed `shelf delete emptied the disk` in one gate run (30/31 suites green), then passed **3/3 standalone** and on the gate's **second run** (31/31). Not caused by this pass: the suite imports none of the changed helpers and no production code was touched. Root cause narrowed to two candidates, now **distinguished by the check's own detail** (which was rewritten to report the HTTP status): (a) the removal is slow under load — a project dir is O(files) to delete — and the old poll budget was a fixed **5 s**; or (b) the server **errored**: `delete_project` calls `shutil.rmtree(project_dir, ignore_errors=False)` with **no retry**, and on Windows that raises `WinError 32` whenever any handle is still open, which surfaces as a **500** and leaves the row in place. The poll budget is now time-based (30 s) and the status is reported, so the next occurrence is self-diagnosing. **The (b) fix — a retry around the `rmtree`, and a clear error instead of a raw 500 — is a PRODUCTION change and is deliberately NOT made blind**: the flake could not be reproduced locally, so any fix would ship unverified. | test integrity / robustness | **open** |
-| **NEW (pass 9)** | `preview-redesigns/shots/` holds **25 tracked PNGs** — `*-welcome/-cowrite/-feedback/-desk.png` × six designs plus `gallery-live.png`. They are screenshots of the screen model the worlds **no longer have**, orphaned now that the old suite (which regenerated them) is gone and the new one writes no artifacts. Excluded from the wheel by design, so not product bloat — but misleading as evidence. | hygiene | **owner decision** (`git rm -r screenplay_studio/webapp/preview-redesigns/shots/`) |
+| **NEW (pass 9)** | **CLOSED (pass 11).** The 25 orphaned `preview-redesigns/shots/` PNGs were untracked via index-only `git rm --cached -r` (after a `git rm -r` incident that wiped 91 sibling files and was recovered with `git reset --hard`), committed + pushed in `91a11b1`. The dead `.gitignore` rule was fixed to the real nested path. Disk copies remain, now gitignored. | hygiene | **closed — pass 11** |
 
 **R10 is closed** — see the pass-8 section below. It was filed as hygiene and turned out to
 hide two broken guards.
