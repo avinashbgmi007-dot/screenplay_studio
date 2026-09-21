@@ -35,6 +35,17 @@ def _save(m, notes: list[dict]) -> None:
     atomic_write_json(_path(m), notes)
 
 
+def _locked(m):
+    """The notes store's load-modify-write lock: hold it across the READ so a
+    racing add/update/delete — in this process or another one — cannot clobber a
+    note it never saw. Measured before this: two concurrent adds left ONE note
+    on disk, because the second loaded the pre-add list and wrote it back over
+    the first. `metrics._modify` and `ideas._modify` already did this; the
+    writer's own pencil and scrapbook did not."""
+    from .jsonio import lock_for
+    return lock_for(_path(m))
+
+
 def load_notes(m) -> list[dict]:
     """All notes, newest first."""
     notes = _load_raw(m)
@@ -65,9 +76,10 @@ def add_note(m, scene_number, text: str, anchor: str | None = None) -> dict:
         "created_at": now,
         "updated_at": now,
     }
-    notes = _load_raw(m)
-    notes.append(note)
-    _save(m, notes)
+    with _locked(m):
+        notes = _load_raw(m)
+        notes.append(note)
+        _save(m, notes)
     return note
 
 
@@ -75,20 +87,22 @@ def update_note(m, note_id: str, text: str) -> dict | None:
     text = (text or "").strip()
     if not text:
         raise ValueError("Note text is required.")
-    notes = _load_raw(m)
-    for n in notes:
-        if n.get("id") == note_id:
-            n["text"] = text
-            n["updated_at"] = time.time()
-            _save(m, notes)
-            return n
+    with _locked(m):
+        notes = _load_raw(m)
+        for n in notes:
+            if n.get("id") == note_id:
+                n["text"] = text
+                n["updated_at"] = time.time()
+                _save(m, notes)
+                return n
     return None
 
 
 def delete_note(m, note_id: str) -> bool:
-    notes = _load_raw(m)
-    kept = [n for n in notes if n.get("id") != note_id]
-    if len(kept) == len(notes):
-        return False
-    _save(m, kept)
+    with _locked(m):
+        notes = _load_raw(m)
+        kept = [n for n in notes if n.get("id") != note_id]
+        if len(kept) == len(notes):
+            return False
+        _save(m, kept)
     return True

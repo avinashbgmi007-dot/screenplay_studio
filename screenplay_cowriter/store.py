@@ -7,32 +7,30 @@ keeps the whole thing inspectable/hand-editable if something goes wrong.
 
 import glob
 import os
-import threading
-import weakref
 
 from .models import Session
 
-# One lock per session file path (process-wide). Streaming turns and the
-# every-10-turns memory refresh can overlap a save from another request;
-# without this, two concurrent saves of the SAME session file race and the
-# last write wins — silently dropping a just-stored message.
-#
-# Weak values (L1), the same shape as jsonio's registry: a holder keeps a strong
-# reference for the duration of `with lock:`, so the entry cannot vanish under a
-# waiter's feet, and a session nobody is saving costs nothing. The plain dict
-# kept one entry per session file for the life of the process.
-_LOCKS_GUARD = threading.Lock()
-_LOCKS: "weakref.WeakValueDictionary[str, threading.Lock]" = weakref.WeakValueDictionary()
+# Sessions are serialized by `screenplay_studio.jsonio.lock_for`, which carries
+# BOTH an in-process RLock and an OS-level byte-range lock. The local
+# `threading.Lock` that used to live here only covered threads inside one
+# process, while the CLI and the webapp both write the same project directory
+# (AGENTS.md documents that as a supported configuration).
 
 
-def _lock_for(path: str) -> threading.Lock:
-    key = os.path.abspath(path)
-    with _LOCKS_GUARD:
-        lock = _LOCKS.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _LOCKS[key] = lock
-        return lock
+def _park_damaged(path: str) -> None:
+    """Move an unreadable session file aside as `<path>.bak` before it is
+    overwritten.
+
+    A chat turn must never break, so a damaged base does not block the save —
+    but silently replacing the writer's conversation is not an acceptable way to
+    achieve that. Parking the bytes keeps the one recoverable copy. Same shape
+    as WriterMemory's `.bak` (screenplay_cowriter/memory.py).
+    """
+    from screenplay_studio.jsonio import retry_permission
+    try:
+        retry_permission(lambda: os.replace(path, path + ".bak"))
+    except OSError:
+        pass  # if it cannot be parked, the save still proceeds
 
 
 class SessionStore:
@@ -71,20 +69,31 @@ class SessionStore:
         # overwrite (lose) messages a faster turn already saved (H4). Inside the
         # lock, re-read the on-disk session and union any branch messages this
         # in-memory snapshot is missing, keyed by content, so no persisted turn
-        # is silently dropped. The write also lands atomically (temp file +
-        # os.replace) so a concurrent reader never sees a torn JSON file.
+        # is silently dropped.
+        #
+        # The write itself is `Session.save`, which is atomic (unique tmp +
+        # fsync + os.replace). This method used to hand-roll that with a FIXED
+        # `path + ".tmp"` — the same name in every process, so two writers'
+        # bytes interleaved in one buffer and the survivor was renamed into the
+        # session file.
         path = self._path(session.session_id)
-        with _lock_for(path):
+        from screenplay_studio.jsonio import lock_for
+        with lock_for(path):
             if os.path.exists(path):
                 try:
                     disk = Session.load(path)
                     self._merge_missing_messages(disk, session)
+                except OSError:
+                    # Transient read contention (a sharing violation), NOT
+                    # damage — park nothing, and still land this save.
+                    pass
                 except Exception:
-                    pass  # a corrupt/unreadable base must not block the save
-            tmp = path + ".tmp"
-            session.save(tmp)
-            from screenplay_studio.jsonio import retry_permission
-            retry_permission(lambda: os.replace(tmp, path))
+                    # Genuinely unreadable (torn or wrong-shape JSON). The save
+                    # must still happen — a chat turn may never break — but the
+                    # unreadable bytes are parked first, so this save is not the
+                    # thing that destroys the only recoverable copy.
+                    _park_damaged(path)
+            session.save(path)
 
     @staticmethod
     def _merge_missing_messages(disk: Session, session: Session) -> None:

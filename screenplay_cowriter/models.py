@@ -173,10 +173,19 @@ class Session:
         return s
 
     def save(self, path: str) -> None:
+        # Atomic since 2026-09-21: this was a raw `open(path, "w")`, which is
+        # truncate-then-write — a crash mid-save (or a reader opening between
+        # the truncate and the write) could see an empty or half-written
+        # session, and the conversation is the most valuable store here. It is
+        # the ONLY writer of a session file, so routing it through jsonio's
+        # unique-tmp + fsync + replace gives every session the cross-process
+        # guarantee as well.
         self.updated_at = time.time()
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        from screenplay_studio.jsonio import atomic_write_json
+        atomic_write_json(path, self.to_dict())
 
     @staticmethod
     def load(path: str) -> "Session":

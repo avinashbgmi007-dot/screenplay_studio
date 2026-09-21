@@ -113,18 +113,22 @@ def finding_intents(m) -> dict:
 
 
 def set_finding_intent(m, finding_id: str, intent) -> None:
-    from .jsonio import load_json_store
+    from .jsonio import StoreUnreadable, load_json_store, lock_for
     path = finding_marks_path(m)
-    data = load_json_store(path, default={})   # damaged -> raises: no mark is
-    if not isinstance(data, dict):             # written over a damaged store
-        from .jsonio import StoreUnreadable
-        raise StoreUnreadable(path, "expected an object")
-    if intent in ("addressed", "deferred"):
-        data[finding_id] = intent
-    else:
-        data.pop(finding_id, None)
-    from .jsonio import atomic_write_json
-    atomic_write_json(path, data)
+    # The lock spans the READ as well as the write. Without it two marks made at
+    # once (two tabs, or the CLI and the webapp) each load the pre-mark store,
+    # and the second write drops the first mark. Reproduced across 4 processes:
+    # 800 attempts, 9 successes, finding_marks.json unparseable at rest.
+    with lock_for(path):
+        data = load_json_store(path, default={})   # damaged -> raises: no mark is
+        if not isinstance(data, dict):             # written over a damaged store
+            raise StoreUnreadable(path, "expected an object")
+        if intent in ("addressed", "deferred"):
+            data[finding_id] = intent
+        else:
+            data.pop(finding_id, None)
+        from .jsonio import atomic_write_json
+        atomic_write_json(path, data)
 
 
 # ---------- last-pass scorekeeping (R4, one generation back) ----------
@@ -338,12 +342,19 @@ def load_working(m) -> ScriptDocument:
 def save_working(m, doc: ScriptDocument, record: dict | None = None) -> None:
     doc.save(working_path(m))
     if record:
-        log = edits_log(m)
-        if "id" not in record:
-            record["id"] = uuid.uuid4().hex[:12]
-        log.append(record)
-        from .jsonio import atomic_write_json
-        atomic_write_json(edits_log_path(m), log)
+        from .jsonio import atomic_write_json, lock_for
+        log_path = edits_log_path(m)
+        # Locked across the read+append+write — the edit log is an accumulate
+        # store, so an unlocked cycle loses entries (measured: 150 kept of 508
+        # applied). Deliberately NOT wrapped around doc.save() above: that
+        # writes working.json, a SECOND store, and holding two store locks at
+        # once is the one thing jsonio.lock_for must never be asked to do.
+        with lock_for(log_path):
+            log = edits_log(m)
+            if "id" not in record:
+                record["id"] = uuid.uuid4().hex[:12]
+            log.append(record)
+            atomic_write_json(log_path, log)
         # a fresh edit invalidates any redo history
         clear_redo(m)
 
@@ -611,35 +622,37 @@ def dismissed_issues(m) -> set:
 
 
 def dismiss_finding(m, index: int, issue: str, finding_id: str | None = None) -> None:
-    from .jsonio import StoreUnreadable, load_json_store
+    from .jsonio import StoreUnreadable, load_json_store, lock_for
     path = dismissed_path(m)
-    data = load_json_store(path, default=[])
-    if not isinstance(data, list):
-        raise StoreUnreadable(path, "expected a list")
-    entry = {"index": int(index), "issue": issue or ""}
-    if finding_id:
-        entry["finding_id"] = finding_id
-    if entry not in data:
-        data.append(entry)
-    from .jsonio import atomic_write_json
-    atomic_write_json(path, data)
+    with lock_for(path):
+        data = load_json_store(path, default=[])
+        if not isinstance(data, list):
+            raise StoreUnreadable(path, "expected a list")
+        entry = {"index": int(index), "issue": issue or ""}
+        if finding_id:
+            entry["finding_id"] = finding_id
+        if entry not in data:
+            data.append(entry)
+        from .jsonio import atomic_write_json
+        atomic_write_json(path, data)
 
 
 def undismiss_finding(m, index: int, finding_id: str | None = None) -> None:
-    from .jsonio import load_json_store
+    from .jsonio import load_json_store, lock_for
     path = dismissed_path(m)
-    data = load_json_store(path, default=[])
-    if not data:
-        return
-    # Prefer id (survives report regeneration); fall back to legacy index
-    # entries that never carried one (old projects).
-    data = [d for d in data if not (
-        isinstance(d, dict)
-        and (d.get("finding_id") == finding_id if finding_id
-             else int(d.get("index", -1)) == int(index))
-    )]
-    from .jsonio import atomic_write_json
-    atomic_write_json(path, data)
+    with lock_for(path):
+        data = load_json_store(path, default=[])
+        if not data:
+            return
+        # Prefer id (survives report regeneration); fall back to legacy index
+        # entries that never carried one (old projects).
+        data = [d for d in data if not (
+            isinstance(d, dict)
+            and (d.get("finding_id") == finding_id if finding_id
+                 else int(d.get("index", -1)) == int(index))
+        )]
+        from .jsonio import atomic_write_json
+        atomic_write_json(path, data)
 
 
 # Change detection is STRICT on purpose, and it is deliberately NOT the

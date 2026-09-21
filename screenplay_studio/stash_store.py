@@ -42,18 +42,20 @@ def add_to_stash(project_dir: str, text: str, title: str = "", scene_number: int
         "scene_number": scene_number if scene_number is not None and isinstance(scene_number, int) else None,
         "created_at": time.time(),
     }
-    stash = load_stash(project_dir)
-    stash.insert(0, entry)  # newest first
-    _save(project_dir, stash)
+    with _locked(project_dir):
+        stash = load_stash(project_dir)
+        stash.insert(0, entry)  # newest first
+        _save(project_dir, stash)
     return entry
 
 
 def remove_from_stash(project_dir: str, entry_id: str) -> bool:
-    stash = load_stash(project_dir)
-    remaining = [e for e in stash if e.get("id") != entry_id]
-    if len(remaining) == len(stash):
-        return False
-    _save(project_dir, remaining)
+    with _locked(project_dir):
+        stash = load_stash(project_dir)
+        remaining = [e for e in stash if e.get("id") != entry_id]
+        if len(remaining) == len(stash):
+            return False
+        _save(project_dir, remaining)
     return True
 
 
@@ -61,3 +63,17 @@ def _save(project_dir: str, stash: list[dict]) -> None:
     os.makedirs(project_dir, exist_ok=True)
     from .jsonio import atomic_write_json
     atomic_write_json(stash_path(project_dir), stash)
+
+
+def _locked(project_dir: str):
+    """The stash's load-modify-write lock: hold it across the READ so a racing
+    save — in this process or another one — cannot clobber an entry it never
+    saw. Measured before this: two concurrent adds left ONE entry, because the
+    second loaded the pre-add list and wrote it back over the first.
+
+    The makedirs mirrors `_save`'s: the lock sidecar lives beside the store, so
+    the directory has to exist before there is anything to lock.
+    """
+    os.makedirs(project_dir, exist_ok=True)
+    from .jsonio import lock_for
+    return lock_for(stash_path(project_dir))

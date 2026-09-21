@@ -630,6 +630,14 @@ def list_projects():
         # internal data, not a project. It must never appear as a shelf card.
         if name == "writer_profile.json":
             continue
+        # jsonio drops a `<store>.lock` sidecar beside every store it writes, and
+        # one of those (writer_profile.json.lock) lands in this very directory.
+        # A lock file is a FILE, not a project: without this it reached
+        # _project_dir -> check_safe_id, which rejects the '.' in the name, and
+        # the `except Exception` below then rendered it as a phantom
+        # "unreadable" project on the writer's shelf.
+        if not os.path.isdir(os.path.join(PROJECTS_DIR, name)):
+            continue
         try:
             m = ProjectManifest.load(_project_dir(name))
             out.append(_manifest_summary(m))
@@ -919,6 +927,10 @@ def backup_project(name):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, _dirs, files in os.walk(project_dir):
             for fname in files:
+                # jsonio's lock sidecars, and any temp file a write is mid-flight
+                # through, are our plumbing rather than the writer's desk.
+                if fname.endswith(".lock") or fname.endswith(".tmp"):
+                    continue
                 full = os.path.join(root, fname)
                 arcname = os.path.join(name, os.path.relpath(full, project_dir))
                 try:

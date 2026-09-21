@@ -112,15 +112,22 @@ class TestTheLockRegistryDoesNotGrowWithoutBound:
         assert len(jsonio._LOCKS) == 0
 
     def test_the_session_store_registry_is_bounded_too(self, tmp_path):
-        """store.py carried the same unbounded shape as jsonio — one entry per
-        session file ever saved, kept for the life of the process."""
+        """The session store carried the same unbounded shape as jsonio — one
+        entry per session file ever saved, kept for the life of the process.
+        That registry was folded into jsonio's weak-value one, so the guarantee
+        is now literally the same object — and there is only ONE registry left
+        to leak from."""
         import screenplay_cowriter.store as store
 
         sessions = store.SessionStore(str(tmp_path / "sessions"))
         for i in range(120):
             sessions.save(store.Session.new(title=f"session {i}"))
         gc.collect()
-        assert len(store._LOCKS) == 0
+        assert not hasattr(store, "_LOCKS"), (
+            "the session store grew a second lock registry — sessions must share "
+            "jsonio's, or the CLI and the webapp cannot serialize against each other"
+        )
+        assert len(jsonio._LOCKS) == 0
 
     def test_a_held_lock_is_the_same_object_for_every_caller(self, tmp_path):
         """Weak values must not break mutual exclusion: while anyone holds the

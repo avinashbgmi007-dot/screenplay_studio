@@ -19,16 +19,20 @@ import pytest
 
 import screenplay_studio.webapp_server as webapp_server
 from screenplay_cowriter.llm_client import LlamaServerError, LlamaServerClient as CowriterClient
-from screenplay_cowriter.store import SessionStore, _lock_for
+from screenplay_cowriter.store import SessionStore
+from screenplay_studio.jsonio import lock_for
 from screenplay_studio.manifest import ProjectManifest
 
 
 # ---------------------------------------------------------------- F6
 
 def test_lock_for_is_stable_per_path(tmp_path):
-    a = _lock_for(str(tmp_path / "s1.json"))
-    b = _lock_for(str(tmp_path / "s1.json"))
-    c = _lock_for(str(tmp_path / "s2.json"))
+    """One registry per path, shared by every store — sessions included. The
+    session store used to keep its own process-local Lock; it was folded into
+    jsonio's so the CLI and the webapp serialize against each other too."""
+    a = lock_for(str(tmp_path / "s1.json"))
+    b = lock_for(str(tmp_path / "s1.json"))
+    c = lock_for(str(tmp_path / "s2.json"))
     assert a is b and a is not c
 
 

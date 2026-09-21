@@ -216,6 +216,22 @@ CASES = [
         why="WriterMemory.load backs the torn file up to .bak and starts a fresh "
             "profile ('chat must never break') — damage preserved, not swallowed",
     ),
+    StoreCase(
+        name="cowriter session",
+        module="screenplay_cowriter/models.py",
+        path=lambda m: _session_path(m),
+        read=lambda m: _session_read(m),
+        seed=lambda m: _session_seed(m),
+        mutate=lambda m: _session_mutate(m),
+        missing_default=None,
+        # asking for a session by id and getting nothing back is not "the writer
+        # never wrote here" — it is a missing conversation, and it is reported.
+        missing_reads_as="error",
+        evidence_path=lambda m: _session_path(m) + ".bak",
+        status="guarded",
+        why="B4: SessionStore.save parks an unreadable base as .bak before the "
+            "save lands, so a chat turn cannot destroy the only recoverable copy",
+    ),
 ]
 
 
@@ -251,6 +267,44 @@ def _memory_mutate(m) -> None:
     from screenplay_cowriter.memory import WriterMemory
     mem = WriterMemory.load(_memory_path(m))
     mem.save()
+
+
+# ---------- the cowriter's session store (BE-B4) ----------------------------
+
+# A fixed id so the harness can address exactly one session file from the
+# manifest. `Session.new()` mints a random one; the store keys off the field.
+_SESSION_ID = "fault_session"
+
+
+def _sessions_dir(m) -> str:
+    return os.path.join(m.project_dir, "sessions")
+
+
+def _session_path(m) -> str:
+    return os.path.join(_sessions_dir(m), f"{_SESSION_ID}.json")
+
+
+def _session_store(m):
+    from screenplay_cowriter.store import SessionStore
+    return SessionStore(_sessions_dir(m))
+
+
+def _session_seed(m) -> None:
+    from screenplay_cowriter.models import Session
+    session = Session.new(title="fault fixture session")
+    session.session_id = _SESSION_ID
+    _session_store(m).save(session)
+
+
+def _session_read(m):
+    return _session_store(m).load(_SESSION_ID).title
+
+
+def _session_mutate(m) -> None:
+    from screenplay_cowriter.models import Session
+    session = Session.new(title="saved after the damage")
+    session.session_id = _SESSION_ID
+    _session_store(m).save(session)
 
 
 EXEMPT = {

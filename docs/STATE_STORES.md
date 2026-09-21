@@ -30,6 +30,26 @@
 > `parsed.json` / `working.json` (regenerable; the unregenerable edit log is
 > covered by A1).
 >
+> **Concurrency — added 2026-09-21.** A per-path lock used to be a
+> `threading.RLock`, which cannot serialize two *processes* — and `AGENTS.md`
+> documents the CLI and the webapp writing the same project directory as a
+> supported configuration. `atomic_write_json` also wrote through a **fixed**
+> `<store>.tmp` name that every process shared, so two writers interleaved their
+> bytes into one buffer and the survivor was renamed into the store (reproduced
+> across 4 processes: `edits.json` kept 150 of 508 applied edits, and
+> `finding_marks.json` was left torn at rest). `jsonio.lock_for` now returns one
+> object carrying both an in-process RLock and an OS byte-range lock
+> (`msvcrt.locking` / `fcntl.flock`) on a `<store>.lock` sidecar, and the temp
+> name is unique per write (`<store>.<pid>.<hex>.tmp`, fsynced before the
+> rename). Stores that do a load-modify-write must hold `lock_for` across the
+> **read** as well as the write — `notes`, `stash_store`, `metrics`, `ideas`,
+> `revision` (marks / edit log / dismissals) and the cowriter's `SessionStore`
+> all do. The sidecars are plumbing, not data: `*.json` globs skip them, the
+> shelf scan requires a directory, and `/backup` excludes `.lock` / `.tmp`.
+> **Never hold two `lock_for` locks at once** — that is the one way to deadlock
+> them. `tests/test_store_concurrency.py` proves all of this with real child
+> processes.
+>
 > Companion docs: `docs/API_ROUTE_MAP.md` (which endpoints touch which store),
 > `docs/DATA_FORMATS.md` (full JSON schemas), `CONTEXT.md` (entity glossary).
 
