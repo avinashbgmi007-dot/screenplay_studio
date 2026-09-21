@@ -10,8 +10,8 @@ environment, it was impossible**: `design_session` framed an SPA that ships
 studio now and pins the deliberate block as a check. Only `gun_pen_audit` remains
 excluded, and it genuinely needs a model server. **Verified against the gate's own
 output this time, not against this table.**)
-**HEAD:** `0645610` (pass 12's tracker stamp) — **pushed**; `git ls-remote origin main`
-agrees. This pass's commit hash is stamped at the bottom.
+**HEAD:** `aab3d8f` (pass 13's work commit) — **pushed**; `git ls-remote origin main`
+agrees. The tracker-stamp commit that follows it carries the same content.
 **Baseline for this pass:** `0645610`
 
 ---
