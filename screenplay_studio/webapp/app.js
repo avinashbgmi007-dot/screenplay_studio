@@ -5481,28 +5481,12 @@ function copyFindingEvidence(f) {
 }
 
 // ---------- content-hash finding identity (R1 refined) ----------
-// JS twin of revision.py compute_finding_id — the server observes, the
-// client displays; both produce the SAME id. Key = category + verified
-// evidence_quote; scene_refs ride as data (insert-shift keeps the id);
-// severity is a judgment, not identity. no_quote tier keys on category +
-// normalized issue (documented weak tier).
-function _strHash(s) {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = (((h << 5) + h + s.charCodeAt(i)) | 0) >>> 0;
-  return h;
-}
-function _base36(h) {
-  const D = "0123456789abcdefghijklmnopqrstuvwxyz";
-  if (!h) return "0";
-  let out = "";
-  while (h) { out = D[h % 36] + out; h = Math.floor(h / 36); }
-  return out;
-}
-function computeFindingId(f) {
-  const quote = (f.evidence_quote || "").trim();
-  const norm = quote ? quote : "issue:" + (f.issue || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 100);
-  return "f" + _base36(_strHash((f.category || "other") + "|" + norm));
-}
+// `_strHash` / `_base36` / `computeFindingId` live in core.js: they are
+// DOM-free pure helpers and core.js is the home for those, which is what makes
+// them unit-testable under `node --test` instead of reachable only through a
+// browser. core.js loads first (index.html:765), so they are still plain
+// globals here — and they MUST stay byte-identical to `revision.py`'s
+// `compute_finding_id`, which `tests/e2e_browser_finding_id_parity.py` proves.
 
 // ---------- the finding counting contract (N3) ----------
 // ONE source for disposition (open / addressed / deferred / ghosted /

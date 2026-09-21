@@ -100,6 +100,52 @@ function shortModelId(id) {
   return id.length > 30 ? id.slice(0, 29) + "…" : id;
 }
 
+// ---- content-hash finding identity (R1 refined) ----------------------------
+// The JS twin of `revision.py:compute_finding_id`. The server observes, the
+// client displays, and the two MUST produce the same id — a finding's id is the
+// key for the writer's marks (`finding_marks.json`), their dismissals
+// (`dismissed_findings.json`), ghost detection, and the doctor's case file. If
+// the two implementations disagree, every one of those silently stops matching.
+//
+// Key = category + verified evidence_quote; scene_refs ride as data
+// (insert-shift keeps the id); severity is a judgment, not identity. The
+// no_quote tier keys on category + the normalized issue (documented weak tier).
+//
+// This lives here rather than in app.js because it is a DOM-free pure helper,
+// and core.js is the home for those — which is what makes it unit-testable
+// under `node --test` (tests/js/core.test.js) instead of only reachable through
+// a browser.
+function _strHash(s) {
+  // Iterate CODE POINTS, not UTF-16 code units. `for..of` over a string yields
+  // whole code points, matching Python's `for ch in s`. The previous
+  // `charCodeAt(i)` over `s.length` walked an emoji's surrogate pair as TWO
+  // values, so any finding whose quote or issue contained a non-BMP character
+  // hashed to a different id than the server's. Verified live:
+  // tests/e2e_browser_finding_id_parity.py (3 of 6 probe cases diverged before
+  // this line changed; ASCII and BMP-accented text always agreed).
+  //
+  // The rest of the arithmetic already matched: JS `(x | 0) >>> 0` is exactly
+  // Python's `& 0xFFFFFFFF`, and the intermediate is well inside 2^53, so no
+  // precision is lost.
+  let h = 5381;
+  for (const ch of s) h = (((h << 5) + h + ch.codePointAt(0)) | 0) >>> 0;
+  return h;
+}
+
+function _base36(h) {
+  const D = "0123456789abcdefghijklmnopqrstuvwxyz";
+  if (!h) return "0";
+  let out = "";
+  while (h) { out = D[h % 36] + out; h = Math.floor(h / 36); }
+  return out;
+}
+
+function computeFindingId(f) {
+  const quote = (f.evidence_quote || "").trim();
+  const norm = quote ? quote : "issue:" + (f.issue || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 100);
+  return "f" + _base36(_strHash((f.category || "other") + "|" + norm));
+}
+
 function _stageStep(label, status) {
   const cls = status === "complete" ? "done" : status === "failed" ? "failed" : status === "running" ? "running" : "";
   // status lands inside a quoted attribute — it comes from the project
@@ -117,6 +163,9 @@ if (typeof module !== "undefined" && module.exports) {
     formatElapsed,
     fmtDuration,
     shortModelId,
+    computeFindingId,
+    _strHash,
+    _base36,
     _stageStep,
   };
 }

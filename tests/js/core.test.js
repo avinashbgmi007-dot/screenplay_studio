@@ -11,6 +11,8 @@ const {
   formatElapsed,
   fmtDuration,
   shortModelId,
+  computeFindingId,
+  _strHash,
   _stageStep,
 } = require("../../screenplay_studio/webapp/core.js");
 
@@ -100,4 +102,58 @@ test("escapeHtml: is idempotent-safe on plain text and handles non-strings", () 
 test("_stageStep: escapes an untrusted status (attribute context)", () => {
   const out = _stageStep("Parse", '" onmouseover="window.__XSS_STEP=1');
   assert.ok(!out.includes('onmouseover="window'), "attribute must not break out");
+});
+
+// ---- computeFindingId: byte-identical to revision.py's compute_finding_id ----
+// Regression origin (audit F4): the JS walked UTF-16 code units (`charCodeAt`
+// over `s.length`) while Python walked code points (`for ch in s`). A surrogate
+// pair therefore hashed as TWO values on one side and ONE on the other, so any
+// finding whose quote or issue contained a non-BMP character got a different id
+// on each side. That id is the key for the writer's marks
+// (finding_marks.json), their dismissals, ghost detection, and the doctor's
+// case file — so every one of those silently stopped matching. ASCII and
+// BMP-accented text always agreed, which is exactly why it survived.
+//
+// The expected values below were generated from revision.compute_finding_id.
+// The AUTHORITY on this contract is tests/e2e_browser_finding_id_parity.py,
+// which compares the LIVE js against the LIVE python — that is what catches
+// Python drifting away from this table, and it is what proved the round trip.
+const ID_VECTORS = [
+  ["ascii quote", { category: "dialogue", evidence_quote: "I am angry." }, "f1yh1zgx"],
+  ["empty finding", {}, "f5xnrwm"],
+  ["accents (BMP)", { category: "voice", evidence_quote: "café naïve résumé" }, "f1j8tpa4"],
+  ["emoji in quote", { category: "dialogue", evidence_quote: "She smiled 😀 and left." }, "f17jmr79"],
+  ["emoji in issue", { category: "theme", issue: "the theme 😀 is thin" }, "fyvgmwq"],
+  ["astral in issue", { category: "voice", issue: "astral probe 𝕏 in the quote" }, "f9vdpym"],
+  ["zwj family emoji", { category: "voice", evidence_quote: "the family 👨‍👩‍👧‍👦 arrives" }, "f1ky8xej"],
+];
+
+test("computeFindingId: matches the Python twin on every vector", () => {
+  for (const [label, finding, expected] of ID_VECTORS) {
+    assert.strictEqual(computeFindingId(finding), expected, `${label} diverged`);
+  }
+});
+
+test("_strHash: folds ONE code point per character, not two code units", () => {
+  // 😀 is U+1F600 — one code point, two UTF-16 code units. Compute both
+  // accumulations independently and pin which one the helper implements.
+  const fold = (h, cp) => (((h << 5) + h + cp) | 0) >>> 0;
+  const asCodePoint = fold(5381, 0x1f600);
+  const asSurrogates = fold(fold(5381, 0xd83d), 0xde00);
+
+  assert.strictEqual(_strHash("😀"), asCodePoint,
+    "a surrogate pair must hash as a single code point");
+  assert.notStrictEqual(asCodePoint, asSurrogates,
+    "the two accumulations really do differ — the guard is not vacuous");
+  assert.notStrictEqual(_strHash("😀"), asSurrogates,
+    "the pre-fix implementation hashed the halves separately");
+});
+
+test("computeFindingId: the quote tier wins over the issue tier", () => {
+  const withQuote = computeFindingId({ category: "dialogue", issue: "ignored",
+                                       evidence_quote: "the quote wins" });
+  assert.strictEqual(withQuote, computeFindingId({ category: "dialogue",
+                                                   evidence_quote: "the quote wins" }));
+  assert.notStrictEqual(withQuote,
+    computeFindingId({ category: "dialogue", issue: "the quote wins" }));
 });
