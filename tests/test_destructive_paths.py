@@ -145,3 +145,34 @@ class TestDraftCleanupCannotMaskTheRealError:
         )
         assert resp.status_code == 200, resp.get_data(as_text=True)
         assert "could not remove" in capsys.readouterr().out
+
+
+class TestUnhandledErrorsAnswerAsJson:
+    """The backstop that makes "the writer always gets a reason" a property of the
+    app rather than a thing someone has to remember per call.
+
+    Every route's own failure path returns `_error(...)` because the SPA reads
+    `error` off the body. An unguarded raise ANYWHERE else produced Flask's HTML
+    500 — the front-end found no `error` field and the writer was told nothing.
+    """
+
+    def test_an_unhandled_oserror_answers_as_json(self, http_client, monkeypatch):
+        from screenplay_studio import beatboard
+
+        project = _upload(http_client).get_json()["project"]
+
+        def boom(m):
+            raise OSError(13, "Access is denied")
+
+        monkeypatch.setattr(beatboard, "reset_order", boom)
+        resp = http_client.post(f"/api/projects/{project}/beatboard/reset")
+        assert resp.status_code == 500, resp.get_data(as_text=True)
+        body = resp.get_json()
+        assert body, "an HTML page tells the front-end nothing"
+        assert "Access is denied" in body.get("error", ""), body
+
+    def test_an_http_exception_keeps_its_status(self, http_client):
+        """The handler must not swallow 404/405 into a 500 — those codes are the
+        API's contract, and the SPA branches on them."""
+        assert http_client.get("/api/definitely-not-a-route").status_code == 404
+        assert http_client.delete("/api/health").status_code == 405

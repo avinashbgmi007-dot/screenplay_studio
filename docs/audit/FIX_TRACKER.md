@@ -110,6 +110,51 @@ tracker-stamp commit that follows carries the same content.
 
 ---
 
+## Closed in this pass (2026-09-21, pass 14f) — the sweep only walked one package, and the app had no JSON backstop
+
+Two things the pass-14e sweep could not have told me, because it only looked at `screenplay_studio/`.
+
+### The sweep was scoped to the module I was already looking at
+
+Widened to all four packages it found the same defect class in two more places — and one is the path
+AGENTS.md names explicitly:
+
+| site | shape | why it matters |
+|---|---|---|
+| `screenplay_parser/pdf_parser.py` `_ocr_extract` | temp PNG removed in a **`finally`**, unguarded | AGENTS.md: a missing OCR engine must give *"a clear message, not an empty parse"*. A raise from that `finally` **replaces the in-flight exception**, so a refused temp file turned the clear OCR message into a traceback about a PNG. |
+| `screenplay_cowriter/store.py`, `beatboard.py`, `diff.py`, `revision.py` | unguarded single-file removals | reachable from routes whose own `except` clauses catch only `ValueError` / `FileNotFoundError`, so an `OSError` escaped. |
+
+And the sweep had **a second false-positive mode**: a call inside a `finally` was reported unguarded
+even when the finally body had its own `try/except OSError` — which `stt.py` does. The `elif` chain
+let the outer `finally` short-circuit the inner guard. Fixed, `stt.py` and `jsonio.py` resolve to
+guarded.
+
+### The systemic fix, instead of six call-site guards
+
+Rather than wrap each site, the app now has **one backstop**:
+
+```python
+@app.errorhandler(Exception)
+def _unhandled(e):
+    if isinstance(e, HTTPException):
+        return e                      # 404/405/413 keep their codes and their own handlers
+    traceback.print_exc()
+    return jsonify({"error": f"Unexpected error: {e}"}), 500
+```
+
+Every route's own failure path already returned `_error(...)` because the SPA reads `error` off the
+body; an unguarded raise anywhere else produced Flask's **HTML 500**, so the front-end found no
+`error` field and the writer was told nothing. This makes "the writer always gets a reason" a property
+of the app instead of a thing someone has to remember per call. The per-site guards stay — they
+produce a **sentence naming what failed** — and the handler is the floor beneath them.
+
+### Verified
+- `tests/test_destructive_paths.py` — 5 tests (2 more for the backstop), **mutation-verified 4/4**.
+- `tests/test_pdf_ocr.py` — +1 test pinning the OCR information-loss property, **mutation-verified**.
+  All five mutations are **named failures**, each with the source restored byte-identical.
+
+---
+
 ## Closed in this pass (2026-09-21, pass 14e) — the last two unguarded destructive calls, and a bug in the sweep that found them
 
 Pass 12 swept every destructive filesystem call with an AST and split them by **blast radius**: the

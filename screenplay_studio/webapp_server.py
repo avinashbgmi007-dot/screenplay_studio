@@ -28,6 +28,7 @@ import zipfile
 from functools import lru_cache
 
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
+from werkzeug.exceptions import HTTPException
 
 from .jsonio import (StoreUnreadable, atomic_write_json, check_safe_id, lock_for,
                      retry_permission, safe_dir_name, suffixed_id)
@@ -411,6 +412,31 @@ def _store_unreadable(e):
 def _too_large(e):
     return jsonify({"error": "Upload too large (limit 256MB). "
                              "Split the file or export a smaller PDF."}), 413
+
+
+@app.errorhandler(Exception)
+def _unhandled(e):
+    """Any unhandled error answers as JSON, never as Flask's HTML page.
+
+    The SPA reads `error` off the response body — which is why every route's own
+    failure path returns `_error(...)`. An unguarded raise ANYWHERE else bypassed
+    all of it and produced Flask's HTML 500, so the front-end found no `error`
+    field and told the writer nothing they could act on.
+
+    Measured while closing the last unguarded destructive calls (pass 14e): an
+    `OSError` from `os.remove` in `reparse_project`, `reset_beatboard`,
+    `reset_edits` and `activate_draft` reached the client as an HTML page. Those
+    sites have their own guards now — they produce a SENTENCE naming what failed
+    — but this is the backstop that makes "the writer always gets a reason" a
+    property of the app instead of a thing someone has to remember per call.
+
+    `HTTPException` is passed straight through: 404/405/413 already have their own
+    handlers and their status codes are part of the API's contract.
+    """
+    if isinstance(e, HTTPException):
+        return e
+    traceback.print_exc()
+    return jsonify({"error": f"Unexpected error: {e}"}), 500
 
 
 # ---------- static frontend ----------

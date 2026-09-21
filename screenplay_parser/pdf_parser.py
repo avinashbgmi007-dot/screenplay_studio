@@ -206,8 +206,17 @@ def _ocr_extract(pdf_path: str, engine) -> list[str]:
                 tmp_path = f.name
             text = (engine(tmp_path) or "") if tmp_path else ""
         finally:
+            # Cleanup is not the operation, and a raise from a `finally` REPLACES
+            # the in-flight exception — so a locked or refused PNG would discard
+            # the real OCR error. That matters here specifically: AGENTS.md says a
+            # missing OCR engine must "fail loudly with actionable errors … a
+            # clear message, not an empty parse", and an unguarded unlink would
+            # turn that clear message into a traceback about a temp file.
             if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
         prev_blank = False
         for ln in text.splitlines():
             if ln.strip():

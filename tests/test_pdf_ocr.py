@@ -79,3 +79,34 @@ def test_render_does_not_require_pil():
     bitmap = pdf[0].render(scale=200 / 72)
     png = pdf_parser._bitmap_to_png_bytes(bitmap)
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_a_refused_temp_cleanup_does_not_mask_the_ocr_error(monkeypatch):
+    """A raise from a `finally` REPLACES the in-flight exception.
+
+    The per-page temp PNG is removed in a `finally`, so an unguarded unlink would
+    let a locked or refused temp file discard the real engine error and surface a
+    traceback about a PNG instead. That is exactly the failure AGENTS.md names for
+    this path — a broken OCR engine must give "a clear message, not an empty
+    parse" — and it is the same shape as the `finally` bug fixed in
+    `upload_draft` (pass 14e).
+    """
+
+    def failing_engine(image_path: str) -> str:
+        raise RuntimeError("tesseract exploded")
+
+    monkeypatch.setattr(pdf_parser, "_get_ocr_engine", lambda: failing_engine)
+
+    real_unlink = os.unlink
+
+    def refuse_only_pngs(path, *a, **kw):
+        if str(path).endswith(".png"):
+            raise PermissionError(13, "Access is denied")
+        return real_unlink(path, *a, **kw)
+
+    monkeypatch.setattr(os, "unlink", refuse_only_pngs)
+
+    with pytest.raises(RuntimeError) as caught:
+        pdf_parser.parse_pdf(FIXTURE)
+    assert "tesseract exploded" in str(caught.value), (
+        "the cleanup's failure replaced the engine's error")
