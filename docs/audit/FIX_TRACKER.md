@@ -9,8 +9,8 @@ a real defect**: the Windows `rmtree` lock race that made `delete_project` answe
 raw 500 *and leave the project half-deleted*. Both `rmtree` sites now run inside
 `jsonio.retry_permission`, the retry the store paths already used. Production code,
 mutation-verified **4/4**. **Nothing is left open that this audit can decide.**)
-**HEAD:** `44f18b3` (pass 11's tracker stamp) — **pushed**; `git ls-remote origin main`
-agrees. This pass's commit hash is stamped at the bottom.
+**HEAD:** `4786175` (pass 12's work commit) — **pushed**; `git ls-remote origin main`
+agrees. The tracker-stamp commit that follows it carries the same content.
 **Baseline for this pass:** `44f18b3`
 
 ---
