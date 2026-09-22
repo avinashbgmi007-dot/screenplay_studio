@@ -4350,6 +4350,78 @@ async function renderDiffBanner() {
   banner.style.display = "block";
 }
 
+// ---- knowledge-base rule popover (spec section 7: "grounded in rule X" has to
+// be answerable from the desk, not only from an exported report)
+
+const _ruleLookups = new Map(); // ruleId -> response: the desk asks once
+let _ruleDismissalWired = false;
+
+/** Close the open rule popover. Returns true when there was one, so the Esc
+ *  cascade knows the keypress was consumed before it reached the dock. */
+function closeRulePopover() {
+  const open = document.querySelector(".rule-popover");
+  if (!open) return false;
+  open.remove();
+  return true;
+}
+
+function _wireRulePopoverDismissal() {
+  if (_ruleDismissalWired) return;
+  _ruleDismissalWired = true;
+  document.addEventListener("mousedown", (e) => {
+    // e.target is not always an Element (synthetic/document events) and closest()
+    // only exists on Elements — one throw here would silently kill dismissal for
+    // the rest of the session (same guard as the idea-quote float)
+    if (!(e.target instanceof Element)) return;
+    if (e.target.closest(".rule-popover") || e.target.closest(".finding-rule-btn")) return;
+    closeRulePopover();
+  });
+}
+
+/** The rule's own name and craft attribution, fetched the first time it is asked
+ *  for. Rendered inside the card, not the hover-only deep block, so it does not
+ *  vanish when the pointer leaves. */
+async function showRulePopover(ruleId, anchorEl) {
+  const card = anchorEl.closest(".finding-note");
+  if (!card) return;
+  const was = card.querySelector(".rule-popover");
+  closeRulePopover();
+  if (was && was.dataset.ruleId === ruleId) return; // second click on one chip closes it
+  const box = el("div", "rule-popover");
+  box.dataset.ruleId = ruleId;
+  box.appendChild(el("p", "rule-popover-loading", "Looking up " + ruleId + "\u2026"));
+  card.appendChild(box);
+  _wireRulePopoverDismissal();
+  let rec = _ruleLookups.get(ruleId);
+  if (rec === undefined) {
+    try {
+      rec = await api("/rules/" + encodeURIComponent(ruleId));
+    } catch (err) {
+      rec = { error: err.message };
+    }
+    _ruleLookups.set(ruleId, rec);
+  }
+  if (!box.isConnected) return; // closed while the lookup was in flight
+  box.textContent = "";
+  if (rec.error) {
+    box.appendChild(el("p", "rule-popover-error", rec.error));
+    return;
+  }
+  box.appendChild(el("p", "rule-popover-name", rec.name));
+  box.appendChild(el("p", "rule-popover-source", rec.source));
+}
+
+function ruleChip(ruleId) {
+  const b = el("button", "finding-rule-btn", "\uD83D\uDCD6 KB rule \u00B7 " + ruleId);
+  b.type = "button";
+  b.title = "Which craft rule is this, and who says so?";
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    showRulePopover(ruleId, b);
+  });
+  return b;
+}
+
 function findingNoteEl(f, index, opts = {}) {
   const disp = opts.disposition || "open";
   // forward-compatible states (Phase D defer / Phase E ghosting): muted
@@ -4374,8 +4446,20 @@ function findingNoteEl(f, index, opts = {}) {
     if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
     const badge = verificationBadge(f.verification);
     if (badge) deep.appendChild(badge);
+    // The markdown report has printed the verifier's note all along; the desk
+    // dropped it, so "the quote came back from a different scene" was invisible
+    // unless you exported the report (spec section 7).
+    if (f.verification && f.verification.note) {
+      deep.appendChild(el("span", "finding-deep-note", f.verification.note));
+    }
+    // The one thing the desk cannot name is which mechanical check fired, so it
+    // says the id: a check is a measurement with no authority to cite (unlike a
+    // KB rule, which is a button you can ask — it lives in the action row).
+    if (f.check_id && !f.rule_id) {
+      deep.appendChild(el("span", "finding-check",
+        "\u2699 mechanical check \u00B7 " + f.check_id));
+    }
     if (deep.children.length) note.appendChild(deep);
-    if (f.rule_id) cat.title = "Grounded in knowledge-base rule " + f.rule_id;
   }
 
   const actions = el("div", "finding-note-actions");
@@ -4429,6 +4513,10 @@ function findingNoteEl(f, index, opts = {}) {
     e.stopPropagation();
     discussFinding(f, index);
   });
+  // spec §7: "grounded in knowledge-base rule X" is a claim with an author behind
+  // it, so it gets a verb. The chip sits with the other verbs — the deep block is
+  // hover-only, and a writer could never have clicked it there.
+  if (opts.deep && f.rule_id) actions.appendChild(ruleChip(f.rule_id));
   actions.appendChild(locateBtn);
   // R6: the margin pin points, the board/dock judge — Rewrite and Discuss are
   // the writer's judgment and have one home each (the board's card and the
@@ -7733,6 +7821,10 @@ function bindGlobalShortcuts() {
       closePalette();
       return;
     }
+
+    // An open rule popover takes Esc first (it is the innermost thing on the
+    // card, same standing as a modal); the dock keeps the keypress after it.
+    if (e.key === "Escape" && closeRulePopover()) return;
 
     // Esc closes the top-most open modal — even while typing inside it,
     // so this must sit ABOVE the isTypingTarget bail-out further down.

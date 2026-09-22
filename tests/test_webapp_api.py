@@ -756,63 +756,24 @@ class TestReportRuleIdNormalization:
         assert not bad, f"served rule ids that are not KB rules: {bad}"
 
 
-class TestReportRuleIdNormalization:
-    """`rule_id` is rendered in the UI as "Grounded in knowledge-base rule
-    <id>" (app.js:4066). Reports written before that contract was split stored
-    the deterministic passes' own check names in `rule_id`, so an existing
-    project claimed grounding in rules that do not exist. `_sanitize_report`
-    re-files them at serve time — same reasoning as the existing feedback
-    filter, so no re-analysis is needed."""
+class TestRuleAttributionEndpoint:
+    """spec §7: a card may say "Grounded in knowledge-base rule <id>", so asking
+    *on whose authority?* has to be answerable from the desk itself. The rule's
+    own name and citation come out of the shipped KB — a read, not a model call."""
 
-    def test_legacy_check_name_is_refiled(self):
-        report = {"findings": [{"category": "continuity",
-                                "rule_id": "unmarked_time_flip", "issue": "flip"}]}
-        out = webapp_server._sanitize_report(report)["findings"]
-        assert out[0].get("rule_id") is None
-        assert out[0]["check_id"] == "unmarked_time_flip"
+    def test_rule_endpoint_returns_name_and_citation(self, http_client):
+        body = http_client.get("/api/rules/chekhovs_gun").get_json()
+        assert body["id"] == "chekhovs_gun"
+        assert body["name"] == "Chekhov's Gun"
+        assert "Chekhov" in body["source"]
 
-    def test_real_kb_rule_is_left_alone(self):
-        report = {"findings": [{"category": "plot_thread",
-                                "rule_id": "chekhovs_gun", "issue": "gun"}]}
-        out = webapp_server._sanitize_report(report)["findings"]
-        assert out[0]["rule_id"] == "chekhovs_gun"
-        assert "check_id" not in out[0]
+    def test_a_widely_taught_rule_cites_the_convention_not_an_author(self, http_client):
+        """The KB holds both kinds of source. Attributing a general convention to
+        a person would be the popover inventing the thing it exists to verify."""
+        body = http_client.get("/api/rules/timeline_consistency").get_json()
+        assert "convention" in body["source"]
 
-    def test_an_existing_check_id_is_not_overwritten(self):
-        report = {"findings": [{"category": "structure", "rule_id": "pacing_drag",
-                                "check_id": "pacing_drag", "issue": "drag"}]}
-        out = webapp_server._sanitize_report(report)["findings"]
-        assert out[0]["check_id"] == "pacing_drag"
-        assert out[0].get("rule_id") is None
-
-    def test_findings_without_a_rule_id_are_untouched(self):
-        report = {"findings": [{"category": "dialogue", "issue": "x", "rule_id": None}]}
-        out = webapp_server._sanitize_report(report)["findings"]
-        assert out[0]["rule_id"] is None and "check_id" not in out[0]
-
-    def test_the_stored_report_is_not_mutated(self):
-        original = {"category": "continuity", "rule_id": "unmarked_time_flip", "issue": "flip"}
-        webapp_server._sanitize_report({"findings": [original]})
-        assert original["rule_id"] == "unmarked_time_flip", "sanitising mutated the input"
-
-    def test_without_the_knowledge_base_nothing_is_touched(self, monkeypatch):
-        """We cannot tell a stale id from a real one without the KB."""
-        monkeypatch.setattr(webapp_server, "_kb_rule_ids", lambda: frozenset())
-        report = {"findings": [{"category": "continuity",
-                                "rule_id": "unmarked_time_flip", "issue": "flip"}]}
-        out = webapp_server._sanitize_report(report)["findings"]
-        assert out[0]["rule_id"] == "unmarked_time_flip"
-
-    def test_every_served_rule_id_resolves_in_the_kb(self):
-        """The contract, stated end to end."""
-        from knowledge_base import KnowledgeBase
-        known = {r.id for r in KnowledgeBase().all()}
-        report = {"findings": [
-            {"category": "continuity", "rule_id": "unmarked_time_flip"},
-            {"category": "voice", "rule_id": "voice_bleed"},
-            {"category": "structure", "rule_id": "pacing_drag"},
-            {"category": "plot_thread", "rule_id": "chekhovs_gun"},
-        ]}
-        served = webapp_server._sanitize_report(report)["findings"]
-        bad = [f.get("rule_id") for f in served if f.get("rule_id") and f["rule_id"] not in known]
-        assert not bad, f"served rule ids that are not KB rules: {bad}"
+    def test_unknown_rule_is_a_404_that_says_so(self, http_client):
+        resp = http_client.get("/api/rules/not_a_rule")
+        assert resp.status_code == 404
+        assert "not_a_rule" in resp.get_json()["error"]

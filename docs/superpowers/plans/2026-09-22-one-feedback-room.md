@@ -357,7 +357,7 @@ The P1 visual gate caught a regression from this change: the row badge squeezed 
 
 **Interfaces:** Produces: `GET /api/rules/<rule_id> -> {id, name, source} | 404`. Client: `showRulePopover(ruleId, anchorEl)` (app.js).
 
-- [ ] **Step 1: Failing test**:
+- [x] **Step 1: Failing test**:
 
 ```python
 def test_rule_endpoint_returns_attribution(self, http_client):
@@ -368,10 +368,16 @@ def test_rule_endpoint_returns_attribution(self, http_client):
     assert http_client.get("/api/rules/not_a_rule").status_code == 404
 ```
 
-- [ ] **Step 2: Run, expect 404/FAIL.**
-- [ ] **Step 3: Implement** the route (KB lazy-load, unknown id → 404, no model calls) and the card fields + popover (one fetch per open, `escapeHtml` everything, close on Esc/outside-click per the Esc cascade convention).
-- [ ] **Step 4: Gates** — pytest PASS; `node --check`; e2e card shows the note text.
-- [ ] **Step 5: Commit** — `"P2.13: verification.note + check_id on cards; /api/rules/<id> attribution popover"`
+- [x] **Step 2: Run, expect 404/FAIL.** (3 failed: the route did not exist, so the 404 came back as HTML and `get_json()` was None.)
+- [x] **Step 3: Implement** the route (KB lazy-load, unknown id → 404, no model calls) and the card fields + popover (one fetch per open, `escapeHtml` everything, close on Esc/outside-click per the Esc cascade convention).
+- [x] **Step 4: Gates** — pytest PASS; `node --check`; e2e card shows the note text.
+- [x] **Step 5: Commit** — `"P2.13: verification.note + check_id on cards; /api/rules/<id> attribution popover"`
+
+Deviations — the plan's example id `inciting_incident` is not a knowledge-base rule (263 ids checked; there is no inciting-incident rule), so the test cites `chekhovs_gun` and adds a second case for a `general_craft` rule, whose attribution must say *widely-taught convention* rather than invent an author. The rule chip ended up in the card's **action row**, not the deep block: `.finding-deep` is `display:none` until hover/`:focus-within`, so a chip placed there could never be clicked (the e2e caught it as "click never landed"). `check_id` prints only when there is no `rule_id`, so one card never carries two competing provenance lines.
+
+Also found and fixed on the way: `tests/test_webapp_api.py` defined `TestReportRuleIdNormalization` **twice** with byte-identical bodies — Python rebinds the name, so the first 62 lines were dead code that looked like coverage. Deleted the shadowed copy (63 tests before and after, so nothing was being lost, but the trap is gone).
+
+Measured (the P1 gate now photographs this surface): `03e_rule_popover_night` shows `General Setup and Payoff` / `Robert McKee — Story: Substance, Structure, Style, and the Principles of Screenwriting (1997)`; `03f_rule_chip_night` shows the chip's label. The gate gained a `ruleChip` measurement that fails if the chip is clipped or under 60px, and the first run caught the chip wrapping mid-label inside the 320px card — fixed with `.dock-section .finding-note-actions { flex-wrap: wrap }` + `white-space:nowrap` on the chip (the same squeeze P2.12 hit in the queue row). Re-measured: 172px, one line, not clipped, `FAILURES: none`.
 
 ### Task 14: Report header model_used + errors[] banner + coverage/strengths/read-confidence + formatting section
 

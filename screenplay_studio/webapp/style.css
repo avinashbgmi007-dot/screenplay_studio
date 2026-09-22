@@ -6382,6 +6382,25 @@ body:not(.idea-mode) .desk {
 .finding-deep-badge { align-self:flex-start; font-size:var(--fs-2xs); font-weight:600; border-radius:var(--r-sm); padding:1px var(--sp-2); }
 .finding-deep-badge.verified { color:var(--ok); border:1px solid var(--ok); }
 .finding-deep-badge.unverified { color:var(--danger); border:1px solid var(--danger); }
+/* spec section 7: the verifier's own words about this quote, beside the quote */
+.finding-deep-note { font-size:var(--fs-2xs); color:var(--text-muted); font-style:italic; line-height:1.55; }
+/* a KB rule is a claim with an author, so it is a button you can ask; a
+   mechanical check has nobody to cite and says so plainly */
+.finding-rule-btn { appearance:none; align-self:flex-start; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
+.finding-rule-btn:hover { color:var(--text); border-color:var(--lamp); }
+.finding-rule-btn:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
+.finding-check { align-self:flex-start; font-size:var(--fs-2xs); color:var(--text-faint); }
+/* the ledger column gives a card ~320px and the rule chip names a whole rule id:
+   unwrapped, it squeezed every verb beside it — the same damage the queue row
+   took in P2.12. The buttons keep their line; a long rule name gets its own. */
+.dock-section .finding-note-actions { flex-wrap: wrap; }
+.dock-section .finding-rule-btn { white-space:nowrap; flex:0 0 auto; }
+/* the receipt: the rule's name and its craft attribution, in the card, where the
+   writer is already looking — not a hover tooltip that disappears on the move to read it */
+.rule-popover { border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface); padding:var(--sp-3); margin-top:var(--sp-2); }
+.rule-popover-name { font-size:var(--fs-xs); font-weight:600; color:var(--text); margin:0; line-height:1.45; }
+.rule-popover-source, .rule-popover-loading { font-size:var(--fs-2xs); color:var(--text-muted); margin:var(--sp-1) 0 0; line-height:1.5; }
+.rule-popover-error { font-size:var(--fs-2xs); color:var(--danger); margin:0; }
 
 /* forward-compatible finding states (R3 defer / R9 ghosting): muted, never red, CSS-only (marks never reflow script text) */
 .finding-note.deferred{opacity:.72}

@@ -1,9 +1,11 @@
 """P1.6 gate — the Evidence dock's sections REALLY collapse (plan §5).
 
-Grew two more ledger contracts as those phases landed: P1.7 (the scene is a
-FILTER dimension on the ONE filter row, never a surface of its own) and P1.8
-(spec §5 "one rendering per finding per panel" — the DOM is asked which section
-cards each finding, and no finding may answer twice).
+Grew more ledger contracts as those phases landed: P1.7 (the scene is a FILTER
+dimension on the ONE filter row, never a surface of its own), P1.8 (spec §5
+"one rendering per finding per panel" — the DOM is asked which section cards each
+finding, and no finding may answer twice) and P2.13 (spec §7 — the deep card
+carries the verifier's own note, names a mechanical check as one, and a KB rule
+is a button whose popover resolves the rule's name and citation).
 
 The dock's own comment promised "sections stack vertically and collapse under one
 header each" while every `.dock-section-title` was a plain div: nothing collapsed,
@@ -30,7 +32,8 @@ import requests
 from playwright.sync_api import sync_playwright
 
 from e2e_browser_common import (Checks, clicked, launch, note,  # noqa: E402
-                                open_dock_section, open_studio)
+                                open_dock_section, open_dock_section_holding,
+                                open_studio)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -770,6 +773,158 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
               "no #diff-banner to read")
 
 
+# P2.13 (spec §7): the deep card carries the three facts that make a judgment
+# checkable — what the verifier actually said about the quote, which mechanical
+# check fired when there is no KB rule behind it, and whose authority the KB rule
+# cites. The markdown report has printed the verification note for months; the
+# desk simply dropped it, and `rule_id` was a hover title nobody could read.
+HONESTY_SEED_JS = """(args) => {
+  const fs = [{
+    category: "dialogue", severity: "high", scene_refs: [],
+    issue: "HONESTY rule seed: the quote is real but the scene was wrong",
+    why_it_matters: "A corrected scene is a fact the writer can use.",
+    evidence_quote: args.quote,
+    rule_id: "chekhovs_gun",
+    verification: { status: "verified", matched_scene: args.scene, confidence: 0.93,
+                    note: args.note },
+  }, {
+    category: "continuity", severity: "medium", scene_refs: [],
+    issue: "HONESTY check seed: the clock jumps with no slug",
+    check_id: "unmarked_time_flip",
+    verification: { status: "not_found", matched_scene: null, confidence: 0.2 },
+  }];
+  state.findings = fs;
+  state.report = Object.assign({}, state.report || {}, { findings: fs });
+  state.findingIds = fs.map((f) => computeFindingId(f));
+  state.findingStatus = {};
+  state.findingMarks = {};
+  state.ghostedIds = new Set();
+  refreshAllFindingSurfaces(); // the ONE re-render entry point (P0.4)
+  return { n: fs.length };
+}"""
+
+
+def check_card_honesty_fields(page, lens, base):
+    """P2.13 (spec §7): note text, check-vs-rule wording, and a rule chip whose
+    popover really resolves the citation from the knowledge base."""
+    lines = page.evaluate("""() => {
+        const out = [];
+        for (const l of document.querySelectorAll('#manuscript-container .el-action, #manuscript-container .el-dialogue')) {
+          const t = (l.textContent || '').trim();
+          if (t.length > 14) out.push(t);
+          if (out.length === 2) break;
+        }
+        return out;
+    }""")
+    assert len(lines) >= 1, "no manuscript line available to seed a real quote"
+    note_text = "Quote found in Scene 1, not the cited scene(s) [2] — corrected."
+    if not page.evaluate("() => dockIsOpen()"):
+        open_dock(page)
+    page.evaluate(HONESTY_SEED_JS, {"quote": lines[0], "scene": 1, "note": note_text})
+    page.wait_for_timeout(300)
+    open_dock_section_holding(page, ".finding-note")
+    page.wait_for_timeout(400)
+
+    rule_card = lens.locator(".finding-note").filter(has_text="HONESTY rule seed").first
+    check("P2.13: both seeded findings reached a deep card",
+          rule_card.count() == 1
+          and lens.locator(".finding-note").filter(has_text="HONESTY check seed").count() == 1,
+          f"rule={rule_card.count()} check="
+          f"{lens.locator('.finding-note').filter(has_text='HONESTY check seed').count()}")
+
+    # -- 1. the verifier's own note is on the card ---------------------------
+    # Scoped to the dock card on purpose: the same issue text also exists as a
+    # shallow margin pin in the manuscript, and a document-wide query finds that
+    # one first — it has no deep block, so it could never carry the note.
+    note_loc = rule_card.locator(".finding-deep-note")
+    shown = note_loc.first.text_content() if note_loc.count() else None
+    check("P2.13: the verification note the report already prints reaches the desk",
+          shown == note_text, repr(shown))
+    rule_card.hover()
+    page.wait_for_timeout(200)
+    check("P2.13: and the writer can actually read it (the deep block reveals it)",
+          note_loc.count() == 1 and note_loc.first.is_visible(), repr(shown))
+
+    # -- 2. a mechanical check is NOT dressed up as a KB rule ----------------
+    check_card = lens.locator(".finding-note").filter(has_text="HONESTY check seed").first
+    chk_loc = check_card.locator(".finding-check")
+    chk_text = chk_loc.first.text_content() if chk_loc.count() else None
+    check("P2.13: check_id is named on the card as a mechanical check",
+          chk_text and "unmarked_time_flip" in chk_text
+          and "rule" not in chk_text.lower(), repr(chk_text))
+    check("P2.13: a check-only finding offers no rule popover (nothing to look up)",
+          check_card.locator(".finding-rule-btn").count() == 0,
+          f"{check_card.locator('.finding-rule-btn').count()} chips on a check-only card")
+
+    # -- 3. rule_id is a reachable button that resolves its citation ---------
+    btn = rule_card.locator(".finding-rule-btn")
+    check("P2.13: rule_id is a real <button>, not a hover title",
+          btn.count() == 1 and btn.first.get_attribute("type") == "button",
+          f"{btn.count()} buttons")
+    requests = []
+    page.on("request", lambda r: requests.append(r.url)
+            if "/api/rules/" in r.url else None)
+    check("P2.13: clicking the rule chip opens the popover",
+          clicked(btn.first), "click never landed")
+    page.wait_for_timeout(900)
+    pop = page.evaluate(
+        """() => { const p = document.querySelector('.rule-popover');
+             return p ? { text: p.textContent, name: (p.querySelector('.rule-popover-name') || {}).textContent,
+                          source: (p.querySelector('.rule-popover-source') || {}).textContent } : null; }""")
+    check("P2.13: the popover resolves the rule's real name from the KB",
+          bool(pop) and pop.get("name") == "Chekhov's Gun", repr(pop))
+    check("P2.13: and the craft attribution that backs it",
+          bool(pop) and "Chekhov" in (pop.get("source") or ""), repr(pop))
+    check("P2.13: the lookup is one request to /api/rules/<id>",
+          len(requests) == 1, str(requests))
+
+    # -- 4. dismiss: the popover is the innermost Esc, the dock survives -----
+    was_open = page.evaluate("() => !!document.querySelector('.rule-popover')")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(250)
+    closed = page.evaluate("() => !document.querySelector('.rule-popover')")
+    check("P2.13: Esc closes the popover", bool(was_open) and bool(closed),
+          f"was_open={was_open} closed_again={closed}")
+    check("P2.13: and does NOT cascade into closing the dock (innermost first)",
+          page.evaluate("() => dockIsOpen()") is True, "the dock closed with it")
+
+    # -- 5. an outside click closes it too, and the cache answers the reopen --
+    if clicked(btn.first):
+        page.wait_for_timeout(300)
+        # Close by clicking something INERT inside the dock. A blind coordinate
+        # lands on desk chrome (a toggle) and re-lays the page out, which is a
+        # different fact from the one this leg is checking.
+        outside = page.locator('.dock-lens[data-lens="evidence"] .dock-mass-strip').first
+        check("P2.13: an inert strip inside the dock is available to click away onto",
+              outside.count() == 1, f"{outside.count()} strips")
+        clicked(outside)
+        page.wait_for_timeout(250)
+        gone = page.evaluate("() => !document.querySelector('.rule-popover')")
+        check("P2.13: a click outside closes it", bool(gone), repr(gone))
+        again = clicked(btn.first)
+        page.wait_for_timeout(500)
+        check("P2.13: reopening shows the citation without a second lookup",
+              again and len(requests) == 1,
+              f"re-click landed={again} requests={requests}")
+        reopened = page.evaluate("""() => { const p = document.querySelector('.rule-popover');
+                   return p ? p.textContent : ''; }""")
+        check("P2.13: the reopened popover really has the text again",
+              "Chekhov" in reopened, repr(reopened[:120]))
+        page.keyboard.press("Escape")
+    else:
+        check("P2.13: an inert strip inside the dock is available to click away onto",
+              False, "the chip could not be re-clicked")
+        check("P2.13: a click outside closes it", False, "the chip could not be re-clicked")
+        check("P2.13: reopening shows the citation without a second lookup", False,
+              "no chip to click")
+        check("P2.13: the reopened popover really has the text again", False, "no chip")
+
+    # -- 6. leave the ledger as the next section found it --------------------
+    page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
+                       showDeferred: false, category: null, scene: null };
+                     refreshAllFindingSurfaces(); }""")
+
+
 def run(base):
     name = seed_and_analyze(base, "Ledger Collapse")
     with sync_playwright() as p:
@@ -927,6 +1082,7 @@ def run(base):
         check_scene_filter(page, lens)
         check_seeded_scene_filter(page, lens)
         check_shelf_defers_and_one_pacing(page, lens, base, name)
+        check_card_honesty_fields(page, lens, base)
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

@@ -59,6 +59,13 @@ MEASURE = r"""() => {
     rowBox: r(document.querySelector('.dock-section-fixqueue .fix-row')),
     sevText: (document.querySelector('.dock-section-fixqueue .sev-badge') || {}).textContent || null,
     badges: document.querySelectorAll('.dock-section-fixqueue .fix-row .finding-deep-badge').length,
+    // P2.13: a chip whose label cannot fit its own box reads as an icon and says
+    // nothing — the pixels have to reject that, not just find the node.
+    ruleChip: (() => { const b = document.querySelector('#context-dock .finding-rule-btn');
+      if (!b) return null;
+      const box = b.getBoundingClientRect();
+      return { text: b.textContent, w: Math.round(box.width),
+               clipped: b.scrollWidth > b.clientWidth + 1 }; })(),
   };
 }"""
 
@@ -166,6 +173,21 @@ def main():
                 element_shot(page, ".dock-section .finding-note", "03c_card_night")
                 element_shot(page, ".dock-section-fixqueue .fix-row",
                              "03d_queue_row_night")
+                # P2.13: a KB rule is now a button whose popover cites the rule's
+                # name and author. It has to READ as an answer in a 380px column —
+                # a DOM assertion cannot tell a citation from a squeezed strip.
+                rule_chip = page.locator(".dock-section .finding-rule-btn >> visible=true")
+                if not rule_chip.count():
+                    raise RuntimeError("no visible KB-rule chip on the real report — "
+                                       "the popover surface was never photographed")
+                rule_chip.first.scroll_into_view_if_needed()
+                element_shot(page, ".dock-section .finding-rule-btn",
+                             "03f_rule_chip_night")
+                rule_chip.first.click()
+                page.wait_for_timeout(900)
+                element_shot(page, ".rule-popover", "03e_rule_popover_night")
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(300)
             ledger_expanded()
 
             def ledger_scene():
@@ -233,9 +255,11 @@ def main():
         if k.startswith("_") or not isinstance(v, dict) or "manuscriptPct" not in v:
             continue
         w = v.get("manuscriptPct")
+        rc = v.get("ruleChip")
         line = [k, f"ms={w}%" if w is not None else "ms=?",
                 f"secs={v.get('sectionsOpen')}/{v.get('sections')}",
                 f"ovfX={v.get('overflowX')}",
+                f"chip={rc['w']}px" if rc else "chip=-",
                 "OVERLAP" if v.get("surfacesOverlap") else ""]
         if v.get("surfacesOverlap"):
             bad.append(k + " surfaces overlap")
@@ -249,6 +273,9 @@ def main():
         if rb.get("h", 0) > 260:
             bad.append(f"{k} a queue row stands {rb['h']}px tall — its text column "
                        "is being squeezed by the chips beside it")
+        if rc and (rc.get("clipped") or rc.get("w", 0) < 60):
+            bad.append(f"{k} the KB-rule chip is unreadable (w={rc.get('w')} "
+                       f"clipped={rc.get('clipped')} text={rc.get('text')!r})")
         print("   " + "  ".join(x for x in line if x))
     for n in EL_SHOTS:
         if facts.get(n) != "ok":

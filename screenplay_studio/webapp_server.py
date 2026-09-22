@@ -600,15 +600,23 @@ def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) 
 
 
 @lru_cache(maxsize=1)
+def _knowledge_base():
+    """The KB, loaded once. None when the package isn't installed — callers then
+    say they cannot answer rather than guessing (same rule as `_kb_rule_ids`)."""
+    try:
+        from knowledge_base import KnowledgeBase
+    except ImportError:
+        return None
+    return KnowledgeBase()
+
+
+@lru_cache(maxsize=1)
 def _kb_rule_ids() -> frozenset:
     """The real knowledge-base rule ids, resolved once. Empty when the
     knowledge base isn't installed — callers then leave reports untouched,
     because without it we cannot tell a real id from a stale one."""
-    try:
-        from knowledge_base import KnowledgeBase
-    except ImportError:
-        return frozenset()
-    return frozenset(r.id for r in KnowledgeBase().all())
+    kb = _knowledge_base()
+    return frozenset() if kb is None else frozenset(r.id for r in kb.all())
 
 
 def _normalize_rule_ids(findings: list) -> list:
@@ -753,6 +761,23 @@ def real_server_check():
 def health():
     return jsonify({"status": "ok", "server_url": CONFIG.get("server_url"),
                      "demo_model": _DEMO_MODEL_ACTIVE})
+
+
+@app.route("/api/rules/<rule_id>", methods=["GET"])
+def get_rule(rule_id):
+    """spec §7: a card may claim "grounded in knowledge-base rule <id>", so the
+    desk has to be able to answer *says who?*. This is a read of the shipped
+    knowledge base — no model call, and an id that isn't a rule is a 404 rather
+    than a popover that invents an authority."""
+    kb = _knowledge_base()
+    if kb is None:
+        return _error("The knowledge base isn't installed, so this rule "
+                      "cannot be looked up.", 503)
+    try:
+        rule = kb.get(rule_id)
+    except KeyError:
+        return _error(f"No knowledge-base rule with id '{rule_id}'.", 404)
+    return jsonify({"id": rule.id, "name": rule.name, "source": rule.attribution})
 
 
 @app.route("/api/config", methods=["GET"])
