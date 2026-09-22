@@ -18,6 +18,12 @@ This suite plants payloads at each sink and asserts they render as TEXT. It
 fails against the pre-fix code and guards the class going forward: escaping one
 sink while leaving its siblings raw is the exact regression it catches.
 
+History: the original canvas was `#problem-board` (FE-C1's sink). P0.2 retired
+the board; P0.1 deleted the dormant Feedback View. The payload legs now drive
+the Evidence dock (`.dock-lens[data-lens="evidence"]`) — the canonical finding
+canvas — and the dead-sink legs assert ABSENCE of the removed renderers, which
+is the strongest form of "inert". No security assertion was weakened.
+
 It boots with the capability token ON (unlike most suites' --no-token default)
 so the "injected JS cannot read the token" leg is a real assertion, not a
 vacuous one.
@@ -131,26 +137,32 @@ def run(base, projects_dir, headers):
         cookie_before = page.evaluate("() => document.cookie")
 
         # openProject() is the app's own entry point — it fetches the report and
-        # calls showProblemBoard() when findings exist.
+        # populates the desk. Then open the Evidence dock: since P0.2 it is the
+        # canonical finding canvas (the Problem Board this suite originally
+        # targeted was retired; the payload legs re-point here).
         page.evaluate("(n) => openProject(n)", name)
         page.wait_for_timeout(2500)
+        page.evaluate("() => openDock('evidence')")
+        page.wait_for_timeout(1200)
 
         # --- the exploit itself ---
         fired = page.evaluate(
             "() => ({board: window.__XSS_BOARD===1, fv: window.__XSS_FV===1,"
             " attr: window.__XSS_ATTR===1})")
-        checks.ok("Problem Board payload did NOT execute",
+        checks.ok("dock-rendered finding payload did NOT execute",
                   fired["board"] is False, "arbitrary JS ran from finding text")
-        checks.ok("FV-board payload did NOT execute",
-                  fired["fv"] is False, "dormant sink is live")
+        checks.ok("FV payload flag never fired (and the sink is gone)",
+                  fired["fv"] is False and page.evaluate(
+                      "() => typeof renderFeedbackView === 'undefined'"),
+                  "a resurrected dormant sink executed")
 
         # The scene number is interpolated into the row's ATTRIBUTES. A payload
         # there must not be able to create a handler attribute — the structural
         # form of the check, which holds whatever event name an attacker picks.
         injected_handlers = page.evaluate(
             "() => document.querySelectorAll("
-            "'#pb-list [onmouseover], #pb-list [onerror], #pb-list [onclick], "
-            "#pb-list [onload], #pb-list [onfocus], #pb-list [onmouseenter]')"
+            "'#context-dock [onmouseover], #context-dock [onerror], #context-dock [onclick], "
+            "#context-dock [onload], #context-dock [onfocus], #context-dock [onmouseenter]')"
             ".length")
         checks.ok("no event-handler attributes are built from finding data",
                   injected_handlers == 0,
@@ -159,7 +171,8 @@ def run(base, projects_dir, headers):
         # …and it must not fire even when the row is actually interacted with
         # (a payload in an unused attribute would otherwise pass vacuously).
         page.evaluate(
-            "() => document.querySelectorAll('#pb-list .pb-item').forEach("
+            "() => document.querySelectorAll("
+            "'.dock-lens[data-lens=\"evidence\"] .fix-row').forEach("
             "n => n.dispatchEvent(new MouseEvent('mouseover', {bubbles:true})))")
         page.wait_for_timeout(300)
         checks.ok("attribute-context payload did NOT execute on interaction",
@@ -171,48 +184,51 @@ def run(base, projects_dir, headers):
                   stolen is None, f"leaked {stolen!r}")
 
         # --- and the findings must still be USABLE, not just safe ---
+        DOCK = '.dock-lens[data-lens="evidence"]'
         rows = page.evaluate(
-            "() => document.querySelectorAll('#pb-list .pb-item').length")
-        checks.ok("board still renders every finding",
+            "() => document.querySelectorAll("
+            "'.dock-lens[data-lens=\"evidence\"] .fix-row').length")
+        checks.ok("the ledger still renders every finding",
                   rows == baseline + len(planted),
                   f"{rows} rows vs expected {baseline + len(planted)}")
 
         issues = page.evaluate(
-            "() => Array.from(document.querySelectorAll('#pb-list .pb-issue'))"
+            "() => Array.from(document.querySelectorAll("
+            "'.dock-lens[data-lens=\"evidence\"] .fix-row'))"
             ".map(n => n.textContent)")
         checks.ok("payload is shown as literal TEXT (not swallowed)",
                   any(PAYLOAD_TEXT in t for t in issues),
                   "the finding text vanished instead of being escaped")
 
-        board_html = page.evaluate(
-            "() => { const n = document.querySelector('#pb-list');"
+        dock_html = page.evaluate(
+            "() => { const n = document.querySelector("
+            "'.dock-lens[data-lens=\"evidence\"]');"
             " return n ? n.innerHTML : null; }")
         checks.ok("markup in the DOM is escaped, not raw",
-                  bool(board_html) and "&lt;img" in board_html
-                  and "<img" not in board_html)
+                  bool(dock_html) and "&lt;img" in dock_html
+                  and "<img" not in dock_html)
 
-        # --- the delegation refactor must still WORK ---
+        # --- the row interactions must still WORK ---
         page.evaluate(
-            "() => { const it = document.querySelector('#pb-list .pb-item');"
-            " if (it) it.click(); }")
+            "() => { const it = document.querySelector("
+            "'.dock-lens[data-lens=\"evidence\"] .fix-row');"
+            " if (it) it.dispatchEvent(new MouseEvent('click', {bubbles: true})); }")
         page.wait_for_timeout(500)
-        checks.ok("board rows are still clickable after delegation",
+        checks.ok("ledger rows remain interactive",
                   page.evaluate(
-                      "() => !!document.querySelector('#pb-list .pb-item')"))
+                      "() => !!document.querySelector("
+                      "'.dock-lens[data-lens=\"evidence\"] .fix-row')"))
 
-        # --- the dormant Feedback view must not be a landmine ---
-        # renderFeedbackView() has no live caller, but its targets still exist
-        # in index.html; invoking it directly guards against a future re-enable
-        # resurrecting the raw-script-text sink.
-        page.evaluate("() => { try { renderFeedbackView(); } catch (e) {} }")
-        page.wait_for_timeout(600)
-        checks.ok("dormant FV script sink is inert when invoked",
-                  page.evaluate("() => window.__XSS_FV === 1") is False)
-        fv_html = page.evaluate(
-            "() => { const n = document.getElementById('fv-script');"
-            " return n ? n.innerHTML : null; }")
-        checks.ok("FV script renderer escapes raw script text",
-                  fv_html is None or "<img" not in fv_html)
+        # --- the dormant Feedback view is GONE (P0.1), not merely inert ----
+        # The clone was deleted — the strongest form of "inert" is "absent".
+        # If it ever comes back, the FV payload flag above re-arms.
+        checks.ok("the dormant FV sink does not exist at all",
+                  page.evaluate(
+                      "() => typeof renderFeedbackView === 'undefined'"
+                      " && typeof renderFvBoard === 'undefined'"))
+        checks.ok("the FV script renderer's DOM target is gone too",
+                  page.evaluate(
+                      "() => document.getElementById('fv-script') === null"))
 
         # --- the containment layer ---
         # The app itself must run clean under the policy (captured BEFORE the

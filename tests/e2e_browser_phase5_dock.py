@@ -8,7 +8,8 @@ Verifies the dock's structural contract on the live app:
   * desktop: dock is an in-flow sibling, manuscript keeps >=50% width
   * tablet (<=1199px): dock becomes a fixed right overlay; manuscript full width
   * mobile (<=767px): dock becomes a bottom sheet, full width
-  * legacy surfaces untouched: #room-drawer, #feedback-panel, #feedback-view, #problem-board
+  * legacy surfaces: #room-drawer, #feedback-panel live on; #feedback-view and
+  #problem-board are RETIRED (P0.1/P0.2) — absence asserted in the suite
 
 Run:  python tests/e2e_browser_phase5_dock.py   (boots its own demo studio;
       set E2E_BASE to reuse an already-running one)
@@ -142,10 +143,14 @@ def run(base):
         page.keyboard.press("Escape")
         page.set_viewport_size({"width": 1440, "height": 900})
 
-        # --- legacy surfaces remain (Phase 5 must not remove them) ------------
-        for sel, label in [("#room-drawer", "room drawer"), ("#feedback-panel", "feedback panel"),
-                           ("#feedback-view", "feedback view"), ("#problem-board", "problem board")]:
+        # --- live legacy surfaces remain; the retired two stay retired --------
+        # P0.1/P0.2: #feedback-view (dormant clone) and #problem-board were
+        # deliberately deleted — absence is now the contract, not presence.
+        for sel, label in [("#room-drawer", "room drawer"), ("#feedback-panel", "feedback panel")]:
             check(f"legacy surface intact: {label}", page.locator(sel).count() > 0)
+        for sel, label in [("#feedback-view", "feedback view clone"),
+                           ("#problem-board", "problem board")]:
+            check(f"retired surface stays gone: {label}", page.locator(sel).count() == 0)
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

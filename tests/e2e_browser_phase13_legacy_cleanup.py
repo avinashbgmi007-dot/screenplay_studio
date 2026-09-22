@@ -8,12 +8,11 @@ Proves the migration's end state: ONE presentation architecture.
   * every migrated control still has a reachable home:
     #desk-toolbar (finding chips, search), #premise-view, the Stash &
     Notes dock lens, the selection floats
-  * the Problem Board is VISIBLE in script mode. It spent every phase
-    since Stage 3B nested inside .desk (display:none in script mode), so
-    toggling it "open" rendered 0x0 — the phase 5/6 gates asserted
-    count() > 0 (existence) and never saw it. Visibility is asserted here.
+  * the Problem Board is RETIRED (P0.2). This suite used to prove its
+    visibility/geometry; the board graduated into the Evidence dock, so the
+    gate here is its absence: no markup, no edge tab, no helpers.
   * mode rules point at the LIVE row: spotlight hides the desk toolbar
-    (and the board), focus mode dims it (filter, still visible)
+    (focus mode dims it — filter, still visible)
 
 Run:  python tests/e2e_browser_phase13_legacy_cleanup.py
 """
@@ -92,11 +91,10 @@ def main():
             check("finding chips render on the desk row",
                   bool(fs and fs["visible"]), str(fs))
 
-            # ---- 3. Problem Board relocation (the buried-since-3B fix) ---
+            # ---- 3. Problem Board RETIRED (P0.2) — the gate is its absence --
             # Seed findings onto state — no model needed (the real analysis
-            # path is the phase 8 gate's job). The board renders from
-            # state.findings, and the auto-expand observer keys off the
-            # active scene, so these belong to scene 1.
+            # path is the phase 8 gate's job). Section 3b below still renders
+            # margin pins from these; the board that used to read them is gone.
             page.evaluate(
                 """() => {
         state.findings = [
@@ -111,88 +109,36 @@ def main():
             scene_refs: [1], scene: 1 },
         ];
     }""")
-            page.evaluate("() => toggleProblemBoard()")
-            page.wait_for_timeout(800)
-            board = probe(page, "#problem-board")
-            check("problem board VISIBLE after toggle (script mode)",
-                  bool(board and board["visible"]), str(board))
-            check("board is inside the live workspace row",
+            check("P0.2: the Problem Board is gone from the DOM",
+                  page.locator("#problem-board").count() == 0)
+            check("P0.2: its edge tab is gone",
+                  page.locator("#pb-edge-tab").count() == 0)
+            check("P0.2: its helpers are gone from the page scope",
                   page.evaluate(
-                      "() => !!document.querySelector('.manuscript-workspace-layout > #problem-board')"))
-            n_items = page.locator("#pb-list .pb-item").count()
-            check("board renders its findings", n_items == 3, f"items={n_items}")
+                      "() => typeof toggleProblemBoard === 'undefined'"
+                      " && typeof renderProblemBoard === 'undefined'"
+                      " && typeof collapseProblemBoard === 'undefined'"))
 
-            # collapse -> the edge tab must surface (sibling pairing survived
-            # the move). Assert from real state, not from a toggle-count guess:
-            # with no findings on the active scene the board auto-collapses on
-            # the very first toggle, so "which phase are we in" is a state read.
-            def board_state():
-                return page.evaluate(
-                    """() => {
-            const b = document.getElementById('problem-board');
-            const t = document.getElementById('pb-edge-tab');
-            const tr = t.getBoundingClientRect();
-            return { collapsed: b.classList.contains('pb-collapsed'),
-                     visible: b.classList.contains('visible'),
-                     tab_visible: getComputedStyle(t).display !== 'none' && tr.width > 0 };
-        }""")
-
-            if not board_state()["collapsed"]:
-                page.evaluate("() => toggleProblemBoard()")
-                page.wait_for_timeout(700)
-            st = board_state()
-            check("collapsed board surfaces the edge tab (visible)",
-                  bool(st["collapsed"] and st["tab_visible"]), str(st))
-
-            # the collapsed board (translateX(105%)) must be fully outside
-            # the row it lives in — the row clips it, so nothing bleeds into
-            # the transparent 56px gutter.
-            geom = page.evaluate(
-                """() => {
-        const b = document.getElementById('problem-board').getBoundingClientRect();
-        const row = document.querySelector('.manuscript-workspace-layout');
-        const r = row.getBoundingClientRect();
-        return { board_left: Math.round(b.left), row_right: Math.round(r.right),
-                 clipped: getComputedStyle(row).overflow !== 'visible',
-                 vw: window.innerWidth };
-    }""")
-            check("collapsed board is clipped, never bleeds into the gutter",
-                  bool(geom["clipped"] and geom["board_left"] >= geom["row_right"]),
-                  str(geom))
-
-            # two handles share the row's right edge — the Board tab must not
-            # cover the dock's "Context" affordance (it did at right:0, which
-            # made the dock unopenable whenever the board was collapsed).
+            # the dock's "Context" affordance must stay hittable now that no
+            # board tab shares the row's right edge (the old conflict is moot;
+            # this is the surviving half of that check)
             reach = page.evaluate(
                 """() => {
         const a = document.getElementById('right-edge-affordance').getBoundingClientRect();
         const hit = document.elementFromPoint(a.left + a.width / 2, a.top + a.height / 2);
         return { hit: hit && (hit.id || hit.className), w: Math.round(a.width) };
     }""")
-            check("collapsed board does not cover the Context affordance",
+            check("the Context affordance owns its edge (no board tab fights it)",
                   reach["hit"] == "right-edge-affordance", str(reach))
 
-            page.locator("#pb-edge-tab").click(timeout=8000)
-            page.wait_for_timeout(700)
-            st2 = board_state()
-            check("edge tab reopens (expands) the board",
-                  bool(not st2["collapsed"] and st2["visible"]), str(st2))
-
-            # an open dock must not be buried by the board (sibling rule)
+            # the dock still opens beside the page (the board used to bow to it;
+            # with the board retired this is the surviving sanity check)
             page.evaluate("() => openDock('evidence')")
             page.wait_for_timeout(700)
-            dock_geom = page.evaluate(
-                """() => {
-        const b = document.getElementById('problem-board').getBoundingClientRect();
-        const d = document.getElementById('context-dock').getBoundingClientRect();
-        return { board_right: Math.round(b.right), dock_left: Math.round(d.left),
-                 dock_open: document.getElementById('context-dock').classList.contains('open') };
-    }""")
-            # the board bows LEFT of an open dock — no overlap (1px tolerance)
-            check("board bows to an open dock (does not cover it)",
-                  bool(not dock_geom["dock_open"]
-                       or dock_geom["board_right"] <= dock_geom["dock_left"] + 1),
-                  str(dock_geom))
+            check("dock opens on the Evidence lens",
+                  bool(page.evaluate(
+                      "() => document.getElementById('context-dock')"
+                      ".classList.contains('open')")))
             page.keyboard.press("Escape")
             page.wait_for_timeout(400)
 
@@ -201,11 +147,10 @@ def main():
             # laws came out of the UI walk: the margin NEVER covers the script
             # (it used to overlap 164px of every line it sat on), and a margin
             # pin POINTS at a finding instead of being a fourth place to judge
-            # it (Locate only — Rewrite/Discuss live in the board and the dock).
+            # it (Locate only — Rewrite/Discuss live in the dock).
             # the scroll position is preserved across the re-render on purpose:
-            # the board's scroll observer keys off the active scene, and this
-            # suite seeded findings on scene 1 only, so a reset-to-top would
-            # make it re-decide (and re-show its edge tab) mid-suite.
+            # the margin walk reads geometry, and a reset-to-top would re-measure
+            # mid-suite against a different viewport slice.
             page.evaluate(
                 """() => {
         const mc = document.getElementById('manuscript-container');
@@ -247,8 +192,8 @@ def main():
         return out;
     }"""
             flow = page.evaluate(MARGIN_GEOM)
-            check("R6: no margin pin covers a line of script (board open: pins in "
-                  "the page's flow)",
+            check("R6: no margin pin covers a line of script (pins in the "
+                  "page's flow)",
                   bool(flow["pins"] and flow["overlapping"] == 0), str(flow))
 
             LABELS = """() => {
@@ -270,24 +215,14 @@ def main():
             # walks Locate + Discuss on the deep cards from a REAL analysis. The
             # dock needs state.report, which this suite does not seed.)
 
-            # slide the board away (not hide/show: that resets the scroll
-            # observer's active scene and the board re-decides later)
-            page.evaluate("() => collapseProblemBoard()")
-            page.wait_for_timeout(700)
+            # the margin walks straight into its final state — the board's
+            # overlay that used to force a collapse/expand dance is retired
             gutter = page.evaluate(MARGIN_GEOM)
-            check("R6: with the board's overlay gone the pins take the paper's gutter",
+            check("R6: the pins take the paper's gutter (no board overlay)",
                   bool(gutter["position"] == "absolute"
                        and gutter["pin_left"] >= gutter["page_right"]), str(gutter))
             check("R6: the gutter column clears the paper (still zero overlap)",
                   bool(gutter["overlapping"] == 0), str(gutter))
-            # hand the board back the way the dock step above left it
-            page.evaluate("() => expandProblemBoard()")
-            page.wait_for_timeout(700)
-            check("R6: the board is back open after the margin walk",
-                  bool(page.evaluate(
-                      "() => !document.getElementById('problem-board')"
-                      ".classList.contains('pb-collapsed')"
-                      " && document.getElementById('pb-edge-tab').offsetParent === null")))
 
             # ---- 4. mode swaps: spotlight hides the NEW toolbar row -------
             page.evaluate("() => toggleSpotlight()")
@@ -295,9 +230,6 @@ def main():
             st = probe(page, "#desk-toolbar")
             check("spotlight hides the desk toolbar",
                   bool(st and not st["visible"]), str(st))
-            board_sp = probe(page, "#problem-board")
-            check("spotlight hides the problem board too (nothing but the page)",
-                  bool(board_sp and not board_sp["visible"]), str(board_sp))
             page.evaluate("() => exitSpotlight()")
             page.wait_for_timeout(600)
 

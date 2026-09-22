@@ -129,8 +129,11 @@ def run(base):
         # --- close + reopen restores context ------------------------------------
         page.keyboard.press("Escape")
         page.wait_for_timeout(350)
-        check("Esc returns the consultant column to the Feedback View",
-              page.locator("#feedback-view .fv-consult #fv-consult-messages").count() == 1)
+        # P0.1: after Esc the desk is the resting state — the consultant column
+        # must simply not be ON SCREEN (its old resting host, the retired
+        # Feedback View clone, no longer exists; the dock lens owns it when open).
+        check("Esc closes the dock (no orphaned consultant column on screen)",
+              page.locator(".dock-lens[data-lens=\"sushruta\"]").is_visible() is False)
         page.locator("#right-edge-affordance").click()
         page.wait_for_timeout(450)
         # (A hardcoded-True check sat here, naming a contract the app does not

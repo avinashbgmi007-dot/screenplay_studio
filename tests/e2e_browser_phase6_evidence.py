@@ -10,8 +10,8 @@ Verifies the dock's evidence lens against the live app, DOM/text only:
     Dismiss, Restore; Addressed rows render addressed
   * the scene strip tracks scrolling (retitles for a different scene)
   * manuscript context preserved across open/close (scroll position)
-  * legacy surfaces untouched: #room-drawer #feedback-panel #feedback-view
-    #problem-board still present and functional after dock use
+  * legacy surfaces: #room-drawer and #feedback-panel survive dock use;
+    #feedback-view and #problem-board are retired (P0.1/P0.2) — absence asserted
 
 Run:  python tests/e2e_browser_phase6_evidence.py   (boots its own demo studio;
       set E2E_BASE to reuse an already-running one)
@@ -265,13 +265,17 @@ def run(base):
         check("reopen re-assembles the sections",
               page.locator('.dock-lens[data-lens="evidence"] .dock-section').count() > 0)
 
-        # --- legacy surfaces still present and untouched ----------------------
+        # --- live legacy surfaces remain; the retired two stay retired --------
+        # P0.1/P0.2 deleted the dormant #feedback-view clone and the Problem
+        # Board — this gate asserts their absence now.
         for sel, label in [("#room-drawer", "room drawer"),
-                           ("#feedback-panel", "feedback panel"),
-                           ("#feedback-view", "feedback view"),
-                           ("#problem-board", "problem board")]:
+                           ("#feedback-panel", "feedback panel")]:
             check(f"legacy surface intact: {label}",
                   page.locator(sel).count() > 0)
+        for sel, label in [("#feedback-view", "feedback view clone"),
+                           ("#problem-board", "problem board")]:
+            check(f"retired surface stays gone: {label}",
+                  page.locator(sel).count() == 0)
 
         # --- no JS errors across the whole flow -------------------------------
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
