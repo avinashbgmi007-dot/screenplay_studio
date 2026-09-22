@@ -181,13 +181,15 @@ function updateDawnMeter() {
 }
 
 // ---- retry only the failed analysis categories (partial-report recovery) ----
+// P2.16: the banner in the ledger is the ONLY place this action lives. The desk
+// toolbar and the drawer header each carried their own copy of this button, with
+// their own label and their own disabled dance — three surfaces to keep in sync
+// to say one sentence.
 async function retryFailedCategories(anchor) {
-  const btn = $("#retry-failed-btn");
-  const deskBtn = $("#desk-retry-failed-btn"); // Phase 8: same action from the desk
-  const btns = [btn, deskBtn, anchor].filter(Boolean);
-  if (!btns.length || btns.every((b) => b.disabled)) return;
-  btns.forEach((b) => { b.disabled = true; b.textContent = "Retrying…"; });
-  const label = "⚠ Retry failed";
+  if (!anchor || anchor.disabled) return;
+  const label = anchor.textContent;
+  anchor.disabled = true;
+  anchor.textContent = "Rerunning…";
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/retry-failed`, {
       method: "POST", body: JSON.stringify({}),
@@ -200,19 +202,14 @@ async function retryFailedCategories(anchor) {
     refreshMetrics();
   } catch (e) {
     showError("Retry failed: " + e.message, true);
+    anchor.disabled = false;
+    anchor.textContent = label;
   } finally {
-    const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
-    const still = ((projSummary && projSummary.failed_categories) || []).length;
-    btns.forEach((b) => {
-      b.disabled = false;
-      b.textContent = still ? `⚠ Retry failed (${still})` : label;
-      b.style.display = still ? "inline-block" : "none";
-    });
     refreshDeskToolbar(); // the desk's status line reflects the merged report
-    // P2.14: the banner holding this button is part of the evidence lens, and it
-    // must go away with the failure it describes — a stale "1 pass failed" over a
-    // complete report is the UI lying about a report it already fixed.
-    if (anchor) renderDockEvidence();
+    // The banner holding this button is part of the evidence lens, and it must go
+    // away with the failure it describes — a stale "1 pass failed" over a complete
+    // report is the UI lying about a report it already fixed.
+    renderDockEvidence();
   }
 }
 
@@ -692,7 +689,7 @@ function renderDashboard() {
     stats.appendChild(el("span", null, `${p.edit_count || 0} edit${(p.edit_count || 0) === 1 ? "" : "s"}`));
     if ((p.failed_categories || []).length) {
       const warn = el("span", "dash-warn", `⚠ ${(p.failed_categories).length} failed`);
-      warn.title = "Some analysis categories failed — Retry failed in the Feedback room";
+      warn.title = "Some analysis categories failed — the ledger's banner reruns them";
       stats.appendChild(warn);
     }
     card.appendChild(stats);
@@ -2488,7 +2485,6 @@ function hideAnalysisProgressUI() {
  *  complete   → "Re-run Analysis" + findings count */
 function refreshDeskToolbar() {
   const btn = $("#desk-analyze-btn");
-  const retryBtn = $("#desk-retry-failed-btn");
   const status = $("#desk-analyze-status");
   if (!btn) return;
   const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
@@ -2497,7 +2493,6 @@ function refreshDeskToolbar() {
 
   if (!state.currentProject) {
     btn.style.display = "none";
-    if (retryBtn) retryBtn.style.display = "none";
     if (status) { status.textContent = ""; status.title = ""; }
     return;
   }
@@ -2534,7 +2529,7 @@ function refreshDeskToolbar() {
           const failed = failedCats.includes(k);
           return `${failed ? "✗" : "✓"}${k === "genre" ? " genre" : ""}`;
         }).join(" ");
-        status.textContent = `Partial report — ${failedCats.length} categor${failedCats.length === 1 ? "y" : "ies"} failed: ${failedCats.join(", ")}. Retry re-runs only those.`;
+        status.textContent = `Partial report — ${failedCats.length} categor${failedCats.length === 1 ? "y" : "ies"} failed: ${failedCats.join(", ")}. The Evidence lens offers the rerun.`;
         // the desk row is one line (Phase 13) — the sentence can ellipsize
         // there, so the hover title carries the full detail first
         status.title = `${status.textContent}  ·  ${marks}`;
@@ -2554,7 +2549,6 @@ function refreshDeskToolbar() {
       status.title = status.textContent;
     }
   }
-  if (retryBtn) retryBtn.style.display = failedCats.length ? "inline-block" : "none";
 }
 
 async function runAnalysis() {
@@ -6090,13 +6084,25 @@ function buildFailureBanner(failedCategories, errors) {
       "Skipped: " + failed.join(", ") + ". Every finding below came from a pass that"
       + " finished — a failed one leaves no gap you would notice, which is why the"
       + " rerun sits here rather than in a section you have to open."));
-    const btn = el("button", "rerun-failed",
-      "Rerun the " + plural(failed.length, "pass") + " \u2014 fast");
-    btn.type = "button";
-    btn.title = "Your good findings stay exactly as worded. Re-running the whole"
-      + " analysis is the slower option, and it re-words everything.";
-    btn.addEventListener("click", () => { retryFailedCategories(btn); });
-    box.appendChild(btn);
+    const actions = el("div", "failure-banner-actions");
+    const cheap = el("button", "rerun-failed",
+      "Rerun the " + plural(failed.length, "failed pass"));
+    cheap.type = "button";
+    cheap.title = "Fast, and your good findings stay exactly as worded — this only"
+      + " fills in the passes that errored.";
+    cheap.addEventListener("click", () => { retryFailedCategories(cheap); });
+    actions.appendChild(cheap);
+    const full = el("button", "rerun-full", "Rerun the whole analysis");
+    full.type = "button";
+    full.title = "Fresh eyes on everything. Note: the model may re-word findings it"
+      + " already gave you, so your fixed/new counts get noisy unless you have"
+      + " edited the script.";
+    full.addEventListener("click", () => { runAnalysis(); });
+    actions.appendChild(full);
+    box.appendChild(actions);
+    box.appendChild(el("p", "failure-banner-rule",
+      "Rule of thumb: edited the script → the whole analysis; just want the missing"
+      + " passes back → the failed ones."));
   }
   errs.forEach((e2) => box.appendChild(el("p", "failure-banner-error", String(e2))));
   return box;
@@ -6807,14 +6813,8 @@ async function loadFeedbackPanels() {
   try {
     if (!state.fixQueue) state.fixQueue = await api(`${base}/fixqueue`);
   } catch (_) { /* no analysis yet */ }
-  // partial-analysis recovery: offer a one-click retry when categories failed
-  const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
-  const failedCats = (projSummary && projSummary.failed_categories) || [];
-  const retryBtn = $("#retry-failed-btn");
-  if (retryBtn) {
-    retryBtn.style.display = failedCats.length ? "inline-block" : "none";
-    if (failedCats.length) retryBtn.textContent = `⚠ Retry failed (${failedCats.length})`;
-  }
+  // P2.16: the one-click rerun for a partial report lives in the ledger's failure
+  // banner (buildFailureBanner), not in a header button beside it.
   const hasReport = !!(state.report && (state.report.findings || state.report.coverage));
   const empty = $("#feedback-empty");
   const tabs = $("#feedback-tabs");
@@ -8774,12 +8774,10 @@ function init() {
 
   $("#analyze-btn").addEventListener("click", runAnalysis);
   $("#reparse-btn").addEventListener("click", reparseProject);
-  $("#retry-failed-btn").addEventListener("click", retryFailedCategories);
-  // Phase 8: the desk toolbar — same lifecycle actions beside the page
+  // Phase 8: the desk toolbar — same lifecycle actions beside the page. The
+  // partial-report rerun is NOT here: it is the ledger banner's job (P2.16).
   const deskAnalyzeBtn = $("#desk-analyze-btn");
   if (deskAnalyzeBtn) deskAnalyzeBtn.addEventListener("click", runAnalysis);
-  const deskRetryBtn = $("#desk-retry-failed-btn");
-  if (deskRetryBtn) deskRetryBtn.addEventListener("click", retryFailedCategories);
 
   // script pane
   $("#script-search").addEventListener("input", () => renderManuscript(document.getElementById('manuscript-container')));

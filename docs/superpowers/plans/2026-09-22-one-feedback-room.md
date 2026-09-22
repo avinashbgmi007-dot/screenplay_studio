@@ -454,11 +454,25 @@ Measured (the P1 gate now photographs this surface): `03e_rule_popover_night` sh
 
 **Interfaces:** Consumes: `POST /api/projects/<name>/analyze/retry-failed` (exists, webapp_server.py:1156) and `POST /analyze {"force": true}` (exists). Produces: banner DOM contract: primary `.rerun-failed` ("Rerun the N failed passes — fast; your good findings stay exactly as worded"), secondary `.rerun-full` ("Rerun the whole analysis — fresh eyes; re-words findings, noisy counts unless you edited").
 
-- [ ] **Step 1: Failing e2e** — with a partial-failure fixture, assert both buttons exist, clicking `.rerun-failed` POSTs to `/analyze/retry-failed`, clicking `.rerun-full` POSTs `{"force": true}` to `/analyze`.
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** the two actions; delete the old three retry buttons.
-- [ ] **Step 4: Gates** — `node --check`; lifecycle e2e PASS.
-- [ ] **Step 5: Commit** — `"P2.16: retry split — failed-only default, full re-run with the churn warning, one banner"`
+- [x] **Step 1: Failing e2e** — with a partial-failure fixture, assert both buttons exist, clicking `.rerun-failed` POSTs to `/analyze/retry-failed`, clicking `.rerun-full` POSTs `{"force": true}` to `/analyze`.
+- [x] **Step 2: Run, expect FAIL.** — 7 legs red: `.rerun-full` did not exist, and the DOM offered three rerun verbs across two surfaces.
+- [x] **Step 3: Implement** the two actions; delete the old three retry buttons.
+- [x] **Step 4: Gates** — `node --check`; lifecycle e2e PASS.
+- [x] **Step 5: Commit** — `"P2.16: retry split — failed-only default, full re-run with the churn warning, one banner"`
+
+**Deviations.**
+1. The POST legs intercept with `page.route` and assert on the request the client
+   makes. Driving a real re-analysis inside the honesty suite would reload the
+   project and wipe the seeded failure the earlier sections assert on — and the
+   contract under test is which endpoint and body the button chooses.
+2. `.rerun-full` calls the existing `runAnalysis()` rather than issuing its own
+   POST, so the desk, the drawer button and the banner remain ONE lifecycle
+   (Phase 8's no-double-fire rule) — the banner is another door, not another run.
+3. `retryFailedCategories` lost its global-button bookkeeping entirely: it now
+   manages only its anchor and re-renders the lens in `finally`, which is what
+   makes a banner that outlives its failure impossible.
+4. The visual gate cannot photograph the split (`gun_pen_2` is a clean report, so
+   the banner is correctly absent there); its pixels rest on the seeded suite.
 
 ### Task 17: Quickcheck — live deterministic lint (NEW endpoint + wiring)
 

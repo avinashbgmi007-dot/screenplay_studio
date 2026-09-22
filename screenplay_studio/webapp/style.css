@@ -4600,13 +4600,6 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 .fq-toggle-dismissed { margin-left: auto; }
 .fix-row.dismissed { opacity: 0.55; font-style: italic; }
 
-/* ---------- retry failed categories chip ---------- */
-
-.retry-failed {
-  border-color: var(--desk-rust);
-  color: var(--desk-rust);
-}
-.retry-failed:hover { filter: brightness(1.1); }
 
 /* ---------- streaming reply sink ---------- */
 
@@ -5406,7 +5399,6 @@ body:not(.idea-mode) #manuscript-workspace {
 .desk-analyze {
   font-weight: 600;
 }
-#desk-toolbar .retry-failed { color: var(--lamp, #e0a458); }
 .desk-analyze-progress { flex: 0 1 180px; }
 .desk-analyze-status {
   font-size: var(--fs-sm);
@@ -6419,18 +6411,35 @@ body:not(.idea-mode) .desk {
   line-height: 1.55;
 }
 .failure-banner-error { font-family: var(--font-mono); color: var(--text-faint); }
-.failure-banner .rerun-failed {
+/* P2.16: two reruns, one banner. They are NOT equal buttons — the cheap one is
+   the default (severity-coloured, first) and the whole re-run is a quiet
+   secondary, because its own title says it can re-word findings the writer has
+   already been counted against. */
+.failure-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
   align-self: flex-start;
+  gap: var(--sp-2);
+}
+.failure-banner .rerun-failed, .failure-banner .rerun-full {
   appearance: none;
-  border: 1px solid var(--danger);
-  background: var(--surface);
-  color: var(--danger);
   border-radius: var(--r-sm);
   padding: 2px var(--sp-3);
   font-size: var(--fs-2xs);
   cursor: pointer;
 }
-.failure-banner .rerun-failed:disabled { opacity: .6; cursor: default; }
+.failure-banner .rerun-failed {
+  border: 1px solid var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+}
+.failure-banner .rerun-full {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-muted);
+}
+.failure-banner-rule { font-size: var(--fs-3xs); color: var(--text-faint); margin: 0; font-style: italic; }
+.failure-banner .rerun-failed:disabled, .failure-banner .rerun-full:disabled { opacity: .6; cursor: default; }
 .dock-cov-frame { font-size: var(--fs-2xs); color: var(--lamp); margin: 0 0 var(--sp-2) 0; letter-spacing: .02em; }
 .dock-cov-films { font-size: var(--fs-2xs); color: var(--text-faint); margin: var(--sp-2) 0 0; font-style: italic; }
 /* The one section whose rows no model wrote — so it is dressed like the margin,

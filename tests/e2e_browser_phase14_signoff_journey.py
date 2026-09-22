@@ -142,9 +142,10 @@ def run(base):
                              json={}, timeout=30)
         check("failure: retry-failed honestly 400s with no completed report",
               r_pre.status_code == 400, f"status={r_pre.status_code}")
-        # the desk chip mirrors the (empty) failed-category state
-        check("failure: retry chip hidden while nothing failed",
-              page.locator("#desk-retry-failed-btn").is_hidden())
+        # P2.16: the desk carries no rerun of its own at all — the ledger's banner
+        # is the only one, and it appears with a failure.
+        check("failure: no rerun button sits on the desk",
+              page.locator("#desk-retry-failed-btn").count() == 0)
 
         # ================= 8. RUN ANALYSIS -> PROGRESS -> COMPLETE ===========
         page.locator("#desk-analyze-btn").click()

@@ -226,16 +226,26 @@ def run(base):
         # 200/201 = merged retry; 400 = no completed report (honest guard)
         check("retry endpoint contract intact (merge or honest 400)",
               r_retry.status_code in (200, 201, 400), f"status={r_retry.status_code}")
-        # the desk retry chip mirrors the failed-category state
-        desk_retry = page.locator("#desk-retry-failed-btn")
-        legacy_retry = page.locator("#retry-failed-btn")
+        # P2.16 (spec §15.2): the desk carries NO rerun of its own. Three buttons
+        # (desk toolbar, drawer header, arrival strip) used to say "Retry failed"
+        # in three places; the ledger's failure banner is now the only one, and the
+        # desk's status line points there instead of duplicating the action.
         s = requests.get(f"{base}/api/projects/{fresh}", timeout=15).json()
         failed_n = len(s.get("failed_categories") or [])
-        vis = desk_retry.is_visible() if desk_retry.count() else False
-        check("desk retry chip mirrors the failed-category state",
-              vis == (failed_n > 0), f"chip={vis} failed={failed_n}")
-        check("legacy retry chip stays in sync (parity)",
-              (legacy_retry.is_visible() if legacy_retry.count() else False) == (failed_n > 0))
+        check("the desk toolbar has no retry button of its own",
+              page.locator("#desk-retry-failed-btn").count() == 0
+              and page.locator("#retry-failed-btn").count() == 0)
+        on_desk = page.evaluate("""() => [...document.querySelectorAll('#desk-toolbar button')]
+            .filter((b) => /rerun|retry/i.test(b.textContent || '')).length""")
+        check("no rerun verb is clickable on the desk toolbar", on_desk == 0, str(on_desk))
+        # ... and the status line, when something did fail, says where the fix is
+        if failed_n:
+            st_txt = status.inner_text()
+            check("a partial report names the ledger as the way home",
+                  "Evidence" in st_txt and str(failed_n) in st_txt, st_txt[:120])
+        else:
+            check("a clean desk status invents no rerun instruction",
+                  "Retry" not in status.inner_text(), status.inner_text()[:120])
 
         # --- 5. structure: toolbar sits above the manuscript row -----------------
         tb_box = page.locator("#desk-toolbar").bounding_box()

@@ -1109,6 +1109,7 @@ def check_report_honesty_surfaces(page, lens, base, name):
     page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
                        showDeferred: true, category: null, scene: null };
                      refreshAllFindingSurfaces(); }""")
+
     page.wait_for_timeout(300)
     open_dock_section_holding(page, ".finding-note")
     page.wait_for_timeout(400)
@@ -1140,6 +1141,76 @@ def check_report_honesty_surfaces(page, lens, base, name):
           "pinned" in ((pin.first.text_content() or "").lower() if pin.count() else ""),
           repr((pin.first.text_content() or "") if pin.count() else "no pin button"))
 
+
+    # -- 9. P2.16 (spec §15.2): the split — cheap rerun as default, full rerun
+    # as the honest secondary, and the banner is the ONLY place either lives.
+    # These legs run last: both clicks reload the project list, which drops the
+    # seeded failure the earlier sections assert on.
+    check("P2.16: the banner offers BOTH reruns, primary first",
+          banner.count() == 1
+          and banner.locator("button.rerun-failed").count() == 1
+          and banner.locator("button.rerun-full").count() == 1,
+          f"{banner.count()} banners / "
+          f"{banner.locator('button.rerun-failed').count()} failed / "
+          f"{banner.locator('button.rerun-full').count()} full")
+
+    # A missing control must report FAIL, not raise and take the suite down.
+    def _txt(loc, attr=None):
+        if loc.count() != 1:
+            return ""
+        return (loc.first.get_attribute(attr) if attr
+                else loc.first.text_content()) or ""
+
+    rf_btn = banner.locator("button.rerun-failed")
+    rr_btn = banner.locator("button.rerun-full")
+    split_txt = _txt(banner)
+    rf, rf_title = _txt(rf_btn), _txt(rf_btn, "title")
+    rr, rr_title = _txt(rr_btn), _txt(rr_btn, "title")
+    check("P2.16: the default names the count and promises the good findings survive",
+          "1 failed pass" in rf and "worded" in rf_title.replace("-", " "),
+          f"btn={rf!r} title={rf_title!r}")
+    check("P2.16: the secondary warns that a full rerun re-words findings",
+          "whole" in rr.lower() and ("re-word" in rr_title.lower() or "noisy" in rr_title.lower()),
+          f"btn={rr!r} title={rr_title!r}")
+    check("P2.16: the banner states the rule of thumb for which one to pick",
+          "edit" in split_txt.lower() and "missing" in split_txt.lower(),
+          repr(split_txt[:260]))
+    # Nothing else on the desk may offer a rerun: three retry buttons used to
+    # (desk toolbar, drawer header, arrival strip) and each was a second copy of
+    # the same lifecycle with its own label.
+    dupes = page.evaluate("""() => [...document.querySelectorAll('button')]
+        .filter((b) => /retry|rerun/i.test(b.textContent || ''))
+        .map((b) => (b.className || '') + '|' + (b.textContent || '').trim().slice(0, 30))""")
+    check("P2.16: no rerun control lives outside the banner",
+          len(dupes) == 2, str(dupes)[:220])
+
+    hits = []
+
+    def _capture(route):
+        req = route.request
+        hits.append((req.method, req.url, req.post_data))
+        route.fulfill(status=200, content_type="application/json", body='{"ok": true}')
+
+    page.route("**/analyze**", _capture)
+    if rf_btn.count() == 1 and clicked(rf_btn.first):
+        page.wait_for_timeout(1500)
+    failed_posts = [p for p in hits if p[1].endswith("/analyze/retry-failed")]
+    check("P2.16: the cheap rerun really POSTs the merge endpoint",
+        len(failed_posts) == 1 and (failed_posts[0][2] or "").strip() in ("{}", ""),
+        str([(u.split('/api/')[-1], d) for _, u, d in posts])[:220])
+    hits.clear()
+    page.evaluate(REPORT_SEED_JS, {"model": "qwen3.6-test.gguf",
+                                   "quote": lines[0] if lines else "x", "scene": 1})
+    page.wait_for_timeout(500)
+    banner = lens.locator(".failure-banner")
+    rr_btn = banner.locator("button.rerun-full")
+    if rr_btn.count() == 1 and clicked(rr_btn.first):
+        page.wait_for_timeout(1500)
+    full_posts = [p for p in hits if p[1].endswith("/analyze")]
+    check("P2.16: the full rerun POSTs /analyze with force, not the merge",
+          len(full_posts) == 1 and "true" in (full_posts[0][2] or ""),
+          str([(u.split('/api/')[-1], d) for _, u, d in full_posts])[:220])
+    page.unroute("**/analyze**")
     page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
                        showDeferred: false, category: null, scene: null };
                      refreshAllFindingSurfaces(); }""")
