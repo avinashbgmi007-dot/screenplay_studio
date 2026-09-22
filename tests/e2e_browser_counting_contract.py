@@ -82,6 +82,110 @@ def expected_dawn_pct(ledger):
     return round(100 * (ledger["total"] - ledger["open"]) / ledger["total"])
 
 
+# Disposition ledger, asked of the app itself: how many findings the writer
+# has resolved (intent OR observed) — the number every "done" style must match.
+ADDRESSED_JS = """() => {
+  const findings = state.findings || [];
+  let n = 0;
+  findings.forEach((f, i) => { if (findingDisposition(f, i) === "addressed") n += 1; });
+  return n;
+}"""
+
+
+def test_intent_updates_every_mounted_surface(base, checks):
+    """P0.4: refreshAllFindingSurfaces — marking an intent in the dock must
+    re-render EVERY mounted finding surface in the same gesture, with no
+    reload: the dock card, the summary chips, AND a mounted #feedback-fixqueue
+    tab, plus a fresh metrics pull. Pre-fix, setFindingIntent re-rendered the
+    dock + manuscript but never the queue tab, so the desk's own queue kept
+    counting the marked finding as open until something else re-rendered it.
+    """
+    sample = post(base, "/api/sample")
+    name = sample.get("project")
+    checks.ok("intent-e2e: sample project created", bool(name), f"got {name!r}")
+    if not name:
+        return
+    post(base, f"/api/projects/{name}/analyze")
+    queue = get(base, f"/api/projects/{name}/fixqueue")
+    items = queue.get("items") or []
+    checks.ok("intent-e2e: demo analysis produced a fix queue",
+              len(items) > 0, f"{len(items)} items")
+    if not items:
+        return
+
+    with sync_playwright() as pw:
+        browser, page, errors = launch(pw)
+        page.goto(base)
+        page.evaluate("async (n) => { await openProject(n); }", name)
+        page.wait_for_selector("#finding-summary .fs-chip.open",
+                               state="attached", timeout=15000)
+
+        # Mount BOTH surfaces: the Feedback room's Fix Queue tab and the
+        # dock's Evidence lens (the deep cards there carry the intent buttons).
+        page.evaluate("async () => { await loadFeedbackPanels(); }")
+        page.evaluate("() => { setRoom('feedback'); switchFeedbackTab('fixqueue'); }")
+        page.wait_for_selector("#feedback-fixqueue .fix-row",
+                               state="attached", timeout=15000)
+        page.evaluate("() => { openDock('evidence'); }")
+        page.wait_for_selector('.dock-lens[data-lens="evidence"] .finding-note',
+                               state="attached", timeout=15000)
+
+        # spy on the metrics pull — a mutation must leave the strip fresh
+        page.evaluate("""() => {
+          window.__metricCalls = 0;
+          const orig = refreshMetrics;
+          window.refreshMetrics = function () { window.__metricCalls += 1; return orig(); };
+        }""")
+
+        ledger0 = page.evaluate(CONTRACT_JS)
+        title0 = page.locator("#feedback-fixqueue .craft-panel-title").first.text_content() or ""
+
+        # the writer marks the first dock card addressed — ONE gesture
+        chip0 = page.locator("#finding-summary .fs-chip.open").first.text_content() or ""
+        card = page.locator('.dock-lens[data-lens="evidence"] .finding-note').first
+        card.locator('.intent-btn[title^="My call"]').click()
+        # the round-trip completed once the summary chips re-render (an
+        # addressed card leaves the dock's open list, so the chips are the
+        # stable post-mark signal)
+        page.wait_for_function(
+            "(t) => { const c = document.querySelector('#finding-summary .fs-chip.open');"
+            " return c && c.textContent !== t; }",
+            arg=chip0, timeout=15000)
+
+        ledger1 = page.evaluate(CONTRACT_JS)
+        checks.ok("intent-e2e: the mark reached the client ledger (one fewer open)",
+                  ledger1["open"] == ledger0["open"] - 1
+                  and ledger1["total"] == ledger0["total"],
+                  f"before={ledger0} after={ledger1}")
+
+        chip = page.locator("#finding-summary .fs-chip.open").first.text_content() or ""
+        checks.ok("intent-e2e: the summary chips moved with the mark",
+                  f"{ledger1['open']} open" in chip,
+                  f"chip={chip!r} ledger={ledger1}")
+
+        # THE contract: the mounted Fix Queue tab shows the SAME ledger NOW —
+        # no reload, no tab switch, no second gesture.
+        title1 = page.locator("#feedback-fixqueue .craft-panel-title").first.text_content() or ""
+        m = re.search(r"(\d+) open /", title1)
+        checks.ok("intent-e2e: the mounted Fix Queue tab re-rendered on the mark — SAME open count as the chips",
+                  m is not None and int(m.group(1)) == ledger1["open"],
+                  f"tab title before={title0!r} after={title1!r} ledger open={ledger1['open']} "
+                  "(pre-fix: setFindingIntent re-rendered dock+manuscript but never the queue tab)")
+        addressed = page.evaluate(ADDRESSED_JS)
+        done = page.locator("#feedback-fixqueue .fix-row.done").count()
+        checks.ok("intent-e2e: queue rows read the SAME disposition ledger (done rows == addressed)",
+                  done == addressed,
+                  f"done rows={done} ledger addressed={addressed}")
+
+        metrics_calls = page.evaluate("() => window.__metricCalls")
+        checks.ok("intent-e2e: the mutation pulled fresh metrics (no openProject wait)",
+                  metrics_calls >= 1,
+                  f"refreshMetrics calls during the mark: {metrics_calls}")
+
+        assert_no_js_errors(checks, errors)
+        browser.close()
+
+
 def run(base, projects_dir, headers):
     checks = Checks()
 
@@ -162,6 +266,10 @@ def run(base, projects_dir, headers):
 
         assert_no_js_errors(checks, errors)
         browser.close()
+
+    # P0.4: one re-render entry point — a writer mark must move every MOUNTED
+    # surface in the same gesture (see the function docstring)
+    test_intent_updates_every_mounted_surface(base, checks)
 
     checks.finish()
 

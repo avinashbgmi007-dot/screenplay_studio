@@ -254,8 +254,7 @@ function wireInlineEdit(lineEl, sceneNumber, originalText) {
         showError("Inline edit failed: " + err.message);
       }
       await loadScriptData();
-      renderManuscript(document.getElementById('manuscript-container'));
-      refreshMetrics();
+      refreshAllFindingSurfaces(); // P0.4: one entry point (metrics ride along)
     };
     lineEl.addEventListener("blur", () => finish(true), { once: true });
     lineEl.addEventListener("keydown", (kev) => {
@@ -3856,7 +3855,14 @@ function renderFixQueuePanel(container) {
   panel.appendChild(head);
 
   for (const item of shown) {
-    const row = el("div", "fix-row" + (item.status === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
+    // row state reads the SAME disposition ledger the header counts (N3) — a
+    // finding the writer marked addressed shows done on every surface, not
+    // only where the server-observed item.status has already moved
+    const fi = queueItemFindingIndex(item);
+    const disp = fi != null
+      ? findingDisposition((state.findings || [])[fi], fi)
+      : (item.dismissed ? "dismissed" : item.status);
+    const row = el("div", "fix-row" + (disp === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
     row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
     const act = el("span", "act-chip", item.act_name || "Script-level");
@@ -3890,8 +3896,7 @@ function renderFixQueuePanel(container) {
         await api(`/projects/${encodeURIComponent(state.currentProject)}/findings/${item.index}/${verb}`,
           { method: "POST", body: JSON.stringify({ issue: item.issue || "" }) });
         await reloadFixQueue();
-        if (state.view === "feedback") loadFeedbackPanels();
-        else     renderManuscript(document.getElementById('manuscript-container'));
+        refreshAllFindingSurfaces(); // P0.4: one entry point, no stale surface
       } catch (err) { showError("Triage failed: " + err.message); }
     });
     actions.appendChild(locateBtn);
@@ -5347,9 +5352,7 @@ async function setFindingIntent(findingId, intent) {
   }
   if (intent) state.findingMarks[findingId] = intent;
   else delete state.findingMarks[findingId];
-  renderDockEvidence();
-  renderManuscript();
-  renderSceneIndex();
+  refreshAllFindingSurfaces(); // P0.4: every mounted surface moves with the mark
 }
 
 // ---------- arrival (R5-b peek + R9-adjacent unread dot) ----------
@@ -5923,6 +5926,31 @@ function buildSetupPayoffSpine(sp) {
 function refreshDockEvidence() {
   if (!dockIsOpen() || dockLens !== "evidence") return;
   renderDockEvidence();
+}
+
+// ---------- P0.4: ONE re-render entry point ----------
+// Every finding-affecting mutation — dismiss/restore, writer intent, edit
+// apply/undo/redo/reset, inline line edits — calls this instead of its own
+// partial re-render list, so no mounted surface keeps a stale ledger and the
+// status-strip metrics never wait for the next openProject. Order: dock
+// Evidence (if mounted), manuscript (ink + summary chips + the craft-shelf
+// queue all ride renderManuscript's tail), the fix queue in whichever OTHER
+// container is mounted (Feedback room tab, Revision view), the dawn meter,
+// then a fresh metrics pull.
+function refreshAllFindingSurfaces() {
+  refreshDockEvidence(); // no-op unless the dock is open on the Evidence lens
+  renderManuscript();    // ink + #finding-summary chips + craft-shelf queue (tail)
+  // the queue's other homes — re-rendered through the SAME renderer, never a
+  // forked path; skipped when the container was never mounted (the tab's
+  // self-heal renders it on first open instead)
+  const fq = $("#feedback-fixqueue");
+  if (fq && fq.children.length) {
+    fq.innerHTML = "";
+    renderFixQueuePanel(fq);
+  }
+  if (state.view === "revision" && $("#revision-findings")) renderRevisionView();
+  updateDawnMeter();
+  refreshMetrics();
 }
 
 // ---------- Phase 7: Sameer / Sushruta — conversation lenses ----------
@@ -6979,7 +7007,7 @@ async function applyOneRewrite(rep, row) {
     status.className = "rewrite-status ok";
     status.textContent = "Applied to the working copy — Undo is in the script toolbar.";
     await loadScriptData();
-    renderManuscript(document.getElementById('manuscript-container'));
+    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
   } catch (e) {
     status.className = "rewrite-status error";
     status.textContent = "Apply failed: " + e.message;
@@ -7091,7 +7119,7 @@ async function applyRewrite() {
     });
     closeModal("#rewrite-modal");
     await loadScriptData();
-    renderManuscript(document.getElementById('manuscript-container'));
+    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
     const msg = res.skipped && res.skipped.length
       ? `Applied ${res.applied.length} change(s); ${res.skipped.length} couldn't be matched — ${res.skipped.map((s) => s.reason).join("; ")}`
       : `Applied ${res.applied.length} change(s) to Scene ${rewriteState.sceneNumber}.`;
@@ -7107,7 +7135,7 @@ async function undoEdit() {
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/undo`, { method: "POST" });
     await loadScriptData();
-    renderManuscript(document.getElementById('manuscript-container'));
+    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
     appendSystemNote("Undid the last applied edit.");
   } catch (e) {
     showError("Couldn't undo: " + e.message);
@@ -7118,7 +7146,7 @@ async function redoEdit() {
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/redo`, { method: "POST" });
     await loadScriptData();
-    renderManuscript(document.getElementById('manuscript-container'));
+    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
     appendSystemNote("Re-applied the undone edit.");
   } catch (e) {
     showError("Couldn't redo: " + e.message);
@@ -7130,7 +7158,7 @@ async function resetEdits() {
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/reset`, { method: "POST" });
     await loadScriptData();
-    renderManuscript(document.getElementById('manuscript-container'));
+    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
     appendSystemNote("All edits discarded — the script is back to its original state.");
   } catch (e) {
     showError("Couldn't reset edits: " + e.message);
