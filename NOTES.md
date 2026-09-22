@@ -3,6 +3,51 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+- **2026-09-23 — ONE DESK, ONE LEDGER / P1.10: the craft shelf stops copying the queue, Pacing is one panel with two named metrics, and one vocabulary speaks the pass delta.**
+*(plan Task 10, spec §5 'one panel per question' + §8 'vocabulary unification')*
+**What was wrong:** three duplications. The shelf embedded its own fix queue (a second copy
+of `renderFixQueuePanel` the ledger already showed); two different charts were both titled
+'Pacing' — the shelf drew dialogue-vs-action words per page while the doctor's report drew
+the per-scene `pace_score`, so one name printed different data depending on where you
+looked; and the arrival strip said `still live / no longer flagged / new` while the diff
+banner four lines above it said `resolved / carried / still open` — the same delta in two
+dialects. **The four edits:** the shelf keeps its panels and gains a
+`.craft-shelf-ledger` chip that opens the dock on Evidence (a sibling of the head, because
+the head is a `<button>` and buttons do not nest); `renderPacingPanel` is now the ONE
+pace_score renderer, drawing both metrics as labelled `.pace-block`s ('Words per page —
+dialogue against action' / 'Where the script drags'), so the shelf *and* the dock's
+Pacing section gained the drag chart while the report lost its copy; `const DELTA_TERMS`
+above `renderDiffBanner` is the only place the three words are spelled, printed by the
+banner's chips, its group titles and the arrival line (which still renders byte-identical
+text); and every deep card now carries a `.finding-intent-hint` naming what each gesture
+costs — addressed survives re-analysis, next pass returns it, Dismiss hides it from the
+to-do only.
+**Gate bug found on the way:** `test_app_symbol_integrity.py`'s `_top_level_functions()`
+matched only `^function`, so a gate aimed at the `async function renderDiffBanner` silently
+read an empty body and would have passed for the wrong reason. It matches `^async function`
+now, and the banned-word half of the delta gate runs on comment-stripped source — a comment
+may name the server's fields; only the words a writer reads are constrained.
+**Choices made visible:** the banner's `carried` and `still_present` are two measurements of
+one thing (the finding survived the draft), so both print `still live` and the difference
+moves to each chip's `title` rather than becoming a fourth noun.
+**Self-critique (two reviewers dispatched on the diff) caught three things the green tests
+did not:** (1) the banner first printed two chips that both read `still live` with
+different numbers (31 / 28) — the exact count-contradiction this whole plan exists to kill,
+so `carried` is now disclosed inside the one chip's hover instead of as a rival headline;
+(2) the new card hint explained `Dismiss`, a gesture deep cards do not carry (it lives on
+queue rows only), so the hint split: cards say ✓/next-pass, the queue says Dismiss;
+(3) two of the new e2e legs were weak — a DOM probe that fell back to `document.body`
+would have counted the dock's chart and called it proof about the shelf, and the queue
+hint inside a collapsed section reads empty via `inner_text()`. Both re-pinned (95/0), and
+`e2e_browser_counting_contract.py` — which had been reading the shelf's queue clone — is
+re-pinned to the ledger's header (20/0).
+**Measured:** `node --check` clean; full `pytest tests/` 1631 passed / 1 failed -> 1638/0;
+`e2e_browser_dock_sections.py` RED 84 passed / 9 failed -> 95/0; the re-pinned
+`e2e_browser_counting_contract.py` 20/0; the 36-suite browser runner 35 passed / 0 failed /
+1 skipped (`gun_pen_audit` needs a live llama-server). The banner leg uploads a second
+draft, which resets only the parse stage, so it costs no second analysis. The static gate
+caught one of my own follow-up edits (`carried` surviving as a chip class after the wording
+merged) — which is the gate working, not a false alarm.
 - **2026-09-23 — ONE DESK, ONE LEDGER / P1.9: the arrival strip answers the writer's question first, and its call to action is the fix loop.** *(plan `docs/superpowers/plans/2026-09-22-one-feedback-room.md` Task 9, spec §6 R4 + N1 + N2)* **What was wrong:** the strip led with the analyzer's four pass numbers, which `buildArrivalStrip`'s own comment admits can never respond to an edit — so the first thing a writer saw on arriving after a revision session was data about the model's re-read, and the answer to “did my edits work?” (`findingCounts().addressed`) sat below it as a draft clause. **The inversion:** head order is now **headline → CTA → pass line → rewrite → scope → trust** (`K of M addressed by you` from the ONE counter, then `.arrival-loop-cta` `Start the fix loop — N highs`, N = `findingCounts().bySeverity.high`). **No new counter, no new state**: the headline and the CTA's number are both read from `findingCounts()` on the same object the chips and the queue header print, and the click is `startLoop()`, which is the surface the keys already walk. **GAP-5/GAP-7 honesty preserved verbatim** — only the order moved. Two new regression checks pin that: the `same_input` clause must still read `“3 of the last pass's 4 DISTINCT findings reworded by the model — your script did not change”` and the scope chip must still say `from the last run, not your edits`. **Deviation kept visible, not silent:** the inline `Retry failed (N)` button stays OUTSIDE the collapsed `<details>` the ghosted list lives in — a partially failed arrival is exactly when the affordance must not hide behind a summary. **Tests (`e2e_browser_dock_sections.py` 73 → 80 checks):** `ARRIVAL_SEED_JS` seeds a full `state.lastPass` (41 → 39 still live, 2 fixed, `same_input`, 4 prev / 3 reworded) and `ARRIVAL_JS` reads the DOM *by child order*, which the old checks never did — they asserted the strings existed, so the strip could have had them in any order and passed. RED `76/4` for the right reasons → GREEN `80/0`. **Plan Step 4's “arrival e2e re-pinned” was a NO-OP and is recorded as one in the plan:** `gun_pen_audit` selects the strip by class, not position, so inverting it needed no re-pin (and that suite skips here anyway). **Gates:** `node --check` OK; pytest **1630 passed / 3 skipped**; browser runner **36 suites → 35 passed, 0 failed, 1 skipped**. Next: T10 (shelf defers to the ledger, ONE Pacing panel with both metrics, `DELTA_TERMS` vocabulary, disposition microcopy) → T11 (the P1 night+dawn pixel gate, which has still never run).
 
 - **2026-09-23 — The two red browser suites are FIXED; the gate is green again (35 passed / 0 failed / 1 skipped).** *(closes the loose end the P1.8 entry above left open — and corrects it: `translate_mic` was never "the idea page's aria snapshot", that was a guess written down as a finding. Both root causes were measured, and **neither was a product regression**)* **`phase8_lifecycle`** — `Locator.click: Timeout 30000ms` on `#desk-analyze-btn`, "intercepts pointer events". Measured with a throwaway `elementsFromPoint` probe on the live desk: `#desk-toolbar` computes **`opacity: 0; pointer-events: none`** while idle, because `style.css .auto-hide-chrome #desk-toolbar` makes it hover-revealed chrome (restored by a `mousemove` with `clientY < 120`, dropped again after `CHROME_HIDE_DELAY = 4000`) — and Playwright's `is_visible()` **ignores opacity**, so the suite's own first check `Run Analysis visible on the desk` was passing on a button no writer could click. Proof it is a timing gate, not a layout gate: `t=0s → ASIDE#sidebar`, `t=4.5s → DIV#manuscript-workspace`, `after mouse.move(700,8) → BUTTON#desk-analyze-btn | chrome-visible=true → CLICK OK`. So P1.6/P1.7 did not move anything — they made `openProject` render enough extra (dock sections, mass strip, scene chip) that the click now lands **after** the 4s timer. Fix is test-side and asserts the real contract: `reveal_chrome(page)` moves the pointer where a writer's would be and **polls the hit test** until the button is the target (a poll, not a sleep, because the collapsed `#sidebar` is mid-animation over the same x-range too), and the check is renamed `Run Analysis is REACHABLE on the desk (hover reveals it)`. **`translate_mic`** — `/api/stt` answered **503**. Not a missing dependency: the suite *mocks* the whisper server, and it hardcoded `WHISPER_PORT = 8077`, which the local **Laya** server now owns (`netstat`: one listener, PID 21928). `HTTPServer.allow_reuse_address` is truthy, so on Windows the mock **binds an occupied port without erroring** and the studio's `POST /inference` reaches Laya instead: `curl -X POST 127.0.0.1:8077/inference → 404 {"error":"not found"}` → `raise_for_status` → `RequestException` → `STTUnavailableError` → the 503 the check reported. Fix: `start_mock_whisper(port=0)` lets the OS pick, `__main__` publishes `mock.server_address[1]` into `SCREENPLAY_STUDIO_WHISPER_URL` before the studio boots, and `run()` no longer binds a **second** mock over the first. **Lesson for every future suite:** never hardcode a localhost port in these tests, and never trust `is_visible()` for anything inside `#project-bar`/`#desk-toolbar`. **Gates:** `phase8_lifecycle` 13/13, `translate_mic` 22/22, full runner **36 suites → 35 passed, 0 failed, 1 skipped** (`gun_pen_audit` — no llama-server on :8080 right now, so the P1.8 dedupe is still unverified on real Gun_Pen data), `ruff` clean, diagnostics deleted. Next: T9 (arrival inversion + fix-loop CTA) → T10 → **T11, the P1 visual gate that has never run**.

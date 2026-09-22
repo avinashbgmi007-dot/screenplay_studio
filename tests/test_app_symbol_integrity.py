@@ -24,13 +24,21 @@ def _source():
         return f.read()
 
 
+def _strip_comments(src):
+    """app.js source with its `//` line comments removed."""
+    return chr(10).join(re.sub(r"//.*$", "", line) for line in src.splitlines())
+
+
 def _top_level_functions(src):
-    """{name: [body, ...]} for every `^function name(` declaration.
+    """{name: [body, ...]} for every top-level `function`/`async function` decl.
 
     A top-level declaration starts at column 0 (no indentation), which is how
     app.js is written; indented helpers/nested functions are not collected.
+    `async` counts: without it a gate on an async renderer silently reads an
+    empty body and passes for the wrong reason.
     """
-    matches = list(re.finditer(r"(?m)^function\s+([A-Za-z_$][\w$]*)\s*\(", src))
+    matches = list(re.finditer(
+        r"(?m)^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(", src))
     bodies = collections.defaultdict(list)
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(src)
@@ -100,3 +108,38 @@ def test_mass_strip_reads_the_one_counter():
         "the mass strip must not scan the findings itself -- read findingCounts()"
     assert "findingCounts()" in body, \
         "the mass strip must print the one counter's numbers"
+
+
+def test_pace_score_has_one_renderer():
+    # P1.10 (spec §5, one panel per question): the per-scene pace index was drawn
+    # only in the doctor's report panel while the craft shelf's Pacing chart drew
+    # a DIFFERENT metric (dialogue vs action words per page). Two charts, one
+    # name, neither answering "where does it drag". `renderPacingPanel` is now the
+    # ONE renderer and carries both labeled metrics — which also means the shelf
+    # and the dock's Pacing section (the same function) stop disagreeing.
+    owners = sorted(n for n, bodies in _top_level_functions(_source()).items()
+                    if any("pace_score" in b for b in bodies))
+    assert owners == ["renderPacingPanel"], \
+        f"pace_score must be drawn in exactly one renderer, found: {owners}"
+
+
+def test_delta_vocabulary_is_one_source():
+    # P1.10 (spec §8 "vocabulary unification"): the arrival strip said
+    # "no longer flagged / still live / new" while the diff banner said
+    # "resolved / carried / still open" — the same four numbers, two dialects,
+    # in the two places a writer compares drafts. One constant now, and neither
+    # renderer is allowed to restate the words.
+    src = _source()
+    assert re.search(r"(?m)^const DELTA_TERMS = \{", src), \
+        "DELTA_TERMS must be a module-level constant (one vocabulary)"
+    banner = (_top_level_functions(src).get("renderDiffBanner") or [""])[0]
+    arrival = (_top_level_functions(src).get("buildArrivalStrip") or [""])[0]
+    for body, who in ((banner, "renderDiffBanner"), (arrival, "buildArrivalStrip")):
+        assert "DELTA_TERMS" in body, f"{who} must print DELTA_TERMS' words"
+    # Comments are how a renderer names the server's own fields; only the words
+    # a writer can read are held to the one vocabulary.
+    said = _strip_comments(banner + chr(10) + arrival)
+    for banned in (" resolved", " carried", " still open", "Still present",
+                   "Resolved in this", " still live", " no longer flagged", " new`"):
+        assert banned not in said, \
+            f"a renderer still hard-codes the delta word {banned.strip()!r}"

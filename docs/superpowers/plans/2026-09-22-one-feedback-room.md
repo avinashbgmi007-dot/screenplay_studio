@@ -279,11 +279,28 @@ per-step verification, not trust in a commit message — do it in Task 21’s ac
 
 **Interfaces:** Produces: single `renderPacingPanel` containing both labeled metrics; diff-banner copy constant `DELTA_TERMS = {fixed: "no longer flagged", carried: "still live", added: "new"}` used by banner AND arrival strip.
 
-- [ ] **Step 1: Failing checks** — (a) grep-gate in `test_app_symbol_integrity.py`: `pace_score` appears in exactly one renderer; (b) e2e: craft shelf has no `.fix-row`; (c) e2e: diff banner text uses "still live".
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** all four edits. Disposition microcopy on cards: `✓ addressed — "you fixed it (survives re-analysis)"`, `⏭ next pass — "park it; it returns next analysis"`, `Dismiss — "hide from the queue only"`.
-- [ ] **Step 4: Gates** — `node --check`; suites PASS.
-- [ ] **Step 5: Commit** — `"P1.10: shelf defers to the ledger; one Pacing with both metrics; one delta vocabulary; disposition explainers"`
+- [x] **Step 1: Failing checks** — (a) grep-gate in `test_app_symbol_integrity.py`: `pace_score` appears in exactly one renderer; (b) e2e: craft shelf has no `.fix-row`; (c) e2e: diff banner text uses "still live".
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement** all four edits. Disposition microcopy on cards: `✓ addressed — "you fixed it (survives re-analysis)"`, `⏭ next pass — "park it; it returns next analysis"`, `Dismiss — "hide from the queue only"`.
+- [x] **Step 4: Gates** — `node --check`; suites PASS.
+- [x] **Step 5: Commit** — `"P1.10: shelf defers to the ledger; one Pacing with both metrics; one delta vocabulary; disposition explainers"`
+**RED evidence (measured before the edits):** `test_app_symbol_integrity.py` 2 failed /
+5 passed (pace_score had two renderers; DELTA_TERMS absent) and
+`e2e_browser_dock_sections.py` 84 passed / 9 failed (`shelf rows=8`, `no button`, one
+chart titled Pacing, `0 hints`, banner `0 resolved | 8 carried | 1 still open`).
+GREEN after: 7/0 and 93/0.
+
+**Two notes on how Step 3 landed.** (1) The grep-gate's `_top_level_functions()` helper
+only matched `^function`, so a gate aimed at the `async function renderDiffBanner` read
+an empty body and would have passed for the wrong reason; it now matches
+`^async function` too, and the banned-word check runs on comment-stripped source (a
+comment may name the server's own fields -- only the words a writer reads are held to
+the one vocabulary). (2) The banner's `carried` and `still_present` are two
+measurements of one thing (the finding survived the draft). Printing both as chips made the
+banner say `31 still live` and `28 still live` two pixels apart -- the contradiction this plan
+exists to kill -- so `carried` now rides inside the one chip's hover instead of becoming a
+rival headline. Review also split the disposition hint: a deep card explains only the
+addressed / next-pass marks it carries, because Dismiss is a queue-row gesture.
 
 ### Task 11: P1 visual truth gate
 

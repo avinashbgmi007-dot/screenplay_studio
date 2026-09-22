@@ -52,6 +52,11 @@ def get(base, path):
 # The disposition ledger, asked of the app itself: open = findings whose
 # findingDisposition is "open"; total = the whole report (nothing dismissed is
 # seeded here, so the queue's ledger is the report's finding list).
+# P1.10: the craft shelf no longer embeds a copy of the queue, so the desk has
+# ONE queue header to read - the ledger's. (Before, .first silently picked the
+# shelf clone and the contract was checked against a duplicate.)
+DOCK_QUEUE_TITLE = ".dock-section-fixqueue .fix-queue .craft-panel-title"
+
 CONTRACT_JS = """() => {
   const findings = state.findings || [];
   let open = 0;
@@ -62,7 +67,7 @@ CONTRACT_JS = """() => {
 
 def read_surfaces(page):
     """The three desk count surfaces, parsed from what the writer actually sees."""
-    title = page.locator(".fix-queue .craft-panel-title").first.text_content() or ""
+    title = page.locator(DOCK_QUEUE_TITLE).first.text_content() or ""
     m = re.search(r"(\d+) open / (\d+) shown / (\d+) total", title)
     chip = page.locator("#finding-summary .fs-chip.open").first.text_content() or ""
     mc = re.search(r"(\d+)\s*open", chip)
@@ -214,9 +219,9 @@ def run(base, projects_dir, headers):
         browser, page, errors = launch(pw)
         page.goto(base)
         page.evaluate("async (n) => { await openProject(n); }", name)
-        # the queue panel rides in the collapsed craft shelf — attached, not visible
-        page.wait_for_selector(".fix-queue .craft-panel-title",
-                               state="attached", timeout=15000)
+        # the queue lives in the Evidence ledger only (P1.10) — open the dock for it
+        page.evaluate("() => { openDock('evidence'); }")
+        page.wait_for_selector(DOCK_QUEUE_TITLE, state="attached", timeout=15000)
         page.wait_for_selector("#finding-summary .fs-chip.open",
                                state="attached", timeout=15000)
 

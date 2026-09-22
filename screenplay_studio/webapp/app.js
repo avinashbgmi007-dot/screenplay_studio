@@ -3853,6 +3853,10 @@ function renderFixQueuePanel(container) {
     head.appendChild(toggleBtn);
   }
   panel.appendChild(head);
+  // P1.10: the queue's own gesture, printed where it is used (the deep cards
+  // explain ✓ / next-pass on the card; Dismiss exists only here).
+  panel.appendChild(el("p", "finding-intent-hint",
+    "Dismiss — takes the row out of this to-do; the finding stays in the report"));
 
   for (const item of shown) {
     // row state reads the SAME disposition ledger the header counts (N3) — a
@@ -3913,34 +3917,78 @@ function renderFixQueuePanel(container) {
   updateDawnMeter();
 }
 
+// ONE pacing panel, TWO labeled metrics (P1.10, spec §5 "one panel per
+// question"). Before this the shelf drew words-per-page while the doctor's
+// report drew the per-scene pace index — two charts titled "Pacing", neither
+// answering "where does it drag". Both are blocks of this one function now, so
+// the shelf, the dock's Pacing section and the report can never disagree.
 function renderPacingPanel(container) {
-  const pacing = state.reportStats && state.reportStats.pacing;
-  if (!pacing || !pacing.segments || !pacing.segments.length) return;
-  const segs = pacing.segments;
-  const maxW = Math.max(1, ...segs.map((s) => s.dialogue_words + s.action_words));
-  const W = 720, H = 150, pad = 26;
-  const barW = (W - pad - 10) / segs.length;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pacing chart: dialogue vs action words per page segment" class="pacing-svg">`;
-  segs.forEach((s, i) => {
-    const x = pad + i * barW;
-    const dH = Math.max(1, (s.dialogue_words / maxW) * (H - 44));
-    const aH = Math.max(1, (s.action_words / maxW) * (H - 44));
-    svg += `<rect x="${x}" y="${H - 34 - dH}" width="${barW - 3}" height="${dH}" class="bar-dialogue"/>`;
-    svg += `<rect x="${x}" y="${H - 34 - dH - aH}" width="${barW - 3}" height="${aH}" class="bar-action"/>`;
-    if (i % 2 === 0 || segs.length < 8) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${s.page_start}</text>`;
-  });
-  svg += `</svg>`;
+  const stats = state.reportStats && state.reportStats.pacing;
+  const segs = (stats && stats.segments) || [];
+  const perScene = (state.report && state.report.pacing) || [];
+  if (!segs.length && !perScene.length) return;
   const panel = el("div", "craft-panel");
   const head = el("div", "craft-panel-head");
-  head.appendChild(el("span", "craft-panel-title", `Pacing — ${pacing.total_pages} pages`));
-  const legend = el("span", "pacing-legend");
-  legend.appendChild(el("span", "legend-dialogue", "dialogue"));
-  legend.appendChild(el("span", "legend-action", "action"));
-  head.appendChild(legend);
+  head.appendChild(el("span", "craft-panel-title",
+    stats && stats.total_pages ? `Pacing — ${stats.total_pages} pages` : "Pacing"));
   panel.appendChild(head);
-  const body = el("div", "pacing-body");
-  body.innerHTML = svg;
-  panel.appendChild(body);
+
+  if (segs.length) {
+    const block = el("div", "pace-block");
+    block.appendChild(el("p", "pace-block-title",
+      "Words per page — dialogue against action"));
+    const maxW = Math.max(1, ...segs.map((s) => s.dialogue_words + s.action_words));
+    const W = 720, H = 150, pad = 26;
+    const barW = (W - pad - 10) / segs.length;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pacing chart: dialogue vs action words per page segment" class="pacing-svg">`;
+    segs.forEach((s, i) => {
+      const x = pad + i * barW;
+      const dH = Math.max(1, (s.dialogue_words / maxW) * (H - 44));
+      const aH = Math.max(1, (s.action_words / maxW) * (H - 44));
+      svg += `<rect x="${x}" y="${H - 34 - dH}" width="${barW - 3}" height="${dH}" class="bar-dialogue"/>`;
+      svg += `<rect x="${x}" y="${H - 34 - dH - aH}" width="${barW - 3}" height="${aH}" class="bar-action"/>`;
+      if (i % 2 === 0 || segs.length < 8) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${s.page_start}</text>`;
+    });
+    svg += `</svg>`;
+    const legend = el("span", "pacing-legend");
+    legend.appendChild(el("span", "legend-dialogue", "dialogue"));
+    legend.appendChild(el("span", "legend-action", "action"));
+    block.appendChild(legend);
+    const body = el("div", "pacing-body");
+    body.innerHTML = svg;
+    block.appendChild(body);
+    panel.appendChild(block);
+  }
+
+  if (perScene.length) {
+    const block = el("div", "pace-block");
+    block.appendChild(el("p", "pace-block-title", "Where the script drags"));
+    const W = 720, H = 170, pad = 30;
+    const scores = perScene.map((r) => r.pace_score || 0);
+    const maxScore = Math.max(68, ...scores);
+    const barW = (W - pad - 10) / perScene.length;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pace per scene; flagged scenes are drags" class="pacing-svg">`;
+    svg += `<line x1="${pad}" y1="${H - 34 - (68 / maxScore) * (H - 60)}" x2="${W - 6}" y2="${H - 34 - (68 / maxScore) * (H - 60)}" class="pace-drag-line"/>`;
+    perScene.forEach((r, i) => {
+      const x = pad + i * barW;
+      const h = Math.max(2, (r.pace_score / maxScore) * (H - 60));
+      const y = H - 34 - h;
+      const cls = r.drag ? "bar-pace drag" : "bar-pace";
+      svg += `<rect data-scene="${r.scene_number}" class="${cls}" x="${x}" y="${y}" width="${barW - 3}" height="${h}"><title>Scene ${r.scene_number} — pace ${r.pace_score}/100${r.drag ? " (drag)" : ""}</title></rect>`;
+      if (perScene.length <= 26) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${r.scene_number}</text>`;
+    });
+    svg += `</svg>`;
+    const body = el("div", "pacing-body");
+    body.innerHTML = svg;
+    body.addEventListener("click", (ev) => {
+      const rect = ev.target.closest(".bar-pace");
+      if (rect && rect.dataset.scene) jumpToScene(Number(rect.dataset.scene));
+    });
+    block.appendChild(body);
+    block.appendChild(el("p", "pacing-legend",
+      "Amber bars = pace drags (long, low-movement scenes). Click a bar to jump to the scene. The dashed line is the drag threshold."));
+    panel.appendChild(block);
+  }
   addPanel(container, panel);
 }
 
@@ -4103,6 +4151,13 @@ function buildCraftShelf(panels) {
   head.appendChild(el("span", "craft-shelf-caret", craftOpen ? "▾" : "▸"));
   head.addEventListener("click", toggleCraftShelf);
   wrap.appendChild(head);
+  // A sibling of the head, not a child: the head is a <button> and buttons do
+  // not nest. The shelf's one job is to point at the ledger it used to duplicate.
+  const toLedger = el("button", "craft-shelf-ledger fchip", "Fix queue: open the ledger \u2192");
+  toLedger.type = "button";
+  toLedger.title = "The to-do list lives in the Evidence dock — one queue, one home";
+  toLedger.addEventListener("click", () => openDock("evidence"));
+  wrap.appendChild(toLedger);
   const body = el("div", "craft-shelf-body");
   for (const p of panels) body.appendChild(p);
   wrap.appendChild(body);
@@ -4187,6 +4242,12 @@ function previousDraftName() {
   return list[list.length - 2] || "original"; // active is 'original'
 }
 
+// ONE vocabulary for what changed between passes (spec §5/8). Before this the
+// arrival strip said "still live / no longer flagged" and the diff banner said
+// "carried / resolved / still open" — the same delta described in two dialects,
+// four lines apart. Both surfaces print these words.
+const DELTA_TERMS = { fixed: "no longer flagged", live: "still live", added: "new" };
+
 async function renderDiffBanner() {
   const banner = $("#diff-banner");
   banner.style.display = "none";
@@ -4206,11 +4267,23 @@ async function renderDiffBanner() {
   }
 
   const s = diff.findings.summary;
+  const sentence = (t) => t.charAt(0).toUpperCase() + t.slice(1);
   const chips = el("div", "diff-chips");
-  chips.appendChild(el("span", "diff-chip resolved", `${s.resolved} resolved`));
-  chips.appendChild(el("span", "diff-chip new", `${s.new} new`));
-  chips.appendChild(el("span", "diff-chip carried", `${s.carried} carried`));
-  chips.appendChild(el("span", "diff-chip open", `${s.still_present} still open`));
+  const mkChip = (cls, text, title) => {
+    const chip = el("span", "diff-chip " + cls, text);
+    chip.title = title;
+    return chip;
+  };
+  // Three chips, three numbers, one word each: two chips reading "31 still live"
+  // and "28 still live" is the contradiction the ledger exists to kill. The
+  // carried count (findings the analysis repeated by identity) is disclosed in the
+  // hover of the one that speaks it, not as a rival headline.
+  chips.appendChild(mkChip("resolved", `${s.resolved} ${DELTA_TERMS.fixed}`,
+    "Findings from the previous draft whose quoted passage is gone from this one."));
+  chips.appendChild(mkChip("new", `${s.new} ${DELTA_TERMS.added}`,
+    "Findings this draft is flagged for that the previous one was not."));
+  chips.appendChild(mkChip("open", `${s.still_present} ${DELTA_TERMS.live}`,
+    `Still in the script: ${s.still_present} of the previous draft's findings still quote a passage this draft holds; ${s.carried} of the rows on the board are findings the analysis repeated from the previous draft.`));
   const added = diff.scenes.added_scenes.length;
   const removed = diff.scenes.removed_scenes.length;
   if (added || removed) {
@@ -4226,9 +4299,9 @@ async function renderDiffBanner() {
   const detail = el("div", "diff-detail");
   detail.style.display = "none";
   const groups = [
-    ["Resolved in this draft", diff.findings.resolved],
+    [`${sentence(DELTA_TERMS.fixed)} in this draft`, diff.findings.resolved],
     ["Newly flagged in this draft", diff.findings.new],
-    ["Still present (not yet fixed)", diff.findings.still_present],
+    [`${sentence(DELTA_TERMS.live)} (not yet fixed)`, diff.findings.still_present],
   ];
   for (const [title, items] of groups) {
     if (!items.length) continue;
@@ -4356,6 +4429,13 @@ function findingNoteEl(f, index, opts = {}) {
     actions.appendChild(discussBtn);
   }
   note.appendChild(actions);
+  // P1.10 (spec §8: learnable, not by punishment): the card says what its own
+  // gestures COST. Hover-only titles left 'addressed' and 'next pass' a guess. The
+  // queue's gesture (Dismiss) is explained in the queue, where its button is.
+  if (opts.deep) {
+    note.appendChild(el("p", "finding-intent-hint",
+      "\u2713 you fixed it \u2014 survives re-analysis \u00B7 \u23ED park it \u2014 returns next analysis"));
+  }
   return note;
 }
 
@@ -4675,7 +4755,9 @@ function renderManuscript(container) {
 
   // the analysis panels ride in a collapsed craft shelf — page one first
   const craftPanels = [];
-  renderFixQueuePanel(craftPanels);
+  // P1.10 (spec §5, one panel per question): the shelf no longer embeds a
+  // second fix queue. The queue rows have ONE home — the Evidence ledger —
+  // and the lid below points there instead of copying it.
   renderPacingPanel(craftPanels);
   renderCharacterPanel(craftPanels);
   renderCharacterDialsPanel(craftPanels);
@@ -5661,7 +5743,8 @@ function buildArrivalStrip() {
   // the re-wording clause below names the previous total. A headline that
   // disagreed with the board would be the UI pretending.
   head.appendChild(el("span", "dock-arrival-line",
-    `Pass: ${lp.last_total} \u2192 ${lp.still_live} still live \u00B7 ${lp.fixed} no longer flagged \u00B7 ${lp.new} new`));
+    `Pass: ${lp.last_total} \u2192 ${lp.still_live} ${DELTA_TERMS.live}`
+    + ` \u00B7 ${lp.fixed} ${DELTA_TERMS.fixed} \u00B7 ${lp.new} ${DELTA_TERMS.added}`));
   const scope = el("span", "dock-arrival-scope", "from the last run, not your edits");
   // GAP-7: on a byte-identical script the pass numbers can only be the model
   // re-wording its own findings. Say that, so "0 no longer flagged" reads as
@@ -6256,7 +6339,7 @@ function refreshDockEvidence() {
 // then a fresh metrics pull.
 function refreshAllFindingSurfaces() {
   refreshDockEvidence(); // no-op unless the dock is open on the Evidence lens
-  renderManuscript();    // ink + #finding-summary chips + craft-shelf queue (tail)
+  renderManuscript();    // ink + #finding-summary chips + craft shelf (P1.10: no queue)
   // the queue's other homes — re-rendered through the SAME renderer, never a
   // forked path; skipped when the container was never mounted (the tab's
   // self-heal renders it on first open instead)
@@ -6529,40 +6612,9 @@ function renderReportPanel() {
     c.appendChild(spCard);
   }
 
-  // Pacing — the per-scene pace index as an SVG line. Scene numbers on the
-  // x-axis, drags flagged in amber, click a bar to jump to that scene.
-  const pacing = state.report && state.report.pacing;
-  if (pacing && pacing.length) {
-    const paceCard = el("div", "craft-panel");
-    const paceHead = el("div", "craft-panel-head");
-    paceHead.appendChild(el("span", "craft-panel-title", "Pacing — where the script drags"));
-    paceCard.appendChild(paceHead);
-    const W = 720, H = 170, pad = 30;
-    const scores = pacing.map((r) => r.pace_score || 0);
-    const maxScore = Math.max(68, ...scores);
-    const barW = (W - pad - 10) / pacing.length;
-    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pace per scene; flagged scenes are drags" class="pacing-svg">`;
-    svg += `<line x1="${pad}" y1="${H - 34 - (68 / maxScore) * (H - 60)}" x2="${W - 6}" y2="${H - 34 - (68 / maxScore) * (H - 60)}" class="pace-drag-line"/>`;
-    pacing.forEach((r, i) => {
-      const x = pad + i * barW;
-      const h = Math.max(2, (r.pace_score / maxScore) * (H - 60));
-      const y = H - 34 - h;
-      const cls = r.drag ? "bar-pace drag" : "bar-pace";
-      svg += `<rect data-scene="${r.scene_number}" class="${cls}" x="${x}" y="${y}" width="${barW - 3}" height="${h}"><title>Scene ${r.scene_number} — pace ${r.pace_score}/100${r.drag ? " (drag)" : ""}</title></rect>`;
-      if (pacing.length <= 26) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${r.scene_number}</text>`;
-    });
-    svg += `</svg>`;
-    const body = el("div", "pacing-body");
-    body.innerHTML = svg;
-    body.addEventListener("click", (ev) => {
-      const rect = ev.target.closest(".bar-pace");
-      if (rect && rect.dataset.scene) jumpToScene(Number(rect.dataset.scene));
-    });
-    paceCard.appendChild(body);
-    const legend = el("p", "pacing-legend", "Amber bars = pace drags (long, low-movement scenes). Click a bar to jump to the scene. The dashed line is the drag threshold.");
-    paceCard.appendChild(legend);
-    c.appendChild(paceCard);
-  }
+  // P1.10: the per-scene pace chart used to be drawn a SECOND time here under
+  // the same "Pacing" title as the shelf's words-per-page chart, with different
+  // data. Both metrics now live in renderPacingPanel: one panel, two blocks.
 
   // Character dials -- the ONE shared panel (re-homed out of the dead
   // #struct-rail by the 2026-09-19 gaps pass; it used to render only here

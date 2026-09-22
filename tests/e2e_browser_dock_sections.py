@@ -617,6 +617,132 @@ def check_seeded_scene_filter(page, lens):
     page.evaluate("""() => { state.lastPass = null; refreshAllFindingSurfaces(); }""")
 
 
+def check_shelf_defers_and_one_pacing(page, lens, base, name):
+    """P1.10 (spec §5 + §8): the desk has ONE findings ledger, ONE pacing panel
+    and one vocabulary for the pass delta."""
+    # the seeded checks above leave the filter where they put it; this section
+    # reads the ledger as the writer meets it, so start from the default view
+    page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
+                       showDeferred: false, category: null, scene: null };
+                     refreshAllFindingSurfaces(); }""")
+    page.wait_for_timeout(300)
+    # -- 1. the craft shelf defers to the ledger -----------------------------
+    in_shelf = page.locator(".craft-shelf .fix-row").count()
+    in_ledger = lens.locator(".dock-section-fixqueue .fix-row").count()
+    check("P1.10: the craft shelf no longer embeds a second fix queue",
+          in_shelf == 0, f"shelf rows={in_shelf} (the ledger keeps {in_ledger})")
+    check("P1.10: the queue rows live in exactly one place — the ledger",
+          in_ledger > 0 and lens.locator(".dock-section-fixqueue").count() == 1,
+          f"{in_ledger} rows in {lens.locator('.dock-section-fixqueue').count()} section")
+    btn = page.locator(".craft-shelf .craft-shelf-ledger")
+    check("P1.10: the shelf lid routes the writer to the ledger",
+          btn.count() == 1 and "ledger" in (btn.first.inner_text() or "").lower(),
+          btn.first.inner_text() if btn.count() else "no button")
+    dock_closed = page.evaluate("""() => { closeDock(); return !dockIsOpen(); }""")
+    check("P1.10: the lid's route is real (the dock was closed first)",
+          bool(dock_closed), repr(dock_closed))
+    if btn.count():
+        clicked(btn.first)
+        back = page.evaluate("""() => ({ open: dockIsOpen(), lens: dockLens })""")
+        check("P1.10: clicking it opens the dock on the Evidence lens",
+              bool(back.get("open")) and back.get("lens") == "evidence", str(back))
+    else:
+        check("P1.10: clicking it opens the dock on the Evidence lens", False,
+              "no .craft-shelf-ledger button to click")
+
+    # -- 2. ONE pacing panel carrying BOTH metrics ---------------------------
+    # The shelf's chart answered "how is dialogue spread over the pages"
+    # (reportStats.pacing.segments) while the doctor's report drew the per-scene
+    # pace index. Two charts, one title, neither answering "where does it drag".
+    # Render the doctor's report before probing it: an empty container would
+    # make the absence check pass without ever having held the chart.
+    page.evaluate("""() => { renderReportPanel(); }""")
+    page.wait_for_timeout(250)
+    pace = page.evaluate("""() => {
+      const shelf = document.querySelector('.craft-shelf');
+      if (!shelf) return { shelfMissing: true };
+      const secs = [...(shelf ? shelf.querySelectorAll('.pacing-svg') : [])];
+      const bars = (root) => ({
+        seg: root.querySelectorAll('.bar-dialogue').length,
+        drag: root.querySelectorAll('.bar-pace').length,
+      });
+      const s = bars(shelf || document.body);
+      const rep = bars(document.querySelector('#feedback-report') || document.body);
+      const dock = bars(document.querySelector('.dock-lens[data-lens="evidence"]') || document.body);
+      const titled = [...document.querySelectorAll('.craft-shelf .pace-block-title')]
+        .map((e) => e.textContent.trim());
+      return { charts: secs.length, seg: s.seg, drag: s.drag,
+               repDrag: rep.drag, repCharts: (document.querySelector('#feedback-report') || document.body)
+                 .querySelectorAll('.pacing-svg').length, repKids: (document.querySelector('#feedback-report') || {}).childElementCount || 0,
+               repPanels: document.querySelectorAll('#feedback-report .craft-panel').length,
+               dockSeg: dock.seg, dockDrag: dock.drag, titles: titled, shelfMissing: false,
+               pacePanels: [...document.querySelectorAll('.craft-shelf .craft-panel')]
+                 .filter((p) => p.querySelector('.pace-block')).length };
+    }""")
+    check("P1.10: the shelf exists to be probed (no body-wide fallback)",
+          not pace.get("shelfMissing"), str(pace))
+    check("P1.10: the shelf's ONE Pacing panel carries both metrics",
+          pace["seg"] > 0 and pace["drag"] > 0 and pace["pacePanels"] == 1, str(pace))
+    check("P1.10: both blocks are labeled, so neither is mistaken for the other",
+          len(pace["titles"]) == 2 and any("drag" in t.lower() for t in pace["titles"]),
+          str(pace["titles"]))
+    check("P1.10: the doctor's report no longer draws the pace chart a second time",
+          pace["repPanels"] > 1 and pace["repKids"] > 0
+          and pace["repDrag"] == 0 and pace["repCharts"] == 0,
+          f"report: {pace['repCharts']} charts / {pace['repDrag']} pace bars "
+          f"(rendered={pace['repKids']} children)")
+    check("P1.10: the dock's Pacing section is the same panel, so it gained both too",
+          pace["dockSeg"] > 0 and pace["dockDrag"] > 0, str(pace))
+
+    # -- 3. the disposition taxonomy is explained on the card, not by hover ---
+    hint = lens.locator(".finding-intent-hint")
+    txt = " | ".join((hint.nth(i).text_content() or "") for i in range(hint.count()))
+    check("P1.10: a card explains its own gestures (spec §8: learnable, not by punishment)",
+          hint.count() > 0 and "survives re-analysis" in txt and "next analysis" in txt
+          and "to-do" in txt, f"{hint.count()} hints; said={txt[:160]!r}")
+    card = lens.locator(".finding-note .finding-intent-hint").first
+    check("P1.10: no surface explains a gesture it does not carry",
+          card.count() == 0 or "Dismiss" not in (card.inner_text() or ""),
+          (card.inner_text() if card.count() else "no card hint")[:90])
+
+    # -- 4. the diff banner speaks the arrival strip's words ------------------
+    # Uploading a second draft resets the PARSE stage only, so the report on
+    # desk is still complete and /diff compares it against the new text — the
+    # banner renders without paying for a second analysis.
+    with open(FIXTURE, "rb") as f:
+        text = f.read().decode("utf-8")
+    changed = text.replace("EXT/INT. HOSPITAL - NIGHT",
+                           "EXT. HOSPITAL ENTRANCE - NIGHT", 1)
+    assert changed != text, "the fixture changed; the draft-edit no longer edits anything"
+    r = requests.post(f"{base}/api/projects/{name}/drafts",
+                      files={"file": ("second.fountain", changed.encode("utf-8"),
+                                      "text/plain")}, timeout=60)
+    assert r.status_code in (200, 201), r.text[:200]
+    page.evaluate("async (n) => { await openProject(n); }", name)
+    page.wait_for_timeout(1200)
+    ban = page.evaluate("""() => {
+      const b = document.querySelector('#diff-banner');
+      if (!b || b.style.display === 'none') return null;
+      return { chips: [...b.querySelectorAll('.diff-chip')].map((c) => c.textContent.trim()),
+               groups: [...b.querySelectorAll('.diff-group-title')].map((g) => g.textContent.trim()) };
+    }""")
+    check("P1.10: the diff banner renders for the second draft", bool(ban), str(ban)[:160])
+    if ban:
+        words = " | ".join(ban["chips"] + ban["groups"])
+        check("P1.10: the banner prints the canonical delta words",
+              "no longer flagged" in words and "still live" in words
+              and " new" in words, words[:200])
+        check("P1.10: the retired dialect is gone from the banner",
+              not any(w in words for w in (" resolved", " carried", "still open",
+                                           "Still present", "Resolved in")),
+              words[:200])
+    else:
+        check("P1.10: the banner prints the canonical delta words", False,
+              "no #diff-banner to read")
+        check("P1.10: the retired dialect is gone from the banner", False,
+              "no #diff-banner to read")
+
+
 def run(base):
     name = seed_and_analyze(base, "Ledger Collapse")
     with sync_playwright() as p:
@@ -773,6 +899,7 @@ def run(base):
               not real_dupes, "; ".join(real_dupes[:6]))
         check_scene_filter(page, lens)
         check_seeded_scene_filter(page, lens)
+        check_shelf_defers_and_one_pacing(page, lens, base, name)
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()
