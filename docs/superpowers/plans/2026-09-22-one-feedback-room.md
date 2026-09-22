@@ -251,11 +251,25 @@ def test_finding_renders_once_in_dock(base, page):
 
 **Interfaces:** Consumes: `state.lastPass` (`{computed_at, last_total, still_live, fixed, new, same_input, ghosted_marks}`), `findingCounts()`. Produces: arrival strip DOM contract — first element = `K of M addressed by you` headline; secondary clause = pass-diff numbers; primary CTA button `.arrival-loop-cta` → `startLoop()`; `same_input` disclosure verbatim.
 
-- [ ] **Step 1: Failing e2e** — assert the strip's FIRST text node mentions "addressed by you" and a `.arrival-loop-cta` button exists and starts the loop (`#loop-bar` becomes visible).
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Rewrite** `buildArrivalStrip` body: headline `findingCounts`-derived writer number, pass-diff as one muted clause, CTA `"Start the fix loop — N highs"` (N = open highs from `findingCounts`+severity), ghosted list + retry link preserved inside a collapsed detail. Keep every honesty statement — only the ORDER changes.
-- [ ] **Step 4: Gates** — `node --check`; arrival e2e re-pinned and PASS.
-- [ ] **Step 5: Commit** — `"P1.9: arrival strip answers 'did my edits work?' first; fix loop is the CTA"`
+- [x] **Step 1: Failing e2e** — assert the strip's FIRST text node mentions "addressed by you" and a `.arrival-loop-cta` button exists and starts the loop (`#loop-bar` becomes visible).
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Rewrite** `buildArrivalStrip` body: headline `findingCounts`-derived writer number, pass-diff as one muted clause, CTA `"Start the fix loop — N highs"` (N = open highs from `findingCounts`+severity), ghosted list + retry link preserved inside a collapsed detail. Keep every honesty statement — only the ORDER changes.
+- [x] **Step 4: Gates** — `node --check`; arrival e2e re-pinned and PASS.
+- [x] **Step 5: Commit** — `"P1.9: arrival strip answers 'did my edits work?' first; fix loop is the CTA"`
+
+**Deviation, Step 4 (recorded rather than claimed):** the “re-pin expected DOM order” leg was a
+**no-op**. `tests/e2e_browser_gun_pen_audit.py` reads the arrival strip *by class*
+(`.dock-arrival-draft` / `-line` / `-scope`), never by position, so inverting the order needs no
+re-pin — and that suite needs a live llama-server, so it skips in this environment anyway. The new
+arrival checks went to `tests/e2e_browser_dock_sections.py` instead (it boots the studio with the
+demo model), where `ARRIVAL_SEED_JS` seeds a full `state.lastPass` and asserts the position contract
+for real: headline first, `.arrival-loop-cta` present + clickable → `#loop-bar`, `same_input` and
+scope wording byte-for-byte unchanged. RED `76/4` → GREEN `80/0`.
+
+**Task order, so the boxes above are not misread as pending work:** P1.6 and P1.7 shipped in
+`44bb136` and `0d12d56`, and P0.1–P0.5 in the five commits before them, but their step boxes were
+never ticked; only their `NOTES.md` entries record it (P1.6/P1.7 have none). Ticking them needs
+per-step verification, not trust in a commit message — do it in Task 21’s acceptance walk.
 
 ### Task 10: Shelf defers + one Pacing + vocabulary unification + disposition microcopy
 

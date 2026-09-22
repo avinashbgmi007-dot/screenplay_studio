@@ -6368,9 +6368,16 @@ body:not(.idea-mode) .desk {
 #dock-tab-evidence.has-unread::after { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lamp); margin-left:4px; box-shadow:0 0 8px var(--glow-strong); }
 .dock-arrival-strip { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-3); border:1px solid var(--lamp); border-radius:var(--r-md); background:var(--glow); }
 .dock-arrival-head { display:flex; align-items:baseline; gap:var(--sp-3); flex-wrap:wrap; }
-.dock-arrival-line { font-size:var(--fs-xs); font-weight:600; color:var(--text); }
+/* P1.9 (spec §6): the strip's visual hierarchy now follows the writer's
+   question instead of the analyzer's. Their own number is the headline; the
+   pass diff is a secondary clause and must not READ as progress, so it lost its
+   weight and its full-strength ink when it lost the lead. */
+.dock-arrival-draft { font-size:var(--fs-xs); font-weight:700; color:var(--text); }
+.dock-arrival-line { font-size:var(--fs-2xs); font-weight:400; color:var(--text-muted); }
 .dock-arrival-scope { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; }
-.dock-arrival-draft { font-size:var(--fs-2xs); font-weight:600; color:var(--text-muted); }
+/* the loop CTA is the strip's one action — lamp is the action/progress token in
+   all three registers (night, dawn, tungsten), never a severity colour */
+.arrival-loop-cta { border-color:var(--lamp); color:var(--lamp); font-weight:600; }
 .dock-arrival-retry { align-self:flex-start; appearance:none; border:1px solid var(--danger); background:var(--danger-bg,rgba(200,80,58,.10)); color:var(--danger); border-radius:var(--r-sm); padding:2px var(--sp-3); font-size:var(--fs-2xs); cursor:pointer; }
 .dock-arrival-retry:disabled { opacity:.6; cursor:default; }
 .dock-ghosted summary { font-size:var(--fs-2xs); color:var(--text-faint); cursor:pointer; }

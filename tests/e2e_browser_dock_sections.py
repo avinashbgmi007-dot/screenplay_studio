@@ -223,6 +223,42 @@ SEED_JS = """(args) => {
   return { ids: state.findingIds };
 }"""
 
+# P1.9 (spec §6): the arrival strip answers the writer's question first. Seeded
+# on top of the fixture ledger so the headline number is this suite's own
+# findingCounts(), never a model run.
+ARRIVAL_SEED_JS = """(args) => {
+  state.lastPass = {
+    computed_at: Date.now(), last_total: 41, still_live: 39, fixed: 2, new: 0,
+    same_input: !!args.same_input, rewritten: 3, prev_total: 4, ghosted_marks: [],
+  };
+  refreshAllFindingSurfaces(); // the ONE re-render entry point (P0.4)
+  return true;
+}"""
+
+# What the strip is built from, and in what order.
+ARRIVAL_JS = """() => {
+  const strip = document.querySelector(
+    '.dock-lens[data-lens="evidence"] .dock-arrival-strip');
+  if (!strip) return { missing: true };
+  const head = strip.querySelector('.dock-arrival-head');
+  const kids = head ? [...head.children].map((c) => c.className) : [];
+  const text = (sel) => {
+    const e = strip.querySelector(sel);
+    return e ? e.textContent.trim() : null;
+  };
+  const cta = strip.querySelector('.arrival-loop-cta');
+  return {
+    headKids: kids,
+    firstText: kids.length ? head.firstElementChild.textContent.trim() : null,
+    draft: text('.dock-arrival-draft'),
+    passLine: text('.dock-arrival-line'),
+    scope: text('.dock-arrival-scope'),
+    rewrite: text('.dock-arrival-rewrite'),
+    ctaText: cta ? cta.textContent.trim() : null,
+    ctaIsAButton: !!cta && cta.tagName === 'BUTTON',
+  };
+}"""
+
 # The rail's marks, as the writer sees them: a clean ✓, or severity dots?
 RAIL_MARKS_JS = """() => {
   return [...document.querySelectorAll("#scene-index-list .scene-index-item")].map((it) => {
@@ -529,6 +565,56 @@ def check_seeded_scene_filter(page, lens):
           marked == 2 and b2.get("clean") is True and b2.get("dots", 0) == 0
           and a2.get("clean") is False,
           f"marks={marked} scene {scene_b}={b2} scene {scene_a}={a2}")
+
+    # --- P1.9 (spec §6): the arrival strip leads with the writer's number ----
+    # Four findings seeded, scene B's pair just marked addressed: the ONE
+    # counter says 2 of 4 addressed, 2 open, and exactly ONE of the open ones
+    # is a high (scene A's dialogue high; the pacing high is addressed).
+    check("P1.9/seed: the arrival strip appears once state.lastPass lands",
+          page.evaluate(ARRIVAL_SEED_JS, {"same_input": False}))
+    page.wait_for_timeout(300)
+    a1 = page.evaluate(ARRIVAL_JS) or {}
+    kids = a1.get("headKids") or []
+    check("P1.9: the strip's FIRST line is the writer's own number, not the pass diff",
+          kids[:1] == ["dock-arrival-draft"]
+          and a1.get("firstText") == "2 of 4 addressed by you",
+          f"first={a1.get('firstText')!r} head={kids}")
+    check("P1.9: the pass diff is still printed — and it no longer leads",
+          "dock-arrival-line" in kids and kids.index("dock-arrival-line") > 0
+          and "Pass: 41 → 39 still live" in (a1.get("passLine") or ""),
+          f"passLine={a1.get('passLine')!r} head={kids}")
+    check("P1.9: the fix loop is the strip's CTA and counts the OPEN highs only",
+          a1.get("ctaIsAButton") and "Start the fix loop" in (a1.get("ctaText") or "")
+          and re.search(r"\b1 high\b", a1.get("ctaText") or "") is not None,
+          f"cta={a1.get('ctaText')!r}")
+    # Guarded, never a bare .click(): a missing CTA must report as the named
+    # failure below, not as a 30s TimeoutError that aborts the run and hides the
+    # two honesty checks that come after it (e2e_browser_common's own lesson).
+    loop_engaged = False
+    if lens.locator(".arrival-loop-cta").count():
+        lens.locator(".arrival-loop-cta").click()
+        page.wait_for_timeout(400)
+        loop_engaged = (page.locator("#loop-bar").count() > 0
+                        and page.locator("#loop-bar").is_visible())
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+    check("P1.9: clicking the CTA engages the existing keyboard loop (#loop-bar)",
+          loop_engaged, f"cta={a1.get('ctaText')!r}")
+
+    # The trust layer is non-negotiable: inverting the ORDER must not cost a
+    # single honesty statement. Re-seed with same_input and read them all.
+    page.evaluate(ARRIVAL_SEED_JS, {"same_input": True})
+    page.wait_for_timeout(300)
+    a2s = page.evaluate(ARRIVAL_JS) or {}
+    check("P1.9: the same_input model-rewording disclosure survives verbatim",
+          "reworded by the model" in (a2s.get("rewrite") or "")
+          and "your script did not change" in (a2s.get("rewrite") or "")
+          and "3 of the last pass's 4 DISTINCT findings" in (a2s.get("rewrite") or ""),
+          f"rewrite={a2s.get('rewrite')!r}")
+    check("P1.9: the pass numbers keep their 'not your edits' disclaimer",
+          a2s.get("scope") == "from the last run, not your edits",
+          f"scope={a2s.get('scope')!r}")
+    page.evaluate("""() => { state.lastPass = null; refreshAllFindingSurfaces(); }""")
 
 
 def run(base):

@@ -5613,19 +5613,44 @@ function clearEvidenceUnread() {
   if (tab) tab.classList.remove("has-unread");
 }
 
-// ---------- arrival strip (R4 + N1 + N2): the "finally" ----------
-// The pass line ("Pass: 62 → 41 still live · 14 no longer flagged · 7 new") +
-// a scope chip + the trust readout + the writer's OWN progress ("Your draft: N
-// addressed") + inline retry when the pass arrived partially. GAP-5: the four
-// pass numbers are analyzer re-read drift and can never track writer edits —
-// the scope chip says so on-screen, and the draft clause carries the
-// working-copy truth (observed "addressed") that used to be missing here.
+// ---------- arrival strip (R4 + N1 + N2 + P1.9): the "finally" ----------
+// Reads in the order the writer asks it: THEIR number ("N of M addressed by
+// you") and the fix-loop CTA first, then the pass line ("Pass: 62 → 41 still
+// live · 14 no longer flagged · 7 new") as a secondary clause with its scope
+// chip, the trust readout, and inline retry when the pass arrived partially.
+// GAP-5: the four pass numbers are analyzer re-read drift and can never track
+// writer edits — the scope chip says so on-screen, and the draft clause carries
+// the working-copy truth (observed "addressed") that used to be missing here.
 // Ghosted marks expand to a muted list — never red, in no open count (R9).
 function buildArrivalStrip() {
   const lp = state.lastPass;
   if (!lp || !lp.computed_at) return null;
   const strip = el("div", "dock-arrival-strip");
   const head = el("div", "dock-arrival-head");
+  // P1.9 (spec §6): THE INVERSION. The writer arriving at the desk is asking
+  // one question — "did my edits work?" — so their own number leads and the
+  // analyzer's pass diff, which can never respond to an edit, drops to a
+  // secondary clause. Only the ORDER moved; every honesty statement below is
+  // the one GAP-5/GAP-7 put here, word for word.
+  const prog = findingCounts();
+  if (prog.addressed || prog.open) {
+    head.appendChild(el("span", "dock-arrival-draft",
+      `${prog.addressed} of ${prog.addressed + prog.open} addressed by you`));
+  }
+  // The CTA is the loop, not a fourth place to read a count. It counts the
+  // OPEN highs from the ONE counter — never the report's total — so the number
+  // it advertises is the number the loop will actually walk.
+  if (prog.open) {
+    const highs = (prog.bySeverity && prog.bySeverity.high) || 0;
+    const cta = el("button", "arrival-loop-cta fchip");
+    cta.type = "button";
+    cta.textContent = "Start the fix loop \u2014 "
+      + (highs ? `${highs} high${highs > 1 ? "s" : ""}` : `${prog.open} open`);
+    cta.title = "Walk the live findings one at a time: mark, park, discuss, copy"
+      + (highs ? ` \u2014 ${highs} of them are highs.` : ".");
+    cta.addEventListener("click", () => startLoop());
+    head.appendChild(cta);
+  }
   // GAP-5: these four numbers diff THIS pass against the PREVIOUS one — both
   // read the parse-of-record (orchestrator.py loads m.parsed_path), so writer
   // edits can never move them. Say "Pass:", not "Last pass… Fixed", so the
@@ -5651,16 +5676,6 @@ function buildArrivalStrip() {
   }
   scope.title = "These compare one analysis pass to the previous one. They never respond to your edits \u2014 your own progress rides beside them.";
   head.appendChild(scope);
-  // GAP-5's honest counterpart: the working-copy truth the pass line cannot
-  // carry. Same counting contract as the revision strip (N3) — the writer's
-  // number agrees with every other surface. Sits with the pass line (left) so
-  // "what the passes say / what you've done" reads in one breath; the
-  // secondary quote-trust metric stays pushed right.
-  const prog = findingCounts();
-  if (prog.addressed || prog.open) {
-    head.appendChild(el("span", "dock-arrival-draft",
-      `${prog.addressed} of ${prog.addressed + prog.open} addressed by you`));
-  }
   const vs = state.report && state.report.verification_summary;
   if (vs) {
     const vTotal = (vs.verified || 0) + (vs.not_found || 0) + (vs.no_quote || 0) + (vs.scene_not_found || 0);
@@ -5668,7 +5683,10 @@ function buildArrivalStrip() {
       (vs.verified || 0) + " of " + vTotal + " quotes verified (" + Math.round(100 * (vs.verified || 0) / vTotal) + "%)"));
   }
   strip.appendChild(head);
-  // inline retry (N2): the moment a partial arrival is seen is the moment it's fixed
+  // inline retry (N2): the moment a partial arrival is seen is the moment it's
+  // fixed. Kept OUTSIDE the collapsed detail below on purpose — a partially
+  // failed analysis is exactly when the affordance must not be one click away
+  // behind a summary. The ghosted list beside it already is collapsed.
   const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
   const failed = (projSummary && projSummary.failed_categories) || [];
   if (failed.length) {
