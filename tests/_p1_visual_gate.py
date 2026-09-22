@@ -66,6 +66,25 @@ MEASURE = r"""() => {
       const box = b.getBoundingClientRect();
       return { text: b.textContent, w: Math.round(box.width),
                clipped: b.scrollWidth > b.clientWidth + 1 }; })(),
+    // P2.14: honesty surfaces. On this report the model line and the strengths
+    // block MUST be there (the real report carries model_used and 2 strengths);
+    // the failure banner must NOT be (nothing failed). Whether a surface reads
+    // as an answer or as a squeezed strip is a pixels question.
+    p214: (() => {
+      const box = (s) => { const n = document.querySelector(s); if (!n) return null;
+        return { text: (n.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 70),
+                 w: Math.round(n.getBoundingClientRect().width),
+                 clipped: n.scrollWidth > n.clientWidth + 1 }; };
+      return {
+        model: box('#context-dock .dock-report-model'),
+        working: box('#context-dock .dock-working-head'),
+        workingRows: document.querySelectorAll('#context-dock .dock-working-row').length,
+        banner: document.querySelectorAll('#context-dock .failure-banner').length,
+        fmtTitle: box('#context-dock .dock-section[data-key="formatting"] .dock-section-title'),
+        fmtRows: document.querySelectorAll('#context-dock .dock-fmt-row').length,
+        trust: [...document.querySelectorAll('.dock-trust')].map((n) => n.textContent),
+      };
+    })(),
   };
 }"""
 
@@ -188,6 +207,14 @@ def main():
                 element_shot(page, ".rule-popover", "03e_rule_popover_night")
                 page.keyboard.press("Escape")
                 page.wait_for_timeout(300)
+                # P2.14: the three lines that tell the writer who wrote this
+                # report, what went well, and what was checked deterministically.
+                element_shot(page, "#context-dock .dock-report-model",
+                             "03g_report_model_night")
+                element_shot(page, "#context-dock .dock-working",
+                             "03h_whats_working_night")
+                element_shot(page, "#context-dock .dock-fmt-row",
+                             "03i_formatting_row_night")
             ledger_expanded()
 
             def ledger_scene():
@@ -238,6 +265,7 @@ def main():
                 element_shot(page, ".dock-section .finding-note", "07b_card_dawn")
                 element_shot(page, ".dock-section-fixqueue .fix-queue > .craft-panel-head",
                              "07c_fixqueue_dawn")
+                element_shot(page, "#context-dock .dock-working", "07d_whats_working_dawn")
                 page.keyboard.press("a")
                 page.wait_for_timeout(900)
                 shot(page, "08_shelf_dawn")
@@ -256,10 +284,14 @@ def main():
             continue
         w = v.get("manuscriptPct")
         rc = v.get("ruleChip")
+        pd = v.get("p214") or {}
+        mdl = (pd.get("model") or {}).get("w")
         line = [k, f"ms={w}%" if w is not None else "ms=?",
                 f"secs={v.get('sectionsOpen')}/{v.get('sections')}",
                 f"ovfX={v.get('overflowX')}",
                 f"chip={rc['w']}px" if rc else "chip=-",
+                f"mdl={mdl}px" if mdl else "mdl=-",
+                f"bands={len(pd.get('trust') or [])}",
                 "OVERLAP" if v.get("surfacesOverlap") else ""]
         if v.get("surfacesOverlap"):
             bad.append(k + " surfaces overlap")
@@ -276,6 +308,27 @@ def main():
         if rc and (rc.get("clipped") or rc.get("w", 0) < 60):
             bad.append(f"{k} the KB-rule chip is unreadable (w={rc.get('w')} "
                        f"clipped={rc.get('clipped')} text={rc.get('text')!r})")
+        if pd and v.get("dockOpen"):
+            for surf in ("model", "working", "fmtTitle"):
+                box = pd.get(surf)
+                if box and box.get("clipped"):
+                    bad.append(f"{k} the {surf} line is clipped "
+                               f"(w={box.get('w')} text={box.get('text')!r})")
+            if not pd.get("model"):
+                bad.append(f"{k} no model line — the report says who wrote it and "
+                           "the desk is not saying so")
+            elif "\\" in (pd["model"].get("text") or ""):
+                bad.append(f"{k} the model line prints a machine path, not a name: "
+                           f"{pd['model']['text']!r}")
+            if not pd.get("working"):
+                bad.append(f"{k} no strengths block — the ledger opens with problems")
+            if pd.get("banner"):
+                bad.append(f"{k} a failure banner is up on a report whose passes all "
+                           "completed")
+            trusted = set(pd.get("trust") or [])
+            if len(trusted) > 1:
+                bad.append(f"{k} the verification readout prints {len(trusted)} "
+                           f"denominators: {sorted(trusted)}")
         print("   " + "  ".join(x for x in line if x))
     for n in EL_SHOTS:
         if facts.get(n) != "ok":

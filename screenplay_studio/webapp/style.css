@@ -6402,6 +6402,69 @@ body:not(.idea-mode) .desk {
 .rule-popover-source, .rule-popover-loading { font-size:var(--fs-2xs); color:var(--text-muted); margin:var(--sp-1) 0 0; line-height:1.5; }
 .rule-popover-error { font-size:var(--fs-2xs); color:var(--danger); margin:0; }
 
+/* P2.14 (spec §3): the report's facts about itself. All three of these sit above
+   the filter row and outside every collapsible section — a report that could not
+   finish, or was written by a different model than the one now configured, has to
+   say so before the writer reads a single finding. */
+.dock-report-model { font-size:var(--fs-3xs); color:var(--text-faint); margin:0; }
+.failure-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  background: var(--danger-bg, rgba(200, 80, 58, .08));
+  padding: var(--sp-3);
+}
+.failure-banner-head { font-size: var(--fs-xs); font-weight: 700; color: var(--danger); margin: 0; }
+.failure-banner-scope, .failure-banner-error {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.55;
+}
+.failure-banner-error { font-family: var(--font-mono); color: var(--text-faint); }
+.failure-banner .rerun-failed {
+  align-self: flex-start;
+  appearance: none;
+  border: 1px solid var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+  border-radius: var(--r-sm);
+  padding: 2px var(--sp-3);
+  font-size: var(--fs-2xs);
+  cursor: pointer;
+}
+.failure-banner .rerun-failed:disabled { opacity: .6; cursor: default; }
+.dock-cov-frame { font-size: var(--fs-2xs); color: var(--lamp); margin: 0 0 var(--sp-2) 0; letter-spacing: .02em; }
+.dock-cov-films { font-size: var(--fs-2xs); color: var(--text-faint); margin: var(--sp-2) 0 0; font-style: italic; }
+/* The one section whose rows no model wrote — so it is dressed like the margin,
+   not like the ledger, and cannot be mistaken for a judgment. */
+.dock-fmt-row { font-size: var(--fs-2xs); line-height: 1.55; color: var(--text-faint); margin: 0 0 var(--sp-2) 0; }
+.dock-fmt-rule {
+  display: inline-block;
+  margin-left: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xs);
+  color: var(--text-faint);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  padding: 0 var(--sp-1);
+}
+/* A character read's own hedge, printed rather than hidden in a hover. */
+.wm-confidence, .wm-scenes {
+  display: inline-block;
+  margin-right: var(--sp-3);
+  font-size: var(--fs-3xs);
+  color: var(--text-faint);
+}
+/* Strengths first (spec §6): praise is not a finding, so it gets its own quiet
+   block and never a count, a severity or a place in the ledger. */
+.dock-working { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); border-left: 2px solid var(--ok); }
+.dock-working-head { font-size: var(--fs-2xs); font-weight: 700; color: var(--ok); }
+.dock-working-row { font-size: var(--fs-sm); line-height: 1.55; color: var(--text-muted); margin: 0; }
+
 /* forward-compatible finding states (R3 defer / R9 ghosting): muted, never red, CSS-only (marks never reflow script text) */
 .finding-note.deferred{opacity:.72}
 .finding-note.ghosted{opacity:.6;filter:saturate(.4)}

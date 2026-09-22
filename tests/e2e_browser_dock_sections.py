@@ -925,6 +925,226 @@ def check_card_honesty_fields(page, lens, base):
                      refreshAllFindingSurfaces(); }""")
 
 
+# P2.14 (spec §3 + §7): the report carries facts the desk used to drop — which
+# model wrote it, which passes errored, what the coverage pass liked, how sure a
+# character read is, and what the deterministic formatting check found. Seeded on
+# a project the suite already analysed, so the demo report's own values are the
+# baseline and every seeded string is one this suite asserts on.
+REPORT_SEED_JS = """(args) => {
+  state.report = Object.assign({}, state.report || {}, {
+    model_used: args.model,
+    errors: ["dialogue: the model returned no parsable answer"],
+    coverage: Object.assign({}, (state.report || {}).coverage || {}, {
+      recommendation: "revise",
+      genre: "Neo-noir",
+      tone: "Claustrophobic",
+      strengths: ["<img src=x onerror=alert(1)> the interrogation holds",
+                  "SEEDSTRENGTH Raj's voice is distinct"],
+      comparable_films: ["Sicario", "Prisoners"],
+    }),
+    verification_summary: { verified: 10, not_found: 3, scene_not_found: 3, no_quote: 26 },
+    formatting_findings: [{
+      rule: "scene_heading_missing", severity: "medium", scene_refs: [1],
+      message: "SEEDFMT page 1 opens with no scene heading",
+    }],
+    character_reads: [{
+      character: "SEEDREAD Raj", how_reads: "comes across as reactive",
+      confidence: 0.44, scene_refs: [2, 5], evidence_quote: args.quote,
+      verification: { status: "verified", matched_scene: args.scene, confidence: 0.9 },
+    }],
+  });
+  const proj = (state.projects || []).find((p) => p.project === state.currentProject);
+  if (proj) proj.failed_categories = ["dialogue"];
+  // The arrival strip is what the strengths line and the banner sit under, and it
+  // needs a pass to describe — earlier sections of this suite left none standing.
+  state.lastPass = {
+    computed_at: Date.now(), last_total: 2, still_live: 2, fixed: 0, new: 0,
+    same_input: false, rewritten: 0, prev_total: 0, ghosted_marks: [],
+  };
+  refreshAllFindingSurfaces();
+  return { reads: state.report.character_reads.length };
+}"""
+
+
+def check_report_honesty_surfaces(page, lens, base, name):
+    """P2.14: model id, error banner, strengths-first, coverage extras, read
+    confidence + scene refs, and a formatting section that names itself
+    deterministic."""
+    lines = page.evaluate("""() => {
+        const out = [];
+        for (const l of document.querySelectorAll('#manuscript-container .el-action')) {
+          const t = (l.textContent || '').trim();
+          if (t.length > 14) out.push(t);
+          if (out.length === 1) break;
+        }
+        return out;
+    }""")
+    assert lines, "no manuscript line available to seed a read's quote"
+    if not page.evaluate("() => dockIsOpen()"):
+        open_dock(page)
+    page.evaluate(REPORT_SEED_JS, {
+        "model": "C:\\models\\qwen3.6-test.gguf",
+        "quote": lines[0], "scene": 1,
+    })
+    page.wait_for_timeout(400)
+
+    # -- 1. which model actually wrote this report ---------------------------
+    # The status strip names the model configured NOW; the report may be older
+    # than that, so the dock has to name the one that did the work.
+    model = lens.locator(".dock-report-model")
+    model_txt = (model.first.text_content() or "") if model.count() else None
+    check("P2.14: the dock names the model that wrote the report",
+          model.count() == 1 and "qwen3.6-test" in (model_txt or ""),
+          repr(model_txt))
+    check("P2.14: it names the model, not the whole path it lives at",
+          model.count() == 1 and "\\" not in (model_txt or ""), repr(model_txt))
+
+    # -- 2. the partial-failure banner carries the errors, not just the count --
+    banner = lens.locator(".failure-banner")
+    banner_txt = (banner.first.text_content() or "") if banner.count() else None
+    check("P2.14: a failed pass raises one banner in the ledger",
+          banner.count() == 1, f"{banner.count()} banners")
+    check("P2.14: the banner offers the cheap rerun, not the noisy one",
+          banner.count() == 1 and "1 pass failed" in banner_txt
+          and "rerun just that" in banner_txt, repr(banner_txt))
+    check("P2.14: the banner quotes the error the report recorded",
+          banner.count() == 1 and "returned no parsable answer" in banner_txt,
+          repr(banner_txt))
+    check("P2.14: the retry is a real button with the failed-only action",
+          banner.count() == 1
+          and banner.locator("button.rerun-failed[type='button']").count() == 1)
+    check("P2.14: the banner stays visible with its sections collapsed",
+          banner.count() == 1 and banner.first.is_visible())
+
+    # -- 3. strengths first, and escaped ------------------------------------
+    working = lens.locator(".dock-working")
+    working_txt = (working.first.text_content() or "") if working.count() else None
+    check("P2.14: what the analysis LIKED is its own line under the arrival strip",
+          working.count() == 1 and "What’s working (2)" in working_txt,
+          repr(working_txt))
+    check("P2.14: the strength text is on the page",
+          working.count() == 1 and "voice is distinct" in working_txt,
+          repr(working_txt))
+    injected = page.evaluate(
+        "() => document.querySelectorAll('.dock-working img').length")
+    check("P2.14: a seeded strength with markup renders as text, never a node",
+          working.count() == 1 and injected == 0, f"{injected} img nodes")
+
+    # -- 4. the coverage section stops dropping half its payload -------------
+    open_dock_section(page, "coverage")
+    page.wait_for_timeout(350)
+    cov_txt = page.evaluate("""() => { const s =
+        document.querySelector('.dock-section[data-key="coverage"] .dock-section-body');
+        return s ? s.textContent : ''; }""")
+    for want in ("Neo-noir", "Claustrophobic", "Sicario", "Prisoners"):
+        check(f"P2.14: coverage shows the seeded {want}", want in cov_txt,
+              repr(cov_txt[:160]))
+    check("P2.14: the strengths are stated once, not echoed into coverage too",
+          cov_txt.count("voice is distinct") == 0, repr(cov_txt[:160]))
+
+    # -- 5. formatting: the deterministic checks get a labelled home ---------
+    fmt = lens.locator('.dock-section[data-key="formatting"]')
+    fmt_head = (fmt.locator(".dock-section-title").first.text_content()
+                if fmt.count() else None)
+    check("P2.14: the formatting findings have exactly one section",
+          fmt.count() == 1, f"{fmt.count()} sections")
+    check("P2.14: its header says these are mechanical, not a judgment call",
+          fmt.count() == 1 and "deterministic" in (fmt_head or "").lower()
+          and "not model judgment" in (fmt_head or "").lower(), repr(fmt_head))
+    check("P2.14: collapsed by default like every other section",
+          fmt.count() == 1 and fmt.first.get_attribute("data-open") == "false",
+          fmt.first.get_attribute("data-open") if fmt.count() else "no section")
+    if fmt.count():
+        clicked(fmt.locator(".dock-section-head").first)
+        page.wait_for_timeout(350)
+    fmt_body = page.evaluate("""() => { const s =
+        document.querySelector('.dock-section[data-key="formatting"] .dock-section-body');
+        return s ? s.textContent : ''; }""")
+    check("P2.14: opening it shows the seeded formatting finding",
+          "SEEDFMT page 1 opens with no scene heading" in fmt_body,
+          repr(fmt_body[:180]))
+    check("P2.14: formatting rows never join the findings ledger",
+          page.evaluate("""() => { const b = document.querySelector(
+              '.dock-section[data-key="formatting"] .dock-section-body');
+            return !b || b.querySelectorAll('.finding-note').length; }""") == 0,
+          "a formatting row was carded as a finding")
+
+    # -- 6. a character read states how sure it is, and where it looked ------
+    # The dock forces every craft section open for this check (P1.10's rule:
+    # the shelf may defer, the ledger must not hide a panel's own payload).
+    open_dock_section(page, "mirror")
+    page.wait_for_timeout(300)
+    mirror = page.evaluate("""() => {
+      const cards = [...document.querySelectorAll('.wm-char')];
+      const c = cards.find((x) => (x.textContent || '').includes('SEEDREAD Raj'));
+      if (!c) return null;
+      const conf = c.querySelector('.wm-confidence');
+      const scenes = c.querySelector('.wm-scenes');
+      return { conf: conf ? conf.textContent.trim() : null,
+               scenes: scenes ? scenes.textContent.trim() : null };
+    }""")
+    check("P2.14: the read shows its own confidence",
+          mirror is not None and mirror.get("conf") is not None
+          and "44%" in mirror["conf"], str(mirror))
+    check("P2.14: the read names the scenes it formed it from",
+          mirror is not None and mirror.get("scenes") is not None
+          and "S2" in mirror["scenes"] and "S5" in mirror["scenes"], str(mirror))
+
+    # -- 7. the trust line says the same thing in both of its homes ----------
+    # It used to print "10 of 36 (28%)" beside "10 of 13 (77%)" for one report:
+    # the arrival strip counted the quote-less findings in its denominator, the
+    # mass strip did not. Two honest-looking numbers that disagree read as the
+    # desk not knowing its own report.
+    want = "10 of 16 quotes verified (63%) · 26 carried no quote"
+    trust = page.evaluate("""() => [...document.querySelectorAll(
+        '.dock-lens[data-lens="evidence"] .dock-trust')].map((e) => e.textContent.trim())""")
+    check("P2.14: the verification readout renders in both orientation strips",
+          len(trust) == 2, str(trust))
+    check("P2.14: both print the same sentence, from one denominator",
+          len(trust) == 2 and trust[0] == trust[1] == want,
+          f"got={trust} want={want!r}")
+
+    # -- 8. pinning a finding to the notes rail (spec §14.2) ------------------
+    before = requests.get(f"{base}/api/projects/{name}/notes", timeout=30).json()["notes"]
+    page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
+                       showDeferred: true, category: null, scene: null };
+                     refreshAllFindingSurfaces(); }""")
+    page.wait_for_timeout(300)
+    open_dock_section_holding(page, ".finding-note")
+    page.wait_for_timeout(400)
+    cards = lens.locator(".finding-note")
+    pin = lens.locator(".finding-pin-btn")
+    check("P2.14: a deep card offers the note-keeping verb",
+          cards.count() > 0 and pin.count() >= 1,
+          f"{cards.count()} cards, {pin.count()} pin buttons")
+    card_issue = (pin.first.evaluate(
+        "(b) => (b.closest('.finding-note').querySelector('.finding-note-text') || {}).textContent")
+        or "").strip() if pin.count() else ""
+    posts = []
+    page.on("request", lambda r: posts.append((r.method, r.url, r.post_data))
+            if r.method == "POST" and r.url.endswith("/notes") else None)
+    landed = clicked(pin.first) if pin.count() else False
+    page.wait_for_timeout(700)
+    after = requests.get(f"{base}/api/projects/{name}/notes", timeout=30).json()["notes"]
+    check("P2.14: clicking it really lands a note",
+          landed and len(after) == len(before) + 1,
+          f"landed={landed} {len(before)} -> {len(after)}")
+    check("P2.14: the note carries the finding's own words",
+          len(after) > len(before) and card_issue
+          and (after[-1].get("text") or "").startswith(card_issue),
+          f"card={card_issue[:60]!r} note={(after[-1] if after else {}).get('text', '')[:80]!r}")
+    mine = [p for p in posts if "anchor" in (p[2] or "")]
+    check("P2.14: the POST goes to the EXISTING notes endpoint with an anchor",
+          bool(posts) and bool(mine), str([(m, u.split('/api/')[-1]) for m, u, _ in posts][:3]))
+    check("P2.14: the button says it took, so the click is not a silent no-op",
+          "pinned" in ((pin.first.text_content() or "").lower() if pin.count() else ""),
+          repr((pin.first.text_content() or "") if pin.count() else "no pin button"))
+
+    page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
+                       showDeferred: false, category: null, scene: null };
+                     refreshAllFindingSurfaces(); }""")
+
+
 def run(base):
     name = seed_and_analyze(base, "Ledger Collapse")
     with sync_playwright() as p:
@@ -1083,6 +1303,7 @@ def run(base):
         check_seeded_scene_filter(page, lens)
         check_shelf_defers_and_one_pacing(page, lens, base, name)
         check_card_honesty_fields(page, lens, base)
+        check_report_honesty_surfaces(page, lens, base, name)
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

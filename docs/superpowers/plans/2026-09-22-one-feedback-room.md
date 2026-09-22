@@ -387,11 +387,27 @@ Measured (the P1 gate now photographs this surface): `03e_rule_popover_night` sh
 
 **Interfaces:** Consumes: `state.report` fields `model_used`, `errors`, `coverage.{genre,tone,strengths,comparable_films}`, `formatting_findings`, `character_reads[].confidence/scene_refs`. Produces: `buildFailureBanner(failedCategories, errors) -> HTMLElement | null`.
 
-- [ ] **Step 1: Failing e2e** — seed a report with `model_used`, `errors: ["dialogue: timeout"]`, `coverage.strengths`; assert: header shows the model id, banner shows "1 pass failed — rerun just that", "What's working" line renders the strength text (escaped).
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** all six renderings; every string through `escapeHtml`; banner retry button calls `retryFailedCategories()` (182). **Also (spec §14.2):** `findingNoteEl` gains a "📝 pin to notes" verb — POSTs `{scene_number, text: finding issue + quote, anchor: evidence_quote}` to the EXISTING `POST /api/projects/<name>/notes` endpoint and confirms with the note's toast; no new backend.
-- [ ] **Step 4: Gates** — `node --check`; e2e PASS; dawn register screenshot check (tokens only).
-- [ ] **Step 5: Commit** — `"P2.14: model_used, errors[] banner, coverage extras, strengths-first, read confidence, formatting section"`
+- [x] **Step 1: Failing e2e** — seed a report with `model_used`, `errors: ["dialogue: timeout"]`, `coverage.strengths`; assert: header shows the model id, banner shows "1 pass failed — rerun just that", "What's working" line renders the strength text (escaped).
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement** all six renderings; every string through `escapeHtml`; banner retry button calls `retryFailedCategories()` (182). **Also (spec §14.2):** `findingNoteEl` gains a "📝 pin to notes" verb — POSTs `{scene_number, text: finding issue + quote, anchor: evidence_quote}` to the EXISTING `POST /api/projects/<name>/notes` endpoint and confirms with the note's toast; no new backend.
+- [x] **Step 4: Gates** — `node --check`; e2e PASS; dawn register screenshot check (tokens only).
+- [x] **Step 5: Commit** — `"P2.14: model_used, errors[] banner, coverage extras, strengths-first, read confidence, formatting section"`
+
+**Deviations (T14).**
+- The arrival strip's inline retry block was **deleted**, not duplicated: `buildFailureBanner()` is now the only place a
+  failed-pass retry lives, so a stale "1 pass failed" cannot hover over a report the retry already fixed
+  (`retryFailedCategories` re-renders the lens in its `finally`). Task 16 therefore only has to add `.rerun-full`
+  to the banner and remove the desk-toolbar + drawer buttons.
+- The banner renders no count of its own — a second counter would be a second counting path (N3).
+- `verificationReadout()` is the ONE builder behind both `.dock-trust` renderings (arrival strip + script-mass
+  strip), fixing the two-denominator bug filed during P1 (100% vs 28% off the same report).
+- `character_reads[].confidence` is absent on real reports, so it renders only when the key exists — same rule as
+  the T13 verification note. `pinFindingToNotes` sits in the actions row, not `.finding-deep` (hover-only, so a
+  verb there can never be clicked); pin state is derived from `state.notes`, so it survives re-render and cannot
+  double-pin.
+- `tests/_p1_visual_gate.py` now photographs `.dock-report-model`, `.dock-working` and `.dock-fmt-row` and fails
+  if the model line prints a machine path, if either honesty surface is clipped, if a banner stands on a clean
+  report, or if the two verification readouts disagree.
 
 
 ### Task 15: Progress stage ladder (honest, heartbeat-driven)

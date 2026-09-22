@@ -460,8 +460,8 @@ def step_matrix():
         RESULTS["failed_categories"] = failed
         check("C: no failed categories on this script (quiet state honest)",
               failed == [], str(failed))
-        check("C: no inline retry button when nothing failed",
-              lens.locator(".dock-arrival-retry").count() == 0)
+        check("C: no failure banner when nothing failed or errored (quiet state)",
+              lens.locator(".failure-banner").count() == 0)
 
         # -- full-lens verdict shot ------------------------------------------
         shot(page, "A02-evidence-lens-full.png", full=True)
@@ -1037,8 +1037,8 @@ def step_cleanbill():
               lens.locator(".finding-note").count() == 0)
         check("clean bill: no mass strip claimed (nothing to weigh)",
               lens.locator(".dock-mass-strip").count() == 0)
-        check("clean bill: no retry button (nothing failed)",
-              lens.locator(".dock-arrival-retry").count() == 0)
+        check("clean bill: no failure banner (nothing failed, nothing errored)",
+              lens.locator(".failure-banner").count() == 0)
         shot(page, "C-clean-bill.png")
         check("clean bill: no JS errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

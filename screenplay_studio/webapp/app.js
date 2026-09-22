@@ -181,10 +181,10 @@ function updateDawnMeter() {
 }
 
 // ---- retry only the failed analysis categories (partial-report recovery) ----
-async function retryFailedCategories() {
+async function retryFailedCategories(anchor) {
   const btn = $("#retry-failed-btn");
   const deskBtn = $("#desk-retry-failed-btn"); // Phase 8: same action from the desk
-  const btns = [btn, deskBtn].filter(Boolean);
+  const btns = [btn, deskBtn, anchor].filter(Boolean);
   if (!btns.length || btns.every((b) => b.disabled)) return;
   btns.forEach((b) => { b.disabled = true; b.textContent = "Retrying…"; });
   const label = "⚠ Retry failed";
@@ -209,6 +209,10 @@ async function retryFailedCategories() {
       b.style.display = still ? "inline-block" : "none";
     });
     refreshDeskToolbar(); // the desk's status line reflects the merged report
+    // P2.14: the banner holding this button is part of the evidence lens, and it
+    // must go away with the failure it describes — a stale "1 pass failed" over a
+    // complete report is the UI lying about a report it already fixed.
+    if (anchor) renderDockEvidence();
   }
 }
 
@@ -4112,6 +4116,17 @@ function renderWriterMirrorPanel(container) {
     for (const r of reads) {
       const card = el("div", "wm-char");
       card.appendChild(el("div", "wm-char-name", r.character));
+      // spec §3: a read is a model's impression, and impressions vary in how sure
+      // the model was. Its own confidence and the scenes it drew on are the facts
+      // that let a writer weigh the sentence instead of swallowing it.
+      if (r.confidence != null) {
+        card.appendChild(el("span", "wm-confidence",
+          "\u25D0 " + Math.round(r.confidence * 100) + "% sure"));
+      }
+      if ((r.scene_refs || []).length) {
+        card.appendChild(el("span", "wm-scenes",
+          "read from " + r.scene_refs.map((n) => "S" + n).join(", ")));
+      }
       const lines = [
         ["Reads as", r.how_reads],
         ["Apparent intent", r.apparent_intent],
@@ -4492,6 +4507,19 @@ function findingNoteEl(f, index, opts = {}) {
     why.title = "Ask Dr. Sushruta why this was flagged — the finding rides along";
     why.addEventListener("click", (e) => { e.stopPropagation(); discussWithDoctor(f, index); });
     actions.appendChild(why);
+    // spec §14.2: the desk's one-way doors were copy and Discuss. A finding worth
+    // keeping is worth a margin note — the writer's own store, on the finding's
+    // scene, quoting the same evidence. No new backend: this is the endpoint the
+    // rail's note composer already posts to.
+    const pin = el("button", "finding-pin-btn", "\uD83D\uDCDD pin");
+    pin.type = "button";
+    pin.title = "Keep this finding as a margin note on its scene — issue and quote";
+    pin.addEventListener("click", (e) => {
+      e.stopPropagation();
+      pinFindingToNotes(f, pin);
+    });
+    paintPinState(pin, f);
+    actions.appendChild(pin);
   }
   const locateBtn = el("button", "", "🎯 Locate");
   locateBtn.type = "button";
@@ -4538,6 +4566,50 @@ function findingNoteEl(f, index, opts = {}) {
 }
 
 // ---- writer's margin notes ----
+
+/** Does one of the writer's notes already carry this finding? Matched on the
+ *  issue text the pin writes, so the button's state comes from the note store
+ *  rather than from a label set at click time — a re-render cannot un-pin it,
+ *  and the same finding cannot be pinned twice by accident. */
+function noteCoversFinding(f) {
+  const issue = String((f && f.issue) || "");
+  if (!issue) return false;
+  return (state.notes || []).some((n) => (n.text || "").indexOf(issue) === 0);
+}
+
+function paintPinState(btn, f) {
+  const pinned = noteCoversFinding(f);
+  btn.textContent = pinned ? "\uD83D\uDCDD pinned" : "\uD83D\uDCDD pin";
+  btn.disabled = pinned;
+  btn.title = pinned
+    ? "This finding is already in your margin notes"
+    : "Keep this finding as a margin note on its scene \u2014 issue and quote";
+}
+
+/** spec §14.2: the desk had one-way doors — copy a finding, or argue with it.
+ *  A finding worth keeping is worth a note in the writer's own store, on the
+ *  finding's scene, quoting the same evidence. The rail's composer posts to this
+ *  exact endpoint already, so no new backend is involved. */
+async function pinFindingToNotes(f, btn) {
+  if (!state.currentProject || noteCoversFinding(f)) return;
+  const refs = f.scene_refs || [];
+  const issue = String(f.issue || "Finding").trim();
+  const quote = String(f.evidence_quote || "").trim();
+  try {
+    await api(`/projects/${encodeURIComponent(state.currentProject)}/notes`, {
+      method: "POST",
+      body: JSON.stringify({
+        scene_number: refs.length ? refs[0] : null,
+        text: issue + (quote ? " \u2014 \u201C" + quote + "\u201D" : ""),
+        anchor: quote || null,
+      }),
+    });
+    await reloadNotesAndRender();
+    if (btn) paintPinState(btn, f);
+  } catch (e) {
+    showError("Couldn't pin the finding: " + e.message);
+  }
+}
 
 async function reloadNotesAndRender() {
   try {
@@ -5423,6 +5495,20 @@ function renderDockEvidence() {
   const arrival = buildArrivalStrip();
   if (arrival) lens.appendChild(arrival);
 
+  // -- 0c. strengths first (spec §6): the desk only ever arrived holding its
+  // complaints, so praise the analysis had already written stayed buried in the
+  // coverage section below. This is that list, rendered once, up front.
+  const working = buildWhatsWorking();
+  if (working) lens.appendChild(working);
+
+  // -- 0d. which model wrote this, and what it could not finish (spec §3) -----
+  const proj = (state.projects || []).find((p) => p.project === state.currentProject);
+  const banner = buildFailureBanner((proj && proj.failed_categories) || [],
+    (state.report && state.report.errors) || []);
+  if (banner) lens.appendChild(banner);
+  const modelLine = buildReportModelLine();
+  if (modelLine) lens.appendChild(modelLine);
+
   // -- 0a. the ONE filter row (R5-b + R8): severity toggles drive ink,
   // board list, loop and counts together; category chips count and filter —
   // tap = filtered view, NO regrouping. The loop button engages the
@@ -5567,7 +5653,18 @@ function renderDockEvidence() {
     const sec = dockSection("coverage",
       `Coverage — ${(cov.recommendation || "").toUpperCase()}`, (inner) => {
         if (cov.logline) inner.appendChild(el("p", "dock-cov-logline", cov.logline));
+        // The coverage pass answers more than "what is wrong": what it thinks the
+        // script IS (genre/tone) and what it would sit beside. The desk dropped all
+        // three, so the section's header oversold what it actually showed.
+        if (cov.genre || cov.tone) {
+          inner.appendChild(el("p", "dock-cov-frame",
+            [cov.genre, cov.tone].filter(Boolean).join(" \u00B7 ")));
+        }
         (cov.weaknesses || []).forEach((w) => inner.appendChild(el("p", "dock-cov-weak", "• " + w)));
+        if ((cov.comparable_films || []).length) {
+          inner.appendChild(el("p", "dock-cov-films",
+            "Comparable films \u2014 " + cov.comparable_films.join(", ")));
+        }
         // Evidence depth (§5 item 4): how much of this report read the pages, and how
         // much read a model-written summary of them. Absent on reports analysed before
         // the field existed, so it is rendered only when present.
@@ -5609,6 +5706,25 @@ function renderDockEvidence() {
         inner.appendChild(row);
       });
     }));
+  }
+
+  // -- 6b. Formatting -------------------------------------------------------
+  // These rows were in the report all along, but only in the exported markdown:
+  // the desk never read `formatting_findings` at all. They are also the one array
+  // no model wrote, so the header says so — otherwise a measurement borrows the
+  // findings' authority and the writer cannot tell the two kinds apart.
+  const fmt = state.report && state.report.formatting_findings;
+  if (fmt && fmt.length) {
+    lens.appendChild(dockSection("formatting",
+      "Formatting \u2014 deterministic checks, not model judgment", (inner) => {
+        fmt.forEach((e2) => {
+          const scenes = (e2.scene_refs || []).map((n) => "S" + n).join(", ") || "script-wide";
+          const row = el("p", "dock-fmt-row",
+            `[${(e2.severity || "low").toUpperCase()}] ${scenes} \u2014 ${e2.message || e2.rule}`);
+          if (e2.rule) row.appendChild(el("span", "dock-fmt-rule", e2.rule));
+          inner.appendChild(row);
+        });
+      }));
   }
 
   // -- 7. Pacing + Characters + Dials + Writer's Mirror ----------------------
@@ -5802,6 +5918,26 @@ function clearEvidenceUnread() {
 // writer edits — the scope chip says so on-screen, and the draft clause carries
 // the working-copy truth (observed "addressed") that used to be missing here.
 // Ghosted marks expand to a muted list — never red, in no open count (R9).
+/** The trust line, under ONE denominator rule: only findings that carry a quote
+ *  can be verified, so `no_quote` never sits in the denominator (UI audit
+ *  2026-09-20, defect #10 — the demo report used to read "0 of 6 verified (0%)"
+ *  when there was nothing to check). Both orientation strips print this string;
+ *  two honest-looking numbers that disagree is how a writer stops trusting both. */
+function verificationReadout() {
+  const vs = state.report && state.report.verification_summary;
+  if (!vs) return null;
+  const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
+  const unquoted = vs.no_quote || 0;
+  if (checkable) {
+    return (vs.verified || 0) + " of " + checkable + " quotes verified ("
+      + Math.round(100 * (vs.verified || 0) / checkable) + "%)"
+      + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "");
+  }
+  return unquoted
+    ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"
+    : null;
+}
+
 function buildArrivalStrip() {
   const lp = state.lastPass;
   if (!lp || !lp.computed_at) return null;
@@ -5857,40 +5993,17 @@ function buildArrivalStrip() {
   }
   scope.title = "These compare one analysis pass to the previous one. They never respond to your edits \u2014 your own progress rides beside them.";
   head.appendChild(scope);
-  const vs = state.report && state.report.verification_summary;
-  if (vs) {
-    const vTotal = (vs.verified || 0) + (vs.not_found || 0) + (vs.no_quote || 0) + (vs.scene_not_found || 0);
-    if (vTotal) head.appendChild(el("span", "dock-trust",
-      (vs.verified || 0) + " of " + vTotal + " quotes verified (" + Math.round(100 * (vs.verified || 0) / vTotal) + "%)"));
-  }
+  // Two surfaces used to print this number with two different denominators — the
+  // arrival strip counted every finding, the strip below counted only the ones
+  // that carry a quote. Same report, 28% against 100%: the writer cannot tell
+  // which to believe, so neither survives. One builder, both readers.
+  const trust = verificationReadout();
+  if (trust) head.appendChild(el("span", "dock-trust", trust));
   strip.appendChild(head);
-  // inline retry (N2): the moment a partial arrival is seen is the moment it's
-  // fixed. Kept OUTSIDE the collapsed detail below on purpose — a partially
-  // failed analysis is exactly when the affordance must not be one click away
-  // behind a summary. The ghosted list beside it already is collapsed.
-  const projSummary = (state.projects || []).find((p) => p.project === state.currentProject);
-  const failed = (projSummary && projSummary.failed_categories) || [];
-  if (failed.length) {
-    const retry = el("button", "dock-arrival-retry");
-    retry.type = "button";
-    retry.textContent = "Retry failed (" + failed.length + ")";
-    retry.title = "Re-run only the failed categories — the report merges";
-    retry.addEventListener("click", async () => {
-      retry.disabled = true;
-      retry.textContent = "Retrying\u2026";
-      try {
-        await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/retry-failed`, { method: "POST" });
-        await loadScriptData();
-        renderDockEvidence();
-        renderManuscript();
-      } catch (e) {
-        retry.disabled = false;
-        retry.textContent = "Retry failed";
-        showError("Retry failed: " + e.message);
-      }
-    });
-    strip.appendChild(retry);
-  }
+  // The retry this block used to hold moved into buildFailureBanner (P2.14,
+  // spec §3): a partially failed report now names the passes that errored AND
+  // offers the cheap rerun in ONE place — still outside every collapsed
+  // section, so N2's rule (fix it the moment you see it) survives the move.
   // ghosted: the writer's marks that transformed — muted, expandable, never red
   const ghosted = lp.ghosted_marks || [];
   if (ghosted.length) {
@@ -5907,6 +6020,63 @@ function buildArrivalStrip() {
   return strip;
 }
 
+// P2.14 (spec §3): the report has always carried the facts about itself the desk
+// dropped — which model wrote it, which passes errored, what the coverage pass
+// liked. Each builder below returns null when the report has nothing to say, so a
+// report without the field renders exactly what it rendered before.
+function buildReportModelLine() {
+  const model = state.report && state.report.model_used;
+  if (!model) return null;
+  // The status strip names the model CONFIGURED NOW, which on a reopened project
+  // may never have read this script. The basename is the half worth reading, and
+  // a model id is a Windows path as often as it is a name.
+  const m = String(model);
+  const cut = Math.max(m.lastIndexOf(String.fromCharCode(92)), m.lastIndexOf("/"));
+  const line = el("p", "dock-report-model",
+    "\u2699 analysed by " + (cut >= 0 ? m.slice(cut + 1) : m));
+  line.title = "The model that wrote this report. The status strip shows the model"
+    + " configured right now, which is not always the same one.";
+  return line;
+}
+
+function buildWhatsWorking() {
+  const cov = (state.report && state.report.coverage) || {};
+  const strengths = cov.strengths || [];
+  if (!strengths.length) return null;
+  const box = el("div", "dock-working");
+  box.appendChild(el("span", "dock-working-head",
+    "What\u2019s working (" + strengths.length + ")"));
+  strengths.forEach((s) => box.appendChild(el("p", "dock-working-row", "\u2022 " + s)));
+  box.title = "What the analysis thought already holds. These are not findings and"
+    + " join no count — the numbers on the strip above stay untouched.";
+  return box;
+}
+
+function buildFailureBanner(failedCategories, errors) {
+  const failed = failedCategories || [];
+  const errs = errors || [];
+  if (!failed.length && !errs.length) return null;
+  const box = el("div", "failure-banner");
+  const plural = (n, word) => n + " " + word + (n > 1 ? "es" : "");
+  box.appendChild(el("p", "failure-banner-head", failed.length
+    ? plural(failed.length, "pass") + " failed \u2014 rerun just that"
+    : plural(errs.length, "pass") + " reported a problem \u2014 nothing was skipped"));
+  if (failed.length) {
+    box.appendChild(el("p", "failure-banner-scope",
+      "Skipped: " + failed.join(", ") + ". Every finding below came from a pass that"
+      + " finished — a failed one leaves no gap you would notice, which is why the"
+      + " rerun sits here rather than in a section you have to open."));
+    const btn = el("button", "rerun-failed",
+      "Rerun the " + plural(failed.length, "pass") + " \u2014 fast");
+    btn.type = "button";
+    btn.title = "Your good findings stay exactly as worded. Re-running the whole"
+      + " analysis is the slower option, and it re-words everything.";
+    btn.addEventListener("click", () => { retryFailedCategories(btn); });
+    box.appendChild(btn);
+  }
+  errs.forEach((e2) => box.appendChild(el("p", "failure-banner-error", String(e2))));
+  return box;
+}
 // ---------- the keyboard fix loop (R2-b, contextual keys per 2A) ----------
 // When engaged, N/↓ step findings and P/↑ steps back — scene-stepping
 // muscle memory is untouched the moment the loop exits (Esc).
@@ -6268,25 +6438,9 @@ function buildScriptMassStrip() {
   const mText = m.open + " open of " + m.total + " findings" +
     (m.shown < m.total ? " \u00B7 " + m.openShown + " shown by filter" : "");
   head.appendChild(el("span", "dock-mass-total", mText));
-  // Trust readout: only findings that CARRY a quote can be verified, so
-  // `no_quote` findings must not sit in the denominator. Counting them turned
-  // the demo report (every finding no_quote) into a red-looking "0 of 6 quotes
-  // verified (0%)" — which reads as the analysis failing rather than as "there
-  // was nothing to check" (UI audit 2026-09-20, defect #10).
-  const vs = state.report && state.report.verification_summary;
-  if (vs) {
-    const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
-    const unquoted = vs.no_quote || 0;
-    if (checkable) {
-      const pct = Math.round(100 * (vs.verified || 0) / checkable);
-      head.appendChild(el("span", "dock-trust",
-        (vs.verified || 0) + " of " + checkable + " quotes verified (" + pct + "%)" +
-        (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "")));
-    } else if (unquoted) {
-      head.appendChild(el("span", "dock-trust",
-        unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"));
-    }
-  }
+  // Trust readout — the same string the arrival strip prints, from one builder.
+  const trust = verificationReadout();
+  if (trust) head.appendChild(el("span", "dock-trust", trust));
   strip.appendChild(head);
   // severity mass: dots + printed counts — never color-alone
   const mass = el("div", "dock-mass-sev");
