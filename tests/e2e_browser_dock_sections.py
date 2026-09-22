@@ -19,11 +19,13 @@ Run:  python tests/e2e_browser_dock_sections.py   (boots its own demo studio;
       set E2E_BASE to reuse an already-running one)
 """
 import os
+import re
 
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, clicked, launch, note, open_studio
+from e2e_browser_common import (Checks, clicked, launch, note,  # noqa: E402
+                                open_dock_section, open_studio)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -110,6 +112,351 @@ def seconds(value):
         return None
     return None
 
+
+
+# ---------------------------------------------------------------------------
+# P1.7 (plan Task 7; spec §5 + §14.3): the scene is a FILTER dimension, never a
+# surface of its own. Three claims, three different questions:
+#   1. the This-scene chip prints the scope of the count it carries (the N3
+#      counting contract: no count without the scope it describes) and turns the
+#      ONE filter's scene clause on/off — the live list AND the page ink narrow
+#      together, and clearing restores both;
+#   2. the DEFAULT stays the whole ledger, all live findings, highs first,
+#      grouped by category (red-team W2: a scene-scoped default renders a dead
+#      panel on clean scenes and hides cross-scene crown jewels);
+#   3. a scene with zero LIVE findings shows the rail's quiet ✓ (spec §14.3),
+#      derived from findingDisposition — never a second counter.
+# ---------------------------------------------------------------------------
+SCENE_CHIP = ".fchip-scene"
+LIVE_LIST = '.dock-section[data-key="by-category"]'
+
+# The ledger, asked of the app itself (the gun-pen audit's row-C pattern): how
+# many findings are OPEN on `scene`, null meaning the whole script? Counted
+# through the app's own contract function — never a second counter in the test —
+# under the severity rule the default chips apply, so the number is directly
+# comparable with the DOM counts below.
+OPEN_ON_SCENE_JS = """(scene) => {
+  const sevs = ["high", "medium", "low"];
+  let n = 0;
+  (state.findings || []).forEach((f, i) => {
+    if (findingDisposition(f, i) !== "open") return;
+    if (!sevs.includes(((f && f.severity) || "low").toLowerCase())) return;
+    if (scene == null) { n += 1; return; }
+    const refs = (f && f.scene_refs) || [];
+    if (refs.includes(scene) || refs.includes(String(scene))) n += 1;
+  });
+  return n;
+}"""
+
+# Ink, tagged with the scene page that owns it. A bare count of .finding-ink
+# cannot answer "did the page narrow?" — the ancestor scene page can.
+INK_BY_SCENE_JS = """() => {
+  const out = {};
+  document.querySelectorAll("#manuscript-container .finding-ink").forEach((m) => {
+    const sp = m.closest(".scene-page");
+    const n = sp ? sp.dataset.sceneNumber : "?";
+    out[n] = (out[n] || 0) + 1;
+  });
+  return out;
+}"""
+
+# Two real lines of text per scene, straight out of the rendered manuscript, so
+# the seeded findings below can quote them and the page REALLY inks (the demo
+# report carries almost no quotes — this fixture is about the filter, not the
+# model). Distinct, non-nested lines only: one mark per line.
+SEED_LINES_JS = """(scenes) => {
+  const out = {};
+  for (const n of scenes) {
+    const sp = document.querySelector(
+      '#manuscript-container .scene-page[data-scene-number="' + n + '"]');
+    if (!sp) continue;
+    const picks = [];
+    for (const l of sp.querySelectorAll(".el-action, .el-dialogue")) {
+      const t = (l.textContent || "").trim();
+      if (t.length < 14) continue;
+      if (picks.some((p) => p.includes(t) || t.includes(p))) continue;
+      picks.push(t);
+      if (picks.length === 2) break;
+    }
+    out[n] = picks;
+  }
+  return out;
+}"""
+
+# Replace the ledger with a fixture this suite owns end to end: two scenes, two
+# open findings each, every finding quoting a line that exists (phase13's
+# seeding pattern — no model, no server round trip). state.report.findings is
+# the dock's source and state.findings the page's, so both move together.
+SEED_JS = """(args) => {
+  const mk = (cat, sev, scene, quote, issue) => ({
+    category: cat, severity: sev, scene_refs: [scene], issue: issue,
+    description: issue + " (seeded for the scene-filter fixture)",
+    evidence_quote: quote,
+  });
+  const a = args.a, b = args.b;
+  const fs = [
+    mk("dialogue", "low", a.scene, a.lines[0], "SEED low dialogue on " + a.scene),
+    mk("dialogue", "high", a.scene, a.lines[1], "SEED high dialogue on " + a.scene),
+    mk("pacing", "medium", b.scene, b.lines[0], "SEED medium pacing on " + b.scene),
+    mk("structure", "low", b.scene, b.lines[1], "SEED low structure on " + b.scene),
+  ];
+  state.findings = fs;
+  state.report = Object.assign({}, state.report || {}, { findings: fs });
+  state.findingIds = fs.map((f) => computeFindingId(f));
+  state.findingStatus = {};
+  state.findingMarks = {};
+  state.ghostedIds = new Set();
+  state.fixQueue = state.fixQueue || {};
+  state.fixQueue.dismissed_flags = [];
+  refreshAllFindingSurfaces(); // the ONE re-render entry point (P0.4)
+  return { ids: state.findingIds };
+}"""
+
+# The rail's marks, as the writer sees them: a clean ✓, or severity dots?
+RAIL_MARKS_JS = """() => {
+  return [...document.querySelectorAll("#scene-index-list .scene-index-item")].map((it) => {
+    const clean = it.querySelector(".scene-index-clean");
+    return {
+      scene: it.dataset.sceneNumber,
+      clean: !!clean,
+      cleanLabel: clean ? (clean.getAttribute("aria-label") || "") : null,
+      dots: it.querySelectorAll(".scene-index-dots .dot").length,
+      aria: it.getAttribute("aria-label") || "",
+    };
+  });
+}"""
+
+# The cards of one category group, in render order — the highs-first contract.
+GROUP_CARDS_JS = """(label) => {
+  const sec = document.querySelector(
+    '.dock-lens[data-lens="evidence"] .dock-section[data-key="by-category"]');
+  if (!sec) return null;
+  const group = [...sec.querySelectorAll(".dock-cat-group")]
+    .find((g) => {
+      const t = g.querySelector(".dock-section-title");
+      return t && (t.textContent || "").toLowerCase().includes(label.toLowerCase());
+    });
+  if (!group) return null;
+  return [...group.querySelectorAll(".finding-note .finding-note-text")]
+    .map((n) => (n.textContent || "").trim());
+}"""
+
+
+def chip_label(lens):
+    """The This-scene chip's printed label ("" when the chip is missing)."""
+    chip = lens.locator(SCENE_CHIP)
+    return (chip.first.inner_text() or "").strip() if chip.count() else ""
+
+
+def live_cards(lens):
+    """Cards in the ledger's live list — the default all-live-findings section."""
+    return lens.locator(LIVE_LIST + " .finding-note").count()
+
+
+def mass_strip_text(lens):
+    strip = lens.locator(".dock-mass-total")
+    return (strip.first.inner_text() or "").strip() if strip.count() else ""
+
+
+def click_scene_chip(page, lens):
+    """Bounded click: False when the chip could not be clicked (never raises)."""
+    try:
+        lens.locator(SCENE_CHIP).first.click(timeout=6000)
+    except Exception:
+        return False
+    page.wait_for_timeout(400)  # the full re-render (dock + page + chips)
+    return True
+
+
+def check_scene_filter(page, lens):
+    """P1.7 — scene as a FILTER, on the report the app actually analysed.
+
+    The label's scope contract plus the narrowing itself, on real data: no
+    fixture. The ink half asserts that every mark still on the page lives in the
+    current scene (the demo report quotes almost nothing, so exact ink==list
+    parity belongs to the seeded pass below).
+    """
+    chip = lens.locator(SCENE_CHIP)
+    check("P1.7: the ONE filter row carries a This-scene chip",
+          chip.count() == 1, f"{chip.count()} .fchip-scene")
+    scene = page.evaluate("() => currentManuscriptScene()")
+    check("P1.7: the desk knows which scene the writer is on",
+          scene is not None, f"currentManuscriptScene()={scene!r}")
+    if scene is None:
+        return
+    check("P1.7: the ledger's live list is open", open_dock_section(page, "by-category"))
+
+    whole_ledger = page.evaluate(OPEN_ON_SCENE_JS, None)
+    whole_cards = live_cards(lens)
+    off_label = chip_label(lens)
+    check("P1.7: chip off — the label prints the scope of its count ('N open')",
+          re.match(r"^This scene \u00b7 \d+ open$", off_label) is not None, off_label)
+    check("P1.7: the DEFAULT ledger is every live finding, not the current scene's "
+          "(red-team W2)",
+          whole_cards == whole_ledger and whole_ledger > 0,
+          f"cards={whole_cards} ledger={whole_ledger}")
+    check("P1.7: with no scene set the mass strip claims no narrowing",
+          "shown by filter" not in mass_strip_text(lens), mass_strip_text(lens))
+
+    scoped = page.evaluate(OPEN_ON_SCENE_JS, scene)
+    ink_before = page.evaluate(INK_BY_SCENE_JS)
+    check("P1.7: this scene holds some of the ledger, not all of it (so narrowing "
+          "is provable here)",
+          scoped < whole_ledger, f"scene={scene} scoped={scoped} whole={whole_ledger}")
+
+    check("P1.7: clicking the chip lands", click_scene_chip(page, lens))
+    on_label = chip_label(lens)
+    check("P1.7: chip on — the label prints the scene scope ('N open on this scene')",
+          re.match(r"^This scene \u00b7 %d open on this scene$" % scoped,
+                   on_label) is not None, on_label)
+    check("P1.7: the dock's live list narrows to the current scene",
+          live_cards(lens) == scoped, f"cards={live_cards(lens)} scoped={scoped}")
+    ink_after = page.evaluate(INK_BY_SCENE_JS)
+    check("P1.7: the page ink narrows with it — every mark left is in this scene",
+          sum(ink_after.values()) == ink_after.get(str(scene), 0)
+          and sum(ink_after.values()) <= sum(ink_before.values()),
+          f"before={ink_before} after={ink_after}")
+    check("P1.7: the mass strip now labels its narrowed count",
+          "shown by filter" in mass_strip_text(lens), mass_strip_text(lens))
+    check("P1.7: the filter state carries the scene number",
+          page.evaluate("() => state.findingFilter.scene") == scene,
+          page.evaluate("() => state.findingFilter.scene"))
+
+    check("P1.7: clicking again clears the scene clause", click_scene_chip(page, lens))
+    check("P1.7: the label stops claiming a scene scope",
+          re.match(r"^This scene \u00b7 \d+ open$", chip_label(lens)) is not None,
+          chip_label(lens))
+    check("P1.7: and the whole ledger is back",
+          live_cards(lens) == whole_cards, f"cards={live_cards(lens)} whole={whole_cards}")
+    check("P1.7: the filter state is null again (cleared, not parked)",
+          page.evaluate("() => state.findingFilter.scene") is None,
+          page.evaluate("() => state.findingFilter.scene"))
+
+
+# The writer's own navigation, done by hand: land scene `n` in the middle of the
+# viewport so `currentManuscriptScene()` — the scene the chip scopes to — is
+# that scene. Rect math, not offsetTop: the container's offsetParent is not part
+# of the contract.
+SCROLL_TO_SCENE_JS = """(n) => {
+  const c = document.getElementById("manuscript-container");
+  const sp = c && c.querySelector('.scene-page[data-scene-number="' + n + '"]');
+  if (!c || !sp) return null;
+  const delta = sp.getBoundingClientRect().top - c.getBoundingClientRect().top
+    - Math.round(c.clientHeight / 2) + 40;
+  c.scrollTop = Math.max(0, c.scrollTop + delta);
+  return currentManuscriptScene();
+}"""
+
+
+def check_seeded_scene_filter(page, lens):
+    """P1.7 — the seeded fixture: ink/list parity in both states, highs first,
+    and the rail's clean-scene ✓ (spec §14.3, findingDisposition-driven)."""
+    scene_a = page.evaluate("() => currentManuscriptScene()")
+    check("P1.7/seed: the current scene is known", scene_a is not None, f"{scene_a!r}")
+    if scene_a is None:
+        return
+    numbers = page.evaluate(
+        "() => ((state.script && state.script.scenes) || []).map((s) => s.scene_number)")
+    lines_map = page.evaluate(SEED_LINES_JS, numbers) or {}
+    rich = [n for n in numbers if len(lines_map.get(str(n)) or []) >= 2]
+    check("P1.7/seed: the fixture offers two scenes with two quotable lines each",
+          len(rich) >= 2, f"scenes={numbers} rich={rich}")
+    if len(rich) < 2:
+        return
+    scene_a, scene_b = rich[0], rich[1]
+    scene_c = next((n for n in numbers
+                    if str(n) not in (str(scene_a), str(scene_b))), None)
+    if scene_c is None:
+        check("P1.7/seed: the fixture has a third scene to leave clean", False,
+              f"scenes={numbers}")
+        return
+    landed = page.evaluate(SCROLL_TO_SCENE_JS, scene_a)
+    page.wait_for_timeout(350)
+    a_lines, b_lines = lines_map.get(str(scene_a)) or [], lines_map.get(str(scene_b)) or []
+    check("P1.7/seed: scrolling lands the desk on scene A (the scene the chip scopes to)",
+          str(landed) == str(scene_a), f"landed on {landed!r}, wanted {scene_a!r}")
+
+    seeded = page.evaluate(SEED_JS, {"a": {"scene": scene_a, "lines": a_lines},
+                                     "b": {"scene": scene_b, "lines": b_lines}}) or {}
+    page.wait_for_timeout(400)
+    ids = seeded.get("ids") or []
+    check("P1.7/seed: the fixture ledger is in place (4 open findings across 2 scenes)",
+          page.evaluate(OPEN_ON_SCENE_JS, None) == 4, f"ids={ids}")
+    # the ledger re-render collapses the manuscript scroll — the writer scrolls
+    # back to the scene they were reading, and THAT is the scene "this scene"
+    # means when the chip is clicked.
+    relanded = page.evaluate(SCROLL_TO_SCENE_JS, scene_a)
+    page.wait_for_timeout(350)
+    check("P1.7/seed: after the re-render the desk is back on scene A",
+          str(relanded) == str(scene_a), f"landed on {relanded!r}, wanted {scene_a!r}")
+    check("P1.7/seed: the live section is open", open_dock_section(page, "by-category"))
+
+    cards = live_cards(lens)
+    ink = page.evaluate(INK_BY_SCENE_JS)
+    check("P1.7/seed: chip off — the list is EVERY live finding (both scenes)",
+          cards == 4, f"cards={cards}")
+    check("P1.7/seed: chip off — the ink count equals the list count",
+          sum(ink.values()) == cards == 4, f"ink={ink} cards={cards}")
+    check("P1.7/seed: and the ink is split across both scenes",
+          ink.get(str(scene_a)) == 2 and ink.get(str(scene_b)) == 2, f"ink={ink}")
+
+    group = page.evaluate(GROUP_CARDS_JS, "Dialogue") or []
+    check("P1.7: the live groups read highs first",
+          len(group) == 2 and group[0].startswith("SEED high")
+          and group[1].startswith("SEED low"), f"{group}")
+
+    check("P1.7/seed: clicking the chip lands", click_scene_chip(page, lens))
+    cards_on = live_cards(lens)
+    ink_on = page.evaluate(INK_BY_SCENE_JS)
+    check("P1.7/seed: chip on — the list narrows to the current scene's two findings",
+          cards_on == 2, f"cards={cards_on}")
+    check("P1.7/seed: chip on — the ink narrows IDENTICALLY (ink count == list count)",
+          sum(ink_on.values()) == cards_on == 2
+          and ink_on.get(str(scene_a)) == 2 and str(scene_b) not in ink_on,
+          f"ink={ink_on} cards={cards_on}")
+    check("P1.7/seed: chip on — the label prints the scene scope",
+          re.match(r"^This scene \u00b7 2 open on this scene$", chip_label(lens)) is not None,
+          chip_label(lens))
+
+    cleared = click_scene_chip(page, lens)
+    back_ink = page.evaluate(INK_BY_SCENE_JS)
+    check("P1.7/seed: clearing restores the list and the ink together",
+          cleared and live_cards(lens) == 4 and sum(back_ink.values()) == 4,
+          f"cards={live_cards(lens)} ink={back_ink}")
+
+    # --- spec §14.3: the rail's clean-scene ✓ ------------------------------
+    marks = {m["scene"]: m for m in page.evaluate(RAIL_MARKS_JS)}
+    a = marks.get(str(scene_a)) or {}
+    b = marks.get(str(scene_b)) or {}
+    c = marks.get(str(scene_c)) or {}
+    check("P1.7/rail: a scene with live findings keeps its severity dots — no ✓",
+          a.get("clean") is False and a.get("dots", 0) >= 1
+          and b.get("clean") is False and b.get("dots", 0) >= 1,
+          f"scene {scene_a}={a} scene {scene_b}={b}")
+    check("P1.7/rail: a scene with ZERO live findings shows the quiet ✓ instead",
+          c.get("clean") is True and c.get("dots", 0) == 0, f"scene {scene_c}={c}")
+    check("P1.7/rail: the ✓ is labelled (aria), not just painted",
+          c.get("cleanLabel") == "No live findings"
+          and "no live findings" in (c.get("aria") or "").lower(),
+          f"glyph={c.get('cleanLabel')!r} item aria={c.get('aria')!r}")
+
+    # The ✓ must read findingDisposition: mark scene B's two findings addressed
+    # and its dots have to become the ✓ in the same gesture.
+    marked = page.evaluate(
+        """(ids) => {
+             ids.forEach((id) => { state.findingMarks[id] = "addressed"; });
+             refreshAllFindingSurfaces();
+             return Object.keys(state.findingMarks).length;
+           }""", ids[2:])
+    page.wait_for_timeout(300)
+    marks2 = {m["scene"]: m for m in page.evaluate(RAIL_MARKS_JS)}
+    b2 = marks2.get(str(scene_b)) or {}
+    a2 = marks2.get(str(scene_a)) or {}
+    check("P1.7/rail: addressed findings stop being live — the ✓ follows "
+          "findingDisposition, never a second counter",
+          marked == 2 and b2.get("clean") is True and b2.get("dots", 0) == 0
+          and a2.get("clean") is False,
+          f"marks={marked} scene {scene_b}={b2} scene {scene_a}={a2}")
 
 
 def run(base):
@@ -258,6 +605,10 @@ def run(base):
         animated = transition_duration(page, body_sel)
         check("with motion allowed the collapse animates (height transition present)",
               (seconds(animated) is not None and seconds(animated) >= 0.1), animated)
+
+        # --- 7. P1.7: the scene is a FILTER, not a surface (contracts above) --
+        check_scene_filter(page, lens)
+        check_seeded_scene_filter(page, lens)
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

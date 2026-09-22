@@ -5664,6 +5664,19 @@ body:not(.idea-mode) #manuscript-workspace {
   border: 1.5px solid var(--ok);
   box-sizing: border-box;
 }
+/* spec §14.3 — the clean-scene check. A scene with zero live findings shows a
+   quiet ✓ exactly where its severity dots would sit, so the rail reads as a
+   progress map and not just a map of problems. Same flex slot + 8px box as the
+   dots (the column of marks stays aligned). Uses the --ok token the dock's own
+   "clean — no open findings" line uses, softened to stay ambient. */
+.scene-index-clean {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: var(--fs-2xs);
+  line-height: 1;
+  color: var(--ok);
+  opacity: 0.65;
+}
 .scene-index-empty {
   padding: var(--sp-6) var(--sp-3);
   font-size: var(--fs-xs);

@@ -29,7 +29,7 @@ const state = {
   // destroyed trust in every number. Show the ledger whole; the writer narrows
   // with the chips. Page ink stays naturally sparse because a finding can only
   // ink when it carries a quote (most findings are no_quote).
-  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, category: null },
+  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, category: null, scene: null },
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
@@ -4788,16 +4788,29 @@ function renderManuscript(container) {
 
 let sceneIndexRAF = null;
 
+/** Per-scene LIVE aggregate (spec §14.3): `high/medium/low` drive the severity
+ *  dots, `live` is every open finding on the scene whatever its severity — the
+ *  number the clean-scene ✓ is decided on. Both come from the SAME pass over
+ *  findingDisposition (findingOpen), so the rail can never disagree with the
+ *  ledger about what is still live. */
 function sceneIndexSeverity(sceneNumber) {
-  const counts = { high: 0, medium: 0, low: 0 };
+  const counts = { high: 0, medium: 0, low: 0, live: 0 };
   (state.findings || []).forEach((f, index) => {
     if (!findingOpen(f, index)) return;
     const refs = (f.scene_refs && f.scene_refs.length) ? f.scene_refs : (f.scene ? [f.scene] : []);
     if (!refs.includes(sceneNumber)) return;
+    counts.live += 1;
     const sev = (f.severity || "low").toLowerCase();
     if (counts[sev] != null) counts[sev] += 1;
   });
   return counts;
+}
+
+/** Has this script been analysed? The clean-scene ✓ is a claim ABOUT the
+ *  analysis, so it may only be made once a report exists — otherwise every
+ *  scene of an unanalyzed script would read as "nothing live here". */
+function scriptAnalyzed() {
+  return !!(state.report && ((state.report.findings || []).length || state.report.coverage));
 }
 
 function renderSceneIndex() {
@@ -4816,13 +4829,27 @@ function renderSceneIndex() {
     item.setAttribute("tabindex", "0");
     const counts = sceneIndexSeverity(scene.scene_number);
     const total = counts.high + counts.medium + counts.low;
+    // spec §14.3: a scene with zero LIVE findings shows a quiet ✓ where its
+    // severity dots would be — the rail becomes a progress map, not a map of
+    // problems. `live` is the same findingDisposition pass the dots come from
+    // (never a second counter), and only an analysed script may claim it.
+    const clean = scriptAnalyzed() && counts.live === 0;
     const label = (scene.heading_raw || `Scene ${scene.scene_number}`) +
-      (total ? ` — ${total} open finding${total === 1 ? "" : "s"} (${counts.high} high · ${counts.medium} medium · ${counts.low} low)` : "");
+      (clean ? " \u2014 no live findings"
+        : (total ? ` — ${total} open finding${total === 1 ? "" : "s"} (${counts.high} high · ${counts.medium} medium · ${counts.low} low)` : ""));
     item.title = label;
     item.setAttribute("aria-label", label);
     item.appendChild(el("span", "scene-index-num", String(scene.scene_number)));
     item.appendChild(el("span", "scene-index-head", (scene.heading_raw || "").slice(0, 60)));
-    if (total > 0) {
+    if (clean) {
+      const done = el("span", "scene-index-clean", "\u2713");
+      // labelled, not decorative: the glyph carries the meaning on its own, and
+      // the item's own aria-label spells it out for anyone tabbing the rail.
+      done.setAttribute("role", "img");
+      done.setAttribute("aria-label", "No live findings");
+      done.title = "No live findings";
+      item.appendChild(done);
+    } else if (total > 0) {
       const dots = el("span", "scene-index-dots");
       // the item's own aria-label already spells out the counts, so the
       // decorative dots stay out of the a11y tree (no double announcement)
@@ -5034,6 +5061,10 @@ function refreshDockEvidenceScene() {
   dockEvidenceCurrentScene = now;
   const sceneBox = document.querySelector(".dock-evidence-scene");
   if (sceneBox) renderDockEvidenceSceneBox(sceneBox);
+  // the This-scene chip's label names the scene the filter scoped to; once the
+  // writer scrolls off it, "on this scene" would be a lie — restate it (P1.7)
+  const sceneChip = document.querySelector('.dock-lens[data-lens="evidence"] .fchip-scene');
+  if (sceneChip) syncSceneFilterChip(sceneChip);
   refreshDockRulerMarker();
 }
 
@@ -5257,12 +5288,27 @@ function renderDockEvidence() {
     if (!findingPassesFilter(f, index)) return;
     (byCat[f.category] = byCat[f.category] || []).push({ f, index });
   });
-  const catKeys = Object.keys(byCat);
+  // "Live findings" — the ledger's default cut (spec §5): ALL live findings,
+  // highs first, grouped by category. NEVER scene-scoped by default (red-team
+  // W2: a scene-scoped default renders a dead panel on clean scenes and hides
+  // the cross-scene crown jewels — theme/structure/setup-payoff). The scene
+  // only ever enters through the ONE filter's scene clause above.
+  const SEV_RANK = { high: 0, medium: 1, low: 2 };
+  const sevRank = (o) => (SEV_RANK[String(o.f.severity || "low").toLowerCase()] != null
+    ? SEV_RANK[String(o.f.severity || "low").toLowerCase()] : 9);
+  for (const cat of Object.keys(byCat)) {
+    byCat[cat].sort((a, b) => (sevRank(a) - sevRank(b)) || (a.index - b.index));
+  }
+  const catKeys = Object.keys(byCat).sort((a, b) =>
+    (sevRank(byCat[a][0]) - sevRank(byCat[b][0]))        // groups holding highs lead
+    || (byCat[b].length - byCat[a].length)               // then the biggest group
+    || a.localeCompare(b));
   if (catKeys.length) {
-    // ONE collapsible "By category" section holding the per-category groups:
+    // ONE collapsible "Live findings" section holding the per-category groups:
     // the groups keep their own sub-heads (and their counts), the section is
     // the single thing to open — the collapsed header prints the total, so the
-    // closed state still says how much is in there.
+    // closed state still says how much is in there. (The key stays "by-category":
+    // it is the hook the audits and the e2e harness open the section by.)
     const groups = el("div", "dock-cat-groups");
     let total = 0;
     for (const cat of catKeys) {
@@ -5279,8 +5325,9 @@ function renderDockEvidence() {
       groups.appendChild(group);
     }
     const head = el("span", "dock-section-title");
-    head.appendChild(el("span", "", "By category"));
+    head.appendChild(el("span", "", "Live findings"));
     head.appendChild(el("span", "dock-section-count", String(total)));
+    head.title = "Every live finding, highs first, grouped by category";
     lens.appendChild(dockSection("by-category", head, groups));
   }
   // honest emptiness: findings exist but the filter hides them all — the
@@ -5378,15 +5425,43 @@ const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: 
 // ---------- the ONE filter predicate (GAP-1 fix, R5-b completed) ----------
 // ONE predicate behind ink, board list, loop list and fix queue: a finding
 // shows iff its disposition passes (open, or deferred when Next-pass is on)
-// AND its severity AND category pass the chips. Every surface reads it, so
-// the page and the board cannot disagree (N3 law) — by construction.
+// AND its severity AND category pass the chips AND — since P1.7 — its scene
+// refs include the scene the This-scene chip scoped to. Every surface reads
+// it, so the page and the board cannot disagree (N3 law) — by construction.
+// The scene is a FILTER DIMENSION, never a surface of its own (spec §5): the
+// default is null (all live findings — red-team W2), so nothing is scene-scoped
+// unless the writer asks for it.
 function findingPassesFilter(f, index) {
   const d = findingDisposition(f, index);
   if (d === "deferred" ? !state.findingFilter.showDeferred : d !== "open") return false;
   const sev = (f.severity || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
   if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) return false;
+  const sc = state.findingFilter.scene;
+  if (sc != null && !(f.scene_refs || []).includes(sc) && !(f.scene_refs || []).includes(String(sc))) return false;
   return true;
+}
+
+/** Does `f` sit on scene `n`? The chip's own scope count asks the same question
+ *  the clause above asks (numeric OR string scene_refs), so the number the chip
+ *  prints is the number the filter admits — one rule, two readers. */
+function findingOnScene(f, n) {
+  if (n == null) return false;
+  const refs = (f && f.scene_refs) || [];
+  return refs.includes(n) || refs.includes(String(n));
+}
+
+/** How many OPEN findings sit on scene `n` — the This-scene chip's count, read
+ *  through findingDisposition (N3: never a second counter on state), under the
+ *  same severity rule the category chips use (severity-agnostic orientation). */
+function openFindingsOnScene(n) {
+  if (n == null) return 0;
+  let count = 0;
+  (state.findings || []).forEach((f, index) => {
+    if (findingDisposition(f, index) !== "open") return;
+    if (findingOnScene(f, n)) count += 1;
+  });
+  return count;
 }
 
 // ---------- ink (R5-b): the ONE filter drives page ink, board list, loop ----------
@@ -5737,13 +5812,20 @@ function findingDisposition(f, index) {
 function findingOpen(f, index) {
   return findingDisposition(f, index) === "open";
 }
-/** The ONE filter predicate (severity + category). The mass strip and the fix
- *  queue both read it, so the two scopes can never drift apart. Fix-queue items
- *  carry the same two fields, so they pass through it unchanged. */
+/** The ONE filter predicate (severity + category + scene). The mass strip and
+ *  the fix queue both read it, so the two scopes can never drift apart.
+ *  Fix-queue items carry the same three fields (/fixqueue's allowlist includes
+ *  scene_refs), so they pass through it unchanged. */
 function inFindingFilter(f) {
   const sev = ((f && f.severity) || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
   if (state.findingFilter.category && ((f && f.category) || "other") !== state.findingFilter.category) return false;
+  // P1.7: the scene clause rides here too, or the mass strip's "N shown by
+  // filter" would keep counting the whole script while the ledger above/below
+  // it shows one scene — the exact unlabelled-scope contradiction the counting
+  // contract exists to prevent (the writer scoped the view; the scope says so).
+  const sc = state.findingFilter.scene;
+  if (sc != null && !findingOnScene(f, sc)) return false;
   return true;
 }
 /** Scope + disposition counts — the second half of the N3 counting contract.
@@ -5834,7 +5916,7 @@ function buildFindingFilterRow() {
     c.addEventListener("click", onClick);
     return c;
   };
-  const rerender = () => { renderDockEvidence(); renderManuscript(); };
+  const rerender = () => refreshAllFindingSurfaces();
   for (const s of ["high", "medium", "low"]) {
     const on = state.findingFilter.severities.includes(s);
     row.appendChild(mk(s[0].toUpperCase() + s.slice(1), on, (on ? "Inked on the page" : "Hidden from the page") + " — click to toggle", () => {
@@ -5864,7 +5946,54 @@ function buildFindingFilterRow() {
     state.findingFilter.showDeferred = !dp;
     rerender();
   }));
+  // P1.7 — the scene as a FILTER DIMENSION (spec §5): one chip over the same
+  // ONE filter state the severity/category chips write. Its label ALWAYS prints
+  // the scope of the count it carries (the N3 counting contract), and it is
+  // syncSceneFilterChip() — not this builder — that owns that label, so the
+  // chip can re-state its scope when the writer scrolls away from the scene it
+  // scoped to (refreshDockEvidenceScene calls it).
+  const sceneChip = el("button", "fchip fchip-scene");
+  sceneChip.type = "button";
+  if (currentManuscriptScene() == null && state.findingFilter.scene == null) {
+    return row; // no scene under the writer: nothing to scope to, no chip to lie with
+  }
+  syncSceneFilterChip(sceneChip);
+  sceneChip.addEventListener("click", () => {
+    const cur = currentManuscriptScene();
+    if (state.findingFilter.scene == null) {
+      if (cur == null) return; // still nothing to scope to — the chip stays off
+      state.findingFilter.scene = cur; // scope to the scene the writer is on NOW
+    } else {
+      state.findingFilter.scene = null; // tap again: widen back to the whole script
+    }
+    rerender();
+  });
+  row.appendChild(sceneChip);
   return row;
+}
+
+/** Print the This-scene chip's scope + its count, from the ONE filter state.
+ *  The count is always the count of the scope the chip carries (the current
+ *  scene's open findings, or the scoped one's) — the phrase "on this scene"
+ *  appears only while the scope IS the scene under the writer's eyes, so a
+ *  scrolled-away filter names its scene instead of claiming a stale "this". */
+function syncSceneFilterChip(chip) {
+  if (!chip) return;
+  const sc = state.findingFilter.scene;
+  const cur = currentManuscriptScene();
+  const on = sc != null;
+  const n = openFindingsOnScene(on ? sc : cur);
+  let scope;
+  if (!on) scope = `${n} open`;
+  else if (cur != null && Number(cur) === Number(sc)) scope = `${n} open on this scene`;
+  else scope = `${n} open on scene ${sc}`;
+  chip.textContent = `This scene \u00B7 ${scope}`;
+  chip.setAttribute("aria-pressed", on ? "true" : "false");
+  chip.classList.toggle("active", on);
+  chip.title = on
+    ? `Showing only the findings on scene ${sc} — click to show the whole script again`
+    : `Show only the findings on scene ${cur} (${n} open on this scene). `
+      + "Severity and category chips still apply.";
 }
 
 /** Whole-script orientation strip: open/total + severity mass + category
