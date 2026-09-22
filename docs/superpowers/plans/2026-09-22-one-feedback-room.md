@@ -327,7 +327,7 @@ with the dawn meter in the ~380px column -> stacked in `style.css` (one pixel fi
 
 **Interfaces:** Produces: fixqueue item gains `evidence_quote: str`, `verification: {status, matched_scene, confidence, note} | None`. Client consumes verbatim.
 
-- [ ] **Step 1: Failing test** — in the existing fixqueue test class:
+- [x] **Step 1: Failing test** — in the existing fixqueue test class (deviation: the test went in `tests/test_fixqueue.py::TestFixQueue::test_items_carry_evidence_and_verification`, which is where the item-shape contract already lives, and it asserts the quote actually matches the report's, not just that the key exists):
 
 ```python
 def test_fixqueue_items_carry_evidence_and_verification(self, http_client):
@@ -338,10 +338,14 @@ def test_fixqueue_items_carry_evidence_and_verification(self, http_client):
     assert "verification" in items[0]
 ```
 
-- [ ] **Step 2: Run, expect FAIL** (allowlist strips both today).
-- [ ] **Step 3: Widen the allowlist** at 1867–1879; add the badge to queue rows (escapeHtml for note text).
-- [ ] **Step 4: Gates** — new test PASS; `python -m pytest tests/test_fixqueue.py tests/test_feature_batch.py -q` PASS.
-- [ ] **Step 5: Commit** — `"P2.12: fixqueue carries evidence_quote + verification; rows show unverified badges"`
+- [x] **Step 2: Run, expect FAIL** (allowlist strips both today).
+- [x] **Step 3: Widen the allowlist** at 1867–1879; add the badge to queue rows (escapeHtml for note text). The badge is now one builder, `verificationBadge(v)`, shared by the deep card and the row — a row can't say "verified" where its card says "unverified".
+- [x] **Step 4: Gates** — new test PASS; `pytest tests/test_fixqueue.py tests/test_feature_batch.py -q` → 22 passed. Full `pytest tests/ -q` → 1633 passed / 3 skipped. `e2e_browser_dock_sections.py` → 98 passed / 0 failed (3 new legs pin row badge == `verificationBadge(item.verification)`). `e2e_browser_counting_contract.py` → 20/0.
+- [x] **Step 5: Commit** — `"P2.12: fixqueue carries evidence_quote + verification; rows show unverified badges"`
+
+Deviation — the non-verified badge keeps the card's existing wording (`⚠ unverified`) rather than inventing per-status text; the precise server status (`not_found` / `no_quote` / `scene_not_found`) rides in the badge's `title`, so one builder stays honest without a new vocabulary in the ledger.
+
+The P1 visual gate caught a regression from this change: the row badge squeezed `.fix-row-body` into a ~130px column and a row stood **486px tall** at one word per line. Fixed with `.dock-section .fix-row { flex-wrap: wrap }` + `.fix-row-body { flex: 1 1 100% }` (the shape `.revision-findings` already uses); re-measured 257px with 36 badges rendered, `FAILURES: none`. The gate now also fails on any queue row taller than 260px so this can't come back silently.
 
 ### Task 13: Finding-card honesty fields + rule popover endpoint
 

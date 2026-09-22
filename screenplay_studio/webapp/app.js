@@ -3799,6 +3799,20 @@ function addPanel(container, panel) {
   else if (container) container.appendChild(panel);
 }
 
+/** The verifier's verdict on one finding, in the words the ledger already uses.
+ *  One builder for both homes - the deep card and the queue row - so a row can
+ *  never say "verified" where the card says "unverified" (spec section 7). */
+function verificationBadge(v) {
+  if (!v || !v.status) return null;
+  const badge = el("span", "finding-deep-badge " + (v.status === "verified" ? "verified" : "unverified"));
+  badge.textContent = v.status === "verified"
+    ? "\u2713 verified" + (v.confidence != null ? " \u00B7 " + Number(v.confidence).toFixed(2) : "") + (v.matched_scene != null ? " \u00B7 S" + v.matched_scene : "")
+    : "\u26A0 unverified";
+  badge.title = "The analyzer quoted the script and the verifier matched that quote "
+    + "against the text. This finding's quote came back: " + v.status + ".";
+  return badge;
+}
+
 function renderFixQueuePanel(container) {
   const items = (state.fixQueue && state.fixQueue.items) || [];
   // the ONE filter applies to the queue too (R5-b completed): rows whose
@@ -3910,6 +3924,8 @@ function renderFixQueuePanel(container) {
     body.appendChild(actions);
     row.appendChild(sev);
     row.appendChild(act);
+    const vb = verificationBadge(item.verification);
+    if (vb) row.appendChild(vb);
     row.appendChild(body);
     panel.appendChild(row);
   }
@@ -4356,14 +4372,8 @@ function findingNoteEl(f, index, opts = {}) {
     const deep = el("div", "finding-deep");
     if (f.why_it_matters) deep.appendChild(el("span", "finding-deep-why", f.why_it_matters));
     if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
-    const v = f.verification;
-    if (v && v.status) {
-      const badge = el("span", "finding-deep-badge " + (v.status === "verified" ? "verified" : "unverified"));
-      badge.textContent = v.status === "verified"
-        ? "\u2713 verified" + (v.confidence != null ? " \u00B7 " + Number(v.confidence).toFixed(2) : "") + (v.matched_scene != null ? " \u00B7 S" + v.matched_scene : "")
-        : "\u26A0 unverified";
-      deep.appendChild(badge);
-    }
+    const badge = verificationBadge(f.verification);
+    if (badge) deep.appendChild(badge);
     if (deep.children.length) note.appendChild(deep);
     if (f.rule_id) cat.title = "Grounded in knowledge-base rule " + f.rule_id;
   }

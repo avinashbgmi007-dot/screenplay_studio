@@ -1876,6 +1876,11 @@ def get_fixqueue(name):
             "act": act,
             "act_name": (act_names.get(act) if act else "Script-level"),
             "status": status_by_index.get(idx, "unknown"),
+            # §7: a row is a to-do over a real finding, so it carries that
+            # finding's own evidence and how the verifier scored it. The client
+            # renders both verbatim (escapeHtml at the sink, as everywhere).
+            "evidence_quote": f.get("evidence_quote"),
+            "verification": f.get("verification"),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
 

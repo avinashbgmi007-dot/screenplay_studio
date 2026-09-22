@@ -6022,6 +6022,12 @@ body.river-read #right-edge-affordance { display: none; }
 .dock-finding-list { display: flex; flex-direction: column; gap: var(--sp-5); }
 .dock-section .finding-note { margin: 0; }
 .dock-section .fix-row { margin-bottom: var(--sp-4); }
+/* the ledger column gives a row ~320px: with the severity, act and verification
+   chips on the same line the issue text fell to one word per line and a row
+   stood 486px tall. Chips get the first line, the text gets the whole column -
+   the shape .revision-findings already uses. */
+.dock-section .fix-row { flex-wrap: wrap; }
+.dock-section .fix-row-body { flex: 1 1 100%; }
 
 /* the pacing SVG is authored at 720px wide — it scales to the dock column
    without losing the bars (viewBox contract preserved) */

@@ -56,6 +56,9 @@ MEASURE = r"""() => {
     arrivalHeadline: (q('.dock-arrival-strip') || {}).innerText || null,
     shelf: r(q('.craft-shelf')),
     queueRows: document.querySelectorAll('.dock-section-fixqueue .fix-row').length,
+    rowBox: r(document.querySelector('.dock-section-fixqueue .fix-row')),
+    sevText: (document.querySelector('.dock-section-fixqueue .sev-badge') || {}).textContent || null,
+    badges: document.querySelectorAll('.dock-section-fixqueue .fix-row .finding-deep-badge').length,
   };
 }"""
 
@@ -89,6 +92,7 @@ def element_shot(page, selector, name):
         print("   ", name + " (element) HIDDEN")
         return
     node.scroll_into_view_if_needed()
+    page.mouse.move(720, 40)
     page.wait_for_timeout(400)
     node.screenshot(path=os.path.join(SHOTS, name + ".png"))
     facts[name] = "ok"
@@ -160,6 +164,8 @@ def main():
                 element_shot(page, ".dock-section-fixqueue .fix-queue > .craft-panel-head",
                              "03b_fixqueue_night")
                 element_shot(page, ".dock-section .finding-note", "03c_card_night")
+                element_shot(page, ".dock-section-fixqueue .fix-row",
+                             "03d_queue_row_night")
             ledger_expanded()
 
             def ledger_scene():
@@ -239,6 +245,10 @@ def main():
             bad.append(f"{k} manuscript {w}% < 50% with the dock open")
         if v.get("sectionCountsHidden"):
             bad.append(f"{k} a closed section still paints its body")
+        rb = v.get("rowBox") or {}
+        if rb.get("h", 0) > 260:
+            bad.append(f"{k} a queue row stands {rb['h']}px tall — its text column "
+                       "is being squeezed by the chips beside it")
         print("   " + "  ".join(x for x in line if x))
     for n in EL_SHOTS:
         if facts.get(n) != "ok":

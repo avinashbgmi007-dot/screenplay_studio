@@ -1,6 +1,7 @@
 """Webapp tests for the prioritized fix queue (severity x act ordering)."""
 
 import io
+import json
 import os
 
 import pytest
@@ -80,3 +81,34 @@ class TestFixQueue:
         assert item["act"] in (1, 2, 3, None)
         assert item["status"] in ("addressed", "still_present", "unknown")
         assert "issue" in item and "scene_heading" in item
+
+    def test_items_carry_evidence_and_verification(self, http_client):
+        """§7: a queue row is a to-do over a real finding, so it has to say how
+        well that finding's own evidence held up. Both fields exist in the report
+        and the allowlist was dropping them on the floor."""
+        project = _analyzed_project(http_client)
+        items = http_client.get(
+            f"/api/projects/{project}/fixqueue").get_json()["items"]
+        assert items
+        for item in items:
+            assert "evidence_quote" in item
+            assert "verification" in item
+
+        # Carried, not invented: whatever the row shows must be the report's own
+        # text and the verifier's own vocabulary.
+        with open(os.path.join(webapp_server.PROJECTS_DIR, project,
+                               "report.findings.json"), encoding="utf-8") as f:
+            report = json.load(f)
+        report_quotes = {fl.get("evidence_quote") for fl in report["findings"]
+                         if fl.get("evidence_quote")}
+        assert report_quotes, "the mock report carries no quotes to hand over"
+        quoted = [i for i in items if i["evidence_quote"]]
+        assert quoted, "no queue row arrived with its evidence quote"
+        for item in quoted:
+            assert item["evidence_quote"] in report_quotes
+        for item in items:
+            if item["verification"]:
+                assert item["verification"]["status"] in (
+                    "verified", "not_found", "no_quote", "scene_not_found")
+        assert any(i["verification"] for i in items), \
+            "verification never crossed the allowlist"

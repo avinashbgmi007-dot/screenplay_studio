@@ -634,6 +634,33 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
     check("P1.10: the queue rows live in exactly one place — the ledger",
           in_ledger > 0 and lens.locator(".dock-section-fixqueue").count() == 1,
           f"{in_ledger} rows in {lens.locator('.dock-section-fixqueue').count()} section")
+
+    # -- 1b. P2.12: a row states how well its own evidence held up ------------
+    # The queue used to arrive with evidence_quote/verification stripped, so the
+    # to-do list could not say which rows rest on a quote the verifier found.
+    p212 = page.evaluate("""() => {
+      const items = (state.fixQueue && state.fixQueue.items) || [];
+      const byIndex = new Map(items.map((i) => [String(i.index), i]));
+      let withV = 0, badge = 0; const bad = [];
+      document.querySelectorAll('.dock-section-fixqueue .fix-row').forEach((r) => {
+        const it = byIndex.get(r.dataset.findex);
+        if (!it) return;
+        const want = verificationBadge(it.verification);
+        const got = r.querySelector('.finding-deep-badge');
+        if (it.verification && it.verification.status) withV++;
+        if (got) badge++;
+        if ((want ? want.textContent : null) !== (got ? got.textContent : null)) {
+          bad.push(r.dataset.findex + ':' + (got ? got.textContent : 'none'));
+        }
+      });
+      return { rows: items.length, withV, badge, bad: bad.slice(0, 3) };
+    }""")
+    check("P2.12: the queue payload carries verification for real findings",
+          p212["withV"] > 0, str(p212))
+    check("P2.12: every row with a verdict paints one, and no row paints a stray",
+          p212["withV"] == p212["badge"], str(p212))
+    check("P2.12: the row's badge is the SAME builder's output as the card's",
+          not p212["bad"], f"disagreeing rows={p212['bad']}")
     btn = page.locator(".craft-shelf .craft-shelf-ledger")
     check("P1.10: the shelf lid routes the writer to the ledger",
           btn.count() == 1 and "ledger" in (btn.first.inner_text() or "").lower(),
