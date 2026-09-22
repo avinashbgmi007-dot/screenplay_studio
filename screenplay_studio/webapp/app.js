@@ -2086,7 +2086,7 @@ async function openProject(name) {
     // mid-analysis, or a background run is in flight) — resume the live
     // pipeline display without firing a second analysis
     if (project.stages.analyze === "running") {
-      startAnalysisProgressUI(Date.now(), true);
+      startAnalysisProgressUI(Date.now());
     }
 
     // report language follows the project; defaults to English
@@ -2263,66 +2263,104 @@ function openFeedbackRoom() {
 // is running now, and where it's heading — plus a line on why it takes as
 // long as it does.
 
-const ANALYSIS_STAGES = [
-  { key: "formatting", label: "Formatting checks", weight: 1 },
-  { key: "voice", label: "Character voice fingerprints", weight: 1 },
-  { key: "subtext", label: "On-the-nose scan", weight: 1 },
-  { key: "idiolect", label: "Voice consistency", weight: 1 },
-  { key: "continuity", label: "Continuity check", weight: 1 },
-  { key: "pacing", label: "Scene pace", weight: 1 },
-  { key: "summaries", label: "Scene summaries", weight: 3 },
-  { key: "dialogue", label: "Dialogue & action", weight: 5 },
-  { key: "theme", label: "Theme & subtext", weight: 2 },
-  { key: "character", label: "Character arcs", weight: 2 },
-  { key: "structure", label: "Structure & pacing", weight: 2 },
-  { key: "scene_function", label: "Scene functionality", weight: 2 },
-  { key: "principles", label: "Setups & payoffs", weight: 3 },
-  { key: "setup_payoff", label: "Setup/payoff ledger", weight: 2 },
-  { key: "char_reads", label: "Character perception", weight: 2 },
-  { key: "character_dials", label: "Character dials", weight: 1 },
-  { key: "verification", label: "Verifying quotes", weight: 1 },
-  { key: "coverage", label: "Writing coverage", weight: 2 },
-  { key: "logline_test", label: "Logline test", weight: 1 },
-  { key: "genre", label: "Genre conventions", weight: 2 },
+// The one list of passes the pipeline actually reports (pipeline.py's emit()
+// calls). `caption` is what the desk says to the writer; `label` is the short
+// name in the rail. No weights, no percentages: the only honest progress
+// signal here is WHICH pass reported last and HOW LONG AGO (spec §15.1).
+const STAGE_LADDER = [
+  { key: "formatting", label: "Formatting checks",
+    caption: "Counting the page — formatting and script statistics" },
+  { key: "voice", label: "Character voice fingerprints",
+    caption: "Fingerprinting each character's voice" },
+  { key: "subtext", label: "On-the-nose scan",
+    caption: "Scanning for lines that say what they mean" },
+  { key: "idiolect", label: "Voice consistency",
+    caption: "Checking voices stay distinct scene to scene" },
+  { key: "continuity", label: "Continuity check",
+    caption: "Tracking props, injuries and time across scenes" },
+  { key: "pacing", label: "Scene pace",
+    caption: "Measuring how each scene moves" },
+  { key: "summaries", label: "Scene summaries",
+    caption: "Summarizing every scene" },
+  { key: "dialogue", label: "Dialogue & action",
+    caption: "Reading dialogue — who sounds like whom" },
+  { key: "theme", label: "Theme & subtext",
+    caption: "Reading what the script is about underneath" },
+  { key: "character", label: "Character arcs",
+    caption: "Reading how each character changes" },
+  { key: "structure", label: "Structure & pacing",
+    caption: "Reading the shape of the whole" },
+  { key: "scene_function", label: "Scene functionality",
+    caption: "Asking what each scene is for" },
+  { key: "principles", label: "Setups & payoffs",
+    caption: "Checking setups against their payoffs" },
+  { key: "setup_payoff", label: "Setup/payoff ledger",
+    caption: "Auditing the whole script for unclaimed setups" },
+  { key: "char_reads", label: "Character perception",
+    caption: "Reading how each character comes across" },
+  { key: "character_dials", label: "Character dials",
+    caption: "Scoring each character's settings" },
+  { key: "verification", label: "Verifying quotes",
+    caption: "Checking every quote against the page" },
+  { key: "coverage", label: "Writing coverage",
+    caption: "Writing the coverage notes" },
+  { key: "logline_test", label: "Logline test",
+    caption: "Testing the logline against the script" },
+  { key: "genre", label: "Genre conventions",
+    caption: "Comparing against genre conventions" },
 ];
-const ANALYSIS_TOTAL_WEIGHT = ANALYSIS_STAGES.reduce((a, s) => a + s.weight, 0);
 
 let analysisUi = null; // { timer, poll, stop } for the running analysis display
 
 function analysisStageIndex(key) {
-  return ANALYSIS_STAGES.findIndex((s) => s.key === key);
+  return STAGE_LADDER.findIndex((s) => s.key === key);
 }
 
-function formatETA(seconds) {
-  if (!isFinite(seconds) || seconds <= 0) return "time left …";
-  const totalMin = Math.ceil(seconds / 60);
-  if (totalMin >= 60) return `~${Math.floor(totalMin / 60)}h ${totalMin % 60}m left`;
-  return `~${totalMin}m left`;
+/** The heartbeat, in words. `startedTs` is when this pass last reported; a
+ *  pass that has gone quiet for twice the model timeout is not making progress
+ *  to display — saying "waiting" is the honest version of a frozen bar. */
+function stageElapsedText(startedTs, nowTs, timeoutSeconds) {
+  if (!startedTs) return "starting…";
+  const secs = Math.max(0, Math.floor((nowTs - startedTs) / 1000));
+  const mins = Math.floor(secs / 60);
+  const spent = mins >= 1 ? `${mins}m ${secs % 60}s` : `${secs}s`;
+  const quietFor = (timeoutSeconds || 600) * 2;
+  if (secs >= quietFor) {
+    return `no word from the model — waiting ${spent}`;
+  }
+  return `working… ${spent} on this pass`;
 }
 
-function renderPipelinePopover(currentKey) {
-  const wrap = el("div", "analyze-pipeline");
+/** The stage ladder: every pass the pipeline reports, done / current / pending,
+ *  with the live heartbeat on the current one. One row per reported stage —
+ *  nothing is invented between them. */
+function renderStageLadder(container, currentKey, startedTs, timeoutSeconds) {
   const idx = analysisStageIndex(currentKey);
-  const head = el("div", "pipeline-head", "Analysis pipeline");
-  wrap.appendChild(head);
-  ANALYSIS_STAGES.forEach((s, i) => {
-    const row = el("div", "pipeline-row" + (i < idx ? " done" : i === idx ? " run" : ""));
-    const mark = el("span", "pipeline-mark", i < idx ? "✓" : i === idx ? "●" : "○");
-    row.appendChild(mark);
-    row.appendChild(el("span", "pipeline-label", s.label));
-    if (i === idx) row.appendChild(el("span", "pipeline-now", "now"));
-    wrap.appendChild(row);
+  const rail = el("div", "stage-ladder");
+  rail.setAttribute("role", "list");
+  STAGE_LADDER.forEach((s, i) => {
+    const state = i < idx ? "done" : i === idx ? "current" : "pending";
+    const row = el("div", "stage " + state);
+    row.dataset.stage = s.key;
+    row.setAttribute("role", "listitem");
+    row.title = s.caption;            // hover / focus: what this pass does
+    row.appendChild(el("span", "stage-mark", state === "done" ? "✓" : state === "current" ? "●" : "○"));
+    row.appendChild(el("span", "stage-caption", s.caption));
+    if (state === "current") {
+      row.appendChild(el("span", "stage-elapsed",
+        stageElapsedText(startedTs, Date.now(), timeoutSeconds)));
+    }
+    rail.appendChild(row);
   });
-  const note = el("div", "pipeline-note");
-  note.textContent =
-    "Every stage calls the model on this machine — long scripts split into chunks, each taking " +
-    "tens of seconds, so a bigger or slower model stretches every stage. The bar tracks stage " +
-    "weight, not wall-clock, so ETA is an estimate that firms up as it goes.";
-  wrap.appendChild(note);
-  return wrap;
+  if (container) {
+    const old = container.querySelector(".stage-ladder");
+    if (old) old.remove();
+    container.appendChild(rail);
+  }
+  return rail;
 }
 
-function startAnalysisProgressUI(startedAt, resumed = false) {
+function startAnalysisProgressUI(startedAt) {
   if (analysisUi) analysisUi.stop();
   const btn = $("#analyze-btn");
   const chip = $("#analyze-progress");
@@ -2334,62 +2372,44 @@ function startAnalysisProgressUI(startedAt, resumed = false) {
   if (deskBtn) { deskBtn.disabled = true; deskBtn.classList.add("analyzing"); deskBtn.textContent = "Analyzing…"; }
   if (deskChip) deskChip.style.display = "flex";
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
-  let currentKey = "formatting";
-  let currentLabel = "Starting";
-  let renderedFor = "";
-  let lastKey = null;
-  let lastKeyAt = Date.now();
+  const timeoutSeconds = (state.config && state.config.timeout) || 600;
+  let currentKey = STAGE_LADDER[0].key;
+  let currentDetail = "";
+  // The heartbeat: WHEN the run last reported, off progress.json's own ts. A
+  // clock we start here would keep saying "working…" about a run whose
+  // process died minutes ago.
+  let beatAt = null;
+  let ladderFor = "";        // the stage the mounted rails already describe
   let finished = false;
 
   const refresh = () => {
     if (finished) return;
-    const elapsed = (Date.now() - startedAt) / 1000;
     const idx = analysisStageIndex(currentKey);
-    if (lastKey !== currentKey) {
-      lastKey = currentKey;
-      lastKeyAt = Date.now();
-    }
-    const completedWeight =
-      ANALYSIS_STAGES.slice(0, Math.max(0, idx)).reduce((a, s) => a + s.weight, 0) +
-      (idx >= 0 ? ANALYSIS_STAGES[idx].weight * 0.5 : 0);
-    const pct = Math.max(1, Math.min(99, Math.round((completedWeight / ANALYSIS_TOTAL_WEIGHT) * 100)));
-    let eta = null;
-    if (!resumed && pct > 3) {
-      // we know the real elapsed time — extrapolate from overall pace
-      eta = (elapsed / (pct / 100)) * (1 - pct / 100);
-    } else if (idx >= 0) {
-      // resumed mid-run: no known elapsed, so extrapolate from how long the
-      // current stage has been running scaled by its weight
-      const stageElapsed = (Date.now() - lastKeyAt) / 1000;
-      const remainingWeight =
-        ANALYSIS_STAGES.slice(idx + 1).reduce((a, s) => a + s.weight, 0) +
-        ANALYSIS_STAGES[idx].weight * 0.5;
-      if (stageElapsed > 20) eta = (stageElapsed / Math.max(1, ANALYSIS_STAGES[idx].weight)) * remainingWeight;
-    }
-    chip.querySelector(".ap-pct").textContent = `${pct}%`;
-    chip.querySelector(".ap-eta").textContent = formatETA(eta);
-    chip.querySelector(".ap-bar-fill").style.width = pct + "%";
-    btn.textContent = `Analyzing — ${currentLabel} — ${pct}%`;
-    // Phase 8: same numbers on the desk — one lifecycle, two surfaces
-    if (deskChip && deskChip.style.display !== "none") {
-      deskChip.querySelector(".ap-pct").textContent = `${pct}%`;
-      deskChip.querySelector(".ap-eta").textContent = formatETA(eta);
-      deskChip.querySelector(".ap-bar-fill").style.width = pct + "%";
-    }
-    if (deskBtn) deskBtn.textContent = `Analyzing — ${pct}%`;
-    if (renderedFor !== currentKey) {
-      renderedFor = currentKey;
-      const old = chip.querySelector(".analyze-pipeline");
-      if (old) old.remove();
-      chip.appendChild(renderPipelinePopover(currentKey));
-      // the desk's on-demand detail: the same popover, appended to the
-      // desk chip (hover/focus reveals it there too)
-      if (deskChip) {
-        const oldD = deskChip.querySelector(".analyze-pipeline");
-        if (oldD) oldD.remove();
-        deskChip.appendChild(renderPipelinePopover(currentKey));
+    const stage = STAGE_LADDER[idx >= 0 ? idx : 0];
+    const since = beatAt || startedAt;
+    // A pass that reported a problem says so inline; the ledger's banner only
+    // exists once the run is over, and the writer is looking at this instead.
+    const line = /failed:/.test(currentDetail)
+      ? `⚠ ${stage.label} reported a problem — the rest of the run continues`
+      : stage.caption;
+    const beat = stageElapsedText(since, Date.now(), timeoutSeconds);
+    for (const host of [chip, deskChip]) {
+      if (!host) continue;
+      host.querySelector(".ap-stage").textContent = line;
+      host.querySelector(".ap-beat").textContent = beat;
+      // Rebuild the rail when the run MOVES; between moves, only the current
+      // pass's own seconds change, and replacing 20 nodes a second would reset
+      // the hover a writer is using to read them.
+      if (ladderFor !== currentKey) {
+        renderStageLadder(host, currentKey, since, timeoutSeconds);
+      } else {
+        const live = host.querySelector(".stage-ladder .stage.current .stage-elapsed");
+        if (live) live.textContent = beat;
       }
     }
+    ladderFor = currentKey;
+    btn.textContent = `Analyzing — ${stage.label}`;
+    if (deskBtn) deskBtn.textContent = "Analyzing…";
   };
 
   const timer = setInterval(refresh, 1000);
@@ -2419,8 +2439,12 @@ function startAnalysisProgressUI(startedAt, resumed = false) {
         await loadProjects();
         return;
       }
-      currentKey = p.stage || currentKey;
-      currentLabel = p.detail || currentKey;
+      if (p.stage) currentKey = p.stage;
+      currentDetail = p.detail || "";
+      // ts is the run's own clock, written with every event
+      // (orchestrator.py:102-110); a reply that arrives without one still
+      // proves the run answered just now, so fall back to arrival time.
+      beatAt = p.ts ? p.ts * 1000 : Date.now();
       refresh();
     } catch (_) { /* ignore transient poll failures */ }
   }, 2000);
@@ -2505,7 +2529,7 @@ function refreshDeskToolbar() {
     if (status) {
       if (failedCats.length) {
         // per-category ✓/✗ — the writer sees exactly what survived
-        const ALL = ANALYSIS_STAGES.map((s) => s.key);
+        const ALL = STAGE_LADDER.map((s) => s.key);
         const marks = ALL.map((k) => {
           const failed = failedCats.includes(k);
           return `${failed ? "✗" : "✓"}${k === "genre" ? " genre" : ""}`;

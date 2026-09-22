@@ -419,11 +419,32 @@ Measured (the P1 gate now photographs this surface): `03e_rule_popover_night` sh
 
 **Interfaces:** Consumes: `progress.json` events `{stage, ts, ...}` (orchestrator.py:102–110) via the existing poller. Produces: `STAGE_LADDER = [{key, caption}...]` (12 entries, plain-language: e.g. `{key:"dialogue", caption:"Reading dialogue — who sounds like whom"}`) and `renderStageLadder(container, currentKey, startedTs)` — done ✓ / current ● + live elapsed / pending ○; hover/focus shows the stage's purpose. No percentages — elapsed seconds only.
 
-- [ ] **Step 1: Failing e2e** — during a live analysis (mock server), assert `.stage-ladder` exists, exactly one `.stage.current`, its elapsed text ticks up, and completed stages carry ✓.
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** the ladder in the desk header area (visible without hover; hover adds the "what this pass does" detail). Elapsed derived from `ts` — if `ts` is stale > 2× timeout, show "checking…" (the heartbeat's documented purpose).
-- [ ] **Step 4: Gates** — `node --check`; lifecycle e2e PASS; reduced-motion respected.
-- [ ] **Step 5: Commit** — `"P2.15: stage ladder — real pass events, live elapsed, plain-language captions"`
+- [x] **Step 1: Failing e2e** — during a live analysis (mock server), assert `.stage-ladder` exists, exactly one `.stage.current`, its elapsed text ticks up, and completed stages carry ✓.
+- [x] **Step 2: Run, expect FAIL.** — `ReferenceError: renderStageLadder is not defined`.
+- [x] **Step 3: Implement** the ladder in the desk header area (visible without hover; hover adds the "what this pass does" detail). Elapsed derived from `ts` — if `ts` is stale > 2× timeout, show "checking…" (the heartbeat's documented purpose).
+- [x] **Step 4: Gates** — `node --check`; lifecycle e2e PASS; reduced-motion respected.
+- [x] **Step 5: Commit** — `"P2.15: stage ladder — real pass events, live elapsed, plain-language captions"`
+
+**Deviations.**
+1. The ladder has **20 entries, not 12** — one per stage key the pipeline actually
+   emits (`pipeline.py` `progress_cb` boundary). A hand-picked 12 would silently omit
+   real passes, and a pass with no row is exactly the invented-progress lie §15.1 bans.
+2. `ANALYSIS_STAGES` + its per-stage weights + `ANALYSIS_TOTAL_WEIGHT` + `formatETA`
+   + the `%` readout + the extrapolated ETA **and the `.ap-bar`** are deleted, plus the
+   four dead `.ap-bar*` rules in `tungsten.css`. Both the bar and the ETA were
+   extrapolation from a weight that no measurement backs.
+3. The rail lives in the **hover/`:focus-within` popover**, not the always-visible
+   desk header: `#desk-toolbar` is contractually ≤64px (`phase8_lifecycle`) and Task 19
+   forbids covering the page, so 20 rows cannot be permanent chrome. What is always
+   visible is the honest part — the plain-language caption for the pass that reported
+   last plus its live elapsed ("working… 12s on this pass"). Keyboard-reachable via
+   the chip's existing `tabindex="0"` + `:focus-within`.
+4. Stale-heartbeat wording is "no word from the model — waiting X", at 2×
+   `state.config.timeout` (the client's own copy of the server's 600 s default),
+   measured against the event's own `ts` rather than a client clock.
+5. The rail re-renders only when the run *moves* to a new stage; the current row's
+   elapsed is patched in place, so a hovering writer's seconds tick without replacing
+   20 nodes every poll.
 
 ### Task 16: Retry split UI (failed-only default vs full re-run, honestly labeled)
 

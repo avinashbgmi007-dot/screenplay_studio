@@ -193,10 +193,9 @@
              legacy #script-toolbar control; the old row is gone. -->
         <div id="desk-toolbar">
           <button id="desk-analyze-btn" class="btn-secondary desk-analyze" type="button">Run Analysis</button>
-          <div id="desk-analyze-progress" class="analyze-progress desk-analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — hover or focus for the pipeline">
-            <div class="ap-bar"><div class="ap-bar-fill"></div></div>
-            <span class="ap-pct">0%</span>
-            <span class="ap-eta">…</span>
+          <div id="desk-analyze-progress" class="analyze-progress desk-analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — the stage ladder opens on hover or focus">
+            <span class="ap-stage">Starting…</span>
+            <span class="ap-beat">…</span>
           </div>
           <button id="desk-retry-failed-btn" class="btn-secondary retry-failed" style="display:none;" type="button" title="Re-run only the categories that failed last time and merge into the existing report">⚠ Retry failed</button>
           <span id="desk-analyze-status" class="desk-analyze-status" aria-live="polite"></span>
@@ -451,10 +450,9 @@
               <option value="tamil">Tamil</option>
             </select>
           </label>
-          <div id="analyze-progress" class="analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — hover or focus for the pipeline">
-            <div class="ap-bar"><div class="ap-bar-fill"></div></div>
-            <span class="ap-pct">0%</span>
-            <span class="ap-eta">…</span>
+          <div id="analyze-progress" class="analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — the stage ladder opens on hover or focus">
+            <span class="ap-stage">Starting…</span>
+            <span class="ap-beat">…</span>
           </div>
           <a id="report-export-btn" class="btn-secondary report-export" style="display:none;" title="Download the full report as markdown" download>📥 Report</a>
           <button id="analyze-btn" class="btn-secondary">Run Analysis</button>

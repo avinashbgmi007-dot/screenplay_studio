@@ -160,8 +160,15 @@ def run(base):
             # trap in reverse. So it is a note; the real checks below run only
             # when the chip was actually caught.
             note("progress: chip caught live on the desk")
-            pct = chip.locator(".ap-pct").inner_text()
-            check("progress: percentage renders", pct.strip().endswith("%"), pct)
+            # spec §15.1: no invented percentage. The chip shows the pass the
+            # run reported and how long it has been on it.
+            stage = chip.locator(".ap-stage").inner_text()
+            check("progress: the live pass names itself", len(stage.strip()) > 8, stage)
+            check("progress: no percentage is printed", "%" not in stage, stage)
+            beat = chip.locator(".ap-beat").inner_text()
+            check("progress: elapsed heartbeat renders", "on this pass" in beat, beat)
+            check("progress: the stage ladder is mounted",
+                  chip.locator(".stage-ladder .stage").count() >= 12)
         deadline = time.time() + 300
         done = False
         while time.time() < deadline:

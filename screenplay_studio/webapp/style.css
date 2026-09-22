@@ -767,7 +767,7 @@ body::before {
 /* a11y (WCAG 2.4.7 Focus Visible): the ✕ was hover-revealed only, so a
    keyboard user Tabbed onto an INVISIBLE delete button — and Enter there
    deletes a project they cannot see. Reveal the shelf's action buttons
-   when the row holds keyboard focus, mirroring .msg-rail / .analyze-pipeline. */
+   when the row holds keyboard focus, mirroring .msg-rail / .stage-ladder. */
 .project-item:focus-within .project-delete { opacity: 1; }
 
 /* ---- the idea room: scriptless ideas on the corkboard ---- */
@@ -2514,11 +2514,11 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 #compare-from-select:disabled { opacity: 0.5; cursor: not-allowed; }
 #report-lang-select { padding: var(--sp-2) var(--sp-6) var(--sp-2) var(--sp-3); font-size: var(--fs-xs); }
 
-/* analysis progress */
+/* analysis progress — the stage ladder (spec §15.1) */
 .analyze-progress {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex: 0 0 auto;
   gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-4);
@@ -2530,25 +2530,34 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   cursor: help;
   user-select: none;
 }
-.ap-bar { width: 90px; height: 5px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
-.ap-bar-fill { height: 100%; width: 0%; border-radius: var(--r-pill); background: linear-gradient(90deg, var(--accent-deep), var(--accent-bright)); transition: width 0.6s ease; }
-.ap-pct { color: var(--accent-bright); font-weight: 500; min-width: 30px; text-align: right; }
-.ap-eta { color: var(--text-faint); white-space: nowrap; }
+/* The chip's always-visible line is the RUN's own words: which pass reported
+   last, and how long ago. The old bar filled by stage WEIGHT and the
+   extrapolated ETA beside it were both invented progress — a pass that takes
+   four times as long as its weight predicted moved the bar anyway. */
+.ap-stage {
+  font-family: var(--font-body, inherit);
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ap-beat { color: var(--text-faint); white-space: nowrap; }
 
-/* the Analyze button's live text ("Analyzing — Character arcs — 34%") can get
+/* the Analyze button's live text ("Analyzing — Dialogue & action") can get
    long; let it shrink and ellipsize instead of widening the page */
 #analyze-btn { flex-shrink: 1; min-width: 0; white-space: nowrap; }
 #analyze-btn.analyzing { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
 
-.analyze-pipeline {
-  /* Opens DOWNWARD from the header chip: the chip sits near the top of the
-     room, so an upward popover used to fly behind the project bar / off the
-     top of the viewport ("hiding behind the banner"). z-index clears the
-     night vignette (body::before, 40) and grain (45). */
+.stage-ladder {
+  /* Opens DOWNWARD from the chip: the chip sits near the top of the desk, so
+     an upward popover used to fly behind the project bar / off the top of the
+     viewport. z-index clears the night vignette (body::before, 40) and
+     grain (45). */
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 300px;
+  width: 320px;
   max-height: 420px;
   overflow-y: auto;
   background: var(--ink-850);
@@ -2561,40 +2570,26 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   transform: translateY(-4px);
   transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
   z-index: var(--z-pipeline);
+  font-family: var(--font-body, inherit);
 }
-.analyze-progress:hover .analyze-pipeline,
-.analyze-progress:focus-within .analyze-pipeline { opacity: 1; visibility: visible; transform: translateY(0); }
-.pipeline-head {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin-bottom: var(--sp-3);
-  padding-bottom: var(--sp-3);
-  border-bottom: 1px solid var(--line);
-}
-.pipeline-row { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-1) var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
-.pipeline-row.done { color: var(--text-faint); }
-.pipeline-row.done .pipeline-mark { color: var(--ok); }
-.pipeline-row.run { color: var(--text); }
-.pipeline-row.run .pipeline-mark { color: var(--accent-bright); animation: pipeline-pulse 1.4s ease-in-out infinite; }
-.pipeline-now {
+.analyze-progress:hover .stage-ladder,
+.analyze-progress:focus-within .stage-ladder { opacity: 1; visibility: visible; transform: translateY(0); }
+.stage { display: flex; align-items: baseline; gap: var(--sp-4); padding: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
+.stage.done { color: var(--text-faint); }
+.stage.done .stage-mark { color: var(--ok); }
+.stage.current { color: var(--text); }
+.stage.current .stage-mark { color: var(--accent-bright); animation: stage-pulse 1.4s ease-in-out infinite; }
+.stage-mark { width: 14px; flex: 0 0 14px; text-align: center; font-size: var(--fs-xs); }
+.stage-caption { min-width: 0; }
+.stage-elapsed {
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: var(--fs-3xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--accent-bright);
-  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
-  border-radius: var(--r-pill);
-  padding: 1px var(--sp-3);
+  white-space: nowrap;
 }
-.pipeline-mark { width: 14px; text-align: center; font-size: var(--fs-xs); }
-.pipeline-note { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px dashed var(--line); font-size: var(--fs-xs); line-height: 1.5; color: var(--text-faint); }
-@keyframes pipeline-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .pipeline-row.run .pipeline-mark { animation: none; } }
-@media (prefers-reduced-motion: reduce) { .messages-scroll { scroll-behavior: auto; } .translate-btn:hover { transform: none; } }
+@keyframes stage-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .stage.current .stage-mark { animation: none; } }
 
 /* Sam's notes on you */
 .sam-notes-dimensions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: var(--sp-5) 0; }
@@ -3398,8 +3393,7 @@ body.dawn .sidebar-footer-btn:hover { background: var(--ink-800); }
 body.dawn .room-panel::before { background: radial-gradient(120% 70% at 20% -10%, rgba(176, 124, 40, 0.10), transparent 60%); }
 /* the progress pill is hardcoded dark — lift it for light mode */
 body.dawn .analyze-progress { background: var(--ink-800); border-color: var(--line); }
-body.dawn .ap-pct { color: var(--accent-deep); }
-body.dawn .pipeline-now { color: var(--accent-deep); border-color: rgba(124, 85, 23, 0.45); }
+body.dawn .ap-beat, body.dawn .stage-elapsed { color: var(--accent-deep); }
 body.dawn .welcome-card {
   box-shadow: 0 18px 60px rgba(120, 95, 55, 0.28);
 }
@@ -5436,7 +5430,7 @@ body:not(.idea-mode) #manuscript-workspace {
 /* the pipeline popover works on the desk chip exactly as on the room chip —
    but anchored to the chip's LEFT (the desk chip sits left, so right:0 would
    fling the popover across the toolbar) */
-.desk-analyze-progress .analyze-pipeline { left: 0; right: auto; }
+.desk-analyze-progress .stage-ladder { left: 0; right: auto; }
 /* Phase 13: the writing tools on the desk row — compact, ghost-styled,
    never competing with the pages. Run Analysis stays the only primary
    action; everything else is secondary chrome at one height. */

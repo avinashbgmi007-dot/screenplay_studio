@@ -88,6 +88,66 @@ def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
     return False
 
 
+def check_stage_ladder(page):
+    """P2.15: the ladder is built from real stage events, not invented progress.
+
+    Deterministic on purpose. Catching a live demo run mid-stage is a race the
+    suite already documents, so this calls the production renderer with a
+    synthetic position on the SAME stage list the poller walks — which is what
+    the writer sees, minus the luck.
+    """
+    probe = page.evaluate("""() => {
+      const box = document.createElement('div');
+      document.body.appendChild(box);
+      renderStageLadder(box, 'dialogue', Date.now() - 45000);
+      const rows = [...box.querySelectorAll('.stage-ladder .stage')];
+      const txt = (n) => n ? n.textContent : null;
+      const cur = box.querySelector('.stage.current');
+      const out = {
+        ladderClass: !!box.querySelector('.stage-ladder'),
+        rows: rows.length,
+        stages: STAGE_LADDER.length,
+        current: rows.filter(r => r.classList.contains('current')).length,
+        curKey: cur ? cur.dataset.stage : null,
+        curText: txt(cur),
+        done: rows.filter(r => r.classList.contains('done')).length,
+        doneMark: rows.length ? txt(rows[0].querySelector('.stage-mark')) : null,
+        pendingMark: rows.length ? txt(rows[rows.length - 1].querySelector('.stage-mark')) : null,
+        percent: /%/.test(box.textContent),
+        noCaption: STAGE_LADDER.filter(s => !s.caption || !/\\s/.test(s.caption)).map(s => s.key),
+        dupKeys: STAGE_LADDER.length !== new Set(STAGE_LADDER.map(s => s.key)).size,
+        // the heartbeat, read at two clocks apart
+        elapsedFresh: stageElapsedText(Date.now() - 5000, Date.now(), 600),
+        elapsedStale: stageElapsedText(Date.now() - 40 * 60000, Date.now(), 600),
+      };
+      box.remove();
+      return out;
+    }""")
+    check("ladder: renders as .stage-ladder inside the chip host", probe["ladderClass"])
+    check("ladder: one row per real stage event, not a hand-picked dozen",
+          probe["rows"] == probe["stages"] and probe["stages"] >= 12,
+          f"rows={probe['rows']} stages={probe['stages']}")
+    check("ladder: exactly one current stage", probe["current"] == 1, str(probe["current"]))
+    check("ladder: current row is the one passed in", probe["curKey"] == "dialogue",
+          str(probe["curKey"]))
+    check("ladder: earlier stages carry the done mark",
+          probe["done"] == 7 and probe["doneMark"] == "✓",
+          f"done={probe['done']} first={probe['doneMark']!r}")
+    check("ladder: later stages stay pending", probe["pendingMark"] == "○",
+          str(probe["pendingMark"]))
+    check("ladder: the current stage shows elapsed seconds, live",
+          "4" in (probe["curText"] or "") and "s" in (probe["curText"] or ""),
+          str(probe["curText"])[:80])
+    check("ladder: no invented percentage anywhere", probe["percent"] is False)
+    check("ladder: every stage has a plain-language caption",
+          not probe["noCaption"], ",".join(probe["noCaption"])[:120])
+    check("ladder: stage keys are unique", probe["dupKeys"] is False)
+    check("heartbeat: a fresh pass reads as working",
+          "s on this pass" in probe["elapsedFresh"], probe["elapsedFresh"])
+    check("heartbeat: a silent pass says so instead of lying about progress",
+          "waiting" in probe["elapsedStale"].lower(), probe["elapsedStale"])
+
+
 def run(base):
     fresh = seed(base, "Lifecycle Probe")
     with sync_playwright() as p:
@@ -107,6 +167,9 @@ def run(base):
         check("unanalyzed: manuscript stays readable",
               page.locator("#manuscript-container .scene-page").count() > 0)
 
+        # --- 1b. the stage ladder, rendered deterministically from real events --
+        check_stage_ladder(page)
+
         # --- 2. RUNNING state: desk button fires ONE analysis, progress mirrors --
         desk_btn.click()
         page.wait_for_timeout(800)
@@ -122,10 +185,14 @@ def run(base):
             # real would be flaky. Note it, and let the real checks below run
             # only when the chip was actually caught.
             note("running: progress chip caught on the desk")
-            pct_txt = chip.locator(".ap-pct").inner_text()
-            check("running: percentage renders", pct_txt.strip().endswith("%"), pct_txt)
-            check("running: popover available on hover",
-                  chip.locator(".analyze-pipeline").count() > 0)
+            stage_txt = chip.locator(".ap-stage").inner_text()
+            check("running: the desk names the pass in plain language",
+                  "%" not in stage_txt and len(stage_txt.strip()) > 8, stage_txt[:80])
+            check("running: the heartbeat says how long this pass has run",
+                  "on this pass" in chip.locator(".ap-beat").inner_text(),
+                  chip.locator(".ap-beat").inner_text()[:60])
+            check("running: the stage ladder is mounted beside it",
+                  chip.locator(".stage-ladder .stage").count() >= 12)
             check("running: at most one analysis fired (guard)",
                   desk_btn.is_disabled() or "Analyzing" in desk_btn.inner_text())
         # wait for completion either way

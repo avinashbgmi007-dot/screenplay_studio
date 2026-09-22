@@ -129,7 +129,7 @@ def main():
             #     scene-flash (scene nav, 1.4s x1), findingPulse (x2),
             #     sceneFlash (rail nav), sprintFlash (timer done, x1)
             #   progress / meter fills:
-            #     ap-bar-fill (analysis %), dawn-fill (verdict meter),
+            #     dawn-fill (verdict meter),
             #     dawn-wash (the room warming as findings resolve)
             mot = page.evaluate("""() => {
                 const ATTENTION = ['scene-flash', 'findingPulse', 'sceneFlash', 'sprintFlash',
@@ -143,7 +143,7 @@ def main():
                                    // persistent state, unlike the live dotPulse — no
                                    // longer animates forever beside the manuscript.
                                    'ink-halo', 'ink-flash', 'tg-blip'];
-                const PROGRESS_SEL = ['.ap-bar-fill', '.dawn-fill', '.dawn-wash'];
+                const PROGRESS_SEL = ['.dawn-fill', '.dawn-wash'];
                 const over = [];
                 let infiniteNames = new Set();
                 const ONE_SHOT_MS = 280;
@@ -178,7 +178,7 @@ def main():
                     };
                     walk(rules);
                 }
-                const allowedInfinite = ['dotPulse', 'pipeline-pulse', 'pulse',
+                const allowedInfinite = ['dotPulse', 'stage-pulse', 'pulse',
                                           'mic-pulse', 'switch-nudge'];
                 const badInf = Array.from(infiniteNames).filter((n) => !allowedInfinite.includes(n));
                 return {over, infinite: Array.from(infiniteNames), badInf};
