@@ -6008,6 +6008,15 @@ body.river-read #right-edge-affordance { display: none; }
   padding: var(--sp-5) var(--sp-6);
 }
 .dock-section .craft-panel-head { margin-bottom: var(--sp-4); }
+/* the ledger column is ~380px: side by side, the queue's count line and the dawn
+   meter read as one tangled sentence across three lines. Stacked, each is one
+   clean statement - the count, then the meter under it. */
+.dock-section .fix-queue > .craft-panel-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+.dock-section .fix-queue .dawn-meter { margin-left: 0; }
 
 /* finding cards inside the dock keep the manuscript contract */
 .dock-finding-list { display: flex; flex-direction: column; gap: var(--sp-5); }

@@ -304,10 +304,14 @@ addressed / next-pass marks it carries, because Dismiss is a queue-row gesture.
 
 ### Task 11: P1 visual truth gate
 
-- [ ] **Step 1:** Run the studio against the Gun_Pen fixture with the demo model; capture screenshots of the desk with the ledger open — night AND dawn — into gitignored `impl-shots/runs/latest/` (the `tests/_ui_capture.py` harness pattern).
-- [ ] **Step 2:** Review against the spec §11 checklist: no text overlap, sections collapsed by default, arrival headline correct, categories collapsed, manuscript ≥50%.
-- [ ] **Step 3:** Fix what the pixels reject (this is the 15% layout-uncertainty retire step — do not call P1 done on green tests alone).
-- [ ] **Step 4: Commit** — `"P1 gate: visual truth pass (night+dawn), [N] pixel fixes"`
+- [x] **Step 1:** Run the studio against the Gun_Pen fixture with the demo model; capture screenshots of the desk with the ledger open — night AND dawn — into gitignored `impl-shots/runs/latest/` (the `tests/_ui_capture.py` harness pattern).
+- [x] **Step 2:** Review against the spec §11 checklist: no text overlap, sections collapsed by default, arrival headline correct, categories collapsed, manuscript ≥50%.
+- [x] **Step 3:** Fix what the pixels reject (this is the 15% layout-uncertainty retire step — do not call P1 done on green tests alone).
+- [x] **Step 4: Commit** — `"P1 gate: visual truth pass (night+dawn), 1 pixel fix"`
+**Measured (see NOTES.md P1 gate entry):** 0/9 sections open on load, manuscript 70.4%
+with the dock open, `overflowX == 0`, no surface overlap, no JS errors, scene chip 36 → 18
+→ 36 rows on the real Gun_Pen report. Rejected: the fix-queue head tangled its count line
+with the dawn meter in the ~380px column -> stacked in `style.css` (one pixel fix).
 
 
 ---
