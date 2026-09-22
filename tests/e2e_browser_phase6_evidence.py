@@ -12,6 +12,9 @@ Verifies the dock's evidence lens against the live app, DOM/text only:
   * manuscript context preserved across open/close (scroll position)
   * legacy surfaces: #room-drawer and #feedback-panel survive dock use;
     #feedback-view and #problem-board are retired (P0.1/P0.2) — absence asserted
+  * every Evidence section collapses and persists (P1.6): a closed body is
+    hidden (not rendered text, not clickable), so this suite opens the section
+    it wants to read or click inside — the writer's own path
 
 Run:  python tests/e2e_browser_phase6_evidence.py   (boots its own demo studio;
       set E2E_BASE to reuse an already-running one)
@@ -22,7 +25,9 @@ import re
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, launch, open_studio, studio_headers
+from e2e_browser_common import (Checks, launch, open_dock_section,
+                                open_dock_section_holding, open_studio,
+                                studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -138,6 +143,11 @@ def run(base):
               lens.locator(".fix-row .sev-badge").count() > 0)
 
         # -- 4. findings by category sections --------------------------------
+        # P1.6: a section's body is collapsed by default and a closed body is not
+        # rendered text — `inner_text()`/`all_inner_texts()` see "" inside it. So
+        # open the section the way the writer does before reading its words.
+        check("P1.6: the ledger's category section opens from its header",
+              open_dock_section(page, "by-category"))
         cat_sections = lens.locator(".dock-section-title")
         cat_text = " ".join(cat_sections.all_inner_texts())
         check("category sections group the findings",
@@ -153,6 +163,8 @@ def run(base):
         # summaries PLUS the raw pages of the checkpoint scenes, and the dock has
         # to say so — the middle bucket is the whole point of the change. Rendered
         # only when the report carries the field, so an older report stays silent.
+        check("P1.6: the coverage section opens (its depth line is read, not hovered)",
+              open_dock_section(page, "coverage"))
         depth_el = lens.locator(".dock-cov-depth")
         depth_txt = depth_el.first.inner_text() if depth_el.count() else ""
         check("evidence depth line renders in the coverage section", depth_el.count() > 0, depth_txt)
@@ -182,6 +194,11 @@ def run(base):
               lens.locator(".craft-panel").count() > 0)
 
         # --- finding actions fire without JS errors --------------------------
+        # P1.6: the cards live in collapsed sections now — open whatever section
+        # holds them (this-scene or by-category, depending on the filter) so the
+        # writer's own path (open, then act) is the one under test.
+        check("P1.6: the section holding the finding cards opens",
+              open_dock_section_holding(page, ".finding-note") > 0)
         # Locate: jumps the manuscript to the finding's scene
         before_scroll = page.locator("#manuscript-container").evaluate(
             "e => e.scrollTop")
@@ -223,6 +240,8 @@ def run(base):
             check("Discuss present on finding cards", False, "no Discuss button found")
 
         # Dismiss / Restore through the fix queue rows
+        check("P1.6: the fix-queue section opens for its row actions",
+              open_dock_section(page, "fix-queue"))
         dismiss = lens.locator(".fix-row-actions .fq-dismiss").first
         if dismiss.count():
             rows_before = lens.locator(".fix-row").count()

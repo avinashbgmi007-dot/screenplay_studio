@@ -31,7 +31,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
-from e2e_browser_common import Checks, assert_no_js_errors, launch  # noqa: E402
+from e2e_browser_common import (Checks, assert_no_js_errors, launch,  # noqa: E402
+                                open_dock_section_holding)
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 
@@ -129,6 +130,11 @@ def test_intent_updates_every_mounted_surface(base, checks):
         page.evaluate("() => { openDock('evidence'); }")
         page.wait_for_selector('.dock-lens[data-lens="evidence"] .finding-note',
                                state="attached", timeout=15000)
+        # P1.6: the dock's cards live behind collapsible section headers, and a
+        # closed body is hidden (not clickable). Open the section holding them —
+        # the writer's own first move.
+        checks.ok("intent-e2e: the section holding the dock cards opens",
+                  open_dock_section_holding(page, ".finding-note") > 0)
 
         # spy on the metrics pull — a mutation must leave the strip fresh
         page.evaluate("""() => {

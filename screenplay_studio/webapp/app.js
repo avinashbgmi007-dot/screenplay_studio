@@ -4989,8 +4989,22 @@ function refreshDockNotesLens() {
 // legacy surfaces use (renderFixQueuePanel, renderPacingPanel,
 // renderCharacterPanel, renderWriterMirrorPanel, findingNoteEl) — no second
 // data path, no duplicated aggregation (prepareManuscriptData is the single
-// source). Sections stack vertically and collapse under one header each;
-// this is a contextual ledger, not a dashboard of equal cards.
+// source).
+//
+// P1.6 made "sections stack vertically and collapse under one header each"
+// TRUE (it had been aspirational since Phase 6 — every `.dock-section-title`
+// was a plain div, so nothing collapsed and nothing persisted). Every section
+// below is built by dockSection(key, title, buildBody): a real header <button>
+// with aria-expanded + a chevron, and a body that stays hidden until the writer
+// opens it. Open/closed is one pref per key (prefs["dock_section_"+key]), so
+// the ledger keeps the shape the writer gave it, session after session.
+//
+// Three orientation surfaces are deliberately NOT sections — the arrival strip,
+// the ONE filter row and the current-scene strip stay always visible: the filter
+// row is how a narrowed ledger gets widened again, and a collapsed scene strip
+// would hide the answer to "what is wrong HERE". The mass strip + ruler stay
+// ambient for the same reason (spec §5). This is a contextual ledger, not a
+// dashboard of equal cards.
 
 let dockEvidenceCurrentScene = null;
 
@@ -5060,6 +5074,89 @@ function renderDockEvidenceSceneBox(box) {
   }
 }
 
+// ---------- P1.6: the ledger's collapsible sections ----------
+// ONE header + ONE body per section. `buildBody` may fill the container it is
+// handed or simply return the element to put in the body — the existing
+// builders are unchanged (they still just append/return their element). The
+// default is CLOSED: the ledger greets the writer with its shape, not with
+// forty cards.
+//
+// The section's `data-open` attribute is the contract everything else reads
+// (CSS, audits, tests) — never a class, never a style. `aria-expanded` on the
+// header button mirrors it, so the state is announced, not just painted.
+function dockSection(key, title, buildBody, opts) {
+  const defaultOpen = !!(opts && opts.defaultOpen);
+  const open = dockSectionIsOpen(key, defaultOpen);
+  const sec = el("div", "dock-section");
+  sec.dataset.key = key;
+  sec.dataset.open = open ? "true" : "false";
+
+  const head = el("button", "dock-section-head");
+  head.type = "button";
+  head.setAttribute("aria-expanded", open ? "true" : "false");
+  const chev = el("span", "dock-section-chevron", "\u25B8"); // ▸
+  chev.setAttribute("aria-hidden", "true"); // decorative: aria-expanded carries the state
+  head.appendChild(chev);
+  const titleEl = typeof title === "string" ? el("span", "dock-section-title", title) : title;
+  if (titleEl) {
+    if (!titleEl.classList.contains("dock-section-title")) titleEl.classList.add("dock-section-title");
+    head.appendChild(titleEl);
+  }
+
+  const body = el("div", "dock-section-body");
+  const inner = el("div", "dock-section-body-inner");
+  // aria-controls wants a stable id; keys may carry characters ids dislike
+  const bodyId = "dock-section-body-" + String(key).replace(/[^A-Za-z0-9_-]/g, "-");
+  inner.id = bodyId;
+  head.setAttribute("aria-controls", bodyId);
+  const built = typeof buildBody === "function" ? buildBody(inner) : buildBody;
+  if (built) inner.appendChild(built);
+  body.appendChild(inner);
+
+  head.addEventListener("click", () => setDockSectionOpen(sec, sec.dataset.open !== "true"));
+  sec.appendChild(head);
+  sec.appendChild(body);
+  return sec;
+}
+
+/** Is `key` open? The writer's stored choice wins; otherwise the section's own
+ *  default (closed — see dockSection). */
+function dockSectionIsOpen(key, defaultOpen) {
+  const v = loadPrefs()["dock_section_" + key];
+  return typeof v === "boolean" ? v : !!defaultOpen;
+}
+
+/** Open or close ONE section: the attribute (CSS + audits + tests), the
+ *  header's aria-expanded, and the preference that outlives the session. */
+function setDockSectionOpen(sec, open, persist) {
+  if (!sec) return;
+  const key = sec.dataset ? sec.dataset.key : "";
+  sec.dataset.open = open ? "true" : "false";
+  const head = sec.querySelector(":scope > .dock-section-head");
+  if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+  if (persist !== false && key) savePrefs({ ["dock_section_" + key]: !!open });
+}
+
+/** Reveal the collapsed section(s) that hold `node`. The APP calls this when it
+ *  has to show something inside a collapsed section — the fix loop's current
+ *  card is the case that matters: stepping the loop onto a finding whose card
+ *  sits behind a closed header must open that header, or the loop would look
+ *  like it did nothing. Persisted on purpose: every intent mark re-renders the
+ *  ledger from prefs, and the card the writer is working on must still be open
+ *  after that. */
+function revealDockSectionFor(node) {
+  if (!node || !node.closest) return false;
+  let opened = false;
+  let sec = node.closest('.dock-section[data-open="false"]');
+  while (sec) {
+    setDockSectionOpen(sec, true);
+    opened = true;
+    const up = sec.parentElement;
+    sec = up ? up.closest('.dock-section[data-open="false"]') : null;
+  }
+  return opened;
+}
+
 /**
  * Full Evidence Overview render. Called when: the dock opens on the evidence
  * lens, the lens switches to evidence, and after any manuscript re-render
@@ -5115,9 +5212,11 @@ function renderDockEvidence() {
   // -- 2. Fix Queue (What should I do next?) -------------------------------
   // The queue is the doctor's ordered to-do; it opens first for a reason.
   // addPanel() appends the .craft-panel straight into this section div.
-  const fqWrap = el("div", "dock-section dock-section-fixqueue");
+  const fqWrap = el("div", "dock-section-fixqueue");
   renderFixQueuePanel(fqWrap); // existing function, reused verbatim
-  if (fqWrap.children.length) lens.appendChild(fqWrap);
+  if (fqWrap.children.length) {
+    lens.appendChild(dockSection("fix-queue", "Fix queue", fqWrap));
+  }
 
   // -- 3. findings on the current scene (Where, precisely) -----------------
   const data = prepareManuscriptData(); // the single source of truth
@@ -5127,29 +5226,24 @@ function renderDockEvidence() {
     ? (data.byScene[sceneNum] || []).filter(({ f, index }) => findingPassesFilter(f, index))
     : [];
   if (sceneFindings.length) {
-    const sec = el("div", "dock-section dock-section-scene-findings");
-    const title = el("div", "dock-section-title",
-      sceneNum != null ? `Findings — Scene ${sceneNum}` : "Findings — script level");
-    sec.appendChild(title);
     const list = el("div", "dock-finding-list");
     for (const { f, index } of sceneFindings) {
       // Addressed / Still Present rides along (MD §7 preserve list)
       list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     }
-    sec.appendChild(list);
+    const sec = dockSection("scene-findings",
+      sceneNum != null ? `Findings — Scene ${sceneNum}` : "Findings — script level", list);
+    sec.classList.add("dock-section-scene-findings"); // hook kept for the audits
     lens.appendChild(sec);
   }
   // script-level findings ride beneath the scene's own
   const scriptLevel = (data.scriptLevel || []).filter(({ f, index }) => findingPassesFilter(f, index));
   if (scriptLevel.length) {
-    const sec = el("div", "dock-section");
-    sec.appendChild(el("div", "dock-section-title", "Script-level findings"));
     const list = el("div", "dock-finding-list");
     for (const { f, index } of scriptLevel) {
       list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     }
-    sec.appendChild(list);
-    lens.appendChild(sec);
+    lens.appendChild(dockSection("script-level", "Script-level findings", list));
   }
 
   // -- 4. findings grouped by category (How serious, organized) ------------
@@ -5163,56 +5257,72 @@ function renderDockEvidence() {
     if (!findingPassesFilter(f, index)) return;
     (byCat[f.category] = byCat[f.category] || []).push({ f, index });
   });
-  for (const [cat, list] of Object.entries(byCat)) {
-    const sec = el("div", "dock-section");
-    const title = el("div", "dock-section-title");
-    title.appendChild(el("span", "", CATEGORY_LABELS[cat] || cat));
-    title.appendChild(el("span", "dock-section-count", String(list.length)));
-    sec.appendChild(title);
-    const wrap = el("div", "dock-finding-list");
-    for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
-    sec.appendChild(wrap);
-    lens.appendChild(sec);
+  const catKeys = Object.keys(byCat);
+  if (catKeys.length) {
+    // ONE collapsible "By category" section holding the per-category groups:
+    // the groups keep their own sub-heads (and their counts), the section is
+    // the single thing to open — the collapsed header prints the total, so the
+    // closed state still says how much is in there.
+    const groups = el("div", "dock-cat-groups");
+    let total = 0;
+    for (const cat of catKeys) {
+      const list = byCat[cat];
+      total += list.length;
+      const group = el("div", "dock-cat-group");
+      const title = el("div", "dock-section-title");
+      title.appendChild(el("span", "", CATEGORY_LABELS[cat] || cat));
+      title.appendChild(el("span", "dock-section-count", String(list.length)));
+      group.appendChild(title);
+      const wrap = el("div", "dock-finding-list");
+      for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
+      group.appendChild(wrap);
+      groups.appendChild(group);
+    }
+    const head = el("span", "dock-section-title");
+    head.appendChild(el("span", "", "By category"));
+    head.appendChild(el("span", "dock-section-count", String(total)));
+    lens.appendChild(dockSection("by-category", head, groups));
   }
   // honest emptiness: findings exist but the filter hides them all — the
-  // writer asked for a narrower view, and the board says so (never a blank)
+  // writer asked for a narrower view, and the board says so (never a blank).
+  // NOT a section: there is nothing to collapse, and a notice the writer has
+  // to click open is exactly the blank it exists to prevent.
   const anyBoardCards = sceneFindings.length + scriptLevel.length;
   if (!anyBoardCards && Object.keys(byCat).length === 0 && (state.findings || []).length) {
-    const sec = el("div", "dock-section");
-    sec.appendChild(el("div", "dock-lens-hint",
+    const notice = el("div", "dock-notice");
+    notice.appendChild(el("div", "dock-lens-hint",
       "No findings match the current filter — toggle a severity or category chip above to widen the view."));
-    lens.appendChild(sec);
+    lens.appendChild(notice);
   }
 
   // -- 5. Coverage ----------------------------------------------------------
   const cov = state.report && state.report.coverage;
   if (cov) {
-    const sec = el("div", "dock-section");
-    const head = el("div", "dock-section-title",
-      `Coverage — ${(cov.recommendation || "").toUpperCase()}`);
-    sec.appendChild(head);
-    if (cov.logline) sec.appendChild(el("p", "dock-cov-logline", cov.logline));
-    (cov.weaknesses || []).forEach((w) => sec.appendChild(el("p", "dock-cov-weak", "• " + w)));
-    // Evidence depth (§5 item 4): how much of this report read the pages, and how
-    // much read a model-written summary of them. Absent on reports analysed before
-    // the field existed, so it is rendered only when present.
-    const depth = state.report && state.report.stats && state.report.stats.evidence_depth;
-    if (depth && depth.total) {
-      const covStats = state.report.stats || {};
-      const mixed = depth.overview_and_checkpoints || 0;
-      let depthTxt = `Evidence depth — ${depth.full_text} of ${depth.total} from the full script text, `
-        + `${depth.overview} from scene summaries`;
-      if (mixed) {
-        const cov2 = covStats.checkpoint_coverage;
-        const where = (cov2 && cov2.scenes && cov2.scenes.length)
-          ? ` (scenes ${cov2.scenes.join(", ")})` : "";
-        depthTxt += `, ${mixed} from scene summaries plus the raw pages of the key scenes${where}`;
-      }
-      const line = el("p", "dock-cov-depth", depthTxt + ".");
-      line.title = "Script-level passes reason mostly from scene summaries rather than the raw pages. "
-        + "Treat those findings as a second opinion on structure, not a reading of your pages.";
-      sec.appendChild(line);
-    }
+    const sec = dockSection("coverage",
+      `Coverage — ${(cov.recommendation || "").toUpperCase()}`, (inner) => {
+        if (cov.logline) inner.appendChild(el("p", "dock-cov-logline", cov.logline));
+        (cov.weaknesses || []).forEach((w) => inner.appendChild(el("p", "dock-cov-weak", "• " + w)));
+        // Evidence depth (§5 item 4): how much of this report read the pages, and how
+        // much read a model-written summary of them. Absent on reports analysed before
+        // the field existed, so it is rendered only when present.
+        const depth = state.report && state.report.stats && state.report.stats.evidence_depth;
+        if (depth && depth.total) {
+          const covStats = state.report.stats || {};
+          const mixed = depth.overview_and_checkpoints || 0;
+          let depthTxt = `Evidence depth — ${depth.full_text} of ${depth.total} from the full script text, `
+            + `${depth.overview} from scene summaries`;
+          if (mixed) {
+            const cov2 = covStats.checkpoint_coverage;
+            const where = (cov2 && cov2.scenes && cov2.scenes.length)
+              ? ` (scenes ${cov2.scenes.join(", ")})` : "";
+            depthTxt += `, ${mixed} from scene summaries plus the raw pages of the key scenes${where}`;
+          }
+          const line = el("p", "dock-cov-depth", depthTxt + ".");
+          line.title = "Script-level passes reason mostly from scene summaries rather than the raw pages. "
+            + "Treat those findings as a second opinion on structure, not a reading of your pages.";
+          inner.appendChild(line);
+        }
+      });
     lens.appendChild(sec);
   }
 
@@ -5222,27 +5332,37 @@ function renderDockEvidence() {
   // text rows below (the record — nothing lost, flag don't drop).
   const sp = state.report && state.report.setup_payoff;
   if (sp && sp.length) {
-    const sec = el("div", "dock-section");
-    sec.appendChild(el("div", "dock-section-title", "Setup / Payoff"));
-    sec.appendChild(buildSetupPayoffSpine(sp));
-    sp.forEach((e2) => {
-      const setScenes = (e2.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
-      const payScenes = (e2.payoff_scenes && e2.payoff_scenes.length) ? e2.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
-      const row = el("p", "dock-sp-row", `[${SP_STATUS[e2.status] || e2.status}] ${e2.setup} — set up in ${setScenes}, payoff: ${payScenes}`);
-      if (e2.kind) row.appendChild(el("span", "dock-sp-kind", e2.kind));
-      if (e2.note) row.appendChild(el("p", "fix-row-why", e2.note));
-      sec.appendChild(row);
-    });
-    lens.appendChild(sec);
+    lens.appendChild(dockSection("setup-payoff", "Setup / Payoff", (inner) => {
+      inner.appendChild(buildSetupPayoffSpine(sp));
+      sp.forEach((e2) => {
+        const setScenes = (e2.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
+        const payScenes = (e2.payoff_scenes && e2.payoff_scenes.length) ? e2.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
+        const row = el("p", "dock-sp-row", `[${SP_STATUS[e2.status] || e2.status}] ${e2.setup} — set up in ${setScenes}, payoff: ${payScenes}`);
+        if (e2.kind) row.appendChild(el("span", "dock-sp-kind", e2.kind));
+        if (e2.note) row.appendChild(el("p", "fix-row-why", e2.note));
+        inner.appendChild(row);
+      });
+    }));
   }
 
-  // -- 7. Pacing (per-report pace bars) + Character dials + Writer's Mirror -
-  // Same panels the craft shelf and the feedback room render — verbatim.
-  const craftWrap = el("div", "dock-section dock-craft");
-  renderPacingPanel(craftWrap);
-  renderCharacterPanel(craftWrap);
-  renderCharacterDialsPanel(craftWrap);
-  renderWriterMirrorPanel(craftWrap);
+  // -- 7. Pacing + Characters + Dials + Writer's Mirror ----------------------
+  // Same panels the craft shelf renders — verbatim, one section each: every one
+  // of them answers a different question, and a writer who only wants the dials
+  // should not have to scroll past the pacing chart. `.dock-craft` stays as the
+  // group hook the audits and the CSS target; an empty panel (report lacks the
+  // data) contributes no section at all.
+  const craftWrap = el("div", "dock-craft");
+  for (const [key, title, render] of [
+    ["pacing", "Pacing", renderPacingPanel],
+    ["characters", "Characters", renderCharacterPanel],
+    ["dials", "Character dials", renderCharacterDialsPanel],
+    ["mirror", "Writer's Mirror", renderWriterMirrorPanel],
+  ]) {
+    const box = el("div");
+    render(box); // the panel returns early when the report has no data for it
+    if (!box.children.length) continue;
+    craftWrap.appendChild(dockSection(key, title, box));
+  }
   if (craftWrap.children.length) lens.appendChild(craftWrap);
 
   // any lens rebuild mid-loop (filter toggle, intent change) wiped the
@@ -5518,6 +5638,7 @@ function stepLoop(dir) {
   // chip auto-open: the dock card expands to the same finding
   const card = document.querySelector(`.dock-lens[data-lens="evidence"] .finding-note[data-finding-index="${index}"]`);
   if (card) {
+    revealDockSectionFor(card); // P1.6: the card may sit behind a closed header
     card.classList.add("expanded", "loop-current");
     card.scrollIntoView({ block: "nearest" });
     document.querySelectorAll(".dock-lens[data-lens=\"evidence\"] .finding-note.loop-current").forEach((n) => {
@@ -5563,7 +5684,10 @@ function renderLoopBar() {
   // transient card state rides the re-render: re-dock the current expansion
   if (cur) {
     const card = document.querySelector(`.dock-lens[data-lens="evidence"] .finding-note[data-finding-index="${cur.index}"]`);
-    if (card) card.classList.add("expanded", "loop-current");
+    if (card) {
+      revealDockSectionFor(card); // the re-render may have re-closed its section
+      card.classList.add("expanded", "loop-current");
+    }
   }
 }
 function copyFindingEvidence(f) {

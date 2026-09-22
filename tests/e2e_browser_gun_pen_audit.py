@@ -13,6 +13,11 @@ Screenshots and results land in gitignored scratch:
 write into the versioned `impl-shots/` instead — see the note at SHOTS below for
 why that is a deliberate act and not the default.
 No production code changes; gaps are filed in NOTES.md by the operator.
+
+P1.6: the Evidence ledger's sections are collapsed by default, and a closed body
+is hidden (not painted, not in the a11y tree, not part of innerText). Every stage
+below that inspects or clicks INSIDE a section opens the sections first
+(open_dock_section_holding) — the writer's own move.
 """
 import json
 import os
@@ -27,7 +32,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)  # for screenplay_studio / screenplay_cowriter imports
-from e2e_browser_common import Checks, launch, note, studio_headers  # noqa: E402
+from e2e_browser_common import (Checks, launch, note,  # noqa: E402
+                                open_dock_section_holding, studio_headers)
 
 BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8500").rstrip("/")
 PROJECT = os.environ.get("GUNPEN_PROJECT", "gun_pen_2")
@@ -207,6 +213,13 @@ def step_matrix():
         open_project(page, PROJECT)
         open_dock(page, "evidence")
         lens = page.locator('.dock-lens[data-lens="evidence"]')
+        # P1.6: every Evidence section is collapsed by default and a closed body
+        # is hidden (not painted, not in the a11y tree, and NOT part of
+        # innerText — `all_inner_texts()` sees "" inside it). This audit exists
+        # to inspect what each panel RENDERS, so it opens them all first — the
+        # writer's own move, once per section.
+        _opened = open_dock_section_holding(page, ".dock-section-body")
+        note("P1.6: dock sections opened for the audit", f"{_opened} section(s)")
 
         # -- STEP 2: baseline ------------------------------------------------
         shot(page, "A00-baseline-board.png")
@@ -483,6 +496,10 @@ def step_escalation():
             close_room(page)
             open_dock(page, "evidence")
             lens = page.locator('.dock-lens[data-lens="evidence"]')
+            # P1.6: the escalation routes click INSIDE dock sections (cards, queue
+            # rows) — open them first, as the writer must, or the click has no
+            # reachable target.
+            open_dock_section_holding(page, ".dock-section-body")
             widen_filter(page, lens)
             page.wait_for_timeout(450)
             return lens

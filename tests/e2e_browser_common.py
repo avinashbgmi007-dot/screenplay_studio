@@ -150,6 +150,55 @@ def note(label, value=""):
     print(f"  NOTE  {label}" + (f"  [{value}]" if value else ""))
 
 
+# ---------- evidence-dock helpers (P1.6 collapsible sections) ----------------
+# P1.6 put every section of the Evidence ledger behind a real header button with
+# its body collapsed by DEFAULT, and a closed body is genuinely hidden: not
+# painted, not in the tab order, not in the accessibility tree, and not part of
+# `innerText` (Playwright's inner_text()/all_inner_texts() return "" for a
+# hidden subtree; text_content() still sees it). A suite that wants to CLICK or
+# READ inside a section therefore does what the writer does first — open it.
+# Both helpers are bounded and never raise, like clicked()/seen_visible().
+
+def open_dock_section(page, key, timeout=4000):
+    """Open the Evidence dock's section `key`; True if it ends up open.
+
+    No-op (True) when the section is already open; False when there is no such
+    section or the header could not be clicked.
+    """
+    sec = page.locator(f'.dock-lens[data-lens="evidence"] .dock-section[data-key="{key}"]')
+    if not sec.count():
+        return False
+    if sec.first.get_attribute("data-open") == "true":
+        return True
+    if not clicked(sec.first.locator(".dock-section-head"), timeout=timeout):
+        return False
+    return sec.first.get_attribute("data-open") == "true"
+
+
+def open_dock_section_holding(page, inner_selector, timeout=4000):
+    """Open every collapsed section that holds a match for `inner_selector`.
+
+    Callers ask by CONTENT, not by key, because the same card renders in
+    different sections depending on the scene and the ONE filter (this-scene >
+    fix queue > by category). Returns how many sections it opened.
+    """
+    idx = page.evaluate(
+        """(sel) => {
+             const lens = document.querySelector('.dock-lens[data-lens="evidence"]');
+             if (!lens) return [];
+             return [...lens.querySelectorAll('.dock-section')]
+               .map((s, i) => ({ i, has: !!s.querySelector(sel),
+                                 open: s.getAttribute('data-open') }))
+               .filter((x) => x.has && x.open !== 'true').map((x) => x.i);
+           }""", inner_selector)
+    opened = 0
+    for i in idx:
+        sec = page.locator('.dock-lens[data-lens="evidence"] .dock-section').nth(i)
+        if clicked(sec.locator(".dock-section-head"), timeout=timeout):
+            opened += 1
+    return opened
+
+
 # ---------- studio boot ------------------------------------------------------
 
 # Chromium refuses to NAVIGATE to a list of ports it considers unsafe for the web

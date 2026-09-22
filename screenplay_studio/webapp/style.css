@@ -5889,6 +5889,32 @@ body.river-read #right-edge-affordance { display: none; }
 
 /* section scaffolding: one header + the reused legacy panel bodies */
 .dock-section { margin-bottom: var(--sp-8); min-width: 0; }
+/* P1.6 — the header is a real <button>: it carries the hairline the plain
+   title used to have, and the whole row is the hit target. */
+.dock-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 0 var(--sp-3) 0;
+  border-bottom: 1px solid var(--line-soft);
+  margin: 0 0 var(--sp-4) 0;
+}
+.dock-section-head:hover { color: var(--text); }
+.dock-section-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+.dock-section-chevron {
+  flex: 0 0 auto;
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  transition: transform 0.2s ease;
+}
+.dock-section[data-open="true"] .dock-section-chevron { transform: rotate(90deg); }
 .dock-section-title {
   display: flex;
   align-items: baseline;
@@ -5902,6 +5928,29 @@ body.river-read #right-edge-affordance { display: none; }
   border-bottom: 1px solid var(--line-soft);
   margin-bottom: var(--sp-4);
 }
+/* inside a header the title drops its own hairline/rhythm — the head owns both */
+.dock-section-head .dock-section-title {
+  flex: 1 1 auto;
+  padding: 0;
+  border: none;
+  margin: 0;
+}
+/* the body: 1fr → 0fr is the height collapse (grid rows, no measured px). The
+   closed state also leaves the a11y tree + the hit-test tree via visibility,
+   so a closed section can be neither tabbed into nor clicked through. */
+.dock-section-body { display: grid; grid-template-rows: 1fr; min-width: 0; }
+.dock-section[data-open="false"] .dock-section-body { grid-template-rows: 0fr; }
+.dock-section-body-inner { min-height: 0; overflow: hidden; }
+.dock-section[data-open="false"] .dock-section-body-inner { visibility: hidden; }
+/* the height animation is opt-in: under prefers-reduced-motion the body simply
+   snaps open/closed, with no transition to run */
+@media (prefers-reduced-motion: no-preference) {
+  .dock-section-body { transition: grid-template-rows 0.18s ease; }
+}
+/* the honest-empty notice is NOT a section — nothing to collapse */
+.dock-notice { margin-bottom: var(--sp-8); min-width: 0; }
+/* by-category groups inside the one "By category" section */
+.dock-cat-group + .dock-cat-group { margin-top: var(--sp-7); }
 .dock-section-count {
   font-size: var(--fs-2xs);
   font-weight: 600;
