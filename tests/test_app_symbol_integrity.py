@@ -81,3 +81,22 @@ def test_problem_board_is_gone():
     with open(_INDEX_HTML, encoding="utf-8") as f:
         # the element id, not the historical phrase in comments
         assert 'id="problem-board"' not in f.read()
+
+
+def test_mass_strip_reads_the_one_counter():
+    # P0.3 rider (spec §7/§8): EVERY count in the dock comes from the one
+    # counting path. The mass strip is the last surface that walked
+    # state.findings itself: it kept a private `findingOpen` scan for its
+    # headline, its severity mass and its category weights, so the day
+    # findingCounts() gains a rule (a new disposition, a scope) the strip's
+    # numbers start drifting from the chips, the queue header and the dawn
+    # meter -- silently, in the one place the writer reads as "the truth about
+    # this script". It now presents findingCounts()'s scan instead of running
+    # its own.
+    body = (_top_level_functions(_source()).get("buildScriptMassStrip") or [""])[0]
+    assert "findingOpen(" not in body, \
+        "the mass strip must not decide what is open -- read findingCounts()"
+    assert "forEach" not in body, \
+        "the mass strip must not scan the findings itself -- read findingCounts()"
+    assert "findingCounts()" in body, \
+        "the mass strip must print the one counter's numbers"

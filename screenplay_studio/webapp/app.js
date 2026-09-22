@@ -5189,6 +5189,34 @@ function revealDockSectionFor(node) {
 }
 
 /**
+ * P1.8 (spec §5): ONE rendering per finding per panel.
+ *
+ * The ledger has three card sections — this scene, script-level, and the
+ * categorized "Live findings" list — and the live list is a view over EVERY
+ * finding that passes the filter, so without a claim the same finding was
+ * carded twice: once where the writer is reading, once again under its
+ * category (measured on the demo report: `6 (scene-findings + by-category)` and
+ * `7 (script-level + by-category)`). `dedupeDockFindings` takes the indices the
+ * higher-precedence sections already rendered and returns the set the later
+ * sections skip. Precedence: this-scene strip → script-level → live list, i.e.
+ * the most contextual rendering wins and the categorized list is the catch-all.
+ *
+ * The fix queue is deliberately NOT a claimer. /fixqueue emits exactly one row
+ * per report finding (webapp_server.get_fixqueue), so letting the queue claim
+ * ids would empty the categorized ledger on every analyzed project — and §5
+ * wants both sections to exist: the queue is the compact to-do line
+ * (Locate/Rewrite/Discuss/Dismiss), the card is the evidence view (quote +
+ * verification + intent). What must never repeat is the CARD.
+ */
+function dedupeDockFindings(...claimedIndexLists) {
+  const claimed = new Set();
+  for (const list of claimedIndexLists) {
+    for (const index of (list || [])) claimed.add(index);
+  }
+  return claimed;
+}
+
+/**
  * Full Evidence Overview render. Called when: the dock opens on the evidence
  * lens, the lens switches to evidence, and after any manuscript re-render
  * (the renderManuscript tail calls refreshDockEvidence()) so undo/redo/
@@ -5282,9 +5310,15 @@ function renderDockEvidence() {
   // findingNoteEl card (actions intact) instead of the read-only row.
   // The ONE filter applies here too (R5-b): the chips above drive what
   // shows, so the board and the page agree by construction.
+  // P1.8: and it is the CATCH-ALL — the two sections above already carded
+  // these findings where they belong, so this one skips their indices and the
+  // ledger renders each finding exactly once (spec §5).
+  const carded = dedupeDockFindings(sceneFindings.map((o) => o.index),
+    scriptLevel.map((o) => o.index));
   const byCat = {};
   (state.report && state.report.findings || []).forEach((f, i) => {
     const index = f.index != null ? f.index : i;
+    if (carded.has(index)) return;
     if (!findingPassesFilter(f, index)) return;
     (byCat[f.category] = byCat[f.category] || []).push({ f, index });
   });
@@ -5327,7 +5361,12 @@ function renderDockEvidence() {
     const head = el("span", "dock-section-title");
     head.appendChild(el("span", "", "Live findings"));
     head.appendChild(el("span", "dock-section-count", String(total)));
-    head.title = "Every live finding, highs first, grouped by category";
+    // scope honesty (N3): after P1.8 this section holds the findings the two
+    // above did NOT card, so its count must not read as the whole ledger's.
+    head.title = carded.size
+      ? `Live findings the sections above did not card — highs first, grouped by `
+        + `category (${carded.size} more carded in this scene / script level)`
+      : "Every live finding, highs first, grouped by category";
     lens.appendChild(dockSection("by-category", head, groups));
   }
   // honest emptiness: findings exist but the filter hides them all — the
@@ -5835,15 +5874,28 @@ function inFindingFilter(f) {
  *  filtered one (the "6 open of 6 findings" over "0 shown / 6 total"
  *  contradiction). Only disposition "open" is open and only "addressed" is
  *  addressed — deferred/dismissed/ghosted are parked out of both, so the
- *  writer's intent moves every surface that reads this. */
+ *  writer's intent moves every surface that reads this.
+ *
+ *  `bySeverity`/`byCategory` weigh the OPEN findings on the same pass: the
+ *  mass strip is orientation, and orientation that walks the findings itself is
+ *  a seventh counter waiting to drift (spec §8 rider — every count in the dock
+ *  comes through here). */
 function findingCounts() {
   const findings = state.findings || [];
-  const c = { total: findings.length, open: 0, addressed: 0, shown: 0, openShown: 0 };
+  const c = {
+    total: findings.length, open: 0, addressed: 0, shown: 0, openShown: 0,
+    bySeverity: { high: 0, medium: 0, low: 0 }, byCategory: {},
+  };
   findings.forEach((f, index) => {
     const d = findingDisposition(f, index);
     const isOpen = d === "open";
-    if (isOpen) c.open += 1;
-    else if (d === "addressed") c.addressed += 1;
+    if (isOpen) {
+      c.open += 1;
+      const sev = (f.severity || "low").toLowerCase();
+      if (c.bySeverity[sev] != null) c.bySeverity[sev] += 1;
+      const cat = f.category || "other";
+      c.byCategory[cat] = (c.byCategory[cat] || 0) + 1;
+    } else if (d === "addressed") c.addressed += 1;
     if (inFindingFilter(f)) {
       c.shown += 1;
       if (isOpen) c.openShown += 1;
@@ -5998,31 +6050,24 @@ function syncSceneFilterChip(chip) {
 
 /** Whole-script orientation strip: open/total + severity mass + category
  *  weights + the trust readout (verification_summary ships in the report and
- *  rendered nowhere else). Static by design — orientation, not interaction. */
+ *  rendered nowhere else). Static by design — orientation, not interaction.
+ *
+ *  Every number below is PRESENTATION: findingCounts() decides what is open and
+ *  weighs it (spec §8 rider — every count in the dock comes through the one
+ *  path). The strip used to walk state.findings a second time for its headline,
+ *  its severity mass and its category weights: the seventh counter the counting
+ *  contract exists to prevent, and the one place a silent drift would read to
+ *  the writer as "the truth about the whole script". */
 function buildScriptMassStrip() {
   const strip = el("div", "dock-mass-strip");
-  const findings = state.findings || [];
-  if (!findings.length) return strip;
-  const open = (f, index) => findingOpen(f, index);
-  const sev = { high: 0, medium: 0, low: 0 };
-  const cat = {};
-  let openTotal = 0;
-  findings.forEach((f, index) => {
-    if (!open(f, index)) return;
-    openTotal += 1;
-    const s = (f.severity || "low").toLowerCase();
-    if (sev[s] != null) sev[s] += 1;
-    const c = f.category || "other";
-    cat[c] = (cat[c] || 0) + 1;
-  });
-  if (!openTotal) return strip;
+  const m = findingCounts(); // the whole-script scope, from the ONE counter
+  if (!m.total || !m.open) return strip;
   const head = el("div", "dock-mass-head");
   // scope honesty: this strip always describes the WHOLE script. When the ONE
   // filter narrows the view, it says how much of the total is in view — without
   // that, "6 open of 6" reads as a claim about the filtered board below it.
-  const mV = findingCounts();
-  const mText = openTotal + " open of " + findings.length + " findings" +
-    (mV.shown < mV.total ? " \u00B7 " + mV.openShown + " shown by filter" : "");
+  const mText = m.open + " open of " + m.total + " findings" +
+    (m.shown < m.total ? " \u00B7 " + m.openShown + " shown by filter" : "");
   head.appendChild(el("span", "dock-mass-total", mText));
   // Trust readout: only findings that CARRY a quote can be verified, so
   // `no_quote` findings must not sit in the denominator. Counting them turned
@@ -6047,27 +6092,28 @@ function buildScriptMassStrip() {
   // severity mass: dots + printed counts — never color-alone
   const mass = el("div", "dock-mass-sev");
   for (const s of ["high", "medium", "low"]) {
-    if (!sev[s]) continue;
-    const m = el("span", "dock-mass-mark");
-    m.title = sev[s] + " " + s;
-    m.appendChild(el("i", "sev-dot " + s));
-    m.appendChild(el("span", "dock-mass-count", String(sev[s])));
-    mass.appendChild(m);
+    if (!m.bySeverity[s]) continue;
+    const mark = el("span", "dock-mass-mark");
+    mark.title = m.bySeverity[s] + " " + s;
+    mark.appendChild(el("i", "sev-dot " + s));
+    mark.appendChild(el("span", "dock-mass-count", String(m.bySeverity[s])));
+    mass.appendChild(mark);
   }
   strip.appendChild(mass);
   // category weights: single-hue stacked bar (decorative, aria-hidden) with
   // the printed counts row beneath — same pattern as scene-index dots
-  const catKeys = Object.keys(cat).sort((a, b) => cat[b] - cat[a]);
+  const catKeys = Object.keys(m.byCategory).sort((a, b) => m.byCategory[b] - m.byCategory[a]);
   if (catKeys.length) {
     const bar = el("div", "dock-mass-cat");
     bar.setAttribute("aria-hidden", "true");
     for (const c of catKeys) {
       const seg = el("span", "dock-mass-cat-seg");
-      seg.style.width = (100 * cat[c] / openTotal) + "%";
+      seg.style.width = (100 * m.byCategory[c] / m.open) + "%";
       bar.appendChild(seg);
     }
     strip.appendChild(bar);
-    strip.appendChild(el("div", "dock-mass-cat-row", catKeys.map((c) => (CATEGORY_LABELS[c] || c) + " " + cat[c]).join(" \u00B7 ")));
+    strip.appendChild(el("div", "dock-mass-cat-row",
+      catKeys.map((c) => (CATEGORY_LABELS[c] || c) + " " + m.byCategory[c]).join(" \u00B7 ")));
   }
   return strip;
 }

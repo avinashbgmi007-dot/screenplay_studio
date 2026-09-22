@@ -214,7 +214,7 @@ function findingPassesFilter(f, index) {
 
 **Interfaces:** Produces: `dedupeDockFindings(queueIds, sceneIds) -> Set<id>` — precedence: this-scene strip > fix queue > by-category. A finding renders in exactly its highest-precedence section; later sections skip ids in the returned set.
 
-- [ ] **Step 1: Failing e2e**:
+- [x] **Step 1: Failing e2e**:
 
 ```python
 def test_finding_renders_once_in_dock(base, page):
@@ -223,11 +223,26 @@ def test_finding_renders_once_in_dock(base, page):
     assert occ == 1  # fails today: queue row + scene card + category card = 3
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** `dedupeDockFindings` and pass the seen-set through the section builders.
-- [ ] **Step 4: Gates** — `node --check`; e2e PASS; loop list (`startLoop`) unchanged (it reads the filter, not the DOM).
-- [ ] **Step 5: Commit** — `"P1.8: one rendering per finding in the ledger (scene > queue > category)"`
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement** `dedupeDockFindings` and pass the seen-set through the section builders.
+- [x] **Step 4: Gates** — `node --check`; e2e PASS; loop list (`startLoop`) unchanged (it reads the filter, not the DOM).
+- [x] **Step 5: Commit** — `"P1.8: one rendering per finding in the ledger (scene > queue > category)"`
 
+
+> **Executed 2026-09-22 with one change to the stated precedence.** The queue
+> is NOT a claimer: `webapp_server.get_fixqueue` emits exactly one row per
+> report finding, so `queueIds` in the skip-set would empty the categorized
+> live list on every analyzed project (and §5 wants both sections — the queue
+> row is the compact to-do, the card is the evidence view). What must not
+> repeat is the CARD, so `dedupeDockFindings(sceneIdx, scriptLevelIdx)` gates
+> the live list only, and its header tooltip says how many were carded above.
+>
+> **Also shipped in this commit (the spec §8 rider the plan never tasked):**
+> `buildScriptMassStrip` kept a private `findingOpen` scan for its headline,
+> severity mass and category weights — a seventh counting path. It now presents
+> `findingCounts()`'s `bySeverity`/`byCategory`, and
+> `test_mass_strip_reads_the_one_counter` fails the build if the strip starts
+> scanning findings again.
 ### Task 9: Arrival strip inversion + fix-loop CTA
 
 **Files:**

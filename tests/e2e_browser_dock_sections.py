@@ -1,5 +1,10 @@
 """P1.6 gate — the Evidence dock's sections REALLY collapse (plan §5).
 
+Grew two more ledger contracts as those phases landed: P1.7 (the scene is a
+FILTER dimension on the ONE filter row, never a surface of its own) and P1.8
+(spec §5 "one rendering per finding per panel" — the DOM is asked which section
+cards each finding, and no finding may answer twice).
+
 The dock's own comment promised "sections stack vertically and collapse under one
 header each" while every `.dock-section-title` was a plain div: nothing collapsed,
 nothing persisted. This suite pins the contract that makes the sentence true:
@@ -126,9 +131,11 @@ def seconds(value):
 #      panel on clean scenes and hides cross-scene crown jewels);
 #   3. a scene with zero LIVE findings shows the rail's quiet ✓ (spec §14.3),
 #      derived from findingDisposition — never a second counter.
+# P1.8 then moved WHERE a card lives (spec §5: one rendering per finding), so
+# "the ledger's card count" below means every card section together — asking one
+# section would now be asking for part of the answer.
 # ---------------------------------------------------------------------------
 SCENE_CHIP = ".fchip-scene"
-LIVE_LIST = '.dock-section[data-key="by-category"]'
 
 # The ledger, asked of the app itself (the gun-pen audit's row-C pattern): how
 # many findings are OPEN on `scene`, null meaning the whole script? Counted
@@ -197,8 +204,12 @@ SEED_JS = """(args) => {
   const fs = [
     mk("dialogue", "low", a.scene, a.lines[0], "SEED low dialogue on " + a.scene),
     mk("dialogue", "high", a.scene, a.lines[1], "SEED high dialogue on " + a.scene),
+    // Scene B carries TWO findings of one category on purpose: since P1.8 the
+    // current scene's pair is carded in the scene strip and out of the
+    // categorized list, so the highs-first group has to be a group the scene
+    // strip does NOT claim.
     mk("pacing", "medium", b.scene, b.lines[0], "SEED medium pacing on " + b.scene),
-    mk("structure", "low", b.scene, b.lines[1], "SEED low structure on " + b.scene),
+    mk("pacing", "high", b.scene, b.lines[1], "SEED high pacing on " + b.scene),
   ];
   state.findings = fs;
   state.report = Object.assign({}, state.report || {}, { findings: fs });
@@ -249,8 +260,35 @@ def chip_label(lens):
 
 
 def live_cards(lens):
-    """Cards in the ledger's live list — the default all-live-findings section."""
-    return lens.locator(LIVE_LIST + " .finding-note").count()
+    """Every deep card the ledger renders — across its card sections. Since P1.8
+    a finding is carded exactly ONCE (this scene's in the scene strip, the rest
+    in the categorized live list), so the ledger's whole card count is the
+    number comparable with the counting contract and with the page's ink."""
+    return lens.locator(".finding-note").count()
+
+
+def section_cards(lens, key):
+    """Cards inside one ledger section (hidden nodes count: the question is
+    WHERE a finding is rendered, not whether it is currently unfolded)."""
+    return lens.locator(f'.dock-section[data-key="{key}"] .finding-note').count()
+
+
+# The card surface, asked of the DOM rather than of the app's own arithmetic:
+# `data-finding-index` is stamped by findingNoteEl, so a finding rendered in two
+# sections shows up as one index with two section keys. Before P1.8 the current
+# scene's findings answered as `3:scene-findings+by-category` (and a script-level
+# one as `?:script-level+by-category`) — the spec §5 "not three times" defect.
+LEDGER_DUPES_JS = """() => {
+  const seen = {};
+  document.querySelectorAll('.dock-lens[data-lens="evidence"] .finding-note')
+    .forEach((n) => {
+      const k = n.dataset.findingIndex || "?";
+      const sec = n.closest(".dock-section");
+      (seen[k] = seen[k] || []).push((sec && sec.dataset.key) || "?");
+    });
+  return Object.keys(seen).filter((k) => seen[k].length > 1)
+    .map((k) => `${k} (${seen[k].join(" + ")})`);
+}"""
 
 
 def mass_strip_text(lens):
@@ -400,16 +438,50 @@ def check_seeded_scene_filter(page, lens):
     check("P1.7/seed: and the ink is split across both scenes",
           ink.get(str(scene_a)) == 2 and ink.get(str(scene_b)) == 2, f"ink={ink}")
 
-    group = page.evaluate(GROUP_CARDS_JS, "Dialogue") or []
+    # --- P1.8 (spec §5): one rendering per finding per panel ----------------
+    # The ledger has three card sections (this scene / script-level / by
+    # category) and before P1.8 a finding on the scene being read was carded in
+    # TWO of them — the same heavy card, twice, an empty line apart.
+    dupes = page.evaluate(LEDGER_DUPES_JS) or []
+    check("P1.8: no finding is carded in two ledger sections (chip off)",
+          not dupes, "; ".join(dupes))
+    check("P1.8: this scene's findings are carded once, in the scene strip, and "
+          "the categorized list holds only the rest of the script",
+          section_cards(lens, "scene-findings") == 2
+          and section_cards(lens, "by-category") == 2
+          and live_cards(lens) == 4,
+          f"scene={section_cards(lens, 'scene-findings')} "
+          f"live={section_cards(lens, 'by-category')}")
+    check("P1.8: the scene strip stays the 'where, precisely' surface — it holds "
+          "THIS scene's cards",
+          page.evaluate(
+              """(scene) => [...document.querySelectorAll(
+                   '.dock-section[data-key="scene-findings"] .finding-note')]
+                   .every((n) => ((state.findings || [])[n.dataset.findingIndex]
+                                   || {}).scene_refs?.includes(Number(scene)))""",
+              scene_a))
+
+    group = page.evaluate(GROUP_CARDS_JS, "Pacing") or []
     check("P1.7: the live groups read highs first",
           len(group) == 2 and group[0].startswith("SEED high")
-          and group[1].startswith("SEED low"), f"{group}")
+          and group[1].startswith("SEED medium"), f"{group}")
+    check("P1.8: a group the scene strip does not claim keeps every one of its "
+          "cards in the categorized list",
+          len(group) == 2 and section_cards(lens, "by-category") == 2, f"{group}")
 
     check("P1.7/seed: clicking the chip lands", click_scene_chip(page, lens))
     cards_on = live_cards(lens)
     ink_on = page.evaluate(INK_BY_SCENE_JS)
     check("P1.7/seed: chip on — the list narrows to the current scene's two findings",
           cards_on == 2, f"cards={cards_on}")
+    check("P1.8: chip on — the narrowed ledger is still one card per finding "
+          "(the scene strip claims them; the live list renders none twice)",
+          not (page.evaluate(LEDGER_DUPES_JS) or [])
+          and section_cards(lens, "scene-findings") == 2
+          and section_cards(lens, "by-category") == 0,
+          f"scene={section_cards(lens, 'scene-findings')} "
+          f"live={section_cards(lens, 'by-category')} "
+          f"dupes={page.evaluate(LEDGER_DUPES_JS)}")
     check("P1.7/seed: chip on — the ink narrows IDENTICALLY (ink count == list count)",
           sum(ink_on.values()) == cards_on == 2
           and ink_on.get(str(scene_a)) == 2 and str(scene_b) not in ink_on,
@@ -607,6 +679,12 @@ def run(base):
               (seconds(animated) is not None and seconds(animated) >= 0.1), animated)
 
         # --- 7. P1.7: the scene is a FILTER, not a surface (contracts above) --
+        # P1.8 first, on the report the model actually wrote: the whole ledger,
+        # however long, must card each finding exactly once before the seeded
+        # fixture gets a chance to make that easy.
+        real_dupes = page.evaluate(LEDGER_DUPES_JS) or []
+        check("P1.8: on the real report too, no finding is carded in two sections",
+              not real_dupes, "; ".join(real_dupes[:6]))
         check_scene_filter(page, lens)
         check_seeded_scene_filter(page, lens)
 
