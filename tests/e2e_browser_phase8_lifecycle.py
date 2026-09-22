@@ -52,6 +52,42 @@ def open_project(page, base, name):
     page.wait_for_selector("#manuscript-container .scene-page", timeout=20000)
 
 
+def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
+    """Move the mouse where a writer's would be, then poll until the control is
+    genuinely the hit target. Returns True/False — never raises.
+
+    `#desk-toolbar` and `#project-bar` are auto-hiding chrome: while idle they
+    carry `opacity: 0; pointer-events: none` (style.css `.auto-hide-chrome`), and
+    a mousemove with `clientY < 120` is what brings them back for 4s. Playwright's
+    `is_visible()` ignores opacity, so the old `check(name, desk_btn.is_visible())`
+    passed on a button no writer could actually click, and the following `.click()`
+    timed out with `<div id="manuscript-workspace">… intercepts pointer events`
+    (root-caused 2026-09-23: P1's heavier `openProject` pushed the first click
+    past the 4s idle timer, which is what turned this suite red).
+
+    Polling the real hit test also covers the second transition in the way —
+    `#sidebar.sidebar-collapsed` animates 264px -> 0 and briefly overlays the
+    toolbar's left edge, where this button sits.
+    """
+    page.mouse.move(700, 8)
+    deadline = time.time() + timeout / 1000
+    hit = "missing"
+    while time.time() < deadline:
+        hit = page.evaluate(
+            """(sel) => {
+              const e = document.querySelector(sel);
+              if (!e) return 'missing';
+              const r = e.getBoundingClientRect();
+              const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+              if (!t) return 'none';
+              return (e === t || e.contains(t)) ? 'ok' : t.tagName + '#' + (t.id || '-');
+            }""", sel)
+        if hit == "ok":
+            return True
+        page.wait_for_timeout(100)
+    return False
+
+
 def run(base):
     fresh = seed(base, "Lifecycle Probe")
     with sync_playwright() as p:
@@ -61,7 +97,8 @@ def run(base):
         open_project(page, base, fresh)
         desk_btn = page.locator("#desk-analyze-btn")
         status = page.locator("#desk-analyze-status")
-        check("unanalyzed: Run Analysis visible on the desk", desk_btn.is_visible())
+        check("unanalyzed: Run Analysis is REACHABLE on the desk (hover reveals it)",
+              reveal_chrome(page), "desk-analyze-btn never became the hit target")
         check("unanalyzed: button reads Run Analysis (not Re-run)",
               "Run Analysis" in desk_btn.inner_text() and "Re-run" not in desk_btn.inner_text())
         check("unanalyzed: honest status line",

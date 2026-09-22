@@ -33,7 +33,10 @@ from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio,
 # What the mock whisper server always "hears". Deterministic -> assertable.
 MOCK_TEXT = "the brass key hums when it rains"
 # The studio forwards /api/stt to this URL (set below before the studio boots).
-WHISPER_PORT = 8077
+# NEVER a fixed port: 8077 sat idle when this suite was written, and the mock
+# HTTPServer bound over whatever moved in later without erroring (Windows +
+# HTTPServer.allow_reuse_address), so the studio's POST went to a foreign
+# service and /api/stt answered 503. Port 0 lets the OS pick; see __main__.
 
 L1 = "A courier in Mumbai discovers her delivery bag swaps whatever is inside with an object from regret."
 L2 = "She keeps one swapped item: a brass key nobody has claimed."
@@ -57,14 +60,18 @@ class _MockWhisper(BaseHTTPRequestHandler):
         pass
 
 
-def start_mock_whisper(port=8077):
+def start_mock_whisper(port=0):
+    """Serve the mock on a port the OS hands back (port 0) — never a fixed one.
+
+    The caller must read the chosen port off `srv.server_address[1]` and put it
+    in SCREENPLAY_STUDIO_WHISPER_URL BEFORE the studio boots.
+    """
     srv = HTTPServer(("127.0.0.1", port), _MockWhisper)
     threading.Thread(target=srv.serve_forever, daemon=True, name="mock-whisper").start()
     return srv
 
 
 def run(base):
-    start_mock_whisper()
     with sync_playwright() as p:
         browser, page, errors = launch(p, launch_args=[
             "--use-fake-ui-for-media-stream",     # auto-grant the mic prompt
@@ -254,10 +261,11 @@ def run(base):
 if __name__ == "__main__":
     # the mock STT engine must exist BEFORE the studio boots: the studio is
     # pointed at it via SCREENPLAY_STUDIO_WHISPER_URL (inherited env)
-    start_mock_whisper(WHISPER_PORT)
-    os.environ["SCREENPLAY_STUDIO_WHISPER_URL"] = f"http://127.0.0.1:{WHISPER_PORT}"
+    mock = start_mock_whisper()
+    whisper_port = mock.server_address[1]
+    os.environ["SCREENPLAY_STUDIO_WHISPER_URL"] = f"http://127.0.0.1:{whisper_port}"
     try:
         with open_studio() as base:
             run(base)
     finally:
-        pass  # the mock daemon thread dies with the process
+        mock.shutdown()  # the daemon thread would die with the process anyway
