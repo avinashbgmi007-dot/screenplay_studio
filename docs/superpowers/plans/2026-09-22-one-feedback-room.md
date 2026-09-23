@@ -578,17 +578,22 @@ card is still reachable from the ledger.
 ### Task 20: Width budget — persona drawer vs dock (script never <50%)
 
 **Files:**
-- Modify: `app.js` — persona open paths (`openSameerWith`, 🩺 escalation ~4310), dock geometry
-- Modify: `style.css` — the <1600px swap rule
-- Test: `tests/e2e_browser_phase12_visual_motion.py` or the layout-audit suite (30-check layout audit mentioned in SESSION_SUMMARY) — add the 50% assertion
+- Test: `tests/e2e_browser_width_budget.py` (new) — the 50% assertion, per lens and after the 🩺 escalation
+- Modify: ~~`app.js`~~ / ~~`style.css`~~ — **no production change shipped**; see Deviations
 
-**Interfaces:** Produces: `PERSONA_BESIDE_DOCK_MIN_WIDTH = 1600` (app.js const). Below it: opening a persona collapses the dock to its edge button and mounts the chat in the dock's zone with the originating finding card pinned atop; at/above: side by side.
+**Interfaces:** ~~Produces: `PERSONA_BESIDE_DOCK_MIN_WIDTH = 1600`~~ — nothing to produce: the swap the rule described is already how the desk is built (the persona IS a dock lens, one lens at a time).
 
-- [ ] **Step 1: Failing e2e** — at 1440px viewport, open 🩺 from a finding card: assert `#manuscript-container` width ≥ 50% of viewport AND the originating card's quote is pinned atop the chat.
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** the width rule + pinned-card header in the persona drawer.
-- [ ] **Step 4: Gates** — `node --check`; layout audit green at 1440 and 1920.
-- [ ] **Step 5: Commit** — `"P3.20: persona-beside-dock width rule; manuscript never under 50%"`
+- [x] **Step 1: Failing e2e** — at 1440px viewport, open 🩺 from a finding card: assert `#manuscript-container` width >= 50% of viewport AND the originating card's quote is pinned atop the chat.
+- [x] **Step 2: Run, expect FAIL** — it passed; see Deviations 1-2 for what the first crash actually was, and the RED proof that the new gate can still fail.
+- [x] **Step 3: Implement** the width rule + pinned-card header — measured, already satisfied; the suite is the absence contract.
+- [x] **Step 4: Gates** — layout audit green at 1440 and 1920; width budget green at 1200/1440/1920.
+- [x] **Step 5: Commit** — `"P3.20: width-budget e2e — manuscript never under 50% (measured, not moved)"`
+
+**Deviations (recorded, not hidden):**
+1. The premise is obsolete. `PERSONA_BESIDE_DOCK_MIN_WIDTH = 1600` assumed two competing right-hand zones (dock + persona drawer side by side). Since Phase 5 there is ONE zone: `openDock(lens)` swaps lenses, `adoptChatIntoDock()` moves the Sameer/Sushruta panel INTO the dock's slot, and the legacy desk is `display:none` in script mode while `body.idea-mode #context-dock` is pinned to width 0 — so the two can never share the row. Nothing to squeeze, no 1600px rule to add.
+2. The suite's first run was a crash, not a red assert, and the root cause was the test, twice over: it measured the dock mid-transition (0.25s width animation, starved by the ledger render, so 1px at 350ms) and clicked a 🩺 button that was mounted-but-collapsed (ledger sections start closed since P1.6, so a DOM `count()` is not visibility). Fixed with a settle wait on real width and an unconditional `open_dock_section_holding()`.
+3. 1200px was added to the sweep — the tightest in-flow case (below 1200 the dock leaves the row for an overlay/bottom sheet, so the paper gains relief instead of losing it). Measured: 1440 -> manuscript 1015/1440 (70%); dock capped at 380 in flow.
+4. A passing gate is worthless if it cannot fail. RED proof run once here (not committed): with `width: 900px !important` forced on `#context-dock` at 1440, the same measurement reports manuscript 494px (34%) and the assertion goes red. The gate measures; it does not rubber-stamp.
 
 ### Task 21: Final gate
 

@@ -44,6 +44,15 @@ copy-pasted scans.
 browser battery (see below) · pytest (see below) · `tests/_p1_visual_gate.py`
 (see below) · `ruff` clean.
 
+- **2026-09-23 — ONE DESK, ONE LEDGER / P3.20: the 50% width budget measured out already true, so it ships as a gate, not a rule.**
+*(plan Task 20, spec §11.2)*
+**What the plan asked for:** `PERSONA_BESIDE_DOCK_MIN_WIDTH = 1600` — below it, opening a persona collapses the dock and takes its zone, because dock + persona drawer side by side can squeeze the manuscript under half the window.
+**What the desk actually is:** one right-hand zone. The personas ARE dock lenses, `openDock(lens)` swaps one for another, `adoptChatIntoDock()` moves the Sameer/Sushruta panel into `.dock-chat-slot`, the legacy desk is `display:none` outside idea mode, and `body.idea-mode #context-dock` is pinned to width 0. The two panels the rule separated cannot occupy the row together, so there is nothing to swap and no CSS to add. Manuscript measured at the tightest in-flow width (1200, because below it the dock leaves the row for an overlay): 1440 viewport -> 1015px of paper (70%); the dock is `flex: 0 0 auto` capped at 380.
+**What shipped:** `tests/e2e_browser_width_budget.py` (32 legs) — every lens plus the 🩺 escalation at 1200/1440/1920, asserting `#manuscript-container >= 50vw` and that the pinned quote is visible AND is the finding's own evidence text.
+**Two harness bugs, found the slow way.** The first run crashed rather than went red, and both causes were in the test: (1) it measured `#context-dock` mid-transition — 0.25s width/min-width animation, starved of frames by the ledger render, reading 1px at 350ms; now it waits for the real width. (2) It clicked a 🩺 button that was mounted but collapsed — since P1.6 ledger sections start closed, so `locator.count() > 0` is NOT visibility; `open_dock_section_holding()` now runs unconditionally.
+**A gate that passes on its first honest run proves nothing until it can fail.** Red proof (run once, not committed): forcing `#context-dock { width: 900px !important }` at 1440 makes the same measurement report 494px (34%) and the assertion goes red. The gate measures.
+**Gates.** `node --check` untouched (no app.js edit) · `tests/e2e_browser_width_budget.py` 32/32 · full browser battery + layout audit at 1440/1920 (see the run below).
+
 - **2026-09-23 — ONE DESK, ONE LEDGER / P2.18: the revision arc outlives one generation — the desk can now answer "is this converging?".**
 *(plan Task 18, spec §15.4)*
 **What was wrong:** the desk's entire memory of previous analyses was `last_pass.json` — exactly one generation back. After five rewrites the arrival strip could still only say "Pass: 36 → 22" about the newest pair, and the question a writer at pass five is actually asking was unanswerable.
