@@ -3,6 +3,45 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### The manuscript's inline edit has a keyboard path (WCAG 2.1.1)
+
+**What was wrong.** Editing a line on the page was one gesture: double-click. The
+`/edits/apply` path under it, the undo, the change-stars, the exports — all reachable
+without a mouse; the *entry point* was not.
+
+**The shape chosen, and why not the obvious one.** Nine hundred script lines must not
+become nine hundred tab stops — that swaps one barrier for a worse one. So the
+manuscript owns ONE stop (`#manuscript-container`, now `tabindex="0"` so Tab actually
+finds it, and `s` still jumps to it) and the arrows walk a focus cursor through the
+lines, which carry `tabindex="-1"`. `Enter` opens the line you are on. The region's own
+`#manuscript-container:focus { outline: none }` — "the whole pane is the surface" —
+became a `:focus-visible` ring inset to its own edge: a tab stop you cannot see is a
+2.4.7 failure whatever the comment claimed. `[class^=el-]` is the line set the app
+already treats as canonical (`markCurrentLine`, `flashQuoteLine`), so this reuses that
+contract instead of inventing a second one.
+
+**What changed.** `wireInlineEdit` now keeps its state in one closure object and binds
+`dblclick`/`keydown`/`blur` once each (the old code added a fresh `keydown` listener
+inside every double-click); `start()`/`finish()` are shared by both entry points. New:
+`manuscriptLines()`, `manuscriptLineIndex()`, `stepManuscriptLine()`, and
+`refillLineCursor()` — a keyboard save rebuilds the page, so the cursor goes back to
+the line just changed or the writer needs the mouse for the next one. Mouse edits do
+not steal focus. The arrows sit after the fix-loop block in the global handler, so the
+loop keeps `↑`/`↓` while it is engaged, and a line being edited is an
+`isTypingTarget`, so the caret keeps them while you type. CSS: one
+`:focus-visible:not(.inline-editing)` ring, token-coloured, so the dashed amber
+"you are editing" ring still wins while editing. `SHORTCUTS` gained the arrow row (and
+its Esc row lost the retired rail, missed in the pass above).
+
+**Gate.** `node --check` clean · `ruff` clean · new `tests/e2e_browser_keyboard_edit.py`
+**14/14** (RED first: 8 of its legs failed before the code existed, one of them —
+`ArrowUp walks back` — then failed for *my* wrong expectation, so it asserts the walk
+it names) · `run_browser_suites.py quickcheck one_matcher rewrite_loop
+phase14_signoff_journey keyboard_edit` → 5 suites, 0 failed ·
+`pytest tests/test_app_symbol_integrity.py tests/test_webapp_api.py` 88 passed.
+Docs updated at the four places that said "double-click": PRD US-3.1, ARCHITECTURE,
+USER_PERSONAS, UI_UX_SPEC §8 + §2.
+
 ### Structural rail: retired, not hidden (spec §11 / REDESIGN §6 box 3)
 
 **What was wrong.** `#struct-rail` was `display: none` but still fully wired: five

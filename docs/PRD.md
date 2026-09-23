@@ -65,8 +65,8 @@ server is reachable.
   *AC: dismiss persists; "Show/Hide dismissed" appears when any exist.*
 
 ### Epic 3 — Revise the pages
-- **US-3.1** As a writer, I edit any line inline (double-click) with undo/redo so my
-  changes are safe. *AC: edits apply via the edits path; change stars mark new lines with
+- **US-3.1** As a writer, I edit any line inline (double-click, or `Enter` on the line the
+  arrows walk me to) with undo/redo so my changes are safe — no mouse required. *AC: edits apply via the edits path; change stars mark new lines with
   hover "was: <old>"; Ctrl/⌘Z undo, Shift+Z redo; Discard edits clears all (confirmed).*
 - **US-3.2** As a writer, I ask the doctor to rewrite a scene against a finding and choose
   which candidates to apply. *AC: rewrite modal shows old→new candidates with checkboxes;

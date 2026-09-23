@@ -4207,7 +4207,16 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
   #send-btn, .pane-divider { animation: none !important; transition: none !important; }
 }
 
-/* ---------- inline editing (double-click a line on the page) ---------- */
+/* ---------- inline editing (double-click a line, or Enter on the focused one) ---------- */
+
+/* The keyboard cursor on the page. `:focus` alone is not enough: the ring is
+   the only place a writer can see which line Enter would open. The dashed
+   .inline-editing ring below owns a line once it is being edited. */
+#manuscript-container [class^="el-"]:focus-visible:not(.inline-editing) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 
 .inline-editing {
   outline: 2px dashed var(--desk-amber);
@@ -5352,9 +5361,14 @@ body:not(.idea-mode) #manuscript-workspace {
   gap: 0;
 }
 #manuscript-container > :not(.scene-page) { margin-bottom: var(--sp-8); }
-/* focusable scroll container (`s` focuses the manuscript) — no ring, the
-   whole pane is the surface */
-#manuscript-container:focus { outline: none; }
+/* The manuscript is a tab stop and a keyboard landing point (`s` or Tab), so it
+   needs a visible focus per WCAG 2.4.7 — but the ring hugs the pane's own edge
+   (offset -2px) rather than boxing the whole desk, and only for keyboard focus
+   so a click on the paper stays clean. */
+#manuscript-container:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 75%, transparent);
+  outline-offset: -2px;
+}
 
 /* ============================================================
    Phase 5: the Context Dock — one lens at a time beside the page.

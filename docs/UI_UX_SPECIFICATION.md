@@ -248,8 +248,9 @@ exist but are `display:none` — undo/redo is keyboard-only (`Ctrl/⌘ Z`).
 - **Margin notes column** (`scene-notes`): the doctor's finding cards for the scene
   (severity color-coded left border, category label, issue, state, actions) + the writer's
   own hand-font notes.
-- **Inline editing**: double-click any line → contentEditable → Enter/blur saves via the
-  edits/apply path (undoable), Esc cancels.
+- **Inline editing**: double-click any line — or focus it with `s` then the arrows and press
+  `Enter` — → contentEditable → Enter/blur saves via the edits/apply path (undoable), Esc
+  cancels. Keyboard edits put the line cursor back on the page afterwards.
 - **Craft shelf** (`#craft-shelf`): a collapsed-by-default header over the four analysis
   panels that live at the top of the manuscript — Fix queue · Pacing · Characters · Writer's
   Mirror. One click expands; state persisted.
@@ -571,6 +572,7 @@ rail note input rather than calling the Stash endpoint — different from §7.2'
 | `c` | Switch to Co-write (Sameer) |
 | `f` | Switch to Feedback (Consultant) |
 | `s` | Focus the manuscript — dismiss the partner, back to the page |
+| `↑` / `↓` (from `#manuscript-container`) | Walk the line cursor one script line. The manuscript is **one tab stop** (`tabindex="0"` on the region), never nine hundred: lines carry `tabindex="-1"` and arrows move focus, so `Tab` still leaves the page in one press |
 | `a` | Toggle the Craft shelf (analysis panels) |
 | `z` | Spotlight mode — nothing but the page (Esc leaves; **project-gated**, like `b`/`d`/`v`) |
 | `b` | Open the Beat Board (project only) |
@@ -582,11 +584,11 @@ rail note input rather than calling the Stash endpoint — different from §7.2'
 | `?` | Show all shortcuts (palette help) |
 | `Esc` | Leave spotlight → **exit the fix loop (dock stays)** → dismiss partner drawer → craft shelf → modals → flyouts (full cascade in §7.3) |
 | `↑`/`↓` + `Enter` | Palette navigation / run |
-| Inline edit: `Enter` save · `Esc` cancel · `Shift+Enter` newline | |
+| Inline edit: double-click a line **or `Enter` on the focused one** → contentEditable · `Enter` save · `Esc` cancel · `Shift+Enter` newline · after a keyboard save the line cursor returns to the line you just changed | |
 | Composer: `Enter` send · `Shift+Enter` newline · `↑`/`↓` history · `Esc` cancel history | |
 | Inline note editor: `Enter` save · `Esc` cancel | |
 
-Idea room: `c`/`f`/`a`/`r` also work (Sameer ↔ Premise Doctor lens). Full-screen tools
+Idea room: `c`/`f`/`a` also work (Sameer ↔ Premise Doctor lens). Full-screen tools
 guard `b`/`d`/`v` to project mode.
 
 ---

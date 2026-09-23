@@ -218,16 +218,24 @@ async function retryFailedCategories(anchor) {
   }
 }
 
-// ---- inline editing: double-click a line on the page, type, done ----
+// ---- inline editing: double-click a line (or focus it and press Enter),
+// type, done ----
 // Rides the EXISTING apply/undo path underneath (one {old, new} replacement
 // through /edits/apply), so undo, change-stars, finding re-verification and
 // exports all see it — no parallel edit machinery.
 function wireInlineEdit(lineEl, sceneNumber, originalText) {
-  lineEl.title = "Double-click to edit this line in place";
-  lineEl.addEventListener("dblclick", (ev) => {
-    ev.preventDefault();
-    if (lineEl.isContentEditable && lineEl.contentEditable === "true") return;
-    const cancelled = { value: false };
+  // -1, not 0: a screenplay is nine hundred lines and the manuscript owns ONE
+  // tab stop (#manuscript-container). Arrows walk the rest — see stepManuscriptLine.
+  lineEl.tabIndex = -1;
+  lineEl.title = "Double-click or press Enter to edit this line in place";
+  const st = { editing: false, cancelled: false, busy: false, index: -1, keyed: false };
+  const start = (viaKeyboard) => {
+    if (st.editing) return;
+    st.editing = true;
+    st.cancelled = false;
+    st.busy = false;
+    st.keyed = viaKeyboard;
+    st.index = manuscriptLineIndex(lineEl);
     lineEl.contentEditable = "true";
     lineEl.classList.add("inline-editing");
     lineEl.focus();
@@ -238,35 +246,82 @@ function wireInlineEdit(lineEl, sceneNumber, originalText) {
     range.collapse(false);
     sel.removeAllRanges();
     sel.addRange(range);
-    let busy = false;
-    const finish = async (save) => {
-      if (busy) return;
-      busy = true;
-      lineEl.contentEditable = "false";
-      lineEl.classList.remove("inline-editing");
-      const newText = (lineEl.textContent || "").trim();
-      const oldText = originalText.trim();
-      if (!save || cancelled.value || !newText || newText === oldText) {
-        renderManuscript(document.getElementById('manuscript-container'));
-        return;
-      }
-      try {
-        await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/apply`, {
-          method: "POST",
-          body: JSON.stringify({ scene_number: sceneNumber, replacements: [{ old: originalText, new: newText }] }),
-        });
-        appendSystemNote("Line edited on the page — ↶ Undo takes it back.");
-      } catch (err) {
-        showError("Inline edit failed: " + err.message);
-      }
-      await afterScriptEdit();
-    };
-    lineEl.addEventListener("blur", () => finish(true), { once: true });
-    lineEl.addEventListener("keydown", (kev) => {
-      if (kev.key === "Enter" && !kev.shiftKey) { kev.preventDefault(); lineEl.blur(); }
-      if (kev.key === "Escape") { kev.preventDefault(); cancelled.value = true; lineEl.blur(); }
-    });
+  };
+  const finish = async (save) => {
+    if (st.busy) return;
+    st.busy = true;
+    st.editing = false;
+    lineEl.contentEditable = "false";
+    lineEl.classList.remove("inline-editing");
+    const newText = (lineEl.textContent || "").trim();
+    const oldText = originalText.trim();
+    if (!save || st.cancelled || !newText || newText === oldText) {
+      renderManuscript(document.getElementById('manuscript-container'));
+      refillLineCursor(st);
+      return;
+    }
+    try {
+      await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/apply`, {
+        method: "POST",
+        body: JSON.stringify({ scene_number: sceneNumber, replacements: [{ old: originalText, new: newText }] }),
+      });
+      appendSystemNote("Line edited on the page — ↶ Undo takes it back.");
+    } catch (err) {
+      showError("Inline edit failed: " + err.message);
+    }
+    await afterScriptEdit();
+    refillLineCursor(st);
+  };
+  lineEl.addEventListener("dblclick", (ev) => {
+    ev.preventDefault();
+    start(false);
   });
+  lineEl.addEventListener("keydown", (kev) => {
+    if (!st.editing) {
+      if (kev.key === "Enter") { kev.preventDefault(); start(true); }
+      return;
+    }
+    if (kev.key === "Enter" && !kev.shiftKey) { kev.preventDefault(); lineEl.blur(); }
+    if (kev.key === "Escape") { kev.preventDefault(); st.cancelled = true; lineEl.blur(); }
+  });
+  lineEl.addEventListener("blur", () => { if (st.editing) finish(true); });
+}
+
+// The line set the keyboard cursor walks. `[class^=el-]` is the manuscript's
+// own line contract — markCurrentLine and flashQuoteLine read the same thing.
+function manuscriptLines() {
+  const container = getManuscriptContainer();
+  return container ? [...container.querySelectorAll("[class^=el-]")] : [];
+}
+
+function manuscriptLineIndex(lineEl) {
+  return manuscriptLines().indexOf(lineEl);
+}
+
+/** ArrowUp/ArrowDown inside the manuscript: move the focus cursor one line.
+ * Returns false when the keystroke is not ours (so the pager/loop keys keep
+ * it), true when a line took focus. */
+function stepManuscriptLine(target, delta) {
+  const container = getManuscriptContainer();
+  if (!container || !target || !container.contains(target)) return false;
+  const lines = manuscriptLines();
+  if (!lines.length) return false;
+  const i = lines.indexOf(target);
+  const next = lines[i === -1 ? (delta > 0 ? 0 : lines.length - 1) : i + delta];
+  if (!next) return false;
+  next.focus();
+  return true;
+}
+
+/** Editing a line rebuilds the page, which drops focus on the floor. A
+ * keyboard writer who has just saved has to reach for the mouse to fix the
+ * next line — so the cursor goes back where it was. Mouse edits keep the
+ * focus where the writer left it. */
+function refillLineCursor(st) {
+  if (!st.keyed) return;
+  const lines = manuscriptLines();
+  const line = lines[Math.min(st.index, lines.length - 1)];
+  if (line) line.focus();
 }
 
 /** Starts a live "Xm Ys elapsed" ticker inside a target element, prefixed
@@ -7859,9 +7914,10 @@ const SHORTCUTS = [
   ["c", "Switch to Co-write (Sameer)"],
   ["f", "Switch to Feedback (Consultant)"],
   ["s", "Focus the manuscript — dismiss the partner, back to the page"],
+  ["↑ / ↓", "Walk the focused manuscript line by line (Enter edits it in place)"],
   ["a", "Toggle the Craft shelf (analysis panels)"],
   ["z", "Spotlight mode — nothing but the page (Esc leaves)"],
-  ["Esc", "Leave spotlight → dismiss partner drawer → craft shelf → structure rail"],
+  ["Esc", "Leave spotlight → dismiss partner drawer → craft shelf → dock"],
   ["b", "Open the Beat Board"],
   ["d", "Compare drafts side by side"],
   ["j / n", "Next scene (script view)"],
@@ -8107,6 +8163,14 @@ function bindGlobalShortcuts() {
     if (loopState.active) {
       if (e.key === "n" || e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); stepLoop(1); return; }
       if (e.key === "p" || e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); stepLoop(-1); return; }
+      return;
+    }
+    // The manuscript's keyboard cursor: the region is the tab stop, the arrows
+    // walk its lines, Enter edits the one you're on (wireInlineEdit). Typing a
+    // line is already handled above — a contentEditable line is a typing target,
+    // so the caret keeps the arrows while you are in it.
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (stepManuscriptLine(e.target, e.key === "ArrowDown" ? 1 : -1)) e.preventDefault();
       return;
     }
     if (e.key === "?") { e.preventDefault(); openPalette(true); }

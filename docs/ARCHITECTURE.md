@@ -162,6 +162,7 @@ screenplay-studio_1/
 - **Selection interactions.** Select text in the manuscript/idea page → floating
   "Ask Sameer about this" (prefills a quote card), "Stash this" (saves to the Stash), and
   "Note this line" (inline margin note pinned to that line). Double-click any line to edit it
+  (or focus it with `s` + arrows and press `Enter`)
   in place (rides the edits/apply path — undoable, change-starred).
 
 ### Client-Side JavaScript (`screenplay_studio/webapp/app.js` + `core.js`)
