@@ -200,6 +200,31 @@ def main() -> None:
             # first (its left edge), then the item.
             page.locator("#drawer-close").click()
             page.wait_for_timeout(400)
+
+            # ---- C2. the affordance a writer actually opens: the overflow
+            # menu is where every other export lives, and with a project open
+            # the Feedback drawer is NOT reachable from the desk (the room
+            # button routes to the dock), so the report has to be takeable
+            # away from here too.
+            page.locator("#overflow-toggle").click()
+            page.wait_for_timeout(400)
+            rep = page.locator("#export-report")
+            offered = rep.is_visible()
+            ok("the overflow menu offers the report export", offered)
+            rhref = (rep.get_attribute("href") or "") if offered else ""
+            ok("the overflow report export targets /report/export",
+               rhref.endswith("/Seed_Export/report/export"), rhref)
+            if offered and rhref:
+                try:
+                    with page.expect_download(timeout=5000) as dl_info:
+                        rep.click()
+                    ok("the overflow report export downloads",
+                       dl_info.value.suggested_filename == "Seed_Export-report.md",
+                       dl_info.value.suggested_filename)
+                except Exception as e:
+                    ok("the overflow report export downloads", False, str(e)[:80])
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(300)
             dot_cls = page.locator("#connection-dot").get_attribute("class") or ""
             ok("demo mode shows amber dot, not green", "demo" in dot_cls, dot_cls)
             ok("strip names the demo, not a fake model id",

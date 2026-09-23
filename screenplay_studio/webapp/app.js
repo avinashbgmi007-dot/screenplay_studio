@@ -4927,6 +4927,27 @@ function announceManuscriptLoad(count) {
   }
 }
 
+/** The consultant's report is the writer's document, so it stays takeable from
+ *  the overflow menu — the one export surface a project-open writer reaches
+ *  for. (The desk's Feedback button now routes to the dock ledger, so the
+ *  drawer holding #report-export-btn is no longer that path.) Both hosts are
+ *  painted from here so the URL never exists in two places. */
+function paintReportExport() {
+  const url = state.currentProject
+    ? `/api/projects/${encodeURIComponent(state.currentProject)}/report/export` : null;
+  const hasReport = !!(state.report && (state.report.findings || state.report.coverage));
+  for (const id of ["#export-report", "#report-export-btn"]) {
+    const a = $(id);
+    if (!a) continue;
+    const show = url && hasReport;
+    a.style.display = show ? "" : "none";
+    if (show) {
+      a.href = url;
+      a.download = `${state.currentProject}-report.md`;
+    }
+  }
+}
+
 function renderManuscript(container) {
   if (!container) container = getManuscriptContainer();
   if (!container) return;
@@ -5041,6 +5062,7 @@ function renderManuscript(container) {
   $("#export-txt").download = `${state.script.title || "script"}.txt`;
   $("#export-backup").href = `/api/projects/${encodeURIComponent(state.currentProject)}/backup`;
   $("#export-backup").download = `${state.currentProject}-backup.zip`;
+  paintReportExport();
 
   renderRailScenes();
   renderRailNotes();
@@ -7033,12 +7055,7 @@ function renderReportPanel() {
   const c = $("#feedback-report");
   if (!c) return;
   // the doctor's report is the writer's document — let them take it away
-  const exp = $("#report-export-btn");
-  if (exp && state.currentProject && state.report) {
-    exp.href = `/api/projects/${encodeURIComponent(state.currentProject)}/report/export`;
-    exp.download = `${state.currentProject}-report.md`;
-    exp.style.display = "";
-  } else if (exp) exp.style.display = "none";
+  paintReportExport();
   c.innerHTML = "";
   const cov = state.report && state.report.coverage;
   if (cov) {
