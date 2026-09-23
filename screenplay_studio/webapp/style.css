@@ -1368,9 +1368,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
    surfaces — the desk toolbar (a #manuscript-workspace child now) and the
    idea canvas are the live heirs. */
 #script-pane > .idea-canvas { position: relative; z-index: 1; }
-/* the desk toolbar outranks the docked Problem Board (z 510) so its buttons
-   stay clickable and the overflow dropdown — which opens downward into the
-   layout row where the board docks — lands ABOVE the board, not under it */
+/* the desk toolbar carries --z-rail (520) and the docked lens row paints at
+   auto, so the toolbar's buttons stay clickable and its overflow dropdown —
+   which opens downward into the layout row the dock sits in — lands ABOVE the
+   dock, not under it */
 #manuscript-workspace > #desk-toolbar { z-index: var(--z-rail); }
 
 #script-search {
@@ -4266,35 +4267,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .tp-icon.accent2 { color: var(--accent2); }
 .text-popup-sep { height: 1px; background: var(--line-soft); margin: var(--sp-2) var(--sp-3); }
 
-/* Feedback View — 3-panel layout: Sushruta left, script center, Sameer right */
-.fv-header {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-6);
-  padding: var(--sp-5) var(--sp-9);
-  border-bottom: 1px solid var(--line-soft);
-  flex-shrink: 0;
-}
-.fv-title { font-family: var(--font-typewriter); font-size: var(--fs-lg); color: var(--text); }
-.fv-sub { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); }
-.fv-body { flex: 1; display: flex; min-height: 0; }
+/* Chat inside a dock lens — `.fv-*` is the retired Feedback View's prefix and
+   these chat rules are all that survived it (P0.1); the pane chrome, the
+   script column, the Problem Board and the dividers it styled are gone. */
 .fv-panel { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; }
 .fv-consult { border-right: none; }
-.fv-cowrite { border-left: 1px solid var(--line-soft); }
-
-/* resizable FV panes: drag dividers set flex-basis on the side panels;
-   double-click resets to the 300px default */
-.fv-divider {
-  flex: 0 0 6px;
-  cursor: col-resize;
-  background: var(--line-soft);
-  border-radius: var(--r-sm);
-  margin: var(--sp-4) 1px;
-  transition: background 0.12s ease;
-  z-index: 5;
-}
-.fv-divider:hover { background: var(--accent); }
-body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-select: none !important; }
 
 .fv-panel-head {
   display: flex;
@@ -4335,7 +4312,6 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   border-left: 3px solid var(--accent); color: var(--text); border-top-left-radius: 2px;
 }
 .fv-msg.finding.consult { border-left-color: var(--consult); }
-.fv-finding-cat { font-family: var(--font-mono); font-size: var(--fs-3xs); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: var(--sp-2); }
 .fv-composer {
   padding: var(--sp-4) var(--sp-6) var(--sp-6);
   border-top: 1px solid var(--line-soft);
@@ -4358,186 +4334,6 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
 }
 .fv-composer .inp::placeholder { color: var(--text-faint); }
 .fv-composer .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--glow); }
-.fv-script {
-  flex: 1; overflow-y: auto;
-  padding: var(--sp-10) 32px;
-  min-width: 0;
-}
-.fv-script-inner { max-width: 720px; margin: 0 auto; }
-
-/* the fin — explicit end-of-script cap. Below it the script column rests;
-   findings continue only in the board panel, which owns its own scroll. */
-.fv-fin {
-  display: flex; align-items: center; gap: var(--sp-7);
-  padding: 26px 0 34px;
-  color: var(--text-muted);
-  user-select: none;
-}
-.fv-fin-rule { flex: 1; height: 1px; background: var(--line-soft); }
-.fv-fin-mark {
-  font-family: var(--font-typewriter);
-  font-size: var(--fs-body); letter-spacing: 0.3em; text-transform: lowercase;
-  color: var(--text-muted); opacity: 0.8;
-}
-.fv-scene { margin-bottom: var(--sp-10); }
-.fv-scene .paper {
-  width: 100%;
-  background: var(--paper); color: var(--paper-ink);
-  border-radius: var(--r-sm); padding: 24px 28px;
-  box-shadow: var(--shadow-paper);
-  font-family: var(--font-script); font-size: var(--fs-body); line-height: 1.62;
-}
-.fv-finding-cards { display: flex; gap: var(--sp-4); flex-wrap: wrap; margin: var(--sp-4) 0 var(--sp-8); }
-.fv-finding-card {
-  flex: 1; min-width: 200px;
-  padding: var(--sp-4) var(--sp-5);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--glass);
-}
-.fv-finding-card.high { border-left: 3px solid var(--danger); }
-.fv-finding-card.medium { border-left: 3px solid var(--lamp); }
-.fv-finding-card.low { border-left: 3px solid var(--ok); }
-.fv-fc-header { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
-.fv-fc-badge {
-  font-family: var(--font-mono); font-size: var(--fs-3xs); font-weight: 600;
-  padding: 1px var(--sp-3); border-radius: var(--r-sm);
-}
-.fv-fc-badge.high { background: rgba(251, 113, 133, 0.15); color: var(--danger); }
-.fv-fc-badge.medium { background: color-mix(in oklab, var(--sev-mid) 15%, transparent); color: var(--sev-mid); }
-.fv-fc-badge.low { background: color-mix(in oklab, var(--ok) 15%, transparent); color: var(--ok); }
-.fv-fc-cat { font-family: var(--font-typewriter); font-size: var(--fs-xs); color: var(--text); }
-.fv-fc-desc { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; }
-.fv-fc-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }
-.fv-fc-actions .btn-secondary { font-size: var(--fs-2xs); padding: var(--sp-1) var(--sp-4); }
-
-/* Feedback View — Problem Board, toggle tabs, compact finding dots */
-.fv-right {
-  border-left: 1px solid var(--line-soft);
-  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.3, 1),
-              opacity 0.25s ease;
-  position: relative;
-}
-.fv-right.fv-right-collapsed {
-  transform: translateX(100%);
-  opacity: 0;
-  pointer-events: none;
-  border-left: none;
-}
-/* Edge tab for the feedback room right panel */
-.fv-right-edge-tab {
-  display: none;
-  position: absolute;
-  right: 0; top: 50%;
-  transform: translateY(-50%);
-  z-index: var(--z-chrome);
-  writing-mode: vertical-rl;
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  background: var(--ink-900);
-  border: 1px solid var(--line-soft);
-  border-right: none;
-  padding: var(--sp-7) var(--sp-4);
-  cursor: pointer;
-  border-radius: var(--r-md) 0 0 var(--r-md);
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-.fv-right-edge-tab:hover { color: var(--accent); border-color: var(--accent-deep); }
-.fv-right.fv-right-collapsed ~ .fv-right-edge-tab { display: block; }
-.fv-right-tabs {
-  display: flex; border-bottom: 1px solid var(--line-soft); flex-shrink: 0;
-}
-.fv-tab {
-  flex: 1; padding: var(--sp-4) 0; border: none; background: transparent;
-  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted);
-  cursor: pointer; transition: color 0.15s, background 0.15s;
-}
-.fv-tab:hover { background: var(--surface2); color: var(--text); }
-.fv-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--glow-lamp-05); }
-.fv-right-pane { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.fv-board-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: var(--sp-4) var(--sp-6); border-bottom: 1px solid var(--line-soft); flex-shrink: 0;
-}
-.fv-board-toggle {
-  background: none; border: none; color: var(--text-muted); cursor: pointer;
-  font-size: var(--fs-sm); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-sm);
-  transition: color 0.15s, background 0.15s;
-}
-.fv-board-toggle:hover { color: var(--text); background: var(--surface2); }
-.fv-board-title { font-family: var(--font-typewriter); font-size: var(--fs-sm); color: var(--text); }
-.fv-board-filter {
-  font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted);
-  background: transparent; border: 1px solid var(--line-soft); border-radius: var(--r-sm);
-  padding: var(--sp-1) var(--sp-3); cursor: pointer;
-}
-.fv-board-list { flex: 1; overflow-y: auto; padding: var(--sp-4) var(--sp-6); }
-.fv-board-row {
-  display: flex; align-items: flex-start; gap: var(--sp-4);
-  padding: var(--sp-3) 0; border-bottom: 1px solid var(--line-soft);
-  cursor: pointer; transition: background 0.12s;
-}
-.fv-board-row:hover { background: var(--surface2); }
-.fv-board-row.highlighted {
-  background: var(--glow-lamp-08);
-  border-left: 2px solid var(--accent); padding-left: var(--sp-3);
-}
-.fv-board-row.dimmed { opacity: 0.35; }
-.fv-board-sev {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: var(--sp-2);
-}
-.fv-board-sev.high { background: var(--danger); }
-.fv-board-sev.medium { background: var(--lamp); }
-.fv-board-sev.low { background: var(--ok); }
-.fv-board-scene {
-  font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted);
-  flex-shrink: 0; min-width: 36px;
-}
-.fv-board-body { flex: 1; min-width: 0; }
-.fv-board-cat {
-  font-family: var(--font-mono); font-size: var(--fs-3xs); color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.08em;
-}
-.fv-board-issue { font-size: var(--fs-sm); color: var(--text); line-height: 1.4; margin-top: var(--sp-1); }
-.fv-board-actions { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
-.fv-board-actions .btn-secondary { font-size: var(--fs-2xs); padding: var(--sp-1) var(--sp-3); }
-.fv-board-empty {
-  text-align: center; padding: 24px var(--sp-6); color: var(--text-muted);
-  font-size: var(--fs-sm); font-family: var(--font-mono);
-}
-
-/* Compact finding dots in center column */
-.fv-finding-dots {
-  display: flex; align-items: center; gap: var(--sp-2);
-  margin: var(--sp-3) 0 var(--sp-6); padding: var(--sp-2) var(--sp-4);
-  background: var(--glass); border-radius: var(--r-sm);
-  border: 1px solid var(--line-soft);
-}
-.fv-finding-dots .sev-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-}
-.fv-finding-dots .sev-dot.high { background: var(--danger); }
-.fv-finding-dots .sev-dot.medium { background: var(--lamp); }
-.fv-finding-dots .sev-dot.low { background: var(--ok); }
-.fv-dot-count {
-  font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted);
-  margin-left: var(--sp-2);
-}
-.fv-dot-expand {
-  margin-left: auto; font-size: var(--fs-2xs); color: var(--accent);
-  cursor: pointer; background: none; border: none; padding: 0;
-  font-family: var(--font-mono);
-}
-.fv-dot-expand:hover { text-decoration: underline; }
-
-/* Scene highlighting in Feedback View */
-.fv-scene.active .fv-finding-dots {
-  border-color: var(--accent); background: var(--glow-lamp-06);
-}
-
 
 /* Sam's typing dots — three small pulses that read as "thinking…" */
 .typing-dots { display: inline-flex; gap: var(--sp-1); margin: 0 var(--sp-1) 0 var(--sp-2); align-items: center; vertical-align: middle; }
@@ -5522,10 +5318,9 @@ body:not(.idea-mode) #manuscript-workspace {
      row (and the absolutely-positioned right-edge affordance) past the
      viewport edge — the affordance became unclickable at 1000px. */
   min-width: 0;
-  /* Phase 13: the Problem Board lives in this row now, and its collapsed
-     state is translateX(105%) — without a clip its left edge lands 15px
-     past the row (a 41px full-height strip bleeding into the transparent
-     gutter). Clip the row so the collapsed board is simply gone. */
+    /* Kept from Phase 13, whose motivating surface (the board) retired in P0.2:
+     the row paints nothing outside itself. Load-bearing again the moment a
+     child is parked off-canvas inside it. */
   overflow: hidden;
   /* design-critic P1: when the shelf is summoned the scene rail indents to
      the shelf's right edge — the reserved rail strip widens with it so the

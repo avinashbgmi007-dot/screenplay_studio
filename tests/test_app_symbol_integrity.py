@@ -97,6 +97,33 @@ def test_problem_board_is_gone():
         assert 'id="problem-board"' not in f.read()
 
 
+def test_no_retired_class_rule_survives_in_the_sheet():
+    # spec §11 says a retired surface is gone from the *bundle*. There is no
+    # build step and no tree-shaking here, so a rule whose class no element
+    # ever receives is unrecoverable dead weight -- worse, it reads to the next
+    # session as evidence the surface is still live. The id-scoped guards above
+    # only catch rules named after the old host element; this one catches the
+    # whole retired class family, by asking the sheet which of its `fv-`/`pb-`
+    # class names the shipped code can actually put on a node.
+    webapp = os.path.dirname(_APP_JS)
+    with open(os.path.join(webapp, "style.css"), encoding="utf-8") as f:
+        sheet = f.read()
+
+    bundle = []
+    for name in ("app.js", "core.js", "index.html"):
+        with open(os.path.join(webapp, name), encoding="utf-8") as f:
+            bundle.append(f.read())
+    bundle = _strip_comments("\n".join(bundle))
+    bundle = re.sub(r"<!--.*?-->", "", bundle, flags=re.S)  # markup comments
+    used = set(re.findall(r"\b(?:fv|pb)-[A-Za-z0-9_-]+", bundle))
+
+    selectors = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)  # CSS comments
+    # the leading dot is CSS syntax, not part of the class name
+    in_css = set(re.findall(r"\.((?:fv|pb)-[A-Za-z0-9_-]+)", selectors))
+    dead = sorted(in_css - used)
+    assert not dead, f"style.css styles classes nothing renders: {dead}"
+
+
 def test_mass_strip_reads_the_one_counter():
     # P0.3 rider (spec §7/§8): EVERY count in the dock comes from the one
     # counting path. The mass strip is the last surface that walked

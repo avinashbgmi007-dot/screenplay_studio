@@ -44,7 +44,18 @@ copy-pasted scans.
 browser battery (see below) · pytest (see below) · `tests/_p1_visual_gate.py`
 (see below) · `ruff` clean.
 
+- **2026-09-23 — §11 bundle clause finished: the retired Feedback View's dead CSS is out (193 lines) and the sheet is now pinned by class name, not just by id.**
+**Why this was still open:** the sweep's follow-up audit re-read spec §11's one unticked box, which asks for the retired surfaces to be *gone from the bundle*. `test_app_symbol_integrity` only proved the host id was gone (`#feedback-view`, `id="problem-board"`), so 43 `.fv-board-*` / `.fv-fc-*` / `.fv-right*` / `.fv-fin*` / `.fv-scene*` selectors — 193 lines of the retired 3-panel chrome — stayed in `style.css` styling classes no element ever receives. There is no build step and no tree-shaking here: that text is unrecoverable, and worse it reads to the next session as evidence the surface is still live.
+**RED first, then the cut:** new `test_no_retired_class_rule_survives_in_the_sheet` asks the sheet which `fv-`/`pb-` class names it styles and which the shipped `app.js`/`core.js`/`index.html` can actually put on a node (comments stripped both sides, so a comment mentioning a class cannot keep it alive). It failed listing exactly those 43; the first version failed for the wrong reason — the CSS side kept its leading dot so the set difference matched nothing, which is the lesson to remember. A one-off walker then removed only rules whose *whole* selector list is dead, kept the live dock-chat rules (`.fv-msg`, `.fv-composer .inp`, `.fv-avatar`, `#fv-consult-composer` …), and took the five section banners that would have been left explaining a surface that no longer exists. Diff is 193 lines deleted, 0 rewritten; braces balanced; the two live-rule comments that used to justify themselves by the retired board (`#desk-toolbar` z-order, the workspace row's clip) now state what is actually true.
+**Also:** §11's quoted `app.js` numbers were stale (`+944/-392`; the sweep commit moved it to `+985/-410`), so the box now separates the half that is met and pinned from the half that is a product call — the box stays unticked because "net-negative `app.js`" is still false, and that is the writer's decision to amend, not a gate tick.
+**Gates after the cut:** `pytest tests/` 1662 passed / 3 skipped (the new leg is the +1);
+`run_browser_suites.py` 40 suites -> 39 passed, 0 failed, 1 skipped (`gun_pen_audit` wants a live
+llama-server); `tests/_p1_visual_gate.py` FAILURES: none, js errors: none in both registers;
+`node --check` clean (app.js untouched); `ruff` clean. Sheet diff is +10/-215 and the only
+additions are three comments.
+
 - **2026-09-23 — ONE DESK, ONE LEDGER / P3 gate: spec §11 walked, the plan is fully ticked, and one box is reported NOT met.**
+
 *(plan Task 21)*
 **Numbers (fresh, this run).** `python -m pytest tests/ -q` -> 1661 passed, 3 skipped. `python tests/run_browser_suites.py` -> 40 suites: 39 passed, 0 failed, 1 skipped (`gun_pen_audit`, needs a live llama-server). `node --check` + `ruff check screenplay_studio/ tests/` clean.
 **The walk's purpose is to catch what per-task gates miss, and it did — twice.**

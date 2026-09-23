@@ -163,14 +163,18 @@ remembered.
          `e2e_browser_counting_contract.py`, `test_app_symbol_integrity.py` (one-counter strip).
 - [ ] `app.js` net-negative diff; `#feedback-view`, `renderFvBoard*`, `pb-*` (if
       retired) gone from the bundle.
-      -> HALF MET, on purpose. The retired surfaces are gone and now pinned in JS,
-         markup AND sheet (`test_app_symbol_integrity` covers all three; the 3 dead
-         `#feedback-view` rules came out in this pass). `app.js` is NOT net-negative:
-         +944/-392 against `main`, because each deletion bought a surface this spec
-         asks for (collapsible persisted sections, the one-rendering dedupe, the
-         convergence line, the stage ladder, `/quickcheck`, the rule popover). Either
-         the box is amended to "the retired surfaces stay retired" or ~550 lines of
-         spec-mandated chrome come out; that is a product call, not a gate tick.
+      -> The BUNDLE half is met and now pinned by name: the retired JS/markup is
+         gone, and `test_app_symbol_integrity` fails on any `.fv-*`/`.pb-*` rule
+         whose class nothing in `app.js`/`core.js`/`index.html` can put on a node
+         (43 dead selectors in 193 lines came out — the pane chrome, the fin, the
+         board, the edge tab, the divider, the scene/finding cards; the dock chat's
+         live `.fv-*` rules stay, rebannered to say what they are).
+         `app.js` is NOT net-negative: +985/-410 against `main`, because each
+         deletion bought a surface this spec asks for (collapsible persisted
+         sections, the one-rendering dedupe, the convergence line, the stage
+         ladder, `/quickcheck`, the rule popover). Either the box is amended to
+         "the retired surfaces stay retired" or ~550 lines of spec-mandated chrome
+         come out; that is a product call, not a gate tick.
 - [x] Evidence sections collapse and persist; default = live highs first; "this scene"
       chip works both directions.
       -> `e2e_browser_dock_sections.py` (reload + prefs, highs-first, chip both ways).
