@@ -8558,9 +8558,7 @@ function attachMic(inputEl) {
         const fd = new FormData();
         fd.append("audio", blob, "speech.webm");
         fd.append("language", sttLanguage());
-        const res = await fetch("/api/stt", { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "transcription failed");
+        const data = await api("/stt", { method: "POST", body: fd });
         if ((data.text || "").trim()) insertAtCaret(inputEl, data.text.trim());
       } catch (err) {
         appendSystemNote("Dictation failed: " + err.message, true);
@@ -8733,20 +8731,22 @@ function init() {
   $("#idea-content").addEventListener("input", handleIdeaContentInput);
   $("#idea-content").addEventListener("blur", saveIdeaContent);
 
-  // Closing/reloading within the autosave debounce must not eat keystrokes:
-  // flush any pending save (sendBeacon survives unload).
+  // Closing/reloading within the autosave debounce must not eat keystrokes.
+  // This used to be navigator.sendBeacon, which survives unload but cannot set
+  // a header — so in the default hardened posture the server 403'd the flush and
+  // the last few keystrokes vanished silently. A keepalive fetch survives too,
+  // and going through api() is what carries the capability token.
   window.addEventListener("pagehide", () => {
     if (!state.currentIdea || !state.inIdea || !ideaSaveTimer) return;
     clearTimeout(ideaSaveTimer);
     ideaSaveTimer = null;
     const content = $("#idea-content").value;
     if (content === state.currentIdea.content) return;
-    const url = `${API}/ideas/${encodeURIComponent(state.currentIdea.id)}/content`;
-    try {
-      navigator.sendBeacon(url, new Blob([JSON.stringify({ content })], { type: "application/json" }));
-    } catch (_) {
-      fetch(url, { method: "POST", body: JSON.stringify({ content }), keepalive: true });
-    }
+    api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/content`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+      keepalive: true,
+    }).catch(() => { /* unloading; nothing left to tell */ });
   });
 
   tickSessionElapsed();

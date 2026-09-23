@@ -3,6 +3,51 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### Production-readiness audit pass 1: writes, tokens, and the severity chip
+
+**What was wrong.** The audit of the SPA against the shipped security posture found
+three things the test fleet could not see, because the harness itself booted the
+studio with `--no-token`. With the control switched off in every suite, a write path
+that cannot carry `X-Studio-Token` went green while real writers got a 403:
+the dictation upload (`fetch("/api/stt")`), the `pagehide` idea flush
+(`navigator.sendBeacon`, which cannot set a header at all), and all six
+`/preview-next/` design labs (`_lab.js` rode a bare `fetchJSON`). The labs were the
+worst of the three — the server minted the token cookie on `/` only, so a lab page
+reached directly had no token to read.
+
+**What changed.**
+- `webapp_server._hand_token_to_every_document` (`@app.after_request`) mints the
+  cookie on every `text/html` response and skips assets. The invariant is now
+  written down: *the cookie is a page's licence to write, so every served document
+  must hand it over.*
+- `_lab.js` reads the cookie and attaches the header in its one write choke point.
+- `app.js`: `/api/stt` and the idea flush now go through `api()`; the flush is a
+  `keepalive` fetch because `sendBeacon` can never carry a header.
+- `e2e_browser_common`: `start_studio()` has no `use_token` parameter any more — the
+  suites boot the product. `studio_headers(base)` / `studio.write|post|delete` are
+  the ways to carry it.
+- `run_browser_suites.py` refuses to run a suite whose source mentions `--no-token`
+  or `use_token`, so the old way of going green is now a gate failure, not a habit.
+- `test_capability_token.py` (+2) and `e2e_browser_token_mode.py` (10 → 17 checks)
+  pin the cookie on every document, its absence on assets, and that a lab page can
+  actually *read* it.
+- `e2e_browser_layout_audit.py` check 4 measured the status strip's shared **top**
+  edge; `#status-strip` is `align-items: center`, so a 24px button beside a 15px
+  span is correct, not crooked. It now measures a shared midline plus containment,
+  and was proved stricter by injecting a `translateY(9px)` and a `marginTop:40px`
+  fault.
+- B1: severity chips re-pinned in `tungsten.css` (`--danger-text` / `--sev-mid-text`
+  per theme) so the label is legible in night and dawn, plus WCAG 2.5.8 minimum
+  target size in `style.css`.
+
+**Gate.** Full pytest 1664 passed / 3 skipped. Browser fleet: **41 suites: 40
+passed, 0 failed, 1 skipped** (`gun_pen_audit` needs a real llama-server).
+
+**Still open (this audit, next passes).** Dead structural-rail surface; the
+dblclick-only inline edit has no keyboard path; CTA/hover contrast and the
+unthemed `idea-mode` palette; the `index.html` UTF-8 BOM plus two mis-decoded `→`
+glyphs (lines 534, 557); doc drift; per-keystroke manuscript rebuild.
+
 ### P2.19 — inked ⇔ clickable: one matcher decides where a finding sits
 
 **What was wrong.** Two matchers answered the same question on the manuscript. The

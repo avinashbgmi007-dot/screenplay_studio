@@ -33,7 +33,7 @@ from playwright.sync_api import sync_playwright
 
 from e2e_browser_common import (Checks, clicked, launch, note,  # noqa: E402
                                 open_dock_section, open_dock_section_holding,
-                                open_studio)
+                                open_studio, studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -52,12 +52,12 @@ def seed_and_analyze(base, title):
     """
     with open(FIXTURE, "rb") as f:
         r = requests.post(f"{base}/api/projects",
-                          files={"file": (f"{title}.fountain", f, "text/plain")},
+                          headers=studio_headers(base), files={"file": (f"{title}.fountain", f, "text/plain")},
                           data={"title": title}, timeout=60)
     assert r.status_code in (200, 201), r.text
     name = r.json().get("project") or r.json().get("name") or title
     r2 = requests.post(f"{base}/api/projects/{name}/analyze",
-                       json={"force": True}, timeout=300)
+                       headers=studio_headers(base), json={"force": True}, timeout=300)
     assert r2.status_code in (200, 201), r2.text[:400]
     return name
 
@@ -745,7 +745,7 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
                            "EXT. HOSPITAL ENTRANCE - NIGHT", 1)
     assert changed != text, "the fixture changed; the draft-edit no longer edits anything"
     r = requests.post(f"{base}/api/projects/{name}/drafts",
-                      files={"file": ("second.fountain", changed.encode("utf-8"),
+                      headers=studio_headers(base), files={"file": ("second.fountain", changed.encode("utf-8"),
                                       "text/plain")}, timeout=60)
     assert r.status_code in (200, 201), r.text[:200]
     page.evaluate("async (n) => { await openProject(n); }", name)

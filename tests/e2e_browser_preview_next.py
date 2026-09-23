@@ -19,7 +19,8 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio
+from e2e_browser_common import (Checks, assert_no_js_errors, launch, open_studio,
+                                studio_headers)
 from playwright.sync_api import sync_playwright
 
 WORLDS = ["report-first", "chat-first", "canvas-first", "stream-first", "inspector-first", "command-first"]
@@ -32,7 +33,8 @@ def seed_project(base):
         req = urllib.request.Request(
             base + path,
             data=json.dumps(body or {}).encode(),
-            headers={"Content-Type": "application/json"}, method="POST")
+            headers={"Content-Type": "application/json", **studio_headers(base)},
+            method="POST")
         return json.loads(urllib.request.urlopen(req, timeout=timeout).read().decode())
 
     def get(path, timeout=30):

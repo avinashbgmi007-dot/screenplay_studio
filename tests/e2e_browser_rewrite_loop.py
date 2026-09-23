@@ -28,7 +28,7 @@ import requests
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from e2e_browser_common import Checks, launch, seen_visible, start_studio
+from e2e_browser_common import studio_headers, Checks, launch, seen_visible, start_studio
 
 FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "fixtures", "pain_tenglish.fountain")
@@ -53,12 +53,12 @@ DIFF_CASES = [
 def seed_and_analyze(base, title):
     with open(FIXTURE, "rb") as f:
         r = requests.post(f"{base}/api/projects",
-                          files={"file": (f"{title}.fountain", f, "text/plain")},
+                          headers=studio_headers(base), files={"file": (f"{title}.fountain", f, "text/plain")},
                           data={"title": title}, timeout=60)
     assert r.status_code in (200, 201), r.text
     name = r.json().get("project") or r.json().get("name") or title
     r2 = requests.post(f"{base}/api/projects/{name}/analyze",
-                       json={"force": True}, timeout=300)
+                       headers=studio_headers(base), json={"force": True}, timeout=300)
     assert r2.status_code in (200, 201), r2.text[:400]
     return name
 

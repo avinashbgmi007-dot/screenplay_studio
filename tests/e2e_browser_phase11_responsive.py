@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import requests  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
-from e2e_browser_common import Checks, launch, open_studio, assert_no_js_errors  # noqa: E402
+from e2e_browser_common import studio_headers, Checks, launch, open_studio, assert_no_js_errors  # noqa: E402
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -33,7 +33,7 @@ def main():
             name = None
             with open(FIXTURE, "rb") as f:
                 r = requests.post(f"{base}/api/projects",
-                                  files={"file": ("P11 Gate.fountain", f, "text/plain")},
+                                  headers=studio_headers(base), files={"file": ("P11 Gate.fountain", f, "text/plain")},
                                   data={"title": "P11 Gate"}, timeout=60)
             name = r.json()["project"]
 
@@ -218,7 +218,7 @@ def main():
                 text = f.read().decode("utf-8")
             text2 = text.replace("EXT/INT. HOSPITAL - NIGHT", "EXT. HOSPITAL ENTRANCE - NIGHT", 1)
             r2 = requests.post(f"{base}/api/projects/{name}/drafts",
-                               files={"file": ("second.fountain", text2.encode("utf-8"), "text/plain")},
+                               headers=studio_headers(base), files={"file": ("second.fountain", text2.encode("utf-8"), "text/plain")},
                                timeout=60)
             assert r2.status_code in (200, 201), r2.text
 
@@ -247,7 +247,7 @@ def main():
             check("resize back: desktop strip restored (no stuck mobile state)",
                   back["indexW"] == 44 and back["vw"] == 1440, json.dumps(back))
 
-            requests.delete(f"{base}/api/projects/{name}", timeout=30)
+            requests.delete(f"{base}/api/projects/{name}", headers=studio_headers(base), timeout=30)
             assert_no_js_errors(checks, errors)
             browser.close()
 

@@ -23,7 +23,7 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio
+from e2e_browser_common import studio_headers, Checks, assert_no_js_errors, launch, open_studio
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURE = os.path.join(HERE, "fixtures", "pain_tenglish.fountain")
@@ -35,7 +35,7 @@ check = checks.ok
 def seed(base, title):
     with open(FIXTURE, "rb") as f:
         r = requests.post(f"{base}/api/projects",
-                          files={"file": (f"{title}.fountain", f, "text/plain")},
+                          headers=studio_headers(base), files={"file": (f"{title}.fountain", f, "text/plain")},
                           data={"title": title}, timeout=60)
     assert r.status_code in (200, 201), r.text
     return r.json().get("name", title)
@@ -45,7 +45,7 @@ def run(base):
     # self-cleaning for shared-server sweeps: purge leftovers so this suite's
     # counts mean exactly what it seeded (a no-op on a fresh private studio)
     for p0 in requests.get(f"{base}/api/projects", timeout=15).json():
-        requests.delete(f"{base}/api/projects/{p0['project']}", timeout=15)
+        requests.delete(f"{base}/api/projects/{p0['project']}", headers=studio_headers(base), timeout=15)
     seed(base, "Rain Courier")
     seed(base, "Night Ferry")
 

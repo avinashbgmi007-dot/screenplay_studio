@@ -75,6 +75,26 @@ KNOWN_BROKEN = {}
 
 _SUMMARY_RE = re.compile(r"^=== (\d+) passed, (\d+) failed ===", re.M)
 
+# Every suite must boot the studio the product ships with: secure by default,
+# capability token minted. `--no-token` (and the harness parameter that used to
+# pass it) switches the control off, so a suite can go green while a write path
+# that cannot carry the header is 403ing for real writers. The dictation upload
+# and the pagehide idea flush were exactly that, and the whole fleet missed it.
+# Checked on the source text because the flag also reaches argv at runtime.
+_TOKEN_SWITCH_RE = re.compile(r"--no-token|\buse_token\b")
+
+
+def _token_switch_off_suites():
+    """Return [(suite, line-number, text)] for suites that disable the token."""
+    offenders = []
+    for filename in discover():
+        path = os.path.join(TESTS_DIR, filename)
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for lineno, line in enumerate(fh, 1):
+                if _TOKEN_SWITCH_RE.search(line):
+                    offenders.append((_key(filename), lineno, line.strip()))
+    return offenders
+
 
 def _key(filename: str) -> str:
     return filename[len("e2e_browser_"):-len(".py")]
@@ -156,6 +176,18 @@ def main() -> int:
         suites = [f for f in suites if any(n in f for n in args.names)]
     if not suites:
         print("no suites matched")
+        return 1
+
+    offenders = [o for o in _token_switch_off_suites()
+                 if f"e2e_browser_{o[0]}.py" in suites]
+    if offenders:
+        print("GATE FAILED — a suite boots the studio with the capability token "
+              "switched off, so its green says nothing about the shipped, "
+              "secure-by-default product:")
+        for key, lineno, text in offenders:
+            print(f"  e2e_browser_{key}.py:{lineno}: {text}")
+        print("Remove the switch and carry the token instead "
+              "(studio_headers(base), or studio.write/post/delete).")
         return 1
 
     rows, failed = [], 0

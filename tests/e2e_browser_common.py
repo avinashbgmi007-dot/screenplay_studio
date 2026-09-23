@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 # Windows consoles default to cp1252, so any check detail carrying a non-Latin-1
@@ -303,6 +304,38 @@ class Studio:
         with urllib.request.urlopen(self.base_url + path, timeout=15) as r:
             return json.loads(r.read().decode())
 
+    def write(self, method, path, payload=None, timeout=300):
+        """A direct (non-browser) WRITE that proves who it came from.
+
+        The studio is secure by default, so a seeding call that forgets the
+        capability token gets a 403 and the suite fails on an empty project
+        rather than on the real question. `payload=None` sends the `{}` body
+        every write endpoint accepts. Returns (status, parsed-body-or-None);
+        an HTTPError is returned as (code, body) so a suite can assert on a
+        rejection without unwinding.
+        """
+        body = json.dumps(payload if payload is not None else {}).encode()
+        req = urllib.request.Request(
+            self.base_url + path, data=body, method=method,
+            headers=dict({"Content-Type": "application/json"},
+                         **studio_headers(self.base_url)))
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read().decode()
+                return r.status, (json.loads(raw) if raw else None)
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode()
+            try:
+                return e.code, json.loads(raw)
+            except Exception:
+                return e.code, raw or None
+
+    def post(self, path, payload=None, **kw):
+        return self.write("POST", path, payload, **kw)
+
+    def delete(self, path, **kw):
+        return self.write("DELETE", path, None, **kw)
+
     def tail_log(self, n=2000):
         try:
             with open(self.log_path, "r", encoding="utf-8", errors="replace") as f:
@@ -337,8 +370,7 @@ class Studio:
         self.close()
 
 
-def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None,
-                 use_token=False):
+def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None):
     """Boot the real webapp server with the in-process demo craft model.
 
     projects_dir: existing dir to serve from (seed it BEFORE calling), or
@@ -347,13 +379,16 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None,
                   (drives the status-strip switch-back flow). Passed via
                   --server with the demo ENV TRIGGER OFF, so main() applies
                   it BEFORE demo activation pins real_server_url.
-    use_token:    boot SECURE-BY-DEFAULT (main() mints a capability token and
-                  `/` sets it as a SameSite=Strict cookie) instead of the
-                  harness's usual --no-token opt-out. Suites that seed through
-                  direct server-side requests then need studio_headers() on
-                  every write; suites that only drive the browser get the
-                  cookie for free. Default False keeps every existing suite's
-                  behaviour unchanged.
+
+    The studio boots EXACTLY as the product ships: secure by default, with a
+    minted capability token. There is no --no-token opt-out here. Before
+    2026-09-23 every one of these 40+ suites ran against a server with the
+    control switched off, which is why two writes that cannot carry a header
+    (the dictation upload and the pagehide idea flush) reached the product 403
+    and silently dropped the writer's keystrokes while the whole fleet stayed
+    green. Seed through `studio.post(...)` / `studio_headers(base)` instead of
+    a bare requests call, and run_browser_suites.py fails any suite that
+    reaches for the opt-out again.
     Returns a Studio; call .close() (or use `with`) or the child lingers.
     """
     tmp = None
@@ -371,16 +406,10 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None,
     # skips the "is :8080 up?" probe), the flag keeps it explicit.
     env["SCREENPLAY_STUDIO_DEMO_MODEL"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
-    # --no-token: the harness is a trusted local tool and seeds projects with
-    # direct server-side requests, which the secure-by-default capability token
-    # would 403. The harness opts out explicitly (it used to rely on the token
-    # being off globally). The hardened path stays covered by
-    # e2e_browser_token_mode.py, test_capability_token.py, and any suite that
-    # asks for use_token=True.
+    # No --no-token: the harness boots the product as shipped, capability token
+    # and all. See the start_studio docstring for what that caught.
     cmd = [sys.executable, "-m", "screenplay_studio.webapp_server",
            "--port", str(port), "--projects-dir", projects_dir, "--demo-model"]
-    if not use_token:
-        cmd.append("--no-token")
     if server_url:
         # Drive --server through main() instead: both import-time demo paths
         # (env trigger and the :8080-unreachable fallback) would lock

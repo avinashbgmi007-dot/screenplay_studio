@@ -32,7 +32,7 @@ import requests
 from playwright.sync_api import sync_playwright
 
 from e2e_browser_common import (Checks, clicked, filled, launch, note,
-                                seen_visible, start_studio)
+                                seen_visible, start_studio, studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 checks = Checks()
@@ -139,7 +139,7 @@ def run(base):
         # ================= 7. FAILURE (the retry contract's honest face) =====
         proj = page.evaluate("() => state.currentProject")
         r_pre = requests.post(f"{base}/api/projects/{proj}/analyze/retry-failed",
-                             json={}, timeout=30)
+                             headers=studio_headers(base), json={}, timeout=30)
         check("failure: retry-failed honestly 400s with no completed report",
               r_pre.status_code == 400, f"status={r_pre.status_code}")
         # P2.16: the desk carries no rerun of its own at all — the ledger's banner

@@ -10,7 +10,7 @@ import re
 import requests
 from playwright.sync_api import expect, sync_playwright
 
-from e2e_browser_common import Checks, launch, open_studio
+from e2e_browser_common import Checks, launch, open_studio, studio_headers
 PAGE = (
     "Flyout Probe\n\n"
     "A night courier in Mumbai discovers her delivery bag swaps whatever is "
@@ -24,6 +24,7 @@ ok = checks.ok
 
 def main(base):
     api = requests.Session()
+    api.headers.update(studio_headers(base))
     # seed an idea + conversation over HTTP (the browser then navigates via UI)
     iid = api.post(f"{base}/api/ideas", json={"title": "Flyout Probe"}).json()["id"]
     # sweep leftovers from earlier aborted runs so counts are deterministic

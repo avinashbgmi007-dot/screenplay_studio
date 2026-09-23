@@ -21,7 +21,8 @@ sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from e2e_browser_common import (Checks, assert_no_js_errors, launch,  # noqa: E402
-                                open_dock_section_holding, start_studio)
+                                open_dock_section_holding, start_studio,
+                                studio_headers)
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 LENSES = ("evidence", "notes", "sameer", "sushruta")
@@ -168,4 +169,4 @@ def run(base, projects_dir, headers):
 if __name__ == "__main__":
     import tempfile
     with start_studio(projects_dir=tempfile.mkdtemp(prefix="width_budget_")) as studio:
-        run(studio.base_url, studio.projects_dir, {})
+        run(studio.base_url, studio.projects_dir, studio_headers(studio.base_url))

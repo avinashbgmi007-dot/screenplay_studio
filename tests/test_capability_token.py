@@ -62,6 +62,31 @@ def test_index_sets_token_cookie_when_configured(monkeypatch, tmp_path):
     assert "SameSite=Strict" in cookie
 
 
+def test_every_served_document_sets_the_token_cookie(monkeypatch, tmp_path):
+    """The token is a page's LICENCE TO WRITE, so it rides on EVERY HTML
+    document — not just `/`. The design labs are separate documents reached
+    directly (`/preview-next/report-first.html`); when only `index()` minted
+    the cookie they could not read it, so every dismissal and chat turn they
+    post came back `missing or invalid capability token` — six worlds, all
+    broken, and invisible while the browser harness booted with --no-token."""
+    ws, client = _make_client(monkeypatch, tmp_path)
+    monkeypatch.setattr(ws, "_API_TOKEN", "secret-token-123")
+    for doc in ("/index.html", "/design_session.html",
+                "/preview-next/index.html", "/preview-next/report-first.html"):
+        r = client.get(doc)
+        assert r.status_code == 200, doc
+        assert "studio_token=secret-token-123" in r.headers.get("Set-Cookie", ""), doc
+
+
+def test_assets_do_not_carry_the_token_cookie(monkeypatch, tmp_path):
+    """Scoped to documents on purpose: a cookie on every stylesheet, font and
+    script the page pulls is noise, and 'every response' would not be a check."""
+    ws, client = _make_client(monkeypatch, tmp_path)
+    monkeypatch.setattr(ws, "_API_TOKEN", "secret-token-123")
+    for asset in ("/style.css", "/app.js", "/core.js"):
+        assert "studio_token" not in client.get(asset).headers.get("Set-Cookie", "")
+
+
 # ---------- startup posture: secure by default (H1) ----------
 
 def _launch(monkeypatch, tmp_path, extra_argv):

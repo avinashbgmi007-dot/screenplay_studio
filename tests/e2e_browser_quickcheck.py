@@ -23,7 +23,7 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, clicked, launch, note, open_studio
+from e2e_browser_common import studio_headers, Checks, clicked, launch, note, open_studio
 
 checks = Checks()
 check = checks.ok
@@ -57,7 +57,7 @@ SEC = f'.dock-lens[data-lens="evidence"] .dock-section[data-key="{KEY}"]'
 
 def seed(base, title="Quickcheck Script"):
     r = requests.post(f"{base}/api/projects",
-                      files={"file": ("quickcheck.fountain", SCRIPT.encode(), "text/plain")},
+                      headers=studio_headers(base), files={"file": ("quickcheck.fountain", SCRIPT.encode(), "text/plain")},
                       data={"title": title}, timeout=60)
     assert r.status_code in (200, 201), r.text
     return r.json().get("project") or title

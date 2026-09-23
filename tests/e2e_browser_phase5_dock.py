@@ -21,7 +21,7 @@ import os
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, launch, open_studio
+from e2e_browser_common import studio_headers, Checks, launch, open_studio
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -32,7 +32,7 @@ check = checks.ok
 def seed_project(base):
     with open(FIXTURE, "rb") as f:
         r = requests.post(f"{base}/api/projects",
-                          files={"file": ("Rain Courier.fountain", f, "text/plain")},
+                          headers=studio_headers(base), files={"file": ("Rain Courier.fountain", f, "text/plain")},
                           data={"title": "Rain Courier"}, timeout=60)
     assert r.status_code in (200, 201), r.text
     return r.json().get("name", "Rain Courier")

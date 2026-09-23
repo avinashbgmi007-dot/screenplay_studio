@@ -91,13 +91,14 @@ def main():
         page.evaluate("""async (title) => {
             // clean slate for the probe title, then create through the API the
             // button itself uses (the button click path is covered below when
-            // the shelf is reachable; API keeps this suite dual-mode safe)
-            const list = await (await fetch('/api/ideas')).json();
-            for (const old of list) {
-                if (old.title === title) await fetch('/api/ideas/' + old.id, {method: 'DELETE'});
+            // the shelf is reachable; API keeps this suite dual-mode safe).
+            // api(), not fetch(): it is what attaches the capability token, so
+            // a suite that seeded with a bare fetch would 403 in the posture
+            // the product ships in.
+            for (const old of await api('/ideas')) {
+                if (old.title === title) await api('/ideas/' + old.id, {method: 'DELETE'});
             }
-            await fetch('/api/ideas', {method: 'POST', headers: {'Content-Type': 'application/json'},
-                                       body: JSON.stringify({title})});
+            await api('/ideas', {method: 'POST', body: JSON.stringify({title})});
         }""", IDEA_TITLE)
         # drive the real UI: ideas flyout -> new idea button (self-host fresh
         # shelf has exactly our probe idea)
@@ -151,12 +152,11 @@ def main():
         # the idea room here, so desk buttons are hidden — create via API and
         # open through the app's own openProject() path
         made = page.evaluate("""async () => {
-            const ps = await (await fetch('/api/projects')).json();
+            const ps = await api('/projects');
             if ((ps.projects || []).some(p => p.project === 'The Late Hour')) {
                 return 'The Late Hour';
             }
-            const r = await fetch('/api/sample', { method: 'POST' });
-            return (await r.json()).project;
+            return (await api('/sample', { method: 'POST' })).project;
         }""")
         page.evaluate("async (name) => { await openProject(name); }", made)
         page.wait_for_timeout(2500)
@@ -243,9 +243,8 @@ def main():
 
         # ---- cleanup: remove the probe idea (live-server runs stay clean) ---
         page.evaluate("""async (title) => {
-            const list = await (await fetch('/api/ideas')).json();
-            for (const old of list) {
-                if (old.title === title) await fetch('/api/ideas/' + old.id, {method: 'DELETE'});
+            for (const old of await api('/ideas')) {
+                if (old.title === title) await api('/ideas/' + old.id, {method: 'DELETE'});
             }
         }""", IDEA_TITLE)
 

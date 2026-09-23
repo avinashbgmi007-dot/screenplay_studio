@@ -154,6 +154,25 @@ def _serve_spa_document(resp):
     return _stamp_asset_versions(_harden_spa_document(resp))
 
 
+@app.after_request
+def _hand_token_to_every_document(resp):
+    """Mint the capability token on EVERY served HTML document, not just `/`.
+
+    A page can only write if it can read the cookie and echo it as
+    X-Studio-Token, so the cookie is not decoration — it is the page's licence
+    to mutate. Handing it out on one route made that invisible for everything
+    reached directly: the preview-next design labs are separate documents at
+    /preview-next/*.html, and all six died on `missing or invalid capability
+    token` the moment the browser harness stopped booting with --no-token.
+    Subresources (JS/CSS/fonts) are skipped — they never write, and a cookie on
+    each is noise.
+    """
+    if _API_TOKEN and resp.mimetype == "text/html":
+        # SameSite=Strict so a foreign page's request never carries it.
+        resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
+    return resp
+
+
 # ---------------------------------------------------------------------------
 # Cross-origin write guard.
 #
@@ -445,10 +464,6 @@ def _unhandled(e):
 def index():
     resp = send_from_directory(WEBAPP_DIR, "index.html")
     resp.headers["Cache-Control"] = "no-cache"
-    if _API_TOKEN:
-        # SameSite=Strict so a foreign page's request never carries it; the SPA
-        # reads it and echoes it back as the X-Studio-Token header.
-        resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
     return _serve_spa_document(resp)
 
 

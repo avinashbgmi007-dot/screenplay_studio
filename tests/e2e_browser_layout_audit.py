@@ -143,26 +143,40 @@ def main():
                           f"width spread {spread:.1f}px over {len(row_widths)}")
 
             # ---- 4. status strip row --------------------------------------
-            # the strip is one row: items must share a top edge. Only items
-            # actually PRESENT are measured (some are conditionally rendered)
+            # the strip is one row: items must sit on ONE LINE. #status-strip
+            # is `align-items: center`, so the invariant is a shared MIDLINE,
+            # not a shared top edge — tops only ever matched while every item
+            # happened to be the same height, and WCAG 2.5.8 ends that (a 24px
+            # button beside a 15px span is correct, not crooked). Measuring the
+            # top here would fail on a row that is visually perfect.
+            # Only items actually PRESENT are measured (some are conditionally
+            # rendered), and each must stay inside the strip's own box.
             strip_items = page.evaluate(
                 """() => {
+                  const strip = document.querySelector('#status-strip');
+                  const sr = strip && strip.getBoundingClientRect();
                   const sels = ['#status-project', '#status-model',
                                 '#status-conn', '#status-dawn',
                                 '#status-elapsed', '#status-metrics'];
-                  const out = [];
+                  const mid = [], outside = [];
                   for (const s of sels) {
                     const el = document.querySelector(s);
-                    if (el && el.offsetParent !== null)
-                      out.push(el.getBoundingClientRect().top);
+                    if (!el || el.offsetParent === null) continue;
+                    const r = el.getBoundingClientRect();
+                    mid.push(r.top + r.height / 2);
+                    if (sr && (r.top < sr.top - 1 || r.bottom > sr.bottom + 1))
+                      outside.push(s);
                   }
-                  return out;
+                  return { mid, outside };
                 }"""
             )
-            if strip_items:
-                spread = max(strip_items) - min(strip_items)
-                CHECKS.ok("status strip items vertically aligned",
-                          spread <= 2, f"top spread {spread:.1f}px")
+            if strip_items["mid"]:
+                spread = max(strip_items["mid"]) - min(strip_items["mid"])
+                CHECKS.ok("status strip items share one line (midline aligned)",
+                          spread <= 2, f"midline spread {spread:.1f}px")
+                CHECKS.ok("status strip items stay inside the strip's row",
+                          not strip_items["outside"],
+                          ", ".join(strip_items["outside"]))
 
             # ---- 5. status strip span --------------------------------------
             # WIREFRAME CONTRACT (States 1/4/5): "Status strip x:0-1440,

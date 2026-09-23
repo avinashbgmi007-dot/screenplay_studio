@@ -23,7 +23,7 @@ import os
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, launch, start_studio
+from e2e_browser_common import studio_headers, Checks, launch, start_studio
 
 checks = Checks()
 check = checks.ok
@@ -34,7 +34,7 @@ def run(base):
         browser, page, errors = launch(p)
 
         # --- create an idea through the API the button uses ------------------
-        r = requests.post(f"{base}/api/ideas", json={"title": "phase9 probe"}, timeout=30)
+        r = requests.post(f"{base}/api/ideas", headers=studio_headers(base), json={"title": "phase9 probe"}, timeout=30)
         assert r.status_code in (200, 201), r.text
         ideas = requests.get(f"{base}/api/ideas", timeout=30).json()
         idea = next((i for i in ideas if i["title"] == "phase9 probe"), None)
@@ -136,7 +136,7 @@ def run(base):
         check("Premise Doctor reachable from the idea room (on demand)", doctor_reachable)
 
         # --- idea isolation --------------------------------------------------------
-        r2 = requests.post(f"{base}/api/ideas", json={"title": "phase9 second"}, timeout=30)
+        r2 = requests.post(f"{base}/api/ideas", headers=studio_headers(base), json={"title": "phase9 second"}, timeout=30)
         ideas2 = requests.get(f"{base}/api/ideas", timeout=30).json()
         idea2 = next((i for i in ideas2 if i["title"] == "phase9 second"), None)
         page.evaluate("async (id) => { await openIdea(id); }", idea2["id"])
@@ -167,7 +167,7 @@ def run(base):
 
         # --- cleanup -------------------------------------------------------------
         for iid in (idea["id"], idea2["id"]):
-            requests.delete(f"{base}/api/ideas/{iid}", timeout=30)
+            requests.delete(f"{base}/api/ideas/{iid}", headers=studio_headers(base), timeout=30)
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

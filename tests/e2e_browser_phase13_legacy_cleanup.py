@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, assert_no_js_errors, launch, open_studio
+from e2e_browser_common import studio_headers, Checks, assert_no_js_errors, launch, open_studio
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -54,7 +54,7 @@ def main():
             with open(FIXTURE, "rb") as f:
                 resp = requests.post(
                     f"{base}/api/projects",
-                    files={"file": ("P13D Verify.fountain", f, "text/plain")},
+                    headers=studio_headers(base), files={"file": ("P13D Verify.fountain", f, "text/plain")},
                     data={"title": "P13D Verify"},
                     timeout=60,
                 )

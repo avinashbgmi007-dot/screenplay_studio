@@ -28,7 +28,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import requests  # noqa: E402
-from e2e_browser_common import Checks, launch, open_studio, assert_no_js_errors  # noqa: E402
+from e2e_browser_common import studio_headers, Checks, launch, open_studio, assert_no_js_errors  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
@@ -40,7 +40,7 @@ check = checks.ok
 def seed_project(base, title):
     with open(FIXTURE, "rb") as f:
         r = requests.post(f"{base}/api/projects",
-                          files={"file": (f"{title}.fountain", f, "text/plain")},
+                          headers=studio_headers(base), files={"file": (f"{title}.fountain", f, "text/plain")},
                           data={"title": title}, timeout=60)
     assert r.status_code in (200, 201), r.text
     return r.json()["project"]
@@ -196,7 +196,7 @@ def main():
                 text = f.read().decode("utf-8")
             text2 = text.replace("EXT/INT. HOSPITAL - NIGHT", "EXT. HOSPITAL ENTRANCE - NIGHT", 1)
             r = requests.post(f"{base}/api/projects/{name}/drafts",
-                             files={"file": ("second.fountain", text2.encode("utf-8"), "text/plain")},
+                             headers=studio_headers(base), files={"file": ("second.fountain", text2.encode("utf-8"), "text/plain")},
                              timeout=60)
             assert r.status_code in (200, 201), r.text
             page.evaluate("() => openCompareView()")
@@ -255,7 +255,7 @@ def main():
                   f"desk={json.dumps(desk)} back={json.dumps(rr)}")
 
             # ---------- cleanup ----------
-            requests.delete(f"{base}/api/projects/{name}", timeout=30)
+            requests.delete(f"{base}/api/projects/{name}", headers=studio_headers(base), timeout=30)
             assert_no_js_errors(checks, errors)
             browser.close()
 

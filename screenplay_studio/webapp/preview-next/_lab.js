@@ -34,8 +34,21 @@
   let DATA = null;
   let STATE = { left: true, right: true, feedback: "auto" }; // feedback: auto|empty|running|complete
 
+  // H1: the studio mints a capability token on `/` and answers every non-GET
+  // without it with 403. The lab writes (dismiss, chat, restart) used to ride a
+  // bare fetch, so under the shipped secure-by-default posture each one failed
+  // silently. One reader, one header, every call.
+  function studioToken() {
+    const m = document.cookie.match(/(?:^|;\s*)studio_token=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
   async function fetchJSON(url, opts) {
-    const r = await fetch(url, opts);
+    opts = opts || {};
+    const headers = Object.assign({}, opts.headers);
+    const tok = studioToken();
+    if (tok) headers["X-Studio-Token"] = tok;
+    const r = await fetch(url, Object.assign({}, opts, { headers }));
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(body.error || r.statusText), { status: r.status, body });
     return body;

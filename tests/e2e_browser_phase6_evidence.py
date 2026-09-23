@@ -43,7 +43,7 @@ def seed_and_analyze(base, title):
     """
     with open(FIXTURE, "rb") as f:
         r = requests.post(f"{base}/api/projects",
-                          files={"file": (f"{title}.fountain", f, "text/plain")},
+                          headers=studio_headers(base), files={"file": (f"{title}.fountain", f, "text/plain")},
                           data={"title": title}, timeout=60)
     assert r.status_code in (200, 201), r.text
     # the manifest summary carries the server-safe directory name under
@@ -51,7 +51,7 @@ def seed_and_analyze(base, title):
     name = r.json().get("project") or r.json().get("name") or title
     # demo model analyzes deterministically; the endpoint blocks until done
     r2 = requests.post(f"{base}/api/projects/{name}/analyze",
-                       json={"force": True}, timeout=300)
+                       headers=studio_headers(base), json={"force": True}, timeout=300)
     assert r2.status_code in (200, 201), r2.text[:400]
     return name
 
@@ -306,7 +306,7 @@ def run(base):
         browser, page, errors = launch(p)
         with open(FIXTURE, "rb") as f:
             r = requests.post(f"{base}/api/projects",
-                              files={"file": ("Unanalyzed.fountain", f, "text/plain")},
+                              headers=studio_headers(base), files={"file": ("Unanalyzed.fountain", f, "text/plain")},
                               data={"title": "Unanalyzed"}, timeout=60)
         assert r.status_code in (200, 201), r.text
         unanalyzed = r.json().get("project") or "Unanalyzed"
@@ -323,7 +323,7 @@ def run(base):
 
 
 if __name__ == "__main__":
-    from e2e_browser_common import start_studio
+    from e2e_browser_common import studio_headers, start_studio
     if os.environ.get("E2E_BASE"):
         run(os.environ["E2E_BASE"])
     else:

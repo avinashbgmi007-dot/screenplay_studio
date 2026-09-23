@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import requests  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
-from e2e_browser_common import Checks, launch, open_studio, assert_no_js_errors  # noqa: E402
+from e2e_browser_common import studio_headers, Checks, launch, open_studio, assert_no_js_errors  # noqa: E402
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -45,7 +45,7 @@ def main():
             name = None
             with open(FIXTURE, "rb") as f:
                 r = requests.post(f"{base}/api/projects",
-                                  files={"file": ("P12 Gate.fountain", f, "text/plain")},
+                                  headers=studio_headers(base), files={"file": ("P12 Gate.fountain", f, "text/plain")},
                                   data={"title": "P12 Gate"}, timeout=60)
             name = r.json()["project"]
 

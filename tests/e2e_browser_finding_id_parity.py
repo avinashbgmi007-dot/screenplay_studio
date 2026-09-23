@@ -41,7 +41,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
-from e2e_browser_common import Checks, assert_no_js_errors, launch  # noqa: E402
+from e2e_browser_common import (Checks, assert_no_js_errors, launch,  # noqa: E402
+                                studio_headers)
 from playwright.sync_api import sync_playwright  # noqa: E402
 from screenplay_studio.revision import compute_finding_id  # noqa: E402
 
@@ -102,7 +103,8 @@ def finding(issue, scene=1, category="dialogue", severity="high",
 def post(base, path, body=None):
     req = urllib.request.Request(
         base + path, data=json.dumps(body or {}).encode(),
-        headers={"Content-Type": "application/json"}, method="POST")
+        headers={"Content-Type": "application/json", **studio_headers(base)},
+        method="POST")
     with urllib.request.urlopen(req, timeout=180) as r:
         return json.loads(r.read().decode() or "{}")
 

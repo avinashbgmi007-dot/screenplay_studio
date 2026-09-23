@@ -24,9 +24,9 @@ the Evidence dock (`.dock-lens[data-lens="evidence"]`) — the canonical finding
 canvas — and the dead-sink legs assert ABSENCE of the removed renderers, which
 is the strongest form of "inert". No security assertion was weakened.
 
-It boots with the capability token ON (unlike most suites' --no-token default)
-so the "injected JS cannot read the token" leg is a real assertion, not a
-vacuous one.
+It boots with the capability token ON, like every other suite now that the
+harness boots the product as shipped, so the "injected JS cannot read the
+token" leg is a real assertion, not a vacuous one.
 
 Run:  python tests/e2e_browser_xss_inert.py
 """
@@ -271,8 +271,8 @@ def run(base, projects_dir, headers):
 
 if __name__ == "__main__":
     from e2e_browser_common import start_studio, studio_headers
-    # Token ON: this suite proves the whole chain, including that injected JS
-    # cannot lift the capability token.
-    with start_studio(use_token=True) as studio:
+    # The harness boots the product as shipped, so this suite's token leg is a
+    # real assertion, not a vacuous one.
+    with start_studio() as studio:
         run(studio.base_url, studio.projects_dir,
             studio_headers(studio.base_url))
