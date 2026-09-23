@@ -389,6 +389,57 @@ def run(base, name):
                       page.locator(".sev-badge:visible").count() > 0)
             sweep(checks, page, f"{theme} desk")
 
+            # ②b The dispositions the desk sweep could not reach. Every settled
+            # row is dimmed with `opacity`, which composites against whatever
+            # surface is underneath it — so a sweep of the untouched report
+            # measures paper these rows never get. Two real writer calls, taken
+            # through the cards' own buttons: "next pass" parks a finding (it
+            # stays on screen, muted, once the Next-pass chip shows it) and
+            # "addressed" leaves the ledger but not the Fix-queue row.
+            def click(page, selector):
+                return page.evaluate("""(sel) => {
+                  const b = document.querySelector(sel);
+                  if (!b) return false;
+                  b.click(); return true;
+                }""", selector)
+
+            parked = click(page, '.finding-note .intent-btn[title^="Park"]')
+            page.wait_for_timeout(700)
+            called = click(page, '.finding-note .intent-btn[title^="My call"]')
+            page.wait_for_timeout(900)
+            chip = page.locator('.dock-filter-row .fchip', has_text="Next pass")
+            checks.ok(f"{theme}: the desk offers both writer intents and the chip",
+                      parked and called and chip.count() > 0)
+            chip.first.click()
+            page.wait_for_timeout(700)
+            dims = page.evaluate("""() => {
+              const visible = (sel) => [...document.querySelectorAll(sel)]
+                  .filter((n) => n.offsetParent).length;
+              return {deferred: visible('.finding-note.deferred'),
+                      done: visible('.fix-row.done'),
+                      marks: JSON.stringify(state.findingMarks || {})};
+            }""")
+            checks.ok(f"{theme}: a parked finding and a done queue row are on screen",
+                      dims["deferred"] and dims["done"], str(dims))
+            # The recede has to live in a colour, not in an alpha. Asserting the
+            # parked card reads dimmer than an open one AND carries no alpha is
+            # what stops `opacity` from coming back on a settled row wearing a
+            # contrast the sweep would otherwise pass.
+            cue = page.evaluate("""() => {
+              const one = (sel) => [...document.querySelectorAll(sel)]
+                  .find((n) => n.offsetParent);
+              const parked = one('.finding-note.deferred');
+              const open = one('.finding-note:not(.deferred):not(.addressed):not(.ghosted)');
+              const body = (n) => n && getComputedStyle(n.querySelector('.finding-note-text')).color;
+              return { parked: body(parked), open: body(open),
+                       alpha: parked && getComputedStyle(parked).opacity };
+            }""")
+            checks.ok(f"{theme}: a parked card recedes by colour, not by alpha",
+                      bool(cue["parked"] and cue["open"])
+                      and cue["parked"] != cue["open"]
+                      and float(cue["alpha"]) == 1.0, str(cue))
+            sweep(checks, page, f"{theme} desk, dispositions taken")
+
             # ③ river read — the same manuscript re-painted on dark glass. Its
             # handler is #flow-btn's, which is parked in the overflow menu, so
             # the product's own click is invoked directly (a JS click fires on

@@ -3,6 +3,67 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### Production-readiness audit pass 4: the states pass 2 could not put on screen
+
+Pass 2 closed with a gap it named itself: *"the sweep does not reach the disposition
+states, so these are still unmeasured"* — and every one of those rules dimmed with
+`opacity`, which is the exact defect pass 2 spent its budget removing. The gate could
+not see them because a settled row is not on screen until a writer settles it.
+Sweep ②b (`tests/e2e_browser_readiness_gate.py`) now takes two real writer calls through
+the cards' own intent buttons — "Park for the next pass", then "My call: addressed" —
+opens the parked one with the **Next pass** chip, proves both a `.finding-note.deferred`
+and a `.fix-row.done` are actually painted, and sweeps again. **64 → 76 checks**, in both
+rooms.
+
+**The first run measured 11 failures, and every single one was alpha.** Not a bad token:
+the gate reports the alpha riding on each node, and folding it out left every colour
+≥ 4.8:1. Three rules were the whole damage:
+
+- `.fix-row.done { opacity: 0.45 }` took the *row's own* tokens with it — issue text
+  2.67, MEDIUM badge 2.02, act chip 2.08, `⚠ unverified` 2.07, and the Locate / Rewrite /
+  Discuss buttons 2.03, on both themes. A settled queue row was unreadable by design.
+- `.finding-note.deferred { opacity: .72 }` took the card body to 3.29 and its own
+  "next pass" label to 3.47.
+- `.scene-index-clean { opacity: 0.65 }` took the clean-scene ✓ to 2.82 — the mark that
+  tells the writer a scene is *done* was the dimmest text in the rail.
+
+**Fix, same rule as pass 2:** the dim role moves to a colour token, so the recede stays
+and the badges/buttons keep their own strength. `.finding-note.addressed` and `.deferred`
+now `color: var(--text-muted)` (14.65 → **7.09** night, 13.5 → **6.5** dawn on the card's
+own `#20160f`) and keep their non-colour redundancy — the `--ok` rail, the "addressed" /
+"next pass" label; `.fix-row.done`/`.dismissed` dim the row's *issue* text and let the
+severity badge and action buttons stand; the ✓ is quiet by size (`--fs-2xs`), not by
+alpha; `.ghosted` keeps its `saturate(.4)`; and `.msg-pending .msg-bubble` (0.75 →
+`--text-muted` + the existing italic) is fixed sight-unseen — the gate has no way to
+catch a bubble mid-stream. **Measured floor after: 4.81 night / 4.88 dawn — unchanged
+from pass 2, now over 12 more surfaces and 1,614 measured runs.**
+
+**The cue has a test, not a comment.** `recedes by colour, not by alpha` asserts the
+parked card's body text differs in *colour* from an open card's and carries no alpha.
+Red-proof: restore HEAD's `.finding-note.deferred{opacity:.72}` and it fails in both
+rooms with the evidence printed — `{'parked': 'rgb(242, 232, 218)', 'open':
+'rgb(242, 232, 218)', 'alpha': '0.72'}` — i.e. the old rule dimmed nothing that a
+colour-only reading could see, and the body was byte-identical to an open card.
+**76 → 78 checks, 0 failed.**
+
+**One real 2.5.8 hit came with the new state:** `button.dock-ruler-tick` measured 24×22
+once parked rows were on screen. The ruler's `min-height: 0` exemption was written to
+protect the *painted* stem — but the stem is a bottom-aligned child, so the transparent
+button around it can reach the 24px floor without redrawing a pixel. The exemption now
+covers `min-width` only (the track scrolls horizontally; 20 ticks × 24px would blow the
+dock's width budget); `.dock-sp-mk` is untouched.
+
+**Deliberately still unmeasured:** `.finding-note.ghosted` needs a second real analysis
+pass (ghosting derives from `pass_history`, not from a writer mark), and
+`.msg-pending .msg-bubble` exists for a moment while the model streams. The `addressed`
+card is live but reachable only through the margin-pin path (`app.js:4747-4754` builds
+pins from the *observed* status) — the dock list filters addressed rows out, so ②b pins
+the cue on the parked card, which shares the rule family.
+
+**Verification:** gate 78/78; browser fleet **43 suites: 42 passed / 0 failed /
+1 skipped** (`gun_pen_audit`, needs a real llama-server); **pytest 1669 passed /
+3 skipped**. No JS touched.
+
 ### Production-readiness audit pass 3: the bytes, the keystroke, and five docs describing a panel that is gone
 
 Passes 1–2 measured the *rendered* page. This pass swept the three findings that

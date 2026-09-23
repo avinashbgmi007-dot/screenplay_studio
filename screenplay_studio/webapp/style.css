@@ -498,8 +498,11 @@ button, input, textarea, select { font-family: inherit; font-size: inherit; colo
    anchors are exempt by the criterion itself, so they are not swept up here. */
 button, [role="button"], [role="tab"] { min-height: 24px; min-width: 24px; }
 /* The ruler ticks and the setup/payoff marks are scale graphics: the painted box
-   IS their meaning, so they keep it and carry the hit area in a transparent pad. */
-.dock-ruler-tick, .dock-sp-mk { min-height: 0; min-width: 0; }
+   IS their meaning, so they keep it and carry the hit area in a transparent pad.
+   A tick's height is not exempt — the stem inside it is bottom-aligned and stays
+   its own height, so the button can reach the 24px floor without redrawing. */
+.dock-ruler-tick { min-width: 0; }
+.dock-sp-mk { min-height: 0; min-width: 0; }
 .dock-ruler-tick { position: relative; }
 .dock-ruler-tick::before, .dock-sp-mk::before { content: ""; position: absolute; inset: -9px; }
 
@@ -1620,7 +1623,11 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .finding-note.sev-high { border-left-color: var(--danger); }
 .finding-note.sev-medium { border-left-color: var(--sev-mid); }
 .finding-note.sev-low { border-left-color: var(--ok); }
-.finding-note.addressed { opacity: 0.45; border-left-color: var(--ok); }
+/* Settled states recede by colour, never by alpha: opacity composites the row's
+   own tokens (badge, act chip, buttons) against the surface and takes them under
+   AA — measured by tests/e2e_browser_readiness_gate.py, which reaches the
+   writer-intent states. */
+.finding-note.addressed { color: var(--text-muted); border-left-color: var(--ok); }
 .finding-note-top { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
 .finding-note-cat {
   font-family: var(--font-mono);
@@ -1862,7 +1869,7 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 
 .fix-row { display: flex; align-items: flex-start; gap: var(--sp-5); padding: var(--sp-4) 0; border-bottom: 1px solid var(--line-soft); }
 .fix-row:last-child { border-bottom: none; }
-.fix-row.done { opacity: 0.45; }
+.fix-row.done .fix-row-issue, .fix-row.dismissed .fix-row-issue { color: var(--text-muted); }
 .sev-badge {
   font-family: var(--font-mono);
   font-size: var(--fs-3xs);
@@ -2216,7 +2223,7 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .msg.user .msg-bubble { background: var(--paper); color: var(--paper-ink); border-top-right-radius: 2px; }
 .msg.assistant .msg-bubble { background: var(--ink-800); border: 1px solid var(--line); color: var(--text); border-top-left-radius: 2px; }
 .msg.assistant .msg-bubble a { color: var(--lamp-bright); }
-.msg-pending .msg-bubble { opacity: 0.75; font-style: italic; }
+.msg-pending .msg-bubble { color: var(--text-muted); font-style: italic; }
 
 .msg-bubble p { margin: 0 0 var(--sp-5); }
 .msg-bubble p:last-child { margin-bottom: 0; }
@@ -4239,7 +4246,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .fq-dismiss:hover { border-color: var(--desk-rust); color: var(--desk-rust); }
 .fq-undismiss:hover { border-color: var(--desk-amber); color: var(--desk-amber); }
 .fq-toggle-dismissed { margin-left: auto; }
-.fix-row.dismissed { opacity: 0.55; font-style: italic; }
+.fix-row.dismissed { font-style: italic; }
 
 
 /* ---------- streaming reply sink ---------- */
@@ -5362,14 +5369,14 @@ body:not(.idea-mode) #manuscript-workspace {
    quiet ✓ exactly where its severity dots would sit, so the rail reads as a
    progress map and not just a map of problems. Same flex slot + 8px box as the
    dots (the column of marks stays aligned). Uses the --ok token the dock's own
-   "clean — no open findings" line uses, softened to stay ambient. */
+   "clean — no open findings" line uses; quiet by size, not by alpha — the gate
+   measures it as text and alpha here would take it under AA. */
 .scene-index-clean {
   flex: 0 0 auto;
   margin-left: auto;
   font-size: var(--fs-2xs);
   line-height: 1;
   color: var(--ok);
-  opacity: 0.65;
 }
 .scene-index-empty {
   padding: var(--sp-6) var(--sp-3);
@@ -6182,8 +6189,8 @@ body:not(.idea-mode) .desk {
 .dock-working-row { font-size: var(--fs-sm); line-height: 1.55; color: var(--text-muted); margin: 0; }
 
 /* forward-compatible finding states (R3 defer / R9 ghosting): muted, never red, CSS-only (marks never reflow script text) */
-.finding-note.deferred{opacity:.72}
-.finding-note.ghosted{opacity:.6;filter:saturate(.4)}
+.finding-note.deferred{color:var(--text-muted)}
+.finding-note.ghosted{color:var(--text-muted);filter:saturate(.4)}
 .finding-note.deferred .finding-note-state,.finding-note.ghosted .finding-note-state{color:var(--text-faint);font-family:var(--font-body,var(--font-base,var(--font-mono)))}
 .finding-note.deferred .finding-note-state,.finding-note.ghosted .finding-note-state{font-style:italic}
 
