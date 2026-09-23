@@ -82,6 +82,30 @@ hard-coded `#fff`, which is a token-policy question, not a contrast one).
 1 skipped** (`gun_pen_audit`, needs a real llama-server); **pytest 1669 passed /
 3 skipped**. No JS touched.
 
+### Audit close-out: the same gate re-run at HEAD, and one claim I had wrong
+
+Re-ran the three commands that constitute this audit's gate on a clean tree at
+`e695aad`, so the handoff ends on fresh evidence instead of a remembered one:
+
+- `tests/e2e_browser_readiness_gate.py` → **78 passed, 0 failed**, over **14 sweeps /
+  1,614 measured token-text runs**: worst **4.81:1** night, **4.88:1** dawn, **0** runs
+  under AA, **0** controls under 24×24 — both rooms, all 12 states (landing, idea room
+  idle/saving/saved, desk, desk-with-dispositions-taken, river read × night/dawn).
+- `tests/run_browser_suites.py` → **43 suites: 42 passed / 0 failed / 1 skipped**
+  (`gun_pen_audit`, needs a live llama-server).
+- `python -m pytest tests/ -q` → **1669 passed / 3 skipped**.
+
+**Self-correction, because the record matters more than the claim.** A narrow `grep` for
+a draft-gated doctor render returned nothing and I read that as spec §2.2 being
+unimplemented. It is implemented, in two places: `app.js:1227` adds `body.idea-mode`
+(comment: *"no doctor / scripts / shelf chrome"*) and `style.css:5457-5462` forces
+`#context-dock` — the only route to the Sushruta lens (`app.js:5125`) — to
+`width: 0; visibility: hidden`, so in the idea room the dock is neither painted nor
+focusable. The idea room's two live actions are `#idea-sam-pill` and
+`#idea-graduate-btn`, which the gate already asserts as *the idea room offers its two
+calls to action*. An empty narrow grep is not an absence proof; ask the rendered page.
+**No spec item from §2.2 is open.**
+
 ### Production-readiness audit pass 3: the bytes, the keystroke, and five docs describing a panel that is gone
 
 Passes 1–2 measured the *rendered* page. This pass swept the three findings that
