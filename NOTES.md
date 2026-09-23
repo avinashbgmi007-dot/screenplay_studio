@@ -3,6 +3,47 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### P2.19 — inked ⇔ clickable: one matcher decides where a finding sits
+
+**What was wrong.** Two matchers answered the same question on the manuscript. The
+ink pass (`inkMatch`) falls back to a quote's longest leading fragment, because a
+quote the model cited across a line wrap can never be found whole on one line. The
+click pass used a different predicate — `lt.includes(qq) || qq.includes(lt.slice(0, 40))`
+— and it ran twice (workspace + revision view). Where they disagreed the page lied:
+a phrase carried the `.el-anchored` ❋ marker and a hover title and clicking it did
+nothing, or (worse, the measured case) it was highlighted with no click target at
+all. `prepareManuscriptData` also built a third scene map (`anchorsByScene`, keyed
+off `findingTargetScene`) that only that pass used.
+
+**What shipped.** The mark IS the anchor. `decorateLineWithInk` now stamps
+`el-anchored` + `data-finding-index` + the hover title on the line it decorated, and
+`wireInkClicks(root, activate)` hangs the click off exactly those lines — one
+matcher, so the two surfaces cannot drift. Both anchor passes and `anchorsByScene`
+are deleted. `locateFinding`'s duplicated 9-line scan became `flashQuoteLine`, which
+flashes the line holding that finding's ink and only scans when there is no ink (a
+quote crossing a line break), so a Locate can never land on a line the page never
+marked. Net: fewer lines than before, and `❋` now means "this opens something".
+
+**Cards: measured, not moved.** Spec §"Manuscript" also demands floating cards never
+overlap page text. That already holds — P0.2's margin made `.scene-notes` in-flow
+under the container breakpoint and gutter-pinned (`position: absolute; left: 100%`)
+above it. Both layouts measured **0 cards over text** at night, dawn and dock-open,
+so the re-anchor step is a no-op and the leg stays as the absence contract.
+
+**Honest cost.** Ink respects `findingPassesFilter`; the deleted click pass did not.
+A finding the ONE filter hides is now neither highlighted nor clickable on the page —
+it used to keep a clickable ❋. Its card is still in the ledger, and this is what
+"the ONE filter drives the page" has meant since R5-b.
+
+**Deleted:** the workspace anchor pass, the revision-view anchor pass,
+`anchorsByScene` (build + both return/destructure sites), `locateFinding`'s two
+copy-pasted scans.
+
+**Gates.** `node --check` OK · new suite `tests/e2e_browser_one_matcher.py` 19/19
+(RED first: 4 failures — the cross-wrap ink had no click in all three layouts) ·
+browser battery (see below) · pytest (see below) · `tests/_p1_visual_gate.py`
+(see below) · `ruff` clean.
+
 - **2026-09-23 — ONE DESK, ONE LEDGER / P2.17: the deterministic rules answer an edit at once, on the current text, and call themselves provisional.**
 *(plan Task 17, spec §15.3)*
 **What was wrong:** breaking a line cost a full re-analysis to be told about it. §15.3 promised the cheap half of the pipeline live: `continuity` and `formatting` are pure functions of the text (no model, milliseconds), yet nothing re-ran them after an edit, so a writer who had just introduced a time flip or a 90-word action paragraph kept reading the ledger's report of the PRE-edit script.

@@ -3022,52 +3022,47 @@ function findingTargetScene(f) {
   return (f.scene_refs && f.scene_refs[0]) || null;
 }
 
+/** Flash the line a quote lives on. Where the page inked that quote, the mark
+ *  IS the answer — the same match the writer already sees, so a Locate can never
+ *  land on a line the page never marked. Only when there is no ink (a quote
+ *  cited across a line break, which no single line holds) does this scan itself.
+ */
+function flashQuoteLine(root, quote, findingId) {
+  if (!root) return;
+  const ink = findingId
+    ? root.querySelector(`.finding-ink[data-finding-id="${CSS.escape(findingId)}"]`) : null;
+  let line = ink ? ink.closest("[class^=el-]") : null;
+  if (!line) {
+    const q = normText(quote);
+    if (q.length < 4) return;
+    for (const cand of root.querySelectorAll("[class^=el-]")) {
+      const lt = normText(cand.textContent);
+      if (lt.length >= 4 && (lt.includes(q) || q.includes(lt.slice(0, 40)))) {
+        line = cand;
+        break;
+      }
+    }
+  }
+  if (!line) return;
+  line.classList.add("finding-highlight");
+  line.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => line.classList.remove("finding-highlight"), 2600);
+}
+
 function locateFinding(f, index) {
   const scene = findingTargetScene(f);
   if (scene == null) { showError("This finding isn't tied to a specific scene."); return; }
+  const quote = (f.evidence_quote || "").trim();
+  const id = (state.findingIds && state.findingIds[index]) || null;
   // in the revision view, stay inside it — jump the revision column instead
   // of yanking the writer back to the workspace
   if (state.view === "revision") {
     jumpRevisionScene(scene);
-    const quote = (f.evidence_quote || "").trim();
-    if (quote) {
-      const q = normText(quote);
-      if (q.length >= 4) {
-        setTimeout(() => {
-          const box = $("#revision-script");
-          if (!box) return;
-          for (const line of box.querySelectorAll("[class^=el-]")) {
-            const lt = normText(line.textContent);
-            if (lt.length >= 4 && (lt.includes(q) || q.includes(lt.slice(0, 40)))) {
-              line.classList.add("finding-highlight");
-              line.scrollIntoView({ behavior: "smooth", block: "center" });
-              setTimeout(() => line.classList.remove("finding-highlight"), 2600);
-              return;
-            }
-          }
-        }, 140);
-      }
-    }
+    setTimeout(() => flashQuoteLine($("#revision-script"), quote, id), 140);
     return;
   }
   scrollToSceneInPlace(scene);
-  const quote = (f.evidence_quote || "").trim();
-  if (!quote) return;
-  setTimeout(() => {
-    const page = document.getElementById(`scene-page-${scene}`);
-    if (!page) return;
-    const q = normText(quote);
-    if (q.length < 4) return;
-    for (const line of page.querySelectorAll("[class^=el-]")) {
-      const lt = normText(line.textContent);
-      if (lt.length >= 4 && (lt.includes(q) || q.includes(lt.slice(0, 40)))) {
-        line.classList.add("finding-highlight");
-        line.scrollIntoView({ behavior: "smooth", block: "center" });
-        setTimeout(() => line.classList.remove("finding-highlight"), 2600);
-        return;
-      }
-    }
-  }, 140);
+  setTimeout(() => flashQuoteLine(document.getElementById(`scene-page-${scene}`), quote, id), 140);
 }
 
 function openFindingCard(index) {
@@ -4858,13 +4853,6 @@ function prepareManuscriptData() {
     (changedByScene[ed.scene_number] = changedByScene[ed.scene_number] || []).push(...ed.applied);
   }
 
-  const anchorsByScene = {};
-  findings.forEach((f, index) => {
-    const sc = findingTargetScene(f);
-    if (sc == null || !(f.evidence_quote || "").trim()) return;
-    (anchorsByScene[sc] = anchorsByScene[sc] || []).push({ f, index });
-  });
-
   const bySceneNotes = {};
   const scriptLevelNotes = [];
   for (const n of notes) {
@@ -4881,7 +4869,6 @@ function prepareManuscriptData() {
     byScene,
     scriptLevel,
     changedByScene,
-    anchorsByScene,
     bySceneNotes,
     scriptLevelNotes,
     discussedScenes,
@@ -4944,7 +4931,6 @@ function renderManuscript(container) {
     byScene,
     scriptLevel,
     changedByScene,
-    anchorsByScene,
     bySceneNotes,
     scriptLevelNotes,
     discussedScenes,
@@ -4982,22 +4968,10 @@ function renderManuscript(container) {
       if (!matches) { page.classList.add("hidden"); }
       else matchCount += 1;
     }
-    // anchor pass: mark the quoted lines so a click opens the finding
-    for (const { f, index } of anchorsByScene[scene.scene_number] || []) {
-      const qq = normText(f.evidence_quote);
-      if (qq.length < 4) continue;
-      for (const line of page.querySelectorAll("[class^=el-]")) {
-        const lt = normText(line.textContent);
-        if (lt.length >= 4 && (lt.includes(qq) || qq.includes(lt.slice(0, 40)))) {
-          line.classList.add("el-anchored");
-          line.title = `${CATEGORY_LABELS[f.category] || f.category}: ${f.issue}`;
-          line.addEventListener("click", () => {
-            if (!openFindingCard(index)) locateFinding(f, index);
-          });
-          break;
-        }
-      }
-    }
+    // inked <=> clickable: the click goes on the lines the ink decorated
+    wireInkClicks(page, (index) => {
+      if (!openFindingCard(index)) locateFinding(state.findings[index], index);
+    });
     // anchored margin notes: lines with a pinned note get a marker; click opens it
     for (const n of bySceneNotes[scene.scene_number] || []) {
       if (!n.anchor) continue;
@@ -5963,6 +5937,11 @@ function decorateLineWithInk(line, text, anchors) {
   }
   if (!first) return 0;
   const { idx, len } = firstMatch;
+  // This mark IS the anchor: the same inkMatch call decides both where the
+  // finding sits and what a click on it does (see wireInkClicks).
+  line.classList.add("el-anchored");
+  line.title = `${CATEGORY_LABELS[first.f.category] || first.f.category}: ${first.f.issue}`;
+  line.dataset.findingIndex = String(first.index);
   line.textContent = "";
   line.appendChild(document.createTextNode(text.slice(0, idx)));
   const mark = document.createElement("mark");
@@ -5981,6 +5960,21 @@ function decorateLineWithInk(line, text, anchors) {
   line.appendChild(mark);
   line.appendChild(document.createTextNode(text.slice(idx + len)));
   return hits;
+}
+
+/** Inked <=> clickable, by construction: the click lives on the line the ink
+ *  decorated, so `inkMatch` is the only thing that decides where a finding sits.
+ *  A second text-matching pass used to wire clicks with a looser predicate, and
+ *  where the two disagreed the writer clicked highlighted text and nothing
+ *  happened. `activate(findingIndex)` is the caller's own gesture: the workspace
+ *  opens the card, the revision view flashes its queue row. */
+function wireInkClicks(root, activate) {
+  for (const line of root.querySelectorAll(".el-anchored")) {
+    if (line.dataset.inkWired) continue;
+    line.dataset.inkWired = "1";
+    const index = Number(line.dataset.findingIndex);
+    line.addEventListener("click", () => activate(index));
+  }
 }
 
 // ---------- writer intent (R2-b / R3): one setter, every surface re-renders ----------
@@ -7366,20 +7360,8 @@ function renderRevisionView() {
       changedByScene[scene.scene_number] || [],
       "revision-"
     );
-    // anchored findings: clicking the quoted line flashes its queue row
-    for (const { f, index } of byScene[scene.scene_number] || []) {
-      const qq = normText(f.evidence_quote);
-      if (qq.length < 4) continue;
-      for (const line of page.querySelectorAll("[class^=el-]")) {
-        const lt = normText(line.textContent);
-        if (lt.length >= 4 && (lt.includes(qq) || qq.includes(lt.slice(0, 40)))) {
-          line.classList.add("el-anchored");
-          line.title = `${CATEGORY_LABELS[f.category] || f.category}: ${f.issue}`;
-          line.addEventListener("click", () => flashFindingRow(index));
-          break;
-        }
-      }
-    }
+    // inked <=> clickable: the same matcher the ink uses, here flashing the row
+    wireInkClicks(page, (index) => flashFindingRow(index));
     // anchored margin notes: 📌 opens the note card
     for (const n of bySceneNotes[scene.scene_number] || []) {
       if (!n.anchor) continue;

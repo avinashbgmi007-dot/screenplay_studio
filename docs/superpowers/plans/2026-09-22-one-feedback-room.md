@@ -533,11 +533,41 @@ def test_quickcheck_runs_deterministic_passes_on_working_doc(self, http_client):
 
 **Interfaces:** Produces: `matchQuoteInScene(sceneEl, quote) -> Range | null` (app.js) — the ONE matcher used by BOTH ink decoration and click-anchor wiring, so inked ⇔ clickable by construction.
 
-- [ ] **Step 1: Failing e2e** — (a) every `.finding-ink` ancestor line also has a click handler (`el-anchored`); (b) no finding card's bounding box intersects any `.scene-page` text node's box (`getBoundingClientRect` overlap assertion).
-- [ ] **Step 2: Run, expect FAIL** (the audit photographed both failures).
-- [ ] **Step 3: Implement** the shared matcher and re-anchor cards to the margin.
-- [ ] **Step 4: Gates** — `node --check`; e2e PASS night + dawn.
-- [ ] **Step 5: Commit** — `"P3.19: cards never cover the page; ink and click share one matcher"`
+- [x] **Step 1: Failing e2e** — (a) every `.finding-ink` ancestor line also has a click handler (`el-anchored`); (b) no finding card's bounding box intersects any `.scene-page` text node's box (`getBoundingClientRect` overlap assertion).
+- [x] **Step 2: Run, expect FAIL** (the audit photographed both failures).
+- [x] **Step 3: Implement** the shared matcher and re-anchor cards to the margin.
+- [x] **Step 4: Gates** — `node --check`; e2e PASS night + dawn.
+- [x] **Step 5: Commit** — `"P2.19: cards never cover the page; ink and click share one matcher"`
+
+**Deviation — the new suite is its own file.** The plan named
+`tests/e2e_browser_counting_contract.py` (extend). That suite's premise is a REAL
+demo analysis, and a real report inks NOTHING: measured 0 `.finding-ink` on the
+sample project's 20 findings, because the model's quotes are paraphrases no single
+line contains. An ink contract asserted there would be vacuously green. The legs
+live in `tests/e2e_browser_one_matcher.py` instead, over a seeded fixture report
+whose three quotes are chosen to make the two old matchers disagree (cross-wrap /
+wrong punctuation / absent).
+
+**Deviation — no `matchQuoteInScene(sceneEl, quote) -> Range | null`.** A Range
+would be a third way to answer a question the ink already answered. The mark
+itself is the anchor: `decorateLineWithInk` now stamps `el-anchored` +
+`data-finding-index` on the line it decorated, and `wireInkClicks(root, activate)`
+hangs the click off that line, so the two surfaces cannot disagree by construction.
+Both mount-time anchor passes (workspace + revision view) and their
+`lt.includes(qq) || qq.includes(lt.slice(0, 40))` predicate are deleted;
+`prepareManuscriptData` no longer builds `anchorsByScene`.
+
+**Cards: measured, not moved.** "Floating cards must never overlap page text"
+already holds — P0.2's margin made `.scene-notes` in-flow under the container
+breakpoint and gutter-pinned (`position:absolute; left:100%`) above it. Both
+layouts measured 0 cards over text (night, dawn, and dock-open/in-flow), so
+Step 3's re-anchor is a no-op and the leg stays as the absence contract.
+
+**Honest cost.** Ink respects `findingPassesFilter`; the old click pass did not.
+So a finding the ONE filter hides is now neither highlighted NOR clickable on the
+page — previously it kept a `❋` marker you could click. That is the spec's own
+"ink discipline unchanged ... the ONE filter drives the page" reading, and its
+card is still reachable from the ledger.
 
 ### Task 20: Width budget — persona drawer vs dock (script never <50%)
 
