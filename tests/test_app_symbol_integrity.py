@@ -84,6 +84,48 @@ def test_feedback_view_clone_is_gone():
         assert "#feedback-view" not in f.read()
 
 
+def test_structural_rail_is_retired_not_hidden():
+    # spec §11 / REDESIGN §6 box 3. The rail was retired in Phase 13 by the
+    # cheapest available move — `display: none` on the host — and every one of
+    # its parts survived behind that: two renderers painting a hidden node, a
+    # `r` shortcut, a palette command, an edge tab, a resize offset, a prefs
+    # key, and ~120 lines of sheet. Hidden is not retired: the next session
+    # reads a live renderer plus a live rule as proof the surface still exists,
+    # and the keyboard shortcut still answers on a desk where nothing moves.
+    # Stash and margin notes already live in the dock's Stash & Notes lens and
+    # the scene outline in the scene index, so there is nothing to migrate here
+    # — only chrome to take away.
+    src = _strip_comments(_source())
+    with open(_INDEX_HTML, encoding="utf-8") as f:
+        html = re.sub(r"<!--.*?-->", "", f.read(), flags=re.S)
+    with open(os.path.join(os.path.dirname(_APP_JS), "style.css"),
+              encoding="utf-8") as f:
+        css = re.sub(r"/\*.*?\*/", "", f.read(), flags=re.S)
+
+    # helpers that rendered only into the rail
+    for sym in ("toggleRail", "renderRailScenes", "renderRailCharacters",
+                "loadCharacters", "charTracks"):
+        assert sym not in src, f"{sym} served only the hidden rail"
+    # the controls that reached it
+    assert 'id="struct-rail"' not in html
+    assert 'id="rail-edge-tab"' not in html
+    assert 'id="rail-toggle"' not in html
+    assert "Toggle the Structure rail" not in src, \
+        "the palette must not offer a command for retired chrome"
+    assert "rail_collapsed" not in src, \
+        "a pref key for a surface that cannot expand is a lie in the prefs file"
+    # the keyboard: `r` toggled it and Esc spent a press collapsing it. Both
+    # reached the rail by id, and so did every listener — one check covers the
+    # lot. (The sprint widget owns its own lowercase `r`; that one stays.)
+    assert '"#struct-rail"' not in src, \
+        "a control that queries the retired rail by id is a dead keybinding"
+    # the sheet: the rail's own rules, by class name (the family check below
+    # catches the rest, but an id rule needs naming)
+    for dead_rule in ("#struct-rail", ".rail-edge-tab", ".rail-char-strip",
+                      ".rail-scene-page"):
+        assert dead_rule not in css, f"{dead_rule} styles a node that no longer exists"
+
+
 def test_problem_board_is_gone():
     # P0.2: the Problem Board (a fifth findings surface that ignored
     # findingDisposition/findingPassesFilter, contradicted the dock's counts,
@@ -103,8 +145,10 @@ def test_no_retired_class_rule_survives_in_the_sheet():
     # ever receives is unrecoverable dead weight -- worse, it reads to the next
     # session as evidence the surface is still live. The id-scoped guards above
     # only catch rules named after the old host element; this one catches the
-    # whole retired class family, by asking the sheet which of its `fv-`/`pb-`
-    # class names the shipped code can actually put on a node.
+    # whole retired class family, by asking the sheet which of its `fv-`/`pb-`/
+    # `rail-`/`struct-rail` class names the shipped code can actually put on a
+    # node. Widening the family list is the point: the failure it prevents is
+    # forgetting to name a retired surface in a list.
     webapp = os.path.dirname(_APP_JS)
     with open(os.path.join(webapp, "style.css"), encoding="utf-8") as f:
         sheet = f.read()
@@ -115,11 +159,12 @@ def test_no_retired_class_rule_survives_in_the_sheet():
             bundle.append(f.read())
     bundle = _strip_comments("\n".join(bundle))
     bundle = re.sub(r"<!--.*?-->", "", bundle, flags=re.S)  # markup comments
-    used = set(re.findall(r"\b(?:fv|pb)-[A-Za-z0-9_-]+", bundle))
+    families = "fv|pb|rail|struct-rail"
+    used = set(re.findall(rf"\b(?:{families})-[A-Za-z0-9_-]+", bundle))
 
     selectors = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)  # CSS comments
     # the leading dot is CSS syntax, not part of the class name
-    in_css = set(re.findall(r"\.((?:fv|pb)-[A-Za-z0-9_-]+)", selectors))
+    in_css = set(re.findall(rf"\.((?:{families})-[A-Za-z0-9_-]+)", selectors))
     dead = sorted(in_css - used)
     assert not dead, f"style.css styles classes nothing renders: {dead}"
 

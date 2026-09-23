@@ -3,6 +3,42 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### Structural rail: retired, not hidden (spec §11 / REDESIGN §6 box 3)
+
+**What was wrong.** `#struct-rail` was `display: none` but still fully wired: five
+renderers (`renderRailScenes`, `renderRailCharacters`, `loadCharacters`,
+`renderRailNotes`' dead sibling, `toggleRail`), `state.charTracks`, a `r`
+keyboard shortcut, a palette command, an Esc branch, a `rail_collapsed` pref key, a
+drag offset, and ~190 lines of CSS. Hidden is not retired — the next session reads a
+live renderer plus a live rule as proof the surface exists, and the palette was
+offering a command for chrome that cannot appear.
+
+**Dependency proof first.** Every content the rail held already lives elsewhere: scene
+outline in the scene index, Stash and margin notes in the Dock's Stash & Notes lens.
+Nothing to migrate, so the deletion is the whole fix. `renderRailNotes()` (the dock's
+`#rail-notes`) is a *different* surface and stays.
+
+**What changed.** `app.js`: all five renderers, `charTracks`, the `r` binding, the
+palette command, the shortcut-help row, the Esc branch, both rail listeners, the pref
+restore and the `railOffset()` closure deleted — pane drag is now
+`applyPaneWidth(e.clientX - wsRect.left)`, because the desk's left edge is the desk's
+left edge. `index.html`: the `<aside>` and `#rail-edge-tab` gone. `style.css`: 190
+lines out, including `--z-board-tab` and the rail members of the focus/idea/spotlight
+and print selector lists. Docs: `ARCHITECTURE.md`, `UI_UX_SPECIFICATION.md` (7 sites,
+incl. the Esc cascade and the prefs list), `REDESIGN_MASTER_PLAN.md` §6 (marked done
+with the dependency record), `AGENTS.md`.
+
+**Prevention.** `test_app_symbol_integrity.py::test_structural_rail_is_retired_not_hidden`
+fails on the symbols, the ids, the palette string, the pref key, and four dead rules —
+and the `#struct-rail`-by-id assertion is what catches the *keyboard* leg too, since
+every dead listener reached the rail through that selector. The retired-class-family
+check widened to `fv|pb|rail|struct-rail`: naming a retired surface in that list is
+the point, and forgetting to is the failure it prevents.
+
+**Gate.** `node --check` clean · `ruff` clean · `test_app_symbol_integrity.py` 9
+passed · **41 suites: 40 passed, 0 failed, 1 skipped** (`gun_pen_audit` needs a live
+llama-server).
+
 ### Production-readiness audit pass 1: writes, tokens, and the severity chip
 
 **What was wrong.** The audit of the SPA against the shipped security posture found
@@ -43,10 +79,10 @@ reached directly had no token to read.
 **Gate.** Full pytest 1664 passed / 3 skipped. Browser fleet: **41 suites: 40
 passed, 0 failed, 1 skipped** (`gun_pen_audit` needs a real llama-server).
 
-**Still open (this audit, next passes).** Dead structural-rail surface; the
-dblclick-only inline edit has no keyboard path; CTA/hover contrast and the
-unthemed `idea-mode` palette; the `index.html` UTF-8 BOM plus two mis-decoded `→`
-glyphs (lines 534, 557); doc drift; per-keystroke manuscript rebuild.
+**Still open (this audit, next passes).** ~~Dead structural-rail surface~~ → **closed**,
+see the entry above; the dblclick-only inline edit has no keyboard path; CTA/hover
+contrast and the unthemed `idea-mode` palette; the `index.html` UTF-8 BOM plus two
+mis-decoded `→` glyphs (lines 534, 557); doc drift; per-keystroke manuscript rebuild. Dated audit reports were left as historical records.
 
 ### P2.19 — inked ⇔ clickable: one matcher decides where a finding sits
 

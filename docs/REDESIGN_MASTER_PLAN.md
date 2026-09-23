@@ -127,7 +127,19 @@ Carried from NOTES.md; every redesign PR asserts them:
 2. Migrate any still-live behavior (Stash/notes already live in the Dock; scenes in the scene index).
 3. Remove, run the full ladder + journey, commit in one isolated commit.
 
-The legacy `.desk` wrapper (index L331) joins this batch once the redesign decides the pane-divider's fate (it is `.desk`'s sibling).
+**DONE for the rail (2026-09-23), 1 and 2 and 3.** Dependency proof: the two ids had no
+test asserting on their DOM (only `gun_pen_audit`'s comment records that the check used to
+encode the defect); `renderRailScenes`/`renderRailCharacters`/`loadCharacters`/`charTracks`
+had no consumer outside the hidden `<aside>`; `#rail-notes` survives because the *dock* owns
+that id now. Nothing needed migrating. Removed: markup, five helpers, the `r` binding, the
+palette command and its help row, the Esc branch, both listeners, the pane-drag's
+`railOffset()` (always 0 while the rail was `display:none`, so a no-op), the `rail_collapsed`
+pref, and ~190 lines of sheet. `test_app_symbol_integrity` now refuses the surface back:
+id-scoped guards plus the class-family check widened to `rail-`/`struct-rail`, which asks the
+sheet which rail classes shipped code can still put on a node.
+
+`#pane-divider` stays: it is the live resize handle. The legacy `.desk` wrapper (index L331)
+still joins this batch once the redesign decides the pane-divider's fate (it is `.desk`'s sibling).
 
 ## 7. Per-phase gate contract (how redesign phases are verified)
 

@@ -45,7 +45,6 @@ const state = {
   lint: null,
   premise: null,          // premise card carried into a graduated project
   notes: [],              // the writer's own margin notes
-  charTracks: [],         // per-character track layer from /characters
 };
 
 // ---------- utilities ----------
@@ -874,27 +873,6 @@ function renderStashList() {
   });
 }
 
-// ---------- Phase 0: the structural rail (scenes outline · stash · notes) ----------
-
-function renderRailScenes() {
-  const list = $("#rail-scenes");
-  if (!list) return;
-  list.innerHTML = "";
-  const scenes = state.script && state.script.scenes;
-  if (!scenes || !scenes.length) {
-    list.appendChild(el("p", "empty-hint", "No scenes yet."));
-    return;
-  }
-  scenes.forEach((scene) => {
-    const item = el("div", "rail-scene");
-    item.appendChild(el("span", "rail-scene-num", String(scene.scene_number)));
-    item.appendChild(el("span", "rail-scene-head", scene.heading_raw || `Scene ${scene.scene_number}`));
-    if (scene.page_start) item.appendChild(el("span", "rail-scene-page", `p.${scene.page_start}`));
-    item.addEventListener("click", () => jumpToScene(scene.scene_number));
-    list.appendChild(item);
-  });
-}
-
 function renderRailNotes() {
   const list = $("#rail-notes");
   if (!list) return;
@@ -949,123 +927,6 @@ function renderRailNotes() {
     });
     list.appendChild(item);
   });
-}
-
-async function loadCharacters() {
-  if (!state.currentProject) return;
-  try {
-    const data = await api(`/projects/${encodeURIComponent(state.currentProject)}/characters`);
-    state.charTracks = (data && data.characters) || [];
-  } catch (_) { state.charTracks = []; /* track layer is optional */ }
-  renderRailCharacters();
-}
-
-function renderRailCharacters() {
-  const list = $("#rail-characters");
-  if (!list) return;
-  list.innerHTML = "";
-  const tracks = state.charTracks || [];
-  if (!tracks.length) {
-    list.appendChild(el("p", "empty-hint", "Run an analysis to map who's in this script."));
-    return;
-  }
-  const mains = tracks.filter((t) => t.importance === "main");
-  const rest = tracks.filter((t) => t.importance !== "main");
-  const renderRow = (t) => {
-    const item = el("div", "rail-char" + (t.importance === "main" ? " main" : ""));
-    const head = el("div", "rail-char-head");
-    head.appendChild(el("span", "rail-char-name", t.name));
-    head.appendChild(el("span", "rail-char-meta", `${t.scene_count} sc · ${t.dialogue_lines} ln`));
-    item.appendChild(head);
-    const body = el("div", "rail-char-body");
-    body.hidden = true;
-    // presence strip: scenes present as ticks, click to jump
-    if (state.script && state.script.scene_count) {
-      const strip = el("div", "rail-char-strip");
-      const total = state.script.scene_count;
-      const present = new Set(t.scenes_present || []);
-      for (let n = 1; n <= total; n++) {
-        const dot = el("span", "rail-char-dot" + (present.has(n) ? " on" : ""), "");
-        if (present.has(n)) {
-          dot.title = `Scene ${n}`;
-          dot.addEventListener("click", (ev) => { ev.stopPropagation(); jumpToScene(n); });
-        }
-        strip.appendChild(dot);
-      }
-      body.appendChild(strip);
-    }
-    // dials (trait scores) as labelled sliders
-    if (t.dials && t.dials.length) {
-      const dials = el("div", "rail-char-dials");
-      t.dials.forEach((d) => {
-        const row = el("div", "dial-row");
-        row.appendChild(el("span", "dial-label", d.trait));
-        const trackEl = el("span", "dial-track");
-        const fill = el("span", "dial-fill");
-        fill.style.width = `${d.score * 10}%`;
-        trackEl.appendChild(fill);
-        row.appendChild(trackEl);
-        row.appendChild(el("span", "dial-score", String(d.score)));
-        if (d.note) row.title = d.note;
-        dials.appendChild(row);
-      });
-      body.appendChild(dials);
-    }
-    // trait mentions from the page (age/descriptor parentheticals)
-    if (t.traits && t.traits.length) {
-      const tm = el("div", "rail-char-traits");
-      t.traits.forEach((x) => {
-        const chip = el("span", "trait-chip", x.text);
-        if (x.scene) { chip.title = `Scene ${x.scene}`; chip.addEventListener("click", () => jumpToScene(x.scene)); }
-        tm.appendChild(chip);
-      });
-      body.appendChild(tm);
-    }
-    // interactions: who they share scenes with
-    if (t.interactions && t.interactions.length) {
-      const ix = el("div", "rail-char-ix");
-      ix.appendChild(el("span", "rail-char-ix-label", "On stage with:"));
-      t.interactions.forEach((i) => {
-        const chip = el("span", "ix-chip", `${i.name} ×${i.scenes.length}`);
-        chip.title = `Scenes: ${i.scenes.join(", ")}`;
-        ix.appendChild(chip);
-      });
-      body.appendChild(ix);
-    }
-    // reads (how they come across) — if the analysis produced them
-    if (t.reads && (t.reads.how_reads || t.reads.apparent_intent)) {
-      const rd = el("div", "rail-char-reads");
-      if (t.reads.how_reads) rd.appendChild(el("p", "", `Reads: ${t.reads.how_reads}`));
-      if (t.reads.apparent_intent && t.reads.apparent_intent !== t.reads.how_reads) rd.appendChild(el("p", "", `Intent: ${t.reads.apparent_intent}`));
-      body.appendChild(rd);
-    }
-    item.appendChild(body);
-    head.addEventListener("click", () => { body.hidden = !body.hidden; });
-    return item;
-  };
-  mains.forEach((t) => list.appendChild(renderRow(t)));
-  if (rest.length) {
-    const toggle = el("button", "rail-char-more", `+ ${rest.length} more`);
-    toggle.type = "button";
-    const restWrap = el("div", "rail-char-rest");
-    restWrap.hidden = true;
-    rest.forEach((t) => restWrap.appendChild(renderRow(t)));
-    toggle.addEventListener("click", () => { restWrap.hidden = !restWrap.hidden; toggle.textContent = restWrap.hidden ? `+ ${rest.length} more` : "− fewer"; });
-    list.appendChild(toggle);
-    list.appendChild(restWrap);
-  }
-}
-
-function toggleRail(collapsed) {
-  const rail = $("#struct-rail");
-  if (!rail) return;
-  const btn = $("#rail-toggle");
-  rail.classList.toggle("rail-collapsed", collapsed);
-  if (btn) {
-    btn.textContent = collapsed ? "»" : "«";
-    btn.setAttribute("aria-expanded", String(!collapsed));
-  }
-  savePrefs({ rail_collapsed: collapsed });
 }
 
 // collapsible left sidebar (the shelf) — same pattern as the structure rail
@@ -5064,9 +4925,7 @@ function renderManuscript(container) {
   $("#export-backup").download = `${state.currentProject}-backup.zip`;
   paintReportExport();
 
-  renderRailScenes();
   renderRailNotes();
-  loadCharacters();
   if (document.body.classList.contains("focus-mode")) markCurrentScene();
 }
 
@@ -8001,7 +7860,6 @@ const SHORTCUTS = [
   ["f", "Switch to Feedback (Consultant)"],
   ["s", "Focus the manuscript — dismiss the partner, back to the page"],
   ["a", "Toggle the Craft shelf (analysis panels)"],
-  ["r", "Toggle the Structure rail"],
   ["z", "Spotlight mode — nothing but the page (Esc leaves)"],
   ["Esc", "Leave spotlight → dismiss partner drawer → craft shelf → structure rail"],
   ["b", "Open the Beat Board"],
@@ -8024,7 +7882,6 @@ function paletteCommands() {
     { type: "command", label: "Spotlight mode — nothing but the page", keys: "z", run: toggleSpotlight },
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
     { type: "command", label: "Toggle the Craft shelf (analysis panels)", keys: "a", run: toggleCraftShelf },
-    { type: "command", label: "Toggle the Structure rail", keys: "r", run: () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")) },
     // no key hint: "b" already opens the Beat Board (see SHORTCUTS + the
     // keydown handler) — this entry must not advertise it a second time.
     { type: "command", label: "Toggle the Beat Board", keys: "", run: () => openBeatboardView() },
@@ -8236,8 +8093,6 @@ function bindGlobalShortcuts() {
         if (drawer && drawer.classList.contains("open")) { closeRoomDrawer(); return; }
         const shelf = document.querySelector(".craft-shelf");
         if (shelf && shelf.classList.contains("open")) { toggleCraftShelf(); return; }
-        const rail = $("#struct-rail");
-        if (rail && !rail.classList.contains("rail-collapsed")) { toggleRail(true); return; }
       }
       return;
     }
@@ -8262,7 +8117,6 @@ function bindGlobalShortcuts() {
       else openFeedbackRoom();
     }
     else if (e.key === "a") { toggleCraftShelf(); }
-    else if (e.key === "r") { toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")); }
     else if (e.key === "s") { closeRoomDrawer(); const sc = getManuscriptContainer(); if (sc) sc.focus(); }
     else if (e.key === "b" && state.currentProject) { openBeatboardView(); }
     else if (e.key === "d" && state.currentProject) { openCompareView(); }
@@ -8636,7 +8490,6 @@ function init() {
   $("#new-project-btn").addEventListener("click", () => showWelcomeDesk());
   $("#new-idea-btn").addEventListener("click", createIdea);
   // Phase 0: structural rail
-  $("#rail-toggle").addEventListener("click", () => toggleRail(!$("#struct-rail").classList.contains("rail-collapsed")));
   // Phase 4: scene index — expand/collapse + scroll-synced current-scene highlight
   const sceneIndexToggle = $("#scene-index-toggle");
   if (sceneIndexToggle) {
@@ -8847,7 +8700,6 @@ function init() {
   // Manuscript Stage: the structure rail starts off-canvas — the page owns the
   // room. Only an explicit "open" preference keeps it out; anything else (or
   // nothing) collapses it.
-  if (prefs.rail_collapsed !== false) toggleRail(true);
   // sidebar: honor saved collapse preference (default open — unlike the rail)
   if (prefs.sidebar_collapsed) toggleSidebar(true);
   applyReaderMode(prefs.reader);
@@ -9071,10 +8923,6 @@ function init() {
   const scriptPane = $("#script-pane");
   let paneDragging = false;
   const deskEl = () => document.querySelector(".desk") || document.querySelector(".workspace");
-  const railOffset = () => {
-    const rail = document.getElementById("struct-rail");
-    return (rail && !rail.classList.contains("rail-collapsed")) ? rail.offsetWidth : 0;
-  };
   const applyPaneWidth = (px) => {
     const desk = deskEl();
     // the manuscript never shrinks below half the desk (Phase 0 rule)
@@ -9107,9 +8955,9 @@ function init() {
     if (!paneDragging) return;
     const ws = document.querySelector(".workspace");
     const wsRect = ws.getBoundingClientRect();
-    // measure from the desk's left edge (past the rail), so the drag gives
-    // the script exactly the width the pointer asks for
-    applyPaneWidth(e.clientX - wsRect.left - railOffset());
+    // the desk's left edge is the desk's left edge: the drag gives the script
+    // exactly the width the pointer asks for
+    applyPaneWidth(e.clientX - wsRect.left);
   });
   window.addEventListener("mouseup", () => {
     if (!paneDragging) return;
@@ -9183,7 +9031,6 @@ function init() {
     else openFeedbackRoom();
   });
   $("#drawer-close").addEventListener("click", closeRoomDrawer);
-  $("#rail-edge-tab").addEventListener("click", () => toggleRail(false));
   $("#bb-icon").addEventListener("click", () => { closeOverflow(); openBeatboardView(); });
   $("#compare-icon").addEventListener("click", () => { closeOverflow(); openCompareView(); });
   $("#revise-btn").addEventListener("click", openRevisionView);

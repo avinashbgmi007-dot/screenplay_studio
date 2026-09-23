@@ -175,20 +175,20 @@ Base: 15px, line-height 1.55, **`--font-ui` (DM Sans) is the body default** (not
 
 - `#app` is a full-height flex row: fixed `264px` sidebar (`--sidebar-w`) + flexible main.
   **The sidebar collapses** (`#sidebar-toggle` + edge tab `#sidebar-edge-tab`,
-  pref `sidebar_collapsed`) — same pattern as the structure rail.
+  pref `sidebar_collapsed`) 
 - **The desk** (`#script-pane`) owns the room: full width, the paper centered at
   `max-width: 700px`. The manuscript never shrinks below 50% of the desk.
 - **Room drawer** (`#room-drawer`): the partner panel (Sameer / Dr. Sushruta), summoned
   from the right-edge gutter tabs, dismissed by ✕ / Esc / clicking the manuscript. The
   script keeps the room.
-- **Structural rail** (`#struct-rail`): collapsible left rail (scenes · characters ·
-  the Stash · margin notes + Beat Board / Compare buttons). Edge tab `☰ Structure` reopens.
+- **Structural rail** — **RETIRED** (`#struct-rail`; its markup, `r` shortcut, edge
+  tab and CSS are gone). Its jobs: scene outline → the scene index; Stash + notes →
+  the dock's Stash & Notes lens; character dials → the craft shelf and Evidence lens.
 - **Problem Board** (`#problem-board`): a docked right-side findings panel with its own
   edge tab (`#pb-edge-tab`) — see §4.4b.
 - **Status strip** (`#status-strip`): thin footer with model/connection/metrics/sprint/dawn.
 
 ### 3.1 Responsive behavior
-- The structure rail collapses; a thin edge tab restores it.
 - The script pane width is resizable via `#pane-divider` (drag), clamped 50–78% of the desk;
   double-click resets. Persisted (`localStorage pane-width-v2`).
 - Full-screen tools (Beat Board, Compare, Revision) take the whole main area.
@@ -500,7 +500,7 @@ composer placeholder becomes "Reply to the highlighted passage…" while text is
 
 ### 7.3 Esc cascade ("the page wins")
 Top-most visible modal closes first; then river-read → Spotlight → Revision view →
-**Feedback view → Compare → Beat Board** → room drawer → craft shelf → structure rail →
+**Feedback view → Compare → Beat Board** → room drawer → craft shelf →
 close flyouts (flyout Esc is handled separately).
 
 ### 7.4 Spotlight mode (key `z`)
@@ -545,7 +545,7 @@ Fork (create), switch, delete branches; per-message origin badge with stable per
 - Session (last project/idea/view/scene — incl. `view: "fv"` Feedback view) → `localStorage
   screenplay_studio.session.v1`; a reload restores where the writer left off.
 - Prefs (dawn, reader, focus, flow, craft_open, hintDismissed, stt lang, pane width,
-  rail_collapsed, sidebar_collapsed) → `localStorage screenplay_studio.prefs.v1`
+  sidebar_collapsed) → `localStorage screenplay_studio.prefs.v1`
   (+ `pane-width-v2`, `studio-stt-lang`).
 - The sprint timer state survives reload (`localStorage screenplay_studio.sprint.v1`);
   the session-elapsed start lands in **sessionStorage** (`studio.session.start`) so it
@@ -572,7 +572,6 @@ rail note input rather than calling the Stash endpoint — different from §7.2'
 | `f` | Switch to Feedback (Consultant) |
 | `s` | Focus the manuscript — dismiss the partner, back to the page |
 | `a` | Toggle the Craft shelf (analysis panels) |
-| `r` | Toggle the Structure rail |
 | `z` | Spotlight mode — nothing but the page (Esc leaves; **project-gated**, like `b`/`d`/`v`) |
 | `b` | Open the Beat Board (project only) |
 | `d` | Compare drafts side by side (project only) |
@@ -581,7 +580,7 @@ rail note input rather than calling the Stash endpoint — different from §7.2'
 | `k` / `p` | Previous scene (script view) — **while the fix loop is active: previous finding (with `↑`)** |
 | `/` | Search the script |
 | `?` | Show all shortcuts (palette help) |
-| `Esc` | Leave spotlight → **exit the fix loop (dock stays)** → dismiss partner drawer → craft shelf → structure rail → modals → flyouts (full cascade in §7.3) |
+| `Esc` | Leave spotlight → **exit the fix loop (dock stays)** → dismiss partner drawer → craft shelf → modals → flyouts (full cascade in §7.3) |
 | `↑`/`↓` + `Enter` | Palette navigation / run |
 | Inline edit: `Enter` save · `Esc` cancel · `Shift+Enter` newline | |
 | Composer: `Enter` send · `Shift+Enter` newline · `↑`/`↓` history · `Esc` cancel history | |

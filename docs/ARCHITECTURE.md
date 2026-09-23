@@ -136,10 +136,13 @@ screenplay-studio_1/
   (`#problem-board`) offers a severity-filtered findings panel beside the manuscript.
   `body[data-room]` drives the room theming. Beat Board, Compare, and Revision are
   full-screen tools opened from the script-pane toolbar (keys `b`/`d`/`v`).
-- **Three-zone shell.** Collapsible left structural rail (`#struct-rail`) holds the scene
-  outline (click → jump + flash), the **character track layer** (`#rail-characters` —
-  presence strip, dials, trait chips, interactions, reads), the Stash, and margin notes
-  (newest-first, pinned to scenes or lines). The script pane never shrinks below 50%. A thin
+- **Three-zone shell.** The left structural rail (`#struct-rail`) is **retired** — it
+  shipped `display:none` since Phase 13 and was removed with its markup, renderers,
+  `r` shortcut, edge tab and CSS in the redesign's ring-fenced batch (spec §11). Its
+  content lives in the Context Dock's **Stash & Notes** lens (Stash, margin notes
+  newest-first, pinned to scenes or lines) and the **scene index** (click → jump);
+  the character track layer's dials reach the page through the craft shelf and the
+  Evidence lens. The script pane never shrinks below 50%. A thin
   status strip shows project · model · connection · loop metrics · sprint timer · desk
   elapsed · dawn toggle.
 - **Mood & reading modes.** Focus mode (`✳`, typewriter scroll, dims everything but the live
