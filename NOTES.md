@@ -60,6 +60,24 @@ card is live but reachable only through the margin-pin path (`app.js:4747-4754` 
 pins from the *observed* status) — the dock list filters addressed rows out, so ②b pins
 the cue on the parked card, which shares the rule family.
 
+**Addendum while double-checking that last claim.** Asked whether
+`.finding-note.addressed { color: var(--text-muted) }` earns its place, I deleted just
+that declaration and re-ran the gate: **78/78, still green** — which is the expected
+result, not a defence of the rule. Removing a *dim* can only raise contrast, so no
+sweep can ever fail it; the declaration is the recede cue, and the gate cannot see this
+state at all. The CSS comment said "measured by … the readiness gate" for this selector;
+that was an overclaim and now says so plainly. Separately, sweeping the two stylesheets
+by *pattern* (fractional `opacity` on a rule that also sets `color`) instead of by class
+name turned up 7 rules, one of which is text in the same unreachable settled family:
+`.dock-ghosted-issue` dimmed `--text-muted` at `.75` — computed against the dock panel
+that is **≈4.25:1 night / ≈3.72:1 dawn**, both under AA; the `opacity` is gone (the token
++ the sibling's `--text-faint` italic intent still carry the recede). The other six are
+judgement calls, left in place and named: `.fix-row-locate` (.75, `--accent`, hover
+reveal pair, swept live and AA-clean), `.msg-translation-label`/.msg-translation-text`
+(.85/.92 on chat text, mild), `.el-anchored::after`/.el-changed::before` (decorative
+glyphs, and the second carries an absolute offset), `.error-banner button` (.8 on a
+hard-coded `#fff`, which is a token-policy question, not a contrast one).
+
 **Verification:** gate 78/78; browser fleet **43 suites: 42 passed / 0 failed /
 1 skipped** (`gun_pen_audit`, needs a real llama-server); **pytest 1669 passed /
 3 skipped**. No JS touched.

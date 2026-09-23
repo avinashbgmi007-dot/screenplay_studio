@@ -1623,10 +1623,13 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .finding-note.sev-high { border-left-color: var(--danger); }
 .finding-note.sev-medium { border-left-color: var(--sev-mid); }
 .finding-note.sev-low { border-left-color: var(--ok); }
-/* Settled states recede by colour, never by alpha: opacity composites the row's
-   own tokens (badge, act chip, buttons) against the surface and takes them under
-   AA — measured by tests/e2e_browser_readiness_gate.py, which reaches the
-   writer-intent states. */
+/* Settled states recede by colour, never by alpha: opacity composites the row's own
+   tokens (badge, act chip, buttons) against the surface and takes them under AA.
+   Sweep ②b measures the parked card; it cannot reach THIS selector — app.js's
+   findingPassesFilter drops every non-open disposition from the dock lists, so an
+   "addressed" card is off-screen by design and the gate would not notice this rule
+   going either way. The colour is only the recede cue; the --ok rail and the
+   "addressed" label carry the state. */
 .finding-note.addressed { color: var(--text-muted); border-left-color: var(--ok); }
 .finding-note-top { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
 .finding-note-cat {
@@ -6231,7 +6234,7 @@ body:not(.idea-mode) .desk {
 .dock-arrival-retry:disabled { opacity:.6; cursor:default; }
 .dock-ghosted summary { font-size:var(--fs-2xs); color:var(--text-faint); cursor:pointer; }
 .dock-ghosted-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
-.dock-ghosted-issue { font-size:var(--fs-2xs); color:var(--text-muted); opacity:.75; }
+.dock-ghosted-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
 .dock-ghosted-intent { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; white-space:nowrap; }
 /* P2.18 (spec 15.4): the revision arc — one quiet line under the arrival strip.
    lamp is the progress token in every register; "widening" stays neutral ink
