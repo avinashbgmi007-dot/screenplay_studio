@@ -3,6 +3,69 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### Production-readiness audit pass 2: the gate learned to see, and found four more
+
+**What was wrong.** Pass 1's gate measured contrast from `getComputedStyle().color`
+against the nearest *opaque* background, and only in two states. Three of its
+assumptions were false, and each one was hiding a real defect:
+
+1. **`color-mix(in oklab, …)` decoded wrong.** Chrome reports the computed value as
+   `oklab(L a b)`; the probe divided those channels by 255. A mid amber became
+   near-black, which *invented* 1.09:1 failures and masked a real one. Fixed with a
+   proper oklab→linear-sRGB→gamma conversion (`hex()` now refuses `hsl()`/`color()`/
+   `lab()` rather than guessing).
+2. **Translucent gradient stops were not grounds.** The ship's surfaces are painted
+   `linear-gradient(180deg,#e8d5b5,#d3bd97)` and alpha-radial washes; the walk skipped
+   them and reported the void underneath. A gradient is *alternative* grounds — stops
+   with α ≥ 0.5 composite into the candidate set and the caller takes the worst.
+   "no resolvable ground" went from ~20 rows per sweep to **0**; 226 previously
+   unmeasurable rows are now measured.
+3. **`opacity` was invisible.** A label at `opacity: .45` renders mixed toward its
+   backdrop, so it is not the ratio its `color` claims. The probe now walks the
+   effective alpha and folds it into the foreground — and skips `opacity: 0` entirely,
+   because the hover-revealed row ✕ and the proximity-faded `#project-bar` are *absent*
+   chrome, not illegible chrome (same category as the parked-off-screen exemption the
+   hit-target walk already made). Infinite pulse keyframes are cancelled before each
+   sweep so the resting rule is what gets measured, not a random phase.
+
+**Four defects that surfaced (all measured, before → after).**
+
+- **dawn Flow mode rendered the whole script at 1.17:1.** `tungsten.css` re-pins
+  `html body.dawn .scene-page` (0,2,2) and beat `body.river-read .scene-page` (0,2,1)
+  in `style.css`, so the morning theme overwrote the river's dark page with cream-on-
+  cream. The fix is not a higher-specificity fight: both tungsten re-pins now read
+  `:not(.river-read)` so the theme stands down instead of out-specifying the mode.
+- **`.note-add` had never cleared AA on the manuscript** — 2.05:1, the 62% accent mix
+  measured against the cream page's *darkest* stop (`#d3bd97`), which the old
+  opaque-background walk could not see. Now 20%, plus river-specific re-inks for the
+  chip and the page numerals (`#a8bdb4` / `#ffd58a`).
+- **Sidebar shelf headings + their carets: 3.49:1 night / 2.41:1 dawn.** Root cause was
+  dimming by *opacity* (trigger `.75` × caret `.55` = `.41` effective). Both now use the
+  dim **colour** roles (`--text-muted` / `--text-faint`), which read the same quiet and
+  hold AA in both themes. `#room-chip`'s decorative `opacity: .85` (3.79:1 dawn) is gone.
+- **The Spark Wall idea room was never themed** — a hard-coded cool-navy palette that
+  ignored dawn. Retired: the block now reads a `--spark-*` token family (void/ink/mute/
+  faint/edge/glass/sameer/consult), and the one CTA that must clear AA rides the theme's
+  own gold ramp (`--accent` / `--accent-bright` / `--accent-ink`).
+
+**Gate scope grew** to the two dark rooms nobody had measured: `{night,dawn} ×`
+`{landing, idea room, idea room saving, idea room saved, desk, river read}`. The
+saving/saved sweeps drive the autosave the way a writer does (type, wait for the label)
+because `.busy` is only on screen for a moment — that is what made the opacity folding
+worth having.
+
+**Numbers.** 64 checks, **0 failed**, over all 12 states: worst measured token-text
+ratio 4.81:1 night / 4.88:1 dawn, 0 sub-AA rows, 0 controls under 24×24, 0 rows with no
+resolvable ground (was 20-21 per sweep).
+
+**Known gap, deliberately left open.** Opacity folding is live but the sweep does not
+reach the *disposition* states, so these are still unmeasured:
+`.finding-note.addressed` / `.fix-row.done` (0.45), `.finding-note.ghosted` (0.6),
+`.deferred` (0.72), `.msg-pending .msg-bubble` (0.75). Each dims text the writer may
+re-read, so each is a probable finding waiting for a sweep that puts an addressed note
+on screen. Next gate extension: drive one disposition in the desk state and sweep again.
+
+## Completed
 ### The manuscript's inline edit has a keyboard path (WCAG 2.1.1)
 
 **What was wrong.** Editing a line on the page was one gesture: double-click. The

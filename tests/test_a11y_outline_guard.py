@@ -46,8 +46,6 @@ CSS_PATH = os.path.join(ROOT, "screenplay_studio", "webapp", "style.css")
 WHITELIST = {
     "#main:focus":
         "the manuscript container — a ring around the whole page is hostile",
-    "#manuscript-container:focus":
-        "same container, scroll wrapper",
     ".idea-content":
         "the idea writing surface — word-processor caret exemption; a ring "
         "while typing prose would be actively hostile",
@@ -114,8 +112,9 @@ def _suppressors(css: str) -> list[tuple[int, str, str, str]]:
 def _is_bare(base: str, pseudo: str, body: str, css: str) -> bool:
     """True when this suppressor has no compensating focus affordance."""
     # 1. the audited whitelist wins outright — it is a reviewed exception, and
-    #    `#main:focus` / `#manuscript-container:focus` are focus rules that
-    #    suppress the ring with nothing put back, deliberately.
+    #    `#main:focus` is a focus rule that suppresses the ring with nothing put
+    #    back, deliberately. (`#manuscript-container` is not on the list: it no
+    #    longer suppresses anything — it declares a `:focus-visible` ring.)
     if f"{base}{pseudo}" in WHITELIST:
         return False
     # 2. the suppressor is itself a focus rule that swaps the ring
