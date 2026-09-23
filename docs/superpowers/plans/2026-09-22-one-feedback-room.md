@@ -32,6 +32,13 @@
 
 # PHASE P0 — Subtractions + one counting path
 
+> **Retro-ticked 2026-09-23 at the P3 gate.** These boxes stayed unchecked
+> through the sessions that did the work (P0.1-P0.4 + the P0 gate, P1.6 `44bb136`,
+> P1.7 `0d12d56`), because each one ships a commit and a named gate instead of a
+> tick: `tests/test_app_symbol_integrity.py`, `tests/e2e_browser_counting_contract.py`,
+> `tests/e2e_browser_dock_sections.py`, `tests/e2e_browser_phase13_legacy_cleanup.py`.
+> So a tick here is a pointer to a live check, not a memory.
+
 ### Task 1: Delete the dormant Feedback View clone
 
 **Files:**
@@ -42,7 +49,7 @@
 
 **Interfaces:** Consumes: nothing. Produces: absence — no `renderFvBoard*` symbol or `#feedback-view` element anywhere.
 
-- [ ] **Step 1: Failing test** — append to `tests/test_app_symbol_integrity.py`:
+- [x] **Step 1: Failing test** — append to `tests/test_app_symbol_integrity.py`:
 
 ```python
 def test_feedback_view_clone_is_gone():
@@ -52,10 +59,10 @@ def test_feedback_view_clone_is_gone():
     assert "feedback-view" not in html
 ```
 
-- [ ] **Step 2: Run, expect FAIL** — `python -m pytest tests/test_app_symbol_integrity.py -v`
-- [ ] **Step 3: Delete.** Grep `fv`, `Fv`, `feedback-view` across `app.js`/`index.html`/`style.css`; delete the markup, the renderer family, and every call site that belongs to the clone. Careful: `.fv-scene .paper` in style.css belongs to the clone, but verify each `.fv-` rule is clone-owned before deleting (the 2026-09-10 NOTES entry documents a careless multi-line delete here before — review the diff line by line).
-- [ ] **Step 4: Gates** — `node --check screenplay_studio/webapp/app.js`; `python -m pytest tests/test_app_symbol_integrity.py tests/test_webapp_api.py -q` PASS; `python -m pytest tests/e2e_browser_smoke.py -q` PASS.
-- [ ] **Step 5: Commit** — `git commit -m "P0.1: delete the dormant #feedback-view clone (~700 lines)"`
+- [x] **Step 2: Run, expect FAIL** — `python -m pytest tests/test_app_symbol_integrity.py -v`
+- [x] **Step 3: Delete.** Grep `fv`, `Fv`, `feedback-view` across `app.js`/`index.html`/`style.css`; delete the markup, the renderer family, and every call site that belongs to the clone. Careful: `.fv-scene .paper` in style.css belongs to the clone, but verify each `.fv-` rule is clone-owned before deleting (the 2026-09-10 NOTES entry documents a careless multi-line delete here before — review the diff line by line).
+- [x] **Step 4: Gates** — `node --check screenplay_studio/webapp/app.js`; `python -m pytest tests/test_app_symbol_integrity.py tests/test_webapp_api.py -q` PASS; `python -m pytest tests/e2e_browser_smoke.py -q` PASS.
+- [x] **Step 5: Commit** — `git commit -m "P0.1: delete the dormant #feedback-view clone (~700 lines)"`
 
 ### Task 2: Retire the Problem Board + sanitize legacy stored state
 
@@ -67,7 +74,7 @@ def test_feedback_view_clone_is_gone():
 
 **Interfaces:** Produces `_sanitizeLegacyState(p)` (app.js, beside `loadPrefs`) — drops stored keys referencing retired surfaces; consumed by `loadPrefs()` and the session-restore path (~8410).
 
-- [ ] **Step 1: Failing test**:
+- [x] **Step 1: Failing test**:
 
 ```python
 def test_problem_board_is_gone():
@@ -78,8 +85,8 @@ def test_problem_board_is_gone():
     assert "pbItemClick" not in src
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Delete + add the sanitizer**:
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Delete + add the sanitizer**:
 
 ```javascript
 function _sanitizeLegacyState(p) {
@@ -91,8 +98,8 @@ function _sanitizeLegacyState(p) {
 ```
 
 Wire it into `loadPrefs()` and the stored-`view` restore before either is used.
-- [ ] **Step 4: Gates** — `node --check`; symbol-integrity PASS; `python -m pytest tests/e2e_browser_smoke.py tests/e2e_browser_phase8_lifecycle.py -q` PASS.
-- [ ] **Step 5: Commit** — `"P0.2: retire the Problem Board; sanitize legacy stored view/prefs"`
+- [x] **Step 4: Gates** — `node --check`; symbol-integrity PASS; `python -m pytest tests/e2e_browser_smoke.py tests/e2e_browser_phase8_lifecycle.py -q` PASS.
+- [x] **Step 5: Commit** — `"P0.2: retire the Problem Board; sanitize legacy stored view/prefs"`
 
 ### Task 3: One counting path — queue header, dawn meter, summary chips, revision strip
 
@@ -102,7 +109,7 @@ Wire it into `loadPrefs()` and the stored-`view` restore before either is used.
 
 **Interfaces:** Consumes: `findingCounts() -> {total, open, shown, openShown}`, `findingDisposition(f, index) -> "open"|"addressed"|"deferred"|"ghosted"|"dismissed"`. Produces: `queueCounts() -> {open, total}` (app.js) mapping `/fixqueue` items through `findingDisposition` via `finding_id`→index (same mapping `isFindingDismissed` uses at 5650); every surface above prints from these two functions only.
 
-- [ ] **Step 1: Failing e2e check** — new `tests/e2e_browser_counting_contract.py`: seed an analyzed project (mock server fixtures per `tests/e2e_browser_finding_id_parity.py` pattern), mark one finding intent=addressed via `POST /findings/intent`, then assert in the browser that the fix-queue header count, the `#finding-summary` chip, and the dawn meter all report the SAME open number:
+- [x] **Step 1: Failing e2e check** — new `tests/e2e_browser_counting_contract.py`: seed an analyzed project (mock server fixtures per `tests/e2e_browser_finding_id_parity.py` pattern), mark one finding intent=addressed via `POST /findings/intent`, then assert in the browser that the fix-queue header count, the `#finding-summary` chip, and the dawn meter all report the SAME open number:
 
 ```python
 def test_queue_header_matches_disposition_count(base, page):
@@ -112,10 +119,10 @@ def test_queue_header_matches_disposition_count(base, page):
     assert queue_open == chip_open  # fails today: queue reads raw item.status
 ```
 
-- [ ] **Step 2: Run, expect FAIL** (queue header ignores `state.findingMarks` today).
-- [ ] **Step 3: Implement** `queueCounts()` and rewire the five surfaces to `findingCounts()`/`queueCounts()`; delete any surface-local counting.
-- [ ] **Step 4: Gates** — `node --check`; new e2e PASS; `python -m pytest tests/test_webapp_api.py -q` PASS.
-- [ ] **Step 5: Commit** — `"P0.3: one counting path — queue header, dawn meter, chips, revision strip read findingDisposition"`
+- [x] **Step 2: Run, expect FAIL** (queue header ignores `state.findingMarks` today).
+- [x] **Step 3: Implement** `queueCounts()` and rewire the five surfaces to `findingCounts()`/`queueCounts()`; delete any surface-local counting.
+- [x] **Step 4: Gates** — `node --check`; new e2e PASS; `python -m pytest tests/test_webapp_api.py -q` PASS.
+- [x] **Step 5: Commit** — `"P0.3: one counting path — queue header, dawn meter, chips, revision strip read findingDisposition"`
 
 
 ### Task 4: Re-render completeness + metrics freshness
@@ -126,7 +133,7 @@ def test_queue_header_matches_disposition_count(base, page):
 
 **Interfaces:** Produces: `refreshAllFindingSurfaces()` (app.js) — the ONE function every mutation calls: re-renders dock Evidence (if mounted), manuscript ink, fix queue (whichever container is mounted), summary chips, dawn meter, then `refreshMetrics()`. All mutation handlers call it instead of their current partial subsets.
 
-- [ ] **Step 1: Failing e2e** — with the Feedback Fix Queue tab AND the dock both mounted, mark an intent; assert BOTH surfaces reflect it without reload:
+- [x] **Step 1: Failing e2e** — with the Feedback Fix Queue tab AND the dock both mounted, mark an intent; assert BOTH surfaces reflect it without reload:
 
 ```python
 def test_intent_updates_every_mounted_surface(base, page):
@@ -136,17 +143,17 @@ def test_intent_updates_every_mounted_surface(base, page):
     # fails today: setFindingIntent re-renders dock+manuscript but not the queue tab
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** `refreshAllFindingSurfaces()`; replace the per-handler re-render lists (dismiss at 3894, intent at 5360, apply/undo/redo handlers) with it; add `refreshMetrics()` to the apply/undo/redo/intent paths (metrics staleness fix).
-- [ ] **Step 4: Gates** — `node --check`; new e2e PASS; `python -m pytest tests/test_revision.py -q` PASS.
-- [ ] **Step 5: Commit** — `"P0.4: refreshAllFindingSurfaces — one re-render entry point; fresh metrics after every mutation"`
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement** `refreshAllFindingSurfaces()`; replace the per-handler re-render lists (dismiss at 3894, intent at 5360, apply/undo/redo handlers) with it; add `refreshMetrics()` to the apply/undo/redo/intent paths (metrics staleness fix).
+- [x] **Step 4: Gates** — `node --check`; new e2e PASS; `python -m pytest tests/test_revision.py -q` PASS.
+- [x] **Step 5: Commit** — `"P0.4: refreshAllFindingSurfaces — one re-render entry point; fresh metrics after every mutation"`
 
 ### Task 5: P0 gate — suite green, surfaces gone
 
-- [ ] **Step 1:** `python -m pytest tests/ -q -x --ignore=tests/e2e_browser_gun_pen_audit.py` — full unit suite green (baseline: 3 known flakes per NOTES: `test_save_rename_race_never_tears_json`, `test_store_save_serializes_concurrent_writers`, `test_chat_stream_decodes_utf8_not_latin1`).
-- [ ] **Step 2:** Browser suites that referenced retired surfaces re-pinned and green: `python tests/run_browser_suites.py` (the CI runner).
-- [ ] **Step 3:** Update `docs/CODEBASE_MAP.md` (remove `renderFvBoard`/`renderProblemBoard` entries) and append the dated P0 entry to `NOTES.md`.
-- [ ] **Step 4: Commit** — `"P0 gate: subtractions shipped, one counting path live, suites re-pinned"`
+- [x] **Step 1:** `python -m pytest tests/ -q -x --ignore=tests/e2e_browser_gun_pen_audit.py` — full unit suite green (baseline: 3 known flakes per NOTES: `test_save_rename_race_never_tears_json`, `test_store_save_serializes_concurrent_writers`, `test_chat_stream_decodes_utf8_not_latin1`).
+- [x] **Step 2:** Browser suites that referenced retired surfaces re-pinned and green: `python tests/run_browser_suites.py` (the CI runner).
+- [x] **Step 3:** Update `docs/CODEBASE_MAP.md` (remove `renderFvBoard`/`renderProblemBoard` entries) and append the dated P0 entry to `NOTES.md`.
+- [x] **Step 4: Commit** — `"P0 gate: subtractions shipped, one counting path live, suites re-pinned"`
 
 ---
 
@@ -161,7 +168,7 @@ def test_intent_updates_every_mounted_surface(base, page):
 
 **Interfaces:** Produces: `dockSection(key, title, buildBody, {defaultOpen=false}) -> HTMLElement` — renders a header button (`aria-expanded`, chevron) + body region; open state persisted as `prefs["dock_section_"+key]`; used by every section in the Evidence lens. Consumes: existing section builders unchanged (they keep returning elements).
 
-- [ ] **Step 1: Failing e2e**:
+- [x] **Step 1: Failing e2e**:
 
 ```python
 def test_dock_sections_collapse_and_persist(base, page):
@@ -173,10 +180,10 @@ def test_dock_sections_collapse_and_persist(base, page):
     assert page.locator('.dock-section[data-key="by-category"]').get_attribute("data-open") == "true"
 ```
 
-- [ ] **Step 2: Run, expect FAIL** (sections are plain divs today).
-- [ ] **Step 3: Implement** `dockSection()`; wrap each section in `renderDockEvidence` (queue, scene cards, script-level, by-category, coverage, setup/payoff, pacing, characters, dials, mirror). The comment at 4992–4998 becomes true; update it to describe the real behavior.
-- [ ] **Step 4: Gates** — `node --check`; new e2e PASS; reduced-motion: no height animation without `@media (prefers-reduced-motion: no-preference)` guard.
-- [ ] **Step 5: Commit** — `"P1.6: dockSection — every Evidence section collapses and persists"`
+- [x] **Step 2: Run, expect FAIL** (sections are plain divs today).
+- [x] **Step 3: Implement** `dockSection()`; wrap each section in `renderDockEvidence` (queue, scene cards, script-level, by-category, coverage, setup/payoff, pacing, characters, dials, mirror). The comment at 4992–4998 becomes true; update it to describe the real behavior.
+- [x] **Step 4: Gates** — `node --check`; new e2e PASS; reduced-motion: no height animation without `@media (prefers-reduced-motion: no-preference)` guard.
+- [x] **Step 5: Commit** — `"P1.6: dockSection — every Evidence section collapses and persists"`
 
 ### Task 7: Live-highs default + "this scene" chip (scene as filter, not surface)
 
@@ -199,11 +206,11 @@ function findingPassesFilter(f, index) {
 }
 ```
 
-- [ ] **Step 1: Failing e2e** — clicking "This scene" narrows dock list + ink to the current scene; clearing restores all; counts label switches "N open on this scene" vs "N open" (scope always printed — the findingCounts comment contract).
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** the filter field + chip; the "Live findings" section renders highs first, grouped by category inside `dockSection("live", ...)`; default = all live findings (NOT scene-scoped — red-team W2). **Also (spec §14.3):** in `renderSceneIndex`/`sceneIndexSeverity` (4808/4796), a scene with zero live findings renders a quiet ✓ glyph where its severity dot would be — the rail becomes a progress map.
-- [ ] **Step 4: Gates** — `node --check`; e2e PASS; ink narrows identically (assert page marks == list count).
-- [ ] **Step 5: Commit** — `"P1.7: scene as a filter dimension — this-scene chip on the ONE filter"`
+- [x] **Step 1: Failing e2e** — clicking "This scene" narrows dock list + ink to the current scene; clearing restores all; counts label switches "N open on this scene" vs "N open" (scope always printed — the findingCounts comment contract).
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement** the filter field + chip; the "Live findings" section renders highs first, grouped by category inside `dockSection("live", ...)`; default = all live findings (NOT scene-scoped — red-team W2). **Also (spec §14.3):** in `renderSceneIndex`/`sceneIndexSeverity` (4808/4796), a scene with zero live findings renders a quiet ✓ glyph where its severity dot would be — the rail becomes a progress map.
+- [x] **Step 4: Gates** — `node --check`; e2e PASS; ink narrows identically (assert page marks == list count).
+- [x] **Step 5: Commit** — `"P1.7: scene as a filter dimension — this-scene chip on the ONE filter"`
 
 
 ### Task 8: One rendering per finding per panel
@@ -597,11 +604,19 @@ card is still reachable from the ledger.
 
 ### Task 21: Final gate
 
-- [ ] **Step 1:** `python -m pytest tests/ -q` — full suite green (3 known baseline flakes excepted, per NOTES).
-- [ ] **Step 2:** `python tests/run_browser_suites.py` — all browser suites green.
-- [ ] **Step 3:** Spec acceptance walk — check every box in `2026-09-22-one-feedback-room-design.md` §11 against the running app.
-- [ ] **Step 4:** `docs/CODEBASE_MAP.md` updated (`pass_history.py`, `/quickcheck`, `/rules/<id>`, `dockSection`, `refreshAllFindingSurfaces`, `matchQuoteInScene`, removed symbols); `NOTES.md` final entry.
-- [ ] **Step 5: Commit** — `"P3 gate: One Desk, One Ledger complete — spec §11 walked"`
+- [x] **Step 1:** `python -m pytest tests/ -q` — **1661 passed, 3 skipped**. The 3 skips are `test_store_fault_injection` legs that name stores a writer cannot clobber (a store it never reads), not baseline flakes: this plan’s own P0 gate entry already recorded that the "3 known flakes" wording was wrong, and it is corrected here rather than carried.
+- [x] **Step 2:** `python tests/run_browser_suites.py` — **40 suites: 39 passed, 0 failed, 1 skipped** (the skip is `gun_pen_audit`, which needs a live llama-server; the runner installs no model).
+- [x] **Step 3:** Spec acceptance walk — every §11 box now carries, inline, the gate that pins it. **One box is reported NOT met instead of ticked:** `app.js` net-negative (Deviations 3).
+- [x] **Step 4:** Docs swept for the symbols this plan moved: `docs/CODEBASE_MAP.md` already carries `pass_history.py`, `/passes`, `dockSection`, `refreshAllFindingSurfaces`, `dedupeDockFindings`, `findingCounts`, `inkMatch`/`wireInkClicks`/`flashQuoteLine` and `buildPassArcLine`, and no longer names a single retired symbol; `docs/ARCHITECTURE.md` gains `/quickcheck` next to `/passes`. `NOTES.md` carries the P3-gate entry.
+- [x] **Step 5: Commit** — `"P3 gate: One Desk, One Ledger complete — spec §11 walked"`
+
+**Deviations (recorded, not hidden):**
+1. `matchQuoteInScene` never shipped under that name: P2.19 collapsed the quote matcher into `inkMatch`, which is now the ONE matcher both ink and click read. The plan’s Step 4 list is stale on that symbol, so the map documents `inkMatch` instead.
+2. The walk found two live gaps that the per-task gates had missed, and both are fixed in this pass rather than filed:
+   - **The escalation pin was invisible.** `discussWithDoctor` pinned the finding into `pendingQuote`, which renders only inside Sameer’s composer — a node that lives in the room drawer while the doctor’s lens is open. The writer escalated a finding and saw no trace of it (the send still rode it, so nothing else noticed). `renderQuoteCard` now paints both chat surfaces — only one is ever on screen — and `#fv-consult-composer` wraps so the pin takes its own line. Gates: `e2e_browser_phase7_chat_lenses.py` (the pin, and an unsent draft, survive a lens round trip) and `e2e_browser_width_budget.py`.
+   - **A passing gate that was measuring the wrong thing.** The width suite first asserted the pin by rect width anywhere in the document, which is satisfied by a card parked in a closed drawer. It now asserts the card is inside the lens the writer is looking at. Without that tightening, the fix above would have had a green tick and a broken feature.
+3. **§11 box 2 is NOT met as written.** `app.js` is +944/−392 against `main`, not net-negative: each deletion bought a surface the same spec asks for (collapsible persisted sections, the one-rendering dedupe, the convergence line, the stage ladder, `/quickcheck`, the rule popover). The half that is about the retired surfaces is met and now pinned in three files (JS, markup and sheet — the 3 dead `#feedback-view` rules came out here). Amending the box to "the retired surfaces stay retired" is a product call, so it is reported, not ticked.
+4. `tests/_p1_visual_gate.py` cannot photograph the arc line: its fixture project is a COPY, and `ProjectManifest.from_dict` keeps the `project_dir` recorded at analysis time, so a copied/renamed project silently resolves every store back to its original directory. That is pre-existing (the gate has read the original all along, and `studio_projects/` is git-ignored so nothing tracked is dirty) and out of scope for this plan; the arc’s dawn coverage went into `e2e_browser_pass_arc.py` instead, where the data is real. Recorded so the next session does not rediscover it as a mystery.
 
 ---
 

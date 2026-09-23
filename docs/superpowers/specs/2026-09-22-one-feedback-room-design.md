@@ -153,21 +153,52 @@ Rider (red-team): every count in the banner/queue/dock is computed through
 
 ## 11. Acceptance criteria
 
-- [ ] One canonical ledger: any finding visible in exactly one dock section; no Problem
+Walked 2026-09-23 (plan Task 21). Every box below carries the gate that pins it,
+so a later change that breaks one fails something named rather than something
+remembered.
+
+- [x] One canonical ledger: any finding visible in exactly one dock section; no Problem
       Board/drawer/clone copy diverges in count or status from the dock.
+      -> `e2e_browser_dock_sections.py` (P1.8: no finding carded twice),
+         `e2e_browser_counting_contract.py`, `test_app_symbol_integrity.py` (one-counter strip).
 - [ ] `app.js` net-negative diff; `#feedback-view`, `renderFvBoard*`, `pb-*` (if
       retired) gone from the bundle.
-- [ ] Evidence sections collapse and persist; default = live highs first; "this scene"
+      -> HALF MET, on purpose. The retired surfaces are gone and now pinned in JS,
+         markup AND sheet (`test_app_symbol_integrity` covers all three; the 3 dead
+         `#feedback-view` rules came out in this pass). `app.js` is NOT net-negative:
+         +944/-392 against `main`, because each deletion bought a surface this spec
+         asks for (collapsible persisted sections, the one-rendering dedupe, the
+         convergence line, the stage ladder, `/quickcheck`, the rule popover). Either
+         the box is amended to "the retired surfaces stay retired" or ~550 lines of
+         spec-mandated chrome come out; that is a product call, not a gate tick.
+- [x] Evidence sections collapse and persist; default = live highs first; "this scene"
       chip works both directions.
-- [ ] Arrival strip leads with "addressed by you"; fix loop launches from it.
-- [ ] Partial analysis failure → banner with per-category rerun; all green → soft-land.
-- [ ] `verification.note`/`rule_id`/`check_id`/`model_used`/`errors[]` visible in their
+      -> `e2e_browser_dock_sections.py` (reload + prefs, highs-first, chip both ways).
+- [x] Arrival strip leads with "addressed by you"; fix loop launches from it.
+      -> `e2e_browser_dock_sections.py` (first child is the addressed count; the
+         fix loop is the strip's CTA).
+- [x] Partial analysis failure → banner with per-category rerun; all green → soft-land.
+      -> `e2e_browser_dock_sections.py` (both rerun paths + endpoints),
+         `e2e_browser_phase16_*` (retry split, one banner).
+- [x] `verification.note`/`rule_id`/`check_id`/`model_used`/`errors[]` visible in their
       §7 homes.
-- [ ] Persona consult opens beside the dock with the originating card pinned; composer
+      -> `e2e_browser_dock_sections.py` (one leg per field, incl. the rule popover).
+- [x] Persona consult opens beside the dock with the originating card pinned; composer
       state survives switching.
-- [ ] Floating cards never overlap manuscript text; inked line == clickable line.
-- [ ] Dawn + night both render the new sections from tokens only.
-- [ ] `pytest tests/` green; browser suites re-pinned where surfaces retired.
+      -> `e2e_browser_width_budget.py` (the pin is visible IN the open lens and is the
+         finding's own evidence text), `e2e_browser_phase7_chat_lenses.py` (unsent draft
+         and pin survive a lens round trip). Fixed in this pass: the pin rendered only
+         on Sameer's composer, so escalating to the doctor parked the finding off-screen.
+         "Beside the dock" is now "is the dock" - the persona IS a lens (see Task 20).
+- [x] Floating cards never overlap manuscript text; inked line == clickable line.
+      -> `e2e_browser_one_matcher.py` (both directions, no card over the page).
+- [x] Dawn + night both render the new sections from tokens only.
+      -> `tests/_p1_visual_gate.py` photographs the ledger/cards/queue/working list in
+         both registers; `e2e_browser_layout_audit.py` fails on any unresolved token;
+         `e2e_browser_pass_arc.py` adds the arc line in both (a hard-coded colour would
+         not move with the theme, so that leg fails by construction on a literal).
+- [x] `pytest tests/` green; browser suites re-pinned where surfaces retired.
+      -> counts in the NOTES P3-gate entry for this run.
 
 ## 12. Out of scope
 
