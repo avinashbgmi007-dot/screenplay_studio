@@ -39,8 +39,13 @@ from typing import Any, Callable, Optional
 
 import pytest
 
-from screenplay_studio import beatboard, metrics, notes, revision, stash_store
+from screenplay_studio import beatboard, metrics, notes, pass_history, revision, stash_store
 from screenplay_studio.manifest import ProjectManifest
+
+
+# what one finished analysis looks like to pass_history.append_pass: the same
+# summary block finding_statuses produces, so the fixture stays honest.
+_SUMMARY = {"summary": {"addressed": 3, "still_present": 5, "unknown": 1}}
 
 
 def _write_raw(path: str, text: str) -> None:
@@ -125,6 +130,19 @@ CASES = [
         seed=lambda m: metrics.record_analysis(m, 1.5),
         mutate=lambda m: metrics.record_analysis(m, 2.5),
         missing_default={},
+        status="guarded",
+    ),
+    StoreCase(
+        # spec 15.4: the revision arc is append-only, so the load-modify-write
+        # cycle is the whole risk — a damaged arc read as [] would let the next
+        # analysis overwrite the writer's only record of their passes.
+        name="pass history",
+        module="screenplay_studio/pass_history.py",
+        path=lambda m: pass_history.path(m),
+        read=lambda m: pass_history.load_passes(m),
+        seed=lambda m: pass_history.append_pass(m, _SUMMARY),
+        mutate=lambda m: pass_history.append_pass(m, _SUMMARY),
+        missing_default=[],
         status="guarded",
     ),
     StoreCase(

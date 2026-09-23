@@ -33,6 +33,7 @@ const state = {
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
+  passes: [],             // spec 15.4: the revision arc, one entry per analysis
   editsData: null,        // { edits, findings_status } from /edits
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
@@ -3801,6 +3802,14 @@ async function loadScriptData() {
   const arrived = !!(lp && lp.computed_at && state.lastPassKey !== lp.computed_at);
   state.lastPass = lp;
   if (lp && lp.computed_at) state.lastPassKey = lp.computed_at;
+  // The arc lives in its own store, so it is fetched from its own endpoint:
+  // /edits carries one generation of diff and /passes carries every one.
+  // Reading the arc through two payloads would be two renderings of one fact.
+  try {
+    state.passes = (await api(`${base}/passes`)).passes || [];
+  } catch (_) {
+    state.passes = [];
+  }
   if (lp && lp.ghosted_marks) state.ghostedIds = new Set(lp.ghosted_marks.map((g) => g.finding_id));
   try {
     state.fixQueue = await api(`${base}/fixqueue`);
@@ -5575,6 +5584,11 @@ function renderDockEvidence() {
   const arrival = buildArrivalStrip();
   if (arrival) lens.appendChild(arrival);
 
+  // -- 0b2. the revision arc (spec 15.4): one line, under the strip that only
+  // remembers the last two passes.
+  const arc = buildPassArcLine();
+  if (arc) lens.appendChild(arc);
+
   // -- 0c. strengths first (spec §6): the desk only ever arrived holding its
   // complaints, so praise the analysis had already written stayed buried in the
   // coverage section below. This is that list, rendered once, up front.
@@ -6042,6 +6056,79 @@ function verificationReadout() {
   return unquoted
     ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"
     : null;
+}
+
+// spec 15.4: pass_history keeps the ledger's open count beyond one generation,
+// so the desk can show the whole revision arc instead of only the newest step.
+// One line and a hover sparkline — a per-pass table is the failure mode the
+// spec names, so this builds prose, not a dashboard.
+//
+// The number is the ledger's OPEN count as of that analysis (the same
+// still_present + unknown arithmetic the mass strip and the arrival headline
+// use), so the trend measures movement between passes — which is the writer's
+// own work. It never counts edits made after the last analysis: saying so is
+// the whole honesty of the line, and it rides in the title.
+function buildPassArcLine() {
+  const passes = state.passes || [];
+  if (!passes.length) return null;
+  const last = passes[passes.length - 1];
+  const prev = passes.length > 1 ? passes[passes.length - 2] : null;
+  const line = el("div", "dock-pass-arc");
+  line.appendChild(el("span", "dock-pass-head", `Pass ${passes.length} \u00B7 `));
+  if (!prev) {
+    line.appendChild(el("span", "dock-pass-nums", `${last.open} open`));
+  } else {
+    const word = last.open < prev.open ? "converging"
+      : last.open === prev.open ? "steady" : "widening";
+    line.appendChild(el("span", "dock-pass-nums", `${prev.open} \u2192 ${last.open} open \u00B7 `));
+    line.appendChild(el("span", `dock-pass-trend ${word}`, word));
+  }
+  line.title = "One point per analysis of this script: how many findings the ledger still held"
+    + " OPEN when that pass finished. "
+    + passes.map((p, i) => `Pass ${i + 1}: ${p.open} open`).join(" \u00B7 ")
+    + " \u2014 it compares one pass with the last; edits made since the newest analysis are not"
+    + " counted until it runs again."
+    + " Analyses from before this store existed are not on the line, so the"
+    + " number can be ahead of the points.";
+  line.appendChild(passArcSparkline(passes));
+  return line;
+}
+
+// Ceiling on the arc pair above: the tooltip lists every point and the
+// sparkline plots every point, so a project with dozens of analyses gets a long
+// hover and a crowded line. Upgrade path if it bites: window to the last N with
+// an "...and M earlier" clause, in buildPassArcLine alone.
+// A legacy project's arc starts where this store began, so the pass NUMBER can
+// lead the count of points; the title says that instead of letting the line
+// claim arithmetic the desk cannot verify.
+//
+// Inline SVG, built through createElementNS — no innerHTML, no chart library.
+function passArcSparkline(passes) {
+  const NS = "http://www.w3.org/2000/svg";
+  const W = 66, H = 14, PAD = 2;
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "dock-pass-spark");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", String(W));
+  svg.setAttribute("height", String(H));
+  svg.setAttribute("aria-hidden", "true");
+  const opens = passes.map((p) => p.open);
+  const hi = Math.max.apply(null, opens);
+  const lo = Math.min.apply(null, opens);
+  const span = (hi - lo) || 1;  // a flat arc still needs a slope-free line
+  const step = passes.length > 1 ? (W - PAD * 2) / (passes.length - 1) : 0;
+  const pts = opens.map((o, i) => {
+    const x = PAD + step * i;
+    const y = PAD + (H - PAD * 2) * (1 - (o - lo) / span);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const poly = document.createElementNS(NS, "polyline");
+  poly.setAttribute("points", pts.join(" "));
+  poly.setAttribute("fill", "none");
+  poly.setAttribute("stroke", "currentColor");
+  poly.setAttribute("stroke-width", "1.5");
+  svg.appendChild(poly);
+  return svg;
 }
 
 function buildArrivalStrip() {

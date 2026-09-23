@@ -865,3 +865,68 @@ class TestQuickcheck:
         resp = http_client.post(f"/api/projects/{project}/quickcheck", json={})
         assert resp.status_code == 400
         assert "parsed" in resp.get_json()["error"].lower()
+
+
+class TestPassHistoryEndpoint:
+    """spec §15.4: GET /passes returns the revision arc — one point per analysis.
+
+    These legs drive a REAL analysis against the mock server, so they guard the
+    append hook in the analyze path, not merely the route. Without the hook the
+    arc is empty and every leg below that expects a point fails.
+    """
+
+    def _project(self, http_client):
+        return _upload(http_client).get_json()["project"]
+
+    def test_no_analysis_yet_is_an_empty_arc_not_an_error(self, http_client):
+        project = self._project(http_client)
+        resp = http_client.get(f"/api/projects/{project}/passes")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"passes": []}
+
+    def test_analyze_records_one_point_whose_arithmetic_agrees(self, http_client):
+        project = self._project(http_client)
+        assert http_client.post(f"/api/projects/{project}/analyze").status_code == 200
+        resp = http_client.get(f"/api/projects/{project}/passes")
+        assert resp.status_code == 200
+        passes = resp.get_json()["passes"]
+        assert len(passes) == 1
+        p = passes[0]
+        assert set(p) == {"ts", "total", "open", "addressed", "failed_categories"}
+        # the client line draws `total` and `open` off the same numbers the
+        # ledger used, so they must reconcile or the arc lies
+        assert p["total"] == p["addressed"] + p["open"]
+        assert isinstance(p["failed_categories"], list)
+
+    def test_a_second_analysis_adds_a_point_and_keeps_the_first(self, http_client):
+        project = self._project(http_client)
+        http_client.post(f"/api/projects/{project}/analyze")
+        http_client.post(f"/api/projects/{project}/analyze", json={"force": True})
+        passes = http_client.get(f"/api/projects/{project}/passes").get_json()["passes"]
+        assert len(passes) == 2
+        assert passes[0]["ts"] <= passes[1]["ts"]
+
+    def test_reparse_does_not_erase_the_arc(self, http_client):
+        """Append-only: rewriting the script starts a new draft, it does not
+        delete the record of the drafts before it."""
+        project = self._project(http_client)
+        http_client.post(f"/api/projects/{project}/analyze")
+        http_client.post(f"/api/projects/{project}/reparse")
+        http_client.post(f"/api/projects/{project}/analyze")
+        passes = http_client.get(f"/api/projects/{project}/passes").get_json()["passes"]
+        assert len(passes) == 2
+
+    def test_damaged_history_says_so_instead_of_claiming_no_passes(self, http_client):
+        project = self._project(http_client)
+        from screenplay_studio.pass_history import path
+        from screenplay_studio.manifest import ProjectManifest
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        with open(path(m), "w", encoding="utf-8") as f:
+            f.write("{not json")
+        resp = http_client.get(f"/api/projects/{project}/passes")
+        assert resp.status_code == 503
+        assert "passes.json" in resp.get_json()["error"] or "pass_history" in resp.get_json()["error"]
+
+    def test_unknown_project_is_404(self, http_client):
+        resp = http_client.get("/api/projects/nope/passes")
+        assert resp.status_code == 404

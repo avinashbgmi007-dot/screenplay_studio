@@ -236,7 +236,7 @@ state each endpoint reads/writes is cataloged in `docs/STATE_STORES.md`. Quick i
 |------|----------|---------|
 | Config/conn | `/api/config`, `/api/test-connection`, `/api/health`, `/api/real-server-check` | GET/POST |
 | Projects | `/api/projects`, `/api/projects/<name>`, `/api/sample`, `/api/projects/<name>/backup`, `/api/projects/<name>/reparse` | GET/POST/DELETE |
-| Analysis | `/api/projects/<name>/analyze`, `/analyze/retry-failed`, `/progress`, `/report`, `/report/export`, `/fixqueue`, `/findings/<index>/dismiss`, `/findings/<index>/undismiss`, `/characters` | GET/POST |
+| Analysis | `/api/projects/<name>/analyze`, `/analyze/retry-failed`, `/progress`, `/report`, `/report/export`, `/fixqueue`, `/findings/<index>/dismiss`, `/findings/<index>/undismiss`, `/passes` (the revision arc, spec 15.4), `/characters` | GET/POST |
 | Manuscript | `/script`, `/rewrite`, `/edits`, `/edits/apply`, `/edits/undo`, `/edits/redo`, `/edits/reset`, `/export`, `/metrics` | GET/POST |
 | Notes/Stash | `/notes`, `/notes/<id>`, `/stash`, `/stash/<id>`, `/premise` | GET/POST/PATCH/DELETE |
 | Beat board/Drafts | `/beatboard`, `/beatboard/reset`, `/beatboard/export`, `/drafts`, `/drafts/activate`, `/diff`, `/compare` | GET/POST/PUT |

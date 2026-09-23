@@ -1119,6 +1119,26 @@ def _start_progress_heartbeat(m) -> None:
     })
 
 
+def _record_pass(m) -> None:
+    """spec §15.4: stamp the revision arc with this pass's numbers.
+
+    Best-effort on purpose. The analysis is finished and its report is on disk
+    by the time this runs, so a history write that fails (a locked store, a full
+    disk) must not answer a completed run with a 500 that pushes the writer into
+    re-running the model. The failure is printed, not swallowed — the same
+    discipline the `record_analysis` call directly above it applies.
+    """
+    try:
+        from .pass_history import append_pass
+        from .revision import finding_statuses
+        statuses = (finding_statuses(m)
+                    if m.stage("analyze").status == "complete" else {})
+        failed = (m.stage("analyze").output_paths or {}).get("failed_categories") or []
+        append_pass(m, statuses, failed)
+    except Exception:
+        traceback.print_exc()
+
+
 def _analyze_locked(m):
     # The pre-flight lives OUTSIDE the pipeline's try below, and it does real
     # work: it rewrites the manifest and resets the progress heartbeat. An
@@ -1175,6 +1195,7 @@ def _analyze_locked(m):
 
     from .metrics import record_analysis
     record_analysis(m, _t.time() - _t0)
+    _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
     return jsonify(_manifest_summary(m))
 
 
@@ -1224,6 +1245,7 @@ def _retry_failed_locked(m):
 
     from .metrics import record_analysis
     record_analysis(m, _t.time() - _t0)
+    _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
     return jsonify(_manifest_summary(m))
 
 
@@ -1329,6 +1351,22 @@ def get_report(name):
     if m.stage("analyze").status != "complete":
         return _error("Analysis hasn't completed for this project yet.", 400)
     return jsonify(_load_report_sanitized(m))
+
+
+@app.route("/api/projects/<name>/passes", methods=["GET"])
+def get_pass_history(name):
+    """spec §15.4: the revision arc — one entry per analysis this project has had.
+
+    The store's own contract answers a damaged file (the global StoreUnreadable
+    handler turns it into a 503 that says so), because "passes": [] here would
+    read as "you have never analysed this script" to a writer with a history.
+    """
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    from .pass_history import load_passes
+    return jsonify({"passes": load_passes(m)})
 
 
 @app.route("/api/projects/<name>/characters", methods=["GET"])

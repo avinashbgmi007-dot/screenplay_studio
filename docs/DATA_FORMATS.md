@@ -25,6 +25,7 @@ my_project/
 ├── stash.json               <- saved passages (the Stash)
 ├── beatboard.json           <- saved scene order
 ├── metrics.json             <- desk metrics (reply/analysis timings, fix counts)
+├── pass_history.json          <- revision arc: one point per analysis (append-only)
 ├── premise.json             <- premise card (when graduated from an idea)
 ├── sessions/                <- Piece 3: one JSON per chat session
 └── drafts/                  <- draft snapshots (name -> {source copy, parsed.json,
@@ -374,6 +375,7 @@ All written atomically (`jsonio.atomic_write_json`). Schemas (top level):
 - **notes.json** — margin notes. Array of `{id, scene_number: int|null, text, anchor: str|null, created_at, updated_at}`.
 - **beatboard.json** — saved scene order. `{"order": [scene numbers], "saved_at": ts}`.
 - **metrics.json** — desk metrics. `{analysis_seconds, last_analysis_ts, reply_seconds (rolling ≤40), discussed, findings_open, findings_total}`.
+- **pass_history.json** — the revision arc (spec §15.4). Append-only array, oldest first, one entry per completed or partial analysis: `{ts, total, open, addressed, failed_categories}`, with `total = addressed + open` and `open = still_present + unknown` — the `finding_statuses` summary arithmetic, i.e. the same one `metrics.json` and the client's `findingCounts()` use, so no surface owns a second counter. `last_pass.json` keeps ONE generation of diff; this keeps every one.
 - **working.json** — edit working copy; full ScriptDocument schema (same as parsed.json).
 - **edits.json** — undo log. Array of `{id, scene_number, applied: [{old, new, similarity}], skipped: [{old, new, reason}], applied_at}`.
 - **edits.redo.json** — redo stack; same record shape as edits.json.

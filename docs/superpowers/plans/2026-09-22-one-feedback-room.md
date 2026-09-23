@@ -513,12 +513,18 @@ def test_quickcheck_runs_deterministic_passes_on_working_doc(self, http_client):
 
 **Interfaces:** Produces: entry shape `{ts, total, open, addressed, failed_categories}`; `GET .../passes`. Consumes: `finding_statuses` summary + `failed_categories` already computed in the analyze path.
 
-- [ ] **Step 1: Failing test** — `tests/test_pass_history.py`: append twice, read back ordered; concurrent-append under `lock_for` keeps both entries; damaged file → `StoreUnreadable` (store contract, not silent empty).
-- [ ] **Step 2: Run, expect FAIL** (module missing).
-- [ ] **Step 3: Implement** store + append hook + endpoint + client line.
-- [ ] **Step 4: Gates** — pytest PASS; `node --check`; e2e: two analyses → line reads "Pass 2".
-- [ ] **Step 5: Commit** — `"P2.18: pass_history store + convergence line (your revision arc)"`
+- [x] **Step 1: Failing test** — `tests/test_pass_history.py`: append twice, read back ordered; concurrent-append under `lock_for` keeps both entries; damaged file → `StoreUnreadable` (store contract, not silent empty).
+- [x] **Step 2: Run, expect FAIL** (module missing).
+- [x] **Step 3: Implement** store + append hook + endpoint + client line.
+- [x] **Step 4: Gates** — pytest PASS; `node --check`; e2e: two analyses → line reads "Pass 2".
+- [x] **Step 5: Commit** — `"P2.18: pass_history store + convergence line (your revision arc)"`
 
+**Deviations (recorded, not hidden):**
+1. Step 2's red was never watched for the STORE: `pass_history.py` and `tests/test_pass_history.py` were written in the same breath, so "module missing" could not fail. What WAS watched red: the client line (`tests/e2e_browser_pass_arc.py` printed `arc=None` on both legs before `buildPassArcLine` existed) and the append hook (commenting out the two `_record_pass(m)` calls fails exactly the three arc legs in `tests/test_webapp_api.py`; restoring them turns them green — so those legs prove the HOOK, not merely the route).
+2. The plan named one test file; the work left four gates behind: `tests/test_pass_history.py` (store, incl. two real child processes appending at once), `/passes` endpoint legs, `tests/e2e_browser_pass_arc.py`, and a `StoreCase` in `tests/test_store_fault_injection.py` — the last was not optional: `test_every_store_writer_is_in_the_registry` failed until the new store joined the fault-injection battery.
+3. The convergence line mounts in the Evidence dock, because that is where the ledger renders, so the suite opens the dock before measuring (the first RED run's `arc=None` was partly that, not only the missing builder).
+4. Hover is the native `title` tooltip rather than a JS popover: same information, no new surface, no library.
+5. `open` in the arc is the ledger's open count AS OF each analysis, which is why the line's title says so — counting the writer's marks made since the newest pass would read as progress the desk has not verified.
 
 ---
 

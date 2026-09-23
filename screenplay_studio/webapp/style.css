@@ -6545,6 +6545,15 @@ body:not(.idea-mode) .desk {
 .dock-ghosted-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
 .dock-ghosted-issue { font-size:var(--fs-2xs); color:var(--text-muted); opacity:.75; }
 .dock-ghosted-intent { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; white-space:nowrap; }
+/* P2.18 (spec 15.4): the revision arc — one quiet line under the arrival strip.
+   lamp is the progress token in every register; "widening" stays neutral ink
+   because it is a fact about the draft, not a severity. */
+.dock-pass-arc { display:flex; align-items:baseline; gap:var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); }
+.dock-pass-head { font-weight:600; color:var(--text); }
+.dock-pass-trend { font-style:italic; }
+.dock-pass-trend.converging { color:var(--lamp); }
+.dock-pass-trend.steady, .dock-pass-trend.widening { color:var(--text-faint); }
+.dock-pass-spark { color:var(--lamp); flex:none; align-self:center; }
 .loop-bar { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; padding:var(--sp-2) var(--sp-3); border:1px solid var(--lamp); border-radius:var(--r-md); background:var(--glass-strong); position:sticky; top:0; z-index:2; }
 .loop-pos { font-size:var(--fs-2xs); font-weight:700; color:var(--lamp); font-variant-numeric:tabular-nums; }
 .loop-btn { appearance:none; border:1px solid var(--line); background:var(--surface); border-radius:var(--r-sm); padding:2px var(--sp-3); font-size:var(--fs-2xs); color:var(--text); cursor:pointer; }
