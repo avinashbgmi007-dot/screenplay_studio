@@ -6455,6 +6455,38 @@ body:not(.idea-mode) .desk {
   border-radius: var(--r-sm);
   padding: 0 var(--sp-1);
 }
+/* spec §15.3 — the live check, dressed apart from the ledger on purpose. These
+   rows are two rule passes measuring the CURRENT text; they are not a model's
+   judgment and they are not counted, so the section has to survive a glance and
+   answer "is this the report?" out loud. */
+.dock-lint-chip {
+  display: inline-block;
+  margin-left: var(--sp-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  padding: 0 var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xs);
+  font-weight: 400;
+  letter-spacing: .02em;
+  color: var(--lamp);
+}
+.dock-lint-row { font-size: var(--fs-2xs); line-height: 1.55; color: var(--text-faint); margin: 0 0 var(--sp-2) 0; }
+.dock-lint-rule {
+  display: inline-block;
+  margin-left: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xs);
+  color: var(--text-faint);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  padding: 0 var(--sp-1);
+}
+/* the two states that are NOT a finding: the rules saw nothing, or they could
+   not answer. Both say so, and neither dresses itself in the ledger's colour. */
+.dock-lint-clean { color: var(--ok); }
+.dock-lint-down { color: var(--danger); }
+.dock-lint-note { font-size: var(--fs-3xs); font-style: italic; color: var(--text-faint); margin: 0; }
 /* A character read's own hedge, printed rather than hidden in a hover. */
 .wm-confidence, .wm-scenes {
   display: inline-block;

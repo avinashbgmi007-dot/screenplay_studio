@@ -483,7 +483,7 @@ Measured (the P1 gate now photographs this surface): `03e_rule_popover_night` sh
 
 **Interfaces:** Produces: `POST /api/projects/<name>/quickcheck -> {findings: [...], errors: [...], provisional: true}` — runs `run_continuity_analysis(doc)` + `check_formatting(doc)` on the WORKING doc (`revision.load_working`/`ensure_working`), no LLM, no state mutation. Client: `runQuickcheck()` merges into the lint layer; lint findings render with a "live check" chip, never counted in `findingCounts` (they are not model findings — separate `state.lintFindings`).
 
-- [ ] **Step 1: Failing test**:
+- [x] **Step 1: Failing test**:
 
 ```python
 def test_quickcheck_runs_deterministic_passes_on_working_doc(self, http_client):
@@ -496,10 +496,12 @@ def test_quickcheck_runs_deterministic_passes_on_working_doc(self, http_client):
     # and: no model involved -> works with no llama-server configured
 ```
 
-- [ ] **Step 2: Run, expect 404.**
-- [ ] **Step 3: Implement** the route (guarded by the same `_error` pattern; NOT under `_analyze_lock` — it's read-only and fast) and the client wiring + "live check" chip styling.
-- [ ] **Step 4: Gates** — pytest PASS; `node --check`; e2e: edit a line that breaks a heading, lint chip appears without analysis.
-- [ ] **Step 5: Commit** — `"P2.17: /quickcheck — deterministic lint on edit, provisional and labeled"`
+- [x] **Step 2: Run, expect 404.**
+- [x] **Step 3: Implement** the route (guarded by the same `_error` pattern; NOT under `_analyze_lock` — it's read-only and fast) and the client wiring + "live check" chip styling.
+- [x] **Step 4: Gates** — pytest PASS; `node --check`; e2e: edit a line that breaks a heading, lint chip appears without analysis.
+- [x] **Step 5: Commit** — `"P2.17: /quickcheck — deterministic lint on edit, provisional and labeled"`
+
+**Deviations.** (1) The route reads through `revision.load_working` and answers 400 when there is no script to check, so `ensure_working`'s `FileNotFoundError` cannot become a 500; it takes no `_analyze_lock` (read-only, milliseconds), which a test pins by holding the lock and calling it anyway. (2) The client does NOT merge into `state.findings` as §Files sketched — the Interfaces line forbids it, and merging would put unjudged rule rows inside `findingCounts()`, the mass strip and the ink. `state.lint` is its own layer, and the ledger's live-check section is mounted a second time in the *unanalysed* branch of `renderDockEvidence`, so the chip can appear with no report at all (that is what Step 4's gate asks for). (3) The five edit tails (inline save, apply-one, apply-many, undo, redo — plus reset) collapsed into one `afterScriptEdit()`; a full report landing clears `state.lint`, because the pass subsumes the provisional answer it replaces. (4) The e2e is its own suite (`tests/e2e_browser_quickcheck.py`, 15 legs) rather than a section of `dock_sections`, because its whole premise is a desk that has never been analysed.
 
 ### Task 18: Pass history + convergence line (NEW store)
 

@@ -777,3 +777,91 @@ class TestRuleAttributionEndpoint:
         resp = http_client.get("/api/rules/not_a_rule")
         assert resp.status_code == 404
         assert "not_a_rule" in resp.get_json()["error"]
+
+
+class TestQuickcheck:
+    """spec §15.3: the writer edits a line, and the deterministic passes answer
+    immediately. No model, no report, no manifest write — and the result says so
+    on its own (`provisional`), because a live check is not the full pass."""
+
+    LONG_ACTION = " ".join(["MARA studies the revolver on the desk for a long moment."] * 8)
+
+    def _project(self, http_client):
+        return _upload(http_client).get_json()["project"]
+
+    def test_quickcheck_runs_deterministic_passes_on_working_doc(self, http_client):
+        project = self._project(http_client)
+        resp = http_client.post(f"/api/projects/{project}/quickcheck", json={})
+        assert resp.status_code == 200, resp.get_json()
+        body = resp.get_json()
+        assert body["provisional"] is True
+        assert isinstance(body["findings"], list)
+        assert isinstance(body["errors"], list)
+
+    def test_no_model_server_needed(self, http_client):
+        """The whole point: it answers while llama-server is down or busy."""
+        project = self._project(http_client)
+        http_client.post(f"/api/projects/{project}/analyze")  # real report exists
+        webapp_server.CONFIG["server_url"] = "http://127.0.0.1:9"  # nothing listening
+        resp = http_client.post(f"/api/projects/{project}/quickcheck", json={})
+        assert resp.status_code == 200, resp.get_json()
+        assert resp.get_json()["provisional"] is True
+
+    def test_it_reads_the_working_copy_not_the_original_parse(self, http_client):
+        project = self._project(http_client)
+        before = http_client.post(f"/api/projects/{project}/quickcheck", json={}).get_json()
+        assert "long_action_block" not in [f.get("rule") for f in before["findings"]]
+        # edit a line of the script: one over-long action paragraph
+        resp = http_client.post(f"/api/projects/{project}/edits/apply", json={
+            "scene_number": 1,
+            "replacements": [{
+                "old": "MARA takes out an old REVOLVER, setting it on the desk.",
+                "new": self.LONG_ACTION,
+            }],
+        })
+        assert resp.status_code == 200 and resp.get_json()["applied"], resp.get_json()
+        after = http_client.post(f"/api/projects/{project}/quickcheck", json={}).get_json()
+        flagged = [f for f in after["findings"] if f.get("rule") == "long_action_block"]
+        assert flagged, "quickcheck still reports the pre-edit parse"
+
+    def test_it_mutates_no_project_state(self, http_client, tmp_path):
+        project = self._project(http_client)
+        project_dir = webapp_server._project_dir(project)
+        http_client.post(f"/api/projects/{project}/quickcheck", json={})
+        from screenplay_studio.manifest import ProjectManifest
+        m = ProjectManifest.load(project_dir)
+        assert m.stage("analyze").status == "pending"
+        assert not os.path.exists(os.path.join(project_dir, "report.json"))
+        assert not os.path.exists(os.path.join(project_dir, "report.findings.json"))
+        # a live check is not a run: it must not leave a progress heartbeat
+        # behind, or the desk would show a ladder for a call that finished
+        assert not os.path.exists(os.path.join(project_dir, "progress.json"))
+
+    def test_it_does_not_queue_behind_an_analysis(self, http_client):
+        """Read-only and milliseconds — taking the analyze lock would make it
+        wait minutes for a run it does not participate in."""
+        project = self._project(http_client)
+        lock = webapp_server._analyze_lock(project)
+        assert lock.acquire(blocking=False)
+        try:
+            resp = http_client.post(f"/api/projects/{project}/quickcheck", json={})
+            assert resp.status_code == 200
+        finally:
+            lock.release()
+
+    def test_unknown_project_is_404(self, http_client):
+        resp = http_client.post("/api/projects/nope/quickcheck", json={})
+        assert resp.status_code == 404
+
+    def test_an_unparsed_project_says_so(self, http_client):
+        """No script to check — a clear error, not a 500 from ensure_working."""
+        project = self._project(http_client)
+        from screenplay_studio.manifest import ProjectManifest
+        from screenplay_studio import revision
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        os.remove(m.parsed_path)
+        if os.path.exists(revision.working_path(m)):
+            os.remove(revision.working_path(m))
+        resp = http_client.post(f"/api/projects/{project}/quickcheck", json={})
+        assert resp.status_code == 400
+        assert "parsed" in resp.get_json()["error"].lower()

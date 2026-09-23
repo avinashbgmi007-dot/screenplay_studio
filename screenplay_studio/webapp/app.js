@@ -37,6 +37,11 @@ const state = {
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
   reportStats: null,      // stats from report.findings.json
+  // spec §15.3: { findings, errors, ok } — the two deterministic rule passes
+  // re-run on the CURRENT text after an edit. Deliberately not `findings`:
+  // findingCounts() reads state.findings, and a live check must never borrow
+  // the ledger's authority (or its counts).
+  lint: null,
   premise: null,          // premise card carried into a graduated project
   notes: [],              // the writer's own margin notes
   charTracks: [],         // per-character track layer from /characters
@@ -254,8 +259,7 @@ function wireInlineEdit(lineEl, sceneNumber, originalText) {
       } catch (err) {
         showError("Inline edit failed: " + err.message);
       }
-      await loadScriptData();
-      refreshAllFindingSurfaces(); // P0.4: one entry point (metrics ride along)
+      await afterScriptEdit();
     };
     lineEl.addEventListener("blur", () => finish(true), { once: true });
     lineEl.addEventListener("keydown", (kev) => {
@@ -2043,6 +2047,7 @@ async function openProject(name) {
     state.findingStatus = {};
     state.fixQueue = null;
     state.reportStats = null;
+    state.lint = null;
     state.premise = null;
     $("#premise-view").style.display = "none";
     // leaving the idea room must put the canvas AWAY, or it stays stacked
@@ -3779,6 +3784,10 @@ async function loadScriptData() {
   }
   state.findings = findings;
   state.report = report;
+  // A full pass has the same two rule passes in it, judged against the same
+  // text — so the provisional rows are retired rather than left on screen
+  // disagreeing with the report that just landed.
+  state.lint = null;
   state.reportStats = (report && report.stats) || null;
   // content-hash identity: the client computes the SAME id the server
   // observes (revision.py compute_finding_id). Status reads prefer id —
@@ -5486,6 +5495,81 @@ function dedupeDockFindings(...claimedIndexLists) {
   return claimed;
 }
 
+/** The live check (spec §15.3): the two deterministic rule passes re-run on the
+ *  writer's CURRENT text, milliseconds after an edit, with no model call.
+ *
+ *  It is NOT the ledger. No model judged these rows, they cover two of the
+ *  twenty passes, and `findingCounts()` never sees them — so the header has to
+ *  say what it is, in its own words, rather than borrow the report's authority.
+ *  Built here and mounted twice: after the report's own formatting rows, and on
+ *  the unanalysed desk, where it is the only evidence anyone has.
+ */
+function buildLiveCheckSection() {
+  const lint = state.lint;
+  if (!lint) return null;
+
+  const title = el("span", "dock-section-title", "Live check ");
+  title.appendChild(el("span", "dock-lint-chip", "provisional \u2014 full pass pending"));
+
+  return dockSection("livecheck", title, (inner) => {
+    if (!lint.ok) {
+      inner.appendChild(el("p", "dock-lint-row dock-lint-down",
+        "The live check could not answer \u2014 the last full pass is still the truth here."));
+    }
+    (lint.errors || []).forEach((e) => {
+      inner.appendChild(el("p", "dock-lint-row dock-lint-down", e));
+    });
+    if ((lint.findings || []).length) {
+      lint.findings.forEach((f) => {
+        const scenes = (f.scene_refs || []).map((n) => "S" + n).join(", ") || "script-wide";
+        const row = el("p", "dock-lint-row",
+          `[${(f.severity || "low").toUpperCase()}] ${scenes} \u2014 `
+          + (f.message || f.issue || f.rule || "flagged"));
+        const tag = f.rule || f.check_id || f.category;
+        if (tag) row.appendChild(el("span", "dock-lint-rule", tag));
+        inner.appendChild(row);
+      });
+    } else if (lint.ok) {
+      inner.appendChild(el("p", "dock-lint-row dock-lint-clean",
+        "Nothing the rules flag on the current text."));
+    }
+    inner.appendChild(el("p", "dock-lint-note",
+      "Continuity + formatting only, no model. A full pass may see more."));
+  }, { defaultOpen: true });
+}
+
+let _lintSeq = 0;
+
+/** Ask the server for the live check. Sequence-guarded: undo-then-redo fires two
+ *  of these and the older answer must not overwrite the newer one. */
+async function runQuickcheck() {
+  if (!state.currentProject) return;
+  const seq = ++_lintSeq;
+  try {
+    const res = await api(`/projects/${encodeURIComponent(state.currentProject)}/quickcheck`,
+      { method: "POST", body: JSON.stringify({}) });
+    if (seq !== _lintSeq) return;
+    state.lint = {
+      findings: res.findings || [], errors: res.errors || [],
+      ok: res.provisional === true,
+    };
+  } catch (e) {
+    if (seq !== _lintSeq) return;
+    state.lint = { findings: [], errors: [], ok: false };
+  }
+  renderDockEvidence(); // only the ledger changes — no re-ink, no re-count
+}
+
+/** The ONE tail of every path that changes the working copy — inline edit,
+ *  rewrite apply, undo, redo, reset. Reload the pages, move the finding
+ *  surfaces, and ask the deterministic rules what the new text says (§15.3).
+ */
+async function afterScriptEdit() {
+  await loadScriptData();
+  refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
+  await runQuickcheck();
+}
+
 /**
  * Full Evidence Overview render. Called when: the dock opens on the evidence
  * lens, the lens switches to evidence, and after any manuscript re-render
@@ -5505,6 +5589,10 @@ function renderDockEvidence() {
     empty.appendChild(el("p", "dock-lens-hint",
       "No analysis yet. Run Analysis from the toolbar — the evidence ledger assembles itself here when the report lands."));
     lens.appendChild(empty);
+    // The one thing that CAN be said about an unanalysed script: the rules that
+    // need no model already re-ran on the text the writer just edited.
+    const lintEmpty = buildLiveCheckSection();
+    if (lintEmpty) lens.appendChild(lintEmpty);
     return;
   }
 
@@ -5744,6 +5832,12 @@ function renderDockEvidence() {
         });
       }));
   }
+
+  // -- 6c. Live check (spec §15.3) — the same two rule kinds, on the CURRENT
+  // text. Sitting beside the report's formatting rows is the point: one is what
+  // the last pass measured, the other is what your page says right now.
+  const liveCheck = buildLiveCheckSection();
+  if (liveCheck) lens.appendChild(liveCheck);
 
   // -- 7. Pacing + Characters + Dials + Writer's Mirror ----------------------
   // Same panels the craft shelf renders — verbatim, one section each: every one
@@ -7651,8 +7745,7 @@ async function applyOneRewrite(rep, row) {
     _markProposalRow(row, "applied", true);
     status.className = "rewrite-status ok";
     status.textContent = "Applied to the working copy — Undo is in the script toolbar.";
-    await loadScriptData();
-    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
+    await afterScriptEdit();
   } catch (e) {
     status.className = "rewrite-status error";
     status.textContent = "Apply failed: " + e.message;
@@ -7763,8 +7856,7 @@ async function applyRewrite() {
       body: JSON.stringify({ scene_number: rewriteState.sceneNumber, replacements }),
     });
     closeModal("#rewrite-modal");
-    await loadScriptData();
-    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
+    await afterScriptEdit();
     const msg = res.skipped && res.skipped.length
       ? `Applied ${res.applied.length} change(s); ${res.skipped.length} couldn't be matched — ${res.skipped.map((s) => s.reason).join("; ")}`
       : `Applied ${res.applied.length} change(s) to Scene ${rewriteState.sceneNumber}.`;
@@ -7779,8 +7871,7 @@ async function applyRewrite() {
 async function undoEdit() {
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/undo`, { method: "POST" });
-    await loadScriptData();
-    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
+    await afterScriptEdit();
     appendSystemNote("Undid the last applied edit.");
   } catch (e) {
     showError("Couldn't undo: " + e.message);
@@ -7790,8 +7881,7 @@ async function undoEdit() {
 async function redoEdit() {
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/redo`, { method: "POST" });
-    await loadScriptData();
-    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
+    await afterScriptEdit();
     appendSystemNote("Re-applied the undone edit.");
   } catch (e) {
     showError("Couldn't redo: " + e.message);
@@ -7802,8 +7892,7 @@ async function resetEdits() {
   if (!confirm("Discard all applied edits and return the script to its original parsed state?")) return;
   try {
     await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/reset`, { method: "POST" });
-    await loadScriptData();
-    refreshAllFindingSurfaces(); // P0.4: one entry point + fresh metrics
+    await afterScriptEdit();
     appendSystemNote("All edits discarded — the script is back to its original state.");
   } catch (e) {
     showError("Couldn't reset edits: " + e.message);

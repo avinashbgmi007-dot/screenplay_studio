@@ -1704,6 +1704,43 @@ def redo_edits(name):
     return jsonify({**result, "findings_status": statuses})
 
 
+@app.route("/api/projects/<name>/quickcheck", methods=["POST"])
+def quickcheck_project(name):
+    """spec §15.3: the deterministic passes re-run on the working copy the moment
+    the writer edits — no model call, and the report is left alone.
+
+    Read-only by contract: no manifest write, no report, no progress heartbeat,
+    and deliberately NOT under the analyze lock, so a writer mid-run still gets
+    an answer in milliseconds. `provisional` rides in the body because this is
+    two rule passes, not the full analysis — the client must not present it as
+    the ledger's own findings.
+    """
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    if m.stage("parse").status != "complete":
+        return _error("Project hasn't been parsed yet.", 400)
+    from .revision import load_working
+    try:
+        doc = load_working(m)
+    except FileNotFoundError as exc:
+        return _error(f"Nothing to check — no parsed script. ({exc})", 400)
+
+    findings, errors = [], []
+    try:
+        from screenplay_analyzer.continuity import run_continuity_analysis
+        findings.extend(run_continuity_analysis(doc)[0])
+    except Exception as exc:  # a pass that breaks is reported, never fatal
+        errors.append(f"Continuity check failed: {exc}")
+    try:
+        from screenplay_analyzer.formatting_check import check_formatting
+        findings.extend(check_formatting(doc))
+    except Exception as exc:
+        errors.append(f"Formatting check failed: {exc}")
+    return jsonify({"findings": findings, "errors": errors, "provisional": True})
+
+
 @app.route("/api/projects/<name>/edits/reset", methods=["POST"])
 def reset_edits(name):
     try:
