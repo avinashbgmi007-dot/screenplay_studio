@@ -4746,7 +4746,7 @@ function renderScenePage(scene, findings, searchQuery, notes = [], discussed = f
     for (const { f, index } of findings) {
       const addressed = findingStatusOf(f, index) === "addressed";
       // R6: a margin PIN, not a fourth card. The finding already renders in
-      // the Problem Board and in the dock's Evidence lens; the margin's job is
+      // the dock's Evidence lens; the margin's job is
       // to say what sits on this line while the writer is reading it, so it
       // keeps Locate (navigation) and drops the judgment controls
       // (Rewrite / Discuss) — which is what findingNoteEl's own contract
@@ -4825,8 +4825,8 @@ function highlightMatches(node, text, query) {
 // removed — this is the only manuscript path). Renders into the container
 // it is given (#manuscript-container). All DOM contracts survive:
 // .scene-page, data-scene-number, scene-page-N ids, the el-* line classes
-// — jumpToScene, focus mode, river read, Problem Board sync and
-// selection-to-ask all depend on them.
+// — jumpToScene, focus mode, river read and selection-to-ask all depend
+// on them.
 // a11y (WCAG 4.1.3 Status Messages): announce a NEW manuscript load. Every
 // re-render (typing, undo, notes, search) flows through renderManuscript, so
 // gate on the scene count actually changing — otherwise the polite live
@@ -7917,7 +7917,8 @@ const SHORTCUTS = [
   ["↑ / ↓", "Walk the focused manuscript line by line (Enter edits it in place)"],
   ["a", "Toggle the Craft shelf (analysis panels)"],
   ["z", "Spotlight mode — nothing but the page (Esc leaves)"],
-  ["Esc", "Leave spotlight → dismiss partner drawer → craft shelf → dock"],
+  ["Esc", "Back to the page: fix loop → spotlight → full-screen tool → "
+          + "dock → partner drawer → craft shelf"],
   ["b", "Open the Beat Board"],
   ["d", "Compare drafts side by side"],
   ["j / n", "Next scene (script view)"],
@@ -8133,8 +8134,9 @@ function bindGlobalShortcuts() {
 
     if (isTypingTarget(e.target)) return;
 
-    // Esc — the page wins: dismiss the partner drawer, then the craft shelf,
-    // then the structure rail (palette Esc is handled above; modals keep Esc).
+    // Esc — the page wins: leave the fix loop, the spotlight and any
+    // full-screen tool, then the dock, the partner drawer, the craft shelf
+    // (palette Esc and modals are handled above).
     if (e.key === "Escape") {
       if (loopState.active) { exitLoop(); return; }
       if (document.body.classList.contains("spotlight-mode")) { exitSpotlight(); return; }
@@ -8142,7 +8144,7 @@ function bindGlobalShortcuts() {
       if (state.view === "premise") { closePremiseView(); return; }
       if (state.view === "compare") { closeCompareView(); return; }
       if (state.view === "beatboard") { closeBeatboardView(); return; }
-      // (open modals already returned above — dock/drawer/shelf/rail are safe)
+      // (open modals already returned above — dock/drawer/shelf are safe)
       {
         if (dockIsOpen()) { closeDock(); return; }
         const drawer = $("#room-drawer");
@@ -8153,8 +8155,8 @@ function bindGlobalShortcuts() {
       return;
     }
 
-    // idea room has no project — but the room keys (c/f), the craft shelf (a)
-    // and the rail (r) belong there too
+    // idea room has no project — but the room keys (c/f) and the craft
+    // shelf (a) belong there too
     if (!state.currentProject && !state.inIdea) return;
 
     // the keyboard fix loop (R2-b, contextual per 2A): while engaged, the
@@ -8876,8 +8878,18 @@ function init() {
   const deskAnalyzeBtn = $("#desk-analyze-btn");
   if (deskAnalyzeBtn) deskAnalyzeBtn.addEventListener("click", runAnalysis);
 
-  // script pane
-  $("#script-search").addEventListener("input", () => renderManuscript(document.getElementById('manuscript-container')));
+  // script pane — the search box FILTERS the manuscript, so a keystroke must
+  // not rebuild it. `renderManuscript()` starts with `innerHTML = ""` and
+  // rebuilds every scene page plus the five craft panels; per keystroke that
+  // cost the writer a torn-down page (and any edit caret in it) six times for
+  // "zebrax". Coalesce the burst; the two programmatic clears call the render
+  // directly and stay synchronous.
+  let searchRenderTimer = null;
+  $("#script-search").addEventListener("input", () => {
+    clearTimeout(searchRenderTimer);
+    searchRenderTimer = setTimeout(
+        () => renderManuscript(document.getElementById("manuscript-container")), 160);
+  });
   $("#reset-edits-btn").addEventListener("click", resetEdits);
   $("#undo-btn").addEventListener("click", undoEdit);
   $("#redo-btn").addEventListener("click", redoEdit);

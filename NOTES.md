@@ -3,6 +3,56 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### Production-readiness audit pass 3: the bytes, the keystroke, and five docs describing a panel that is gone
+
+Passes 1–2 measured the *rendered* page. This pass swept the three findings that
+neither a contrast probe nor a screenshot can see: the app's own bytes, the cost
+of one keystroke, and what the docs tell the next reader.
+
+**1. `index.html` shipped a BOM and three runs of mojibake.** A UTF-8 BOM sat
+before `<!DOCTYPE html>`, and `→` had been round-tripped through cp1252 twice, so
+the premise card's close button read `â†' Back to the page` and its journey line
+carried the same glyph twice — *on screen, to the writer*. Nothing caught it:
+`test_kb_text_hygiene.py` only reads craft-rule JSON, and no test opened the
+frontend's bytes. Fixed in place (BOM stripped, 3 runs re-encoded; CRLF line
+endings untouched at 723, diff is 3 lines). The guard is
+`tests/test_webapp_text_hygiene.py` — every served `.html` must decode as UTF-8
+without a BOM, carry no double-encoded run, and `index.html` must still declare
+its charset. Red-proof: pointed at `git show HEAD:index.html` it reports
+`BOM: True, runs: ['â†', 'â†', 'â†']`.
+
+**2. One keystroke rebuilt the entire manuscript.** `#script-search`'s `input`
+handler called `renderManuscript()` directly, and that function opens with
+`container.innerHTML = ""` — so typing "zebrax" tore down and rebuilt every scene
+page plus the five craft panels six times, taking any inline-edit caret in the
+page with it. Now coalesced behind a 160 ms timer; the two programmatic clears
+(`jumpToScene`, `scrollToSceneInPlace`) still render synchronously. New suite
+`tests/e2e_browser_script_search.py` counts renders through a wrapped
+`renderManuscript` (6 → 1) and pins filter honesty on the way: both-shown,
+one-hidden, the "No scenes match" hint, and clearing restores.
+
+**3. Five living docs still described the Problem Board as shipping.** The
+surface was cut in P0.2 and `test_app_symbol_integrity.test_problem_board_is_gone`
+has proved the element absent ever since — but `CONTEXT.md` (the glossary
+AGENTS.md tells every agent to use for official names), `UI_UX_SPECIFICATION.md`
+§3/§4.4c/§7.3/§7.13/§11, `ARCHITECTURE.md`, `PRD.md` US-1.4 + US-3.3 and
+`USER_PERSONAS.md` all
+went on describing it in the present tense, and the glossary had **no entry for
+the Context Dock or the Evidence lens at all** — so the one doc a next session
+reads first named a dead surface and omitted the live one. Rewritten: Problem
+Board and Structure Rail marked **RETIRED**, Feedback View marked **DORMANT**,
+Context Dock + Evidence lens added as the official names. `tests/test_doc_surface_hygiene.py`
+now fails if any of the five docs mentions a retired surface without a
+retirement marker nearby (**17 offenders → 0**).
+
+**Also swept:** the Esc cascade, which was drifting in two directions at once —
+`SHORTCUTS` told the writer "spotlight → partner drawer → craft shelf → dock"
+while the code does loop → spotlight → full-screen tool → dock → drawer → shelf,
+and the spec listed a Feedback-view rung nothing can open any more. Both now
+match `app.js`. Three stale `app.js` comments named the Problem Board and the
+retired `r` rail key; the pass-1 "900/600 breakpoints" item is **void** — no doc
+ever made a numeric breakpoint claim, so there was nothing to fix.
+
 ### Production-readiness audit pass 2: the gate learned to see, and found four more
 
 **What was wrong.** Pass 1's gate measured contrast from `getComputedStyle().color`

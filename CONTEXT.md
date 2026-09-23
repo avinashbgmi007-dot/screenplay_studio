@@ -35,7 +35,8 @@ conversation should use these terms exactly. Last synced 2026-09-06.
 - **Dismissed Finding** — a Finding the writer triaged away (`dismissed_findings.json`).
   Dismissable and restorable; never deleted from the report.
 - **Fix Queue** — the per-Project worklist of Findings sorted by severity/act, joined with
-  dismissal + addressed state. Powers the Fix Queue panel, Revision view, and Problem Board.
+  dismissal + addressed state. Powers the Fix Queue pane, the dock's Evidence lens, and
+  the Revision view.
 - **Rule** — one attributed craft principle from the **Knowledge Base** (263 rules across
   26 files: Aristotle, McKee, Field, Snyder, Swain, Vogler, Chekhov + genre conventions).
   Findings may cite a rule by id.
@@ -90,11 +91,24 @@ conversation should use these terms exactly. Last synced 2026-09-06.
 - **Room** — one of two lenses over the script: **Co-write** (warm/violet, Sameer) or
   **Feedback** (cool/cyan, Dr. Sushruta). Swapped by `body[data-room]`.
 - **Room Drawer** — the summoned right-side partner panel.
-- **Feedback View** — the full-screen 3-panel consultant surface (`state.view="fv"`): chat ·
-  script column with severity dots · Board/Sameer tabs. What the Feedback room opens for
-  Projects.
-- **Problem Board** — the docked right-side severity-filtered findings panel on the Desk.
-- **Structure Rail** — the collapsible left rail: scenes · characters · Stash · notes.
+- **Context Dock** (`#context-dock`) — the desk's docked right rail, opened from the
+  right-edge affordance or one of its lens tabs: **Evidence** · Sameer · Sushruta ·
+  Stash & Notes. The only docked surface for findings and partners; the script keeps the
+  room.
+- **Evidence lens** (`#dock-lens-evidence`) — the ONE home for a Finding row: arrival
+  strip, script mass strip, per-scene deep cards (Locate · Rewrite · Discuss · Dismiss),
+  severity filter row and the dawn meter. What the Feedback room, `f` and the Consultant
+  gutter tab all open.
+- **Feedback View** (`#feedback-view`) — **DORMANT** since the GO 2 fold: the old
+  full-screen 3-panel consultant surface (`state.view="fv"`). Still in the DOM, unreachable;
+  every route into it now lands on the **Evidence lens**.
+- **Problem Board** — **RETIRED**: was the docked right-side severity-filtered findings
+  panel (`#problem-board`, edge tab `#pb-edge-tab`). Markup, CSS, palette command and
+  scroll-sync are gone; the **Evidence lens** holds the rows, and the manuscript's margin
+  pins keep only Locate.
+- **Structure Rail** — **RETIRED** (`#struct-rail`, `r` shortcut, edge tab gone): was the
+  collapsible left rail. Scene outline → the scene index; Stash + notes → the dock's
+  Stash & Notes lens; character dials → the Craft Shelf and Evidence lens.
 - **Craft Shelf** — the collapsed-by-default analysis panels header (Fix queue · Pacing ·
   Characters · Writer's Mirror).
 - **Idea Canvas (Spark Wall)** — the blank starfield page an Idea is written on.

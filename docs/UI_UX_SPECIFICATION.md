@@ -164,8 +164,8 @@ Base: 15px, line-height 1.55, **`--font-ui` (DM Sans) is the body default** (not
 │  brand · connection dot   │  ┌─ project bar: ⌂ | title | branches ─────┐ │
 │  + Lay a new page         │  │  room toggle (Co-write|Feedback) · chip · ⌘K │
 │  ───────────────────      │  ├─ WORKSPACE (flex, 3 zones) ─────────────┤ │
-│  Ideas (flyout)           │  │  [struct rail] [ DESK: script pane ]     │ │
-│  On the shelf (flyout)    │  │         [Problem Board] [gutter tabs]    │ │
+│  Ideas (flyout)           │  │  [ DESK: script pane ]   [gutter tabs]   │ │
+│  On the shelf (flyout)    │  │  [Context Dock — Evidence / notes]       │ │
 │  Your library (flyout)    │  │  [room drawer — summoned from gutter]    │ │
 │  ───────────────────      │  └──────────────────────────────────────────┘ │
 │  ☀ Dawn · ⚙ Settings      │  STATUS STRIP: project · model · conn ·      │
@@ -184,8 +184,11 @@ Base: 15px, line-height 1.55, **`--font-ui` (DM Sans) is the body default** (not
 - **Structural rail** — **RETIRED** (`#struct-rail`; its markup, `r` shortcut, edge
   tab and CSS are gone). Its jobs: scene outline → the scene index; Stash + notes →
   the dock's Stash & Notes lens; character dials → the craft shelf and Evidence lens.
-- **Problem Board** (`#problem-board`): a docked right-side findings panel with its own
-  edge tab (`#pb-edge-tab`) — see §4.4b.
+- **Problem Board** — **RETIRED** (`#problem-board` and its `#pb-edge-tab`: markup, CSS,
+  palette command and scroll-sync are gone, not dormant). Its jobs: the finding list,
+  severity filter and Locate/Rewrite/Discuss/Dismiss controls → the Context Dock's
+  **Evidence lens** (§4.4b); the per-line reminder → the manuscript margin pins. One home
+  per finding row, per §4.4b's "zero new surfaces".
 - **Status strip** (`#status-strip`): thin footer with model/connection/metrics/sprint/dawn.
 
 ### 3.1 Responsive behavior
@@ -328,15 +331,18 @@ unreachable — not deleted** (its removal is a separate later commit). The draw
   (`initFvDividers`), scroll sync between script column and findings (`initFvScrollSync`),
   and an honest `fin` end-marker at the bottom of the script column.
 
-### 4.4c Problem Board (`#problem-board`)
+### 4.4c Problem Board (`#problem-board`) — RETIRED
 
-A docked right-side findings panel in the workspace (not a full-screen view):
+**Status: removed, not dormant.** The docked right-side findings panel, its edge tab
+(`#pb-edge-tab`), its palette command and its IntersectionObserver scroll-sync are gone
+from the DOM, CSS and command palette. A finding row has ONE home now:
 
-- Severity filter (all / high / medium / low), auto-expand/collapse per scene, and an
-  IntersectionObserver that scroll-syncs highlight with the manuscript.
-- Edge tab (`#pb-edge-tab`) reopens it; the command palette has "Toggle the Problem Board".
-  ⚠ Palette key-binding for it shows `b` — colliding with Beat Board; the actual keyboard
-  `b` opens the Beat Board.
+- Severity filter, scene grouping, and the Locate / Rewrite / Discuss / Dismiss controls
+  → the Context Dock's **Evidence lens** (§4.4b) — mass strip, deep cards, filter row.
+- "What sits on this line while I'm reading it" → the manuscript margin pins (`R6`),
+  which keep Locate only and stay read-only by contract.
+- The old `b` palette collision note is moot: `b` opens the Beat Board, and nothing else
+  claims it.
 
 ### 4.5 Full-screen tools
 
@@ -500,9 +506,11 @@ note editor pinned to that line). Selection cleared / scroll / outside-click hid
 composer placeholder becomes "Reply to the highlighted passage…" while text is selected.
 
 ### 7.3 Esc cascade ("the page wins")
-Top-most visible modal closes first; then river-read → Spotlight → Revision view →
-**Feedback view → Compare → Beat Board** → room drawer → craft shelf →
-close flyouts (flyout Esc is handled separately).
+A craft-rule popover closes first, then the top-most visible modal, then river-read
+(flow). Below those, in order: the keyboard fix loop → Spotlight → Revision view →
+Premise card → Compare → Beat Board → **Context Dock** → room drawer → craft shelf.
+Sidebar flyouts handle their own Esc separately. (The retired Feedback View and Problem
+Board are no longer rungs — nothing can open them, so nothing closes them.)
 
 ### 7.4 Spotlight mode (key `z`)
 TOTAL chrome removal — project bar, toolbars, rail, drawer, gutter, craft shelf, script-level
@@ -543,8 +551,9 @@ Fork (create), switch, delete branches; per-message origin badge with stable per
 "main" is always neutral brass. Composer history recall (↑/↓).
 
 ### 7.13 Session & preference persistence
-- Session (last project/idea/view/scene — incl. `view: "fv"` Feedback view) → `localStorage
-  screenplay_studio.session.v1`; a reload restores where the writer left off.
+- Session (last project/idea/view/scene — a stored `view: "fv"` restores as the workspace,
+  see §4.4b's fold) → `localStorage screenplay_studio.session.v1`; a reload restores where
+  the writer left off.
 - Prefs (dawn, reader, focus, flow, craft_open, hintDismissed, stt lang, pane width,
   sidebar_collapsed) → `localStorage screenplay_studio.prefs.v1`
   (+ `pane-width-v2`, `studio-stt-lang`).
@@ -783,8 +792,10 @@ the session "saw" (used for stale-session honesty), in addition to the shape in 
 ## 11. Acceptance checklist (what "built & integrated" means)
 
 - [ ] All screens in §4 exist and render: welcome/dashboard, project desk, manuscript,
-      co-write room, feedback room, **Feedback View (§4.4b), Problem Board (§4.4c),
-      NOCTA chrome (§4.8)**, beat board, compare, revision view, idea room, all 5 modals.
+      co-write room, feedback room, **Context Dock Evidence lens (§4.4b)**, beat board,
+      compare, revision view, idea room, all 5 modals, NOCTA chrome (§4.8). Feedback View
+      (§4.4b) and Problem Board (§4.4c) are RETIRED surfaces — their absence is the
+      expected state.
 - [ ] Every interaction in §7 works: rooms, select-to-ask float, Esc cascade, spotlight,
       focus, river read, reader mode, explore chips, dictation, translation, dawn meter,
       branches, session restore.

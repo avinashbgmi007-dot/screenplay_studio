@@ -129,11 +129,13 @@ screenplay-studio_1/
 - **Two rooms, one script.** The workspace is a shared script pane (always visible) plus a
   right-hand **room drawer** summoned from the edge gutter tabs: **Co-write** (the writer's
   desk — Sameer) and **Feedback** (the consultant's desk — Dr. Sushruta's Report + Fix Queue
-  tabs). For projects, the Feedback room actually opens the **Feedback View**
-  (`#feedback-view`, `state.view="fv"`) — a full-screen 3-panel surface (chat · script
-  column with severity dots · Board/Sameer tabs) with draggable dividers and scroll sync;
-  the drawer panel remains for idea-less contexts. A docked **Problem Board**
-  (`#problem-board`) offers a severity-filtered findings panel beside the manuscript.
+  tabs). For projects, the Feedback room toggle, the `f` shortcut and the Consultant gutter
+  tab all open the **Context Dock** on its **Evidence lens** instead (arrival strip ·
+  script mass strip · per-scene deep cards · severity filter · dawn meter); the drawer
+  panel remains for idea-less contexts. The old full-screen **Feedback View**
+  (`#feedback-view`, `state.view="fv"`) and the docked **Problem Board**
+  (`#problem-board`) are the two surfaces that route there — the first is still in the DOM
+  but unreachable, the second is gone (markup, CSS, palette command and scroll-sync).
   `body[data-room]` drives the room theming. Beat Board, Compare, and Revision are
   full-screen tools opened from the script-pane toolbar (keys `b`/`d`/`v`).
 - **Three-zone shell.** The left structural rail (`#struct-rail`) is **retired** — it
@@ -218,7 +220,7 @@ screenplay-studio_1/
 ### HTML (`screenplay_studio/webapp/index.html`)
 - ~770 lines. SPA shell: collapsible sidebar (brand · new-page · Ideas/shelf/library
   flyouts · Dawn/Settings footer), welcome scene + dashboard, project bar, workspace
-  (structural rail · desk · Problem Board · gutter · room drawer), status strip, Beat
+  (desk · context dock · gutter · room drawer), status strip, Beat
   Board / Compare / Revision / Feedback-View full-screen views (the Feedback View is
   dormant — the fold routes its entry points to the workspace dock, §app.js GO 1/2),
   premise pane + idea canvas, NOCTA chrome (Sameer panel mock, level badge, cursor

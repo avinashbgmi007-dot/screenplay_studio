@@ -42,7 +42,8 @@ server is reachable.
   shelf flagged "⚠ unreadable", so I can delete or retry it. *AC: flag-don't-drop; open
   shows the error; delete still works.*
 - **US-1.4** As a returning writer, the app restores my last session (project, idea, view,
-  scene) on reload. *AC: session restore covers all views incl. Feedback View.*
+  scene) on reload. *AC: session restore covers every live view; a stored Feedback View
+  (`view: "fv"`, now retired to the dock's Evidence lens) restores as the workspace.*
 - **US-1.5** As a writer, I pick the report language (English/Tenglish/Hindi/Telugu/Tamil)
   before running analysis. *AC: selector drives `report_language`; report renders in that
   register; quotes stay verbatim (verification unaffected).*
@@ -72,8 +73,8 @@ server is reachable.
   which candidates to apply. *AC: rewrite modal shows old→new candidates with checkboxes;
   Apply runs through edits/apply (undoable); skipped lines listed with reasons.*
 - **US-3.3** As a writer, I see whether a finding is addressed or still present as I edit.
-  *AC: findings_status recomputes on every apply/undo/redo; Problem Board + Revision view
-  reflect it live.*
+  *AC: findings_status recomputes on every apply/undo/redo; the dock's Evidence lens +
+  Revision view reflect it live.*
 - **US-3.4** As a writer, I keep a working copy distinct from my source. *AC: edits mutate
   working.json; export (fountain/fdx/txt) writes from the working copy; source untouched.*
 

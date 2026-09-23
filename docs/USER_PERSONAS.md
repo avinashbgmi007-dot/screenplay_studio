@@ -50,9 +50,8 @@ product spends most of its time in.
 - Timebox work sessions (sprint timer) and keep momentum on the desk.
 
 **Behaviors:**
-- Lives in Revision view + Problem Board; uses inline line editing (double-click or the
-  keyboard's `Enter`) with
-  change stars and undo/redo.
+- Lives in Revision view + the dock's Evidence lens; uses inline line editing (double-click
+  or the keyboard's `Enter`) with change stars and undo/redo.
 - Accepts rewrite candidates selectively; never bulk-applies.
 - Reorders scenes on the Beat Board, exports a reordered draft, compares against previous.
 - Returns after days away and resumes exactly where they left off (session restore).
