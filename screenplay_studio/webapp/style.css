@@ -4296,10 +4296,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .fv-divider:hover { background: var(--accent); }
 body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-select: none !important; }
 
-/* maximize: the script takes the whole body, both side panels tuck away */
-#feedback-view.fv-maximized .fv-panel { display: none; }
-#feedback-view.fv-maximized .fv-divider { display: none; }
-#feedback-view.fv-maximized .fv-script-inner { max-width: 900px; }
 .fv-panel-head {
   display: flex;
   align-items: center;
@@ -4345,6 +4341,9 @@ body.fv-resizing, body.fv-resizing * { cursor: col-resize !important; user-selec
   border-top: 1px solid var(--line-soft);
   display: flex; gap: var(--sp-3);
 }
+/* the consult's pin takes its own line above the input (`.quote-card` is
+   `flex: 1 0 100%; order: -1`), so this row has to be allowed to wrap. */
+#fv-consult-composer { flex-wrap: wrap; }
 .fv-composer .inp {
   flex: 1;
   /* a11y (WCAG 1.4.3, caught by axe): .inp had NO background rule, so it

@@ -96,6 +96,25 @@ def test_arc_after_one_analysis(base, projects_dir, headers, checks, name):
         browser.close()
 
 
+COLORS_JS = """() => {
+  const g = (sel) => { const n = document.querySelector(sel);
+    return n ? getComputedStyle(n).color : null; };
+  return { trend: g('.dock-pass-trend'), spark: g('.dock-pass-spark') };
+}"""
+
+
+def to_dawn(page):
+    """The rail's Dawn button is hidden while the rail is collapsed; the status
+    strip carries the same control, so click whichever the writer can see."""
+    for sel in ("#dawn-btn", "#status-dawn"):
+        btn = page.locator(sel + " >> visible=true")
+        if btn.count():
+            btn.first.click(timeout=6000)
+            page.wait_for_timeout(900)
+            return True
+    return False
+
+
 def test_arc_after_two_analyses(base, projects_dir, headers, checks, name):
     passes = get(base, f"/api/projects/{name}/passes", headers)["passes"]
     checks.ok("two analyses produced two points on the arc",
@@ -133,6 +152,18 @@ def test_arc_after_two_analyses(base, projects_dir, headers, checks, name):
                       arc["rows"] == 0, f"rows={arc['rows']}")
             checks.ok("one line, not a paragraph",
                       arc["lineHeightish"] <= 60, f"height={arc['lineHeightish']}")
+            # spec §11: the new sections render in dawn too, from tokens only.
+            # A hard-coded colour would not move when the theme does.
+            night = page.evaluate(COLORS_JS)
+            checks.ok("the desk can switch to dawn", to_dawn(page))
+            dawn = page.evaluate(COLORS_JS)
+            arc_dawn = page.evaluate(ARC_JS)
+            checks.ok("the arc still reads Pass 2 at dawn",
+                      bool(arc_dawn) and "Pass 2" in arc_dawn["text"],
+                      f"arc={arc_dawn!r}")
+            checks.ok("the arc is token-driven: its colors move with the theme",
+                      dawn["trend"] != night["trend"] and dawn["spark"] != night["spark"],
+                      f"night={night} dawn={dawn}")
         assert_no_js_errors(checks, errors)
         browser.close()
 

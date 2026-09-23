@@ -7,6 +7,8 @@ The dock ADOPTS the live conversation (portal re-parenting). Verifies:
   * Sushruta lens: the consultant column adopts; the assistant reply label
     reads Dr. Sushruta (persona routing follows the lens)
   * lens switching returns the conversation to its home panel cleanly
+  * composer STATE survives switching: an unsent draft and the pinned quote are
+    still there after a lens round trip (spec §11)
   * close (Esc + ✕) returns the conversation; reopen re-adopts
   * never two chat columns: while a lens is adopted, the room drawer panel
     holds no conversation DOM
@@ -92,6 +94,18 @@ def run(base):
               page.locator('.dock-lens[data-lens="sameer"] .msg.user').count() >= 1 and
               page.locator('.dock-lens[data-lens="sameer"] .msg.assistant').count() >= 1)
 
+        # --- composer STATE survives switching (spec §11) ----------------------
+        # Unsent draft is the writer's own, in no store: re-parenting the panel
+        # into another lens must not eat it.
+        slot.locator("#input").fill("a line I have not sent yet")
+        page.locator("#dock-tab-evidence").click()
+        page.wait_for_timeout(300)
+        page.locator("#dock-tab-sameer").click()
+        page.wait_for_timeout(400)
+        check("unsent draft survives a lens round trip",
+              (page.locator('.dock-lens[data-lens="sameer"] #input')
+               .input_value() or "") == "a line I have not sent yet")
+
         # --- lens switch: conversation returns home, evidence renders ---------
         page.locator("#dock-tab-evidence").click()
         page.wait_for_timeout(350)
@@ -125,6 +139,21 @@ def run(base):
             }""", timeout=60000)
         check("doctor conversation works inside the lens",
               page.locator('.dock-lens[data-lens="sushruta"] .fv-msg.ai').count() >= 1)
+
+        # --- the pinned quote survives switching (spec §11) --------------------
+        # The quote is WHY the consult was opened; leaving the lens for the
+        # ledger and back must return it, not a blank composer.
+        page.evaluate("""() => setPendingQuote({scene_number: 1,
+                       text: 'INT. PROBE - DAY: the pinned line'})""")
+        page.wait_for_timeout(250)
+        page.locator("#dock-tab-evidence").click()
+        page.wait_for_timeout(300)
+        page.locator("#dock-tab-sushruta").click()
+        page.wait_for_timeout(400)
+        pinned = page.locator('#dock-lens-sushruta #fv-consult-quote-card .quote-card-text')
+        check("the pinned quote survives a lens round trip",
+              pinned.count() == 1 and "pinned line" in (pinned.inner_text() or ""),
+              pinned.count())
 
         # --- close + reopen restores context ------------------------------------
         page.keyboard.press("Escape")

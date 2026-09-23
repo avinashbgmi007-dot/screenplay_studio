@@ -51,14 +51,21 @@ MEASURE = """() => {
   const r = (sel) => { const n = document.querySelector(sel);
                        return n ? n.getBoundingClientRect().width : 0; };
   const dock = document.querySelector('#context-dock');
-  const q = document.querySelector('#quote-card .quote-card-text');
+  // The pin must be on the surface the writer is LOOKING AT. A rect-width check
+  // anywhere in the document passes for the card parked in the closed room
+  // drawer, which is not a feature the writer can see.
+  const lens = document.querySelector('#context-dock .dock-lens:not([hidden])');
+  const card = lens ? [...lens.querySelectorAll('.quote-card')]
+                       .find((e) => !e.hidden && e.getBoundingClientRect().width > 0)
+                    : null;
+  const q = card ? card.querySelector('.quote-card-text') : null;
   return {
     vw: window.innerWidth,
     ms: r('#manuscript-container'),
     dock: r('#context-dock'),
     dockOpen: !!(dock && dock.classList.contains('open')),
     quote: q ? q.textContent.trim() : null,
-    quoteVisible: !!(q && q.getBoundingClientRect().width > 0),
+    quoteVisible: !!q,
   };
 }"""
 

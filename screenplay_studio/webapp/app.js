@@ -2937,18 +2937,24 @@ function clearPendingQuote() {
 }
 
 function renderQuoteCard() {
-  const card = $("#quote-card");
-  if (!card) return;
-  if (!pendingQuote) { card.hidden = true; card.innerHTML = ""; return; }
-  card.hidden = false;
-  card.innerHTML = "";
-  const meta = el("span", "quote-card-meta", pendingQuote.scene_number ? `Scene ${pendingQuote.scene_number}` : "The script");
-  const txt = el("span", "quote-card-text", truncate(pendingQuote.text, 220));
-  const x = el("button", "quote-card-x", "✕");
-  x.type = "button";
-  x.title = "Remove the quote";
-  x.addEventListener("click", clearPendingQuote);
-  card.append(meta, txt, x);
+  // The pin belongs to whichever conversation is on screen, and only one ever
+  // is (the dock shows one lens, the room one panel) — so the same
+  // `pendingQuote` paints on both hosts instead of the writer's finding
+  // vanishing into Sameer's composer while they talk to the doctor.
+  for (const sel of ["#quote-card", "#fv-consult-quote-card"]) {
+    const card = $(sel);
+    if (!card) continue;
+    card.innerHTML = "";
+    if (!pendingQuote) { card.hidden = true; continue; }
+    card.hidden = false;
+    const meta = el("span", "quote-card-meta", pendingQuote.scene_number ? `Scene ${pendingQuote.scene_number}` : "The script");
+    const txt = el("span", "quote-card-text", truncate(pendingQuote.text, 220));
+    const x = el("button", "quote-card-x", "✕");
+    x.type = "button";
+    x.title = "Remove the quote";
+    x.addEventListener("click", clearPendingQuote);
+    card.append(meta, txt, x);
+  }
 }
 
 function renderQuoteBlock(quote) {

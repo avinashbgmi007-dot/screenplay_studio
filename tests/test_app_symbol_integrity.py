@@ -76,6 +76,12 @@ def test_feedback_view_clone_is_gone():
     with open(_INDEX_HTML, encoding="utf-8") as f:
         # the element id, not the historical phrase in comments
         assert 'id="feedback-view"' not in f.read()
+    # spec §11 keeps the retired surface out of the sheet, too: with no host
+    # element, an id-scoped rule can never match — it is dead weight that reads
+    # as if the surface were still live.
+    with open(os.path.join(os.path.dirname(_APP_JS), "style.css"),
+              encoding="utf-8") as f:
+        assert "#feedback-view" not in f.read()
 
 
 def test_problem_board_is_gone():
