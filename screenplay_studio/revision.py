@@ -302,6 +302,48 @@ def edits_redo_path(m) -> str:
     return os.path.join(m.project_dir, "edits.redo.json")
 
 
+# ---------------------------------------------------------------------------
+# The edit-cycle lock topology (P1-3, audit 2026-09)
+# ---------------------------------------------------------------------------
+# working.json, edits.json and edits.redo.json are ONE logical unit: every
+# edit-cycle member (apply via save_working, undo, redo, reset, and the
+# lazy create/refresh in ensure_working) reads and rewrites all of them, and
+# a reader must never observe a state where the log claims an edit the text
+# does not carry. So `lock_for(working.json)` is the SINGLE cycle lock: one
+# cycle, one explicit acquisition, covering the whole read-modify-write of
+# the trio — never only the write. (Before this, working writes were unlocked
+# or taken under the edits/redo locks in three different shapes, and an
+# audit measured 200/200 working/edits divergence across two OS processes.)
+#
+# The one-lock rule from jsonio.lock_for still holds: `lock_for(working)` is
+# the only lock any cycle TAKES. jsonio's primitives inside a cycle
+# (atomic_write_json / load_json_store on edits.json or edits.redo.json, and
+# _remove_with_retry in clear_redo) briefly acquire the target store's own
+# lock as a LEAF — nothing acquires a further lock while holding a leaf, so
+# the wait-for graph is a fixed depth-2 fan-out working -> {working, edits,
+# redo} with no path back into working: no cycle, no deadlock. Reentrancy on
+# working itself (doc.save / ensure_working inside the cycle) is the RLock
+# case jsonio documents.
+#
+# This makes the trio CONCURRENCY-safe, not transactional: the three stores
+# still land as separate atomic renames, so a crash between the text write
+# and the log write still diverges them (each file individually never tears).
+# Known, accepted follow-up.
+# ---------------------------------------------------------------------------
+
+
+def _remove_with_retry(path: str) -> None:
+    """Delete a store the way the store layer writes one: under its own lock,
+    retrying the transient Windows sharing violation via jsonio.retry_permission,
+    and treating 'already gone' as success (the exists->remove TOCTOU)."""
+    from .jsonio import lock_for, retry_permission
+    try:
+        with lock_for(path):          # leaf lock: nothing else is taken inside
+            retry_permission(lambda: os.remove(path))
+    except FileNotFoundError:
+        pass  # already gone == cleared
+
+
 def ensure_working(m) -> str:
     """Create the working copy from the parsed document on first use.
 
@@ -309,30 +351,37 @@ def ensure_working(m) -> str:
     (a re-parse, e.g. after a parser fix or a new draft upload) and the writer
     has NOT applied any edits, the working copy is rebuilt from the fresh
     parse so the viewer/chat never show outdated classification. If the writer
-    HAS edits, their work is never overwritten silently."""
-    path = working_path(m)
-    if not os.path.exists(path):
-        if not os.path.exists(m.parsed_path):
-            raise FileNotFoundError(
-                f"Project has no parsed script ('{m.parsed_path}') — run parse first."
-            )
-        with open(m.parsed_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        from .jsonio import atomic_write_json
-        atomic_write_json(path, data)
-        return path
+    HAS edits, their work is never overwritten silently.
 
-    # re-parse refreshes the display copy when there's nothing to preserve
-    if not has_edits(m) and os.path.exists(m.parsed_path):
-        try:
-            if os.path.getmtime(m.parsed_path) > os.path.getmtime(path):
-                with open(m.parsed_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                from .jsonio import atomic_write_json
-                atomic_write_json(path, data)
-        except (OSError, ValueError):
-            pass  # if the timestamps/parse are unreadable, keep the existing copy
-    return path
+    The whole check-and-write runs under the cycle lock: this function WRITES
+    working.json (create / refresh), so an unlocked read of `has_edits` + the
+    mtimes could rebuild the copy from the stale parse in the gap of a cycle
+    that has just applied an edit."""
+    from .jsonio import lock_for
+    path = working_path(m)
+    with lock_for(path):
+        if not os.path.exists(path):
+            if not os.path.exists(m.parsed_path):
+                raise FileNotFoundError(
+                    f"Project has no parsed script ('{m.parsed_path}') — run parse first."
+                )
+            with open(m.parsed_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            from .jsonio import atomic_write_json
+            atomic_write_json(path, data)
+            return path
+
+        # re-parse refreshes the display copy when there's nothing to preserve
+        if not has_edits(m) and os.path.exists(m.parsed_path):
+            try:
+                if os.path.getmtime(m.parsed_path) > os.path.getmtime(path):
+                    with open(m.parsed_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    from .jsonio import atomic_write_json
+                    atomic_write_json(path, data)
+            except (OSError, ValueError):
+                pass  # if the timestamps/parse are unreadable, keep the existing copy
+        return path
 
 
 def load_working(m) -> ScriptDocument:
@@ -340,21 +389,31 @@ def load_working(m) -> ScriptDocument:
 
 
 def save_working(m, doc: ScriptDocument, record: dict | None = None) -> None:
-    doc.save(working_path(m))
-    if record:
-        from .jsonio import atomic_write_json, lock_for
+    from .jsonio import atomic_write_json, lock_for
+    if not record:
+        # a plain full-copy overwrite: atomic_write_json already serializes it
+        # under working.json's own lock (via doc.save), and there is no
+        # read-modify-write of any store to protect.
+        doc.save(working_path(m))
+        return
+    wp = working_path(m)
+    # P1-3: the whole cycle — the working copy AND the log AND the redo
+    # invalidation — runs under working.json's lock as the ONE explicit
+    # acquisition (see the topology note above ensure_working). The old shape
+    # wrote working.json completely unlocked and only then took the EDITS-log
+    # lock for the append, so a racing undo/redo cycle could read the working
+    # copy before this write and overwrite it after, while this call's record
+    # still landed in the log: working.json and edits.json diverged (measured
+    # 200/200 across two OS processes). That is a lost update on a
+    # read-modify-write cycle, not a torn file — the rename is atomic.
+    with lock_for(wp):
+        doc.save(wp)
         log_path = edits_log_path(m)
-        # Locked across the read+append+write — the edit log is an accumulate
-        # store, so an unlocked cycle loses entries (measured: 150 kept of 508
-        # applied). Deliberately NOT wrapped around doc.save() above: that
-        # writes working.json, a SECOND store, and holding two store locks at
-        # once is the one thing jsonio.lock_for must never be asked to do.
-        with lock_for(log_path):
-            log = edits_log(m)
-            if "id" not in record:
-                record["id"] = uuid.uuid4().hex[:12]
-            log.append(record)
-            atomic_write_json(log_path, log)
+        log = edits_log(m)
+        if "id" not in record:
+            record["id"] = uuid.uuid4().hex[:12]
+        log.append(record)
+        atomic_write_json(log_path, log)
         # a fresh edit invalidates any redo history
         clear_redo(m)
 
@@ -382,9 +441,13 @@ def has_edits(m) -> bool:
 
 
 def reset_working(m) -> None:
-    for path in (working_path(m), edits_log_path(m), edits_redo_path(m)):
-        if os.path.exists(path):
-            os.remove(path)
+    # A cycle member: the trio goes together, under the cycle lock (leaf
+    # removals retry the transient Windows sharing violation instead of
+    # raising, and 'already gone' is success).
+    from .jsonio import lock_for
+    with lock_for(working_path(m)):
+        for path in (working_path(m), edits_log_path(m), edits_redo_path(m)):
+            _remove_with_retry(path)
 
 
 def _load_json_list(path: str) -> list:
@@ -416,8 +479,17 @@ def redo_stack(m) -> list[dict]:
 
 
 def clear_redo(m) -> None:
-    if os.path.exists(edits_redo_path(m)):
-        os.remove(edits_redo_path(m))
+    # P1-4: this used to be a bare `if exists: os.remove` — it deleted the
+    # stack straight out from under a process holding lock_for(redo) mid-move
+    # (measured: it returned in 0.11 ms through a 3 s hold; undo ∥ clear_redo
+    # left an undone record in NEITHER log 49/200 runs — permanently
+    # unrecoverable — and racing clears raised FileNotFoundError 20% of the
+    # time from the exists->remove TOCTOU). Take the redo store's own lock and
+    # retry the transient Windows sharing violation. Safe inside the edit
+    # cycle (save_working holds the working lock): redo is acquired as a LEAF
+    # and never taken before working anywhere, so the fixed order working ->
+    # redo cannot deadlock.
+    _remove_with_retry(edits_redo_path(m))
 
 
 def _replace_in_scene(doc: ScriptDocument, scene_number: int, from_text: str, to_text: str):
@@ -436,19 +508,21 @@ def undo_last_edit(m) -> dict:
     """Reverse the most recent applied edit group (new -> old). The record
     moves from the undo log to the redo stack. Returns a summary dict.
 
-    H5 (re-audit 2026-09-24): the log is an accumulate store like every other
-    one, so its read-modify-write happens UNDER `lock_for(edits.json)`. It used
-    to hold no lock at all, which erased the record of an edit applied while the
-    undo was in flight — the text stayed in working.json, the record did not, and
-    the writer could never undo that edit again. Measured by the probe with a
-    slowed log read: final `ids=[]`. The redo stack is a SECOND store, so its
-    lock is taken only after this one is released (`jsonio.lock_for` must never
-    be asked to hold two store locks at once).
+    H5 (re-audit 2026-09-24) put this cycle under `lock_for(edits.json)` —
+    right for the log, wrong store to anchor: the cycle ALSO reads and rewrites
+    working.json (a lost update there diverged working.json from edits.json,
+    200/200 across two OS processes) and, in a second section, the redo stack.
+    P1-3 collapses the whole trio into ONE section under working.json's lock —
+    still exactly ONE explicit lock_for per path through the module, with the
+    log/redo writes taken as leaf locks by jsonio inside it. Not transactional
+    across a crash — the three atomic renames can still be split by a power
+    cut; that is the documented, accepted gap.
     """
     from .jsonio import lock_for
+    wp = working_path(m)
     log_path = edits_log_path(m)
     redo_path = edits_redo_path(m)
-    with lock_for(log_path):
+    with lock_for(wp):
         log = edits_log(m)
         if not log:
             raise ValueError("Nothing to undo.")
@@ -467,13 +541,12 @@ def undo_last_edit(m) -> dict:
                 restored.append({"old": new_text, "new": old_text})
             else:
                 failed.append({"old": new_text, "new": old_text})
-        doc.save(working_path(m))
-        # move the record: undo log -> redo stack
+        doc.save(wp)
+        # move the record: undo log -> redo stack, inside the same section —
+        # the redo write re-reads under the cycle lock, so it appends to the
+        # stack as it is NOW, not to a copy this call happened to see earlier
         log.pop()
         _save_json_list(log_path, log)
-    with lock_for(redo_path):
-        # re-read under the lock: the write-back must append to the stack as it
-        # is NOW, not to the copy this call happened to see earlier
         redo = redo_stack(m)
         redo.append(record)
         _save_json_list(redo_path, redo)
@@ -490,15 +563,19 @@ def redo_last_edit(m) -> dict:
     """Re-apply the most recently undone edit group (old -> new). The record
     moves from the redo stack back onto the undo log.
 
-    H5, the mirror of undo_last_edit: the redo stack's own read-modify-write runs
-    under its lock, and the LOG append re-reads under the log's lock — otherwise
-    a locked apply landing mid-flight lost its record (`ids=['e1-race']`: the
-    redo's stale list overwrote the apply's append).
+    H5, the mirror of undo_last_edit, and P1-3 folds it into the same shape:
+    the whole trio — redo stack, working copy, undo log — mutates inside ONE
+    section under working.json's lock. Before that the working write sat in
+    the REDO lock's section and the log append in a later, separate EDITS
+    section, so a locked apply landing between them could still be clobbered
+    in working.json while its record survived in the log (`ids=['e1-race']`
+    with the text gone).
     """
     from .jsonio import lock_for
+    wp = working_path(m)
     log_path = edits_log_path(m)
     redo_path = edits_redo_path(m)
-    with lock_for(redo_path):
+    with lock_for(wp):
         redo = redo_stack(m)
         if not redo:
             raise ValueError("Nothing to redo.")
@@ -514,11 +591,11 @@ def redo_last_edit(m) -> dict:
                 applied.append({"old": old_text, "new": new_text})
             else:
                 failed.append({"old": old_text, "new": new_text})
-        doc.save(working_path(m))
+        doc.save(wp)
         redo.pop()
         _save_json_list(redo_path, redo)
-    with lock_for(log_path):
-        # fresh read under the lock — never append to the list this call read
+        # fresh read under the cycle lock — never append to the list this
+        # call read before the working copy was rewritten
         log = edits_log(m)
         log.append(record)
         _save_json_list(log_path, log)
