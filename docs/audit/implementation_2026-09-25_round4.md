@@ -24,26 +24,31 @@ restored byte-identical** (`.workbuddy-ai/scratch/mutation_check_r4.py`).
 
 ### 1.1 Gates, measured at this revision
 
+*Both tables below are the ladder (§1–§8) **plus** the BE-3 follow-on (§11), measured
+together at one revision.*
+
 | Gate | Command | Result |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/ -q --cov` | **1779 passed, 3 skipped, 0 failed — 87%** (9730 statements, 1287 missed), exit 0 |
-| Browser E2E | `python tests/run_browser_suites.py` | **51 suites: 50 passed, 0 failed, 1 skipped, 0 known-broken — 1257 checks**, exit 0 |
+| Unit + integration | `python -m pytest tests/ -q --cov` | **1786 passed, 3 skipped, 0 failed — 87%** (9751 statements, 1290 missed), exit 0 |
+| Browser E2E | `python tests/run_browser_suites.py` | **52 suites: 51 passed, 0 failed, 1 skipped, 0 known-broken — 1264 checks**, exit 0 |
 | Lint | `ruff check .` | **All checks passed** |
 | JS unit | `node --test tests/js/core.test.js` | **16 / 16** |
-| Mutation harness | `.workbuddy-ai/scratch/mutation_check_r4.py` | **7 / 7 detected**; tree restored byte-identical |
+| Mutation harness | `.workbuddy-ai/scratch/mutation_check_r4.py` | **11 / 11 detected**; tree restored byte-identical |
 
 Two rows carry the weight:
 
-- **The 1,235 pre-existing browser checks are unchanged and all still pass.** That
-  is the claim that needed proving: the edit cycle went from two critical sections to
-  one, the SPA gained announcement plumbing, and a security tripwire's classifier
-  changed — and nothing else moved. The 22 new checks are `live_regions` (14) and
-  `two_contexts` (8).
+- **The 1,235 browser checks that existed before this work are unchanged and all
+  still pass.** That is the claim that needed proving: the edit cycle went from two
+  critical sections to one, the SPA gained announcement plumbing, a security
+  tripwire's classifier changed, and the busy-store classification changed — and
+  nothing else moved. The 29 new checks are `live_regions` (14), `two_contexts` (8)
+  and `store_busy` (7).
 - The one skip is `gun_pen_audit`, printed with its reason: *"runs a real analyze —
   needs a llama-server, so E2E_BASE must point at a studio that has one"*.
 
 Against the round-3 baseline (**1771 passed / 49 suites / 1235 checks**):
-**+8 pytest tests** (4 cycle-continuity, 4 apply-race), **+2 suites**, **+22 checks**.
+**+15 pytest tests** (4 cycle-continuity, 4 apply-race, 7 store-busy), **+3 suites**,
+**+29 checks**.
 
 The fleet was run **twice**: the first run came back **49 passed, 1 failed** on
 `xss_inert`, which is the finding in §7. The figures above are from the run at the
@@ -341,7 +346,7 @@ Every finding from round 3, so this document is not read as "all clear":
 | UX-1 errors/replies silent | MEDIUM | **fixed** (one half unguardable, §4) |
 | UX-3 no second browser context | MEDIUM | **fixed** |
 | E2E-1 lock guard blind | MEDIUM | **fixed** |
-| **BE-3 `StoreLockTimeout` → 500** | MEDIUM | **open** — should be 503 + `Retry-After`; the fix that introduced the contention also made this reachable |
+| **BE-3 `StoreLockTimeout` → 500** | MEDIUM | **fixed** — see §11 |
 | **BE-4 403 recovery copy** | LOW | **open** |
 | **BE-5 over-strict loopback spellings** | LOW | **open** |
 | **BE-6 session metadata last-writer-wins** | LOW | **open** — `store.save` merges messages only |
@@ -384,3 +389,89 @@ Residuals of this change set, stated plainly:
 
 **Not touched:** the in-flight re-audit that was already in the tree (I re-ran it,
 and it passes).
+
+---
+
+## 11. Follow-on: BE-3 — a busy store is 503, and the writer is told
+
+The last MEDIUM from the round-3 report, and the only remaining finding where a
+transient condition was reported to the writer as a crash.
+
+### What it was
+
+`jsonio.StoreLockTimeout` subclasses `RuntimeError` and had no
+`@app.errorhandler`, so it fell through to `_unhandled`: a contended
+`GET /script` or `/export` answered **500** after 10.018s with
+`{"error":"Unexpected error: timed out after 10s waiting for another process to
+release working.json"}` — no `Retry-After`, and no way for the writer or the SPA to
+tell it apart from a real fault. `StoreUnreadable` already met the right standard
+one layer over.
+
+### What changed
+
+1. **`@app.errorhandler(StoreLockTimeout)` → 503 + `Retry-After` + `busy: true`**,
+   with a sentence that names the condition and says what to do. `busy` is what
+   keeps it apart from a damaged store, which also answers 503 and must never be
+   retried.
+2. **The amplifier the round-3 report named.** `reset_working` holds the cycle lock
+   while taking three leaf locks, and each used to start a **fresh**
+   `LOCK_TIMEOUT_SECONDS` — so one stuck file could hold the cycle lock for ~3× the
+   budget while every other request expired its own and was told the studio had
+   broken. `jsonio.lock_deadline()` now puts **one** deadline over the whole
+   removal, and `_acquire_os_lock` takes the tighter of that and its own.
+3. **The half that makes the fix real: the writer is now told.** `openProject`
+   wrapped `loadScriptData()` in `catch (_) { /* no parse yet */ }`, which swallowed
+   **every** failure as "this project has no parse yet" — so a busy store (and any
+   500) left the manuscript pane showing nothing and said nothing at all. The two
+   other `loadScriptData` call sites already did
+   `showError("Couldn't load the script: " + e.message)`; the project-open path was
+   the odd one out, and it is the app's most important surface. **Without this the
+   503 would have been invisible on exactly the route the finding names.**
+
+### The same probe, re-run
+
+The round-3 probe that measured the 500 (`.workbuddy-ai/scratch/lock_timeout_probe.py`)
+was re-run against this revision with `LOCK_TIMEOUT_SECONDS` left at its real 10s:
+
+```
+GET /api/projects/The_Late_Hour/script WHILE THE LOCK IS HELD
+  status  : 503
+  elapsed : 10.1s
+  body    : {"busy":true,"error":"The studio is busy — another window or process is
+             writing to this project right now. Nothing was lost. Try again in a moment.",
+             "retry_after":1}
+GET script after release -> 200
+```
+
+Before: **500** / 10.018s / `{"error":"Unexpected error: timed out after 10s …"}`.
+The `Retry-After: 1` header is asserted in `tests/test_store_busy.py`.
+
+### A retry I wrote and then removed
+
+My first version had the SPA retry a read once on `Retry-After`. I dropped it: it
+would have been **unguarded** — making a studio answer 503 inside a browser suite
+needs real contention plus the full 10s timeout — and its value is low, because the
+round-3 reachability measurement puts a load-induced timeout at nil. It fires when a
+holder is genuinely stuck, and a 1s retry does not help there. The header is there
+for a client that wants it; the writer gets a sentence they can act on instead.
+
+### Guards
+
+- `tests/test_store_busy.py` (7) drives **real cross-process contention** — a child
+  process holds the lock, because in-process contention cannot produce the timeout
+  at all (the in-process `RLock` is acquired with no timeout, so two threads simply
+  serialize). It asserts the status, the `Retry-After` header, the `busy` flag, the
+  message, that an uncontended read still answers 200, and that a damaged store is
+  **not** reported as busy. It also pins the budget composition with
+  `LOCK_TIMEOUT_SECONDS` left at its real 10s default, so the assertion is about the
+  block and not about a patched number.
+- `tests/e2e_browser_store_busy.py` (7) is the end-to-end half: a real studio, a
+  real holder child, and the writer actually seeing the banner.
+
+### Not guarded, stated plainly
+
+`reset_working`'s **use** of `lock_deadline` is not directly asserted. The
+observable difference needs two contended leaves held across overlapping windows
+inside one budget, which is a timing-margin test that would be flaky for little
+assurance — and the mechanism it depends on *is* guarded. This is the same
+judgement as UX-1's `clear-first` (§4).

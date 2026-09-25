@@ -28,10 +28,10 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1779 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4) at `e86ff62` (187s; coverage **87%** — 9730 statements, 1287 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +8 over the previous row: `test_cycle_continuity.py` 4 + `test_apply_race.py` 4) |
+| Unit + integration | `python -m pytest tests/` | **1786 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4) at `4a86356` (185s; coverage **87%** — 9751 statements, 1290 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +15 over the previous row: `test_cycle_continuity.py` 4, `test_apply_race.py` 4, `test_store_busy.py` 7) |
 | Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
-| Browser E2E | `python tests/run_browser_suites.py` | **51 suites: 50 pass, 0 fail, 1 skip, 0 known-broken** — **1,257 checks** — measured 2026-09-25 (round 4) at `e86ff62`. The load-bearing part: the **1,235 pre-existing checks are unchanged and all still pass**, so the edit cycle going from two critical sections to one, plus the new announcement plumbing, moved nothing else. The 22 new checks are `live_regions` (14) and `two_contexts` (8). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
+| Browser E2E | `python tests/run_browser_suites.py` | **52 suites: 51 pass, 0 fail, 1 skip, 0 known-broken** — **1,264 checks** — measured 2026-09-25 (round 4) at `4a86356`. The load-bearing part: the **1,235 checks that existed before this work are unchanged and all still pass**, so the edit cycle going from two critical sections to one, plus the announcement plumbing, the census classifier and the busy-store classification, moved nothing else. The 29 new checks are `live_regions` (14), `two_contexts` (8) and `store_busy` (7). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
 
 > **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
 > correctly found that `design_session`'s exclusion label was false — the console frames the SPA
@@ -113,6 +113,7 @@ tracker-stamp commit that follows carries the same content.
 | UX-3 | No e2e suite had ever opened a second browser context, which is why BE-1 survived 1,235 checks | `e86ff62` | `tests/e2e_browser_two_contexts.py` (8), with a per-round overlap control |
 | E2E-1 | `test_lock_order.py` enforces acquisition **order**, so acquire→release→acquire was invisible to the guard written to prevent its bug class | `e86ff62` | the same `test_cycle_continuity.py`, plus 3 can-fail legs inside it |
 | E2E-3 | `xss_inert`'s census counted a `/** */` docstring that MENTIONS `innerHTML` as a sink, and `fn_re` used `.match()` so it skipped every `async function` and mis-attributed their sinks | `e86ff62` | the census's own two assertions; the non-clearing total is unchanged at 18 |
+| BE-3 | A contended store answered **500** with an internal crash string on the two routes that render the writer's script, and the SPA **swallowed** the failure so the pane went blank in silence | `4a86356` | `tests/test_store_busy.py` (7 — REAL cross-process contention) + `tests/e2e_browser_store_busy.py` (7 — a real studio, a real holder child, the writer actually seeing the banner). Mutation-verified: 11/11 detected, tree byte-identical |
 
 ---
 
@@ -166,8 +167,25 @@ non-clearing figure was right, the total was not. A recount of that revision's
 `app.js` gives **67** lines (4 comments, 45 clearing, 18 non-clearing). This pass adds
 exactly one line — the docstring mention above.
 
-**Still open from round 3, unchanged:** BE-3 (`StoreLockTimeout` → **500** instead of
-503 + `Retry-After`), BE-4, BE-5, BE-6, UX-2 (viewport breadth), UX-4, UX-5.
+**BE-3, fixed in the same round (`4a86356`) — and its third part is why it works.**
+A contended store answered **500** with an internal crash string; it answers
+**503 + `Retry-After` + `busy: true`** now, with a sentence the writer can act on.
+The amplifier the round-3 report named is closed too: `reset_working` took three
+leaf locks while holding the cycle lock, each starting a FRESH
+`LOCK_TIMEOUT_SECONDS`, so one stuck file could hold the cycle lock for ~3× the
+budget — `jsonio.lock_deadline()` puts ONE deadline over the block and
+`_acquire_os_lock` takes the tighter of that and its own (deliberately opt-in;
+`_StoreLock`'s own bookkeeping was not touched to automate it).
+
+**And `openProject` was swallowing the failure.** `catch (_) { /* no parse yet */ }`
+treated EVERY error as "this project has no parse yet", so a busy store — and any
+500 — left the manuscript pane blank and said nothing at all, on the app's most
+important surface. The two other `loadScriptData` call sites already did
+`showError("Couldn't load the script: " + e.message)`; the project-open path was the
+odd one out. **A better status code is not a fix if the client discards it.**
+
+**Still open from round 3, unchanged:** BE-4, BE-5, BE-6, UX-2 (viewport breadth),
+UX-4, UX-5.
 
 **Recorded here rather than only in a comment (E2E-2):** the edit trio is
 **concurrency-safe, not transactional**. `working.json`, `edits.json` and
