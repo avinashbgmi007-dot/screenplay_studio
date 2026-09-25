@@ -28,10 +28,10 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1821 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4, LOW pass + §14) at `2eee94a` + the §14 working tree (187s; coverage **87%** — 9768 statements, 1272 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; **+35** over the pre-pass row: `test_analyze_contract.py` 4, `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 7, `test_host_header_guard.py` 20, `test_repo_hygiene.py` 1) |
+| Unit + integration | `python -m pytest tests/` | **1825 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4, LOW pass + §14 + DEL-1) at `2eee94a` + the DEL-1 working tree (191s; coverage **87%** — 9775 statements, 1262 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; **+39** over the pre-pass row: `test_analyze_contract.py` 4, `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 11, `test_host_header_guard.py` 20, `test_repo_hygiene.py` 1) |
 | Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
-| Browser E2E | `python tests/run_browser_suites.py` | **54 suites: 53 pass, 0 fail, 1 skip, 0 known-broken** — **1,330 checks** — measured 2026-09-25 (round 4, LOW pass) at `2eee94a`. The load-bearing part: the **1,319 checks that existed before this pass are unchanged and all still pass**; the 11 new ones are `403_advice`. `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
+| Browser E2E | `python tests/run_browser_suites.py` | **54 suites: 53 pass, 0 fail, 1 skip, 0 known-broken** — **1,330 checks** — measured 2026-09-25 (round 4, LOW pass) at `2eee94a`, **re-run unchanged** after the DEL-1 `models.py` change. The load-bearing part: the **1,319 checks that existed before this pass are unchanged and all still pass**; the 11 new ones are `403_advice`. `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
 
 > **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
 > correctly found that `design_session`'s exclusion label was false — the console frames the SPA
@@ -120,6 +120,7 @@ tracker-stamp commit that follows carries the same content.
 | BE-4 | One 403 message for two different 403s: the Host-guard refusal told the writer to reload, which cannot help | `2eee94a` | server marks it (`host_rejected`) + SPA branches on it; `tests/e2e_browser_403_advice.py` (11) injects the **real server-produced bodies**, because Chromium refuses to send a foreign `Host` (`net::ERR_INVALID_ARGUMENT`) so the branch is undrivable over the wire |
 | BE-5 | The loopback predicate refused `127.1`, `2130706433`, `0x7f000001`, `0177.0.0.1` and the DNS root label | `2eee94a` | 20 pytest in `test_host_header_guard.py`; the range check is asserted too — `3232235777` (192.168.1.1) and `0xc0a80101` stay refused |
 | BE-6 | The store's merge unioned branch **messages** only, so `current_branch` / `active_persona` / `active_mode` stayed last-writer-wins and a stale chat turn silently undid a branch switch | `2eee94a` | `tests/test_session_selection_merge.py` (6) + a static check across **both packages**. Mutation-verified: 8/8 detected, four files byte-identical. The first version of the static check scanned only `webapp_server.py`, and the gate found the three writers it missed in `screenplay_cowriter/server.py` plus five in `cli.py` |
+| DEL-1 | **`/delete <branch>` was undone on disk** — the CLI printed `Deleted branch 'alt'.` and the branch survived, because the message union re-adds a whole branch the session no longer has (it cannot tell a deliberate deletion from a concurrent fork). **Pre-existing**, CLI-only, and found by measuring before writing the test | `05b94c5` | `Session.deleted_branches` — a tombstone appended by `delete_branch`, cleared by `fork` when the name is reused, read with a default so pre-existing session files still load, and respected by the union. Mutation-verified: 5/5, five files byte-identical. The load-bearing one is `test_a_concurrent_fork_is_still_kept_by_a_stale_save`, the regression test for the tempting wrong fix |
 
 ---
 
@@ -205,10 +206,11 @@ for the input device, and it is the wrong proxy.**
 
 **All five LOW findings from round 3 are now closed** (`2eee94a`) — BE-4, BE-5,
 BE-6, UX-4, UX-5. **Nothing from the round-3 audit remains open.** What is left is
-the deliberate residuals, which are not findings: the edit trio is
-concurrency-safe but not transactional (E2E-2, below), and BE-6's `/delete` and
-`/mode` CLI commands are covered by a presence check rather than behaviourally
-(see the report, §13.6).
+the deliberate residual, which is not a finding: the edit trio is concurrency-safe
+but not transactional (E2E-2, below). The presence-check limitation §13.6 recorded
+for BE-6's `/delete` and `/mode` CLI commands is closed too — `/delete` needed a
+fix of its own (**DEL-1**, `05b94c5`), and all five of `_handle_command`'s
+selection-owning saves now have behavioural coverage.
 
 **Recorded here rather than only in a comment (E2E-2):** the edit trio is
 **concurrency-safe, not transactional**. `working.json`, `edits.json` and
@@ -1458,7 +1460,7 @@ whole section is about.
 | ID | Item | Evidence | Why deferred |
 |---|---|---|---|
 | **BE-M3** | `undo_last_edit` / `redo_last_edit` read-modify-write `edits.json` + `edits.redo.json` **without holding `lock_for` across the cycle** (each read and each write is locked; the gap between them is not) | 3 real children behind a file barrier: **two read `len=7`, both wrote `len=6`** — the log loses an entry relative to the reversals the working copy actually got. Script: `.workbuddy-ai/scratch/be_m3_instrument.py` | **Owner decision (pass 7): not required.** Accepted as-is, and the fix shape is now recorded so it is not re-litigated: a **CAS retry loop** (read → re-check the store is unchanged → write → retry on conflict), *not* two `lock_for` locks held at once (forbidden by the one-lock-at-a-time invariant, which exists to prevent deadlock). Harm is narrow (two *simultaneous* undos of one project) and non-destructive: the working copy is correct, only the history bookkeeping drifts. |
-| **DEL-1** | **`/delete <branch>` is undone on disk.** The CLI prints `Deleted branch 'alt'.` and the branch is still there on the next load — a user-facing success message that is false. The store's message union (H4) **re-adds a whole branch the session no longer has**, because it cannot tell "this snapshot deliberately removed it" from "another process just forked it". | Measured, `2eee94a`: after `/fork alt` then `/delete alt`, `store.load(sid).branches == ['alt', 'main']` (expected `['main']`). **Causal proof**: mutating the union's `session.branches[bname] = dbranch` line to `pass` makes it `['main']` — that one line is the cause. **Pre-existing, not BE-6**: the line is unchanged and present at `HEAD~1`. **Reach is CLI-only**: `delete_branch` has exactly one caller (`cli.py:172`) and no HTTP route deletes a branch. | **Needs a design decision, so it is not being rushed.** The union cannot distinguish a deliberate delete from a concurrent fork, so the fix is for the session to **record its own deletions**: `Session.deleted_branches: list[str]`, appended by `delete_branch`, discarded by `fork` when the name is reused, serialized in `to_dict`/`from_dict` (additive — old files still load), and skipped by the union. **The obvious fix is a trap**: suppressing the union's branch re-add for `owns_selection=True` saves would make a stale selection-owning save *drop* a branch another process had just forked, losing that branch's messages — worse than the bug it fixes. Impact is low and non-destructive (a stale branch lingers; nothing is lost or corrupted), which is what makes deferring safe. |
+| **DEL-1** | **CLOSED (`05b94c5`).** `/delete <branch>` reported success and the branch was still there — the store's message union re-added it, because it could not tell a deliberate deletion from a concurrent fork. Fixed by giving the session a **tombstone** (`Session.deleted_branches`), appended by `delete_branch`, cleared when the name is re-forked, and respected by the union. | See the Closed row above | ✅ **done** |
 
 ---
 

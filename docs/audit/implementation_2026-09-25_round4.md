@@ -920,4 +920,88 @@ surface as a check is the mistake pass 13 made with `design_session`, and the
 tracker's own gate note records the reversal. The test that will exist is the one
 that fails today and passes after the fix.
 
+---
+
+## 15. DEL-1, fixed — the deletion that was undone, and why the fix is not the obvious one
+
+### What it was
+
+`/delete <branch>` printed `Deleted branch 'alt'.` and the branch was still there
+on the next load. The store's message union (H4) copies a whole branch from disk
+when the session does not have it — which is normally a concurrent **fork**, where
+losing it would lose messages. But a deliberate **deletion** looks identical from
+inside the merge, so every `/delete` was silently undone while the CLI reported
+success.
+
+Causal proof rather than inference, as in §14: mutating the union's
+`session.branches[bname] = dbranch` line to `pass` made the deletion persist. The
+line is unchanged and present at `HEAD~1`, so this was **pre-existing**, not a
+BE-6 regression, and `delete_branch` has exactly one caller (`cli.py:172`) with no
+HTTP route — CLI-only reach.
+
+### Why it was filed in §14 instead of fixed there
+
+Because the obvious fix is a trap. The tempting change is to stop the union
+re-adding branches for `owns_selection=True` saves. That would make a stale
+selection-owning save **drop a branch another process had just forked** — losing
+that branch and its messages, which is worse than the bug it fixes.
+
+The union genuinely has to keep doing its job. So the *deletion* is what has to be
+recorded, not the merge narrowed.
+
+### The fix
+
+`Session.deleted_branches` — a tombstone list.
+
+- `delete_branch` appends the name. This is what the union consults.
+- `fork` clears the name, because the branch exists again. Without this the
+  tombstone would outlive the name and the store would refuse to merge the
+  re-forked branch back in — the fork would work in memory and vanish on the next
+  load.
+- `to_dict` writes it; `from_dict` reads it **with a default**, because every
+  session file on disk predates the field. Opening an existing conversation is the
+  one thing that may never break.
+- The union skips a missing branch whose name is tombstoned, and otherwise
+  behaves exactly as before.
+
+### The guard, and the one that carries the weight
+
+Five mutations, all detected, five files restored byte-identical:
+
+| Mutation | Test that goes red |
+|---|---|
+| `delete_branch` stops recording the tombstone | `test_the_cli_delete_command_persists` |
+| the union stops respecting the tombstone | `test_the_cli_delete_command_persists` |
+| `fork` stops clearing the tombstone | `test_reforking_a_deleted_name_clears_the_tombstone` |
+| `from_dict` requires the field (breaks old files) | `test_a_session_file_written_before_the_tombstone_field_still_loads` |
+| **the union never re-adds a missing branch — the tempting wrong fix** | **`test_a_concurrent_fork_is_still_kept_by_a_stale_save`** |
+
+The last row is the one that matters. It is the regression test for the trap
+described above: it fails for exactly the shortcut it exists to forbid. **Without
+it, that shortcut looks correct** — every other test in the file still passes,
+including all of §13's. A guard written after the fact would have been written
+against the fix I chose; this one was written against the fix I rejected, which is
+the only reason the rejection is durable rather than a note in a report.
+
+The fifth CLI save site is now covered too, so all five of
+`_handle_command`'s selection-owning saves have behavioural coverage — the
+residual §13.6 recorded as a limitation is closed.
+
+### 15.1 Gates, measured at this revision
+
+| Gate | Command | Result |
+|---|---|---|
+| Unit + integration | `python -m pytest tests/ -q --cov` | **1825 passed, 3 skipped, 0 failed — 87%** (9775 statements, 1262 missed), exit 0 |
+| Browser E2E | `python tests/run_browser_suites.py` | **54 suites: 53 passed, 0 failed, 1 skipped, 0 known-broken — 1330 checks**, exit 0 |
+| Lint | `ruff check .` | **All checks passed** |
+| JS unit | `node --test tests/js/core.test.js` | **16 / 16** |
+| Mutation harness | `.workbuddy-ai/scratch/mutation_check_be6.py` | **13 / 13 detected**; all five mutated files restored byte-identical |
+
+**The fleet is unchanged at 1,330 checks, and that is the informative part.** This
+revision touches `models.py` — the on-disk session format — and the browser fleet
+does not exercise a branch deletion, so a green fleet says the format change
+disturbed nothing it covers, not that the change is exercised end to end. The
+evidence for DEL-1 is the pytest suite and the mutation harness; the fleet is the
+evidence that nothing else moved.
+
 
