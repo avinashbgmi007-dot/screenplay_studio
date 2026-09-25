@@ -3390,9 +3390,38 @@ ladder produced, and the next session with a model server running should run
 `E2E_BASE=… python tests/e2e_browser_gun_pen_audit.py pass2` against a throwaway copy
 of the project and record the result here.
 
+**Residual, measured (what "production readiness e2e" still does not have).**
+- **Sleep-based waiting is still the fleet's dominant pattern**: 424 `wait_for_timeout(`
+  calls across the browser suites. P4 converted `deep_links` only. Worst: dock_sections
+  34, phase14_signoff_journey 30, modal_guards 26, race_guards 23 — the last two are
+  suites this ladder edited, so the fixed waits around the new legs are known and are not
+  a proof the behaviour settled. Converting them needs the same route-settling predicates
+  `deep_links` now uses, one suite at a time, with an impossible-condition can-fail each
+  time; it is not a sweep.
+- **The CI gate is real and was re-read this pass** (`.github/workflows/ci.yml`: pinned
+  ruff, `pytest -q --cov`, `node --test`, a 45-minute `test-browser` job that runs the
+  whole `run_browser_suites.py` fleet, and a Windows job for the platform-dependent
+  store/lock/delete paths). Its browser-job comment still claimed "~25 suites / ~460
+  checks" where the fleet is 49/1,235 — corrected on 2026-09-25, and it now names the one
+  thing CI cannot cover. Nothing here has been *pushed*, so none of it has been run by CI
+  yet; the local gates are the only evidence so far.
+- **CI cannot cover `gun_pen_audit` either** — no llama-server on a runner — so the three
+  converted checks there are unexecutable in both places that run the fleet. That is a
+  structural hole, not an oversight: it needs a recorded manual run against a throwaway
+  copy of a real multi-scene project, or the checks should move to a suite that can run.
+- `_apiOnce`'s 403 ambiguity (item 3 above) and the three un-exercised endpoints (item 2)
+  remain open by decision, not by accident.
+- Nothing was pushed and `main` was not touched: `qoder/update` is 33 commits ahead of
+  `main`, 0 behind, and 5 ahead of `origin/qoder/update`. Merging or pushing is the
+  writer's call.
+
 **Deferred, with anchors (report-only, per the agreed scope).**
-1. No fixture with >3 scenes, so the scene-filter and this-scene-strip paths are only
-   exercised at 1-3 scenes: `tests/e2e_browser_common.py` fixture scripts, `app.js:findingOnScene`.
+1. No browser fixture is longer than ~3 scenes — counted: the largest inline `SCRIPT`
+   has 3 `INT.`/`EXT.` lines (`tests/e2e_browser_keyboard_edit.py`), most have 1–2, and
+   the only genuinely multi-scene project in the suite set is `gun_pen_2`, which lives in
+   the one suite the gate skips. So `findingOnScene` (`app.js:6130`) and the
+   this-scene-strip scope are exercised at ≤3 scenes only, where a 40-scene feature
+   length is the real load.
 2. Three endpoints have no browser call site — `grep` over every `tests/e2e_browser_*.py`
    finds none, so they are tested at the HTTP level only: `POST /api/projects/<name>/reparse`
    (`webapp_server.py:1412`), `POST /api/projects/<name>/beatboard/reset` (`webapp_server.py:2003`),

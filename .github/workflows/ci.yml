@@ -71,9 +71,13 @@ jobs:
   # The SPA is ~9k lines of vanilla app.js (plus 6.5k of CSS) with no build step
   # and, until 2026-09-20, no automated coverage in CI at all: the 29
   # tests/e2e_browser_*.py suites were run by hand and are invisible to pytest
-  # (they do not match test_*.py). This job is that missing gate — ~25 suites
-  # and ~460 checks against a real chromium. Keep the runner's exit code honest:
-  # it fails the job on any suite that fails or crashes.
+  # (they do not match test_*.py). This job is that missing gate. Measured on
+  # 2026-09-25: 49 suites, 48 pass / 0 fail / 1 skip, 1,235 checks, against a
+  # real chromium. The one skip is `gun_pen_audit`, which POSTs a live /analyze
+  # and needs a llama-server CI does not have — so a check that exists only
+  # there is NOT covered by this job, whatever its local status. Keep the
+  # runner's exit code honest: it fails the job on any suite that fails or
+  # crashes.
   test-browser:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
