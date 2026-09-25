@@ -134,7 +134,7 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
         else:
             try:
                 session.fork(arg)
-                store.save(session)
+                store.save(session, owns_selection=True)
                 print(f"Forked into new branch '{arg}' from '{session.branches[arg].parent_branch}'. Now on '{arg}'.")
             except ValueError as e:
                 print(f"[error] {e}")
@@ -145,7 +145,7 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
         else:
             try:
                 session.switch(arg)
-                store.save(session)
+                store.save(session, owns_selection=True)
                 print(f"Switched to branch '{arg}'.")
                 # P3.12: switching back is exactly when the writer has lost
                 # track of what the branch they left has done since.
@@ -170,7 +170,7 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
         else:
             try:
                 session.delete_branch(arg)
-                store.save(session)
+                store.save(session, owns_selection=True)
                 print(f"Deleted branch '{arg}'.")
             except ValueError as e:
                 print(f"[error] {e}")
@@ -182,7 +182,7 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
             print(f"[error] Unknown persona '{arg}'. Available: {list(PERSONAS.keys())}")
         else:
             session.branch.active_persona = arg
-            store.save(session)
+            store.save(session, owns_selection=True)
             print(f"Persona set to '{arg}' for branch '{session.current_branch}'.")
 
     elif name == "mode":
@@ -192,7 +192,7 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
             print(f"[error] Unknown mode '{arg}'. Available: {list(MODES.keys())}")
         else:
             session.branch.active_mode = arg
-            store.save(session)
+            store.save(session, owns_selection=True)
             print(f"Mode set to '{arg}' for branch '{session.current_branch}'.")
 
     elif name == "history":

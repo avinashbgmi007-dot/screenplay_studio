@@ -62,7 +62,7 @@ class SessionStore:
         from screenplay_studio.jsonio import retry_permission
         return retry_permission(lambda: Session.load(path))
 
-    def save(self, session: Session) -> None:
+    def save(self, session: Session, *, owns_selection: bool = False) -> None:
         # Serialize writes per session file AND merge across concurrent turns.
         # The lock alone only serializes the writes; the load that produced
         # `session` happened OUTSIDE it, so a stale in-memory snapshot would
@@ -70,6 +70,20 @@ class SessionStore:
         # lock, re-read the on-disk session and union any branch messages this
         # in-memory snapshot is missing, keyed by content, so no persisted turn
         # is silently dropped.
+        #
+        # BE-6 (round-3 audit 2026-09-25): the merge covered branch MESSAGES and
+        # nothing else, so the writer's SELECTION — `current_branch` and each
+        # branch's active persona/mode — stayed last-writer-wins. A chat turn
+        # holds a snapshot taken before the writer switched branches, so its save
+        # wrote the OLD branch back and silently undid the switch. Only the routes
+        # that exist to change the selection pass `owns_selection=True`; every
+        # message-only save now leaves disk's selection alone.
+        #
+        # Deliberately scoped to those three fields, and the exclusions are
+        # choices rather than oversights: `server_url` / `model_id` / `title` are
+        # written when a session is created or resumed, where the snapshot IS the
+        # source of truth, and `awaiting_probe` is turn state the engine has just
+        # set — preserving disk's would break the probe.
         #
         # The write itself is `Session.save`, which is atomic (unique tmp +
         # fsync + os.replace). This method used to hand-roll that with a FIXED
@@ -82,7 +96,7 @@ class SessionStore:
             if os.path.exists(path):
                 try:
                     disk = Session.load(path)
-                    self._merge_missing_messages(disk, session)
+                    self._merge_missing_messages(disk, session, owns_selection)
                 except OSError:
                     # Transient read contention (a sharing violation), NOT
                     # damage — park nothing, and still land this save.
@@ -96,11 +110,20 @@ class SessionStore:
             session.save(path)
 
     @staticmethod
-    def _merge_missing_messages(disk: Session, session: Session) -> None:
+    def _merge_missing_messages(disk: Session, session: Session,
+                                owns_selection: bool = True) -> None:
         """Append onto `session` any branch messages present on `disk` (the
         already-saved state) that this in-memory snapshot lacks. Keyed on
         (branch, role, content) so the two halves of one turn never collide and
-        a repeated phrase on a different turn is still its own message."""
+        a repeated phrase on a different turn is still its own message.
+
+        `owns_selection=False` additionally takes the writer's SELECTION from
+        `disk`: `current_branch` and each branch's active persona/mode. That is
+        BE-6 — see `save` for why those three and not the rest.
+
+        `owns_selection` defaults to True so the method keeps its old behaviour
+        for any direct caller; `save` is what passes the real value through.
+        """
         for bname, dbranch in disk.branches.items():
             sbranch = session.branches.get(bname)
             if sbranch is None:
@@ -111,6 +134,24 @@ class SessionStore:
                 if (m.role, m.content) not in have:
                     sbranch.messages.append(m)
                     have.add((m.role, m.content))
+        if not owns_selection:
+            # A snapshot that predates the writer's last switch must not write
+            # the old branch back. `disk` is the newer truth for a field this
+            # save was never about.
+            #
+            # Only adopt it if it names a branch we actually hold. The union
+            # loop above guarantees that for any session this app wrote, but a
+            # hand-edited or torn file can carry a dangling `current_branch`,
+            # and assigning it would turn a healthy in-memory session into a
+            # `KeyError` on the next `session.branch` — a 500 on the next turn,
+            # from a save that was only ever meant to add a message.
+            if disk.current_branch in session.branches:
+                session.current_branch = disk.current_branch
+            for bname, dbranch in disk.branches.items():
+                sbranch = session.branches.get(bname)
+                if sbranch is not None:
+                    sbranch.active_persona = dbranch.active_persona
+                    sbranch.active_mode = dbranch.active_mode
 
     def list(self) -> list[dict]:
         """Lightweight listing (id, title, branch count, last updated) without full deserialization cost."""

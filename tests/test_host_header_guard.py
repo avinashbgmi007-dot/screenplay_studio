@@ -126,6 +126,51 @@ class TestLocalHostsStillWork:
         from screenplay_studio.net_guard import is_loopback_host
         assert is_loopback_host("127.0.0.2") is True
         assert is_loopback_host("127.0.0.1.evil.com") is False
+        # the predicate answers for the bare IPv6 literal; the Host HEADER needs
+        # the bracketed form, which the parametrized test below covers
+        assert is_loopback_host("::1") is True
+
+    @pytest.mark.parametrize("host", ["127.1", "2130706433", "0x7f000001",
+                                      "0177.0.0.1", "127.0.0.2", "[::1]:8500"])
+    def test_every_inet_aton_spelling_of_loopback_is_accepted(self, monkeypatch, tmp_path, host):
+        """BE-5 (round-3 audit 2026-09-25): `ipaddress` accepts only the canonical
+        textual forms, so these four legitimate ways to write 127.0.0.1 were all
+        REFUSED — a false rejection with no workaround, on an app whose whole
+        promise is that it is local. No browser sends them, which is why this was
+        a completeness nit rather than a defect, but the guard's job is to answer
+        "is this loopback?" correctly.
+
+        `[::1]:8500` is the bracketed form an IPv6 `Host` header actually uses —
+        the bare `::1` belongs to the predicate test above, because an unbracketed
+        IPv6 literal is a malformed authority, not a spelling of loopback.
+        """
+        _, client = _client(monkeypatch, tmp_path)
+        assert client.get("/api/projects", headers={"Host": host}).status_code == 200
+
+    @pytest.mark.parametrize("host", ["3232235777", "0xc0a80101", "2886729729"])
+    def test_the_inet_aton_path_does_not_open_a_bypass(self, monkeypatch, tmp_path, host):
+        """The new branch must not accept a REMOTE host in a non-canonical
+        spelling. `3232235777` is 192.168.1.1 and `2886729729` is 172.16.0.1 —
+        private, but not loopback, and the range check must still refuse them."""
+        _, client = _client(monkeypatch, tmp_path)
+        assert client.get("/api/projects", headers={"Host": host}).status_code == 403
+
+    @pytest.mark.parametrize("url", ["http://127.1:8080", "http://2130706433:8080",
+                                     "http://127.0.0.1.:8080", "http://localhost.:8080"])
+    def test_the_predicate_is_one_answer_for_urls_too(self, url):
+        """`net_guard` exists so there is ONE "is this local?" answer. The same
+        spellings reach it through `is_loopback_url` — which gates the model-server
+        URL — and refusing them there was the same false rejection, one layer
+        over."""
+        from screenplay_studio.net_guard import is_loopback_url
+        assert is_loopback_url(url) is True
+
+    @pytest.mark.parametrize("url", ["http://3232235777:8080", "http://192.168.1.1:8080",
+                                     "http://localhost.evil.com:8080",
+                                     "http://evil.com.", "http://127.0.0.1.evil.com:80"])
+    def test_the_url_form_refuses_remote_hosts_in_every_spelling(self, url):
+        from screenplay_studio.net_guard import is_loopback_url
+        assert is_loopback_url(url) is False
 
     @pytest.mark.parametrize("host", ["localhost.", "localhost.:8500", "127.0.0.1."])
     def test_the_dns_root_label_is_not_a_false_rejection(self, monkeypatch, tmp_path, host):
@@ -151,3 +196,31 @@ class TestLocalHostsStillWork:
         No browser sends either form, so refusing them costs nothing."""
         _, client = _client(monkeypatch, tmp_path)
         assert client.get("/api/projects", headers={"Host": host}).status_code == 403
+
+
+class TestTheTwoForbiddenAreDistinguishable:
+    """BE-4 (round-3 audit 2026-09-25): both guards answer 403, and they need
+    DIFFERENT advice. Reloading fixes a stale capability token; it cannot fix a
+    Host the desk does not answer to, because the reload re-sends the same Host
+    and gets the same 403. The client could not tell them apart from the status
+    code, so it told the writer to reload either way — confidently wrong advice.
+    The server marks the Host branch; `_tokenError` branches on the marker.
+    """
+
+    def test_the_host_refusal_is_marked(self, monkeypatch, tmp_path):
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.get("/api/projects", headers={"Host": "evil.attacker.com"})
+        assert r.status_code == 403
+        body = r.get_json()
+        assert body.get("host_rejected") is True, body
+
+    def test_the_token_refusal_is_not_marked_as_a_host_refusal(self, monkeypatch, tmp_path):
+        """The marker is the ONLY thing separating the two, so a token refusal
+        that claimed it would send the writer to a loopback URL that was already
+        correct — the same defect, mirrored."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.post("/api/projects/whatever/analyze")   # no X-Studio-Token
+        assert r.status_code == 403, r.get_data(as_text=True)
+        body = r.get_json()
+        assert not body.get("host_rejected"), body
+        assert body.get("error"), "a 403 with no reason gives the client nothing"

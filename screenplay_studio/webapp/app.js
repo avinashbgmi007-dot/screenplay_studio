@@ -137,6 +137,22 @@ async function _apiOnce(path, options, _retry) {
 }
 
 function _tokenError(resp, data) {
+  // BE-4 (round-3 audit 2026-09-25): a 403 has TWO causes and they need
+  // different advice. A stale token is fixed by reloading. A Host the desk does
+  // not answer to is NOT — the reload re-sends the same Host and gets the same
+  // 403, so "Reload this page" was confidently wrong advice. The server marks
+  // that branch (`host_rejected`), and the fix is to open the desk at its
+  // loopback address instead. The port comes from `location`, so this stays
+  // right on any port the writer launched the studio on.
+  if (data && data.host_rejected) {
+    const port = location.port ? ":" + location.port : "";
+    const err = new Error(
+      "This desk only answers at its own loopback address, so this address was " +
+      "refused. Open http://127.0.0.1" + port + " and try again.");
+    err.status = resp.status;
+    err.hostRejected = true;
+    return err;
+  }
   // Writer-facing, not internal: what they must DO, not what the server calls it.
   const err = new Error(
     "The studio restarted since this page was opened. Reload this page to keep writing.");

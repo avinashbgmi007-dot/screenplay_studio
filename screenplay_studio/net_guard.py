@@ -13,6 +13,7 @@ So the check lives here, once, and is parsed rather than pattern-matched.
 from __future__ import annotations
 
 import ipaddress
+import socket
 from urllib.parse import urlparse
 
 # Only the *name* needs listing: every literal loopback address (127.0.0.0/8
@@ -33,12 +34,42 @@ def is_loopback_host(host: str | None) -> bool:
     """
     if not host:
         return False
+    # A trailing dot is the DNS root label: `localhost.` and `127.0.0.1.` name the
+    # same hosts as their undotted forms. Stripping dots can only ever REMOVE
+    # characters, so it cannot turn a remote name into a loopback one
+    # (`evil.com.` -> `evil.com` -> still refused). This also fixes the same false
+    # rejection one layer over: `is_loopback_url("http://127.0.0.1.:8080")` used to
+    # be refused, because `urlparse` hands back the dotted hostname. The Host guard
+    # strips dots itself as well; that is now belt-and-braces rather than the only
+    # place it happens.
+    host = host.rstrip(".")
+    if not host:
+        return False
     if host.lower() in _LOOPBACK_NAMES:
         return True
     try:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
+        pass
+    # BE-5 (round-3 audit 2026-09-25): `ipaddress` accepts only the canonical
+    # textual forms, so the `inet_aton` spellings of loopback — `127.1`,
+    # `2130706433`, `0x7f000001`, `0177.0.0.1` — were all REFUSED. They are
+    # legitimate ways to write 127.0.0.1, and refusing one is a false rejection
+    # with no workaround on an app whose whole promise is that it is local.
+    #
+    # `inet_aton` parses those forms into the same four bytes, so the range check
+    # is unchanged and this cannot accept a remote host: a name raises OSError,
+    # and a non-127 address fails `is_loopback` exactly as it does above
+    # (`3232235777` is 192.168.1.1 and stays refused).
+    #
+    # No browser sends these in a Host header, which is why this is a
+    # completeness fix rather than a defect — but the guard's job is to answer
+    # "is this loopback?" correctly, and it now does so for every spelling.
+    try:
+        packed = socket.inet_aton(host)
+    except OSError:
         return False
+    return ipaddress.ip_address(packed).is_loopback
 
 
 def is_loopback_url(url: str | None) -> bool:

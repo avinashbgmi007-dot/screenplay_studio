@@ -74,7 +74,21 @@ class Checks:
         self.failed = []
         self.fail_fast = fail_fast
 
-    def ok(self, name, cond=True, detail=""):
+    def ok(self, name, cond, detail=""):
+        """`cond` is required, deliberately.
+
+        UX-5 (round-3 audit 2026-09-25) found eight `ok("...")` calls in
+        `e2e_browser_ui_batch.py` that passed a name and nothing else, because
+        `cond` used to default to `True`. They verified nothing and still counted
+        as passes. The eight were the symptom; the default was the cause, and it
+        was a trap that any future suite could walk into without noticing.
+
+        With no default, a marker-only call is a `TypeError` at the moment it is
+        written instead of a silent no-op. `e2e_browser_export_flush.py` has
+        always declared its own `ok(name, cond, extra="")` this way. A check that
+        genuinely has no condition to assert should be deleted, not left as a
+        pass.
+        """
         cond = bool(cond)
         (self.passed if cond else self.failed).append((name, detail))
         print(f"  {'PASS' if cond else 'FAIL'}  {name}"

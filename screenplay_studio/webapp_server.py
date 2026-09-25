@@ -269,10 +269,18 @@ def _host_header_is_local() -> bool:
 @app.before_request
 def _reject_foreign_host():
     """Registered ahead of the write guard so a foreign-Host request is refused
-    for the reason that actually applies — and on every method, reads included."""
+    for the reason that actually applies — and on every method, reads included.
+
+    `host_rejected` is the machine-readable half (BE-4, round-3 audit 2026-09-25):
+    a 403 here and a 403 from the capability-token guard need DIFFERENT advice —
+    reloading fixes a stale token and cannot fix a Host the desk does not answer
+    to, because the reload re-sends the same Host. The client could not tell them
+    apart from the status code, so it told the writer to reload either way.
+    """
     if not _host_header_is_local():
         return jsonify({"error": "request rejected: this desk answers only to "
-                                 "its own loopback address"}), 403
+                                 "its own loopback address",
+                        "host_rejected": True}), 403
     return None
 
 
@@ -3035,7 +3043,9 @@ def fork_session(name, sid):
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
 
-    store.save(session)
+    # BE-6: this route EXISTS to change the selection (it forks a branch and
+    # switches to it), so its snapshot owns those fields.
+    store.save(session, owns_selection=True)
     return jsonify({"current_branch": session.current_branch, "branches": list(session.branches.keys())})
 
 
@@ -3054,7 +3064,8 @@ def switch_branch(name, sid):
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
 
-    store.save(session)
+    # BE-6: switching branches IS the selection change this save exists for.
+    store.save(session, owns_selection=True)
     return jsonify({"current_branch": session.current_branch})
 
 
@@ -3083,7 +3094,7 @@ def update_settings(name, sid):
         session.branch.active_persona = persona
     if mode:
         session.branch.active_mode = mode
-    store.save(session)
+    store.save(session, owns_selection=True)
     return jsonify({"active_persona": session.branch.active_persona, "active_mode": session.branch.active_mode})
 
 
@@ -3919,7 +3930,7 @@ def idea_update_settings(idea_id, sid):
         branch.active_persona = persona
     if mode:
         branch.active_mode = mode
-    store.save(session)
+    store.save(session, owns_selection=True)
     return jsonify({"active_persona": branch.active_persona, "active_mode": branch.active_mode})
 
 

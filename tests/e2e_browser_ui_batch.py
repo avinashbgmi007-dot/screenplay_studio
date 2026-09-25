@@ -62,10 +62,10 @@ def main(base):
         # ---- sidebar flyouts ----
         ideas_section = page.locator("#ideas-section")
         expect(page.locator("#idea-list")).to_be_hidden()
-        ok("flyouts collapsed on load")
+        ok("flyouts collapsed on load", page.locator("#idea-list").is_hidden())
         page.locator("#ideas-trigger").hover()
         expect(ideas_section).to_have_class(re.compile("open"))
-        ok("hover opens the Ideas flyout")
+        ok("hover opens the Ideas flyout", "open" in (ideas_section.get_attribute("class") or ""))
         badge = page.locator("#idea-count").inner_text().strip()
         ok("count badge shows items", badge == str(n_ideas))
 
@@ -74,7 +74,7 @@ def main(base):
         expect(page.locator("#idea-content")).to_be_visible()
         val = page.locator("#idea-content").input_value()
         assert "brass key" in val, val[:120]
-        ok("flyout item click opens the idea")
+        ok("flyout item click opens the idea", "brass key" in val)
 
         # typing still lands after mic reparenting
         page.locator("#idea-content").focus()
@@ -87,12 +87,12 @@ def main(base):
         while "key" not in composer.input_value() and deadline < 40:
             page.wait_for_timeout(100); deadline += 1
         assert "key" in composer.input_value(), composer.input_value()
-        ok("/sameer summons from the flyout-opened idea")
+        ok("/sameer summons from the flyout-opened idea", "key" in composer.input_value())
 
         composer.press("Enter")
         # assistant bubbles render straight into .msg-bubble (no .msg-text wrapper)
         page.wait_for_selector(".msg.assistant:not(.msg-pending)", timeout=20000)
-        ok("Sameer replies in the summoned room")
+        ok("Sameer replies in the summoned room", page.locator(".msg.assistant:not(.msg-pending)").count() > 0)
         page.wait_for_timeout(700)   # let the reply stream settle (a human reads first)
 
         # ---- translate language picker ----
@@ -111,7 +111,7 @@ def main(base):
               return last && !last.hidden ? last.querySelector('.msg-translation-label')?.textContent : null;
             }""", timeout=15000)
         assert "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41" in panel_label.json_value(), panel_label.json_value()
-        ok("Telugu target renders a labeled inline panel")
+        ok("Telugu target renders a labeled inline panel", "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41" in panel_label.json_value())
         # not persisted: reload wipes it (display-only contract)
         n_before = page.locator(".msg-translation").count()
 
@@ -120,7 +120,7 @@ def main(base):
         expect(mic).to_be_visible()
         mic.click()
         expect(mic).to_have_class(re.compile("recording"))
-        ok("mic click starts recording state")
+        ok("mic click starts recording state", "recording" in (mic.get_attribute("class") or ""))
         page.evaluate(
             "() => { const r = window.MediaRecorder.instances.at(-1);" 
             " r.ondataavailable({ data: new Blob(['hello'], { type: 'audio/webm' }) }); }")
@@ -129,7 +129,7 @@ def main(base):
         while "dictated brass key line" not in composer.input_value() and deadline < 50:
             page.wait_for_timeout(100); deadline += 1
         assert "dictated brass key line" in composer.input_value(), composer.input_value()
-        ok("transcribed text lands at the caret")
+        ok("transcribed text lands at the caret", "dictated brass key line" in composer.input_value())
 
         # right-click picks the speech language (remembered)
         mic.click(button="right")

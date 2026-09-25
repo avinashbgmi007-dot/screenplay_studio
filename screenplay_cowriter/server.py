@@ -123,7 +123,7 @@ def fork_session(session_id):
     try:
         session = store.load(session_id)
         session.fork(name, from_branch=body.get("from_branch"))
-        store.save(session)
+        store.save(session, owns_selection=True)
     except FileNotFoundError:
         return jsonify({"error": "not found"}), 404
     except ValueError as e:
@@ -138,7 +138,7 @@ def switch_branch(session_id):
     try:
         session = store.load(session_id)
         session.switch(name)
-        store.save(session)
+        store.save(session, owns_selection=True)
     except FileNotFoundError:
         return jsonify({"error": "not found"}), 404
     except ValueError as e:
@@ -165,7 +165,7 @@ def update_settings(session_id):
         session.branch.active_persona = persona
     if mode:
         session.branch.active_mode = mode
-    store.save(session)
+    store.save(session, owns_selection=True)
     return jsonify(_session_summary(session))
 
 
