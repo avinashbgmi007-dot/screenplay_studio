@@ -92,6 +92,12 @@ class Session:
     last_seen_content: str | None = None
     branches: dict[str, Branch] = field(default_factory=dict)
     current_branch: str = "main"
+    # Branches this session deliberately REMOVED. Without it, `SessionStore`'s
+    # message union cannot tell a deliberate deletion from a concurrent fork —
+    # both look like "a branch on disk that this snapshot does not have" — so it
+    # re-added the branch and `/delete` was silently undone on disk while the CLI
+    # reported success (DEL-1). A tombstone is cleared when the name is re-forked.
+    deleted_branches: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -124,6 +130,12 @@ class Session:
         )
         self.branches[new_name] = new_branch
         self.current_branch = new_name
+        # The name exists again, so it is no longer deleted. Leaving the
+        # tombstone would make the store's union refuse to merge this branch
+        # back in from disk — the fork would survive in memory and vanish on the
+        # next load.
+        if new_name in self.deleted_branches:
+            self.deleted_branches.remove(new_name)
         return new_branch
 
     def switch(self, name: str) -> Branch:
@@ -140,6 +152,10 @@ class Session:
         del self.branches[name]
         if self.current_branch == name:
             self.current_branch = "main"
+        # Record it, so the save that follows is not undone by the store's
+        # message union re-adding the branch from disk (DEL-1).
+        if name not in self.deleted_branches:
+            self.deleted_branches.append(name)
 
     def to_dict(self) -> dict:
         return {
@@ -152,6 +168,7 @@ class Session:
             "last_seen_content": self.last_seen_content,
             "branches": {k: v.to_dict() for k, v in self.branches.items()},
             "current_branch": self.current_branch,
+            "deleted_branches": list(self.deleted_branches),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -164,6 +181,10 @@ class Session:
             server_url=d.get("server_url"), model_id=d.get("model_id"),
             last_seen_content=d.get("last_seen_content"),
             current_branch=d.get("current_branch", "main"),
+            # Absent in every session file written before DEL-1, so the default
+            # is load-bearing: without it, opening an existing conversation
+            # would raise. An old file simply has no tombstones.
+            deleted_branches=list(d.get("deleted_branches", [])),
             created_at=d.get("created_at", time.time()), updated_at=d.get("updated_at", time.time()),
             branches={},
         )

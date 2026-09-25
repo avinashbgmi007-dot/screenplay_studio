@@ -264,11 +264,9 @@ def test_the_cli_selection_commands_survive_a_stale_chat_save(tmp_path):
 def test_the_cli_mode_command_survives_a_stale_chat_save(tmp_path):
     """`/mode` is the fifth selection-owning save in `_handle_command`.
 
-    `/delete` is the fourth and is deliberately **not** covered here. The store's
-    union re-adds a whole branch the session no longer has, so `/delete` is undone
-    on disk — a test asserting the deletion persists would fail, and pinning a
-    broken product surface as a check is the mistake pass 13 made with
-    `design_session` (see the tracker's "Proven, deliberately NOT fixed", DEL-1).
+    `/delete` is the fourth and has its own tests below, because it needed a
+    different fix: the store's union was re-adding the deleted branch, so the
+    deletion had to be recorded rather than merely selected (DEL-1).
     """
     from screenplay_cowriter.cli import _handle_command
 
@@ -286,6 +284,106 @@ def test_the_cli_mode_command_survives_a_stale_chat_save(tmp_path):
 
     assert store.load(sid).branch.active_mode == "brainstorm", \
         "a chat turn undid the CLI's /mode"
+
+
+# ---- DEL-1: a deliberate deletion must survive the union -------------------
+#
+# The union copies a whole branch from disk when the session does not have it,
+# because that is normally a concurrent FORK and losing it would lose messages.
+# But a deliberate deletion looks identical from inside the merge, so the union
+# silently undid every `/delete` while the CLI printed "Deleted branch 'alt'."
+# The fix is a tombstone on the session, and the reason it is not the "obvious"
+# fix is the second test below.
+
+def test_the_cli_delete_command_persists(tmp_path):
+    """DEL-1, the reported defect. Before the fix this left `['alt', 'main']`."""
+    from screenplay_cowriter.cli import _handle_command
+
+    store = SessionStore(str(tmp_path))
+    sid = store.create("T").session_id
+
+    session = store.load(sid)
+    _handle_command("/fork alt", session, store)
+    assert store.load(sid).current_branch == "alt"
+
+    session = store.load(sid)
+    _handle_command("/delete alt", session, store)
+
+    after = store.load(sid)
+    assert "alt" not in after.branches, \
+        "the union re-added the deleted branch — /delete is a false success message"
+    assert after.current_branch == "main", \
+        "deleting the current branch must land on main"
+
+
+def test_a_concurrent_fork_is_still_kept_by_a_stale_save(tmp_path):
+    """The reason DEL-1 could not be fixed by narrowing the union.
+
+    The tempting fix is to stop the union re-adding branches for
+    `owns_selection=True` saves. That would make a stale selection-owning save
+    DROP a branch another process had just forked, losing that branch and its
+    messages — worse than the bug it fixes. So the union must keep doing its job
+    and the deletion must be recorded instead.
+
+    Without this test, that shortcut looks correct: every other test in this file
+    would still pass.
+    """
+    store = SessionStore(str(tmp_path))
+    sid = store.create("T").session_id
+
+    stale = _stale_snapshot(sid)  # a chat turn's snapshot, loaded before the fork
+
+    faster = store.load(sid)
+    faster.fork("alt")
+    store.save(faster, owns_selection=True)
+
+    _turn(stale, "stale-q")
+    store.save(stale)  # message-only, and it has never heard of "alt"
+
+    assert "alt" in store.load(sid).branches, \
+        "a stale save dropped a concurrently forked branch"
+
+
+def test_reforking_a_deleted_name_clears_the_tombstone(tmp_path):
+    """A tombstone must not outlive the name it records.
+
+    If it did, the store would refuse to merge the re-forked branch back in from
+    disk: the fork would work in memory and vanish on the next load.
+    """
+    from screenplay_cowriter.cli import _handle_command
+
+    store = SessionStore(str(tmp_path))
+    sid = store.create("T").session_id
+
+    for command in ("/fork alt", "/delete alt", "/fork alt"):
+        _handle_command(command, store.load(sid), store)
+
+    after = store.load(sid)
+    assert after.current_branch == "alt"
+    assert "alt" in after.branches
+    assert after.deleted_branches == [], \
+        "the tombstone survived the re-fork, so the branch will not merge back"
+
+
+def test_a_session_file_written_before_the_tombstone_field_still_loads(tmp_path):
+    """The field is new, so every session file on disk predates it.
+
+    `from_dict` must default it rather than raise — opening an existing
+    conversation is the one thing that may never break.
+    """
+    store = SessionStore(str(tmp_path))
+    sid = store.create("T").session_id
+    session = store.load(sid)
+    session.fork("alt")
+    store.save(session, owns_selection=True)
+
+    old = store.load(sid).to_dict()
+    del old["deleted_branches"]  # exactly what a pre-DEL-1 file looks like
+
+    loaded = Session.from_dict(old)
+    assert loaded.deleted_branches == []
+    assert loaded.current_branch == "alt"
+    assert "alt" in loaded.branches
 
 
 def test_every_writer_that_changes_the_selection_says_so():

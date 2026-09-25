@@ -127,6 +127,14 @@ class SessionStore:
         for bname, dbranch in disk.branches.items():
             sbranch = session.branches.get(bname)
             if sbranch is None:
+                # A branch on disk that this snapshot does not have is usually a
+                # concurrent fork, and losing it would lose its messages — so the
+                # union copies it. But it is also what a DELIBERATE deletion
+                # looks like from here, which is why `Session.delete_branch`
+                # leaves a tombstone and this respects it. Without that check the
+                # union silently undid every `/delete` (DEL-1).
+                if bname in session.deleted_branches:
+                    continue
                 session.branches[bname] = dbranch  # whole branch is new to us
                 continue
             have = {(m.role, m.content) for m in sbranch.messages}
