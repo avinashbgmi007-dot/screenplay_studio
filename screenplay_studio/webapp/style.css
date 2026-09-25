@@ -3145,9 +3145,9 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .revision-nav-row.ok .rn-head { text-decoration: line-through; text-decoration-color: color-mix(in oklab, var(--ok) 60%, transparent); }
 .sev-dots { display: inline-flex; gap: var(--sp-1); align-items: center; }
 .sev-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-.sev-dot.high { background: #e5484d; }
-.sev-dot.medium { background: #f5a623; }
-.sev-dot.low { background: #46a758; }
+.sev-dot.high { background: var(--danger); }
+.sev-dot.medium { background: var(--sev-mid); }
+.sev-dot.low { background: var(--ok); }
 .bb-card-findings {
   display: flex;
   align-items: center;

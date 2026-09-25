@@ -267,6 +267,75 @@ def main():
             page.keyboard.press("Escape")
             page.wait_for_timeout(300)
 
+            # ---------- M11: the dock's Escape return point is the LAST opener --
+            # The L8 probe leaves the desk for the idea page, where there is no
+            # dock to focus into, so come back to a real project first. The openers
+            # are two controls the desk always paints: settings-btn and
+            # ideas-trigger live behind #overflow-toggle at this width, and focus()
+            # on a display:none control silently does nothing — which is a fixture
+            # bug, not a finding.
+            page.evaluate("async (n) => { await openProject(n); }", name)
+            page.wait_for_function("() => !document.body.classList.contains('idea-mode')",
+                                   timeout=15000)
+            # openDock() used to capture the opener only when the dock was closed
+            # (`if (!dockIsOpen())`), so a lens switch — which re-enters openDock
+            # with the dock already open — kept the FIRST opener. Escape then
+            # jumped back to a control the writer stopped using several clicks ago.
+            page.evaluate("() => closeDock()")
+            page.wait_for_timeout(200)
+            page.evaluate("() => { document.getElementById('home-btn').focus(); }")
+            page.evaluate("() => openDock('evidence')")
+            page.wait_for_timeout(400)
+            focus_in_dock = page.evaluate(
+                "() => !!document.activeElement.closest('#context-dock')")
+            check("openDock parks focus inside the dock (precondition)",
+                  focus_in_dock, json.dumps(focus_in_dock))
+            page.evaluate("() => document.getElementById('focus-btn').focus()")
+            page.evaluate("() => openDock('notes')")
+            page.wait_for_timeout(400)
+            page.evaluate("() => closeDock()")
+            page.wait_for_timeout(300)
+            back = page.evaluate(
+                "() => document.activeElement.id || document.activeElement.tagName")
+            check("Escape/close returns to the control the writer last used, not the first",
+                  back == "focus-btn", back)
+            # and the other half: focus already INSIDE the dock must not become the
+            # return point, or closing hands focus to a tab that is hidden a moment
+            # later. openDock() parks focus on the lens tab (`#dock-tab-<lens>`),
+            # so after the probe above the focus is already there.
+            page.evaluate("() => document.getElementById('home-btn').focus()")
+            page.evaluate("() => openDock('evidence')")
+            page.wait_for_timeout(400)
+            page.evaluate("() => openDock('notes')")
+            page.wait_for_timeout(400)
+            page.evaluate("() => closeDock()")
+            page.wait_for_timeout(300)
+            kept = page.evaluate(
+                "() => document.activeElement.id || document.activeElement.tagName")
+            check("a lens switch from inside the dock keeps the opener as the return point",
+                  kept == "home-btn", kept)
+            # third half: an opener detached by a re-render used to leave focus on
+            # <body>, so the next Tab restarted at the top of the document.
+            page.evaluate("""() => {
+                const s = document.createElement('span');
+                s.id = '__detached_opener'; s.tabIndex = -1;
+                s.textContent = 'x';
+                document.getElementById('main').appendChild(s);
+                s.focus();
+            }""")
+            page.evaluate("() => openDock('evidence')")
+            page.wait_for_timeout(400)
+            page.evaluate("() => document.getElementById('__detached_opener').remove()")
+            page.evaluate("() => closeDock()")
+            page.wait_for_timeout(300)
+            fell = page.evaluate("""() => ({
+                active: document.activeElement.id || document.activeElement.tagName,
+                body: document.activeElement === document.body,
+            })""")
+            check("a detached opener falls back to the dock's own affordance, not <body>",
+                  fell["active"] == "right-edge-affordance" and not fell["body"],
+                  json.dumps(fell))
+
             assert_no_js_errors(checks, errors)
             browser.close()
 

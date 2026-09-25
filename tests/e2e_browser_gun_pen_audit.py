@@ -795,8 +795,27 @@ def _start_analysis_and_wait():
                               json={"force": True}, timeout=3600,
                               headers=studio_headers(BASE))
             if r.status_code in (200, 201):
+                # "Accepted" must be MEASURED, not assumed from the status-code
+                # branch we happen to be in (this check used to be `check(name,
+                # True)` — unfailable). The blocking handler answers 200 with
+                # this project's manifest summary; a 200 whose body is an error
+                # envelope, another project's summary, or non-JSON (a proxy
+                # page) is the server NOT confirming the forced run.
+                try:
+                    ack = r.json()
+                except ValueError:
+                    ack = None
+                accepted = (isinstance(ack, dict)
+                            and ack.get("project") == PROJECT
+                            and not ack.get("error"))
+                check("pass2: force re-analysis accepted", accepted,
+                      f"HTTP {r.status_code} but body is not this project's "
+                      "manifest summary: "
+                      + (json.dumps(ack)[:140] if isinstance(ack, dict)
+                         else repr(getattr(r, "text", "")[:140])))
+                if not accepted:
+                    return False
                 started = True
-                check("pass2: force re-analysis accepted", True)
             else:
                 # NOT accepted -> return WITHOUT waiting. Trap 4, and the one
                 # this function learned the hard way: a wait loop whose trigger
@@ -841,8 +860,23 @@ def _start_analysis_and_wait():
         # A NEW completion only: `ts` strictly after the run we started.
         if ts > before_ts and (pr.get("status") == "complete"
                                or pr.get("stage") == "done"):
-            check("pass2: analysis completed", True)
-            return True
+            # The heartbeat flipping is only half the promise (the check used
+            # to be `check(name, True)` — it merely echoed the loop condition
+            # it sat under). A completed analysis must ALSO leave a non-empty
+            # report behind, or the arrival strip below counts a pass that
+            # produced nothing. Measure the LIVE report from the server.
+            try:
+                rep = api("GET", f"/api/projects/{PROJECT}/report", timeout=60)
+                n_findings = len(rep.get("findings") or [])
+                rep_err = ""
+            except Exception as e:
+                n_findings, rep_err = -1, str(e)[:120]
+            completed = n_findings > 0
+            check("pass2: analysis completed", completed,
+                  f"progress says {pr.get('status')}/{pr.get('stage')} at "
+                  f"ts={ts} (new vs {before_ts}), but the live report carries "
+                  f"{n_findings} findings {rep_err}".strip())
+            return completed
         if last_ts <= before_ts and time.time() > first_beat_by:
             check("pass2: analysis completed", False,
                   f"no heartbeat within {FIRST_BEAT_S}s of an accepted trigger — "
@@ -898,7 +932,23 @@ def step_pass2():
               f"computed_at unchanged ({after.get('computed_at')}) — the strip would "
               "be compared against the previous pass")
         return
-    check("pass2: the new pass wrote a fresh arrival snapshot", True)
+    # "Fresh" is more than "computed_at differs" (which the branch above just
+    # echoed; the check used to be `check(name, True)` — unfailable). The
+    # snapshot must be STRICTLY NEWER and carry the exact arithmetic fields the
+    # arrival checks below read by name — a pass that wrote a partial or
+    # backwards-dated snapshot must fail here, not NPE further down.
+    required = ("computed_at", "last_total", "prev_total",
+                "still_live", "fixed", "new")
+    missing = [k for k in required if after.get(k) is None]
+    newer = ((after.get("computed_at") or 0)
+             > (before.get("computed_at") or 0))
+    fresh = newer and not missing
+    check("pass2: the new pass wrote a fresh arrival snapshot", fresh,
+          f"computed_at {before.get('computed_at')!r} -> "
+          f"{after.get('computed_at')!r} (strictly newer={newer}); "
+          f"missing fields={missing}")
+    if not fresh:
+        return
     RESULTS["arrival_expected"] = after
     print("    post-pass2 expected arrival:", after)
 

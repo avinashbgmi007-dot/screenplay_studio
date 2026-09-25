@@ -236,6 +236,39 @@ PROBE = """(tokens) => {
     if (rec.ratio < rec.need) other.push({ ...rec, why: rec.token ? "token " + rec.token : "sub-AA" });
   }
 
+  // WCAG 1.4.11 — NON-TEXT contrast, 3:1. A severity dot carries meaning on
+  // its own (the printed count beside it does not say WHICH severity it is),
+  // so its FILL is measured here. The authority is `groundsOf`, not the token:
+  // the dock is a translucent panel over a gradient body, so the pixel under a
+  // dot is a composite no arithmetic over --ok can see. That is how a dot
+  // reading 2.50:1 against a token measured 2.41:1 on screen.
+  const fills = [];
+  for (const sel of [".sev-dot.high", ".sev-dot.medium", ".sev-dot.low"]) {
+    document.querySelectorAll(sel).forEach((el) => {
+      if (!visible(el)) return;
+      const r = el.getBoundingClientRect();
+      if (r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return;
+      const st = cs(el);
+      const paint = hex(st.backgroundColor);
+      if (!paint) return;
+      const host = el.parentElement;
+      const grounds = host ? groundsOf(host) : null;
+      const ea = effAlpha(el);
+      if (ea <= 0.01) return;
+      let worstR = null, worstG = null;
+      for (const g of (grounds || [])) {
+        const v = ratio(ea < 0.999 ? blend(paint, g, ea) : paint, g);
+        if (worstR === null || v < worstR) { worstR = v; worstG = g; }
+      }
+      fills.push({
+        sel, painted: st.backgroundColor,
+        ground: worstG ? "rgb(" + worstG.map((v) => Math.round(v * 255)).join(",") + ")" : null,
+        opacity: ea < 0.999 ? Math.round(ea * 100) / 100 : null,
+        ratio: worstR === null ? null : Math.round(worstR * 100) / 100,
+      });
+    });
+  }
+
   const boxes = [];
   // The hit area, not the painted box: a control may carry its target in a
   // transparent ::before pad (the ruler ticks are 6px scale marks). A pad is
@@ -273,11 +306,11 @@ PROBE = """(tokens) => {
   });
 
   return { tokenText: text, failing: other, smallTargets: boxes,
-           missingTokens: missingTokens };
+           missingTokens: missingTokens, fills: fills };
 }"""
 
 
-def sweep(checks, page, tag):
+def sweep(checks, page, tag, dots=False):
     page.wait_for_timeout(250)
     res = page.evaluate(PROBE, list(TOKENS))
     # An unresolvable token would drop its sites out of scope silently, which is
@@ -321,6 +354,31 @@ def sweep(checks, page, tag):
         e[0] += 1
         e[1] = min(e[1], r["w"])
         e[2] = min(e[2], r["h"])
+    # Non-text contrast: the same rule this gate already applies to text — a
+    # measurement that saw nothing is a look-away, not a pass. Only on the
+    # sweeps that are expected to have the dots on screen; elsewhere there is
+    # nothing to measure and a failure would be about the fixture, not the paint.
+    if dots:
+        seen = {}
+        for r in res["fills"]:
+            k = (r["sel"], r["ratio"])
+            seen[k] = seen.get(k, 0) + 1
+        rows = sorted(seen, key=lambda k: (k[1] is None, k[1]))
+        unmeasurable = [k for k in rows if k[1] is None]
+        measurable = [k for k in rows if k[1] is not None]
+        checks.ok(f"{tag}: severity dots are on screen to measure",
+                  bool(measurable), f"{len(res['fills'])} dots found, none with a resolvable ground")
+        checks.ok(
+            f"{tag}: every severity dot clears 3:1 non-text contrast",
+            not [k for k in measurable if k[1] < 3.0] and not unmeasurable,
+            "; ".join(f"{k[0]} {k[1]}:1 x{seen[k]}" for k in measurable if k[1] < 3.0)
+            + "; " + "; ".join(f"{k[0]} no resolvable ground" for k in unmeasurable),
+        )
+        print(f"  NOTE  {tag}: {len(measurable)} dot shapes measured, "
+              f"worst {min((k[1] for k in measurable), default='n/a')}:1")
+        for r in res["fills"][:6]:
+            print(f"        {r['sel']} {r['ratio']}:1 {r['painted']} on {r['ground']}"
+                  + (f" @opacity {r['opacity']}" if r['opacity'] else ""))
     print(f"  NOTE  {tag}: {len(worst)} token-text runs measured, "
           f"worst {worst[0]['ratio'] if worst else 'n/a'}:1, "
           f"{len(res['failing'])} other sub-AA/inferred, "
@@ -387,7 +445,7 @@ def run(base, name):
                       is (theme == "dawn"))
             checks.ok(f"{theme}: severity chips are on screen",
                       page.locator(".sev-badge:visible").count() > 0)
-            sweep(checks, page, f"{theme} desk")
+            sweep(checks, page, f"{theme} desk", dots=True)
 
             # ②b The dispositions the desk sweep could not reach. Every settled
             # row is dimmed with `opacity`, which composites against whatever
@@ -438,7 +496,7 @@ def run(base, name):
                       bool(cue["parked"] and cue["open"])
                       and cue["parked"] != cue["open"]
                       and float(cue["alpha"]) == 1.0, str(cue))
-            sweep(checks, page, f"{theme} desk, dispositions taken")
+            sweep(checks, page, f"{theme} desk, dispositions taken", dots=True)
 
             # ③ river read — the same manuscript re-painted on dark glass. Its
             # handler is #flow-btn's, which is parked in the overflow menu, so

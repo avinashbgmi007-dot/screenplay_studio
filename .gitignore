@@ -41,6 +41,8 @@ Thumbs.db
 .gstack/
 
 # Runtime data (never versioned)
+# logsetup writes this at the repo root whenever a studio runs from here
+screenplay_studio.log
 .freebuff/
 studio_projects/
 preview_shots/

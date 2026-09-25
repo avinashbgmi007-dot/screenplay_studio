@@ -21,4 +21,3 @@ html body.dawn .brand-mark{box-shadow:0 0 14px rgba(190,140,50,.30)}
 html body.dawn .finding-flash{box-shadow:0 0 16px rgba(190,140,50,.30)}
 body.dawn .scene-window{background:linear-gradient(180deg,#f8ead0 0%,#f5e3bd 70%,#ecd9ac 100%)}
 @media(prefers-reduced-motion:reduce){html body.dawn .sev-dot.sev-high,html body.dawn .sev-badge.sev-high{animation:none}}
-body.dawn .sev-dot.high{background:#a03722}body.dawn .sev-dot.medium{background:#8a5a14}
