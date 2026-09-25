@@ -218,6 +218,32 @@ fetched commit confirms `_reject_foreign_host` and `syncRoute` are present. The
 checkout was clean apart from the audit report, so the push carried the six fix
 commits and nothing else.
 
+**The round-4 push.** `e86ff62` (code + tests) and `2b38648` (docs) are pushed too:
+`git ls-remote` reports `qoder/update = 2b38648`, and `git grep` against the fetched
+commit confirms `apply_edit`, `announce`, `role="alert"` and all four new test files
+are present in it.
+
+### 6.1 Two environment hazards, neither a product defect
+
+Recorded because both cost real time and both will recur.
+
+1. **`git push` looked hung; it was the credential helper.** `GIT_TRACE=1` shows
+   `git credential-helper-selector get` taking **68 seconds** before it even reaches
+   `git-credential-manager.exe`, and three attempts — including one with a
+   900-second budget — never completed. Bypassing the selector and calling GCM
+   directly finished the push in **6 seconds**:
+   `git -c credential.helper= -c 'credential.helper=!"…/git-credential-manager.exe"' push origin <branch>`.
+   A push killed by `timeout` also wedges the next attempt for ~12 minutes, so the
+   first two failures compounded.
+2. **Every `git commit` in this checkout deletes the current branch's ref.** The
+   Qoder `post-commit` hook runs the Qoder SDK, and `refs/heads/qoder/update`
+   disappears — `HEAD` becomes unresolvable and `git status` reports the whole tree
+   as staged-new. **The commit object and its reflog entry are written correctly**, so
+   nothing is lost, but the recovery is not obvious:
+   `TIP=$(tail -1 .git/logs/refs/heads/<branch> | awk '{print $2}')`, then write it to
+   `.git/refs/heads/<branch>`. `git update-ref` returned **exit 0 without creating the
+   ref**, so the direct write is the one that works. It happened on both commits here.
+
 ---
 
 ## 7. The `xss_inert` tripwire fired — and it had two bugs of its own
