@@ -7,7 +7,9 @@ A three-piece screenplay analysis and co-writing system for writers who want str
 - **Parses** screenplays in multiple formats (Fountain .fdx, .fountain, plain text, .md, PDF with OCR fallback)
 - **Analyzes** them across 12 model categories (dialogue, theme, character, structure, scene_function, principles, setup/payoff ledger, char_reads, character_dials, coverage, genre, logline_test) plus deterministic passes (voice/subtext/idiolect, continuity, pacing) using an LLM with grammar-constrained JSON output
 - **Co-writes** with the screenplay via a conversational interface: 8 personas × 5 modes, branch-based sessions, writer relationship memory, and a writer library (PAST WORK digest of past projects)
-- **Serves a webapp** (Flask, port 8500): a two-room studio shell — the writer's desk (Sameer, co-write) and the consultant's desk (Dr. Sushruta, feedback) around a shared script pane — plus a scriptless Ideas room (premise incubator with graduation into a real project), the Stash, margin notes, Beat Board, Compare, Revision view, Feedback View, dictation (STT), and reply translation
+- **Serves a webapp** (Flask, port 8500): a two-room studio shell — the writer's desk (Sameer, co-write) and the consultant's desk (Dr. Sushruta, feedback) around a shared script pane — plus a scriptless Ideas room (premise incubator with graduation into a real project), the Stash, margin notes, Beat Board, Compare, Revision view, and the Context Dock
+(Evidence · Sameer · Sushruta · Stash & Notes lenses — the old full-screen Feedback View was
+removed; the Evidence lens carries it), dictation (STT), and reply translation
 
 ## Core Design Principles
 - **Boring is good** — no database, no framework; state is file-based, sessions are JSON files

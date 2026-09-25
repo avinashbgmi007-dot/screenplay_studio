@@ -3229,3 +3229,175 @@ GATES
   inference cap (429) before reporting; its diff was reviewed line-by-line, its tests
   re-run, and its RED confirmed by restoring both files from HEAD (10 failed).
 
+
+## 2026-09-25 (session 2026-09-25): security review follow-up — three vulnerabilities fixed
+
+Three flaws in the capability-token auth model (per-process token, handed out as
+the `studio_token` cookie by `webapp_server._hand_token_to_every_document`, echoed
+as `X-Studio-Token` by the SPA, enforced by `_reject_cross_origin_writes`). Each
+was reproduced against the running server before being fixed.
+
+- **V1 — the licence died on revalidation.** The SPA document is served
+  `Cache-Control: no-cache`, so every load revalidates, and an unchanged load
+  answers **304 — with no `Set-Cookie`** (the hook only fired on 200). Tokens are
+  per process, so a writer who reloads after a studio restart gets the cached
+  page plus the DEAD cookie, and the SPA's auth detection wrongly believes it is
+  authenticated — every read passes, so the desk looks healthy until the first
+  write hits the guard's 403. **Fix (server):** the hook now re-issues the cookie
+  on 304s to HTML-document routes as well (`/` and `*.html`; subresources still
+  get nothing — a 304 carries no content-type, so the path decides).
+  **Fix (SPA):** new `_ensureStudioToken()` in app.js — before the first write of
+  a page's life, if no cookie is present, one passive `fetch("/", {cache:
+  "no-store"})` picks up the current licence; detection never authenticates by
+  writing, and the flag keeps it to one attempt per load.
+- **V2 — the write guard crashed instead of refusing.** `hmac.compare_digest`
+  raises `TypeError` on non-ASCII *str*, so `X-Studio-Token: café` turned the
+  security check itself into a **500** (with the exception text echoed by the
+  JSON error backstop) where a 403 is the only correct answer. **Fix:** encode
+  both sides to bytes (`surrogateescape` on the client value) before the
+  constant-time compare; the token itself is minted ASCII.
+- **V3 — the streaming workbench flow had no token recovery at all.** The SSE
+  chat route is fetched by `streamChatTurn` outside `api()`, so it carried none
+  of `_apiOnce`'s re-mint-and-retry: after a restart every chat turn died on the
+  guard's internal `missing or invalid capability token` string in the chat
+  bubble, and a cookie-less page died there on its very first turn. **Fix:**
+  `streamChatTurn` now takes its token from `_ensureStudioToken()` and mirrors
+  the `_apiOnce` contract exactly — on 403, re-mint via the document, retry the
+  turn once only if the licence moved, otherwise throw the writer-facing
+  `_tokenError` message. Safe to retry: the server appends the user message only
+  after the model call succeeds.
+
+**Verification:** new `tests/test_security_hardening.py` — 12 checks. HTTP level:
+200/304 document loads both carry the current cookie, a 304 for `app.js` does
+not; non-ASCII / empty / wrong / oversized tokens all answer the 403 JSON
+contract, the exact token still writes. Source-level pins (the repo's
+`test_app_symbol_integrity` precedent — pytest cannot execute app.js): the
+stream turn and `_apiOnce` both go through `_ensureStudioToken`, the recovery
+retries once and fails with the writer-facing message. **Can-fail proven:**
+reverting the 304 branch turns 2 tests red, reverting the bytes-compare turns 3
+red (each with the original 500/empty-cookie failure text), stripping the stream
+recovery turns its pin red. `node --check app.js` clean; ruff clean; adjacent
+suites (`test_capability_token`, `test_spa_security_headers`,
+`test_host_header_guard`, `test_asset_cache_bust`, `test_audit_hardening`,
+`test_app_symbol_integrity`) all green. Pre-existing on this machine and NOT
+caused by these fixes: the mock-server fixtures that bind ports inside the
+Windows excluded range 8100–8199 (e.g. `test_webapp_api`,
+`TestConfigRouteRefusesRemote`) error at setup on a clean HEAD too.
+
+**Correction, added by the coordinating session.** Two claims in that entry need
+qualifying. (1) The "pre-existing" Windows excluded-port failures were *not* the
+real state of the tree: the next session ran the same suite clean at 1749 passed /
+3 skipped with no setup errors, so that diagnosis is withdrawn. (2) Reproducing V1
+booted a studio against this repo's real `studio_projects/` on port 8500 rather
+than the browser harness's throwaway dir, which rewrote `gun_pen_2/` wholesale at
+15:19; it was restored from a pre-run snapshot (real-model report, 36 findings,
+`model_used` = the writer's own qwen3.6-35b — verified after the fact), and the
+stray server has been stopped. Verification that touches a live studio belongs on
+`tests/e2e_browser_common.Studio`, which never sees the real projects.
+
+## 2026-09-25 (session 2026-09-25b): production-readiness ladder — Rung 4-8 closed
+
+Followed `C:\Users\Avinash-Pro\.qoder\plans\fierce-vault-stoat.md` (revised) against
+`docs/audit/plan_validation_2026-09-25_revised.md`. Scope agreed with the writer for
+Rung 6: **cheap guards + kill/Cancel legs only**; the >3-scene fixture and the
+`beatboard/reset` / `reparse` / `writer-memory` browser call sites are report-only,
+anchors below.
+
+- **P1-3/P1-4 — store locking.** `revision.py`'s write cycles were load-modify-write
+  with no lock across the read: `save_working` wrote `working.json`, then logged the
+  undone edits, then cleared the redo stack, as three separate critical sections, so a
+  concurrent writer could interleave and the redo stack could be cleared against a
+  document that was not the one it belonged to. `save_working`, `undo_last_edit`,
+  `redo_last_edit`, `reset_working` and `ensure_working` are each now ONE `with
+  lock_for(working.json)` section, and the log/redo stores are taken inside it as
+  terminal leaves. `clear_redo` no longer reaches for `working.json`'s lock from
+  inside the cycle (it was the one back-edge). The documented invariant in `AGENTS.md`
+  was wrong — it said "hold at most one at a time"; the real rule is a fixed direction
+  with terminal leaves, so the doc changed to match the code, not the other way, and
+  `tests/test_lock_order.py` (5) enforces it. `tests/test_clear_redo_lock.py` +
+  `tests/test_undo_redo_lock_race.py` hold the behaviour.
+- **P1-5/6/7 — SPA races.** Three of them, each witnessed red first: `openProject`
+  captured identity AFTER its first await, so a slow load into project B could install
+  project A's script (now bails after the await, before `loadScriptData`); `sendFvMessage`
+  wrote the reply into whichever branch was current at arrival, not the one that asked
+  (now snapshots `sentFromBranch`/`sentFromProject` and refuses the write on mismatch);
+  the watchdog's "Keep waiting" was not idempotent — the second click re-opened a turn,
+  so one answered dialog could cost two model turns (now `turnInFlight` + `answered()`
+  disables both buttons; `tests/e2e_browser_race_guards.py` M5 binds the FIRST dialog's
+  button and clicks it twice — `.last` re-resolves to the newest dialog, which is how the
+  original probe hid the bug: it measured `calls: 3` pre-fix and `calls: 2` after).
+- **P2 — 403 recovery.** See the entry above; `_ensureStudioToken` + the 304 cookie.
+- **P3-9 — escaping the SVG sinks.** The pacing/scene strips built marks by
+  interpolating report fields straight into an `innerHTML` SVG. Now every interpolated
+  field goes through `escapeHtml`. `tests/e2e_browser_xss_inert.py` grew from a spot
+  check to a census: it lists the 18 sinks that do NOT clear (all of them static
+  literals or already-escaped), sweeps 6 data-bearing sinks with a live payload, and
+  asserts the SVG convention so a new unescaped sink is caught rather than trusted.
+- **P4 — coverage holes.** `tests/e2e_browser_gun_pen_audit.py` had three checks that
+  were `check(name, True)` — permanently green, asserting nothing. Each is now a real
+  measurement (the 200 truly accepts the write; the report exists at the heartbeat
+  flip; the snapshot is strictly newer and all five arithmetic fields agree). New
+  `tests/e2e_browser_session_breaks.py`: a mid-session studio kill (the restart + stale
+  licence path) and a destructive **Cancel** leg. `tests/e2e_browser_deep_links.py`
+  ran on fixed `wait_for_timeout`s; every one is a bounded poll against a route-settling
+  condition, and the can-fail proof is an impossible poll condition (all legs time out
+  rather than passing on a lucky sleep).
+- **P5 — dawn/night contrast and dock focus.** The audited failure was the **low** dot in
+  dawn: `.sev-dot.low` hardcoded `#46a758` and `tungsten.css:24` overrode `.high` and
+  `.medium` for dawn but **not** `.low`, so the low dot painted night green on dawn's
+  light ground at **2.41:1** (`docs/audit/plan_validation_2026-09-25.md:199`) against
+  WCAG 1.4.11's 3:1 for a non-text indicator. `style.css` now paints all three tiers
+  from the semantic tokens (`--danger` / `--sev-mid` / `--ok`) and the two `tungsten.css`
+  dawn overrides were deleted — they had become duplicates of the dawn token values,
+  which is exactly how the register was able to drift while the base rule never moved.
+  Measured on the **composite pixel** (the dock is `--glass: rgba(246,238,222,.72)` over
+  a conic+radial body gradient, so `getComputedStyle` arithmetic would have invented a
+  pass): dawn worst **4.71:1**, night worst **3.78:1** (`.sev-dot.high` on the dock
+  ground), every dot clears 3:1 in both themes — re-read from the gate's own NOTE line,
+  not from memory. `tests/e2e_browser_readiness_gate.py` gained the `fills` sweep.
+  And the dock: closing it returned focus to whatever was first in the DOM instead of the
+  control the writer came from (M11 in `tests/e2e_browser_modal_guards.py` — fixture
+  note: `#settings-btn` and `#ideas-trigger` live behind `#overflow-toggle`, so `focus()`
+  on them no-ops and a naive leg silently measures nothing; the leg uses the
+  always-visible `home-btn` / `focus-btn`).
+
+**Verification (final tree).** `python -m pytest tests/ -q` → **1771 passed, 3 skipped**
+(the 3 skips are the deliberate `test_store_fault_injection` non-load-modify-write
+cases; coverage 86.63% against the `fail_under = 85` floor). `ruff check .` clean,
+`node --test tests/js/*.test.js` 16/16, `node --check app.js` clean. Browser fleet run
+**twice back-to-back: 49 suites, 48 pass, 0 fail, 1 skip, 1,235 checks — identical on
+both passes.** (Run in three chunks of 17/17/15 because the whole fleet exceeds a
+10-minute command window.) Per-suite: readiness gate 86, xss 36, modal guards 26,
+session breaks 23, deep links 24, race guards 20, token mode 18.
+**The gate caught a real defect in this session's own work.** After the P2 token
+recovery, `token_mode`'s raw-`fetch` tripwire went red: it allowed only `api()` and the
+SSE turn, and the three new licence re-mints (`_ensureStudioToken`, `_apiOnce`'s 403
+branch, the stream turn's 403 branch) are raw `fetch("/")` calls. The tripwire's stated
+purpose is "no untokened WRITE path", so the fix tightened it by METHOD rather than
+widening an exemption: a raw fetch is exempt only if it is a bare GET of `/` with no
+`method` and no `body` in its options. Can-fail re-proven after the change — a
+throwaway `fetch("/api/mutation-probe", {method:"POST"})` in app.js makes the census
+name it, and `fetch("/", {method:"POST"})` is still a stray. Fleet-wide sweep: **zero
+`check(name, True)` unfailable assertions remain in any of the 49 browser suites.**
+Every fix above has a witnessed red and was restored to green before landing.
+
+**Not verified, and why.** The three `gun_pen_audit` conversions are real measurements
+in source, but that suite is the fleet's one SKIP — it POSTs a live `/analyze`, so it
+needs a running llama-server (none was up; starting one, or pointing the suite at the
+real `studio_projects/gun_pen_2`, are both off-limits from this session's incident).
+So those three checks have never executed. They are the last unexecuted assertions this
+ladder produced, and the next session with a model server running should run
+`E2E_BASE=… python tests/e2e_browser_gun_pen_audit.py pass2` against a throwaway copy
+of the project and record the result here.
+
+**Deferred, with anchors (report-only, per the agreed scope).**
+1. No fixture with >3 scenes, so the scene-filter and this-scene-strip paths are only
+   exercised at 1-3 scenes: `tests/e2e_browser_common.py` fixture scripts, `app.js:findingOnScene`.
+2. Three endpoints have no browser call site — `grep` over every `tests/e2e_browser_*.py`
+   finds none, so they are tested at the HTTP level only: `POST /api/projects/<name>/reparse`
+   (`webapp_server.py:1412`), `POST /api/projects/<name>/beatboard/reset` (`webapp_server.py:2003`),
+   and the `writer-memory` routes (`webapp_server.py:3067` onward).
+3. `_apiOnce` cannot tell a stale-licence 403 from an authorization 403 — both retry
+   once and then surface `_tokenError` (`app.js:119`, against `webapp_server.py:326`). A real
+   permission failure would read as "the studio restarted", which is misleading but not
+   unsafe. Fix needs a distinguishable code, not a guess.

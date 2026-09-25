@@ -28,10 +28,10 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1614 passed, 4 skipped, 0 failed** (1618 collected; +4 in pass 14b: `tests/test_analyze_preflight.py`) |
-| Lint | `ruff check .` | **clean** |
-| JS unit | `node --test tests/js/*.test.js` | **16 / 16** |
-| Browser E2E | `python tests/run_browser_suites.py` | **34 suites: 33 pass, 0 fail, 1 skip, 0 known-broken** — **702 checks** (pass 14: +1 suite, +32 checks). **Re-run in pass 14b** after the product change: unchanged, `GATE-EXIT=0` — the pre-flight guard only alters failure paths. `gun_pen_audit` remains the one skip, and its label was re-tested this pass and held. |
+| Unit + integration | `python -m pytest tests/` | **1771 passed, 3 skipped, 0 failed** — measured 2026-09-25 at this revision (113s; coverage **87%** — 86.63%: 9616 statements, 1286 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +22 over the previous row: the lock-order, clear-redo, undo/redo-race and security-hardening files) |
+| Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
+| JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
+| Browser E2E | `python tests/run_browser_suites.py` | **49 suites: 48 pass, 0 fail, 1 skip, 0 known-broken** — **1,235 checks** — measured 2026-09-25 on the final tree, run **twice back-to-back with an identical result** (the two passes agree to the check: 48/0/1 and 1,235 each). Correcting the previous row's count: `discover()` finds **49** suites, not 48. `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. The gate is run in three alphabetical chunks because the whole fleet exceeds a single 10-minute command window; the chunk splits are 17/17/15 and each chunk's own summary line is what is quoted here. |
 
 > **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
 > correctly found that `design_session`'s exclusion label was false — the console frames the SPA

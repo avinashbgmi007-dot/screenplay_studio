@@ -54,7 +54,8 @@ conversation should use these terms exactly. Last synced 2026-09-06.
 - **Character Track** — the serve-time per-character layer: presence, dials, traits,
   interactions, reads (assembled from KG + report; no model).
 - **Stash** — the writer's saved snippets per Project (`stash.json`): select a passage →
-  Stash this → the rail lists them.
+  Stash this → the dock's Stash & Notes lens lists them (the left rail that once did is
+  retired — see below and `docs/REDESIGN_MASTER_PLAN.md` §6).
 - **Margin Note** — the writer's own hand-font note pinned to a scene or line
   (`notes.json`). Distinct from the doctor's Finding cards.
 - **Beat Board** — the reorderable corkboard of scene cards; saving writes a permutation,
@@ -99,9 +100,10 @@ conversation should use these terms exactly. Last synced 2026-09-06.
   strip, script mass strip, per-scene deep cards (Locate · Rewrite · Discuss · Dismiss),
   severity filter row and the dawn meter. What the Feedback room, `f` and the Consultant
   gutter tab all open.
-- **Feedback View** (`#feedback-view`) — **DORMANT** since the GO 2 fold: the old
-  full-screen 3-panel consultant surface (`state.view="fv"`). Still in the DOM, unreachable;
-  every route into it now lands on the **Evidence lens**.
+- **Feedback View** (`#feedback-view`) — **REMOVED** (P0.1, after the GO 2 fold): the old
+  full-screen 3-panel consultant surface (`state.view="fv"`) is gone from the DOM; only the
+  `openFeedbackView()` fold survives, and every route into it lands on the **Evidence lens**
+  (the dock's Sushruta lens carries the consultant chat, `sendFvMessage`).
 - **Problem Board** — **RETIRED**: was the docked right-side severity-filtered findings
   panel (`#problem-board`, edge tab `#pb-edge-tab`). Markup, CSS, palette command and
   scroll-sync are gone; the **Evidence lens** holds the rows, and the manuscript's margin

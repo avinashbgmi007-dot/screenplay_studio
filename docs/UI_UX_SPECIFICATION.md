@@ -130,11 +130,14 @@ to system fonts by design):
 Base: 15px, line-height 1.55, **`--font-ui` (DM Sans) is the body default** (not serif).
 `body` uses `-webkit-font-smoothing: antialiased`.
 
-> ⚠ **Known gap:** `--font-display: "Instrument Serif"` and `--font-ui: "DM Sans"` are
-> referenced in `:root` but **not bundled** — there is no `@font-face` for them and no
-> `.woff2` in `webapp/fonts/`, so both silently fall back (Georgia / system-ui). Bundling
-> them (or re-pointing the vars at bundled families) is an open code task; a rebuild must
-> either ship the woff2 files or accept the fallback.
+> ✅ **Fonts are bundled — and that is load-bearing:** `webapp/fonts/` holds 14 `.woff2`
+> files (including `InstrumentSerif-*` and `DMSans-*`) and `style.css` carries 18
+> `@font-face` declarations — `Instrument Serif` at `style.css:111`/`:119`, `DM Sans` at
+> `:127`/`:135` — so the display/UI stacks render from self-hosted files, not the Georgia /
+> system-ui fallbacks. Zero external requests: no CDN is referenced and the SPA document is
+> served with a strict `script-src 'self'` CSP (`webapp_server.py`). Shipping the assets in
+> the install is correctness, not polish — `tests/test_packaging_data_files.py` builds a
+> wheel and an sdist and fails if a font (or any other data file) stops being shipped.
 
 ### 2.3 Buttons & controls
 
@@ -313,23 +316,21 @@ The consultant's desk — "Dr. Sushruta's Report".
   conversational lenses are switched via rooms/lens, not dropdowns. `/api/config` still
   serves the full persona/mode lists and the fallback contract below stands.
 
-### 4.4b Feedback View (`#feedback-view`) — DORMANT since the GO 2 fold
+### 4.4b Feedback View (`#feedback-view`) — REMOVED (the GO 2 fold, then P0.1 deleted it)
 
-**Status (GO 2, "1A — fold FV in"): the Feedback room toggle, the `f` shortcut, and the
-Consultant gutter tab now all route to the main workspace** — they open the Context Dock
-with the **Evidence lens** active (mass strip + deep cards + filter row) instead of this
-surface. `openFeedbackView()` is a fold: it never sets `state.view = "fv"`; session
-restore maps a stored `view: "fv"` to the workspace too, and the layout audit grep-gates
-that no reachable path sets it. The three-pane surface below remains in the DOM **dormant,
-unreachable — not deleted** (its removal is a separate later commit). The drawer panel
-(§4.4) remains reachable in idea-less contexts via `openFeedbackRoom()`.
+**Status: the three-pane surface is gone, not dormant.** `renderFeedbackView`, `switchFvTab`,
+`initFvDividers` and `initFvScrollSync` no longer exist in `app.js`, and `#feedback-view` no
+longer exists in `index.html` (P0.1 deleted the clone). What ships is the routing: the Feedback
+room toggle, the `f` shortcut, and the Consultant gutter tab all call `openFeedbackView()`,
+which is a fold — it sets no view; it does `setRoom("cowrite")` + `openDock("evidence")` and
+lands on the Context Dock's **Evidence lens** (mass strip + deep cards + filter row). A stored
+`view: "fv"` session restores to the same workspace, and the layout audit grep-gates that no
+reachable path sets it.
 
-- **Three panes (dormant)**: left Dr. Sushruta chat (streaming via `sendFvMessage`), center script
-  column with per-scene finding severity dots (`renderFeedbackView`), right panel with
-  Board/Sameer tabs (`switchFvTab`).
-- **Layout machinery (dormant)**: maximize toggle (`fv-maximized`), draggable pane dividers
-  (`initFvDividers`), scroll sync between script column and findings (`initFvScrollSync`),
-  and an honest `fin` end-marker at the bottom of the script column.
+- **The surviving feedback chat** is the dock's Sushruta lens: it carries the old FV's
+  consultant column (`fv-*` ids and handlers were moved into the dock slot, not deleted —
+  `sendFvMessage("consultant")` streams there) alongside Sameer's composer.
+- The drawer panel (§4.4) remains reachable in idea-less contexts via `openFeedbackRoom()`.
 
 ### 4.4c Problem Board (`#problem-board`) — RETIRED
 
@@ -579,7 +580,7 @@ rail note input rather than calling the Stash endpoint — different from §7.2'
 | `Ctrl/⌘ Z` | Undo last applied edit |
 | `Ctrl/⌘ Shift Z` | Redo the undone edit |
 | `c` | Switch to Co-write (Sameer) |
-| `f` | Switch to Feedback (Consultant) |
+| `f` | Open Feedback — branches on context: **with a project open** it is the §4.4b fold (switch to the Co-write room + open the dock's Evidence lens); **with no project** it summons the Consultant drawer (`openFeedbackRoom`) |
 | `s` | Focus the manuscript — dismiss the partner, back to the page |
 | `↑` / `↓` (from `#manuscript-container`) | Walk the line cursor one script line. The manuscript is **one tab stop** (`tabindex="0"` on the region), never nine hundred: lines carry `tabindex="-1"` and arrows move focus, so `Tab` still leaves the page in one press |
 | `a` | Toggle the Craft shelf (analysis panels) |
@@ -821,19 +822,23 @@ the session "saw" (used for stale-session honesty), in addition to the shape in 
 
 ## 12. Reference files & implementation notes
 
-- Frontend source of truth: `screenplay_studio/webapp/` — `index.html` (~770 lines, SPA
-  shell), `app.js` (~8,530 lines, all client logic), `style.css` (~6,520 lines, full
-  design system incl. the NOCTA layer), `tungsten.css` (frozen visual system override,
-  night + dawn registers — loads after `style.css`), `core.js` (~96 lines, DOM-free pure helpers:
+- Frontend source of truth: `screenplay_studio/webapp/` — `index.html` (~720 lines at the
+  time of writing, SPA shell), `app.js` (~9,700 lines, all client logic), `style.css` (~6,250
+  lines, full design system incl. the NOCTA layer), `tungsten.css` (frozen visual system override,
+  night + dawn registers — loads after `style.css`), `core.js` (~170 lines, DOM-free pure helpers:
   `fuzzyScore`, `formatMessageContent`, `truncate`, `formatElapsed`, `fmtDuration`,
   `shortModelId`), plus `fonts/` (self-hosted woff2, Instrument Serif + DM Sans,
   18 `@font-face` declarations) and the Design Lab preview folders
-  (`preview-redesigns/`, `preview-next/`, `preview-r4/`).
-- Backend: `screenplay_studio/webapp_server.py` (~2,805 lines) — all endpoints in §9.
+  (`preview-redesigns/`, `preview-next/`, `preview-r4/`, `preview-design/`).
+  (Treat these counts as ballpark — they drift with every commit.)
+- Backend: `screenplay_studio/webapp_server.py` (~4,085 lines at the time of writing) — all
+  endpoints in §9.
 - Pure helpers must stay DOM-free (unit-tested in `node --test tests/js/`).
-- Cache-busting: `index.html` references `style.css?v=<hash>` / `app.js?v=<hash>` /
-  `core.js?v=<hash>` — bump the query whenever those files change (no-cache only revalidates
-  against the browser's own copy).
+- Cache-busting is **automatic — never hand-bump a version**: the `?v=` tokens in
+  `index.html` are placeholders that `webapp_server._stamp_asset_versions` rewrites to each
+  asset's content hash as the document is served, so editing a JS/CSS file invalidates its
+  URL with no build step and no manual step. `tests/test_asset_cache_bust.py` guards this —
+  do not reintroduce a "remember to bump this" instruction.
 - Browser e2e suites (Playwright) live in `tests/e2e_browser_*.py`; any UI change that
   alters an element id/class/flow may need these updated — see `docs/TESTING.md`.
 - Deferred UI items (KB browser, genre badge, pipeline progress UI, confidence badges,
