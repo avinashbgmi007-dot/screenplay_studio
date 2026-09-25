@@ -58,10 +58,13 @@ def get_order(m) -> list[int]:
 
 def set_order(m, order) -> dict:
     natural = scene_numbers(m)
-    try:
-        order = [int(n) for n in order]
-    except (TypeError, ValueError):
-        raise ValueError("order must be a list of scene numbers.")
+    # L6 (re-audit 2026-09-24): the list comprehension iterated any iterable, so
+    # {"order": "312"} became [3, 1, 2] and was SAVED (a valid permutation of a
+    # 3-scene script), and int() coerced bools (True -> 1) and numeric strings
+    # the same way — schema drift that silently rearranged the corkboard instead
+    # of failing. The board stores scene numbers: a list of ints, nothing else.
+    if not isinstance(order, list) or any(isinstance(n, bool) or not isinstance(n, int) for n in order):
+        raise ValueError("order must be a list of scene numbers (integers).")
     if len(order) != len(natural) or sorted(order) != sorted(natural):
         raise ValueError(
             f"order must be a permutation of the script's scene numbers "

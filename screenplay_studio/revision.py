@@ -434,31 +434,49 @@ def _replace_in_scene(doc: ScriptDocument, scene_number: int, from_text: str, to
 
 def undo_last_edit(m) -> dict:
     """Reverse the most recent applied edit group (new -> old). The record
-    moves from the undo log to the redo stack. Returns a summary dict."""
-    log = edits_log(m)
-    if not log:
-        raise ValueError("Nothing to undo.")
-    record = log[-1]
-    # Pre-flight the redo stack BEFORE anything moves. It raises on a damaged
-    # stack (BE-M1), and reading it up here rather than after the working copy
-    # and the edit log have already been rewritten is what makes the refusal
-    # clean: a corrupt edits.redo.json declines the undo instead of silently
-    # consuming it and leaving a half-applied reversal behind.
-    redo = redo_stack(m)
-    doc = load_working(m)
-    restored, failed = [], []
-    for rep in record.get("applied", []):
-        old_text, new_text = rep["old"], rep["new"]
-        if _replace_in_scene(doc, record["scene_number"], new_text, old_text):
-            restored.append({"old": new_text, "new": old_text})
-        else:
-            failed.append({"old": new_text, "new": old_text})
-    doc.save(working_path(m))
-    # move the record: undo log -> redo stack
-    log.pop()
-    _save_json_list(edits_log_path(m), log)
-    redo.append(record)
-    _save_json_list(edits_redo_path(m), redo)
+    moves from the undo log to the redo stack. Returns a summary dict.
+
+    H5 (re-audit 2026-09-24): the log is an accumulate store like every other
+    one, so its read-modify-write happens UNDER `lock_for(edits.json)`. It used
+    to hold no lock at all, which erased the record of an edit applied while the
+    undo was in flight — the text stayed in working.json, the record did not, and
+    the writer could never undo that edit again. Measured by the probe with a
+    slowed log read: final `ids=[]`. The redo stack is a SECOND store, so its
+    lock is taken only after this one is released (`jsonio.lock_for` must never
+    be asked to hold two store locks at once).
+    """
+    from .jsonio import lock_for
+    log_path = edits_log_path(m)
+    redo_path = edits_redo_path(m)
+    with lock_for(log_path):
+        log = edits_log(m)
+        if not log:
+            raise ValueError("Nothing to undo.")
+        record = log[-1]
+        # Pre-flight the redo stack BEFORE anything moves. It raises on a damaged
+        # stack (BE-M1), and reading it up here rather than after the working copy
+        # and the edit log have already been rewritten is what makes the refusal
+        # clean: a corrupt edits.redo.json declines the undo instead of silently
+        # consuming it and leaving a half-applied reversal behind.
+        redo_stack(m)
+        doc = load_working(m)
+        restored, failed = [], []
+        for rep in record.get("applied", []):
+            old_text, new_text = rep["old"], rep["new"]
+            if _replace_in_scene(doc, record["scene_number"], new_text, old_text):
+                restored.append({"old": new_text, "new": old_text})
+            else:
+                failed.append({"old": new_text, "new": old_text})
+        doc.save(working_path(m))
+        # move the record: undo log -> redo stack
+        log.pop()
+        _save_json_list(log_path, log)
+    with lock_for(redo_path):
+        # re-read under the lock: the write-back must append to the stack as it
+        # is NOW, not to the copy this call happened to see earlier
+        redo = redo_stack(m)
+        redo.append(record)
+        _save_json_list(redo_path, redo)
     return {
         "undone": record,
         "restored": restored,
@@ -470,27 +488,40 @@ def undo_last_edit(m) -> dict:
 
 def redo_last_edit(m) -> dict:
     """Re-apply the most recently undone edit group (old -> new). The record
-    moves from the redo stack back onto the undo log."""
-    redo = redo_stack(m)
-    if not redo:
-        raise ValueError("Nothing to redo.")
-    record = redo[-1]
-    # Same pre-flight as undo_last_edit: a damaged edits.json refuses the redo
-    # before the working copy is rewritten, instead of after.
-    log = edits_log(m)
-    doc = load_working(m)
-    applied, failed = [], []
-    for rep in record.get("applied", []):
-        old_text, new_text = rep["old"], rep["new"]
-        if _replace_in_scene(doc, record["scene_number"], old_text, new_text):
-            applied.append({"old": old_text, "new": new_text})
-        else:
-            failed.append({"old": old_text, "new": new_text})
-    doc.save(working_path(m))
-    redo.pop()
-    _save_json_list(edits_redo_path(m), redo)
-    log.append(record)
-    _save_json_list(edits_log_path(m), log)
+    moves from the redo stack back onto the undo log.
+
+    H5, the mirror of undo_last_edit: the redo stack's own read-modify-write runs
+    under its lock, and the LOG append re-reads under the log's lock — otherwise
+    a locked apply landing mid-flight lost its record (`ids=['e1-race']`: the
+    redo's stale list overwrote the apply's append).
+    """
+    from .jsonio import lock_for
+    log_path = edits_log_path(m)
+    redo_path = edits_redo_path(m)
+    with lock_for(redo_path):
+        redo = redo_stack(m)
+        if not redo:
+            raise ValueError("Nothing to redo.")
+        record = redo[-1]
+        # Same pre-flight as undo_last_edit: a damaged edits.json refuses the redo
+        # before the working copy is rewritten, instead of after.
+        edits_log(m)
+        doc = load_working(m)
+        applied, failed = [], []
+        for rep in record.get("applied", []):
+            old_text, new_text = rep["old"], rep["new"]
+            if _replace_in_scene(doc, record["scene_number"], old_text, new_text):
+                applied.append({"old": old_text, "new": new_text})
+            else:
+                failed.append({"old": old_text, "new": new_text})
+        doc.save(working_path(m))
+        redo.pop()
+        _save_json_list(redo_path, redo)
+    with lock_for(log_path):
+        # fresh read under the lock — never append to the list this call read
+        log = edits_log(m)
+        log.append(record)
+        _save_json_list(log_path, log)
     return {
         "redone": record,
         "applied": applied,

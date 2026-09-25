@@ -311,3 +311,166 @@ def test_sdist_ships_the_data_files(sdist_path):
         "sdist is missing the SPA"
     assert not any(n.lower().endswith(".png") for n in normalised), \
         "sdist should not carry the evidence screenshots"
+
+
+# --------------------------------------------------------------------------
+# Layer 4 — install the wheel and SERVE from it (E2E-2, audit 2026-09-24)
+#
+# Layers 2/3 assert archive MEMBERSHIP. Membership is a proxy, and the repo's own
+# recorded standard is the opposite — "verify by installing the wheel and serving
+# from it, never by reasoning". A membership check cannot catch a loader that
+# resolves its assets relative to the CURRENT WORKING DIRECTORY: that passes from
+# a source checkout and fails the moment the package is installed. Nor can it
+# catch a wheel that carries a file the runtime cannot read.
+#
+# Both loaders that matter were verified package-relative on 2026-09-24
+# (`knowledge_base.py` and `webapp_server.py` each derive their directory from
+# `os.path.abspath(__file__)`), so there is no bug today. This is the guard that
+# would have caught one.
+#
+# Everything below runs with `cwd` set to a NEUTRAL directory and the repo root
+# ABSENT from sys.path — that is what makes it an install test rather than a
+# source-tree test wearing a hat.
+# --------------------------------------------------------------------------
+
+# The shipped KB's rule count, cross-checked against the source tree in Layer 2
+# rather than pinned here, so a legitimate KB expansion does not turn this red.
+# The rule count is NOT pinned here — it is cross-checked against the source tree
+# in `test_installed_wheel_loads_the_whole_knowledge_base`, so a legitimate KB
+# expansion does not turn this red, while a wheel that ships fewer rules than the
+# tree does. The floor is the documented minimum from the module docstring.
+INSTALLED_MIN_RULE_FILES = 26
+
+
+def _source_rule_count() -> int:
+    """How many rules the SOURCE tree loads — the number the install must match."""
+    from knowledge_base import KnowledgeBase
+
+    return len(KnowledgeBase().all())
+
+
+def _free_port() -> int:
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _wait_for_port(port: int, timeout: float = 60.0) -> bool:
+    import socket
+    import time
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+                return True
+        except OSError:
+            time.sleep(0.25)
+    return False
+
+
+@pytest.fixture(scope="module")
+def installed_wheel(wheel_path, tmp_path_factory):
+    """`pip install --target` the built wheel into an isolated directory.
+
+    `--no-index --no-deps` keeps this offline and free of resolution surprises:
+    the wheel is local and the runtime deps are already in this environment.
+    """
+    target = tmp_path_factory.mktemp("installed")
+    proc = _run([sys.executable, "-m", "pip", "install", "--no-deps", "--no-index",
+                 "--target", str(target), str(wheel_path)])
+    if proc.returncode != 0:
+        pytest.skip("pip install of the built wheel failed in this environment: "
+                    + (proc.stderr or proc.stdout or "")[-400:])
+    return target
+
+
+@pytest.fixture(scope="module")
+def neutral_cwd(tmp_path_factory):
+    """A directory with nothing importable in it, so a cwd-relative loader cannot
+    accidentally succeed."""
+    return tmp_path_factory.mktemp("neutral")
+
+
+def _installed_env(target, neutral_cwd) -> dict:
+    env = dict(os.environ)
+    # The repo root is deliberately NOT on the path — only the install target.
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(target), env.get("PYTHONPATH", "")) if p)
+    env["SCREENPLAY_STUDIO_DEMO_MODEL"] = "1"
+    # A production-like boot: the child must not think it is inside a test run.
+    env.pop("PYTEST_CURRENT_TEST", None)
+    return env
+
+
+def test_installed_wheel_loads_the_whole_knowledge_base(installed_wheel, neutral_cwd):
+    """The silent-degradation failure mode: a wheel whose KB loads ZERO rules
+    makes every report lose its "grounded in rule X" attribution with no error
+    anywhere. Counting the rules from the INSTALLED package is the only way to
+    know the install is not hollow."""
+    script = (
+        "import os, knowledge_base\n"
+        "kb = knowledge_base.KnowledgeBase()\n"
+        "print(os.path.dirname(os.path.abspath(knowledge_base.__file__)))\n"
+        "print(len(kb.all()))\n"
+    )
+    proc = subprocess.run([sys.executable, "-c", script],
+                          cwd=str(neutral_cwd),
+                          env=_installed_env(installed_wheel, neutral_cwd),
+                          capture_output=True, text=True, timeout=180)
+    assert proc.returncode == 0, (proc.stderr or proc.stdout)[-800:]
+    where, count = proc.stdout.strip().splitlines()[-2:]
+    assert str(installed_wheel) in where, (
+        f"the test imported the wrong knowledge_base: {where}")
+    expected = _source_rule_count()
+    assert int(count) == expected, (
+        f"the installed wheel loaded {count} craft rules, the source tree loads "
+        f"{expected} — the wheel is not shipping the knowledge base whole")
+    assert expected >= INSTALLED_MIN_RULE_FILES, (
+        "the knowledge base lost files in the SOURCE tree, which is a different "
+        "problem from packaging")
+
+
+def test_installed_wheel_serves_the_spa(installed_wheel, neutral_cwd):
+    """`GET /` from an installed wheel.
+
+    This is what turns "the SPA is in the archive" into "the SPA is served" —
+    the difference the writer actually experiences. It is also the check that
+    would have caught the original R1 defect, where a `pip install` produced a
+    wheel with no frontend at all and `GET /` 404'd silently.
+    """
+    import urllib.request
+
+    port = _free_port()
+    log_path = neutral_cwd / "serve.log"
+    with open(log_path, "wb") as log:
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "screenplay_studio.webapp_server",
+             "--port", str(port), "--projects-dir", str(neutral_cwd / "proj")],
+            cwd=str(neutral_cwd),
+            env=_installed_env(installed_wheel, neutral_cwd),
+            stdout=log, stderr=subprocess.STDOUT)
+        try:
+            assert _wait_for_port(port), (
+                "the installed app never came up on 127.0.0.1:\n"
+                + log_path.read_text(encoding="utf-8", errors="replace")[-2000:])
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=20) as r:
+                assert r.status == 200, f"GET / answered {r.status} from the installed wheel"
+                body = r.read().decode("utf-8", "replace")
+            assert "app.js" in body, (
+                "GET / answered 200 but the body is not the SPA document")
+            # The SPA's own assets must resolve from the install too — index.html
+            # alone would be a page that renders nothing.
+            for asset in ("/app.js", "/core.js", "/style.css", "/tungsten.css"):
+                with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}{asset}", timeout=20) as r:
+                    assert r.status == 200, f"{asset} answered {r.status} from the installed wheel"
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=15)

@@ -125,6 +125,7 @@ def run(base):
         # 30-second Playwright timeout that aborts the suite mid-run.
         try:
             _run_loop(page, base, name)
+            _run_bulk_apply_probes(page)
         except Exception as e:  # noqa: BLE001 — a probe reports, it does not crash
             check("loop: the rewrite loop ran end to end", False, f"{type(e).__name__}: {e}"[:160])
 
@@ -234,13 +235,113 @@ def _run_loop(page, base, name):
     check("apply: the row is marked applied",
           page.locator("#rewrite-candidates .rewrite-candidate-applied").count() == 1)
 
+    # ---- H1 regression: a typing target owns Ctrl+Z ----
+    # The script-level undo branch sat ABOVE the isTypingTarget bail, so with
+    # an undoable edit on the stack (as right now), Ctrl+Z pressed while
+    # composing rewound the SCRIPT and preventDefault ate the field's own
+    # text undo. These probes run BEFORE the positive undo check below,
+    # because that check is what spends the edit off the undo stack.
+    page.evaluate("() => closeModal('#rewrite-modal')")
+    page.evaluate("() => openCowriteRoom()")
+    page.wait_for_timeout(600)
+    undo_hits = []
+    page.on("request",
+            lambda req: undo_hits.append(req.url) if "/edits/undo" in req.url else None)
+    page.locator("#input").click()
+    page.keyboard.type("draft words")
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(700)
+    check("undo: Ctrl+Z in the composer never touches the script undo stack",
+          len(undo_hits) == 0, f"undoRequests={len(undo_hits)}")
+    composer_value = page.locator("#input").input_value()
+    check("undo: the composer's own text undo still runs",
+          composer_value != "draft words", f"value={composer_value!r}")
+
     # undo still unwinds it — the loop rides the EXISTING revision machinery
+    # (focus must leave the composer first: a typing target now owns Ctrl+Z,
+    #  which is the very behaviour asserted above)
+    page.evaluate("() => { if (document.activeElement) document.activeElement.blur(); }")
     page.keyboard.press("Control+z")
     page.wait_for_timeout(1800)
     gone = page.evaluate(
         "() => ![...document.querySelectorAll('#manuscript-container [class^=el-]')]"
         ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
     check("apply: Ctrl+Z unwinds it through the existing undo stack", gone)
+
+
+def _run_bulk_apply_probes(page):
+    """H2 regression: bulk Apply must send exactly the proposals the writer
+    picked. Two failure modes lived here:
+
+      * Reject removed the DOM row but not its replacement, and the bulk
+        collector indexed the replacements array by DOM position — every
+        proposal after a rejected one was silently shifted onto the WRONG
+        replacement.
+      * An individually-applied row had its checkbox disabled but left
+        CHECKED, so the next bulk Apply sent it a second time (a spurious
+        "couldn't be matched" skip at best, a duplicated edit at worst).
+
+    The probes drive the real modal with crafted replacements and capture the
+    actual /edits/apply payloads, so the assertion is on what the client
+    SENDS, not on how the DOM happens to look. The old texts are deliberately
+    absent from the fixture, so the server skips them and writes nothing.
+    """
+    posted = []
+
+    def _capture(route):
+        try:
+            posted.append(route.request.post_data_json.get("replacements"))
+        except Exception:  # noqa: BLE001 — a probe reports, it does not crash
+            posted.append(None)
+        route.continue_()
+
+    page.route("**/edits/apply", _capture)
+    try:
+        # ---- reject must not shift the row -> replacement mapping ----
+        page.evaluate("""() => {
+            openRewriteModal(1, null);
+            renderRewriteCandidates({note: "", replacements: [
+                {old: "ZZZ-NO-SUCH-LINE-ONE", new: "one"},
+                {old: "ZZZ-NO-SUCH-LINE-TWO", new: "two"},
+                {old: "ZZZ-NO-SUCH-LINE-THREE", new: "three"},
+            ]});
+        }""")
+        page.locator("#rewrite-candidates .rewrite-candidate").first \
+            .locator(".rc-reject").click()
+        page.wait_for_timeout(300)
+        page.locator("#rewrite-apply").click()
+        page.wait_for_timeout(1500)
+        sent = posted[-1] if posted else None
+        check("bulk: rejecting a row does not shift which replacements are sent",
+              sent == [{"old": "ZZZ-NO-SUCH-LINE-TWO", "new": "two"},
+                       {"old": "ZZZ-NO-SUCH-LINE-THREE", "new": "three"}],
+              f"sent={sent}")
+
+        # ---- an individually-applied row must not ride the bulk apply ----
+        posted.clear()
+        page.evaluate("""() => {
+            openRewriteModal(1, null);
+            renderRewriteCandidates({note: "", replacements: [
+                {old: "ZZZ-NO-SUCH-LINE-ONE", new: "one"},
+                {old: "ZZZ-NO-SUCH-LINE-TWO", new: "two"},
+            ]});
+        }""")
+        page.locator("#rewrite-candidates .rewrite-candidate").first \
+            .locator(".rc-apply").click()
+        page.wait_for_timeout(1500)
+        check("bulk: the individually-applied row posts on its own first",
+              posted is not None and len(posted) >= 1
+              and posted[0] == [{"old": "ZZZ-NO-SUCH-LINE-ONE", "new": "one"}],
+              f"posted={posted}")
+        page.locator("#rewrite-apply").click()
+        page.wait_for_timeout(1500)
+        sent2 = posted[-1] if posted else None
+        check("bulk: the applied row is not sent a second time",
+              sent2 == [{"old": "ZZZ-NO-SUCH-LINE-TWO", "new": "two"}],
+              f"sent={sent2}")
+    finally:
+        page.unroute("**/edits/apply")
+        page.evaluate("() => closeModal('#rewrite-modal')")
 
 
 if __name__ == "__main__":

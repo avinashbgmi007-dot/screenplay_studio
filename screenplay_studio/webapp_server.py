@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import io
 import json
+import logging
 import os
 import queue
 import re
@@ -26,6 +27,7 @@ import traceback
 import zipfile
 
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 from werkzeug.exceptions import HTTPException
@@ -34,6 +36,7 @@ from .jsonio import (StoreUnreadable, atomic_write_json, check_safe_id, lock_for
                      retry_permission, safe_dir_name, suffixed_id)
 
 from .ideas import IdeaStore
+from .logsetup import configure as _configure_logging
 from .manifest import ProjectManifest
 from .net_guard import is_loopback_host, is_loopback_url
 from .orchestrator import Orchestrator, OrchestratorError
@@ -41,6 +44,11 @@ from .orchestrator import Orchestrator, OrchestratorError
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 
 app = Flask(__name__, static_folder=None)
+
+# BE-3 (audit 2026-09-24): the desk ships no telemetry, so this file IS the
+# support channel. Configured by main(); a module logger so a handler can log
+# even if startup never got that far.
+log = logging.getLogger("screenplay_studio.webapp")
 
 
 # ---------------------------------------------------------------------------
@@ -165,12 +173,73 @@ def _hand_token_to_every_document(resp):
     /preview-next/*.html, and all six died on `missing or invalid capability
     token` the moment the browser harness stopped booting with --no-token.
     Subresources (JS/CSS/fonts) are skipped — they never write, and a cookie on
-    each is noise.
+    each is noise. A refused request is skipped too: the token is a page's
+    licence to WRITE, so handing it to a request the Host guard just rejected
+    (BE-1) would license the very client it turned away.
     """
-    if _API_TOKEN and resp.mimetype == "text/html":
+    if _API_TOKEN and resp.status_code == 200 and resp.mimetype == "text/html":
         # SameSite=Strict so a foreign page's request never carries it.
         resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
     return resp
+
+
+# ---------------------------------------------------------------------------
+# BE-1: Host-header validation — the DNS-rebinding door.
+#
+# The write guard below assumes a foreign page is *cross-origin*, and therefore
+# labelled. DNS rebinding removes that assumption: the attacker serves a page
+# from a name they control, then re-points that name at 127.0.0.1. The browser
+# now treats `http://evil.attacker.com:8500` as the attacker's OWN origin, so
+# the request arrives with `Host: evil.attacker.com`, no `Origin` mismatch to
+# catch, and — because the write guard returns early for GET/HEAD/OPTIONS — no
+# capability token either. Measured 2026-09-24 against a studio booted exactly
+# as shipped: `GET /api/projects/<name>/script` with a foreign Host and no
+# cookie returned the writer's screenplay in full. Writes were correctly
+# refused (403) by the Origin check, so this was a read exposure — which is
+# still the one promise this product makes.
+#
+# The Host header is the right place to stop it: it is a forbidden header name
+# for fetch/XHR, so a page cannot forge it, and it is the one part of a rebound
+# request that still names the attacker.
+#
+# Why a before_request hook and not Flask's `TRUSTED_HOSTS`: that setting takes
+# a static list of literal names, which would need a SECOND enumeration of
+# "what counts as local" — exactly the duplication net_guard exists to prevent
+# (BE-H1) — and it still could not express "any 127.0.0.0/8 address". Here the
+# one predicate decides, and it covers `localhost`, every loopback literal and
+# `::1` with no list to keep in step.
+# ---------------------------------------------------------------------------
+def _host_header_is_local() -> bool:
+    """True when this request's Host header names this machine and nothing else."""
+    raw = request.host or ""
+    # A Host header is `host[:port]` and nothing else. Reject userinfo, a path or
+    # whitespace BEFORE parsing: urlparse reads `evil.com@127.0.0.1` as the
+    # loopback host and would accept it.
+    if not raw or any(ch in raw for ch in "@\\/ \t"):
+        return False
+    try:
+        # Parsed, never prefix-matched — and it handles `[::1]:8500`, which a
+        # split-on-colon would mangle.
+        host = urlparse(f"//{raw}").hostname
+    except ValueError:  # malformed IPv6 brackets and the like
+        return False
+    if not host:
+        return False
+    # A trailing dot is the DNS root label: `localhost.` IS `localhost`, so
+    # refusing it would be a false rejection of a writer who typed it. Stripping
+    # dots can only ever REMOVE a character, so it cannot turn a foreign name
+    # into a loopback one.
+    return is_loopback_host(host.rstrip("."))
+
+
+@app.before_request
+def _reject_foreign_host():
+    """Registered ahead of the write guard so a foreign-Host request is refused
+    for the reason that actually applies — and on every method, reads included."""
+    if not _host_header_is_local():
+        return jsonify({"error": "request rejected: this desk answers only to "
+                                 "its own loopback address"}), 403
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +273,6 @@ def _reject_cross_origin_writes():
     # Defense-in-depth: a foreign Origin is always rejected, token or not.
     origin = request.headers.get("Origin")
     if origin:
-        from urllib.parse import urlparse
         # Same "is this local?" rule the model server and dictation use — see
         # net_guard. A missing/garbage Origin host resolves to None, which the
         # predicate reports as not-local, so a `null` origin is still refused.
@@ -455,6 +523,12 @@ def _unhandled(e):
     if isinstance(e, HTTPException):
         return e
     traceback.print_exc()
+    # BE-3: the writer's only durable record of a failure. `traceback.print_exc`
+    # goes to stderr, which is lost when the app is launched from a shortcut.
+    # `exc_info=e` rather than `log.exception` so the record names THIS exception
+    # rather than whichever one happens to be in flight.
+    log.error("unhandled error serving %s %s: %s", request.method, request.path,
+              e, exc_info=e)
     return jsonify({"error": f"Unexpected error: {e}"}), 500
 
 
@@ -1629,14 +1703,22 @@ def rewrite_scene_endpoint(name):
         try:
             report = _load_report_sanitized(m)
             findings = report.get("findings", [])
-            finding = findings[int(finding_index)]
-            refs = ", ".join(f"Scene {n}" for n in (finding.get("scene_refs") or []))
-            finding_text = (
-                f"[{finding.get('severity', 'medium').upper()}] {refs or 'General'}: "
-                f"{finding.get('issue', '')} — {finding.get('why_it_matters', '')}"
-            )
-            if finding.get("evidence_quote"):
-                finding_text += f" Evidence: \"{finding['evidence_quote']}\""
+            # L4 (re-audit 2026-09-24): a negative index is valid Python
+            # indexing, so finding_index -1 quietly grounded the rewrite on the
+            # LAST finding — a confident note about the wrong moment — while a
+            # positive out-of-range index raised IndexError and degraded (below).
+            # Only a real slot grounds the rewrite; every other index degrades
+            # to ungrounded, exactly like the out-of-range path already did.
+            idx = int(finding_index)
+            if 0 <= idx < len(findings):
+                finding = findings[idx]
+                refs = ", ".join(f"Scene {n}" for n in (finding.get("scene_refs") or []))
+                finding_text = (
+                    f"[{finding.get('severity', 'medium').upper()}] {refs or 'General'}: "
+                    f"{finding.get('issue', '')} — {finding.get('why_it_matters', '')}"
+                )
+                if finding.get("evidence_quote"):
+                    finding_text += f" Evidence: \"{finding['evidence_quote']}\""
         except (FileNotFoundError, KeyError, IndexError, ValueError):
             pass
 
@@ -1682,6 +1764,15 @@ def apply_edits(name):
     replacements = body.get("replacements")
     if not isinstance(replacements, list) or not replacements:
         return _error("replacements list is required.")
+    # L5 (re-audit 2026-09-24): the list was validated but its ITEMS were not, so
+    # a bare string reached revision.apply_replacements -> rep.get() -> AttributeError
+    # and came back as a 500 with the traceback in the message. A wrong client
+    # shape is a 400, and the message names the row that is wrong.
+    for i, rep in enumerate(replacements):
+        if not isinstance(rep, dict):
+            return _error(f"replacements[{i}] must be an object with 'old' and 'new', got {type(rep).__name__}.", 400)
+        if not isinstance(rep.get("old"), str) or not isinstance(rep.get("new"), str):
+            return _error(f"replacements[{i}] must have string 'old' and string 'new'.", 400)
 
     from .revision import load_working, save_working, apply_replacements, finding_statuses, scene_text
     doc = load_working(m)
@@ -1840,6 +1931,12 @@ def get_beatboard(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    # L3 (re-audit 2026-09-24): the guard /script, /rewrite and /quickcheck all
+    # carry. Without it board_view -> load_working -> ensure_working raises
+    # FileNotFoundError (not a ValueError), which escaped to the catch-all as a
+    # 500 whose message also carried a raw filesystem path.
+    if m.stage("parse").status != "complete":
+        return _error("Project hasn't been parsed yet.", 400)
     from .beatboard import board_view
     return jsonify(board_view(m))
 
@@ -1850,6 +1947,9 @@ def put_beatboard(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    # L3 (re-audit 2026-09-24): parse guard — same 400 as /script, not a 500.
+    if m.stage("parse").status != "complete":
+        return _error("Project hasn't been parsed yet.", 400)
     body = request.get_json() or {}
     from .beatboard import set_order
     try:
@@ -1865,6 +1965,9 @@ def reset_beatboard(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    # L3 (re-audit 2026-09-24): parse guard — same 400 as /script, not a 500.
+    if m.stage("parse").status != "complete":
+        return _error("Project hasn't been parsed yet.", 400)
     from .beatboard import reset_order
     return jsonify(reset_order(m))
 
@@ -1875,6 +1978,9 @@ def export_beatboard(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    # L3 (re-audit 2026-09-24): parse guard — same 400 as /script, not a 500.
+    if m.stage("parse").status != "complete":
+        return _error("Project hasn't been parsed yet.", 400)
     fmt = request.args.get("format", "fountain")
     if fmt not in ("fountain", "fdx", "txt"):
         return _error("format must be one of: fountain, fdx, txt.", 400)
@@ -3876,6 +3982,10 @@ def main():
 
     PROJECTS_DIR = args.projects_dir
     os.makedirs(PROJECTS_DIR, exist_ok=True)
+    # BE-3: start the log before anything else can fail, so a startup problem is
+    # recorded somewhere durable rather than only printed to a console nobody is
+    # watching. A read-only install directory returns None and is reported below.
+    _log_file = _configure_logging(PROJECTS_DIR)
     # env-var demo trigger already pointed CONFIG at the demo server at import
     # time -- don't clobber it back to :8080 (keeps flag/env parity honest).
     if not _DEMO_MODEL_ACTIVE:
@@ -3896,6 +4006,8 @@ def main():
         CONFIG["api_key"] = args.api_key or _api_key_env
 
     print(f"Projects directory: {os.path.abspath(PROJECTS_DIR)}")
+    print("Log file: " + (_log_file or
+                          "unavailable (could not write beside the projects directory)"))
     print(f"Default model server: {CONFIG['server_url']} ({connection_mode()})")
     if CONFIG.get("api_key"):
         print("Model server auth: bearer token set (from "
@@ -3906,6 +4018,11 @@ def main():
               "as a cookie; scripted clients send:")
         print(f"  X-Studio-Token: {_API_TOKEN}")
         print("  (pass --no-token to disable on a loopback-only machine)")
+    # Recorded AFTER the demo decision above, so the log names the server the desk
+    # will actually talk to rather than the one that was configured.
+    log.info("desk starting: port=%s projects=%s model=%s remote_server_optin=%s token=%s",
+             args.port, os.path.abspath(PROJECTS_DIR), CONFIG["server_url"],
+             _ALLOW_REMOTE_SERVER, "on" if _API_TOKEN else "OFF")
     # threaded: one long LLM turn must never freeze autosave/sidebar/etc.
     app.run(host="127.0.0.1", port=args.port, debug=False, threaded=True)
 

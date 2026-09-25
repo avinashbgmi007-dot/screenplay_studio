@@ -98,3 +98,33 @@ markers = [
     # them to the end (pytest_collection_modifyitems).
     "route_coverage: asserts every HTTP route was exercised by the whole suite",
 ]
+
+# E2E-5 (audit 2026-09-24). `pytest-cov` was declared in the `ci` extra and
+# installed, but no job ran with `--cov` and there was no floor — so coverage
+# could fall anywhere and nothing would say so.
+#
+# MEASURED at this revision: 87% (9699 statements, 1291 missed) across 1749
+# tests. `fail_under` is a RATCHET, not a target: 85 leaves two points of room
+# for ordinary churn while still failing a change that quietly stops exercising a
+# whole module. Raise it when the number rises. Do NOT lower it to make a build
+# green — a floor that gets lowered is not a floor.
+#
+# `source` is the one place "what do we measure" is decided, so CI can run a bare
+# `pytest --cov` and the local and CI numbers mean the same thing.
+[tool.coverage.run]
+source = [
+    "screenplay_studio",
+    "screenplay_analyzer",
+    "screenplay_cowriter",
+    "screenplay_parser",
+    "knowledge_base",
+]
+
+[tool.coverage.report]
+fail_under = 85
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

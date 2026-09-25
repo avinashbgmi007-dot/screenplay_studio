@@ -89,6 +89,13 @@ def test_assets_do_not_carry_the_token_cookie(monkeypatch, tmp_path):
 
 # ---------- startup posture: secure by default (H1) ----------
 
+# The app.run() kwargs of the last _launch(). E2E-1 (audit 2026-09-24): this stub
+# used to be `lambda **_kw: None`, which DISCARDED the host argument — so the one
+# line that decides whether this desk is reachable from the LAN was observed by
+# no test in the suite. Capturing it is what makes the bind assertable.
+_LAST_RUN_KWARGS: dict = {}
+
+
 def _launch(monkeypatch, tmp_path, extra_argv):
     """Run webapp_server.main() in-process with app.run stubbed out.
 
@@ -100,7 +107,8 @@ def _launch(monkeypatch, tmp_path, extra_argv):
     import screenplay_studio.webapp_server as ws
     monkeypatch.setattr(ws, "_API_TOKEN", None)
     monkeypatch.setattr(ws, "PROJECTS_DIR", str(tmp_path))
-    monkeypatch.setattr(ws.app, "run", lambda **_kw: None)
+    _LAST_RUN_KWARGS.clear()
+    monkeypatch.setattr(ws.app, "run", lambda **kw: _LAST_RUN_KWARGS.update(kw))
     monkeypatch.setattr(sys, "argv", ["webapp_server", "--port", "8599",
                                       "--projects-dir", str(tmp_path)] + extra_argv)
     ws.main()
@@ -137,3 +145,30 @@ def test_default_launch_token_actually_guards_writes(monkeypatch, tmp_path):
     ws.app.config["TESTING"] = True
     r = ws.app.test_client().post("/api/projects/The_Late_Hour/analyze")
     assert r.status_code == 403
+
+
+# ---------- E2E-1: the bind host IS the privacy promise --------------------
+
+def test_the_shipped_launch_binds_loopback_and_nothing_else(monkeypatch, tmp_path):
+    """E2E-1 (audit 2026-09-24). `app.run(host=...)` is the entire inbound half
+    of "nothing leaves this machine", and until now NO test observed it:
+
+      * `test_webapp_demo_binds_loopback_not_all_interfaces` regexes
+        `webapp_demo.py`, which has contained zero `app.run` calls since it began
+        delegating to main() — so its assertion could not fail; and
+      * the launch stub discarded `host` entirely.
+
+    Consequence, before this test: flipping this one string to "0.0.0.0" left
+    1684 pytest tests and 1138 browser checks green while every project on the
+    machine became reachable from the LAN — and, because `/` hands the
+    capability cookie to whoever asks, writable too.
+
+    Mutation-verified: flipping the bind turns this red.
+    """
+    _launch(monkeypatch, tmp_path, [])
+    assert _LAST_RUN_KWARGS, "main() never reached app.run()"
+    assert _LAST_RUN_KWARGS["host"] == "127.0.0.1", (
+        "the shipped launch does not bind loopback — this desk is on the network")
+    assert _LAST_RUN_KWARGS["port"] == 8599
+    assert _LAST_RUN_KWARGS["debug"] is False, (
+        "debug=True ships the Werkzeug console, which is remote code execution")

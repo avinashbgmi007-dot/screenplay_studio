@@ -97,6 +97,85 @@ class TestRewriteFlow:
         resp = http_client.post(f"/api/projects/{project}/rewrite", json={})
         assert resp.status_code == 400
 
+    def test_negative_finding_index_does_not_ground_on_the_last_finding(self, http_client, monkeypatch):
+        """L4 (re-audit 2026-09-24): -1 is valid Python indexing, so a negative
+        index silently grounded the rewrite on the LAST finding instead of
+        degrading to ungrounded — a wrong-script note, delivered with confidence.
+        """
+        project = self._analyzed_project(http_client)
+        findings = http_client.get(f"/api/projects/{project}/report").get_json()["findings"]
+        assert len(findings) >= 2, "need at least 2 findings to tell 'the last one' from 'none'"
+
+        from screenplay_studio import revision as revision_mod
+        seen: list[str] = []
+        real_rewrite = revision_mod.rewrite_scene
+
+        def spy_rewrite(client, doc, scene_number, finding_text="", instruction=""):
+            seen.append(finding_text)
+            return real_rewrite(client, doc, scene_number, finding_text, instruction)
+
+        monkeypatch.setattr(revision_mod, "rewrite_scene", spy_rewrite)
+
+        # a valid positive index still grounds the rewrite in that finding
+        resp = http_client.post(
+            f"/api/projects/{project}/rewrite",
+            json={"scene_number": 1, "finding_index": len(findings) - 1},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        assert findings[-1]["issue"] in seen[-1]
+
+        # a negative index must degrade to ungrounded, never wrap to the last finding
+        resp = http_client.post(
+            f"/api/projects/{project}/rewrite",
+            json={"scene_number": 1, "finding_index": -1},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        assert seen[-1] == "", f"a negative index must not ground the rewrite, got {seen[-1]!r}"
+        assert findings[-1]["issue"] not in seen[-1]
+
+    def test_apply_rejects_a_non_object_replacement(self, http_client):
+        """L5 (re-audit 2026-09-24): the list was validated but its ITEMS were
+        not, so ['junk'] reached revision.apply_replacements -> .get on a str ->
+        500 with a traceback in the message instead of a 400 naming the item."""
+        project = self._analyzed_project(http_client)
+        resp = http_client.post(
+            f"/api/projects/{project}/edits/apply",
+            json={"scene_number": 1, "replacements": ["junk"]},
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert "replacements[0]" in resp.get_json()["error"]
+        assert http_client.get(f"/api/projects/{project}/edits").get_json()["edits"] == []
+
+    def test_apply_rejects_a_replacement_missing_its_keys(self, http_client):
+        """L5 (re-audit 2026-09-24): the 400 names the offending index — the
+        client can point at the row that is wrong, not just 'bad request'."""
+        project = self._analyzed_project(http_client)
+        resp = http_client.post(
+            f"/api/projects/{project}/edits/apply",
+            json={"scene_number": 1, "replacements": [{"old": "a", "new": "b"}, {"old": "c"}]},
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert "replacements[1]" in resp.get_json()["error"]
+
+        # nothing was applied: the rejected payload never touched the working copy
+        assert http_client.get(f"/api/projects/{project}/edits").get_json()["edits"] == []
+        scene1 = http_client.get(f"/api/projects/{project}/script").get_json()["scenes"][0]
+        assert "I'll tell you everything when this is over." in [e["text"] for e in scene1["elements"]]
+
+    def test_apply_still_accepts_a_well_formed_replacement(self, http_client):
+        """L5 guard-rail: the new item validation must not reject the shape the
+        SPA actually sends (a dict of two strings)."""
+        project = self._analyzed_project(http_client)
+        candidates = http_client.post(
+            f"/api/projects/{project}/rewrite", json={"scene_number": 1, "finding_index": 0}
+        ).get_json()["replacements"]
+        resp = http_client.post(
+            f"/api/projects/{project}/edits/apply",
+            json={"scene_number": 1, "replacements": candidates},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        assert resp.get_json()["applied"]
+
     def test_apply_changes_working_copy_and_marks_finding_addressed(self, http_client):
         project = self._analyzed_project(http_client)
         resp = http_client.post(f"/api/projects/{project}/rewrite", json={"scene_number": 1, "finding_index": 0})

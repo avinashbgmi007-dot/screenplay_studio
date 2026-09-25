@@ -49,7 +49,13 @@ jobs:
         # ruff pin in the `lint` job above.
         run: pip install ".[ci]" -c requirements.lock.txt
       - name: Run test suite
-        run: pytest -q
+        # E2E-5 (audit 2026-09-24): pytest-cov was declared and installed but no
+        # job ever ran with --cov, and there was no floor — coverage could fall
+        # anywhere and nothing would say so. Measured at this revision: 87%.
+        # `[tool.coverage.run] source` decides what is measured, so this bare
+        # `--cov` and a developer's local run produce the same number, and
+        # `fail_under = 85` in pyproject.toml is the ratchet.
+        run: pytest -q --cov --cov-report=term
 
   test-js:
     runs-on: ubuntu-24.04
@@ -83,3 +89,43 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Run browser suites
         run: python tests/run_browser_suites.py
+
+  # BE-4 (audit 2026-09-24): the shipping platform is Windows, and every job above
+  # runs ubuntu-24.04 — so the Windows branch of the app's platform-specific
+  # mechanisms never ran unattended:
+  #
+  #   * `jsonio`'s cross-process lock is `msvcrt.locking` on Windows and
+  #     `fcntl.flock` everywhere else, so CI only ever exercised the fcntl branch;
+  #   * `TestDeleteSurvivesAWindowsLock` is `skipif(os.name != "nt")` — for a
+  #     legitimate reason (POSIX unlinks open files, so the race cannot exist
+  #     there) — which meant the one test covering the Windows delete-retry
+  #     defect was permanently skipped in the only place the suite runs by itself.
+  #
+  # Scoped to the store/lock/delete paths rather than the whole suite on purpose:
+  # those are the files whose behaviour is platform-dependent, and duplicating the
+  # ubuntu run would cost 25 minutes for no new signal. Widen to `pytest -q` once
+  # this job has a green baseline.
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ".[ci]" -c requirements.lock.txt
+      - name: Run the platform-specific store, lock and delete tests
+        run: >
+          pytest -q
+          tests/test_delete_project.py
+          tests/test_delete_retry.py
+          tests/test_store_concurrency.py
+          tests/test_store_fault_injection.py
+          tests/test_report_atomicity.py
+          tests/test_undo_redo.py
+          tests/test_undo_redo_lock_race.py
+          tests/test_revision.py
+          tests/test_webapp_revision.py
+          tests/test_stash.py

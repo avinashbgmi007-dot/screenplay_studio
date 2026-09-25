@@ -47,15 +47,143 @@ class TestSessionIdGuard:
         assert outside.exists()
 
 
-# ---- B2: the demo launcher never binds 0.0.0.0 --------------------------
-def test_webapp_demo_binds_loopback_not_all_interfaces():
-    """B2: the demo launcher must not bind all interfaces. Assert no *actual*
-    `app.run(host="0.0.0.0")` remains — mentions in comments/docstrings are
-    allowed (they document the fix), a live bind call is not."""
-    import re
-    src = open("screenplay_studio/webapp_demo.py", encoding="utf-8").read()
-    assert not re.search(r'run\s*\(\s*host\s*=\s*["\']0\.0\.0\.0', src), (
-        "webapp_demo still makes a live app.run(host='0.0.0.0') bind")
+# ---- B2 / E2E-1: the shipped server is loopback-only, MEASURED -----------
+#
+# What used to sit here regexed `webapp_demo.py` for a literal
+# `app.run(host="0.0.0.0")`. That file stopped containing any `app.run` at all
+# when it began delegating to `webapp_server.main()`, so the assertion passed
+# unconditionally — a guard that cannot fail. The 2026-09-24 audit (finding
+# E2E-1) rated that the highest-value thing to fix, because the bind host is the
+# entire inbound half of "nothing leaves this machine".
+#
+# A source regex was the wrong shape anyway: it proves a *string* is absent, not
+# that the server is unreachable. So this replaces it with a measurement — boot
+# the shipped server and try to reach it on an address that is not loopback.
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _non_loopback_ipv4():
+    """This machine's own address on its default route, or None when it has none.
+
+    A UDP `connect` sends no packets — it just asks the kernel which local
+    address it would use to reach the world, which is the address a LAN peer
+    would dial.
+    """
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+    except OSError:
+        return None
+    return ip if ip and not ip.startswith("127.") else None
+
+
+def _port_is_open(host, port, timeout=3.0):
+    """True when a TCP handshake to host:port completes."""
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _free_port():
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _wait_for_server(port, timeout=60.0):
+    import time
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _port_is_open("127.0.0.1", port, timeout=1.0):
+            return True
+        time.sleep(0.25)
+    return False
+
+
+class TestTheShippedServerIsLoopbackOnly:
+    """E2E-1: measured, not inferred. The audit proved the *guard* was vacuous;
+    this proves the *behaviour* it was supposed to be guarding."""
+
+    def test_not_reachable_on_a_non_loopback_address(self, tmp_path):
+        import socket
+        import subprocess
+        import sys
+        import urllib.request
+
+        lan = _non_loopback_ipv4()
+        if lan is None:
+            pytest.skip("this machine has no non-loopback IPv4 — nothing to probe")
+
+        # Control probe FIRST, and this is what keeps the test from being
+        # Control probe FIRST, and this is what keeps the test from being
+        # vacuous: if a socket bound to 0.0.0.0 is not reachable on the same
+        # address either, then the probe itself is blocked (firewall, multi-homed
+        # routing) and a refusal below would prove nothing at all. That case is a
+        # SKIP, not a failure — failing would blame the product for the host's own
+        # network policy, while passing would be worthless. The listener stays
+        # bound for the whole test so the comparison is like-for-like on the same
+        # interface at the same moment.
+        with socket.socket() as ctl:
+            ctl.bind(("0.0.0.0", 0))
+            ctl.listen(1)
+            control_port = ctl.getsockname()[1]
+            if not _port_is_open(lan, control_port):
+                pytest.skip(
+                    f"cannot probe {lan} from this host (firewall or multi-homed "
+                    "routing), so a refusal would be indistinguishable from a "
+                    "blocked probe")
+
+            env = dict(os.environ)
+            env["PYTHONPATH"] = os.pathsep.join(
+                p for p in (ROOT, env.get("PYTHONPATH", "")) if p)
+            env["SCREENPLAY_STUDIO_DEMO_MODEL"] = "1"
+            # stdout to a FILE, not a pipe: the e2e harness already recorded that
+            # an unread pipe wedges the server mid-run, and this test would then
+            # report "never came up" for a server that was fine.
+            log_path = tmp_path / "server.log"
+            proc = None
+            for _attempt in (1, 2):
+                # `_free_port` binds-then-closes, so another process can take the
+                # port in between. One retry keeps a lost race from being read as
+                # a product failure.
+                port = _free_port()
+                with open(log_path, "wb") as log:
+                    proc = subprocess.Popen(
+                        [sys.executable, "-m", "screenplay_studio.webapp_server",
+                         "--port", str(port), "--projects-dir", str(tmp_path / "proj")],
+                        cwd=str(tmp_path), env=env, stdout=log, stderr=subprocess.STDOUT)
+                if _wait_for_server(port):
+                    break
+                proc.terminate()
+                proc.wait(timeout=15)
+                proc = None
+            assert proc is not None, (
+                "the shipped server never came up on 127.0.0.1:\n"
+                + log_path.read_text(encoding="utf-8", errors="replace")[-4000:])
+            try:
+                # It really is serving, so the refusal below is about the ADDRESS
+                # and not about a dead process.
+                with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/api/health", timeout=10) as r:
+                    assert r.status == 200
+                assert not _port_is_open(lan, port), (
+                    f"the shipped server answered on {lan}:{port} — it is bound to "
+                    "more than loopback, so every project on this machine is "
+                    "reachable from the network")
+            finally:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=15)
 
 
 # ---- A1: corrupt edits.json must NOT read as "no edits" -----------------

@@ -3050,3 +3050,182 @@ STILL OPEN (needs a decision, not just code)
 - D: demo mode still SHOWS a fix queue of tagged [demo] findings; hiding it entirely is a product call.
 - LICENSE / CHANGELOG (legal/product, not engineering).
 - PUSH: the credential-path push blocker persists; 7 commits ahead of origin/main now.
+
+---
+
+# 2026-09-24 — Audit fixes H1 + H2 (rewrite-modal bulk apply; Ctrl+Z hijack)
+
+From the production-readiness audit (see docs/UI_UX_SPECIFICATION.md traceability work): the two
+data-corruption-class Highs are fixed, RED-first.
+
+- **H2 — bulk "Apply changes" sent the wrong proposals** (two independent paths, both in the
+  rewrite modal):
+  1. `rejectOneRewrite` removed the DOM row but not the replacement slot, and `applyRewrite`
+     indexed `rewriteState.replacements[i]` by DOM position — every proposal after a rejected one
+     silently applied the WRONG old→new pair. Fixed by tagging each row with its slot
+     (`row.dataset.repIndex`) in `renderRewriteCandidates` and collecting by tag, not position
+     (app.js:7812-7817, 7853-7860).
+  2. `_markProposalRow(row, "applied", true)` disabled the checkbox but left it CHECKED, so an
+     individually-applied proposal rode the next bulk Apply a second time (spurious
+     "couldn't be matched" skips at best). Fixed: uncheck + disable (app.js:7737-7739).
+- **H1 — Ctrl+Z in any text field rewound the SCRIPT's undo stack.** The undo branch sat above
+  the `isTypingTarget` bail in `bindGlobalShortcuts`; it was a deliberate "undo anywhere in the
+  script view" choice, but typing targets are now exempt — a field owns Ctrl/Cmd+Z while the caret
+  is in it (app.js:8136-8141). Consequence to know: while a manuscript line is open for inline
+  editing (contentEditable), Ctrl+Z is native text undo until the edit commits/cancels.
+- Tests: 4 new probes in tests/e2e_browser_rewrite_loop.py (H1 x2: no /edits/undo request fires
+  from the composer AND the field's own text undo still runs; H2 x2: actual /edits/apply payloads
+  captured via route interception — rejection must not shift the payload, an applied row must not
+  be re-sent). Watched all 4 fail on the unfixed code (undoRequests=1, value='draft words',
+  shifted payload, doubled payload), then pass: suite 41/41.
+- Gates: full pytest 1669 passed / 3 skipped (pre-existing skips); e2e phase14 47/47,
+  keyboard_edit 14/14, quickcheck 15/15; node --check app.js clean.
+
+REVIEWER NOTES (independent review, verdict "sound-with-notes") — pre-existing, not regressions:
+- Stashed rows keep a live CHECKED checkbox by design ("park it, decide later" — bulk apply is a
+  legitimate later decision). After this fix a stashed row is the only surprising checked row
+  left; if stash should feel more parked, uncheck-but-don't-disable on stash. Product call.
+- `applyOneRewrite` marks its row only after the await; a bulk Apply clicked during that flight
+  still collects the row (same race as before the fix).
+- `rejectOneRewrite` counts individually-applied rows as "left", so the bulk button can stay
+  visible with zero selectable proposals; it no-ops via the `!replacements.length` guard.
+
+---
+
+# 2026-09-24 (later) — Re-audit sweep: 17 findings fixed, 2 lows left open
+
+The numbered list the previous entry worked from was never persisted, so it was
+re-derived: three READ-ONLY experts (state / input-a11y / server-render) audited
+disjoint scopes and their reports were consolidated into one severity list. Every
+fix below was RED-first or mutation-verified — an assertion I could not watch fail
+is not a regression test.
+
+FIXED — Highs
+- **H3 the Beat Board drag died after one hop.** `dragover` called
+  `renderBeatboard()`, which opens with `board.innerHTML = ""` — so the first
+  crossing destroyed the DRAG SOURCE (a native drag is cancelled when its source
+  leaves the document) and the rebuilt cards were wired by a fresh closure whose
+  `dragNum` was null, so every later dragover bailed. One grab = exactly one slot,
+  plus a partial reorder the writer never completed. Now: drag identity at MODULE
+  scope, `dragover` re-seats the EXISTING nodes (`bbSyncDomOrder` — appendChild
+  moves, never re-creates) and ONE repaint happens on `dragend`. Suite
+  `tests/e2e_browser_beatboard_drag.py` (12 checks) asserts the node survives the
+  gesture, ZERO renders mid-drag, two crossings = two slots, and one repaint per
+  gesture; mutation-verified (restoring the old dragover → 5 red).
+- **H4 single-letter shortcuts fired BEHIND an open dialog.** The cascade bailed
+  only for typing targets, so with focus on any button in Settings, `b` mounted the
+  Beat Board behind it, `s` called `getManuscriptContainer().focus()` and pulled
+  focus out of the dialog (defeating the Tab trap), `z` toggled spotlight. Now one
+  predicate (`openModalOverlays()`) is asked by both the Esc branch and the
+  cascade, and the cascade returns after the palette-navigation branch. Suite
+  `tests/e2e_browser_modal_guards.py` — each stray key probed from a FRESH dialog
+  (the first version measured `s` in the state `b` had already poisoned).
+- **H5 `undo_last_edit`/`redo_last_edit` did an UNLOCKED load-modify-write** on
+  edits.json / edits.redo.json while `save_working` appends under
+  `lock_for(log)`. Two writers (two tabs; or CLI+webapp, which AGENTS.md calls
+  supported) lost records: text in working.json, no record in edits.json, and the
+  edit can never be undone again. Measured by probe: `ids=[]` (undo) and
+  `ids=['e1-race']` (redo). Now the RMW holds `lock_for`; the second store's lock is
+  taken only after the first is RELEASED (never two at once). New
+  `tests/test_undo_redo_lock_race.py` widens the exact window the auditor's live
+  repro used (slowed read + a real locked apply from another thread).
+
+FIXED — Mediums
+- **M1 a chat reply landed in whatever the writer had switched to.** The completion
+  handler read `state.currentBranch`/`currentProject` at completion; a local model
+  can take minutes. Now the turn remembers where it was SENT from (`sentFrom` /
+  `sentProject` / `sentIdea`), writes into THAT branch (keeping the branch's own
+  persona/mode) and only when the place still matches.
+- **M2 two project opens, the slower one won.** `loadScriptData` snapshots its
+  project and publishes only if that project is still the one on screen (two
+  guards), and `openProject` stops before painting if a second open got there
+  first. Probe reading: `state.script.title == "Pain"` while the desk said RaceB.
+- **M3 the Beat Board said "Order saved" over moves the PUT never carried.** The
+  body is a snapshot and the ↑/↓ buttons stay live during the flight; success now
+  clears the dirty flag only when `bbOrder` still equals what was sent (and says so
+  in the log line when it does not).
+- **M4 keyboard reorder dropped focus to `<body>` every hop** (the render rebuilds
+  the button) — focus is restored to the same control at the card's new index, so
+  Enter is repeatable (the WCAG 2.1.1 alternative is real, not a formality).
+- **M5 the backdrop click bypassed `closeModal`** (direct `style.display`), so
+  focus stayed on a now-hidden field and the Tab trap was never removed. Now routed
+  through `closeModal`.
+- **M6 one Escape spent TWO rungs.** A standalone document listener closed sidebar
+  flyouts on ANY Escape, independent of the cascade, so flyout + dock both closed in
+  one press. The flyout is now the cascade's LAST rung (and returns focus to its
+  trigger); the probe counts which rung-functions the press called. Consequence to
+  know: Esc pressed while the caret is in a text field no longer closes a flyout —
+  the typing-target bail owns that press, which is the same rule the composer and
+  the partner drawer already follow.
+- **M7 a file dropped anywhere but #dropzone navigated the tab to the file** (the
+  SPA unloaded mid-session). A window-level backstop cancels the default for drags
+  that carry FILES and never for a text field, so dragging text into the composer
+  still pastes.
+
+FIXED — Lows
+- **L3** the four beatboard routes lacked the parse-stage guard their siblings carry:
+  an unparsed project answered **500** with a raw filesystem path in the message
+  where `/script` answers 400. Guard added; parse != complete → 400.
+- **L4** `POST /rewrite` with `finding_index: -1` silently grounded the rewrite on
+  the LAST finding (negative indexing is valid Python). Now only a real slot
+  grounds; everything else degrades to ungrounded, like the out-of-range path.
+- **L5** `/edits/apply` answered 500 (traceback in the message) for a non-dict
+  replacement. The route validates the ITEMS and names `replacements[i]` in a 400.
+- **L6** `set_order` iterated any iterable, so `{"order": "312"}` persisted as
+  `[3,1,2]` and `int()` coerced bools/floats. Now it requires a list of ints.
+- **L7** `_fvEscape` was a hand-rolled clone of core.js's `escapeHtml`; the fv-
+  containers were outside the XSS suite's net. Deleted — the canonical helper.
+- **L8 the pane divider is RETIRED, not keyboard-enabled.** The audit proposed
+  tabindex + arrow keys. Measuring first paid: a **240px mouse drag changed
+  nothing** — `style.css:1368` pins `#script-pane` with `flex: 1 1 auto !important`
+  ("the retired divider code must never squeeze the page back into a 70/30 split"),
+  so the divider wrote a `pane-width-v2` pref nothing honoured while sitting on
+  screen in the idea room as a mouse-only `role="separator"`. Keyboard support for a
+  no-op would be worse, so element + wiring + pref + CSS are gone (the desk's layout
+  was already full-width by design; `#script-pane` stays — the idea page lives in
+  it). `tests/test_dead_surface_retirement.py` pins the absence (mutation-verified).
+- **L9** the command palette's dialog was the one overlay without `aria-modal`.
+
+LEFT OPEN (deliberate, with the evidence so the next pass starts warm)
+- **L1 idea autosave loses its 300ms debounce tail on a room switch** — nothing
+  flushes the pending timer in `openIdea`/`openProject`/`goHome`, so the last
+  keystrokes of the idea you were just in are never POSTed (no cross-idea
+  corruption). Needs a flush + a probe; left rather than shipped unfixed-and-unproved.
+- **L2 session restore double-opens the project for legacy `view: "chat"|"script"`
+  saved sessions** (a second full open just to scroll to a scene). Visible as
+  doubled network calls on restore; no corruption by itself.
+
+PRODUCT CALLS SURFACED (not code defects)
+- The stashed rewrite row keeping a live CHECKED checkbox (previous entry, still a call).
+- Demo mode still shows the `[demo]`-tagged fix queue; no `.bak` per edit-apply.
+
+METHOD NOTES (three instruments lied before they told the truth)
+- **Two probes passed on the broken code and had to be rewritten.** M5: pre-focusing
+  the opener meant the backdrop click left focus on the opener by accident. M2: the
+  first hold gated the MANIFEST fetch, so the stale flight never reached the code
+  the race is about — the defect only showed after gating the per-project DATA batch,
+  and then only in `state.script` (the DOM half still read B). An assertion that
+  passes for a reason you did not intend is not evidence.
+- **`page.evaluate("() => f()")` awaits the returned promise.** Holding a request
+  that an async function returns hangs the probe silently; wrap in braces when the
+  point is fire-and-forget.
+- **A Playwright on-the-wire route hold stalled the whole page** in this setup (every
+  later request queued behind it; no error, empty log). Holding INSIDE the page (wrap
+  `window.fetch` for named URLs, release from the test) is deterministic and readable.
+- **Read the CSS before "fixing" an a11y finding**: the inert divider was explained
+  by a comment six hundred lines from the audit's cite.
+
+GATES
+- pytest: **1684 passed / 3 skipped** (the same 3 pre-existing skips; +15 tests over
+  the 1669 of the previous entry), including the new
+  `test_undo_redo_lock_race.py`, `test_dead_surface_retirement.py` and the L3–L6
+  additions (38 passed in `test_beatboard.py` + `test_webapp_revision.py`; 10 of
+  those fail against HEAD — mutation-verified).
+- Browser: `beatboard_drag` **12/12**, `modal_guards` **22/22**, `race_guards`
+  **11/11** — each mutation-verified (reverting the fix turns them red: 5, 3 and 3
+  failures respectively) — plus the regression subset in the run log.
+- `node --check screenplay_studio/webapp/app.js` clean after every edit.
+- The L3–L6 work was drafted by a `fixer-server` teammate that then died on an
+  inference cap (429) before reporting; its diff was reviewed line-by-line, its tests
+  re-run, and its RED confirmed by restoring both files from HEAD (10 failed).
+

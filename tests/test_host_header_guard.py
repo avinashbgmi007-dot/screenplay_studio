@@ -1,0 +1,153 @@
+"""BE-1 (audit 2026-09-24) — the Host header must name this machine.
+
+The finding this closes was *executed*, not inferred. With `TRUSTED_HOSTS`
+unset and `request.host` never read, a page served from a name the attacker
+controls could re-point that name at 127.0.0.1 (DNS rebinding) and every read
+on this server answered it:
+
+    GET /api/projects/<name>/script   Host: evil.attacker.com   -> 200
+    (the writer's screenplay, in full, with no capability cookie)
+
+Writes were already refused (403) by the Origin check, so this was a *read*
+exposure — and reads are the half of the product that promises to stay on the
+machine. The defence belongs on the Host header because it is a forbidden
+header name for fetch/XHR: a page cannot forge it, and it is the one part of a
+rebound request that still names the attacker.
+
+Every rejection test below fails against the pre-fix server — verified by
+reverting the guard and watching them go red, which is the whole complaint the
+audit made about the *previous* loopback guard (it could not fail).
+"""
+from __future__ import annotations
+
+import pytest
+
+# Names a rebound page would arrive as. `localhost.evil.com` and
+# `127.0.0.1.evil.com` are the prefix-match traps net_guard exists to avoid;
+# `evil.com@127.0.0.1` is the userinfo trap urlparse would read as loopback;
+# `0.0.0.0` is the wildcard bind, which is never a client's own name.
+FOREIGN = (
+    "evil.attacker.com",
+    "evil.attacker.com:8500",
+    "localhost.evil.com",
+    "127.0.0.1.evil.com",
+    "evil.com@127.0.0.1",
+    "0.0.0.0",
+    "192.168.1.50:8500",
+)
+
+# Names the writer's own browser legitimately arrives as.
+LOCAL = (
+    "localhost",
+    "localhost:8500",
+    "127.0.0.1",
+    "127.0.0.1:8500",
+    "127.0.0.2",          # any 127.0.0.0/8 address — a static TRUSTED_HOSTS list misses this
+    "[::1]:8500",
+)
+
+
+def _client(monkeypatch, tmp_path, token="secret-token-123"):
+    import screenplay_studio.webapp_server as ws
+    monkeypatch.setattr(ws, "PROJECTS_DIR", str(tmp_path))
+    monkeypatch.setattr(ws, "_API_TOKEN", token)
+    ws.app.config["TESTING"] = True
+    return ws, ws.app.test_client()
+
+
+class TestForeignHostIsRefused:
+    @pytest.mark.parametrize("host", FOREIGN)
+    def test_reads_are_refused(self, monkeypatch, tmp_path, host):
+        """The executed defect: a GET carried no token requirement, so a foreign
+        Host read the project list — and `/script` read the screenplay."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.get("/api/projects", headers={"Host": host})
+        assert r.status_code == 403, f"Host {host!r} was served: {r.status_code}"
+
+    @pytest.mark.parametrize("host", FOREIGN)
+    def test_the_spa_document_is_refused(self, monkeypatch, tmp_path, host):
+        _, client = _client(monkeypatch, tmp_path)
+        assert client.get("/", headers={"Host": host}).status_code == 403
+
+    @pytest.mark.parametrize("host", FOREIGN)
+    def test_writes_are_refused_too(self, monkeypatch, tmp_path, host):
+        """Reads were the exposure, but the guard is method-blind on purpose:
+        one place decides, so a future route cannot reintroduce the hole."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.post("/api/projects/The_Late_Hour/analyze",
+                        headers={"Host": host, "X-Studio-Token": "secret-token-123"})
+        assert r.status_code == 403
+
+    def test_a_refused_request_is_not_handed_the_capability_cookie(self, monkeypatch, tmp_path):
+        """The cookie is a page's licence to WRITE. Handing it to a request the
+        Host guard just turned away would license the client it refused."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.get("/", headers={"Host": "evil.attacker.com"})
+        assert "studio_token" not in (r.headers.get("Set-Cookie") or "")
+
+    def test_the_rejection_names_the_host_guard_not_the_token_guard(self, monkeypatch, tmp_path):
+        """Ordering is load-bearing: if the write guard ran first, a foreign-Host
+        POST would be refused for the wrong reason and the diagnosis would be a
+        red herring."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.post("/api/projects/The_Late_Hour/analyze",
+                        headers={"Host": "evil.attacker.com"})
+        assert r.status_code == 403
+        body = r.get_json()
+        assert "loopback" in (body or {}).get("error", ""), (
+            f"refused by the wrong guard: {body!r}")
+
+    def test_a_missing_host_header_is_not_a_free_pass(self, monkeypatch, tmp_path):
+        """HTTP/1.0 lets a client omit Host. Werkzeug then synthesises one from
+        SERVER_NAME — which is the test client's `localhost` — so this asserts
+        the guard reads the *resolved* host rather than crashing on None."""
+        ws, client = _client(monkeypatch, tmp_path)
+        assert ws._host_header_is_local.__module__ == "screenplay_studio.webapp_server"
+        assert client.get("/api/projects").status_code == 200
+
+
+class TestLocalHostsStillWork:
+    @pytest.mark.parametrize("host", LOCAL)
+    def test_the_writer_is_served(self, monkeypatch, tmp_path, host):
+        _, client = _client(monkeypatch, tmp_path)
+        assert client.get("/api/projects", headers={"Host": host}).status_code == 200
+
+    @pytest.mark.parametrize("host", LOCAL)
+    def test_the_writer_still_gets_the_token_cookie(self, monkeypatch, tmp_path, host):
+        """The guard must not cost the real page its licence to write."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.get("/", headers={"Host": host})
+        assert r.status_code == 200
+        assert "studio_token=secret-token-123" in (r.headers.get("Set-Cookie") or "")
+
+    def test_every_loopback_literal_is_accepted_by_the_predicate(self):
+        """The guard is predicate-driven, not list-driven: `127.0.0.2` is a valid
+        loopback address that no hand-written TRUSTED_HOSTS list would carry."""
+        from screenplay_studio.net_guard import is_loopback_host
+        assert is_loopback_host("127.0.0.2") is True
+        assert is_loopback_host("127.0.0.1.evil.com") is False
+
+    @pytest.mark.parametrize("host", ["localhost.", "localhost.:8500", "127.0.0.1."])
+    def test_the_dns_root_label_is_not_a_false_rejection(self, monkeypatch, tmp_path, host):
+        """`localhost.` is `localhost` — the trailing dot is the root label. A
+        writer who typed it must still be served, and stripping dots can only
+        remove characters, so it cannot turn a foreign name into a loopback one.
+
+        `localhost.:8500` is the form a browser actually sends, and it is why the
+        dot has to be stripped from the parsed HOST rather than from the raw
+        header (a raw `rstrip('.')` would leave this one broken)."""
+        _, client = _client(monkeypatch, tmp_path)
+        assert client.get("/api/projects", headers={"Host": host}).status_code == 200
+
+    @pytest.mark.parametrize("host", ["evil.com.", "localhost.evil.com.", "0.0.0.0."])
+    def test_the_root_label_does_not_open_a_bypass(self, monkeypatch, tmp_path, host):
+        _, client = _client(monkeypatch, tmp_path)
+        assert client.get("/api/projects", headers={"Host": host}).status_code == 403
+
+    @pytest.mark.parametrize("host", ["[::1", "[::1]."])
+    def test_a_malformed_ipv6_host_is_refused_not_crashed(self, monkeypatch, tmp_path, host):
+        """`urlparse` raises ValueError on an unterminated IPv6 bracket, and
+        `[::1].` is not a valid authority either. Both must be a 403, never a 500.
+        No browser sends either form, so refusing them costs nothing."""
+        _, client = _client(monkeypatch, tmp_path)
+        assert client.get("/api/projects", headers={"Host": host}).status_code == 403

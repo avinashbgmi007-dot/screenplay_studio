@@ -1892,21 +1892,31 @@ function wireSprint() {
   renderSprint();
 }
 
+function currentSceneAnchor() {
+  // The scene the writer is actually looking at. Extracted from saveSession so
+  // the saved session and the URL anchor on the SAME reading — two copies of
+  // this scroll arithmetic would drift apart (UX-1, audit 2026-09-24).
+  if (state.view !== "cowrite" && state.view !== "feedback") return null;
+  if (!(state.script && state.script.scenes && state.script.scenes.length)) return null;
+  const container = getManuscriptContainer();
+  const pages = container ? [...container.querySelectorAll(".scene-page")] : [];
+  if (!pages.length) return null;
+  const viewportTop = container.getBoundingClientRect().top + 24;
+  let idx = pages.findIndex((p) => p.getBoundingClientRect().top >= viewportTop - 8);
+  if (idx === -1) idx = pages.length - 1;
+  return pages[Math.max(0, idx)].dataset.sceneNumber || null;
+}
+
 function saveSession() {
   try {
     const payload = { project: state.currentProject, view: state.view, idea: state.currentIdea ? state.currentIdea.id : null };
-    if ((state.view === "cowrite" || state.view === "feedback") && state.script && state.script.scenes && state.script.scenes.length) {
-      const container = getManuscriptContainer();
-      const pages = container ? [...container.querySelectorAll(".scene-page")] : [];
-      if (pages.length) {
-        const viewportTop = container.getBoundingClientRect().top + 24;
-        let idx = pages.findIndex((p) => p.getBoundingClientRect().top >= viewportTop - 8);
-        if (idx === -1) idx = pages.length - 1;
-        payload.scene = pages[Math.max(0, idx)].dataset.sceneNumber || null;
-      }
-    }
+    const scene = currentSceneAnchor();
+    if (scene) payload.scene = scene;
     localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
   } catch (_) { /* private mode — restore just won't persist */ }
+  // Every project, view and scene change already routes through here, so this is
+  // the one place the URL can be kept honest without touching a dozen callers.
+  syncRoute();
 }
 
 function restoreSession() {
@@ -1916,6 +1926,148 @@ function restoreSession() {
   } catch (_) {
     return null;
   }
+}
+
+// ---- URL routing (UX-1, audit 2026-09-24) ---------------------------------
+//
+// The desk had NO url at all. The audit measured two consequences: a scene or a
+// view could not be bookmarked or sent to anyone, and Browser Back left the
+// whole application instead of stepping back a view.
+//
+// The hash is the right vehicle here. The studio serves one document for every
+// path, so a path-based route would need a server change for no gain, and
+// `popstate` gives Back/Forward for free.
+//
+// The hash is DERIVED from `state`, never the source of truth. `syncRoute()` is
+// called from `saveSession()`, which every project, view and scene change
+// already goes through, so the URL cannot drift from what is on screen.
+
+const ROUTE_VIEWS = ["cowrite", "feedback", "premise", "compare", "revision", "beatboard"];
+const ROUTE_DEFAULT_VIEW = "cowrite";
+
+// True only while a Back/Forward is being applied, so applying a route never
+// pushes a fresh entry on top of the one the writer just navigated to.
+let routeApplying = false;
+
+function buildRoute() {
+  // An idea room is not project-scoped, so it has no shareable address.
+  if (!state.currentProject || state.inIdea) return "";
+  const view = ROUTE_VIEWS.indexOf(state.view) === -1 ? ROUTE_DEFAULT_VIEW : state.view;
+  let route = `#/${encodeURIComponent(state.currentProject)}/${view}`;
+  const scene = currentSceneAnchor();
+  if (scene) route += `/${scene}`;
+  return route;
+}
+
+function routePrefix(hash) {
+  return (hash || "").replace(/^#\/?/, "").split("/").slice(0, 2).join("/");
+}
+
+function syncRoute() {
+  if (routeApplying) return;
+  const next = buildRoute();
+  const here = location.hash || "";
+  if (next === here) return;
+  const url = next || (location.pathname + location.search);
+  // A different project or view is a NAVIGATION — Back must undo it. A different
+  // scene inside the same view is not: pushing there would make Back walk
+  // through every scene the writer scrolled past.
+  const navigating = routePrefix(next) !== routePrefix(here);
+  try {
+    if (navigating) history.pushState(null, "", url);
+    else history.replaceState(null, "", url);
+  } catch (_) { /* file:// or a sandboxed frame — routing is a convenience */ }
+}
+
+function parseRoute() {
+  const raw = (location.hash || "").replace(/^#\/?/, "");
+  if (!raw) return null;
+  const parts = raw.split("/").filter(Boolean).map((p) => {
+    try { return decodeURIComponent(p); } catch (_) { return p; }
+  });
+  if (parts.length < 2) return null;
+  return { project: parts[0], view: parts[1], scene: parts[2] || null };
+}
+
+// Rewrite the address to what is ACTUALLY on screen, without adding a history
+// entry. An address is a promise: after a link to a project this desk does not
+// have, the bar must stop claiming it rather than sit there disagreeing with the
+// page (UX-1).
+function correctRoute() {
+  const next = buildRoute();
+  try {
+    history.replaceState(null, "", next || (location.pathname + location.search));
+  } catch (_) { /* file:// or a sandboxed frame */ }
+}
+
+// The ONE place a view name becomes a view. The saved session and the URL both
+// go through it, so the two can never disagree about what "revision" means.
+// The legacy aliases ("chat"/"script" from an older session payload, "fv" from
+// the feedback view's first name) keep their ORIGINAL destinations rather than
+// being collapsed, so restoring an old session behaves exactly as it did.
+async function openViewByName(view, scene) {
+  let pagesOnScreen = false;
+  if (view === "chat" || view === "script") { await openScriptView(); pagesOnScreen = true; }
+  else if (view === "fv") await openFeedbackView();
+  else if (view === "beatboard") await openBeatboardView();
+  else if (view === "compare") await openCompareView();
+  else if (view === "revision") await openRevisionView();
+  else if (view === "premise") await openPremiseView();
+  else if (view === "feedback") { await openFeedbackRoom(); pagesOnScreen = true; }
+  else { await openScriptView(); pagesOnScreen = true; }   // default: the writing desk
+  // A scene anchor only means something where the pages are actually on screen,
+  // and a hand-typed `#/p/revision/nonsense` must not raise "Scene NaN isn't in
+  // the working draft right now." at the writer.
+  const n = Number(scene);
+  if (scene && pagesOnScreen && Number.isFinite(n)) scrollToSceneInPlace(n);
+}
+
+// Apply the address bar. Returns false when there is nothing to apply (no hash,
+// or a project this desk does not have) so the caller can fall back to the
+// remembered session — a stale bookmark must not strand the writer.
+//
+// `fromNavigation` distinguishes the two ways an EMPTY route can arrive, and they
+// mean opposite things:
+//   * on a fresh load it is simply "no deep link" — the remembered session
+//     decides, which is how refresh lands the writer back in their script; and
+//   * reached by Back it means they asked to leave the project. Treating it as
+//     "no route" there would hand it to correctRoute(), which would write the
+//     project's address straight back and make Back look broken.
+async function applyRoute(opts) {
+  const raw = (location.hash || "").replace(/^#\/?/, "");
+  if (!raw) {
+    if (opts && opts.fromNavigation && state.currentProject) {
+      routeApplying = true;
+      try { goHome(); } finally { routeApplying = false; }
+      return true;
+    }
+    return false;
+  }
+  const route = parseRoute();
+  if (!route) return false;
+  if (!(state.projects || []).some((p) => p.project === route.project)) return false;
+  routeApplying = true;
+  try {
+    if (state.currentProject !== route.project) await openProject(route.project);
+    await openViewByName(route.view, route.scene);
+  } finally {
+    routeApplying = false;
+  }
+  return true;
+}
+
+// Keep the scene in the URL as the writer scrolls — that is what makes "send me
+// a link to the scene I mean" mean anything. Debounced to a settle, and it
+// REPLACES the history entry (see syncRoute), so scrolling never floods Back.
+// Nothing else persisted on scroll, so without this the scene would only ever be
+// captured at the last view change.
+let routeSceneTimer = null;
+function scheduleRouteSync() {
+  if (routeSceneTimer) return;
+  routeSceneTimer = setTimeout(() => {
+    routeSceneTimer = null;
+    syncRoute();
+  }, 300);
 }
 
 // ---- Home: back to the welcome desk (shelf · library · ideas) ----
@@ -1947,6 +2099,9 @@ function goHome() {
   const input = $("#input");
   if (input) input.value = "";
   try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+  // UX-1: the welcome desk is the EMPTY route, so leaving a project is itself a
+  // navigation — Back from the shelf returns to the script the writer left.
+  syncRoute();
   refreshMetrics();
   loadProjects();
 }
@@ -2032,6 +2187,10 @@ async function openProject(name) {
 
     // the script pane is always visible in both rooms — render it once
     try { await loadScriptData(); } catch (_) { /* no parse yet — pane shows its hint */ }
+    // M2 (re-audit 2026-09-24): a second open can have finished while this one was
+    // waiting. Everything below paints state onto the page, so a stale flight must
+    // stop here instead of overwriting the desk the writer is looking at.
+    if (state.currentProject !== name) return;
     renderManuscript(document.getElementById('manuscript-container'));
     maybeShowWelcome();
 
@@ -3448,10 +3607,25 @@ async function sendMessage() {
       const base = state.inIdea
         ? `/ideas/${encodeURIComponent(state.currentIdea.id)}`
         : `/projects/${encodeURIComponent(state.currentProject)}`;
+      // M1 (re-audit 2026-09-24): remember WHERE this turn was sent from. A local
+      // model can take minutes, and reading state.currentBranch / currentProject at
+      // COMPLETION wrote the reply into whatever the writer had switched to by
+      // then — another branch's history, or across a project switch, another
+      // project's whole message list.
+      const sentFrom = state.currentBranch;
+      const sentProject = state.currentProject;
+      const sentIdea = state.inIdea ? state.currentIdea.id : null;
       const res = await streamChatTurn(`${base}/chat/sessions/${sessionId}`, text, quote, pendingBubble, container);
       stopTicker();
-      state.branches[state.currentBranch] = { ...currentBranchData(), messages: res.messages };
-      renderMessages();
+      const samePlace = state.inIdea
+        ? !!(state.currentIdea && state.currentIdea.id === sentIdea)
+        : state.currentProject === sentProject;
+      if (samePlace) {
+        // the branch it was SENT from keeps its own persona/mode; only the message
+        // history is this turn's to write
+        state.branches[sentFrom] = { ...(state.branches[sentFrom] || currentBranchData()), messages: res.messages };
+        renderMessages();
+      }
       refreshMetrics();  // reply timing landed — update the loop readout
       finishTurn();
     } catch (e) {
@@ -3676,13 +3850,21 @@ const CATEGORY_LABELS = {
 };
 
 async function loadScriptData() {
-  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
+  // M2 (re-audit 2026-09-24): a project open is several awaited round trips, and
+  // the writer can open another project while this one is still loading. The
+  // flight that finished LAST used to win every write, so B's desk could render
+  // A's manuscript, findings ledger and undo state while every later POST went to
+  // B. The load knows which project it is FOR; anything it cannot still claim is
+  // dropped instead of published.
+  const target = state.currentProject;
+  const base = `/projects/${encodeURIComponent(target)}`;
   const [script, edits, drafts, notes] = await Promise.all([
     api(`${base}/script`),
     api(`${base}/edits`),
     api(`${base}/drafts`),
     api(`${base}/notes`),
   ]);
+  if (state.currentProject !== target) return;
   state.script = script;
   state.editsData = edits;
   state.drafts = drafts;
@@ -3741,6 +3923,9 @@ async function loadScriptData() {
   if (arrived && findings.length) scheduleArrivalPeek();
   renderDraftBar();
   await renderDiffBanner();
+  // the second wave of awaits is long enough for the writer to have switched
+  // projects — same rule as above: a load may only publish the project it is for
+  if (state.currentProject !== target) return;
   // The desk status line reads state.findings, which this function just set.
   // At project-open the toolbar refresh runs BEFORE this async load resolves, so
   // without this re-render a 36-finding desk read "a clean bill" forever (audit
@@ -7179,13 +7364,10 @@ async function openFeedbackView() {
   openDock("evidence");
 }
 
-// tiny escape for the legacy FV bubbles (innerHTML path) — messages are
-// writer/model text; never trust them into raw HTML
-function _fvEscape(s) {
-  return String(s).replace(/[&<>"']/g, function(c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-  });
-}
+// renderFvChat renders writer/model text through the ONE canonical escapeHtml
+// (core.js). It used to carry its own `_fvEscape` clone: functionally identical
+// then, but two escape implementations drift, and the XSS suite's dead-sink legs
+// never drove the fv- containers (L7, re-audit 2026-09-24).
 
 function renderFvChat(containerId, room) {
   var container = document.getElementById(containerId);
@@ -7220,9 +7402,9 @@ function renderFvChat(containerId, room) {
     if (m.role === 'user' && m.quote && m.quote.text) {
       var q = String(m.quote.text).slice(0, 140);
       html += '<div class="fv-msg-quote" title="The passage this question was about">' +
-              _fvEscape(q) + '</div>';
+              escapeHtml(q) + '</div>';
     }
-    html += '<div class="fv-msg ' + cls + '">' + _fvEscape(m.content || m.text || '') + '</div>';
+    html += '<div class="fv-msg ' + cls + '">' + escapeHtml(m.content || m.text || '') + '</div>';
   });
   container.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:var(--fs-sm);">Start a conversation...</div>';
   container.scrollTop = container.scrollHeight;
@@ -7450,6 +7632,13 @@ let bbDirty = false;
 
 let bbPrevRoom = "cowrite";
 
+// Drag identity lives at MODULE scope, not in bindBeatboardDrag's closure — a
+// closure-scoped `dragNum` is replaced by a fresh (null) one every time the
+// board re-renders, which is half of why one grab could only ever move a card
+// one slot (H3, re-audit 2026-09-24).
+let bbDragNum = null;
+let bbDragMoved = false;  // did this gesture actually change the order?
+
 async function openBeatboardView() {
   if (state.view === "beatboard") return;
   exitSpotlight();
@@ -7539,9 +7728,7 @@ function renderBeatboard() {
     card.appendChild(moves);
     board.appendChild(card);
   });
-  $("#bb-save-btn").textContent = bbDirty ? "Save order" : "Order saved";
-  $("#bb-save-btn").disabled = !bbDirty;
-  $("#bb-save-btn").classList.toggle("dirty", bbDirty);
+  updateBeatboardSaveState();
   $("#bb-export").href = `/api/projects/${encodeURIComponent(state.currentProject)}/beatboard/export?format=fountain`;
   $("#bb-export").download = `${(state.script && state.script.title) || "script"}-beatboard-order.fountain`;
   bindBeatboardDrag();
@@ -7553,15 +7740,36 @@ function bbMove(i, dir) {
   [bbOrder[i], bbOrder[j]] = [bbOrder[j], bbOrder[i]];
   bbDirty = true;
   renderBeatboard();
+  // The render rebuilds every card, so the button that was just activated no
+  // longer exists and focus falls to <body>. Put it back on the same control at
+  // the card's NEW index — otherwise a keyboard reorder costs one Tab-walk
+  // through the whole board per slot, which is the difference between "an
+  // alternative to dragging" (WCAG 2.1.1) and a formality (M4, re-audit 2026-09-24).
+  const moved = document.querySelectorAll("#beatboard-board .bb-card")[j];
+  if (!moved) return;
+  const buttons = [...moved.querySelectorAll(".bb-move")];
+  const preferred = buttons[dir < 0 ? 0 : 1];
+  const target = preferred && !preferred.disabled ? preferred : buttons.find((b) => !b.disabled);
+  if (target) target.focus();
 }
 
 async function saveBeatboard() {
   try {
     const base = `/projects/${encodeURIComponent(state.currentProject)}`;
-    await api(`${base}/beatboard`, { method: "PUT", body: JSON.stringify({ order: bbOrder }) });
-    bbDirty = false;
+    // M3 (re-audit 2026-09-24): the PUT body is a snapshot taken here, and the
+    // writer can keep reordering while it flies — the ↑/↓ buttons stay live. On
+    // success the old code cleared the dirty flag unconditionally, so the board
+    // printed "Order saved" over moves that were never sent, and the next load
+    // silently reverted them.
+    const sentOrder = bbOrder.slice();
+    await api(`${base}/beatboard`, { method: "PUT", body: JSON.stringify({ order: sentOrder }) });
+    if (bbOrder.join(",") === sentOrder.join(",")) {
+      bbDirty = false;
+      appendSystemNote("Beat-board order saved. Export it when the arrangement feels right.");
+    } else {
+      appendSystemNote("Beat-board order saved — your later moves are still unsaved.");
+    }
     renderBeatboard();
-    appendSystemNote("Beat-board order saved. Export it when the arrangement feels right.");
   } catch (e) {
     showError("Couldn't save the beat board: " + e.message);
   }
@@ -7578,30 +7786,77 @@ async function restoreBeatboard() {
   }
 }
 
+function updateBeatboardSaveState() {
+  const btn = $("#bb-save-btn");
+  if (!btn) return;
+  btn.textContent = bbDirty ? "Save order" : "Order saved";
+  btn.disabled = !bbDirty;
+  btn.classList.toggle("dirty", bbDirty);
+}
+
+// Re-seat the EXISTING card nodes in bbOrder's order. appendChild MOVES a node
+// that is already in the board — it never re-creates one — which is what makes
+// this safe to call while a drag is live: the dragged element remains the same
+// DOM node, so the browser keeps the gesture instead of aborting it.
+//
+// H3 (re-audit 2026-09-24): this used to be `renderBeatboard()`, i.e.
+// `board.innerHTML = ""` and a full rebuild on the FIRST dragover. That detached
+// the drag source mid-gesture (a native drag is cancelled when its source leaves
+// the document) and wired the new cards to a fresh closure whose `dragNum` was
+// null, so every later dragover bailed on `dragNum != null`. Net: one grab moved
+// a card exactly one slot, while the partial reorder it had already made stayed
+// on the board as an unsaved change the writer never asked for.
+function bbSyncDomOrder() {
+  const board = $("#beatboard-board");
+  const byNum = new Map();
+  board.querySelectorAll(".bb-card").forEach((c) => byNum.set(Number(c.dataset.num), c));
+  bbOrder.forEach((num) => {
+    const node = byNum.get(num);
+    if (node) board.appendChild(node);
+  });
+}
+
 function bindBeatboardDrag() {
   const board = $("#beatboard-board");
-  let dragNum = null;
   board.querySelectorAll(".bb-card").forEach((card) => {
-    card.addEventListener("dragstart", (e) => {
-      dragNum = Number(card.dataset.num);
-      e.dataTransfer.effectAllowed = "move";
+    card.addEventListener("dragstart", () => {
+      bbDragNum = Number(card.dataset.num);
+      bbDragMoved = false;
       card.classList.add("dragging");
     });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-    card.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      const overNum = Number(card.dataset.num);
-      if (dragNum != null && overNum !== dragNum) {
-        const from = bbOrder.indexOf(dragNum);
-        const to = bbOrder.indexOf(overNum);
-        bbOrder.splice(from, 1);
-        bbOrder.splice(to, 0, dragNum);
-        bbDirty = true;
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      bbDragNum = null;
+      // ONE repaint for the whole gesture: position numbers and the ↑/↓ disabled
+      // states come from bbOrder, and painting them mid-drag is what killed the
+      // drag. An untouched gesture (a drag that was cancelled, or dropped where
+      // it started) repaints nothing.
+      if (bbDragMoved) {
+        bbDragMoved = false;
         renderBeatboard();
-        dragNum = Number(card.dataset.num);
+      } else {
+        updateBeatboardSaveState();
       }
     });
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      const overNum = Number(card.dataset.num);
+      if (bbDragNum == null || overNum === bbDragNum) return;
+      const from = bbOrder.indexOf(bbDragNum);
+      const to = bbOrder.indexOf(overNum);
+      if (from < 0 || to < 0 || from === to) return;
+      bbOrder.splice(from, 1);
+      bbOrder.splice(to, 0, bbDragNum);
+      bbDirty = true;
+      bbDragMoved = true;
+      bbSyncDomOrder();
+      updateBeatboardSaveState();
+    });
+    // the order already moved during dragover, so a drop commits nothing extra —
+    // but its default action must still be cancelled (a file dropped here must
+    // never navigate the tab away from the writer's session)
+    card.addEventListener("drop", (e) => e.preventDefault());
   });
 }
 
@@ -7734,7 +7989,9 @@ function _markProposalRow(row, state, terminal) {
   row.classList.add("rewrite-candidate-" + state);
   if (!terminal) return;
   const cb = row.querySelector("input[type=checkbox]");
-  if (cb) cb.disabled = true;
+  // Uncheck as well as disable: a decided row must not ride the next bulk
+  // "Apply changes" — a disabled-but-checked box used to be sent a second time.
+  if (cb) { cb.checked = false; cb.disabled = true; }
   const actions = row.querySelector(".rewrite-candidate-actions");
   if (actions) actions.remove();
 }
@@ -7809,8 +8066,12 @@ function renderRewriteCandidates(res) {
   }
 
   rewriteState.replacements = res.replacements;
-  for (const rep of res.replacements) {
+  res.replacements.forEach((rep, repIndex) => {
     const row = el("div", "rewrite-candidate");
+    // The row is tagged with its slot in rewriteState.replacements: Reject
+    // removes a row from the DOM, so the bulk collector must never infer the
+    // replacement from the row's position among its surviving siblings.
+    row.dataset.repIndex = String(repIndex);
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = true;
@@ -7838,16 +8099,20 @@ function renderRewriteCandidates(res) {
     actions.appendChild(rejectBtn);
     row.appendChild(actions);
     wrap.appendChild(row);
-  }
+  });
   $("#rewrite-apply").style.display = "inline-block";
 }
 
 async function applyRewrite() {
   if (!rewriteState || !rewriteState.replacements) return;
-  const checkboxes = document.querySelectorAll("#rewrite-candidates .rewrite-candidate input[type=checkbox]");
   const replacements = [];
-  document.querySelectorAll("#rewrite-candidates .rewrite-candidate").forEach((row, i) => {
-    if (row.querySelector("input").checked) replacements.push(rewriteState.replacements[i]);
+  // Collect by the row's tagged replacement slot, not its DOM position —
+  // rejected rows leave the list, and decided rows are unchecked + disabled.
+  document.querySelectorAll("#rewrite-candidates .rewrite-candidate").forEach((row) => {
+    const cb = row.querySelector("input[type=checkbox]");
+    if (cb && cb.checked && !cb.disabled) {
+      replacements.push(rewriteState.replacements[Number(row.dataset.repIndex)]);
+    }
   });
   if (!replacements.length) return;
 
@@ -8078,6 +8343,13 @@ function isTypingTarget(t) {
   return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
 }
 
+// Every VISIBLE overlay. ONE predicate: the Esc branch and the keyboard cascade
+// both need this answer, and two hand-rolled `.modal-overlay` filters are how
+// they drift apart.
+function openModalOverlays() {
+  return [...document.querySelectorAll(".modal-overlay")].filter((m) => m.style.display === "flex");
+}
+
 function bindGlobalShortcuts() {
   document.addEventListener("keydown", (e) => {
     const mod = e.ctrlKey || e.metaKey;
@@ -8102,7 +8374,7 @@ function bindGlobalShortcuts() {
     // Esc closes the top-most open modal — even while typing inside it,
     // so this must sit ABOVE the isTypingTarget bail-out further down.
     if (e.key === "Escape") {
-      const overlays = [...document.querySelectorAll(".modal-overlay")].filter((m) => m.style.display === "flex");
+      const overlays = openModalOverlays();
       if (overlays.length) {
         closeModal("#" + overlays[overlays.length - 1].id);
         return;
@@ -8123,9 +8395,21 @@ function bindGlobalShortcuts() {
       return;
     }
 
-    // undo/redo — meaningful in the script view (or anywhere with edits)
+    // A dialog owns the keyboard while it is open. The palette-navigation branch
+    // above is the one exception, because the palette IS a dialog with its own
+    // keys; for every other overlay the surface BEHIND it must not act — single
+    // letters used to mount full-screen tools behind the dialog, "s" called
+    // getManuscriptContainer().focus() and pulled focus straight out of the dialog
+    // (silently defeating the Tab trap), and "z" toggled spotlight behind it
+    // (H4, re-audit 2026-09-24).
+    if (openModalOverlays().length) return;
+
+    // undo/redo — meaningful in the script view (or anywhere with edits), but a
+    // text field owns Ctrl/Cmd+Z while the caret is in it: script-level undo must
+    // not eat the field's own text undo (the isTypingTarget bail below used to
+    // arrive too late for this branch).
     if (mod && e.key.toLowerCase() === "z") {
-      if ((state.view === "cowrite" || state.view === "feedback") && state.editsData && (state.editsData.can_undo || e.shiftKey)) {
+      if (!isTypingTarget(e.target) && (state.view === "cowrite" || state.view === "feedback") && state.editsData && (state.editsData.can_undo || e.shiftKey)) {
         e.preventDefault();
         if (e.shiftKey) redoEdit(); else undoEdit();
       }
@@ -8151,6 +8435,18 @@ function bindGlobalShortcuts() {
         if (drawer && drawer.classList.contains("open")) { closeRoomDrawer(); return; }
         const shelf = document.querySelector(".craft-shelf");
         if (shelf && shelf.classList.contains("open")) { toggleCraftShelf(); return; }
+        // The sidebar's own popover is the LAST rung: it covers the least, and the
+        // writer opened it by clicking a section chip. It closes HERE, in the
+        // cascade, and not in a second document-level listener — that listener
+        // fired on every Escape independent of the cascade, so one press closed
+        // the flyout AND the rung below it (M6, re-audit 2026-09-24).
+        const flyout = document.querySelector(".sidebar-section.open");
+        if (flyout) {
+          const trigger = flyout.querySelector(".sidebar-section-trigger");
+          closeSidebarFlyouts(null);
+          if (trigger) trigger.focus();
+          return;
+        }
       }
       return;
     }
@@ -8303,7 +8599,9 @@ function wireSidebarFlyouts() {
     // interacting inside a pinned flyout keeps it open
     section.querySelector(".sidebar-flyout").addEventListener("mouseenter", () => clearTimeout(hideTimer));
   }
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSidebarFlyouts(null); });
+  // (a standalone document Escape listener used to close the flyouts here, on
+  // ANY Escape — it spent a rung the cascade had already spent. The flyout is
+  // now the cascade's last rung in bindGlobalShortcuts, so there is one ladder.)
   // A dropped-down flyout OVERLAYS the sections beneath it -- and sliding the
   // pointer across it keeps cancelling its close timer, so it lingers over
   // the shelf/library triggers and swallows their hover/clicks (invisible
@@ -8551,6 +8849,19 @@ function init() {
   dropzone.addEventListener("drop", (e) => {
     const file = e.dataTransfer.files[0];
     if (file) uploadFile(file);
+  });
+  // Page-level backstop (M7, re-audit 2026-09-24): the two lines above only cover
+  // the dropzone. A file dropped anywhere ELSE made the browser navigate to it —
+  // the SPA unloaded mid-session and whatever was on screen went with it. Only
+  // drags that actually carry FILES are cancelled, and never onto a text field,
+  // so dragging selected text into the composer still pastes.
+  const dragCarriesFiles = (e) => {
+    const types = e.dataTransfer && e.dataTransfer.types;
+    return !!types && Array.from(types).indexOf("Files") !== -1;
+  };
+  window.addEventListener("dragover", (e) => { if (dragCarriesFiles(e)) e.preventDefault(); });
+  window.addEventListener("drop", (e) => {
+    if (dragCarriesFiles(e) && !isTypingTarget(e.target)) e.preventDefault();
   });
 
   $("#new-project-btn").addEventListener("click", () => showWelcomeDesk());
@@ -8842,34 +9153,52 @@ function init() {
     }
   });
 
-  // pick up where the writer left off — last idea OR project, view, and scene
-  projectsPromise.then(() => {
+  // pick up where the writer left off — a DEEP LINK first, then the last idea
+  // OR project, view, and scene
+  projectsPromise.then(async () => {
+    // UX-1: an address in the bar outranks the remembered session. That is what
+    // makes a shared link mean something — and it is why a stale one falls
+    // through to the session rather than stranding the writer on a blank desk.
+    if (await applyRoute()) return;
     const s = restoreSession();
-    if (!s) return;
     // the idea room is restored too: refresh lands you back in the
     // brainstorming session, not just on the script desk
-    if (s.idea && (state.ideas || []).some((i) => i.id === s.idea)) {
+    if (s && s.idea && (state.ideas || []).some((i) => i.id === s.idea)) {
       openIdea(s.idea).catch(() => showWelcomeDesk());
       return;
     }
-    if (!s.project || !(state.projects || []).some((p) => p.project === s.project)) return;
-    openProject(s.project).then(() => {
-      if (s.view === "chat" || s.view === "script") {
-        // legacy saved views map to the Co-write room (the script is the shared pane)
-        openProject(s.project).then(() => {
-          if (s.scene) {
-            const page = document.getElementById(`scene-page-${s.scene}`);
-            if (page) page.scrollIntoView({ behavior: "auto", block: "start" });
-          }
-        });
-      } else if (s.view === "beatboard") openBeatboardView();
-      else if (s.view === "compare") openCompareView();
-      else if (s.view === "revision") openRevisionView();
-      else if (s.view === "premise") openPremiseView();
-      else if (s.view === "fv") openFeedbackView();
-      else if (s.view === "feedback") openFeedbackRoom();
-    }).catch(() => { /* project vanished — stay on the welcome scene */ });
+    if (s && s.project && (state.projects || []).some((p) => p.project === s.project)) {
+      // One dispatch table for both the session and the URL (openViewByName), so
+      // "revision" cannot come to mean two different things.
+      openProject(s.project)
+        .then(() => openViewByName(s.view, s.scene))
+        .catch(() => { /* project vanished — stay on the welcome scene */ });
+      return;
+    }
+    // Nothing to restore. An address naming a project this desk does not have
+    // must stop claiming it — otherwise the bar and the page disagree, and the
+    // next reload repeats the lie.
+    if (parseRoute()) correctRoute();
   });
+
+  // UX-1: the address drives the view.
+  //
+  // ONE listener, not two: traversing between two history entries that differ
+  // only in the fragment fires `popstate` AND `hashchange`, so `hashchange`
+  // already covers Back/Forward — a `popstate` listener beside it is dead weight.
+  // (Verified by mutation: deleting this listener turns the deep-link suite red;
+  // deleting a `popstate` twin changed nothing at all, which is how it was
+  // found.) A future PATH-based route would need `popstate` again, because a
+  // path change is not a fragment change.
+  window.addEventListener("hashchange", () => {
+    applyRoute({ fromNavigation: true })
+      .then((applied) => { if (!applied) correctRoute(); })
+      .catch(() => {});
+  });
+  // ...and the address follows the writer's reading position, so the scene they
+  // are on is the scene a link points at.
+  const routeScrollPane = getManuscriptContainer();
+  if (routeScrollPane) routeScrollPane.addEventListener("scroll", scheduleRouteSync, { passive: true });
 
   $("#analyze-btn").addEventListener("click", runAnalysis);
   $("#reparse-btn").addEventListener("click", reparseProject);
@@ -8993,57 +9322,15 @@ function init() {
   });
   const scrollPane = getManuscriptContainer(); if (scrollPane) scrollPane.addEventListener("scroll", hideQuoteFloat, { passive: true });
 
-  // resizable script pane — drag the divider; double-click resets to 70%
-  // (the manuscript is center stage by default; the chat is the right pane)
-  const paneDivider = $("#pane-divider");
-  const scriptPane = $("#script-pane");
-  let paneDragging = false;
-  const deskEl = () => document.querySelector(".desk") || document.querySelector(".workspace");
-  const applyPaneWidth = (px) => {
-    const desk = deskEl();
-    // the manuscript never shrinks below half the desk (Phase 0 rule)
-    const min = desk ? Math.round(desk.clientWidth * 0.5) : 300;
-    const max = desk ? Math.round(desk.clientWidth * 0.78) : 1200;
-    px = Math.max(min, Math.min(px, max));
-    scriptPane.style.flex = `0 0 ${px}px`;
-    localStorage.setItem("pane-width-v2", String(px));
-  };
-  // v2 key: the v1 value was saved while the layout still defaulted to a wide
-  // chat, so honoring it now would override the small-chat default. A stale
-  // v1 value is deliberately ignored. The same rule extends to v2: a stored
-  // width that would leave the chat under ~30% is treated as a leftover from
-  // a wide-drag session and dropped, so the manuscript is center stage on
-  // every fresh load (drag to resize still works live, up to the 78% clamp).
-  const savedPaneWidth = parseFloat(localStorage.getItem("pane-width-v2"));
-  const wsEl = deskEl();
-  // honor a stored width only inside the 50–78% band; anything wider (a
-  // leftover from a wide-drag session) is treated as stale and dropped
-  const minPane = wsEl ? Math.round(wsEl.clientWidth * 0.5) : 300;
-  if (savedPaneWidth && wsEl && savedPaneWidth >= minPane && savedPaneWidth <= Math.round(wsEl.clientWidth * 0.78)) {
-    applyPaneWidth(savedPaneWidth);
-  }
-  paneDivider.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    paneDragging = true;
-    document.body.classList.add("resizing");
-  });
-  window.addEventListener("mousemove", (e) => {
-    if (!paneDragging) return;
-    const ws = document.querySelector(".workspace");
-    const wsRect = ws.getBoundingClientRect();
-    // the desk's left edge is the desk's left edge: the drag gives the script
-    // exactly the width the pointer asks for
-    applyPaneWidth(e.clientX - wsRect.left);
-  });
-  window.addEventListener("mouseup", () => {
-    if (!paneDragging) return;
-    paneDragging = false;
-    document.body.classList.remove("resizing");
-  });
-  paneDivider.addEventListener("dblclick", () => {
-    scriptPane.style.flex = "";
-    localStorage.removeItem("pane-width-v2");
-  });
+  // RETIRED 2026-09-24 (L8, re-audit): the resizable script pane. The divider
+  // that drove it was already inert — `style.css` pins `#script-pane` with
+  // `flex: 1 1 auto !important` ("the retired divider code must never squeeze the
+  // page back into a 70/30 split"), so a measured 240px drag moved nothing while
+  // still writing a `pane-width-v2` pref nothing honoured, and the divider stayed
+  // a mouse-only `role="separator"` on screen in the idea room. Keyboard support
+  // for a no-op would be worse than none, so the whole affordance is gone: the
+  // divider (index.html), this wiring, the pref, and its CSS. The manuscript owns
+  // the room; the idea canvas is full width.
   $("#input").addEventListener("input", autoResizeTextarea);
   $("#input").addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" && chatHistoryArrowUp(e)) return;
@@ -9091,7 +9378,11 @@ function init() {
   $("#fork-name-input").addEventListener("keydown", (e) => { if (e.key === "Enter") createFork(); });
 
   document.querySelectorAll(".modal-overlay").forEach((overlay) => {
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.style.display = "none"; });
+    // Route the backdrop click through closeModal: it is a close like any other,
+    // so it must remove the Tab trap and restore focus to the control that opened
+    // the dialog. Writing style.display directly left focus on a now-hidden
+    // control and dropped the writer at <body> (M5, re-audit 2026-09-24).
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal("#" + overlay.id); });
   });
 
   // rooms

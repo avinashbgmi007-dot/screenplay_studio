@@ -58,6 +58,37 @@ class _NullRulesContext:
         return default
 
 
+def _empty_kb_message(rules_ctx) -> str | None:
+    """The message to surface when the craft KB is present but loaded NO rules.
+
+    Returns None when grounding is fine, and also when the count is unknowable:
+    a context with no `rule_count` at all, or one that raises, reports None rather
+    than 0 — because "cannot count" and "counted zero" are different facts, and
+    reporting the first as the second would raise a false alarm on a healthy KB
+    that hit a transient read error.
+
+    Extracted from `analyze()` so the guard can be tested without driving a whole
+    analysis: BE-2 (audit 2026-09-24) exists because this state used to be
+    indistinguishable from a healthy one.
+    """
+    counter = getattr(rules_ctx, "rule_count", None)
+    if counter is None:
+        return None
+    try:
+        count = counter()
+    except Exception:
+        return None
+    if count is None or count > 0:
+        return None
+    where = getattr(getattr(rules_ctx, "kb", None), "rules_dir", "knowledge_base/rules")
+    return (
+        "The craft knowledge base loaded ZERO rules — analysis is running without "
+        "craft-principle grounding, so findings cannot cite the principles behind "
+        f"them. Check that {where} exists and holds the rules/*.json files "
+        "(reinstalling the package restores them)."
+    )
+
+
 def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
@@ -665,6 +696,21 @@ def analyze(
             "without craft-principle grounding. Copy the knowledge_base/ folder next "
             "to screenplay_analyzer/ to restore it."
         )
+    else:
+        # BE-2 (audit 2026-09-24): the package can be PRESENT and still load zero
+        # rules. `KnowledgeBase._load()` globs `rules/*.json` and silently yields
+        # `{}` when the glob finds nothing — no exception, no warning. That is the
+        # repo's own documented worst case (rules_context.py's header), and the
+        # only guard against it was BUILD-time (the wheel must carry >=26 rule
+        # files). A permissions problem, a path refactor or a renamed file reaches
+        # it at runtime and quietly strips every finding's "grounded in rule X"
+        # attribution. Loud, not fatal: the pipeline still runs, and the writer is
+        # told rather than handed an ungrounded report that looks normal.
+        empty_kb = _empty_kb_message(rules_ctx)
+        if empty_kb:
+            import sys
+            print(f"[screenplay_analyzer] WARNING: {empty_kb}", file=sys.stderr)
+            result.errors.append(empty_kb)
 
     # 1. deterministic passes — always run, never fail the whole pipeline
     emit("formatting", "running", "Formatting checks & analytics")

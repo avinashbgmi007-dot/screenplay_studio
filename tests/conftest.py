@@ -11,6 +11,26 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # tests/ (route_
 MOCK_PORT = 8196
 
 
+@pytest.fixture(autouse=True)
+def _isolate_root_logger():
+    """BE-3: `webapp_server.main()` configures the ROOT logger, and several tests
+    call `main()`. Without this teardown the rotating handler it attaches outlives
+    the test that caused it — later tests' records are appended to a stale
+    directory's log, and on Windows the open handle makes that directory
+    unremovable ([WinError 32], the very failure the delete-retry tests exist for).
+    Restores the level too, since `configure()` sets it.
+    """
+    import logging
+
+    from screenplay_studio import logsetup
+
+    root = logging.getLogger()
+    level = root.level
+    yield
+    logsetup.reset_for_tests()
+    root.setLevel(level)
+
+
 def pytest_configure(config):
     """Install the route-exercise recorder (T2c).
 

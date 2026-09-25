@@ -1365,8 +1365,9 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 
 #script-pane {
   /* the manuscript is center stage — full width, the page column centered */
-  flex: 1 1 auto !important;  /* !important: the retired divider code must never
-                                 squeeze the page back into a 70/30 split */
+  flex: 1 1 auto !important;  /* !important: the manuscript owns the room — the
+                                 retired pane divider must never come back and
+                                 squeeze the page into a 70/30 split */
   min-width: 400px;
   min-height: 0;
   display: flex;
@@ -2024,7 +2025,6 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 body.focus-mode #desk-toolbar,
 body.focus-mode .draft-bar,
 body.focus-mode .diff-banner,
-body.focus-mode .pane-divider,
 body.focus-mode #sidebar,
 body.focus-mode .room-panel,
 body.focus-mode #status-strip {
@@ -3795,18 +3795,10 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   .scene-page.flash { animation: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 60%, transparent); }
 }
 
-/* resizable script pane — drag the divider to resize the script pane */
-.pane-divider {
-  display: block;
-  flex: 0 0 5px;
-  cursor: col-resize;
-  background: var(--line-soft);
-  position: relative;
-  z-index: 6;
-  transition: background 0.12s ease;
-}
-.pane-divider:hover { background: var(--accent); }
-body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
+/* the resizable-pane divider that used to sit here is RETIRED (2026-09-24): it
+   was already inert — see the `!important` on #script-pane above — and a
+   mouse-only `role="separator"` is a violation whether or not it can do
+   anything, so the element, its wiring and its pref are gone. */
 
 /* ---------- motion: small, contextual life (reduced-motion safe) ----------
    Motion here is deliberate, not decorative: it marks *what changed* — a new
@@ -4215,7 +4207,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 
 @media (prefers-reduced-motion: reduce) {
   .msg:last-child, .room-panel, .quote-card, .quote-float, .typing-dots i,
-  #send-btn, .pane-divider { animation: none !important; transition: none !important; }
+  #send-btn { animation: none !important; transition: none !important; }
 }
 
 /* ---------- inline editing (double-click a line, or Enter on the focused one) ---------- */

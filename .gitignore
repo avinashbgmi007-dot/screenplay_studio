@@ -6,6 +6,10 @@ dist/
 build/
 *.egg-info/
 coverage/
+# E2E-5: `pytest --cov` writes this data file at the repo root. Without the
+# entry it is an untracked artifact that shows up in every `git status`.
+.coverage
+.coverage.*
 
 # Python
 .pytest_cache/
@@ -13,6 +17,7 @@ __pycache__/
 
 # Temp
 .tmp/
+.tmp_*/
 *.tmp
 
 # Local tooling
@@ -79,6 +84,10 @@ Cursors/
 /freebuff-chat-*.md
 /SESSION_SUMMARY.md
 /tests/_browser_smoke.png
+# Audit probe output: a live-browser sweep writes screenshots next to the suites
+# that took them. They are evidence for one run, regenerable, and 3 MB each set.
+/tests/_audit_shots/
+/tests/_browser_*.png
 
 # UI evidence shots (regenerate with tests/_ui_capture.py; never versioned - repo already carries 69 PNGs)
 /impl-shots/ui_audit/

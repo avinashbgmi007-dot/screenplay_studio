@@ -126,6 +126,25 @@ class RulesContext:
             kb = KnowledgeBase()
         self.kb = kb
 
+    def rule_count(self) -> int | None:
+        """How many craft rules are loaded — or None when this KB cannot be
+        enumerated at all (a test double, or a store that raised).
+
+        None is deliberately NOT 0. Zero means "grounding is missing", which the
+        pipeline must report; None means "this guard has nothing to say".
+        Collapsing the two would raise a false alarm — "the knowledge base loaded
+        ZERO rules" — on a full 263-rule KB that hit one transient read error.
+
+        `KnowledgeBase._load()` globs `rules/*.json` and yields `{}` when the glob
+        matches nothing, with no exception and no warning, so "the package is
+        importable" is NOT the same as "grounding is available". `pipeline.analyze()`
+        reads this to turn that silence into a visible error — BE-2, audit 2026-09-24.
+        """
+        try:
+            return len(self.kb.all())
+        except Exception:
+            return None
+
     # ---- rule selection ---------------------------------------------------
 
     def rules_for_category(self, category: str, include_genre_rules: bool = False) -> list:
