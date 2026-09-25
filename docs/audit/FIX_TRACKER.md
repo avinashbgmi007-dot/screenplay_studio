@@ -28,10 +28,10 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1786 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4) at `4a86356` (185s; coverage **87%** — 9751 statements, 1290 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +15 over the previous row: `test_cycle_continuity.py` 4, `test_apply_race.py` 4, `test_store_busy.py` 7) |
+| Unit + integration | `python -m pytest tests/` | **1786 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4) at `6d48f13` (194s; coverage **87%** — 9751 statements, 1290 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +15 over the previous row: `test_cycle_continuity.py` 4, `test_apply_race.py` 4, `test_store_busy.py` 7) |
 | Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
-| Browser E2E | `python tests/run_browser_suites.py` | **52 suites: 51 pass, 0 fail, 1 skip, 0 known-broken** — **1,264 checks** — measured 2026-09-25 (round 4) at `4a86356`. The load-bearing part: the **1,235 checks that existed before this work are unchanged and all still pass**, so the edit cycle going from two critical sections to one, plus the announcement plumbing, the census classifier and the busy-store classification, moved nothing else. The 29 new checks are `live_regions` (14), `two_contexts` (8) and `store_busy` (7). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
+| Browser E2E | `python tests/run_browser_suites.py` | **53 suites: 52 pass, 0 fail, 1 skip, 0 known-broken** — **1,319 checks** — measured 2026-09-25 (round 4) at `6d48f13`. The load-bearing part: the **1,235 checks that existed before this work are unchanged and all still pass**, so the edit cycle going from two critical sections to one, plus the announcement plumbing, the census classifier, the busy-store classification and a touch media query, moved nothing else. The 84 new checks are `live_regions` (14), `two_contexts` (8), `store_busy` (7) and `viewport_ladder` (55). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
 
 > **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
 > correctly found that `design_session`'s exclusion label was false — the console frames the SPA
@@ -114,6 +114,7 @@ tracker-stamp commit that follows carries the same content.
 | E2E-1 | `test_lock_order.py` enforces acquisition **order**, so acquire→release→acquire was invisible to the guard written to prevent its bug class | `e86ff62` | the same `test_cycle_continuity.py`, plus 3 can-fail legs inside it |
 | E2E-3 | `xss_inert`'s census counted a `/** */` docstring that MENTIONS `innerHTML` as a sink, and `fn_re` used `.match()` so it skipped every `async function` and mis-attributed their sinks | `e86ff62` | the census's own two assertions; the non-clearing total is unchanged at 18 |
 | BE-3 | A contended store answered **500** with an internal crash string on the two routes that render the writer's script, and the SPA **swallowed** the failure so the pane went blank in silence | `4a86356` | `tests/test_store_busy.py` (7 — REAL cross-process contention) + `tests/e2e_browser_store_busy.py` (7 — a real studio, a real holder child, the writer actually seeing the banner). Mutation-verified: 11/11 detected, tree byte-identical |
+| UX-2 | A **touch device wider than the mobile breakpoint** got 24px scene-index rows, below the 44px the stylesheet states as its own minimum — the rule was gated on `max-width: 767px`, so a phone in landscape fell into the tablet band | `6d48f13` | `tests/e2e_browser_viewport_ladder.py` (55) — a context per config, with non-vacuity checks for the render and for the touch emulation. Mutation-verified: 13/13 detected, tree byte-identical |
 
 ---
 
@@ -184,8 +185,20 @@ important surface. The two other `loadScriptData` call sites already did
 `showError("Couldn't load the script: " + e.message)`; the project-open path was the
 odd one out. **A better status code is not a fix if the client discards it.**
 
-**Still open from round 3, unchanged:** BE-4, BE-5, BE-6, UX-2 (viewport breadth),
-UX-4, UX-5.
+**UX-2, fixed in the same round (`6d48f13`) — and it found a real defect.** The
+fleet ran one viewport and `phase11_responsive` covered the width ladder; the gaps
+were **vertical** and **touch** (`has_touch` / `is_mobile` are CONTEXT options, so
+`set_viewport_size` cannot emulate a touch device). Measured first: the shell is
+sound everywhere — no horizontal overflow, the manuscript keeps ≥50%, the status
+strip is never clipped, every open panel's close button stays in reach. **One real
+defect turned up on the axis nothing had ever run:** the stylesheet's own
+`/* touch targets >= 44px: the index rows and their toggle */` rule was gated on
+`max-width: 767px`, so a phone in **landscape** (844px wide, `pointer: coarse` true)
+fell into the tablet band and got **24px** rows. Fixed with
+`@media (pointer: coarse) and (max-width: 1199px)`. **Width was being used as a proxy
+for the input device, and it is the wrong proxy.**
+
+**Still open from round 3, unchanged:** BE-4, BE-5, BE-6, UX-4, UX-5.
 
 **Recorded here rather than only in a comment (E2E-2):** the edit trio is
 **concurrency-safe, not transactional**. `working.json`, `edits.json` and

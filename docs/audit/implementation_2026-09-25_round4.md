@@ -24,31 +24,31 @@ restored byte-identical** (`.workbuddy-ai/scratch/mutation_check_r4.py`).
 
 ### 1.1 Gates, measured at this revision
 
-*Both tables below are the ladder (§1–§8) **plus** the BE-3 follow-on (§11), measured
-together at one revision.*
+*Everything below is the ladder (§1–§8) **plus** the BE-3 (§11) and UX-2 (§12)
+follow-ons, measured together at one revision.*
 
 | Gate | Command | Result |
 |---|---|---|
 | Unit + integration | `python -m pytest tests/ -q --cov` | **1786 passed, 3 skipped, 0 failed — 87%** (9751 statements, 1290 missed), exit 0 |
-| Browser E2E | `python tests/run_browser_suites.py` | **52 suites: 51 passed, 0 failed, 1 skipped, 0 known-broken — 1264 checks**, exit 0 |
+| Browser E2E | `python tests/run_browser_suites.py` | **53 suites: 52 passed, 0 failed, 1 skipped, 0 known-broken — 1319 checks**, exit 0 |
 | Lint | `ruff check .` | **All checks passed** |
 | JS unit | `node --test tests/js/core.test.js` | **16 / 16** |
-| Mutation harness | `.workbuddy-ai/scratch/mutation_check_r4.py` | **11 / 11 detected**; tree restored byte-identical |
+| Mutation harness | `.workbuddy-ai/scratch/mutation_check_r4.py` | **13 / 13 detected**; tree restored byte-identical |
 
 Two rows carry the weight:
 
 - **The 1,235 browser checks that existed before this work are unchanged and all
   still pass.** That is the claim that needed proving: the edit cycle went from two
   critical sections to one, the SPA gained announcement plumbing, a security
-  tripwire's classifier changed, and the busy-store classification changed — and
-  nothing else moved. The 29 new checks are `live_regions` (14), `two_contexts` (8)
-  and `store_busy` (7).
+  tripwire's classifier changed, the busy-store classification changed, and a touch
+  media query changed — and nothing else moved. The 84 new checks are `live_regions`
+  (14), `two_contexts` (8), `store_busy` (7) and `viewport_ladder` (55).
 - The one skip is `gun_pen_audit`, printed with its reason: *"runs a real analyze —
   needs a llama-server, so E2E_BASE must point at a studio that has one"*.
 
 Against the round-3 baseline (**1771 passed / 49 suites / 1235 checks**):
-**+15 pytest tests** (4 cycle-continuity, 4 apply-race, 7 store-busy), **+3 suites**,
-**+29 checks**.
+**+15 pytest tests** (4 cycle-continuity, 4 apply-race, 7 store-busy), **+4 suites**,
+**+84 checks**.
 
 The fleet was run **twice**: the first run came back **49 passed, 1 failed** on
 `xss_inert`, which is the finding in §7. The figures above are from the run at the
@@ -350,7 +350,7 @@ Every finding from round 3, so this document is not read as "all clear":
 | **BE-4 403 recovery copy** | LOW | **open** |
 | **BE-5 over-strict loopback spellings** | LOW | **open** |
 | **BE-6 session metadata last-writer-wins** | LOW | **open** — `store.save` merges messages only |
-| **UX-2 viewport breadth** | MEDIUM | **open** — most suites still run at one viewport |
+| **UX-2 viewport breadth** | MEDIUM | **fixed** — and it found a real defect; see §12 |
 | **UX-4 the 3 de-vacuumed checks sit in the skipped suite** | LOW | **open** |
 | **UX-5 eight marker-only checks in `ui_batch`** | LOW | **open** |
 | **E2E-2 residual in the wrong place** | LOW | **partly moot** — BE-1's residual is gone; the trio's non-transactional gap is still documented only in `revision.py` |
@@ -475,3 +475,72 @@ observable difference needs two contended leaves held across overlapping windows
 inside one budget, which is a timing-margin test that would be flaky for little
 assurance — and the mechanism it depends on *is* guarded. This is the same
 judgement as UX-1's `clear-first` (§4).
+
+---
+
+## 12. Follow-on: UX-2 — the viewport ladder, and the defect it found
+
+### What the audit said
+
+The shared `launch()` helper hardcodes **1440×900** and only 6 of 49 suites
+override it; `phase11_responsive` covers 1440 / 1024 / 390 well. The named gaps are
+a different axis: **no short viewport** (1366×768, 1440×720), **no touch
+emulation** — `set_viewport_size` changes the viewport but not `has_touch` /
+`is_mobile`, which are *context* options, so no suite had ever run with a real touch
+capability — and **no mobile landscape**.
+
+### I measured before writing anything
+
+Across 1440×900, 1366×768, 1440×720, 844×390 (touch) and 390×844 (touch), with the
+dock and the partner drawer both **open**: zero horizontal overflow, the manuscript
+keeps ≥50% everywhere, the status strip is never clipped, and every open panel's
+close button stays inside the viewport. **The shell itself is sound.** One real
+defect turned up on the axis nothing had ever run:
+
+### The defect: a touch device wider than the mobile breakpoint got 24px rows
+
+The stylesheet states its own minimum — `/* touch targets >= 44px: the index rows
+and their toggle */` — but that rule lives inside `@media (max-width: 767px)`.
+**Width is a proxy for the input device, and the wrong one:** a phone in landscape is
+844px wide and unambiguously a touch device, so it fell into the *tablet* band and
+got the compact strip's 24px rows. Measured with `has_touch` + `is_mobile`
+emulation (`pointer: coarse` true):
+
+| config | `pointer: coarse` | scene-index row |
+|---|---|---|
+| 1440×900 | false | 25px |
+| 1366×768 | false | 25px |
+| **844×390 landscape** | **true** | **24px** ← below the file's own 44px floor |
+| 390×844 portrait | true | 44px |
+
+### The fix
+
+`@media (pointer: coarse) and (max-width: 1199px)` applies the 44px minimum to the
+index rows and its toggle — keyed off the property that actually describes the
+input device, and scoped to the compact strip so the wide desktop layout (where the
+pointer is normally fine) is untouched. After it: **844×390 → 44px**, 390×844 → 44px
+(unchanged), and every non-touch config unchanged at 24–25px, with no overflow and
+identical manuscript widths. Verified across the ladder, not just at the one config.
+
+### The guard
+
+`tests/e2e_browser_viewport_ladder.py` (55 checks) runs the ladder with a **context
+per config** — the only way to emulate touch — and asserts, per config: the
+manuscript actually rendered, the emulation is real, no horizontal overflow, the
+manuscript keeps ≥50%, the column is tall enough to read, and the status strip is
+not clipped; then, with the dock and drawer **open**, that each opens and keeps its
+close button in reach. The touch configs also check the 44px target.
+
+The two non-vacuity checks are load-bearing: a blank page has no overflow, and a
+"touch" config whose emulation silently failed would assert nothing about touch.
+This shape of suite passes trivially without them.
+
+**A mutation that did not reach the property, and why that is not the same as a
+vacuous guard.** The first attempt at proving the 50% check could fail widened the
+scene index (`#scene-index { width: 700px }`) — and the suite stayed **green**.
+The guard was not at fault: `#scene-index` is a flex item, so the layout absorbed
+the width and the manuscript never approached the floor. Re-pointing the mutation
+at the manuscript's own `flex: 1` (`flex: 0 0 30%`) turns it red. The lesson is
+worth keeping: **a green mutation result means "the guard cannot see this", and
+"this" may be the mutation rather than the guard.** The harness now says so in the
+entry itself.
