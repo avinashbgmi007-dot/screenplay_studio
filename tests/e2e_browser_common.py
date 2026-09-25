@@ -384,7 +384,8 @@ class Studio:
         self.close()
 
 
-def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None):
+def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None,
+                 demo_model=True):
     """Boot the real webapp server with the in-process demo craft model.
 
     projects_dir: existing dir to serve from (seed it BEFORE calling), or
@@ -393,6 +394,15 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
                   (drives the status-strip switch-back flow). Passed via
                   --server with the demo ENV TRIGGER OFF, so main() applies
                   it BEFORE demo activation pins real_server_url.
+    demo_model:   True (default) — the in-process demo craft model. That is what
+                  every suite but the real-transport one wants, and what keeps
+                  the fleet fast and model-free.
+                  False — boot against `server_url` with BOTH demo paths
+                  suppressed, so a turn goes over a real HTTP transport. This
+                  exists because the demo model is in-process: the SPA's
+                  fetch -> SSE -> render loop had never been driven against any
+                  transport at all (E2E-4, audit 2026-09-24). `server_url` is
+                  required when it is False, or there is no model.
 
     The studio boots EXACTLY as the product ships: secure by default, with a
     minted capability token. There is no --no-token opt-out here. Before
@@ -405,6 +415,8 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
     reaches for the opt-out again.
     Returns a Studio; call .close() (or use `with`) or the child lingers.
     """
+    if not demo_model and not server_url:
+        raise ValueError("demo_model=False needs a server_url — there would be no model")
     tmp = None
     if projects_dir is None:
         tmp = tempfile.TemporaryDirectory(prefix="studio_e2e_")
@@ -416,14 +428,17 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
     port = free_port()
     env = dict(os.environ)
     env.update(env_extra or {})
-    # env + flag parity: the env var activates the demo at import time (and
-    # skips the "is :8080 up?" probe), the flag keeps it explicit.
-    env["SCREENPLAY_STUDIO_DEMO_MODEL"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
+    if demo_model:
+        # env + flag parity: the env var activates the demo at import time (and
+        # skips the "is :8080 up?" probe), the flag keeps it explicit.
+        env["SCREENPLAY_STUDIO_DEMO_MODEL"] = "1"
     # No --no-token: the harness boots the product as shipped, capability token
     # and all. See the start_studio docstring for what that caught.
     cmd = [sys.executable, "-m", "screenplay_studio.webapp_server",
-           "--port", str(port), "--projects-dir", projects_dir, "--demo-model"]
+           "--port", str(port), "--projects-dir", projects_dir]
+    if demo_model:
+        cmd.append("--demo-model")
     if server_url:
         # Drive --server through main() instead: both import-time demo paths
         # (env trigger and the :8080-unreachable fallback) would lock
@@ -431,6 +446,10 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
         # both suppressed, main() sets server_url first and demo activation
         # then records it as the writer's real server. PYTEST_CURRENT_TEST
         # reuses the app's own deterministic-startup escape hatch.
+        #
+        # With demo_model=False there is no demo activation to sequence around,
+        # but the same suppression is what keeps the import-time fallback from
+        # quietly replacing the server under test.
         env.pop("SCREENPLAY_STUDIO_DEMO_MODEL", None)
         env.setdefault("PYTEST_CURRENT_TEST", "e2e_browser_common boot")
         cmd += ["--server", server_url]
@@ -458,10 +477,15 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None)
         try:
             cfg = json.loads(urllib.request.urlopen(base + "/api/config",
                                                     timeout=3).read().decode())
-            if cfg.get("demo_model"):
+            # Wait for the state that was ASKED for. Requiring demo_model to be
+            # truthy unconditionally would hang a real-transport boot; accepting
+            # either would let a silent fallback back to the demo model satisfy a
+            # suite that exists precisely to prove the demo is not in the path.
+            if bool(cfg.get("demo_model")) == demo_model:
                 studio.token = studio._fetch_token()  # H1
                 return studio
-            last_err = "server is up but demo_model is not active"
+            last_err = (f"server is up but demo_model={cfg.get('demo_model')!r}, "
+                        f"expected {demo_model!r}")
         except Exception as e:
             last_err = str(e)
         time.sleep(0.4)

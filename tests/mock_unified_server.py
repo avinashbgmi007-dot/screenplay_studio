@@ -16,10 +16,52 @@ what's already proven to work.
 import json
 import re
 
-from flask import Flask, request, jsonify
+from flask import Flask, Response, request, jsonify
 
 app = Flask(__name__)
 MODEL_ID = "mock-e2e-model.gguf"
+
+
+def _sse_frames(content: str) -> str:
+    """The same content, as llama-server's SSE stream.
+
+    Split into several frames on purpose: a single frame would let a client that
+    buffers the whole body look identical to one that renders incrementally, so
+    the chunking is part of what the streaming test needs to observe.
+    """
+    step = max(1, len(content) // 4) if content else 1
+    chunks = [content[i:i + step] for i in range(0, len(content), step)] or [""]
+    frames = [
+        "data: " + json.dumps({"choices": [{"index": 0, "delta": {"content": c}}]}) + "\n\n"
+        for c in chunks
+    ]
+    frames.append("data: " + json.dumps(
+        {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}) + "\n\n")
+    frames.append("data: [DONE]\n\n")
+    return "".join(frames)
+
+
+@app.after_request
+def _answer_in_the_shape_that_was_asked_for(resp):
+    """Stream SSE when the client asked to stream.
+
+    Every route above answers with a single JSON body, which is the shape the
+    pytest suite drives. But a real llama-server streams, and the SPA's chat pane
+    fetches `/messages/stream` and parses `data:` frames — so with a JSON-only
+    mock the browser's fetch -> SSE -> render loop had no transport to talk to at
+    all (E2E-4, audit 2026-09-24). Doing the conversion here rather than in each
+    branch keeps the non-streaming path byte-identical, which is what the
+    existing tests assert against.
+    """
+    if request.path != "/v1/chat/completions" or not request.is_json:
+        return resp
+    if not (request.get_json(silent=True) or {}).get("stream"):
+        return resp
+    data = resp.get_json(silent=True)
+    if not data or "choices" not in data:
+        return resp
+    content = ((data["choices"][0].get("message") or {}).get("content")) or ""
+    return Response(_sse_frames(content), mimetype="text/event-stream")
 
 
 def _scene_numbers_in_prompt(text: str) -> list:
