@@ -28,10 +28,10 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1771 passed, 3 skipped, 0 failed** — measured 2026-09-25 at this revision (113s; coverage **87%** — 86.63%: 9616 statements, 1286 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +22 over the previous row: the lock-order, clear-redo, undo/redo-race and security-hardening files) |
+| Unit + integration | `python -m pytest tests/` | **1779 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4) at `e86ff62` (187s; coverage **87%** — 9730 statements, 1287 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +8 over the previous row: `test_cycle_continuity.py` 4 + `test_apply_race.py` 4) |
 | Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
-| Browser E2E | `python tests/run_browser_suites.py` | **49 suites: 48 pass, 0 fail, 1 skip, 0 known-broken** — **1,235 checks** — measured 2026-09-25 on the final tree, run **twice back-to-back with an identical result** (the two passes agree to the check: 48/0/1 and 1,235 each). Correcting the previous row's count: `discover()` finds **49** suites, not 48. `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. The gate is run in three alphabetical chunks because the whole fleet exceeds a single 10-minute command window; the chunk splits are 17/17/15 and each chunk's own summary line is what is quoted here. |
+| Browser E2E | `python tests/run_browser_suites.py` | **51 suites: 50 pass, 0 fail, 1 skip, 0 known-broken** — **1,257 checks** — measured 2026-09-25 (round 4) at `e86ff62`. The load-bearing part: the **1,235 pre-existing checks are unchanged and all still pass**, so the edit cycle going from two critical sections to one, plus the new announcement plumbing, moved nothing else. The 22 new checks are `live_regions` (14) and `two_contexts` (8). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
 
 > **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
 > correctly found that `design_session`'s exclusion label was false — the console frames the SPA
@@ -107,6 +107,74 @@ tracker-stamp commit that follows carries the same content.
 | BE-M2 | `edits_log` read raw → 400 "bad request" for a damaged disk | `a5742d5` | `test_damaged_edit_log_is_reported_not_read_as_empty` + 503 API assertion |
 | BE-M1b | Undo/redo mutated before discovering the other store was damaged | `a5742d5` | both pre-flight tests (one per direction) |
 | R7 | CI ran `pip install ruff` unpinned | `a5742d5` | `test_ci_pins_its_linter_to_the_version_the_repo_uses` |
+| BE-1 | `POST /edits/apply` did its read-modify-write in **two** acquisitions of the cycle lock → an accepted edit lost its text while both records stayed in the log | `e86ff62` | `tests/test_cycle_continuity.py` (4 — deterministic, armed over the real route) + `tests/test_apply_race.py` (4 — two threads and two OS processes, each with a sequential control) + `tests/e2e_browser_two_contexts.py` (8). Mutation-verified: 7/7 detected, every mutated file restored byte-identical |
+| BE-2 | The six fix commits were local-only; the *pushed* branch still leaked the whole screenplay on a foreign `Host` | `e86ff62` | `git ls-remote origin qoder/update` — the local tracking ref does not persist in this sandbox |
+| UX-1 | Errors and chat replies were silent to a screen reader (WCAG 4.1.3); `#error-banner` and `#messages-scroll` were not live regions | `e86ff62` | `tests/e2e_browser_live_regions.py` (14) — asserts the reveal-before-write ORDER, the clear-first empty write, and the **absence** of a live region on the wholesale-rebuilt message list |
+| UX-3 | No e2e suite had ever opened a second browser context, which is why BE-1 survived 1,235 checks | `e86ff62` | `tests/e2e_browser_two_contexts.py` (8), with a per-round overlap control |
+| E2E-1 | `test_lock_order.py` enforces acquisition **order**, so acquire→release→acquire was invisible to the guard written to prevent its bug class | `e86ff62` | the same `test_cycle_continuity.py`, plus 3 can-fail legs inside it |
+| E2E-3 | `xss_inert`'s census counted a `/** */` docstring that MENTIONS `innerHTML` as a sink, and `fn_re` used `.match()` so it skipped every `async function` and mis-attributed their sinks | `e86ff62` | the census's own two assertions; the non-clearing total is unchanged at 18 |
+
+---
+
+## Closed in this pass (2026-09-25, round 4) — the ladder the round-3 audit recommended, and a tripwire that fired on its own classifier
+
+The round-3 audit (`e2e_production_readiness_2026-09-25_round3.md`) ended with an
+ordered list; this pass worked it in order. The full write-up is
+`implementation_2026-09-25_round4.md`. What belongs here is what a future reader
+needs in order to trust the rows above.
+
+**Why BE-1 could not be fixed by adding a lock to `save_working`.** The obvious fix —
+take `lock_for(working.json)` inside `save_working` — nests **log → working** on the
+undo/redo path. That is the one direction the module's own topology note forbids in
+writing, and it would deadlock two processes taking the pair in opposite orders. The
+fix had to make the *caller* hold the lock, so it became a new primitive
+(`revision.apply_edit`) rather than a line inside the old one. The route now calls
+only that, and `apply_replacements` points at it so the next reader meets both
+together.
+
+**Why the guard reads `_StoreLock._depth` instead of keeping its own stack.** The
+first version tracked per-thread enter/exit events over `jsonio._lock_for`. It did not
+stay in sync — the recorded stack grew by one after each exit — and two empirical
+traces reproduced the drift without explaining it. That design was discarded rather
+than debugged into working, and the guard rebuilt on the lock's own state. A first
+attempt at *that* also failed quietly: `_lock_is_held` called `jsonio.lock_for`, which
+the fixture had monkeypatched, so the guard introspected **its own proxy**, found no
+`_depth`, and reported "never held" for every lock — which made the two can-fail legs
+pass for the wrong reason. The guard now takes the real `_lock_for` as a constructor
+argument.
+
+**The tripwire fired, and it was the tripwire's fault.** The first full fleet run at
+this revision came back 49 passed / 1 failed: `xss_inert` counted **19** non-clearing
+`innerHTML` sinks against an expected 18. The 19th was UX-1's docstring explaining why
+`#messages-scroll` is deliberately NOT a live region — prose that mentions
+`innerHTML = ""`. Two latent classifier bugs sat behind it:
+
+1. the census recognised only `//` comments, so any `/** */` docstring that mentions
+   `innerHTML` counted as a sink;
+2. `fn_re` used `.match()`, which anchors at column 0, so it silently skipped every
+   `async function` and credited their sinks to whatever earlier plain `function`
+   preceded them. Fixing (1) then exposed a **pre-existing mis-attribution**:
+   `checkConnection`'s fixed status string (`app.js:722`) was being counted under
+   `setConnectionMode`. `EXPECTED_CENSUS` now reads `setConnectionMode: 1` +
+   `checkConnection: 1` where it read `setConnectionMode: 2`.
+
+The sum is unchanged at 18, so the tripwire is exactly as strong as before and now
+points at the right function. Neither was a product defect.
+
+**A correction to the round-3 report.** Its "18 non-clearing of **63**": the
+non-clearing figure was right, the total was not. A recount of that revision's
+`app.js` gives **67** lines (4 comments, 45 clearing, 18 non-clearing). This pass adds
+exactly one line — the docstring mention above.
+
+**Still open from round 3, unchanged:** BE-3 (`StoreLockTimeout` → **500** instead of
+503 + `Retry-After`), BE-4, BE-5, BE-6, UX-2 (viewport breadth), UX-4, UX-5.
+
+**Recorded here rather than only in a comment (E2E-2):** the edit trio is
+**concurrency-safe, not transactional**. `working.json`, `edits.json` and
+`edits.redo.json` still land as three separate atomic renames, so a crash between the
+text write and the log write still diverges them. Each file individually never tears.
+Documented in `revision.py`'s topology note; it is now in this tracker too, which is
+where this repo's convention says a residual belongs.
 
 ---
 
