@@ -5885,6 +5885,24 @@ body:not(.idea-mode) .desk {
      nothing else to recompose — the manuscript keeps the room */
 }
 
+/* ---- Touch, at ANY width the compact strip covers -------------------------
+   The mobile block below gates its "touch targets >= 44px" rule on
+   `max-width: 767px`. Width is a PROXY for the input device, and it is the
+   wrong one: a phone in landscape (844x390) is a touch device that is wider
+   than the breakpoint, so it got the tablet strip's 24px rows — below the 44px
+   this file states as its own minimum. Measured with `pointer: coarse` true and
+   `has_touch` emulation: 844x390 landscape -> 24px rows, 390x844 -> 44px.
+
+   `pointer: coarse` describes the primary input device, which is the property
+   that actually matters here. Scoped to <=1199px so the wide desktop layout,
+   where the pointer is normally fine, is untouched. (UX-2, round-4 audit
+   2026-09-25 — found by the viewport ladder's touch emulation, which no suite
+   had ever run.) */
+@media (pointer: coarse) and (max-width: 1199px) {
+  .scene-index-item { min-height: 44px; align-items: center; }
+  #scene-index .scene-index-toggle { min-width: 44px; min-height: 44px; }
+}
+
 /* ---- Mobile (<768): recompose, don't shrink ---- */
 @media (max-width: 767px) {
   /* the scene index stops being a strip that steals manuscript width:
