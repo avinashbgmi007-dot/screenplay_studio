@@ -21,6 +21,7 @@ newcomer lock a fresh inode while an existing holder still owns the old one.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import threading
@@ -50,6 +51,48 @@ _LOCK_POLL_SECONDS = 0.01
 
 class StoreLockTimeout(RuntimeError):
     """Another process held a store lock for longer than LOCK_TIMEOUT_SECONDS."""
+
+
+# ---------------------------------------------------------------------------
+# Composing lock budgets (BE-3 amplifier, round-4 audit 2026-09-25)
+# ---------------------------------------------------------------------------
+# LOCK_TIMEOUT_SECONDS bounds ONE acquisition. A cycle that takes the anchor
+# lock and then leaf locks therefore gets the SUM of those budgets, and it holds
+# the cycle lock for all of it — so one stuck file could keep every other
+# request waiting past its own budget and have them all told the studio is
+# broken. `reset_working` is the worst case: three leaves, so ~3x.
+#
+# `lock_deadline()` puts ONE deadline over a block, so nested acquisitions share
+# it instead of each starting a fresh one.
+#
+# Deliberately opt-in and additive: nothing changes unless a caller wraps a
+# block. `_StoreLock`'s own enter/exit bookkeeping — the thing standing between
+# the writer and a lost edit — is deliberately NOT touched to make this
+# automatic; a per-thread hold counter there would be more elegant and much
+# riskier, and the amplifier is a latency problem in a case the audit measured
+# as unreachable by load (it needs a ~50MB working copy, or a genuinely stuck
+# process).
+_deadline_local = threading.local()
+
+
+@contextlib.contextmanager
+def lock_deadline(seconds: float | None = None):
+    """Cap the TOTAL wait of every lock acquired inside this block.
+
+    `seconds=None` uses LOCK_TIMEOUT_SECONDS. Nested blocks take the tighter of
+    the two, so an inner block can only ever shorten the budget — never extend
+    an outer one.
+    """
+    if seconds is None:
+        seconds = LOCK_TIMEOUT_SECONDS
+    stack = getattr(_deadline_local, "stack", None)
+    if stack is None:
+        stack = _deadline_local.stack = []
+    stack.append(time.monotonic() + seconds)
+    try:
+        yield
+    finally:
+        stack.pop()
 
     def __init__(self, path: str, timeout: float):
         self.path = path
@@ -85,6 +128,11 @@ def _acquire_os_lock(fd: int, path: str, timeout: float | None = None) -> None:
     if timeout is None:
         timeout = LOCK_TIMEOUT_SECONDS
     deadline = time.monotonic() + timeout
+    # A surrounding `lock_deadline()` block wins when it is tighter. That is how
+    # a cycle's leaf acquisitions share ONE budget instead of one each.
+    stack = getattr(_deadline_local, "stack", None)
+    if stack:
+        deadline = min(deadline, stack[-1])
     while True:
         try:
             if os.name == "nt":

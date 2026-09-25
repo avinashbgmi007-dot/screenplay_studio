@@ -502,10 +502,17 @@ def reset_working(m) -> None:
     # A cycle member: the trio goes together, under the cycle lock (leaf
     # removals retry the transient Windows sharing violation instead of
     # raising, and 'already gone' is success).
-    from .jsonio import lock_for
-    with lock_for(working_path(m)):
-        for path in (working_path(m), edits_log_path(m), edits_redo_path(m)):
-            _remove_with_retry(path)
+    from .jsonio import lock_deadline, lock_for
+    # BE-3 amplifier (round-4 audit 2026-09-25): ONE budget for the whole
+    # removal, not one per leaf. Each `_remove_with_retry` takes its own leaf
+    # lock, so without this each would start a FRESH LOCK_TIMEOUT_SECONDS — a
+    # single stuck file could hold the CYCLE lock for ~3x the configured budget,
+    # and every other request would expire its own budget and be told the studio
+    # had broken. `lock_deadline` makes the leaves share the one budget.
+    with lock_deadline():
+        with lock_for(working_path(m)):
+            for path in (working_path(m), edits_log_path(m), edits_redo_path(m)):
+                _remove_with_retry(path)
 
 
 def _load_json_list(path: str) -> list:

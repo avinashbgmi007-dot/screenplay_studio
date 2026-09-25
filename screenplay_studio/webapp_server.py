@@ -32,8 +32,9 @@ from urllib.parse import urlparse
 from flask import Flask, Response, request, jsonify, send_from_directory, send_file
 from werkzeug.exceptions import HTTPException
 
-from .jsonio import (StoreUnreadable, atomic_write_json, check_safe_id, lock_for,
-                     retry_permission, safe_dir_name, suffixed_id)
+from .jsonio import (StoreLockTimeout, StoreUnreadable, atomic_write_json,
+                     check_safe_id, lock_for, retry_permission, safe_dir_name,
+                     suffixed_id)
 
 from .ideas import IdeaStore
 from .logsetup import configure as _configure_logging
@@ -534,6 +535,35 @@ def _store_unreadable(e):
                              f"{getattr(e, 'detail', '')}",
                     "store": name,
                     "unreadable": True}), 503
+
+
+# How long to tell a client to wait when a store is busy. Short on purpose: a
+# holder is normally a single write or load-modify-write cycle (milliseconds),
+# and the timeout only fires when it is genuinely stuck.
+_BUSY_RETRY_AFTER = 1
+
+
+@app.errorhandler(StoreLockTimeout)
+def _store_lock_timeout(e):
+    """A BUSY store is 503 + Retry-After, never a 500 (BE-3, round-4 audit).
+
+    `StoreLockTimeout` subclasses RuntimeError and had no handler, so it fell
+    through to `_unhandled` and the writer was shown "Unexpected error: timed out
+    after 10s waiting for another process to release working.json" — a crash
+    report for a transient condition, on the two routes that render their script,
+    with no retry hint and no way to tell it from a real fault.
+
+    This is the same standard `StoreUnreadable` already meets, one layer over:
+    name the condition, say what the writer should do, and tell the client when
+    to come back. The `busy` flag lets the SPA — and any script — tell it apart
+    from damage without string-matching the message.
+    """
+    return jsonify({
+        "error": "The studio is busy — another window or process is writing to "
+                 "this project right now. Nothing was lost. Try again in a moment.",
+        "busy": True,
+        "retry_after": _BUSY_RETRY_AFTER,
+    }), 503, {"Retry-After": str(_BUSY_RETRY_AFTER)}
 
 
 @app.errorhandler(413)

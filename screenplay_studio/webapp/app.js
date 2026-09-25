@@ -2315,7 +2315,20 @@ async function openProject(name) {
     // loadSession above is a second await: a switch during it must stop here,
     // not carry the losing project's session into the winner's desk.
     if (state.currentProject !== name) return;
-    try { await loadScriptData(); } catch (_) { /* no parse yet — pane shows its hint */ }
+    // A 400 here is the ordinary "this project has not been parsed yet" case and
+    // the pane shows its own hint for it. Anything ELSE is a real failure and the
+    // writer has to be told: this catch used to swallow every error as "no parse
+    // yet", so a BUSY store (503) or an internal fault (500) left the manuscript
+    // pane empty and said nothing at all — the app's most important surface
+    // failing silently. (BE-3, round-4 audit 2026-09-25: the 503 that replaced
+    // the 500 would have been invisible here, which is the whole point of it.)
+    try {
+      await loadScriptData();
+    } catch (err) {
+      if (err && err.status && err.status !== 400) {
+        showError("Couldn't load the script: " + err.message);
+      }
+    }
     // M2 (re-audit 2026-09-24): a second open can have finished while this one was
     // waiting. Everything below paints state onto the page, so a stale flight must
     // stop here instead of overwriting the desk the writer is looking at.
