@@ -70,18 +70,60 @@ function _studioToken() {
   return m ? decodeURIComponent(m[1]) : "";
 }
 
+// V1 (security review follow-up): the SPA's auth DETECTION must never assume
+// it is authenticated — and the cookie is the whole of auth here. A page can
+// be (re)served WITHOUT a live token: the document was revalidated (a 304
+// carries the cached page), a server restart minted a fresh per-process token
+// after this tab loaded, or the cookie was cleared/expired. Reads all pass —
+// only writes carry the licence — so the desk looks fine and every mutation
+// would die at the write guard with a 403. Before the FIRST write of the
+// page's life, if no cookie is present, fetch the document once (a passive
+// GET; the server re-issues the cookie on it — this detects the missing
+// licence, it never authenticates by WRITING) and re-read. One attempt per
+// page load: with --no-token there is no cookie to find and every later call
+// short-circuits on the flag.
+let _tokenMintFetched = false;
+async function _ensureStudioToken() {
+  const tok = _studioToken();
+  if (tok || _tokenMintFetched) return tok;
+  _tokenMintFetched = true;
+  try { await fetch("/", { cache: "no-store" }); } catch (_) { /* dead server: the write below fails readable */ }
+  return _studioToken();
+}
+
 async function api(path, options = {}) {
+  const data = await _apiOnce(path, options);
+  return data;
+}
+
+async function _apiOnce(path, options, _retry) {
   const headers = Object.assign(
     {},
     options.body && !(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {},
     options.headers || {}
   );
-  const tok = _studioToken();
+  const tok = await _ensureStudioToken();
   if (tok) headers["X-Studio-Token"] = tok;
   const resp = await fetch(API + path, { ...options, headers });
   let data = null;
   try { data = await resp.json(); } catch (_) { /* no body */ }
   if (!resp.ok) {
+    // W1 (audit 2026-09-25): the capability token is per server PROCESS. A
+    // studio restart mints a new one, so every write from a tab that was
+    // already open comes back 403 "missing or invalid capability token" — and
+    // used to fail there with no recovery, surfacing an internal string to the
+    // writer while their edit sat unsaved. `/` re-mints and re-sets the cookie
+    // (Cache-Control: no-cache, so this is the live document, not a cached one),
+    // so one silent reload of the document and one retry covers the whole
+    // restart case. Never retried twice: a second 403 is a real rejection.
+    if (resp.status === 403 && !_retry) {
+      try { await fetch('/', { cache: 'no-store' }); }
+      catch (_) { /* offline/dead: fall through to the readable message below */ }
+      if (_studioToken() && _studioToken() !== tok) {
+        return _apiOnce(path, options, true);
+      }
+      throw _tokenError(resp, data);
+    }
     const message = (data && data.error) || `Request failed (${resp.status})`;
     const err = new Error(message);
     // Status + watchdog flag ride on the error so callers can offer a
@@ -94,16 +136,25 @@ async function api(path, options = {}) {
   return data;
 }
 
+function _tokenError(resp, data) {
+  // Writer-facing, not internal: what they must DO, not what the server calls it.
+  const err = new Error(
+    "The studio restarted since this page was opened. Reload this page to keep writing.");
+  err.status = resp.status;
+  err.tokenStale = true;
+  return err;
+}
+
 // ---- streaming chat turn (SSE) ----
 // Raw tokens stream into the pending bubble AS the model writes them — the
 // perceived-latency win for slow local models. The final SSE event carries
 // the CLEANED, stored reply + full history, so what lands in state is
 // exactly what the server persisted (streaming never changes what is kept).
 // Falls back to the blocking endpoint when the stream route is missing.
-async function streamChatTurn(base, text, quote, bubble, scrollContainer) {
+async function streamChatTurn(base, text, quote, bubble, scrollContainer, _retry) {
   const body = JSON.stringify(quote ? { text, quote } : { text });
   const _h = { "Content-Type": "application/json" };
-  const _tok = _studioToken();
+  const _tok = await _ensureStudioToken();
   if (_tok) _h["X-Studio-Token"] = _tok;
   const resp = await fetch(API + base + "/messages/stream", {
     method: "POST",
@@ -116,6 +167,23 @@ async function streamChatTurn(base, text, quote, bubble, scrollContainer) {
   if (!resp.ok) {
     let data = null;
     try { data = await resp.json(); } catch (_) { /* no body */ }
+    // V3 (security review follow-up): the stream route bypasses api(), so it
+    // used to have NONE of the stale-token recovery — after a studio restart
+    // every chat turn died on the first send with the guard's internal
+    // "missing or invalid capability token" string in the chat bubble. Same
+    // contract as _apiOnce: re-mint via the document once, retry the turn
+    // once if the licence actually moved, otherwise fail with the writer-
+    // facing message. A turn that gets this far was never stored (the server
+    // appends the user message only after the model call succeeds), so the
+    // silent retry cannot duplicate it.
+    if (resp.status === 403 && !_retry) {
+      try { await fetch("/", { cache: "no-store" }); }
+      catch (_) { /* offline/dead: fall through to the readable message */ }
+      if (_studioToken() && _studioToken() !== _tok) {
+        return streamChatTurn(base, text, quote, bubble, scrollContainer, true);
+      }
+      throw _tokenError(resp, data);
+    }
     const err = new Error((data && data.error) || `Request failed (${resp.status})`);
     err.status = resp.status;
     err.stillWorking = !!(data && data.still_working);
@@ -2130,6 +2198,13 @@ async function openProject(name) {
     $(".partner-name").textContent = partnerLabel("Sameer — AI writing partner");
     $("#input").placeholder = "Ask about a scene, a character, a note in the margins…";
     const project = await api(`/projects/${encodeURIComponent(name)}`);
+    // M2 (re-audit 2026-09-24), hoisted: the identity bail used to sit only at
+    // the END of this function, after every paint below. A losing flight that
+    // survived its awaits still repainted the bar, the premise card, the
+    // analyze button, the report language and the branch state — so the writer
+    // saw the project they DIDN'T open on the desk they were looking at. Bail
+    // as soon as the first await is over, before anything is painted.
+    if (state.currentProject !== name) return;
     renderProjectList();
     renderLibraryList();
     loadStash();
@@ -2186,6 +2261,9 @@ async function openProject(name) {
     }
 
     // the script pane is always visible in both rooms — render it once
+    // loadSession above is a second await: a switch during it must stop here,
+    // not carry the losing project's session into the winner's desk.
+    if (state.currentProject !== name) return;
     try { await loadScriptData(); } catch (_) { /* no parse yet — pane shows its hint */ }
     // M2 (re-audit 2026-09-24): a second open can have finished while this one was
     // waiting. Everything below paints state onto the page, so a stale flight must
@@ -3575,11 +3653,19 @@ async function sendMessage() {
   // choose to keep waiting — which re-POSTs the same turn. That's safe
   // because the backend appends the user message only after the model call
   // succeeds, so a timed-out turn was never stored.
+  let turnInFlight = false;
   const finishTurn = () => {
+    turnInFlight = false;
     $("#send-btn").disabled = false;
     input.focus();
   };
   const attemptTurn = async () => {
+    // M5 (audit 2026-09-25): one turn in flight, ever. The watchdog's "Keep
+    // waiting" button used to be live for every click and every dialog that
+    // ever appeared, so N clicks meant N concurrent POSTs — N model calls and
+    // N replies for one question (measured: 2 clicks -> 3 stream requests).
+    if (turnInFlight) return;
+    turnInFlight = true;
     // pending/pendingBubble/stopTicker live at function scope (not inside
     // the try) so the watchdog branch in catch can reach them.
     let pending = null, pendingBubble = null, stopTicker = null;
@@ -3630,6 +3716,9 @@ async function sendMessage() {
       finishTurn();
     } catch (e) {
       if (e.stillWorking && pendingBubble) {
+        // The turn is over — this attempt is not in flight any more, and the
+        // writer's next click is allowed to start exactly one new one.
+        turnInFlight = false;
         // Watchdog: the turn hit its cap mid-generation. Offer a choice
         // instead of failing the turn. IMPORTANT: keep the .elapsed span
         // alive — the ticker updates ONLY that span, and if it's gone the
@@ -3643,10 +3732,19 @@ async function sendMessage() {
         const stopBtn = el("button", "wd-btn wd-stop", "Give up");
         pendingBubble.appendChild(keepBtn);
         pendingBubble.appendChild(stopBtn);
+        const answered = () => {
+          // The dialog is a question, asked once: retire BOTH buttons so a
+          // second click on a stale dialog can't re-open the turn.
+          turnInFlight = false;   // this attempt is over; the writer decides
+          keepBtn.disabled = true;
+          stopBtn.disabled = true;
+        };
         keepBtn.addEventListener("click", () => {
+          answered();
           attemptTurn();  // same text+quote — safe to resend
         });
         stopBtn.addEventListener("click", () => {
+          answered();
           stopTicker();
           pending.classList.remove("msg-pending");
           pendingBubble.textContent = "Stopped waiting — Sam was still working when the time cap hit. Send the message again to retry.";
@@ -4105,13 +4203,20 @@ function renderPacingPanel(container) {
       const aH = Math.max(1, (s.action_words / maxW) * (H - 44));
       svg += `<rect x="${x}" y="${H - 34 - dH}" width="${barW - 3}" height="${dH}" class="bar-dialogue"/>`;
       svg += `<rect x="${x}" y="${H - 34 - dH - aH}" width="${barW - 3}" height="${aH}" class="bar-action"/>`;
-      if (i % 2 === 0 || segs.length < 8) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${s.page_start}</text>`;
+      if (i % 2 === 0 || segs.length < 8) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${escapeHtml(s.page_start)}</text>`;
     });
     svg += `</svg>`;
     const legend = el("span", "pacing-legend");
     legend.appendChild(el("span", "legend-dialogue", "dialogue"));
     legend.appendChild(el("span", "legend-action", "action"));
     block.appendChild(legend);
+    // Both pacing SVGs are innerHTML sinks, so every interpolation rides
+    // escapeHtml like every other one (AGENTS.md: escape at the render
+    // boundary). Today each value is a parser-computed NUMBER (page_start from
+    // the segment index, scene_number from the parser's counter, pace_score
+    // rounded), so none of them is reachable from a screenplay — this is the
+    // contract held, not a live XSS. A future label that rides script text
+    // would otherwise be the one sink with no helper in front of it.
     const body = el("div", "pacing-body");
     body.innerHTML = svg;
     block.appendChild(body);
@@ -4132,8 +4237,8 @@ function renderPacingPanel(container) {
       const h = Math.max(2, (r.pace_score / maxScore) * (H - 60));
       const y = H - 34 - h;
       const cls = r.drag ? "bar-pace drag" : "bar-pace";
-      svg += `<rect data-scene="${r.scene_number}" class="${cls}" x="${x}" y="${y}" width="${barW - 3}" height="${h}"><title>Scene ${r.scene_number} — pace ${r.pace_score}/100${r.drag ? " (drag)" : ""}</title></rect>`;
-      if (perScene.length <= 26) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${r.scene_number}</text>`;
+      svg += `<rect data-scene="${escapeHtml(r.scene_number)}" class="${cls}" x="${x}" y="${y}" width="${barW - 3}" height="${h}"><title>Scene ${escapeHtml(r.scene_number)} — pace ${escapeHtml(r.pace_score)}/100${r.drag ? " (drag)" : ""}</title></rect>`;
+      if (perScene.length <= 26) svg += `<text x="${x + barW / 2}" y="${H - 14}" class="bar-label">${escapeHtml(r.scene_number)}</text>`;
     });
     svg += `</svg>`;
     const body = el("div", "pacing-body");
@@ -5351,7 +5456,16 @@ function openDock(lens) {
   if (!dock) return;
   if (lens) setDockLens(lens);
   else setDockLens(dockLens); // normalize + keep tabs in sync on first open
-  if (!dockIsOpen()) _dockFocusReturn = document.activeElement;
+  // P5 (audit 2026-09-25): capture the opener EVERY time focus is outside the
+  // dock, not only when the dock was closed. `if (!dockIsOpen())` meant a lens
+  // switch or a second openDock() kept the FIRST opener, so Escape jumped back
+  // to a control the writer stopped using several clicks ago; and focus already
+  // inside the dock must not overwrite the return point, or Escape would
+  // "restore" focus to a tab that is hidden the moment the dock closes.
+  const active = document.activeElement;
+  if (!dock.contains(active) && active && active !== document.body) {
+    _dockFocusReturn = active;
+  }
   dock.classList.add("open");
   if (edge) edge.hidden = true;
   // Phase 6: opening straight into the evidence ledger
@@ -5374,8 +5488,14 @@ function closeDock() {
   // Phase 7: closing the dock returns the conversation to its room panel —
   // the chat never stays trapped in a hidden lens
   returnChatFromDock();
+  // P5 (audit 2026-09-25): if the opener was detached by a re-render, focus
+  // used to land on <body> — the writer's next Tab starts at the top of the
+  // document again. The edge affordance is the dock's own front door and is
+  // un-hidden immediately above, so hand focus to that instead.
   if (_dockFocusReturn && document.contains(_dockFocusReturn)) {
-    try { _dockFocusReturn.focus(); } catch (_) { /* detached node */ }
+    try { _dockFocusReturn.focus(); } catch (_) { /* detached mid-flight */ }
+  } else if (edge && !edge.hidden) {
+    try { edge.focus(); } catch (_) { /* not focusable */ }
   }
   _dockFocusReturn = null;
 }
@@ -7438,6 +7558,13 @@ async function sendFvMessage(partner) {
   typingDiv.textContent = partner === 'consultant' ? 'Dr. Sushruta is reading...' : 'Sameer is thinking...';
   container.appendChild(typingDiv);
   container.scrollTop = container.scrollHeight;
+  // M4 (audit 2026-09-25): M1's guard, back-ported to the dock's consultant
+  // lens. Snapshot WHERE this turn belongs before the first await; the writes
+  // after it used to read state.currentBranch/currentProject at COMPLETION
+  // time, so a doctor's reply that took its time installed another project's
+  // whole message list as the history of the one the writer switched to.
+  var sentFromBranch = state.currentBranch;
+  var sentFromProject = state.currentProject;
   try {
     var sessionId = await ensureSession();
     // The composer's partner IS the voice. A session created by this very
@@ -7452,8 +7579,14 @@ async function sendFvMessage(partner) {
     }
     var base = '/projects/' + encodeURIComponent(state.currentProject);
     var res = await streamChatTurn(base + '/chat/sessions/' + sessionId, text, quote, typingDiv, container);
-    state.branches[state.currentBranch] = Object.assign({}, currentBranchData(), { messages: res.messages });
-    renderFvChat(containerId, partner === 'consultant' ? 'consult' : 'cowrite');
+    if (state.currentProject === sentFromProject) {
+      // the branch it was SENT from owns this history; the writer may have
+      // moved to another branch in the same project, so never write through
+      // state.currentBranch here
+      state.branches[sentFromBranch] = Object.assign(
+        {}, state.branches[sentFromBranch] || currentBranchData(), { messages: res.messages });
+      renderFvChat(containerId, partner === 'consultant' ? 'consult' : 'cowrite');
+    }
   } catch (err) {
     typingDiv.textContent = 'Error: ' + err.message;
     typingDiv.style.color = 'var(--danger)';
@@ -8177,7 +8310,7 @@ const SHORTCUTS = [
   ["Ctrl/⌘ Z", "Undo last applied edit"],
   ["Ctrl/⌘ Shift Z", "Redo the undone edit"],
   ["c", "Switch to Co-write (Sameer)"],
-  ["f", "Switch to Feedback (Consultant)"],
+  ["f", "Feedback — Evidence dock (Consultant drawer with no project)"],
   ["s", "Focus the manuscript — dismiss the partner, back to the page"],
   ["↑ / ↓", "Walk the focused manuscript line by line (Enter edits it in place)"],
   ["a", "Toggle the Craft shelf (analysis panels)"],

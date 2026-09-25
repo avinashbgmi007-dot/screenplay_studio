@@ -162,6 +162,19 @@ def _serve_spa_document(resp):
     return _stamp_asset_versions(_harden_spa_document(resp))
 
 
+def _html_document_path() -> bool:
+    """True when the requested path serves an HTML *document* (not a subresource).
+
+    For a 200 the answer comes from the response's own mimetype; a 304 carries
+    no content-type at all (its body is the browser's cached bytes — which for
+    a revalidated page ARE the same document), so the path decides: `/` and
+    every `*.html` route serve a document, everything else (JS/CSS/fonts,
+    JSON) is a subresource that never writes.
+    """
+    path = request.path or "/"
+    return path == "/" or path.lower().endswith(".html")
+
+
 @app.after_request
 def _hand_token_to_every_document(resp):
     """Mint the capability token on EVERY served HTML document, not just `/`.
@@ -176,10 +189,30 @@ def _hand_token_to_every_document(resp):
     each is noise. A refused request is skipped too: the token is a page's
     licence to WRITE, so handing it to a request the Host guard just rejected
     (BE-1) would license the very client it turned away.
+
+    A 304 refreshes the licence too (V1, security review follow-up): the
+    documents are served `Cache-Control: no-cache`, so every load revalidates,
+    and an unchanged load answers 304 with NO Set-Cookie. Tokens are minted per
+    process, so after a restart the writer who reloads got a 304, kept the dead
+    cookie, and the page — every read passes, only writes carry the licence —
+    wrongly believed it was authenticated until the write guard answered 403.
+    The cookie on the 304 means the page's licence is re-issued on every load,
+    not only on loads that move bytes.
     """
-    if _API_TOKEN and resp.status_code == 200 and resp.mimetype == "text/html":
-        # SameSite=Strict so a foreign page's request never carries it.
-        resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
+    if not _API_TOKEN:
+        return resp
+    if resp.status_code == 200 and resp.mimetype == "text/html":
+        _issue_token_cookie(resp)
+    elif resp.status_code == 304 and _html_document_path():
+        _issue_token_cookie(resp)
+    return resp
+
+
+def _issue_token_cookie(resp):
+    """Hand this response's page its licence to write. One place, so the 200
+    and 304 paths can never drift apart."""
+    # SameSite=Strict so a foreign page's request never carries it.
+    resp.set_cookie("studio_token", _API_TOKEN, samesite="Strict", path="/")
     return resp
 
 
@@ -281,7 +314,15 @@ def _reject_cross_origin_writes():
     if _API_TOKEN:
         # Token configured: require it, using the constant-time compare.
         import hmac
-        if not hmac.compare_digest(request.headers.get("X-Studio-Token", ""), _API_TOKEN):
+        # V2 (security review follow-up): compare BYTES, not str.
+        # `hmac.compare_digest` raises TypeError on a non-ASCII str, so a
+        # header like `X-Studio-Token: café` crashed the guard — the writer
+        # got a 500 from the security check itself (with the exception text
+        # echoed by the JSON error backstop) where a 403 is the only correct
+        # answer. Encoding both sides first accepts arbitrary client bytes
+        # and still fails constant-time.
+        supplied = request.headers.get("X-Studio-Token", "").encode("utf-8", "surrogateescape")
+        if not hmac.compare_digest(supplied, _API_TOKEN.encode("utf-8")):
             return jsonify({"error": "missing or invalid capability token"}), 403
     return None
 

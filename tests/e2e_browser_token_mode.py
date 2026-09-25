@@ -12,6 +12,7 @@ Run:  python tests/e2e_browser_token_mode.py
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -144,15 +145,34 @@ def write_proofs(c, base):
         # A behaviour test can only prove the two writes it knows about. This
         # proves there are no others: the only raw fetch() allowed in app.js are
         # api() itself and the SSE turn (which sets the header by hand).
+        # Exempt, and only these: the licence re-mint, which GETs the HTML
+        # document to receive the cookie. It cannot be a write — a document route
+        # has no write handler and the call carries no method — so the census
+        # keys on METHOD, not on rawness. A future untokened POST is still a
+        # stray; `fetch("/", {method: "POST"})` would be too.
         src = open(os.path.join(REPO, "screenplay_studio", "webapp", "app.js"),
                    encoding="utf-8").read()
         raws = [ln.strip() for ln in src.splitlines()
                 if "fetch(" in ln or "sendBeacon(" in ln]
         allowed = ("const resp = await fetch(API + path",
                    "const resp = await fetch(API + base")
-        strays = [r for r in raws if not r.startswith(allowed)]
+        remint = re.compile(r"""(?<![.\w])fetch\(\s*['"]/['"]\s*(?:,\s*\{[^{}]*\})?\s*\)""")
+
+        def is_remint(line):
+            m = remint.search(line)
+            if not m:
+                return False
+            opts = m.group(0)[m.group(0).index(","):] if "," in m.group(0) else ""
+            return "method" not in opts and "body" not in opts
+
+        strays = [r for r in raws
+                  if not r.startswith(allowed) and not is_remint(r)]
         c.check("no untokened write path left in the SPA", not strays,
                 "; ".join(strays[:4]))
+        c.check("the census exempts exactly the licence re-mints, nothing else",
+                sum(1 for r in raws if is_remint(r)) == 3,
+                f"{sum(1 for r in raws if is_remint(r))} exempted re-mints, "
+                "expected 3 (_ensureStudioToken, _apiOnce's 403, the stream turn's 403)")
         browser.close()
 
 

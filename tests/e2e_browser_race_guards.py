@@ -104,6 +104,34 @@ def upload(base, title, path, body=None):
     return r.json()["project"]
 
 
+def proj_title(base, name):
+    r = requests.get(f"{base}/api/projects/{name}", headers=studio_headers(base), timeout=30)
+    assert r.status_code == 200, r.text
+    return r.json()["title"]
+
+
+# A fetch mode that answers a chat turn with the server's own "the model is
+# still working" 408 immediately, so the watchdog dialog appears on demand
+# without waiting minutes for a real cap. It counts the attempts the app makes.
+WATCHDOG_408 = """
+() => {
+  const inner = window.fetch.bind(window);
+  window.__streamCalls = 0;
+  window.__fetchMode = 'pass';
+  window.fetch = function (url, opts) {
+    const u = String(url), m = ((opts && opts.method) || 'GET').toUpperCase();
+    if (window.__fetchMode === '408' && /\\/messages\\/stream$/.test(u) && m === 'POST') {
+      window.__streamCalls += 1;
+      return Promise.resolve(new Response(
+        JSON.stringify({ error: 'still working', still_working: true }),
+        { status: 408, headers: { 'Content-Type': 'application/json' } }));
+    }
+    return inner(url, opts);
+  };
+}
+"""
+
+
 def main():
     with open_studio() as base:
         with sync_playwright() as pw:
@@ -113,7 +141,9 @@ def main():
 
             upload(base, "RaceA", FIXTURE)                      # A: OPEN PARK …
             upload(base, "RaceB", FIXTURE, OTHER_SCRIPT)        # B: QUIET KITCHEN …
+            title_a, title_b = proj_title(base, "RaceA"), proj_title(base, "RaceB")
             page.evaluate(HOLD)
+            page.evaluate(WATCHDOG_408)
 
             # ---------- M2: two opens, the slower one must lose ---------------
             page.evaluate("(n) => { openProject(n); }", "RaceA")   # fire-and-forget
@@ -151,6 +181,31 @@ def main():
                               "hasB": "QUIET KITCHEN" in after["text"]}))
             check("and the desk still says which project it is",
                   after["current"] == "RaceB", after["current"])
+
+            # ---------- M2b: the late flight must not repaint the project bar ----
+            # M2 holds A's DATA batch; the project NAME is painted off A's detail
+            # GET, which the batch regex did not cover. A flight that loses the
+            # race must not overwrite the title the writer is looking at.
+            page.evaluate("""() => { window.__holdKey = (u, m) =>
+                (/\\/api\\/projects\\/RaceA(\\/|$|\\?)/.test(u) && m === 'GET') ? 'A' : null; }""")
+            page.evaluate("() => { openProject('RaceA'); }")
+            page.wait_for_timeout(600)
+            page.evaluate("async (n) => { await openProject(n); }", "RaceB")
+            page.wait_for_timeout(1400)
+            bar = page.evaluate("""() => document.getElementById('project-title').textContent""")
+            check("B's title is on the bar while A's detail flight is held (precondition)",
+                  bar == title_b, json.dumps({"bar": bar, "want": title_b}))
+            page.evaluate("() => window.__release('A')")
+            page.wait_for_timeout(1800)
+            bar2 = page.evaluate("""() => ({
+                title: document.getElementById('project-title').textContent,
+                current: state.currentProject,
+            })""")
+            check("A's late flight cannot repaint the bar with A's title",
+                  bar2["title"] == title_b and bar2["current"] == "RaceB",
+                  json.dumps({**bar2, "want": title_b}))
+            page.evaluate("""() => { window.__holdKey = (u, m) =>
+                (/\\/messages\\/stream$/.test(u) && m === 'POST') ? 'turn' : null; }""")
 
             page.evaluate("""() => { window.__holdKey = (u, m) => {
                 if (/\\/messages\\/stream$/.test(u) && m === 'POST') return 'turn';
@@ -215,6 +270,83 @@ def main():
             }""")
             check("the save does not claim an order it never sent",
                   saved["dirty"] and not saved["disabled"], json.dumps(saved))
+
+            # ---------- M4: the dock's consultant lens is the same race --------
+            # sendFvMessage never got M1's guard: it writes
+            # `state.branches[state.currentBranch]` AFTER two awaits, so a doctor
+            # reply from project B lands in whatever the writer opened meanwhile.
+            page.evaluate("""() => { window.__holdKey = (u, m) =>
+                (/\\/messages\\/stream$/.test(u) && m === 'POST') ? 'turn' : null; }""")
+            page.evaluate("async (n) => { await openProject(n); }", "RaceB")
+            page.evaluate("() => openDock('sushruta')")
+            page.wait_for_timeout(1600)
+            fv_ask = "which scene drags hardest in this draft"
+            page.locator("#fv-consult-input").fill(fv_ask)
+            page.locator("#fv-consult-composer").evaluate("f => f.requestSubmit()")
+            page.wait_for_timeout(1400)
+            inflight = page.evaluate("() => Object.keys(window.__held)")
+            check("the consultant's turn is in flight (the probe is holding it)",
+                  "turn" in inflight, json.dumps(inflight))
+            shown = page.evaluate(
+                "() => document.getElementById('fv-consult-messages').textContent")
+            check("the writer's own line is on screen in the lens (precondition)",
+                  fv_ask in shown, json.dumps({"lens": shown[:120]}))
+            # the writer opens the OTHER project while the doctor is still writing
+            page.evaluate("async (n) => { await openProject(n); }", "RaceA")
+            page.wait_for_timeout(1200)
+            parked = page.evaluate("""() => ({
+                current: state.currentProject,
+                branch: state.currentBranch,
+                messages: ((state.branches[state.currentBranch] || {}).messages || []).length,
+            })""")
+            check("the writer is on the other project's empty thread (precondition)",
+                  parked["current"] == "RaceA" and parked["messages"] == 0, json.dumps(parked))
+            page.evaluate("() => window.__release('turn')")
+            page.wait_for_timeout(2500)
+            landed = page.evaluate("""() => ({
+                current: state.currentProject,
+                here: JSON.stringify(state.branches),
+            })""")
+            check("the doctor's reply cannot be installed as the other project's history",
+                  landed["current"] == "RaceA" and fv_ask not in landed["here"],
+                  json.dumps({"current": landed["current"], "leaked": fv_ask in landed["here"]}))
+
+            # ---------- M5: the watchdog's "Keep waiting" is not idempotent -----
+            page.evaluate("() => { window.__fetchMode = '408'; window.__streamCalls = 0; }")
+            page.evaluate("() => openCowriteRoom()")
+            page.wait_for_timeout(900)
+            page.locator("#input").fill("a line worth asking twice about")
+            page.get_by_role("button", name="Send", exact=True).click()
+            page.wait_for_timeout(1600)
+            dlg = page.evaluate("""() => ({
+                calls: window.__streamCalls,
+                keeps: document.querySelectorAll('.wd-btn.wd-keep').length,
+            })""")
+            check("the 408 watchdog dialog is up after one attempt (precondition)",
+                  dlg["calls"] == 1 and dlg["keeps"] == 1, json.dumps(dlg))
+            # Two clicks on the SAME "Keep waiting" button. The second attempt
+            # raises its own watchdog and appends its own dialog, so the count
+            # of dialogs is not the signal — the signal is that the button the
+            # writer already answered is retired and cannot spend another turn.
+            page.evaluate("() => { window.__firstKeep = document.querySelector('.wd-btn.wd-keep'); }")
+            page.locator(".wd-btn.wd-keep").first.click()
+            page.wait_for_timeout(700)
+            stale = page.evaluate("""() => {
+                const b = window.__firstKeep;
+                b.click();          // the browser drops clicks on a disabled button
+                return { disabled: b.disabled, calls: window.__streamCalls };
+            }""")
+            page.wait_for_timeout(1200)
+            dbl = page.evaluate("""() => ({
+                calls: window.__streamCalls,
+                keeps: document.querySelectorAll('.wd-btn.wd-keep').length,
+                staleDisabled: window.__firstKeep.disabled,
+            })""")
+            check("a second click on the answered 'Keep waiting' costs no extra model turn",
+                  dbl["calls"] == 2, json.dumps(dbl))
+            check("the answered watchdog retires the button it was asked on",
+                  dbl["staleDisabled"] and stale["disabled"], json.dumps({**dbl, "at_click": stale["disabled"]}))
+            page.evaluate("() => { window.__fetchMode = 'pass'; }")
 
             assert_no_js_errors(checks, errors)
             browser.close()
