@@ -27,6 +27,10 @@ restored byte-identical** (`.workbuddy-ai/scratch/mutation_check_r4.py`).
 *Everything below is the ladder (§1–§8) **plus** the BE-3 (§11) and UX-2 (§12)
 follow-ons, measured together at one revision.*
 
+> **Superseded by §13.9**, which measures the same gates after the five LOW
+> findings. This table is kept as the record of the revision the ladder landed at
+> (`27bd576`): 1786 / 53 suites / 1319 checks.
+
 | Gate | Command | Result |
 |---|---|---|
 | Unit + integration | `python -m pytest tests/ -q --cov` | **1786 passed, 3 skipped, 0 failed — 87%** (9751 statements, 1290 missed), exit 0 |
@@ -544,3 +548,309 @@ at the manuscript's own `flex: 1` (`flex: 0 0 30%`) turns it red. The lesson is
 worth keeping: **a green mutation result means "the guard cannot see this", and
 "this" may be the mutation rather than the guard.** The harness now says so in the
 entry itself.
+
+---
+
+## 13. Follow-on: the five LOW findings, as one pass
+
+The round-3 audit closed with five LOWs. Four of them are the same defect class
+this repo keeps producing — **a check that cannot fail**, or an assurance that
+exists but is unreachable — so they were taken together.
+
+| Finding | What it actually was | Guard added | Mutations |
+|---|---|---|---|
+| **UX-5** | 8 of the fleet's checks asserted nothing (`cond=True` default) | `tests/test_browser_check_hygiene.py` (3) — and the default removed | 2 / 2 |
+| **UX-4** | 3 de-vacuumed checks live in the one suite that never runs | `tests/test_analyze_contract.py` (4) | see §13.2 |
+| **BE-4** | one 403 message for two different 403s | `tests/e2e_browser_403_advice.py` (11) + 3 pytest | see §13.3 |
+| **BE-5** | the loopback predicate over-rejected valid spellings | 6 pytest in `test_host_header_guard.py` | see §13.4 |
+| **BE-6** | the store's merge covered messages, not the selection | `tests/test_session_selection_merge.py` (6) | 8 / 8 |
+
+### 13.1 UX-5 — the eight checks that asserted nothing, and the default that let them
+
+`Checks.ok` was `def ok(self, name, cond=True, detail="")`. Eight calls in
+`e2e_browser_ui_batch.py` passed a name and nothing else, so they verified nothing
+and still counted as passes.
+
+The audit's own correction is the important part of the finding: the first sweep
+inspected only `args[0]`, so it missed `check(name, True)`-shaped calls where the
+constant is the **second** argument. **A vacuous-check sweep has to read every
+argument position *and* the helper's default.** I ran that wider sweep over all
+55 suites — 1,095 `ok`/`check` calls — and it found the eight, and only the eight.
+
+Fixing the eight is fixing the symptom. The **cause** is the default: it is a trap
+any future suite can walk into without noticing, and the failure mode is silent.
+So `cond` is now required:
+
+```python
+def ok(self, name, cond, detail=""):   # no default, deliberately
+```
+
+Measured before changing it: **zero** callers in the fleet omit `cond` (I scanned
+for the subtler `ok(name, detail=...)` shape too, which a positional check would
+have missed). `e2e_browser_export_flush.py` has always declared its own
+`ok(name, cond, extra="")` this way, so the correct signature was already the
+house style. A marker-only call is now a `TypeError` at the moment it is written.
+
+`test_browser_check_hygiene.py` guards both ends — the signature, and a scan for a
+literal `True`/`None` condition — with a non-vacuity floor (≥40 suites, ≥500
+calls) so a broken glob cannot pass while guarding nothing.
+
+**One rule I deliberately did not write.** The sweep also found **33** calls
+passing a literal `False`, and they are all legitimate: `ok("x", False, detail)`
+inside an `except` block or a precondition-failure branch is the fleet's
+established "record a failure with a reason" idiom. A guard that flagged those
+would be wrong 33 times, and a guard that cries wolf gets deleted. Only the
+`True`/`None` shape is flagged, and the reason is recorded in the file.
+
+### 13.2 UX-4 — giving the three checks somewhere they actually run
+
+`e2e_browser_gun_pen_audit.py` is the one skipped suite: it POSTs a real
+`/analyze` and needs a live `llama-server`. Commit `25aacf8` replaced three
+`check(name, True)` calls in it with real conditions, and those three have never
+executed — in CI or locally. The work was correct; its value was zero.
+
+The audit offered two ways out. I measured whether the demo model could carry
+them, the same way as §12 — before writing anything:
+
+```
+POST /api/projects/<p>/analyze   -> 200, body has "project" and no "error"
+GET  /api/projects/<p>/last-pass -> 6 findings
+the arrival snapshot             -> all six fields present
+```
+
+It can. So the three guarantees now have a home in **`tests/test_analyze_contract.py`**
+(4 tests, **2.6s**, no model, no browser): the analyze ack names the project, the
+run produces findings, and the arrival snapshot carries its six fields. They run
+on every `pytest` invocation now instead of never.
+
+They also remain in the browser suite, where they will run when someone points
+`E2E_BASE` at a studio that has a model. The pytest suite is what makes the
+guarantee reachable by default.
+
+### 13.3 BE-4 — two different 403s, one piece of advice
+
+`app.js` showed *"The studio restarted since this page was opened. Reload this
+page to keep writing."* for **any** non-retryable 403. But a 403 also comes from
+the Host guard (`_reject_foreign_host`), where reloading cannot possibly help —
+the writer would reload into the same refusal, forever, with the app confidently
+telling them to.
+
+The server now marks that refusal (`host_rejected: true`) and the SPA branches on
+it, so the Host case gets advice that is true for it.
+
+**A measurement that changed the guard's shape.** I checked whether a browser can
+produce the host branch at all, rather than assuming it:
+
+```
+context with extra_http_headers={"Host": "evil.attacker.com"}
+  -> page.goto() raises net::ERR_INVALID_ARGUMENT
+```
+
+**Chromium refuses to send a foreign `Host`.** So the SPA's Host branch is not
+reachable over the wire from a browser, and a suite that tried to drive it that
+way would assert nothing (or silently test the token path instead). That also
+confirms the Host guard's real trigger is DNS rebinding — a resolved address, not
+a forged header.
+
+`tests/e2e_browser_403_advice.py` therefore injects the **real server-produced
+bodies** for both branches and asserts the two messages differ, that the token one
+still says "reload", and that the Host one does not. It carries the real capability
+token (the fleet gate fails any suite that boots with the token switched off, and
+it passed), and it sends a genuinely bad token to obtain the token 403 as a
+measured precondition rather than a fabricated body.
+
+### 13.4 BE-5 — the loopback predicate
+
+`net_guard.is_loopback_host` accepted only the canonical textual forms
+`ipaddress` understands, so `127.1`, `2130706433`, `0x7f000001` and `0177.0.0.1`
+were all refused. No browser sends those, which is why this was a nit rather than
+a defect — but the predicate's job is to answer "is this loopback?", and it was
+answering "no" to four correct spellings of yes.
+
+It now resolves the `inet_aton` forms and range-checks them, and strips the DNS
+root label, so `localhost.` and `127.0.0.1.` are accepted. The range check is what
+keeps it safe: measured, `3232235777` (= 192.168.1.1) is still refused, and so is
+`127.0.0.1.evil.com`. Stripping dots can only remove characters, so it cannot turn
+a foreign name into a loopback one.
+
+**My own test was wrong, and the suite said so.** I first asserted that a `Host`
+of bare `::1` was accepted. It is not, and should not be: an IPv6 literal in a
+`Host` header must be bracketed (`[::1]:8500`), so bare `::1` is a malformed
+header rather than a loopback spelling. The parametrisation now uses the form a
+browser actually sends.
+
+### 13.5 BE-6 — the selection was last-writer-wins
+
+The store's `_merge_missing_messages` unioned branch **messages** (the H4 fix) and
+nothing else, so `current_branch` and each branch's `active_persona` /
+`active_mode` stayed last-writer-wins on the in-memory snapshot. A chat turn holds
+a snapshot taken *before* the writer switched branches, so its save wrote the old
+branch back and silently undid the switch. Nothing errored, nothing was lost — the
+writer simply found themselves in the wrong room, and the store's own comment
+claimed to have closed this class while having closed it for exactly one field
+family.
+
+The merge now keeps the message union and, for a save that is **not** about the
+selection, takes those three fields from disk. The four routes whose whole purpose
+*is* to change the selection (`fork_session`, `switch_branch`, both
+`update_settings`) pass `owns_selection=True`. Scoped deliberately to those three
+fields; the exclusions are choices, not oversights, and are stated in the code:
+`server_url` / `model_id` / `title` are written where the snapshot *is* the source
+of truth, and `awaiting_probe` is turn state the engine has just set.
+
+**The guard has two layers, because they rot for different reasons.**
+`test_session_selection_merge.py` pins the mechanism (a stale message-save
+preserves disk's selection; an owning save applies its own; the union still runs
+either way), and a **static check across both packages** asserts that every
+function which changes the selection says so. A behavioural test cannot catch a
+*fifth* writer that forgets the flag, because such a writer only misbehaves under a
+race — so that half reads the source. It asserts the expected set of writers
+exactly, so a renamed or added writer cannot make it pass silently. §13.6 is the
+story of how the first version of that check was scoped too narrowly, and the gate
+said so.
+
+**One more thing the mutation run found.** The `except OSError` path is not the
+only way a corrupt file can reach the merge, and a dangling `current_branch` on
+disk would have been copied into a *healthy* in-memory session — turning the next
+`session.branch` into a `KeyError`, a 500 caused by a save that only meant to
+append a message. The merge now adopts disk's pointer only when it names a branch
+we hold. That case has its own test.
+
+### 13.6 The gate caught what my guard's scope missed
+
+The first full `pytest` run at this revision came back **3 failed**. All three were
+in `test_cowriter_server.py`, and all three were BE-6-shaped:
+
+```
+assert store.load(session_id).current_branch == "alt"   -> 'main'
+assert store.load(session_id).branch.active_persona == "premise_doctor"
+                                                        -> 'writing_partner'
+assert store.load(session_id).branch.active_mode == "brainstorm"  -> 'peer'
+```
+
+The cause was mine. **`screenplay_cowriter/server.py` — the standalone cowriter
+HTTP surface — has its own `fork`, `switch` and `settings` routes**, and they call
+`store.save(session)` too. Making the selection preserve-by-default turned the flag
+from an optimisation into a requirement, and I had marked only the four writers in
+`webapp_server.py`: the file the audit happened to cite. A repo-wide AST sweep then
+found **eight** writers, not four — the other three routes in `server.py`, and five
+more inside `cli.py`'s `_handle_command` (`/fork`, `/switch`, `/delete`,
+`/persona`, `/mode`).
+
+The lesson is not "I forgot a file". It is that **a guard's scope is part of the
+guard.** The static check scanned exactly one module, so it certified a property of
+one module and I read it as a property of the codebase — which is the same failure
+as a check that cannot fail, arriving by a different route. It now scans both
+packages, keyed by `(module, function)` because `fork_session`, `switch_branch` and
+`update_settings` each exist in *both* servers, and it asserts the expected set
+exactly so a new writer is a deliberate update rather than a silent omission.
+
+**And the harness then caught a second defect, in my own test.** The CLI test was
+named `test_the_cli_switch_command_survives_a_stale_chat_save` and drove `/fork`.
+Mutating the `/switch` save left the suite **green** — the mutation was fine; the
+test was lying about what it covered. It now drives `/fork`, `/switch` and
+`/persona` (three separate save sites, and the three that touch all three fields),
+and the `/switch` mutation goes red.
+
+The residual, stated plainly: `/delete` and `/mode` are additional save sites in
+the same dispatcher, and the static check can only prove the flag appears
+*somewhere* in `_handle_command`, not that it is on each of the five calls. Two
+are covered behaviourally; three are covered by presence. A per-call-site rule is
+not expressible statically here, because a save inside a function that mutates the
+selection may legitimately be a message-only save.
+
+### 13.7 What the mutation harness caught in my own tests
+
+Six mutations, six detected, tree byte-identical — but only after the harness
+caught a defect in the test I had just written.
+
+**The union assertion in the first BE-6 test was vacuous.** Disabling the message
+union (`if (m.role, m.content) not in have:` → `if False:`) left the suite
+**green**. The reason is worth stating precisely: the union copies **disk →
+session**, and the message I was asserting on was the *session's own*. It was
+present regardless. The test now seeds a message that exists **only on disk**,
+which can reach the final state only through the merge — and that mutation goes
+red.
+
+**And one expectation of mine was wrong, not the test.** I expected the
+dangling-pointer test to fail when the whole preserve path was disabled. It does
+not, and it should not: with nothing adopted, a healthy session stays healthy, so
+the test passes for the right reason. The guard itself is pinned by the mutation
+that removes only the guard. A test that also failed when the feature was absent
+entirely would be asserting the wrong thing — so the harness records that
+distinction in the entry rather than quietly dropping it.
+
+### 13.8 An observation I could not reproduce, and a correction to my own first reading
+
+Not one of the five. Recorded because the first version of this section made a
+claim that turned out to be **unsupported**, and the correction matters more than
+the observation did.
+
+**What I saw.** While checking the working tree before committing, `git status`
+listed `script_doctor_studio-0.1.0/` at the repo root: a complete second copy of
+the source tree (its own `tests/`, `knowledge_base/`, and
+`script_doctor_studio.egg-info/`), untracked and **not covered by `.gitignore`**,
+which lists `dist/`, `build/` and `*.egg-info/` but not the `<name>-<version>/`
+pattern setuptools uses for sdist staging.
+
+**What I first concluded, wrongly.** That
+`test_packaging_data_files.py`'s `setuptools.build_meta.build_sdist(out)` stages
+`<name>-<version>/` in `cwd=ROOT` and leaves it behind, because
+`_purge_build_state()` only clears `build/` and `*.egg-info/`. That reading was
+wrong, and the test disproved it:
+
+```
+pytest tests/test_packaging_data_files.py -k sdist   ->  1 passed; no directory created
+pytest tests/test_packaging_data_files.py            -> 10 passed; no build/, no dist/,
+                                                         no <name>-<version>/
+```
+
+setuptools cleans up its own staging directory on a successful build. So there is
+no defect here to fix, and the claim is withdrawn.
+
+**What misled me.** The directory's mtime was 02:41 — during this session — which
+looked like proof that something in this session had just written it. It was not:
+`ruff check .` had descended into it and written `.ruff_cache/` **inside** it, and
+writing a file inside a directory updates that directory's mtime. A timestamp is
+not evidence of authorship. The directory itself carried files dated 2026-09-21 —
+a leftover from an earlier session — and it was gone before I could move it aside
+for a controlled experiment, most likely removed by setuptools' own staging
+cleanup during the sdist build I ran to test the hypothesis.
+
+**The one narrow thing that is true.** `.gitignore` does not cover the
+`<name>-<version>/` staging pattern. Nothing in the current suite leaves such a
+directory, so this is hardening rather than a fix: an *interrupted* build, or a
+manual extraction, would land untracked-but-not-ignored, and `git add -A` would
+commit a duplicate of the whole tree. It is worth one line in `.gitignore`, and it
+is recorded here as a gap rather than dressed up as a finding.
+
+### 13.9 Gates, measured at this revision
+
+*This table supersedes §1.1, which was measured at `27bd576` before the LOW pass.*
+
+| Gate | Command | Result |
+|---|---|---|
+| Unit + integration | `python -m pytest tests/ -q --cov` | **1819 passed, 3 skipped, 0 failed — 87%** (9768 statements, 1278 missed), exit 0 |
+| Browser E2E | `python tests/run_browser_suites.py` | **54 suites: 53 passed, 0 failed, 1 skipped, 0 known-broken — 1330 checks**, exit 0 |
+| Lint | `ruff check .` | **All checks passed** |
+| JS unit | `node --test tests/js/core.test.js` | **16 / 16** |
+| Mutation harness | `.workbuddy-ai/scratch/mutation_check_be6.py` | **8 / 8 detected**; all four mutated files restored byte-identical |
+| Mutation harness (UX-5) | inline, `.workbuddy-ai/scratch` | **2 / 2 detected**; both files restored byte-identical |
+
+Two rows carry the weight, as in §1.1:
+
+- **The 1,319 browser checks that existed before this pass are unchanged and all
+  still pass.** The 11 new ones are `403_advice`. So the `ok()` signature change —
+  which touches the harness *every* suite imports — moved nothing, and the four
+  sources touched by BE-4/BE-5/BE-6 moved nothing either.
+- **`pytest` went from 1786 to 1819** (+33): `test_analyze_contract.py` 4,
+  `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 6,
+  `test_host_header_guard.py` 20.
+
+The `pytest` figure is from the **second** run at this revision. The first run came
+back **3 failed** — the `screenplay_cowriter/server.py` writers I had missed
+(§13.6). That is worth stating rather than quietly reporting the green run: the
+red one is the evidence that the fix was incomplete, and the gate is what caught
+it.
+
+

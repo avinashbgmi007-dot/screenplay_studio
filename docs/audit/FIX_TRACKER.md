@@ -28,10 +28,10 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1786 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4) at `6d48f13` (194s; coverage **87%** — 9751 statements, 1290 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; +15 over the previous row: `test_cycle_continuity.py` 4, `test_apply_race.py` 4, `test_store_busy.py` 7) |
+| Unit + integration | `python -m pytest tests/` | **1819 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4, LOW pass) at `2eee94a` (189s; coverage **87%** — 9768 statements, 1278 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; **+33** over the pre-pass row: `test_analyze_contract.py` 4, `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 6, `test_host_header_guard.py` 20) |
 | Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
-| Browser E2E | `python tests/run_browser_suites.py` | **53 suites: 52 pass, 0 fail, 1 skip, 0 known-broken** — **1,319 checks** — measured 2026-09-25 (round 4) at `6d48f13`. The load-bearing part: the **1,235 checks that existed before this work are unchanged and all still pass**, so the edit cycle going from two critical sections to one, plus the announcement plumbing, the census classifier, the busy-store classification and a touch media query, moved nothing else. The 84 new checks are `live_regions` (14), `two_contexts` (8), `store_busy` (7) and `viewport_ladder` (55). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
+| Browser E2E | `python tests/run_browser_suites.py` | **54 suites: 53 pass, 0 fail, 1 skip, 0 known-broken** — **1,330 checks** — measured 2026-09-25 (round 4, LOW pass) at `2eee94a`. The load-bearing part: the **1,319 checks that existed before this pass are unchanged and all still pass**; the 11 new ones are `403_advice`. `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
 
 > **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
 > correctly found that `design_session`'s exclusion label was false — the console frames the SPA
@@ -115,6 +115,11 @@ tracker-stamp commit that follows carries the same content.
 | E2E-3 | `xss_inert`'s census counted a `/** */` docstring that MENTIONS `innerHTML` as a sink, and `fn_re` used `.match()` so it skipped every `async function` and mis-attributed their sinks | `e86ff62` | the census's own two assertions; the non-clearing total is unchanged at 18 |
 | BE-3 | A contended store answered **500** with an internal crash string on the two routes that render the writer's script, and the SPA **swallowed** the failure so the pane went blank in silence | `4a86356` | `tests/test_store_busy.py` (7 — REAL cross-process contention) + `tests/e2e_browser_store_busy.py` (7 — a real studio, a real holder child, the writer actually seeing the banner). Mutation-verified: 11/11 detected, tree byte-identical |
 | UX-2 | A **touch device wider than the mobile breakpoint** got 24px scene-index rows, below the 44px the stylesheet states as its own minimum — the rule was gated on `max-width: 767px`, so a phone in landscape fell into the tablet band | `6d48f13` | `tests/e2e_browser_viewport_ladder.py` (55) — a context per config, with non-vacuity checks for the render and for the touch emulation. Mutation-verified: 13/13 detected, tree byte-identical |
+| UX-5 | 8 of the fleet's checks asserted nothing — `Checks.ok` had `cond=True` as a default, so a name-only call was a silent pass | `2eee94a` | `tests/test_browser_check_hygiene.py` (3) — the default is **removed** (so the shape is a `TypeError` when written) and the scan flags only a literal `True`/`None`, because the 33 literal-`False` calls are the legitimate "record a failure with a reason" idiom. Mutation-verified: 2/2 |
+| UX-4 | The three de-vacuumed checks in `gun_pen_audit` live in the one **skipped** suite, so they had never executed in CI or locally | `2eee94a` | `tests/test_analyze_contract.py` (4, 2.6s, no model) — the same three guarantees, reachable by default. Placed only after probing that the demo model covers all three |
+| BE-4 | One 403 message for two different 403s: the Host-guard refusal told the writer to reload, which cannot help | `2eee94a` | server marks it (`host_rejected`) + SPA branches on it; `tests/e2e_browser_403_advice.py` (11) injects the **real server-produced bodies**, because Chromium refuses to send a foreign `Host` (`net::ERR_INVALID_ARGUMENT`) so the branch is undrivable over the wire |
+| BE-5 | The loopback predicate refused `127.1`, `2130706433`, `0x7f000001`, `0177.0.0.1` and the DNS root label | `2eee94a` | 20 pytest in `test_host_header_guard.py`; the range check is asserted too — `3232235777` (192.168.1.1) and `0xc0a80101` stay refused |
+| BE-6 | The store's merge unioned branch **messages** only, so `current_branch` / `active_persona` / `active_mode` stayed last-writer-wins and a stale chat turn silently undid a branch switch | `2eee94a` | `tests/test_session_selection_merge.py` (6) + a static check across **both packages**. Mutation-verified: 8/8 detected, four files byte-identical. The first version of the static check scanned only `webapp_server.py`, and the gate found the three writers it missed in `screenplay_cowriter/server.py` plus five in `cli.py` |
 
 ---
 
@@ -198,7 +203,12 @@ fell into the tablet band and got **24px** rows. Fixed with
 `@media (pointer: coarse) and (max-width: 1199px)`. **Width was being used as a proxy
 for the input device, and it is the wrong proxy.**
 
-**Still open from round 3, unchanged:** BE-4, BE-5, BE-6, UX-4, UX-5.
+**All five LOW findings from round 3 are now closed** (`2eee94a`) — BE-4, BE-5,
+BE-6, UX-4, UX-5. **Nothing from the round-3 audit remains open.** What is left is
+the deliberate residuals, which are not findings: the edit trio is
+concurrency-safe but not transactional (E2E-2, below), and BE-6's `/delete` and
+`/mode` CLI commands are covered by a presence check rather than behaviourally
+(see the report, §13.6).
 
 **Recorded here rather than only in a comment (E2E-2):** the edit trio is
 **concurrency-safe, not transactional**. `working.json`, `edits.json` and
