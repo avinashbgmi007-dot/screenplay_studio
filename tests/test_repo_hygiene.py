@@ -133,6 +133,28 @@ def test_the_hygiene_rule_is_not_vacuous():
             f"broad and would silently untrack a real repo file")
 
 
+def test_the_sdist_staging_directory_is_ignored():
+    """The same class one layer down: setuptools stages an sdist as
+    `<name>-<version>/` in the repo ROOT (cwd), and removes it on success.
+
+    An interrupted build — or a manual `tar -xzf dist/*.tar.gz` — leaves a
+    complete second copy of the source tree at the root. `build/`, `dist/` and
+    `*.egg-info/` do not cover it, so it would sit untracked-but-not-ignored and
+    `git add -A` would commit the duplicate, which carries its own `.egg-info`.
+
+    Two spellings and two versions are asserted, because the defect this file
+    exists to catch was a rule that enumerated today's shapes. A version bump or
+    a project rename must not silently un-ignore the staging directory.
+    """
+    if not _in_work_tree():
+        pytest.skip("no git work tree here — there is no index to inspect")
+
+    for name in ("script_doctor_studio-0.1.0", "script-doctor-studio-9.9.9"):
+        assert _is_ignored(f"{name}/pyproject.toml"), (
+            f"{name}/ is NOT gitignored — an interrupted sdist build would leave "
+            f"a duplicate of the whole source tree untracked-but-not-ignored")
+
+
 # --- the same class of bug, one level up: a harness must not write over evidence ---
 #
 # Top-level `impl-shots/` is EVIDENCE — the verdict tables in docs/ cite those

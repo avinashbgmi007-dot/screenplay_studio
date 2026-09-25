@@ -261,6 +261,33 @@ def test_the_cli_selection_commands_survive_a_stale_chat_save(tmp_path):
         "a chat turn undid the CLI's /persona"
 
 
+def test_the_cli_mode_command_survives_a_stale_chat_save(tmp_path):
+    """`/mode` is the fifth selection-owning save in `_handle_command`.
+
+    `/delete` is the fourth and is deliberately **not** covered here. The store's
+    union re-adds a whole branch the session no longer has, so `/delete` is undone
+    on disk — a test asserting the deletion persists would fail, and pinning a
+    broken product surface as a check is the mistake pass 13 made with
+    `design_session` (see the tracker's "Proven, deliberately NOT fixed", DEL-1).
+    """
+    from screenplay_cowriter.cli import _handle_command
+
+    store = SessionStore(str(tmp_path))
+    sid = store.create("T").session_id
+
+    session = store.load(sid)
+    _handle_command("/mode brainstorm", session, store)
+    assert store.load(sid).branch.active_mode == "brainstorm", \
+        "the CLI mode change did not persist"
+
+    stale = _stale_snapshot(sid)  # holds Branch's own default mode, "peer"
+    _turn(stale, "mode-q")
+    store.save(stale)
+
+    assert store.load(sid).branch.active_mode == "brainstorm", \
+        "a chat turn undid the CLI's /mode"
+
+
 def test_every_writer_that_changes_the_selection_says_so():
     """The wiring half. A behavioural test cannot catch a NEW writer that forgets
     the flag — such a writer only misbehaves under a race — so this reads the

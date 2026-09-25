@@ -6,6 +6,17 @@ dist/
 build/
 *.egg-info/
 coverage/
+
+# setuptools stages an sdist as `<name>-<version>/` in the repo ROOT (cwd) and
+# removes it on success — but an interrupted build, or a manual
+# `tar -xzf dist/*.tar.gz`, leaves a complete second copy of the source tree
+# there. `build/`, `dist/` and `*.egg-info/` above do NOT cover it, so it lands
+# untracked-but-not-ignored and `git add -A` would commit the duplicate (which
+# carries its own `.egg-info`, the exact thing the packaging guard purges).
+# `?` spans both the underscored sdist name and the hyphenated project name, and
+# `*` spans the version, so neither a bump nor a rename silently un-ignores it.
+# Guard: tests/test_repo_hygiene.py
+/script?doctor?studio-*/
 # E2E-5: `pytest --cov` writes this data file at the repo root. Without the
 # entry it is an untracked artifact that shows up in every `git status`.
 .coverage

@@ -853,4 +853,71 @@ back **3 failed** — the `screenplay_cowriter/server.py` writers I had missed
 red one is the evidence that the fix was incomplete, and the gate is what caught
 it.
 
+---
+
+## 14. Closing the two things §13 left open — and the defect found on the way
+
+### 14.1 `.gitignore` did not cover the sdist staging pattern
+
+§13.8 withdrew the claim that the packaging tests leave a staging directory, but
+kept one narrow gap: `.gitignore` lists `build/`, `dist/` and `*.egg-info/` — not
+the `<name>-<version>/` directory setuptools stages in the repo root. Nothing in
+the suite leaves one today, so this is hardening, not a fix: an *interrupted*
+build, or a manual `tar -xzf dist/*.tar.gz`, lands untracked-but-not-ignored, and
+`git add -A` commits a duplicate of the whole source tree — which carries its own
+`.egg-info`, the exact thing `_purge_build_state()` exists to purge.
+
+The rule is `/script?doctor?studio-*/`: `?` spans the underscored sdist name *and*
+the hyphenated project name, `*` spans the version. The guard asserts **two
+spellings and two versions**, because the defect this file exists to catch was a
+rule that enumerated today's shapes. Mutation-verified both ways — removing the
+rule goes red, and narrowing it to `/script_doctor_studio-0.1.0/` (today's
+version, i.e. the enumeration mistake) goes red too.
+
+**A newline hazard, caught by an assertion rather than by luck.** The first
+mutation attempt matched **zero** times and wrote nothing: `.gitignore` is CRLF and
+my anchor was LF. The match-count assertion in the harness — the one this repo's
+notes insist on — is what turned a silent no-op into a visible error.
+
+### 14.2 `/mode` closed; `/delete` is a real defect, and it is filed rather than rushed
+
+`/mode`, the fifth selection-owning save in `_handle_command`, now has behavioural
+coverage: a stale chat turn cannot revert it.
+
+`/delete` is the fourth, and **measuring before asserting anything turned up a
+pre-existing defect**. The command reports success and the branch is still there:
+
+```
+/fork alt      -> current=alt   branches=['alt', 'main']
+/delete alt    -> "Deleted branch 'alt'."
+                  current=main  branches=['alt', 'main']     <- still present
+```
+
+The store's message union re-adds a whole branch the session no longer has,
+because it cannot tell *"this snapshot deliberately removed it"* from *"another
+process just forked it"*. **Causal proof, not inference**: mutating the union's
+`session.branches[bname] = dbranch` line to `pass` makes the delete persist
+(`branches=['main']`). And it is **not** mine — the line is unchanged and present
+at `HEAD~1`. Reach is narrow: `delete_branch` has exactly one caller
+(`cli.py:172`) and no HTTP route deletes a branch.
+
+**Why this is filed rather than fixed in the same pass.** The fix is not the
+one-line change it looks like. The union genuinely needs to keep a branch another
+process just forked, so the session has to record its own deletions —
+`Session.deleted_branches`, appended by `delete_branch`, discarded by `fork` when a
+name is reused, serialized additively so old files still load, and skipped by the
+union. That is a change to a cross-process on-disk format.
+
+**And the obvious fix is a trap.** Suppressing the union's branch re-add for
+`owns_selection=True` saves would make a stale selection-owning save *drop* a
+branch another process had just forked — losing that branch's messages. That is
+worse than the bug it fixes, which is why the shape is written down in the tracker
+(`DEL-1`) instead of being improvised at the end of a long pass. Impact is low and
+non-destructive: a stale branch lingers; nothing is lost or corrupted.
+
+I did **not** add a test asserting the broken behaviour. Pinning a broken product
+surface as a check is the mistake pass 13 made with `design_session`, and the
+tracker's own gate note records the reversal. The test that will exist is the one
+that fails today and passes after the fix.
+
 
