@@ -224,3 +224,33 @@ class TestTheTwoForbiddenAreDistinguishable:
         body = r.get_json()
         assert not body.get("host_rejected"), body
         assert body.get("error"), "a 403 with no reason gives the client nothing"
+
+
+class TestTheGuardCoversEveryReadableSurface:
+    """BE-5 (audit 2026-09-24): `/api/health` discloses the model server URL on an
+    unauthenticated GET.
+
+    The audit listed it as LOW because it was *"one of the surfaces BE-1 makes
+    remotely readable"* — so the finding's own premise is that the disclosure only
+    matters if a foreign page can reach it. BE-1's fix is the Host guard, and this
+    pins that the guard covers the surface the finding named rather than only the
+    one the other tests happen to use. Without it, the disposition rests on a
+    one-off manual check.
+    """
+
+    def test_health_is_readable_from_loopback(self, monkeypatch, tmp_path):
+        """The guard must not break the endpoint for the writer's own browser."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.get("/api/health", headers={"Host": "127.0.0.1:8500"})
+        assert r.status_code == 200, r.get_data(as_text=True)
+        assert r.get_json().get("status") == "ok"
+
+    def test_health_is_refused_for_a_foreign_host(self, monkeypatch, tmp_path):
+        """What DNS rebinding sends. This is what closes BE-5: the disclosure is
+        loopback-only, which is what a local health endpoint is for."""
+        _, client = _client(monkeypatch, tmp_path)
+        r = client.get("/api/health", headers={"Host": "evil.attacker.com"})
+        assert r.status_code == 403, (
+            "a foreign Host can still read /api/health — the model server URL is "
+            "disclosed to whatever page asked")
+        assert r.get_json().get("host_rejected") is True

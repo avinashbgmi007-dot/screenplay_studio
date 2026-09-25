@@ -28,10 +28,10 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1825 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4, LOW pass + §14 + DEL-1) at `2eee94a` + the DEL-1 working tree (191s; coverage **87%** — 9775 statements, 1262 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; **+39** over the pre-pass row: `test_analyze_contract.py` 4, `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 11, `test_host_header_guard.py` 20, `test_repo_hygiene.py` 1) |
+| Unit + integration | `python -m pytest tests/` | **1827 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4: LOW pass + §14 + DEL-1 + E2E-4) at `d19fbce` (191s; coverage **87%** — 9775 statements, 1262 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; **+41** over the pre-pass row: `test_analyze_contract.py` 4, `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 11, `test_host_header_guard.py` 22, `test_repo_hygiene.py` 1) |
 | Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
-| Browser E2E | `python tests/run_browser_suites.py` | **54 suites: 53 pass, 0 fail, 1 skip, 0 known-broken** — **1,330 checks** — measured 2026-09-25 (round 4, LOW pass) at `2eee94a`, **re-run unchanged** after the DEL-1 `models.py` change. The load-bearing part: the **1,319 checks that existed before this pass are unchanged and all still pass**; the 11 new ones are `403_advice`. `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
+| Browser E2E | `python tests/run_browser_suites.py` | **55 suites: 54 pass, 0 fail, 1 skip, 0 known-broken** — **1,343 checks** — measured 2026-09-25 at `d19fbce`. The load-bearing part: the **1,330 checks that existed before this pass are unchanged and all still pass**; the 13 new ones are `real_transport` (E2E-4). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
 
 > **Pass 14 reversed pass 13's central decision, and that is the point of the entry.** Pass 13
 > correctly found that `design_session`'s exclusion label was false — the console frames the SPA
@@ -121,6 +121,7 @@ tracker-stamp commit that follows carries the same content.
 | BE-5 | The loopback predicate refused `127.1`, `2130706433`, `0x7f000001`, `0177.0.0.1` and the DNS root label | `2eee94a` | 20 pytest in `test_host_header_guard.py`; the range check is asserted too — `3232235777` (192.168.1.1) and `0xc0a80101` stay refused |
 | BE-6 | The store's merge unioned branch **messages** only, so `current_branch` / `active_persona` / `active_mode` stayed last-writer-wins and a stale chat turn silently undid a branch switch | `2eee94a` | `tests/test_session_selection_merge.py` (6) + a static check across **both packages**. Mutation-verified: 8/8 detected, four files byte-identical. The first version of the static check scanned only `webapp_server.py`, and the gate found the three writers it missed in `screenplay_cowriter/server.py` plus five in `cli.py` |
 | DEL-1 | **`/delete <branch>` was undone on disk** — the CLI printed `Deleted branch 'alt'.` and the branch survived, because the message union re-adds a whole branch the session no longer has (it cannot tell a deliberate deletion from a concurrent fork). **Pre-existing**, CLI-only, and found by measuring before writing the test | `05b94c5` | `Session.deleted_branches` — a tombstone appended by `delete_branch`, cleared by `fork` when the name is reused, read with a default so pre-existing session files still load, and respected by the union. Mutation-verified: 5/5, five files byte-identical. The load-bearing one is `test_a_concurrent_fork_is_still_kept_by_a_stale_save`, the regression test for the tempting wrong fix |
+| E2E-4 | **The browser gate only ever exercised the demo model** — and the demo craft model is IN-PROCESS, so the SPA's `fetch(/messages/stream)` → SSE → render loop had never been driven against any transport. Called "the largest single coverage asymmetry in the gate" | `d19fbce` | `tests/e2e_browser_real_transport.py` (13) over a real HTTP round trip. **Two prerequisites had to be built first, and they were the finding's real content:** the mock answered only in the non-streaming shape (a streaming request got zero tokens and an empty reply — measured), and `start_studio` had no way to boot without the demo. Mutation-verified: disabling the mock's SSE goes red with `reply=''`; ignoring `demo_model=False` goes red on **six** checks including *"the mock received the turn: 0 completion(s) seen"* — so the suite cannot pass while the demo model is in the path |
 
 ---
 
@@ -1452,6 +1453,36 @@ only guard, and it is vacuous.
 studio pointed at a real `llama-server` and a pre-seeded `gun_pen_2` project, so it
 cannot be executed here. An unverified test edit is exactly the failure mode this
 whole section is about.
+
+---
+
+## The 2026-09-24 audit, dispositioned
+
+`production_readiness_2026-09-24.md` was **never recorded in this tracker**. Its two HIGH
+findings were fixed — BE-1 by the Host guard, E2E-1 by a bind test — but the rest were
+never dispositioned anywhere, so a reader could not tell what was open and every pass had
+to re-derive it. That is the same class of defect as the ones this tracker exists to
+catch: an assurance that exists but is unreachable.
+
+All twelve are now closed or explicitly not-a-defect. Recorded here so it is not
+re-audited, and so the two findings fixed *incidentally* (BE-5 by BE-1's fix, E2E-3 #1 by
+E2E-1's) are visible as such.
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| BE-1 | HIGH | No `Host` validation: a website can read the writer's screenplay | **FIXED** — `_reject_foreign_host` ahead of every route + `tests/test_host_header_guard.py` (67) |
+| BE-2 | MED | No runtime detection of a degraded (empty) knowledge base | **FIXED** — `pipeline._empty_kb_message` + `tests/test_empty_kb_guard.py` |
+| BE-3 | MED | No logging or observability in the shipped product | **FIXED** — `logsetup.py` + `_configure_logging` |
+| BE-4 | MED | The shipping platform (Windows) is absent from CI | **FIXED** — `ci.yml` runs a `windows-latest` job |
+| BE-5 | LOW | `/api/health` discloses the model server URL on an unauthenticated GET | **CLOSED BY BE-1, and that is the honest label.** The finding's own premise was that it matters because BE-1 made it *remotely* readable. Measured: a foreign `Host` now gets **403** on `/api/health`, so the disclosure is loopback-only — which is what a local health endpoint is for. Pinned by `TestTheGuardCoversEveryReadableSurface` (2), mutation-verified: exempting `/api/health` from the guard goes red |
+| BE-6 | LOW | Accepted trade-offs (Werkzeug dev server, 600 s timeout, upload cap) | **Not a defect** — recorded so it is not re-litigated |
+| E2E-1 | HIGH | The loopback bind has no guard that can fail | **FIXED** — `test_the_shipped_launch_binds_loopback_and_nothing_else`. Re-verified by mutation in this pass: flipping the bind to `0.0.0.0` goes red, and so does `debug=True` |
+| E2E-2 | MED | The packaging guard asserts membership, never that the install *works* | **FIXED** — the suite now `pip install --target`s the built wheel into an isolated dir and serves from it |
+| E2E-3 | MED | 8 tests in the readiness suite assert on source text, not behaviour | **#1 FIXED** — replaced by the E2E-1 bind test. The other 7 stand, and they are belt-and-braces: `e2e_browser_phase13_legacy_cleanup` walks the margin geometry and the readiness gate asserts the severity chips render, so the regexes are a second signal rather than the only one |
+| E2E-4 | MED | The browser gate only ever exercises the demo model | **FIXED** — `d19fbce`, `tests/e2e_browser_real_transport.py` (13), §16 of the round-4 report |
+| E2E-5 | LOW | No coverage measurement | **FIXED** — `--cov` with `fail_under = 85`, currently 87%. The gate is now ~18 min, still well inside the job budget |
+| UX-1 | MED | No URL or history routing | **FIXED** — hash routing with `pushState`/`replaceState`/`popstate` in `app.js` |
+| UX-2 | LOW | WCAG 1.4.4 (resize text) and device-pixel-ratio untested | **FIXED** — `tests/e2e_browser_render_scale.py` |
 
 ---
 

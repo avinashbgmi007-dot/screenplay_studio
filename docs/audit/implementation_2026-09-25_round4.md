@@ -1004,4 +1004,77 @@ disturbed nothing it covers, not that the change is exercised end to end. The
 evidence for DEL-1 is the pytest suite and the mutation harness; the fleet is the
 evidence that nothing else moved.
 
+---
+
+## 16. E2E-4 — the chat pane finally has a transport
+
+The 2026-09-24 audit's remaining MEDIUM: *"the browser gate only ever exercises the
+demo model"*, which it called **the largest single coverage asymmetry in the gate**.
+
+### Why the gate could not see it
+
+`e2e_browser_common.start_studio()` forced `SCREENPLAY_STUDIO_DEMO_MODEL=1` and
+passed `--demo-model`, and the demo craft model runs **in-process**. So no suite had
+ever put an HTTP model transport under the chat pane at all. pytest does cover the
+pipeline against `tests/mock_unified_server.py` — but that is `requests`, and
+non-streaming, which is a different transport *and* a different code path from the
+SPA's `fetch(/messages/stream)` → SSE → render loop. A regression in the browser's
+handling of a real model's streaming would have been invisible.
+
+### Two things had to exist first, and they are the finding's real content
+
+**1. The mock had no SSE to give.** Every route answers with a single JSON body —
+the shape the pytest suite drives — while `chat_stream` parses `data:` frames. A
+streaming request therefore got **zero** tokens and the reply came back **empty**:
+
+```
+LlamaServerClient.chat_stream(...) -> on_token fired 0 times, full text: ''
+```
+
+So the mock could not stand in for the transport even if a suite asked it to. Fixed
+with an `after_request` hook that converts a completion to SSE **only when the
+request asked to stream**, which leaves the non-streaming path byte-identical —
+that is what the existing tests assert against, and they still pass. Verified with
+the *real* client rather than by inspecting frames: `on_token` now fires 5 times and
+the assembled text carries the mock's marker.
+
+**2. `start_studio` had no way to boot without the demo.** Added
+`demo_model=True`, defaulted so every existing suite is unchanged. `False` requires
+a `server_url` — otherwise there would be no model at all — and suppresses both
+import-time demo paths, so `main()` points `CONFIG["server_url"]` at the mock and
+never activates the demo.
+
+The readiness loop also had to change: it waited for `demo_model` to be **truthy**,
+which would hang a real-transport boot. It now waits for the demo state that was
+*asked for* — and that matters beyond the hang, because accepting either state
+would let a silent fallback back to the demo model satisfy the suite.
+
+### The suite
+
+`tests/e2e_browser_real_transport.py` (13 checks). A turn now really travels:
+
+```
+SPA fetch -> studio /messages/stream -> HTTP -> mock -> SSE frames -> studio -> SPA render
+```
+
+The checks are written so this cannot pass by accidentally testing the demo path
+again — which is the failure mode that would make the whole exercise worthless:
+
+- `/api/config` must report `demo_model: false`;
+- the studio's `server_url` must be the mock's;
+- the reply must be non-empty **and** carry the mock's `[mock chat reply]` marker;
+- the mock must have received the turn, and received it with `stream: true`.
+
+### Mutation-verified
+
+| Mutation | Result |
+|---|---|
+| the mock stops streaming SSE | **red** — `reply=''`, exactly the pre-fix behaviour |
+| `start_studio` ignores `demo_model=False` | **red** — **six** checks, including *"the mock received the turn: 0 completion(s) seen"* |
+
+The second is the one that carries the weight. It proves the suite **cannot pass
+while the demo model is in the path**, which is the entire point of the finding. A
+green run against a suite that quietly fell back to the demo model would have
+looked like coverage and been none.
+
 
