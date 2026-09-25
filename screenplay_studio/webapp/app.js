@@ -229,6 +229,24 @@ async function streamChatTurn(base, text, quote, bubble, scrollContainer, _retry
   return final;
 }
 
+/** Announce a completed reply to assistive tech (UX-1).
+ *
+ *  A BOUNDED excerpt, not the whole reply, and deliberately not a live region on
+ *  the message list: `renderMessages()` rebuilds `#messages-scroll` with
+ *  `innerHTML = ""`, so a live region there would re-announce the entire
+ *  conversation on every re-render — the same trap the manuscript region's own
+ *  comment records. The list stays a plain region; the announcement goes to the
+ *  one always-present status line.
+ */
+function announceReply(res) {
+  const messages = (res && res.messages) || [];
+  const last = messages.length ? messages[messages.length - 1] : null;
+  const body = String((last && last.content) || "").replace(/\s+/g, " ").trim();
+  const LIMIT = 220;
+  if (!body) { announce("Studio replied."); return; }
+  announce("Studio replied: " + (body.length > LIMIT ? body.slice(0, LIMIT) + "…" : body));
+}
+
 // ---- finding triage: reload just the fix queue ----
 async function reloadFixQueue() {
   try {
@@ -421,10 +439,43 @@ function startElapsedTicker(targetEl, label) {
 
 let errorBannerTimeout = null;
 
+// ---------- live-region announcements (UX-1, round-3 audit 2026-09-25) -------
+// ONE helper for "tell assistive tech that something changed", because the two
+// mistakes it exists to prevent are easy to make twice:
+//
+//  * the write must land while the region is RENDERED. A `role="alert"` region
+//    that is `display:none` is not in the accessibility tree, so writing its
+//    text there is announced to nobody. Hence reveal-first, write-after.
+//  * the write must BE a content change. `textContent = sameString` replaces the
+//    text node either way — the DOM does change — but a screen reader that diffs
+//    the CONTENT sees no difference and stays silent, so a repeated error would
+//    go unannounced. Clearing first makes the re-write a real content change.
+//    Measured, and worth stating plainly: the mutation records appear with or
+//    without the clear, so this half is NOT observable from the DOM and has no
+//    guard. It is here for the AT behaviour, not for the DOM's.
+//
+// `requestAnimationFrame` rather than a microtask: the whole point is that the
+// region is painted (and therefore in the a11y tree) before the text lands.
+// The sequence token stops a slower earlier write from clobbering a newer one.
+const announceSeq = new WeakMap();
+function announce(message, target) {
+  const el = target || document.getElementById("a11y-status");
+  if (!el) return;
+  const seq = (announceSeq.get(el) || 0) + 1;
+  announceSeq.set(el, seq);
+  el.textContent = "";
+  requestAnimationFrame(() => {
+    if (announceSeq.get(el) === seq) el.textContent = message;
+  });
+}
+
 function showError(message, persistent) {
   const banner = $("#error-banner");
-  $("#error-banner-text").textContent = message;
+  // UX-1: this used to set the text while the banner was still display:none —
+  // announced to nobody, so every error in the app was silent to a screen
+  // reader. The banner is role="alert" now, and the reveal has to come first.
   banner.style.display = "flex";
+  announce(message, $("#error-banner-text"));
   if (errorBannerTimeout) clearTimeout(errorBannerTimeout);
   if (!persistent) errorBannerTimeout = setTimeout(hideError, 10000);
 }
@@ -3711,6 +3762,10 @@ async function sendMessage() {
         // history is this turn's to write
         state.branches[sentFrom] = { ...(state.branches[sentFrom] || currentBranchData()), messages: res.messages };
         renderMessages();
+        // UX-1: the reply is otherwise silent to a screen reader. Announced only
+        // when it landed where the writer is still looking — a reply that went to
+        // a branch they have since left has no visible context to attach to.
+        announceReply(res);
       }
       refreshMetrics();  // reply timing landed — update the loop readout
       finishTurn();
@@ -5125,12 +5180,11 @@ let lastAnnouncedSceneCount = -1;
 function announceManuscriptLoad(count) {
   if (count === lastAnnouncedSceneCount) return;
   lastAnnouncedSceneCount = count;
-  const el = document.getElementById("a11y-status");
-  if (el) {
-    el.textContent = count
-      ? `Manuscript loaded: ${count} scene${count === 1 ? "" : "s"}.`
-      : "";
-  }
+  // UX-1: shares #a11y-status with every other announcement — one status line,
+  // one writer pattern, so a stale write can never outlive a newer one.
+  announce(count
+    ? `Manuscript loaded: ${count} scene${count === 1 ? "" : "s"}.`
+    : "");
 }
 
 /** The consultant's report is the writer's document, so it stays takeable from

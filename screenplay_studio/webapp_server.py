@@ -1815,23 +1815,21 @@ def apply_edits(name):
         if not isinstance(rep.get("old"), str) or not isinstance(rep.get("new"), str):
             return _error(f"replacements[{i}] must have string 'old' and string 'new'.", 400)
 
-    from .revision import load_working, save_working, apply_replacements, finding_statuses, scene_text
-    doc = load_working(m)
-    result = apply_replacements(doc, scene_number, replacements)
-    if result["applied"]:
-        save_working(m, doc, record={
-            "scene_number": scene_number,
-            "applied": result["applied"],
-            "skipped": result["skipped"],
-            "applied_at": time.time(),
-        })
+    # BE-1 (round-3 audit 2026-09-25): ONE call, because the load and the write
+    # must be one critical section. This used to be `load_working` here and
+    # `save_working` a few lines down — two separate acquisitions of the cycle
+    # lock with the whole document round-trip between them, so two concurrent
+    # applies each wrote back a document that did not carry the other's change
+    # and `edits.json` held a record whose text was gone (measured 40/40
+    # through two real browser contexts, 295/300 across two threads).
+    # `apply_edit` holds `lock_for(working.json)` across the read; do not
+    # reintroduce a caller-side load here. The response shape is unchanged —
+    # `scene_text_after` now comes back from inside the section.
+    from .revision import apply_edit, finding_statuses
+    result = apply_edit(m, scene_number, replacements)
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
     _record_findings_metrics(m, statuses)
-    return jsonify({
-        **result,
-        "scene_text_after": scene_text(doc, scene_number),
-        "findings_status": statuses,
-    })
+    return jsonify({**result, "findings_status": statuses})
 
 
 @app.route("/api/projects/<name>/edits/undo", methods=["POST"])

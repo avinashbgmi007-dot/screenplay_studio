@@ -1,15 +1,15 @@
 """The edit log's undo/redo path is a load-modify-write like any other store —
 and it was the one writer-owned cycle with NO lock on it (H5, re-audit 2026-09-24).
 
-`save_working` appends under `lock_for(edits_log_path)`. `undo_last_edit` and
-`redo_last_edit` read both stores, mutate in memory, and write them back with no
-lock at all — while the webapp runs `threaded=True` and AGENTS.md documents
-CLI + webapp over one project directory as supported. Two writers therefore
-overlap, and the loser's record disappears: an edit whose text IS in
-working.json can vanish from edits.json, so the writer can never undo it and
-has no sign anything was lost. Measured live in the audit (a 0.4 s-slowed read
-+ one concurrent apply): final `edits.json` had **0 records** while the working
-copy carried the applied text.
+At the time, `save_working` appended under `lock_for(edits_log_path)`, while
+`undo_last_edit` and `redo_last_edit` read both stores, mutated in memory, and
+wrote them back with no lock at all — and the webapp runs `threaded=True` while
+AGENTS.md documents CLI + webapp over one project directory as supported. Two
+writers therefore overlapped, and the loser's record disappeared: an edit whose
+text IS in `working.json` could vanish from `edits.json`, so the writer could
+never undo it and had no sign anything was lost. Measured live in the audit (a
+0.4 s-slowed read + one concurrent apply): final `edits.json` had **0 records**
+while the working copy carried the applied text.
 
 These tests widen that exact window deterministically — the read is slowed and
 the concurrent apply is driven at the moment the read has happened but the
@@ -84,18 +84,21 @@ def _make_project(tmp_path):
 def _apply(m, scene_number, old_line, new_line, record_id):
     """One real apply through the locked path — the same call the webapp makes.
 
+    BE-1 (round-3 audit 2026-09-25): this used to spell out the load-then-save
+    pair by hand, which is the very shape that lost updates. It now calls
+    `revision.apply_edit`, so every guard in this file and in
+    `test_lock_order.py` drives the primitive the route drives, not a
+    hand-rolled imitation of it.
+
     The record id is supplied rather than read back afterwards: re-reading the log
     here would sample a different moment than the append did, and this probe has
     to name the record it is looking for, not whichever one is on disk when it
     looks (`save_working` only mints an id when the record has none).
     """
-    doc = revision.load_working(m)
-    result = revision.apply_replacements(doc, scene_number, [{"old": old_line, "new": new_line}])
+    result = revision.apply_edit(
+        m, scene_number, [{"old": old_line, "new": new_line}],
+        record={"id": record_id})
     assert result["applied"], f"the fixture line was not found: {result}"
-    revision.save_working(m, doc, record={
-        "id": record_id, "scene_number": scene_number, "applied": result["applied"],
-        "skipped": [], "applied_at": time.time(),
-    })
     return record_id
 
 
@@ -257,13 +260,11 @@ _APPLY_CHILD = textwrap.dedent(
         time.sleep(0.001)
     gate = time.monotonic()
     time.sleep(delay)
-    doc = revision.load_working(m)
-    result = revision.apply_replacements(doc, 2, [{"old": old_line, "new": new_line}])
+    # BE-1: the production primitive — one critical section across load + write,
+    # so this child contends for the cycle lock the way the webapp does.
+    result = revision.apply_edit(
+        m, 2, [{"old": old_line, "new": new_line}], record={"id": "e2-race"})
     assert result["applied"], f"fixture line not found: {result}"
-    revision.save_working(m, doc, record={
-        "id": "e2-race", "scene_number": 2, "applied": result["applied"],
-        "skipped": [], "applied_at": time.time(),
-    })
     print("ELAPSED " + repr(time.monotonic() - gate))
     """
 )

@@ -418,6 +418,64 @@ def save_working(m, doc: ScriptDocument, record: dict | None = None) -> None:
         clear_redo(m)
 
 
+def apply_edit(m, scene_number: int, replacements: list[dict],
+               record: dict | None = None) -> dict:
+    """Apply line replacements to the working copy as ONE critical section.
+
+    BE-1 (round-3 audit 2026-09-25). The webapp route used to call
+    `load_working` and then `save_working` — two SEPARATE acquisitions of the
+    cycle lock with the whole document round-trip in between. Two concurrent
+    applies therefore each read the pre-apply text and each wrote back a
+    document that did not carry the other's change, so `edits.json` ended up
+    holding a record whose text was not in `working.json`: the exact
+    divergence the cycle lock exists to prevent, and the direction the
+    topology note above `ensure_working` says must never be observable.
+    Measured with nothing slowed — 295/300 across two threads of one process
+    (`app.run(threaded=True)` makes two browser tabs two threads), 126/300
+    across two OS processes, and 40/40 through two real browser contexts.
+
+    The shape here is the one every sibling store in this package already
+    uses: `notes._locked`, `stash_store._locked`, `ideas._modify`, and
+    `screenplay_cowriter.store.save`, which names this hazard in its own
+    comment ("the load that produced `session` happened OUTSIDE it, so a
+    stale in-memory snapshot would overwrite ... messages a faster turn
+    already saved"). The load is INSIDE the lock, so a caller must not load
+    the document itself — `tests/test_cycle_continuity.py` is the guard that
+    turns red if a caller goes back to load-then-save, and
+    `tests/test_apply_race.py` is the behavioural one.
+
+    `record` supplies EXTRA fields for the log entry (a test pinning a
+    deterministic `id`, say). The fields derived from the result — scene,
+    applied, skipped, applied_at — are always this call's own, so a caller
+    cannot log a claim the write did not make.
+
+    Returns JSON-safe fields only (no document object, so a caller cannot
+    accidentally serialize the whole script into a response):
+    `{applied, skipped, scene_text_after}`.
+    """
+    from .jsonio import lock_for
+    with lock_for(working_path(m)):
+        doc = load_working(m)
+        result = apply_replacements(doc, scene_number, replacements)
+        if result["applied"]:
+            entry = {
+                "scene_number": scene_number,
+                "applied": result["applied"],
+                "skipped": result["skipped"],
+                "applied_at": time.time(),
+            }
+            if record:
+                entry.update(record)
+            save_working(m, doc, record=entry)
+        return {
+            "applied": result["applied"],
+            "skipped": result["skipped"],
+            # computed INSIDE the section: this is the text this cycle wrote,
+            # not a re-read that could already show a later cycle's change
+            "scene_text_after": scene_text(doc, scene_number),
+        }
+
+
 def has_edits(m) -> bool:
     """True once any edit has been applied (working copy may exist just from
     viewing the script — that alone doesn't count as edits).
@@ -670,6 +728,12 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
 
     Returns {applied: [{old, new}], skipped: [{old, new, reason}]}. Replacements
     are applied in order; a skipped replacement is never partially applied.
+
+    This mutates the IN-MEMORY document and writes nothing. To persist an edit,
+    call `apply_edit`, which does this inside the cycle lock. Pairing this with
+    a caller-side `load_working` / `save_working` is BE-1 (round-3 audit
+    2026-09-25): two concurrent applies then lose one edit's text while BOTH
+    records stay in the log, and undo reports `failed` with no explanation.
     """
     elements = scene_elements(doc, scene_number)
     applied, skipped = [], []

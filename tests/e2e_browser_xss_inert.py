@@ -83,7 +83,8 @@ APP_JS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 # leg in `sink_sweep()` below. A new non-clearing sink anywhere fails the
 # census check — that failure is the suite demanding its sweep be widened.
 EXPECTED_CENSUS = {
-    "setConnectionMode":  2,   # static literals only
+    "setConnectionMode":  1,   # static literals only
+    "checkConnection":    1,   # static literals only (one fixed status string)
     "renderConnCard":     1,   # DATA: config server_url + model id  -> swept
     "renderDashboard":    1,   # DATA: manifest stage strings        -> swept
     "setDrawerIdentity":  2,   # static literals only
@@ -95,6 +96,13 @@ EXPECTED_CENSUS = {
     "renderFvChat":       2,   # DATA: feedback-view chat text       -> swept
     "attachMic":          3,   # static icon-SVG constants
 }
+# `setConnectionMode`/`checkConnection` were ONE entry (`setConnectionMode: 2`)
+# until round 4 (2026-09-25). That was wrong: `fn_re` used `.match()`, which
+# anchors at column 0, so it silently skipped every `async function` and
+# attributed their sinks to whatever earlier plain `function` preceded them.
+# `checkConnection` is `async` (app.js:694) and its fixed status string was
+# being credited to `setConnectionMode`. The sum is unchanged at 18, so the
+# tripwire is exactly as strong — it is now also pointing at the right function.
 
 
 def _sink_census():
@@ -105,15 +113,31 @@ def _sink_census():
     """
     with open(APP_JS, encoding="utf-8") as f:
         lines = f.read().splitlines()
-    fn_re = re.compile(r"function\s+(\w+)\s*\(")
+    fn_re = re.compile(r"(?:async\s+)?function\s*\*?\s*(\w+)\s*\(")
     total = comment = clearing = 0
     by_func = {}
+    in_block = False
     for i, l in enumerate(lines):
+        s = l.strip()
+        # Comments describe sinks; they are not sinks. This used to recognise
+        # only `//`, so a /** */ docstring that MENTIONS `innerHTML` counted as a
+        # non-clearing sink — which is exactly what UX-1's explanation of why
+        # #messages-scroll is deliberately NOT a live region did (round 4,
+        # 2026-09-25), failing the gate on a comment. A line beginning `*` is a
+        # block-comment continuation; no valid JS statement does.
+        #
+        # The block state has to be tracked for EVERY line, which is why this
+        # runs before the `innerHTML` skip below.
+        is_comment = (in_block or s.startswith("//")
+                      or s.startswith("*") or s.startswith("/*"))
+        if "/*" in s and "*/" not in s:
+            in_block = True
+        if "*/" in s:
+            in_block = False
         if "innerHTML" not in l:
             continue
         total += 1
-        s = l.strip()
-        if s.startswith("//"):
+        if is_comment:
             comment += 1
             continue
         m = re.search(r"innerHTML\s*=\s*(.*)", s)
