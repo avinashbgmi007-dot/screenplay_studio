@@ -27,6 +27,14 @@ So these tests do NOT assert the buttons are visible. They pin the *decision*:
   * the copy names the KEYBOARD instead — which is the actual contract
     (`app.js:8627` binds Ctrl/⌘ Z to `undoEdit()` in the views that have edits).
 
+**FE-L1** — the audit reported the scene rail as *"cryptic (`1 ▮ 2 3 c`), no labels,
+no accessible name"*, in its **unverified** tier (`⚠️ reported`). Measured in a
+browser, the item-level claim is false: every item carries `role="button"`,
+`tabindex="0"` and an `aria-label` of the full scene heading (`app.js:5412-5427`).
+The real gap was one level up — the *rail* had no role and no name, so a screen
+reader reached an unlabelled cluster of buttons — and the toggle's only name was a
+`title` tooltip. Both are fixed, and pinned here.
+
 **Why there is no browser check for the hiding.** An inline `display:none` is
 defeated only by an `!important` rule. The stylesheet's 19 `display:...!important`
 declarations were enumerated: 13 are inside `@media print` (they hide, they do not
@@ -389,4 +397,105 @@ def test_no_user_facing_copy_names_a_location_for_undo_or_redo():
         "the post-apply confirmation no longer names the keyboard. The undo/redo "
         f"buttons are display:none by design, so the hint must name Ctrl/⌘ Z:\n  "
         + "\n  ".join(repr(s) for s in confirmations)
+    )
+
+
+# ---------------------------------------------------------------------------
+# FE-L1 — the scene rail is a NAMED navigation region
+# ---------------------------------------------------------------------------
+
+def test_the_scene_index_is_a_named_region():
+    """FE-L1, corrected by measurement.
+
+    The audit's claim — *"no labels, no accessible name"* — is **false at item
+    level**. Measured in a browser: every item carries `role="button"`,
+    `tabindex="0"`, a `title`, and an `aria-label` of the full scene heading
+    (`app.js:5412-5427`); 3/3 named, 3/3 with a visible heading.
+
+    The real gap was one level up, and the audit's phrase is the clue: *the rail*
+    had no name. A screen reader reached an unlabelled cluster of buttons with no
+    indication of what they were for. So this asserts the container, not the items.
+    """
+    html = _read(INDEX)
+    m = re.search(r'<div id="scene-index"([^>]*)>', html)
+    assert m, "#scene-index is gone — update this guard"
+    attrs = m.group(1)
+
+    assert re.search(r'role="[a-z]+"', attrs), (
+        "#scene-index has no role, so the rail is not exposed as a landmark and "
+        "its buttons arrive with no context for a screen reader"
+    )
+    assert re.search(r'aria-label="[^"]+"', attrs), (
+        "#scene-index has a role but no accessible name. An unnamed navigation "
+        "landmark is announced as just 'navigation', which tells the writer nothing "
+        "about what it navigates."
+    )
+
+
+def test_the_scene_index_toggle_has_an_explicit_accessible_name():
+    """`title` is a tooltip, not a label.
+
+    It happens to compute as the accessible name for a button, which is why this
+    looked fine — but it is not reliable across AT and it is unavailable on touch.
+    The toggle now carries an explicit `aria-label` as well.
+    """
+    html = _read(INDEX)
+    m = re.search(r'<button id="scene-index-toggle"[^>]*>', html)
+    assert m, "the scene-index toggle is gone — update this guard"
+    tag = m.group(0)
+    assert re.search(r'aria-label="[^"]+"', tag), (
+        "the scene-index toggle has no aria-label — its only name is `title`, "
+        "which is a tooltip"
+    )
+    # Non-vacuity for the pair above: the region and the toggle must be the same
+    # rail. If the toggle were renamed, the container test would keep passing while
+    # guarding a control nobody uses.
+    assert 'id="scene-index-toggle"' in html and 'id="scene-index-list"' in html, (
+        "the rail's parts are no longer both present"
+    )
+
+
+def test_the_scene_index_items_are_named_in_the_source():
+    """The item-level half lives in `app.js`, so it is a source check.
+
+    The audit claimed the items were unlabelled. Measured, they are not. This pins
+    that, because the container's new name is only useful if the buttons inside it
+    are still individually named — a render rewrite that dropped the labels would
+    make the audit's claim true retroactively while the container test stayed green.
+    """
+    js = _read(APPJS)
+    start = js.find("function renderSceneIndex(")
+    assert start != -1, "renderSceneIndex is gone — update this guard"
+    end = js.find("\n}", start)
+    assert end != -1, "could not find the end of renderSceneIndex"
+    body = js[start:end]
+
+    # Non-vacuity: the extraction must have found the real function.
+    assert "scene-index-item" in body, (
+        "the extracted body does not look like renderSceneIndex — the guard's "
+        "anchors moved and it is now inspecting nothing"
+    )
+
+    # The ITEM element itself must be what gets named. Asserting that the string
+    # `aria-label` appears anywhere in the body is vacuous here: this function sets
+    # an aria-label on TWO elements — the item and its ✓ clean-marker — so deleting
+    # the item's left the string present and this test GREEN. The mutation harness
+    # caught exactly that, which is why these assertions name `item.` explicitly.
+    for pattern, what in (
+        (r'item\.setAttribute\(\s*["\']aria-label["\']', "an aria-label"),
+        (r'item\.setAttribute\(\s*["\']role["\']\s*,\s*["\']button["\']',
+         'role="button"'),
+        (r'item\.setAttribute\(\s*["\']tabindex["\']', "a tabindex"),
+    ):
+        assert re.search(pattern, body), (
+            f"renderSceneIndex no longer gives its items {what}, so the rail's "
+            f"buttons are no longer individually named/exposed — which is what the "
+            f"audit claimed all along"
+        )
+
+    # The name must be the scene HEADING, not the number. "Cryptic" was the
+    # audit's word, and a rail whose accessible name is just "1" would earn it.
+    assert "scene.heading_raw" in body, (
+        "the items' label no longer derives from the scene heading, so a screen "
+        "reader would announce bare numbers"
     )
