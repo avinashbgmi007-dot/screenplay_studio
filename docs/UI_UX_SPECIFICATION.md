@@ -99,7 +99,9 @@ Base token set in `style.css` (`:root`, the fallback under the Tungsten override
 
 Room swap: `body` sets `--accent/--accent-deep/--accent-bright/--glow/--glow-strong` to the
 violet values by default; `body[data-room="feedback"]` overrides them to the cyan values
-(`--accent-bright: #6dd8f7`). The Tungsten override re-pins both ramps
+(`--accent-bright: var(--consult-bright)` — a token, not a literal, so each theme can
+re-pin it; it paints text, and an inline hex here read 1.35:1 on dawn's page). The
+Tungsten override re-pins both ramps
 (night: gold lamp + cyan consult; dawn: deep-gold lamp + `#15708a` consult).
 **All interactive/accented UI must read from these variables, never hardcoded colors.**
 

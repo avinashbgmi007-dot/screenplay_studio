@@ -233,6 +233,7 @@
   --lamp-bright: #9b8aff;
   --consult: #53c7f0;
   --consult-deep: #3da8d4;
+  --consult-bright: #6dd8f7;
   --accent-ink: #1a140d;   /* dark ink on lamp-lit fills — primary btns, active pills, send, rail flashes */
   /* severity middle tier — amber sits between ok(green) and danger(red) */
   --sev-mid: #e8a24f;
@@ -369,7 +370,7 @@
 /* room lighting — the signature element */
 body { --accent: var(--lamp); --accent-deep: var(--lamp-deep); --accent-bright: var(--lamp-bright);
        --glow: rgba(126, 107, 255, 0.16); --glow-strong: rgba(126, 107, 255, 0.30); }
-body[data-room="feedback"] { --accent: var(--consult); --accent-deep: var(--consult-deep); --accent-bright: #6dd8f7;
+body[data-room="feedback"] { --accent: var(--consult); --accent-deep: var(--consult-deep); --accent-bright: var(--consult-bright);
        --glow: rgba(83, 199, 240, 0.14); --glow-strong: rgba(83, 199, 240, 0.26); }
 
 /* ============================================================
@@ -423,6 +424,12 @@ body.dawn {
      consult-deep 5.83, sev-mid 5.06. */
   --consult: #15708a;
   --consult-deep: #0f6379;
+  /* The feedback room's --accent-bright is this token, and it paints TEXT
+     (.premise-title-label, #reader-btn.active, .msg-bubble strong). The night
+     literal it replaced sat 1.35:1 on dawn's page; dawn's bright goes dark with
+     its siblings, as --lamp-bright does above. 5.61 on the dawn body, 6.32 on
+     --ink-800. */
+  --consult-bright: #0f6379;
   --sev-mid: #8a5a14;
   --sev-mid-text: #7a4e0c;
 

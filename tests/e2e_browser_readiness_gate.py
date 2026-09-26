@@ -36,9 +36,12 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 # `*-text` roles are listed alongside their fills on purpose: a site repointed
 # from --sev-mid to --sev-mid-text must stay IN this gate's scope, or the gate
 # would go green by losing track of the very chip it exists to protect.
+# --accent-bright joins them because the feedback room re-pins it and it paints
+# TEXT (.premise-title-label, #reader-btn.active, .msg-bubble strong) — a room
+# the gate did not enter is how it read 1.35:1 on dawn's page.
 TOKENS = ("--danger", "--danger-text", "--danger-on-paper", "--sev-mid",
           "--sev-mid-text", "--ok", "--text", "--text-muted", "--text-faint",
-          "--accent-ink")
+          "--accent-ink", "--accent-bright")
 
 PROBE = """(tokens) => {
   const num = (s) => (s || "").match(/[-\\d.]+/g) || [];
@@ -510,6 +513,33 @@ def run(base, name):
                       page.locator("#manuscript-container .scene-page:visible").count() > 0)
             sweep(checks, page, f"{theme} river read")
             page.evaluate("() => document.getElementById('flow-btn').click()")
+
+            # ④ the partner drawer, in both rooms. `body[data-room="feedback"]`
+            # re-pins the whole accent ladder to the consultant's cyan, and the
+            # room's --accent-bright paints TEXT. A sweep that never entered a
+            # room could not see the pairing it re-pinned there.
+            page.evaluate("() => openCowriteRoom()")
+            page.wait_for_selector("#room-drawer.open", timeout=5000)
+            checks.ok(f"{theme}: the composer is on screen to measure",
+                      page.locator("#input:visible").count() > 0)
+            sweep(checks, page, f"{theme} partner drawer, cowrite room")
+
+            page.evaluate("() => { setRoom('feedback'); openRoomDrawer(); }")
+            page.wait_for_timeout(400)
+            checks.ok(f"{theme}: the feedback room is the lit one",
+                      page.evaluate(
+                          "() => document.body.getAttribute('data-room')")
+                      == "feedback")
+            sweep(checks, page, f"{theme} partner drawer, feedback room")
+
+            # The premise card is that room's own surface, and it carries the
+            # token's worst case: an uppercase 2xs label, where no large-text
+            # allowance can rescue a thin colour.
+            page.evaluate("() => openPremiseView()")
+            page.wait_for_timeout(400)
+            checks.ok(f"{theme}: the premise card is open",
+                      page.locator(".premise-title-label:visible").count() > 0)
+            sweep(checks, page, f"{theme} premise card, feedback room")
             browser.close()
     checks.finish()
 
