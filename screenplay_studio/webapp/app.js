@@ -8412,7 +8412,7 @@ const SHORTCUTS = [
   ["↑ / ↓", "Walk the focused manuscript line by line (Enter edits it in place)"],
   ["a", "Toggle the Craft shelf (analysis panels)"],
   ["z", "Spotlight mode — nothing but the page (Esc leaves)"],
-  ["Esc", "Back to the page: fix loop → spotlight → full-screen tool → "
+  ["Esc", "Back to the page: composer → fix loop → spotlight → full-screen tool → "
           + "dock → partner drawer → craft shelf"],
   ["b", "Open the Beat Board"],
   ["d", "Compare drafts side by side"],
@@ -8660,7 +8660,20 @@ function bindGlobalShortcuts() {
       if (state.view === "beatboard") { closeBeatboardView(); return; }
       // (open modals already returned above — dock/drawer/shelf are safe)
       {
-        if (dockIsOpen()) { closeDock(); return; }
+        if (dockIsOpen()) {
+          closeDock();
+          // P5 has `closeDock()` hand focus back to the control that opened the
+          // dock — correct for a mouse user, but that control is often the
+          // composer, and a typing target is exactly what this cascade bails on.
+          // Without this the writer's next Escape spent itself leaving the field
+          // the DOCK had just restored, not closing the partner (measured: four
+          // presses to dismiss the drawer, twice on the same caret).
+          const manuscript = getManuscriptContainer();
+          if (manuscript && manuscript.offsetParent && isTypingTarget(document.activeElement)) {
+            manuscript.focus();
+          }
+          return;
+        }
         const drawer = $("#room-drawer");
         if (drawer && drawer.classList.contains("open")) { closeRoomDrawer(); return; }
         const shelf = document.querySelector(".craft-shelf");
@@ -9565,7 +9578,21 @@ function init() {
   $("#input").addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" && chatHistoryArrowUp(e)) return;
     if (e.key === "ArrowDown" && chatHistoryArrowDown(e)) return;
-    if (e.key === "Escape" && chatHistoryEscape(e)) return;
+    if (e.key === "Escape") {
+      if (chatHistoryEscape(e)) return;
+      // R6-UX-4: Escape means "back to the page", and the global cascade bails
+      // on any typing target — so while the caret was in this composer the key
+      // spent NOTHING, on the surface the writer uses most. Leave the field
+      // here (draft intact, focus on the manuscript, which is one tab stop and
+      // arrow-walkable) and let the NEXT press run the cascade. Closing the
+      // partner or the dock mid-sentence is the wrong answer to the same key.
+      e.preventDefault();
+      const mc = getManuscriptContainer();
+      // `offsetParent` is null while the element is hidden — in the idea room
+      // there is no page to go back to, so fall back to leaving the field.
+      if (mc && mc.offsetParent) mc.focus(); else e.target.blur();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
   $("#input").addEventListener("blur", () => {
@@ -9824,30 +9851,35 @@ document.addEventListener("DOMContentLoaded", init);
   function showPopup(x, y, context) {
     // Hide all items first
     popup.querySelectorAll(".text-popup-item").forEach(el => el.style.display = "none");
-    // Show context-appropriate items
+    // Show context-appropriate items — and only rows the click handler below can
+    // actually carry out. R6-UX-3: this popup used to render seven actions and
+    // branch on four, so "Rewrite passage", "Locate finding" and "Add to logline"
+    // closed the menu and did nothing. Each context now offers what works there;
+    // tests/e2e_browser_text_popup.py holds the table and drives every row.
     const askSameer = popup.querySelector('[data-action="ask-sameer"]');
     const askConsultant = popup.querySelector('[data-action="ask-consultant"]');
     const marginNote = popup.querySelector('[data-action="margin-note"]');
     const stash = popup.querySelector('[data-action="stash"]');
-    const addLogline = popup.querySelector('[data-action="add-logline"]');
-    const rewrite = popup.querySelector('[data-action="rewrite"]');
-    const locate = popup.querySelector('[data-action="locate"]');
 
     if (context === "idea") {
+      // No project behind an idea, so the three project rows would have nothing
+      // to file against (the Stash POST is project-guarded, and a margin note
+      // saves to /projects/<none>/notes). The idea page is also a <textarea>,
+      // which the Selection API never reports — so in practice this row set is
+      // reached from the idea room's conversation, where Ask Sameer is the ask.
       askSameer.style.display = "";
-      addLogline.style.display = "";
-      marginNote.style.display = "";
-      stash.style.display = "";
     } else if (context === "script") {
       askSameer.style.display = "";
       askConsultant.style.display = "";
       marginNote.style.display = "";
       stash.style.display = "";
     } else if (context === "revision") {
+      // The revision view's own queue carries "🎯 Locate" and "Rewrite" per
+      // finding, with the finding in hand — which a text selection cannot
+      // supply: openRewriteModal needs a scene + finding index and locateFinding
+      // needs the finding. Those rows are gone rather than duplicated badly.
       askSameer.style.display = "";
       askConsultant.style.display = "";
-      rewrite.style.display = "";
-      locate.style.display = "";
     }
 
     // Position popup near cursor, keep in viewport
@@ -9913,11 +9945,20 @@ document.addEventListener("DOMContentLoaded", init);
         input.focus();
       }
     } else if (action === "ask-consultant") {
-      openFeedbackRoom();
-      const input = $("#input");
-      if (input) {
-        input.value = '"' + text.substring(0, 200) + '"';
-        input.focus();
+      // The doctor's own lens in the dock — same route `discussWithDoctor` uses.
+      // This used to be `openFeedbackRoom()` + `#input`, which typed into a
+      // composer it had just hidden: `#input` lives inside `#cowrite-panel`, and
+      // switching rooms sets that panel `display: none`, so the quote landed
+      // nowhere the writer could see (R6-UX-1's shape again, caught by the new
+      // popup suite rather than the audit that found the first one).
+      const inScript = selectionInScriptPane();
+      if (inScript) setPendingQuote(inScript);
+      openDock("sushruta");
+      const consult = $("#fv-consult-input");
+      if (consult) {
+        consult.value = '"' + text.substring(0, 200) + '"';
+        consult.focus();
+        consult.dispatchEvent(new Event("input", { bubbles: true }));
       }
     } else if (action === "margin-note") {
       // Pin a note to the current line — the form lives in the dock's

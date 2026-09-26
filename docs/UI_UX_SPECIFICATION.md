@@ -567,10 +567,29 @@ Fork (create), switch, delete branches; per-message origin badge with stable per
 
 ### 7.14 Contextual text-selection popup (`#text-popup`)
 A second selection surface (distinct from §7.2's float stack): a context-aware popup whose
-actions depend on the current page (idea / script / revision): **Ask Sameer, Ask Consultant,
-Add margin note, Stash, Add to logline, Rewrite passage, Locate finding**. Routes asks
-through `/sameer <ask>`. Note: its **Stash** action writes a `"[STASH] …"` line into the
-rail note input rather than calling the Stash endpoint — different from §7.2's float Stash.
+actions depend on the current page. Routes asks through `/sameer <ask>`.
+
+**Each context offers only the rows its click handler can carry out** — a row that
+closes the menu and does nothing is a defect, not a placeholder
+(R6-UX-3, 2026-09-26: this popup rendered seven actions and branched on four).
+`tests/e2e_browser_text_popup.py` holds this table, asserts every context's offered
+set equals it, and drives a real click on every row:
+
+| Context | Rows | Why the others are absent |
+|---|---|---|
+| script | Ask Sameer · Ask Consultant · Add margin note · Stash this | — |
+| revision | Ask Sameer · Ask Consultant | the view's own queue carries "🎯 Locate" and "Rewrite" **per finding**, with the finding in hand; a text selection cannot supply one (`openRewriteModal` needs a scene + finding index, `locateFinding` needs the finding), so those two rows are gone rather than badly duplicated |
+| idea | Ask Sameer | an idea has no project: Stash is project-guarded and a margin note has nothing to attach to. `#idea-logline` sits behind "▸ Structure", and the idea page is a `<textarea>` (no `Selection` API range), so the popup is reached there only from the conversation — where the idea room's own `#idea-quote-float` already offers the same ask |
+
+**Ask Consultant** goes to the doctor's lens in the dock (`setPendingQuote` +
+`openDock("sushruta")` + `#fv-consult-input`, the route `discussWithDoctor` uses).
+It used to call `openFeedbackRoom()` and then type into `#input` — but `#input`
+lives inside `#cowrite-panel`, which that switch hides, so the quote landed in a
+composer the writer could not see (R6-UX-1's shape, caught by the suite above).
+
+**Stash** posts to `/projects/<name>/stash` — the same endpoint §7.2's float uses.
+(Its old rail-era behaviour, writing a `"[STASH] …"` line into the note input, was
+retired in Phase 13; the spec text describing it was left behind.)
 
 ---
 
@@ -594,10 +613,10 @@ rail note input rather than calling the Stash endpoint — different from §7.2'
 | `k` / `p` | Previous scene (script view) — **while the fix loop is active: previous finding (with `↑`)** |
 | `/` | Search the script |
 | `?` | Show all shortcuts (palette help) |
-| `Esc` | Leave spotlight → **exit the fix loop (dock stays)** → dismiss partner drawer → craft shelf → modals → flyouts (full cascade in §7.3) |
+| `Esc` | Leave spotlight → **exit the fix loop (dock stays)** → dismiss partner drawer → craft shelf → modals → flyouts (full cascade in §7.3). From a **typing target** it first leaves the field (see the composer row); the cascade then runs on the next press (§7.3 bails on any typing target, so without that rung Escape did nothing at all while the caret was in the composer — R6-UX-4) |
 | `↑`/`↓` + `Enter` | Palette navigation / run |
 | Inline edit: double-click a line **or `Enter` on the focused one** → contentEditable · `Enter` save · `Esc` cancel · `Shift+Enter` newline · after a keyboard save the line cursor returns to the line you just changed | |
-| Composer: `Enter` send · `Shift+Enter` newline · `↑`/`↓` history · `Esc` cancel history | |
+| Composer: `Enter` send · `Shift+Enter` newline · `↑`/`↓` history · `Esc` cancel history, then (with no history browse open) `Esc` **leaves the field** — the unsent draft is kept and focus goes to the manuscript, never to the dock or the partner | |
 | Inline note editor: `Enter` save · `Esc` cancel | |
 
 Idea room: `c`/`f`/`a` also work (Sameer ↔ Premise Doctor lens). Full-screen tools

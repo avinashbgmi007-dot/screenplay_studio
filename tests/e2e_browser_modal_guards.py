@@ -205,6 +205,61 @@ def main():
                   not page.evaluate("() => !!document.querySelector('.sidebar-section.open')")
                   and not page.evaluate("() => dockIsOpen()"))
 
+            # ---------- R6-UX-4: Escape while the caret is in the composer ------
+            # `bindGlobalShortcuts` bails on any typing target BEFORE its Escape
+            # cascade, and the composer's own handler spent the press only when a
+            # history browse was open. So with focus in `#input` — where the writer
+            # spends most of their time in this app — Escape did nothing at all,
+            # while the palette's own help line promises "Back to the page: … →
+            # dock → partner drawer". The fix is the least destructive rung: the
+            # press leaves the field (draft intact, focus on the manuscript), and
+            # the NEXT press runs the cascade. Closing a partner mid-sentence would
+            # be a worse answer to the same keypress.
+            page.evaluate("() => openCowriteRoom()")
+            page.evaluate("() => openDock('evidence')")
+            page.wait_for_timeout(500)
+            page.evaluate("""() => {
+                const i = document.getElementById('input');
+                i.value = 'half a sentence I did not send';
+                i.focus();
+            }""")
+            page.wait_for_timeout(200)
+            pre = page.evaluate("""() => ({
+                active: document.activeElement.id,
+                typing: isTypingTarget(document.activeElement),
+                dock: dockIsOpen(),
+                drawer: !!document.querySelector('#room-drawer.open'),
+            })""")
+            check("Escape is pressed with the caret in the composer, dock + partner open (precondition)",
+                  pre["active"] == "input" and pre["typing"] and pre["dock"] and pre["drawer"],
+                  json.dumps(pre))
+
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+            left = page.evaluate("""() => ({
+                active: document.activeElement.id || document.activeElement.tagName,
+                text: document.getElementById('input').value,
+                dock: dockIsOpen(),
+                drawer: !!document.querySelector('#room-drawer.open'),
+            })""")
+            check("Escape in the composer leaves the field instead of doing nothing",
+                  left["active"] == "manuscript-container"
+                  and left["text"] == "half a sentence I did not send", json.dumps(left))
+            check("...and spends no rung: the unsent draft keeps its dock and partner",
+                  left["dock"] and left["drawer"], json.dumps(left))
+
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+            spent = page.evaluate("""() => ({ dock: dockIsOpen(),
+                drawer: !!document.querySelector('#room-drawer.open') })""")
+            check("the next Escape spends the dock, as the cascade always said",
+                  not spent["dock"] and spent["drawer"], json.dumps(spent))
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+            check("and the one after that closes the partner",
+                  not page.evaluate("() => !!document.querySelector('#room-drawer.open')"))
+            page.evaluate("() => { document.getElementById('input').value = ''; }")
+
             # ---------- M7: a stray file drop must not unload the app --------
             page.evaluate("() => openDock('notes')")
             page.wait_for_timeout(500)
