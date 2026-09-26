@@ -21,6 +21,7 @@ import logging
 import os
 import queue
 import re
+import sys
 import threading
 import time
 import traceback
@@ -41,6 +42,13 @@ from .logsetup import configure as _configure_logging
 from .manifest import ProjectManifest
 from .net_guard import is_loopback_host, is_loopback_url
 from .orchestrator import Orchestrator, OrchestratorError
+
+# Output-encoding contract (round 6): this module prints to the console at IMPORT
+# time -- the startup demo-fallback notice carries an em dash -- so a legacy code
+# page raised UnicodeEncodeError out of the import and the desk never started.
+# Pin the streams before anything can print. tests/test_cli_output_encoding.py.
+for _stream in (sys.stdout, sys.stderr):
+    _stream.reconfigure(encoding="utf-8")
 
 WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 
