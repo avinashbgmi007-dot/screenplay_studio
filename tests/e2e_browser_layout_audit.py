@@ -309,18 +309,29 @@ def main():
                       if (typeof startLoop !== 'function' || typeof loopState === 'undefined')
                         return null;
                       if (!(state.findings || []).length) return { skipped: true };
-                      const before = loopState.pos;
+                      // startLoop() seats the cursor at -1 and then calls
+                      // stepLoop(1), so the shipped claim `pos1 >= 0` could
+                      // almost never fail, and comparing against the previous
+                      // pos depended on how the suite had driven the loop
+                      // earlier. The promise in the check's name is that the
+                      // loop ADVANCES, so advance it twice and require movement.
                       startLoop();
                       const entered = loopState.active;
-                      const pos1 = loopState.pos;
-                      return { skipped: false, entered, stepped: pos1 >= 0,
-                               before, pos1 };
+                      const landed = loopState.pos;
+                      stepLoop(1);
+                      return { skipped: false, entered, landed,
+                               moved: loopState.pos !== landed, n: loopList().length };
                     }"""
                 )
                 if loop and not loop.get("skipped"):
+                    # `n` rides in the detail because a one-item loopList wraps
+                    # back onto itself: `moved` would then be false for a loop
+                    # that is working.
                     CHECKS.ok("fix loop engages and steps on entry",
-                              loop["entered"] and loop["stepped"],
-                              f"entered={loop['entered']} pos={loop['pos1']}")
+                              loop["entered"] and loop["landed"] >= 0
+                              and loop["moved"],
+                              f"entered={loop['entered']} landed={loop['landed']} "
+                              f"of {loop['n']}")
                     # Esc exits (contextual keys return to scene-stepping)
                     page.keyboard.press("Escape")
                     page.wait_for_timeout(200)

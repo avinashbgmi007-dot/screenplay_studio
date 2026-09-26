@@ -205,14 +205,37 @@ def run(base):
         first_locate = lens.locator(".finding-note-actions button",
                                     has_text="Locate").first
         if first_locate.count():
+            # Which scene the card cites, read off the card itself, and whether
+            # it quotes anything at all. The demo report's findings carry
+            # `evidence_quote: null` (verification.status "no_quote"), so
+            # flashQuoteLine has no line to mark — the highlight half of
+            # Locate's contract is proven in e2e_browser_one_matcher.py, which
+            # seeds real quotes. What must ALWAYS happen is the landing.
+            target = first_locate.evaluate(
+                """b => {
+                    const card = b.closest('.finding-note');
+                    const i = Number(card && card.dataset.findingIndex);
+                    const f = (state.findings || [])[i] || {};
+                    return { scene: (f.scene_refs || [])[0] ?? null,
+                             quote: (f.evidence_quote || '').trim() };
+                }"""
+            )
             first_locate.click()
             page.wait_for_timeout(900)
             after_scroll = page.locator("#manuscript-container").evaluate(
                 "e => e.scrollTop")
-            check("Locate scrolls the manuscript (not the dock)",
-                  abs(after_scroll - before_scroll) > 4
-                  or before_scroll > 0,
-                  f"before={before_scroll} after={after_scroll}")
+            landed = page.evaluate(
+                """n => {
+                    const p = document.getElementById('scene-page-' + n);
+                    if (!p) return false;
+                    const r = p.getBoundingClientRect();
+                    const c = document.getElementById('manuscript-container')
+                                  .getBoundingClientRect();
+                    return r.top < c.bottom && r.bottom > c.top;
+                }""", target["scene"])
+            check("Locate lands the pane on the finding's scene", landed,
+                  f"scene={target['scene']} quote={target['quote'][:30]!r} "
+                  f"scroll {before_scroll}->{after_scroll}")
         else:
             check("Locate present on finding cards", False, "no Locate button found")
 
@@ -253,12 +276,32 @@ def run(base):
             check("Dismiss removes the row from the dock queue",
                   rows_after == rows_before - 1,
                   f"before={rows_before} after={rows_after}")
-            restore = lens.locator(".fix-row-actions .fq-undismiss").first
-            if restore.count():
-                restore.click()
-                page.wait_for_timeout(1200)
-                check("Restore returns the row to the dock queue",
-                      lens.locator(".fix-row-actions .fq-dismiss").count() > 0)
+            # Restore lives on the DISMISSED view: the queue hides dismissed
+            # rows by default, so the writer's own path is "Show dismissed"
+            # first — and the section has to be open to click in it (P1.6: a
+            # collapsed body is not clickable, and each re-render rebuilds it).
+            # Every guard is paired with a check that fails when it is not
+            # reached, so renaming a control turns the suite red instead of
+            # quietly deleting the assertion.
+            open_dock_section(page, "fix-queue")
+            toggle = lens.locator(".fq-toggle-dismissed:visible")
+            check("A dismissed row can be brought back into view",
+                  toggle.count() > 0)
+            if toggle.count():
+                toggle.first.click()
+                page.wait_for_timeout(1200)  # api + re-render
+                open_dock_section(page, "fix-queue")
+                restore = lens.locator(".fix-row-actions .fq-undismiss:visible").first
+                check("Showing dismissed reveals the row to restore",
+                      restore.count() > 0,
+                      f"{lens.locator('.fix-row:visible').count()} rows shown")
+                if restore.count():
+                    restore.click()
+                    page.wait_for_timeout(1200)
+                    open_dock_section(page, "fix-queue")
+                    check("Restore returns the row to the dock queue",
+                          lens.locator(".fix-row-actions .fq-dismiss:visible")
+                          .count() > 0)
         else:
             check("Dismiss button present on fix rows", False,
                   "no dismissable rows (queue state)")
@@ -271,7 +314,7 @@ def run(base):
         page.wait_for_timeout(700)
         strip_after = dock_scrolls.first.inner_text() if dock_scrolls.count() else ""
         check("scene strip retitles as the writer scrolls",
-              strip_before != strip_after or "Scene" in strip_after,
+              strip_before != strip_after,
               f"before='{strip_before}' after='{strip_after}'")
 
         # --- close + reopen preserves lens + sections -------------------------

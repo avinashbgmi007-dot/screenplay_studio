@@ -352,9 +352,14 @@ def run(base):
         check("export: fountain href bound to the live project",
               href.startswith("/api/projects/") and "format=fountain" in href, href[:60])
         r_exp = requests.get(f"{base}{href}", timeout=30)
+        # Parenthesised: `and` binds tighter than `or`, so the version shipped
+        # here read `(200 and "INT.") or "EXT." or len>200` — a 500 error page
+        # of any length passed it. The export works today (fountain/fdx/txt all
+        # 200); this is the check that will say so when one stops.
         check("export: fountain downloads",
-              r_exp.status_code == 200 and "INT." in r_exp.text or "EXT." in r_exp.text
-              or len(r_exp.text) > 200,
+              (r_exp.status_code == 200
+               and ("INT." in r_exp.text or "EXT." in r_exp.text)
+               and len(r_exp.text) > 200),
               f"status={r_exp.status_code} len={len(r_exp.text)}")
         r_zip = requests.get(f"{base}/api/projects/{proj}/backup", timeout=60)
         zip_ok = False

@@ -109,8 +109,29 @@ def run():
 
             page.click("#settings-save")
             expect(page.locator("#settings-modal")).to_be_hidden(timeout=20000)
-            checks.ok("saving the real URL still succeeds",
-                      _config(page)["server_url"] == real_url)
+            # A SAVE, not another refusal. The old check here re-read the config
+            # and compared it to the value it started with — which every write
+            # above had left untouched, so it could not fail even if POST
+            # /api/config were a 403 or a no-op. Save a DIFFERENT loopback and
+            # assert the change landed, then put the desk back.
+            other = "http://127.0.0.1:8099"
+            checks.ok("the config starts on the URL the desk is on",
+                      _config(page)["server_url"] == real_url,
+                      f"{_config(page)['server_url']} vs {real_url}")
+            page.click("#settings-btn")
+            page.fill("#server-url-input", other)
+            page.click("#settings-save")
+            expect(page.locator("#settings-modal")).to_be_hidden(timeout=20000)
+            checks.ok("saving a different loopback URL persists",
+                      _config(page)["server_url"] == other,
+                      f"{_config(page)['server_url']} != {other}")
+            page.click("#settings-btn")
+            page.fill("#server-url-input", real_url)
+            page.click("#settings-save")
+            expect(page.locator("#settings-modal")).to_be_hidden(timeout=20000)
+            checks.ok("the desk's own URL saves back",
+                      _config(page)["server_url"] == real_url,
+                      f"{_config(page)['server_url']} != {real_url}")
 
             assert_no_js_errors(checks, errors)
             browser.close()
