@@ -565,8 +565,93 @@ class TestProgressStall:
 
         resp = http_client.get(f"/api/projects/{project}/progress")
         assert resp.status_code == 200, f"torn progress surfaced as HTTP {resp.status_code}"
+        assert resp.get_json(), "the SPA reads JSON off the body"
+
+    def test_an_unreadable_progress_file_does_not_report_the_run_as_idle(self, http_client):
+        """R6-BE-9. The 200 above was bought by inventing an answer.
+
+        On any read failure the handler fell back to the manifest and returned
+        `stage: "idle"` — so while `analyze` was RUNNING it told the poller there
+        was no run. The poller does keep polling ("idle" is not a stop state), but
+        `p.stage` is what positions the ladder: `analysisStageIndex("idle")` is
+        -1, so the display jumped to pass 1 ("Formatting & stats") and the elapsed
+        clock restarted, every 2 s for as long as the read failed. A writer who
+        watched it saw a 20-minute run begin again.
+
+        What is actually knowable here is one thing: the progress file could not be
+        read. So say that, and stay silent about the stage rather than guessing.
+        """
+        import json
+        import time
+
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_running("analyze")
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            json.dump({"stage": "dialogue", "status": "running",
+                       "ts": time.time()}, f)
+        # A directory where the file should be is the shape of a transient read
+        # failure that is NOT a parse error: os.open raises IsADirectoryError
+        # (an OSError), and it is what a concurrent replace can expose on Windows.
+        os.remove(m.progress_path)
+        os.makedirs(m.progress_path)
+        try:
+            resp = http_client.get(f"/api/projects/{project}/progress")
+        finally:
+            os.rmdir(m.progress_path)
+        assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
-        assert "stage" in data and "status" in data
+        assert "stage" not in data, (
+            f"the endpoint invented a stage for a run it could not read: {data}")
+        assert data.get("status") == "retrying", data
+        # ...and the run is NOT declared over: no `done` means the poller keeps
+        # watching, which is the correct behaviour while the run is alive.
+        m2 = ProjectManifest.load(webapp_server._project_dir(project))
+        assert m2.stage("analyze").status == "running", (
+            "a failed progress READ healed the manifest — the run was killed by "
+            "a reader")
+
+    def test_an_unreadable_progress_file_still_reports_a_finished_run(self, http_client):
+        """The other side of the same branch: when the manifest DOES settle it,
+        say so — otherwise the poller watches a completed run forever."""
+        import json
+
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_complete("analyze")
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            json.dump({"stage": "dialogue", "status": "running"}, f)
+        os.remove(m.progress_path)
+        os.makedirs(m.progress_path)
+        try:
+            resp = http_client.get(f"/api/projects/{project}/progress")
+        finally:
+            os.rmdir(m.progress_path)
+        assert resp.get_json().get("stage") == "done", resp.get_json()
+
+    def test_an_unreadable_progress_file_reports_a_failed_run_as_failed(self, http_client):
+        """And a dead one as dead: "idle" made the SPA poll a failed run for the
+        rest of the session, ladder on pass 1."""
+        import json
+
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = self._upload_only(http_client)
+        m = ProjectManifest.load(webapp_server._project_dir(project))
+        m.mark_failed("analyze", "boom")
+        with open(m.progress_path, "w", encoding="utf-8") as f:
+            json.dump({"stage": "dialogue", "status": "running"}, f)
+        os.remove(m.progress_path)
+        os.makedirs(m.progress_path)
+        try:
+            resp = http_client.get(f"/api/projects/{project}/progress")
+        finally:
+            os.rmdir(m.progress_path)
+        assert resp.get_json().get("stage") == "failed", resp.get_json()
 
     def test_progress_writes_use_the_atomic_writer(self):
         """Guard the fix at the source: the three progress writes were plain

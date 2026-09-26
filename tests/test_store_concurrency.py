@@ -464,6 +464,91 @@ def test_a_damaged_manifest_answers_store_damage_not_a_bad_request(tmp_path):
     assert resp.get_json().get("unreadable") is True
 
 
+def _analysed_project(tmp_path, name="proj", server_url=None):
+    """A project whose analyze stage is COMPLETE, so the report routes get past
+    their stage gate and actually read `report.findings.json`."""
+    import json
+
+    import screenplay_studio.webapp_server as webapp_server
+    m = _manifest(tmp_path, name=name)
+    if server_url:
+        # create() snapshots nothing from CONFIG — `server_url` is a manifest
+        # field with a hard default (`manifest.py:78`), and `_make_client`
+        # (`webapp_server.py:739`) reads the manifest, not the CONFIG. Set it
+        # where the request will actually look.
+        m.server_url = server_url
+        m.save()
+    from screenplay_parser import parse_screenplay
+    parse_screenplay(str(m.source_path)).save(m.parsed_path)
+    from screenplay_studio.revision import ensure_working
+    ensure_working(m)
+    m.mark_complete("parse")
+    m.mark_complete("analyze")
+    with open(m.report_findings_path, "w", encoding="utf-8") as f:
+        json.dump({"findings": [], "logline": "x", "coverage": {}}, f)
+    webapp_server.PROJECTS_DIR = str(os.path.dirname(m.project_dir))
+    webapp_server.app.config["TESTING"] = True
+    return m, webapp_server.app.test_client()
+
+
+def test_a_damaged_report_answers_store_damage_not_a_bad_request(tmp_path):
+    """R6-BE-7's residual, and the same contract as the manifest test above.
+
+    `_load_report_sanitized` read through a bare `open()` + `json.load`, so a
+    torn report raised JSONDecodeError — a ValueError — and the app-wide
+    ValueError handler answered 400 with the parser's own sentence. The writer is
+    told their REQUEST was bad, about their damaged file, and `docs/` calls the
+    damage the 503 answer every other writer-owned store already gets.
+    """
+    m, client = _analysed_project(tmp_path)
+    with open(m.report_findings_path, "w", encoding="utf-8") as f:
+        f.write('{"findings": [{"issue": "truncu')
+
+    resp = client.get(f"/api/projects/{os.path.basename(m.project_dir)}/report")
+    assert resp.status_code == 503, (
+        f"a damaged report answered {resp.status_code}: {resp.get_json()}")
+    body = resp.get_json()
+    assert body.get("unreadable") is True, body
+    assert "findings" not in body, (
+        "a damaged report was served as an empty one — the writer would read a "
+        "torn file as a clean script")
+
+
+def test_a_missing_report_answers_404_not_a_500(tmp_path):
+    """The same route, the other missing fact: analyze says complete, the file
+    is gone. FileNotFoundError escaped the view and came back as 'Unexpected
+    error: [Errno 2] No such file or directory: ...' with a server path in it."""
+    m, client = _analysed_project(tmp_path)
+    os.remove(m.report_findings_path)
+
+    resp = client.get(f"/api/projects/{os.path.basename(m.project_dir)}/report")
+    assert resp.status_code == 404, (
+        f"a missing report answered {resp.status_code}: {resp.get_data(as_text=True)[:200]}")
+    assert "Errno" not in resp.get_data(as_text=True), resp.get_json()
+
+
+def test_a_damaged_report_still_degrades_the_rewrite_rather_than_failing(tmp_path, mock_server):
+    """The one caller that CHOOSES to swallow damage, kept on purpose.
+
+    `/rewrite` grounds a note in the finding it answers, and its comment says a
+    missing or stale report degrades to an ungrounded rewrite instead of failing.
+    Making the reader honest (above) must not turn that best-effort path into a
+    503, so its catch names the damage now instead of catching it by accident
+    via ValueError.
+    """
+    m, client = _analysed_project(tmp_path, server_url=mock_server)
+    with open(m.report_findings_path, "w", encoding="utf-8") as f:
+        f.write('{"findings": [{"issue": "truncu')
+
+    resp = client.post(f"/api/projects/{os.path.basename(m.project_dir)}/rewrite",
+                       json={"scene_number": 1, "finding_index": 0})
+    assert resp.status_code == 200, (
+        f"a damaged report broke the rewrite instead of degrading it: "
+        f"{resp.status_code} {resp.get_json()}")
+    assert resp.get_json().get("replacements") is not None
+
+
+
 # ---------------------------------------------------------------------------
 # 9. writer_profile.json — R6-BE-4, across processes
 # ---------------------------------------------------------------------------

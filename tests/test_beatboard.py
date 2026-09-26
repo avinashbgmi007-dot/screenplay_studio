@@ -81,6 +81,27 @@ class TestBeatBoardModule:
         assert beatboard.get_order(m) == [1, 2, 3, 4, 5, 6]
         assert beatboard.has_board(m) is False
 
+    def test_the_reset_that_loses_the_delete_race_still_resets(self, tmp_path, monkeypatch):
+        """R6-BE-9: the reset was `if os.path.exists(path): os.remove(path)` —
+        a two-step check on a file a second window (or the CLI) can delete in
+        between. The writer who loses that race has a board-less project, which
+        is exactly what they asked for, and used to be answered a 500 naming
+        `[Errno 2]`. Simulated by having the remove do the deleting and then
+        report the file gone, which is the interleaving itself rather than a
+        stand-in for it."""
+        m = _make_project(tmp_path)
+        beatboard.set_order(m, [6, 5, 4, 3, 2, 1])
+
+        real_remove = os.remove
+
+        def already_gone(path, *a, **kw):
+            real_remove(path)
+            raise FileNotFoundError(2, "No such file or directory", path)
+
+        monkeypatch.setattr(beatboard.os, "remove", already_gone)
+        out = beatboard.reset_order(m)
+        assert out["order"] == [1, 2, 3, 4, 5, 6], out
+
     def test_export_reordered_sequence(self, tmp_path):
         m = _make_project(tmp_path)
         new_order = [3, 1, 2, 4, 5, 6]

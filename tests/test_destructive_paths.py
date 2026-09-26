@@ -176,3 +176,97 @@ class TestUnhandledErrorsAnswerAsJson:
         API's contract, and the SPA branches on them."""
         assert http_client.get("/api/definitely-not-a-route").status_code == 404
         assert http_client.delete("/api/health").status_code == 405
+
+    def test_a_rejected_request_body_is_explained_in_json(self, http_client):
+        """R6-BE-7 (round-6 audit), and the hole the backstop above left open.
+
+        `_unhandled` deliberately passes `HTTPException` straight through so a 404
+        keeps its code. But a 400/415 raised while FLASK parses the body is also
+        an HTTPException — so every route reading `request.get_json()` without
+        `silent=True` answered a malformed body with Werkzeug's HTML page.
+
+        Measured before the fix: 22 of the 45 mutating routes. Not the routes'
+        fault and not fixable per route — the reason lives in the framework's body
+        parser, one layer below every handler, so the answer is the same backstop
+        extended rather than 22 more `try` blocks.
+
+        This sweeps the live URL map instead of naming routes, so a new
+        body-parsing endpoint is covered the moment it is registered.
+        """
+        project = _upload(http_client).get_json()["project"]
+        offenders = []
+        for rule in webapp_server.app.url_map.iter_rules():
+            for meth in sorted(rule.methods & {"POST", "PATCH", "PUT"}):
+                vals = {a: (project if a == "name" else "1") for a in rule.arguments}
+                path = rule.build(vals)[1]
+                resp = http_client.open(path=path, method=meth,
+                                        data='{"scene_number": ',
+                                        content_type="application/json")
+                if resp.status_code not in (400, 415):
+                    continue  # a route that got past the body: not this finding
+                if not resp.headers.get("Content-Type", "").startswith("application/json"):
+                    offenders.append(
+                        f"{meth} {rule.rule} -> {resp.status_code} "
+                        f"{resp.headers.get('Content-Type')!r}")
+        assert not offenders, (
+            "a rejected body answered as a page, so the SPA found no `error` "
+            "field and the writer saw a generic failure:\n" + "\n".join(offenders))
+
+    def test_an_unparseable_number_never_becomes_a_500(self, http_client):
+        """The other half of R6-BE-7: `int()` on a value the client sent.
+
+        The audit named `int(page)` / `int(scene_start)` as unguarded 500 sites.
+        Neither exists any more, and the claim was false twice over even for the
+        conversions that DO remain (`rewrite`, `edits/apply`, `stash`, the two
+        `CONFIG` timeouts): each catches TypeError/ValueError and answers
+        `_error(...)`, and below that an app-wide `@app.errorhandler(ValueError)`
+        already turns any stray ValueError into a 400. So this half is a
+        NON-defect — recorded, not fixed.
+
+        The fence stays, because it is the only thing that would notice a new
+        unguarded `int(body[...])`. Its shape matters: a STRING where a number
+        belongs cannot break it, since ValueError is answered by that handler
+        whatever the route does. A LIST raises TypeError, which nothing catches,
+        so this is the body that proves the guards are load-bearing.
+        """
+        project = _upload(http_client).get_json()["project"]
+        offenders = []
+        for rule in webapp_server.app.url_map.iter_rules():
+            for meth in sorted(rule.methods & {"POST", "PATCH", "PUT"}):
+                # Path segments keep a real number: `<int:...>` converters reject
+                # a word with a 404 before the view runs, which is correct and
+                # not this finding. The bad numbers go in the BODY, where `int()`
+                # is the route's own call.
+                vals = {a: (project if a == "name" else "1")
+                        for a in rule.arguments}
+                path = rule.build(vals)[1]
+                resp = http_client.open(path=path, method=meth, json={
+                    "scene_number": [1], "index": [1], "timeout": [1],
+                    "page": [1], "finding_index": [1], "lines": [1]})
+                if resp.status_code == 500:
+                    offenders.append(
+                        f"{meth} {rule.rule}: {resp.get_data(as_text=True)[:90]}")
+        assert not offenders, (
+            "an unparseable number escaped as a 500 instead of a 400 that says "
+            "which field:\n" + "\n".join(offenders))
+
+    def test_the_rejection_says_what_was_wrong(self, http_client):
+        """The other half: JSON is only useful if it carries a sentence.
+
+        Werkzeug's default description for a 400 is 'Failed to decode JSON
+        object.' with the parser's detail in `e.description`; a bare 'Bad
+        Request' would be JSON-shaped and still tell the writer nothing.
+        """
+        resp = http_client.post("/api/config", data="{oops",
+                                content_type="application/json")
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        body = resp.get_json()
+        assert body and body.get("error"), f"no error field: {resp.get_data(as_text=True)!r}"
+        assert "json" in body["error"].lower(), body
+        # A body with the right type but no JSON at all is a 415, and must be
+        # just as readable — that is what a hand-rolled fetch without a
+        # Content-Type header actually produces.
+        resp = http_client.post("/api/config", data="scene=1",
+                                content_type="application/x-www-form-urlencoded")
+        assert resp.status_code == 415, resp.get_data(as_text=True)
+        assert (resp.get_json() or {}).get("error"), resp.get_data(as_text=True)

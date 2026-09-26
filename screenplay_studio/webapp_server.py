@@ -580,6 +580,37 @@ def _too_large(e):
                              "Split the file or export a smaller PDF."}), 413
 
 
+# R6-BE-7: the two body-parsing rejections, answered like every other failure in
+# this app. Flask raises these from INSIDE `request.get_json()`, one layer below
+# the handler, so a route cannot answer them without wrapping its own read — and
+# 22 of the 45 mutating routes did not. Fixing it here covers the 25 call sites
+# that read `get_json()` bare and every endpoint registered after this.
+_REJECTED_BODY_MESSAGE = {
+    # Both say "nothing was changed": a rejected POST is the one case where the
+    # writer needs to know the write did NOT land, not just that it failed.
+    400: "The request body couldn't be read as JSON, so nothing was changed.",
+    415: "The request body wasn't sent as JSON, so nothing was changed.",
+}
+
+
+@app.errorhandler(400)
+@app.errorhandler(415)
+def _rejected_body(e):
+    """A rejected request must still reach the SPA, which reads `error` off JSON.
+
+    Werkzeug's own 400 text is the generic "the browser (or proxy) sent a request
+    this server could not understand" — true of every HTML error page and useless
+    to a front-end that has to render a sentence. Non-API paths keep the browser's
+    page: this handler exists for the JSON contract, not to restyle a typo in the
+    address bar.
+    """
+    if not request.path.startswith("/api/"):
+        return e.get_response()
+    log.info("rejected %s body for %s %s: %s", e.code, request.method,
+             request.path, e.description)
+    return jsonify({"error": _REJECTED_BODY_MESSAGE[e.code]}), e.code
+
+
 @app.errorhandler(Exception)
 def _unhandled(e):
     """Any unhandled error answers as JSON, never as Flask's HTML page.
@@ -596,8 +627,9 @@ def _unhandled(e):
     — but this is the backstop that makes "the writer always gets a reason" a
     property of the app instead of a thing someone has to remember per call.
 
-    `HTTPException` is passed straight through: 404/405/413 already have their own
-    handlers and their status codes are part of the API's contract.
+    `HTTPException` is passed straight through: 404/405 keep their codes, and 413
+    plus the body-parsing 400/415 have their own handlers above, which Flask
+    resolves before this one.
     """
     if isinstance(e, HTTPException):
         return e
@@ -826,8 +858,37 @@ def _sanitize_report(report: dict) -> dict:
 
 
 def _load_report_sanitized(m: ProjectManifest) -> dict:
-    with open(m.report_findings_path, "r", encoding="utf-8") as f:
-        return _sanitize_report(json.load(f))
+    """Read `report.findings.json` the way every other writer-owned store is read.
+
+    R6-BE-9's second half, and the same shape `test_a_damaged_manifest_answers_
+    store_damage_not_a_bad_request` already enforces for `project.json`. This one
+    reader is behind five routes, and until now it was a bare `open()` +
+    `json.load`, so it answered the two things that can go wrong with it
+    incorrectly:
+
+    - **torn / unparseable** raised `JSONDecodeError`, which is a `ValueError`,
+      which the app-wide handler turned into **400 "your request was bad"** with
+      the parser's sentence as the message. The writer is told to fix a request
+      they did not send, about a file the app wrote, and the docs call that state
+      the 503 damaged-store answer.
+    - **absent** (analyze says `complete`, the file is gone — a failed delete, a
+      hand-cleaned project dir) raised `FileNotFoundError` through to `_unhandled`
+      → **500 `Unexpected error: [Errno 2] No such file or directory: 'C:\\...'`**,
+      leaking a server path.
+
+    Now: MISSING re-raises `FileNotFoundError` for the caller to answer as a 404
+    it can word, and damage raises `StoreUnreadable` so the 503 handler names the
+    store. A non-dict document is damage too — `load_json_store` only checks that
+    the bytes parse.
+    """
+    from .jsonio import load_json_store
+    report = load_json_store(m.report_findings_path, default=None)
+    if report is None:
+        raise FileNotFoundError(m.report_findings_path)
+    if not isinstance(report, dict):
+        raise StoreUnreadable(m.report_findings_path,
+                              f"expected a JSON object, found {type(report).__name__}")
+    return _sanitize_report(report)
 
 
 def _error(message: str, status: int = 400):
@@ -1530,7 +1591,15 @@ def get_report(name):
         return _error("Project not found.", 404)
     if m.stage("analyze").status != "complete":
         return _error("Analysis hasn't completed for this project yet.", 400)
-    return jsonify(_load_report_sanitized(m))
+    try:
+        report = _load_report_sanitized(m)
+    except FileNotFoundError:
+        # The manifest claims a finished analyze and the report is not on disk.
+        # That is a missing fact, not a bad request and not a server fault worth
+        # a stack trace: 404, worded, with no path in it.
+        return _error("The analysis report is missing from this project. Re-run "
+                      "Analysis to produce one.", 404)
+    return jsonify(report)
 
 
 @app.route("/api/projects/<name>/passes", methods=["GET"])
@@ -1810,7 +1879,13 @@ def rewrite_scene_endpoint(name):
                 )
                 if finding.get("evidence_quote"):
                     finding_text += f" Evidence: \"{finding['evidence_quote']}\""
-        except (FileNotFoundError, KeyError, IndexError, ValueError):
+        except (FileNotFoundError, KeyError, IndexError, ValueError,
+                StoreUnreadable):
+            # R6-BE-9: `StoreUnreadable` is a RuntimeError, so it does NOT ride in
+            # with ValueError. Named here because the reader underneath is now
+            # honest about damage: without this the best-effort grounding below
+            # would turn a torn report into a 503 on a route that has always
+            # degraded to an ungrounded rewrite instead.
             pass
 
     instruction = (body.get("instruction") or "").strip()
@@ -2115,12 +2190,30 @@ def get_progress(name):
         # A torn or half-written progress file. Writes are atomic now, so this
         # is defence in depth for a legacy file or an external writer — and a
         # transient read must never surface as a 400 to the poller mid-run.
+        #
+        # R6-BE-9: this branch used to answer `stage: "idle"` for every stage
+        # that was not `complete`, INCLUDING A LIVE RUN, and that is not a
+        # neutral placeholder. The SPA reads `stage` twice: it stops the watch
+        # on done/stalled/failed, and it *positions the ladder* on anything
+        # else (`analysisStageIndex()`). So one unreadable read answered
+        # "this project is idle" about a run that was mid-pass-8, reset the
+        # display to pass 1, and restarted the beat clock — a failed read was
+        # reported as a run that never happened.
+        #
+        # Say only what the manifest proves. `complete` and `failed` are facts
+        # the manifest holds regardless of the progress file, and `failed` is
+        # the one code that SHOULD stop the watch. For a run still marked
+        # `running`, hold: omit `stage` entirely, which is the single answer
+        # the front-end ignores (`if (p.stage) currentKey = p.stage`), so the
+        # ladder stays where it was and the poll keeps trying.
         stage = m.stage("analyze").status
-        return jsonify({
-            "stage": "done" if stage == "complete" else "idle",
-            "status": "complete" if stage == "complete" else "idle",
-            "detail": "progress unreadable — retrying",
-        })
+        if stage == "complete":
+            return jsonify({"stage": "done", "status": "complete", "detail": ""})
+        if stage == "failed":
+            return jsonify({"stage": "failed", "status": "failed",
+                            "detail": m.stage("analyze").error or ""})
+        return jsonify({"status": "retrying",
+                        "detail": "progress unreadable — retrying"})
     # ts is the heartbeat written by every run since the fix; a file without
     # it is guaranteed legacy (all current runs stamp it), so its own mtime is
     # the best available signal for when the dead run last wrote.
@@ -2155,7 +2248,15 @@ def get_fixqueue(name):
     if m.stage("analyze").status != "complete":
         return jsonify({"items": [], "acts": []})
 
-    report = _load_report_sanitized(m)
+    try:
+        report = _load_report_sanitized(m)
+    except FileNotFoundError:
+        # Same contradiction as /report: analyze claims complete, the findings are
+        # gone. The honest answer is not `{"items": []}` just above, which means
+        # "analysed, nothing to fix" — a writer would close the queue believing
+        # the script is clean.
+        return _error("The analysis report is missing from this project. Re-run "
+                      "Analysis to produce one.", 404)
 
     from screenplay_parser.structure import assign_acts, act_for_scene
     from .revision import load_working, finding_statuses, compute_finding_id, dismissed_finding_ids

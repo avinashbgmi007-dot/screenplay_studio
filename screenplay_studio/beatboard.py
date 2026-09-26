@@ -76,8 +76,14 @@ def set_order(m, order) -> dict:
 
 
 def reset_order(m) -> dict:
-    if os.path.exists(_path(m)):
+    try:
         os.remove(_path(m))
+    except FileNotFoundError:
+        # R6-BE-9: `if os.path.exists(...)` then remove is a two-step check on a
+        # file a second window (or the CLI) may delete between them, and the
+        # losing caller got a 500 for a reset that had already succeeded. The
+        # desired end state is "no board", which both branches now reach.
+        pass
     return {"order": scene_numbers(m)}
 
 
