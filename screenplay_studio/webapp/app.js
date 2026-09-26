@@ -7503,8 +7503,13 @@ function renderCompare(data) {
   pane.innerHTML = "";
   if (!data.scenes || !data.scenes.length) {
     pane.appendChild(el("p", "script-empty-hint", "No scenes in common to compare — the drafts don't share scenes."));
+    announce("This comparison has no scenes in common.");
     return;
   }
+  // R6-UX-5: name what is on screen; the diff itself is for reading. The panes
+  // are no longer an aria-live region, so this is the only thing an AT user
+  // hears when the comparison renders.
+  announce(`Comparing ${data.from} against ${data.to} — ${data.common_scene_count} scenes in common.`);
   const summary = el("div", "compare-summary");
   summary.appendChild(el("span", "diff-chip", `${data.common_scene_count} scenes compared`));
   pane.appendChild(summary);
@@ -7965,6 +7970,10 @@ function bbMove(i, dir) {
   [bbOrder[i], bbOrder[j]] = [bbOrder[j], bbOrder[i]];
   bbDirty = true;
   renderBeatboard();
+  // R6-UX-5: the board used to carry `aria-live`, which announced EVERY card on
+  // every move. The board is a plain region now, so say the one thing that
+  // changed — which scene, and where it landed.
+  announce(`Scene ${bbOrder[j]} is now position ${j + 1} of ${bbOrder.length}.`);
   // The render rebuilds every card, so the button that was just activated no
   // longer exists and focus falls to <body>. Put it back on the same control at
   // the card's NEW index — otherwise a keyboard reorder costs one Tab-walk

@@ -496,7 +496,12 @@
           <button id="bb-save-btn" class="btn-primary">Save order</button>
         </div>
       </div>
-      <div id="beatboard-board" class="beatboard-board" aria-live="polite"></div>
+      <!-- R6-UX-5: NOT a live region. `renderBeatboard()` empties this node and
+               re-appends every card on each move, so as `aria-live="polite"` it
+               read the whole board back for one drag — the same trap the
+               manuscript region's comment above records. The move itself is
+               spoken into #a11y-status instead. -->
+          <div id="beatboard-board" class="beatboard-board"></div>
     </section>
 
     <!-- Compare -->
@@ -511,7 +516,10 @@
         <span id="compare-to-label" class="compare-to-label">active draft</span>
         <span class="compare-hint">Read the change, side by side. Added lines are underlined, removed lines struck through.</span>
       </div>
-      <div id="compare-panes" class="compare-panes" aria-live="polite"></div>
+      <!-- R6-UX-5: same reason — `renderCompare()` rebuilds the panes wholesale,
+               so a live region here re-announced the entire diff for one click.
+               What is being compared is announced instead; the diff is read. -->
+      <div id="compare-panes" class="compare-panes"></div>
     </section>
 
     <!-- Premise view (Phase 13): the card that grew into this script — a

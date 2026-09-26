@@ -21,6 +21,15 @@ both would make it worthless:
     non-empty while the banner was hidden — a check that fails against the
     original `showError`, which wrote the text first and revealed second.
 
+R6-UX-5 added the third member of the family: the beat board and the compare
+panes. Both are rebuilt with `innerHTML = ""` and both carried
+`aria-live="polite"`, so one drag read out the entire corkboard and one click read
+out the entire diff — the announcement buried the change it was meant to report.
+They are covered here as a PAIR, because either half alone is a weak fence: the
+absence check proves the noise is gone, and the positive check proves the delta
+still arrives. Deleting only `aria-live` would leave a screen-reader user with a
+silent board and pass half the suite.
+
 Run:  python tests/e2e_browser_live_regions.py
 """
 import json
@@ -52,6 +61,8 @@ MARKUP_JS = """() => {
   const a11y = document.getElementById('a11y-status');
   const banner = document.getElementById('error-banner');
   const scroller = document.getElementById('messages-scroll');
+  const board = document.getElementById('beatboard-board');
+  const panes = document.getElementById('compare-panes');
   const live = (el) => el ? (el.getAttribute('aria-live') || '') : 'MISSING';
   return {
     a11y_role: a11y && a11y.getAttribute('role'),
@@ -62,6 +73,10 @@ MARKUP_JS = """() => {
     scroller_role: scroller && scroller.getAttribute('role'),
     scroller_live: live(scroller),
     scroller_rendered: scroller ? getComputedStyle(scroller).display : null,
+    board_live: live(board),
+    board_role: board && board.getAttribute('role'),
+    panes_live: live(panes),
+    panes_role: panes && panes.getAttribute('role'),
   };
 }"""
 
@@ -128,6 +143,21 @@ def main():
                   "so a live region there would re-announce the whole conversation)",
                   markup["scroller_role"] in (None, "") and markup["scroller_live"] in ("", None),
                   json.dumps({"role": markup["scroller_role"], "live": markup["scroller_live"]}))
+            # R6-UX-5: the same trap, in the two full-redraw regions the round-3
+            # fix did not reach. `renderBeatboard()` does `board.innerHTML = ""`
+            # and re-appends every card on EVERY move, and `renderCompare()` does
+            # the same to the panes — so each was an `aria-live="polite"` region
+            # that read the entire board back for one drag, and the whole diff for
+            # one click, burying the change the user was checking.
+            for key, label in (("board", "the beat board"),
+                               ("panes", "the compare panes")):
+                check(f"{label} is NOT a live region (rebuilt card-for-card / "
+                      f"pane-for-pane, so a live region there re-announces the "
+                      f"whole view for one edit)",
+                      markup[f"{key}_role"] in (None, "")
+                      and markup[f"{key}_live"] in ("", None),
+                      json.dumps({"role": markup[f"{key}_role"],
+                                  "live": markup[f"{key}_live"]}))
 
             # ---------- an error is announced where it can be heard -----------
             page.evaluate(ARM_BANNER_JS)
@@ -209,6 +239,41 @@ def main():
             check("...as a bounded excerpt, not the whole reply",
                   replied and 0 < len(spoken_reply) <= 300,
                   f"announced length: {len(spoken_reply)}")
+
+            # ---------- R6-UX-5: the delta still has to be SPOKEN --------------
+            # Taking `aria-live` off a redrawn region only stops the noise. The
+            # pair of checks below is what keeps it honest: the announcement has
+            # to arrive, and it has to be the ONE THING THAT CHANGED — a sentence
+            # about the card that moved, not the board.
+            loaded = page.evaluate("async () => { "
+                                   "if (state.view === 'beatboard') state.view = 'cowrite'; "
+                                   "await loadBeatboard(); announce(''); return bbOrder.slice(); }")
+            page.wait_for_timeout(300)
+            check("the beat board has scenes to move (precondition)",
+                  isinstance(loaded, list) and len(loaded) >= 2, json.dumps(loaded))
+            moved_scene = loaded[0]
+            page.evaluate("() => bbMove(0, 1)")
+            page.wait_for_timeout(400)
+            spoken = page.evaluate("() => document.getElementById('a11y-status').textContent || ''")
+            check("one keyboard move is announced",
+                  str(moved_scene) in spoken and " 2" in spoken, json.dumps(spoken[:160]))
+            check("...as the one card that changed, not the board it sits on",
+                  0 < len(spoken) <= 120 and spoken.count("Scene") <= 2,
+                  f"announced length: {len(spoken)}")
+
+            page.evaluate("() => announce('')")
+            page.wait_for_timeout(300)
+            page.evaluate("""() => renderCompare({
+              from: 'draft 1', to: 'active draft', common_scene_count: 2,
+              scenes: [{scene_number: 1, heading: 'INT. DEPOT - NIGHT', rows: [
+                {kind: 'changed', left: 'One line.', right: 'Another line.'}]}]})""")
+            page.wait_for_timeout(400)
+            spoken = page.evaluate("() => document.getElementById('a11y-status').textContent || ''")
+            check("opening a comparison is announced as what is being compared",
+                  "draft 1" in spoken and "active draft" in spoken, json.dumps(spoken[:160]))
+            check("...in a sentence, not the diff text",
+                  0 < len(spoken) <= 160 and "INT. DEPOT" not in spoken,
+                  f"announced length: {len(spoken)}")
 
             assert_no_js_errors(checks, errors)
             browser.close()
