@@ -469,8 +469,11 @@ board; full rationale in `docs/PHASE_B_FV_FOLD_SPEC.md`):
   Shelf rows: stage dot (complete=filled ok / failed=red), title, status line, hover-reveal
   ✕ delete (with cascade-honest confirm). **Unreadable projects** show a "⚠ unreadable"
   flag, error on open, remain deletable. Library = a live view of the shelf (deleting one
-  deletes the other); library rows render **without** a delete button (deletion happens via
-  shelf/dashboard).
+  deletes the other); library rows carry the same hover-reveal ✕, wired to **the same
+  `deleteProjectFlow` and the same confirm** — the invariant is one delete path for one
+  store, not one delete *button*. (R6-UX-6: this sentence used to claim library rows
+  render without a delete, which the product has contradicted ever since the flow was
+  shared; the spec was the stale side.)
 - **Footer**: ☀ Dawn · ⚙ Settings.
 - **Collapse**: the whole sidebar collapses via `#sidebar-toggle` / `#sidebar-edge-tab`
   (pref `sidebar_collapsed`), mirroring the structure-rail pattern.
@@ -606,7 +609,7 @@ retired in Phase 13; the spec text describing it was left behind.)
 | `↑` / `↓` (from `#manuscript-container`) | Walk the line cursor one script line. The manuscript is **one tab stop** (`tabindex="0"` on the region), never nine hundred: lines carry `tabindex="-1"` and arrows move focus, so `Tab` still leaves the page in one press |
 | `a` | Toggle the Craft shelf (analysis panels) |
 | `z` | Spotlight mode — nothing but the page (Esc leaves; **project-gated**, like `b`/`d`/`v`) |
-| `b` | Open the Beat Board (project only) |
+| `b` | Toggle the Beat Board (project only) |
 | `d` | Compare drafts side by side (project only) |
 | `v` | Toggle the Revision view (project only) |
 | `j` / `n` | Next scene (script view) — **while the fix loop is active: next finding (with `↓`)** |

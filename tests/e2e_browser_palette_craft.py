@@ -16,6 +16,7 @@ covered what a row DOES.
 Checks are on computed style and the real DOM — no screenshots (project rule).
 """
 
+import json
 import sys
 
 sys.path.insert(0, "tests")
@@ -105,6 +106,60 @@ with pw_sync.sync_playwright() as p:
         check("focus is in the composer — one keystroke from sending",
               after["focused"],
               f"activeElement={after['activeTag']} {after['drawerOpen']}")
+
+        # ---------- R6-UX-6: the palette, the help screen and one toggle -------
+        # The palette is the product's advertised list of what it can do; `?` is
+        # the list of keys that do them. They are two literals in two places, and
+        # "Open the Revision view v" existed in one and not the other — so the
+        # help screen under-reported a shortcut that works. Swept live rather
+        # than by reading the source, because that is the pair that ships.
+        contract = page.evaluate("""() => {
+          const advertised = (typeof SHORTCUTS !== 'undefined' ? SHORTCUTS : [])
+            .map(([k]) => k);
+          const rows = paletteCommands();
+          const labels = {};
+          const dupes = [];
+          const orphans = [];
+          for (const r of rows) {
+            labels[r.label] = (labels[r.label] || 0) + 1;
+            const keys = (r.keys || '').trim();
+            if (!keys) continue;
+            // A row may advertise a chord ("Ctrl/⌘ K") or a pair ("j / n");
+            // every slash-separated member must be reachable from the help.
+            const members = keys.split('/').map(s => s.trim()).filter(Boolean);
+            for (const m of members) {
+              if (!advertised.some(a => a.toLowerCase().includes(m.toLowerCase())))
+                orphans.push(`${r.label} → ${keys} (member ${m})`);
+            }
+          }
+          for (const [label, n] of Object.entries(labels))
+            if (n > 1) dupes.push(`${label} ×${n}`);
+          return {advertised, orphans, dupes, rows: rows.length};
+        }""")
+        check("every key the palette advertises is also in the `?` help",
+              not contract["orphans"], json.dumps(contract["orphans"]))
+        check("no command is listed in the palette twice",
+              not contract["dupes"], json.dumps(contract["dupes"]))
+
+        # "Toggle the Beat Board" called `openBeatboardView()`, which returns
+        # immediately when the board is ALREADY up — so the row that says toggle
+        # could only ever open, and a writer on the board clicked it to nothing.
+        toggled = page.evaluate("""async () => {
+          const row = paletteCommands().find(r => r.label === 'Toggle the Beat Board');
+          if (!row) return {missing: true};
+          if (state.view !== 'beatboard') await row.run();
+          const opened = state.view;
+          await row.run();
+          const off = state.view;
+          await row.run();
+          return {opened, off, back: state.view};
+        }""")
+        check("the Beat Board row opens it when it is closed",
+              toggled.get("opened") == "beatboard", json.dumps(toggled))
+        check("...and closes it when it is up — the row is called 'Toggle'",
+              toggled.get("off") != "beatboard", json.dumps(toggled))
+        check("...and opens it again, so it is a toggle and not a one-way exit",
+              toggled.get("back") == "beatboard", json.dumps(toggled))
 
         assert_no_js_errors(checks, errors)
         browser.close()

@@ -7888,6 +7888,15 @@ function closeBeatboardView() {
   setRoom(bbPrevRoom);
 }
 
+// R6-UX-6: `openBeatboardView()` returns immediately when the board is already
+// up, so a row labelled "Toggle" could only ever open — and the palette carried
+// an "Open" row for the same view on top of it. One function now, used by the
+// key, the row and the toolbar, so "toggle" means what it says.
+async function toggleBeatboardView() {
+  if (state.view === "beatboard") closeBeatboardView();
+  else await openBeatboardView();
+}
+
 async function loadBeatboard() {
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   const data = await api(`${base}/beatboard`);
@@ -8423,7 +8432,8 @@ const SHORTCUTS = [
   ["z", "Spotlight mode — nothing but the page (Esc leaves)"],
   ["Esc", "Back to the page: composer → fix loop → spotlight → full-screen tool → "
           + "dock → partner drawer → craft shelf"],
-  ["b", "Open the Beat Board"],
+  ["v", "Toggle the Revision view (the desk with the fix queue)"],
+  ["b", "Toggle the Beat Board (Esc leaves it too)"],
   ["d", "Compare drafts side by side"],
   ["j / n", "Next scene (script view)"],
   ["k / p", "Previous scene (script view)"],
@@ -8437,15 +8447,12 @@ function paletteCommands() {
   // silently did nothing when clicked (UI audit 2026-09-20, defect #8).
   const hasProject = !!state.currentProject;
   const projectOnly = hasProject ? [
-    { type: "command", label: "Open the Beat Board", keys: "b", run: () => openBeatboardView() },
+    { type: "command", label: "Toggle the Beat Board", keys: "b", run: () => toggleBeatboardView() },
     { type: "command", label: "Compare drafts side by side", keys: "d", run: () => openCompareView() },
     { type: "command", label: "Open the Revision view", keys: "v", run: () => openRevisionView() },
     { type: "command", label: "Spotlight mode — nothing but the page", keys: "z", run: toggleSpotlight },
     { type: "command", label: "Run Analysis", keys: "", run: () => runAnalysis() },
     { type: "command", label: "Toggle the Craft shelf (analysis panels)", keys: "a", run: toggleCraftShelf },
-    // no key hint: "b" already opens the Beat Board (see SHORTCUTS + the
-    // keydown handler) — this entry must not advertise it a second time.
-    { type: "command", label: "Toggle the Beat Board", keys: "", run: () => openBeatboardView() },
     { type: "command", label: "Search the script", keys: "/", run: () => { if (state.view !== "cowrite" && state.view !== "feedback") openCowriteRoom(); setTimeout(() => $("#script-search").focus(), 80); } },
     { type: "command", label: "Export working draft (.fountain)", keys: "", run: () => $("#export-fountain").click() },
   ] : [];
@@ -8732,7 +8739,7 @@ function bindGlobalShortcuts() {
     }
     else if (e.key === "a") { toggleCraftShelf(); }
     else if (e.key === "s") { closeRoomDrawer(); const sc = getManuscriptContainer(); if (sc) sc.focus(); }
-    else if (e.key === "b" && state.currentProject) { openBeatboardView(); }
+    else if (e.key === "b" && state.currentProject) { toggleBeatboardView(); }
     else if (e.key === "d" && state.currentProject) { openCompareView(); }
     else if (e.key === "v" && state.currentProject) { if (state.view === "revision") closeRevisionView(); else openRevisionView(); }
     else if (e.key === "z" && state.currentProject) { toggleSpotlight(); }
