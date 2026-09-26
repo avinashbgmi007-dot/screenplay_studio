@@ -9721,7 +9721,10 @@ function init() {
 // question now lands in the Co-write room's real composer, one keystroke from
 // being sent.
 function openSameerWith(question) {
-  if (state.view !== "cowrite") openCowriteRoom();
+  // Unconditional on purpose: opening a project leaves the cowrite VIEW
+  // selected with the drawer CLOSED, so a `state.view !== "cowrite"` guard
+  // skipped the summon and the question was typed into hidden chrome.
+  openCowriteRoom();
   const input = $("#input");
   if (input) {
     input.value = question;
