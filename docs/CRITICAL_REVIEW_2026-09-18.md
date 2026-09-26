@@ -457,6 +457,33 @@ The 4 failures are **phase-12 visual/motion discipline** — pre-existing (ident
 - ~~`identity_forensics`~~ — **FIXED**: was a hard `KeyError: 'E2E_BASE'`. Now dual-mode like `export_flush` (self-boots a demo studio when the env var is absent). **6/6.**
 - **LAB-ONLY (3, classified not fixed):** `design_session` (needs a hand-started studio on :8500 by design), `preview_next` + `preview_redesigns` (design gallery under `webapp/preview-next/`, not shipped surface). The sweep now reports them as `LAB`, not `FAIL`.
 
+> **CORRECTION — 2026-09-26.** The clause *"not shipped surface"* above is **wrong**,
+> and it stayed wrong for eight days because nothing re-read it. Measured:
+> `pyproject.toml`'s `[tool.setuptools.package-data]` ships
+> `webapp/**/*.html|js|css|woff2` **recursively**, and its own comment says why —
+> *"the preview-\* design labs are still served by the `/<path:filename>` route and
+> are exercised by `test_preview_lab.py`, and they nest two levels deep
+> (`preview-r4/v2/*.html`), so a single-level glob silently drops them."* Confirmed
+> at runtime: `GET /preview-next/index.html` → **200**.
+>
+> The claim mattered. On 2026-09-26 a later pass read *"not shipped surface"*, measured
+> 4.07 MB of lab directories inside the webapp tree, and nearly added all four to
+> `EXCLUDED_FROM_SHIPPING` to reclaim it. That would have been wrong twice over: the
+> 4.07 MB figure counted **25 + 17 PNG screenshots**, which the packaging config
+> excludes on purpose, so the real shipped cost is **660 KB**, not 4 MB; and
+> `preview-next/` is **live** — two of its pages call `/api/preview/*`, a surface
+> with five routes in `webapp_server.py` and 14 tests in `test_preview_lab.py`.
+> Excluding it would have broken the only consumer of a tested API.
+>
+> The accurate statement is narrower: **`preview-next` (7 HTML) is a live prototype
+> surface; `preview-redesigns` (7), `preview-r4` (8) and `preview-design` (4) are
+> inert mockups.** All four ship, deliberately. Leaving the mockups in place is the
+> owner's recorded call (`SESSION_SUMMARY.md`: *"leave (not referenced by any
+> production surface; ... delete = only destructive option)"*). The live/inert split
+> is now pinned by `tests/test_spa_contract.py`'s sibling record in
+> `docs/audit/FIX_TRACKER.md` so a future cleanup cannot delete the live half by
+> accident.
+
 ## Phase-12 visual/motion — the 4 real failures, resolved
 
 | Check | Root cause | Action |

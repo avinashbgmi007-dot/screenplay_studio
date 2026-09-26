@@ -27,8 +27,9 @@ restored byte-identical** (`.workbuddy-ai/scratch/mutation_check_r4.py`).
 *Everything below is the ladder (§1–§8) **plus** the BE-3 (§11) and UX-2 (§12)
 follow-ons, measured together at one revision.*
 
-> **Superseded by §13.9**, which measures the same gates after the five LOW
-> findings. This table is kept as the record of the revision the ladder landed at
+> **Superseded.** §13.9 measures the same gates after the five LOW findings, and
+> **§17.8 is the current row** (2026-09-26: 1835 pytest / 55 suites / 1343 checks).
+> This table is kept as the record of the revision the ladder landed at
 > (`27bd576`): 1786 / 53 suites / 1319 checks.
 
 | Gate | Command | Result |
@@ -1076,5 +1077,195 @@ The second is the one that carries the weight. It proves the suite **cannot pass
 while the demo model is in the path**, which is the entire point of the finding. A
 green run against a suite that quietly fell back to the demo model would have
 looked like coverage and been none.
+
+---
+
+## 17. The 2026-09-21 audit's four open findings — and three corrections to my own work
+
+I said I would close FE-M2 and FE-M3 first because they were small. Measuring them
+first was the right order and the wrong expectation: **one was a real defect, one
+was not a defect at all, one was mis-framed, and one had a sub-claim that is simply
+false.** And three of the mistakes this pass found were in work I had already
+written down as verified.
+
+The method was the one from the `audit-claim-validation` skill: read the anchor, not
+the summary; decide the claim's type; then try to falsify it. Every verdict below is
+a measurement, and each one names the command or the file:line that decided it.
+
+### 17.1 The four, measured
+
+| ID | The audit said | Measured 2026-09-26 | Verdict |
+|---|---|---|---|
+| **FE-M2** | `state.view` union drifted; `"fv"` dead but still consulted | `app.js:18` read `// "chat" \| "script"` — two legacy aliases, **none of the six live names**. But `"fv"` is documented at `app.js:2140-2142` as a legacy alias that "keeps its ORIGINAL destination", reachable from the URL parser (`app.js:2124`) and a saved payload (`app.js:2047`), with `openFeedbackView()` live at `app.js:7562` | **half right** — comment real, `"fv"` claim refuted |
+| **FE-M3** | Undo/Redo unreachable by mouse; `✅ code-verified` | True as an observation, and **intended**. `index.html:206-208` documents it; `git log -S` dates that comment to `f648506` (**2026-09-10**) — eleven days *before* the audit | **not a defect** |
+| **FE-L3** | Four abandoned design labs ship, ~26 HTML | 26 is exact (7+7+8+4). But `preview-next/` is **live**: 2 pages call `/api/preview/*`, which has 5 routes and 14 tests. The other three reference it zero times. Shipped cost **660 KB** (33.5%), not 4 MB | **count right, framing wrong** |
+| **FE-L4** | ~69 `!important`, ~58 `z-index`, two `:root`, dawn twice | **80** `!important`, **51** `z-index`, **2** `:root` (the second self-documenting at `style.css:4770`). `grep -E '^body\.dawn *\{'` → **exactly one** hit | **numbers off, one sub-claim refuted** |
+
+### 17.2 FE-M3 is not a defect, and the proof is a date
+
+The audit labelled this `✅ code-verified`, which is its strongest evidence mark. It
+verified the code. It did not read the comment three lines above it:
+
+```html
+<!-- Undo/Redo: no visible surface on purpose — keyboard parity
+     (Ctrl+Z / Ctrl+Shift+Z) is the contract; the hidden buttons
+     stay because the edit-state refreshers drive their .disabled. -->
+```
+
+`git log -S "no visible surface on purpose"` returns **one** commit: `f648506`,
+2026-09-10 — the baseline, and eleven days before the audit. So the hiding was
+documented intent before the audit was written, not an oversight it discovered.
+
+The code agrees. `app.js:5342-5344`, three adjacent lines in one function:
+
+```js
+$("#reset-edits-btn").style.display = hasEdits ? "inline-block" : "none";
+$("#undo-btn").disabled = !hasEdits;
+$("#redo-btn").disabled = !(state.editsData && state.editsData.can_redo);
+```
+
+`#reset-edits-btn` starts from the *same* inline `display:none` and JS reveals it.
+Undo/redo get only `.disabled`. An author editing those lines in one sitting and
+choosing differently is not an oversight — and `app.js:8627` binds Ctrl/⌘ Z to
+`undoEdit()` in the views that hold edits, so the keyboard really is the contract.
+
+**The correction to the finding is not "it is fine".** It is that the audit
+classified a decision as a bug, and the *next* reader will do the same, because
+nothing in the tracker said otherwise until now. So the decision is now pinned:
+`tests/test_spa_contract.py` fails if the controls become visible *or* if the comment
+explaining why they are hidden is deleted.
+
+### 17.3 The defect the audit missed, in the same feature
+
+The buttons are hidden. The product then told the writer to look at them:
+
+```js
+status.textContent = "Applied to the working copy — Undo is in the script toolbar.";
+```
+
+`#undo-btn` lives in `#desk-toolbar` — the script toolbar — and is `display:none`.
+So the confirmation message for an applied rewrite sent the writer to the one place
+the code deliberately never renders. A second site (`app.js:370`) referenced the
+hidden button's own glyph (`↶ Undo takes it back`). Both now name the keyboard.
+
+This is the highest-value thing this pass produced, and it is exactly the shape the
+skill warns about: **a wrong claim can still point at a real defect — just not the
+one it names.** The audit's `file:line` was right and its diagnosis was wrong, and
+the real defect sat two thousand lines away in the copy.
+
+### 17.4 FE-L3: I nearly deleted a live feature
+
+I measured the four lab directories at 4.07 MB, computed 76% of the webapp tree, and
+started reading `EXCLUDED_FROM_SHIPPING` to reclaim it. Two checks stopped me.
+
+**First, the number was inflated.** 4.07 MB counted 25 + 17 PNG screenshots. The
+packaging config excludes PNGs on purpose (`pyproject.toml`: *"Screenshots (\*.png)
+are deliberately excluded: they are evidence artifacts, not app assets"*). The honest
+figure is **660 KB**, and the honest share is **33.5%**.
+
+**Second, and worse, the premise was false.** `pyproject.toml:53-56` ships them
+*deliberately* and says why: the recursive glob exists because *"the preview-\* design
+labs are still served by the `/<path:filename>` route and are exercised by
+`test_preview_lab.py`"*. `GET /preview-next/index.html` returns **200**. And
+`preview-next/` is genuinely live — `webapp_server.py` carries five `/api/preview/*`
+routes and `test_preview_lab.py` has 14 tests over them.
+
+Adding all four to `EXCLUDED_FROM_SHIPPING` would have **broken the only consumer of
+a tested API**, to save 660 KB. What saved it was checking the *producer* of the
+"abandoned" framing rather than the framing: the phrase came from
+`CRITICAL_REVIEW_2026-09-18.md:458` — *"not shipped surface"* — which is simply
+wrong, and which nothing had re-read in eight days. That claim is now corrected in
+place with a dated block, original text left visible.
+
+### 17.5 Three errors in my own work
+
+**1. I reported 4.07 MB / 76% for something that ships 660 KB.** The inflated figure
+counted files the packaging excludes. I published it in the previous turn's summary
+before checking what actually ships.
+
+**2. My first literal scanner was unsound.** To find copy mentioning undo I ran a
+regex for `'...'` over `app.js`. It matched from the apostrophe in a prose comment
+(`"the writer's line"`) to the next apostrophe hundreds of lines away and reported
+whole code blocks as string literals. It produced a list of "offenders" that were not
+copy. **A scan that does not strip comments cannot measure copy** — this is the same
+grep-vs-parser error the skill names, and I made it while using the skill. The
+scanner is now a small state machine, with `test_the_literal_scanner_does_not_read_comments`
+as its own regression test.
+
+**3. My first "permanently hidden" detector was unsound in the other direction.** It
+subtracted `.style.display` assignments from inline-hidden ids and reported **20**
+controls as permanently hidden. The true answer is **2**: modals are revealed by
+`classList` toggles (131 calls), `.hidden` writes (23), and the `openModal` helpers.
+An unsound detector is worse than none, so the guard no longer computes the set — it
+declares `HIDDEN_BY_DESIGN` and checks each member against every reveal mechanism the
+SPA actually uses, plus the stylesheet. `#reset-edits-btn` is kept as the contrast
+case that proves the reveal-detection works at all.
+
+**A fourth, smaller one:** my `VIEWS:` extractor first scraped `|`-separated tokens
+out of the whole prose comment and got a union missing `compare` and `fv` — because
+the joined lines put a `//` in front of one token and an em-dash sentence swallowed
+the other. The fix was to stop parsing prose: the comment now carries one
+machine-readable `// VIEWS:` line, because **prose is not a data format**.
+
+### 17.6 The guards
+
+`tests/test_spa_contract.py` — 8 tests, 0.1 s, no browser:
+
+| Test | Guards |
+|---|---|
+| `test_the_view_union_comment_matches_the_source` | FE-M2 — the `VIEWS:` line equals `openViewByName()`'s own literals, plus the else-branch default |
+| `test_the_view_union_guard_can_fail` | non-vacuity: a comment missing `compare` is detected |
+| `test_the_deliberately_hidden_controls_are_still_hidden[undo/redo]` | FE-M3 — still inline-hidden, unrevealed by JS, and untouched by any non-print stylesheet rule |
+| `test_the_hidden_control_detector_can_see_a_revealed_control` | non-vacuity: `#reset-edits-btn` (same inline hiding, *is* revealed) is detected |
+| `test_the_reason_for_hiding_travels_with_the_code` | the intent comment cannot be deleted without a red test |
+| `test_the_literal_scanner_does_not_read_comments` | the scanner regression above |
+| `test_no_user_facing_copy_names_a_location_for_undo_or_redo` | FE-M3b — no copy names a location, **and** the post-apply hint still names the keyboard |
+
+That last pair is deliberate: "no copy names a location" is satisfied by *deleting the
+hint*, which would be a regression dressed as a pass. So the test also asserts the
+confirmation still tells the writer how to undo.
+
+**No browser check for the hiding, and that is a finding too.** An inline
+`display:none` is defeated only by an `!important` rule, so I enumerated all 19
+`display:…!important` declarations: 13 are inside `@media print` (they hide, they do
+not show) and the six outside it target `.gutter`, `.script-level-notes`,
+`.finding-summary` and `#cowrite-panel`. The only rule naming `#undo-btn`/`#redo-btn`
+is `style.css:3572`, inside `@media print`. The computed value is therefore
+determined by the markup, and a browser would confirm a constant. Saying so is better
+than adding a suite that cannot fail.
+
+### 17.7 Mutation-verified
+
+Six mutations, all detected, three files restored byte-identical
+(`.workbuddy-ai/scratch/mutation_check_spa_contract.py`):
+
+| Mutation | Result |
+|---|---|
+| the copy names the toolbar again (the exact defect) | **red** |
+| the `VIEWS:` line loses `compare` (the original FE-M2 drift) | **red** |
+| `app.js` starts revealing `#undo-btn` | **red** |
+| the reason-for-hiding comment is deleted from `index.html` | **red** |
+| the post-apply hint is deleted instead of corrected | **red** |
+| the literal scanner stops skipping comments | **red** |
+
+M5 is the one worth keeping: it proves the copy rule cannot be satisfied by removing
+the message, only by fixing it.
+
+### 17.8 Gates at this revision
+
+| Gate | Result |
+|---|---|
+| `python -m pytest tests/ -q --cov` | **1835 passed, 3 skipped, 0 failed — 87%** (9775 statements, 1262 missed), exit 0. **+8** over the previous row, all of them `tests/test_spa_contract.py` |
+| `python tests/run_browser_suites.py` | **55 suites: 54 passed, 0 failed, 1 skipped — 1343 checks**, exit 0 — **unchanged from the previous row** |
+| `ruff check .` | All checks passed |
+| `node --test tests/js/core.test.js` | 16 / 16 |
+| Mutation harness | **6 / 6 detected**, three files restored byte-identical |
+
+`app.js` is product code that all 55 browser suites load, so **the unchanged fleet
+is the load-bearing result here**, not the pytest count: it is the evidence that a
+comment rewrite and two copy strings moved nothing else. The static guards are the
+cheap always-on half — 0.1 s, no browser — and the fleet is the expensive half that
+covers the paths a source check cannot see.
+
 
 
