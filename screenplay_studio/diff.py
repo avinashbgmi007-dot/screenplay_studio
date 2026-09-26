@@ -56,12 +56,19 @@ def snapshot_active(m, name: str) -> None:
     after edits refreshes that draft's snapshot, which is the right semantics
     — the snapshot always reflects the latest state of that draft).
     """
-    if m.stage("parse").status != "complete":
-        return  # nothing parsed to snapshot
     dst = draft_dir(m, name)
     os.makedirs(dst, exist_ok=True)
+    # The source copy happens whether or not the script parsed. Both callers
+    # remove or replace the active source right after, so a snapshot gated on
+    # `parse == complete` could leave a draft's text on disk nowhere else — and
+    # a draft whose parse failed (a bad upload, an OCR miss) is exactly the one
+    # the writer still has to get back to.
+    if os.path.exists(m.source_path):
+        shutil.copy2(m.source_path,
+                     os.path.join(dst, os.path.basename(m.source_path)))
+    if m.stage("parse").status != "complete":
+        return  # nothing parsed to snapshot
     for src, rel in (
-        (m.source_path, os.path.basename(m.source_path)),
         (m.parsed_path, "parsed.json"),
         (m.report_findings_path, "report.findings.json"),
         (m.report_md_path, "report.md"),
@@ -83,8 +90,10 @@ def upload_new_draft(m, uploaded_path: str, filename: str):
     The original upload is implicit (not in m.drafts); every subsequent upload
     gets an auto-named draft entry. Returns the manifest (mutated + saved).
     """
-    if m.stage("parse").status == "complete":
-        snapshot_active(m, m.active_draft or "original")
+    # Unconditional: `snapshot_active` copies the source and skips the derived
+    # files when there is nothing parsed yet, so an unparsed draft's text is
+    # preserved here before the atomic swap below retires the active source.
+    snapshot_active(m, m.active_draft or "original")
 
     ext = os.path.splitext(filename)[1].lower()
     m.source_filename = filename
@@ -107,6 +116,27 @@ def upload_new_draft(m, uploaded_path: str, filename: str):
     return m
 
 
+def _snapshot_source(m, name: str, source_filename: str):
+    """The snapshot's own copy of that draft's source, or None if there isn't
+    exactly one candidate.
+
+    `snapshot_active` files the source under `source<ext>` rather than the
+    uploaded filename, so the ext is read back from the snapshot instead of
+    trusting the manifest: "original" has no draft record to take it from, which
+    is what made the old lookup look for `drafts/original/draft2.fountain` — a
+    path no writer of that snapshot ever produced.
+    """
+    d = draft_dir(m, name)
+    try:
+        names = sorted(n for n in os.listdir(d) if n.startswith("source."))
+    except OSError:
+        return None
+    want = "source" + os.path.splitext(source_filename)[1].lower()
+    if want in names:
+        return os.path.join(d, want)
+    return os.path.join(d, names[0]) if len(names) == 1 else None
+
+
 def activate_draft(m, name: str):
     """Switch the active draft back to a previously-snapshotted one."""
     d = draft_dir(m, name)
@@ -115,8 +145,7 @@ def activate_draft(m, name: str):
         raise ValueError(f"No snapshot for draft '{name}'.")
 
     # preserve the current state first (so switching is never destructive)
-    if m.stage("parse").status == "complete":
-        snapshot_active(m, m.active_draft or "original")
+    snapshot_active(m, m.active_draft or "original")
 
     # find this draft's source filename from the manifest record
     source_filename = m.source_filename
@@ -125,21 +154,36 @@ def activate_draft(m, name: str):
             source_filename = rec["source_filename"]
             break
 
-    old_source = m.source_path
-    if os.path.exists(old_source):
-        os.remove(old_source)
-    m.source_filename = source_filename
-    m.source_format = os.path.splitext(source_filename)[1].lower()
+    # Copy FIRST, swap SECOND, exactly as `upload_new_draft` does. The active
+    # source used to be removed before anything was restored, so either a copy
+    # that failed (a Windows sharing violation is routine) or a snapshot whose
+    # source sits under a name this function never looked for left the project
+    # with no script file at all — while parsed.json restored cleanly, so the
+    # writer saw a healthy draft with nothing behind it.
+    snap_src = _snapshot_source(m, name, source_filename)
+    previous_source = m.source_path
     m.active_draft = name
+    if snap_src:
+        m.source_filename = source_filename
+        m.source_format = os.path.splitext(snap_src)[1].lower()
+        incoming = m.source_path + ".incoming"
+        shutil.copy2(snap_src, incoming)
+        os.replace(incoming, m.source_path)
+        if m.source_path != previous_source and os.path.exists(previous_source):
+            os.remove(previous_source)  # the two drafts use different formats
+    # No source in the snapshot at all: keep the current file. It belongs to the
+    # draft being left, which is wrong, but the writer's copy is unrecoverable
+    # and a stale source can be re-uploaded.
 
-    # copy the snapshot's files back to the active positions
-    report_src = os.path.join(d, "report.findings.json")
-    report_md_src = os.path.join(d, "report.md")
+    # Restore the snapshot's derived files. A draft that was never analyzed
+    # clears the active report rather than leaving the previous draft's findings
+    # attributed to a script that never produced them — `_reset_derived_state`
+    # below re-queues analysis either way, and the outgoing report survives in
+    # that draft's own snapshot.
     for target, src in (
-        (m.source_path, os.path.join(d, os.path.basename(source_filename) or "source" + m.source_format_ext)),
         (m.parsed_path, parsed_src),
-        (m.report_findings_path, report_src),
-        (m.report_md_path, report_md_src),
+        (m.report_findings_path, os.path.join(d, "report.findings.json")),
+        (m.report_md_path, os.path.join(d, "report.md")),
     ):
         if os.path.exists(src):
             shutil.copy2(src, target)

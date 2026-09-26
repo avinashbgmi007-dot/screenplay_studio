@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from screenplay_parser import parse_fountain
+from screenplay_parser import parse_fountain, parse_screenplay
 from screenplay_studio.manifest import ProjectManifest
 from screenplay_studio.orchestrator import Orchestrator
 from screenplay_studio import diff
@@ -112,6 +112,73 @@ class TestSnapshotAndUpload:
     def test_activate_unknown_draft_raises(self, analyzed_manifest):
         with pytest.raises(ValueError):
             diff.activate_draft(analyzed_manifest, "ghost")
+
+
+# ---------- R6-BE-3: switching drafts must never cost the writer a script ----------
+# The docstring above `activate_draft` promises "switching is never destructive".
+# These two are that promise, as files on disk: the draft you switch TO must have
+# its own source text back, and the draft you switch AWAY from must keep its text
+# even when it never parsed (the preserve step used to be gated on
+# `parse == complete`, and the delete was unconditional).
+ORIG_LINE = "I'll tell you everything when this is over."
+D2_LINE = "Now I have to tell you the truth."
+
+
+class TestActivatePreservesSource:
+    def _read(self, path):
+        assert os.path.exists(path), f"{os.path.basename(path)} is not on disk"
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+
+    def test_activate_restores_the_drafts_own_source_text(self, analyzed_manifest, tmp_path):
+        m = analyzed_manifest
+        diff.upload_new_draft(m, _write_draft2(tmp_path), "draft2.fountain")
+        Orchestrator(m).run_parse()
+        assert D2_LINE in self._read(m.source_path)
+
+        diff.activate_draft(m, "original")
+        # The snapshot holds "source.fountain"; activation used to look for the
+        # uploaded filename instead, find nothing, and leave the project with no
+        # source file at all (parsed.json restored, so the UI looked fine).
+        assert ORIG_LINE in self._read(m.source_path)
+        assert m.source_format == ".fountain"
+
+    def test_switching_from_an_unparsed_draft_keeps_its_text(self, analyzed_manifest, tmp_path):
+        m = analyzed_manifest
+        diff.upload_new_draft(m, _write_draft2(tmp_path), "draft2.fountain")
+        # deliberately no re-parse: the writer switches before the parse ran
+
+        diff.activate_draft(m, "original")
+        assert ORIG_LINE in self._read(m.source_path)
+        preserved = os.path.join(diff.draft_dir(m, "draft-1"), "source.fountain")
+        assert D2_LINE in self._read(preserved), (
+            "draft-2's only copy was deleted while its parse was still pending")
+
+    def test_a_snapshot_missing_its_source_does_not_delete_the_active_one(
+            self, analyzed_manifest, tmp_path):
+        m = analyzed_manifest
+        diff.upload_new_draft(m, _write_draft2(tmp_path), "draft2.fountain")
+        Orchestrator(m).run_parse()
+        # A damaged/older snapshot: parsed.json present, source file not.
+        os.remove(os.path.join(diff.draft_dir(m, "original"), "source.fountain"))
+
+        diff.activate_draft(m, "original")
+        # The old code deleted the active source up front and then had nothing to
+        # put back. Keeping the current file is wrong about which draft is active,
+        # but recoverable; deleting it was not.
+        assert D2_LINE in self._read(m.source_path)
+
+    def test_the_restored_source_actually_parses(self, analyzed_manifest, tmp_path):
+        m = analyzed_manifest
+        diff.upload_new_draft(m, _write_draft2(tmp_path), "draft2.fountain")
+        Orchestrator(m).run_parse()
+        diff.activate_draft(m, "original")
+        # A fresh parse is what the writer's Re-parse button does, and what the
+        # next analyze needs. (Calling Orchestrator.run_parse() here would be a
+        # no-op check: activate_draft leaves `parse` complete, so it returns
+        # before ever opening the file — the missing source stayed invisible.)
+        doc = parse_screenplay(m.source_path)
+        assert doc.scene_count == 3
 
 
 class TestStructuralDiff:
