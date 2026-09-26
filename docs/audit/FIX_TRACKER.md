@@ -28,7 +28,7 @@ tracker-stamp commit that follows carries the same content.
 
 | Gate | Command | Result at this pass |
 |---|---|---|
-| Unit + integration | `python -m pytest tests/` | **1827 passed, 3 skipped, 0 failed** — measured 2026-09-25 (round 4: LOW pass + §14 + DEL-1 + E2E-4) at `d19fbce` (191s; coverage **87%** — 9775 statements, 1262 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; **+41** over the pre-pass row: `test_analyze_contract.py` 4, `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 11, `test_host_header_guard.py` 22, `test_repo_hygiene.py` 1) |
+| Unit + integration | `python -m pytest tests/` | **1827 passed, 3 skipped, 0 failed** — measured 2026-09-25 at **`dbeade7`** (191s; coverage **87%** — 9775 statements, 1262 missed, against the `fail_under = 85` floor; the 3 skips are `test_store_fault_injection`'s structurally-inapplicable non-load-modify-write cases; **+41** over the pre-pass row: `test_analyze_contract.py` 4, `test_browser_check_hygiene.py` 3, `test_session_selection_merge.py` 11, `test_host_header_guard.py` 22, `test_repo_hygiene.py` 1). **Revision corrected:** this figure was first recorded against `d19fbce`, which is wrong — the +2 BE-5 tests are in `dbeade7` |
 | Lint | `ruff check .` | **clean** (re-measured 2026-09-25) |
 | JS unit | `node --test tests/js/*.test.js` | **16 / 16** (re-measured 2026-09-25) |
 | Browser E2E | `python tests/run_browser_suites.py` | **55 suites: 54 pass, 0 fail, 1 skip, 0 known-broken** — **1,343 checks** — measured 2026-09-25 at `d19fbce`. The load-bearing part: the **1,330 checks that existed before this pass are unchanged and all still pass**; the 13 new ones are `real_transport` (E2E-4). `gun_pen_audit` remains the one skip — it POSTs a real `/analyze` and needs a live llama-server. |
@@ -1483,6 +1483,46 @@ E2E-1's) are visible as such.
 | E2E-5 | LOW | No coverage measurement | **FIXED** — `--cov` with `fail_under = 85`, currently 87%. The gate is now ~18 min, still well inside the job budget |
 | UX-1 | MED | No URL or history routing | **FIXED** — hash routing with `pushState`/`replaceState`/`popstate` in `app.js` |
 | UX-2 | LOW | WCAG 1.4.4 (resize text) and device-pixel-ratio untested | **FIXED** — `tests/e2e_browser_render_scale.py` |
+
+---
+
+## The 2026-09-21 audit, dispositioned
+
+Same blind spot as the 2026-09-24 audit, found the same way and one turn later: this
+audit's `FE-*` / `REL-*` ids appear **nowhere** in this tracker. A reader could not tell
+which of them were fixed, and **four are still open** — so the tracker was not merely
+incomplete, it was misleading.
+
+**Recorded as a correction to my own claim.** I asserted in this session that "every
+finding across all five audits is now closed or explicitly dispositioned". That was not
+verified, and it was false: I had checked two audits properly and inferred the rest. It
+is the exact error this tracker exists to catch — an assurance asserted rather than
+demonstrated — and I made it in the same pass that was fixing it elsewhere.
+
+Statuses below are **measured 2026-09-26**, not read off the audit's own text.
+
+| ID | Sev | Finding | Status |
+|---|---|---|---|
+| FE-C1 | CRIT | Stored XSS: model-controlled text into `innerHTML` unescaped | **FIXED** (`e3b283f`, row in the Closed table) |
+| FE-H1 | HIGH | Client and server compute different finding ids for astral characters | **FIXED** (`17f0757`, F4) |
+| FE-H2 | HIGH | The cache-bust guard was vacuous (matched 1 of 4 token shapes) | **FIXED** (`efb3dd5`, F5) |
+| FE-M1 | MED | No URL / hash routing at all | **FIXED** — `pushState` / `replaceState` / `popstate` + hash routing in `app.js` |
+| FE-M2 | MED | `state.view` union has drifted, and a dead value is still consulted | **OPEN, but narrower than the audit says.** Measured: the declaration at `app.js:18` still reads `// "chat" \| "script"` while the live values are `cowrite \| feedback \| fv \| premise \| compare \| revision \| beatboard` — that stale comment is the real defect and it is a one-line fix. The second half is **half-wrong**: `"fv"` is read at `app.js:2146` but it is a deliberate backward-compatibility alias for older session payloads, and `app.js:2140` says so. The audit read it as a dead value still consulted; it is a live compatibility shim |
+| FE-M3 | MED | Undo/Redo are unreachable by mouse | **OPEN** — measured: `index.html:209-210` still carry `style="display:none;"` on both, so the wired handlers stay undiscoverable |
+| FE-M4 | MED | Dock density collapse | **OPEN — design**, not verifiable as a defect: a layout judgement about how much the dock should hold |
+| FE-M5 | MED | Evidence layer has no single owner | **OPEN — design**: an unresolved argument about where the writer works, encoded as several containers |
+| FE-L1 | LOW | Left scene rail is cryptic (`1 ▮ 2 3 c`), no accessible name | **UNVERIFIED** — `#scene-index` still ships (`index.html:231-233`, 15 refs in `app.js`) as the compact strip; whether it still lacks a label cannot be settled by reading |
+| FE-L2 | LOW | At 900 px the premise-doctor drawer takes ~48% | **UNVERIFIED** — no rule under that name in `style.css`; needs a browser measurement |
+| FE-L3 | LOW | Four abandoned design labs still ship (~26 HTML files) | **OPEN, and deliberate** — all four still ship: `preview-next` 7, `preview-redesigns` 7, `preview-r4` 8, `preview-design` 4 = **26**, exactly as the audit measured. AGENTS.md's packaging notes treat `webapp/**/*.html` as shipped on purpose, so this is a decision to revisit, not an oversight |
+| FE-L4 | LOW | Theme escalation: ~69 `!important`, two `:root` blocks, dawn declared twice | **OPEN, and planned** — measured: **68** `!important`, **2** `:root`. `REDESIGN_MASTER_PLAN.md` §2 says the CSS debt must be paid down FIRST, before any visual change |
+| REL-C1 | CRIT | The built wheel contains **zero** data files | **FIXED** (`e3b283f`, R1) |
+| REL-H1 | HIGH | Nothing is shippable as a release | **FIXED** — `LICENSE`, `pyproject.toml`, and `pip install .` verified in a clean venv |
+| REL-H2 | HIGH | The work is not pushed | **FIXED** |
+
+**What is genuinely left in this repo, in one place:** FE-M2 and FE-M3 are small and
+verifiable; FE-L3 is a deliberate decision; FE-L4 is planned work with a home in the
+redesign plan; FE-M4/FE-M5 are design judgements; FE-L1/FE-L2 need a browser to settle.
+Everything else across all five audits is closed.
 
 ---
 
