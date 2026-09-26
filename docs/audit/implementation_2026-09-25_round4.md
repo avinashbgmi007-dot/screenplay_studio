@@ -27,10 +27,10 @@ restored byte-identical** (`.workbuddy-ai/scratch/mutation_check_r4.py`).
 *Everything below is the ladder (§1–§8) **plus** the BE-3 (§11) and UX-2 (§12)
 follow-ons, measured together at one revision.*
 
-> **Superseded.** §13.9 measures the same gates after the five LOW findings, and
-> **§17.8 is the current row** (2026-09-26: 1835 pytest / 55 suites / 1343 checks).
-> This table is kept as the record of the revision the ladder landed at
-> (`27bd576`): 1786 / 53 suites / 1319 checks.
+> **Superseded.** §13.9 measures the same gates after the five LOW findings, §17.8
+> after FE-M2/FE-M3b, and **§18.4 is the current row** (2026-09-26: 1838 pytest /
+> 55 suites / 1343 checks). This table is kept as the record of the revision the
+> ladder landed at (`27bd576`): 1786 / 53 suites / 1319 checks.
 
 | Gate | Command | Result |
 |---|---|---|
@@ -1309,10 +1309,120 @@ Five things, stated so they are not read as closed:
    declarations are load-bearing (the 13 inside `@media print` hide print chrome by
    design). A pay-down plan needs to know *which* are removable; I measured the total
    and the trend, which is the input to that question rather than the answer.
-5. **Mutation M6 mutates the test file, not the product.** It proves the literal
+5. **One mutation mutates the test file, not the product.** M6 proves the literal
    scanner's comment-skipping is load-bearing. It is legitimate — that scanner is the
-   thing measuring copy — but "6/6 detected" should not be read as six mutations of
-   product behaviour. Five are.
+   thing measuring copy — but "10/10 detected" should not be read as ten mutations of
+   product behaviour. Nine are.
+
+---
+
+## 18. FE-L1 and FE-L2 — the audit's unverified tier, and both were wrong
+
+The 2026-09-21 audit tagged its findings either `✅ code-verified` or `⚠️ reported`.
+FE-L1 and FE-L2 were `⚠️ reported` — the two it never checked. They sat in this
+tracker as `UNVERIFIED` for two passes with the note *"needs a browser"*. I have a
+browser, so leaving them there was a choice rather than a constraint. Both are now
+measured, and **both are wrong**.
+
+### 18.1 FE-L1 — "no labels, no accessible name"
+
+```
+items rendered        : 3
+container #scene-index: role='navigation' aria-label='Scene index' width=44px
+toggle button         : text='☰' title='Toggle scene index' aria-label='Toggle scene index'
+
+  role='button' tabindex='0'
+    aria-label : "INT. WRITER'S ROOM - NIGHT"
+    num/head   : '1' / "INT. WRITER'S ROOM - NIGHT"
+
+items with an accessible name : 3/3
+items with a visible heading  : 3/3
+```
+
+Every item carries `role="button"`, `tabindex="0"`, a `title`, an `aria-label` of the
+**full scene heading**, and a visible `.scene-index-head` span. The claim is false as
+written, and the source says so plainly at `app.js:5412-5427`.
+
+The audit's own description is the clue to what it actually saw: `` `1 ▮ 2 3 c` `` is
+the **collapsed** 44px strip. That is the rail's design — a collapsed rail shows
+numbers — not its content. Reading a collapsed control and reporting it as
+unlabelled is a measurement error, not a finding.
+
+**But there was a real gap one level up, and the audit's phrase half-named it.** *The
+rail* had no `role` and no name. So a screen reader reached an unlabelled cluster of
+buttons with nothing saying what they were for — and the toggle's accessible name came
+from `title` alone, which is a tooltip: unreliable across AT and absent on touch. Both
+fixed:
+
+```html
+<div id="scene-index" role="navigation" aria-label="Scene index">
+  <button id="scene-index-toggle" … title="Toggle scene index" aria-label="Toggle scene index">
+```
+
+Verified at runtime, not just in the markup — the probe reports
+`role='navigation' aria-label='Scene index'` and the toggle's explicit label, with the
+items still 3/3 named.
+
+### 18.2 FE-L2 — "the premise-doctor drawer takes ~48% and the canvas runs under it"
+
+```
+viewport width        : 900px
+#premise-view         : 900px wide (100.0% of the viewport) display=flex position=static
+#manuscript-container : 0px wide display=flex left=0 right=0
+horizontal overlap    : 0px
+```
+
+There is no ~48% drawer and the canvas does not run under anything. The reason is
+self-documented in the stylesheet at `style.css:838`:
+
+> `/* (Phase 13: the .premise-pane container retired — the premise card is the`
+> `   full-screen #premise-view now. …`
+
+**The audit described a container that had already been retired.** Its `⚠️ reported`
+tier was right to withhold confidence, but the finding should not have been carried
+forward at all — and I carried it for two passes, as `UNVERIFIED — needs a browser`,
+when the answer was a one-line read of the stylesheet's own comment.
+
+### 18.3 The mutation harness caught a vacuous guard in my own work — again
+
+The first version of `test_the_scene_index_items_are_named_in_the_source` asserted
+`'setAttribute("aria-label"' in body`. Mutation M10 (delete the item's label) left it
+**green**: `renderSceneIndex` sets an `aria-label` on *two* elements — the item and its
+`✓` clean-marker — so the string was still there.
+
+That is the third time this session that a check of mine was satisfiable for the wrong
+reason, and the second time in a guard I had just written. The assertion now names
+`item.` explicitly and requires the label to derive from `scene.heading_raw`, so a rail
+announcing bare numbers — which is what "cryptic" would actually mean — fails. M10 is
+red.
+
+The pattern is worth stating plainly: **a substring assertion over a function body is
+not an assertion about that function.** It is an assertion that the substring exists
+somewhere inside it, and functions do more than one thing.
+
+### 18.4 Guards and gates
+
+`tests/test_spa_contract.py` is now 11 tests, 0.2 s, no browser. Mutations **10/10
+detected** (M1–M10), three files restored byte-identical.
+
+Two of the ten are deliberately about the *name* rather than the presence of an
+attribute: M8 keeps `role="navigation"` and removes only `aria-label`, because an
+unnamed navigation landmark is announced as just "navigation" and the guard's whole
+point is that the name is what was missing.
+
+| Gate | Result |
+|---|---|
+| `python -m pytest tests/ -q --cov` | **1838 passed, 3 skipped, 0 failed — 87%** (9775 statements, 1262 missed), exit 0. **+3** over §17.8, all of them the FE-L1 scene-rail tests |
+| `python tests/run_browser_suites.py` | **55 suites: 54 passed, 0 failed, 1 skipped — 1343 checks**, exit 0 — **unchanged across three consecutive revisions** |
+| `ruff check .` | All checks passed |
+| `node --test tests/js/core.test.js` | 16 / 16 |
+| Mutation harness | **10 / 10 detected**, three files restored byte-identical |
+
+The fleet row is the one that carries weight again: this revision edits `index.html`,
+which every one of the 55 suites loads, so "unchanged" is the evidence that adding a
+`role` and two `aria-label`s disturbed nothing else — including the two a11y suites
+(`e2e_browser_live_regions.py`, `test_a11y_outline_guard.py`), which is the specific
+risk an a11y change carries.
 
 
 
