@@ -1099,7 +1099,7 @@ a measurement, and each one names the command or the file:line that decided it.
 | **FE-M2** | `state.view` union drifted; `"fv"` dead but still consulted | `app.js:18` read `// "chat" \| "script"` — two legacy aliases, **none of the six live names**. But `"fv"` is documented at `app.js:2140-2142` as a legacy alias that "keeps its ORIGINAL destination", reachable from the URL parser (`app.js:2124`) and a saved payload (`app.js:2047`), with `openFeedbackView()` live at `app.js:7562` | **half right** — comment real, `"fv"` claim refuted |
 | **FE-M3** | Undo/Redo unreachable by mouse; `✅ code-verified` | True as an observation, and **intended**. `index.html:206-208` documents it; `git log -S` dates that comment to `f648506` (**2026-09-10**) — eleven days *before* the audit | **not a defect** |
 | **FE-L3** | Four abandoned design labs ship, ~26 HTML | 26 is exact (7+7+8+4). But `preview-next/` is **live**: 2 pages call `/api/preview/*`, which has 5 routes and 14 tests. The other three reference it zero times. Shipped cost **660 KB** (33.5%), not 4 MB | **count right, framing wrong** |
-| **FE-L4** | ~69 `!important`, ~58 `z-index`, two `:root`, dawn twice | **80** `!important`, **51** `z-index`, **2** `:root` (the second self-documenting at `style.css:4770`). `grep -E '^body\.dawn *\{'` → **exactly one** hit | **numbers off, one sub-claim refuted** |
+| **FE-L4** | ~69 `!important`, ~58 `z-index`, two `:root`, dawn twice | **80** `!important` at HEAD — but **82 at the audit's own revision** (`git show e3b283f:…style.css`), so the audit undercounted by 13 and the debt has gone flat-to-down since. **51** `z-index` (overstated by 7). **2** `:root` (the second self-documenting at `style.css:4770`). `grep -E '^body\.dawn *\{'` → **exactly one** hit | **numbers off both ways, one sub-claim refuted** |
 
 ### 17.2 FE-M3 is not a defect, and the proof is a date
 
@@ -1128,6 +1128,23 @@ $("#redo-btn").disabled = !(state.editsData && state.editsData.can_redo);
 Undo/redo get only `.disabled`. An author editing those lines in one sitting and
 choosing differently is not an oversight — and `app.js:8627` binds Ctrl/⌘ Z to
 `undoEdit()` in the views that hold edits, so the keyboard really is the contract.
+
+**And that asymmetry is observed, not inferred.** I read it out of the source first,
+which is the weaker proof, so I measured it: seed a project, apply a real edit
+through `/edits/apply`, then read the computed styles in one browser.
+
+```
+#undo-btn             display=none         box=0x0  HIDDEN
+#redo-btn             display=none         box=0x0  HIDDEN
+#reset-edits-btn      display=inline-block box=0x0  VISIBLE
+#print-btn            display=flex         box=0x0  VISIBLE
+```
+
+One toolbar, one starting state, one edit present: JS un-hides `#reset-edits-btn` and
+leaves undo/redo hidden. (The `0x0` boxes are the closed overflow menu — the parent
+is `display:none` until it opens. The element's *own* computed display is what proves
+the reveal, which is the property the guard asserts.) Script:
+`.workbuddy-ai/scratch/contrast_runtime_probe.py`.
 
 **The correction to the finding is not "it is fine".** It is that the audit
 classified a decision as a bug, and the *next* reader will do the same, because
@@ -1266,6 +1283,36 @@ is the load-bearing result here**, not the pytest count: it is the evidence that
 comment rewrite and two copy strings moved nothing else. The static guards are the
 cheap always-on half — 0.1 s, no browser — and the fleet is the expensive half that
 covers the paths a source check cannot see.
+
+### 17.9 What this pass does not settle
+
+Five things, stated so they are not read as closed:
+
+1. **FE-M3's underlying worry is legitimate even though its diagnosis was not.** The
+   audit said "undiscoverable", and I disproved the *bug* framing — but I did not
+   measure discoverability. The buttons stay invisible by design, so finding undo now
+   rests entirely on the SHORTCUTS table in the command palette. Whether a writer
+   actually looks there is a UX question, and "the keyboard is the contract" is a
+   design assertion, not a measurement. The copy fix helps only *after* an edit.
+2. **The runtime evidence for FE-M3 is not in CI.** The contrast table above comes
+   from `.workbuddy-ai/scratch/contrast_runtime_probe.py`, a scratch script. The
+   committed guard is a source check. That is the right call for the *hiding* (see
+   §17.6 — the computed value is determined by the markup), but it does mean the
+   runtime observation would not fail a future build. If the hiding ever becomes
+   contentious, the probe belongs in a suite.
+3. **FE-L3's three inert labs are still served.** They are unreferenced by the app,
+   but `GET /preview-r4/…` answers on loopback. I measured their size and their
+   API-reachability, not whether serving them is acceptable. The risk is low — static
+   mockups, no API calls — but "unreferenced" and "unreachable" are different words
+   and only the first is true.
+4. **FE-L4's count is not the same as its cost.** Some of the 80 `!important`
+   declarations are load-bearing (the 13 inside `@media print` hide print chrome by
+   design). A pay-down plan needs to know *which* are removable; I measured the total
+   and the trend, which is the input to that question rather than the answer.
+5. **Mutation M6 mutates the test file, not the product.** It proves the literal
+   scanner's comment-skipping is load-bearing. It is legitimate — that scanner is the
+   thing measuring copy — but "6/6 detected" should not be read as six mutations of
+   product behaviour. Five are.
 
 
 
