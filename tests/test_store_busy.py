@@ -27,6 +27,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import textwrap
 import time
 
@@ -258,3 +259,48 @@ def test_reset_working_still_resets_under_one_budget(tmp_path):
     assert not os.path.exists(revision.working_path(m))
     assert not os.path.exists(revision.edits_log_path(m))
     assert not os.path.exists(revision.edits_redo_path(m))
+
+
+# ---------------------------------------------------------------------------
+# R6-BE-8: the message the class was written to carry.
+# ---------------------------------------------------------------------------
+
+def test_a_lock_timeout_names_the_store_it_waited_for(tmp_path):
+    """The sentence exists in the source and binds nowhere.
+
+    `jsonio.py:97-102` defines `StoreLockTimeout.__init__` INSIDE
+    `lock_deadline`'s generator body, after its `finally: stack.pop()`, so it is
+    dead code that never reaches the class. `StoreLockTimeout(path, timeout)`
+    therefore falls back to RuntimeError's default repr:
+
+        >>> str(StoreLockTimeout('/x/working.json', 6.0))
+        "('/x/working.json', 6.0)"
+
+    The 503 body is composed by the webapp handler, so a writer does not see the
+    tuple THERE — that part of the audit overstated it. What still leaks is every
+    surface that prints the exception itself: the `traceback.print_exc()` a route
+    takes on the way to a 500, the werkzeug console line for that request, and the
+    CLI's error path. AGENTS.md asks those to be actionable, and a tuple names
+    neither the wait nor the file's owner. So this drives the real acquisition and
+    reads the real exception rather than a hand-built one.
+    """
+    target = str(tmp_path / "working.json")
+    with open(target, "w", encoding="utf-8") as fh:
+        fh.write("{}")
+
+    with _Held(target):
+        with pytest.raises(jsonio.StoreLockTimeout) as excinfo:
+            with jsonio.lock_deadline(0.4):
+                with jsonio.lock_for(target):
+                    pass
+
+    msg = str(excinfo.value)
+    assert "working.json" in msg, f"the timeout never said which store: {msg}"
+    assert "another process" in msg, f"the timeout never said why it waited: {msg}"
+    assert "timed out" in msg, f"the timeout reads like a crash: {msg}"
+    # ...and the number has to be the budget that actually expired. The raise
+    # site used to hand on the PER-ACQUISITION default, so a 0.4s block reported
+    # "after 10s" — a wrong figure in a message whose only job is accuracy.
+    stated = re.search(r"after ([0-9.]+)s", msg)
+    assert stated and float(stated.group(1)) <= 0.4, (
+        f"the block's budget was 0.4s but the message says {msg!r}")

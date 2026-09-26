@@ -282,6 +282,62 @@ class TestRetryFailedEndpoint:
         data = resp.get_json()
         assert isinstance(data["failed_categories"], list)
 
+    def test_a_retry_that_raised_leaves_a_state_the_button_can_still_resume(
+            self, http_client, monkeypatch):
+        """R6-BE-6 — the one resumable state used to be the only one refused.
+
+        A *partial* analyze already lands `complete` + failed_categories (the
+        AGENTS.md contract, orchestrator.py:156-166). But when a retry itself
+        raises — the server went away mid-flight — the orchestrator marks the
+        stage `failed` and RESTORES that partial record (orchestrator.py:181-187)
+        precisely so a later retry can resume from the same failed set. The desk
+        reads failed_categories off the shelf (app.js:2740, :6603) and offers
+        "Rerun the N failed passes"; the gate demanded status == "complete", so
+        it answered 400 for the exact state the button was built for. The writer
+        then pays a full 12-pass rerun or stays on a stale report.
+
+        The state is produced here by the real path, not by writing a manifest.
+        """
+        from screenplay_analyzer import pipeline as pipeline_mod
+        from screenplay_analyzer.llm_client import LlamaServerError
+        from screenplay_analyzer.llm_client import LlamaServerClient as AnalyzerClient
+
+        def manifest():
+            return ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project))
+
+        project = _upload(http_client)
+
+        # 1. one pass raises inside the pipeline -> a partial analysis
+        def boom(*args, **kwargs):
+            raise LlamaServerError("summaries unavailable (simulated)")
+
+        monkeypatch.setattr(pipeline_mod, "build_scene_summaries", boom)
+        http_client.post(f"/api/projects/{project}/analyze", json={})
+        failed_before = manifest().stage("analyze").output_paths.get("failed_categories") or []
+        assert failed_before, "the simulated partial run produced no failed passes"
+        assert manifest().stage("analyze").status == "complete"
+
+        # 2. the retry itself dies -> `failed`, but the partial record survives
+        monkeypatch.undo()
+
+        def dead(self):
+            raise LlamaServerError("server down (simulated)")
+
+        monkeypatch.setattr(AnalyzerClient, "resolve_model", dead)
+        refused = http_client.post(f"/api/projects/{project}/analyze/retry-failed", json={})
+        assert refused.status_code in (400, 502), refused.get_json()
+        assert manifest().stage("analyze").status == "failed"
+        assert (manifest().stage("analyze").output_paths.get("failed_categories")
+                == failed_before)
+
+        # 3. the server is back and the desk still offers the rerun: it resumes
+        monkeypatch.undo()
+        assert (webapp_server._manifest_summary(manifest())["failed_categories"]
+                == failed_before), "the shelf must keep advertising the rerun for this state"
+        resumed = http_client.post(f"/api/projects/{project}/analyze/retry-failed", json={})
+        assert resumed.status_code == 200, resumed.get_json()
+        assert resumed.get_json()["failed_categories"] == []
+
 
 class TestFindingDismissal:
     def test_dismiss_roundtrip_filters_fixqueue(self, http_client):

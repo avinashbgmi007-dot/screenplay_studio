@@ -52,6 +52,14 @@ _LOCK_POLL_SECONDS = 0.01
 class StoreLockTimeout(RuntimeError):
     """Another process held a store lock for longer than LOCK_TIMEOUT_SECONDS."""
 
+    def __init__(self, path: str, timeout: float):
+        self.path = path
+        self.timeout = timeout
+        secs = f"{timeout:.1f}".rstrip("0").rstrip(".")
+        super().__init__(
+            f"timed out after {secs}s waiting for another process to "
+            f"release {os.path.basename(path)}")
+
 
 # ---------------------------------------------------------------------------
 # Composing lock budgets (BE-3 amplifier, round-4 audit 2026-09-25)
@@ -94,13 +102,6 @@ def lock_deadline(seconds: float | None = None):
     finally:
         stack.pop()
 
-    def __init__(self, path: str, timeout: float):
-        self.path = path
-        self.timeout = timeout
-        super().__init__(
-            f"timed out after {timeout:.0f}s waiting for another process to "
-            f"release {os.path.basename(path)}")
-
 
 def _lock_file_path(path: str) -> str:
     """Sidecar path holding a store's cross-process lock.
@@ -127,7 +128,8 @@ def _acquire_os_lock(fd: int, path: str, timeout: float | None = None) -> None:
     """
     if timeout is None:
         timeout = LOCK_TIMEOUT_SECONDS
-    deadline = time.monotonic() + timeout
+    started = time.monotonic()
+    deadline = started + timeout
     # A surrounding `lock_deadline()` block wins when it is tighter. That is how
     # a cycle's leaf acquisitions share ONE budget instead of one each.
     stack = getattr(_deadline_local, "stack", None)
@@ -145,7 +147,12 @@ def _acquire_os_lock(fd: int, path: str, timeout: float | None = None) -> None:
             return
         except OSError:
             if time.monotonic() >= deadline:
-                raise StoreLockTimeout(path, timeout) from None
+                # Report the budget that ACTUALLY expired. `timeout` is the
+                # per-acquisition default (10s); inside a `lock_deadline(0.4)`
+                # block the wait ended at 0.4s, and a message that says "after
+                # 10s" is wrong in the one place the writer reads to find out
+                # how long the studio was busy.
+                raise StoreLockTimeout(path, deadline - started) from None
             time.sleep(_LOCK_POLL_SECONDS)
 
 

@@ -1387,7 +1387,19 @@ def retry_failed_categories(name):
                       "wait for it to finish before retrying.", 409)
     try:
         if m.stage("analyze").status != "complete":
-            return _error("Analysis hasn't completed yet — run the full analysis first.", 400)
+            # R6-BE-6: a retry that itself raised leaves the stage `failed` while
+            # the orchestrator RESTORES the partial record it started from
+            # (failed_categories + report paths, orchestrator.py:181-187) exactly
+            # so a later attempt can resume the same set — and the desk reads
+            # that record off the shelf to offer "Rerun the N failed passes"
+            # (app.js:2740, :6603). Demanding `complete` here made the one
+            # resumable state the only state this endpoint refused: the writer
+            # paid a full 12-pass rerun or stayed on a stale report. The
+            # resume itself already works at the orchestrator level; this gate
+            # was the whole defect.
+            resumable = bool((m.stage("analyze").output_paths or {}).get("failed_categories"))
+            if not resumable:
+                return _error("Analysis hasn't completed yet — run the full analysis first.", 400)
         return _retry_failed_locked(m)
     finally:
         lock.release()
