@@ -98,3 +98,176 @@ def test_no_suite_omits_the_condition():
         "these checks pass no condition at all (and would raise TypeError): "
         f"{missing}"
     )
+
+# ---- the three shapes round 6 found living inside a GREEN fleet --------------
+# R6-E2E-1 proved the gap concretely: an export check written
+#     code == 200 and "INT." in text or "EXT." in text or len(text) > 200
+# binds as `(200 and "INT.") or "EXT." or len>200`, so a 500 error page passed
+# it — and it sat in a fleet that ran 1,249 checks and printed PASS. The rules
+# above (literal True / no condition) could not see it, because the vacuity is
+# in the SHAPE of the expression, not a bare constant. These three cover that
+# class; each is proven on a synthetic snippet below, so a rule that stops
+# firing on real code is caught rather than assumed.
+
+_OPS = (ast.And, ast.Or)
+
+
+def _is_check(node):
+    fn = node.func
+    name = (fn.attr if isinstance(fn, ast.Attribute)
+            else fn.id if isinstance(fn, ast.Name) else None)
+    return name in CHECK_NAMES
+
+
+def _cond(node):
+    kwargs = {k.arg: k.value for k in node.keywords}
+    return node.args[1] if len(node.args) >= 2 else kwargs.get("cond")
+
+
+def _wrapped(lines, node):
+    """Was THIS operand written inside its own parentheses?
+
+    The AST throws parens away, so `a and b or c` and `a and (b or c)` are
+    indistinguishable as trees — and only one of them means what its author
+    thought. This reads the source back, which is the whole point of the rule.
+    """
+    before = lines[node.lineno - 1][:node.col_offset].rstrip()
+    after = lines[node.end_lineno - 1][node.end_col_offset:node.end_col_offset + 2]
+    return before.endswith("(") and after.lstrip().startswith(")")
+
+
+def _vacuous_sites(src, tree):
+    """[(line, why)] for check conditions that cannot evaluate to False."""
+    lines = src.splitlines()
+    hits = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and _is_check(node)):
+            continue
+        cond = _cond(node)
+        if cond is None:
+            continue
+        for sub in ast.walk(cond):
+            if isinstance(sub, ast.BoolOp):
+                for v in sub.values:
+                    if isinstance(v, ast.Constant) and v.value in (True, None):
+                        hits.append((node.lineno, "a literal in an or/and chain"))
+                    elif (isinstance(v, ast.BoolOp)
+                          and type(v.op) is not type(sub.op)
+                          and not _wrapped(lines, v)):
+                        hits.append((node.lineno, "and/or mixed without parentheses"))
+            # `len(x) >= 0` and `x.count() >= 0` are true for every value a
+            # length can hold. That is the idiom R6-E2E-3 found guarding a
+            # dismiss that did nothing.
+            elif (isinstance(sub, ast.Compare) and len(sub.ops) == 1
+                    and isinstance(sub.left, ast.Call)
+                    and isinstance(sub.comparators[0], ast.Constant)):
+                fn = sub.left.func
+                called = (fn.id if isinstance(fn, ast.Name)
+                          else getattr(fn, "attr", ""))
+                op, rhs = sub.ops[0], sub.comparators[0].value
+                never_false = ((isinstance(op, ast.GtE) and rhs == 0)
+                               or (isinstance(op, ast.Gt) and rhs == -1))
+                if called in ("len", "count") and never_false:
+                    hits.append((node.lineno, "a length compared against 0"))
+        if isinstance(cond, ast.Constant) and cond.value in (True, None):
+            hits.append((node.lineno, "a literal condition"))
+    return sorted(set(hits))
+
+
+@pytest.mark.parametrize("snippet, reason", [
+    # exactly what shipped in R6-E2E-1
+    ('check("export works", code == 200 and "INT." in t or "EXT." in t)', "and/or"),
+    ('check("dismiss worked", rows.count() >= 0)', "length"),
+    ('check("decoration", True)', "literal"),
+])
+def test_each_rule_fires_on_the_shape_it_exists_to_catch(snippet, reason):
+    """A guard that cannot fire is the same defect it polices. Prove each one red
+    before trusting it green, and prove it STAYS green on the parenthesised form
+    so the rule filters instead of bullying."""
+    tree = ast.parse(snippet)
+    hits = _vacuous_sites(snippet, tree)
+    assert hits, f"{snippet!r} is the defect this rule was written for"
+    assert reason in " ".join(w for _, w in hits)
+
+
+def test_the_parenthesised_form_is_clean():
+    good = ('check("export works",\n'
+            '      (code == 200 and ("INT." in t or "EXT." in t) and len(t) > 200))')
+    assert not _vacuous_sites(good, ast.parse(good))
+
+
+def test_no_suite_uses_a_condition_that_cannot_fail():
+    suites = sorted(TESTS_DIR.glob("e2e_browser_*.py"))
+    assert len(suites) >= 40, f"only {len(suites)} suites found — the scan is broken"
+    offenders = []
+    for path in suites:
+        src = path.read_text(encoding="utf-8", errors="replace")
+        offenders += [f"{path.name}:{line} ({why})"
+                      for line, why in _vacuous_sites(src, ast.parse(src))]
+    assert not offenders, (
+        "these checks cannot evaluate to False, so they count as passes while "
+        f"asserting nothing: {offenders}"
+    )
+
+
+# ---- R6-E2E-2: the `if`-guarded block with no `else` -------------------------
+# The fourth shape the fleet's own hygiene test could not see. When every check in
+# a suite sits inside `if <fixture precondition>:` and that guard has no `else`, a
+# rename or a changed fixture deletes the ASSERTION without failing anything: the
+# suite records nothing, prints PASS, and the product law it guarded — "the script
+# pane never drops below 50%" — stops being tested in silence.
+# `e2e_browser_dock_sections.py:596-605` is the correct local shape (an `else`
+# that records a failing check), so this is a known pattern that never got applied
+# elsewhere.
+#
+# A ratchet, not a clean rule: measured at 53 sites across 21 files when this was
+# written, and converting one costs a fixture judgement per site (some guards are
+# reachable and simply never entered by the current project dir, which is
+# layout_audit's case). So the ceiling may only FALL, and each fix lowers it —
+# while nothing new is allowed in. The list below is the work queue.
+IF_GUARD_CEILING = 53
+
+
+def _if_guarded_sites():
+    hits = []
+    for path in sorted(TESTS_DIR.glob("e2e_browser_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.If) or node.orelse:
+                continue
+            if any(_is_check(c) for c in ast.walk(node) if isinstance(c, ast.Call)):
+                hits.append(f"{path.name}:{node.lineno}")
+    return hits
+
+
+def test_if_guarded_checks_do_not_grow():
+    sites = _if_guarded_sites()
+    assert len(sites) <= IF_GUARD_CEILING, (
+        f"{len(sites)} checks sit inside an `if` with no `else` (ceiling "
+        f"{IF_GUARD_CEILING}). When the guard is false the suite records nothing "
+        "and still prints PASS. Give the guard an "
+        "`else: check(..., False, 'guard not reached')` like "
+        f"dock_sections.py:596-605, or lower the ceiling honestly: {sites}"
+    )
+
+
+def test_the_ratchet_is_not_a_free_pass():
+    """A ceiling above zero is only trustworthy if the scanner still sees the
+    shape it counts — and if the queue it describes is real. Proves the scan is
+    wired to the AST rather than returning a constant."""
+    sites = _if_guarded_sites()
+    assert len(sites) == IF_GUARD_CEILING, (
+        f"the queue moved to {len(sites)}; update IF_GUARD_CEILING in the same "
+        "commit so the direction (down) stays visible in the diff"
+    )
+    # layout_audit's 9c block is the found-in-the-wild instance; it must be in here.
+    assert any(s.startswith("e2e_browser_layout_audit.py:") for s in sites)
+    sample = (
+        'def t():\n'
+        '    if widths:\n'
+        '        check("the pane never drops below 50%", ok)\n')
+    tree = ast.parse(sample)
+    guarded = [n for n in ast.walk(tree)
+               if isinstance(n, ast.If) and not n.orelse
+               and any(_is_check(c) for c in ast.walk(n) if isinstance(c, ast.Call))]
+    assert len(guarded) == 1

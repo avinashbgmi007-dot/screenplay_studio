@@ -713,13 +713,14 @@ def test_the_gate_retries_a_driver_init_failure_and_says_it_did(monkeypatch):
         calls.append(path)
         if len(calls) == 1:
             driver = "Exception: Connection.init: Connection closed while reading from the driver"
-            return "ERROR", driver, 2.0, driver
-        return "PASS", "47 passed", 30.0, "=== 47 passed, 0 failed ==="
+            return "ERROR", driver, 2.0, driver, None
+        return "PASS", "47 passed", 30.0, "=== 47 passed, 0 failed ===", 47
 
     monkeypatch.setattr(rbs, "_attempt", fake_attempt)
-    status, detail, elapsed = rbs.run_one("e2e_browser_x.py", 60)
+    status, detail, elapsed, count = rbs.run_one("e2e_browser_x.py", 60)
 
     assert status == "PASS"
+    assert count == 47, "the runner must carry the check count, not just the verdict"
     assert "driver-init retry" in detail, f"a retried pass must say so: {detail!r}"
     assert elapsed == 32.0, "the retry's time must be counted, not dropped"
     assert len(calls) == 2
@@ -734,13 +735,34 @@ def test_the_gate_does_not_retry_a_real_failure(monkeypatch):
 
     def fake_attempt(path, timeout):
         calls.append(path)
-        return "FAIL", "3 passed, 1 failed", 5.0, "FAILED  some check"
+        return "FAIL", "3 passed, 1 failed", 5.0, "FAILED  some check", 3
 
     monkeypatch.setattr(rbs, "_attempt", fake_attempt)
-    status, detail, _ = rbs.run_one("e2e_browser_x.py", 60)
+    status, detail, _, count = rbs.run_one("e2e_browser_x.py", 60)
 
     assert status == "FAIL"
     assert len(calls) == 1, "a genuine failure must never be retried away"
+
+
+def test_a_suite_that_records_no_checks_cannot_pass(monkeypatch):
+    """The floor (R6-E2E-4). The verdict used to be `failed or returncode`, and
+    `passed` was parsed only to build the detail string — so a suite whose every
+    assertion sits inside an `if` guard the fixture never enters printed
+    `PASS 0 passed` and the gate called it green. layout_audit's fix-loop block
+    (the engage/Esc contract, the "<50% manuscript" law) is exactly that shape.
+    """
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import run_browser_suites as rbs
+
+    def fake_attempt(path, timeout):
+        return "PASS", "0 passed", 5.0, "=== 0 passed, 0 failed ===", 0
+
+    monkeypatch.setattr(rbs, "_attempt", fake_attempt)
+    status, detail, _, count = rbs.run_one("e2e_browser_x.py", 60)
+
+    assert status == "FAIL", "zero checks recorded is not a pass"
+    assert "0 checks" in detail
 
 
 # ---- B4: the "never off the machine" STT guard must not be prefix-bypassable --

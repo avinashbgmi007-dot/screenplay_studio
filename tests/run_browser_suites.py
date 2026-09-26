@@ -126,39 +126,53 @@ def _looks_like_driver_init_failure(out: str) -> bool:
 
 
 def _attempt(path: str, timeout: int):
+    """Returns (status, detail, seconds, out, n_checks) — n_checks None if unknown."""
     started = time.time()
     try:
         proc = subprocess.run(
             [sys.executable, path], cwd=REPO_ROOT, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=timeout)
     except subprocess.TimeoutExpired:
-        return "TIMEOUT", f"exceeded {timeout}s", time.time() - started, ""
+        return "TIMEOUT", f"exceeded {timeout}s", time.time() - started, "", None
     elapsed = time.time() - started
     out = (proc.stdout or "") + (proc.stderr or "")
     hits = _SUMMARY_RE.findall(out)
     if not hits:
         tail = "\n".join([line for line in out.strip().splitlines()[-6:] if line.strip()])
-        return "ERROR", tail or f"no summary; exit {proc.returncode}", elapsed, out
+        return "ERROR", tail or f"no summary; exit {proc.returncode}", elapsed, out, None
     passed, failed = (int(x) for x in hits[-1])
     if failed or proc.returncode != 0:
         fails = [line for line in out.splitlines() if line.startswith("FAILED")]
         detail = f"{passed} passed, {failed} failed"
         if fails:
             detail += " | " + " ; ".join(fails[:3])
-        return "FAIL", detail, elapsed, out
-    return "PASS", f"{passed} passed", elapsed, out
+        return "FAIL", detail, elapsed, out, passed
+    return "PASS", f"{passed} passed", elapsed, out, passed
 
 
 def run_one(filename: str, timeout: int):
-    """Returns (status, detail, seconds). status in PASS / FAIL / ERROR / TIMEOUT."""
+    """Returns (status, detail, seconds, n_checks). status in PASS/FAIL/ERROR/TIMEOUT."""
     path = os.path.join(TESTS_DIR, filename)
-    status, detail, elapsed, out = _attempt(path, timeout)
+    status, detail, elapsed, out, count = _attempt(path, timeout)
     if status == "ERROR" and _looks_like_driver_init_failure(out):
-        status, detail, again, _ = _attempt(path, timeout)
+        status, detail, again, _, count = _attempt(path, timeout)
         elapsed += again
         detail = (f"{detail} (after one Playwright driver-init retry)" if status == "PASS"
                   else f"{detail} (retried once after a driver-init failure)")
-    return status, detail, elapsed
+    # THE FLOOR, applied to the verdict that is actually reported (so a retried
+    # pass is covered too). A suite that records nothing cannot fail, and the
+    # verdict used to be only `if failed or returncode` — so `PASS 0 passed` was a
+    # green suite. That is how a whole block of product laws (layout_audit 9c, the
+    # fix-loop contract, the "<50% manuscript" rule) stopped being asserted while
+    # the fleet kept printing its check total: the assertions sit inside `if`
+    # guards the current fixture never enters, and nothing compared the count to
+    # anything.
+    if status == "PASS" and not count:
+        return ("FAIL",
+                "recorded 0 checks — a suite that asserts nothing cannot fail "
+                "(its checks are behind guards the fixture never reaches)",
+                elapsed, count)
+    return status, detail, elapsed, count
 
 
 def main() -> int:
@@ -190,7 +204,7 @@ def main() -> int:
               "(studio_headers(base), or studio.write/post/delete).")
         return 1
 
-    rows, failed = [], 0
+    rows, failed, total_checks = [], 0, 0
     print("=== browser suite gate ===")
     if not live:
         print("(no E2E_BASE set — suites boot their own private studio)")
@@ -202,8 +216,10 @@ def main() -> int:
         if key in KNOWN_BROKEN and not args.strict:
             rows.append(("BROKEN", key, KNOWN_BROKEN[key], 0.0))
             continue
-        status, detail, secs = run_one(filename, args.timeout)
+        status, detail, secs, count = run_one(filename, args.timeout)
         rows.append((status, key, detail, secs))
+        if count:
+            total_checks += count
         print(f"  {status:<7} {key:<28} {detail}  ({secs:.0f}s)", flush=True)
         if status in ("FAIL", "ERROR", "TIMEOUT"):
             failed += 1
@@ -214,8 +230,12 @@ def main() -> int:
     passed = sum(1 for r in rows if r[0] == "PASS")
     skipped = sum(1 for r in rows if r[0] == "SKIP")
     broken = sum(1 for r in rows if r[0] == "BROKEN")
+    # The total is the number that matters across runs, not the suite count: a
+    # suite can stay PASS while losing twenty of its assertions to an un-reached
+    # `if`. Printing it here is what makes "the check total went down" a thing a
+    # human sees in one line.
     print(f"\n{len(rows)} suites: {passed} passed, {failed} failed, "
-          f"{skipped} skipped, {broken} known-broken")
+          f"{skipped} skipped, {broken} known-broken — {total_checks} checks")
     if failed:
         print("GATE FAILED — a browser suite regressed.")
         return 1
