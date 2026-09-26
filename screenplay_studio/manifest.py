@@ -16,11 +16,37 @@ Standard project directory layout:
 
 from __future__ import annotations
 
-import json
+import copy
 import os
 import shutil
 import time
 from dataclasses import dataclass, field, asdict
+
+
+def _merge_manifest(baseline: dict, desired: dict, on_disk: dict) -> dict:
+    """Fold what this writer changed into the document that is on disk now.
+
+    `baseline` is the document this object was read from (or last wrote), so
+    `desired` differs from it only where this writer made a change. Everything
+    else is taken from disk — that is the whole point: an in-flight analyze must
+    not be able to resurrect a setting or a stage a newer writer already moved.
+    Stages merge per stage name so two runners stamping two different stages
+    each keep their own.
+    """
+    out = dict(on_disk)
+    disk_stages = on_disk.get("stages") or {}
+    baseline_stages = baseline.get("stages") or {}
+    stages = dict(disk_stages)
+    for name, value in (desired.get("stages") or {}).items():
+        if baseline_stages.get(name) != value or name not in disk_stages:
+            stages[name] = value
+    out["stages"] = stages
+    for key, value in desired.items():
+        if key == "stages":
+            continue
+        if baseline.get(key) != value:
+            out[key] = value
+    return out
 
 
 @dataclass
@@ -68,6 +94,10 @@ class ProjectManifest:
     report_language: str = "eng"  # language of the analysis report: eng | tenglish | hindi | telugu | tamil
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
+    # The document this object was read from (or last wrote), used by `save()` to
+    # tell "a field I changed" from "a field I never looked at". Not persisted:
+    # `to_dict()` is explicit about what a manifest is.
+    _baseline: dict = field(default_factory=dict, repr=False, compare=False)
 
     # ---- standard paths within the project directory ----
     @property
@@ -166,21 +196,64 @@ class ProjectManifest:
         for name in ("parse", "analyze", "chat"):
             if name not in m.stages:
                 m.stages[name] = StageStatus()
+        # Every path that reads a manifest from disk goes through here, so this
+        # is where a writer learns what it is allowed to overwrite.
+        m._baseline = copy.deepcopy(d)
         return m
 
     def save(self) -> None:
+        """Write the manifest without reverting a field this writer never touched.
+
+        A manifest is held for as long as the work it describes — an analyze run
+        owns one for minutes — and `save()` used to write that whole in-memory
+        copy back. So a run that started before a re-parse reset `parse`, or
+        before the writer changed a setting in another window, stamped the newer
+        value out of existence. Measured across four real processes: three of
+        four writers' stage entries never reached the file.
+
+        The fix is to merge, not to hold the lock longer. `lock_for` covers the
+        read-modify-write, and the write is what changed since this object was
+        read (per stage name, so two runners stamping two stages do not fight).
+        Holding the lock across the analyze instead would block every status poll
+        the desk makes for the length of a model run.
+
+        `drafts` is merged as a whole list: two processes appending a draft in
+        the same instant can still lose one. Upload is a short cycle and reloads
+        per request, so it is the one field where that window is negligible.
+        """
+        from .jsonio import atomic_write_json, load_json_store, lock_for
         self.updated_at = time.time()
         os.makedirs(self.project_dir, exist_ok=True)
-        from .jsonio import atomic_write_json
-        atomic_write_json(self.manifest_path, self.to_dict())
+        desired = self.to_dict()
+        with lock_for(self.manifest_path):
+            out = desired
+            if self._baseline:
+                on_disk = load_json_store(self.manifest_path, None)
+                if isinstance(on_disk, dict):
+                    out = _merge_manifest(self._baseline, desired, on_disk)
+            atomic_write_json(self.manifest_path, out)
+        # Whatever is now on disk is this object's reference point: a field we
+        # did not own keeps the other writer's value without us "changing" it
+        # back on the next save.
+        self._baseline = copy.deepcopy(out)
 
     @staticmethod
     def load(project_dir: str) -> "ProjectManifest":
+        from .jsonio import StoreUnreadable, load_json_store
         path = os.path.join(project_dir, "project.json")
         if not os.path.exists(path):
             raise FileNotFoundError(f"No project found at '{project_dir}' (no project.json).")
-        with open(path, "r", encoding="utf-8") as f:
-            return ProjectManifest.from_dict(json.load(f))
+        # The shared store reader, so a damaged manifest is DAMAGE (StoreUnreadable
+        # -> HTTP 503) rather than a JSONDecodeError riding the generic 400
+        # handler — which told the writer their request was bad about a file they
+        # never sent. It also reads under the store lock, with the transient
+        # Windows sharing-violation retry, instead of through a bare `open`.
+        data = load_json_store(path, None)
+        if data is None:
+            raise FileNotFoundError(f"No project found at '{project_dir}' (no project.json).")
+        if not isinstance(data, dict):
+            raise StoreUnreadable(path, f"expected an object, got {type(data).__name__}")
+        return ProjectManifest.from_dict(data)
 
     @staticmethod
     def create(project_dir: str, source_file: str, title: str = None) -> "ProjectManifest":

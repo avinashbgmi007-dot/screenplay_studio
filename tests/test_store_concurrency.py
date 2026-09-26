@@ -26,6 +26,7 @@ from types import SimpleNamespace
 import pytest
 
 from screenplay_studio import jsonio, notes, stash_store
+from screenplay_studio.manifest import ProjectManifest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHILD_TIMEOUT = 240
@@ -335,3 +336,129 @@ def test_the_lock_sidecar_sits_beside_its_store(tmp_path):
     path = str(tmp_path / "store.json")
     jsonio.atomic_write_json(path, {"a": 1})
     assert sorted(os.listdir(tmp_path)) == ["store.json", "store.json.lock"]
+
+
+# ---------------------------------------------------------------------------
+# 7. R6-BE-2: project.json — the one store whose cycle held no lock
+# ---------------------------------------------------------------------------
+# Every other writer-owned store reads under `lock_for`. The manifest did not,
+# and `save()` wrote its whole in-memory copy — so a run that loaded a manifest
+# minutes before (an analyze holds one for exactly that long) stamped out any
+# field someone else changed in between. Holding the lock across the analyze
+# instead is not the fix: the desk polls project.json every second, so that
+# starves the writer's own UI for the length of a model run. The write has to
+# merge.
+
+
+def _manifest(tmp_path, name="proj"):
+    src = tmp_path / "s.fountain"
+    src.write_text("INT. ONE - DAY\n\nA.\n\nCUT TO:\n\nINT. TWO - DAY\n\nB.\n",
+                   encoding="utf-8")
+    return ProjectManifest.create(str(tmp_path / name), str(src))
+
+
+def test_a_stale_snapshot_cannot_revert_a_field_it_never_touched(tmp_path):
+    """Two writers, two different fields. The older copy may change its own
+    field; it must not carry the other one backwards."""
+    m = _manifest(tmp_path)
+    stale = ProjectManifest.load(m.project_dir)     # read before the settings sync
+    live = ProjectManifest.load(m.project_dir)
+    live.server_url = "http://127.0.0.1:9999"
+    live.api_key = "rotated"
+    live.save()
+
+    stale.model_id = "somewhere-else"               # a different field entirely
+    stale.save()
+
+    after = ProjectManifest.load(m.project_dir)
+    assert after.model_id == "somewhere-else"
+    assert after.server_url == "http://127.0.0.1:9999", (
+        "a stale save reverted a settings sync that landed while it was running")
+    assert after.api_key == "rotated"
+
+
+def test_a_finished_analyze_does_not_unreset_a_reparse(tmp_path):
+    """The exact shape from the audit: a re-parse resets `parse` to pending
+    while an analyze run is in flight, and the analyze's final stamp used to
+    write the whole document from its pre-reparse copy — restoring
+    `parse: complete` and reporting a run built from a superseded source as
+    done."""
+    from screenplay_studio.manifest import StageStatus
+    m = _manifest(tmp_path)
+    m.mark_complete("parse")
+    runner = ProjectManifest.load(m.project_dir)    # the analyze, minutes ago
+
+    reparse = ProjectManifest.load(m.project_dir)
+    reparse.stages["parse"] = StageStatus()         # re-parse queued
+    reparse.save()
+
+    runner.stages["analyze"] = StageStatus(status="complete")
+    runner.save()
+
+    after = ProjectManifest.load(m.project_dir)
+    assert after.stage("analyze").status == "complete"
+    assert after.stage("parse").status == "pending", (
+        "a superseded snapshot stamped the re-parse's reset back to complete")
+
+
+_HAMMER_MANIFEST = textwrap.dedent(
+    """
+    import sys, time
+    from screenplay_studio.manifest import ProjectManifest, StageStatus
+
+    d, worker, rounds, start_at = sys.argv[1], sys.argv[2], int(sys.argv[3]), float(sys.argv[4])
+    while time.time() < start_at:
+        time.sleep(0.001)
+    for k in range(rounds):
+        m = ProjectManifest.load(d)
+        m.stages[worker] = StageStatus(status="complete", output_paths={"k": str(k)})
+        m.save()
+    """
+)
+
+
+def test_four_processes_stamping_the_manifest_lose_no_stage(tmp_path):
+    """Real processes, one project directory — the CLI and the webapp are a
+    supported pairing, and an in-process test cannot see it."""
+    import json
+    m = _manifest(tmp_path)
+    workers, rounds = 4, 20
+    start_at = time.time() + 1.5
+    procs = [_spawn(_HAMMER_MANIFEST, m.project_dir, f"w{i}", str(rounds), repr(start_at))
+             for i in range(workers)]
+    failures = []
+    for i, proc in enumerate(procs):
+        _out, err = proc.communicate(timeout=CHILD_TIMEOUT)
+        if proc.returncode != 0:
+            failures.append(f"worker {i} exited {proc.returncode}: {err.strip()[-400:]}")
+    assert not failures, "child processes failed:\n" + "\n".join(failures)
+
+    with open(m.manifest_path, encoding="utf-8") as f:
+        stages = json.load(f)["stages"]
+    missing = [f"w{i}" for i in range(workers) if f"w{i}" not in stages]
+    assert not missing, f"lost stage writes: {missing} never reached the manifest"
+
+
+def test_a_damaged_manifest_answers_store_damage_not_a_bad_request(tmp_path):
+    """`load` read through a bare `open()`, so a torn project.json raised
+    JSONDecodeError — a ValueError — and the generic 400 handler told the writer
+    *their* request was bad. It is the store that is damaged, which is the 503
+    answer every other store already gets."""
+    import screenplay_studio.webapp_server as webapp_server
+
+    m = _manifest(tmp_path, name="proj")
+    with open(m.manifest_path, "w", encoding="utf-8") as f:
+        f.write('{"title": "truncated by a power cut", "st')
+
+    with pytest.raises(jsonio.StoreUnreadable):
+        ProjectManifest.load(m.project_dir)
+
+    monkey_projects = tmp_path / "webapp_projects"
+    monkey_projects.mkdir()
+    os.replace(m.project_dir, os.path.join(str(monkey_projects), "proj"))
+    webapp_server.PROJECTS_DIR = str(monkey_projects)
+    webapp_server.app.config["TESTING"] = True
+    resp = webapp_server.app.test_client().get("/api/projects/proj")
+    assert resp.status_code == 503, (
+        f"a damaged manifest answered {resp.status_code}: {resp.get_json()}")
+    assert resp.get_json().get("unreadable") is True

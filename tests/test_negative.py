@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from screenplay_studio import jsonio
 from screenplay_studio.manifest import ProjectManifest
 from screenplay_studio.orchestrator import Orchestrator, OrchestratorError
 
@@ -86,11 +87,20 @@ class TestCorruptState:
             ProjectManifest.load(str(tmp_path / "does_not_exist"))
 
     def test_corrupt_manifest_json_raises_clear_error(self, tmp_path):
+        """A damaged project.json is store damage, not a bad request.
+
+        This asserted `json.JSONDecodeError` — a ValueError — which the webapp's
+        generic ValueError handler answered as HTTP 400, "your request was bad",
+        about a file the writer never sent. Every other writer-owned store
+        answers damage with StoreUnreadable (503, "not treated as empty"); the
+        manifest reads through the same reader now.
+        """
         project_dir = tmp_path / "corrupt_proj"
         project_dir.mkdir()
         (project_dir / "project.json").write_text("{not valid json")
-        with pytest.raises(json.JSONDecodeError):
+        with pytest.raises(jsonio.StoreUnreadable) as exc:
             ProjectManifest.load(str(project_dir))
+        assert "project.json" in str(exc.value)
 
     def test_missing_source_file_raises_clear_error(self, tmp_path):
         with pytest.raises(FileNotFoundError):
