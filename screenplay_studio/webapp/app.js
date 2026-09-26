@@ -15,7 +15,16 @@ const state = {
   branches: {},           // { branchName: { messages, active_persona, active_mode, parent_branch } }
   currentBranch: "main",
   config: { server_url: "http://localhost:8080", model: null, timeout: 600 },
-  view: "chat",          // "chat" | "script"
+  // Every name openViewByName() accepts.
+  // VIEWS: premise | cowrite | feedback | compare | revision | beatboard | chat | script | fv
+  // LIVE: premise, cowrite, feedback, compare, revision, beatboard.
+  // LEGACY: chat, script, fv — kept because a saved session and a hand-typed URL
+  // must behave exactly as they always did. `cowrite` is the else-branch default
+  // rather than a compared name, so it is declared above but never matched.
+  // The old comment here read `// "chat" | "script"` — two legacy aliases, and
+  // not one of the six live names. The VIEWS line is asserted against the source
+  // by tests/test_spa_contract.py so the next drift is a red test, not a lie.
+  view: "chat",
   script: null,           // working-copy ScriptDocument JSON (script view)
   findings: [],           // findings from report.findings.json
   findingStatus: {},      // finding id (or legacy index) -> addressed / still_present / unknown
@@ -367,7 +376,7 @@ function wireInlineEdit(lineEl, sceneNumber, originalText) {
         method: "POST",
         body: JSON.stringify({ scene_number: sceneNumber, replacements: [{ old: originalText, new: newText }] }),
       });
-      appendSystemNote("Line edited on the page — ↶ Undo takes it back.");
+      appendSystemNote("Line edited on the page — Ctrl/⌘ Z takes it back.");
     } catch (err) {
       showError("Inline edit failed: " + err.message);
     }
@@ -8223,7 +8232,12 @@ async function applyOneRewrite(rep, row) {
     });
     _markProposalRow(row, "applied", true);
     status.className = "rewrite-status ok";
-    status.textContent = "Applied to the working copy — Undo is in the script toolbar.";
+    // Names the KEYBOARD, not a location. The undo/redo buttons in the desk
+    // toolbar are display:none by design (index.html:206-208), so copy that told
+    // the writer to look for Undo "in the script toolbar" sent them to a control
+    // that is deliberately not rendered. Ctrl/⌘ Z is the actual contract and is
+    // what SHORTCUTS advertises.
+    status.textContent = "Applied to the working copy — Ctrl/⌘ Z undoes it.";
     await afterScriptEdit();
   } catch (e) {
     status.className = "rewrite-status error";
