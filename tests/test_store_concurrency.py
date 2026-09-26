@@ -462,3 +462,58 @@ def test_a_damaged_manifest_answers_store_damage_not_a_bad_request(tmp_path):
     assert resp.status_code == 503, (
         f"a damaged manifest answered {resp.status_code}: {resp.get_json()}")
     assert resp.get_json().get("unreadable") is True
+
+
+# ---------------------------------------------------------------------------
+# 9. writer_profile.json — R6-BE-4, across processes
+# ---------------------------------------------------------------------------
+
+_HAMMER_PROFILE = textwrap.dedent(
+    """
+    import sys, time
+    from screenplay_cowriter import memory as mem
+
+    path, rounds, start_at, text = sys.argv[1], int(sys.argv[2]), float(sys.argv[3]), sys.argv[4]
+    while time.time() < start_at:
+        time.sleep(0.001)
+    for _ in range(rounds):
+        # A FRESH instance per turn, which is what the webapp does per request —
+        # the snapshot is read again each time, exactly as it is in production.
+        mem.WriterMemory.load(path).observe(text, "idea", False, None)
+    """
+)
+
+
+def test_two_processes_observing_one_profile_lose_no_turn(tmp_path):
+    """Sameer's relationship memory is writer-level, so the CLI and the webapp
+    both write `writer_profile.json` — a supported pairing per AGENTS.md.
+
+    Its only lock was a module-level `threading.RLock`, which cannot serialize
+    two processes at all, and `save()` wrote a whole in-memory snapshot. So every
+    turn one process saved reverted whatever the other had just learned.
+    """
+    import json
+    path = str(tmp_path / "writer_profile.json")
+    workers, rounds = 2, 10
+    start_at = time.time() + 1.5
+    texts = ["just tell me straight what's wrong", "I'd like a lot more detail, please"]
+    procs = [_spawn(_HAMMER_PROFILE, path, str(rounds), repr(start_at), texts[i])
+             for i in range(workers)]
+    failures = []
+    for i, proc in enumerate(procs):
+        _out, err = proc.communicate(timeout=CHILD_TIMEOUT)
+        if proc.returncode != 0:
+            failures.append(f"worker {i} exited {proc.returncode}: {err.strip()[-400:]}")
+    assert not failures, "child processes failed:\n" + "\n".join(failures)
+
+    with open(path, encoding="utf-8") as f:
+        profile = json.load(f)
+    assert profile["meta"]["total_turns_observed"] == workers * rounds, (
+        f"{workers}x{rounds} turns were observed but the profile counts "
+        f"{profile['meta']['total_turns_observed']}")
+    # Both writers' signals survived, not just the last process to save.
+    dims = profile["dimensions"]
+    for dim in ("directness", "detail_level"):
+        ev = dims[dim]["evidence"]
+        assert ev["pos"] + ev["neg"] == rounds, (
+            f"'{dim}' should hold {rounds} bumps from its own writer, got {ev}")

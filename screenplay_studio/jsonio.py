@@ -325,7 +325,7 @@ def _read_text(path: str) -> str:
         return f.read()
 
 
-def load_json_store(path: str, default):
+def load_json_store(path: str, default, assume_present: bool = False):
     """Read a JSON store. MISSING -> `default`; PRESENT-BUT-UNREADABLE -> raise.
 
     The one shared reader behind every writer-owned store, so the distinction
@@ -339,6 +339,14 @@ def load_json_store(path: str, default):
     contention that clears in milliseconds (measured: 785 such escalations in
     one 4-process run). Contended is not damaged: only a read still failing
     after the retry budget is reported as unreadable.
+
+    `assume_present` is for a load-modify-write cycle that ALREADY holds
+    `lock_for(path)`. It settles the existence question inside that lock instead
+    of by the unlocked pre-check below, because a peer that creates the file a
+    microsecond earlier is otherwise answered "missing" — harmless for a plain
+    read, but a merge reads "missing" as permission to write its whole stale
+    snapshot over a file that now exists. Measured: that cost exactly one
+    writer's turn in a 2-process race on `writer_profile.json`.
     """
 
     def _read():
@@ -353,13 +361,14 @@ def load_json_store(path: str, default):
     # taking the lock — no `.lock` sidecar for a file that isn't there. Nothing
     # is lost: a writer creating it lands atomically, and answering "missing"
     # for a file that appeared a microsecond ago is what a plain open() did
-    # before this lock existed.
+    # before this lock existed. A MERGE is the one caller that must not act on
+    # that answer, which is what `assume_present` is for.
     try:
         present = os.path.exists(path)
     except OSError:
         present = False
 
-    if present:
+    if present or assume_present:
         # Under the lock, so a concurrent writer's os.replace cannot land
         # between our open and our read.
         with _lock_for(path):

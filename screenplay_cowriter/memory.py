@@ -354,6 +354,13 @@ def _maybe_add_template_observation(profile, dim):
         "id": "obs_" + uuid.uuid4().hex[:8],
         "text": text,
         "dimension": dim,
+        # A dimension belief is about the WRITER, never about one script, so it
+        # is global by construction. The two-scope migration (`_migrate_v2`)
+        # supplies this key for older files; omitting it here meant every load
+        # of a rules-created observation looked like a v1 profile and rewrote the
+        # whole file - which is a lost update whenever a second process wrote in
+        # between (R6-BE-4).
+        "scope": "global",
         "confidence": d["confidence"],
         "source": "rules",
         "contradictions": 0,
@@ -560,11 +567,40 @@ def default_memory_path() -> str:
     return os.path.join(os.path.expanduser("~"), MEMORY_DIR_NAME, MEMORY_FILE_NAME)
 
 
+def _replay(profile, kind, payload):
+    """Re-apply one recorded operation to a freshly read profile.
+
+    Kept deliberately small: each branch is the same call the mutation site
+    already made against its own snapshot, so the merge inherits the production
+    semantics rather than restating them.
+    """
+    if kind == "signals":
+        apply_signals(profile, payload)
+        profile["meta"]["total_turns_observed"] = \
+            profile["meta"].get("total_turns_observed", 0) + 1
+    elif kind == "migrate":
+        _migrate_v2(profile, payload)
+    elif kind == "suppress":
+        for obs in profile.get("observations", []):
+            if obs.get("id") == payload:
+                obs["suppressed"] = True
+    elif kind == "refresh":
+        if payload:
+            merge_refresh(profile, payload)
+        meta = profile["meta"]
+        meta["turns_at_last_refresh"] = meta.get("total_turns_observed", 0)
+        meta["last_refresh"] = time.time()
+        meta["refresh_count"] = meta.get("refresh_count", 0) + 1
+
+
 class WriterMemory:
     def __init__(self, path, profile=None):
         self.path = path
         self.profile = profile if profile is not None else empty_profile()
         self._refresh_in_flight = False
+        # The changes THIS instance made, replayed onto the file as it is at save
+        # time rather than written over it. See `save`.
+        self._pending = []
 
     @classmethod
     def load(cls, path):
@@ -583,22 +619,60 @@ class WriterMemory:
                     except OSError:
                         pass
         if profile is not None:
-            changed = _migrate_v2(profile, _entity_scope_map(os.path.dirname(os.path.dirname(path))))
-            if changed:
-                from screenplay_studio.jsonio import atomic_write_json
-                with _FILE_LOCK:
-                    try:
-                        atomic_write_json(path, profile)
-                    except OSError:
-                        pass
-            return cls(path, profile=profile)
+            scope_map = _entity_scope_map(os.path.dirname(os.path.dirname(path)))
+            memory = cls(path, profile)
+            if _migrate_v2(profile, scope_map):
+                # Deferred to the next save, which merges. Writing it HERE would
+                # be an unmerged whole-document write of a snapshot read outside
+                # any cross-process lock - the same revert as the lost update it
+                # sits next to, and before `scope` was carried at creation it
+                # fired on nearly every load.
+                memory._pending.append(("migrate", scope_map))
+            return memory
         return cls(path)
 
     def save(self):
-        from screenplay_studio.jsonio import atomic_write_json
-        with _FILE_LOCK:
-            os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-            atomic_write_json(self.path, self.profile)
+        """Apply this instance's own changes to the file as it is NOW.
+
+        The webapp builds a FRESH WriterMemory per request
+        (`webapp_server.py:2906`, `:3103`, `:3231`), so `self.profile` is a
+        snapshot read before the model call that so often precedes this save,
+        and `save()` used to write that whole snapshot back. Two turns in flight
+        at once therefore each discarded the other's observation and turn
+        counter — `_FILE_LOCK` is a module-level `threading.RLock`, which
+        serializes the two file operations and leaves the read-modify-write
+        window open, and does nothing at all across the CLI and the webapp
+        (R6-BE-4).
+
+        The merge replays recorded operations instead of patching fields,
+        because `_bump`'s semantics can't be re-derived safely: evidence counts
+        are stored RELATIVE to the dimension's current value and swap when a
+        belief flips, so a hand-written "take the bigger count" would silently
+        invert a writer's stated preference. `_replay` runs the same production
+        functions that made the change.
+
+        Mirrors what `manifest.ProjectManifest.save` does for `project.json`.
+        """
+        from screenplay_studio.jsonio import atomic_write_json, load_json_store, lock_for
+        ops = self._pending
+        self._pending = []
+        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+        with lock_for(self.path):
+            # `assume_present`: we hold the lock, so let the reader settle the
+            # existence question inside it. Answered from the unlocked pre-check,
+            # a peer's write a microsecond earlier reads as "missing" and the
+            # branch below would write the stale snapshot instead of merging.
+            disk = load_json_store(self.path, None, assume_present=True) if ops else None
+            if not isinstance(disk, dict) or "meta" not in disk:
+                # first write, or a peer has never written a usable profile:
+                # there is nothing to merge into, so this snapshot IS the file
+                out = self.profile
+            else:
+                for kind, payload in ops:
+                    _replay(disk, kind, payload)
+                out = disk
+            atomic_write_json(self.path, out)
+        self.profile = out
 
     def to_dict(self):
         return self.profile
@@ -607,6 +681,7 @@ class WriterMemory:
         signals = extract_signals(user_text, turn_kind, was_pending, previous_reply)
         apply_signals(self.profile, signals)
         self.profile["meta"]["total_turns_observed"] += 1
+        self._pending.append(("signals", signals))
         self.save()
 
     def card_text(self, scope: str | None = None):
@@ -627,6 +702,7 @@ class WriterMemory:
                 if obs["suppressed"]:
                     return False  # already forgotten
                 obs["suppressed"] = True
+                self._pending.append(("suppress", obs_id))
                 self.save()
                 return True
         return False
@@ -682,4 +758,8 @@ class WriterMemory:
             self.profile["meta"]["turns_at_last_refresh"] = self.profile["meta"]["total_turns_observed"]
             self.profile["meta"]["last_refresh"] = time.time()
             self.profile["meta"]["refresh_count"] += 1
+            # The proposal, not the snapshot: `save()` replays it onto the file
+            # as it is now, so a refresh that took a whole model call to build
+            # cannot erase what a concurrent turn learned in the meantime.
+            self._pending.append(("refresh", proposal))
             self.save()

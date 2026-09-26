@@ -512,3 +512,70 @@ def test_entity_scope_map_resolves_relative_projects_dir():
     finally:
         import shutil
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ---------- R6-BE-4: two turns must not revert each other ----------
+
+
+def test_a_turn_does_not_revert_a_concurrent_turn(tmp_path):
+    """The webapp builds a FRESH WriterMemory per request (webapp_server.py
+    :2906, :3103, :3231) and `observe()` saves the whole in-memory profile.
+
+    So two turns in flight at once each read the same disk state, and the later
+    save writes a snapshot that never saw the earlier observation. `_FILE_LOCK`
+    is a module-level threading.RLock: it serializes the two file operations,
+    which is exactly why the window survives — the gap it does NOT cover is the
+    model call between the read and the write. The writer's relationship memory
+    then loses signals silently, and the "notes on you" panel contradicts what
+    actually happened in the room.
+
+    This reproduces the interleaving with two instances, no mocks, real file.
+    """
+    path = str(tmp_path / "writer_profile.json")
+
+    turn_a = mem.WriterMemory.load(path)     # request A reads
+    turn_b = mem.WriterMemory.load(path)     # request B reads the SAME state
+
+    turn_a.observe("just tell me straight what's wrong", "idea", False, None)
+    turn_b.observe("I'd like a lot more detail, please", "rewrite", False, None)
+
+    on_disk = json.load(open(path, encoding="utf-8"))
+    assert on_disk["meta"]["total_turns_observed"] == 2, (
+        "a turn's save reverted a concurrent turn's counter — the profile is "
+        f"left holding {on_disk['meta']['total_turns_observed']} of 2 turns")
+    # Each turn moved a DIFFERENT dimension, so both must be present: the later
+    # save reverting the earlier one is exactly what this catches.
+    dims = on_disk["dimensions"]
+    for dim in ("directness", "detail_level"):
+        ev = dims[dim]["evidence"]
+        assert ev["pos"] + ev["neg"] >= 1, (
+            f"'{dim}' was stated by one of the two turns and never reached disk")
+
+
+def test_a_saved_profile_needs_no_migration_on_the_next_load(tmp_path):
+    """The root cause behind the cross-process loss, fenced at its source.
+
+    `_maybe_add_template_observation` used to create observations with no
+    `scope` key, so `_migrate_v2` reported work to do on a profile the previous
+    `save()` had just written — on every load, forever. Each of those migrations
+    rewrote the whole file, and a rewrite of a snapshot read outside any
+    cross-process lock is the lost update again (measured: one turn per
+    collision, twice in a 2-process race).
+
+    So: a profile this code writes must be final. If it is not, `load()` has
+    found something to fix, and something that fix must be replayed under the
+    merge rather than written over a peer.
+    """
+    path = str(tmp_path / "wp_root.json")
+    m = mem.WriterMemory.load(path)
+    for _ in range(mem.MIN_EVIDENCE + 2):
+        m.observe("just tell me straight what's wrong", "idea", False, None)
+
+    on_disk = json.load(open(path, encoding="utf-8"))
+    assert on_disk["observations"], "the gate never produced a belief to record"
+    for obs in on_disk["observations"]:
+        assert "scope" in obs, f"an observation reached disk scope-less: {obs}"
+
+    assert not any(kind == "migrate" for kind, _ in mem.WriterMemory.load(path)._pending), (
+        "a profile this wrote still looks like v1 to load() — the next save "
+        "would replay a migration, and any older build rewrote the file here")

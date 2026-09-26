@@ -228,7 +228,11 @@ class ProjectManifest:
         with lock_for(self.manifest_path):
             out = desired
             if self._baseline:
-                on_disk = load_json_store(self.manifest_path, None)
+                # `assume_present` for the same reason as WriterMemory.save: this
+                # block holds the lock, and a peer that created project.json a
+                # microsecond ago must not be answered "missing" — that reads
+                # here as "nothing to merge into", i.e. write the stale snapshot.
+                on_disk = load_json_store(self.manifest_path, None, assume_present=True)
                 if isinstance(on_disk, dict):
                     out = _merge_manifest(self._baseline, desired, on_disk)
             atomic_write_json(self.manifest_path, out)

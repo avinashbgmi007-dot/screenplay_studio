@@ -262,3 +262,58 @@ class TestExport:
         doc = parse_fdx(str(p))
         assert doc.scene_count == 2
         assert doc.title == "Revision Test Script"
+
+
+class TestAnalysisNeverEntersTheEditStore:
+    """R6-BE-5 (round-6 audit), kept as a fence on a boundary it turns out the
+    product already holds.
+
+    The finding read: an analysis writes edit records into `edits.json` and
+    clears the redo stack, so after a rerun Ctrl+Shift+Z replays *model* text as
+    if the writer had typed it. It was reported with a citation to a file that
+    does not exist (`screenplay_studio/analysis_writer.py`), and the audit
+    flagged it as lane-reported and not re-proved.
+
+    Re-derived here from the only side that matters: `revision.py` has exactly
+    one writer of `edits.json` records — `save_working(..., record=...)` at
+    :469 — and its only caller is `apply_edit`, reached only from
+    `POST /edits/apply`, i.e. the writer approving a reviewed replacement. The
+    analyze route never touches it. So the claimed shape does not happen.
+
+    This test is the standing proof of that, not a fix. If an analysis ever
+    starts writing edit records — which would be a real bug, since undo would
+    then resurrect model text into the manuscript — it fails here by name.
+    """
+
+    def test_a_full_analysis_leaves_the_writers_undo_history_empty(self, http_client):
+        from screenplay_studio import revision
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = _upload(http_client).get_json()["project"]
+        resp = http_client.post(f"/api/projects/{project}/analyze")
+        assert resp.status_code == 200, resp.get_json()
+
+        m = ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project))
+        assert revision.edits_log(m) == [], (
+            "an analysis wrote into the writer's edit store: undo would now "
+            "replay model text as if the writer had typed it")
+        assert revision.redo_stack(m) == [], (
+            "an analysis cleared the redo stack")
+
+    def test_the_edit_store_still_only_records_an_applied_rewrite(self, http_client):
+        """The other half of the fence: the ONE path that is allowed to write
+        there still does, so the empty result above is a real boundary and not
+        an endpoint that quietly stopped recording anything."""
+        from screenplay_studio import revision
+        from screenplay_studio.manifest import ProjectManifest
+
+        project = _upload(http_client).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        candidates = http_client.post(
+            f"/api/projects/{project}/rewrite",
+            json={"scene_number": 1, "finding_index": 0}).get_json()["replacements"]
+        http_client.post(f"/api/projects/{project}/edits/apply",
+                         json={"scene_number": 1, "replacements": candidates})
+
+        m = ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project))
+        assert len(revision.edits_log(m)) == 1
