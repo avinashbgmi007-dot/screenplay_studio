@@ -220,23 +220,60 @@ def test_no_suite_uses_a_condition_that_cannot_fail():
 # that records a failing check), so this is a known pattern that never got applied
 # elsewhere.
 #
-# A ratchet, not a clean rule: measured at 53 sites across 21 files when this was
-# written, and converting one costs a fixture judgement per site (some guards are
-# reachable and simply never entered by the current project dir, which is
-# layout_audit's case). So the ceiling may only FALL, and each fix lowers it —
-# while nothing new is allowed in. The list below is the work queue.
-IF_GUARD_CEILING = 53
+# A ratchet, not a clean rule: 53 raw sites when this was written, 25 once the
+# guards that already pair with a hoisted precondition check are excluded (see
+# _preceded_by_precondition_check — that shape cannot silence anything).
+# Converting a real one costs a fixture judgement per site, so the ceiling may
+# only FALL and nothing new may enter. layout_audit's 13 were the worst cluster
+# and are now 0: the suite seeds its own desk, so the "<50% manuscript" law and
+# the fix-loop contract are asserted again (25 checks -> 37, run twice). Largest
+# survivor is gun_pen_audit, which SKIPs outright without a live llama-server —
+# unrun, and named as such, rather than silently empty.
+IF_GUARD_CEILING = 23
+
+
+def _preceded_by_precondition_check(guard, prevs):
+    """True when a statement just above the guard already records a failing check
+    for the SAME condition — `check("control present", x.count() > 0)` followed by
+    `if x.count(): click…`. That shape cannot silence anything: the precondition
+    went red a line earlier, and the guard only avoids aborting the suite on a
+    click that would throw. Not the defect."""
+    test = ast.unparse(guard.test)
+    # `if not found:` is the same precondition as a preceding
+    # `check("...", found)` — the bail-out branch, not the silent branch.
+    positives = {test, test[4:] if test.startswith("not ") else f"not {test}"}
+    for stmt in prevs:
+        for call in ast.walk(stmt):
+            if not (isinstance(call, ast.Call) and _is_check(call)):
+                continue
+            cond = _cond(call)
+            if cond is None:
+                continue
+            cond_src = ast.unparse(cond)
+            if any(p in cond_src for p in positives):
+                return True
+    return False
 
 
 def _if_guarded_sites():
     hits = []
     for path in sorted(TESTS_DIR.glob("e2e_browser_*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.If) or node.orelse:
-                continue
-            if any(_is_check(c) for c in ast.walk(node) if isinstance(c, ast.Call)):
-                hits.append(f"{path.name}:{node.lineno}")
+
+        def visit(block):
+            for i, stmt in enumerate(block):
+                if (isinstance(stmt, ast.If) and not stmt.orelse
+                        and any(_is_check(c) for c in ast.walk(stmt)
+                                if isinstance(c, ast.Call))
+                        and not _preceded_by_precondition_check(
+                            stmt, block[max(0, i - 3):i])):
+                    hits.append(f"{path.name}:{stmt.lineno}")
+                for attr in ("body", "orelse", "finalbody"):
+                    sub = getattr(stmt, attr, None)
+                    if isinstance(sub, list) and sub and isinstance(sub[0], ast.stmt):
+                        visit(sub)
+
+        visit(tree.body)
     return hits
 
 
@@ -260,8 +297,10 @@ def test_the_ratchet_is_not_a_free_pass():
         f"the queue moved to {len(sites)}; update IF_GUARD_CEILING in the same "
         "commit so the direction (down) stays visible in the diff"
     )
-    # layout_audit's 9c block is the found-in-the-wild instance; it must be in here.
-    assert any(s.startswith("e2e_browser_layout_audit.py:") for s in sites)
+    # layout_audit carried 13 of these (the "<50% manuscript" law and the whole
+    # fix-loop contract behind `if cards.count() > 0:`, with no project seeded).
+    # Guard the repair: none of its guards may come back.
+    assert not [s for s in sites if s.startswith("e2e_browser_layout_audit.py:")]
     sample = (
         'def t():\n'
         '    if widths:\n'
