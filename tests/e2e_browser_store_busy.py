@@ -127,6 +127,15 @@ def main():
             shown = _wait_for(page, "() => { const b = document.getElementById("
                                     "'error-banner'); return !!b && "
                                     "getComputedStyle(b).display !== 'none'; }", 30000)
+            # `showError` reveals the banner and `announce()` lands the words on the
+            # NEXT animation frame — that deferral is the point of UX-1 (a role="alert"
+            # region only announces if it is already rendered). So the instant this poll
+            # returns true the banner is visible with empty text, and reading it there
+            # measured a state the product holds for one frame. Measured on 2026-09-27:
+            # the same tree gave 7/0 and 5/2 on two runs. The text gets its own wait.
+            _wait_for(page, "() => { const t = document.getElementById("
+                            "'error-banner-text'); return !!t && "
+                            "t.textContent.trim() !== ''; }", 5000)
             banner = page.evaluate(BANNER_JS)
 
             check("a busy store is reported to the writer, not swallowed",
