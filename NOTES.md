@@ -3504,9 +3504,11 @@ Proposed: correct the sentence, add no code.
 ## 2026-09-27 (session round-6-rung-12): Fix A — `project.json` records a directory, it does not choose one
 
 **What the incident cost, stated plainly.** An analyze run aimed at a throwaway COPY of
-`gun_pen_2` rewrote the ORIGINAL: 36 findings became 25, plus an applied page edit. The
-copy was restored afterwards, but the writer's own edit log in the real project is the
-part I cannot certify (see "still his call" below), and the mechanism was not the copy —
+`gun_pen_2` rewrote the ORIGINAL: 36 findings became 30 in the copy, plus an applied page
+edit *(both figures corrected at the end of this file — "25" and the "cannot certify"
+clause were both wrong)*. The copy was restored afterwards; the real project's own edit
+log turned out clean, which is what the "still his call" bullet below now says. The
+mechanism was not the copy —
 it was this: `ProjectManifest.load(project_dir)` read the file and then handed back the
 `project_dir` **stored inside it**, so every caller's resolved directory was replaced by a
 string written during some earlier launch. `./studio_projects\<name>` resolves against the
@@ -3549,10 +3551,13 @@ executed separately on 2026-09-27 against the real 35B at :8080 and closed **45 
 gaps**, so it is not an unexecuted hole any more. `python -m ruff check .` clean.
 
 **Still his call, not mine:**
-- The real `studio_projects/gun_pen_2/working.json` carries 5 `"(rewritten in the audit)"`
+- ~~The real `studio_projects/gun_pen_2/working.json` carries 5 `"(rewritten in the audit)"`
   markers where the agent recorded 4 at baseline. Findings are back to 36; this is the part
-  the restore did not reconcile. Say the word and I will diff it against the incident copy
-  under `/e/r6_audit_tmp/` before touching anything.
+  the restore did not reconcile.~~ **CLOSED, and the numbers were backwards:** the baseline
+  was always **5** (the "4" was the bad reading — `grep -c` on single-line JSON answers 1),
+  and the live edit log is **chained** — every record's `new` is the next record's `old`,
+  the last `new` equals the on-disk line verbatim, and all 5 records are stamped
+  **2026-09-21**, days before the incident. Nothing was left unreconciled.
 - An orphaned studio is still listening on **:8555** (PID 8916). I will not kill a process
   you may be using.
 - `:8080` was never touched, and nothing in this round pushed or merged.
@@ -3575,3 +3580,41 @@ authorized Fix A, and a fleet-wide wait audit is its own item.
 
 Nothing pushed and `qoder/update` was not merged into `main`; the merge stays on hold per
 the standing instruction, awaiting a stability verdict the operator has to accept.
+
+## 2026-09-27 (session round-6-rung-13): the gun_pen audit's two reds were the HARNESS, and it had been reading a stale COPY of the project
+
+**The re-run the last rung promised.** `e2e_browser_gun_pen_audit.py` closed **37 passed /
+2 failed** against a live 35B; both reds were then traced to the harness, fixed test-only, and
+re-run end to end: **51 passed / 0 failed / 0 gaps filed**. The 14-check delta is the arrival
+assertions that the false `computed_at unchanged` FAIL used to skip — so on-screen arrival
+arithmetic on a real model is now actually verified: strip line `Pass: 50 → 50 still live · 0
+no longer flagged · 0 new`, exact against the server's own diff, and the unchanged-script
+headline equal to the board's 50 rows. `clean bill` 6/6.
+
+**Root cause, narrower than the earlier report.** The suite never asked the server where the
+project lives — it *derived* it from the screenshots scratch path: `dirname(SHOTS) +
+"studio_projects"`. With `AUDIT_PROMOTE` off that resolves to `impl-shots/runs/studio_projects/
+gun_pen_2/`, a stale copy left beside the scratch evidence, so the arrival check compared the
+live browser against a frozen `last_pass.json` (its `last_total 33`) while the server was
+reporting `36`. Three reads shared that assumption; all three now go through the server or an
+explicit `GUNPEN_PROJECTS_DIR`: `_expected_arrival()` reads the `last_pass` the `GET /edits`
+route already carries (`webapp_server.py:1818`), `_working_texts()` takes `GET /script` instead
+of a guessed `working.json`, and the `source.pdf` probe takes `PROJECTS_DIR`.
+
+**And one write, which is why the writer's data had a stranger in it.** `tests/_gunpen_clean_bill.py`
+hardcoded `http://127.0.0.1:8500` and `REPO/studio_projects`, so the synthetic `Clean_Bill_Probe`
+it seeds always landed in the REAL projects dir no matter which studio was under test — that is
+the leftover sitting in `studio_projects/`, and under a different `E2E_BASE` the `cleanbill` stage
+timed out looking for a shelf row that had landed in another tree. It also had no capability
+token since B2/B3 made writes authenticated, so it could only have worked against an unprotected
+server. Now: `E2E_BASE` + `GUNPEN_PROJECTS_DIR` + `studio_headers(BASE)`.
+
+**Data safety, measured again rather than asserted.** The audit ran against a fresh copy under
+`E:\r6_audit_tmp\r7\projects`; afterwards **201 files across 26 real projects, 0 modified, 0
+deleted, 0 new**. My scratch studio (`:8561`, PID 25936, command line confirmed before stopping)
+is closed; `:8080` untouched and `/health` ok; the orphaned `:8555` (PID 8916) left alone.
+
+**Still open, unchanged:** nothing committed or pushed by this rung (two test files + NOTES.md
+sit in the worktree), the `qoder/update` → `main` merge hold stands, and `Clean_Bill_Probe` in
+`studio_projects/` plus `impl-shots/runs/studio_projects/` (a copy of his project data, now
+unreferenced) await his word before deletion.

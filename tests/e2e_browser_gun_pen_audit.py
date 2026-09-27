@@ -51,6 +51,14 @@ PROMOTE = os.environ.get("AUDIT_PROMOTE") == "1"
 SHOTS = (os.path.join(_REPO_ROOT, "impl-shots") if PROMOTE
          else os.path.join(_REPO_ROOT, "impl-shots", "runs", "latest"))
 os.makedirs(SHOTS, exist_ok=True)
+# The project directory the studio under test actually serves. This suite never
+# boots one (see the module docstring), so the operator names it; the default is
+# the product's own. It used to be derived from SHOTS, which silently resolved to
+# `impl-shots/runs/studio_projects/<project>` — a stale COPY of the project left
+# beside the scratch evidence, so every filesystem read here looked at a frozen
+# tree while the browser looked at the live one.
+PROJECTS_DIR = (os.environ.get("GUNPEN_PROJECTS_DIR")
+                or os.path.join(_REPO_ROOT, "studio_projects"))
 
 checks = Checks()
 check = checks.ok
@@ -88,10 +96,9 @@ def shot(page, name, full=False):
     return path
 
 
-def _working_texts(project_dir):
-    """(scene_number, element_text) for the working copy."""
-    with open(os.path.join(project_dir, "working.json"), encoding="utf-8") as f:
-        doc = json.load(f)
+def _working_texts(doc):
+    """(scene_number, element_text) from a ScriptDocument dict — pass the server's
+    own `GET /script`, not a working.json read from a guessed path."""
     return [(s.get("scene_number"), el.get("text") or "")
             for s in doc.get("scenes", []) for el in s.get("elements", [])]
 
@@ -170,7 +177,7 @@ def widen_filter(page, lens):
 
 def step_probe():
     import pypdf
-    pdf = os.path.join(os.path.dirname(SHOTS), "studio_projects", PROJECT, "source.pdf")
+    pdf = os.path.join(PROJECTS_DIR, PROJECT, "source.pdf")
     r = pypdf.PdfReader(pdf)
     txt = "\n".join((p.extract_text() or "") for p in r.pages)
     probe = {
@@ -665,7 +672,6 @@ def step_escalation():
 # ---------------------------------------------------------------------------
 
 def step_inbetween():
-    pdir = os.path.join(os.path.dirname(SHOTS), "studio_projects", PROJECT)
     rep = api("GET", f"/api/projects/{PROJECT}/report")
     findings = rep.get("findings") or []
     # ids straight from the server (no client-side re-derivation to drift)
@@ -689,7 +695,7 @@ def step_inbetween():
     # one quote-visible edit: change a line a verified finding cites. The quote
     # must sit inside a SINGLE wrapped element (quote_present True) or
     # apply_replacements skips it ("line not found in scene").
-    texts = _working_texts(pdir)
+    texts = _working_texts(api("GET", f"/api/projects/{PROJECT}/script"))
     target = None
     for f in findings:
         q = (f.get("evidence_quote") or "").strip()
@@ -729,11 +735,8 @@ def _expected_arrival():
     snapshot (last_pass_snapshot computes it lazily on GET /edits), so the
     assertion compares the UI against the server's arithmetic, not a
     re-implementation of it."""
-    api("GET", f"/api/projects/{PROJECT}/edits")
-    lp_path = os.path.join(os.path.dirname(SHOTS), "studio_projects", PROJECT, "last_pass.json")
-    with open(lp_path, encoding="utf-8") as f:
-        snap = json.load(f)
-    return snap.get("payload") or {}
+    ed = api("GET", f"/api/projects/{PROJECT}/edits")
+    return ed.get("last_pass") or {}
 
 
 def _progress():

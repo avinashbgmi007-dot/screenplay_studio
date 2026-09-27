@@ -10,9 +10,17 @@ import os
 import sys
 import urllib.request
 
-BASE = "http://127.0.0.1:8500"
+BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:8500").rstrip("/")
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Where the probe is seeded. Must be the SAME directory the studio under test
+# serves — e2e_browser_gun_pen_audit.py's cleanbill stage looks for the project
+# in the desk's shelf, and it used to be written into the real `studio_projects`
+# no matter which server was running. Then the probe either appeared as a
+# leftover in the writer's own data or the stage timed out waiting for a shelf
+# row that had landed in a different tree.
+PROJECTS_DIR = os.environ.get("GUNPEN_PROJECTS_DIR") or os.path.join(REPO, "studio_projects")
 sys.path.insert(0, REPO)
+sys.path.insert(0, os.path.join(REPO, "tests"))
 
 CLEAN = """Title: The Quiet Kitchen
 Author: audit probe
@@ -50,14 +58,16 @@ I noticed.
 
 def main():
     import requests
+    from e2e_browser_common import studio_headers
     r = requests.post(f"{BASE}/api/projects",
                       files={"file": ("The Quiet Kitchen.fountain", CLEAN.encode(), "text/plain")},
-                      data={"title": "Clean Bill Probe"}, timeout=90)
+                      data={"title": "Clean Bill Probe"},
+                      headers=studio_headers(BASE), timeout=90)
     r.raise_for_status()
     name = r.json().get("project") or r.json().get("name")
     print("project:", name)
 
-    pdir = os.path.join(REPO, "studio_projects", name)
+    pdir = os.path.join(PROJECTS_DIR, name)
     # write a completed analysis with ZERO findings (the clean-bill state)
     empty = {
         "title": "The Quiet Kitchen",
