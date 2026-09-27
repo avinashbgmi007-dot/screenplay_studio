@@ -26,7 +26,7 @@ from types import SimpleNamespace
 import pytest
 
 from screenplay_studio import jsonio, notes, stash_store
-from screenplay_studio.manifest import ProjectManifest
+from screenplay_studio.manifest import ProjectManifest, _merge_manifest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHILD_TIMEOUT = 240
@@ -253,6 +253,77 @@ def test_two_concurrent_stash_adds_both_survive(tmp_path, monkeypatch):
     _in_parallel(stash_store.add_to_stash, (str(d),), ["line A", "line B"])
 
     assert len(stash_store.load_stash(str(d))) == 2
+
+
+# ---------------------------------------------------------------------------
+# 4b. project.json merges every field but one — and that one is a list
+# ---------------------------------------------------------------------------
+
+def _draft(name: str, filename: str, when: float = 1000.0) -> dict:
+    return {"name": name, "source_filename": filename, "uploaded_at": when}
+
+
+def test_a_draft_added_by_a_peer_survives_this_writers_save():
+    """Two uploads in the same instant used to leave ONE draft record, because
+    `drafts` is the one field `save()` writes back as this writer's whole list
+    instead of merging it. The losing writer's source snapshot stays on disk with
+    no manifest row pointing at it, so the draft is unreachable from the desk.
+    """
+    out = _merge_manifest(
+        {"drafts": []},
+        {"drafts": [_draft("draft-2", "mine.fountain")]},
+        {"drafts": [_draft("draft-2", "theirs.fountain")]},
+    )
+    assert [d["source_filename"] for d in out["drafts"]] == [
+        "theirs.fountain", "mine.fountain"]
+
+
+def test_a_colliding_draft_label_is_not_left_ambiguous():
+    """`snapshot_active` names a draft from the list length, so two concurrent
+    uploads both compute "draft-2". Merging the records is only half the fix:
+    /diff and /drafts/activate select BY NAME, so two rows sharing a label makes
+    the loser's draft unaddressable — the newcomer gets the next free name.
+    """
+    out = _merge_manifest(
+        {"drafts": []},
+        {"drafts": [_draft("draft-2", "mine.fountain")], "active_draft": "draft-2"},
+        {"drafts": [_draft("draft-2", "theirs.fountain")], "active_draft": "draft-2"},
+    )
+    names = [d["name"] for d in out["drafts"]]
+    assert len(set(names)) == 2, names
+    mine = [d for d in out["drafts"] if d["source_filename"] == "mine.fountain"][0]
+    # the writer that was renumbered must not be left "active" on the peer's row
+    assert out["active_draft"] == mine["name"]
+
+
+def test_a_removed_draft_still_stays_removed():
+    """The merge is 3-way, not a union that cannot forget: a draft this writer
+    dropped must not be resurrected from the copy on disk.
+    """
+    a, b = _draft("draft-1", "a.fountain"), _draft("draft-2", "b.fountain")
+    out = _merge_manifest({"drafts": [a, b]}, {"drafts": [a]}, {"drafts": [a, b]})
+    assert out["drafts"] == [a]
+
+
+def test_a_saved_manifest_reports_the_drafts_the_store_actually_holds(tmp_path):
+    """After `save()` re-baselines from disk, the in-memory object must agree with
+    disk. A writer that reads `m.drafts` after saving (to name the next draft, to
+    label the shelf) otherwise keeps acting on the list that just lost a race.
+    """
+    d = tmp_path / "proj"
+    d.mkdir()
+    m = ProjectManifest.create(str(d), __file__, title="T")
+    peer = ProjectManifest.load(str(d))
+    peer.drafts.append(_draft("draft-1", "theirs.fountain"))
+    peer.save()                      # the peer writes first
+    m.drafts.append(_draft("draft-1", "mine.fountain"))
+    m.save()                         # m read its baseline before the peer landed
+
+    on_disk = ProjectManifest.load(str(d))
+    assert [x["source_filename"] for x in on_disk.drafts] == [
+        "theirs.fountain", "mine.fountain"]
+    assert [x["source_filename"] for x in m.drafts] == [
+        "theirs.fountain", "mine.fountain"]
 
 
 # ---------------------------------------------------------------------------

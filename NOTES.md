@@ -3618,3 +3618,41 @@ is closed; `:8080` untouched and `/health` ok; the orphaned `:8555` (PID 8916) l
 sit in the worktree), the `qoder/update` → `main` merge hold stands, and `Clean_Bill_Probe` in
 `studio_projects/` plus `impl-shots/runs/studio_projects/` (a copy of his project data, now
 unreferenced) await his word before deletion.
+
+## 2026-09-27 (session round-6-rung-14): `drafts` was the one field merged as a WHOLE list
+
+`_merge_manifest` had a rule for every field — keep what this writer changed, take the rest from
+the disk — plus a per-stage merge for `stages`. `drafts` fell through the generic rule, so the
+whole list was swapped as one unit: two processes that each add a draft to the same project
+resolve to whichever saved last, and the other draft vanishes without an error. Same lost-update
+class the locking contract already guards per field and per stage; this was the one field left
+un-guarded.
+
+**Fix, at the shared function.** `_merge_drafts()` (manifest.py) now 3-way merges the list per
+RECORD, keyed on `(name, source_filename)`: peer rows this writer never saw are kept, rows this
+writer removed stay removed (so it is a merge, not a union), and a peer that happened to claim
+this writer's label renumbers that writer's own row through `_next_draft_name()` rather than
+leaving two rows named `draft-3`. `active_draft` follows the renumbered *owning* row. After the
+write, `save()` copies the merged result back onto the in-memory manifest, so a caller that reads
+`m.drafts` next sees what the store actually holds instead of what it intended to store.
+
+**TDD evidence.** RED: 3 of the 4 new tests failed first — the end-to-end one through
+`ProjectManifest.create/load/save` returned only `['mine.fountain']`, i.e. the peer's draft was
+gone. GREEN: 4/4. Mutation proof: setting `removed = set()` (union-only merge) fails exactly
+`test_a_removed_draft_still_stays_removed`, then restored. Tests live in the concurrency section
+of `tests/test_store_concurrency.py`, next to the other cross-process manifest guards.
+
+**Gates.** 56 passed across the 4 affected suites; full `pytest tests/` **1,925 passed / 3
+skipped in 155.22 s**; `ruff check .` clean. Because `save()` is on every browser suite's write
+path, the whole fleet was re-run rather than a subset: **58 suites, 57 passed, 0 failed,
+1 skipped (`gun_pen_audit`, needs a real llama-server), 1,468 checks** — byte-identical totals to
+the pre-change baseline, so no browser regression. `studio_projects/` measured again after the
+fleet: **0 files modified in the run window**.
+
+**Docs.** `docs/DATA_FORMATS.md` now states the merge contract for `project.json` in one
+paragraph (per field, and per record for the draft list), so the next field added to the manifest
+is written against it instead of discovering it.
+
+**Still open (1 item, test-only):** the banner-text race — 4 suites match on error/notice banner
+*text* without first asserting the banner is gone, so `tests/e2e_browser_branch_ui.py:105` can
+pass while an error is on screen.

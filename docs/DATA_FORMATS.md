@@ -305,6 +305,13 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
 
 Stage `status` values: `pending | running | complete | failed | skipped`.
 
+`project.json` merges per field on every write (`manifest._merge_manifest`): a save rewrites
+only what its own object changed since it read the file, so a CLI run and the desk can stamp
+different stages without either reverting the other. `drafts` merges per record for the same
+reason — two uploads in the same instant both survive, and because a label is derived from the
+list length, the newcomer is renumbered rather than left sharing a `draft-N` with the row
+already on disk.
+
 Resume semantics:
 - `complete` stages are never re-run.
 - A **total** analyze failure (nothing usable produced) → `failed` → rerun on next `run`/`resume`.

@@ -23,6 +23,51 @@ import time
 from dataclasses import dataclass, field, asdict
 
 
+def _next_draft_name(taken) -> str:
+    n = len(taken) + 1
+    while f"draft-{n}" in taken:
+        n += 1
+    return f"draft-{n}"
+
+
+def _merge_drafts(baseline: dict, desired: dict, on_disk: dict):
+    """3-way merge the draft list per RECORD, the way every other field merges.
+
+    `snapshot_active` names a new draft from the list length, so two uploads in
+    the same instant both compute "draft-2" and both append: writing this
+    writer's whole list back erased the peer's row, which orphaned the source
+    file the peer had already snapshotted. An entry's identity is
+    (name, source_filename), so a disk row disappears only when THIS writer had
+    it and dropped it. Two rows cannot share a label — `/diff` and
+    `/drafts/activate` select by name — so a colliding newcomer takes the next
+    free one. Returns (merged, {old_name: new_name} for this writer's adds).
+    """
+    def key(d):
+        return (d.get("name"), d.get("source_filename"))
+
+    base = baseline.get("drafts") or []
+    want = desired.get("drafts") or []
+    disk = on_disk.get("drafts") or []
+    base_keys = {key(d) for d in base}
+    removed = base_keys - {key(d) for d in want}
+    merged = [d for d in disk if key(d) not in removed]
+    have = {key(d) for d in merged}
+    names = {d.get("name") for d in merged}
+    renamed = {}
+    for d in want:
+        if key(d) in base_keys or key(d) in have:
+            continue                     # not this writer's add / already on disk
+        entry = dict(d)
+        if entry.get("name") in names:
+            new = _next_draft_name(names)
+            renamed[entry["name"]] = new
+            entry["name"] = new
+        merged.append(entry)
+        names.add(entry["name"])
+        have.add(key(entry))
+    return merged, renamed
+
+
 def _merge_manifest(baseline: dict, desired: dict, on_disk: dict) -> dict:
     """Fold what this writer changed into the document that is on disk now.
 
@@ -42,10 +87,18 @@ def _merge_manifest(baseline: dict, desired: dict, on_disk: dict) -> dict:
             stages[name] = value
     out["stages"] = stages
     for key, value in desired.items():
-        if key == "stages":
+        if key in ("stages", "drafts"):
             continue
         if baseline.get(key) != value:
             out[key] = value
+    if "drafts" in desired:
+        out["drafts"], renamed = _merge_drafts(baseline, desired, on_disk)
+        # A writer that activated the draft it just added must follow it when the
+        # merge renumbered it, or "active" silently means the peer's row. Only
+        # when this writer touched the field: otherwise it is the peer's pointer.
+        if (renamed and out.get("active_draft") in renamed
+                and baseline.get("active_draft") != desired.get("active_draft")):
+            out["active_draft"] = renamed[out["active_draft"]]
     return out
 
 
@@ -217,9 +270,11 @@ class ProjectManifest:
         Holding the lock across the analyze instead would block every status poll
         the desk makes for the length of a model run.
 
-        `drafts` is merged as a whole list: two processes appending a draft in
-        the same instant can still lose one. Upload is a short cycle and reloads
-        per request, so it is the one field where that window is negligible.
+        `drafts` merges per record, not as a whole list: two processes that
+        append in the same instant both survive, and the one whose label
+        collides is renumbered by the merge (see `_merge_drafts`). This is the
+        one field a save can legitimately CHANGE on the writer's object, so
+        `save()` re-reads it from what the store took.
         """
         from .jsonio import atomic_write_json, load_json_store, lock_for
         self.updated_at = time.time()
@@ -240,6 +295,8 @@ class ProjectManifest:
         # did not own keeps the other writer's value without us "changing" it
         # back on the next save.
         self._baseline = copy.deepcopy(out)
+        self.drafts = out.get("drafts") or []
+        self.active_draft = out.get("active_draft")
 
     @staticmethod
     def load(project_dir: str) -> "ProjectManifest":
