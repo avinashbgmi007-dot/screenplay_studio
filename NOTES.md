@@ -3563,3 +3563,15 @@ gaps**, so it is not an unexecuted hole any more. `python -m ruff check .` clean
 hide a real error: `check("the fork reports no error", err_text == "")` passes just as well
 on a banner that is visible with the words not yet landed. Not fixed here — the ladder
 authorized Fix A, and a fleet-wide wait audit is its own item.
+
+**What each commit holds** (verified with `git show --stat`, not from memory):
+
+| commit | holds |
+|---|---|
+| `fa73b4d` | R6-BE-1 — `pipeline.py` + `rules_context.py` + `tests/test_analyzer_prompt_sizing.py` (351 new test lines) |
+| `0a1ccd3` | R6-BE-10 / fix A — `manifest.py` + `tests/test_project_dir_authority.py` + the `CODEBASE_MAP.md` line |
+| `6d7acaa` | R6-E2E-6 — the 9-line wait in `tests/e2e_browser_store_busy.py` |
+| `51e6e43` | this section + the `AGENTS.md` demo-label correction |
+
+Nothing pushed and `qoder/update` was not merged into `main`; the merge stays on hold per
+the standing instruction, awaiting a stability verdict the operator has to accept.
