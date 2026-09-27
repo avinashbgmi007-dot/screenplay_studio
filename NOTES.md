@@ -3438,3 +3438,128 @@ of the project and record the result here.
    once and then surface `_tokenError` (`app.js:119`, against `webapp_server.py:326`). A real
    permission failure would read as "the studio restarted", which is misleading but not
    unsafe. Fix needs a distinguishable code, not a guess.
+
+## 2026-09-27 (session round-6-rung-11): R6-BE-1 — the analyzer sizes its craft block to the model
+
+**What shipped** (uncommitted, 2 files + 1 new suite): `rules_context.py` gained a
+per-call `char_budget` on `fragment_for_pass`/`_render`, a named `KB_OMISSION_MARKER`,
+and a `_budget()` that takes `min(env, model)`. `pipeline.py` gained
+`fit_rules_fragment_to_model()` + `SCRIPT_LEVEL_MAX_TOKENS` (the literal 4000 the send
+site already used, so sizing and sending cannot drift) and `CONTEXT_SLACK_TOKENS = 256`.
+The four script-level passes now compare the prompt with `client.context_window()`
+before sending; a window with room sheds nothing, a tight one sheds WHOLE rules
+highest-confidence-tier first and says so inside the prompt, and a window that cannot
+carry the pass at all records which `--ctx-size` to raise instead of overflowing quietly.
+
+**Two corrections to the finding itself, both measured after implementing.**
+1. The plan's gate wording (`assert every analyzer prompt stays under TOKEN_BUDGET`) is
+   a category error: `TOKEN_BUDGET = 1400` is the *chunker's* ceiling on scene text
+   (`pipeline.py:240`, `_chunk_by_budget`), not a whole-prompt ceiling. All 8 analyzer
+   prompts exceed it — the smallest, `logline_test`, is 1,719 tokens with an empty KB —
+   so that gate could only pass by deleting the knowledge base, which the same plan
+   forbids. The gate is instead "every script-level prompt fits the window the model
+   reports", recorded as the executable test `test_token_budget_could_not_be_the_gate`.
+2. The finding's size was inflated by the estimator: 65,226 chars is 15,510 real tokens
+   (`POST /tokenize` on the live server), not 24,422 — `CHARS_PER_TOKEN = 3` over-counts
+   English KB prose by ~37% (real 4.9 chars/token; Tenglish script text is 2.9). So the
+   character pass needs 19,510 tokens against its completion reserve, not ~28.4k. That
+   fits this author's `n_ctx=50176` and does NOT fit 4k or 8k, which is the normal
+   setting on an 8 GB card. The defect is real; the severity is "small-context users",
+   not "everyone".
+
+**Live verification** (`http://localhost:8080`, the operator's own llama-server, left
+untouched): `LlamaServerClient.context_window()` → 50176 through our code path;
+`/v1/models` → `qwen3.6-35b-a3b-pruned-v2`; 1 slot. At that window the fix is inert by
+design — nothing sheds — which is the expected result and not a passing grade for the
+shedding branch. The shedding branch is covered by `tests/test_analyzer_prompt_sizing.py`
+(32 tests) against the real KB, not by a live 4k server: exercising it live would mean
+re-launching the operator's model, which is prohibited.
+
+**Gates.** `ruff check .` clean. `python -m pytest tests/ -q` → **1909 passed / 3
+skipped in 159 s** (baseline 1877 + the 32 new). Two can-fail proofs, each reverted:
+making `fit_rules_fragment_to_model` a passthrough → **13 failed / 19 passed**; keeping
+the function and removing only the `analyze()` call site → **1 failed / 31 passed**, and
+the one failure was `test_analyze_sizes_the_prompt_it_sends_not_only_the_one_tests_call`,
+so the wiring test is not resting on the behaviour tests.
+
+**Residual, found while sizing (report-only, needs a decision).**
+`SCRIPT_LEVEL_MAX_TOKENS = 4000` means a 4096-window server can never fit ANY
+script-level pass: the completion reserve alone leaves `-160` tokens of slack, so
+shedding every rule still needs ~6,353 tokens. Such a run now records a readable error
+naming `--ctx-size` instead of a bare 400, but the category still fails and the manifest
+still reads `complete`. Making it work would mean scaling `max_tokens` down with the
+window (a different decision about output quality vs reach) — deliberately not taken
+here, because the ladder authorized sizing the *rules* only.
+
+**Open item 2 closed as NOT A BUG, by measurement.** The claim on record ("the on-disk
+`report.md` carries no demo label") is wrong. `report.py:97-98` prints
+`**Analyzed with:** \`<model>\`` and the stand-in advertises `MODEL_ID =
+"demo-craft-model"`, so `studio_projects/P11_Gate/report.md` and
+`studio_projects/Pain_3/report.md` both name the stand-in on disk today. `DEMO_REPORT_BANNER`
+adds a *sentence* to the printable export only, which is the documented design. What is
+wrong is the prose: `AGENTS.md`'s gotcha ("copy a demo analysis out of the project dir
+and it reads as a real one") overstates the gap, and round 6's own report repeated it.
+Proposed: correct the sentence, add no code.
+
+## 2026-09-27 (session round-6-rung-12): Fix A — `project.json` records a directory, it does not choose one
+
+**What the incident cost, stated plainly.** An analyze run aimed at a throwaway COPY of
+`gun_pen_2` rewrote the ORIGINAL: 36 findings became 25, plus an applied page edit. The
+copy was restored afterwards, but the writer's own edit log in the real project is the
+part I cannot certify (see "still his call" below), and the mechanism was not the copy —
+it was this: `ProjectManifest.load(project_dir)` read the file and then handed back the
+`project_dir` **stored inside it**, so every caller's resolved directory was replaced by a
+string written during some earlier launch. `./studio_projects\<name>` resolves against the
+process CWD, not against `--projects-dir`, and `save()` even `os.makedirs` the escaped
+target into existence. Measured on disk: **21 of 22 projects store such a relative path**,
+so this was the ordinary case.
+
+**Fix A, as approved.** The caller resolved the directory for THIS launch; the manifest
+field is a record. `manifest.py:259-272` re-asserts `m.project_dir = project_dir` after
+`from_dict`, which repairs the record on the next `save()` (`_merge_manifest` sees the
+field differ from the baseline and writes the resolved path). One line of behaviour, no
+new abstraction, and it also removes the copy-case 500 for free: the resolved path is a
+real directory, so `load_working` stops pointing at a phantom.
+
+**RED first, and it was red all the way down.** `tests/test_project_dir_authority.py`, 12
+checks — the incident repro (`load` honoring the stored string), all 8 artifact-path
+properties escaping, `save()` creating `./studio_projects/` under a hostile CWD, and two
+API-level checks that a read finds the stash entry that is really in the served project and
+that a stash write lands inside `PROJECTS_DIR`. First run: **12 failed, 1 passed** — the one
+pass was a check that could not fail (a GET cannot `makedirs`), so it was rewritten to read
+a stash entry that exists only in the served tree, which fails today; second run **12
+failed, 0 passed**, then **12 passed** after the fix.
+
+**A fleet failure that was not the fix.** Chunk 6 went red on `store_busy` (2 failed).
+Rather than assume, I ran the same suite on the tree with fix A backed out: **7/0 then 5/2**
+on two runs of the SAME code — a pre-existing flake, not a regression. Root cause is in the
+test, not the product: `showError` reveals the banner and `announce()` lands the words on the
+next `requestAnimationFrame` (that ordering *is* R6-UX-1 — an unrendered `role="alert"` region
+announces to nobody), and the suite polled for `display !== none` and read the text in the
+same breath, so it sampled a state the product holds for one frame. Fixed by giving the text
+its own bounded wait (`tests/e2e_browser_store_busy.py:130-138`); can-fail proof by swapping
+the expectation to an impossible word, which failed with the real sentence printed
+("Couldn't load the script: The studio is busy — …"), then reverted. Two runs after: 7/0, 7/0.
+
+**Gate numbers on the final tree.** Fleet **57 suites / 0 failed / 1,468 checks**, in 8
+chunks derived from `ls tests/e2e_browser_*.py` (per-chunk `N suites:` lines: 8→169, 8→258,
+8→140, 8→214, 8→325, 8→148, 8→178, 1→36); the glob answers 59 because `e2e_browser_common.py`
+is the harness and `gun_pen_audit` is the suite that needs a live llama-server — that one was
+executed separately on 2026-09-27 against the real 35B at :8080 and closed **45 checks / 0
+gaps**, so it is not an unexecuted hole any more. `python -m ruff check .` clean.
+
+**Still his call, not mine:**
+- The real `studio_projects/gun_pen_2/working.json` carries 5 `"(rewritten in the audit)"`
+  markers where the agent recorded 4 at baseline. Findings are back to 36; this is the part
+  the restore did not reconcile. Say the word and I will diff it against the incident copy
+  under `/e/r6_audit_tmp/` before touching anything.
+- An orphaned studio is still listening on **:8555** (PID 8916). I will not kill a process
+  you may be using.
+- `:8080` was never touched, and nothing in this round pushed or merged.
+
+**A latent cousin of the same flake, named and left alone.** Four other suites read
+`#error-banner-text` after checking visibility (`branch_ui.py:105`, `deep_links.py:58`,
+`session_breaks.py:199/306`, `server_url_guard.py:78`). `branch_ui`'s is the one that could
+hide a real error: `check("the fork reports no error", err_text == "")` passes just as well
+on a banner that is visible with the words not yet landed. Not fixed here — the ladder
+authorized Fix A, and a fleet-wide wait audit is its own item.
