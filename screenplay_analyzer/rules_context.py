@@ -193,18 +193,16 @@ class RulesContext:
 
     # ---- rendering --------------------------------------------------------
 
-    def _render(self, rules: list, label: str, char_budget: int | None = None) -> str:
+    def _render(self, rules: list, label: str) -> str:
         """Render rules for a prompt, never splitting a rule in half.
 
-        `char_budget` is a per-call cap, used by the analyzer to fit a fragment
-        to the context window the model actually reported. The environment
-        budget still applies on top of it: whichever is TIGHTER wins, so a model
-        with a large window can never hand back craft the operator capped away.
+        `SCREENPLAY_KB_BUDGET` is the only cap here — how dense the craft
+        grounding is stays the operator's decision.
         """
         if not rules:
             return ""
         rendered = self.kb.render_for_prompt(rules)
-        budget = self._budget(char_budget)
+        budget = self._budget()
         if budget is not None and len(rendered) > budget:
             return self._render_budgeted(rules, budget)
         if budget is None and KB_FRAGMENT_SOFT_WARN \
@@ -218,21 +216,10 @@ class RulesContext:
         return rendered
 
     @staticmethod
-    def _budget(char_budget: int | None) -> int | None:
-        """The cap in force, or None for unlimited.
-
-        The two sources read 0 differently and must keep doing so: the
-        environment's 0 means "unlimited — this is not my decision", while a
-        caller's 0 means "this model has no room left", which is the tightest cap
-        there is. So the unlimited case is None, not 0, and the two can be merged
-        without the second meaning swallowing the first.
-        """
-        caps = []
-        if KB_FRAGMENT_CHAR_BUDGET > 0:
-            caps.append(KB_FRAGMENT_CHAR_BUDGET)
-        if char_budget is not None:
-            caps.append(max(0, int(char_budget)))
-        return min(caps) if caps else None
+    def _budget() -> int | None:
+        """The cap in force, or None for unlimited. The environment's 0 reads as
+        "not my decision", so it must not become a cap that sheds every rule."""
+        return KB_FRAGMENT_CHAR_BUDGET or None
 
     def _render_budgeted(self, rules: list, budget: int) -> str:
         """Keep whole rules, highest confidence tier first, until the budget is
@@ -340,13 +327,11 @@ class RulesContext:
         )
         return header + self._render(unique, f"dialogue:{genre or 'any'}")
 
-    def fragment_for_pass(self, pass_name: str, char_budget: int | None = None) -> str:
+    def fragment_for_pass(self, pass_name: str) -> str:
         """Get the complete prompt fragment for a pipeline pass.
         Combines category rules with any extra files defined in PASS_EXTRAS,
-        de-duplicated by rule id.
-
-        `char_budget` caps the result for one call — see `_render`."""
+        de-duplicated by rule id."""
         rules = self.rules_for_pass(pass_name)
         if not rules:
             return ""
-        return self._render(rules, pass_name, char_budget=char_budget)
+        return self._render(rules, pass_name)

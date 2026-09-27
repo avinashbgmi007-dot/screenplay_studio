@@ -48,7 +48,7 @@ class _NullRulesContext:
     def prompt_fragment_for_rule(self, rule_id: str) -> str:
         return ""
 
-    def fragment_for_pass(self, pass_name: str, char_budget: int | None = None) -> str:
+    def fragment_for_pass(self, pass_name: str) -> str:
         return ""
 
     def prompt_fragment_for_genre(self, genre: str) -> str:
@@ -259,17 +259,10 @@ MAX_SCENE_CHARS = 2200
 # prompt_tokens≈3000) — cap it the same way.
 MAX_OVERVIEW_CHARS = 6000
 # The completion a script-level pass asks for. Grammar-constrained findings JSON
-# needs headroom to close the array (1500 truncated every script-level category
-# in the wild — see `run_script_level_category`), so this is not a number to
-# shave. It is also half of what a script-level pass needs from the model's
-# window, which is why the sizing below takes it as an argument instead of
-# guessing, and why it lives next to the prompt budget constants.
+# needs headroom to close the array — shorter completions truncated it mid-emit
+# on every script-level category in the wild (see `run_script_level_category`),
+# so this is not a number to shave.
 SCRIPT_LEVEL_MAX_TOKENS = 4000
-# Room left over for what the token estimate cannot see: the chat template's
-# control tokens (measured at +15 on a two-message request against llama.cpp's
-# own count), and the ~3% the conservative CHARS_PER_TOKEN under-estimates on
-# mixed-script text. Small, but it is the difference between fitting and 400.
-CONTEXT_SLACK_TOKENS = 256
 
 TRUNCATION_MARKER = "\n[...scene text truncated for context budget...]"
 
@@ -308,67 +301,6 @@ def _chunk_by_budget(scene_dicts: list, chunk_size: int, budget: int = TOKEN_BUD
     if cur:
         chunks.append(cur)
     return chunks
-
-
-def _prompt_chars(assembled) -> int:
-    """Chars in an assembled prompt, whether a prompt fn returns a string or
-    the (system, user) pair most of them return."""
-    if isinstance(assembled, str):
-        return len(assembled)
-    return sum(len(part) for part in assembled)
-
-
-def fit_rules_fragment_to_model(client, *, fragment: str, max_tokens: int,
-                                assemble, shrink) -> tuple[str, str | None]:
-    """Size a craft-rule fragment to the context window the server reports.
-
-    Returns `(fragment, unreachable_message)`. This can only ever make a
-    fragment SMALLER:
-
-      * no fragment, nothing to do;
-      * a server that does not report a window (no `/props`, or the mock the
-        whole browser fleet runs against) is left exactly as it was — a guessed
-        cap would be worse than none, because the guess sets how much craft the
-        writer's findings are grounded in;
-      * a window with room for prompt + completion keeps every rule, on purpose.
-        How dense the grounding is stays the operator's call —
-        `SCREENPLAY_KB_BUDGET` remains the only way to make it.
-
-    Only when the model genuinely cannot hold the pass does the fragment get
-    re-rendered under a character budget, and `_render_budgeted` then states the
-    omission inside the prompt so the model cannot present a full-grounding read.
-    If even an empty rule list cannot fit, the second return value says so: the
-    alternative was three retries against an HTTP 400 and a category recorded
-    `failed` under a manifest that still read `complete`.
-
-    `assemble(fragment)` builds the pass's real prompt from a fragment;
-    `shrink(char_budget)` re-renders the fragment under a cap. Taking them as
-    callables keeps this from having to know which pass is asking.
-    """
-    if not fragment:
-        return fragment, None
-    probe = getattr(client, "context_window", None)
-    n_ctx = probe() if callable(probe) else None
-    if not isinstance(n_ctx, int) or n_ctx <= 0:
-        return fragment, None
-    # What the pass carries besides the rules — the overview, the character
-    # list, the instruction block. Measured against the full fragment so the
-    # arithmetic uses this script's real prompt, not an assumed constant.
-    others = _prompt_chars(assemble(fragment)) - len(fragment)
-    allowance = ((n_ctx - max_tokens - CONTEXT_SLACK_TOKENS) * CHARS_PER_TOKEN
-                 - others)
-    if allowance >= len(fragment):
-        return fragment, None
-    fitted = shrink(max(0, allowance))
-    required = _prompt_chars(assemble(fitted)) // CHARS_PER_TOKEN + max_tokens
-    if required <= n_ctx:
-        return fitted, None
-    return fitted, (
-        f"This pass cannot fit the model it was addressed: its prompt needs "
-        f"~{required} tokens against a context window of {n_ctx}, even with "
-        f"every craft rule shed (the script text and the {max_tokens}-token "
-        f"completion already exceed it). Raise llama-server's --ctx-size, or "
-        f"point the analysis at a model with a larger window.")
 
 
 def _extract_items(result, key: str) -> list:
@@ -596,11 +528,9 @@ def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_
 def run_script_level_category(prompt_fn, client: LlamaServerClient, rules_fragment: str, *args, category: str = "theme", default_severity: str = "low", language: str = "eng") -> list[dict]:
     grammar = findings_grammar()
     system, user = prompt_fn(*args, rules_fragment=rules_fragment, language=language)
-    # 1500 truncated the findings JSON mid-emit on every script-level category
-    # (character/scene_function died at finish_reason='length' in the wild);
-    # grammar-constrained JSON needs headroom to close the array + object.
-    # SCRIPT_LEVEL_MAX_TOKENS is the same constant the prompt sizing reads, so
-    # the two cannot drift apart and leave a pass sized for the wrong window.
+    # The grammar needs headroom to close the array + object: with a shorter
+    # completion this call died at finish_reason='length' on every script-level
+    # category in the wild.
     result = client.chat_json(system, user, grammar=grammar,
                               max_tokens=SCRIPT_LEVEL_MAX_TOKENS)
     items = _extract_items(result, "findings")
@@ -930,25 +860,6 @@ def analyze(
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
-                # R6-BE-1: the craft block is the largest thing in this prompt
-                # (65,226 chars for `character`, ~15.5k tokens on a live 35B),
-                # and it went to the model without ever being compared with the
-                # window that model reported. A 4k or 8k context llama-server —
-                # the normal setting on an 8 GB card — answered HTTP 400, the
-                # client retried it three times, and this category was recorded
-                # `failed` under a manifest that still read `complete`.
-                rules_fragment, too_small = fit_rules_fragment_to_model(
-                    client, fragment=rules_fragment,
-                    max_tokens=SCRIPT_LEVEL_MAX_TOKENS,
-                    assemble=lambda f, _fn=fn, _args=args: _fn(
-                        *_args, rules_fragment=f, language=report_language),
-                    shrink=lambda chars, _cat=cat: rules_ctx.fragment_for_pass(
-                        _cat, char_budget=chars))
-                if too_small:
-                    # Recorded, not raised: the pass still goes to the model,
-                    # whose estimate this is only, and a wrong estimate should
-                    # not cost the writer a category that would have fit.
-                    result.errors.append(f"{cat}: {too_small}")
                 all_findings.extend(_tag_evidence(
                     run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language),
                     script_level_source))

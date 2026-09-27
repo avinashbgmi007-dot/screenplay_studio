@@ -3698,3 +3698,56 @@ quietly removed a guarded site); `ruff check .` clean. Browser fleet: **58 suite
 0 failed, 1 skipped (`gun_pen_audit`), 1,469 checks** — 1,468 + the one new settle check.
 `studio_projects/` after the fleet: 203 files, **0 touched** in the run window. Product code was
 not modified by this rung; one test file plus NOTES.md.
+
+## 2026-09-27 (session round-6-rung-16): the owner chose "no ctx arithmetic at all" — the window guard is deleted
+
+Rung 11's R6-BE-1 left three options on the table (document an 8192 floor / refuse at
+connect / adapt the completion budget). The answer was none of them: **"dont hardcode or
+mention any value at all w.r.t context or ctx size! remove the gaurd!"** So the guard went,
+and with it the only code in the analyzer that ever asked a model how big its window was.
+
+**Deleted** (`pipeline.py`, `rules_context.py`): `fit_rules_fragment_to_model()` (51 lines —
+the `/props` probe, the `(n_ctx - max_tokens - slack) * chars_per_token - others` arithmetic,
+and the sentence that named `--ctx-size` and the window number), `CONTEXT_SLACK_TOKENS = 256`,
+`_prompt_chars()` (dead the moment the probe left), the `analyze()` call site's
+`rules_fragment, too_small = fit(...)` plus the `result.errors.append(f"{cat}: {too_small}")`
+"recorded, not raised" path, and **`char_budget`** — the per-call cap parameter on
+`fragment_for_pass`/`_render`/`_budget`, whose only production caller had been that guard.
+`_budget()` is now `return KB_FRAGMENT_CHAR_BUDGET or None`. The analyzer no longer calls
+`context_window()` anywhere; its one remaining caller is `webapp_server.py:3743`, the
+co-writer's prompt budget, which is a different subsystem and untouched.
+
+**Kept, against the literal wording, and said out loud:** `SCRIPT_LEVEL_MAX_TOKENS = 4000`.
+It is a *completion length*, the same family as the 500/800/900/1200/1800/2000 every other
+pass asks for, not a share of the model's window. Deleting it makes `chat_json` fall back to
+its 1500 default, which is the value that truncated the grammar-constrained findings JSON
+mid-array on every script-level category in a real run — R6-BE-1's original bug. The owner's
+alternative, offered and not yet taken: send no `max_tokens` at all and let the server run
+until the array closes. Still mentioning context, still standing: `TOKEN_BUDGET`,
+`COMPLETION_RESERVE`, `MAX_SCENE_CHARS`, `MAX_OVERVIEW_CHARS`, `TRUNCATION_MARKER`'s own
+words, and `screenplay_cowriter/context.py:budget_for_context` (+ its :596 warning). Those
+change what text goes to the model, so they wait for a decision rather than riding along here.
+
+**What this costs:** on this operator's server, nothing — the guard's own test asserted *a
+window with room sheds NOTHING*, so prompts are byte-identical before and after. On a
+hypothetically tiny server a pass now gets HTTP 400 → 3 retries → category `failed`, with no
+"raise --ctx-size" sentence; `except LlamaServerError` at the call site still appends to
+`result.errors`, so it is loud, merely less specific.
+
+**Tests.** `tests/test_analyzer_prompt_sizing.py` rewritten around the one cap that remains:
+`SCREENPLAY_KB_BUDGET` is the operator's, it is a ceiling and never a floor, it sheds WHOLE
+rules in confidence-tier order, it states the true omitted count in the prompt, and it is on
+the path `analyze()` actually takes. 32 old tests → 13. `test_the_cap_bites_somewhere_and_
+not_everywhere` exists because the parametrized shed test needs both arms live: `theme`'s
+fragment is 6,014 chars, under an 8,000 cap, and `character`'s is 65,226 over it — the first
+RED run caught that assumption and the canary keeps it from rotting into a branch that never
+runs.
+
+**Gates.** Full `pytest tests/` **1,906 passed / 3 skipped in 149.79 s**; the 19-test delta
+against rung 15's 1,925 is exactly this file's window checks (1,925 − 32 + 13 = 1,906), and
+the 3 skips are the pre-existing `test_store_fault_injection.py:507` ones. `ruff check` clean
+on both packages plus the test file. `grep -rn "char_budget|fit_rules_fragment_to_model|CONTEXT_SLACK_TOKENS" --include=*.py .`
+→ **0 hits** outside the rewritten file. Not run: the browser fleet (0 of the 58 suites
+references any removed symbol; no SPA or e2e file was touched) and `gun_pen_audit`, which is
+the only gate that would exercise a real 12-pass analysis end to end — it needs :8080, so it
+is the owner's call, not a default.
