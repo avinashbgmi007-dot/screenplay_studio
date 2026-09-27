@@ -257,7 +257,19 @@ class ProjectManifest:
             raise FileNotFoundError(f"No project found at '{project_dir}' (no project.json).")
         if not isinstance(data, dict):
             raise StoreUnreadable(path, f"expected an object, got {type(data).__name__}")
-        return ProjectManifest.from_dict(data)
+        m = ProjectManifest.from_dict(data)
+        # The caller resolved `project_dir` for THIS launch (the CLI's `--project`,
+        # or `_project_dir(name)` under the running server's `--projects-dir`); the
+        # string inside project.json is a record of where the project was created,
+        # which is not an instruction to a different process. Honoring it moved every
+        # artifact path — and `save()`'s `os.makedirs` — out of the tree the operator
+        # pointed at: an analyze run against a COPY of a project rewrote the original,
+        # because the copy still said `"project_dir": "./studio_projects\\<name>"` and
+        # that resolves against the launcher's CWD, not the server's projects dir.
+        # 21 of 22 projects on disk store such a relative path, so this was the normal
+        # case. `save()` then writes the resolved directory back, repairing the record.
+        m.project_dir = project_dir
+        return m
 
     @staticmethod
     def create(project_dir: str, source_file: str, title: str = None) -> "ProjectManifest":
