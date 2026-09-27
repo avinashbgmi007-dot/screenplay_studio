@@ -96,14 +96,37 @@ def run(base):
         branch_name = "alt-%d" % (int(time.time()) % 100000)
         page.locator("#fork-name-input").fill(branch_name)
         page.locator("#fork-save").click()
-        page.wait_for_timeout(1800)
+
+        # The create settles one of two ways (app.js:3607): the modal closes, or
+        # showError reveals the banner with words. Poll to EITHER. A fixed sleep
+        # reads the banner in the frame before a slow failure lands — measured:
+        # at 1.8 s the text was '' and "the fork reports no error" PASSED, while
+        # at 4.3 s the banner read "Couldn't create fork: …".
+        settled = ""
+        deadline = time.time() + 15
+        while time.time() < deadline and not settled:
+            settled = page.evaluate(
+                """() => {
+                  const modal = document.getElementById('fork-modal');
+                  const banner = document.getElementById('error-banner');
+                  const text = document.getElementById('error-banner-text');
+                  if (modal && modal.style.display === 'none') return 'created';
+                  if (banner && banner.style.display === 'flex' && text.textContent.trim())
+                    return 'errored';
+                  return '';
+                }""")
+            page.wait_for_timeout(120)
+        check("the fork create settles: the modal closes or an error lands",
+              settled in ("created", "errored"),
+              settled or "neither terminal state within 15 s")
 
         # The error banner is how a failed create surfaces (createFork -> showError).
         # Reading it names the cause instead of leaving "nothing happened".
         err_text = ""
         if page.locator("#error-banner").is_visible():
             err_text = page.locator("#error-banner-text").inner_text().strip()
-        check("the fork reports no error", err_text == "", err_text)
+        check("the fork reports no error", settled == "created" and err_text == "",
+              f"settled={settled} banner={err_text!r}")
 
         check("the fork modal closes after a successful create",
               not page.locator("#fork-modal").is_visible())

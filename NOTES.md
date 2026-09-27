@@ -3656,3 +3656,45 @@ is written against it instead of discovering it.
 **Still open (1 item, test-only):** the banner-text race — 4 suites match on error/notice banner
 *text* without first asserting the banner is gone, so `tests/e2e_browser_branch_ui.py:105` can
 pass while an error is on screen.
+
+## 2026-09-27 (session round-6-rung-15): "the fork reports no error" passed while the fork was failing
+
+The last defect on the round-6 list, and the only one whose fix was a *wait*, not a predicate.
+`tests/e2e_browser_branch_ui.py` slept a fixed 1800 ms after clicking create and then read
+`#error-banner-text` — so a slow failure landed after the read and the check recorded a pass with
+nothing on screen yet to object to.
+
+**Reproduced before touching anything** (`E:\r6_audit_tmp\r7\branch_race_red.py`, holds the fork
+POST 2.6 s then 500s it):
+`at the suite's own 1800 ms read: banner text = '' -> check PASSED (claimed no error)`,
+`at 4.3 s: banner visible = True text = "Couldn't create fork: boom from the RED probe"`.
+The banner is not the flaky part — `showError` sets `display: flex` then `announce()` fills the
+text on the next animation frame (`app.js:486-505`), so "visible with no words" is a real DOM
+state, and one second earlier the whole banner is simply not there yet.
+
+**Fix:** poll to either terminal state of the create instead of sleeping — modal closed (success
+closes it) or banner up *with words* (`createFork`, `app.js:3607`, ends one way or the other) —
+and add a check that the create settled at all, so a hang fails loudly rather than reading an
+empty banner. 15 s ceiling, 120 ms step.
+
+**Green, and it can still fail.** The real suite: **12 passed / 0 failed**, run twice standalone
+and again inside the fleet. The same late-500 injected by monkeypatching the harness `launch()`
+(`branch_race_canfail.py`, so the *suite's own code* is what is tested) now reports
+`FAIL  the fork reports no error  [settled=errored banner="Couldn't create fork: boom from the
+can-fail probe"]` — the exact check that had passed vacuously.
+
+**The three cousins, measured instead of assumed.** NOTES called them latent; they are not the
+same defect. `deep_links.py:341` and `store_busy.py:112` read the banner only after a bounded
+poll has settled the action they belong to, and `session_breaks.py:261` samples `bannerShown &&
+bannerText` in a loop. `branch_ui`'s was the one that could pass while *its own* action was still
+in flight. The broader wait audit is still its own item and it is bigger than it looks: 461
+`wait_for_timeout` calls remain across the suites (most are hover-settle and animation waits, not
+reads-of-outcome), and `test_browser_check_hygiene.py` separately ratchets **23** `if`-guarded
+check sites that no rule here touches.
+
+**Gates.** Full `pytest tests/` **1,925 passed / 3 skipped in 136.84 s**; browser + doc hygiene
+**11 passed** (the `if`-guard ratchet still measures exactly 23, so the edit neither added nor
+quietly removed a guarded site); `ruff check .` clean. Browser fleet: **58 suites, 57 passed,
+0 failed, 1 skipped (`gun_pen_audit`), 1,469 checks** — 1,468 + the one new settle check.
+`studio_projects/` after the fleet: 203 files, **0 touched** in the run window. Product code was
+not modified by this rung; one test file plus NOTES.md.
