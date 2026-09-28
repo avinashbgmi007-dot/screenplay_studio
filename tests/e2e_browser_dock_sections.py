@@ -5,7 +5,12 @@ dimension on the ONE filter row, never a surface of its own), P1.8 (spec §5
 "one rendering per finding per panel" — the DOM is asked which section cards each
 finding, and no finding may answer twice) and P2.13 (spec §7 — the deep card
 carries the verifier's own note, names a mechanical check as one, and a KB rule
-is a button whose popover resolves the rule's name and citation).
+is a button whose popover resolves the rule's name and citation) and R6 item 3 (a
+card names the SCOPE its claim covers — one scene, several scenes, or the whole
+script — reads at body size instead of 11px micro-type, and holds its verbs on ONE
+row in BOTH of that row's states: `pin` is the one control whose label changes
+length when the writer uses it, and pressing it must not re-wrap its own row. The
+rule chip stays with the reasoning, where it is now clickable).
 
 The dock's own comment promised "sections stack vertically and collapse under one
 header each" while every `.dock-section-title` was a plain div: nothing collapsed,
@@ -780,7 +785,11 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
 # desk simply dropped it, and `rule_id` was a hover title nobody could read.
 HONESTY_SEED_JS = """(args) => {
   const fs = [{
-    category: "dialogue", severity: "high", scene_refs: [],
+    // Cites Scene 2 and matched in Scene 1 — the note below says exactly that,
+    // so the scene_refs must say it too. R6 item 3 reads the card's scope label
+    // off these refs, and a fixture that contradicted its own note would have
+    // made the new label untestable.
+    category: "dialogue", severity: "high", scene_refs: [2],
     issue: "HONESTY rule seed: the quote is real but the scene was wrong",
     why_it_matters: "A corrected scene is a fact the writer can use.",
     evidence_quote: args.quote,
@@ -1238,6 +1247,261 @@ def check_report_honesty_surfaces(page, lens, base, name):
                      refreshAllFindingSurfaces(); }""")
 
 
+# R6 item 3: a card tells the writer WHAT KIND of evidence its judgment rests on.
+# The ledger's own text already distinguishes three — a claim about a line the
+# verifier found, a claim about named scenes, and a claim about the whole script —
+# but the card printed none of them, so 94 of the writer's own findings (measured
+# on his 4 stored reports) all looked like the same unanchored opinion. Seeded here
+# rather than read off the demo report because the demo report's scene refs and
+# verification statuses are the model's, not this suite's.
+TYPOLOGY_SEED_JS = """(args) => {
+  const mk = (o) => Object.assign({
+    description: o.issue + " (seeded for the evidence-typing fixture)",
+    why_it_matters: "Seeded so the scope label has a card to sit on.",
+    evidence_quote: args.quote,
+  }, o);
+  const fs = [
+    // cites Scene 2, quote actually matched in Scene 1: the SCOPE is what the
+    // analyzer claimed, the badge is what the verifier confirmed. Two verbs.
+    mk({ category: "dialogue", severity: "high", scene_refs: [2],
+         issue: "TYPE line seed", rule_id: "chekhovs_gun",
+         verification: { status: "verified", matched_scene: 1, confidence: 0.93,
+                         note: null } }),
+    mk({ category: "structure", severity: "medium", scene_refs: [4, 5],
+         issue: "TYPE scenes seed", evidence_quote: null,
+         verification: { status: "no_quote", matched_scene: null, confidence: null } }),
+    mk({ category: "theme", severity: "low", scene_refs: [],
+         issue: "TYPE script seed", evidence_quote: null,
+         verification: { status: "no_quote", matched_scene: null, confidence: null } }),
+  ];
+  state.findings = fs;
+  state.report = Object.assign({}, state.report || {}, { findings: fs });
+  state.findingIds = fs.map((f) => computeFindingId(f));
+  state.findingStatus = {};
+  state.findingMarks = {};
+  state.ghostedIds = new Set();
+  state.fixQueue = state.fixQueue || {};
+  state.fixQueue.dismissed_flags = [];
+  refreshAllFindingSurfaces(); // the ONE re-render entry point (P0.4)
+  return { n: fs.length };
+}"""
+
+# One round trip per card: the scope label, every own-text layer's computed size,
+# the action row's geometry, and each icon button's accessible name.
+CARD_SHAPE_JS = """(want) => {
+  const card = [...document.querySelectorAll('.dock-lens[data-lens="evidence"] .finding-note')]
+    .find((n) => (n.textContent || '').includes(want));
+  if (!card) return null;
+  const scope = card.querySelector('.finding-note-scope');
+  const px = (sel) => { const e = card.querySelector(sel);
+    return e ? parseFloat(getComputedStyle(e).fontSize) : null; };
+  const layers = [];
+  card.querySelectorAll('*').forEach((e) => {
+    const own = [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    if (!own) return;
+    if (!e.getBoundingClientRect().height) return;
+    layers.push({ cls: (e.className || e.tagName).toString().split(' ')[0],
+                  px: parseFloat(getComputedStyle(e).fontSize),
+                  text: e.textContent.trim().slice(0, 24) });
+  });
+  const actions = card.querySelector('.finding-note-actions');
+  const ar = actions.getBoundingClientRect();
+  const tops = new Set([...actions.children]
+    .filter((c) => c.getBoundingClientRect().height > 0)
+    .map((c) => Math.round(c.getBoundingClientRect().top)));
+  const chip = card.querySelector('.finding-rule-btn');
+  return {
+    scope: scope ? scope.textContent.trim() : null,
+    issuePx: px('.finding-note-text'),
+    whyPx: px('.finding-deep-why'),
+    layers,
+    smallest: layers.length ? Math.min(...layers.map((l) => l.px)) : null,
+    under10: layers.filter((l) => l.px < 10).map((l) => l.cls + '@' + l.px),
+    actions: { h: Math.round(ar.height), rows: tops.size,
+               names: [...actions.children].map((c) => (c.textContent || '').trim()) },
+    icons: [...card.querySelectorAll('.intent-btn')].map((b) => ({
+      glyph: (b.textContent || '').trim(),
+      aria: b.getAttribute('aria-label'),
+      title: (b.getAttribute('title') || '').slice(0, 18) })),
+    chipInDeep: !!chip && !!chip.closest('.finding-deep'),
+    chipInActions: !!chip && !!chip.closest('.finding-note-actions'),
+  };
+}"""
+
+
+def card_shape(page, want):
+    return page.evaluate(CARD_SHAPE_JS, want)
+
+
+def check_evidence_typing_and_row(page, lens):
+    """item 3: the card names its evidence scope, reads at a legible size, and
+    spends ONE row on its verbs instead of two."""
+    lines = page.evaluate("""() => {
+        const out = [];
+        for (const l of document.querySelectorAll('#manuscript-container .el-action, #manuscript-container .el-dialogue')) {
+          const t = (l.textContent || '').trim();
+          if (t.length > 14) out.push(t);
+          if (out.length === 1) break;
+        }
+        return out;
+    }""")
+    assert lines, "no manuscript line available to seed a real quote"
+    if not page.evaluate("() => dockIsOpen()"):
+        open_dock(page)
+    page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
+                       showDeferred: true, category: null, scene: null }; }""")
+    page.evaluate(TYPOLOGY_SEED_JS, {"quote": lines[0]})
+    page.wait_for_timeout(300)
+    open_dock_section_holding(page, ".finding-note")
+    page.wait_for_timeout(400)
+
+    # -- 1. the three kinds of evidence, each named on its card ---------------
+    line_card = card_shape(page, "TYPE line seed")
+    scenes_card = card_shape(page, "TYPE scenes seed")
+    script_card = card_shape(page, "TYPE script seed")
+    check("item 3: all three seeded findings reached a deep card",
+          bool(line_card) and bool(scenes_card) and bool(script_card),
+          f"line={line_card is not None} scenes={scenes_card is not None} "
+          f"script={script_card is not None}")
+    check("item 3: a finding cited to two scenes names BOTH scenes as its scope",
+          scenes_card is not None and scenes_card["scope"] == "Scenes 4, 5",
+          repr(scenes_card and scenes_card["scope"]))
+    check("item 3: a finding with no scene cited says it is about the whole script",
+          script_card is not None and script_card["scope"] == "Whole script",
+          repr(script_card and script_card["scope"]))
+
+    # -- 2. scope is the ANALYZER's claim, never the verifier's answer --------
+    # The quote matched in Scene 1 while the finding cites Scene 2. Printing the
+    # matched scene here would quietly contradict the verification note the same
+    # card shows, and the writer could not tell which scene to open.
+    check("item 3: the scope is the cited scene, not where the quote matched",
+          line_card is not None and line_card["scope"] == "Scene 2"
+          and "1" not in (line_card["scope"] or ""),
+          repr(line_card and line_card["scope"]))
+    check("item 3: the scope label is a deep-card fact only — the margin pin "
+          "already sits ON its scene, so it must not repeat it",
+          page.evaluate("""() => document.querySelectorAll(
+              '#manuscript-container .finding-note .finding-note-scope').length""") == 0,
+          str(page.evaluate("""() => document.querySelectorAll(
+              '#manuscript-container .finding-note .finding-note-scope').length""")))
+
+    # -- 3. legibility: the card's own sentence is not micro-type -------------
+    # Measured on the pre-fix card: base 11px, every one of its 12 text layers
+    # between 9px and 11px. The diagnosis prose was smaller than the script it
+    # diagnoses (13px) by the app's own token scale.
+    check("item 3: the finding's own sentence reads at body size, not 11px",
+          line_card is not None and line_card["issuePx"] is not None
+          and line_card["issuePx"] >= 12,
+          f"{line_card and line_card['issuePx']}px (measured before the fix: 11px)")
+    check("item 3: the reasoning under it is at least 12px",
+          line_card is not None and line_card["whyPx"] is not None
+          and line_card["whyPx"] >= 12,
+          f"{line_card and line_card['whyPx']}px (measured before the fix: 10px)")
+    check("item 3: no painted text layer on the card is under 10px",
+          line_card is not None and line_card["smallest"] is not None
+          and line_card["smallest"] >= 10,
+          f"smallest {line_card and line_card['smallest']}px; "
+          f"under 10: {line_card and line_card['under10']}")
+
+    # -- 4. the action row: one row of verbs, each with a name ---------------
+    # The rule chip's rule id is a long string and it lived in this row, which put
+    # the eight controls over the card's 322px content box (342px clientWidth minus
+    # 10px side padding) — so the last verb wrapped onto a second row and every card
+    # in the ledger paid for it. It now needs 300px, one row.
+    check("item 3: the card's verbs fit ONE row (was 2 rows / 52px here, "
+          "54px on the demo report's cards)",
+          line_card is not None and line_card["actions"]["rows"] == 1,
+          f"{line_card and line_card['actions']}")
+    check("item 3: and the row is one control tall, not two",
+          line_card is not None and line_card["actions"]["h"] <= 30,
+          f"{line_card and line_card['actions']['h']}px")
+
+    # The row's shape is not a one-off measurement: `pin` is the only control on
+    # this card whose LABEL CHANGES WHEN THE WRITER USES IT (pin -> pinned, +18px,
+    # taking the row from 300px to 318px of its 322px). Measured before the glyph
+    # came off "Locate": pressing pin re-wrapped its own row, 24px -> 52px (the two
+    # check labels below print both halves). That is the same self-resizing defect
+    # B painted out of the reasoning block, arriving from the other direction — a
+    # state change instead of a hover — so the state itself is gated here.
+    pinned_row = page.evaluate("""(want) => {
+      const card = [...document.querySelectorAll('.dock-lens[data-lens="evidence"] .finding-note')]
+        .find((n) => (n.textContent || '').includes(want));
+      if (!card) return null;
+      const btn = card.querySelector('.finding-pin-btn');
+      if (!btn) return null;
+      btn.click();
+      return { clicked: true };
+    }""", "TYPE line seed")
+    page.wait_for_timeout(900)
+    if not pinned_row:
+        check("item 3: pinning keeps its own row on one line", False,
+              "no pin button on the seeded card to press")
+    else:
+        check("item 3: pressing pin really flips the label (so the next check "
+              "cannot pass by doing nothing)",
+              page.evaluate("""(want) => {
+                const card = [...document.querySelectorAll(
+                  '.dock-lens[data-lens="evidence"] .finding-note')]
+                  .find((n) => (n.textContent || '').includes(want));
+                const b = card && card.querySelector('.finding-pin-btn');
+                return !!b && b.textContent.trim() === 'pinned' && b.disabled === true;
+              }""", "TYPE line seed"),
+              "the pin button did not reach the pinned state")
+        after = page.evaluate("""(want) => {
+          const card = [...document.querySelectorAll('.dock-lens[data-lens="evidence"] .finding-note')]
+            .find((n) => (n.textContent || '').includes(want));
+          const a = card ? card.querySelector('.finding-note-actions') : null;
+          if (!a) return null;
+          const kids = [...a.children].filter((c) => c.getBoundingClientRect().height > 0);
+          const tops = new Set(kids.map((c) => Math.round(c.getBoundingClientRect().top)));
+          return { rows: tops.size, h: Math.round(a.getBoundingClientRect().height),
+                   cardH: Math.round(card.getBoundingClientRect().height) };
+        }""", "TYPE line seed")
+        check("item 3: pinning does NOT re-wrap the verb row "
+              "(measured before the fix: 1 row/24px became 2 rows/52px)",
+              after is not None and after["rows"] == 1 and after["h"] <= 30,
+              str(after))
+
+    icons = (line_card or {}).get("icons") or []
+    named = [b for b in icons if (b["aria"] or "").strip() and len(b["aria"].strip()) > 2]
+    check("item 3: every glyph-only verb carries a name a screen reader can say",
+          len(icons) == 4 and len(named) == 4,
+          f"{len(named)}/{len(icons)} labelled: {icons}")
+
+    # -- 5. provenance lives with the reasoning, and stays clickable ----------
+    # The chip was put in the action row only because the deep block used to be
+    # hover-gated (a button inside it could never be clicked). R6 defect B painted
+    # that block, so the reason expired — and the chip's rule id is a long string
+    # that is what pushed the verbs onto a second row.
+    check("item 3: the rule chip sits with the reasoning, not among the verbs",
+          line_card is not None and line_card["chipInDeep"]
+          and not line_card["chipInActions"],
+          f"in_deep={line_card and line_card['chipInDeep']} "
+          f"in_actions={line_card and line_card['chipInActions']}")
+    deep_chip = lens.locator(".finding-note", has_text="TYPE line seed") \
+        .locator(".finding-deep .finding-rule-btn")
+    if deep_chip.count() == 1:
+        check("item 3: and clicking it there still opens the citation",
+              clicked(deep_chip.first), "the click never landed")
+        page.wait_for_timeout(900)
+        pop = page.evaluate("""() => { const p = document.querySelector('.rule-popover');
+              return p ? (p.textContent || '') : ''; }""")
+        check("item 3: the popover still resolves the rule from the knowledge base",
+              "Chekhov" in pop, repr(pop[:120]))
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(250)
+    else:
+        check("item 3: and clicking it there still opens the citation", False,
+              f"{deep_chip.count()} chips inside the deep block to click")
+        check("item 3: the popover still resolves the rule from the knowledge base",
+              False, "no chip in the deep block")
+
+    # -- 6. leave the ledger as the next section found it --------------------
+    page.evaluate("""() => { state.findingFilter = { severities: ["high", "medium", "low"],
+                       showDeferred: false, category: null, scene: null };
+                     refreshAllFindingSurfaces(); }""")
+
+
 def run(base):
     name = seed_and_analyze(base, "Ledger Collapse")
     with sync_playwright() as p:
@@ -1411,6 +1675,7 @@ def run(base):
         check_shelf_defers_and_one_pacing(page, lens, base, name)
         check_card_honesty_fields(page, lens, base)
         check_report_honesty_surfaces(page, lens, base, name)
+        check_evidence_typing_and_row(page, lens)
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

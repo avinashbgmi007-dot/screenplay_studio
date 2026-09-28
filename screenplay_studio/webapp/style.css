@@ -1617,7 +1617,15 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   border-left: 3px solid var(--danger);
   border-radius: var(--r-md);
   padding: var(--sp-4) var(--sp-5);
-  font-size: var(--fs-xs);
+  /* R6 item 3: this was --fs-xs (11px), so the card's own sentence — the words
+     the writer has to act on — rendered SMALLER than the 13px script it is
+     commenting on. Every text layer on the card measured 9-11px.
+     The READING matter now sits here (13px) and in .finding-deep-* (12px); the
+     verbs stay at the 10px label tier on purpose, and the reason is width, not
+     taste: in the pinned state the eight controls spend 318px of the row's
+     322px, so raising any verb label by a tier re-wraps the row that this rung
+     just straightened. Raise the verb size only together with the column. */
+  font-size: var(--fs-body);
   line-height: 1.45;
   box-shadow: 0 3px 10px var(--shadow-a40);
   cursor: pointer;
@@ -1639,21 +1647,27 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
    going either way. The colour is only the recede cue; the --ok rail and the
    "addressed" label carry the state. */
 .finding-note.addressed { color: var(--text-muted); border-left-color: var(--ok); }
-.finding-note-top { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
+/* R6 item 3: the label row reads left-to-right as WHAT the claim is — its
+   category, then the ground it covers. `margin-left: auto` on the state keeps it
+   at the right edge now that a third label shares the line; space-between would
+   have pushed the scope to the middle of the card and split the pair. */
+.finding-note-top { display: flex; justify-content: flex-start; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-2); }
 .finding-note-cat {
   font-family: var(--font-mono);
-  font-size: var(--fs-3xs);
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
 }
-.finding-note-state { font-family: var(--font-mono); font-size: var(--fs-3xs); color: var(--ok); }
+.finding-note-scope { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); white-space: nowrap; }
+.finding-note-state { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--ok); margin-left: auto; }
 .finding-note-text { display: block; margin-bottom: var(--sp-2); }
 .finding-note-actions { display: flex; gap: var(--sp-3); }
 /* P1.10: what each gesture costs, printed on the card instead of hidden behind
-   a hover. Muted so it never competes with the finding itself. */
+   a hover. Muted so it never competes with the finding itself. R6 item 3: 9px was
+   below this system's own label floor — a sentence has to be readable to work. */
 .finding-intent-hint {
-  font-size: var(--fs-3xs);
+  font-size: var(--fs-2xs);
   color: var(--text-faint);
   margin: var(--sp-3) 0 0;
   line-height: 1.5;
@@ -6074,24 +6088,33 @@ body:not(.idea-mode) .desk {
    not animate (display:none has no start value), and made every card resize
    itself under the pointer. */
 .finding-deep { display:flex; flex-direction:column; gap:var(--sp-2); margin-top:var(--sp-2); padding-top:var(--sp-2); border-top:1px dashed var(--line-soft); }
-.finding-deep-why { font-size:var(--fs-2xs); color:var(--text-muted); line-height:1.55; }
-.finding-deep-quote { font-size:var(--fs-2xs); color:var(--text); font-style:italic; line-height:1.5; }
+/* R6 item 3: the diagnosis, its quote and the verifier's note are the reading
+   matter of the card, and they were set at 10px — under even the app's own
+   12px "secondary text" tier. The chrome (chips, buttons) stays at the label
+   tier so the hierarchy still reads. */
+.finding-deep-why { font-size:var(--fs-sm); color:var(--text-muted); line-height:1.55; }
+.finding-deep-quote { font-size:var(--fs-sm); color:var(--text); font-style:italic; line-height:1.5; }
 .finding-deep-badge { align-self:flex-start; font-size:var(--fs-2xs); font-weight:600; border-radius:var(--r-sm); padding:1px var(--sp-2); }
 .finding-deep-badge.verified { color:var(--ok); border:1px solid var(--ok); }
 .finding-deep-badge.unverified { color:var(--danger-text); border:1px solid var(--danger); }
 /* spec section 7: the verifier's own words about this quote, beside the quote */
-.finding-deep-note { font-size:var(--fs-2xs); color:var(--text-muted); font-style:italic; line-height:1.55; }
+.finding-deep-note { font-size:var(--fs-sm); color:var(--text-muted); font-style:italic; line-height:1.55; }
 /* a KB rule is a claim with an author, so it is a button you can ask; a
    mechanical check has nobody to cite and says so plainly */
 .finding-rule-btn { appearance:none; align-self:flex-start; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
 .finding-rule-btn:hover { color:var(--text); border-color:var(--lamp); }
 .finding-rule-btn:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
 .finding-check { align-self:flex-start; font-size:var(--fs-2xs); color:var(--text-faint); }
-/* the ledger column gives a card ~320px and the rule chip names a whole rule id:
-   unwrapped, it squeezed every verb beside it — the same damage the queue row
-   took in P2.12. The buttons keep their line; a long rule name gets its own. */
-.dock-section .finding-note-actions { flex-wrap: wrap; }
-.dock-section .finding-rule-btn { white-space:nowrap; flex:0 0 auto; }
+/* The ledger card's clientWidth measures 342px and its own 10px side padding
+   leaves the verb row a 322px content box. R6 item 3 took the rule chip OUT of
+   this row — it is provenance, so it now sits with the reasoning above — and
+   tightened the gap. Measured on the final tree: the eight controls need 300px
+   and hold ONE row / 24px, and the pinned state (the "pin" -> "pinned" swap is
+   why the glyph left "Locate", see app.js) needs 318px and still holds. Before,
+   the chip's rule id put the row over 322px and every card paid a second row:
+   2 rows / 54px. flex-wrap stays as the safety for a narrower column. */
+.dock-section .finding-note-actions { flex-wrap: wrap; gap: var(--sp-2); }
+.dock-section .finding-deep .finding-rule-btn { white-space:nowrap; flex:0 0 auto; }
 /* the receipt: the rule's name and its craft attribution, in the card, where the
    writer is already looking — not a hover tooltip that disappears on the move to read it */
 .rule-popover { border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface); padding:var(--sp-3); margin-top:var(--sp-2); }

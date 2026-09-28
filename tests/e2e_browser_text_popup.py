@@ -15,7 +15,7 @@ Each row is now judged the same way, per context:
 
 Why the sets differ from the spec's original seven:
 * `rewrite` / `locate` are GONE from the markup. The revision view's own queue
-  (app.js `renderFixQueuePanel`) already carries "🎯 Locate" and "Rewrite" per
+  (app.js `renderFixQueuePanel`) already carries "Locate" and "Rewrite" per
   finding, with the finding object in hand — the thing a text selection cannot
   supply, since `openRewriteModal` needs a scene + finding index and
   `locateFinding` needs the finding. A worse duplicate that silently no-ops is

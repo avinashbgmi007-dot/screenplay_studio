@@ -4223,7 +4223,14 @@ function renderFixQueuePanel(container) {
     if (item.why_it_matters) issue.appendChild(el("div", "fix-row-why", item.why_it_matters));
     body.appendChild(issue);
     const actions = el("div", "fix-row-actions");
-    const locateBtn = el("button", "", "🎯 Locate");
+    // R6 item 3: one spelling for one verb. The dock renders this queue in the
+    // same ~320px column as the ledger cards (style.css: .dock-section .fix-row
+    // wraps for exactly that reason), and the card side proved "🎯 Locate" costs
+    // 15px the row does not have. Measured here: Locate 53 + Rewrite 56 +
+    // Discuss 57 + Dismiss 57 + three gaps = 235px in a 319px column, one line —
+    // so this label was never the problem. It matches the card because the writer
+    // should not read the same action two ways on two surfaces one column apart.
+    const locateBtn = el("button", "", "Locate");
     locateBtn.type = "button";
     locateBtn.title = "Jump to the exact line in the script";
     locateBtn.addEventListener("click", () => locateFinding(item, item.index));
@@ -4762,6 +4769,21 @@ async function showRulePopover(ruleId, anchorEl) {
   box.appendChild(el("p", "rule-popover-source", rec.source));
 }
 
+/** What the finding's own fields say its claim COVERS — the three shapes the
+ *  ledger produces (one scene, several, none) and nothing else.
+ *
+ *  Deliberately the scenes the analyzer cited, never
+ *  `verification.matched_scene`: the scope is the claim ("about Scene 2") and the
+ *  trust badge beside it is the verifier's answer ("the quote was found in
+ *  Scene 1"). Printing the matched scene here would make one card assert two
+ *  different locations, which is the confusion this label exists to remove.
+ */
+function evidenceScopeLabel(f) {
+  const refs = (f.scene_refs || []).filter((n) => n !== null && n !== undefined && n !== "");
+  if (!refs.length) return "Whole script";
+  return (refs.length === 1 ? "Scene " : "Scenes ") + refs.join(", ");
+}
+
 function ruleChip(ruleId) {
   const b = el("button", "finding-rule-btn", "\uD83D\uDCD6 KB rule \u00B7 " + ruleId);
   b.type = "button";
@@ -4784,6 +4806,11 @@ function findingNoteEl(f, index, opts = {}) {
   const cat = el("span", "finding-note-cat", CATEGORY_LABELS[f.category] || f.category);
   const stateEl = el("span", "finding-note-state", opts.addressed ? "addressed" : (disp === "deferred" ? "next pass" : disp === "ghosted" ? "stale" : ""));
   top.appendChild(cat);
+  // R6 item 3: the ledger already knows whether a judgment is about one line,
+  // named scenes, or the whole script — it just never said so, so every card
+  // looked like the same unanchored opinion. Deep cards only: a margin pin sits
+  // on its own scene already, and repeating that is the clutter this fixes.
+  if (opts.deep) top.appendChild(el("span", "finding-note-scope", evidenceScopeLabel(f)));
   top.appendChild(stateEl);
   note.appendChild(top);
   note.appendChild(el("span", "finding-note-text", f.issue));
@@ -4803,9 +4830,15 @@ function findingNoteEl(f, index, opts = {}) {
     if (f.verification && f.verification.note) {
       deep.appendChild(el("span", "finding-deep-note", f.verification.note));
     }
+    // Who says so, on the line with the rest of the reasoning. The chip used to
+    // live in the action row because the deep block was hover-gated and a button
+    // inside it could not be clicked; R6 defect B painted that block, so the
+    // reason expired — and a chip that names a 40-character rule id was what
+    // pushed the card's verbs onto a second row.
+    if (f.rule_id) deep.appendChild(ruleChip(f.rule_id));
     // The one thing the desk cannot name is which mechanical check fired, so it
     // says the id: a check is a measurement with no authority to cite (unlike a
-    // KB rule, which is a button you can ask — it lives in the action row).
+    // KB rule, which is a button you can ask).
     if (f.check_id && !f.rule_id) {
       deep.appendChild(el("span", "finding-check",
         "\u2699 mechanical check \u00B7 " + f.check_id));
@@ -4819,9 +4852,13 @@ function findingNoteEl(f, index, opts = {}) {
   // dock is where the writer's judgment is made, margin pins stay read-only)
   if (opts.deep) {
     const id = (state.findingIds && state.findingIds[index]) || String(index);
-    const mkIntent = (label, intent, title) => {
+    // These four carry a glyph, not a word: their accessible name has to be
+    // typed, because a screen reader reading "⏭" aloud names a media key, not
+    // the verb the writer is being asked to press.
+    const mkIntent = (label, name, intent, title) => {
       const b = el("button", "intent-btn" + (state.findingMarks[id] === intent ? " active" : ""), label);
       b.type = "button";
+      b.setAttribute("aria-label", name);
       b.title = title;
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -4829,10 +4866,13 @@ function findingNoteEl(f, index, opts = {}) {
       });
       return b;
     };
-    actions.appendChild(mkIntent("\u2713", "addressed", "My call: addressed (survives re-analysis)"));
-    actions.appendChild(mkIntent("\u23ED", "deferred", "Park for the next pass"));
+    actions.appendChild(mkIntent("\u2713", "My call: addressed", "addressed",
+                                 "My call: addressed (survives re-analysis)"));
+    actions.appendChild(mkIntent("\u23ED", "Park for the next pass", "deferred",
+                                 "Park for the next pass"));
     const cp = el("button", "intent-btn", "\u29C9");
     cp.type = "button";
+    cp.setAttribute("aria-label", "Copy the finding's evidence");
     cp.title = "Copy the evidence + scene slug";
     cp.addEventListener("click", (e) => { e.stopPropagation(); copyFindingEvidence(f); });
     actions.appendChild(cp);
@@ -4840,6 +4880,7 @@ function findingNoteEl(f, index, opts = {}) {
     // with the finding (and its quote) riding into the consult turn
     const why = el("button", "intent-btn", "\uD83E\uDE7A");
     why.type = "button";
+    why.setAttribute("aria-label", "Ask Dr. Sushruta why this was flagged");
     why.title = "Ask Dr. Sushruta why this was flagged — the finding rides along";
     why.addEventListener("click", (e) => { e.stopPropagation(); discussWithDoctor(f, index); });
     actions.appendChild(why);
@@ -4847,7 +4888,7 @@ function findingNoteEl(f, index, opts = {}) {
     // keeping is worth a margin note — the writer's own store, on the finding's
     // scene, quoting the same evidence. No new backend: this is the endpoint the
     // rail's note composer already posts to.
-    const pin = el("button", "finding-pin-btn", "\uD83D\uDCDD pin");
+    const pin = el("button", "finding-pin-btn", "pin");
     pin.type = "button";
     pin.title = "Keep this finding as a margin note on its scene — issue and quote";
     pin.addEventListener("click", (e) => {
@@ -4857,7 +4898,17 @@ function findingNoteEl(f, index, opts = {}) {
     paintPinState(pin, f);
     actions.appendChild(pin);
   }
-  const locateBtn = el("button", "", "🎯 Locate");
+  // R6 item 3: the glyph comes off here, not as decoration. The card's clientWidth
+  // measures 342px, its 10px side padding leaves the verb row 322px, and the eight
+  // deep-card controls need 300px of it. But `pin` is the one control whose LABEL
+  // CHANGES WHEN USED: pin -> pinned is +18px, so the pinned state needs 318px.
+  // With the 15px glyph on "Locate" that put the row over 322px, so pressing pin
+  // re-wrapped its OWN row — 24px -> 52px, the pair the suite's checks print, and the
+  // card grew by a row's height on one click. The same self-resizing defect rung 17
+  // painted out of `.finding-deep`, arriving from the other direction. Without the
+  // glyph both states hold one line (300px / 318px of 322px). The suite gates the
+  // PINED state, not just this one.
+  const locateBtn = el("button", "", "Locate");
   locateBtn.type = "button";
   locateBtn.title = "Jump to the exact line this finding quotes";
   locateBtn.addEventListener("click", (e) => {
@@ -4877,11 +4928,6 @@ function findingNoteEl(f, index, opts = {}) {
     e.stopPropagation();
     discussFinding(f, index);
   });
-  // spec §7: "grounded in knowledge-base rule X" is a claim with an author behind
-  // it, so it gets a verb. It sits with the other verbs because a button has to
-  // be clickable where it is painted, and the deep block used to appear only on
-  // hover.
-  if (opts.deep && f.rule_id) actions.appendChild(ruleChip(f.rule_id));
   actions.appendChild(locateBtn);
   // R6: the margin pin points, the board/dock judge — Rewrite and Discuss are
   // the writer's judgment and have one home each (the board's card and the
@@ -4916,7 +4962,7 @@ function noteCoversFinding(f) {
 
 function paintPinState(btn, f) {
   const pinned = noteCoversFinding(f);
-  btn.textContent = pinned ? "\uD83D\uDCDD pinned" : "\uD83D\uDCDD pin";
+  btn.textContent = pinned ? "pinned" : "pin";
   btn.disabled = pinned;
   btn.title = pinned
     ? "This finding is already in your margin notes"
@@ -9897,7 +9943,7 @@ document.addEventListener("DOMContentLoaded", init);
       marginNote.style.display = "";
       stash.style.display = "";
     } else if (context === "revision") {
-      // The revision view's own queue carries "🎯 Locate" and "Rewrite" per
+      // The revision view's own queue carries "Locate" and "Rewrite" per
       // finding, with the finding in hand — which a text selection cannot
       // supply: openRewriteModal needs a scene + finding index and locateFinding
       // needs the finding. Those rows are gone rather than duplicated badly.

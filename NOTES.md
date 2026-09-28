@@ -3863,3 +3863,125 @@ it: `app.js`'s rule-popover docstring no longer calls `.finding-deep` hover-only
 `_diagnose_parse_failure`'s `--ctx-size` advice text; moves 3 (evidence-kind typing of
 notes), 2 (root-cause the 36/29/9 server-store counter split, investigation only) and 4 (the
 architecture fork in `docs/design/ux2026/`).
+
+## Round 6 · rung 18: the card now says what its evidence covers (2026-09-29)
+
+Move 3 of the four the owner approved (order 1 → 3 → 2 → 4): type each finding by
+the kind of evidence it carries, fix the micro-type, fix the 54px action row. No
+new endpoint, no new surface — everything below reads fields the desk already
+receives (`scene_refs`, `verification`, `rule_id`).
+
+**A correction to my own report, before anything else.** I told the owner "10 of 12
+text layers under 12px". Measured with the throwaway probe on a real card: the
+card's base was 11px and **all 12 painted text layers sat between 9px and 11px** —
+the count was wrong and the sentence underneath it (the diagnosis prose, 10px) was
+smaller than the 13px script it comments on. The probe's numbers are now in the
+check details so the record points at the tool, not at my memory.
+
+**Typing.** A deep card prints its scope: `Scene 2`, `Scenes 4, 5`, or
+`Whole script`, straight from `scene_refs`. Two deliberate decisions:
+- **Deep cards only.** A margin pin already sits on its own scene; printing "Scene 6"
+  on it is the repetition this whole move exists to remove. Gated by a check that
+  counts scope labels inside `#manuscript-container` and requires zero.
+- **Scope is the analyzer's claim, never the verifier's answer.** The temptation was
+  to print `verification.matched_scene`, which is "more accurate". It would make one
+  card assert two locations — the finding cites Scene 2, the quote matched in Scene 1,
+  and the verification note already says so. Two verbs, two facts: the label says what
+  the claim covers, the badge says whether the quote was found. The existing
+  `HONESTY_SEED_JS` fixture contradicted itself (empty `scene_refs` next to a note
+  naming "[2]"), so it now cites Scene 2 like its own text claims.
+
+**Type.** Reading matter to the token scale that already exists: card body 11 → 13px
+(`--fs-body`), the three reasoning lines 10 → 12px (`--fs-sm`), the label row 9 → 10px.
+No new sizes invented, and the **verbs stay at 10px on purpose** — measured, not
+taste: the eight controls need 300px of the row's 322px content box and 318px in the
+pinned state, so raising a verb label by a tier re-wraps the row this rung just
+straightened. The comment in `style.css` says that so nobody "finishes" the job later.
+
+**The action row — and a defect I caught in my own diff.** The rule chip moved out of
+the verb row into the reasoning block it belongs to (its reason for living among the
+buttons expired when rung 17 painted `.finding-deep`: a button inside a hover-gated
+block could not be clicked; inside a painted block it can, and a check clicks it there
+and asserts the citation still opens). That left the row needing ~315px of its 322px
+content box (300px measured + the 15px glyph) — 7px of play. My first pass shortened
+the *wrong surface's* label: I dropped the glyph
+from the fix-queue's "Locate" and left the card's "🎯 Locate" alone, with a comment
+above the queue quoting measurements of a card. Re-reading the diff before committing
+found it. Measured properly, the real defect was not the static row at all:
+**`pin` is the only control on the card whose label changes when the writer uses it**
+(pin → pinned is +18px), so pressing it pushed the need to ~333px — past 322px — and
+re-wrapped its own row (24px → 52px, the pair the suite's own check label prints). A
+state-driven version of the self-resizing card that
+rung 17 painted out of the reasoning block. Taking the glyph off the *card's* Locate
+holds both states on one line (300px measured, 318px pinned). `probe_pin.py` — a
+throwaway, deleted with the rest of the scratch; the figures are restated by the
+suite's checks, not by a file to re-run — measured every candidate
+label ("📝 pinned" 62px, "✓ pinned" 56px, "in notes" 51px — all still wrap) rather
+than guessing which word would fit.
+The queue's label stayed shortened and the reason changed: not that it needed it (its
+four verbs measure 235px in a 319px column and never wrapped) but that the dock renders
+that queue in the same ~320px column, one column apart from the card, and the writer
+should not read the same action spelled two ways. **Deliberately untouched: the
+feedback view's inline "🎯 Locate" (`app.js:7466`)** — a third surface, never measured
+here, and the remaining inconsistency is item 4's architecture question, not a
+one-off rename in this rung.
+
+**Names on the glyphs.** ✓, ⏭, ⧉ and 🩺 now carry `aria-label`s. A screen reader says
+"skip" for ⏭, not "park this for the next pass" — and this app's whole argument is
+that a finding is a claim somebody made, so its verbs have to be sayable.
+
+**Re-measured before committing, and three quoted figures moved.** Running the probe
+once more on the final tree to sanity-check the numbers the shipped comments assert:
+the fix-queue's four verbs are 235px in a 319px column (a comment said 259px), the card
+row needs 300px of a content box that is 322px (342px `clientWidth` minus its own 10px
+side padding — comments said "322px interior" without naming the box), and the pinned
+state is 318px, so the +18px label swap is the whole story. The pre-fix sums no longer
+reproducible from any artifact (347px / 345px / 316px / 334px / 28px→46px / 171px) were
+dropped from `style.css`, `app.js` and this file rather than kept as a third spelling.
+So was one figure that *looked* measured: the card's own **182px → 210px** growth, in
+three places (an `app.js` comment, this suite's comment, here). It came from a probe run
+whose output I never kept, and the pre-fix tree is gone, so nothing can print it again —
+`node --check`, a re-run suite and the fleet cannot re-derive it either. The row pair
+**24px → 52px** replaces it everywhere, because both halves are check labels this suite
+prints on every run. After these edits: `node --check` clean, `ruff` clean,
+`dock_sections` re-run → **169 passed / 0 failed**, `pytest tests/ -q` → **1912 passed /
+3 skipped in 150.86 s**, and the full fleet re-run below, since a fleet certifies the
+bytes it ran and these were edits to a shipped JS file.
+
+**Gates.** RED first (155 passed / 12 failed), GREEN 167; then the self-caught defect
+added two checks and the can-fail proof: with "🎯 Locate" restored, the suite fails
+with `{'rows': 2, 'h': 52, 'cardH': 259}` — the exact measured defect — and the
+sibling check confirms the label really flipped, so that failure is not vacuous.
+Final tree: `dock_sections` **169 passed / 0 failed**, `python -m pytest tests/ -q`
+**1912 passed / 3 skipped in 170.84 s**, `ruff check .` clean, `node --check` clean.
+Fleet, final tree → **58 suites: 57 passed, 0 failed, 1 skipped, 1488 checks** (rung
+17's 1,472 + the 16 this rung added, all in `dock_sections` **169 / 0**), and re-run once
+more after the comment corrections above — `app.js` is a shipped, served byte, so the
+certification had to move with it: **identical totals, 57 / 0 / 1, 1488 checks**, and
+`grep -cE "^(FAIL|ERROR)"` on that run's own log = **0**. The taller
+cards and the shortened verb row broke no layout gate: `readiness_gate` 116,
+`layout_audit` 37, `viewport_ladder` 55, `width_budget` 32, `phase6_evidence` 40,
+`phase13_legacy_cleanup` 27, `text_popup` 12, `xss_inert` 36. Census of `studio_projects/`
+after that fleet, **naming the walk** (the one that skips the store root): **192 files
+inside 98 directories under 23 top-level project dirs, `Gun_Pen\sessions` and
+`P11_Gate\sessions` the only empty ones, 0 files modified in the run window**; the other
+walk, which adds the 2 files sitting at the root (`writer_profile.json` + its `.lock`) and
+the root itself, reports 194 / 99 / 24. Both were true of the same tree, which is exactly
+why the count says which walk made it. This rung is client-side only.
+One pre-existing flake worth naming: the first fleet run reported
+`ERROR preview_next — Page.reload: net::ERR_NETWORK_IO_SUSPENDED`, an OS network
+suspension, not an assertion, and printed **1,394** checks — its total, because a suite
+that errors contributes none of its own. Run standalone three times `preview_next` is
+**92 passed / 0 failed** each time, and the arithmetic closes: 1,394 + 92 = 1,486 =
+rung 17's 1,472 + the 14 checks that existed at that run. The final tree prints
+**1,488** = 1,472 + **16**, because the pinned-state pair took `dock_sections` 167 → 169
+between those two runs. Same fleet, two trees, both totals correct.
+
+**A runner trap I walked into, so it is written down:** `tests/_run_e2e_sweep.py` is
+NOT the gate. It globs every `e2e_browser_*.py` including `gun_pen_audit` and gives
+that suite a hard-wired `http://127.0.0.1:8500`, so with no studio of its own running
+it reports failures that are connection refusals, not assertions (this rung: "5
+failed", all of them that one suite). The gate is
+`python -u tests/run_browser_suites.py`, which skips live-model suites by name and
+prints its own `58 suites: …` line — always run it **`-u`**, or the redirected log
+stays buffered and shows nothing until the process exits, which looks like a hang.
