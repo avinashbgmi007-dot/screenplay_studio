@@ -813,6 +813,41 @@ class TestReportRuleIdNormalization:
         out = webapp_server._sanitize_report(report)["findings"]
         assert out[0]["rule_id"] is None and "check_id" not in out[0]
 
+    def test_a_rule_cited_by_its_name_resolves_to_its_id(self):
+        """The prompt prints each principle as `### <name>` and never shows its id,
+        so a model citing a rule faithfully writes the NAME. Demoting that to a
+        mechanical check told the writer a McKee principle was a measurement and
+        hid the button that answers 'says who?'."""
+        from knowledge_base import KnowledgeBase
+        rule = next(r for r in KnowledgeBase().all() if r.name)
+        report = {"findings": [{"category": "subtext",
+                                "rule_id": rule.name, "issue": "on the nose"}]}
+        out = webapp_server._sanitize_report(report)["findings"]
+        assert out[0]["rule_id"] == rule.id
+        assert "check_id" not in out[0]
+
+    def test_a_name_carrying_the_source_the_prompt_prints_still_resolves(self):
+        """`to_prompt_fragment` renders `### <name> (source: <attribution>)`, and
+        models copy that line whole. The parenthetical is not part of the rule."""
+        from knowledge_base import KnowledgeBase
+        rule = next(r for r in KnowledgeBase().all() if r.name)
+        report = {"findings": [{"category": "theme",
+                                "rule_id": f"{rule.name} (source: {rule.attribution})",
+                                "issue": "unthemed"}]}
+        out = webapp_server._sanitize_report(report)["findings"]
+        assert out[0]["rule_id"] == rule.id
+        assert "check_id" not in out[0]
+
+    def test_a_name_that_is_not_a_kb_rule_is_still_demoted(self):
+        """The strip must not turn a plausible sentence into a cited authority —
+        only an exact rule name (or id) earns a `rule_id`."""
+        report = {"findings": [{"category": "theme",
+                                "rule_id": "Characters Should Change Over Time (source: Nobody)",
+                                "issue": "x"}]}
+        out = webapp_server._sanitize_report(report)["findings"]
+        assert out[0].get("rule_id") is None
+        assert out[0]["check_id"] == "Characters Should Change Over Time (source: Nobody)"
+
     def test_the_stored_report_is_not_mutated(self):
         original = {"category": "continuity", "rule_id": "unmarked_time_flip", "issue": "flip"}
         webapp_server._sanitize_report({"findings": [original]})

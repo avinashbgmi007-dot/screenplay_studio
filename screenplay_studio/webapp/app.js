@@ -4730,8 +4730,8 @@ function _wireRulePopoverDismissal() {
 }
 
 /** The rule's own name and craft attribution, fetched the first time it is asked
- *  for. Rendered inside the card, not the hover-only deep block, so it does not
- *  vanish when the pointer leaves. */
+ *  for. Rendered in the card itself, the same place as the other verbs, so it
+ *  does not vanish when the pointer leaves. */
 async function showRulePopover(ruleId, anchorEl) {
   const card = anchorEl.closest(".finding-note");
   if (!card) return;
@@ -4878,8 +4878,9 @@ function findingNoteEl(f, index, opts = {}) {
     discussFinding(f, index);
   });
   // spec §7: "grounded in knowledge-base rule X" is a claim with an author behind
-  // it, so it gets a verb. The chip sits with the other verbs — the deep block is
-  // hover-only, and a writer could never have clicked it there.
+  // it, so it gets a verb. It sits with the other verbs because a button has to
+  // be clickable where it is painted, and the deep block used to appear only on
+  // hover.
   if (opts.deep && f.rule_id) actions.appendChild(ruleChip(f.rule_id));
   actions.appendChild(locateBtn);
   // R6: the margin pin points, the board/dock judge — Rewrite and Discuss are
@@ -5711,7 +5712,8 @@ function renderDockEvidenceSceneBox(box) {
 // handed or simply return the element to put in the body — the existing
 // builders are unchanged (they still just append/return their element). The
 // default is CLOSED: the ledger greets the writer with its shape, not with
-// forty cards.
+// forty cards. `opts.defaultOpen` is for the one section whose whole job is the
+// next action (the fix queue) — a collapsed to-do list is not a to-do list.
 //
 // The section's `data-open` attribute is the contract everything else reads
 // (CSS, audits, tests) — never a class, never a style. `aria-expanded` on the
@@ -5752,7 +5754,7 @@ function dockSection(key, title, buildBody, opts) {
 }
 
 /** Is `key` open? The writer's stored choice wins; otherwise the section's own
- *  default (closed — see dockSection). */
+ *  default (see dockSection — closed unless the section asks otherwise). */
 function dockSectionIsOpen(key, defaultOpen) {
   const v = loadPrefs()["dock_section_" + key];
   return typeof v === "boolean" ? v : !!defaultOpen;
@@ -5968,12 +5970,17 @@ function renderDockEvidence() {
   refreshDockRulerMarker();
 
   // -- 2. Fix Queue (What should I do next?) -------------------------------
-  // The queue is the doctor's ordered to-do; it opens first for a reason.
+  // The queue is the doctor's ordered to-do, so it is the ONE section that opens
+  // on its own: P1.6 collapsed everything, and the writer landed on a ledger of
+  // eleven closed headers with the answer hidden behind a click on the header.
+  // A writer who closes it once stays closed — `dockSectionIsOpen` honours the
+  // stored preference over this default.
   // addPanel() appends the .craft-panel straight into this section div.
   const fqWrap = el("div", "dock-section-fixqueue");
   renderFixQueuePanel(fqWrap); // existing function, reused verbatim
   if (fqWrap.children.length) {
-    lens.appendChild(dockSection("fix-queue", "Fix queue", fqWrap));
+    lens.appendChild(dockSection("fix-queue", "Fix queue", fqWrap,
+                                 { defaultOpen: true }));
   }
 
   // -- 3. findings on the current scene (Where, precisely) -----------------

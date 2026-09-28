@@ -582,6 +582,62 @@ def test_craft_principles_is_bounded():
     assert "not listed here" in block, "a truncated block must say so"
 
 
+# --------------------------------------------------------------------------
+# A rule the model cited by NAME is still a rule
+#
+# `Rule.to_prompt_fragment` prints each principle as `### <name> (source:
+# <attribution>)` and never shows its id, while the citation instruction asks
+# for "that principle's id" — so a faithful local model copies the line it was
+# shown. Storing that verbatim meant two silent failures on a real project
+# (33 of its 35 rule citations): the desk demoted each to "mechanical check",
+# and the co-writer's craft block skipped the rule it exists to name.
+# --------------------------------------------------------------------------
+
+def _a_plain_rule():
+    from knowledge_base import KnowledgeBase
+    return next(r for r in KnowledgeBase().all()
+                if r.name and "(" not in r.attribution)
+
+
+def _a_nested_attribution_rule():
+    from knowledge_base import KnowledgeBase
+    return next(r for r in KnowledgeBase().all()
+                if r.name and "(" in r.attribution)
+
+
+def test_a_rule_cited_by_name_is_stored_as_its_id():
+    from screenplay_analyzer.pipeline import _normalize_findings
+    plain, nested = _a_plain_rule(), _a_nested_attribution_rule()
+    out = _normalize_findings([
+        {"rule_id": plain.name, "issue": "by name"},
+        {"rule_id": f"{plain.name} (source: {plain.attribution})", "issue": "whole line"},
+        # the prompt's own attribution can itself hold parentheses
+        {"rule_id": f"{nested.name} (source: {nested.attribution})", "issue": "nested"},
+    ], "dialogue")
+    assert [f["rule_id"] for f in out] == [plain.id, plain.id, nested.id]
+
+
+def test_an_unresolvable_rule_reference_is_left_as_the_model_wrote_it():
+    """Re-naming something we cannot ground would be the worse error, so it is
+    left alone and the serve path is the one that calls it a mechanical check."""
+    from screenplay_analyzer.pipeline import _normalize_findings
+    out = _normalize_findings([{"rule_id": "Pacing Should Tighten Midpoint",
+                                "issue": "x"}], "dialogue")
+    assert out[0]["rule_id"] == "Pacing Should Tighten Midpoint"
+
+
+def test_craft_principles_sees_a_rule_the_model_cited_by_name():
+    """The co-writer's grounding block is the user-visible half of this: a name
+    that never resolved left Sameer and Dr. Sushruta advised from prose alone."""
+    from screenplay_analyzer.pipeline import _normalize_findings
+    from screenplay_cowriter.context import ReportContext
+    plain = _a_plain_rule()
+    findings = _normalize_findings([{"rule_id": plain.name, "issue": "flat arc"}],
+                                   "character")
+    block = ReportContext({"findings": findings}).craft_principles()
+    assert plain.name in block, f"the rule the finding rests on never reached the block: {block!r}"
+
+
 def test_craft_principles_reaches_the_cowriter_system_prompt(rc):
     from screenplay_cowriter.context import ReportContext, ScriptContext, build_system_prompt
     report = ReportContext({"findings": [{"rule_id": "chekhovs_gun"}]})

@@ -92,6 +92,36 @@ def resolve_rule_key(rule_ref, by_name: dict[str, str], known: set[str]) -> str 
     return by_name.get(ref.lower())
 
 
+def canonical_rule_id(rule_ref, kb=None):
+    """A finding's rule reference -> that rule's knowledge-base id, or None.
+
+    `Rule.to_prompt_fragment` prints each principle as `### <name> (source:
+    <attribution>)` and never its id, so a model that cites one faithfully
+    copies that whole line. Both shapes are the same grounded claim, and every
+    consumer that answers "says who?" — the desk's rule button, the co-writer's
+    craft block, the report's rule list — looks up by id, so resolve here once
+    rather than each of them learning to accept names.
+
+    Exact-match only, deliberately: the `character` pass is shown 83 rules, and
+    promoting a near-miss would print an authority the finding does not have.
+    """
+    if not rule_ref:
+        return None
+    if kb is None:
+        try:
+            from knowledge_base import KnowledgeBase
+            kb = KnowledgeBase()
+        except Exception:
+            return None
+    ref = str(rule_ref).strip()
+    known = {r.id for r in kb.all()}
+    by_name = _by_name(kb)
+    # Cut the attribution at the prompt's own marker, not at a bracket: an
+    # attribution can itself contain parentheses.
+    return (resolve_rule_key(ref, by_name, known)
+            or resolve_rule_key(ref.split(" (source:", 1)[0].strip(), by_name, known))
+
+
 def directly_related(adj: dict[str, set[str]], a: str | None, b: str | None) -> bool:
     """True when the KB links these two rules in one hop (either direction)."""
     if not a or not b or a == b:

@@ -474,6 +474,7 @@ Method: a live studio (`--port 8512 --no-token`, throwaway projects dir) driven 
 **What was wrong:** three small dishonesties on the deep card. `verification.note` ("Quote found in Scene 1, not the cited scene(s) [2] — corrected") was written by the verifier and printed by `report.py` for months, but never reached the desk; `rule_id` was a *hover title* (`cat.title = "Grounded in knowledge-base rule " + id`) that nobody could read or click; and `check_id` — a mechanical pass with no author — had no rendering at all, so a pace measurement and a curated craft judgment looked identical.
 **What shipped:** `GET /api/rules/<rule_id>` → `{id, name, source}` (the KB's own `attribution`, so a `general_craft` rule answers "widely-taught convention", not a made-up author) or 404; a cached `_knowledge_base()` that `_kb_rule_ids()` now shares. Client: `verificationBadge()` keeps its one-builder rule, `.finding-deep-note` prints the note verbatim, `.finding-check` names the check (`⚙ mechanical check · unmarked_time_flip`, and only when there is no rule to cite), and `ruleChip()` + `showRulePopover(ruleId, anchorEl)` fetch once per rule per session (`_ruleLookups`), render the name + citation inside the card, and dismiss on Esc / outside click.
 **Two lessons worth keeping:** (1) the chip first went into `.finding-deep`, which is `display:none` until hover/`:focus-within` — an affordance inside it can never be clicked, so provenance verbs live in the card's **action row**; (2) a document-wide `querySelector` in an e2e finds the manuscript's *shallow* margin pin before the dock's deep card, because both carry the same issue text — scope probes to `lens`.
+_[Amended 2026-09-28, R6 defect B: lesson (1)'s mechanism is gone — `.finding-deep` is painted, not hover-revealed, per spec §7's "not hover-only". The lesson still holds as history; it no longer describes the cascade._]
 **Found on the way:** `tests/test_webapp_api.py` defined `TestReportRuleIdNormalization` twice with byte-identical bodies (Python rebinds the name → the first 62 lines were dead code masquerading as coverage). Deleted the shadowed copy; test count unchanged at 63, so nothing was being lost but the trap is gone.
 **Gates:** `pytest tests/ -q` → **1636 passed / 3 skipped** (3 new endpoint tests); `dock_sections` → **114 passed / 0 failed** (16 new P2.13 legs); `_p1_visual_gate.py` → FAILURES: none, with two new photographs (`03e_rule_popover_night`, `03f_rule_chip_night`) and a `ruleChip` rule that fails on a clipped/undersized chip. Next: T14 (report header `model_used`, `errors[]` banner, coverage extras, strengths, read confidence, formatting section, pin-to-notes — plus the two-denominator verification readout filed under T11).
 
@@ -3751,3 +3752,114 @@ on both packages plus the test file. `grep -rn "char_budget|fit_rules_fragment_t
 references any removed symbol; no SPA or e2e file was touched) and `gun_pen_audit`, which is
 the only gate that would exercise a real 12-pass analysis end to end — it needs :8080, so it
 is the owner's call, not a default.
+
+## Round 6 · push close-out (2026-09-28)
+
+The owner chose **two pushes** over "create a new branch and delete `qoder/update`", after
+asking who set the `4000` and what happens past it. Both ran as fast-forwards and were
+verified against GitHub itself (`git ls-remote --heads`), not the local cache:
+
+```
+eee15cf..c89572e   main          -> main          (was ahead 1)
+979ad24..c89572e   qoder/update  -> qoder/update  (was ahead 25)
+```
+
+`main` == `origin/main` == `qoder/update` == `origin/qoder/update` == `c89572e`, each pair
+`0 0`. Nothing was created, deleted or merged, so nothing could be lost — the 25-commit gap
+was the GitHub bookmark being stale, not work sitting on a different branch.
+
+**Still unrun at `c89572e`:** the 58-suite browser fleet. The fleet figures above
+(57 pass / 1 skip / 1,469 checks) are the **rung-15 tree**. `c89572e` is pytest- and
+ruff-certified only. Do not call it fleet-certified until that gate is re-run as a background
+task.
+
+**Still the owner's call:** the other context-flavored constants, and
+`_diagnose_parse_failure`'s error text — the last place in the product that still tells the
+operator to raise `--ctx-size`.
+
+**Closed 2026-09-28 — the `4000` cap.** He was given A (send no `max_tokens`), B (retry once
+at a larger cap when `finish_reason == 'length'`), C (leave it) and chose **C**. No code
+changed. `SCRIPT_LEVEL_MAX_TOKENS = 4000` stays, with the reasoning already on file: a
+completion length, not a context size; the 1500 it would fall back to demonstrably truncated
+grammar-constrained findings JSON mid-array in a real run; and llama.cpp clamps the request to
+whatever room the window actually leaves, so the number can never collide with his 50K window.
+Consequence of C, stated plainly: if a script-level category ever does need more than 4000
+tokens of answer, it fails **loudly and all-or-nothing** — that category returns zero findings
+and the run records `"<category> analysis failed: …"` in `errors[]`, which the SPA paints in
+the banner and the manifest marks. It is never a silent quality reduction. Do not re-offer A
+or B.
+
+## Round 6 · rung 17: the three defects that did not need the architecture fork (2026-09-28)
+
+The UI/UX analysis offered four moves and the owner said "continue as per your suggested
+order", which was 1 → 3 → 2 → 4. This is move 1: the three defects that are true whatever
+the eventual information architecture is. No new surface, no new API, no prototype.
+
+**Defect A — a grounded claim was being destroyed at serve time, then labelled a
+measurement.** `Rule.to_prompt_fragment()` prints each principle as `### <name> (source:
+<attribution>)` and **never its id**, while `prompts.py` says "set `rule_id` to that
+principle's id". A model that obeys faithfully writes the *name*; `_normalize_rule_ids`
+only recognised exact ids, so it demoted the citation to `check_id` and the card printed
+"⚙ mechanical check" — a McKee principle reclassified as a measurement, and the "says who?"
+button gone. Census of his real reports (94 findings): `exact_id 9 / exact_name 53 /
+name_plus_source_paren 8 / unresolved 4` — **the 4 unresolved are `unmarked_time_flip`,
+correctly demoted.** Fix: one resolver, `dedupe.canonical_rule_id()`, built on the
+`resolve_rule_key`/`_by_name` pair that already existed for exactly this (`_by_name`'s
+docstring had recorded "the model-driven ones write the rule's display NAME"); it cuts the
+attribution at the prompt's own `" (source:"` marker rather than at a bracket, because some
+attributions contain brackets (`"widely-taught convention (no single originator)"`). Wired
+in **two** places, because the same destroyed field had a second victim:
+`_normalize_findings` (the analyzer's single collection choke point, so disk data is now
+right for the desk, the co-writer and `report.md`) and `_normalize_rule_ids` (so the ~90
+reports already written are served correctly without rewriting them). Measured through the
+real serve path: **chips that resolve 9 → 70 of 94 findings (+61)**; `Rain_Courier_7` 5 →
+33, `gun_pen_2` 2 → 35. The second victim was worse than the button:
+`screenplay_cowriter/context.py:craft_principles()` does `kb.get(rid)` and *skips* a
+`KeyError`, so on `gun_pen_2` only **2 of 35** rules ever reached Sameer's CRAFT PRINCIPLES
+IN PLAY block — the co-writer was arguing without the rules it was supposed to be grounded
+in. Exact-match only, deliberately: the `character` pass is shown 83 rules, and promoting a
+near-miss would print an authority the finding does not have ("flag, don't drop").
+**Deliberate deviation from my own report:** I had promised a `prompts.py` change and did
+not make one. Printing the id would change what his single-slot GPU model emits and cannot
+be verified without a real 12-min analysis run; the resolver accepts both shapes, so the
+prompt is not load-bearing. Not a forgotten task — a traded one.
+
+**Defect B — the card's reasoning appeared only on hover.** `.finding-note:hover
+.finding-deep { display:flex }` over a `display:none` base: unreadable on touch, unreachable
+by keyboard (`.finding-note` carries no click handler, so there was no tap-to-reveal either),
+and it could not animate because `display:none` has no start value. Measured on the seeded
+card: **126 px unhovered → 223 px hovered** — every card resized itself under the pointer.
+Worth noting against my own earlier report, which quoted "269 px": the real number is 223,
+and the e2e check name that repeated my wrong figure has been renamed to say what it
+measures and put the measurement in the evidence line. This was **spec drift, not a design
+choice** — `docs/superpowers/specs/2026-09-22-one-feedback-room-design.md` §7 already says
+the verification note and `rule_id` belong in the "Finding card body (not hover-only)". Fix
+is a deletion: `.finding-deep` is painted.
+
+**Defect C — the to-do list arrived collapsed.** P1.6 made every dock section closed by
+default, including the Fix queue, whose own call-site comment claimed "it opens first for a
+reason" while passing no default. The writer landed on eleven closed headers and had to click
+the header to read the doctor's ordered list. Fix: `dockSection("fix-queue", …, {
+defaultOpen: true })` — the attribute contract is unchanged, `dockSectionIsOpen` still lets a
+stored preference overrule it, so a writer who closes it once stays closed. `livecheck`'s
+`defaultOpen` lives in a different lens, so "exactly one evidence-lens section opens" is a
+census the suite can enforce: `open_keys == ["fix-queue"]`, plus the reload half (the default
+survives, and the sections the writer never touched stay closed).
+
+**Gates, re-run on the final tree.** `python -m pytest tests/ -q` → **1912 passed / 3
+skipped** (was 1906; +6 = the 3 serve-path and 3 analyzer/co-writer tests above). `python -m
+ruff check .` clean. Fleet → **58 suites: 57 passed, 0 failed, 1 skipped, 1472 checks** (was
+1,469; the +3 net is dock_sections' new checks less the hover check it replaced), with
+`dock_sections` **153 / 0** (at RED: 149 passed / 3 failed), `readiness_gate` **116**,
+`viewport_ladder` 55, `width_budget` 32, `phase12_visual_motion` 18, `xss_inert` 36 — i.e.
+the taller-by-default cards broke none of the layout or the visual gates. `node --check`
+clean. Census: **194 files across 23 projects in `studio_projects/`, 0 modified, 0 new, 0
+deleted** — the analyzer half of this fix only affects *future* analyses, and the serve half
+is read-time, so no stored report was rewritten. Two comment/lesson corrections went with
+it: `app.js`'s rule-popover docstring no longer calls `.finding-deep` hover-only, and the
+2026-09-27 lesson that justified putting the chip in the action row is amended as history.
+
+**Still the owner's call, unchanged:** the remaining ctx-flavored constants and
+`_diagnose_parse_failure`'s `--ctx-size` advice text; moves 3 (evidence-kind typing of
+notes), 2 (root-cause the 36/29/9 server-store counter split, investigation only) and 4 (the
+architecture fork in `docs/design/ux2026/`).

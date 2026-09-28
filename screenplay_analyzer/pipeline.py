@@ -221,7 +221,17 @@ def _normalize_findings(findings: list, category: str, default_severity: str = "
     """Fill in the fields real local models sometimes leave null (seen live:
     severity and category missing on GGUF output). Every downstream consumer
     — the report, the fix queue, the UI severity badge — assumes these exist,
-    so normalize at collection time with values the pipeline already knows."""
+    so normalize at collection time with values the pipeline already knows.
+
+    This is also where a rule the model cited by its printed name becomes that
+    rule's id, because everything that later has to *look the rule up* looks it
+    up by id. See `dedupe.canonical_rule_id`."""
+    from .dedupe import canonical_rule_id
+    try:
+        from knowledge_base import KnowledgeBase
+        kb = KnowledgeBase()
+    except Exception:
+        kb = None  # nothing to check a reference against, so leave them as written
     out = []
     for f in findings or []:
         if not isinstance(f, dict):
@@ -233,6 +243,8 @@ def _normalize_findings(findings: list, category: str, default_severity: str = "
         f.setdefault("evidence_quote", None)
         f.setdefault("rule_id", None)
         f.setdefault("why_it_matters", "")
+        if kb is not None and f["rule_id"]:
+            f["rule_id"] = canonical_rule_id(f["rule_id"], kb) or f["rule_id"]
         out.append(f)
     return out
 

@@ -828,24 +828,46 @@ def _kb_rule_ids() -> frozenset:
 
 
 def _normalize_rule_ids(findings: list) -> list:
-    """Re-file a `rule_id` that is not a knowledge-base rule as `check_id`.
+    """Canonicalise a finding's rule reference, or re-file it as a `check_id`.
 
-    The UI renders `rule_id` as "Grounded in knowledge-base rule <id>"
-    (app.js:4066), so a value that does not resolve in the KB is a false
-    claim. Reports written before that contract was split stored the
-    deterministic passes' own check names (voice_bleed, pacing_drag,
-    unmarked_time_flip, ...) in `rule_id`; this moves them at serve time, so
-    an existing project displays honestly without a re-analysis."""
-    known = _kb_rule_ids()
-    if not known:
+    Two shapes arrive in `rule_id`. A rule's own id, and — because
+    `Rule.to_prompt_fragment` prints each principle as `### <name> (source:
+    <attribution>)` and never shows its id — the rule's display name, copied
+    from the line the model was shown. Both are grounded claims, so both become
+    the canonical id: that is what lets the card show the rule button and
+    `GET /api/rules/<id>` answer "says who?" instead of asserting a knowledge-base
+    rule the desk cannot name.
+
+    Anything else is a mechanical check's own name and moves to `check_id`,
+    because the UI renders `rule_id` as "Grounded in knowledge-base rule <id>"
+    (app.js:4066) and a value that does not resolve in the KB is a false claim.
+    Reports written before that contract was split stored the deterministic
+    passes' check names here; this re-files them at serve time, so an existing
+    project displays honestly without a re-analysis.
+
+    Resolution is exact-only (id, or the whole lowercased name) and borrows the
+    dedup's own resolver, so the desk and the merge can never disagree about
+    what counts as a rule. A name that matches nothing stays demoted: a
+    plausible sentence must not be promoted into a cited authority."""
+    if not _kb_rule_ids():
         return findings
+    from screenplay_analyzer.dedupe import canonical_rule_id
+    kb = _knowledge_base()  # cached; the resolver takes it rather than re-reading 26 files per card
     out = []
     for f in findings:
         rid = f.get("rule_id") if isinstance(f, dict) else None
-        if rid and rid not in known:
+        if not rid:
+            out.append(f)
+            continue
+        canon = canonical_rule_id(rid, kb)
+        if canon:
+            if canon != rid:
+                f = dict(f)
+                f["rule_id"] = canon
+        else:
             f = dict(f)
             f.pop("rule_id", None)
-            f.setdefault("check_id", rid)
+            f.setdefault("check_id", str(rid).strip())
         out.append(f)
     return out
 

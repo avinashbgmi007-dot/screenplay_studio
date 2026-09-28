@@ -840,10 +840,32 @@ def check_card_honesty_fields(page, lens, base):
     shown = note_loc.first.text_content() if note_loc.count() else None
     check("P2.13: the verification note the report already prints reaches the desk",
           shown == note_text, repr(shown))
-    rule_card.hover()
-    page.wait_for_timeout(200)
-    check("P2.13: and the writer can actually read it (the deep block reveals it)",
+    # R6 defect B: this block used to appear only on `:hover`, so the reasoning
+    # was unreadable on touch, on a keyboard, and to anyone who moved the pointer
+    # to read it — and it could not animate (display:none has no start value).
+    # The card is now static: no hover, no jump. `is_visible()` without any
+    # `hover()` call is the whole test, and it fails if the gate comes back.
+    check("defect B: the card's reasoning is visible with NO hover at all",
           note_loc.count() == 1 and note_loc.first.is_visible(), repr(shown))
+    deep_shape = """() => { const c = [...document.querySelectorAll(
+              '.dock-lens[data-lens="evidence"] .finding-note')]
+            .find(n => n.querySelector('.finding-deep'));
+          if (!c) return null;
+          return { h: Math.round(c.getBoundingClientRect().height),
+                   display: getComputedStyle(c.querySelector('.finding-deep')).display };
+          }"""
+    before = page.evaluate(deep_shape)
+    if before:
+        rule_card.hover()
+        page.wait_for_timeout(150)
+        hovered = page.evaluate(deep_shape)
+    else:
+        hovered = None
+    check("defect B: hovering a card changes nothing (no resize under the pointer)",
+          bool(before) and before.get("display") == "flex"
+          and hovered is not None and hovered.get("h") == before.get("h"),
+          f"unhovered {before}, hovered {hovered} "
+          f"(measured before the fix: 126px -> 223px on hover)")
 
     # -- 2. a mechanical check is NOT dressed up as a KB rule ----------------
     check_card = lens.locator(".finding-note").filter(has_text="HONESTY check seed").first
@@ -1245,8 +1267,16 @@ def run(base):
         states = [keyed.nth(i).get_attribute("data-open") for i in range(n_keyed)]
         check("every section declares data-open true|false",
               bool(states) and all(v in ("true", "false") for v in states), str(states))
-        check("every section starts CLOSED (P1.6 default)",
-              bool(states) and all(v == "false" for v in states), str(states))
+        # R6 defect C: P1.6 collapsed everything, including the Fix queue — the
+        # one section that is the doctor's ordered to-do, and whose own call site
+        # comment claimed "it opens first for a reason" while passing no default.
+        # The writer landed on a ledger of nine closed headers.
+        open_keys = [k for k, v in zip(keys, states) if v == "true"]
+        check("the fix queue is the section that opens first (defect C)",
+              open_keys == ["fix-queue"], f"open sections: {open_keys}")
+        check("every other section still starts CLOSED (P1.6 default)",
+              bool(states) and all(v == "false" for k, v in zip(keys, states)
+                                   if k != "fix-queue"), str(list(zip(keys, states))))
         for key in ("fix-queue", "by-category", "coverage"):
             check(f"the plan's section set includes {key!r}", key in keys, str(keys))
         check("the fix-queue section keeps its hook class",
@@ -1337,10 +1367,16 @@ def run(base):
         others = [
             keyed.nth(i).get_attribute("data-open")
             for i in range(keyed.count())
-            if keyed.nth(i).get_attribute("data-key") != "by-category"
+            if keyed.nth(i).get_attribute("data-key") not in ("by-category", "fix-queue")
         ]
         check("the sections the writer never opened are still closed",
               all(v == "false" for v in others), str(others))
+        # defect C's persistence half: the queue opened by default, and the
+        # default must survive a reload until the writer overrules it.
+        fq = lens.locator('.dock-section[data-key="fix-queue"]')
+        check("the fix queue is still open after a reload (defect C)",
+              fq.count() == 1 and fq.first.get_attribute("data-open") == "true",
+              fq.first.get_attribute("data-open") if fq.count() else "no section")
 
         # --- 5. closing persists too -----------------------------------------
         check("clicking again closes it",
