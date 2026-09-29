@@ -180,6 +180,68 @@ analyze (demo model) → report (7 findings) → fixqueue → revision legs.
   and zero unexpected network failures across all three journeys
   (`j5_j6_j7_console.json`).
 
+## Phase 2 — API contract probes (31/31 PASS) — script `scripts/audit_phase2_api_probes.py` → `phase2_api_evidence.json`
+
+Every error response asserted against the app.js `api()` contract: JSON body
+with a readable `error` string, never an HTML 500.
+
+- **404 shapes** (unknown project/analyze/delete/session/idea): all readable JSON.
+- **Malformed JSON** on `/api/config`: clean 400, not 500.
+- **Finding index guards**: 9999 → M4's JSON 400. **FINDING (P3, recorded with
+  evidence)**: `-1` escapes `<int:index>` into the GET-only static catch-all and
+  answers a Werkzeug **HTML 405** the SPA cannot parse — UI-unreachable
+  (indices come from the server's own report); the M4 contract should cover
+  negative indices. Evidence: `finding_negative_index`.
+- **Stale finding_id intent**: no-op, never 500.
+- **Unicode titles**: Telugu-folded dir created, display title kept (H2 contract).
+- **Path traversal** on `<name>` (encoded + plain): never succeeds, never 500.
+- **Tokenless writes** (ideas, edits/apply): 403 — secure by default.
+- **Concurrency**: concurrent analyze → one 200 + one clean refusal (lock
+  contract); concurrent idea saves both accepted with the store intact.
+- **Redo/empty + invalid drafts/beatboard payloads**: clean JSON 400s.
+- **SSE**: full turn persists exactly one user+assistant pair; a mid-stream
+  disconnect (open → 64 bytes → slam) leaves the session file valid and the
+  server healthy.
+- **Route census** recorded: webapp_server routes counted from source vs the
+  2026-09-06 doc claim (84+2) — delta is growth (rungs), verified by census.
+- **Security**: `/api/config` leaks no token; nosniff/CSP on the SPA document
+  (shipped scope, pinned by the repo's own test). **Observation (P3
+  hardening, recorded)**: `nosniff` is not applied to API JSON responses
+  (minimal MIME-confusion risk for application/json). Evidence:
+  `api_json_nosniff`.
+
+## Phase 3 — repo's own suites on HEAD (8/8 green) — script `scripts/audit_phase3_suites.py` → `phase3_suites_evidence.json`
+
+| Suite | Kind | Result |
+|---|---|---|
+| e2e_browser_smoke.py | browser | PASS (exit 0) |
+| e2e_browser_quickcheck.py | browser | PASS (exit 0) |
+| e2e_browser_phase6_evidence.py | browser | PASS (exit 0) |
+| e2e_browser_phase8_lifecycle.py | browser | PASS (exit 0) |
+| tests/test_fixqueue.py | pytest | PASS (exit 0) |
+| tests/test_production_readiness.py | pytest | PASS (exit 0) |
+| tests/test_webapp_api.py | pytest | PASS (exit 0) |
+| tests/test_negative.py | pytest | PASS (exit 0) |
+
+## Findings register (running total — full detail goes to Report 1)
+
+1. **[P3] Activate-already-active draft → 400 "No snapshot"** — misleading
+   error on a no-op; UI-unreachable. (J4 evidence: `j4_activate_active_quirk`.)
+2. **[P3] Negative finding index → HTML 405** from the static catch-all
+   instead of M4's JSON 400 — SPA-unreadable error body; UI-unreachable.
+   (Phase 2 evidence: `finding_negative_index`.)
+3. **[P3-hardening observation] `nosniff` not applied to API JSON** — shipped
+   hardening scope is the SPA document. (Phase 2 evidence: `api_json_nosniff`.)
+4. **[Report-2 evidence] Feedback route fold**: every shipped route lands on
+   the Evidence lens; legacy tabs are deep-link-only. (J3.)
+5. **[Report-2 evidence] Same-issue-text findings render as two rows**
+   (whole-row dedupe contract). (J3: `j3_same_issue_rows`.)
+6. **[Report-2 evidence] Auto-hiding desk chrome**: Run Analysis discoverability
+   for a first-time writer. (J2 hit-target proof.)
+
+No P0/P1/P2 findings surfaced anywhere in the audit. All demo-model claims
+labeled; three J6 legs recorded UNVERIFIED (needs real model).
+
 ## Reproduce
 
 ```bash
@@ -187,6 +249,8 @@ python docs/audit/evidence-2026-09-30/scripts/audit_boot_probe.py
 python docs/audit/evidence-2026-09-30/scripts/audit_j1_j2_journeys.py
 python docs/audit/evidence-2026-09-30/scripts/audit_j3_j4_journeys.py
 python docs/audit/evidence-2026-09-30/scripts/audit_j5_j6_j7.py
+python docs/audit/evidence-2026-09-30/scripts/audit_phase2_api_probes.py
+python docs/audit/evidence-2026-09-30/scripts/audit_phase3_suites.py
 ```
 
 Each boots its own private studio (demo model, throwaway projects dir,

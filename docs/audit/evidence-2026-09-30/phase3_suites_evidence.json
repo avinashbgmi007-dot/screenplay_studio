@@ -1,0 +1,62 @@
+{
+  "suites": [
+    {
+      "suite": "e2e_browser_smoke.py",
+      "kind": "browser",
+      "exit": 0,
+      "ok": true,
+      "tail": "  PASS  app loads\n  PASS  welcome desk shown\n  PASS  demo model reported by API\n  PASS  status strip shows the demo chip\n  PASS  sample project opened\n  PASS  partner drawer summoned\n  PASS  user message rendered\n  PASS  assistant reply landed\n  PASS  reply is a real answer (no error copy)\n  PASS  turn streamed progressively (5 distinct render sizes)\n  PASS  no error event on the stream\n  PASS  reply arrived as 7 streamed tokens\n  PASS  concatenation of streamed tokens == the final 'done' reply\n  PASS  persisted history ends with this assistant turn\n  PASS  persisted reply == the streamed concatenation\n  PASS  rendered bubble matches what was kept\n  PASS  no error banner\n  PASS  no JS page errors\n\n=== 18 passed, 0 failed ===\n"
+    },
+    {
+      "suite": "e2e_browser_quickcheck.py",
+      "kind": "browser",
+      "exit": 0,
+      "ok": true,
+      "tail": "  PASS  no live check before an edit\n  PASS  the desk really is unanalysed here\n  PASS  the live check mounts after an inline edit, with no analysis run\n  PASS  it names the rule it actually fired\n  PASS  still no report, still no analyse stage\n  PASS  the header says live check\n  PASS  the header says the full pass is still pending\n  PASS  live-check rows are not findings (findingCounts stays empty)\n  PASS  state.findings untouched by the lint layer\n  PASS  undo re-answers: the live check is still mounted\n  PASS  and the flagged row is gone \u00e2\u20ac\u201d it reads the current text\n  PASS  the live check collapses under its own header\n  PASS  the collapse persists (prefs)\n  PASS  a lint row escapes what the script put in it\n  PASS  no JS page errors\n\n=== 15 passed, 0 failed ===\n"
+    },
+    {
+      "suite": "e2e_browser_phase6_evidence.py",
+      "kind": "browser",
+      "exit": 0,
+      "ok": true,
+      "tail": "pens from its header\n  PASS  category sections group the findings\n  PASS  coverage section renders\n  PASS  P1.6: the coverage section opens (its depth line is read, not hovered)\n  PASS  evidence depth line renders in the coverage section\n  PASS  it names the raw pages the script-level passes actually read\n  PASS  it names which scenes were read as pages\n  PASS  it still warns this is not a full reading\n  PASS  setup/payoff section agrees with the report\n  PASS  craft panels render into the dock section\n  PASS  P1.6: the section holding the finding cards opens\n  PASS  Locate lands the pane on the finding's scene\n  PASS  Discuss closes the dock (handoff to the conversation)\n  PASS  Discuss prefills the composer\n  PASS  P1.6: the fix-queue section opens for its row actions\n  PASS  Dismiss removes the row from the dock queue\n  PASS  A dismissed row can be brought back into view\n  PASS  Showing dismissed reveals the row to restore\n  PASS  Restore returns the row to the dock queue\n  PASS  scene strip retitles as the writer scrolls\n  PASS  Esc closes the dock\n  PASS  reopen keeps the evidence lens active\n  PASS  reopen re-assembles the sections\n  PASS  legacy surface intact: room drawer\n  PASS  legacy surface intact: feedback panel\n  PASS  retired surface stays gone: feedback view clone\n  PASS  retired surface stays gone: problem board\n  PASS  no JS page errors\n  PASS  unanalyzed project shows the honest empty state\n  PASS  unanalyzed flow: no JS errors\n\n=== 40 passed, 0 failed ===\n"
+    },
+    {
+      "suite": "e2e_browser_phase8_lifecycle.py",
+      "kind": "browser",
+      "exit": 0,
+      "ok": true,
+      "tail": "  PASS  unanalyzed: Run Analysis is REACHABLE on the desk (hover reveals it)\n  PASS  unanalyzed: button reads Run Analysis (not Re-run)\n  PASS  unanalyzed: honest status line\n  PASS  unanalyzed: manuscript stays readable\n  PASS  ladder: renders as .stage-ladder inside the chip host\n  PASS  ladder: one row per real stage event, not a hand-picked dozen\n  PASS  ladder: exactly one current stage\n  PASS  ladder: current row is the one passed in\n  PASS  ladder: earlier stages carry the done mark\n  PASS  ladder: later stages stay pending\n  PASS  ladder: the current stage shows elapsed seconds, live\n  PASS  ladder: no invented percentage anywhere\n  PASS  ladder: every stage has a plain-language caption\n  PASS  ladder: stage keys are unique\n  PASS  heartbeat: a fresh pass reads as working\n  PASS  heartbeat: a silent pass says so instead of lying about progress\n  PASS  analysis reaches a terminal state (complete/failed)\n  PASS  complete: desk reads Re-run Analysis\n  PASS  complete: status carries the findings count\n  PASS  retry endpoint contract intact (merge or honest 400)\n  PASS  the desk toolbar has no retry button of its own\n  PASS  no rerun verb is clickable on the desk toolbar\n  PASS  a clean desk status invents no rerun instruction\n  PASS  desk toolbar sits above the manuscript row\n  PASS  desk toolbar stays slim (\u00e2\u2030\u00a464px)\n  PASS  no JS page errors\n\n=== 26 passed, 0 failed ===\n"
+    },
+    {
+      "suite": "tests/test_fixqueue.py",
+      "kind": "pytest",
+      "exit": 0,
+      "ok": true,
+      "tail": "....                                                                     [100%]\n============================== warnings summary ===============================\ntests/test_fixqueue.py::TestFixQueue::test_empty_before_analysis\n  C:\\Users\\Avinash-Pro\\AppData\\Roaming\\Python\\Python314\\site-packages\\pytest_asyncio\\plugin.py:1216: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16\n    return asyncio.get_event_loop_policy()\n\ntests/test_fixqueue.py::TestFixQueue::test_items_sorted_by_severity_then_act\n  E:\\screen_play_astra\\screenplay_analyzer\\rules_context.py:212: RuntimeWarning: KB fragment for 'character' is 65226 chars (soft ceiling 40000). Set SCREENPLAY_KB_BUDGET to cap it.\n    warnings.warn(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n4 passed, 2 warnings in 1.29s\n"
+    },
+    {
+      "suite": "tests/test_production_readiness.py",
+      "kind": "pytest",
+      "exit": 0,
+      "ok": true,
+      "tail": "............................................                             [100%]\n============================== warnings summary ===============================\ntests/test_production_readiness.py::TestSessionIdGuard::test_dotdot_backslash_rejected\n  C:\\Users\\Avinash-Pro\\AppData\\Roaming\\Python\\Python314\\site-packages\\pytest_asyncio\\plugin.py:1216: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16\n    return asyncio.get_event_loop_policy()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n44 passed, 1 warning in 2.89s\n"
+    },
+    {
+      "suite": "tests/test_webapp_api.py",
+      "kind": "pytest",
+      "exit": 0,
+      "ok": true,
+      "tail": "........................................................................ [ 82%]\n...............                                                          [100%]\n============================== warnings summary ===============================\ntests/test_webapp_api.py::TestStaticServing::test_index_served\n  C:\\Users\\Avinash-Pro\\AppData\\Roaming\\Python\\Python314\\site-packages\\pytest_asyncio\\plugin.py:1216: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16\n    return asyncio.get_event_loop_policy()\n\ntests/test_webapp_api.py::TestProjectLifecycle::test_analyze_full_flow\n  E:\\screen_play_astra\\screenplay_analyzer\\rules_context.py:212: RuntimeWarning: KB fragment for 'character' is 65226 chars (soft ceiling 40000). Set SCREENPLAY_KB_BUDGET to cap it.\n    warnings.warn(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n87 passed, 2 warnings in 17.05s\n"
+    },
+    {
+      "suite": "tests/test_negative.py",
+      "kind": "pytest",
+      "exit": 0,
+      "ok": true,
+      "tail": "..........                                                               [100%]\n============================== warnings summary ===============================\ntests/test_negative.py::TestAnalyzeFailureIsolation::test_analyze_failure_does_not_lose_parse_progress\n  C:\\Users\\Avinash-Pro\\AppData\\Roaming\\Python\\Python314\\site-packages\\pytest_asyncio\\plugin.py:1216: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16\n    return asyncio.get_event_loop_policy()\n\ntests/test_negative.py::TestAnalyzeFailureIsolation::test_can_retry_analyze_after_fixing_server\n  E:\\screen_play_astra\\screenplay_analyzer\\rules_context.py:212: RuntimeWarning: KB fragment for 'character' is 65226 chars (soft ceiling 40000). Set SCREENPLAY_KB_BUDGET to cap it.\n    warnings.warn(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n10 passed, 2 warnings in 9.09s\n"
+    }
+  ],
+  "started": "phase3",
+  "verdict": "8/8 suites green on HEAD ddac2df"
+}
