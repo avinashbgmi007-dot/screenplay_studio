@@ -1,0 +1,35 @@
+{
+  "j1": {
+    "title": "pain_tenglish",
+    "scene_pages": 6
+  },
+  "j1_console_errors": [],
+  "j1_failed_net": [],
+  "j2c_rerun_control": "Rerun the 1 failed pass",
+  "j2_console_errors": [],
+  "j2b_killed_file": {
+    "status": "running",
+    "stage": "dialogue",
+    "ts": 1790720622.4632947,
+    "detail": ""
+  },
+  "j2b_fresh": {
+    "detail": "",
+    "stage": "dialogue",
+    "status": "running",
+    "ts": 1790720622.686075
+  },
+  "j2b_healed": {
+    "detail": "Analysis appears to have stopped \u2014 no progress for 30+ minutes. Re-run Analysis to start fresh.",
+    "stage": "stalled",
+    "status": "stalled"
+  },
+  "j2b_torn": {
+    "http": 200,
+    "body": {
+      "detail": "progress unreadable \u2014 retrying",
+      "status": "retrying"
+    }
+  },
+  "verdict": "J1+J2 PROVEN"
+}

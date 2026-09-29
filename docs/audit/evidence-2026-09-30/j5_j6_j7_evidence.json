@@ -1,0 +1,17 @@
+{
+  "j6_stream_lengths": {
+    "streamed": 315,
+    "persisted": 315
+  },
+  "console_errors": [
+    "error: Failed to load resource: the server responded with a status of 400 (BAD REQUEST) @ 7.0.0.1:35622/api/projects/Graduated_Idea/report",
+    "error: Failed to load resource: the server responded with a status of 400 (BAD REQUEST) @ /127.0.0.1:35622/api/projects/Chat_Script/report",
+    "error: Failed to load resource: the server responded with a status of 400 (BAD REQUEST) @ 27.0.0.1:35622/api/projects/Robust_Script/report"
+  ],
+  "failed_network": [
+    "400 http://127.0.0.1:35622/api/projects/Graduated_Idea/report",
+    "400 http://127.0.0.1:35622/api/projects/Chat_Script/report",
+    "400 http://127.0.0.1:35622/api/projects/Robust_Script/report"
+  ],
+  "verdict": "J5-J7 PROVEN"
+}
