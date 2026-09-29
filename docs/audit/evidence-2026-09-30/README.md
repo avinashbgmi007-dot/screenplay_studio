@@ -128,12 +128,65 @@ analyze (demo model) → report (7 findings) → fixqueue → revision legs.
 - Zero console errors / failed network calls across both journeys
   (`j3_j4_console.json`).
 
+## J5 — Ideas lifecycle & graduation (12/12 PASS) — script `scripts/audit_j5_j6_j7.py` → `j5_j6_j7_evidence.json`
+
+- Idea created via shipped API → canvas opens in the UI (`shots/j5_idea_canvas.png`).
+- **Autosave**: typed content reaches `/api/ideas/<id>` ("memory palace" persisted).
+- **Premise card** saved through the Structure panel (logline verified in the store).
+- **Idea chat**: session starts; a turn answers (demo model).
+- **Graduation**: multipart upload → project created; `premise.json` carried;
+  the idea conversation carried into `sessions/`; the manifest pins the carried
+  session — the same thread continues on the script desk.
+- Graduated project opens on the desk (`shots/j5_graduated_desk.png`).
+
+## J6 — Chat journeys (12 checks PASS, 3 labeled UNVERIFIED) — same script/evidence file
+
+- **SSE parity (the smoking-gun check)**: tokens streamed over
+  `messages/stream` == the persisted reply in `branches[current].messages`,
+  character-for-character.
+- **Quote-to-reply**: a quoted turn persists the quote with the message.
+- **Fork/switch**: fork creates `audit-branch`; switch (payload key `name`)
+  returns to `main`.
+- **Persona settings**: flip to `script_consultant` and back to
+  `writing_partner` per contract.
+- **Translate**: route answers for the last assistant reply.
+- **Consultant lens**: Dr. Sushruta answers in the dock through the real UI
+  (`shots/j6_sushruta_lens.png`).
+- **Delete**: a throwaway session deletes; strict 404 afterwards.
+- **Memory suppress**: route contract verified (no live observation existed —
+  see UNVERIFIED below).
+- **UNVERIFIED (needs real model) ×3, reasons stated in evidence**: persona
+  VOICE distinctness (demo answers from rules); translation fidelity (rule-based
+  demo translation); real-observation suppression (demo turns produce no
+  scoped observation).
+
+## J7 — Robustness (16/16 PASS) — same script/evidence file
+
+- **Deep links**: `#/p/cowrite`, `#/p/feedback` (legacy panel), `#/p/revision`,
+  `#/p/beatboard` each restore their surface
+  (`shots/j7_deep_links.png`); refresh mid-flow recovers without crash.
+- **Keyboard-only**: `j` walks the manuscript forward monotonically over a
+  20-scene script (positions recorded); `Ctrl+K` opens the palette and the
+  typed command opens Revision — no mouse (`shots/j7_palette.png`).
+- **Reduced motion**: `prefers-reduced-motion: reduce` collapses the palette
+  animation (`animationName: none`).
+- **XSS inertness**: hostile `<img onerror>` payloads in the script TITLE and a
+  margin NOTE render inert — no execution, no injected node
+  (`shots/j7_xss_title_literal.png`). The safe-id title fold was verified in
+  source; the pass condition is inertness, not literal-text presence.
+- **Delete guard**: `confirm()` cancel keeps the project; acceptance deletes it
+  and the shelf answers 404.
+- Zero console errors (expected `/report` 400 contract polls excluded by URL)
+  and zero unexpected network failures across all three journeys
+  (`j5_j6_j7_console.json`).
+
 ## Reproduce
 
 ```bash
 python docs/audit/evidence-2026-09-30/scripts/audit_boot_probe.py
 python docs/audit/evidence-2026-09-30/scripts/audit_j1_j2_journeys.py
 python docs/audit/evidence-2026-09-30/scripts/audit_j3_j4_journeys.py
+python docs/audit/evidence-2026-09-30/scripts/audit_j5_j6_j7.py
 ```
 
 Each boots its own private studio (demo model, throwaway projects dir,
@@ -146,6 +199,9 @@ capability token) via `tests/e2e_browser_common.py` and tears it down.
 - [probe-fixed] J3/J4 first-run probe assumptions (chip semantics, direct
   setRoom() bypassing loadFeedbackPanels, guessed draft names, guessed diff
   keys) — all diagnosed product-contract-first, then fixed probe-side.
+- [probe-fixed] J5–J7 first-run probe assumptions (guessed session shape,
+  switch payload key, translate index contract, dock-tab visibility, one-scene
+  seed for the keyboard walk, console-error URL correlation) — same rule.
 - [finding P3] Activate-already-active draft → 400 "No snapshot" (misleading
   error on a no-op; UI-unreachable). Recorded for the findings register.
 - [observed, by-design → Report 2] Every Feedback route lands on the Evidence
