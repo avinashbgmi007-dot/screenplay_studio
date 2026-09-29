@@ -68,7 +68,7 @@ The desk toolbar (Run Analysis, its status line) is `.auto-hide-chrome`: `opacit
 
 1. **The lens opens on Tier 1 — the worklist.** Fix queue (severity → act), arrival strip (it answers "did my edits work?" — the inversion already shipped in code), dawn meter, filter row + fix loop. Everything else becomes **Tier 2, summoned**: Coverage/Strengths, script-mass + ruler, by-category catch-all, model/provenance line move behind a single "Context" disclosure at the lens foot; the current-scene box stays a slim header *because the queue already answers per-scene via Locate*.
 2. **One findings-state model.** Today four renderers re-derive the same state from `/report` + `/fixqueue` + `/edits` (verified call sites). One store → one renderer → three thin hosts (lens, revision column, deep-link pane) is the structural change that stops the drift the N3/R5-b comments keep patching. The deep-link-only legacy panel is deleted in this move (Report 1 §8's doc delta becomes moot).
-3. **Dedupe for the reader, not the machine.** Keep whole-row collapse for data integrity; add a *display* grouping: identical `issue` text across scenes renders once with a scene-count chip ("Scenes 1, 4 — same note"), expanding on click. No data loss (the underlying rows and marks stay per-scene), the repetition the writer sees disappears.
+3. **Dedupe for the reader, not the machine.** Keep whole-row collapse for data integrity; add a *display* grouping: identical `issue` text across scenes renders once with a scene-count chip ("Scenes 1, 4 — same note"), expanding on click. No data loss (the underlying rows and marks stay per-scene), the repetition the writer sees disappears. Gate 2 note: in the measured case the only field differing between the two rows is `scene_refs` ([1] vs [4]) — the chip preserves exactly that information, so rung 20's "a difference the writer would lose" rule is honored at the display layer too.
 
 Result at 1440×900: opening the lens shows the worklist and the dawn meter **first**, with zero scrolling to the first actionable row; every glance-aside is one click away, not 12 sections away.
 
@@ -91,7 +91,7 @@ Result at 1440×900: opening the lens shows the worklist and the dawn meter **fi
 
 1. **`GET /api/projects/<name>/findings/summary`** — counts by severity × category × status + dawn %, one call. *Why:* the arrival strip, dawn meter, and filter chips currently derive counts client-side across three payloads; a summary endpoint makes Tier 1 renderable before the full report and gives the strip its number in one fetch (complements rung 19's write-time refresh).
 2. **`GET /api/projects/<name>/findings?scene=N&status=open&severity=high`** — scene/status/severity-filtered findings. *Why:* Tier 1's per-scene chip and the loop's `loopList()` currently filter the full client-side list; a queryable endpoint keeps Tier 1 cheap on 100+ finding reports where today's full-report fetch is the only source.
-3. **`POST /api/projects/<name>/findings/intent:batch`** — batch intent/marks. *Why:* the fix loop's mark-and-next cadence is a write per keypress today (`/findings/intent` one at a time); a batch endpoint bounds writes during the loop and enables future offline batching.
+3. **`POST /api/projects/<name>/findings/intent/batch`** — batch intent/marks. *Why:* the fix loop's mark-and-next cadence is a write per keypress today (`/findings/intent` one at a time); a batch endpoint bounds writes during the loop and enables future offline batching. (Feasibility: a thin loop over the existing per-id `revision.set_finding_intent`; the route shape above is Flask-idiomatic, correcting the earlier `intent:batch` sketch at Gate 2.)
 4. *(Optional, Tier 2 only)* **`GET .../findings/groups?by=issue-text`** — server-side display grouping. *Why:* keeps the §4.3 display-dedupe from being recomputed client-side on every render. Could ship client-side first; only justify the endpoint if profiling shows cost.
 
 Nothing in §4 requires these to ship first — all four are density/latency improvements that become worthwhile *after* the state-model consolidation.
@@ -108,3 +108,19 @@ Nothing in §4 requires these to ship first — all four are density/latency imp
 2. Delete the legacy deep-link panel outright, or keep it behind a feature flag one release? *My position: delete — it is unverified surface area; the deep link should redirect.*
 3. Display-dedupe grouping: collapse by identical issue text (measured case), or also by same quote under different rules (the rung-20 docstring's "two notes about one line" case, which it deliberately keeps)? *My position: identical-text only; same-quote-different-rule is real craft information.*
 4. Do the Tier 2 sections need to remember their open state across sessions (prefs), or always open collapsed? *My position: remember per project, like the existing quickcheck collapse does.*
+
+---
+
+## 9. Gate 2 — adversarial red-team verdict (2026-09-30)
+
+**Pressure-test of the recommendation:**
+- **Against DESIGN.md:** the two-tier lens *restores* conformance rather than straining it — the contract's own "Do keep the manuscript the brightest object" and "don't let an analysis panel take the manuscript's width" are honored by *reducing* dock chrome mass; Tier switching is a labelled landmark (severity language, tokens, and the one-gold-key discipline untouched). The display-dedupe chip carries the severity rim/mass/label of its representative row, so severity is never encoded by color or count alone.
+- **Against the writer-JTBD frame:** Tier 1 = the find/decide/verify loop; Tier 2 = the orient context. The only JTBD risk found: a writer who *uses* the script-mass strip as their primary map would now pay one click. Mitigation adopted: Tier 2 sections remember per-project state (open question 4), and the scene chip row stays Tier 1.
+- **Against the measured numbers:** the target (sections-before-first-actionable-row ≤ 1; same-issue visible rows = 1; queue header + ≥3 rows unscrolled at 319px on the 7-finding report) is derived from the audited geometry and the `j3_same_issue_rows` case — not from aspiration.
+- **Cross-checked vs Report 1:** shared claims (route fold, same-issue rows, auto-hide chrome) say the same thing in both reports with the same evidence paths; no contradiction.
+
+**What the critique changed:** the batch-intent API sketch was corrected (`intent:batch` → `intent/batch`, with the thin-loop feasibility note over the existing `revision.set_finding_intent`); the dedupe recommendation now states explicitly that the scene-count chip preserves the only field that differed in the measured case (`scene_refs`), honoring rung 20's no-information-loss rule at the display layer.
+
+**What the critique acquitted:** the fix-vs-rebuild verdict (both rejected options hold their rejection reasons), the four-surface count (call sites re-verified), the ~12-section stack order (matches `renderDockEvidence` source), the "what is NOT the problem" clearances, and proposed APIs 1, 2, and 4 as feasible against the current server code (`_record_findings_metrics`, `_load_report_sanitized`, `finding_statuses` all exist and are the right primitives).
+
+**Verdict: the recommendation stands — Option A+, three moves, phased — with two repairs applied.** Report 1's Gate 2 section covers the readiness register.

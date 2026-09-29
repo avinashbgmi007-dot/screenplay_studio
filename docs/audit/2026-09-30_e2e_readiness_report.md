@@ -39,7 +39,7 @@ What was actually exercised (correctness basis):
 
 ## 3. What held (the strongest evidence, briefly)
 
-- **Honest-state machine under failure.** A real mid-run process kill + restart on the same projects dir: a fresh heartbeat does *not* heal to `stalled`; a heartbeat backdated 31 min heals with an honest "Re-run Analysis" detail; a torn `progress.json` answers HTTP 200 `{"status":"retrying"}` instead of a 400 mid-poll (`j1_j2_evidence.json: j2b_*`, `webapp_server.py:2177-2255`).
+- **Honest-state machine under failure.** A real mid-run process kill + restart on the same projects dir: a fresh heartbeat does *not* heal to `stalled`; a heartbeat backdated 31 min heals with an honest "Re-run Analysis" detail; a torn `progress.json` answers HTTP 200 `{"status":"retrying"}` instead of a 400 mid-poll (`j1_j2_evidence.json: j2b_*`, `webapp_server.py:2177-2255`). Honesty clause (Gate 2): the fast demo run raced the kill, so the mid-run heartbeat was pinned after the kill and the leg proves the **endpoint's stall contract** on that heartbeat — the README's J2b section documents this; the claim here is scoped to match.
 - **Streaming == persistence.** SSE tokens concatenated equal the persisted reply character-for-character (315ch == 315ch; `j5_j6_j7_evidence.json: j6_stream_lengths`), and a mid-stream disconnect leaves the session file valid with the server healthy (`phase2_api_evidence.json`).
 - **The writer loop round-trips.** Rewrite → apply → `findings_status.summary` recompute (`addressed:1, still_present:0, unknown:6`) → undo → redo → export `.fountain`/`.fdx`; draft upload auto-activates and switch-back restores content verbatim (`j3_j4_evidence.json`).
 - **Security by default.** Tokenless writes 403; encoded and plain path traversal on `<name>` never succeeds; `/api/config` leaks no token; CSP `frame-ancestors 'self'` + nosniff on the SPA document; zero external requests on first paint (`boot_evidence.json`, `phase2_api_evidence.json`).
@@ -148,3 +148,23 @@ python docs/audit/evidence-2026-09-30/scripts/audit_phase3_suites.py
 ```
 
 Each boots its own private studio and tears it down. Findings F-01/F-02/F-03 are re-derived by the Phase 2/J4 probes on every run.
+
+---
+
+## 12. Gate 2 — adversarial red-team verdict (2026-09-30)
+
+Method: each P3 re-opened against its cited artifact; census and source lines re-run; all artifact paths resolved (28 files); arithmetic re-checked (164 = 16+25+48+44+31; 244 = 18+15+40+26+4+44+87+10); common-vs-specific cross-read between reports.
+
+**What the critique changed:**
+- **§3 repaired (overclaim):** the stall-heal bullet now carries the probe's honesty clause — the demo run raced the kill, so the leg proves the *endpoint's stall contract* on a pinned running heartbeat (as the README's J2b section always documented). The compressed phrasing had dropped that scope; restored.
+- **F-04 sharpened:** the source was read directly at Gate 2 (`rules_context.py:205-213`) — the warning fires only when **no budget is configured** (`budget is None`) and each fragment warns once per process. The finding stands (a shipped default that exceeds its own soft ceiling), with the trigger condition now stated precisely.
+
+**What the critique acquitted:**
+- **F-01, F-02, F-03** — repro, severity, and UI-unreachability all held against their artifacts (for F-01, the M4 in-range JSON-400 contrast was re-read at source; for F-02, the artifact records the 405 status and its HTML body prefix).
+- **F-05** — census re-run at Gate 2: 88 `@app.route(` in `webapp_server.py` + 2 in `demo_model.py` = 90 vs the doc's stated 86; the doc's own "regenerate after changing any @app.route" rule is quoted in its header. Stands.
+- **Citation paths** — all resolve to real artifacts (6 evidence JSONs, 18 screenshots, 4 probe scripts + runner + README under `evidence-2026-09-30/`).
+- **Arithmetic** — corrected totals confirmed everywhere; no other number drifted.
+- **Cross-report consistency** — §10 (here) and §7 of Report 2 assign every shared claim to exactly one home; no contradiction found.
+- **Missed-findings hunt** — evidence JSONs and suite tails re-swept for underweighted signals: nothing new above the noise floor (the Werkzeug `Server` disclosure and `/report` 400 polls were already appendix items; the KB warning was already F-04).
+
+**Verdict: the register survives with 5 P3s (no additions, no removals), one §3 claim repaired, one finding's trigger condition tightened.** Report 2's Gate 2 section records its own outcome.

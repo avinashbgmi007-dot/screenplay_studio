@@ -256,6 +256,11 @@ python docs/audit/evidence-2026-09-30/scripts/audit_phase3_suites.py
 Each boots its own private studio (demo model, throwaway projects dir,
 capability token) via `tests/e2e_browser_common.py` and tears it down.
 
+## Reports (Gate 1 + Gate 2 applied)
+
+- [Report 1 — E2E production-readiness](../2026-09-30_e2e_readiness_report.md): verdict, P3 register (F-01…F-05), docs delta, UNVERIFIED labels, suite cross-run. Gate 2: register survived (5 P3s, no additions/removals); §3 stall-heal claim re-scoped to the endpoint contract with the honesty clause restored; F-04's trigger condition (no budget configured; warns once per fragment) tightened from a direct source read.
+- [Report 2 — Feedback UIUX architecture](../2026-09-30_feedback_uiux_analysis.md): clutter mechanism, fix-vs-rebuild verdict (Option A+), target two-tier architecture, proposed APIs. Gate 2: recommendation survived against DESIGN.md, writer-JTBD, and the measured numbers; batch-intent API sketch corrected to `intent/batch`; dedupe chip noted as preserving the only differing field (`scene_refs`).
+
 ## Findings so far (register starts at P3; none of the below is a product bug)
 
 - [probe-fixed] Boot probe header comparison was case-sensitive — probe artifact.
