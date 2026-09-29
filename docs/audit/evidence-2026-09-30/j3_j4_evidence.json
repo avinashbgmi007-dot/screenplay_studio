@@ -1,0 +1,57 @@
+{
+  "seed_findings": {
+    "Loop Script": 7
+  },
+  "j3_severity_order": [
+    "medium",
+    "medium",
+    "low",
+    "low",
+    "low",
+    "low",
+    "low"
+  ],
+  "j3_same_issue_rows": [
+    {
+      "issue": "[demo] Sample dialogue finding \u2014 the built-in demo model is ",
+      "row_a": {
+        "severity": "low",
+        "rule_id": null,
+        "check_id": null,
+        "category": "dialogue",
+        "scene_refs": [
+          1
+        ]
+      },
+      "row_b": {
+        "severity": "low",
+        "rule_id": null,
+        "check_id": null,
+        "category": "dialogue",
+        "scene_refs": [
+          4
+        ]
+      }
+    }
+  ],
+  "j3_duplicates": {
+    "total": 7,
+    "exact": []
+  },
+  "j3_feedback_route_contract": "mouse/palette/f-key routes land on the Evidence lens by design; legacy panel reachable only via deep link",
+  "j4_rewrite_candidates": 1,
+  "j4_status_summary": {
+    "addressed": 1,
+    "still_present": 0,
+    "unknown": 6
+  },
+  "j4_activate_active_quirk": {
+    "request": "POST activate name=draft-1 (already active)",
+    "status": 400,
+    "body": "{\"error\":\"No snapshot for draft 'draft-1'.\"}\n",
+    "classification": "P3 API-contract polish: misleading error on a no-op; UI-unreachable"
+  },
+  "console_errors": [],
+  "failed_network": [],
+  "verdict": "J3+J4 PROVEN"
+}
