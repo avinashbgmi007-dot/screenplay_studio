@@ -1672,6 +1672,15 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   margin: var(--sp-3) 0 0;
   line-height: 1.5;
 }
+/* Rung 20b: a mark is keyed on the quoted LINE, so one check can discharge two
+   different notes about it. The card names them, on screen, before the press --
+   so it reads a step louder than the gesture hint under it, never hover-only. */
+.finding-shared-mark {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  margin: var(--sp-3) 0 0;
+  line-height: 1.5;
+}
 .finding-note-actions button {
   background: transparent;
   border: 1px solid var(--line);

@@ -50,6 +50,8 @@ Two consequences, both deliberate:
 
 from __future__ import annotations
 
+import json
+
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
@@ -217,4 +219,29 @@ def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
             why = (survivor.get("why_it_matters") or "").rstrip()
             survivor["why_it_matters"] = f"{why} {clause}".strip()
         out.append(survivor)
+    return out
+
+def collapse_exact_duplicates(findings: list[dict]) -> list[dict]:
+    """Drop a row that is word-for-word another row, keeping first-seen order.
+
+    This is NOT the merge above. `dedupe_related_findings` unites two different
+    notes that share a page, so it has to choose which text survives; this one
+    removes a row that carries nothing the survivor does not, so it chooses
+    nothing and loses nothing. The key is the WHOLE row: a difference in severity,
+    rule id, reasoning, suggestion or scene order keeps both rows, because that
+    difference is information the writer would lose. Two different craft judgments
+    about one quoted line stay two notes with two marks.
+
+    The set of distinct content ids is provably unchanged — `compute_finding_id`
+    reads only category, quote and issue, all three inside this key — so the
+    strip's fixed/new arithmetic cannot move.
+    """
+    seen: set = set()
+    out: list[dict] = []
+    for f in findings:
+        key = json.dumps(f, sort_keys=True, ensure_ascii=False, default=str)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(f)
     return out

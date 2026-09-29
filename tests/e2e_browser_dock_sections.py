@@ -1502,6 +1502,106 @@ def check_evidence_typing_and_row(page, lens):
                      refreshAllFindingSurfaces(); }""")
 
 
+SHARED_MARK_SEED_JS = """() => {
+  // R6 rung 20b: two notes, ONE quoted line. The analyzer flagged the same
+  // evidence under two craft rules (measured on the real shelf: this is exactly
+  // what Rain_Courier_7 and gun_pen_2 contain). They share a content id on
+  // purpose -- the id is the evidence, and the evidence is what survives
+  // re-analysis -- so ONE mark discharges BOTH notes. The writer has to see the
+  // second note before pressing, not discover it afterwards.
+  const quote = "RAHUL Light banchey!";
+  const fs = [{
+    category: "dialogue", severity: "medium", scene_refs: [4],
+    issue: "SHARED-A dialogue is redundant and explains what was just shown",
+    evidence_quote: quote,
+  }, {
+    category: "dialogue", severity: "high", scene_refs: [4],
+    issue: "SHARED-B character voice is indistinguishable from the narrator",
+    evidence_quote: quote,
+  }, {
+    category: "dialogue", severity: "low", scene_refs: [5],
+    issue: "SHARED-SOLO a note no other finding cites",
+    evidence_quote: "SOLO line no other finding quotes",
+  }];
+  state.findings = fs;
+  state.report = Object.assign({}, state.report || {}, { findings: fs });
+  state.findingIds = fs.map((f) => computeFindingId(f));
+  state.findingStatus = {};
+  state.findingMarks = {};
+  state.ghostedIds = new Set();
+  refreshAllFindingSurfaces(); // the ONE re-render entry point (P0.4)
+  return {
+    shared: state.findingIds[0] === state.findingIds[1],
+    solo_is_different: state.findingIds[2] !== state.findingIds[0],
+  };
+}"""
+
+
+def check_shared_mark_disclosure(page, lens):
+    """One mark can cover two different notes on one line. The card must say so."""
+    if not page.evaluate("() => dockIsOpen()"):
+        open_dock(page)
+    seed = page.evaluate(SHARED_MARK_SEED_JS)
+    page.wait_for_timeout(300)
+    open_dock_section_holding(page, ".finding-note")
+    page.wait_for_timeout(400)
+
+    # The precondition, checked as its own failure: if the two seeded notes ever
+    # stop sharing an id, the checks below would be certifying nothing.
+    check("the fixture really is two notes sharing one content id",
+          seed["shared"] and seed["solo_is_different"], str(seed))
+
+    # Own text and disclosure are read together, from the DOM. A locator filtered on
+    # has_text cannot tell the two cards apart: a card that NAMES its sibling also
+    # contains that sibling's text, and the shelf sorts by severity, so "the SHARED-A
+    # card" is not the first match.
+    cards = page.evaluate("""() => [
+      ...document.querySelectorAll('.dock-lens[data-lens="evidence"] .finding-note')
+    ].map((n) => {
+      const own = n.querySelector(".finding-note-text");
+      const mark = n.querySelector(".finding-shared-mark");
+      const r = mark ? mark.getBoundingClientRect() : null;
+      return {own: own ? own.textContent.trim() : "",
+              mark: mark ? mark.textContent.trim() : null,
+              painted: !!r && r.height > 0 && mark.offsetParent !== null};
+    })""")
+    shared = [c for c in cards if c["own"].startswith(("SHARED-A", "SHARED-B"))]
+    solo = [c for c in cards if c["own"].startswith("SHARED-SOLO")]
+
+    check("both seeded notes reached a deep card",
+          len(shared) == 2 and len(solo) == 1,
+          f"shared={len(shared)} solo={len(solo)}")
+
+    # Each card must name the OTHER note, and must not name itself: a disclosure
+    # that repeats the card's own sentence says nothing about what the mark costs.
+    misnamed = [c["own"][:16] for c in shared
+                if not c["mark"]
+                or ("SHARED-A" if c["own"].startswith("SHARED-B")
+                    else "SHARED-B") not in c["mark"]
+                or c["own"][:16] in c["mark"]]
+    check("each card names the OTHER note its mark also discharges",
+          len(shared) == 2 and not misnamed, str(misnamed or shared))
+
+    ncount = [c["mark"] for c in shared if not c["mark"] or "2 notes" not in c["mark"]]
+    check("and it says the mark clears two notes, not one",
+          not ncount, str(ncount))
+
+    # Visible, not hover-only: a title attribute on the button is not enough for a
+    # keyboard or screen-reader writer to learn this before pressing.
+    check("the disclosure is painted on screen, not revealed by hovering",
+          all(c["painted"] for c in shared),
+          str([c["own"][:16] for c in shared if not c["painted"]]))
+
+    # The card must not claim the two notes are the same note -- that was the
+    # wording defect this rung exists to prevent.
+    check("and never calls them the same note",
+          all("same note" not in (c["mark"] or "").lower() for c in shared),
+          str([c["mark"] for c in shared if "same note" in (c["mark"] or "").lower()]))
+
+    check("a note nobody shares gets no disclosure line",
+          len(solo) == 1 and solo[0]["mark"] is None, str(solo))
+
+
 def run(base):
     name = seed_and_analyze(base, "Ledger Collapse")
     with sync_playwright() as p:
@@ -1674,6 +1774,7 @@ def run(base):
         check_seeded_scene_filter(page, lens)
         check_shelf_defers_and_one_pacing(page, lens, base, name)
         check_card_honesty_fields(page, lens, base)
+        check_shared_mark_disclosure(page, lens)
         check_report_honesty_surfaces(page, lens, base, name)
         check_evidence_typing_and_row(page, lens)
 

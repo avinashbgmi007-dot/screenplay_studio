@@ -4795,6 +4795,33 @@ function ruleChip(ruleId) {
   return b;
 }
 
+/** Other notes that share this finding's content id, by their own text.
+ *
+ * The id is the EVIDENCE, not the note: two different craft judgments about one
+ * quoted line hash alike deliberately, because the quoted line is the only thing
+ * that survives re-analysis (severity and scene number are excluded from the id
+ * for exactly that reason). One mark therefore discharges both notes.
+ *
+ * That is honest only while the writer can see the other note BEFORE pressing,
+ * so the deep card names it. A row that is word-for-word its sibling is not named
+ * -- it says nothing new, and report.save_report no longer emits one.
+ */
+function sharedMarkSiblings(index) {
+  const fs = state.findings || [];
+  const ids = state.findingIds || [];
+  const id = ids[index];
+  if (!id) return [];
+  const own = String((fs[index] && fs[index].issue) || "").trim();
+  const seen = new Set();
+  fs.forEach((f, i) => {
+    if (i === index || ids[i] !== id) return;
+    const issue = String((f && f.issue) || "").trim();
+    if (!issue || issue === own) return;
+    seen.add(issue);
+  });
+  return [...seen];
+}
+
 function findingNoteEl(f, index, opts = {}) {
   const disp = opts.disposition || "open";
   // forward-compatible states (Phase D defer / Phase E ghosting): muted
@@ -4942,6 +4969,16 @@ function findingNoteEl(f, index, opts = {}) {
   // gestures COST. Hover-only titles left 'addressed' and 'next pass' a guess. The
   // queue's gesture (Dismiss) is explained in the queue, where its button is.
   if (opts.deep) {
+    // Visible, never hover-only: a writer on a keyboard or a screen reader has
+    // to learn what the mark costs before the click, not from a title they would
+    // first have to discover exists.
+    const sibs = sharedMarkSiblings(index);
+    if (sibs.length) {
+      const clip = (t) => t.length > 72 ? t.slice(0, 72) + "…" : t;
+      note.appendChild(el("p", "finding-shared-mark",
+        "✓ clears " + (sibs.length + 1) + " notes on this line: "
+        + sibs.map((t) => "“" + clip(t) + "”").join(" · ")));
+    }
     note.appendChild(el("p", "finding-intent-hint",
       "\u2713 you fixed it \u2014 survives re-analysis \u00B7 \u23ED park it \u2014 returns next analysis"));
   }

@@ -4017,3 +4017,56 @@ projects); #3 copying a project folder changes the report's mtime, and the
 `last_pass` freshness guard demands mtime equality, so the Fixed/New arithmetic
 silently restarts. Item 4 (the UI/UX architecture fork) is next and does not depend on
 either.
+
+## Round 6 · rung 20: item 2 defect #1, split into the two halves it actually is (2026-09-30)
+
+**Measurement that changed the plan.** The audit line "one dismissal closes two
+different diagnoses" was traced to `revision.compute_finding_id`, whose fingerprint
+is category + quote + issue — deliberately NOT severity (`test_id_survives_rescoring`)
+and NOT the scene number (`test_id_survives_scene_insert_shift`), because those are
+what a re-analysis churns. So a shared id is not a bug in the id: it is what
+evidence-keyed identity costs, and the cost is paid by any tiebreaker that would
+re-key the writer's marks on the next run. Measured on the shelf: 6 colliding groups
+within a project, and only 2 are real analyses — `Rain_Courier_7/f1qgvp6` and
+`gun_pen_2/f1lben1f`, each ONE quoted line flagged under TWO different craft rules
+(separate work, same page). The other collisions, and both `Sample …` demo groups,
+are the same row emitted twice. That split is why this rung is two independent
+changes instead of one.
+
+**20a — a row that is word-for-word another row is not a second note.** New
+`dedupe.collapse_exact_duplicates`, called as pipeline step 8c, keyed on the WHOLE
+row (severity, rule id, reasoning, suggestion and scene order included). Measured:
+the shelf's 94 stored findings hold exactly 2 such rows, and both are byte-identical
+to their survivor, so nothing that carries new information is ever dropped; the
+distinct-id set is asserted unchanged, so the strip's fixed/new arithmetic cannot
+move.
+
+It runs in the pipeline, not at the report writer. A self-review caught the first
+version doing it inside `save_report`, after `verification_summary`
+(`pipeline.py:1082`) and `evidence_depth` (`:1089`) were frozen — which is exactly
+what step 8b's own comment forbids ("every downstream count describes the set the
+writer actually receives"). Mutating `result.findings` from a writer would have made
+`stats.evidence_depth.total` print 5 over 2 rows in `report.md`, the served JSON and
+the desk at once, and would have left a second opinion about the row count living in
+the render path. Relocating it fixed both without adding a recompute.
+`tests/test_report_duplicate_rows.py` (13 tests) is mutation-proved: with step 8c
+moved after the two counts it fails as `evidence_depth totals 5 rows, report carries
+2`; with the step deleted it fails as `the same note was carded 4 times`.
+
+**20b — one mark on one line clears every note about that line, so the card says
+which ones.** The id is kept as it is; `sharedMarkSiblings(index)` makes the deep
+card print, on screen and before the press, `✓ clears 2 notes on this line: "…" ·
+"…"`, naming the sibling notes by their own text. Deliberations: nothing is renamed,
+merged, or re-keyed; no mark store migration; a word-for-word sibling is not named
+(20a no longer emits one); the line is a real `<p>`, not a hover title, because a
+keyboard or screen-reader writer has to learn the cost before clicking.
+
+**Gate.** `python -m pytest tests/` → 1928 passed, 3 skipped, 0 failed. Dock suite
+`tests/e2e_browser_dock_sections.py` → 176 passed, 0 failed; with the disclosure
+suppressed it drops to 173 passed / 3 failed (naming, "2 notes", painted-without-hover),
+so the checks are not decorative. Full browser fleet on the final tree
+(`python -u tests/run_browser_suites.py`) → **58 suites: 57 passed, 0 failed,
+1 skipped, 1495 checks** (1488 at rung 19; the +7 is every check this rung added, all
+in `dock_sections` 169 → 176). Both pre-existing reds stayed green: `phase8_lifecycle`
+26 passed, `translate_mic` 22 passed.
+

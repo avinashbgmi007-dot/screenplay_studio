@@ -1079,6 +1079,15 @@ def analyze(
         result.errors.append(f"Cross-rule dedup skipped: {e}")
     merged_away = before_dedup - len(result.findings)
 
+    # 8c. a row that is word-for-word another row is not a second note (§5 item 2).
+    # It runs here, beside the dedup, for the same reason the dedup does: the summary
+    # and the depth below are the numbers the writer is shown, so they must describe
+    # the rows that survive. Doing it at the report write path instead would leave
+    # `evidence_depth.total` and `verification` printing a total the rows cannot back
+    # up — in report.md, in the served findings JSON and in the live desk.
+    from .dedupe import collapse_exact_duplicates
+    result.findings = collapse_exact_duplicates(result.findings)
+
     result.verification = verification_summary(result.findings)
 
     # 9. evidence depth — computed LAST, on the filtered list, so the number the
