@@ -1,0 +1,31 @@
+{
+  "base": "http://127.0.0.1:50533",
+  "health": {
+    "demo_model": true,
+    "server_url": "http://127.0.0.1:8099",
+    "status": "ok"
+  },
+  "token_len": 32,
+  "stamps": {
+    "style.css": "eb23597313",
+    "tungsten.css": "c14468d18a",
+    "core.js": "e555733939",
+    "app.js": "f7445947f4"
+  },
+  "security_headers_root": {
+    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer"
+  },
+  "security_headers_api": {},
+  "real_server_check": {
+    "available": false,
+    "demo": true,
+    "url": "http://localhost:8080"
+  },
+  "boot_screenshot": "docs\\audit\\evidence-2026-09-30\\shots\\boot_welcome_1440x900.png",
+  "external_requests": [],
+  "console_errors": [],
+  "page_errors": [],
+  "verdict": "BOOT PROVEN"
+}
