@@ -69,3 +69,20 @@ def test_summarize_empty(m):
     s = summarize(m)
     assert s["avg_reply_seconds"] is None
     assert s["discussed"] == 0
+
+
+def test_a_run_without_a_complete_report_leaves_the_count_alone(tmp_path):
+    """`_record_pass` passes `{}` when the analyze stage is not complete. The
+    helper's `if total:` guard must keep a failed run from zeroing a count the
+    writer earned on the last good report."""
+    from types import SimpleNamespace
+
+    from screenplay_studio.webapp_server import _record_findings_metrics
+
+    m = SimpleNamespace(project_dir=str(tmp_path))
+    record_findings(m, open_count=4, total=7)
+    _record_findings_metrics(m, {})
+    assert load(m)["findings_total"] == 7
+    _record_findings_metrics(
+        m, {"summary": {"addressed": 0, "still_present": 0, "unknown": 0}})
+    assert load(m)["findings_total"] == 7

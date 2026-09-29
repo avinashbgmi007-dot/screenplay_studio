@@ -381,7 +381,7 @@ All written atomically (`jsonio.atomic_write_json`). Schemas (top level):
 - **stash.json** — the Stash. Array of `{id, text (≤4000 chars), title (≤120), scene_number: int|null, created_at}`, newest first.
 - **notes.json** — margin notes. Array of `{id, scene_number: int|null, text, anchor: str|null, created_at, updated_at}`.
 - **beatboard.json** — saved scene order. `{"order": [scene numbers], "saved_at": ts}`.
-- **metrics.json** — desk metrics. `{analysis_seconds, last_analysis_ts, reply_seconds (rolling ≤40), discussed, findings_open, findings_total}`.
+- **metrics.json** — desk metrics. `{analysis_seconds, last_analysis_ts, reply_seconds (rolling ≤40), discussed, findings_open, findings_total}`. `findings_open`/`findings_total` are written by `_record_pass` (every completed or partial analysis, and the retry) and by apply/undo/redo — always through `_record_findings_metrics`, i.e. the `finding_statuses` summary arithmetic, so the status strip and `pass_history.json` never disagree and no surface owns a second counter.
 - **pass_history.json** — the revision arc (spec §15.4). Append-only array, oldest first, one entry per completed or partial analysis: `{ts, total, open, addressed, failed_categories}`, with `total = addressed + open` and `open = still_present + unknown` — the `finding_statuses` summary arithmetic, i.e. the same one `metrics.json` and the client's `findingCounts()` use, so no surface owns a second counter. `last_pass.json` keeps ONE generation of diff; this keeps every one.
 - **working.json** — edit working copy; full ScriptDocument schema (same as parsed.json).
 - **edits.json** — undo log. Array of `{id, scene_number, applied: [{old, new, similarity}], skipped: [{old, new, reason}], applied_at}`.

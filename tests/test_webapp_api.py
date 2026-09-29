@@ -111,6 +111,58 @@ class TestProjectLifecycle:
         assert report_resp.status_code == 200
         assert "findings" in report_resp.get_json()
 
+    def test_analyze_records_the_strip_finding_count(self, http_client):
+        """Item 2 (production-readiness audit 2026-09-29): the status strip's
+        `N/M fixed` was written only by apply/undo/redo, so a finished analysis
+        kept showing the PREVIOUS report's numbers — measured on a real project
+        as `0/29 fixed` against a 36-row report. Analyze stamps the pass, so it
+        must stamp the count from the same payload."""
+        import json
+
+        project = _upload(http_client).get_json()["project"]
+        resp = http_client.post(f"/api/projects/{project}/analyze")
+        assert resp.status_code == 200
+
+        report_path = os.path.join(webapp_server._project_dir(project),
+                                   "report.findings.json")
+        n = len(json.load(open(report_path, encoding="utf-8"))["findings"])
+        assert n  # an empty fixture would pass every assertion below by accident
+
+        m = http_client.get(f"/api/projects/{project}/metrics").get_json()
+        assert m["findings_total"] == n
+        # nothing has been edited since this report was written, so nothing can
+        # be 'addressed' — every finding is still_present or unknown
+        assert m["findings_open"] == n
+        assert m["findings_fixed"] == 0
+
+    def test_reanalysis_replaces_a_stale_finding_count(self, http_client):
+        """Seed the store with a previous report's numbers, then re-analyze with
+        force. The strip must move to the new report, not keep the seeded pair."""
+        import json
+        from types import SimpleNamespace
+
+        from screenplay_studio.metrics import record_findings
+
+        project = _upload(http_client).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        report_path = os.path.join(webapp_server._project_dir(project),
+                                   "report.findings.json")
+        n = len(json.load(open(report_path, encoding="utf-8"))["findings"])
+
+        # a different report's arithmetic: 5 open of 10 (the fixture's own mock
+        # report is 6 rows, so the seeded total can never be mistaken for it)
+        record_findings(SimpleNamespace(project_dir=webapp_server._project_dir(project)),
+                        5, 10)
+        seeded = http_client.get(f"/api/projects/{project}/metrics").get_json()
+        assert seeded["findings_total"] == 10
+        assert n != 10  # otherwise the assertion below cannot fail
+
+        resp = http_client.post(f"/api/projects/{project}/analyze", json={"force": True})
+        assert resp.status_code == 200
+        m = http_client.get(f"/api/projects/{project}/metrics").get_json()
+        assert m["findings_total"] == n
+        assert m["findings_open"] == n
+
     def test_report_before_analyze_returns_400(self, http_client):
         upload_resp = _upload(http_client)
         project = upload_resp.get_json()["project"]

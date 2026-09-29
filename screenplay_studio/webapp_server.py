@@ -1379,7 +1379,8 @@ def _start_progress_heartbeat(m) -> None:
 
 
 def _record_pass(m) -> None:
-    """spec §15.4: stamp the revision arc with this pass's numbers.
+    """spec §15.4: stamp the revision arc — and the status-strip finding count —
+    with this pass's numbers.
 
     Best-effort on purpose. The analysis is finished and its report is on disk
     by the time this runs, so a history write that fails (a locked store, a full
@@ -1392,6 +1393,16 @@ def _record_pass(m) -> None:
         from .revision import finding_statuses
         statuses = (finding_statuses(m)
                     if m.stage("analyze").status == "complete" else {})
+        # Item 2 (audit 2026-09-29): `metrics.findings_*` moved only on
+        # apply/undo/redo, so a finished analysis left the PREVIOUS report's
+        # numbers on the status strip (measured: `0/29 fixed` against a 36-row
+        # report). This is the one moment the new report exists and its statuses
+        # are already loaded, and `_record_findings_metrics` is the single
+        # counting path the edits use — reusing it keeps one arithmetic instead
+        # of a second counter. Ahead of append_pass so a history failure cannot
+        # strand the count. An incomplete analyze yields {}, whose total is 0, so
+        # a failed run leaves the writer's existing count untouched.
+        _record_findings_metrics(m, statuses)
         failed = (m.stage("analyze").output_paths or {}).get("failed_categories") or []
         append_pass(m, statuses, failed)
     except Exception:

@@ -3985,3 +3985,35 @@ failed", all of them that one suite). The gate is
 `python -u tests/run_browser_suites.py`, which skips live-model suites by name and
 prints its own `58 suites: …` line — always run it **`-u`**, or the redirected log
 stays buffered and shows nothing until the process exits, which looks like a hang.
+
+## Round 6 · rung 19: the status strip's finding count moves when an analysis finishes (2026-09-29)
+
+Item 2's defect #2, and the smallest of the three. `metrics.findings_open` /
+`findings_total` — the ⚡ strip's `N/M fixed` — were written by **apply/undo/redo
+only** (`_record_findings_metrics`, three call sites). Analyze never wrote them, so
+after a re-run the strip kept the *previous* report's arithmetic: measured on a real
+project as `0/29 fixed` against a 36-row report. The client was never the problem —
+`app.js:2826` already re-pulls `/metrics` the moment an analysis completes; it just
+got numbers that described a report that no longer existed.
+
+The fix is one call in `_record_pass`, which is the moment a new report exists and
+already holds the `finding_statuses` payload: it now feeds that payload to the *same*
+helper the edits use, ahead of `append_pass`. Deliberately not a new counter —
+`pass_history.append_pass` derives `open`/`total` from the same summary, and
+`DATA_FORMATS.md` says so in both entries now, so the strip and the arc cannot drift.
+An incomplete analyze passes `{}`, whose total is 0, so a failed run leaves the
+writer's earned count alone; that branch is guard-tested, and the guard was
+mutation-proved (`if total:` → `if not total:` makes it fail).
+
+Red first, on this tree: `assert None == 6` (nothing wrote the count) and
+`assert 10 == 6` (a seeded stale total survived a forced re-analysis — the reported
+symptom, reproduced in a test). `n != 10` is asserted in that second test because the
+mock report is 6 rows; if a fixture ever changes to 10, the test says so instead of
+passing on coincidence.
+
+**Still open from item 2, untouched here:** #1 the quote-keyed finding id collides, so
+one dismissal closes two different diagnoses (needs the alias step for the 23 real
+projects); #3 copying a project folder changes the report's mtime, and the
+`last_pass` freshness guard demands mtime equality, so the Fixed/New arithmetic
+silently restarts. Item 4 (the UI/UX architecture fork) is next and does not depend on
+either.
