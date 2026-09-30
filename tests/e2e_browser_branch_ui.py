@@ -21,7 +21,9 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import studio_headers, Checks, assert_no_js_errors, launch, start_studio
+from e2e_browser_common import (  # noqa: E402
+    Checks, assert_no_js_errors, banner_text, launch, start_studio, studio_headers,
+)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -124,7 +126,7 @@ def run(base):
         # Reading it names the cause instead of leaving "nothing happened".
         err_text = ""
         if page.locator("#error-banner").is_visible():
-            err_text = page.locator("#error-banner-text").inner_text().strip()
+            err_text = banner_text(page)
         check("the fork reports no error", settled == "created" and err_text == "",
               f"settled={settled} banner={err_text!r}")
 
