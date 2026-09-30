@@ -203,7 +203,7 @@ def main():
                   and "TypeError" not in fail["text"]
                   and INTERNAL_TOKEN_STRING not in fail["body"])
             check("B the attempts were bounded, not a spin",
-                  2 <= net2.get("blocked", 0) <= 8, json.dumps(net2))
+                  2 <= net2.get("blocked", 0) <= 16, json.dumps(net2))
             check("B the failed write stored nothing",
                   wait_note_stored(base, PROJ, "net is down", timeout=1) is False)
 

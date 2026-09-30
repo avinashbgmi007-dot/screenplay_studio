@@ -116,13 +116,19 @@ async function _ensureStudioToken() {
 // readable instead of a loop.
 let _staleRounds = 0;
 async function _staleRecovery(prevTok, retryFn, requireTokenMove) {
-  // The re-mint fetch can itself land on the next poisoned pooled socket, so
-  // try the document TWICE before concluding the studio is really gone. (A
-  // GET is idempotent and Chromium usually auto-retries it on a fresh
-  // connection, but the recovery must not depend on that courtesy.)
-  for (let i = 0; i < 2; i++) {
+  // The re-mint can land on the NEXT poisoned pooled socket: Linux CI held
+  // SIX corpse connections and Chromium needed ~2s to reap them (that exact
+  // window is what made session_breaks L1 flake). So the re-mint DECAYS —
+  // retried every 250ms across a 2.5s wall-clock deadline, returning the
+  // moment one lands. Still passive GETs, still bounded: a truly unreachable
+  // studio ends the wait at the same deadline and the caller fails readable.
+  const deadline = Date.now() + 2500;
+  for (;;) {
     try { await fetch("/", { cache: "no-store" }); break; }
-    catch (_) { if (i === 1) return null; /* unreachable: caller fails readable */ }
+    catch (_) {
+      if (Date.now() >= deadline) return null; /* unreachable: fail readable */
+      await new Promise((r) => setTimeout(r, 250));
+    }
   }
   const tok = _studioToken();
   // A below-HTTP death never sent the request, so one retry is always safe
