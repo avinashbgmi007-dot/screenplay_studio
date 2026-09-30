@@ -562,7 +562,9 @@ let errorBannerTimeout = null;
 //
 //  * the write must land while the region is RENDERED. A `role="alert"` region
 //    that is `display:none` is not in the accessibility tree, so writing its
-//    text there is announced to nobody. Hence reveal-first, write-after.
+//    text there is announced to nobody. show() and write() land in the same
+//    task; this helper is for already-rendered regions only (#a11y-status —
+//    every caller left) — see showError for the hidden-region pattern.
 //  * the write must BE a content change. `textContent = sameString` replaces the
 //    text node either way — the DOM does change — but a screen reader that diffs
 //    the CONTENT sees no difference and stays silent, so a repeated error would
@@ -590,9 +592,16 @@ function showError(message, persistent) {
   const banner = $("#error-banner");
   // UX-1: this used to set the text while the banner was still display:none —
   // announced to nobody, so every error in the app was silent to a screen
-  // reader. The banner is role="alert" now, and the reveal has to come first.
+  // reader. The banner is role="alert" now.
+  //
+  // The reveal and the text land in the SAME task: show-with-content is what a
+  // role="alert" expects, and splitting them (the announce() deferral) held
+  // the banner visible with empty words for one frame — a window CI can read
+  // (server_url_guard, twice on 2026-09-30) and every reader must poll around.
+  // announce()'s rAF half remains only for the always-rendered #a11y-status,
+  // where the one-frame gap is free.
   banner.style.display = "flex";
-  announce(message, $("#error-banner-text"));
+  $("#error-banner-text").textContent = message;
   if (errorBannerTimeout) clearTimeout(errorBannerTimeout);
   if (!persistent) errorBannerTimeout = setTimeout(hideError, 10000);
 }

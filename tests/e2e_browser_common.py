@@ -108,12 +108,15 @@ class Checks:
 
 
 def banner_text(page, timeout=5000):
-    """The error banner's text AFTER announce() has landed it.
+    """The error banner's text, once it is there (kept from the deferral era).
 
-    announce() (UX-1) clears the element and sets the message in the NEXT
-    animation frame, so a read issued the moment the banner becomes visible
-    can see "" — server_url_guard failed on CI on 2026-09-30 on exactly this
-    (banner visible, both text checks empty, every surrounding check green).
+    Before 2026-09-30 announce() cleared the element and set the message in
+    the NEXT animation frame, so a read issued the moment the banner became
+    visible could see "" — server_url_guard failed on CI that day on exactly
+    this (banner visible, both text checks empty, every surrounding check
+    green). showError now writes the text synchronously, but this helper
+    stays: it is cheap, it still bounds the read, and it keeps every banner
+    reader independent of how showError is sequenced internally.
     Waits (bounded) for the text to exist and returns it stripped; "" if the
     banner never carries text within the timeout.
     """
