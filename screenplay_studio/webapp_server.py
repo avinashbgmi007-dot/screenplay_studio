@@ -2556,60 +2556,6 @@ def set_finding_intents_batch(name):
     resp = {"ok": not failed, "applied": applied, "failed": failed}
     return jsonify(resp), (200 if not failed else 207)
 
-    from screenplay_parser.structure import assign_acts, act_for_scene
-    from .revision import load_working, finding_statuses, compute_finding_id, dismissed_finding_ids
-    doc = load_working(m)
-    acts = assign_acts(doc)
-    act_names = {a["act"]: a["name"] for a in acts}
-    scene_heading = {s.scene_number: s.heading_raw for s in doc.scenes}
-    status_by_index = {s["index"]: s["status"] for s in finding_statuses(m)["findings"]}
-
-    from .revision import dismissed_issues as _dismissed
-    dismissed_keys = _dismissed(m)
-    dismissed_ids = dismissed_finding_ids(m)
-
-    items = []
-    for idx, f in enumerate(report.get("findings", [])):
-        refs = f.get("scene_refs") or []
-        scene = refs[0] if refs else None
-        act = act_for_scene(acts, scene) if scene else None
-        items.append({
-            "index": idx,
-            "finding_id": compute_finding_id(f),
-            "category": f.get("category"),
-            "severity": f.get("severity"),
-            "issue": f.get("issue"),
-            "why_it_matters": f.get("why_it_matters"),
-            "scene_refs": refs,
-            "scene_heading": scene_heading.get(scene) if scene else None,
-            "act": act,
-            "act_name": (act_names.get(act) if act else "Script-level"),
-            "status": status_by_index.get(idx, "unknown"),
-            # §7: a row is a to-do over a real finding, so it carries that
-            # finding's own evidence and how the verifier scored it. The client
-            # renders both verbatim (escapeHtml at the sink, as everywhere).
-            "evidence_quote": f.get("evidence_quote"),
-            "verification": f.get("verification"),
-        })
-    items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
-
-    # Triage: dismissed findings are flagged (flag-don't-drop applies to the
-    # writer's own judgment too) but hidden unless explicitly asked for. A
-    # dismissal sticks by content-hash id (survives report regeneration);
-    # legacy (index, issue) entries keep working for old projects.
-    for it in items:
-        it["dismissed"] = (it["finding_id"] in dismissed_ids
-                           or (it["index"], (it["issue"] or "")) in dismissed_keys)
-    include_dismissed = request.args.get("include_dismissed") == "1"
-    visible = [i for i in items if include_dismissed or not i["dismissed"]]
-    # The writer's ledger flags for the client counting contract (N3): the
-    # dock's evidence lens reads these so totals agree with the fix queue.
-    return jsonify({"items": visible, "acts": acts,
-                    "dismissed_flags": [{"index": it["index"], "finding_id": it["finding_id"]}
-                                        for it in items if it["dismissed"]],
-                    "dismissed_count": len(items) - len(visible),
-                    "total_count": len(items)})
-
 
 @app.route("/api/projects/<name>/findings/<int(signed=True):index>/dismiss", methods=["POST"])
 def dismiss_finding_route(name, index):
