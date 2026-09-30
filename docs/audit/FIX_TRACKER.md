@@ -14,15 +14,23 @@ those dead pooled connections (close without RST); Windows evicts them instantly
 locally every run, L1b/L1c/L1d twice on CI on 2026-09-30, and the failure JSON naming the
 network-level banner text rather than the token string. Fix: a shared `_staleRecovery` in
 `app.js` (used by `_apiOnce` AND the SSE `streamChatTurn` path) treats the network-level
-TypeError as a second trigger — passive re-mint via `/` (itself tried twice, since the re-mint
-can hit the next poisoned socket), bounded to two rounds, with per-trigger retry safety:
+TypeError as a second trigger — a passive re-mint via `/` that DECAYS (every 250ms across a 2.5s
+wall-clock deadline, because the page can hold ~six corpse connections and
+Chromium needs ~2s to reap them; CI's own rerun showed the recovery firing
+but giving up before the pool cleared), with per-trigger retry safety:
 a below-HTTP death never sent anything, so the retry runs whenever the re-mint proves the
 server is up; a 403 was received and rejected, so it still requires the token to have moved.
 A truly unreachable studio now fails with a readable sentence instead of a raw `TypeError`.
 Pinned deterministically by the new `tests/e2e_browser_stale_socket_recovery.py` — 14 checks:
 one intercepted below-HTTP death must re-mint, retry and land silently; every attempt dying
 must surface the readable sentence, bounded, storing nothing. A real kill reproduces the
-poisoned socket only by luck, which is why a kill-based suite could never have pinned it.)
+poisoned socket only by luck, which is why a kill-based suite could never have pinned it.
+OUTCOME: commits `8bea3ea`+`689c3e1`+`024f93d` — session_breaks passed FIRST TRY on the
+pull_request event that flaked three times (23/23 in 9s), the new guard ran green in CI,
+and PR #2 went fully CLEAN across both events with no reruns. A second, unrelated latent
+flake surfaced and was fixed in `024f93d`: announce() lands banner text in the NEXT
+animation frame (UX-1), so suites reading #error-banner-text the instant the banner
+becomes visible can read "" — the harness now has banner_text(), which waits (bounded).)
 
 **Last updated:** 2026-09-21 (pass 14b — **a dropped connection was hiding a missing error
 message.** The analyze pre-flight sat OUTSIDE the handler's `try`, so a refused
