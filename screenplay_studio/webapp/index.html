@@ -149,7 +149,7 @@
       <div class="project-bar-right">
         <div id="room-toggle" class="room-toggle" role="tablist" aria-label="Rooms">
           <button id="room-cowrite-btn" class="room-toggle-btn active" role="tab" aria-selected="true" aria-controls="cowrite-panel" type="button">Co-write</button>
-          <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" aria-controls="feedback-panel" type="button">Feedback</button>
+          <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" aria-controls="room-drawer" type="button">Feedback</button>
         </div>
         <span id="room-chip" class="room-chip">Writer's Desk</span>
         <button id="palette-btn" class="palette-btn" title="Command palette (Ctrl+K)" type="button">⌘K</button>
@@ -179,6 +179,11 @@
             <span class="ap-stage">Starting…</span>
             <span class="ap-beat">…</span>
           </div>
+          <!-- Option A+: Re-parse re-homed here when the legacy panel header
+               retired — the desk toolbar is the analysis lifecycle's home, and
+               a destructive control losing its only visible surface is exactly
+               what e2e_browser_desk_controls pins. -->
+          <button id="reparse-btn" class="btn-secondary" type="button" title="Re-parse the source file with the current parser — fixes mis-parsed formatting, then Run Analysis again">↻ Re-parse</button>
           <span id="desk-analyze-status" class="desk-analyze-status" aria-live="polite"></span>
           <!-- finding chips: N open / N addressed — same summary the legacy
                toolbar showed, now on the live row (the dock's Evidence lens
@@ -396,6 +401,15 @@
           <div class="drawer-name" id="drawer-name">Sameer <small>co-writer — beside you</small></div>
           <button class="drawer-close" id="drawer-close" type="button" title="Dismiss the partner — the page stays">✕</button>
         </div>
+        <!-- Option A+: the conversation disclosure lives with the conversation
+             — the drawer serves the writer's desk AND the consultant's/idea
+             room, so one banner discloses the demo partner in whichever room
+             is lit (the legacy panel banner retired with the panel). -->
+        <div class="demo-banner" data-demo-banner hidden>
+          <b>Built-in stand-in model.</b> This report comes from the demo craft
+          model, not a real language model — the findings are canned, not a reading
+          of your pages. Connect your own llama-server and run the analysis again.
+        </div>
 
       <!-- Co-write room: the writer's desk -->
       <section id="cowrite-panel" class="room-panel" role="tabpanel" aria-labelledby="room-cowrite-btn">
@@ -420,44 +434,16 @@
       </section>
 
       <!-- Feedback room: the consultant's desk -->
-      <section id="feedback-panel" class="room-panel" role="tabpanel" aria-labelledby="room-feedback-btn" style="display:none;">
-        <!-- Sits OUTSIDE .feedback-header: that is a flex row, and a banner
-             inside it would become a flex item and shove the toolbar sideways. -->
-        <div class="demo-banner" data-demo-banner hidden>
-          <b>Built-in stand-in model.</b> This report comes from the demo craft
-          model, not a real language model — the findings are canned, not a reading
-          of your pages. Connect your own llama-server and run the analysis again.
-        </div>
-        <div class="feedback-header">
-          <div>
-            <div class="feedback-title">Dr. Sushruta's Report</div>
-            <div class="feedback-sub">A professional review, delivered.</div>
-          </div>
-          <label class="control-label">Report in
-            <select id="report-lang-select" title="Language of the analysis report">
-              <option value="eng">English</option>
-              <option value="tenglish">Tenglish</option>
-              <option value="hindi">Hindi</option>
-              <option value="telugu">Telugu</option>
-              <option value="tamil">Tamil</option>
-            </select>
-          </label>
-          <div id="analyze-progress" class="analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — the stage ladder opens on hover or focus">
-            <span class="ap-stage">Starting…</span>
-            <span class="ap-beat">…</span>
-          </div>
-          <a id="report-export-btn" class="btn-secondary report-export" style="display:none;" title="Download the full report as markdown" download>📥 Report</a>
-          <button id="analyze-btn" class="btn-secondary">Run Analysis</button>
-          <button id="reparse-btn" class="btn-secondary" title="Re-parse the source file with the current parser — fixes mis-parsed formatting, then Run Analysis again">↻ Re-parse</button>
-        </div>
-        <div id="feedback-tabs" class="feedback-tabs" style="display:none;">
-          <button id="tab-report-btn" class="active" type="button">Report</button>
-          <button id="tab-fixqueue-btn" type="button">Fix Queue</button>
-        </div>
-        <div id="feedback-report" class="feedback-pane" style="display:none;"></div>
-        <div id="feedback-fixqueue" class="feedback-pane" style="display:none;"></div>
-        <div id="feedback-empty" class="feedback-empty">No analysis yet — Run Analysis to get the consultant's report.</div>
-      </section>
+      <!-- Option A+ (audit 2026-09-30, Report 2 §4 move 2): the legacy
+           Report/Fix-Queue panel that used to live here (#feedback-panel and
+           its tabs, panes, language select, and header buttons) is retired —
+           it was a third surface projecting the same findings state as the
+           Evidence lens, reachable only by deep link. The Feedback room now
+           hosts the partner conversation and the drawer only; every findings
+           surface is the dock's Evidence lens (Tier 1 worklist / Tier 2
+           context). aria-controls on #room-feedback-btn now points at
+           #room-drawer, which is what the button actually opens. -->
+      <div id="feedback-panel" style="display:none;"></div>
       </div>
 
       <!-- the edge tabs — the only chrome on the right -->

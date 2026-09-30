@@ -1,6 +1,6 @@
 # API Route Map — Screenplay Studio Webapp
 
-> **Generated from source:** 2026-09-06. Authoritative source of truth:
+> **Generated from source:** 2026-09-30. Authoritative source of truth:
 > `screenplay_studio/webapp_server.py` (Flask, port 8500) and
 > `screenplay_studio/demo_model.py` (built-in demo craft model). Regenerate this
 > file after adding or changing any `@app.route` in those modules.
@@ -20,7 +20,9 @@
 - There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
   stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
 
-**Totals:** 84 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **86**.
+**Totals:** 91 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **93**.
+(Pinned by `tests/test_route_map_totals.py`; regenerate after adding or changing
+any `@app.route` — this map had drifted by +4 before the 2026-09-30 audit.)
 
 ---
 
@@ -64,6 +66,9 @@
 | GET | `/api/projects/<name>/characters` | `get_character_tracks` | Assemble per-character track (KG + report, no model). |
 | GET | `/api/projects/<name>/progress` | `get_progress` | Analysis progress / stage statuses. |
 | GET | `/api/projects/<name>/fixqueue` | `get_fixqueue` | Severity-sorted worklist (findings + dismissal + addressed state). |
+| GET | `/api/projects/<name>/findings/summary` | `get_findings_summary` | Counts by severity × category × status + dawn %, one call. |
+| GET | `/api/projects/<name>/findings` | `get_findings` | Queryable findings (`scene`/`status`/`severity`/`category`/`include_dismissed`; `group_by=issue-text` for display groups). |
+| POST | `/api/projects/<name>/findings/intent/batch` | `set_finding_intents_batch` | Batch writer intent marks (`{intents: {finding_id: intent}}`, 500 max). |
 | GET | `/api/projects/<name>/metrics` | `get_metrics` | Desk metrics summary. |
 | POST | `/api/projects/<name>/premise` | `save_project_premise` | Save/update the premise card (post-graduation). |
 | GET | `/api/projects/<name>/script` | `get_script` | Serve the working copy (ScriptDocument). |

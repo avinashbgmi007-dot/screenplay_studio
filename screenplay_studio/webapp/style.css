@@ -2468,8 +2468,13 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   line-height: 1.5;
-  color: var(--text);
-  background: var(--surface);
+  /* The banner OWNS its colors instead of borrowing the room's tokens: it
+     renders in the dock, the idea canvas, and the retired-panel's old home —
+     rooms that paint with their own palettes (idea-mode, dawn, tungsten), and
+     a disclosure that re-derives contrast per room is a disclosure that fails
+     one of them. A fixed dark-amber plate clears 4.5:1 on every ground. */
+  color: #f5e9d0;
+  background: rgba(43, 32, 19, 0.92);
   border: 1px solid var(--sev-mid);
   border-left-width: 3px;
   border-radius: var(--r-sm);
@@ -5693,6 +5698,49 @@ body.river-read #right-edge-affordance { display: none; }
 }
 /* the honest-empty notice is NOT a section — nothing to collapse */
 .dock-notice { margin-bottom: var(--sp-8); min-width: 0; }
+/* ---- Option A+ (audit 2026-09-30): the two-tier Evidence lens ----------
+   Tier 1 opens on the worklist; Tier 2 is the summoned Context. The switch
+   is the lens's first element — a labelled landmark, never a hover. */
+.dock-tier-switch {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+.dock-tier-btn {
+  flex: 1 1 0;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: var(--sp-2) var(--sp-4);
+  cursor: pointer;
+}
+.dock-tier-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.dock-tier-btn.on {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.dock-tier-btn:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 1px; }
+/* Tier 2 is a titled group, not a dock-section (its children are the real
+   sections and keep their own prefs) — one rhythm line above them. */
+.dock-context { min-width: 0; }
+.dock-context > .dock-section-title { margin-bottom: var(--sp-4); }
+/* display dedupe: the scene-count chip on a shared note (scene_refs is the
+   only field the grouped rows differ by — carry it, lose nothing) */
+.finding-note-scenes {
+  display: inline-block;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 var(--sp-3);
+}
 /* by-category groups inside the one "By category" section */
 .dock-cat-group + .dock-cat-group { margin-top: var(--sp-7); }
 .dock-section-count {

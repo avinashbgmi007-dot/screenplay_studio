@@ -26,11 +26,12 @@ Two things this suite deliberately does not pretend:
    that they STAY off the desk, so a half-reveal is a red suite rather than a
    control nobody re-checked. The keyboard round trip is driven by
    `e2e_browser_rewrite_loop.py`.
-2. **`#reparse-btn` is not on the writer's desk.** It is `visibility: hidden`
-   until `setRoom("feedback")` AND the room drawer are open (measured: 90x30
-   hidden in the cowrite room, 90x30 shown in the consultant's). Clicking a
-   hidden node is something Playwright allows and a writer does not, so the suite
-   reveals it the way the product does.
+2. **`#reparse-btn` now lives on the desk toolbar** (Option A+, audit
+   2026-09-30: the legacy panel header that hosted it retired). The desk
+   toolbar is auto-hiding chrome — `visibility` flips on hover, and the
+   toolbar's own `.revealed` class keeps it steady. The suite reveals it the
+   way the product does (the same reveal contract `phase8_lifecycle` pins for
+   Run Analysis), then drives the button through its own POST.
 
 Every destructive check reads the SERVER after the click, not just the page: the
 failure being hunted is a control that looks right and writes nothing (or writes
@@ -112,6 +113,32 @@ def wait_or_false(page, js, timeout):
         return True
     except Exception:  # noqa: BLE001 - the caller's check IS the report
         return False
+
+
+def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
+    """Move the mouse where a writer's would be, then poll until the control is
+    the hit target (auto-hiding chrome: opacity 0 + pointer-events none until a
+    top-edge mousemove brings it back). Returns True/False — never raises.
+    Copied from phase8_lifecycle's identical helper (that suite owns it; this
+    one needed the same contract for the re-homed Re-parse button)."""
+    import time
+    page.mouse.move(700, 8)
+    deadline = time.time() + timeout / 1000
+    hit = "missing"
+    while time.time() < deadline:
+        hit = page.evaluate(
+            """(sel) => {
+              const e = document.querySelector(sel);
+              if (!e) return 'missing';
+              const r = e.getBoundingClientRect();
+              const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+              if (!t) return 'none';
+              return (e === t || e.contains(t)) ? 'ok' : t.tagName + '#' + (t.id || '-');
+            }""", sel)
+        if hit == "ok":
+            return True
+        page.wait_for_timeout(100)
+    return False
 
 
 def api_get(base, path):
@@ -363,11 +390,13 @@ def main():
             os.remove(alt)
 
             # ---------- 5. Re-parse: destroys a finished analysis -------------
-            page.evaluate("() => { setRoom('feedback'); openRoomDrawer(); }")
-            page.wait_for_timeout(800)
+            # Option A+: the button is on the desk toolbar now (auto-hiding
+            # chrome). Reveal it the way the writer's mouse does, then reach in.
+            check("the desk toolbar offers Re-parse on screen",
+                  reveal_chrome(page, "#reparse-btn"))
             v = page.evaluate(VIS, "#reparse-btn")
-            check("the consultant's desk offers Re-parse on screen",
-                  v["onScreen"], json.dumps(v))
+            check("Re-parse is genuinely the hit target once revealed",
+                  v["present"] and v["onScreen"], json.dumps(v))
 
             if stages(base, project).get("analyze") != "complete":
                 requests.post(f"{base}/api/projects/{project}/analyze",
@@ -411,10 +440,15 @@ def main():
             check("and the writer's own edit was NOT swept up with the analysis",
                   len(keep["edits"]) == 1 and "KEEPME" in json.dumps(keep["edits"]),
                   f"{len(keep['edits'])} edits")
-            desk = page.evaluate(VIS, "#analyze-btn")
+            # Phase 8: the desk button is the lifecycle's home (the legacy
+            # #analyze-btn retired with the panel). After a re-parse the desk
+            # re-arms so the writer is not stuck.
             check("the desk re-arms Run Analysis so the writer is not stuck",
-                  desk["onScreen"] and not desk["disabled"], json.dumps(desk))
-            label = page.evaluate("() => document.querySelector('#analyze-btn').textContent.trim()")
+                  reveal_chrome(page, "#desk-analyze-btn"))
+            desk = page.evaluate(VIS, "#desk-analyze-btn")
+            check("...and the re-armed button is genuinely clickable",
+                  desk.get("present") and desk["onScreen"] and not desk["disabled"], json.dumps(desk))
+            label = page.evaluate("() => document.querySelector('#desk-analyze-btn').textContent.trim()")
             check("...and it reads Run Analysis, not Re-run, since there is nothing to re-run",
                   "Run Analysis" in label, label[:40])
 

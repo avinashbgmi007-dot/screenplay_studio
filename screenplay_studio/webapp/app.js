@@ -46,6 +46,7 @@ const state = {
   editsData: null,        // { edits, findings_status } from /edits
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
+  findingsSummary: null,  // server-joined counts + dawn % from /findings/summary (ONE findings-state load)
   reportStats: null,      // stats from report.findings.json
   // spec §15.3: { findings, errors, ok } — the two deterministic rule passes
   // re-run on the CURRENT text after an edit. Deliberately not `findings`:
@@ -273,6 +274,21 @@ function announceReply(res) {
 }
 
 // ---- finding triage: reload just the fix queue ----
+/** Re-pull the server-joined findings summary (Report 2 §6 API 1).
+ *  Loaded once per script load and refreshed after every finding-affecting
+ *  mutation, so `state.findingsSummary` stays the warm mirror of the queue —
+ *  the store the two-tier lens renders from when the full lists have not
+ *  landed yet, and the number an API consumer (or a future Tier-1 chip)
+ *  reads without re-deriving counts across three payloads. The LIVE surfaces
+ *  (queue header, dawn meter) keep their own one-counter contract (N3): the
+ *  summary never overrides a number the writer just moved. */
+async function refreshFindingsSummary() {
+  if (!state.currentProject) return;
+  try {
+    state.findingsSummary = await api(`/projects/${encodeURIComponent(state.currentProject)}/findings/summary`);
+  } catch (_) { /* no analysis yet */ }
+}
+
 async function reloadFixQueue() {
   try {
     state.fixQueue = await api(`/projects/${encodeURIComponent(state.currentProject)}/fixqueue${state.fixQueueShowDismissed ? "?include_dismissed=1" : ""}`);
@@ -314,7 +330,6 @@ async function retryFailedCategories(anchor) {
     await loadProjects();
     await loadScriptData();
     renderManuscript(document.getElementById('manuscript-container'));
-    loadFeedbackPanels();
     refreshMetrics();
   } catch (e) {
     showError("Retry failed: " + e.message, true);
@@ -2157,7 +2172,13 @@ async function openViewByName(view, scene) {
   else if (view === "compare") await openCompareView();
   else if (view === "revision") await openRevisionView();
   else if (view === "premise") await openPremiseView();
-  else if (view === "feedback") { await openFeedbackRoom(); pagesOnScreen = true; }
+  else if (view === "feedback") {
+    // Option A+ (Report 2 §4 move 2): the deep-link-only legacy panel is
+    // retired — the link redirects to the desk + the Evidence lens, which has
+    // carried the same report/queue data since the route fold (1A).
+    if (state.currentProject) { await openFeedbackView(); }
+    else { await openFeedbackRoom(); pagesOnScreen = true; }
+  }
   else { await openScriptView(); pagesOnScreen = true; }   // default: the writing desk
   // A scene anchor only means something where the pages are actually on screen,
   // and a hand-typed `#/p/revision/nonsense` must not raise "Scene NaN isn't in
@@ -2303,9 +2324,7 @@ async function openProject(name) {
     $("#project-title").textContent = project.title;
     $("#project-title").title = project.title;
 
-    $("#analyze-btn").textContent = project.stages.analyze === "complete" ? "Re-run Analysis" : "Run Analysis";
-    $("#analyze-btn").disabled = project.stages.parse !== "complete";
-    refreshDeskToolbar(); // Phase 8: the desk toolbar mirrors the lifecycle
+    refreshDeskToolbar(); // Phase 8: the desk toolbar owns the analysis lifecycle
 
     // a previous analysis may still be running (e.g. the page was reloaded
     // mid-analysis, or a background run is in flight) — resume the live
@@ -2313,10 +2332,6 @@ async function openProject(name) {
     if (project.stages.analyze === "running") {
       startAnalysisProgressUI(Date.now());
     }
-
-    // report language follows the project; defaults to English
-    const langSel = $("#report-lang-select");
-    if (langSel) langSel.value = project.report_language || "eng";
 
     if (project.stages.analyze === "failed" && project.errors && project.errors.analyze) {
       showError("Last analysis attempt failed: " + project.errors.analyze, true);
@@ -2457,7 +2472,8 @@ function setRoom(room) {
   cowriteBtnEl.setAttribute("aria-selected", room === "cowrite" ? "true" : "false");
   feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
   $("#cowrite-panel").style.display = room === "cowrite" ? "flex" : "none";
-  $("#feedback-panel").style.display = room === "feedback" ? "flex" : "none";
+  // (the legacy #feedback-panel is an empty retired marker div — Option A+;
+  // the Feedback room's conversation lives in #room-drawer + the dock lenses)
   // the composer speaks in the active partner's voice: Sameer at the writing
   // desk, the doctor at the consultant's desk
   const inputEl = $("#input");
@@ -2497,7 +2513,6 @@ function openFeedbackRoom() {
   if (state.view === "feedback") { openRoomDrawer(); return; }
   setRoom("feedback");
   if (state.inIdea) { renderMessages(); openRoomDrawer(); return; }  // unreachable — kept for safety
-  if (typeof loadFeedbackPanels === "function") loadFeedbackPanels();  // defined in Task 10
   openRoomDrawer();
 }
 
@@ -2607,14 +2622,9 @@ function renderStageLadder(container, currentKey, startedTs, timeoutSeconds) {
 
 function startAnalysisProgressUI(startedAt) {
   if (analysisUi) analysisUi.stop();
-  const btn = $("#analyze-btn");
-  const chip = $("#analyze-progress");
-  const deskBtn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs
-  const deskChip = $("#desk-analyze-progress"); // the same lifecycle in parallel
-  btn.disabled = true;
-  btn.classList.add("analyzing");
-  chip.style.display = "flex";
-  if (deskBtn) { deskBtn.disabled = true; deskBtn.classList.add("analyzing"); deskBtn.textContent = "Analyzing…"; }
+  const btn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs the lifecycle
+  const deskChip = $("#desk-analyze-progress");
+  if (btn) { btn.disabled = true; btn.classList.add("analyzing"); }
   if (deskChip) deskChip.style.display = "flex";
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   const timeoutSeconds = (state.config && state.config.timeout) || 600;
@@ -2638,7 +2648,7 @@ function startAnalysisProgressUI(startedAt) {
       ? `⚠ ${stage.label} reported a problem — the rest of the run continues`
       : stage.caption;
     const beat = stageElapsedText(since, Date.now(), timeoutSeconds);
-    for (const host of [chip, deskChip]) {
+    for (const host of [deskChip]) {
       if (!host) continue;
       host.querySelector(".ap-stage").textContent = line;
       host.querySelector(".ap-beat").textContent = beat;
@@ -2653,8 +2663,7 @@ function startAnalysisProgressUI(startedAt) {
       }
     }
     ladderFor = currentKey;
-    btn.textContent = `Analyzing — ${stage.label}`;
-    if (deskBtn) deskBtn.textContent = "Analyzing…";
+    if (btn) btn.textContent = `Analyzing — ${stage.label}`;
   };
 
   const timer = setInterval(refresh, 1000);
@@ -2710,14 +2719,10 @@ function startAnalysisProgressUI(startedAt) {
 }
 
 function hideAnalysisProgressUI() {
-  const chip = $("#analyze-progress");
-  if (chip) chip.style.display = "none";
   const deskChip = $("#desk-analyze-progress");
   if (deskChip) deskChip.style.display = "none";
-  const btn = $("#analyze-btn");
+  const btn = $("#desk-analyze-btn");
   if (btn) { btn.disabled = false; btn.classList.remove("analyzing"); }
-  const deskBtn = $("#desk-analyze-btn");
-  if (deskBtn) { deskBtn.disabled = false; deskBtn.classList.remove("analyzing"); }
 }
 
 // ---------- Phase 8: the desk toolbar — analysis lifecycle beside the page ----------
@@ -2801,14 +2806,13 @@ function refreshDeskToolbar() {
 
 async function runAnalysis() {
   if (analysisUi) return; // already running — one lifecycle at a time
-  const btn = $("#analyze-btn");
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   const startedAt = Date.now();
 
   // fire the (blocking) analyze request, and show live stage progress in
   // parallel. force: true so "Re-run Analysis" genuinely re-runs (the
   // orchestrator would otherwise short-circuit on an already-complete stage).
-  const reportLanguage = ($("#report-lang-select") || {}).value || "eng";
+  const reportLanguage = "eng"; // the legacy language select retired with the panel; the API default stands
   const analyzePromise = api(`${base}/analyze`, { method: "POST", body: JSON.stringify({ force: true, report_language: reportLanguage }) });
   startAnalysisProgressUI(startedAt);
 
@@ -2816,19 +2820,16 @@ async function runAnalysis() {
     await analyzePromise;
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
-    btn.textContent = "Re-run Analysis";
     appendSystemNote("Analysis complete. The report is now grounding this conversation.");
     await loadProjects();  // refreshDeskToolbar rides inside the project open path
     // script pane is shared — refresh it in either room after analysis
     await loadScriptData();
     renderManuscript(document.getElementById('manuscript-container'));
-    if (state.view === "feedback") loadFeedbackPanels();
     refreshMetrics();
     refreshDeskToolbar(); // Phase 8: complete state on the desk
   } catch (e) {
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
-    btn.textContent = "Run Analysis";
     showError("Analysis failed: " + e.message, true);
     appendSystemNote("Analysis failed: " + e.message, true);
     await loadProjects(); // stage state changed — sync the desk honestly
@@ -2841,26 +2842,19 @@ async function reparseProject() {
   // the fix for a mis-parsed script — formatting/classification errors show
   // up in the pane and poison the report, so re-parsing then re-running
   // analysis regenerates everything from a clean parse.
-  const btn = $("#reparse-btn");
   const project = state.currentProject;
   if (!project) return;
   if (!confirm(`Re-parse "${project}" from its source file?\n\nThe script is re-parsed with the current parser and the analysis is reset — Run Analysis again to regenerate the report and fix queue.`)) return;
-  btn.disabled = true;
   try {
     await api(`/projects/${encodeURIComponent(project)}/reparse`, { method: "POST" });
     appendSystemNote("Script re-parsed. The analysis was reset — Run Analysis to regenerate the report from the fresh parse.");
     await loadProjects();
     await loadScriptData();
     renderManuscript(document.getElementById('manuscript-container'));
-    const ab = $("#analyze-btn");
-    if (ab) { ab.textContent = "Run Analysis"; ab.disabled = false; }
-    if (state.view === "feedback") loadFeedbackPanels();
     refreshMetrics();
   } catch (e) {
     showError("Re-parse failed: " + e.message, true);
     appendSystemNote("Re-parse failed: " + e.message, true);
-  } finally {
-    btn.disabled = false;
   }
 }
 
@@ -4111,12 +4105,26 @@ async function loadScriptData() {
   } catch (_) {
     state.fixQueue = { items: [], acts: [] };
   }
+  // ONE findings-state load (Report 2 §4 move 2): the server-joined summary
+  // (counts × severity/category/status + dawn %) rides the same load as the
+  // report and the queue — one fetch replaces three payloads re-counted
+  // client-side, and every counter surface reads the same numbers.
+  let summary = null;
+  try {
+    summary = await api(`${base}/findings/summary`);
+  } catch (_) { /* no analysis yet — same state the report fetch tolerates */ }
   if (arrived && findings.length) scheduleArrivalPeek();
   renderDraftBar();
   await renderDiffBanner();
   // the second wave of awaits is long enough for the writer to have switched
   // projects — same rule as above: a load may only publish the project it is for
   if (state.currentProject !== target) return;
+  state.findingsSummary = summary;
+  // The report's takeable-away affordance follows the report's own arrival —
+  // paint it here, where state.report is fresh, not only on the next
+  // manuscript re-render (the retired report pane used to re-paint it as a
+  // side effect; now the data-driven moment owns it).
+  paintReportExport();
   // The desk status line reads state.findings, which this function just set.
   // At project-open the toolbar refresh runs BEFORE this async load resolves, so
   // without this re-render a 36-finding desk read "a clean bill" forever (audit
@@ -4194,8 +4202,7 @@ function renderFixQueuePanel(container) {
     toggleBtn.addEventListener("click", async () => {
       state.fixQueueShowDismissed = !show;
       await reloadFixQueue();
-      if (state.view === "feedback") loadFeedbackPanels();
-      else     renderManuscript(document.getElementById('manuscript-container'));
+      renderManuscript(document.getElementById('manuscript-container'));
     });
     head.appendChild(toggleBtn);
   }
@@ -4841,6 +4848,26 @@ function findingNoteEl(f, index, opts = {}) {
   top.appendChild(stateEl);
   note.appendChild(top);
   note.appendChild(el("span", "finding-note-text", f.issue));
+
+  // Display dedupe (Report 2 §4 move 3): several report rows can carry the
+  // byte-identical issue text — one note repeated per scene (the audit measured
+  // the demo report saying the same sentence on scenes 1 and 4, the only field
+  // differing being scene_refs). Collapse them for the READER: one card, and a
+  // scene-count chip carrying exactly the field that differed. Underlying rows
+  // and their per-scene marks stay whole — rung 20's no-information-loss rule,
+  // honored at the display layer.
+  const twins = (state.findings || []).filter((g, gi) =>
+    g && g.issue === f.issue && gi !== index);
+  if (twins.length) {
+    const scenes = [...new Set([
+      ...((f.scene_refs || []).map((n) => "S" + n)),
+      ...twins.flatMap((g) => (g.scene_refs || []).map((n) => "S" + n)),
+    ])];
+    const chip = el("span", "finding-note-scenes",
+      scenes.length ? scenes.join(", ") : `${twins.length + 1}× same note`);
+    chip.title = `${twins.length + 1} findings share this note. Every row and mark stays in the report — these are the scenes it points at.`;
+    note.appendChild(chip);
+  }
 
   // evidence-deep (opt-in): diagnosis + verified quote + trust badge — the
   // card answers WHY the doctor says it and WHERE it was verified. Dock lens
@@ -6003,10 +6030,164 @@ function renderDockEvidence() {
     return;
   }
 
+  // the tier switch (Report 2 §5 a11y): a labelled landmark toggle, never a
+  // hover — the summon is keyboard-reachable and visible on first paint.
+  lens.appendChild(buildTierSwitch());
+
+  const tier = evidenceTier();
+
+  // ---- Option A+ (audit 2026-09-30, Report 2 §4): two tiers, one lens ------
+  // Tier 1 is the worklist — arrival strip, ONE filter row, fix queue, scene
+  // strip. Tier 2 is the Context DISCLOSURE AT THE LENS FOOT (§4: "a single
+  // 'Context' disclosure at the lens foot") — one collapsed section holding
+  // the context half of the old stack. Both live in the DOM: the collapsed
+  // context is a single header row to scroll past, and every inner section
+  // keeps its own key (and its own stored open/closed preference). The
+  // measured clutter mechanism (~12 stacked sections, Report 2 §2.1) becomes
+  // sections-before-first-action ≤ 1.
+  renderTier1Worklist(lens);
+  lens.appendChild(buildContextSection());
+
+  // any lens rebuild mid-loop (filter toggle, intent change) wiped the
+  // transient bar + card state — re-dock it here (idempotent when inactive)
+  renderLoopBar();
+}
+
+/** Which tier the lens opens on (Report 2 §4): 1 = the worklist (default),
+ *  2 = the Context summoned. The writer's choice is a per-project preference. */
+function evidenceTier() {
+  return loadPrefs()["evidence_tier_" + (state.currentProject || "")] === 2 ? 2 : 1;
+}
+
+/** Summon a tier (Report 2 §5 — a labelled landmark toggle, not a hover).
+ *  Both tiers share one DOM, so summoning is a gesture, not a re-render:
+ *  Tier 2 expands the Context disclosure at the lens foot and walks the eye
+ *  down to it; Tier 1 walks the eye back up to the worklist (nothing is
+ *  collapsed — the writer's disclosure choice is a preference). The scroll
+ *  targets the section's actual scrollable ancestor: the lens itself doesn't
+ *  scroll (the dock body does), and a bare scrollIntoView scrolls the PAGE
+ *  under the fixed dock — moving everything except what the writer reads. */
+function setEvidenceTier(tier) {
+  const lens = document.querySelector('.dock-lens[data-lens="evidence"]');
+  if (lens) {
+    const ctx = lens.querySelector('.dock-section[data-key="context"]');
+    if (tier === 2 && ctx) {
+      if (ctx.dataset.open !== "true") setDockSectionOpen(ctx, true);
+      // The expansion is a 0.18s grid-rows transition (dockSection's CSS);
+      // measuring before it settles reads the collapsed rect and scrolls to a
+      // stale target. Wait out the transition, then bring the disclosure to
+      // the top of whichever ancestor actually scrolls. Direct scrollTop
+      // assignment, not scrollTo({smooth}): the dock body is a grid box, and
+      // Chromium silently no-ops a smooth scrollTo on it (verified live) — a
+      // summon that scrolls nothing is a summon that does nothing.
+      setTimeout(() => {
+        let scroller = ctx.parentElement;
+        while (scroller && scroller.scrollHeight <= scroller.clientHeight + 2) {
+          scroller = scroller.parentElement;
+        }
+        if (!scroller) return;
+        const sr = scroller.getBoundingClientRect();
+        const cr = ctx.getBoundingClientRect();
+        scroller.scrollTop = scroller.scrollTop + cr.top - sr.top;
+      }, 260);
+    } else {
+      let scroller = lens.parentElement;
+      while (scroller && scroller.scrollHeight <= scroller.clientHeight + 2) {
+        scroller = scroller.parentElement;
+      }
+      if (scroller) scroller.scrollTop = 0;
+    }
+  }
+  // the pressed state moves NOW, in place — a re-render would reset the
+  // scroll this gesture just made (visual-verified defect, 2026-09-30)
+  document.querySelectorAll(".dock-tier-btn").forEach((b, i) => {
+    const on = (i === 0) === (tier === 1);
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  savePrefs({ ["evidence_tier_" + (state.currentProject || "")]: tier === 2 ? 2 : 1 });
+}
+
+/** The Tier 1 ↔ Tier 2 switch: two labelled buttons, aria-pressed carrying
+ *  the state (Report 2 §5 — a labelled landmark toggle, not a hover). It is
+ *  the FIRST element in the lens, so keyboard users land on the worklist and
+ *  can summon Context without scrolling. */
+function buildTierSwitch() {
+  const tier = evidenceTier();
+  const sw = el("div", "dock-tier-switch");
+  sw.setAttribute("role", "group");
+  sw.setAttribute("aria-label", "Evidence lens tier — the worklist or the context behind it");
+  const mk = (label, target, title) => {
+    const b = el("button", "dock-tier-btn" + (tier === target ? " on" : ""), label);
+    b.type = "button";
+    b.setAttribute("aria-pressed", tier === target ? "true" : "false");
+    b.title = title;
+    b.addEventListener("click", () => setEvidenceTier(target));
+    return b;
+  };
+  sw.appendChild(mk("Worklist", 1, "The to-do: arrival, filters, fix queue, this scene"));
+  sw.appendChild(mk("Context", 2, "Everything orienting — coverage, strengths, mass, craft, provenance"));
+  return sw;
+}
+
+/** Tier 1 — the worklist the lens opens on (Report 2 §4 move 1). `lens` is the
+ *  evidence lens element. The queue leads; the scene strip is a slim header
+ *  under it, because the queue already answers per-scene via Locate. */
+function renderTier1Worklist(lens) {
   // -- 0b. the arrival strip (R4): the "finally" — scorekeeping + trust +
   // inline retry + ghosted marks, at the top of the board where arrival lands.
   const arrival = buildArrivalStrip();
   if (arrival) lens.appendChild(arrival);
+
+  // -- 0a. the ONE filter row (R5-b + R8): severity toggles drive ink,
+  // board list, loop and counts together; category chips count and filter —
+  // tap = filtered view, NO regrouping. The loop button engages the
+  // keyboard fix loop (R2-b); N/↓ step findings until Esc.
+  const filterRow = buildFindingFilterRow();
+  const loopBtn = el("button", "fchip fchip-loop");
+  loopBtn.type = "button";
+  loopBtn.textContent = "\u21C9 fix loop";
+  loopBtn.title = "Keyboard fix loop: N/\u2193 next finding \u00B7 P/\u2191 previous \u00B7 mark, park, discuss, copy \u00B7 Esc to leave";
+  loopBtn.addEventListener("click", () => startLoop());
+  filterRow.appendChild(loopBtn);
+  lens.appendChild(filterRow);
+
+  // -- 1. current-scene strip (What is wrong HERE? Where?) ----------------
+  // Stays Tier 1 (Report 2 §4 move 1), ABOVE the queue: it is the worklist's
+  // slim header, and its severity dots are pinned on-screen at the desk by the
+  // readiness gate's contrast sweep — below an open queue they fell off the
+  // measured viewport, exactly the regression class the gate exists to catch.
+  const sceneBox = el("div", "dock-evidence-scene");
+  renderDockEvidenceSceneBox(sceneBox);
+  lens.appendChild(sceneBox);
+  dockEvidenceCurrentScene = currentManuscriptScene();
+  refreshDockRulerMarker();
+
+  // -- 2. Fix Queue (What should I do next?) -------------------------------
+  // The queue is the doctor's ordered to-do, so it is the ONE section that opens
+  // on its own: P1.6 collapsed everything, and the writer landed on a ledger of
+  // eleven closed headers with the answer hidden behind a click on the header.
+  // A writer who closes it once stays closed — `dockSectionIsOpen` honours the
+  // stored preference over this default.
+  // addPanel() appends the .craft-panel straight into this section div.
+  const fqWrap = el("div", "dock-section-fixqueue");
+  renderFixQueuePanel(fqWrap); // existing function, reused verbatim
+  if (fqWrap.children.length) {
+    lens.appendChild(dockSection("fix-queue", "Fix queue", fqWrap,
+                                 { defaultOpen: true }));
+  }
+}
+
+/** Tier 2 — the Context DISCLOSURE at the lens foot (Report 2 §4 move 1).
+ *  ONE collapsible section holding the context half of the old stack: pass
+ *  arc, strengths, provenance (model line + failure banner beside what they
+ *  explain), script mass + ruler, finding cards, coverage, setup/payoff,
+ *  formatting, live check, craft panels. It reuses the dock-section collapse
+ *  (key "context", default closed, preference-persisted), so a closed body
+ *  leaves the a11y and hit-test trees exactly like every other ledger
+ *  section; its inner sections keep their own keys and prefs. */
+function buildContextSection() {
+  const lens = el("div", "dock-context");
 
   // -- 0b2. the revision arc (spec 15.4): one line, under the strip that only
   // remembers the last two passes.
@@ -6027,44 +6208,10 @@ function renderDockEvidence() {
   const modelLine = buildReportModelLine();
   if (modelLine) lens.appendChild(modelLine);
 
-  // -- 0a. the ONE filter row (R5-b + R8): severity toggles drive ink,
-  // board list, loop and counts together; category chips count and filter —
-  // tap = filtered view, NO regrouping. The loop button engages the
-  // keyboard fix loop (R2-b); N/↓ step findings until Esc.
-  const filterRow = buildFindingFilterRow();
-  const loopBtn = el("button", "fchip fchip-loop");
-  loopBtn.type = "button";
-  loopBtn.textContent = "\u21C9 fix loop";
-  loopBtn.title = "Keyboard fix loop: N/\u2193 next finding \u00B7 P/\u2191 previous \u00B7 mark, park, discuss, copy \u00B7 Esc to leave";
-  loopBtn.addEventListener("click", () => startLoop());
-  filterRow.appendChild(loopBtn);
-  lens.appendChild(filterRow);
-
   // -- 0. script mass strip + ruler (orientation) ---------------------------
   const strip = buildScriptMassStrip();
   if (strip.children.length) lens.appendChild(strip);
   lens.appendChild(buildScriptRuler());
-
-  // -- 1. current-scene strip (What is wrong HERE? Where?) ----------------
-  const sceneBox = el("div", "dock-evidence-scene");
-  renderDockEvidenceSceneBox(sceneBox);
-  lens.appendChild(sceneBox);
-  dockEvidenceCurrentScene = currentManuscriptScene();
-  refreshDockRulerMarker();
-
-  // -- 2. Fix Queue (What should I do next?) -------------------------------
-  // The queue is the doctor's ordered to-do, so it is the ONE section that opens
-  // on its own: P1.6 collapsed everything, and the writer landed on a ledger of
-  // eleven closed headers with the answer hidden behind a click on the header.
-  // A writer who closes it once stays closed — `dockSectionIsOpen` honours the
-  // stored preference over this default.
-  // addPanel() appends the .craft-panel straight into this section div.
-  const fqWrap = el("div", "dock-section-fixqueue");
-  renderFixQueuePanel(fqWrap); // existing function, reused verbatim
-  if (fqWrap.children.length) {
-    lens.appendChild(dockSection("fix-queue", "Fix queue", fqWrap,
-                                 { defaultOpen: true }));
-  }
 
   // -- 3. findings on the current scene (Where, precisely) -----------------
   const data = prepareManuscriptData(); // the single source of truth
@@ -6276,9 +6423,7 @@ function renderDockEvidence() {
   }
   if (craftWrap.children.length) lens.appendChild(craftWrap);
 
-  // any lens rebuild mid-loop (filter toggle, intent change) wiped the
-  // transient bar + card state — re-dock it here (idempotent when inactive)
-  renderLoopBar();
+  return dockSection("context", "Context", lens);
 }
 
 // ---------- evidence orientation helpers (mass strip / script ruler / sp spine) ----------
@@ -7226,14 +7371,10 @@ function refreshDockEvidence() {
 function refreshAllFindingSurfaces() {
   refreshDockEvidence(); // no-op unless the dock is open on the Evidence lens
   renderManuscript();    // ink + #finding-summary chips + craft shelf (P1.10: no queue)
-  // the queue's other homes — re-rendered through the SAME renderer, never a
-  // forked path; skipped when the container was never mounted (the tab's
-  // self-heal renders it on first open instead)
-  const fq = $("#feedback-fixqueue");
-  if (fq && fq.children.length) {
-    fq.innerHTML = "";
-    renderFixQueuePanel(fq);
-  }
+  refreshFindingsSummary(); // keep the server-joined store warm (fire-and-forget)
+  // the queue's OTHER home — the Revision view's findings column — re-renders
+  // through the same ledger data (the legacy Fix-Queue tab is retired with the
+  // panel; the Evidence lens is the queue's only other renderer now)
   if (state.view === "revision" && $("#revision-findings")) renderRevisionView();
   updateDawnMeter();
   refreshMetrics();
@@ -7407,121 +7548,29 @@ function maybeShowWelcome() {
   }
 }
 
+/** Retired with the legacy Report/Fix-Queue panel (Option A+, Report 2 §4
+ *  move 2): the panel was a third surface projecting the same findings state
+ *  as the Evidence lens, reachable only by deep link — unverified surface
+ *  area, and the historical source of the ONE-filter/ONE-counter drift the
+ *  N3/R5-b contracts keep patching. Callers redirect to the desk + Evidence
+ *  lens, which has carried the same data since the route fold (1A). Kept as a
+ *  named shim so external callers (and bookmarks of old call sites) land
+ *  somewhere intentional instead of on a TypeError. */
 async function loadFeedbackPanels() {
-  // NOTE: no leading /api here — the api() wrapper already prefixes API = "/api";
-  // a doubled prefix 404s and the room shows "No analysis yet" after a good run
-  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
-  try {
-    if (!state.report) state.report = await api(`${base}/report`);
-  } catch (_) { /* no analysis yet */ }
-  try {
-    if (!state.fixQueue) state.fixQueue = await api(`${base}/fixqueue`);
-  } catch (_) { /* no analysis yet */ }
-  // P2.16: the one-click rerun for a partial report lives in the ledger's failure
-  // banner (buildFailureBanner), not in a header button beside it.
-  const hasReport = !!(state.report && (state.report.findings || state.report.coverage));
-  const empty = $("#feedback-empty");
-  const tabs = $("#feedback-tabs");
-  if (empty) empty.style.display = hasReport ? "none" : "block";
-  if (tabs) tabs.style.display = hasReport ? "flex" : "none";
-  if (hasReport) {
-    renderReportPanel();
-    const fq = $("#feedback-fixqueue");
-    if (fq) {
-      fq.innerHTML = "";
-      renderFixQueuePanel(fq);   // existing function, reused verbatim
-    }
-    switchFeedbackTab("report");  // show the Report pane (both panes start hidden)
+  if (state.currentProject && typeof openFeedbackView === "function") {
+    await openFeedbackView();
+    return;
   }
+  await loadScriptData();
 }
 
-function switchFeedbackTab(tab) {
-  const reportBtn = $("#tab-report-btn");
-  const fqBtn = $("#tab-fixqueue-btn");
-  const report = $("#feedback-report");
-  const fq = $("#feedback-fixqueue");
-  if (reportBtn) reportBtn.classList.toggle("active", tab === "report");
-  if (fqBtn) fqBtn.classList.toggle("active", tab === "fixqueue");
-  if (report) report.style.display = tab === "report" ? "block" : "none";
-  if (fq) fq.style.display = tab === "fixqueue" ? "block" : "none";
-  // self-heal: a tab should never show a blank pane — if the target is empty
-  // but data exists in memory, render it now (e.g. a render was skipped when
-  // the room opened before the report fetch landed)
-  if (tab === "fixqueue" && fq && !fq.children.length && state.fixQueue) {
-    renderFixQueuePanel(fq);
-  }
-}
+// (switchFeedbackTab retired with the legacy Report/Fix-Queue tabs —
+// Option A+, Report 2 §4 move 2: one findings state, one lens)
 
-function renderReportPanel() {
-  const c = $("#feedback-report");
-  if (!c) return;
-  // the doctor's report is the writer's document — let them take it away
-  paintReportExport();
-  c.innerHTML = "";
-  const cov = state.report && state.report.coverage;
-  if (cov) {
-    const card = el("div", "craft-panel");
-    const head = el("div", "craft-panel-head");
-    head.appendChild(el("span", "craft-panel-title", `Coverage — ${(cov.recommendation || "").toUpperCase()}`));
-    card.appendChild(head);
-    if (cov.logline) card.appendChild(el("p", "", `Logline: ${cov.logline}`));
-    if (cov.one_page_synopsis) card.appendChild(el("p", "", cov.one_page_synopsis));
-    (cov.weaknesses || []).forEach((w) => card.appendChild(el("p", "fix-row-why", `• ${w}`)));
-    c.appendChild(card);
-  }
-  // Setup / Payoff — the end-of-pipeline whole-script audit (paid / dangling /
-  // abandoned / red herring). Rendered as its own card above the findings.
-  const sp = state.report && state.report.setup_payoff;
-  if (sp && sp.length) {
-    const spCard = el("div", "craft-panel");
-    const spHead = el("div", "craft-panel-head");
-    spHead.appendChild(el("span", "craft-panel-title", "Setup / Payoff"));
-    spCard.appendChild(spHead);
-    sp.forEach((e) => {
-      const setScenes = (e.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
-      const payScenes = (e.payoff_scenes && e.payoff_scenes.length) ? e.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
-      const row = el("p", "fix-row-issue", `[${SP_STATUS[e.status] || e.status}] ${e.setup} — set up in ${setScenes}, payoff: ${payScenes}`);
-      if (e.note) row.appendChild(el("p", "fix-row-why", e.note));
-      spCard.appendChild(row);
-    });
-    c.appendChild(spCard);
-  }
+// (renderReportPanel retired with the legacy Report pane: the Evidence lens
+// carries the same coverage / setup-payoff / dials / mirror / category data,
+// with the deep cards and the ONE filter that pane never had)
 
-  // P1.10: the per-scene pace chart used to be drawn a SECOND time here under
-  // the same "Pacing" title as the shelf's words-per-page chart, with different
-  // data. Both metrics now live in renderPacingPanel: one panel, two blocks.
-
-  // Character dials -- the ONE shared panel (re-homed out of the dead
-  // #struct-rail by the 2026-09-19 gaps pass; it used to render only here
-  // and in the rail, so the live desk had none).
-  renderCharacterDialsPanel(c);
-
-  // Writer's Mirror — how the premise lands in one sentence + how each
-  // character reads to a stranger. Same panel as the craft shelf, reused
-  // verbatim so the doctor's desk carries the whole analysis.
-  renderWriterMirrorPanel(c);
-
-  const byCat = {};
-  (state.report.findings || []).forEach((f) => { (byCat[f.category] = byCat[f.category] || []).push(f); });
-  for (const [cat, list] of Object.entries(byCat)) {
-    const card = el("div", "craft-panel");
-    const head = el("div", "craft-panel-head");
-    head.appendChild(el("span", "craft-panel-title", CATEGORY_LABELS[cat] || cat));
-    card.appendChild(head);
-    list.forEach((f) => {
-      const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "General";
-      const issue = el("p", "fix-row-issue", `[${(f.severity || "low").toUpperCase()}] ${refs}: ${f.issue}`);
-      if (f.why_it_matters) issue.appendChild(el("p", "fix-row-why", f.why_it_matters));
-      const rowBtns = el("span", "fix-row-locate", "🎯 Locate");
-      rowBtns.title = "Jump to the exact line in the script";
-      rowBtns.style.cursor = "pointer";
-      rowBtns.addEventListener("click", () => locateFinding(f));
-      issue.appendChild(rowBtns);
-      card.appendChild(issue);
-    });
-    c.appendChild(card);
-  }
-}
 
 // ---- compare (side-by-side drafts) ----
 
@@ -9549,9 +9598,11 @@ function init() {
   const routeScrollPane = getManuscriptContainer();
   if (routeScrollPane) routeScrollPane.addEventListener("scroll", scheduleRouteSync, { passive: true });
 
-  $("#analyze-btn").addEventListener("click", runAnalysis);
-  $("#reparse-btn").addEventListener("click", reparseProject);
   // Phase 8: the desk toolbar — same lifecycle actions beside the page. The
+  // re-homed Re-parse rides it too (its old home was the retired panel header).
+  const reparseBtn = $("#reparse-btn");
+  if (reparseBtn) reparseBtn.addEventListener("click", reparseProject);
+  // The
   // partial-report rerun is NOT here: it is the ledger banner's job (P2.16).
   const deskAnalyzeBtn = $("#desk-analyze-btn");
   if (deskAnalyzeBtn) deskAnalyzeBtn.addEventListener("click", runAnalysis);
@@ -9790,8 +9841,7 @@ function init() {
       btn.textContent = original;
     }
   });
-  $("#tab-report-btn").addEventListener("click", () => switchFeedbackTab("report"));
-  $("#tab-fixqueue-btn").addEventListener("click", () => switchFeedbackTab("fixqueue"));
+  // (the legacy Report/Fix-Queue tab buttons retired with the panel)
   $("#print-btn").addEventListener("click", () => { closeOverflow();
     if (state.view === "cowrite" || state.view === "feedback") window.print();
   });
