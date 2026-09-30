@@ -4,6 +4,24 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-10-01 (branch `feature/audit-remediation`, PR #2 — **the one-frame
+visible-but-empty error banner window is dead at the source.** `showError` routed its text
+through `announce()`, which clears the element and lands the message in the NEXT animation
+frame — deliberate UX-1, and correct for the always-rendered `#a11y-status`, but on the
+`role="alert"` banner it held the region visible with empty words for one frame. That window
+is what flaked `server_url_guard` twice on CI (the test-side `banner_text()` helper was the
+workaround); it is now impossible for every reader: the reveal and the text land in the SAME
+task — the canonical role="alert" show-with-content pattern — so the announcement fires on
+the mutation that both shows and fills the alert. `announce()` is untouched for its remaining
+callers (all target `#a11y-status`). The `live_regions` mutation-order check survives
+unchanged; its repeat-error clear check had to become a rAF frame sampler pinning the real
+regression (no rendered frame with empty text), because the intermediate empty write it
+looked for WAS that window. Accepted trade: a repeated identical error no longer gets
+announce()'s clear-then-rewrite diff signal — the window and the diff signal were the same
+16ms, and the window was the worse half. OUTCOME: commit `de04459`; live_regions 22/22 with
+both new sampler checks, store_busy/server_url_guard/branch_ui/session_breaks/stale_socket_recovery
+all green (72 checks), JS units 16/16, full pytest 1961 passed / 3 skipped.)
+
 **Last updated:** 2026-09-30 (branch `feature/audit-remediation`, PR #2 — **the session_breaks
 "CI-only flake" was a real product bug: recovery had one trigger where the restart produces
 two.** The capability token is per process and the client re-minted only on HTTP 403 — but the
