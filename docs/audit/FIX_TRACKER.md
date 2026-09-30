@@ -4,6 +4,26 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-09-30 (branch `feature/audit-remediation`, PR #2 — **the session_breaks
+"CI-only flake" was a real product bug: recovery had one trigger where the restart produces
+two.** The capability token is per process and the client re-minted only on HTTP 403 — but the
+first fetch a tab attempts against the restarted process can land on a keep-alive socket the OLD
+process held open, and Chromium discovers the dead socket BELOW HTTP (`TypeError: Failed to
+fetch`, no request sent, so no 403 ever comes back and the recovery never fires). Linux holds
+those dead pooled connections (close without RST); Windows evicts them instantly — hence 23/23
+locally every run, L1b/L1c/L1d twice on CI on 2026-09-30, and the failure JSON naming the
+network-level banner text rather than the token string. Fix: a shared `_staleRecovery` in
+`app.js` (used by `_apiOnce` AND the SSE `streamChatTurn` path) treats the network-level
+TypeError as a second trigger — passive re-mint via `/` (itself tried twice, since the re-mint
+can hit the next poisoned socket), bounded to two rounds, with per-trigger retry safety:
+a below-HTTP death never sent anything, so the retry runs whenever the re-mint proves the
+server is up; a 403 was received and rejected, so it still requires the token to have moved.
+A truly unreachable studio now fails with a readable sentence instead of a raw `TypeError`.
+Pinned deterministically by the new `tests/e2e_browser_stale_socket_recovery.py` — 14 checks:
+one intercepted below-HTTP death must re-mint, retry and land silently; every attempt dying
+must surface the readable sentence, bounded, storing nothing. A real kill reproduces the
+poisoned socket only by luck, which is why a kill-based suite could never have pinned it.)
+
 **Last updated:** 2026-09-21 (pass 14b — **a dropped connection was hiding a missing error
 message.** The analyze pre-flight sat OUTSIDE the handler's `try`, so a refused
 `os.remove(progress.json)` escaped it — and Werkzeug answers an exception it cannot convert by

@@ -101,6 +101,56 @@ async function _ensureStudioToken() {
   return _studioToken();
 }
 
+// The capability token is per server PROCESS, and restart recovery has TWO
+// triggers, not one. The obvious one is a 403. The hidden one is a
+// network-level TypeError ("Failed to fetch"): the first fetch a tab attempts
+// against the NEW process can land on a keep-alive socket the OLD process
+// held open, and the browser discovers the dead socket BELOW HTTP — no
+// request is ever sent, so no 403 ever comes back and a 403-only recovery
+// never fired. (Windows' instant-RST socket close evicts the dead connection
+// immediately, which is why local Windows runs always passed while Linux CI
+// flaked.) One shared contract for both triggers: passively re-mint via the
+// document once, retry the request ONCE if the licence actually moved, and
+// never spin — while a retry is in flight _staleRetried caps it, and a
+// genuinely dead server cannot mint a new token, so the caller's failure is
+// readable instead of a loop.
+let _staleRounds = 0;
+async function _staleRecovery(prevTok, retryFn, requireTokenMove) {
+  // The re-mint fetch can itself land on the next poisoned pooled socket, so
+  // try the document TWICE before concluding the studio is really gone. (A
+  // GET is idempotent and Chromium usually auto-retries it on a fresh
+  // connection, but the recovery must not depend on that courtesy.)
+  for (let i = 0; i < 2; i++) {
+    try { await fetch("/", { cache: "no-store" }); break; }
+    catch (_) { if (i === 1) return null; /* unreachable: caller fails readable */ }
+  }
+  const tok = _studioToken();
+  // A below-HTTP death never sent the request, so one retry is always safe
+  // when the re-mint proved the server is up (requireTokenMove=False). A 403
+  // was received and rejected, so only a genuinely moved licence justifies a
+  // retry there (requireTokenMove=True) — unchanged from the W1 contract.
+  const moved = tok && tok !== prevTok;
+  if ((moved || !requireTokenMove) && _staleRounds < 2) {
+    _staleRounds++;
+    try {
+      // The retried request may ITSELF die below HTTP — another stale pooled
+      // socket — and its own catch calls back in here for round two, bounded.
+      return await retryFn();
+    } finally {
+      _staleRounds--;
+    }
+  }
+  return null; // no recovery happened; the caller keeps its own failure
+}
+
+function _deadStudioError() {
+  const e = new Error(
+    "The studio is not reachable right now. If it was restarted, reload this page to keep writing.");
+  e.status = 0;
+  e.tokenStale = true;
+  return e;
+}
+
 async function api(path, options = {}) {
   const data = await _apiOnce(path, options);
   return data;
@@ -114,7 +164,20 @@ async function _apiOnce(path, options, _retry) {
   );
   const tok = await _ensureStudioToken();
   if (tok) headers["X-Studio-Token"] = tok;
-  const resp = await fetch(API + path, { ...options, headers });
+  let resp;
+  try {
+    resp = await fetch(API + path, { ...options, headers });
+  } catch (e) {
+    // Network-level death (poisoned keep-alive socket, server gone): no HTTP
+    // status exists, so the 403 branch below can never see it. This is the
+    // recovery trigger the restart scenario actually produces on Linux.
+    if (e instanceof TypeError) {
+      const out = await _staleRecovery(tok, () => _apiOnce(path, options, true), false);
+      if (out !== null) return out;
+      throw _deadStudioError();
+    }
+    throw e;
+  }
   let data = null;
   try { data = await resp.json(); } catch (_) { /* no body */ }
   if (!resp.ok) {
@@ -126,12 +189,9 @@ async function _apiOnce(path, options, _retry) {
     // (Cache-Control: no-cache, so this is the live document, not a cached one),
     // so one silent reload of the document and one retry covers the whole
     // restart case. Never retried twice: a second 403 is a real rejection.
-    if (resp.status === 403 && !_retry) {
-      try { await fetch('/', { cache: 'no-store' }); }
-      catch (_) { /* offline/dead: fall through to the readable message below */ }
-      if (_studioToken() && _studioToken() !== tok) {
-        return _apiOnce(path, options, true);
-      }
+    if (resp.status === 403 && _staleRounds === 0) {
+      const out = await _staleRecovery(tok, () => _apiOnce(path, options, true), true);
+      if (out !== null) return out;
       throw _tokenError(resp, data);
     }
     const message = (data && data.error) || `Request failed (${resp.status})`;
@@ -182,11 +242,24 @@ async function streamChatTurn(base, text, quote, bubble, scrollContainer, _retry
   const _h = { "Content-Type": "application/json" };
   const _tok = await _ensureStudioToken();
   if (_tok) _h["X-Studio-Token"] = _tok;
-  const resp = await fetch(API + base + "/messages/stream", {
-    method: "POST",
-    headers: _h,
-    body,
-  });
+  let resp;
+  try {
+    resp = await fetch(API + base + "/messages/stream", {
+      method: "POST",
+      headers: _h,
+      body,
+    });
+  } catch (e) {
+    // Same network-level trigger as _apiOnce: a restart's first chat turn can
+    // die below HTTP on the old process's keep-alive socket.
+    if (e instanceof TypeError) {
+      const out = await _staleRecovery(_tok, () =>
+        streamChatTurn(base, text, quote, bubble, scrollContainer, true), false);
+      if (out !== null) return out;
+      throw _deadStudioError();
+    }
+    throw e;
+  }
   if (resp.status === 404 || !resp.body) {
     return api(`${base}/messages`, { method: "POST", body });
   }
@@ -202,12 +275,10 @@ async function streamChatTurn(base, text, quote, bubble, scrollContainer, _retry
     // facing message. A turn that gets this far was never stored (the server
     // appends the user message only after the model call succeeds), so the
     // silent retry cannot duplicate it.
-    if (resp.status === 403 && !_retry) {
-      try { await fetch("/", { cache: "no-store" }); }
-      catch (_) { /* offline/dead: fall through to the readable message */ }
-      if (_studioToken() && _studioToken() !== _tok) {
-        return streamChatTurn(base, text, quote, bubble, scrollContainer, true);
-      }
+    if (resp.status === 403 && _staleRounds === 0) {
+      const out = await _staleRecovery(_tok, () =>
+        streamChatTurn(base, text, quote, bubble, scrollContainer, true), true);
+      if (out !== null) return out;
       throw _tokenError(resp, data);
     }
     const err = new Error((data && data.error) || `Request failed (${resp.status})`);

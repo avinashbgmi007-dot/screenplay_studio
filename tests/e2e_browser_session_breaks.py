@@ -26,10 +26,15 @@ drained LOG FILE (never an unread PIPE, see e2e_browser_common.py:424-427),
 readiness polled on /api/config. Everything lives under a throwaway temp dir.
 
 Controlled reversion (Leg 1 red witness): deleting the
-`if (resp.status === 403 && !_retry)` block from _apiOnce in app.js turns
-L1b/L1c/L1d red — the write never lands, the page's cookie stays dead, and the
-guard's internal "missing or invalid capability token" string surfaces to the
-writer verbatim.
+`if (resp.status === 403 && _staleRounds === 0)` block from _apiOnce in app.js
+turns L1b/L1c/L1d red — the write never lands, the page's cookie stays dead,
+and the guard's internal "missing or invalid capability token" string surfaces
+to the writer verbatim. NOTE this suite exercises only the 403 half of restart
+recovery; on Linux the FIRST fetch can die BELOW HTTP on a keep-alive socket
+the old process held open — no 403 ever arrives, and only
+e2e_browser_stale_socket_recovery.py pins that network-level trigger
+deterministically (a real kill reproduces it only by luck, which is exactly
+why this suite's L1 legs flaked twice on CI on 2026-09-30 while passing here).
 
 Run:  python tests/e2e_browser_session_breaks.py
 """
