@@ -38,6 +38,18 @@ and `pass_history.json`; persona turns landed (Sameer 74s, Sushruta 70s). The de
 visible in real data: quotable categories verify at 100%, summary-reasoned categories are
 honest about having no quote to check.
 
+**PRODUCTION-SCALE VALIDATION (2026-10-01, `Pain_3_updated_FULL`, 22 scenes, 43 findings):** the
+writer's own full-length analysis (desk on 8500/model 8099, booted PRE-bundle so its stored
+artifacts are old-code) was re-verified OFFLINE with the bundle's verifier — pure CPU, no model
+calls: verdicts are BYTE-IDENTICAL to stored (13 verified / 1 not_found / 29 no_quote / 0
+scene_not_found, zero flips), the derived rate lands at **92.9%** (13 of 14 quote-bearing), and
+the one `not_found` is the flag-don't-drop policy doing its job on a genuine quote mismatch.
+No-regression proof on real data: the bundle changes nothing about existing verdicts. Old-code
+surfaces on this project confirmed the back-compat premise (markdown lacks the rate line,
+pass-history lacks verification_counts); after a desk restart on this branch, the served JSON
+surfaces upgrade on read with no re-analysis — the markdown rate line arrives on the NEXT
+analysis, since markdown is stamped at analysis time.
+
 **Product edges found and REPORTED, deliberately not fixed in this bundle:** (1) the demo
 fallback decision runs at MODULE IMPORT, before `main()` parses `--server` — a desk pointed at
 a live non-default server still silently demos if the DEFAULT url (`http://localhost:8080`,
