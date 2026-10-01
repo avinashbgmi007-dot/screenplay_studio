@@ -49,15 +49,30 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
     quote = finding.get("evidence_quote")
     scene_refs = finding.get("scene_refs") or []
 
-    if not quote or not quote.strip():
+    def _quoteless() -> dict:
+        # A quote-less finding cites SCENE NUMBERS instead (theme/character/
+        # structure/scene_function reason from summaries, so prompts force
+        # evidence_quote to null). Those numbers are the finding's only
+        # citation, and they are checkable: if EVERY cited scene is missing
+        # from the parsed script, the citation cannot exist — same honesty
+        # rule as a fabricated quote, same flag, never a silent pass. One
+        # existing scene keeps the finding as no_quote: the citation may be
+        # right even where another cited scene is not.
+        if scene_refs:
+            existing = {s.scene_number for s in doc.scenes}
+            if all(s not in existing for s in scene_refs):
+                finding["verification"] = {"status": "scene_not_found", "matched_scene": None, "confidence": None}
+                return finding
         finding["verification"] = {"status": "no_quote", "matched_scene": None, "confidence": None}
         return finding
+
+    if not quote or not quote.strip():
+        return _quoteless()
 
     quote_norm = _normalize(quote)
     if len(quote_norm.split()) < 3:
         # too short to meaningfully verify (also too short to be useful evidence)
-        finding["verification"] = {"status": "no_quote", "matched_scene": None, "confidence": None}
-        return finding
+        return _quoteless()
 
     best_scene = None
     best_conf = 0.0
@@ -113,3 +128,22 @@ def verification_summary(findings: list[dict]) -> dict:
         status = f.get("verification", {}).get("status", "no_quote")
         counts[status] = counts.get(status, 0) + 1
     return counts
+
+
+def verification_rate(counts: dict) -> dict:
+    """The derived accuracy number over `verification_summary` counts.
+
+    Quote-bearing findings are the ones a mechanical check can judge:
+    verified or not_found. `no_quote` is excluded (nothing to check — by
+    design for the summary-reasoning categories) and `scene_not_found` is
+    excluded too (it IS a check result, and folding a failure into the
+    denominator would flatter the rate). None until at least one finding
+    carries a checkable quote — a percentage over nothing is a lie."""
+    counts = counts or {}
+    quote_bearing = counts.get("verified", 0) + counts.get("not_found", 0)
+    return {
+        "quote_bearing": quote_bearing,
+        "verified_pct_of_quoted": (
+            round(100.0 * counts.get("verified", 0) / quote_bearing, 1)
+            if quote_bearing else None),
+    }

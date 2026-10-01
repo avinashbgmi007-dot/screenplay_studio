@@ -9,6 +9,7 @@ import os
 import tempfile
 
 from .pipeline import AnalysisResult
+from .verifier import verification_rate
 
 
 def _atomic_write_text(path: str, text: str) -> None:
@@ -327,6 +328,24 @@ def render_markdown(result: AnalysisResult) -> str:
             f"expected for theme/character/structure/scene-function findings, which reason from scene "
             f"summaries rather than full text)."
         )
+        if v.get("scene_not_found", 0):
+            lines.append(
+                f"\n**{v.get('scene_not_found', 0)} findings cite scenes that do not exist in the "
+                "script** (⚠️ flagged in place). Quote-less findings cite scene numbers — those "
+                "numbers are checked too, and a citation that cannot exist reads as unverified, "
+                "not as quietly fine."
+            )
+        # The one number a writer can act on: of the findings whose citation a
+        # machine CAN judge (they carry a quotable line), how many held up.
+        # Deliberately absent when nothing was quote-checkable — a percentage
+        # over nothing is a lie (verifier.verification_rate owns the rule).
+        rate = verification_rate(v)
+        if rate["quote_bearing"]:
+            lines.append(
+                f"\n**Quote-verified rate: {rate['verified_pct_of_quoted']}%** "
+                f"({v.get('verified', 0)} of {rate['quote_bearing']} findings that cite quotable "
+                "text; summary-reasoned findings cite scene numbers and are excluded)."
+            )
         # Evidence depth (§5 item 4): the paragraph above describes the ceiling in
         # prose; this states its SIZE. A count is what makes an invisible
         # false-negative risk visible — "reason from scene summaries" is a caveat,
@@ -387,7 +406,14 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "findings": result.findings,
         "formatting_findings": result.formatting_findings,
         "stats": result.stats,
-        "verification_summary": result.verification,
+        # Counts by verification status plus the derived quote-verified rate
+        # (verifier.verification_rate). Served as-is by /report, so the
+        # writer's "how correct is this feedback" question has a computed
+        # answer instead of a vibe.
+        "verification_summary": {
+            **(result.verification or {}),
+            **verification_rate(result.verification),
+        },
         "errors": result.errors,
     }
 
