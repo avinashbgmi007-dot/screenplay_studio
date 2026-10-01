@@ -78,12 +78,19 @@ def _env_int(name: str, default: int) -> int:
 # A single pass's rendered KB fragment can dwarf the pipeline's own scene
 # budget (the character pass renders ~79k chars / ~20k tokens). Rather than
 # let the model server truncate silently, the size is made visible:
-#   * SCREENPLAY_KB_WARN   — soft ceiling; past it a RuntimeWarning names the pass.
 #   * SCREENPLAY_KB_BUDGET — hard cap; past it, whole rules are kept by
 #     confidence tier and the omission is stated in the prompt itself.
-# The hard budget defaults to 0 (unlimited) so nothing changes unless opted in.
-KB_FRAGMENT_CHAR_BUDGET = _env_int("SCREENPLAY_KB_BUDGET", 0)
+#   * SCREENPLAY_KB_WARN   — soft ceiling; past it a RuntimeWarning names the pass.
+#
+# The budget DEFAULTS to the soft ceiling (F-04, audit 2026-09-30): the shipped
+# default used to be 0 = unlimited, so the character fragment sailed ~65k chars
+# past its own 40k soft ceiling on every run — the product's own warning
+# machinery fired against a default nobody had chosen. 0 still means unlimited
+# (the operator's explicit "not my decision", unchanged), and an explicit
+# SCREENPLAY_KB_BUDGET still wins. A fragment kept whole under 40k is unchanged
+# by this; only fragments over the ceiling start stating what they shed.
 KB_FRAGMENT_SOFT_WARN = _env_int("SCREENPLAY_KB_WARN", 40000)
+KB_FRAGMENT_CHAR_BUDGET = _env_int("SCREENPLAY_KB_BUDGET", KB_FRAGMENT_SOFT_WARN)
 
 _TIER_ORDER = {"high": 0, "medium": 1, "low": 2}
 

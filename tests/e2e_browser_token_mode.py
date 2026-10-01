@@ -154,8 +154,11 @@ def write_proofs(c, base):
                    encoding="utf-8").read()
         raws = [ln.strip() for ln in src.splitlines()
                 if "fetch(" in ln or "sendBeacon(" in ln]
-        allowed = ("const resp = await fetch(API + path",
-                   "const resp = await fetch(API + base")
+        # 2026-09-30: both sites declare `let resp;` on the line above (the
+        # below-HTTP recovery wraps the fetch in its own try), so the census
+        # keys on the call itself, not the declaration.
+        allowed = ("resp = await fetch(API + path",
+                   "resp = await fetch(API + base")
         remint = re.compile(r"""(?<![.\w])fetch\(\s*['"]/['"]\s*(?:,\s*\{[^{}]*\})?\s*\)""")
 
         def is_remint(line):
@@ -169,10 +172,13 @@ def write_proofs(c, base):
                   if not r.startswith(allowed) and not is_remint(r)]
         c.check("no untokened write path left in the SPA", not strays,
                 "; ".join(strays[:4]))
+        # 2026-09-30: the two 403-branch re-mints merged into _staleRecovery's
+        # ONE shared re-mint (it now also serves the below-HTTP TypeError
+        # trigger), so the app is down to two document GETs.
         c.check("the census exempts exactly the licence re-mints, nothing else",
-                sum(1 for r in raws if is_remint(r)) == 3,
+                sum(1 for r in raws if is_remint(r)) == 2,
                 f"{sum(1 for r in raws if is_remint(r))} exempted re-mints, "
-                "expected 3 (_ensureStudioToken, _apiOnce's 403, the stream turn's 403)")
+                "expected 2 (_ensureStudioToken, _staleRecovery's shared re-mint)")
         browser.close()
 
 

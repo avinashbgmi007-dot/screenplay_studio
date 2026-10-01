@@ -392,12 +392,40 @@ def sweep(checks, page, tag, dots=False):
         print(f"        {r['ratio']}:1 (needs {r['need']}) {r['why']} {r['sel']} {r['text']!r}")
 
 
+def clear_intent_marks(base, hdr, project):
+    """Reset the writer-intent store between theme legs.
+
+    The gate runs night then dawn against ONE studio, and intent marks are
+    server-persisted by design (finding_marks.json survives reloads). Without a
+    reset, the night leg's Park/My-call marks carry into dawn: the dawn
+    dispositions clicks toggle already-marked cards, the current scene drains
+    to zero open findings, the scene strip honestly renders 'clean' — and the
+    contrast sweep then finds no severity dots to measure. A fixture
+    precondition (open findings on screen) must hold at the start of each leg.
+    """
+    queue = json.loads(urllib.request.urlopen(
+        urllib.request.Request(f"{base}/api/projects/{project}/fixqueue",
+                               headers=hdr), timeout=60).read().decode() or "{}")
+    marks = {}
+    for it in (queue.get("items") or []):
+        fid = it.get("finding_id")
+        if fid:
+            marks[fid] = None
+    if marks:
+        req = urllib.request.Request(
+            f"{base}/api/projects/{project}/findings/intent/batch",
+            data=json.dumps({"intents": marks}).encode(),
+            headers={"Content-Type": "application/json", **hdr}, method="POST")
+        urllib.request.urlopen(req, timeout=60).read()
+
+
 def run(base, name):
     checks = Checks()
     with sync_playwright() as pw:
         for theme in ("night", "dawn"):
             browser, page, errors = launch(pw)
             page.set_viewport_size({"width": 1280, "height": 900})
+            clear_intent_marks(base, studio_headers(base), name)
             page.goto(base)
             page.wait_for_load_state("networkidle")
             if theme == "dawn":

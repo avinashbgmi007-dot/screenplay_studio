@@ -20,6 +20,13 @@ both would make it worthless:
     mutation sequence with a MutationObserver and asserts the text never became
     non-empty while the banner was hidden — a check that fails against the
     original `showError`, which wrote the text first and revealed second.
+    (2026-09-30: showError stopped deferring its text into the next animation
+    frame — reveal and words now land in the same task, the canonical
+    role="alert" show-with-content pattern, which kills the one-frame
+    visible-but-empty window CI could read. The mutation-order check survives
+    unchanged; the repeat-error clear check below had to become a frame
+    sampler, because the intermediate empty write it looked for WAS that
+    one-frame window.)
 
 R6-UX-5 added the third member of the family: the beat board and the compare
 panes. Both are rebuilt with `innerHTML = ""` and both carried
@@ -87,7 +94,9 @@ MARKUP_JS = """() => {
 #   * a MutationObserver callback fires AFTER the DOM has advanced, so
 #     `getComputedStyle` at callback time cannot see the intermediate state.
 #     Reading the inline style proves nothing — the ORDER of the records is the
-#     evidence. (The reveal must be recorded before any text write.)
+#     evidence. (The reveal must be recorded before any text write; since
+#     showError's 2026-09-30 sync write, reveal and text land in the same
+#     task, and the order still holds.)
 #   * logging the text on EVERY mutation makes a style change look like a text
 #     change, so a "was it written twice?" count silently counted style writes.
 #     Only `kind === 'text'` entries may be counted as writes.
@@ -108,6 +117,26 @@ ARM_BANNER_JS = """() => {
   const mo = new MutationObserver(record);
   mo.observe(banner, { attributes: true, attributeFilter: ['style'] });
   mo.observe(text, { childList: true, characterData: true, subtree: true });
+  return true;
+}"""
+
+# The window sampler: rAF-loop records of (banner visible?, its text), taken
+# every rendered frame for one second. The mutation log CANNOT see a same-task
+# clear (callbacks read final state), but a FRAME can — this is what would
+# catch a future deferral reintroducing the visible-but-empty window that
+# server_url_guard read twice on CI on 2026-09-30.
+SAMPLE_WINDOW_JS = """() => {
+  const banner = document.getElementById('error-banner');
+  const text = document.getElementById('error-banner-text');
+  window.__bannerWin = [];
+  const tick = () => {
+    window.__bannerWin.push({
+      visible: getComputedStyle(banner).display !== 'none',
+      text: text.textContent,
+    });
+    if (window.__bannerWin.length < 60) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
   return true;
 }"""
 
@@ -178,25 +207,45 @@ def main():
                               "sequence": log[:4]}))
 
             # ---------- the SAME error again is still a change ----------------
-            # Note what is and is not observable here. `textContent = sameString`
-            # REPLACES the text node unconditionally, so a DOM record appears
-            # whether or not the line was cleared first — counting message writes
-            # alone therefore proves nothing about the clear. What the clear DOES
-            # leave behind is an intermediate empty write, and that is the part
-            # that makes the re-write a text CHANGE for a screen reader that
-            # diffs content instead of re-reading the node.
+            # showError's 2026-09-30 sync fix took the intermediate empty
+            # write with it: that empty write was announce()'s clear-then-
+            # rewrite diff signal, and it was EXACTLY the one-frame
+            # visible-but-empty window the sync write exists to kill — a
+            # sampler can no longer see it. A same-string textContent
+            # replacement is still a real node replacement (a mutation record
+            # appears either way), so the repeat still lands. What this suite
+            # can no longer observe is AT's content-diff silence on the
+            # identical repeat — which was never observable from the DOM
+            # anyway (see the announce() comment in app.js on the same point).
             page.evaluate("(m) => showError(m)", ERROR_MSG)
             page.wait_for_timeout(500)
             log2 = page.evaluate("() => window.__bannerLog")
             repeats = [e for e in log2
                        if e["kind"] == "text" and (e.get("text") or "").strip() == ERROR_MSG]
-            clears = [e for e in log2
-                      if e["kind"] == "text" and not (e.get("text") or "").strip()]
             check("a repeated identical error is written to the banner again",
                   len(repeats) >= 2, f"message writes: {len(repeats)}")
-            check("...and the line is CLEARED first, so the re-write is a text "
-                  "change rather than a same-string replacement",
-                  len(clears) >= 1, f"empty-text writes: {len(clears)}")
+
+            # ---------- no reader can see the banner visible with empty words -
+            # The regression this suite's ancestor caught (reveal and write
+            # racing across a frame boundary) is now impossible by
+            # construction. This continuous sampler is what pins it: fire the
+            # error, then demand every sample with the banner rendered carries
+            # its text already — including the very first.
+            page.reload()
+            page.wait_for_load_state("networkidle")
+            page.evaluate(SAMPLE_WINDOW_JS)
+            page.evaluate("(m) => showError(m)", ERROR_MSG)
+            page.wait_for_timeout(400)
+            win = page.evaluate("() => window.__bannerWin")
+            empty_visible = [s for s in win
+                             if s["visible"] and not (s["text"] or "").strip()]
+            check("every frame the banner is rendered, it already carries its "
+                  "words (no visible-but-empty window)",
+                  not empty_visible, json.dumps(empty_visible[:3]))
+            check("...and the sampler really saw the banner rendered with its "
+                  "text (it cannot pass on an empty window)",
+                  any(s["visible"] and (s["text"] or "").strip() == ERROR_MSG
+                      for s in win), json.dumps(win[-3:]))
 
             page.evaluate("() => hideError()")
 

@@ -4,6 +4,52 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-10-01 (branch `feature/audit-remediation`, PR #2 — **the one-frame
+visible-but-empty error banner window is dead at the source.** `showError` routed its text
+through `announce()`, which clears the element and lands the message in the NEXT animation
+frame — deliberate UX-1, and correct for the always-rendered `#a11y-status`, but on the
+`role="alert"` banner it held the region visible with empty words for one frame. That window
+is what flaked `server_url_guard` twice on CI (the test-side `banner_text()` helper was the
+workaround); it is now impossible for every reader: the reveal and the text land in the SAME
+task — the canonical role="alert" show-with-content pattern — so the announcement fires on
+the mutation that both shows and fills the alert. `announce()` is untouched for its remaining
+callers (all target `#a11y-status`). The `live_regions` mutation-order check survives
+unchanged; its repeat-error clear check had to become a rAF frame sampler pinning the real
+regression (no rendered frame with empty text), because the intermediate empty write it
+looked for WAS that window. Accepted trade: a repeated identical error no longer gets
+announce()'s clear-then-rewrite diff signal — the window and the diff signal were the same
+16ms, and the window was the worse half. OUTCOME: commit `de04459`; live_regions 22/22 with
+both new sampler checks, store_busy/server_url_guard/branch_ui/session_breaks/stale_socket_recovery
+all green (72 checks), JS units 16/16, full pytest 1961 passed / 3 skipped.)
+
+**Last updated:** 2026-09-30 (branch `feature/audit-remediation`, PR #2 — **the session_breaks
+"CI-only flake" was a real product bug: recovery had one trigger where the restart produces
+two.** The capability token is per process and the client re-minted only on HTTP 403 — but the
+first fetch a tab attempts against the restarted process can land on a keep-alive socket the OLD
+process held open, and Chromium discovers the dead socket BELOW HTTP (`TypeError: Failed to
+fetch`, no request sent, so no 403 ever comes back and the recovery never fires). Linux holds
+those dead pooled connections (close without RST); Windows evicts them instantly — hence 23/23
+locally every run, L1b/L1c/L1d twice on CI on 2026-09-30, and the failure JSON naming the
+network-level banner text rather than the token string. Fix: a shared `_staleRecovery` in
+`app.js` (used by `_apiOnce` AND the SSE `streamChatTurn` path) treats the network-level
+TypeError as a second trigger — a passive re-mint via `/` that DECAYS (every 250ms across a 2.5s
+wall-clock deadline, because the page can hold ~six corpse connections and
+Chromium needs ~2s to reap them; CI's own rerun showed the recovery firing
+but giving up before the pool cleared), with per-trigger retry safety:
+a below-HTTP death never sent anything, so the retry runs whenever the re-mint proves the
+server is up; a 403 was received and rejected, so it still requires the token to have moved.
+A truly unreachable studio now fails with a readable sentence instead of a raw `TypeError`.
+Pinned deterministically by the new `tests/e2e_browser_stale_socket_recovery.py` — 14 checks:
+one intercepted below-HTTP death must re-mint, retry and land silently; every attempt dying
+must surface the readable sentence, bounded, storing nothing. A real kill reproduces the
+poisoned socket only by luck, which is why a kill-based suite could never have pinned it.
+OUTCOME: commits `8bea3ea`+`689c3e1`+`024f93d` — session_breaks passed FIRST TRY on the
+pull_request event that flaked three times (23/23 in 9s), the new guard ran green in CI,
+and PR #2 went fully CLEAN across both events with no reruns. A second, unrelated latent
+flake surfaced and was fixed in `024f93d`: announce() lands banner text in the NEXT
+animation frame (UX-1), so suites reading #error-banner-text the instant the banner
+becomes visible can read "" — the harness now has banner_text(), which waits (bounded).)
+
 **Last updated:** 2026-09-21 (pass 14b — **a dropped connection was hiding a missing error
 message.** The analyze pre-flight sat OUTSIDE the handler's `try`, so a refused
 `os.remove(progress.json)` escaped it — and Werkzeug answers an exception it cannot convert by

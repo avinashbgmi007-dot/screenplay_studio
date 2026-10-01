@@ -98,8 +98,11 @@ def escalate(checks, page, quotes, name):
     """The plan's Step 1 gesture: 🩺 from a finding card, then measure."""
     page.evaluate("() => openDock('evidence')")
     wait_dock_open(page)
-    # the ledger's sections start collapsed (P1.6): a mounted-but-closed card is
-    # in the DOM and unclickable, so open the one holding it before reaching in.
+    # Option A+ (Report 2 §4): the finding cards live in the Context disclosure
+    # at the lens foot — summon Tier 2 (expands it, per-project preference),
+    # then open any inner section still holding its cards.
+    page.evaluate("() => setEvidenceTier(2)")
+    page.wait_for_timeout(400)
     open_dock_section_holding(page, DOCTOR_BTN)
     page.wait_for_timeout(250)
     btn = page.locator(f'.dock-lens[data-lens="evidence"] {DOCTOR_BTN}').first

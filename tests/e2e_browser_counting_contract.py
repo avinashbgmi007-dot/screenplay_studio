@@ -102,10 +102,13 @@ ADDRESSED_JS = """() => {
 def test_intent_updates_every_mounted_surface(base, checks):
     """P0.4: refreshAllFindingSurfaces — marking an intent in the dock must
     re-render EVERY mounted finding surface in the same gesture, with no
-    reload: the dock card, the summary chips, AND a mounted #feedback-fixqueue
-    tab, plus a fresh metrics pull. Pre-fix, setFindingIntent re-rendered the
-    dock + manuscript but never the queue tab, so the desk's own queue kept
-    counting the marked finding as open until something else re-rendered it.
+    reload: the dock card, the summary chips, AND the dock's own fix-queue
+    section, plus a fresh metrics pull. (The legacy #feedback-fixqueue tab
+    retired with the panel — Option A+, Report 2 §4 move 2: one findings
+    state, one renderer, so every surface is a section of the same lens.)
+    Pre-fix, setFindingIntent re-rendered the dock + manuscript but never the
+    queue tab, so the desk's own queue kept counting the marked finding as
+    open until something else re-rendered it.
     """
     sample = post(base, "/api/sample")
     name = sample.get("project")
@@ -127,15 +130,20 @@ def test_intent_updates_every_mounted_surface(base, checks):
         page.wait_for_selector("#finding-summary .fs-chip.open",
                                state="attached", timeout=15000)
 
-        # Mount BOTH surfaces: the Feedback room's Fix Queue tab and the
-        # dock's Evidence lens (the deep cards there carry the intent buttons).
-        page.evaluate("async () => { await loadFeedbackPanels(); }")
-        page.evaluate("() => { setRoom('feedback'); switchFeedbackTab('fixqueue'); }")
-        page.wait_for_selector("#feedback-fixqueue .fix-row",
-                               state="attached", timeout=15000)
-        page.evaluate("() => { openDock('evidence'); }")
+        # Mount the dock's Evidence lens (the deep cards there carry the intent
+        # buttons). The queue rows live in the SAME lens's Tier 1; the cards in
+        # Tier 2 — summon Tier 2 for the cards, then read the queue by its
+        # section locator after switching back for the title assertions.
+        # openDock FIRST, then summon Tier 2: the Context disclosure only
+        # exists once the lens has rendered, and its inner sections are
+        # unclickable until the disclosure itself is expanded (a closed body
+        # is visibility:hidden — the same contract every ledger section has).
+        page.evaluate("() => { openDock('evidence'); setEvidenceTier(2); }")
         page.wait_for_selector('.dock-lens[data-lens="evidence"] .finding-note',
                                state="attached", timeout=15000)
+        # the context expansion is a 0.18s grid-rows transition; inner section
+        # heads are unclickable until it settles (same settle phase6 uses)
+        page.wait_for_timeout(500)
         # P1.6: the dock's cards live behind collapsible section headers, and a
         # closed body is hidden (not clickable). Open the section holding them —
         # the writer's own first move.
@@ -150,7 +158,17 @@ def test_intent_updates_every_mounted_surface(base, checks):
         }""")
 
         ledger0 = page.evaluate(CONTRACT_JS)
-        title0 = page.locator("#feedback-fixqueue .craft-panel-title").first.text_content() or ""
+        DOCK_QUEUE = '.dock-lens[data-lens="evidence"] .dock-section-fixqueue'
+        page.evaluate("() => setEvidenceTier(1)")
+        page.wait_for_timeout(500)  # settle the tier gesture
+        page.wait_for_selector(f"{DOCK_QUEUE} .fix-row", state="attached", timeout=15000)
+        title0 = page.locator(f"{DOCK_QUEUE} .craft-panel-title").first.text_content() or ""
+        page.evaluate("() => setEvidenceTier(2)")
+        page.wait_for_timeout(500)  # settle before reaching into the context tier
+        # idempotent re-open: the gesture must leave the cards clickable, and
+        # this is the same "open, then act" path the writer takes
+        open_dock_section_holding(page, ".finding-note")
+        page.wait_for_timeout(250)
 
         # the writer marks the first dock card addressed — ONE gesture
         chip0 = page.locator("#finding-summary .fs-chip.open").first.text_content() or ""
@@ -175,16 +193,18 @@ def test_intent_updates_every_mounted_surface(base, checks):
                   f"{ledger1['open']} open" in chip,
                   f"chip={chip!r} ledger={ledger1}")
 
-        # THE contract: the mounted Fix Queue tab shows the SAME ledger NOW —
-        # no reload, no tab switch, no second gesture.
-        title1 = page.locator("#feedback-fixqueue .craft-panel-title").first.text_content() or ""
+        # THE contract: the lens's own fix-queue section shows the SAME ledger
+        # NOW — no reload, no second gesture.
+        page.evaluate("() => setEvidenceTier(1)")
+        page.wait_for_selector(f"{DOCK_QUEUE} .fix-row", state="attached", timeout=15000)
+        title1 = page.locator(f"{DOCK_QUEUE} .craft-panel-title").first.text_content() or ""
         m = re.search(r"(\d+) open /", title1)
-        checks.ok("intent-e2e: the mounted Fix Queue tab re-rendered on the mark — SAME open count as the chips",
+        checks.ok("intent-e2e: the fix-queue section re-rendered on the mark — SAME open count as the chips",
                   m is not None and int(m.group(1)) == ledger1["open"],
-                  f"tab title before={title0!r} after={title1!r} ledger open={ledger1['open']} "
+                  f"queue title before={title0!r} after={title1!r} ledger open={ledger1['open']} "
                   "(pre-fix: setFindingIntent re-rendered dock+manuscript but never the queue tab)")
         addressed = page.evaluate(ADDRESSED_JS)
-        done = page.locator("#feedback-fixqueue .fix-row.done").count()
+        done = page.locator(f"{DOCK_QUEUE} .fix-row.done").count()
         checks.ok("intent-e2e: queue rows read the SAME disposition ledger (done rows == addressed)",
                   done == addressed,
                   f"done rows={done} ledger addressed={addressed}")

@@ -107,6 +107,28 @@ class Checks:
         sys.exit(1 if self.failed else 0)
 
 
+def banner_text(page, timeout=5000):
+    """The error banner's text, once it is there (kept from the deferral era).
+
+    Before 2026-09-30 announce() cleared the element and set the message in
+    the NEXT animation frame, so a read issued the moment the banner became
+    visible could see "" — server_url_guard failed on CI that day on exactly
+    this (banner visible, both text checks empty, every surrounding check
+    green). showError now writes the text synchronously, but this helper
+    stays: it is cheap, it still bounds the read, and it keeps every banner
+    reader independent of how showError is sequenced internally.
+    Waits (bounded) for the text to exist and returns it stripped; "" if the
+    banner never carries text within the timeout.
+    """
+    try:
+        page.wait_for_function(
+            "() => { const e = document.getElementById('error-banner-text');"
+            " return e && e.textContent; }", timeout=timeout)
+    except Exception:
+        pass
+    return (page.locator("#error-banner-text").inner_text() or "").strip()
+
+
 def seen_visible(target, selector=None, timeout=8000):
     """Bounded poll: True if the target becomes visible within `timeout`.
 

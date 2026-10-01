@@ -150,11 +150,14 @@ def main() -> None:
                banner_visible and not desk_open,
                f"banner={banner_visible} desk={desk_open}")
 
-            # ---- A. export button lives in the Feedback room ----
-            # The corrupt-project banner from the check above still covers
-            # the top strip for its 10s life, and the project bar idle-fades
-            # after 4s — dismiss the banner and wake the chrome first (the
-            # same pattern the phase-14 journey uses before top-bar clicks).
+            # ---- A. the report export lives in the desk's overflow menu ----
+            # Option A+ (audit 2026-09-30): the legacy Feedback-room header
+            # that hosted #report-export-btn retired with the panel; the
+            # overflow menu (#export-report, painted by paintReportExport —
+            # one href, two hosts, and now one host) is where the writer takes
+            # the report away. The C2 leg below already drove it; A and C2 are
+            # one leg now, so A asserts the host surface is the overflow menu
+            # and falls through to C2 for the download contract.
             page.locator("#error-banner-dismiss").click()
             page.mouse.move(700, 20)
             page.wait_for_timeout(300)
@@ -164,42 +167,16 @@ def main() -> None:
             page.wait_for_timeout(800)
             ok("healthy project opens normally",
                page.locator("#project-title").inner_text().strip() == "Seed Export")
-            # The Feedback DRAWER room is the surface that owns the toolbar's
-            # export button (loadFeedbackPanels -> renderReportPanel shows
-            # it). With a project open, #room-feedback-btn routes to the
-            # full-screen Feedback View instead, so the drawer room is
-            # reached the same way the text-popup's "Ask consultant" action
-            # reaches it (app.js openFeedbackRoom — the established evaluate
-            # nudge, same as ui_fixes uses for openDock).
-            page.mouse.move(700, 20)
-            page.evaluate("openFeedbackRoom()")
-            page.wait_for_timeout(800)
-
-            btn = page.locator("#report-export-btn")
-            ok("export button visible with report", btn.is_visible())
-            href = btn.get_attribute("href") or ""
-            ok("export href targets /report/export",
-               href.endswith("/Seed_Export/report/export"), href)
-            ok("export carries download name",
-               (btn.get_attribute("download") or "") == "Seed_Export-report.md")
-
-            try:
-                with page.expect_download(timeout=5000) as dl_info:
-                    btn.click()
-                dl = dl_info.value
-                ok("clicking downloads the report",
-                   dl.suggested_filename == "Seed_Export-report.md",
-                   dl.suggested_filename)
-            except Exception as e:
-                ok("clicking downloads the report", False, str(e)[:80])
+            ok("the retired panel header did not leave a ghost export button",
+               page.locator("#report-export-btn").count() == 0)
 
             # ---- C. status strip honesty: demo badge, then live re-attach ----
-            # The drawer opened by openFeedbackRoom overlays the strip's
-            # right side, and #status-model stays display:none until the
-            # strip itself is hovered — close the drawer, hover the strip
-            # first (its left edge), then the item.
-            page.locator("#drawer-close").click()
-            page.wait_for_timeout(400)
+            # (Option A+: openFeedbackRoom no longer mounts a report pane, so
+            # no drawer round-trip is needed before the strip reads — the desk
+            # is already the surface.) #status-model stays display:none until
+            # the strip itself is hovered — hover the strip first (its left
+            # edge), then the item.
+            page.locator("#status-strip").hover(position={"x": 10, "y": 10})
 
             # ---- C2. the affordance a writer actually opens: the overflow
             # menu is where every other export lives, and with a project open

@@ -110,8 +110,27 @@ _SPA_CSP = (
 
 
 def _harden_spa_document(resp):
-    """Attach the CSP and companion hardening headers to the SPA document."""
+    """Attach the document-scoped headers to the SPA document.
+
+    CSP stays here on purpose: it is a *document* policy, meaningless (and
+    noisy) on JSON. The always-on headers every response must carry moved to
+    `_harden_every_response` below (F-03, audit 2026-09-30) so the SPA document
+    and the API answer the hardening contract alike."""
     resp.headers["Content-Security-Policy"] = _SPA_CSP
+    return resp
+
+
+@app.after_request
+def _harden_every_response(resp):
+    """Headers every response carries, document or not (F-03, audit 2026-09-30).
+
+    `X-Content-Type-Options: nosniff` used to live only on the SPA document,
+    while the API — same-origin and token-bearing — answered bare. For JSON the
+    risk is small (there is no MIME confusion to sniff into), but the hardening
+    contract should not be scoping itself to one mimetype by accident. CSP is
+    deliberately NOT here: a `Content-Security-Policy` header on a JSON body is
+    dead weight, and the static labs under /preview-*/ keep their own policies
+    instead of inheriting the SPA's."""
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "no-referrer"
     return resp
@@ -2288,16 +2307,22 @@ def get_fixqueue(name):
         return _error("Project not found.", 404)
     if m.stage("analyze").status != "complete":
         return jsonify({"items": [], "acts": []})
-
     try:
-        report = _load_report_sanitized(m)
+        return jsonify(_build_fixqueue(m))
     except FileNotFoundError:
-        # Same contradiction as /report: analyze claims complete, the findings are
-        # gone. The honest answer is not `{"items": []}` just above, which means
+        # Same contradiction as /report: analyze claims complete, the findings
+        # are gone. The honest answer is not `{"items": []}`, which means
         # "analysed, nothing to fix" — a writer would close the queue believing
         # the script is clean.
         return _error("The analysis report is missing from this project. Re-run "
                       "Analysis to produce one.", 404)
+
+
+def _fixqueue_items(m):
+    """The fixqueue's rows plus the act map, shared by `/fixqueue` and
+    `/findings` so the two lists cannot drift. One build, two shapes. Raises
+    FileNotFoundError when the report is missing (callers word the 404)."""
+    report = _load_report_sanitized(m)
 
     from screenplay_parser.structure import assign_acts, act_for_scene
     from .revision import load_working, finding_statuses, compute_finding_id, dismissed_finding_ids
@@ -2343,19 +2368,203 @@ def get_fixqueue(name):
     for it in items:
         it["dismissed"] = (it["finding_id"] in dismissed_ids
                            or (it["index"], (it["issue"] or "")) in dismissed_keys)
+    return items, acts
+
+
+def _build_fixqueue(m) -> dict:
+    """`/fixqueue`'s payload: flag-dismissed rows, hidden unless asked for."""
+    items, acts = _fixqueue_items(m)
     include_dismissed = request.args.get("include_dismissed") == "1"
     visible = [i for i in items if include_dismissed or not i["dismissed"]]
     # The writer's ledger flags for the client counting contract (N3): the
     # dock's evidence lens reads these so totals agree with the fix queue.
-    return jsonify({"items": visible, "acts": acts,
-                    "dismissed_flags": [{"index": it["index"], "finding_id": it["finding_id"]}
-                                        for it in items if it["dismissed"]],
-                    "dismissed_count": len(items) - len(visible),
-                    "total_count": len(items)})
+    return {"items": visible, "acts": acts,
+            "dismissed_flags": [{"index": it["index"], "finding_id": it["finding_id"]}
+                                for it in items if it["dismissed"]],
+            "dismissed_count": len(items) - len(visible),
+            "total_count": len(items)}
 
 
-@app.route("/api/projects/<name>/findings/<int:index>/dismiss", methods=["POST"])
+# ---------- findings query surface (Report 2 §6, audit 2026-09-30) ----------
+
+def _findings_error(m) -> dict | None:
+    """The two honest refusals shared by the findings query endpoints: no
+    analysis yet is a 400 by the /report contract; analyze-complete-with-no-
+    file is a 404 by the /report contract (the answer can never be an empty
+    list — that reads as "analysed, nothing to fix")."""
+    if m.stage("analyze").status != "complete":
+        return _error("Analysis hasn't completed for this project yet.", 400)
+    try:
+        _load_report_sanitized(m)
+    except FileNotFoundError:
+        return _error("The analysis report is missing from this project. Re-run "
+                      "Analysis to produce one.", 404)
+    return None
+
+
+@app.route("/api/projects/<name>/findings/summary", methods=["GET"])
+def get_findings_summary(name):
+    """Counts by severity × category × status, plus dismissed/intent marks and
+    the arc, in one call (Report 2 §6 API 1).
+
+    Tier 1 of the Evidence lens renders from this before the full report is
+    needed, and the arrival strip / dawn meter / filter chips get their numbers
+    without re-deriving counts across three client-side payloads. `dawn_pct`
+    is the resolved share of the queue — the same arithmetic the client's
+    updateDawnMeter() runs over queueCounts(), so the two can never disagree:
+    done = findings with observed status addressed or the writer's 'addressed'
+    intent; open = everything else, dismissed excluded from both numerator and
+    denominator (a row the writer shelved is not an unresolved row).
+    """
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    early = _findings_error(m)
+    if early:
+        return early
+
+    from .revision import finding_statuses, finding_intents
+    items, acts = _fixqueue_items(m)
+    statuses = finding_statuses(m)
+    observed = {s["index"]: s["status"] for s in statuses["findings"]}
+    intents = finding_intents(m)
+    by_severity: dict = {}
+    by_category: dict = {}
+    by_status = {"addressed": 0, "still_present": 0, "unknown": 0}
+    dismissed = 0
+    open_count = 0
+    done_count = 0
+    for it in items:
+        sev = (it.get("severity") or "low").lower()
+        cat = it.get("category") or "other"
+        by_severity[sev] = by_severity.get(sev, 0) + 1
+        by_category[cat] = by_category.get(cat, 0) + 1
+        obs = observed.get(it["index"], it.get("status", "unknown"))
+        if obs in by_status:
+            by_status[obs] += 1
+        if it["dismissed"]:
+            dismissed += 1
+            continue
+        if obs == "addressed" or intents.get(it["finding_id"]) == "addressed":
+            done_count += 1
+        else:
+            open_count += 1
+    total = len(items) - dismissed
+    return jsonify({
+        "total_count": len(items),
+        "dismissed_count": dismissed,
+        "open_count": open_count,
+        "done_count": done_count,
+        "dawn_pct": (round(100 * done_count / total) if total else 0),
+        "by_severity": by_severity,
+        "by_category": by_category,
+        "by_status": by_status,
+        "summary": statuses.get("summary") or {},
+        "acts": [{"act": a["act"], "name": a["name"], "scene_count": len(a.get("scenes") or [])}
+                 for a in acts],
+    })
+
+
+@app.route("/api/projects/<name>/findings", methods=["GET"])
+def get_findings(name):
+    """The same rows `/fixqueue` serves, queryable (Report 2 §6 API 2).
+
+    Filters: `scene` (a finding is in a scene when its scene_refs name it —
+    the same rule the client's byScene join uses), `status`
+    (addressed/still_present/unknown, observed), `severity`, `category`, and
+    `include_dismissed` (default off, same triage contract as /fixqueue).
+    `group_by=issue-text` returns display groups instead of rows: rows whose
+    issue text is byte-identical render once with a scene-count chip, the
+    scene_refs of every grouped row preserved (no information lost — the
+    Report 2 §4.3 display dedupe, served where it is cheap).
+    """
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    early = _findings_error(m)
+    if early:
+        return early
+
+    items, _acts = _fixqueue_items(m)
+    include_dismissed = request.args.get("include_dismissed") == "1"
+    if not include_dismissed:
+        items = [i for i in items if not i["dismissed"]]
+    scene = request.args.get("scene", type=int)
+    status = request.args.get("status")
+    severity = request.args.get("severity")
+    category = request.args.get("category")
+    if scene is not None:
+        items = [i for i in items if scene in (i.get("scene_refs") or [])]
+    if status:
+        items = [i for i in items if (i.get("status") or "unknown") == status]
+    if severity:
+        items = [i for i in items if (i.get("severity") or "low").lower() == severity.lower()]
+    if category:
+        items = [i for i in items if (i.get("category") or "other") == category]
+
+    if request.args.get("group_by") == "issue-text":
+        groups: dict = {}
+        for it in items:
+            groups.setdefault(it.get("issue") or "", []).append(it)
+        return jsonify({"groups": [
+            {
+                "issue": issue,
+                "count": len(rows),
+                "scene_refs": sorted({s for r in rows for s in (r.get("scene_refs") or [])}),
+                "severities": sorted({(r.get("severity") or "low").lower() for r in rows}),
+                "category": rows[0].get("category"),
+                "members": rows,
+            }
+            for issue, rows in groups.items()
+        ]})
+    return jsonify({"items": items, "count": len(items)})
+
+
+@app.route("/api/projects/<name>/findings/intent/batch", methods=["POST"])
+def set_finding_intents_batch(name):
+    """Batch the fix loop's mark-and-next cadence (Report 2 §6 API 3): the loop
+    used to POST `/findings/intent` once per keypress. One call, N marks, each
+    applied through the SAME per-id set_finding_intent the single route uses —
+    so every store invariant (lock span, damaged-store refusal, id keying)
+    holds for the batch because it is N of the thing that already held.
+    Intent values follow the single-write contract: "addressed"/"deferred"
+    set the mark, null clears it. Counting is honest per id: a rejected id is
+    skipped and reported, not silently swallowed."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    body = request.get_json(silent=True) or {}
+    raw = body.get("intents")
+    if not isinstance(raw, dict) or not raw:
+        return _error("intents must be a non-empty object of finding_id -> intent.", 400)
+    if len(raw) > 500:
+        return _error("Too many intents in one batch (500 max).", 400)
+    from .revision import set_finding_intent
+    applied, failed = [], []
+    for fid, intent in raw.items():
+        if not isinstance(fid, str) or not fid.strip():
+            failed.append({"finding_id": fid, "error": "finding_id required."})
+            continue
+        try:
+            set_finding_intent(m, fid, intent)
+            applied.append(fid)
+        except Exception as e:  # a damaged marks store fails loud, per id
+            failed.append({"finding_id": fid, "error": str(e)})
+    resp = {"ok": not failed, "applied": applied, "failed": failed}
+    return jsonify(resp), (200 if not failed else 207)
+
+
+@app.route("/api/projects/<name>/findings/<int(signed=True):index>/dismiss", methods=["POST"])
 def dismiss_finding_route(name, index):
+    """`<int:index>` is positive-only, so a negative index used to fall through
+    to the static catch-all and come back as an HTML 405 no JSON client can
+    parse (F-02, audit 2026-09-30). `<int(signed=True)>` pulls the whole integer
+    domain into the route, and the M4 guard answers it."""
+    if index < 0:
+        return _error(f"Finding index {index} is out of range.", 400)
     """Writer triage: 'I've read it, I'm choosing to live with this one.'
     The finding is hidden from the queue (flag-don't-drop: it stays in the
     report and comes back if the report is regenerated with a different
@@ -2385,8 +2594,11 @@ def dismiss_finding_route(name, index):
     return jsonify({"ok": True, "index": index})
 
 
-@app.route("/api/projects/<name>/findings/<int:index>/undismiss", methods=["POST"])
+@app.route("/api/projects/<name>/findings/<int(signed=True):index>/undismiss", methods=["POST"])
 def undismiss_finding_route(name, index):
+    """Same negative-index fallthrough as dismiss (F-02): JSON-400, not HTML."""
+    if index < 0:
+        return _error(f"Finding index {index} is out of range.", 400)
     try:
         m = _load_manifest(name)
     except FileNotFoundError:
@@ -2910,6 +3122,16 @@ def activate_draft_endpoint(name):
     draft = (body.get("name") or "").strip()
     if not draft:
         return _error("A draft name is required.", 400)
+    if draft == m.active_draft:
+        # Activating the already-active draft is a no-op, not an error (F-01,
+        # audit 2026-09-30): activate_draft() requires a snapshot, which only
+        # exists after a fold, so a retry/echo of the current name used to come
+        # back 400 "No snapshot for draft X" — a message that reads like lost
+        # data about a draft the writer is looking at. The UI cannot reach this
+        # (a <select> cannot fire change on its own value), but an API client
+        # retrying an activate must be able to tell "already done" from "your
+        # data is gone". The manifest summary rides along either way.
+        return jsonify(_manifest_summary(m))
     try:
         from .diff import activate_draft
         activate_draft(m, draft)

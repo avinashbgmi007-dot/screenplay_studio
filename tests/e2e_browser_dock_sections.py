@@ -691,7 +691,7 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
     # pace index. Two charts, one title, neither answering "where does it drag".
     # Render the doctor's report before probing it: an empty container would
     # make the absence check pass without ever having held the chart.
-    page.evaluate("""() => { renderReportPanel(); }""")
+    page.evaluate("""() => { renderDockEvidence(); }""")
     page.wait_for_timeout(250)
     pace = page.evaluate("""() => {
       const shelf = document.querySelector('.craft-shelf');
@@ -702,14 +702,11 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
         drag: root.querySelectorAll('.bar-pace').length,
       });
       const s = bars(shelf || document.body);
-      const rep = bars(document.querySelector('#feedback-report') || document.body);
       const dock = bars(document.querySelector('.dock-lens[data-lens="evidence"]') || document.body);
       const titled = [...document.querySelectorAll('.craft-shelf .pace-block-title')]
         .map((e) => e.textContent.trim());
       return { charts: secs.length, seg: s.seg, drag: s.drag,
-               repDrag: rep.drag, repCharts: (document.querySelector('#feedback-report') || document.body)
-                 .querySelectorAll('.pacing-svg').length, repKids: (document.querySelector('#feedback-report') || {}).childElementCount || 0,
-               repPanels: document.querySelectorAll('#feedback-report .craft-panel').length,
+               reportRetired: !document.querySelector('#feedback-report'),
                dockSeg: dock.seg, dockDrag: dock.drag, titles: titled, shelfMissing: false,
                pacePanels: [...document.querySelectorAll('.craft-shelf .craft-panel')]
                  .filter((p) => p.querySelector('.pace-block')).length };
@@ -721,12 +718,12 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
     check("P1.10: both blocks are labeled, so neither is mistaken for the other",
           len(pace["titles"]) == 2 and any("drag" in t.lower() for t in pace["titles"]),
           str(pace["titles"]))
-    check("P1.10: the doctor's report no longer draws the pace chart a second time",
-          pace["repPanels"] > 1 and pace["repKids"] > 0
-          and pace["repDrag"] == 0 and pace["repCharts"] == 0,
-          f"report: {pace['repCharts']} charts / {pace['repDrag']} pace bars "
-          f"(rendered={pace['repKids']} children)")
-    check("P1.10: the dock's Pacing section is the same panel, so it gained both too",
+    # Option A+ (Report 2 §4 move 2): the legacy report pane is retired — the
+    # second surface it drew (and its chart duplication risk) is gone with it.
+    check("P1.10: the doctor's report pane is retired, so no second chart surface exists",
+          pace["reportRetired"],
+          "the legacy #feedback-report pane must stay gone")
+    check("P1.10: the dock's Pacing section is the same panel, so it carries both too",
           pace["dockSeg"] > 0 and pace["dockDrag"] > 0, str(pace))
 
     # -- 3. the disposition taxonomy is explained on the card, not by hover ---
@@ -1608,6 +1605,11 @@ def run(base):
         browser, page, errors = launch(p)
         open_project(page, base, name)
         open_dock(page)
+        # Option A+ (Report 2 §4): the worklist leads and the context half of
+        # the old stack lives in the collapsed Context disclosure at the lens
+        # foot. This suite pins the sections inside it — summon Tier 2 first.
+        page.evaluate("() => setEvidenceTier(2)")
+        page.wait_for_timeout(600)  # the smooth scroll to the disclosure
         lens = page.locator('.dock-lens[data-lens="evidence"]')
         # the ledger assembles from the report — bounded wait, so a missing
         # section reports as a NAMED failure instead of crashing the run
@@ -1636,11 +1638,16 @@ def run(base):
         # comment claimed "it opens first for a reason" while passing no default.
         # The writer landed on a ledger of nine closed headers.
         open_keys = [k for k, v in zip(keys, states) if v == "true"]
+        # Option A+ (Report 2 §4): the Context disclosure joins the queue as a
+        # first-open-open section — the writer who summoned Tier 2 said so, and
+        # the preference outlives the session by the same contract as every
+        # other disclosure. The queue still LEADS (defect C's contract).
         check("the fix queue is the section that opens first (defect C)",
-              open_keys == ["fix-queue"], f"open sections: {open_keys}")
+              open_keys[:1] == ["fix-queue"], f"open sections: {open_keys}")
         check("every other section still starts CLOSED (P1.6 default)",
               bool(states) and all(v == "false" for k, v in zip(keys, states)
-                                   if k != "fix-queue"), str(list(zip(keys, states))))
+                                   if k not in ("fix-queue", "context")),
+              str(list(zip(keys, states))))
         for key in ("fix-queue", "by-category", "coverage"):
             check(f"the plan's section set includes {key!r}", key in keys, str(keys))
         check("the fix-queue section keeps its hook class",
@@ -1731,7 +1738,8 @@ def run(base):
         others = [
             keyed.nth(i).get_attribute("data-open")
             for i in range(keyed.count())
-            if keyed.nth(i).get_attribute("data-key") not in ("by-category", "fix-queue")
+            if keyed.nth(i).get_attribute("data-key")
+            not in ("by-category", "fix-queue", "context")
         ]
         check("the sections the writer never opened are still closed",
               all(v == "false" for v in others), str(others))

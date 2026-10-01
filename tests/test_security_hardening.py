@@ -195,14 +195,20 @@ def test_spa_detects_a_missing_licence_before_writing():
 
 def test_stream_chat_turn_recovers_from_a_stale_token():
     """streamChatTurn used to surface the guard's internal 403 string with no
-    recovery. It must mirror _apiOnce: re-mint once, retry once, then fail
-    with the writer-facing _tokenError message — never the raw server string.
+    recovery. It must mirror _apiOnce — re-mint, retry once, then fail with
+    the writer-facing _tokenError message, never the raw server string. Since
+    2026-09-30 that recovery is SHARED (_staleRecovery), which also covers the
+    below-HTTP death: a restart's first fetch can die on a keep-alive socket
+    the old process held open, where no 403 ever arrives.
     """
-    body = _function_body(_app_js(), "streamChatTurn")
+    src = _app_js()
+    body = _function_body(src, "streamChatTurn")
     assert "resp.status === 403" in body
     assert "_retry" in body, "never retried twice: a second 403 is a real rejection"
     assert "_tokenError(" in body, "the writer must see the actionable message, not the internal one"
-    assert 'cache: "no-store"' in body
+    assert "_staleRecovery(" in body, "recovery is shared with _apiOnce, not re-implemented here"
+    recovery = _function_body(src, "_staleRecovery")
+    assert 'cache: "no-store"' in recovery, "the licence refresh must bypass the HTTP cache"
 
 
 def test_spa_still_echoes_the_token_as_the_header():
