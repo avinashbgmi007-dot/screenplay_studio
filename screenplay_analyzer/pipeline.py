@@ -19,6 +19,7 @@ Returns an AnalysisResult with everything report.py needs.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 
 from screenplay_parser.models import ScriptDocument
@@ -567,15 +568,54 @@ def _top_characters(stats: dict, doc: ScriptDocument, limit: int = 8) -> list[st
     return (ordered + rest)[:limit]
 
 
+def _with_retries(call, attempts: int = 2, delays=(2.0, 5.0)):
+    """Bounded retry for ONE-SHOT category calls (char_reads, logline test).
+
+    chat_json already retries JSON-parse failures internally; what it cannot
+    retry is a generation that never ARRIVES — llama-server 503/busy after its
+    own busy window, a transient disconnect mid-generation. On the real server
+    that used to surface as char_reads stalling minutes on a hung generation
+    and then dying as failed_categories with no diagnosis in report.errors.
+    Two quick retries (2s, 5s), then the final exception propagates to the
+    category's own failed path — bounded (worst case adds ~7s + 2 quick
+    generations), never a second stall.
+    """
+    last_exc = None
+    for attempt in range(attempts):
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 — the caller's failure path owns the category
+            last_exc = exc
+            if attempt < attempts - 1:
+                time.sleep(delays[min(attempt, len(delays) - 1)])
+    raise last_exc
+
+
 def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerClient, characters: list[str], language: str = "eng") -> list[dict]:
     """The character-perception read: how each character actually comes across
     to a stranger vs. what the script appears to intend. Evidence quotes get
-    the same verification as findings."""
+    the same verification as findings.
+
+    One bounded retry pass wraps the call: a hung/busy generation on the real
+    llama-server (the probe's 3-minute stall then failed_categories) gets two
+    quick attempts before the category fails and the reason lands in
+    report.errors — and after the retry the failure is RECORDED, not just
+    raised blind.
+    """
     if not characters:
         return []
     grammar = character_reads_grammar()
     system, user = prompts.character_reads_prompt(overview, doc.title, characters, language=language)
-    result = client.chat_json(system, user, grammar=grammar, max_tokens=1200, fast=True)
+
+    def _call():
+        return client.chat_json(system, user, grammar=grammar, max_tokens=1200, fast=True)
+
+    try:
+        result = _with_retries(_call)
+    except Exception as exc:
+        raise LlamaServerError(
+            "character-perception read failed after 1 retry "
+            f"({type(exc).__name__}: {exc})") from exc
     items = _extract_items(result, "reads")
     reads = [r for r in items if isinstance(r, dict) and r.get("character")]
     for r in reads:
