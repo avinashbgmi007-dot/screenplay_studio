@@ -1256,6 +1256,14 @@ def create_project():
     # safe_dir_name keeps the display `title` in the manifest untouched.
     safe_name = safe_dir_name(title)
 
+    # R5 (audit M3): an EMPTY file is rejected before any project exists —
+    # the parser "succeeds" on 0 bytes, so only this guard gives the writer
+    # the real reason (a 0-byte drop) instead of a generic parse error.
+    upload.seek(0, os.SEEK_END)
+    if upload.tell() == 0:
+        return _error("The uploaded file is empty (0 bytes). Choose the screenplay file you meant to import.", 400)
+    upload.seek(0)
+
     project_dir = _claim_project_dir(safe_name)
     ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
@@ -1273,6 +1281,34 @@ def create_project():
         orch.run_parse()
     except Exception as e:
         return _error(f"Could not process uploaded file: {e}", 500)
+
+    # R5 (audit M3), the scene-less case: the parser also "succeeds" on a
+    # prose file with no scene headings, so the project USED to be created
+    # (201) and the failure only surfaced minutes later as an analyze 502
+    # ("Document has no parsed scenes") — after the writer had left the
+    # desk believing the import worked. The parse stage records the truth;
+    # read it back here, reject with actionable guidance, and REMOVE the
+    # claimed directory so the shelf never lists a project that cannot be
+    # analyzed. (The write of parsed.json is the same file run_parse just
+    # finished — no sharing violation is expected; the bounded retry covers
+    # a stray Windows handle as elsewhere in this file.)
+    try:
+        from screenplay_parser.models import ScriptDocument
+        doc = ScriptDocument.load(manifest.parsed_path)
+        sceneless = not doc.scenes
+    except Exception:
+        sceneless = False  # unreadable parse output keeps the OLD behavior: a 201 whose analyze fails loudly
+    if sceneless:
+        import shutil
+        try:
+            retry_permission(lambda: shutil.rmtree(project_dir))
+        except OSError:
+            pass  # worst case: one half-claimed dir lingers; the 400 is what matters
+        return _error(
+            "This file contains no readable scenes (no scene headings like 'INT. ROOM - DAY'). "
+            "Nothing was added to your library — export the screenplay as Fountain or plain text "
+            "with scene headings and try again.",
+            400)
 
     return jsonify(_manifest_summary(manifest)), 201
 
