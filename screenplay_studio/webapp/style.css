@@ -6307,6 +6307,10 @@ body:not(.idea-mode) .desk {
 .fchip:hover { color:var(--text); border-color:var(--lamp); }
 .fchip.active { background:var(--lamp); border-color:var(--lamp); color:var(--accent-ink); font-weight:600; }
 .fchip:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
+/* R2: the desk progress chip's Stop control — small, inline, never the
+   primary button style, so it reads as an abort not an action. */
+.ap-cancel { font-size: var(--fs-2xs); padding: 2px 8px; }
+.ap-cancel:disabled { opacity: .55; cursor: default; }
 .fchip-loop { margin-left:auto; border-style:dashed; }
 .finding-ink { background:transparent; color:inherit; font:inherit; border-bottom:2px solid var(--lamp); cursor:help; border-radius:1px; }
 .finding-ink.ink-high { border-bottom-color:var(--danger); box-shadow:inset 0 -3px 0 rgba(200,80,58,.14); }

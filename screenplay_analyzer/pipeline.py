@@ -329,9 +329,13 @@ def _extract_items(result, key: str) -> list:
     return []
 
 
-def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng") -> tuple[dict[int, str], list[str]]:
+def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng", should_cancel=None) -> tuple[dict[int, str], list[str]]:
     summaries: dict[int, str] = {}
     errors: list[str] = []
+    # A cancel requested before the first chunk starts must never reach the
+    # model.
+    if should_cancel is not None and should_cancel():
+        raise AnalysisCancelled("Analysis cancelled at the writer's request.")
     grammar = scene_summary_grammar()
     scene_dicts = [
         {
@@ -351,6 +355,11 @@ def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_
         return _extract_items(result, "summaries")
 
     for chunk in _chunk_by_budget(scene_dicts, chunk_size):
+        # Cancellation checks per chunk: on a 120-scene script this loop is
+        # the longest stage, and per-chunk is the finest honest granularity
+        # (a chunk's own generation always finishes).
+        if should_cancel is not None and should_cancel():
+            raise AnalysisCancelled("Analysis cancelled at the writer's request.")
         items, errs = _with_chunk_backoff(chunk, call)
         errors.extend(errs)
         for item in items:
@@ -715,6 +724,17 @@ def evidence_depth(findings) -> dict:
             "unknown": len(findings) - full - over - mixed, "total": len(findings)}
 
 
+class AnalysisCancelled(Exception):
+    """Raised between stages when the caller asked the run to stop.
+
+    Co-operative cancellation: the desk's Stop button sets a per-project event,
+    and the run honors it at the next stage boundary (and between scene-summary
+    chunks). The CURRENT category finishes — a category can hold minutes of
+    model work, and aborting mid-generation would strand a half-written report
+    — so a cancel request lands within one stage of the click, never mid-write.
+    """
+
+
 def analyze(
     doc: ScriptDocument,
     client: LlamaServerClient,
@@ -723,10 +743,16 @@ def analyze(
     run_categories: tuple[str, ...] = None,
     progress_cb=None,
     report_language: str = "eng",
+    should_cancel=None,
 ) -> AnalysisResult:
     """progress_cb: optional callable(dict) called at every stage boundary with
     {"stage": str, "status": "running"|"complete", "detail": str} — lets a UI
     show live per-stage progress instead of a frozen spinner.
+
+    should_cancel: optional callable returning True when the writer asked the
+    run to stop; checked at every stage boundary and between scene-summary
+    chunks. When it fires, AnalysisCancelled propagates and nothing is written
+    (the report is assembled and saved by the caller, only on success).
 
     run_categories: None or ("all",) runs every category (ALL_CATEGORIES);
     any other tuple runs exactly those. An empty tuple runs only the
@@ -737,6 +763,14 @@ def analyze(
     def emit(stage, status, detail=""):
         if progress_cb:
             progress_cb({"stage": stage, "status": status, "detail": detail})
+
+    def _cp():
+        if should_cancel is not None and should_cancel():
+            raise AnalysisCancelled("Analysis cancelled at the writer's request.")
+
+    # First check BEFORE any work — a cancel that arrives while the run is
+    # starting must not wait for the deterministic passes.
+    _cp()
 
     try:
         rules_ctx = RulesContext()
@@ -837,12 +871,13 @@ def analyze(
         emit("pacing", "complete", f"failed: {e}")
 
     # 2. scene summaries (needed for every script-level category + coverage)
+    _cp()
     needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "setup_payoff", "char_reads", "character_dials", "coverage", "genre", "logline_test"))
     overview = ""
     if needs_summaries:
         try:
             emit("summaries", "running", "Summarizing each scene")
-            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language)
+            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language, should_cancel=should_cancel)
             emit("summaries", "complete")
             overview = build_scene_overview_text(doc, summaries)
             result.category_outcomes["summaries"] = "failed" if summary_errors else "ok"
@@ -883,6 +918,7 @@ def analyze(
                            else EVIDENCE_OVERVIEW)
 
     # 3. scene-level dialogue analysis
+    _cp()
     if "dialogue" in run_categories:
         try:
             emit("dialogue", "running", "Reading dialogue & action")
@@ -909,6 +945,7 @@ def analyze(
     }
     for cat, (fn, args) in category_prompts.items():
         if cat in run_categories and overview:
+            _cp()
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
@@ -932,6 +969,7 @@ def analyze(
     # knowledge graph as the candidate source. Runs independent of the
     # summary-based overview (it works directly off the knowledge graph),
     # so it's not gated behind `overview` like the script-level categories above.
+    _cp()
     if "principles" in run_categories:
         try:
             emit("principles", "running", "Checking setups & payoffs")
@@ -948,6 +986,7 @@ def analyze(
     # 4c. character-perception read — how each character comes across to a
     # stranger vs. apparent intent. Needs the overview + character list; runs
     # after the character arc pass so the deterministic stats are ready.
+    _cp()
     if "char_reads" in run_categories and overview:
         try:
             emit("char_reads", "running", "Reading how characters come across")
@@ -974,6 +1013,7 @@ def analyze(
     # against the Principles Engine's per-candidate findings) so they reach
     # the Fix Queue; the ledger itself is also carried on the result as its
     # own report section.
+    _cp()
     if "setup_payoff" in run_categories and overview:
         try:
             emit("setup_payoff", "running", "Auditing setups & payoffs across the whole script")
@@ -996,6 +1036,7 @@ def analyze(
     # 4e. character dials — ScreenplayIQ-style trait scores for the main
     # cast. Needs the overview + character stats; runs after the character
     # reads so the deterministic stats are ready.
+    _cp()
     if "character_dials" in run_categories and overview:
         try:
             emit("character_dials", "running", "Scoring character dials")
@@ -1023,6 +1064,7 @@ def analyze(
     emit("verification", "complete")
 
     # 6. coverage
+    _cp()
     if "coverage" in run_categories and overview:
         try:
             emit("coverage", "running", "Writing coverage")
@@ -1036,6 +1078,7 @@ def analyze(
 
     # 6a. logline test — does the premise land in one sentence? Diagnosis only;
     # runs after coverage because it judges the coverage pass's logline.
+    _cp()
     if "logline_test" in run_categories and overview and result.coverage and result.coverage.get("logline"):
         try:
             emit("logline_test", "running", "Testing the logline")
@@ -1057,6 +1100,7 @@ def analyze(
 
     # 6b. genre-convention check — uses the genre coverage just produced, so it
     # runs after coverage and only when a genre was reported.
+    _cp()
     if "genre" in run_categories and result.coverage and result.coverage.get("genre"):
         try:
             emit("genre", "running", "Checking genre conventions")

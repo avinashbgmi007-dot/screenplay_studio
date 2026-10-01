@@ -2711,6 +2711,26 @@ function startAnalysisProgressUI(startedAt) {
   if (analysisUi) analysisUi.stop();
   const btn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs the lifecycle
   const deskChip = $("#desk-analyze-progress");
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) {
+    cancelBtn.disabled = false;
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = async () => {
+      // Stop asks the server; the run itself decides when it is safe (the
+      // current stage finishes). The button goes inert the moment the ask
+      // lands — one click is one request, and the poller reports the result.
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = "Stopping…";
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/cancel`, { method: "POST" });
+      } catch (e) {
+        // 409 = the run already finished on its own between the click and
+        // the request; the next poll lands the real state either way.
+        cancelBtn.textContent = "■ Stop";
+        cancelBtn.disabled = false;
+      }
+    };
+  }
   if (btn) { btn.disabled = true; btn.classList.add("analyzing"); }
   if (deskChip) deskChip.style.display = "flex";
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
@@ -2764,6 +2784,12 @@ function startAnalysisProgressUI(startedAt) {
         finished = true;
         analysisUi = null;
         hideAnalysisProgressUI();
+        // RE-B4 audit (2026-10-01): the report-arrival peek used to be gated
+        // on `last_pass` changing — which does not exist on a FIRST analysis,
+        // so the writer's first completed run produced no unread dot and no
+        // halo at all (measured 60s post-completion). This in-session flag is
+        // the first-pass arrival signal; the load path consumes it once.
+        analysisCompletedFor = state.currentProject;
         await loadProjects();
         return;
       }
@@ -2810,6 +2836,8 @@ function hideAnalysisProgressUI() {
   if (deskChip) deskChip.style.display = "none";
   const btn = $("#desk-analyze-btn");
   if (btn) { btn.disabled = false; btn.classList.remove("analyzing"); }
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = "■ Stop"; }
 }
 
 // ---------- Phase 8: the desk toolbar — analysis lifecycle beside the page ----------

@@ -51,7 +51,8 @@ class Orchestrator:
 
     # ---- stage: analyze ----
     def run_analyze(self, categories: tuple = None, report_language: str = None,
-                    retry_failed: bool = False) -> ProjectManifest:
+                    retry_failed: bool = False, should_cancel=None,
+                    prev_stage=None) -> ProjectManifest:
         m = self.manifest
         if m.stage("parse").status != "complete":
             raise OrchestratorError("Cannot analyze — parse stage hasn't completed successfully yet.")
@@ -91,6 +92,15 @@ class Orchestrator:
             m.save()
         language = m.report_language or "eng"
 
+        # The caller's PRE-RESET stage snapshot (prev_stage) is the truth for
+        # a cancelled run: the webapp's `force` path resets the stage BEFORE
+        # run_analyze so the orchestrator re-runs, which means the stage
+        # object here no longer remembers what a cancel must restore. A CLI
+        # caller that never pre-resets can omit it; then the in-method capture
+        # below is used.
+        if prev_stage is None:
+            prev_stage = {"status": stage.status,
+                          "output_paths": dict(stage.output_paths) if stage.output_paths else None}
         m.mark_running("analyze")
         try:
             from screenplay_parser.models import ScriptDocument
@@ -117,6 +127,8 @@ class Orchestrator:
             kwargs = {"report_language": language}
             if categories:
                 kwargs["run_categories"] = categories
+            if should_cancel is not None:
+                kwargs["should_cancel"] = should_cancel
 
             result = analyze(doc, client, progress_cb=progress_cb, **kwargs)
 
@@ -172,6 +184,27 @@ class Orchestrator:
                     "failed_categories": failed_categories,
                 })
         except Exception as e:
+            from screenplay_analyzer.pipeline import AnalysisCancelled
+            if isinstance(e, AnalysisCancelled) and not retry_failed:
+                # A cancelled run is NOT a failed run (RE-B4 audit R2): the
+                # writer chose to stop. The stage returns to what it was
+                # before this run started, and the heartbeat says "cancelled"
+                # — the desk's poller resets on it. No report write happened
+                # (save_report runs only on success), so disk state is the
+                # pre-run state plus the heartbeat.
+                import time as _tc
+                from .manifest import StageStatus
+                try:
+                    atomic_write_json(m.progress_path, {"stage": "analyze", "status": "cancelled", "detail": "Cancelled at the writer's request — the script is unchanged.", "ts": _tc.time()})
+                except Exception:
+                    pass
+                st = StageStatus()
+                st.status = prev_stage["status"]
+                if prev_stage.get("output_paths"):
+                    st.output_paths = prev_stage["output_paths"]
+                m.stages["analyze"] = st
+                m.save()
+                raise
             import time as _t2
             try:
                 atomic_write_json(m.progress_path, {"stage": "failed", "status": "failed", "detail": str(e), "ts": _t2.time()})

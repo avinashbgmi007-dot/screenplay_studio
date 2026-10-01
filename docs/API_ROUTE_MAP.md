@@ -58,6 +58,7 @@ any `@app.route` — this map had drifted by +4 before the 2026-09-30 audit.)
 | GET | `/api/projects/<name>` | `get_project` | Project summary (`_manifest_summary`). |
 | DELETE | `/api/projects/<name>` | `delete_project` | Delete a project (guarded inside `PROJECTS_DIR`). |
 | POST | `/api/projects/<name>/analyze` | `analyze_project` | Run the 12-pass analysis (resumable; `?force` resets). |
+| POST | `/api/projects/<name>/analyze/cancel` | `cancel_analyze` | Ask the running analysis to stop (co-operative; restores the pre-run stage). |
 | POST | `/api/projects/<name>/analyze/retry-failed` | `retry_failed_categories` | Re-run only failed analysis categories. |
 | POST | `/api/projects/<name>/reparse` | `reparse_project` | Re-parse source, regenerate KG, invalidate analysis. |
 | GET | `/api/projects/<name>/backup` | `backup_project` | Download the whole project dir as a zip. |

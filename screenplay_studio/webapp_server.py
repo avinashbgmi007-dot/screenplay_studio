@@ -1352,6 +1352,10 @@ def delete_project(name):
 # collected while it is the thing providing mutual exclusion.
 _ANALYZE_LOCKS: dict[str, threading.Lock] = {}
 _ANALYZE_LOCKS_GUARD = threading.Lock()
+# Per-project cancel events (R2): set by /analyze/cancel, checked co-operatively
+# by the running pipeline at stage boundaries. Lives only as long as the run:
+# created lazily by the cancel route, popped when the run's request returns.
+_ANALYZE_CANCEL: dict[str, threading.Event] = {}
 
 
 def _analyze_lock(name: str) -> threading.Lock:
@@ -1371,9 +1375,31 @@ def analyze_project(name):
         return _error("An analysis is already running for this project — "
                       "wait for it to finish before starting another.", 409)
     try:
-        return _analyze_locked(m)
+        return _analyze_locked(m, name)
     finally:
         lock.release()
+        # The run is over (completed, failed, or cancelled) — a stale event
+        # must never outlive it, or the NEXT run would cancel on arrival.
+        _ANALYZE_CANCEL.pop(name, None)
+
+
+@app.route("/api/projects/<name>/analyze/cancel", methods=["POST"])
+def cancel_analyze(name):
+    """Ask the running analysis to stop (RE-B4 audit R2).
+
+    Co-operative: the event is checked at stage boundaries and between
+    scene-summary chunks, so the current category finishes — a cancel lands
+    within one stage of the click, never mid-write. 409 when nothing is
+    running (double-click, or the run just finished on its own)."""
+    try:
+        _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    ev = _ANALYZE_CANCEL.get(name)
+    if ev is None or not _analyze_lock(name).locked():
+        return _error("No analysis is running for this project.", 409)
+    ev.set()
+    return jsonify({"cancel_requested": True})
 
 
 def _start_progress_heartbeat(m) -> None:
@@ -1451,7 +1477,7 @@ def _record_pass(m) -> None:
         traceback.print_exc()
 
 
-def _analyze_locked(m):
+def _analyze_locked(m, name):
     # The pre-flight lives OUTSIDE the pipeline's try below, and it does real
     # work: it rewrites the manifest and resets the progress heartbeat. An
     # exception here used to escape the handler entirely, and a Flask dev server
@@ -1477,6 +1503,13 @@ def _analyze_locked(m):
         body = request.get_json(silent=True) or {}
         if body.get("force"):
             from .manifest import StageStatus
+            # Snapshot BEFORE the reset (R2): a CANCELLED run must restore the
+            # stage the writer had before they pressed Re-run — a first run
+            # back to pending, a re-run back to complete with its report paths
+            # and partial record intact. (A FAILED run restores nothing: the
+            # orchestrator's own failure record is the truth there, as before.)
+            prev_stage = {"status": m.stage("analyze").status,
+                          "output_paths": dict(m.stage("analyze").output_paths) if m.stage("analyze").output_paths else None}
             # Resetting the stage to pending is what forces the re-run: the
             # orchestrator short-circuits on `stage.status == "complete"`, not on the
             # report files existing. The report files used to be deleted here too,
@@ -1497,8 +1530,17 @@ def _analyze_locked(m):
     orch = Orchestrator(m)
     import time as _t
     _t0 = _t.time()
+    cancel_event = _ANALYZE_CANCEL.setdefault(name, threading.Event())
+    from screenplay_analyzer.pipeline import AnalysisCancelled  # lazy: see AGENTS.md
     try:
-        orch.run_analyze(report_language=report_language)
+        orch.run_analyze(report_language=report_language,
+                         should_cancel=cancel_event.is_set,
+                         prev_stage=prev_stage if body.get("force") else None)
+    except AnalysisCancelled:
+        # The writer stopped the run: not an error, not a metric, not a point
+        # on the revision arc. The orchestrator already restored the stage and
+        # written the cancelled heartbeat; answer plainly.
+        return jsonify({"cancelled": True, **_manifest_summary(m)})
     except OrchestratorError as e:
         return _error(str(e), 502)
     except Exception as e:
