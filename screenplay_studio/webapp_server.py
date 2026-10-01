@@ -1681,6 +1681,58 @@ def backup_project(name):
                      download_name=f"{name}-backup.zip")
 
 
+@app.route("/api/library/backup", methods=["GET"])
+def backup_library():
+    """The WHOLE library as one .zip (audit R7/M5): every project directory,
+    plus a manifest of what was included. The per-project backup above saves
+    one desk; this saves the shelf — the writer's entire body of work in a
+    single click, nothing leaving the machine. The gap this closes: until it
+    existed, the only full copy of a writer's library was a manual, error-
+    prone copy of PROJECTS_DIR from inside the app's own data folder.
+
+    Per-project failures are contained: a damaged or half-deleted project is
+    recorded in the manifest (so the writer KNOWS) instead of failing the
+    whole archive. Lock sidecars and mid-flight temp files are excluded, as
+    in the per-project backup."""
+    buf = io.BytesIO()
+    included, failed = [], []
+    stamp = time.strftime("%Y%m%d-%H%M")
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if os.path.isdir(PROJECTS_DIR):
+            for name in sorted(os.listdir(PROJECTS_DIR)):
+                # Same exclusions as the shelf listing: the profile store is
+                # internal data, not a project; a lock sidecar is a file.
+                if name == "writer_profile.json" or not os.path.isdir(os.path.join(PROJECTS_DIR, name)):
+                    continue
+                project_dir = os.path.realpath(_project_dir(name))
+                try:
+                    n_files = 0
+                    for root, _dirs, files in os.walk(project_dir):
+                        for fname in files:
+                            if fname.endswith(".lock") or fname.endswith(".tmp"):
+                                continue
+                            full = os.path.join(root, fname)
+                            try:
+                                zf.write(full, os.path.join(name, os.path.relpath(full, project_dir)))
+                                n_files += 1
+                            except OSError:
+                                continue  # a file vanishing mid-zip: skip it, keep the archive
+                    included.append({"project": name, "files": n_files})
+                except OSError as e:
+                    # One unreadable project must not destroy the backup of
+                    # the other twenty — and must not be silent about it.
+                    failed.append({"project": name, "error": str(e)})
+        zf.writestr("library-backup.json", json.dumps({
+            "kind": "script-doctor-library-backup",
+            "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "projects": included,
+            "failed": failed,
+        }, indent=2), zipfile.ZIP_DEFLATED)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name=f"script-doctor-library-backup-{stamp}.zip")
+
+
 @app.route("/api/projects/<name>/reparse", methods=["POST"])
 def reparse_project(name):
     """Re-run the parse stage on the active source file, in-app.

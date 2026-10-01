@@ -4,6 +4,38 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-10-02 (branch `feature/readiness-remediations`, stacked on PR #4 — **the seven
+production-readiness remediations from the 2026-10-01 audit, R1→R7, each pinned by tests.** Full
+dispositions in `docs/audit/production_readiness_2026-10-01.md`. (1) R1 arrival gap: a FIRST
+analysis never scheduled the arrival peek — `last_pass` only exists from the second pass on — so
+the writer got no fresh-report signal; a first completion now sets an in-session
+`analysisCompletedFor` flag that the project-load path consumes exactly once (a plain reload of an
+already-read report never fakes a fresh one), and the right-edge affordance — the only dock
+surface visible while the dock is closed — joins the evidence tab in carrying the unread dot.
+(2) R2 cancel: `POST /api/analyze/cancel` flips a per-module cancel flag; `run_analyze` restores
+the stage to its pre-run state (snapshot taken on the force path too) so a cancelled run leaves
+nothing written and the SPA poller says so plainly instead of erroring, with a Stop button in the
+progress chip; also fixed a latent NameError in `_analyze_locked` that had been 500ing EVERY
+analyze call. (3) R4 generation timeouts: `chat_json` runs under a 600s wall-clock budget
+(monotonic deadline, per-attempt slices, the final error names the actual attempts made and the
+budget), the base client can pin a longer socket timeout, and the pipeline's retry hook surfaces
+as a visible "retrying" beat plus Run Notices (`AnalysisResult.notices` → "## ℹ️ Run Notes" in the
+report and `notices` in the findings JSON). (4) R5 upload validation: 0-byte files are rejected at
+create (400, "empty (0 bytes)") and scene-less parse results are rejected with Fountain guidance
+and a retry permission, instead of a project that parses "OK" with 0 scenes and can only fail
+later. (5) R3+R6 CI: `test-live-model` (ubuntu-24.04, gated on the `STUDIO_LIVE_LLM_URL` repo
+variable, drives the live gun_pen_audit via `E2E_BASE`) and `test-browser-windows` (windows-latest,
+full fleet, bash shell, chromium without `--with-deps`) — the fleet now gates on the platform
+writers actually use. (6) R7 library backup: `GET /api/library/backup` zips every project (skips
+`writer_profile.json` and non-project entries, excludes `.lock`/`.tmp`, collects per-project
+failures non-fatally) with an embedded `library-backup.json` manifest, and the dashboard's "Back
+up all" button downloads it through a token-carrying fetch + blob (a bare `<a>` cannot carry
+`X-Studio-Token`); route census 91→93 with the API route map and its test pin updated. OUTCOME:
+full pytest 2012 passed / 3 skipped (the pre-existing store_fault_injection skip), ruff clean,
+JS 23/23, browser fleet 60 suites — 59 passed / 1 skipped (gun_pen_audit, live-only, unchanged) /
+0 failed, 1514 checks; four new suites (test_analyze_cancel, test_generation_timeout,
+test_upload_validation, test_library_backup) add 26 checks.)
+
 **Last updated:** 2026-10-01 (branch `feature/post-trust-hardening`, PR #4 — **three edges the real-model
 probe + Pain_3 validation left on the table, all fixed and pinned.** (1) RE-B4, the demo-fallback
 false positive: the import-time reachability probe can only test the DEFAULT url — `--server` is

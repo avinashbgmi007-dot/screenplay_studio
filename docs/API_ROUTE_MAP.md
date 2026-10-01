@@ -20,7 +20,7 @@
 - There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
   stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
 
-**Totals:** 91 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **93**.
+**Totals:** 93 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **95**.
 (Pinned by `tests/test_route_map_totals.py`; regenerate after adding or changing
 any `@app.route` — this map had drifted by +4 before the 2026-09-30 audit.)
 
@@ -158,6 +158,7 @@ any `@app.route` — this map had drifted by +4 before the 2026-09-30 audit.)
 | POST | `/api/writer-memory/observations/<obs_id>/suppress` | `suppress_writer_observation` | Forget a scoped observation. |
 | POST | `/api/writer-memory/refresh` | `refresh_writer_memory` | Recompute the relationship card. |
 | GET | `/api/writer-library` | `get_writer_library` | Digest of every parsed project (PAST WORK block). |
+| GET | `/api/library/backup` | `backup_library` | Download EVERY project as one zip (with an embedded library manifest). |
 
 ## Ideas (collection + single)
 

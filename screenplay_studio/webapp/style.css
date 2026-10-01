@@ -4316,6 +4316,21 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 }
 .dash-conn.ok { color: var(--desk-ok); border-color: color-mix(in oklab, var(--desk-ok) 50%, transparent); }
 .dash-conn.fail { color: var(--desk-rust); border-color: color-mix(in oklab, var(--desk-rust) 50%, transparent); }
+/* R7: the shelf-saving backup button rides the head's right side, beside the
+   connection pill (which yields its auto margin to this button). */
+.dash-backup-all {
+  margin-left: auto;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: var(--fs-xs);
+  padding: var(--sp-1) var(--sp-4);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--desk-line-dim);
+  background: transparent;
+  color: var(--desk-text-dim);
+  cursor: pointer;
+}
+.dash-backup-all:hover { color: var(--desk-amber); border-color: var(--desk-amber); }
+.dash-head .dash-conn { margin-left: 0; }
 
 .dash-grid {
   display: grid;

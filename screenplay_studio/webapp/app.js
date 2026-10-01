@@ -237,6 +237,38 @@ function _tokenError(resp, data) {
   return err;
 }
 
+// ---- authenticated download (audit R7) ----
+// A bare <a href> cannot carry the X-Studio-Token header, so on a token-
+// protected server a click would save the 403 error page instead of the
+// file. Fetch the bytes WITH the header, hand the blob to the browser as a
+// download, and surface a real failure as a writer-facing message instead
+// of a silently corrupted save.
+async function downloadBackup(path, filename) {
+  try {
+    const headers = {};
+    const tok = await _ensureStudioToken();
+    if (tok) headers["X-Studio-Token"] = tok;
+    let resp;
+    resp = await fetch(API + path, { headers });
+    if (!resp.ok) {
+      let msg = `backup failed (HTTP ${resp.status})`;
+      try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (_) { /* no body */ }
+      throw new Error(msg);
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    showError("Couldn't download the backup: " + (e.message || e));
+  }
+}
+
 // ---- streaming chat turn (SSE) ----
 // Raw tokens stream into the pending bubble AS the model writes them — the
 // perceived-latency win for slow local models. The final SSE event carries
@@ -953,6 +985,19 @@ function renderDashboard() {
   if (!grid) return;
   grid.innerHTML = "";
   const projects = state.projects || [];
+
+  // Library-wide backup (audit R7/M5): the shelf-saving sibling of each
+  // card's ⬇ Backup link. Hidden on an empty shelf — backing up nothing is
+  // a button that can only confuse. Wired once; the flag survives re-renders.
+  const allBtn = document.getElementById("dash-backup-all");
+  if (allBtn) {
+    allBtn.hidden = !projects.length;
+    if (projects.length && !allBtn.dataset.wired) {
+      allBtn.dataset.wired = "1";
+      allBtn.addEventListener("click", () =>
+        downloadBackup("/api/library/backup", "script-doctor-library-backup.zip"));
+    }
+  }
 
   if (!projects.length) {
     const empty = el("p", "dash-empty", "Nothing here yet — lay a manuscript on the desk above, or open the sample page.");
@@ -2790,6 +2835,18 @@ function startAnalysisProgressUI(startedAt) {
         // halo at all (measured 60s post-completion). This in-session flag is
         // the first-pass arrival signal; the load path consumes it once.
         analysisCompletedFor = state.currentProject;
+        await loadProjects();
+        return;
+      }
+      if (p.status === "cancelled") {
+        // R2: the writer stopped the run. The server restored the stage to
+        // its pre-run state; nothing was written. Say so plainly, no error.
+        clearInterval(poll);
+        clearInterval(timer);
+        finished = true;
+        analysisUi = null;
+        hideAnalysisProgressUI();
+        appendSystemNote("Analysis stopped at your request — the script and any previous report are unchanged.", true);
         await loadProjects();
         return;
       }
@@ -6734,6 +6791,8 @@ function scheduleArrivalPeek() {
 function clearEvidenceUnread() {
   const tab = document.getElementById("dock-tab-evidence");
   if (tab) tab.classList.remove("has-unread");
+  const edge = document.getElementById("right-edge-affordance");
+  if (edge) edge.classList.remove("has-unread");
 }
 
 // ---------- arrival strip (R4 + N1 + N2 + P1.9): the "finally" ----------
