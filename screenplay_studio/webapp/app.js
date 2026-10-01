@@ -2368,8 +2368,9 @@ async function openProject(name) {
     state.script = null;
     state.findings = [];
     state.findingStatus = {};
-    state.fixQueue = null;
-    state.reportStats = null;
+  state.fixQueue = null;
+  state.reportStats = null;
+  state.report = null;  // carried the analysis-time verification_summary; readout must not leak it
     state.lint = null;
     state.premise = null;
     $("#premise-view").style.display = "none";
@@ -6704,18 +6705,16 @@ function clearEvidenceUnread() {
  *  when there was nothing to check). Both orientation strips print this string;
  *  two honest-looking numbers that disagree is how a writer stops trusting both. */
 function verificationReadout() {
+  // The ONLY reader of report.verification_summary. The server now recomputes
+  // this block at serve time from the rows being served (_sanitize_report), so
+  // every report — including ones analysed before the field existed — renders
+  // the readout. Old projects must not leak a previous script's numbers when a
+  // new one has no report yet, so the project switch resets state.report.
   const vs = state.report && state.report.verification_summary;
   if (!vs) return null;
-  const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
-  const unquoted = vs.no_quote || 0;
-  if (checkable) {
-    return (vs.verified || 0) + " of " + checkable + " quotes verified ("
-      + Math.round(100 * (vs.verified || 0) / checkable) + "%)"
-      + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "");
-  }
-  return unquoted
-    ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"
-    : null;
+  // The words live in core.js (unit-tested under node --test); this wrapper
+  // keeps the report-data access in one place for both orientation strips.
+  return verificationReadoutText(vs);
 }
 
 // spec 15.4: pass_history keeps the ledger's open count beyond one generation,

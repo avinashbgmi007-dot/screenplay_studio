@@ -153,6 +153,27 @@ function _stageStep(label, status) {
   return `<span class="step ${cls}" title="${escapeHtml(label)}: ${escapeHtml(status || "pending")}"><i></i>${escapeHtml(label)}</span>`;
 }
 
+/** The trust-line words for the dock's verification readout: appends the
+ *  element to the page — that is app.js's job; this just builds the words.
+ *  Reads report.verification_summary (also served for pre-bundle reports —
+ *  the server recomputes the block at serve time). The denominator is
+ *  quote-bearing findings only; `no_quote` rows have nothing checkable and
+ *  are reported as a count instead of a lie.
+ */
+function verificationReadoutText(vs) {
+  if (!vs || typeof vs !== "object") return null;
+  const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
+  const unquoted = vs.no_quote || 0;
+  if (checkable) {
+    return (vs.verified || 0) + " of " + checkable + " quotes verified ("
+      + Math.round(100 * (vs.verified || 0) / checkable) + "%)"
+      + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "");
+  }
+  return unquoted
+    ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"
+    : null;
+}
+
 // ---- Node test hook (browsers never take this branch) ----
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -167,5 +188,6 @@ if (typeof module !== "undefined" && module.exports) {
     _strHash,
     _base36,
     _stageStep,
+    verificationReadoutText,
   };
 }

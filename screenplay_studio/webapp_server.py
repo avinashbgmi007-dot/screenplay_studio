@@ -4469,8 +4469,13 @@ def main():
     # recorded somewhere durable rather than only printed to a console nobody is
     # watching. A read-only install directory returns None and is reported below.
     _log_file = _configure_logging(PROJECTS_DIR)
-    # env-var demo trigger already pointed CONFIG at the demo server at import
-    # time -- don't clobber it back to :8080 (keeps flag/env parity honest).
+    # The demo decision is re-made here against the URL the writer ACTUALLY
+    # passed (RE-B4): the import-time probe could only test the default. Undo
+    # an auto-fallback first so --server lands on a clean config, then apply.
+    # The env-var demo trigger and an explicit --demo-model keep their
+    # import/flag behavior untouched; only the AUTO fallback is re-decided.
+    if _DEMO_FALLBACK_AUTO:
+        _undo_demo_fallback()
     if not _DEMO_MODEL_ACTIVE:
         try:
             CONFIG["server_url"] = args.server
@@ -4480,6 +4485,17 @@ def main():
             parser.error(str(e))
     if args.demo_model:
         _use_demo_model()
+    else:
+        # The false-positive rescue (RE-B4): --server points at a live
+        # llama-server that the default-address probe never saw. Stands down
+        # under pytest (same escape hatch the import-time fallback honours,
+        # so the E2E fleet's deterministic boots are never second-guessed)
+        # and unless the import-time AUTO fallback is what put the demo in
+        # charge — an env/flag demo choice is never overridden here.
+        under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
+            any("pytest" in str(a).lower() for a in __import__("sys").argv)
+        if not under_pytest:
+            _recheck_fallback_after_args()
 
     # The token can also come from the environment, so a launcher script does not
     # have to put a secret on a command line (where it lands in shell history and
@@ -4512,12 +4528,18 @@ def main():
 
 _DEMO_MODEL_ACTIVE = False
 _DEMO_URL = None  # the in-process demo server's URL while active
+# True only while the desk runs on the IMPORT-TIME auto-fallback (the writer
+# never asked for demo; the default url just looked dead). Explicit demo —
+# env trigger or --demo-model — keeps this False, so main()'s re-check never
+# second-guesses a mode the writer chose.
+_DEMO_FALLBACK_AUTO = False
 
 
-def _use_demo_model() -> str:
+def _use_demo_model(auto: bool = False) -> str:
     """Point CONFIG at the built-in demo craft model (started in-process).
-    Opt-in only — never runs unless asked for by flag or env."""
-    global _DEMO_MODEL_ACTIVE, _DEMO_URL
+    Opt-in only — never runs unless asked for by flag or env (or by the
+    startup fallback, which marks itself with auto=True)."""
+    global _DEMO_MODEL_ACTIVE, _DEMO_URL, _DEMO_FALLBACK_AUTO
     try:
         from .demo_model import start_demo_server
         url = start_demo_server()
@@ -4528,11 +4550,71 @@ def _use_demo_model() -> str:
         CONFIG["server_url"] = url
         _DEMO_URL = url
         _DEMO_MODEL_ACTIVE = True
+        _DEMO_FALLBACK_AUTO = auto
         print("DEMO MODEL active (in-process) — no real llama-server needed.")
         return url
     except Exception:  # demo is a convenience — never block startup on it
         print("Demo model unavailable; keeping the configured server.")
         return CONFIG["server_url"]
+
+
+def _server_reachable(url: str) -> bool:
+    """Can the desk talk to this model server right now? Module-level so both
+    the import-time fallback below and main()'s re-check probe the SAME way."""
+    try:
+        from screenplay_analyzer.llm_client import LlamaServerClient
+        return LlamaServerClient(
+            base_url=url,
+            extra_headers=_auth_headers(CONFIG.get("api_key")),
+        ).is_reachable()
+    except Exception:
+        return False
+
+
+def _undo_demo_fallback() -> None:
+    """Undo what the import-time auto-fallback did, before it is re-decided.
+
+    This is exactly `_use_demo_model()` in reverse — including the deliberate
+    DO-NOTHINGs: `start_demo_server()`'s thread is never stopped (stopping it
+    would pull the port out from under the strip and any tab holding it; the
+    thread keeps running but stops answering the desk once the globals move,
+    the same lifetime the switch-back flow already accepts); and if the writer
+    chose a server_url through /api/config between import and main() — which
+    cannot happen on the shipped launch path — that choice would be clobbered
+    by restoring `real_server_url` and, worse, `real_server_url` would be
+    wiped. Accepted: the window is empty in practice and the fallback re-check
+    below runs microseconds after import.
+    """
+    global _DEMO_MODEL_ACTIVE, _DEMO_URL, _DEMO_FALLBACK_AUTO
+    if not _DEMO_MODEL_ACTIVE:
+        return
+    real = CONFIG.get("real_server_url")
+    if real:
+        CONFIG["server_url"] = real
+        CONFIG["real_server_url"] = None
+    _DEMO_MODEL_ACTIVE = False
+    _DEMO_URL = None
+    _DEMO_FALLBACK_AUTO = False
+
+
+def _recheck_fallback_after_args() -> None:
+    """Re-decide the auto-fallback once main() knows the real --server.
+
+    The import-time probe ran against the DEFAULT url; this one runs against
+    what the writer actually pointed the desk at (main() applies --server
+    first). Gated on `_DEMO_FALLBACK_AUTO`, so it stands down for explicit
+    demo mode AND for a clean import (real server found, nothing to undo).
+    The under-pytest rule lives at the main() call site — it protects the
+    E2E fleet's deterministic BOOT path, not the helper itself, which stays
+    unit-testable.
+    """
+    if not _DEMO_FALLBACK_AUTO:
+        return  # explicit demo, or import found a reachable server: stand down
+    if _server_reachable(CONFIG["server_url"]):
+        print("Your model server is reachable — continuing with it. (The startup "
+              "probe had only tested the default address before --server was "
+              "parsed; the fallback was a false positive for your launch.)")
+        _undo_demo_fallback()
 
 
 # The flask CLI path (`flask --app screenplay_studio.webapp_server run`) never
@@ -4541,19 +4623,16 @@ def _use_demo_model() -> str:
 #   2. Auto-fallback: the configured model server is unreachable at startup,
 #      so instead of a dead desk, run on the built-in demo craft model.
 # A reachable llama-server ALWAYS wins — the real flow is never hijacked.
+# KNOWN EDGE (bounded, now re-checked in main()): this probe can only see the
+# DEFAULT url — `--server` is not parsed until main(). A desk pointed at a live
+# non-default server used to silently demo whenever the default was down; the
+# `python -m screenplay_studio.webapp_server --server http://127.0.0.1:8099`
+# launch (llama.cpp binds IPv4, `localhost` resolves `::1` first on Windows)
+# was exactly that desk. main() now re-runs the decision against the real URL
+# and undoes a demo fallback the real server proves wrong.
 if _env_flag("SCREENPLAY_STUDIO_DEMO_MODEL"):
     _use_demo_model()
 else:
-    def _server_reachable(url: str) -> bool:
-        try:
-            from screenplay_analyzer.llm_client import LlamaServerClient
-            return LlamaServerClient(
-                base_url=url,
-                extra_headers=_auth_headers(CONFIG.get("api_key")),
-            ).is_reachable()
-        except Exception:
-            return False
-
     under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
         any("pytest" in str(a).lower() for a in __import__("sys").argv)
     if not under_pytest and not _server_reachable(CONFIG["server_url"]):
@@ -4561,7 +4640,7 @@ else:
               "to the built-in DEMO craft model so the desk still works.")
         print("It is used again automatically whenever your llama-server is up; "
               "set SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback.")
-        _use_demo_model()
+        _use_demo_model(auto=True)
 
 
 if __name__ == "__main__":
