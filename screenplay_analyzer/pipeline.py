@@ -152,6 +152,11 @@ class AnalysisResult:
     verification: dict = field(default_factory=dict)
     model_used: str | None = None
     errors: list[str] = field(default_factory=list)
+    notices: list[str] = field(default_factory=list)
+    """Recoveries worth REPORTING as good news (audit M2): a pass that failed,
+    retried, and succeeded used to be invisible — the writer saw only a
+    spinner that took longer than usual, or nothing at all. Errors stay in
+    `errors`; a notice says "this was bumpy but it landed"."""
     category_outcomes: dict = field(default_factory=dict)
     """Per-category result: category name -> "ok" | "failed". Lets the
     orchestrator record exactly which categories succeeded so a partial
@@ -577,7 +582,7 @@ def _top_characters(stats: dict, doc: ScriptDocument, limit: int = 8) -> list[st
     return (ordered + rest)[:limit]
 
 
-def _with_retries(call, attempts: int = 2, delays=(2.0, 5.0)):
+def _with_retries(call, attempts: int = 2, delays=(2.0, 5.0), on_retry=None):
     """Bounded retry for ONE-SHOT category calls (char_reads, logline test).
 
     chat_json already retries JSON-parse failures internally; what it cannot
@@ -588,6 +593,10 @@ def _with_retries(call, attempts: int = 2, delays=(2.0, 5.0)):
     Two quick retries (2s, 5s), then the final exception propagates to the
     category's own failed path — bounded (worst case adds ~7s + 2 quick
     generations), never a second stall.
+
+    on_retry(n, exc) fires after the n-th failed attempt, before the delay —
+    so a successful recovery can be reported (audit M2) instead of the retry
+    being invisible to the writer.
     """
     last_exc = None
     for attempt in range(attempts):
@@ -596,11 +605,16 @@ def _with_retries(call, attempts: int = 2, delays=(2.0, 5.0)):
         except Exception as exc:  # noqa: BLE001 — the caller's failure path owns the category
             last_exc = exc
             if attempt < attempts - 1:
+                if on_retry is not None:
+                    try:
+                        on_retry(attempt + 1, exc)
+                    except Exception:
+                        pass  # a reporting hook must never break the retry it reports
                 time.sleep(delays[min(attempt, len(delays) - 1)])
     raise last_exc
 
 
-def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerClient, characters: list[str], language: str = "eng") -> list[dict]:
+def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerClient, characters: list[str], language: str = "eng", on_retry=None) -> list[dict]:
     """The character-perception read: how each character actually comes across
     to a stranger vs. what the script appears to intend. Evidence quotes get
     the same verification as findings.
@@ -609,7 +623,8 @@ def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerC
     llama-server (the probe's 3-minute stall then failed_categories) gets two
     quick attempts before the category fails and the reason lands in
     report.errors — and after the retry the failure is RECORDED, not just
-    raised blind.
+    raised blind. `on_retry(n, exc)` rides along so a successful recovery can
+    be surfaced (audit M2) instead of the bump being invisible.
     """
     if not characters:
         return []
@@ -620,7 +635,7 @@ def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerC
         return client.chat_json(system, user, grammar=grammar, max_tokens=1200, fast=True)
 
     try:
-        result = _with_retries(_call)
+        result = _with_retries(_call, on_retry=on_retry)
     except Exception as exc:
         raise LlamaServerError(
             "character-perception read failed after 1 retry "
@@ -990,12 +1005,27 @@ def analyze(
     if "char_reads" in run_categories and overview:
         try:
             emit("char_reads", "running", "Reading how characters come across")
+            retries_used = {"n": 0}
+
+            def _char_retry(n, exc):
+                retries_used["n"] = n
+                emit("char_reads", "running", f"Model hiccup on the character read — retrying ({n})")
+
             result.character_reads = run_character_reads(
                 doc, overview, client,
                 _top_characters(result.stats, doc),
                 language=report_language,
+                on_retry=_char_retry,
             )
             result.category_outcomes["char_reads"] = "ok"
+            if retries_used["n"]:
+                # M2: the retry succeeded — say so. A pass that silently ate a
+                # 2s/5s retry looked identical to a clean one; the writer had
+                # no way to know the read wobbled and recovered.
+                result.notices.append(
+                    f"The character-perception read hit a model hiccup but recovered on retry "
+                    f"#{retries_used['n']} — no findings were lost."
+                )
             emit("char_reads", "complete")
         except LlamaServerError as e:
             result.category_outcomes["char_reads"] = "failed"

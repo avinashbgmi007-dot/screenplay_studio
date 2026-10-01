@@ -131,6 +131,7 @@ class LlamaServerClient(BaseLlamaClient):
         temperature: float = 0.3,
         retries: int = 2,
         fast: bool = False,
+        wall_clock: float | None = 600.0,
     ):
         """
         Sends a chat completion request and returns parsed JSON. Uses the
@@ -140,6 +141,15 @@ class LlamaServerClient(BaseLlamaClient):
 
         fast=True routes the call to the optional cheap tier (fast_model):
         summaries/refresh-style calls where a lighter model is fine.
+
+        wall_clock: a total budget (seconds) for this LOGICAL call — every
+        HTTP attempt inside it, including the internal parse-failure retries
+        and the server's busy window, must fit inside it. Without it, one
+        logical call could legally take (retries+1) x timeout plus busy
+        backoff — minutes of dead air in an analysis run (audit M1). The
+        budget degrades gracefully: if a budget slice shrinks below the
+        configured timeout, the slice wins; if it would go non-positive,
+        the call stops attempting. None disables the budget (old behavior).
         """
         if fast and self.fast_model:
             model = self.resolve_model_id(self.fast_model)
@@ -167,12 +177,35 @@ class LlamaServerClient(BaseLlamaClient):
             payload["presence_penalty"] = 0.3
 
         last_error = None
+        attempts_made = 0
+        deadline = (time.monotonic() + wall_clock) if wall_clock else None
         for attempt in range(retries + 1):
+            # Per-attempt timeout: this attempt's slice of the remaining
+            # budget, capped at the configured timeout — a slow-but-healthy
+            # generation gets its full configured window, but attempts can
+            # never pile up to (retries+1) x timeout of dead air (audit M1).
+            # A non-positive remainder (earlier attempts ate the budget)
+            # stops the loop rather than firing one more request that is
+            # born dead.
+            slice_ = None
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # ceil so a fresh full-budget attempt keeps its exact
+                # configured timeout (599.9999 would otherwise be reported —
+                # and behave — as a hair under what the caller configured).
+                import math as _math
+                slice_ = min(_math.ceil(remaining), float(self.timeout))
+            attempts_made += 1  # a request is being SENT (success or not)
             try:
-                data = self._post_chat(payload, busy_retries=6)
+                data = self._post_chat(payload, busy_retries=6, timeout=slice_)
             except LlamaServerError as e:
                 last_error = str(e)
                 if attempt < retries:
+                    # The 1s settle is NOT deducted from the budget; the
+                    # budget measures generation time. Worst-case drift is
+                    # ~1s per attempt against a 600s budget — acceptable.
                     time.sleep(1)
                     continue
                 break
@@ -197,6 +230,7 @@ class LlamaServerClient(BaseLlamaClient):
                 break
 
         raise LlamaServerError(
-            f"Model output could not be parsed as JSON after {retries + 1} attempts. "
-            f"Last error: {last_error}"
+            f"Model output could not be parsed as JSON after {attempts_made} attempt(s)"
+            + (f" within the {wall_clock:.0f}s wall-clock budget" if wall_clock else "")
+            + f". Last error: {last_error}"
         )

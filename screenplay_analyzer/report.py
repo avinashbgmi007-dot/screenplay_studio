@@ -108,6 +108,15 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append(f"- {e}")
         lines.append("")
 
+    if result.notices:
+        # M2: recoveries get their own voice, distinct from warnings — the
+        # writer should know a pass wobbled and landed, not that something
+        # is wrong with their script.
+        lines.append("## ℹ️ Run Notes")
+        for n in result.notices:
+            lines.append(f"- {n}")
+        lines.append("")
+
     # --- Coverage ---
     if result.coverage:
         cov = result.coverage
@@ -415,6 +424,7 @@ def to_findings_json(result: AnalysisResult) -> dict:
             **verification_rate(result.verification),
         },
         "errors": result.errors,
+        "notices": result.notices,
     }
 
 
