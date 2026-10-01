@@ -4201,6 +4201,13 @@ async function loadScriptData() {
     summary = await api(`${base}/findings/summary`);
   } catch (_) { /* no analysis yet — same state the report fetch tolerates */ }
   if (arrived && findings.length) scheduleArrivalPeek();
+  else if (analysisCompletedFor === target && findings.length) {
+    // A first analysis has no `last_pass` to arrive — the completion event
+    // IS the arrival. Consumed once, so a plain reload of an already-read
+    // report never fakes a fresh one.
+    analysisCompletedFor = null;
+    scheduleArrivalPeek();
+  }
   renderDraftBar();
   await renderDiffBanner();
   // the second wave of awaits is long enough for the writer to have switched
@@ -6671,12 +6678,23 @@ async function setFindingIntent(findingId, intent) {
 // tab carries a lasting unread dot until the Evidence lens is opened. No
 // other ambience runs during the window (one-ambient-event cap, R8).
 let arrivalTimer = null;
+// RE-B4 audit: set by the analysis poll when a run finishes in-session and
+// consumed once by the project-load path — the first pass's arrival signal
+// (last_pass does not exist yet on a first analysis).
+let analysisCompletedFor = null;
 function scheduleArrivalPeek() {
   clearTimeout(arrivalTimer);
   arrivalTimer = setTimeout(() => {
     const tab = document.getElementById("dock-tab-evidence");
-    if (tab && !(document.getElementById("context-dock") || {}).classList?.contains("open")) {
+    const edge = document.getElementById("right-edge-affordance");
+    if (tab && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
       tab.classList.add("has-unread");
+    }
+    // The edge affordance is the ONLY dock surface visible while the dock is
+    // closed — the tab's dot hides with the panel. The report-ready signal
+    // must live where the writer is looking.
+    if (edge && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
+      edge.classList.add("has-unread");
     }
     const firstInk = document.querySelector(".finding-ink");
     if (firstInk) {

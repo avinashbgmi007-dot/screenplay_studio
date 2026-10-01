@@ -6318,6 +6318,11 @@ body:not(.idea-mode) .desk {
 .finding-ink.flash { animation:ink-flash 1.6s ease-out 1; }
 @keyframes ink-flash { 0%,60% { background:var(--glow); } 100% { background:transparent; } }
 #dock-tab-evidence.has-unread::after { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lamp); margin-left:4px; box-shadow:0 0 8px var(--glow-strong); }
+/* The edge affordance is the only dock surface visible while the dock is
+   closed — the report-ready dot must live here too, or a first analysis
+   completes with no visible signal at all (RE-B4 audit 2026-10-01). */
+#right-edge-affordance.has-unread::after { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lamp); margin-left:6px; box-shadow:0 0 8px var(--glow-strong); }
+#right-edge-affordance.has-unread { border-color:var(--lamp); box-shadow:0 0 12px var(--glow); }
 .dock-arrival-strip { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-3); border:1px solid var(--lamp); border-radius:var(--r-md); background:var(--glow); }
 .dock-arrival-head { display:flex; align-items:baseline; gap:var(--sp-3); flex-wrap:wrap; }
 /* P1.9 (spec §6): the strip's visual hierarchy now follows the writer's
