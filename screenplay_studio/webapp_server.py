@@ -895,7 +895,15 @@ def _sanitize_report(report: dict) -> dict:
     """Drop non-writing feedback (dialect identification, subtitle meta-
     commentary) from a stored report before it reaches the writer. Applied at
     serve time so projects analyzed before the filter existed display the
-    same clean report without a re-analysis."""
+    same clean report without a re-analysis.
+
+    Also stamps `verification_summary` (counts by status + the derived
+    quote-verified rate) RECOMPUTED from the served findings: the serve-time
+    filter can remove rows, so the stored block from analysis time may not
+    match what this response actually contains — and the block must describe
+    the rows the writer is looking at. Old reports gain the block on read
+    with no re-analysis; the numbers are one import away from the per-row
+    `verification` fields, so the two can never disagree."""
     if not isinstance(report, dict):
         return report
     findings = report.get("findings")
@@ -903,6 +911,9 @@ def _sanitize_report(report: dict) -> dict:
         from screenplay_analyzer.feedback_filter import filter_findings
         report = dict(report)
         report["findings"] = _normalize_rule_ids(filter_findings(findings))
+        from screenplay_analyzer.verifier import verification_rate, verification_summary
+        counts = verification_summary(report["findings"])
+        report["verification_summary"] = {**counts, **verification_rate(counts)}
     return report
 
 
@@ -1423,7 +1434,19 @@ def _record_pass(m) -> None:
         # a failed run leaves the writer's existing count untouched.
         _record_findings_metrics(m, statuses)
         failed = (m.stage("analyze").output_paths or {}).get("failed_categories") or []
-        append_pass(m, statuses, failed)
+        # The verification aggregate rides each pass entry (Part B): over time
+        # the arc shows whether what remains open is verified or flagged.
+        # Best-effort twice over — a report read that fails must not cost the
+        # pass record itself.
+        ver_block = None
+        try:
+            served = _load_report_sanitized(m)
+            from screenplay_analyzer.verifier import verification_rate, verification_summary
+            counts = verification_summary(served.get("findings") or [])
+            ver_block = {**counts, **verification_rate(counts)}
+        except Exception:
+            ver_block = None
+        append_pass(m, statuses, failed, verification_counts=ver_block)
     except Exception:
         traceback.print_exc()
 
@@ -2426,6 +2449,9 @@ def get_findings_summary(name):
 
     from .revision import finding_statuses, finding_intents
     items, acts = _fixqueue_items(m)
+    # The verification block rides the sanitized report (recomputed from the
+    # served rows), so this endpoint answers the correctness question too.
+    served_report = _load_report_sanitized(m)
     statuses = finding_statuses(m)
     observed = {s["index"]: s["status"] for s in statuses["findings"]}
     intents = finding_intents(m)
@@ -2460,6 +2486,7 @@ def get_findings_summary(name):
         "by_severity": by_severity,
         "by_category": by_category,
         "by_status": by_status,
+        "verification": served_report.get("verification_summary") or {},
         "summary": statuses.get("summary") or {},
         "acts": [{"act": a["act"], "name": a["name"], "scene_count": len(a.get("scenes") or [])}
                  for a in acts],

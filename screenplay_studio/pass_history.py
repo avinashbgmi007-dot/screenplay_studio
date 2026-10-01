@@ -31,19 +31,37 @@ def load_passes(m) -> list[dict]:
     Missing store -> [] ; damaged store -> StoreUnreadable. Reading damage as
     "no history yet" is the destructive option: the next append would write a
     one-entry list over the writer's only copy of the arc.
+
+    `verification_counts` (a 2026-10-01 addition) rides each new entry and is
+    OPTIONAL on read: entries written before it existed load unchanged, and an
+    entry whose block is not a dict is kept but stripped (a damaged field must
+    not poison a consumer that expects a dict).
     """
     from .jsonio import StoreUnreadable, load_json_store
     p = path(m)
     data = load_json_store(p, default=[])
     if not isinstance(data, list):
         raise StoreUnreadable(p, f"expected a list, found {type(data).__name__}")
-    return [e for e in data if isinstance(e, dict) and "open" in e]
+    out = []
+    for e in data:
+        if not (isinstance(e, dict) and "open" in e):
+            continue
+        vc = e.get("verification_counts")
+        if vc is not None and not isinstance(vc, dict):
+            e = {k: v for k, v in e.items() if k != "verification_counts"}
+        out.append(e)
+    return out
 
 
-def append_pass(m, statuses, failed_categories=None) -> dict:
+def append_pass(m, statuses, failed_categories=None, verification_counts=None) -> dict:
     """Record one analysis. `statuses` is the `revision.finding_statuses`
     payload, so `open` means what the ledger says it means (still present +
     not-yet-verifiable) and this module never invents a second counter.
+
+    `verification_counts` is optional (the {status: count, ...} block plus the
+    derived quote-verified rate). When it is None the key is left ABSENT, not
+    null — the documented entry shape stays exactly what it was, so readers
+    written before this field cannot learn a new shape.
     """
     summary = (statuses or {}).get("summary") or {}
     addressed = int(summary.get("addressed") or 0)
@@ -55,6 +73,8 @@ def append_pass(m, statuses, failed_categories=None) -> dict:
         "addressed": addressed,
         "failed_categories": list(failed_categories or []),
     }
+    if verification_counts is not None:
+        entry["verification_counts"] = dict(verification_counts)
     from .jsonio import atomic_write_json, lock_for
     p = path(m)
     os.makedirs(m.project_dir, exist_ok=True)

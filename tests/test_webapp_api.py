@@ -1064,11 +1064,19 @@ class TestPassHistoryEndpoint:
         passes = resp.get_json()["passes"]
         assert len(passes) == 1
         p = passes[0]
-        assert set(p) == {"ts", "total", "open", "addressed", "failed_categories"}
+        # verification_counts joined the documented shape (2026-10-01): every
+        # analyze stamps its verification aggregate so the arc can show
+        # whether what remains open is verified or flagged. append_pass keeps
+        # the key ABSENT (not null) when a caller omits it, so non-analyze
+        # callers still write the five-key shape.
+        assert set(p) == {"ts", "total", "open", "addressed", "failed_categories",
+                          "verification_counts"}
         # the client line draws `total` and `open` off the same numbers the
         # ledger used, so they must reconcile or the arc lies
         assert p["total"] == p["addressed"] + p["open"]
         assert isinstance(p["failed_categories"], list)
+        assert isinstance(p["verification_counts"], dict)
+        assert "verified" in p["verification_counts"]
 
     def test_a_second_analysis_adds_a_point_and_keeps_the_first(self, http_client):
         project = self._project(http_client)
