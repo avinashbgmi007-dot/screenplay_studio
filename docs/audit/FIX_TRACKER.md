@@ -4,6 +4,49 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-10-01 (branch `feature/feedback-trust`, PR #3, stacked on PR #2 — **the
+A+B feedback-trust bundle: findings now carry a machine-checked honesty signal end to end.**
+Part A: quote-less findings (theme/character/structure/scene_function, which reason from scene
+summaries and were previously unverifiable) now get a scene-EXISTENCE check — `_quoteless()` in
+`verify_finding` maps every cited scene_ref against the parsed script and returns `no_quote`
+when ≥1 ref is real or `scene_not_found` when none are; the prompts already forced
+`evidence_quote: null` for these categories, so no prompt or model-call changed. Part B: the
+aggregate quote-verified rate is surfaced on all four read paths — report JSON
+(`verification_summary`, recomputed at SERVE time inside `_sanitize_report` from the exact rows
+being served, so pre-bundle reports gain the block on read with no re-analysis), markdown
+(`**Quote-verified rate:**` line, rendered only when quote_bearing > 0 — a percentage over
+nothing is a lie), `/findings/summary` (`"verification"` key), and pass-history
+(`verification_counts`, back-compat: key kept ABSENT when the caller omits it, damaged fields
+stripped on read, pre-field entries load unchanged). `verification_rate()` counts
+`quote_bearing = verified + not_found` and excludes `no_quote` (nothing to check) and
+`scene_not_found` (a failure, not a denominator). Guarantees held: no prompt/model-call
+changes, no findings added or removed, zero app.js edits (no SPA census risk), fix-queue 1:1
+untouched. Tests: 16 new in `tests/test_verification_summary_surface.py` (quote-less rules,
+rate rule, served-report incl. old-report-gains-block-on-read, pass-history incl. back-compat
++ damaged-block); the shape pin at `tests/test_webapp_api.py:1067` deliberately gained
+`verification_counts` — a named contract change, not a silent one. Full pytest 1977 passed /
+3 skipped, ruff clean, CI 10/10 across both events (run 36799024419).
+
+**REAL-MODEL BASELINE (2026-10-01, live llama-server):** the probe
+(`docs/audit/feedback_probe_session.py`, untracked by design) ran the bundled sample against
+the local server — model `gemma_vn26b-experts-v1-Q4_K_M.gguf`, probe self-reports
+`model_used`/`real_model` so a demo fallback cannot fake the numbers. Analyze 200 in 621s;
+15 findings: dialogue 2/2 with quotes, BOTH `verified` (rate 100.0% of quote-bearing); 13
+quote-less findings all correctly `no_quote` (0 `not_found`, 0 `scene_not_found`); all four
+Part-B surfaces verified byte-real on the served report JSON, the markdown, `/findings/summary`
+and `pass_history.json`; persona turns landed (Sameer 74s, Sushruta 70s). The design split is
+visible in real data: quotable categories verify at 100%, summary-reasoned categories are
+honest about having no quote to check.
+
+**Product edges found and REPORTED, deliberately not fixed in this bundle:** (1) the demo
+fallback decision runs at MODULE IMPORT, before `main()` parses `--server` — a desk pointed at
+a live non-default server still silently demos if the DEFAULT url (`http://localhost:8080`,
+which resolves `::1` first on Windows while llama-server binds IPv4 only) is down at import;
+the probe works around it with `SCREENPLAY_STUDIO_DEMO_MODEL=0` set before import. (2) On the
+real run, the `char_reads` category FAILED (`failed_categories`); its findings simply don't
+exist and never enter the denominators, so the trust numbers stay truthful — but the category's
+real-model reliability is its own follow-up.)
+
 **Last updated:** 2026-10-01 (branch `feature/audit-remediation`, PR #2 — **the one-frame
 visible-but-empty error banner window is dead at the source.** `showError` routed its text
 through `announce()`, which clears the element and lands the message in the NEXT animation
