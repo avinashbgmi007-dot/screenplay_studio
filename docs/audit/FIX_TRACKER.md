@@ -4,6 +4,28 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-10-01 (branch `feature/post-trust-hardening`, PR #4 — **three edges the real-model
+probe + Pain_3 validation left on the table, all fixed and pinned.** (1) RE-B4, the demo-fallback
+false positive: the import-time reachability probe can only test the DEFAULT url — `--server` is
+parsed later in `main()` — so a desk pointed at a LIVE non-default llama-server while the default
+was down silently ran the demo craft model for the whole session (llama.cpp binds IPv4;
+`localhost` resolves `::1` first on Windows). Fix: the auto-fallback marks itself
+(`_DEMO_FALLBACK_AUTO`), `main()` undoes it, applies the writer's actual `--server`, and
+re-decides with a real probe; explicit demo choices (env / `--demo-model`) are never
+second-guessed; the flask-CLI path keeps its import-time behavior; the E2E fleet's
+`PYTEST_CURRENT_TEST` escape hatch moved to the `main()` call site so deterministic boots are
+untouched. (2) char_reads resilience: the pass is ONE one-shot `chat_json` call, so a generation
+that never arrives (the probe's 3-minute stall then bare `failed_categories`) now gets a bounded
+retry (2 attempts, 2s/5s backoff) and, on final failure, an exception that names the pass and
+carries the original reason into `report.errors`. (3) SPA trust line: the readout's words moved
+into `core.js` (`verificationReadoutText`, node-tested — `no_quote` never sits in the
+denominator; nothing-checkable prints a count, never 0%), `verificationReadout()` delegates, and
+`openProject` resets `state.report` so a previous script's numbers cannot leak into a
+report-less project; a NEW e2e (`tests/e2e_browser_trust_line.py`, 5 checks) drives the full
+chain from a PRE-BUNDLE report on disk through the serve-time stamp to the dock strips — the
+chain no suite had ever run as a whole (dock_sections seeds the block by hand). OUTCOME: full
+pytest 1986 passed / 3 skipped, ruff clean, JS 23/23, trust e2e 5/5, dock_sections 176/176.)
+
 **Last updated:** 2026-10-01 (branch `feature/feedback-trust`, PR #3, stacked on PR #2 — **the
 A+B feedback-trust bundle: findings now carry a machine-checked honesty signal end to end.**
 Part A: quote-less findings (theme/character/structure/scene_function, which reason from scene
