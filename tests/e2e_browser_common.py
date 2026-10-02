@@ -176,6 +176,26 @@ def clicked(target, selector=None, timeout=4000):
         return False
 
 
+def became_true(page, js, timeout=8000):
+    """Poll a JS predicate until it is TRUE; False if it never gets there.
+
+    Never raises. The companion to `seen_visible` for state that is not a
+    visibility question: an async round trip (undo POSTs and the manuscript
+    re-renders, a rewrite applies) whose settle time is machine-dependent. A
+    fixed `wait_for_timeout` after such a write is a race — the Windows CI VM
+    lost two of them in one run (2026-10-02) while the same commit passed on
+    the parallel run. Poll the observable change, then assert; a state that
+    never arrives still fails by name.
+
+        check("undo: Ctrl+Z removes the applied edit", became_true(page, gone_js))
+    """
+    try:
+        page.wait_for_function(js, timeout=timeout)
+        return True
+    except Exception:  # noqa: BLE001 - the caller's check IS the report
+        return False
+
+
 def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
     """Move the mouse where a writer's would be, then poll until the control is
     genuinely the hit target. Returns True/False — never raises.

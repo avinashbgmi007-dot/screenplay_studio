@@ -50,7 +50,13 @@ a journey-aborting timeout; its two new checks lift a full green fleet by 2 (151
 coverage). `run_browser_suites._error_detail` now reports the traceback's raising frame alongside
 the six-line tail — the red line showed the action log alone, which is why the call site had to be
 re-derived by hand — with `tests/test_production_readiness.py` pinning both the frame and the
-no-traceback shape.
+no-traceback shape. The next Windows run then showed what that job is for: with the click fixed,
+two fixed-sleep races surfaced that a slower runner loses — phase14's `Ctrl+Z` undo pair and
+`text_popup`'s Stash round trip, both red on the push run with the identical commit green on the
+PR run. Both now wait for the observable change instead: `e2e_browser_common.became_true` (a JS
+predicate poll, the companion to `seen_visible`) for the apply/undo/redo trio, and a bounded
+server-count poll in `text_popup`. The contract each check asserts is unchanged, and a state that
+never arrives still fails by name — a fixed sleep is never a sync point.
 
 **Last updated:** 2026-10-01 (branch `feature/post-trust-hardening`, PR #4 — **three edges the real-model
 probe + Pain_3 validation left on the table, all fixed and pinned.** (1) RE-B4, the demo-fallback

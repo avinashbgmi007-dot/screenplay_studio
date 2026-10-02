@@ -31,8 +31,8 @@ import zipfile
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import (Checks, clicked, filled, launch, note,
-                                reveal_chrome, seen_visible, start_studio,
+from e2e_browser_common import (Checks, became_true, clicked, filled, launch,
+                                note, reveal_chrome, seen_visible, start_studio,
                                 studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
@@ -277,23 +277,25 @@ def run(base):
               cands_seen and cand.count() > 0,
               f"generateClicked={gen_clicked} candidates={cand.count()}")
         apply_clicked = clicked(page, "#rewrite-apply")
-        page.wait_for_timeout(2500)
-        demo_line = page.locator("#manuscript-container", has_text="[demo] The line lands quieter")
+        # The apply is an async round trip — poll for the line instead of sleeping
+        # 2500ms, the same fixed-sleep race the undo pair lost on the Windows
+        # runner (2026-10-02).
+        landed_js = ("() => [...document.querySelectorAll('#manuscript-container [class^=el-]')]"
+                     ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
+        landed = became_true(page, landed_js, timeout=15000)
         check("inline edit: the change lands in the manuscript",
-              apply_clicked and demo_line.count() > 0, f"applyClicked={apply_clicked}")
-        # keyboard parity: Ctrl+Z unwinds, Ctrl+Shift+Z restores
+              apply_clicked and landed, f"applyClicked={apply_clicked} landed={landed}")
+        # keyboard parity: Ctrl+Z unwinds, Ctrl+Shift+Z restores — both async, so
+        # wait for the observable change. A fixed 1800ms sleep turned this check
+        # red on the Windows runner while the identical commit passed on the
+        # parallel run; the contract asserted is unchanged (gone, then back), and
+        # a state that never arrives still fails by name.
         page.keyboard.press("Control+z")
-        page.wait_for_timeout(1800)
-        gone = page.evaluate(
-            "() => ![...document.querySelectorAll('#manuscript-container [class^=el-]')]"
-            ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
-        check("undo: Ctrl+Z removes the applied edit", gone)
+        gone_js = ("() => ![...document.querySelectorAll('#manuscript-container [class^=el-]')]"
+                   ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
+        check("undo: Ctrl+Z removes the applied edit", became_true(page, gone_js))
         page.keyboard.press("Control+Shift+z")
-        page.wait_for_timeout(1800)
-        back = page.evaluate(
-            "() => [...document.querySelectorAll('#manuscript-container [class^=el-]')]"
-            ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
-        check("redo: Ctrl+Shift+Z restores it", back)
+        check("redo: Ctrl+Shift+Z restores it", became_true(page, landed_js))
 
         if not armed:
             # An armed-modal failure leaves the modal OPEN, and an open overlay
