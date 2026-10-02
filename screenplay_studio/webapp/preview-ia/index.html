@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f1f1ef">
+<title>IA Wireframe — Arrive Quiet, Fix by Scene (Screenplay Studio)</title>
+<!--
+  The grayscale, populated wireframe for the post-analysis feedback IA.
+  Source of truth: docs/superpowers/specs/2026-10-02-post-analysis-ia-design.md
+  Renderer: _ia.js · data: /api/preview/data/<name> (the Design Lab feed, live).
+  Structure only — the visual direction (Nocta vs Midnight Desk) stays parked.
+  No build step, no dependencies, no external requests.
+-->
+<style>
+:root{
+  --bg:#f1f1ef; --panel:#ffffff; --ink:#181818; --mut:#5f5f5b; --faint:#646460;
+  --line:#c8c8c4; --soft:#e7e7e4; --hard:#3a3a38;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:light}
+body{background:var(--bg);color:var(--ink);
+  font-family:'Segoe UI',Tahoma,Verdana,sans-serif;font-size:14px;line-height:1.5;
+  padding:34px 26px 70px}
+.wrap{max-width:1180px;margin:0 auto}
+.kick{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--mut);margin-bottom:8px}
+h1{font-size:26px;font-weight:650;margin-bottom:8px}
+.sub{color:var(--mut);max-width:88ch;margin-bottom:12px}
+.sub code{font-family:Consolas,monospace;font-size:12px;color:var(--hard);background:var(--soft);padding:1px 5px}
+.srcbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 6px}
+.badge{font-family:Consolas,monospace;font-size:11px;letter-spacing:.06em;padding:4px 9px;
+  border:1px dashed var(--faint);color:var(--mut);background:var(--panel)}
+.badge.live{border-style:solid;border-color:var(--ink);color:var(--ink)}
+select{font:inherit;font-size:12.5px;padding:6px 9px;min-height:34px;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink);max-width:420px}
+.src-line{font-family:Consolas,monospace;font-size:11.5px;color:var(--mut)}
+.pick-note{color:var(--faint);font-size:12px;margin-bottom:4px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.skip{position:absolute;left:-9999px;top:8px;z-index:10;background:var(--panel);border:1px solid var(--ink);padding:8px 12px;font-size:13px}
+.skip:focus{left:8px}
+button,select{touch-action:manipulation}
+button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.err{border:1px solid var(--hard);background:var(--panel);padding:14px 16px;margin:12px 0}
+.err-kick{font-weight:650;margin-bottom:5px}
+.err-body{color:var(--mut);font-size:13px}
+
+.legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0 26px;
+  padding:10px 12px;border:1px solid var(--line);background:var(--panel)}
+.note-inline{font-size:11.5px;color:var(--faint)}
+
+.sev{font-family:Consolas,monospace;font-size:10px;letter-spacing:.08em;padding:2px 6px;border:1px solid var(--ink)}
+.sev.high{background:var(--ink);color:#fff}
+.sev.medium{background:#8d8d89;color:#fff;border-color:#8d8d89}
+.sev.low{background:none;color:var(--ink)}
+.tag{font-family:Consolas,monospace;font-size:10px;padding:2px 6px;border:1px solid var(--line);color:var(--mut)}
+.tag.ok{border-color:var(--hard);color:var(--ink)}
+.tag.flag{border-style:dashed;border-color:var(--hard);color:var(--ink)}
+.tag.mut{border-style:dotted}
+.tier{font-family:Consolas,monospace;font-size:9.5px;letter-spacing:.08em;padding:2px 5px;
+  border:1px solid var(--faint);color:var(--mut);margin-right:6px}
+.tier.judg{border-color:var(--hard);color:var(--ink)}
+.tier.struct{border-style:double;border-color:var(--hard);color:var(--ink)}
+
+.frame{background:var(--panel);border:1px solid var(--line);margin-bottom:26px}
+.cap{display:flex;align-items:baseline;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);
+  font-weight:600;font-size:14.5px;background:var(--soft)}
+.cap b{font-family:Consolas,monospace;font-size:12px;border:1px solid var(--ink);padding:1px 6px}
+.hint{font-weight:400;color:var(--mut);font-size:12.5px}
+.frame > .grid2,.frame > .grid4,.frame > .loop-grid,.frame > .led{padding:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mini{border:1px solid var(--line);padding:12px;background:var(--bg)}
+.mini .note{margin-top:10px}
+.note{border:1px dashed var(--faint);color:var(--mut);font-size:12px;padding:8px 10px}
+.kick2{font-family:Consolas,monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:8px}
+
+/* Frame A — desk mock */
+.desk{border:1px solid var(--hard);background:var(--panel)}
+.desk-top{padding:12px 14px;border-bottom:1px solid var(--line)}
+.arrive{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:600}
+.halo{width:12px;height:12px;border-radius:50%;background:var(--ink);
+  box-shadow:0 0 0 4px var(--soft),0 0 0 5px var(--ink)}
+.arrive-text{margin-right:4px}
+.cta-btn{font:inherit;font-weight:600;font-size:13px;padding:8px 14px;min-height:36px;
+  background:var(--ink);color:#fff;border:1px solid var(--ink);cursor:default}
+.cta-btn:hover{background:#000}
+.arrive-sub{color:var(--mut);font-size:12px;margin-top:6px;font-family:Consolas,monospace}
+.desk-body{display:grid;grid-template-columns:130px 1fr 110px;min-height:120px}
+.stub{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;
+  color:var(--mut);font-size:12px;padding:14px 8px;text-align:center}
+.rail-stub,.dock-stub{background:var(--soft);border-right:1px solid var(--line)}
+.dock-stub{border-right:none;border-left:1px solid var(--line)}
+.page-stub{background:var(--panel);font-weight:600;color:var(--ink)}
+.stub-mut{font-weight:400;color:var(--faint);font-size:11px}
+.quiet-line{border:1px solid var(--line);border-left:3px solid var(--hard);
+  padding:10px 12px;color:var(--mut);background:var(--panel)}
+
+/* Frame B — loop */
+.loop-grid{display:grid;grid-template-columns:280px 1fr;gap:16px}
+.rail{border:1px solid var(--line);max-height:560px;overflow:auto;background:var(--panel)}
+.rail-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px dotted var(--soft)}
+.rail-row.current{background:var(--soft);border-left:3px solid var(--ink)}
+.rail-n{font-family:Consolas,monospace;font-size:11px;color:var(--mut);width:20px;text-align:right}
+.rail-head{flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rail-marks{display:flex;align-items:center;gap:4px}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot.high{background:var(--ink)}
+.dot.medium{background:#8d8d89}
+.dot.low{background:none;border:1px solid var(--ink)}
+.tick{color:var(--ink);font-weight:700}
+.rail-count{font-family:Consolas,monospace;font-size:10.5px;color:var(--faint)}
+.loop-main{display:flex;flex-direction:column;gap:10px}
+.fold .tier{margin-right:6px}
+.threads,.fold{display:flex;align-items:center;gap:8px;border:1px solid var(--line);
+  padding:9px 12px;background:var(--bg);color:var(--mut);font-size:12.5px}
+.fold-title{flex:1;color:var(--ink)}
+.count{font-family:Consolas,monospace;font-size:12px;border:1px solid var(--ink);padding:1px 7px}
+.chev{color:var(--faint)}
+.arrive-sub,.progress,.reg-counts,.led-totals,.count,.rail-count{font-variant-numeric:tabular-nums}
+.mech-note{font-size:11.5px;color:var(--faint)}
+.scene-kick{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--mut)}
+.scene-head{font-size:17px;font-weight:650;padding-bottom:6px;border-bottom:2px solid var(--ink)}
+.rows{border:1px solid var(--line);background:var(--panel)}
+.row{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-bottom:1px dotted var(--soft)}
+.row:last-child{border-bottom:none}
+.row.empty{color:var(--mut);font-size:12.5px}
+.row-mid{flex:1;min-width:0}
+.row-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:2px}
+.cat{font-family:Consolas,monospace;font-size:10.5px;color:var(--mut)}
+.row-issue{font-size:13px}
+.card{border:1px solid var(--hard);border-left:5px solid var(--ink);padding:13px 15px;background:var(--panel)}
+.card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.card-issue{font-size:14.5px;font-weight:600;margin-bottom:6px}
+.card-why{color:var(--mut);font-size:12.5px;margin-bottom:8px}
+.quote{border-left:3px solid var(--line);padding:6px 10px;color:var(--mut);
+  font-size:12.5px;font-style:italic;margin-bottom:10px}
+.quote.missing{border-left-style:dashed}
+.verbs{display:flex;gap:8px;flex-wrap:wrap}
+.vbtn{font:inherit;font-size:12px;padding:7px 11px;min-height:34px;background:var(--panel);
+  border:1px solid var(--hard);color:var(--ink);cursor:default}
+.vbtn:hover{background:var(--soft);border-style:dashed}
+.progress{font-family:Consolas,monospace;font-size:12px;color:var(--ink);background:var(--soft);
+  border:1px solid var(--line);padding:8px 12px}
+
+/* Frame C — ledger */
+.led-top{display:flex;align-items:baseline;gap:12px;padding-bottom:8px;border-bottom:2px solid var(--ink);margin-bottom:12px}
+.led-totals{font-size:17px;font-weight:650;font-family:Consolas,monospace}
+.led-hint{color:var(--faint);font-size:12px}
+.led-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{font-family:Consolas,monospace;font-size:10.5px;border:1px solid var(--line);padding:3px 8px;background:var(--bg)}
+.thread{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px dotted var(--line);border-top:none;font-size:12px}
+.thread-name{flex:1;color:var(--mut)}
+.strength{padding:6px 10px;border:1px dotted var(--line);border-top:none;font-size:12.5px;color:var(--mut)}
+
+/* Frame D — registers */
+.dock-tabs{display:flex;gap:5px;margin-bottom:10px}
+.dock-tabs span{font-size:12px;padding:6px 10px;border:1px solid var(--line);color:var(--mut);background:var(--panel)}
+.dock-tabs span.on{border-color:var(--ink);color:var(--ink);font-weight:600;border-bottom-width:3px}
+.reg-counts{font-family:Consolas,monospace;font-size:14px;margin:8px 0 12px}
+.pin-kick{font-family:Consolas,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.pin-body{border:1px solid var(--hard);border-left:4px solid var(--ink);padding:9px 11px;font-size:13px;margin-bottom:6px}
+.pin-meta{font-family:Consolas,monospace;font-size:10.5px;color:var(--mut)}
+.composer{border:1px dashed var(--faint);color:var(--faint);padding:10px 12px;font-size:12.5px;margin-top:12px}
+
+/* Frame E — idea room */
+.idea-canvas{border:1px dashed var(--line);min-height:64px;display:flex;align-items:center;
+  justify-content:center;padding:10px;color:var(--mut);font-size:12.5px;text-align:center;margin-bottom:10px}
+.idea-canvas em{color:var(--ink);font-style:italic}
+.idea-line{font-size:12.5px;color:var(--mut);margin-bottom:8px}
+.verdict{border:1px solid var(--hard);padding:7px 10px;font-weight:650;margin-bottom:8px;display:inline-block}
+
+.foot{color:var(--faint);font-size:12px;max-width:95ch}
+.foot b{color:var(--mut)}
+[hidden]{display:none!important}
+@media (max-width:900px){.grid2,.grid4,.led-grid{grid-template-columns:1fr}.loop-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the wireframe frames</a>
+<div class="wrap">
+
+  <header>
+    <div class="kick">Screenplay Studio · IA wireframe · 2026-10-02</div>
+    <h1>Arrive Quiet, Fix by Scene</h1>
+    <p class="sub">Grayscale, structure only, populated from a real analyzed project through the
+      Design Lab feed. Visual direction stays parked (Nocta vs Midnight Desk). Source:
+      <code translate="no">docs/superpowers/specs/2026-10-02-post-analysis-ia-design.md</code>.</p>
+    <div class="srcbar">
+      <span class="badge" id="srcBadge" aria-live="polite">waiting for live data…</span>
+      <label class="sr-only" for="projectSel">Project</label>
+      <select id="projectSel" aria-label="Project"></select>
+      <span class="src-line" id="srcLine"></span>
+    </div>
+    <div class="pick-note" id="pickNote"></div>
+    <div class="err" id="loadError" role="alert" hidden></div>
+  </header>
+
+  <main id="main">
+
+  <div class="legend">
+    <span class="sev high">HIGH</span><span class="sev medium">MED</span><span class="sev low">LOW</span>
+    <span class="tag ok">verified</span><span class="tag flag">flagged</span>
+    <span class="tier mech">MECH</span><span class="tier judg">JUDG</span><span class="tier struct">STRUCT</span>
+    <span class="note-inline">dashed boxes = annotations, not UI · controls are sketches, nothing is wired</span>
+  </div>
+
+  <section class="frame" id="frameA">
+    <h2 class="cap"><b>A</b> Arrival — the moment analysis completes
+      <span class="hint">the page stays, the dock stays shut, one line</span></h2>
+    <div class="grid2">
+      <div class="mini">
+        <div class="desk">
+          <div class="desk-top">
+            <div class="arrive" id="arr-line"></div>
+            <div class="arrive-sub" id="arr-tierline"></div>
+          </div>
+          <div class="desk-body">
+            <div class="stub rail-stub">scene rail<span class="stub-mut">severity dots · clean ✓</span></div>
+            <div class="stub page-stub">the page<span class="stub-mut">ink only · one mark vocabulary</span></div>
+            <div class="stub dock-stub">Evidence<span class="stub-mut">dock shut</span></div>
+          </div>
+        </div>
+        <div class="note">Halo + one line = the whole arrival. Nothing opens. One tap on the line starts the loop.</div>
+      </div>
+      <div class="mini">
+        <div class="kick2">Return visit — the quiet variant</div>
+        <div class="quiet-line" id="arr-return"></div>
+        <div class="note">No halo once seen, no auto-open. The line reports state and nothing else. A week later it still lands quiet.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="frame" id="frameB">
+    <h2 class="cap"><b>B</b> The fix loop — scene by scene, in script order
+      <span class="hint">default post-analysis mode; every shape here is counted</span></h2>
+    <div class="loop-grid">
+      <div class="rail" id="loop-rail" role="list" aria-label="Scene rail — findings by scene"></div>
+      <div class="loop-main">
+        <div class="threads" id="loop-threads"></div>
+        <div class="mech-note" id="loop-mech-note"></div>
+        <div class="scene-kick" id="loop-scene-kick"></div>
+        <div class="scene-head" id="loop-scene"></div>
+        <div class="rows" id="loop-rows"></div>
+        <div class="card-wrap" id="loop-card"></div>
+        <div class="progress" id="loop-progress"></div>
+        <div class="note">One finding at a time, high first; ↑/↓ walk, Esc exits, nothing is lost. A scene with nothing
+          live gets ✓ and the loop moves on. The loop never reorders the script.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="frame" id="frameC">
+    <h2 class="cap"><b>C</b> The ledger — the script scale
+      <span class="hint">counts → facets → cards; every fold shows its count</span></h2>
+    <div class="led">
+      <div class="led-top"><span class="led-totals" id="led-totals"></span>
+        <span class="led-hint">one rendering per finding · totals read findingDisposition</span></div>
+      <div class="led-grid">
+        <div>
+          <div class="kick2">Categories — facets, not a third rail</div>
+          <div class="chips" id="led-facets"></div>
+          <div class="rows" id="led-list"></div>
+        </div>
+        <div>
+          <div class="kick2">Tiers — the trust partition</div>
+          <div id="led-mech"></div>
+          <div id="led-threads"></div>
+          <div id="led-working"></div>
+          <div class="card-wrap" id="led-card"></div>
+        </div>
+      </div>
+      <div class="note">Obligations on display: no silent filters (“N of M shown”), structural reads stay read-once
+        blocks, and every count comes from one predicate.</div>
+    </div>
+  </section>
+
+  <section class="frame" id="frameD">
+    <h2 class="cap"><b>D</b> One rail, two registers, one shared object
+      <span class="hint">the switch is the gesture; the finding rides both</span></h2>
+    <div class="grid2">
+      <div class="mini">
+        <div class="kick2">Ledger register</div>
+        <div class="dock-tabs"><span class="on">Evidence</span><span>Sameer</span><span>Sushruta</span><span>Stash &amp; Notes</span></div>
+        <div class="reg-counts" id="reg-counts"></div>
+        <div class="note">Totals → facets → cards. Counts never fork.</div>
+      </div>
+      <div class="mini">
+        <div class="kick2">Conversation register — one persona at a time</div>
+        <div class="dock-tabs"><span>Evidence</span><span>Sameer</span><span class="on">Sushruta</span><span>Stash &amp; Notes</span></div>
+        <div id="reg-pin"></div>
+        <div class="composer">Ask anything — the pin rides along</div>
+        <div class="note">Unsent draft, scroll and the pin survive switching. No side-by-side chats; the width budget forbids it.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="frame" id="frameE">
+    <h2 class="cap"><b>E</b> Idea room — the door rule v2
+      <span class="hint">sample premise (no idea on this shelf); structure only</span></h2>
+    <div class="grid4">
+      <div class="mini">
+        <div class="kick2">1 · Dormant</div>
+        <div class="idea-canvas">blank canvas</div>
+        <div class="idea-line">Sameer is here — talk about anything.</div>
+        <div class="note">Nothing testable yet: no pitch, no doctor.</div>
+      </div>
+      <div class="mini">
+        <div class="kick2">2 · Testable premise</div>
+        <div class="idea-canvas"><em>“A boy who cannot feel pain learns his father sells it.”</em></div>
+        <button class="vbtn" type="button">Test this premise: one pass · 5 questions · a verdict</button>
+        <div class="note">The affordance appears only once a premise statement exists.</div>
+      </div>
+      <div class="mini">
+        <div class="kick2">3 · One offer, once</div>
+        <div class="idea-line">You’ve a premise here. One pass tells you if it holds.</div>
+        <div class="verbs"><button class="vbtn" type="button">Start</button><button class="vbtn" type="button">Not now</button></div>
+        <div class="note">Dismissal remembered; per idea, not per room; never auto-start.</div>
+      </div>
+      <div class="mini">
+        <div class="kick2">4 · The verdict (sample copy)</div>
+        <div class="verdict">Not yet — here’s the hole</div>
+        <div class="idea-line">The premise promises a question, not a goal. One fix: give him something he wants more than relief.</div>
+        <div class="note">Readiness only; never good idea / bad idea; no verified badge — opinion start to finish.</div>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
+  <footer class="foot">
+    <b>What this is not:</b> visual design (parked: Nocta vs Midnight Desk), mobile layout, margin threads (Phase 2).
+    Controls are sketches — nothing is wired. Numbers are real; the dashed notes are the spec talking.
+  </footer>
+
+</div>
+<script src="_ia.js"></script>
+</body>
+</html>

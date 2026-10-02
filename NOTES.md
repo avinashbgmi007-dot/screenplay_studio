@@ -3,6 +3,30 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### 2026-10-02 — IA wireframe built: *Arrive Quiet, Fix by Scene* (preview-ia)
+
+**What it is.** `screenplay_studio/webapp/preview-ia/index.html` + `_ia.js` — the
+grayscale, populated wireframe for the IA doc. Five frames: arrival line (fresh + quiet
+return), the per-scene fix loop with the whole-script structural stop, the tiered ledger
+(counts → facets → cards; mechanical checklist; setup/payoff), the two registers with a
+pinned finding, and the idea-room door rule v2 (sample copy — no idea on this shelf).
+Served by the studio at `/preview-ia/index.html`; reads the Design Lab feed
+(`/api/preview/data/<name>`) and prefers `gun_pen_2` → `Pain_3_updated_FULL` → `gun_pen`.
+**Data note.** `studio_projects/gun_pen` currently holds a DEMO re-analysis ("[demo]
+Sample…" findings), so the wireframe shows `Pain_3_updated_FULL` — the production 26B
+run: 43 findings · 14 high · 10 mechanical checks · 5 threads · 22 scenes. When the real
+`gun_pen_2` project is back on the shelf it wins automatically.
+**Verification.** `node --check` clean; one-off Playwright walk at 1440×900 against a
+copy of the projects dir (demo studio): 13/13 checks — live badge, "14 high" arrival
+line, 22-scene rail with 5 clean ticks, ledger "43 open · 14 high", "0 of 14 highs
+cleared", 5 h2 frames, skip link, switcher, annotation contrast ≥ 4.8:1, zero JS errors;
+screenshot `impl-shots/runs/latest/ia/ia-wireframe.png` (gitignored).
+`pytest tests/test_webapp_text_hygiene.py tests/test_repo_hygiene.py` → 10 passed.
+**Review fixes applied** from the Vercel Web Interface Guidelines + ui-ux-pro-max UX
+rules: darkened annotation tokens (held ≥ 4.5:1), h2 frame captions, skip link,
+`:focus-visible`/hover states, `aria-hidden` on decorative glyphs, rail as a real list,
+`tabular-nums`, `translate="no"` on the spec path. Controls are sketches — nothing is wired.
+
 ### 2026-10-02 — IA design written: *Arrive Quiet, Fix by Scene* (post-analysis feedback + premise room)
 
 **What it is.** `docs/superpowers/specs/2026-10-02-post-analysis-ia-design.md` — the
