@@ -3,6 +3,25 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+### 2026-10-02 — IA design written: *Arrive Quiet, Fix by Scene* (post-analysis feedback + premise room)
+
+**What it is.** `docs/superpowers/specs/2026-10-02-post-analysis-ia-design.md` — the
+2026-10-02 design thread's deliverable, layered on the already-shipped One Desk, One
+Ledger (which fixed the duplication clutter; this doc fixes arrival + traversal).
+**Locked in the thread:** guided fix loop is the default post-analysis mode; loop unit =
+the scene; everything counted + one tap away (folded, never hidden); and the idea-room
+door rule v2 — Sameer is the default presence, the Premise Doctor's test is opt-in and
+labeled with a state-dependent *invitation* (dormant / labeled affordance / one
+dismissible offer; never auto-start; per-idea, not per-room).
+**Contents:** arrival sequence (Arrive → Guide → Reference), the per-scene fix loop,
+two registers in one rail, the projection matrix, three trust tiers
+(Mechanical/Judgment/Structural), the premise pass (5-7 questions → readiness verdict +
+one fix, never a verified-finding badge), the kill list, phasing A-E, open questions,
+draft acceptance criteria with candidate gates.
+**Status.** Draft for user review; no code touched, docs only. Next artifacts: writer
+review of the doc, then the grayscale populated wireframe with real Gun_Pen data, then
+visual design (fork still parked, `REDESIGN_MASTER_PLAN.md` §4/§10).
+
 ### Production-readiness audit pass 4: the states pass 2 could not put on screen
 
 Pass 2 closed with a gap it named itself: *"the sweep does not reach the disposition
