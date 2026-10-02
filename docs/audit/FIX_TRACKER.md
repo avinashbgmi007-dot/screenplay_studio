@@ -4,6 +4,60 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-10-02 (branch `feature/readiness-remediations`, stacked on PR #4 — **the seven
+production-readiness remediations from the 2026-10-01 audit, R1→R7, each pinned by tests.** Full
+dispositions in `docs/audit/production_readiness_2026-10-01.md`. (1) R1 arrival gap: a FIRST
+analysis never scheduled the arrival peek — `last_pass` only exists from the second pass on — so
+the writer got no fresh-report signal; a first completion now sets an in-session
+`analysisCompletedFor` flag that the project-load path consumes exactly once (a plain reload of an
+already-read report never fakes a fresh one), and the right-edge affordance — the only dock
+surface visible while the dock is closed — joins the evidence tab in carrying the unread dot.
+(2) R2 cancel: `POST /api/analyze/cancel` flips a per-module cancel flag; `run_analyze` restores
+the stage to its pre-run state (snapshot taken on the force path too) so a cancelled run leaves
+nothing written and the SPA poller says so plainly instead of erroring, with a Stop button in the
+progress chip; also fixed a latent NameError in `_analyze_locked` that had been 500ing EVERY
+analyze call. (3) R4 generation timeouts: `chat_json` runs under a 600s wall-clock budget
+(monotonic deadline, per-attempt slices, the final error names the actual attempts made and the
+budget), the base client can pin a longer socket timeout, and the pipeline's retry hook surfaces
+as a visible "retrying" beat plus Run Notices (`AnalysisResult.notices` → "## ℹ️ Run Notes" in the
+report and `notices` in the findings JSON). (4) R5 upload validation: 0-byte files are rejected at
+create (400, "empty (0 bytes)") and scene-less parse results are rejected with Fountain guidance
+and a retry permission, instead of a project that parses "OK" with 0 scenes and can only fail
+later. (5) R3+R6 CI: `test-live-model` (ubuntu-24.04, gated on the `STUDIO_LIVE_LLM_URL` repo
+variable, drives the live gun_pen_audit via `E2E_BASE`) and `test-browser-windows` (windows-latest,
+full fleet, bash shell, chromium without `--with-deps`) — the fleet now gates on the platform
+writers actually use. (6) R7 library backup: `GET /api/library/backup` zips every project (skips
+`writer_profile.json` and non-project entries, excludes `.lock`/`.tmp`, collects per-project
+failures non-fatally) with an embedded `library-backup.json` manifest, and the dashboard's "Back
+up all" button downloads it through a token-carrying fetch + blob (a bare `<a>` cannot carry
+`X-Studio-Token`); route census 91→93 with the API route map and its test pin updated. OUTCOME:
+full pytest 2012 passed / 3 skipped (the pre-existing store_fault_injection skip), ruff clean,
+JS 23/23, browser fleet 60 suites — 59 passed / 1 skipped (gun_pen_audit, live-only, unchanged) /
+0 failed, 1514 checks; four new suites (test_analyze_cancel, test_generation_timeout,
+test_upload_validation, test_library_backup) add 26 checks.)
+
+**Follow-up (2026-10-02, same branch):** the new Windows browser gate then went RED once on the
+push-event run — `phase14_signoff_journey`, 44s elapsed against 41s for its whole green run, a 30s
+Playwright click timeout with `#manuscript-workspace` intercepting. Root cause: the suite's
+`#desk-analyze-btn` click was the fleet's last blind click on auto-hiding chrome (idle = `opacity:
+0` + `pointer-events: none`; only a `clientY < 120` mousemove wakes it for 4s), and the upload's
+render gap pushed it past the idle timer — Playwright checks the hit target BEFORE it moves the
+mouse, so its own retries never recover. Fixed by promoting phase8's `reveal_chrome` into
+`e2e_browser_common` (phase8 and desk_controls had been carrying two copies; all three now share
+one) and having phase14 wake + hit-test before both chrome clicks (`#desk-analyze-btn`,
+`#home-btn`), with the desk click bounded so an unreachable control is a named failure instead of
+a journey-aborting timeout; its two new checks lift a full green fleet by 2 (1514 → 1516 at equal
+coverage). `run_browser_suites._error_detail` now reports the traceback's raising frame alongside
+the six-line tail — the red line showed the action log alone, which is why the call site had to be
+re-derived by hand — with `tests/test_production_readiness.py` pinning both the frame and the
+no-traceback shape. The next Windows run then showed what that job is for: with the click fixed,
+two fixed-sleep races surfaced that a slower runner loses — phase14's `Ctrl+Z` undo pair and
+`text_popup`'s Stash round trip, both red on the push run with the identical commit green on the
+PR run. Both now wait for the observable change instead: `e2e_browser_common.became_true` (a JS
+predicate poll, the companion to `seen_visible`) for the apply/undo/redo trio, and a bounded
+server-count poll in `text_popup`. The contract each check asserts is unchanged, and a state that
+never arrives still fails by name — a fixed sleep is never a sync point.
+
 **Last updated:** 2026-10-01 (branch `feature/post-trust-hardening`, PR #4 — **three edges the real-model
 probe + Pain_3 validation left on the table, all fixed and pinned.** (1) RE-B4, the demo-fallback
 false positive: the import-time reachability probe can only test the DEFAULT url — `--server` is

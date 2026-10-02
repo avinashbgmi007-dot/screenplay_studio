@@ -1256,6 +1256,14 @@ def create_project():
     # safe_dir_name keeps the display `title` in the manifest untouched.
     safe_name = safe_dir_name(title)
 
+    # R5 (audit M3): an EMPTY file is rejected before any project exists —
+    # the parser "succeeds" on 0 bytes, so only this guard gives the writer
+    # the real reason (a 0-byte drop) instead of a generic parse error.
+    upload.seek(0, os.SEEK_END)
+    if upload.tell() == 0:
+        return _error("The uploaded file is empty (0 bytes). Choose the screenplay file you meant to import.", 400)
+    upload.seek(0)
+
     project_dir = _claim_project_dir(safe_name)
     ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
@@ -1273,6 +1281,34 @@ def create_project():
         orch.run_parse()
     except Exception as e:
         return _error(f"Could not process uploaded file: {e}", 500)
+
+    # R5 (audit M3), the scene-less case: the parser also "succeeds" on a
+    # prose file with no scene headings, so the project USED to be created
+    # (201) and the failure only surfaced minutes later as an analyze 502
+    # ("Document has no parsed scenes") — after the writer had left the
+    # desk believing the import worked. The parse stage records the truth;
+    # read it back here, reject with actionable guidance, and REMOVE the
+    # claimed directory so the shelf never lists a project that cannot be
+    # analyzed. (The write of parsed.json is the same file run_parse just
+    # finished — no sharing violation is expected; the bounded retry covers
+    # a stray Windows handle as elsewhere in this file.)
+    try:
+        from screenplay_parser.models import ScriptDocument
+        doc = ScriptDocument.load(manifest.parsed_path)
+        sceneless = not doc.scenes
+    except Exception:
+        sceneless = False  # unreadable parse output keeps the OLD behavior: a 201 whose analyze fails loudly
+    if sceneless:
+        import shutil
+        try:
+            retry_permission(lambda: shutil.rmtree(project_dir))
+        except OSError:
+            pass  # worst case: one half-claimed dir lingers; the 400 is what matters
+        return _error(
+            "This file contains no readable scenes (no scene headings like 'INT. ROOM - DAY'). "
+            "Nothing was added to your library — export the screenplay as Fountain or plain text "
+            "with scene headings and try again.",
+            400)
 
     return jsonify(_manifest_summary(manifest)), 201
 
@@ -1352,6 +1388,10 @@ def delete_project(name):
 # collected while it is the thing providing mutual exclusion.
 _ANALYZE_LOCKS: dict[str, threading.Lock] = {}
 _ANALYZE_LOCKS_GUARD = threading.Lock()
+# Per-project cancel events (R2): set by /analyze/cancel, checked co-operatively
+# by the running pipeline at stage boundaries. Lives only as long as the run:
+# created lazily by the cancel route, popped when the run's request returns.
+_ANALYZE_CANCEL: dict[str, threading.Event] = {}
 
 
 def _analyze_lock(name: str) -> threading.Lock:
@@ -1371,9 +1411,31 @@ def analyze_project(name):
         return _error("An analysis is already running for this project — "
                       "wait for it to finish before starting another.", 409)
     try:
-        return _analyze_locked(m)
+        return _analyze_locked(m, name)
     finally:
         lock.release()
+        # The run is over (completed, failed, or cancelled) — a stale event
+        # must never outlive it, or the NEXT run would cancel on arrival.
+        _ANALYZE_CANCEL.pop(name, None)
+
+
+@app.route("/api/projects/<name>/analyze/cancel", methods=["POST"])
+def cancel_analyze(name):
+    """Ask the running analysis to stop (RE-B4 audit R2).
+
+    Co-operative: the event is checked at stage boundaries and between
+    scene-summary chunks, so the current category finishes — a cancel lands
+    within one stage of the click, never mid-write. 409 when nothing is
+    running (double-click, or the run just finished on its own)."""
+    try:
+        _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    ev = _ANALYZE_CANCEL.get(name)
+    if ev is None or not _analyze_lock(name).locked():
+        return _error("No analysis is running for this project.", 409)
+    ev.set()
+    return jsonify({"cancel_requested": True})
 
 
 def _start_progress_heartbeat(m) -> None:
@@ -1451,7 +1513,7 @@ def _record_pass(m) -> None:
         traceback.print_exc()
 
 
-def _analyze_locked(m):
+def _analyze_locked(m, name):
     # The pre-flight lives OUTSIDE the pipeline's try below, and it does real
     # work: it rewrites the manifest and resets the progress heartbeat. An
     # exception here used to escape the handler entirely, and a Flask dev server
@@ -1477,6 +1539,13 @@ def _analyze_locked(m):
         body = request.get_json(silent=True) or {}
         if body.get("force"):
             from .manifest import StageStatus
+            # Snapshot BEFORE the reset (R2): a CANCELLED run must restore the
+            # stage the writer had before they pressed Re-run — a first run
+            # back to pending, a re-run back to complete with its report paths
+            # and partial record intact. (A FAILED run restores nothing: the
+            # orchestrator's own failure record is the truth there, as before.)
+            prev_stage = {"status": m.stage("analyze").status,
+                          "output_paths": dict(m.stage("analyze").output_paths) if m.stage("analyze").output_paths else None}
             # Resetting the stage to pending is what forces the re-run: the
             # orchestrator short-circuits on `stage.status == "complete"`, not on the
             # report files existing. The report files used to be deleted here too,
@@ -1497,8 +1566,17 @@ def _analyze_locked(m):
     orch = Orchestrator(m)
     import time as _t
     _t0 = _t.time()
+    cancel_event = _ANALYZE_CANCEL.setdefault(name, threading.Event())
+    from screenplay_analyzer.pipeline import AnalysisCancelled  # lazy: see AGENTS.md
     try:
-        orch.run_analyze(report_language=report_language)
+        orch.run_analyze(report_language=report_language,
+                         should_cancel=cancel_event.is_set,
+                         prev_stage=prev_stage if body.get("force") else None)
+    except AnalysisCancelled:
+        # The writer stopped the run: not an error, not a metric, not a point
+        # on the revision arc. The orchestrator already restored the stage and
+        # written the cancelled heartbeat; answer plainly.
+        return jsonify({"cancelled": True, **_manifest_summary(m)})
     except OrchestratorError as e:
         return _error(str(e), 502)
     except Exception as e:
@@ -1601,6 +1679,58 @@ def backup_project(name):
     buf.seek(0)
     return send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"{name}-backup.zip")
+
+
+@app.route("/api/library/backup", methods=["GET"])
+def backup_library():
+    """The WHOLE library as one .zip (audit R7/M5): every project directory,
+    plus a manifest of what was included. The per-project backup above saves
+    one desk; this saves the shelf — the writer's entire body of work in a
+    single click, nothing leaving the machine. The gap this closes: until it
+    existed, the only full copy of a writer's library was a manual, error-
+    prone copy of PROJECTS_DIR from inside the app's own data folder.
+
+    Per-project failures are contained: a damaged or half-deleted project is
+    recorded in the manifest (so the writer KNOWS) instead of failing the
+    whole archive. Lock sidecars and mid-flight temp files are excluded, as
+    in the per-project backup."""
+    buf = io.BytesIO()
+    included, failed = [], []
+    stamp = time.strftime("%Y%m%d-%H%M")
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if os.path.isdir(PROJECTS_DIR):
+            for name in sorted(os.listdir(PROJECTS_DIR)):
+                # Same exclusions as the shelf listing: the profile store is
+                # internal data, not a project; a lock sidecar is a file.
+                if name == "writer_profile.json" or not os.path.isdir(os.path.join(PROJECTS_DIR, name)):
+                    continue
+                project_dir = os.path.realpath(_project_dir(name))
+                try:
+                    n_files = 0
+                    for root, _dirs, files in os.walk(project_dir):
+                        for fname in files:
+                            if fname.endswith(".lock") or fname.endswith(".tmp"):
+                                continue
+                            full = os.path.join(root, fname)
+                            try:
+                                zf.write(full, os.path.join(name, os.path.relpath(full, project_dir)))
+                                n_files += 1
+                            except OSError:
+                                continue  # a file vanishing mid-zip: skip it, keep the archive
+                    included.append({"project": name, "files": n_files})
+                except OSError as e:
+                    # One unreadable project must not destroy the backup of
+                    # the other twenty — and must not be silent about it.
+                    failed.append({"project": name, "error": str(e)})
+        zf.writestr("library-backup.json", json.dumps({
+            "kind": "script-doctor-library-backup",
+            "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "projects": included,
+            "failed": failed,
+        }, indent=2), zipfile.ZIP_DEFLATED)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name=f"script-doctor-library-backup-{stamp}.zip")
 
 
 @app.route("/api/projects/<name>/reparse", methods=["POST"])

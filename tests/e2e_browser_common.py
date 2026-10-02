@@ -176,6 +176,67 @@ def clicked(target, selector=None, timeout=4000):
         return False
 
 
+def became_true(page, js, timeout=8000):
+    """Poll a JS predicate until it is TRUE; False if it never gets there.
+
+    Never raises. The companion to `seen_visible` for state that is not a
+    visibility question: an async round trip (undo POSTs and the manuscript
+    re-renders, a rewrite applies) whose settle time is machine-dependent. A
+    fixed `wait_for_timeout` after such a write is a race — the Windows CI VM
+    lost two of them in one run (2026-10-02) while the same commit passed on
+    the parallel run. Poll the observable change, then assert; a state that
+    never arrives still fails by name.
+
+        check("undo: Ctrl+Z removes the applied edit", became_true(page, gone_js))
+    """
+    try:
+        page.wait_for_function(js, timeout=timeout)
+        return True
+    except Exception:  # noqa: BLE001 - the caller's check IS the report
+        return False
+
+
+def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
+    """Move the mouse where a writer's would be, then poll until the control is
+    genuinely the hit target. Returns True/False — never raises.
+
+    `#desk-toolbar` and `#project-bar` are auto-hiding chrome: while idle they
+    carry `opacity: 0; pointer-events: none` (style.css `.auto-hide-chrome`), and
+    a mousemove with `clientY < 120` is what brings them back for 4s
+    (`CHROME_HIDE_DELAY`, app.js). Playwright's `is_visible()` ignores opacity, so
+    a `check(name, el.is_visible())` passes on a button no writer could actually
+    click, and the following `.click()` dies with
+    `<div id="manuscript-workspace">… intercepts pointer events` — Playwright
+    checks the hit target BEFORE it moves the mouse, so its own retries never
+    recover and the 30s timeout aborts the run (root-caused 2026-09-23:
+    phase8_lifecycle's first click landed past the 4s idle timer; the same trap
+    turned phase14_signoff_journey red on the Windows CI runner 2026-10-01,
+    where the upload's render gap pushed its desk click past the timer).
+
+    Emulating the writer — arrive via the top edge, wait for the real hit test —
+    is what makes the click the writer's click. Polling also covers the second
+    transition in the way: `#sidebar.sidebar-collapsed` animates 264px -> 0 and
+    briefly overlays the toolbar's left edge, where Run Analysis sits.
+    """
+    page.mouse.move(700, 8)
+    deadline = time.time() + timeout / 1000
+    hit = "missing"
+    while time.time() < deadline:
+        hit = page.evaluate(
+            """(sel) => {
+              const e = document.querySelector(sel);
+              if (!e) return 'missing';
+              const r = e.getBoundingClientRect();
+              const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+              if (!t) return 'none';
+              return (e === t || e.contains(t)) ? 'ok' : t.tagName + '#' + (t.id || '-');
+            }""", sel)
+        if hit == "ok":
+            return True
+        page.wait_for_timeout(100)
+    return False
+
+
 def note(label, value=""):
     """Print a diagnostic that is deliberately NOT a check.
 

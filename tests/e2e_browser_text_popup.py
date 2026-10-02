@@ -39,6 +39,7 @@ Run:  python tests/e2e_browser_text_popup.py
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -146,6 +147,23 @@ def stash_count(base, project):
     return len(body["stash"])
 
 
+def stash_count_until(base, project, want, timeout=8000):
+    """Poll the SERVER until the Stash holds `want` cards; return the last count.
+
+    The row's handler is one async POST, so reading the count straight after the
+    click's 500ms settle is a race: measured 2026-10-02, the Windows CI runner
+    reported "0 -> 0" while the identical commit passed on the parallel run.
+    Waiting for the real round trip keeps the check honest — it still fails, by
+    name, if the card never lands.
+    """
+    deadline = time.time() + timeout / 1000.0
+    n = stash_count(base, project)
+    while n != want and time.time() < deadline:
+        time.sleep(0.25)
+        n = stash_count(base, project)
+    return n
+
+
 def main():
     with open_studio() as base:
         with sync_playwright() as pw:
@@ -202,7 +220,7 @@ def main():
             before = stash_count(base, project)
             offer(page, "#manuscript-container")
             click_row(page, "stash")
-            after = stash_count(base, project)
+            after = stash_count_until(base, project, before + 1)
             check("Stash this files a card in the Stash (server round trip)",
                   after == before + 1, f"{before} -> {after}")
 

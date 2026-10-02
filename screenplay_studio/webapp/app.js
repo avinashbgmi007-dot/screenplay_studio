@@ -237,6 +237,38 @@ function _tokenError(resp, data) {
   return err;
 }
 
+// ---- authenticated download (audit R7) ----
+// A bare <a href> cannot carry the X-Studio-Token header, so on a token-
+// protected server a click would save the 403 error page instead of the
+// file. Fetch the bytes WITH the header, hand the blob to the browser as a
+// download, and surface a real failure as a writer-facing message instead
+// of a silently corrupted save.
+async function downloadBackup(path, filename) {
+  try {
+    const headers = {};
+    const tok = await _ensureStudioToken();
+    if (tok) headers["X-Studio-Token"] = tok;
+    let resp;
+    resp = await fetch(API + path, { headers });
+    if (!resp.ok) {
+      let msg = `backup failed (HTTP ${resp.status})`;
+      try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (_) { /* no body */ }
+      throw new Error(msg);
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    showError("Couldn't download the backup: " + (e.message || e));
+  }
+}
+
 // ---- streaming chat turn (SSE) ----
 // Raw tokens stream into the pending bubble AS the model writes them — the
 // perceived-latency win for slow local models. The final SSE event carries
@@ -953,6 +985,19 @@ function renderDashboard() {
   if (!grid) return;
   grid.innerHTML = "";
   const projects = state.projects || [];
+
+  // Library-wide backup (audit R7/M5): the shelf-saving sibling of each
+  // card's ⬇ Backup link. Hidden on an empty shelf — backing up nothing is
+  // a button that can only confuse. Wired once; the flag survives re-renders.
+  const allBtn = document.getElementById("dash-backup-all");
+  if (allBtn) {
+    allBtn.hidden = !projects.length;
+    if (projects.length && !allBtn.dataset.wired) {
+      allBtn.dataset.wired = "1";
+      allBtn.addEventListener("click", () =>
+        downloadBackup("/api/library/backup", "script-doctor-library-backup.zip"));
+    }
+  }
 
   if (!projects.length) {
     const empty = el("p", "dash-empty", "Nothing here yet — lay a manuscript on the desk above, or open the sample page.");
@@ -2711,6 +2756,26 @@ function startAnalysisProgressUI(startedAt) {
   if (analysisUi) analysisUi.stop();
   const btn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs the lifecycle
   const deskChip = $("#desk-analyze-progress");
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) {
+    cancelBtn.disabled = false;
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = async () => {
+      // Stop asks the server; the run itself decides when it is safe (the
+      // current stage finishes). The button goes inert the moment the ask
+      // lands — one click is one request, and the poller reports the result.
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = "Stopping…";
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/cancel`, { method: "POST" });
+      } catch (e) {
+        // 409 = the run already finished on its own between the click and
+        // the request; the next poll lands the real state either way.
+        cancelBtn.textContent = "■ Stop";
+        cancelBtn.disabled = false;
+      }
+    };
+  }
   if (btn) { btn.disabled = true; btn.classList.add("analyzing"); }
   if (deskChip) deskChip.style.display = "flex";
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
@@ -2764,6 +2829,24 @@ function startAnalysisProgressUI(startedAt) {
         finished = true;
         analysisUi = null;
         hideAnalysisProgressUI();
+        // RE-B4 audit (2026-10-01): the report-arrival peek used to be gated
+        // on `last_pass` changing — which does not exist on a FIRST analysis,
+        // so the writer's first completed run produced no unread dot and no
+        // halo at all (measured 60s post-completion). This in-session flag is
+        // the first-pass arrival signal; the load path consumes it once.
+        analysisCompletedFor = state.currentProject;
+        await loadProjects();
+        return;
+      }
+      if (p.status === "cancelled") {
+        // R2: the writer stopped the run. The server restored the stage to
+        // its pre-run state; nothing was written. Say so plainly, no error.
+        clearInterval(poll);
+        clearInterval(timer);
+        finished = true;
+        analysisUi = null;
+        hideAnalysisProgressUI();
+        appendSystemNote("Analysis stopped at your request — the script and any previous report are unchanged.", true);
         await loadProjects();
         return;
       }
@@ -2810,6 +2893,8 @@ function hideAnalysisProgressUI() {
   if (deskChip) deskChip.style.display = "none";
   const btn = $("#desk-analyze-btn");
   if (btn) { btn.disabled = false; btn.classList.remove("analyzing"); }
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = "■ Stop"; }
 }
 
 // ---------- Phase 8: the desk toolbar — analysis lifecycle beside the page ----------
@@ -4201,6 +4286,13 @@ async function loadScriptData() {
     summary = await api(`${base}/findings/summary`);
   } catch (_) { /* no analysis yet — same state the report fetch tolerates */ }
   if (arrived && findings.length) scheduleArrivalPeek();
+  else if (analysisCompletedFor === target && findings.length) {
+    // A first analysis has no `last_pass` to arrive — the completion event
+    // IS the arrival. Consumed once, so a plain reload of an already-read
+    // report never fakes a fresh one.
+    analysisCompletedFor = null;
+    scheduleArrivalPeek();
+  }
   renderDraftBar();
   await renderDiffBanner();
   // the second wave of awaits is long enough for the writer to have switched
@@ -6671,12 +6763,23 @@ async function setFindingIntent(findingId, intent) {
 // tab carries a lasting unread dot until the Evidence lens is opened. No
 // other ambience runs during the window (one-ambient-event cap, R8).
 let arrivalTimer = null;
+// RE-B4 audit: set by the analysis poll when a run finishes in-session and
+// consumed once by the project-load path — the first pass's arrival signal
+// (last_pass does not exist yet on a first analysis).
+let analysisCompletedFor = null;
 function scheduleArrivalPeek() {
   clearTimeout(arrivalTimer);
   arrivalTimer = setTimeout(() => {
     const tab = document.getElementById("dock-tab-evidence");
-    if (tab && !(document.getElementById("context-dock") || {}).classList?.contains("open")) {
+    const edge = document.getElementById("right-edge-affordance");
+    if (tab && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
       tab.classList.add("has-unread");
+    }
+    // The edge affordance is the ONLY dock surface visible while the dock is
+    // closed — the tab's dot hides with the panel. The report-ready signal
+    // must live where the writer is looking.
+    if (edge && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
+      edge.classList.add("has-unread");
     }
     const firstInk = document.querySelector(".finding-ink");
     if (firstInk) {
@@ -6688,6 +6791,8 @@ function scheduleArrivalPeek() {
 function clearEvidenceUnread() {
   const tab = document.getElementById("dock-tab-evidence");
   if (tab) tab.classList.remove("has-unread");
+  const edge = document.getElementById("right-edge-affordance");
+  if (edge) edge.classList.remove("has-unread");
 }
 
 // ---------- arrival strip (R4 + N1 + N2 + P1.9): the "finally" ----------

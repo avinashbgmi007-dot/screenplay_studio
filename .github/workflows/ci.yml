@@ -133,3 +133,60 @@ jobs:
           tests/test_revision.py
           tests/test_webapp_revision.py
           tests/test_stash.py
+
+  # R3 (audit H3): the fleet skips gun_pen_audit everywhere it runs, because it
+  # POSTs a live /analyze and needs a llama-server. That means the one suite
+  # exercising a real end-to-end analysis through the browser NEVER runs
+  # unattended — its assertions exist only on a developer's machine. This job
+  # runs exactly that suite against an operator-provided studio, and only when
+  # the operator has declared one: set the repository VARIABLE
+  # STUDIO_LIVE_LLM_URL (Settings → Secrets and variables → Actions → Variables)
+  # to the base URL of a studio that has a model loaded, and the job runs;
+  # leave it unset and the job shows as skipped, so the green build does not
+  # silently lose its only real-model coverage. It is a variable, not a secret,
+  # on purpose: a URL is not a credential, and a secret would not be visible
+  # in the `if:` guard.
+  test-live-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    if: ${{ vars.STUDIO_LIVE_LLM_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ".[ci]" -c requirements.lock.txt
+      - name: Install chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run the live-model browser suite (gun_pen_audit)
+        env:
+          E2E_BASE: ${{ vars.STUDIO_LIVE_LLM_URL }}
+        # Suite-name filter, not the whole fleet: every other suite boots its
+        # own private demo studio, which would ignore E2E_BASE — only
+        # gun_pen_audit is REQUIRES_LIVE_STUDIO.
+        run: python tests/run_browser_suites.py gun_pen_audit
+
+  # R6 (audit M4): the browser fleet ran on Linux only, but the shipping
+  # platform is Windows — where the studio is actually launched (jsonio's
+  # msvcrt locking, retry_permission on sharing violations, path shapes in the
+  # report/export links). The fleet measured 60 suites / 1,514 checks green on
+  # Windows locally; this job makes that the case in CI too, instead of
+  # trusting a machine that happens to sit on someone's desk.
+  test-browser-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ".[ci]" -c requirements.lock.txt
+      - name: Install chromium
+        run: python -m playwright install chromium
+      - name: Run browser suites
+        shell: bash
+        run: python tests/run_browser_suites.py

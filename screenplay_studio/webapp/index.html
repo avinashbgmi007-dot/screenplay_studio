@@ -129,6 +129,7 @@
       <div id="dashboard" class="dashboard" role="region" aria-label="Your scripts">
         <div class="dash-head">
           <span class="dash-title">On the desk</span>
+          <button id="dash-backup-all" class="dash-backup-all" type="button" hidden title="Download every project — source, reports, chats, edits — as one zip">⬇ Backup library</button>
           <span id="dash-conn" class="dash-conn" title="Model server status">…</span>
         </div>
         <div id="dash-grid" class="dash-grid"></div>
@@ -178,6 +179,9 @@
           <div id="desk-analyze-progress" class="analyze-progress desk-analyze-progress" style="display:none;" tabindex="0" role="group" aria-label="Analysis progress — the stage ladder opens on hover or focus">
             <span class="ap-stage">Starting…</span>
             <span class="ap-beat">…</span>
+            <!-- R2 (RE-B4 audit): a minutes-long run the writer cannot stop is
+                 a trap on a real llama-server; this asks the run to cancel. -->
+            <button id="desk-analyze-cancel" class="btn-secondary ap-cancel" type="button" title="Ask the analysis to stop — the current stage finishes, nothing is written, your script is unchanged">■ Stop</button>
           </div>
           <!-- Option A+: Re-parse re-homed here when the legacy panel header
                retired — the desk toolbar is the analysis lifecycle's home, and
