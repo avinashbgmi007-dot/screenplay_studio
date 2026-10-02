@@ -32,7 +32,8 @@ import requests
 from playwright.sync_api import sync_playwright
 
 from e2e_browser_common import (Checks, clicked, filled, launch, note,
-                                seen_visible, start_studio, studio_headers)
+                                reveal_chrome, seen_visible, start_studio,
+                                studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 checks = Checks()
@@ -148,7 +149,19 @@ def run(base):
               page.locator("#desk-retry-failed-btn").count() == 0)
 
         # ================= 8. RUN ANALYSIS -> PROGRESS -> COMPLETE ===========
-        page.locator("#desk-analyze-btn").click()
+        # The desk toolbar is auto-hiding chrome: after 4s idle it is opacity 0 +
+        # pointer-events none, so a blind click is intercepted by
+        # #manuscript-workspace and waits out Playwright's 30s timeout — this
+        # suite went red exactly there on the Windows CI runner 2026-10-01, where
+        # the upload's render gap pushed the click past the idle timer. Do what
+        # the writer does (arrive via the top edge, wait for the real hit test),
+        # and report a control that never becomes clickable by NAME rather than
+        # aborting the journey on a 30s timeout.
+        reachable = reveal_chrome(page, "#desk-analyze-btn")
+        check("analysis: Run Analysis is reachable on the desk", reachable,
+              "#desk-analyze-btn never became the hit target")
+        started = reachable and clicked(page, "#desk-analyze-btn")
+        check("analysis: the desk click starts the run", started)
         page.wait_for_timeout(800)
         chip = page.locator("#desk-analyze-progress")
         running_seen = chip.is_visible()
@@ -389,14 +402,15 @@ def run(base):
               restored["proj"] == proj, str(restored))
         check("session restore: scene pages render after reload",
               page.locator("#manuscript-container .scene-page").count() > 0)
-        # and leaving via Home clears it — wake the auto-hide chrome first
-        # (the project bar fades out on idle; mouse proximity restores it)
-        page.mouse.move(700, 20)
-        page.wait_for_timeout(600)
-        page.locator("#home-btn").click()
+        # and leaving via Home clears it — wake the auto-hide chrome first and
+        # wait for the real hit test (the project bar fades out on idle; only a
+        # top-edge mousemove restores it), then click bounded so an unreachable
+        # button is a named failure, not a 30s timeout that aborts the journey
+        home_clicked = (reveal_chrome(page, "#home-btn")
+                        and clicked(page, "#home-btn"))
         page.wait_for_timeout(700)
         check("return: home clears the session honestly",
-              page.locator("#welcome-view").is_visible())
+              home_clicked and page.locator("#welcome-view").is_visible())
 
         # ================= 20. VIEWPORT SWEEP (desktop/tablet/mobile) =======
         for name, w, h in (("tablet", 900, 1200), ("mobile", 390, 844), ("desktop", 1440, 900)):

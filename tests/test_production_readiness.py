@@ -765,6 +765,36 @@ def test_a_suite_that_records_no_checks_cannot_pass(monkeypatch):
     assert "0 checks" in detail
 
 
+def test_a_crashed_suite_reports_the_line_that_raised():
+    """An ERRORed suite must name WHERE it raised, not just what it saw.
+
+    Measured 2026-10-01: the Windows `test-browser-windows` job reported
+    phase14's Playwright click timeout as the action log alone — the element that
+    intercepted the click (`#manuscript-workspace`) with no call site — so which
+    click had flaked had to be reconstructed from the suite's elapsed time. The
+    detail now carries the traceback's last `File "…", line N, in …` frame
+    alongside the tail, and keeps the old shape when there is no traceback.
+    """
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import run_browser_suites as rbs
+
+    out = (
+        "Traceback (most recent call last):\n"
+        '  File "tests/e2e_browser_phase14_signoff_journey.py", line 151, in run\n'
+        '    _clicked = page.locator("#desk-analyze-btn").click()\n'
+        "playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.\n"
+        "Call log:\n"
+        '  - <div id="manuscript-workspace">…</div> intercepts pointer events\n'
+        "  - retrying click action\n"
+        "  - waiting 500ms\n"
+    )
+    detail = rbs._error_detail(out, 1)
+    assert "line 151" in detail, f"the raising frame must be named: {detail!r}"
+    assert "manuscript-workspace" in detail, "the action log must survive too"
+    assert rbs._error_detail("", 3) == "no summary; exit 3"
+
+
 # ---- B4: the "never off the machine" STT guard must not be prefix-bypassable --
 class TestWhisperUrlGuard:
     """The external whisper engine is the one place dictation audio could leave

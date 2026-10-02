@@ -36,6 +36,22 @@ JS 23/23, browser fleet 60 suites — 59 passed / 1 skipped (gun_pen_audit, live
 0 failed, 1514 checks; four new suites (test_analyze_cancel, test_generation_timeout,
 test_upload_validation, test_library_backup) add 26 checks.)
 
+**Follow-up (2026-10-02, same branch):** the new Windows browser gate then went RED once on the
+push-event run — `phase14_signoff_journey`, 44s elapsed against 41s for its whole green run, a 30s
+Playwright click timeout with `#manuscript-workspace` intercepting. Root cause: the suite's
+`#desk-analyze-btn` click was the fleet's last blind click on auto-hiding chrome (idle = `opacity:
+0` + `pointer-events: none`; only a `clientY < 120` mousemove wakes it for 4s), and the upload's
+render gap pushed it past the idle timer — Playwright checks the hit target BEFORE it moves the
+mouse, so its own retries never recover. Fixed by promoting phase8's `reveal_chrome` into
+`e2e_browser_common` (phase8 and desk_controls had been carrying two copies; all three now share
+one) and having phase14 wake + hit-test before both chrome clicks (`#desk-analyze-btn`,
+`#home-btn`), with the desk click bounded so an unreachable control is a named failure instead of
+a journey-aborting timeout; its two new checks lift a full green fleet by 2 (1514 → 1516 at equal
+coverage). `run_browser_suites._error_detail` now reports the traceback's raising frame alongside
+the six-line tail — the red line showed the action log alone, which is why the call site had to be
+re-derived by hand — with `tests/test_production_readiness.py` pinning both the frame and the
+no-traceback shape.
+
 **Last updated:** 2026-10-01 (branch `feature/post-trust-hardening`, PR #4 — **three edges the real-model
 probe + Pain_3 validation left on the table, all fixed and pinned.** (1) RE-B4, the demo-fallback
 false positive: the import-time reachability probe can only test the DEFAULT url — `--server` is

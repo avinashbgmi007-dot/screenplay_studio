@@ -125,6 +125,28 @@ def _looks_like_driver_init_failure(out: str) -> bool:
     return any(marker in out for marker in _DRIVER_INIT_MARKERS)
 
 
+def _error_detail(out: str, returncode: int) -> str:
+    """One-line summary of a crashed suite, carrying the RAISING frame.
+
+    The old form was the last six non-empty lines only. For a Playwright timeout
+    those six lines are the action log — they name the element that swallowed the
+    click but NOT the call that raised, so the red line in CI could not say which
+    click or which line was at fault (measured 2026-10-01: the phase14
+    desk-toolbar flake had to be re-derived by hand from the suite's elapsed
+    time). The last `File "…", line N, in …` frame of the traceback rides along.
+    """
+    frame = ""
+    for line in out.splitlines():
+        stripped = line.strip()
+        if stripped.startswith('File "') and ", line " in stripped:
+            frame = stripped
+    tail = "\n".join([line for line in out.strip().splitlines()[-6:] if line.strip()])
+    detail = tail or f"no summary; exit {returncode}"
+    if frame:
+        detail += f" | raised at {frame}"
+    return detail
+
+
 def _attempt(path: str, timeout: int):
     """Returns (status, detail, seconds, out, n_checks) — n_checks None if unknown."""
     started = time.time()
@@ -138,8 +160,7 @@ def _attempt(path: str, timeout: int):
     out = (proc.stdout or "") + (proc.stderr or "")
     hits = _SUMMARY_RE.findall(out)
     if not hits:
-        tail = "\n".join([line for line in out.strip().splitlines()[-6:] if line.strip()])
-        return "ERROR", tail or f"no summary; exit {proc.returncode}", elapsed, out, None
+        return "ERROR", _error_detail(out, proc.returncode), elapsed, out, None
     passed, failed = (int(x) for x in hits[-1])
     if failed or proc.returncode != 0:
         fails = [line for line in out.splitlines() if line.startswith("FAILED")]
