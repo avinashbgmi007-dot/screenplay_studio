@@ -173,6 +173,20 @@ Two things that probe pins beyond the status code:
   sentence for every frame, so a bulk Apply that refuses cannot say WHICH row went stale. Per-row
   marking on that path needs the frame in the error body — a contract change, deliberately not made
   here.
-* **The prototype's own trap frame has not been re-observed in a browser.** The desk now answers the
-  contract `refuseStale()` is wired to, so the state is reachable in production; this pass verified
-  the desk's half (above) and the product modal's half (the suite), not the prototype's frame.
+* ~~**The prototype's own trap frame has not been re-observed in a browser.**~~ **Closed** —
+  `tests/probe_ink_layer_trap_frame.py`, run against the running desk: 9/9. The page is on the LIVE
+  adapter; the real route still offers a usable take (scene 1: 1 frame, 1 take — the producer filter
+  is not over-broad on a real script); a stale frame draws `400 {"stale": true}` which the page's own
+  `classifyApplyError` reads as `kind: 'stale'`; and the gesture (`n` → `Enter` → `j` → `Enter` — the
+  trap frame's ⏎ keep) leaves `data-cast="stale"` on the row with the refusal kept in the fold:
+
+  > NOT WRITTEN · Stale proposal: the text was modified manually. The take was cut from a line that
+  > has moved since, so nothing was written — your text stands. Press J or K to ask again for a fresh
+  > take.
+
+  The writer's line is unchanged. **Disclosed in the probe's docstring:** the take is cut by hand.
+  The demo model skips slug lines on purpose — "so the demo always moves visible text" — while every
+  finding on both loaded projects anchors to a scene *heading*, so no model-produced take can land on
+  a wet row here, and the gesture cannot reach the state without a model that targets the row the
+  finding is anchored to. That is a property of the demo model's target selection, worth knowing
+  before anyone reads "the trap frame works" as "the trap frame is reachable on this script".
