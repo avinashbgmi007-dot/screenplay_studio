@@ -1973,7 +1973,8 @@ def rewrite_scene_endpoint(name):
 
     instruction = (body.get("instruction") or "").strip()
     try:
-        from .revision import load_working, rewrite_scene, scene_text
+        from .revision import (load_working, rewrite_scene, scene_text,
+                               proposal_is_landable)
         doc = load_working(m)
         result = rewrite_scene(_make_client(m), doc, scene_number, finding_text, instruction)
     except Exception as e:
@@ -1988,7 +1989,14 @@ def rewrite_scene_endpoint(name):
         # exact-match apply. Strip it so 'old' can match the scene verbatim.
         old = _strip_rewrite_noise(old)
         new = _strip_rewrite_noise(new)
-        if old and new and old != new:
+        # The producer's half of the staleness contract: a candidate whose text
+        # does not stand verbatim in the scene the writer is looking at is not
+        # shown as a proposal at all. Without this, `_assert_proposal_is_fresh`
+        # would refuse a frame the desk itself had just offered — and the
+        # refusal would say "modified manually" about what was really a model
+        # artifact (`_strip_rewrite_noise` truncating a copied line). Both
+        # halves answer from one predicate, so they cannot disagree.
+        if old and new and old != new and proposal_is_landable(doc, scene_number, old):
             replacements.append({"old": old, "new": new})
     return jsonify({
         "scene_number": scene_number,
@@ -2033,8 +2041,19 @@ def apply_edits(name):
     # `apply_edit` holds `lock_for(working.json)` across the read; do not
     # reintroduce a caller-side load here. The response shape is unchanged —
     # `scene_text_after` now comes back from inside the section.
-    from .revision import apply_edit, finding_statuses
-    result = apply_edit(m, scene_number, replacements)
+    from .revision import (apply_edit, finding_statuses,
+                           StaleProposalError, STALE_PROPOSAL_MESSAGE)
+    try:
+        result = apply_edit(m, scene_number, replacements)
+    except StaleProposalError:
+        # The transaction is refused, whole: the writer typed into one of the
+        # proposed lines while the rewrite was in flight. `stale: true` is what
+        # lets the page say so as a STATE — the refusal is printed in the fold
+        # and kept until the writer answers it — rather than as a generic
+        # failure. Retrying the same payload refuses again, correctly; the fix
+        # is to regenerate the proposal against the current text. The shape is
+        # exactly what `contracts_UI` §3.4 specifies.
+        return jsonify({"error": STALE_PROPOSAL_MESSAGE, "stale": True}), 400
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
     _record_findings_metrics(m, statuses)
     return jsonify({**result, "findings_status": statuses})
