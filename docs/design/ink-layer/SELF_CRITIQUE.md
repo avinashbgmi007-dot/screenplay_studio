@@ -443,9 +443,14 @@ the grammar holds, and it is written down rather than left to be rediscovered.
 
 ### 7.6 What this pass did NOT prove
 
-* **No live desk.** Every "fact" above is read from source, not recorded from a running studio. That
-  is strong evidence and it is not a recording; one `curl` against a live `/findings` would upgrade
-  the whole table from read to observed.
+* **~~No live desk.~~ Done, on the demo model.** The studio was booted (`webapp_demo`, demo craft
+  model), the sample project analysed, and the findings surface observed directly: severity domain
+  (`low`×4, `medium`×1 — no fourth word), `no_quote` on all five rows with `evidence_quote: null`,
+  the intent write (`{"f1gahqi6": "addressed"}` on disk, `null` clearing it to `{}`), and the
+  published report's zero unverified badges. What this **does not** upgrade: the demo model's
+  findings are synthetic (`"[demo] … not a real analysis"` is printed in the report itself), so the
+  live pass validates **shapes, states and arithmetic**, not craft quality; and it is a five-finding
+  sample rather than the 23-finding real script the 83 % figure comes from.
 * **The domain is closed by the grammar, not by a validator.** `_normalize_findings` fills a missing
   severity but does not clamp an out-of-domain one (`pipeline.py:241`). So "severity is one of three"
   is a claim about the constrained-decoding path; a producer without that constraint could emit a

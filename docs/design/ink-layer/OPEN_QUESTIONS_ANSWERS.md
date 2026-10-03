@@ -7,7 +7,10 @@ so in the recommendation itself rather than burying it in the critique.
 
 **Read first, before any of this is acted on.** These answers were first written from
 `contracts_UI`, the route map, the PRD and the architecture brief. They have now been re-checked
-against **the code that produces the data** — `screenplay_analyzer/*`,
+against **the code that produces the data** — and, for the findings surface, **observed against the
+studio itself**: the demo-model desk was booted, the sample project analysed, and the live routes
+answered. Where a claim below says *observed*, it is a recorded response, not a reading
+(`LIVE_VERIFICATION.md` holds the payloads). The re-check was against — `screenplay_analyzer/*`,
 `screenplay_studio/{webapp_server,revision}.py`, `screenplay_parser/quotematch.py`,
 `knowledge_base/rules/*.json`, and the SPA at `screenplay_studio/webapp/app.js` — because a document
 is a claim about the code and the code is the fact. Five answers moved. Where an earlier claim is now
@@ -19,7 +22,7 @@ field is itself evidence about how the earlier answers were reasoned.
 | Severity is a **closed, three-member set**: `SEVERITIES = ["low", "medium", "high"]`, compiled into the findings grammar | `grammar.py:50,69` | **Q1 settled.** The "pin the wire at `critical \| major \| minor`" step is **retracted** — the wire vocabulary was readable all along |
 | The curated corpus agrees: 26 rule files, **263 rules — medium 149 / high 71 / low 43**; `severity_for()` makes the cited rule the source of truth, `"medium"` only for unknown ids | `knowledge_base/rules/*.json`, `rules_context.py:274` | a finding's weight is a curated fact, not a model flourish — the page may draw it without hedging |
 | `by_severity` is **tallied from the findings' own strings** (default `low`) | `webapp_server.py:2460-2467` | **retracted:** the "four bands `high\|major\|medium\|low`" row. `major` is not a key and never was — the fourth band was a document's error, and my alias table was built to absorb it |
-| Verification has **four** states: `verified \| not_found \| no_quote \| scene_not_found` | `verifier.py:46` | **retracted:** "three-state vocabulary" — there is a fourth, and it is the one a citation can hit when the scene number itself is wrong. Q12 |
+| Verification has **four** states: `verified \| not_found \| no_quote \| scene_not_found`, and the summary adds two derived fields — `quote_bearing`, `verified_pct_of_quoted` — the latter **`None` when nothing quote-bearing exists** (no denominator, no number) | `verifier.py:46`; observed live | **retracted:** "three-state vocabulary" — there is a fourth, and it is the one a citation can hit when the scene number itself is wrong. Q12 |
 | The report badges exactly **two** of them (`not_found`, `scene_not_found`) and leaves `no_quote` **blank** | `report.py:36-40` | Q12: the warning copy has an owner, and it is the published report rather than the summary's arithmetic |
 | An unverifiable quote is **never discarded** — downgraded, flagged, kept | verifier policy; `report.py` renders every finding regardless of state | the "kept, never dropped" rule was already the desk's, not mine: unchanged, and now cited rather than asserted |
 | The finding's quote field is **`evidence_quote`**, and a per-row **`verification` block is served** | `/findings` item shape; `revision.py:960` | the demo's `evidence` is a rename the adapter must keep doing; `verification` is not a summary-only concept |
@@ -389,6 +392,16 @@ one.
 4. **`no_quote` is still never a target.** Nothing to match means `anchorFinding` scores it 0 and
    parks it scene-anchored, and casting refuses it with the real reason. That behaviour was already
    right; only the counting was wrong.
+
+**Observed live.** On the sample project (`The Late Hour`, demo model), `/findings` returned five
+findings, **all five `no_quote`** with `evidence_quote: null` — and the published `report.md`
+contains **zero** "unverified" badges, exactly as `report.py` leaves a quoteless state blank. The
+arithmetic the report gives for it is `{'verified': 0, 'not_found': 0, 'no_quote': 5,
+'scene_not_found': 0, 'quote_bearing': 0, 'verified_pct_of_quoted': None}`. Under the predicate this
+build shipped before the audit, that report would have been described as *"5 unverified"* — every
+finding on the page flagged, against a published report that names none. The fix is the difference
+between the page and the report agreeing and the page contradicting the report on 100 % of a live
+sample.
 
 **How common is this, really.** The repo's own review of a live run answers it:
 `docs/CRITICAL_REVIEW_2026-09-18.md:399` reports **19 of 23 findings carrying `no_quote`** (83 %), because
