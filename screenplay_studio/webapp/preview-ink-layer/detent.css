@@ -1,0 +1,395 @@
+/* =═══════════════════════════════════════════════════════════════════════════
+   detent.css — The Detent, as the colour pass over ink-layer.css
+   ════════════════════════════════════════════════════════════════════════════
+   This file exists because ink-layer.css says so in its own header:
+
+       "STRUCTURAL ONLY. No colour, no shadow, no ornament, no theme. …
+        Colour is a later pass and must slot in WITHOUT this file changing shape."
+
+   So: NOTHING here changes a dimension, a track count, a state machine or a
+   transition owner. Every rule paints an element the structural sheet already
+   created, or typesets text the renderer already wrote. If a rule below needs a
+   new element to exist, the element is added in the renderer (ink-layer.js) and
+   noted in the comment — never invented in CSS with ::before content that has no
+   source in the DOM.
+
+   THE LAW THIS PASS ENCODES
+     · The manuscript is the only thing at full ink. Prose is NEVER dimmed — not
+       by the ink threshold, not by an unverified finding, not by quiet.
+     · Colour separates INK STATE (wet · dry · receded), never severity.
+       Severity is width (structural) + solid ▪ blocks (here). `--accent` is
+       reserved for critical and for nothing else.
+     · Evidence is a FILAMENT: a 1px lit rule under the quote, peaking at
+       #FFD9A0, blooming amber beneath. Lit, not printed.
+     · No fills behind text. The fold is a machined SLOT (inset groove), not a
+       card, a panel or a chip.
+     · Two grounds, one design: `data-ground="instrument"` (as designed) and
+       `data-ground="lifted"` (the same instrument raised off black). Switching
+       the attribute changes six values and nothing else.
+
+   Kinetic profile: the precision detent. Fold opens 220ms cubic-bezier(.16,1,.3,1),
+   closes 150ms; the swap dialect is `step` — 90ms, one discrete colour step
+   through wet ink, no interpolation. All of it collapses under reduced motion.
+   =═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── §D0 TOKENS ───────────────────────────────────────────────────────────── */
+
+:root{
+  /* the bench */
+  --desk:      #150807;   /* canvas                                  */
+  --leaf:      #22100E;   /* the lacquered leaf                      */
+  --slot:      #190B0A;   /* a machined groove (fold interiors)      */
+  /* the ink */
+  --ink:       #F0E5D4;   /* warm ivory — text                        */
+  --wet:       #E3A653;   /* wet ink: unsettled, being worked         */
+  --fil:       #FFD9A0;   /* filament core — the hot centre of a lit rule */
+  --under:     #D9973C;   /* filament body                            */
+  --broken:    #8A6A55;   /* unverified stitch · settled · void       */
+  --accent:    #D9593C;   /* critical only. Never a label, never a fill */
+  --brass:     rgba(201,158,94,.42);   /* the hairline                */
+  --brass-2:   rgba(201,158,94,.20);
+
+  /* type: the instrument's three voices */
+  --iface: "DM Sans", system-ui, -apple-system, "Segoe UI", "DejaVu Sans", sans-serif;
+  --serif: "Instrument Serif", Georgia, "DejaVu Serif", serif;
+  --script-face: "Courier Prime", "Courier New", ui-monospace, "DejaVu Sans Mono", monospace;
+
+  /* kinetics (the structural sheet's --fold-ms is respected, not replaced) */
+  --fold-open-ms: 220ms;
+  --fold-close-ms: 150ms;
+  --settle: cubic-bezier(.16,1,.3,1);
+  --step-ms: 90ms;
+}
+
+/* The lifted ground: the same instrument, raised off black so it holds up at
+   low panel brightness and in daylight. Six values, no other difference — the
+   point is that the design does not depend on the darkness. */
+:root[data-ground="lifted"]{
+  --desk:   #241a12;
+  --leaf:   #2b1e15;
+  --slot:   #2e2018;
+  --brass:  rgba(214,176,116,.46);
+  --brass-2: rgba(214,176,116,.22);
+  --broken: #9A7A63;
+}
+
+/* ── §D1 THE BENCH ────────────────────────────────────────────────────────── */
+
+html, body{ background: var(--desk); color: var(--ink); }
+
+/* One worklight, low and warm, off the top-left. This is the page's ground, not
+   a highlight: it never sits behind a line, it never moves, and it carries no
+   meaning. */
+body::before{
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(720px 520px at 8% -6%, rgba(227,166,83,.055), transparent 62%),
+    radial-gradient(900px 700px at 92% 108%, rgba(217,89,60,.022), transparent 60%);
+}
+.surface, .manuscript{ position: relative; z-index: 1; }
+
+::selection{ background: rgba(255,217,160,.16); color: var(--ink); }
+
+/* The scrollbar is part of the bench, not the browser's default furniture. */
+html{ scrollbar-color: rgba(201,158,94,.32) transparent; }
+html::-webkit-scrollbar{ width: 12px; }
+html::-webkit-scrollbar-thumb{ background: rgba(201,158,94,.28); }
+html::-webkit-scrollbar-track{ background: transparent; }
+
+/* Focus: the detent's click, made visible. Brass, never the accent. */
+:root{ --focus-ring: 2px solid var(--under); --focus-offset: 3px; }
+
+/* ── §D2 THE MANUSCRIPT ───────────────────────────────────────────────────── */
+
+/* The script face, with the studio's self-hosted Courier Prime first if the
+   page has it and the system stack otherwise. No network, no webfont fetch. */
+.manuscript{
+  font-family: var(--script-face);
+  color: var(--ink);
+  font-variant-ligatures: none;
+}
+
+/* Scene headings are rows of the manuscript (structural), so they are typed as
+   manuscript: same face, a hair more tracking, a brass rule under the heading —
+   the one ornament this pass spends on the page, because it is the only line
+   that is both prose and structure. */
+.row[data-type="scene_heading"]{
+  letter-spacing: .02em;
+  border-block-end: 1px solid var(--brass-2);
+  padding-block-end: .35em;
+}
+.row[data-type="transition"]{ color: var(--ink); opacity: .82; }
+
+/* Prose is always at full ink. This is asserted rather than assumed: any future
+   rule that fades a row is a bug against the product law. */
+.row{ opacity: 1; }
+
+/* ── §D3 INK STATES — colour carries STATE; width carries SEVERITY ────────── */
+
+/* WET: this line is being worked. Amber rule; the rule's WIDTH is the severity
+   (set structurally) and its COLOUR is the state (set here). */
+.rowgroup[data-ink="wet"]{ border-inline-start-color: var(--wet); }
+.rowgroup[data-ink="wet"][data-worst="critical"]{ border-inline-start-color: var(--accent); }
+/* FLAGGED: the quote could not be located — the stitch is dashed (structural)
+   and broken-brown (here). "Not proven" must not look like "wrong". */
+.rowgroup[data-flagged="true"]{ border-inline-start-color: var(--broken); }
+
+/* DRY: the change-star appears (structural). It is wet ink that has settled.
+   TWO INKS, and the page says which: a line that went dry because the desk
+   LOCATED its evidence settles in wet ink (--wet); a line the writer closed by
+   their own decision settles in brass (--brass) — the instrument's own colour,
+   because no evidence was offered and none is implied. Same state, same
+   geometry: only who resolved it is painted. */
+.rowgroup[data-ink="dry"] > .row::after{ color: var(--wet); opacity: .85; }
+.rowgroup[data-ink="dry"][data-dry="choice"] > .row::after{ color: var(--brass); }
+.rowgroup[data-ink="dry"][data-dry="choice"]{ border-inline-start-color: var(--brass); }
+.rowgroup[data-ink="dry"][data-dry="evidence"]{ border-inline-start-color: var(--wet); }
+
+/* RECEDED by the ink threshold: the CRITIQUE steps back, the prose does not.
+   Structural already thins the rule to a dotted hairline and never fades the
+   row; here the critique loses its colour, nothing else. */
+.rowgroup[data-quiet="true"]{ border-inline-start-color: rgba(138,106,85,.55); }
+.rowgroup[data-quiet="true"] > .row::after{ color: var(--broken); }
+
+/* The row being cast is the control: its own text is the proposed text. */
+.rowgroup[data-cast="active"] > .row{
+  text-decoration: underline;
+  text-decoration-color: var(--under);
+  text-decoration-thickness: 1px;
+  text-underline-offset: .28em;
+}
+/* A take that differs from the original gets the double rule (structural) in
+   the filament's body colour — the delta is visible without being scored. */
+.rowgroup[data-cast="active"] > .row[data-delta="true"]{ text-decoration-color: var(--fil); }
+.rowgroup[data-cast="busy"] > .row{ text-decoration-color: var(--brass); }
+
+/* THE SWAP DIALECT: `step`. One discrete 90ms colour step through wet ink and
+   out — the swap CLICKS instead of sliding. Under reduced motion the line
+   simply arrives at its final colour, which is the same state. */
+@media (prefers-reduced-motion: no-preference){
+  .rowgroup[data-cast="active"] > .row{ animation: detent-step var(--step-ms) steps(2, jump-none) 1; }
+  .rowgroup[data-cast="applied"] > .row{ animation: detent-step var(--step-ms) steps(2, jump-none) 1; }
+}
+@keyframes detent-step{
+  0%   { color: var(--wet); }
+  100% { color: var(--ink); }
+}
+
+/* STALE: the server refused the proposal because the line moved under it. The
+   row is the writer's own text again, untouched, and the refusal is recorded in
+   the fold (see .cast-void) — the page is never marked as if a write happened. */
+.rowgroup[data-cast="stale"]{ border-inline-start-color: var(--broken); }
+
+/* ── §D4 THE FOLD — a machined slot, never a card ─────────────────────────── */
+
+/* The kinetic profile, expressed as durations on the SAME transition the
+   structural sheet owns. Nothing new transitions; only how long it takes. */
+@media (prefers-reduced-motion: no-preference){
+  .rowgroup{ transition-duration: var(--fold-close-ms); }
+  .rowgroup[data-fold="open"],
+  .rowgroup[data-fold="pinned"]{ transition-duration: var(--fold-open-ms); transition-timing-function: var(--settle); }
+}
+@media (prefers-reduced-motion: reduce){
+  :root{ --fold-open-ms: 0ms; --fold-close-ms: 0ms; --step-ms: 0ms; }
+}
+
+/* The groove: inset top and bottom so the fold reads as milled into the bench
+   rather than laid on top of it. The leading hairline attaches it to its line
+   (the attachment is structural; only its colour is set here). */
+.fold{
+  border-inline-start-color: var(--brass);
+  background: var(--slot);
+  box-shadow:
+    inset 0 1px 0 rgba(255,235,215,.055),
+    inset 0 -1px 0 rgba(0,0,0,.55);
+}
+.fold-pad{ font-family: var(--iface); }
+
+/* ── §D5 THE FINDINGS — commentary in the instrument's voice, quotes in the
+        manuscript's ───────────────────────────────────────────────────────── */
+
+.find{ border-inline-start-color: var(--brass); }
+.find[data-verified="false"]{ border-inline-start-color: var(--broken); }
+
+/* The issue is written, not printed: instrument face, comfortable leading. */
+.find-issue{
+  font-family: var(--iface);
+  font-size: .92em;
+  line-height: 1.5;
+  letter-spacing: .002em;
+  color: var(--ink);
+}
+/* The quote is the writer's own words, so it is set in the writer's own face,
+   and it wears the filament. The rule is 1px and the bloom is small: evidence
+   should read as lit, not as selected. */
+.find-evidence{
+  font-family: var(--script-face);
+  font-size: .9em;
+  opacity: 1;
+  background-image: linear-gradient(90deg,
+    rgba(217,151,60,0), rgba(217,151,60,.55) 30%, var(--fil) 50%, rgba(217,151,60,.55) 70%, rgba(217,151,60,0));
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  background-position: 0 calc(100% - 1px);
+  padding-bottom: 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.find[data-verified="false"] .find-evidence{
+  background-image: linear-gradient(90deg, rgba(138,106,85,0), rgba(138,106,85,.75), rgba(138,106,85,0));
+}
+
+/* The signature line: letterspaced, tabular, quiet — and severity as SOLID
+   BLOCKS in --grav, which is the only place severity is drawn. The word stays
+   next to the blocks (it is the accessible label); the blocks are the glyph. */
+.find-sig{
+  font-family: var(--iface);
+  font-size: .72em;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  font-variant-numeric: tabular-nums;
+  color: var(--grav, #8A6A55);
+  opacity: .95;
+}
+.find[data-severity="minor"] .find-sig::before{ content: "▪ "; color: var(--broken); }
+.find[data-severity="major"] .find-sig::before{ content: "▪▪ "; color: var(--broken); }
+.find[data-severity="critical"] .find-sig::before{ content: "▪▪▪ "; color: var(--accent); }
+.find-overflow{ font-family: var(--iface); font-size: .82em; color: var(--broken); opacity: 1; }
+
+/* A measured (deterministic) finding claims no craft authority — structural
+   italicises it; here it also loses the filament: no evidence, no lit rule. */
+.find[data-provenance="measured"] .find-evidence{
+  background-image: linear-gradient(90deg, rgba(138,106,85,0), rgba(138,106,85,.45), rgba(138,106,85,0));
+}
+
+/* ── §D6 THE CAST STRIP — an instrument reading, in the fold ────────────────
+   SEAM NOTE, corrected: an earlier revision of this note declared the strip's
+   PLACEMENT here, on the grounds that ink-layer.css forbade the change. It does
+   not — that sheet is structural only, and a grid template IS structure; what it
+   forbids is colour and ornament, which is exactly what stays in this file. The
+   strip's geometry (one column, the take's three columns, the wrap rules) now
+   lives in ink-layer.css §C, where it belongs, and this pass paints: the
+   ledger's own type, the two inks a take can carry, the struck and the
+   underlined change, the void. Nothing here touches a dimension. */
+
+.casting{ border-top-color: var(--brass); font-family: var(--iface); }
+/* The strip is read as an instrument, not as screenplay: it takes the interface
+   leading (1.5) instead of the manuscript's double spacing, so the ledger, the
+   takes, the scope and the keys sit together as one reading rather than four
+   separate paragraphs. Nothing about the manuscript changes. */
+.casting > p{ line-height: 1.5; }
+.cast-key{
+  font-size: .72em; text-transform: uppercase; letter-spacing: .18em;
+  color: var(--under); opacity: 1;
+}
+/* THE TAKE LEDGER — the readout, printed as text: `TAKE 02 / 03   ● ○ ○   +29 −00`.
+   The three spans are the renderer's own children (.ldg-pos, .ldg-marks,
+   .ldg-delta); the delta is ARITHMETIC on the take against the passage it was cut
+   from — characters added and removed — so it is a measurement, never a score.
+   Tabular, so the counter cannot jitter as it steps. */
+.cast-ledger{
+  display: inline-flex; gap: .9ch; align-items: baseline;
+  font-family: var(--script-face);
+  font-size: .78em; letter-spacing: .22em; text-transform: uppercase;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.cast-ledger .ldg-pos{ color: var(--under); letter-spacing: .3em; }
+.cast-ledger .ldg-marks{ letter-spacing: .3em; color: var(--wet); }
+.cast-ledger .ldg-delta{ color: var(--broken); letter-spacing: .12em; }
+
+/* THE TAKES, PAINTED. The number is a label, not a score: the desk's proposals
+   carry the wet ink's own body colour, and the writer's own line — ORIG — is
+   labelled in the quieter one, because it is not a proposal at all. The delta is
+   arithmetic in the void's colour: what moved, not how good it is. */
+.take .tk-n{ color: var(--broken); }
+.take[data-original="true"] .tk-n{ color: var(--under); }
+.tk-text{ font-family: var(--script-face); color: var(--ink); }
+.tk-delta{ color: var(--broken); letter-spacing: .12em; }
+.take[data-current="true"] .tk-n{ color: var(--wet); }
+/* The take under the keys is marked by a filament under the words themselves —
+   the same rule the ink uses elsewhere, done in type here because the take is
+   not the manuscript and must never wear the manuscript's marks. */
+.take[data-current="true"] .tk-text{
+  text-decoration: underline; text-decoration-color: var(--fil); text-underline-offset: .28em;
+}
+/* The change, in the manuscript's own inks: what goes is struck in the colour
+   of a settled line, what arrives is underlined in the filament's. */
+.tk-text del{ text-decoration-color: var(--broken); }
+.tk-text ins{ text-decoration-color: var(--fil); }
+/* The frame around the editable slice: read-only text is quiet, the hole is lit.
+   AND ONLY ONE MARK AT A TIME: the take's filament underline comes off while the
+   writer is typing, so the provisional rule is the only thing claiming the
+   passage — the mark that says "this is the proposal" and the mark that says
+   "this is yours to write" must never be the same mark. */
+.tk-fix{ color: var(--under); opacity: .75; }
+.tk-edit{ color: var(--ink); border-bottom-color: var(--brass); }
+.tk-edit:focus{ border-bottom-color: var(--under); }
+.casting[data-editing="true"] .take[data-current="true"] .tk-text{ text-decoration: none; }
+.casting[data-editing="true"] .take[data-current="true"] .tk-n{ color: var(--under); }
+
+.cast-scope{ font-size: .74em; letter-spacing: .16em; text-transform: uppercase; color: var(--under); }
+.cast-meta{ font-size: .76em; letter-spacing: .06em; color: var(--broken); opacity: 1; }
+/* A dependency between proposals is a finding about the EXCHANGE, not about the
+   prose — and not a severity. It gets a lit rule, not the accent: the accent
+   means CRITICAL and nothing else, or it stops meaning anything. */
+.cast-overlap{ font-size: .8em; line-height: 1.55; color: var(--ink); border-left: 2px solid var(--under); padding-left: 1ch; }
+.cast-skipped{ font-size: .78em; color: var(--broken); opacity: 1; }
+.cast-busy{ font-size: .78em; color: var(--under); opacity: 1; }
+
+/* The void notice: a refused proposal, recorded where the proposal was. */
+.cast-void{
+  font-size: .82em; line-height: 1.55;
+  color: var(--ink);
+  border-top: 1px dashed var(--broken);
+  padding-top: .5em;
+}
+.cast-void b{ font-weight: 500; color: var(--broken); text-transform: uppercase; letter-spacing: .16em; font-size: .92em; }
+/* The keys are the last line of the strip and sit in the flow of it: they are a
+   reading, not a toolbar. Placement travels with the element that introduced it. */
+.cast-keys{ display: flex; gap: 1ch; flex-wrap: wrap; margin: 0; }
+.cast-keys .cast-meta{ letter-spacing: .04em; }
+
+/* ── §D7 THE HORIZON ──────────────────────────────────────────────────────── */
+
+.hz-band{ stroke: var(--brass); opacity: .55; }
+.hz-band[data-scene]:hover{ opacity: 1; stroke: var(--under); }
+.hz-band[data-current="true"]{ opacity: 1; stroke: var(--wet); }
+.hz-ink rect{ fill: var(--wet); }
+.hz-ink[data-severity="critical"] rect{ fill: var(--accent); }
+.hz-ink[data-flagged="true"] rect{ fill: none; stroke: var(--broken); }
+.hz-window{
+  stroke: var(--fil); stroke-width: 1; opacity: .85;
+  fill: rgba(255,217,160,.05);
+}
+
+/* ── §D8 THE ANNUNCIATOR (visible mode) ───────────────────────────────────── */
+
+/* When the writer opts in with `a`, this is the one strip of interface text in
+   the document — so it is styled as the instrument's plate: slot ground, brass
+   hairline, small letterspaced type, tabular figures. */
+.annunciator[data-show="true"]{
+  font-family: var(--iface);
+  font-size: .82rem; letter-spacing: .04em;
+  color: var(--ink);
+  background: var(--slot);
+  box-shadow: inset 0 1px 0 rgba(255,235,215,.05);
+  border-top: 1px solid var(--brass);
+}
+
+/* ── §D9 PRINT — the Detent is a screen concern ───────────────────────────── */
+
+@media print{
+  html, body{ background: #fff; color: #111; }
+  /* The manuscript is printed as ink on paper, in one colour. Every type voice
+     this sheet gives a tint is forced back to black here: the rows are painted
+     by more specific selectors than `body`, so inheriting a colour is not enough
+     — light amber on white paper is a page nobody can read. */
+  .manuscript, .row, .row[data-type]{ color: #111; }
+  .row[data-type="character"], .row[data-type="dialogue"]{ color: #111; }
+  body::before{ display: none; }
+  .find-evidence{ background-image: none; padding-bottom: 0; }
+  .fold{ background: none; box-shadow: none; }
+  .find-sig{ color: #555; }
+  .hz-band, .hz-window{ stroke: #999; }
+  .hz-ink rect{ fill: #444; }
+}

@@ -1,0 +1,308 @@
+/* =═══════════════════════════════════════════════════════════════════════════
+   ink-layer.css — Architecture I: The Ink Layer
+   STRUCTURAL ONLY. No colour, no shadow, no ornament, no theme.
+   Every rule here exists to make one of three mechanisms legible:
+     §A  the single surface + the 12px Horizon
+     §B  the dwell-depth accordion fold
+     §C  inline take-casting
+   Anything not load-bearing for structure/flow/state is deliberately absent.
+   Colour is a later pass and must slot in WITHOUT this file changing shape.
+   =═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── §0 DIMENSIONS ─────────────────────────────────────────────────────── */
+
+:root{
+  /* The only three numbers the layout is built from. */
+  --horizon-w: 12px;                       /* the track, exactly, as specified   */
+  --horizon-hit: 24px;                     /* pointer target; the track stays 12 */
+  --page-pad: clamp(12px, 4.2vw, 72px);
+  --scrollbar-w: 12px;                     /* gutter reserved for the native bar */
+
+  /* Structural type metrics. The face is a system stack only because a
+     monospace advance width is what makes column alignment deterministic.
+     Choosing a real face is a styling decision and is NOT made here. */
+  --script-face: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --script-size: 1rem;
+  --script-leading: 1.5;
+
+  --fold-ms: 260ms;                        /* mirrors FOLD_MS in core.js */
+  --focus-ring: 2px solid currentColor;
+  --focus-offset: 2px;
+
+  /* Single continuous surface: the manuscript owns the viewport and the page
+     itself scrolls. No nested scroller, no second scroll context. */
+  --measure: 72ch;
+}
+
+/* Reduced motion: the fold state machine is unaffected (it is state, not
+   motion) — only the transition is muted, so opening still settles identically. */
+@media (prefers-reduced-motion: reduce){
+  :root{ --fold-ms: 0ms; }
+}
+
+/* ── §A THE SINGLE SURFACE ─────────────────────────────────────────────── */
+
+html, body{ margin:0; padding:0; }
+html{ scrollbar-gutter: stable; }          /* the layout never shifts when ink appears */
+
+/* The manuscript is the scroller. Nothing else in this document scrolls. */
+.surface{
+  /* padding-right reserves the 12px track + its own breath, so no glyph can
+     ever be occluded by the Horizon at any width. */
+  padding: var(--page-pad);
+  padding-right: calc(var(--page-pad) + var(--horizon-w) + (var(--page-pad) / 2));
+  scrollbar-width: thin;
+}
+@media (max-width: 720px){
+  .surface{ padding-right: var(--horizon-w); }        /* track rides the edge */
+}
+
+/* The manuscript column: centered, fixed measure. Centering is FLEX-BASED
+   (margin:auto) and not allowed to collapse when the Horizon is interactive,
+   because the Horizon is absolutely positioned and takes no flow space. */
+.manuscript{
+  margin-inline: auto;
+  width: min(100%, var(--measure));
+  font-family: var(--script-face);
+  font-size: var(--script-size);
+  line-height: var(--script-leading);
+  tab-size: 4;
+}
+
+/* Rows. One element per screenplay element. The DOM text is the real text —
+   leading whitespace included — so the manuscript in the DOM is the manuscript. */
+.row{
+  display: block;
+  white-space: pre-wrap;                   /* real indentation, no sentinel hacks */
+  position: relative;
+  scroll-margin-block: 8rem;               /* keyboard focus never lands under the fold */
+  outline: none;                           /* replaced by [data-focus] below */
+}
+.row:focus-visible,
+.rowgroup[data-focus] > .row{
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* Element-type alignment. Structural: it expresses the screenplay's own
+   grammar (action flush, speech indented) and gives the fold its column. */
+.row[data-type="action"],
+.row[data-type="scene_heading"],
+.row[data-type="shot"],
+.row[data-type="transition"],
+.row[data-type="general"]{ --indent: 0ch; }
+.row[data-type="character"]{ --indent: 22ch; }
+.row[data-type="parenthetical"]{ --indent: 18ch; }
+.row[data-type="dialogue"]{ --indent: 14ch; }
+.row[data-type="transition"]{ text-align: right; }
+
+/* Indentation is applied by ink-layer.js from the SAME map that sets --indent,
+   so the text and the fold column can never disagree. See INDENT in core.js. */
+
+.scene{ display: block; }
+.scene > .rowgroup > .row[data-type="scene_heading"]{ margin-block: 1.6em .8em; }
+.row + .rowgroup > .row{ margin-block: .35em 0; }
+
+/* ── §A2 INK STATES — structure only, no colour ────────────────────────── */
+
+/* WET: the row is unsettled. A left rule whose THICKNESS is the severity and
+   whose STYLE is the verification state. Both are non-colour channels. */
+.rowgroup[data-ink="wet"]{
+  border-inline-start: 1px solid currentColor;
+  padding-inline-start: 1ch;
+  margin-inline-start: -1ch;
+}
+.rowgroup[data-ink="wet"][data-worst="critical"]{ border-inline-start-width: 6px; }
+.rowgroup[data-ink="wet"][data-worst="major"]   { border-inline-start-width: 3px; }
+.rowgroup[data-ink="wet"][data-worst="minor"]   { border-inline-start-width: 1px; }
+.rowgroup[data-flagged="true"]                  { border-inline-start-style: dashed; }
+
+/* ADDRESSED: dry. The mark is a change-star in the margin, not a colour. */
+.rowgroup[data-ink="dry"] > .row::after{
+  content: "★"; font-size: .7em; vertical-align: super;
+  margin-inline-start: .5ch; opacity: .7;
+}
+/* GHOSTED by the ink threshold: present, receded, still readable and still
+   focusable. Never display:none — "ghost, don't hide". */
+/* THE INK THRESHOLD SOFTENS CRITIQUE MARKS — NEVER THE MANUSCRIPT.
+   Prose legibility is absolute: a screenplay's text is always at full contrast,
+   because dimming it impairs reading and hides the context that judgement needs.
+   Below the floor, the CRITICISM steps back: its rule thins to a dotted hairline,
+   its horizon pip shrinks, and its fold stops opening on a dwell. The line still
+   reads perfectly, and Enter still opens it when the writer asks. */
+.rowgroup[data-quiet="true"]{
+  border-inline-start-style: dotted;
+  border-inline-start-width: 1px;
+}
+.rowgroup[data-quiet="true"] > .row{ opacity: 1; }        /* prose is never faded */
+.rowgroup[data-quiet="true"] > .row::after{ opacity: .5; } /* the change-star recedes */
+
+/* ── §B THE DWELL-DEPTH ACCORDION FOLD ─────────────────────────────────── */
+
+/* The rowgroup is a two-track grid: the line, then the fold.
+   Collapsed = 0fr. The fold participates in layout at all times, so opening it
+   PUSHES the following rows down instead of covering them. */
+.rowgroup{
+  display: grid;
+  grid-template-rows: auto 0fr;
+  transition: grid-template-rows var(--fold-ms) linear;
+}
+.rowgroup[data-fold="open"],
+.rowgroup[data-fold="pinned"],
+.rowgroup[data-fold="closing"]{ grid-template-rows: auto 1fr; }
+.rowgroup[data-fold="closing"]{ grid-template-rows: auto 0fr; }  /* collapse */
+
+/* The grid item must be allowed to shrink and must clip its own overflow,
+   or 0fr cannot reach zero height. */
+.rowgroup > .fold{ min-height: 0; overflow: hidden; }
+
+/* The fold opens in the SAME COLUMN as the line it belongs to. --indent is set
+   on .rowgroup by the renderer from the shared INDENT map. */
+.fold{
+  margin-inline-start: var(--indent, 0ch);
+  border-inline-start: 2px solid currentColor;   /* attaches the fold to its line */
+}
+.fold-pad{ padding: .5em 1ch .75em; display: grid; gap: .75em; }
+
+/* The findings inside one fold STACK in severity order. The stack is the whole
+   reason there is no findings list: N findings on a line is still ONE fold. */
+.finds{ list-style: none; margin: 0; padding: 0; display: grid; gap: .6em; }
+.find{
+  display: grid;
+  grid-template-columns: 1fr auto;         /* text | provenance chip */
+  gap: .1em .75em;
+  padding-inline-start: 1ch;
+  border-inline-start: 1px solid currentColor;
+}
+.find[data-verified="false"]{ border-inline-start-style: dashed; }
+.find[data-provenance="measured"]{ font-style: italic; }   /* no craft authority claimed */
+.find-issue{ grid-column: 1; }
+.find-evidence{ grid-column: 1; white-space: pre-wrap; opacity: .8; }
+.find-evidence::before{ content: "“"; }
+.find-evidence::after{ content: "”"; }
+.find-sig{ grid-column: 2; grid-row: 1 / span 2; white-space: nowrap; opacity: .7; }
+.find-overflow{ grid-column: 1 / -1; opacity: .7; }
+
+/* ── §C INLINE TAKE-CASTING ────────────────────────────────────────────── */
+
+/* While casting, the LIVE row is the control. No overlay, no popup, no panel,
+   and — since the trap frame — no writing into the row either: an audition is a
+   reading, and the line changes only when a take is committed. The underline
+   states that the line is the subject of what is in the fold; data-delta is the
+   line reporting whether it currently holds a change (it does not, mid-audition). */
+.rowgroup[data-cast="active"] > .row{ text-decoration: underline; text-underline-offset: .25em; }
+.rowgroup[data-cast="active"] > .row[data-delta="true"]{ text-decoration-style: double; }
+
+/* THE STRIP IS A STACK, IN THE FOLD'S OWN COLUMN, and its order is the
+   progressive disclosure it promises: where this take sits, then the takes,
+   then the scope the desk answered with, then its reason, then the keys. One
+   fluid column: nothing here needs a second reading position, and nothing here
+   is laid out for one viewport width only. */
+.casting{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .3em;
+  border-top: 1px solid currentColor;
+  padding-top: .5em;
+}
+.casting > *{ margin: 0; }
+.cast-ledger{ white-space: nowrap; }
+.cast-key{ white-space: nowrap; }
+
+/* THE TAKES: number, sentence, arithmetic — the three things a take is. The
+   number column is 4ch so ORIG and 01..09 align without a second look; the
+   sentence takes the rest and wraps at word boundaries; the delta stays on its
+   own take's baseline and never wraps away from it. */
+.cast-takes{ list-style: none; padding: 0; display: grid; gap: .25em; }
+.take{ display: grid; grid-template-columns: 4ch minmax(0, 1fr) auto; gap: 1ch; align-items: baseline; }
+.tk-n{ font-variant-numeric: tabular-nums; }
+.tk-text{ white-space: pre-wrap; overflow-wrap: anywhere; }
+.tk-delta{ font-style: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Type as the change: struck for what goes, underlined for what arrives, and
+   never a colour alone. */
+.tk-text del{ text-decoration: line-through; }
+.tk-text ins{ text-decoration: underline; text-underline-offset: .22em; }
+
+/* The one editable slice of the strip, and it is only ever the passage itself:
+   the frame's prefix and suffix are shown as text, never as fields. */
+.tk-fix{ white-space: pre-wrap; }
+.tk-edit{ white-space: pre-wrap; outline: none; border-bottom: 1px dashed currentColor; }
+.tk-edit:focus-visible{ border-bottom-style: solid; }
+
+.cast-scope{ white-space: normal; }
+.rowgroup[data-cast="busy"]{ cursor: progress; }
+
+/* ── §A3 THE HORIZON (12px, absolute, true proportion) ─────────────────── */
+
+/* No layout impact at all: fixed, out of flow, so the single surface can never
+   be squeezed by its own radar.
+   FIXED, not absolute — an absolutely positioned element resolves against the
+   initial containing block, which is viewport-height, so the track would only
+   represent the first screenful. The Horizon must span the viewport and map the
+   WHOLE document into itself: that is what "true proportion" requires. */
+.horizon{
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: var(--horizon-w);
+  z-index: 3;
+  touch-action: none;                      /* pointer drag is the scrub */
+  user-select: none;
+}
+.horizon:focus-visible{ outline: var(--focus-ring); outline-offset: -2px; }
+
+/* One child g that IS the coordinate system: 0..trackHeight px == 0..scrollHeight. */
+.hz-track{ display: block; width: 100%; height: 100%; }
+
+/* Scene bands: true proportion, integer-tiled, always ≥1px. Structural rule =
+   a hairline between bands; altitude within the story is conveyed by position
+   and height alone. */
+.hz-band{ stroke: currentColor; stroke-width: .5; opacity: .5; }
+.hz-band[data-scene]:hover{ opacity: 1; }
+.hz-band[data-current="true"]{ opacity: 1; stroke-width: 1; }
+
+/* Ink pips: the track is 12px wide; a pip's WIDTH is the severity (core.js
+   inkPx 0/4/8/12) and its inline position is the severity channel. */
+.hz-ink rect{ fill: currentColor; }
+.hz-ink[data-flagged="true"] rect{ fill: none; stroke: currentColor; stroke-width: .6; }
+.hz-ink[data-dismissed="true"] rect{ opacity: .35; }
+
+/* The window: the viewport's true extent. Drawn, never interactive itself —
+   the whole track is the drag surface. */
+.hz-window{ fill: none; stroke: currentColor; stroke-width: 1; opacity: .6; }
+
+/* The dry meter: the only place a progress figure lives, and it is text in the
+   annunciator, never a floating badge. */
+
+/* ── §D THE ANNUNCIATOR — the only non-manuscript text in the document ─── */
+
+/* Visually hidden in the shipped design, but structurally present: it is what
+   makes the whole architecture readable with the screen off. Not a toolbar,
+   not a status bar, takes no space, contains no controls. */
+.annunciator{
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%);
+  white-space: nowrap;
+}
+.annunciator[data-show="true"]{
+  /* Opt-in visible mode for keyboard-only writers; still bottom-anchored and
+     out of flow so it can never displace the manuscript. */
+  position: fixed; inset-inline: 0; inset-block-end: 0;
+  width: auto; height: auto; margin: 0; clip-path: none;
+  padding: .5em 1ch;
+  z-index: 4;
+}
+
+/* ── §E PRINT: the ink layer is strictly a screen concern ──────────────── */
+
+@media print{
+  .horizon, .annunciator{ display: none !important; }
+  .rowgroup{ grid-template-rows: auto 0fr !important; }
+  .rowgroup[data-ink]{ border: 0 !important; }
+  .rowgroup[data-ink="dry"] > .row::after{ content: ""; }
+  .rowgroup[data-quiet="true"]{ border-inline-start-style: solid; }
+  .surface{ padding-right: var(--page-pad); }
+}
