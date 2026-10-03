@@ -2930,10 +2930,13 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .rewrite-candidate-actions .rc-apply { border-color: var(--ok); color: var(--ok); }
 .rewrite-candidate-actions .rc-reject:hover { border-color: var(--danger); color: var(--danger-text); }
 /* a proposal that has been acted on keeps its diff visible, greyed — the writer
-   can still see what they took or parked */
-.rewrite-candidate-applied, .rewrite-candidate-stashed { opacity: 0.55; }
+   can still see what they took or parked. A REFUSED one is here for the same
+   reason: its text moved under it, so it cannot be applied, and the row must
+   read as decided rather than as one still offering an action. */
+.rewrite-candidate-applied, .rewrite-candidate-stashed, .rewrite-candidate-stale { opacity: 0.55; }
 .rewrite-candidate-applied { border-color: var(--ok); }
 .rewrite-candidate-stashed { border-color: var(--accent); }
+.rewrite-candidate-stale { border-color: var(--danger); }
 .rewrite-status.ok { color: var(--ok); }
 
 /* command palette */

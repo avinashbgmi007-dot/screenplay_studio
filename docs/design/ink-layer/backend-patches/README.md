@@ -1,4 +1,10 @@
-# Backend halves the Ink Layer's refusal path depends on (NOT APPLIED)
+# Backend halves the Ink Layer's refusal path depends on — APPLIED
+
+**Applied on `feature/stale-proposal-guard`, 2026-10-03**, branched from the merged `main`
+(`1e1131a`): `bb9ce92` (the guard, the route contract and the `/rewrite` producer filter) and
+`b6c153d` (the client half the browser suite then proved was missing). The sections below are kept
+as they were written — they are what the patch was cut from, and why. The outcome is recorded at the
+end, including the live re-run of the probe in the last section.
 
 These two files are **paste-ready patch documents, not modules**: each one opens with a
 `WHERE THIS GOES` note naming the file and the exact anchor. They are here as a record of what the
@@ -31,7 +37,7 @@ byte. That path reads two things off the response:
 `core.classifyApplyError` decides from `body.stale` — never by matching the sentence — so the flag is
 the load-bearing part, not the wording.
 
-## The one decision these documents are blocked on
+## The one decision these documents were blocked on — resolved: apply, with `main`'s copy
 
 The copy differs between what this prototype was specified against and what the route ships:
 
@@ -47,7 +53,12 @@ flag and the guard, and treat the specified copy as superseded.** Until that is 
 stale path cannot be exercised against a real server — only against the demo, which re-implements the
 guard so the refusal can at least be seen and tested.
 
-## Status
+**Decided 2026-10-03: apply the patch, keep `main`'s per-row messages, add the `stale: true`
+flag.** The specified copy stays superseded, exactly as recommended above — the flag is what the UI
+reads, so the wording never had to agree. With that, the stale path IS exercisable against a real
+server, and the last section records it being exercised.
+
+## Status at the time these documents were written
 
 * Not applied to `screenplay_studio/revision.py` or `screenplay_studio/webapp_server.py` by me.
   Applying them means editing a working copy under concurrent-write guards and re-running the pytest
@@ -56,9 +67,11 @@ guard so the refusal can at least be seen and tested.
 * `webapp_apply_edits.py` block C (the `/rewrite` producer filter) is also a one-line change to the
   route above `/edits/apply` — same reasoning.
 
+Both were applied on 2026-10-03, with the suite and the guards above re-run — see the end.
+
 ---
 
-## Observed on a live desk (2026-10-03) — what happens instead, today
+## Observed on a live desk BEFORE the guard (2026-10-03) — what happened instead
 
 The claim above ("a stale proposal is applied to text that has moved") deserves the sharper version,
 measured rather than reasoned. Against the running desk with the writer's own 28-page script:
@@ -92,3 +105,88 @@ Either resolution is defensible and both are one change:
 What is **not** acceptable is the current arrangement: a UI state that exists, is tested offline, and
 cannot happen in the product. That is the same defect class as the 0 px mark and the hollow quotes —
 a claim in the interface that no data backs.
+
+---
+
+## Applied (2026-10-03) — what changed, and the same probe re-run
+
+**The guard.** `revision.py` gains `STALE_PROPOSAL_MESSAGE`, `StaleProposalError`, `_still_holds`,
+`_assert_proposal_is_fresh` and `proposal_is_landable`. `apply_edit` verifies every frame **inside**
+the same `lock_for('working.json')` section that mutates it — a pre-check in the route would read
+outside the lock and race the very write it protects (BE-1) — and raises before anything moves.
+
+**Whole-value equality at every granularity, never containment.** A writer who types `!` onto the
+proposed line leaves the old text as an exact substring; a substring test passes there, and the frame
+commits over a line the writer had just changed. No strip, no case-fold, no normalisation anywhere: a
+whitespace difference IS the manual edit this exists to catch. The run window covers only proposals
+the model copied across a line break.
+
+**The route** answers `400 {"error": …, "stale": true}` per the contract above, and **the producer**
+shows only the candidates `proposal_is_landable` accepts. Both halves answer from `_still_holds`, so
+the desk can neither offer a proposal the apply path refuses nor accept one the writer has outrun.
+
+**The client half, which the browser suite found.** Turning a silent skip into a refusal exposed
+that `applyOneRewrite`'s catch only wrote the status line: a refused row kept a live, checked
+checkbox and rode the next bulk Apply (`cb.checked && !cb.disabled`), so the desk went on offering an
+Apply that could never land. `tests/e2e_browser_rewrite_loop.py` caught it — its crafted
+`ZZZ-NO-SUCH-LINE-*` frames are absent from the fixture by design, so every individual apply there is
+a refusal — 40/43 on the guard commit, 43/43 once fixed, with the three failing checks watched
+failing. `app.js` now carries `stale` on the api error beside `stillWorking` (the caller decides from
+the flag, never by matching the sentence), marks the refused row `rewrite-candidate-stale` and removes
+its actions; the sentence stays on screen unprefixed by a generic "Apply failed:".
+
+**Tests and gates.** `tests/test_stale_proposal_guard.py` — 12 tests over the predicate, the route
+contract and the producer filter. Full pytest `1987 passed / 4 skipped`; the one intermittent failure
+is `tests/test_apply_race.py`'s overlap assertion, measured **pre-existing at the same rate on the
+parent commit** (5/20 vs 5/20 failed, 20 interleaved runs each way on a 2-core box), so it is not a
+consequence of this change. Browser suites: rewrite_loop 43/43, phase14 47/47, desk_controls 41/41,
+two_contexts 8/8; `node --test tests/js/core.test.js` 16/16; ruff clean.
+
+### The same probe, re-run against the running desk
+
+Same project, same route, capability token sent. The before-state is the section above:
+
+```
+POST /api/projects/Pain_3/edits/apply
+  {"scene_number": 6, "replacements": [{old: "akkada kindha godaki lean iyyi untaadu eyes half close open",
+                                        new: "… open [probe]"}]}
+
+  1st          → 200  {"applied": [{…, "similarity": 1.0}], "skipped": []}
+  2nd, the SAME body, the line now holding its own new text
+               → 400  {"error": "Stale proposal: the text was modified manually.", "stale": true}
+```
+
+where the recorded behaviour was `200 {"applied": [], "skipped": [{reason: "line not found in
+scene"}]}`.
+
+Two things that probe pins beyond the status code:
+
+* **The old text is still a SUBSTRING of the new line** — the new value is the old one plus ` [probe]`
+  — and the frame is refused anyway. The containment trap, measured rather than reasoned.
+* **The refusal is whole.** A call carrying one fresh frame and one stale frame answers 400 and writes
+  nothing: the fresh frame's line is unchanged and `working.json`'s digest is identical before and
+  after.
+
+### Still open
+
+* **A bulk refusal cannot name the row.** The guard refuses the transaction and answers with one
+  sentence for every frame, so a bulk Apply that refuses cannot say WHICH row went stale. Per-row
+  marking on that path needs the frame in the error body — a contract change, deliberately not made
+  here.
+* ~~**The prototype's own trap frame has not been re-observed in a browser.**~~ **Closed** —
+  `tests/probe_ink_layer_trap_frame.py`, run against the running desk: 9/9. The page is on the LIVE
+  adapter; the real route still offers a usable take (scene 1: 1 frame, 1 take — the producer filter
+  is not over-broad on a real script); a stale frame draws `400 {"stale": true}` which the page's own
+  `classifyApplyError` reads as `kind: 'stale'`; and the gesture (`n` → `Enter` → `j` → `Enter` — the
+  trap frame's ⏎ keep) leaves `data-cast="stale"` on the row with the refusal kept in the fold:
+
+  > NOT WRITTEN · Stale proposal: the text was modified manually. The take was cut from a line that
+  > has moved since, so nothing was written — your text stands. Press J or K to ask again for a fresh
+  > take.
+
+  The writer's line is unchanged. **Disclosed in the probe's docstring:** the take is cut by hand.
+  The demo model skips slug lines on purpose — "so the demo always moves visible text" — while every
+  finding on both loaded projects anchors to a scene *heading*, so no model-produced take can land on
+  a wet row here, and the gesture cannot reach the state without a model that targets the row the
+  finding is anchored to. That is a property of the demo model's target selection, worth knowing
+  before anyone reads "the trap frame works" as "the trap frame is reachable on this script".
