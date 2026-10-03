@@ -207,6 +207,12 @@ async function _apiOnce(path, options, _retry) {
     // like a dead server.
     err.status = resp.status;
     err.stillWorking = !!(data && data.still_working);
+    // A refused proposal is a STATE its caller renders, not a transport
+    // failure: `stale: true` (contracts_UI §3.4) means the text this frame was
+    // cut from no longer stands in the scene, so the frame can never apply.
+    // Carried on the error for the same reason as `stillWorking` — the caller
+    // decides from the flag, never by matching the sentence.
+    err.stale = !!(data && data.stale);
     throw err;
   }
   return data;
@@ -8484,7 +8490,20 @@ async function applyOneRewrite(rep, row) {
     await afterScriptEdit();
   } catch (e) {
     status.className = "rewrite-status error";
-    status.textContent = "Apply failed: " + e.message;
+    if (e.stale) {
+      // A refusal is terminal, not retryable: the text this proposal was cut
+      // from is gone from the scene, so Apply can never land, and the row must
+      // stop riding the next bulk "Apply changes" (bulk collects `cb.checked &&
+      // !cb.disabled`). Marking it exactly the way a decided row is marked is
+      // what makes the interface stop offering an action that cannot succeed —
+      // the same rule the "disabled but left checked" defect taught this modal.
+      // The sentence stays on screen until the writer answers it by
+      // regenerating, which is what the refusal is FOR.
+      _markProposalRow(row, "stale", true);
+      status.textContent = e.message;
+    } else {
+      status.textContent = "Apply failed: " + e.message;
+    }
   }
 }
 
