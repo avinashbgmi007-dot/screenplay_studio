@@ -35,16 +35,32 @@ walks the **shipped** path, so it measures the product, not a friendlier one):
 
 * **3 of 16 findings carry a quote at all** (19 %). The other 13 are `no_quote` with
   `evidence_quote: null` — the verifier's citation state, not a failure.
-* **3 of 3 quote-bearing findings reached a line — every one at score 1.000 (exact substring).**
+* **3 of 3 quote-bearing findings reached a row — every one at score 1.000 (exact substring).**
   Mean 1.000, min 1.000. The 0.72 gate was never stressed by this payload: no finding fell into the
-  0.72–0.99 band, and none was loose.
+  0.72–0.99 band, and none was loose. (Each of the three landed on a *heading*, not a line of prose
+  — see the corrected summary below.)
 * **12 findings landed scene-anchored** (the scene's first row — its heading), and **1 is
   script-level with no `scene_refs`**.
 
-So on this real script the honest summary is: **3 lines of manuscript carry ink; 12 scene headings
-carry a scene-level mark; 1 finding has no band to sit in.** The line-anchored layer addresses 19 %
-of the report; the rest is scene-level by nature of the data. Ink is quote-dependent, exactly as the
-run card says.
+**And every one of those three lands on a HEADING — corrected after checking the row types.**
+`measure-anchors.mjs` printed "ROW 136 (scene 6, line —)"; the `—` is `line_start: null`, which only a
+heading row has. Verified directly against the payload: all three quote-anchored rows are
+`type='scene_heading'` — the deterministic continuity pass quotes the heading's own text (*"Unmarked
+time flip: Scene 5 ends in MORNING…"*, evidence `INT. KID SIDDHU'S HOUSE - NIGHT`).
+
+So the honest summary of this script is sharper than the first version of this file claimed:
+
+| inked rows on `Pain_3` | count |
+|---|---|
+| **headings** carrying a mark — 9 scene-level (hairline), 3 quote-anchored (severity border) | **12 of 22** |
+| **prose lines** (action / dialogue / character / parenthetical) carrying ink | **0** |
+
+**On this script the Ink Layer is a scene-level instrument.** Its central claim — a critique attached
+to *the line it is about* — is unrealized on this payload, because the lines are exactly what no
+finding can point at: 13 findings carry no quote, and the 3 that do carry a heading. That is not a
+defect in the page; it is what a `no_quote`-majority report looks like, and at 83 % on the recorded
+real run it is what most reports will look like. The line-level layer is the part that waits for a
+real model to produce quote-bearing findings.
 
 ### The scene-level mark — implemented, and measured before and after
 
@@ -64,9 +80,16 @@ Measured on the live payload, after the change (`tests/measure-anchors.mjs`):
 
 | | before (read-only) | now |
 |---|---|---|
-| rows carrying a severity border | 12 headings + 3 lines | **3** (the line-anchored ones) |
-| rows marked scene (hairline) | — | **9** |
-| scene-level claim on a heading, visually implied | 12 | **0** |
+| headings carrying a full severity border | 12 | **3** |
+| headings carrying a hairline (scene mark) | — | **9** |
+| prose lines carrying any ink | 0 | **0** |
+
+The three that keep a severity border are quote-anchored: the finding's evidence *is* the heading
+text, so it claims that row legitimately — it is a line-claim on a heading, not a scene-claim. Which
+raises a question this measurement cannot settle and a writer should: **should any heading ever draw a
+severity border?** Two defensible rules — (i) what is implemented: a quote that matches the heading's
+own text is a line-claim like any other; (ii) every mark on a heading is scene-level, because a
+heading is a label, not a line of the film. I implemented (i) and flag (ii) as the open alternative.
 
 ### The off-page gap — implemented
 
