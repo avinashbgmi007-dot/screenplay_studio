@@ -890,8 +890,12 @@ export function canApply(cast) {
    ══════════════════════════════════════════════════════════════════════════ */
 
 export const say = {
-  foldOpen: ({ lineNo, count, worst, flagged }) => {
-    const bits = [`Line ${lineNo}`, `${count} finding${count === 1 ? '' : 's'}`];
+  foldOpen: ({ lineNo, scene, placement, count, worst, flagged }) => {
+    /* WHERE the fold opened is not cosmetic: a scene-anchored finding opens on
+       the scene's first row, and calling that row "Line 136" would name a line
+       the finding never claimed. The scene is what the finding is about. */
+    const where = placement === 'scene' && scene != null ? `Scene ${scene}` : `Line ${lineNo}`;
+    const bits = [where, `${count} finding${count === 1 ? '' : 's'}`];
     if (worst && worst !== 'none') bits.push(`worst ${worst}`);
     if (flagged) bits.push(`${flagged} unverified`);
     return bits.join(', ') + '. Press Enter to fold.';
@@ -903,6 +907,30 @@ export const say = {
   castFailed: ({ message }) => `Apply failed. ${message}`,
   castSkipped: ({ skipped }) =>
     skipped.length ? `${skipped.length} candidate${skipped.length === 1 ? '' : 's'} skipped: ${skipped[0].reason}` : '',
+  /* WHY THIS FOLD'S MARK IS QUIET — said once per fold, not once per finding.
+     A scene-placed row's findings all carry the same reason, and repeating it
+     three times in one fold reads as a stutter (seen in the first browser pass
+     over a real script). On a MIXED row the reason is still said per finding,
+     because there it distinguishes. */
+  foldSceneLevel: () => 'About this scene — the mark on the heading is the scene\'s, not a line\'s.',
+  /* FINDINGS THE PAGE CANNOT PUT ON A LINE — said, not swallowed.
+     Three kinds exist and all three mean the same thing to a reader: the page
+     is not showing them. `scriptLevel` names no scene at all (the desk's genre
+     and whole-draft passes); `missingScene` names a scene this draft does not
+     have (the citation is wrong, not the line); `parked` is an answered finding
+     whose fix this session never watched land, so there is no row it could
+     honestly point at. The desk counts all three, so the page says so and says
+     where they are instead of letting the manuscript look complete. */
+  offPage: ({ scriptLevel = [], missingScene = [], parked = [] } = {}) => {
+    const n = scriptLevel.length + missingScene.length + parked.length;
+    if (!n) return '';
+    const bits = [];
+    if (scriptLevel.length) bits.push(`${scriptLevel.length} about the whole script, not a scene`);
+    if (missingScene.length) bits.push(`${missingScene.length} naming a scene this draft does not have`);
+    if (parked.length) bits.push(`${parked.length} already answered`);
+    return `${n} finding${n === 1 ? '' : 's'} not on a line: ${bits.join(', ')}. `
+      + `The desk's board holds ${n === 1 ? 'it' : 'them'}.`;
+  },
   wetNone: ({ dir, filtered = false }) => filtered
     /* The walk follows the FILTER as well as the floor: a writer who narrowed the
        reading to this scene and then was walked into a line they had receded would

@@ -546,6 +546,20 @@ test('every action the router can emit is in HANDLED — no dead switch arms', (
 
 test('announcements carry the load, so no visual channel is load-bearing', () => {
   assert.match(say.foldOpen({ lineNo: 9, count: 3, worst: 'critical', flagged: 1 }), /Line 9, 3 findings, worst critical, 1 unverified/);
+  // A scene-anchored fold opened on a scene's heading is about the SCENE. Calling
+  // that row "Line 136" would name a line the finding never claimed.
+  assert.match(say.foldOpen({ lineNo: 136, scene: 6, placement: 'scene', count: 1, worst: 'major', flagged: 0 }),
+    /^Scene 6, 1 finding, worst major\./, 'the fold says where it is, in the desk\'s own terms');
+  assert.match(say.foldOpen({ lineNo: 136, scene: 6, placement: 'line', count: 1, worst: 'major', flagged: 0 }),
+    /^Line 136,/, 'a line claim is still a line claim');
+
+  // Findings the page cannot put on a line are SAID, never swallowed — three
+  // kinds, one sentence, and each kind named for what it is.
+  assert.equal(say.offPage(), '');
+  assert.equal(say.offPage({ scriptLevel: [{}], missingScene: [], parked: [] }),
+    "1 finding not on a line: 1 about the whole script, not a scene. The desk's board holds it.");
+  assert.match(say.offPage({ scriptLevel: [{}], missingScene: [{}, {}], parked: [{}] }),
+    /^4 findings not on a line: 1 about the whole script, not a scene, 2 naming a scene this draft does not have, 1 already answered\. The desk's board holds them\.$/);
   assert.match(say.castReady({ index: 1, count: 3, text: 'The door was open.' }), /Take 2 of 3: The door was open\./);
   assert.match(say.wetNone({ dir: 1 }), /below/);
   assert.match(say.inkThreshold({ floor: 2, label: 'major and above' }), /major and above/);

@@ -151,7 +151,10 @@ test('every severity the page can render has a rule to render it with', async ()
   // line the desk called `high` drew a border 0px wide — a critique that was
   // present in the data and invisible on the page.
   const width = (w) => {
-    const g = h.groupsOf().find((x) => x.dataset.ink === 'wet' && x.dataset.worst === w);
+    // Line-placed rows only: a scene-level mark drops the severity width on
+    // purpose (see the scene-placement test), so it is not the rule under test.
+    const g = h.groupsOf().find((x) => x.dataset.ink === 'wet' && x.dataset.worst === w
+      && x.dataset.placement !== 'scene');
     assert.ok(g, `a wet ${w} line is on the page to measure`);
     return h.window.getComputedStyle(g).getPropertyValue('border-inline-start-width').trim();
   };
@@ -182,8 +185,8 @@ test('every severity the page can render has a rule to render it with', async ()
 test('findings decorate the lines their quotes sit in; unplaceable ones fall back to the scene', async () => {
   const h = await harness();
   const wet = h.groupsOf().filter((g) => g.dataset.ink === 'wet');
-  assert.equal(wet.length, 6,
-    'four lines + the scene rows that took the unverifiable finding and the corridor one');
+  assert.equal(wet.length, 7,
+    'four lines + the scene rows that took the unverifiable finding, the corridor one, and d9');
   const byText = (t) => h.groupsOf().find((g) => g.querySelector('.row').textContent.includes(t));
   assert.equal(byText("You're late.").dataset.worst, 'critical');
   assert.equal(byText("You're late.").getAttribute('role'), 'button');
@@ -521,7 +524,9 @@ test('the annunciator carries every mechanism, and A reveals it', async () => {
   h.key('a');
   assert.equal(h.window.document.getElementById('annunciator').dataset.show, 'true');
   h.key('n'); h.key('Enter');
-  assert.match(h.announce(), /Line \d+, \d+ finding/);
+  // A fold opens on a LINE, or on a SCENE when the finding is scene-anchored —
+  // the copy says which claim the mark is making, so either is correct here.
+  assert.match(h.announce(), /(Line \d+|Scene \d+), \d+ finding/);
   h.key('Escape');
   assert.match(h.announce(), /Folded|Left/);
   h.key(']');
@@ -713,6 +718,96 @@ test('a heading that arrives twice in the payload is drawn ONCE', async () => {
   // exists as a ROW of the manuscript, because it is text, not chrome.
   assert.ok(texts.some((t) => t.includes('INT. RADIO STATION - BOOTH - NIGHT')),
     'the heading whose element is skipped is still on the page');
+});
+
+test('a scene-level finding is marked on the SCENE: the heading loses the severity width, the horizon keeps it', async () => {
+  /* The design question the real script forced (REAL_SCRIPT_RESULTS §2): a
+     severity border on a heading implies the heading is the problem, and on a
+     28-page script 12 of 22 headings carried one. A scene-anchored finding now
+     draws a hairline; the weight is stated in the fold and drawn on the
+     Horizon, which is scene-scoped by construction — moved, not lost. */
+  const h = await harness();
+  const sceneRows = h.groupsOf().filter((g) => g.dataset.placement === 'scene');
+  assert.ok(sceneRows.length >= 1, 'the demo carries a scene-anchored finding to exercise this');
+  const g = sceneRows[0];
+  assert.equal(g.dataset.ink, 'wet');
+  assert.equal(g.dataset.worst, 'major', 'the severity is still true and still carried');
+  const w = h.window.getComputedStyle(g).getPropertyValue('border-inline-start-width').trim();
+  assert.equal(w, '1px', `a scene-level mark keeps the hairline and drops the width (saw ${w})`);
+
+  // The fold says why, and the announcement says where it opened.
+  assert.equal(g.dataset.fold, 'closed');
+  const idx = Number(g.dataset.index);
+  h.key('ArrowDown'); h.key('ArrowDown');             // focus lands somewhere harmless first
+  h.S.focus = idx; h.key('Enter'); await h.wait(0);
+  assert.ok(g.querySelector('.find[data-placement="scene"]'), 'the fold carries the scene-placed finding');
+  // The reason is on the fold, ONCE — not repeated per finding (the first
+  // browser pass over a real script showed three findings each saying it).
+  assert.equal(g.querySelectorAll('.fold-scene-note').length, 1, 'the fold says why, once');
+  assert.match(g.querySelector('.fold-scene-note').textContent, /About this scene/);
+  for (const sig of g.querySelectorAll('.find[data-placement="scene"] .find-sig')) {
+    assert.doesNotMatch(sig.textContent, /about this scene/,
+      'the per-finding meta does not stutter back what the fold already said once');
+  }
+  assert.match(h.announce(), /^Scene \d+, /, `the fold names the scene, not a line: ${h.announce()}`);
+
+  // And the severity is not lost — the scene-scoped surface still draws it.
+  const pip = [...h.window.document.querySelectorAll('.hz-ink')].find((n) => n.dataset.scene === '14');
+  assert.ok(pip, 'the horizon still has a pip for the scene');
+  assert.equal(pip.dataset.severity, 'critical', 'the horizon keeps the scene\'s real weight');
+});
+
+test('a finding with no quote carries no hollow quotation marks', async () => {
+  /* `no_quote` is the MAJORITY state on a real payload (13 of 16 on the 28-page
+     script). The evidence paragraph draws its quotation marks in CSS, so an
+     empty one rendered as a pair of empty quotes — seen in the first browser
+     pass, invisible to every offline assertion before it. */
+  const h = await harness();
+  // d9 cites a scene but carries no quote. Open the fold it lands on and look.
+  const rowIdx = [...h.S.findingsByRow.entries()]
+    .find(([, fs]) => fs.some((f) => f.finding_id === 'd9'))[0];
+  assert.notEqual(rowIdx, undefined, 'the quoteless finding is on a real row');
+  h.S.focus = rowIdx; h.key('Enter'); await h.wait(0);
+  const fold = h.window.document.querySelector(`.rowgroup[data-index="${rowIdx}"]`);
+  const li = [...fold.querySelectorAll('.find')].find((n) => /Time flip/.test(n.textContent));
+  assert.ok(li, 'the quoteless finding is in the fold');
+  // ABSENCE is the fix: nothing to quote means no quotation marks are drawn at
+  // all. (The element exists only when it has something to hold.)
+  assert.equal(li.querySelector('.find-evidence'), null,
+    'a quoteless finding draws no quotation marks — not a hollow pair');
+  assert.ok(li.querySelector('.find-issue').textContent.trim().length > 0,
+    'and it is never silent: the finding itself is on the page');
+  assert.match(li.querySelector('.find-sig').textContent, /CONT-014/, 'with its rule attribution');
+  // Whatever IS rendered holds something. This is the invariant the browser pass broke.
+  for (const node of h.window.document.querySelectorAll('.find-evidence')) {
+    assert.ok(node.textContent.trim().length > 0,
+      `no rendered evidence paragraph is empty: ${JSON.stringify(node.textContent)}`);
+  }
+});
+
+test('findings that fit no line are counted and said — never silently absent', async () => {
+  /* Third instance of one defect class: a real payload carries findings the page
+     cannot place on a line (script-level, or a scene the draft does not have,
+     or an answered finding with no row this session watched). They used to leave
+     the page in silence. */
+  const h = await harness();
+  const off = h.S.offPage;
+  assert.equal(off.scriptLevel.length, 1, 'the demo carries one whole-script finding');
+  assert.equal(off.scriptLevel[0].finding_id, 'd8');
+  assert.equal(off.missingScene.length, 0);
+  // The parked case was never surfaced anywhere before this pass — a comment
+  // claimed "the annunciator says so" and nothing did. Now it is counted too.
+  assert.equal(off.parked.length, 1, 'the answered finding with no row this session watched');
+  assert.equal(off.parked[0].finding_id, 'd5');
+  assert.match(h.announce(),
+    /2 findings not on a line: 1 about the whole script, not a scene, 1 already answered\. The desk's board holds them\./,
+    `the boot sentence names every kind and where they are: ${h.announce()}`);
+  // Neither is given a line: no row invents one, anywhere.
+  for (const id of ['d8', 'd5']) {
+    const claimed = h.S.rows.some((r) => (r.finds || []).some((f) => f.finding_id === id));
+    assert.equal(claimed, false, `no row invents a line for ${id}`);
+    assert.ok(h.S.findings.some((f) => f.finding_id === id), `${id} is still held — counted, never dropped`);
+  }
 });
 
 test('an unlocated finding is shown, is never auto-targeted, and the strip says why', async () => {

@@ -46,23 +46,41 @@ carry a scene-level mark; 1 finding has no band to sit in.** The line-anchored l
 of the report; the rest is scene-level by nature of the data. Ink is quote-dependent, exactly as the
 run card says.
 
-⚠️ **This is the design question the real script forces, and it is open.** A scene-anchored finding
-currently draws the same severity mark as a line-anchored one, on the heading row. On this script
-that is 12 marks on 22 headings — more than half the scene headings marked. Options, none chosen
-here: (a) keep it (honest, but the top level looks busy); (b) show scene-level findings with a
-quieter mark — the fold still opens, no severity border on the heading; (c) a distinct scene-level
-mark that never claims a line. The recommendation is (b), because a severity border on a heading
-implies the heading is the problem, and the finding is about the scene. This needs a writer's eye,
-not more measurement.
+### The scene-level mark — implemented, and measured before and after
 
-### An unresolved gap, found by the same measurement
+A scene-anchored finding opens on the scene's first row, which is its **heading**. Drawing the full
+severity border there implies *the heading is the problem*; the finding is about the scene. On this
+script that was 12 marked headings out of 22.
 
-**1 of 16 findings is not shown by the page at all.** A finding with no `scene_refs` (category
-`genre`, script-level by nature) is skipped by the dispatch: no band claims it, so it inks no row and
-appears in no fold. The desk counts it; the page is silent about it. The Detent rule — *kept, never
-dropped* — is not satisfied for this class. Proposed, **not implemented** (it is a copy decision):
-one sentence in the annunciator when such findings exist, e.g. *"1 finding is about the whole script
-— the desk's board holds it."* Nothing else in the page should move.
+Implemented as recommended: a row whose open findings are **all** scene-anchored is marked
+`data-placement="scene"` and draws a **hairline** — the severity width is dropped, the weight is
+still stated in the fold's meta line, and the **Horizon still draws it** (the Horizon is
+scene-scoped by construction, so no severity is lost anywhere). A row with **even one**
+line-anchored finding is a `line` row and is unchanged: at least one finding really does claim the
+line. The fold says the reason once — *"About this scene — the mark on the heading is the scene's,
+not a line's."* — and a mixed row still says it per finding, where it distinguishes.
+
+Measured on the live payload, after the change (`tests/measure-anchors.mjs`):
+
+| | before (read-only) | now |
+|---|---|---|
+| rows carrying a severity border | 12 headings + 3 lines | **3** (the line-anchored ones) |
+| rows marked scene (hairline) | — | **9** |
+| scene-level claim on a heading, visually implied | 12 | **0** |
+
+### The off-page gap — implemented
+
+**1 of 16 findings was not shown by the page at all** (script-level, no `scene_refs`). The
+implementation went one step further than proposed, because the audit found the class was larger than
+the one case: **three** kinds of finding can be off-page — a **script-level** finding (names no
+scene), a **missing-scene** finding (cites a scene this draft does not have), and a **parked** finding
+(answered, and no row this session watched the fix land on). All three are now counted and said once
+at boot, in the desk's own terms:
+
+> `1 finding not on a line: 1 about the whole script, not a scene. The desk's board holds it.`
+
+The parked case had **never been surfaced anywhere** — a comment in the code claimed "the
+annunciator says so" and nothing did. It is, now.
 
 ## 3 · Defects the real payload exposed — both fixed, both invisible offline
 
@@ -140,3 +158,48 @@ curl -F "file=@Pain_3_updated_FULL.pdf" -F "title=Pain_3" http://127.0.0.1:8500/
 curl -X POST http://127.0.0.1:8500/api/projects/Pain_3/analyze -H 'Content-Type: application/json' -d '{}'
 cd screenplay_studio/webapp/preview-ink-layer && node tests/measure-anchors.mjs http://127.0.0.1:8500 Pain_3
 ```
+
+---
+
+## 6 · The browser pass — the first time this page ran in a real browser
+
+Playwright was provisioned in the sandbox (chromium + the system libraries the headless shell
+needs), and the prototype was loaded **against the live desk with the real script**:
+`/preview-ink-layer/index.html?project=Pain_3`. Four defects surfaced that no offline assertion could
+have caught, because **jsdom does not lay out**:
+
+1. **Hollow quotation marks.** `.find-evidence` draws its curlys in `::before`/`::after`, so a
+   quoteless finding rendered as a pair of empty quotation marks — and `no_quote` is the majority of
+   a real payload (13 of 16 here). The element is now created only when it has something to hold; a
+   quoteless finding shows its issue and its attribution, and no quotes at all.
+2. **A stutter in the fold.** Three findings in one fold each repeated *"about this scene"*. The
+   reason is now stated once per fold, and per finding only on a mixed row.
+3. **The fold was 26 % air.** `.find-issue` and `.find-evidence` are `<p>` elements, so they arrived
+   with the UA's `margin: 1em 0`; in a grid every margin adds to its **row**, so a 22px line made a
+   51.5px row and `.find-sig` — spanning both rows — inherited the inflated height. Every finding
+   occupied **53px for 22px of text**; a three-finding fold was **257px**. With the UA margins
+   removed and the gap owning the rhythm: **190.7px**, items at 26.9 / 49 / 26.9.
+4. **`/preview-ink-layer/` 404s.** The catch-all serves files, not directory indexes — the URL in the
+   PR description and in `PUSH_INSTRUCTIONS.md` is wrong. It is
+   **`/preview-ink-layer/index.html`**. (Same family as the audit's finding that the docs and the
+   code can disagree; this one was mine.)
+
+Everything else measured clean: 1001 rows, 9 scene-placed / 3 line-placed, 0 empty evidence
+paragraphs after the fix, exactly one fold note, the boot sentence naming the off-page finding, and
+**no console errors or warnings** on a real script.
+
+## 7 · The capability-token path — closed
+
+The desk was restarted **with the token required** (no `--no-token`) and the page's own helpers were
+exercised against it, not a hand-written header:
+
+* the server minted the cookie and issued it on the document (`_issue_token_cookie`,
+  `webapp_server.py:239-243`);
+* `tokenFromCookie()` read it out of the cookie string and `writeHeaders()` produced
+  `X-Studio-Token: …`;
+* a write **without** the header → **403 `{"error":"missing or invalid capability token"}`**;
+* the same write **with** the header core.js produced → **200**, persisted to
+  `finding_marks.json` on disk.
+
+§5's item 4 is closed. What remains open from the audit is only the demo-vs-real *model*, not the
+token path.

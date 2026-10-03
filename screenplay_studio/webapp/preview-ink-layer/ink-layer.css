@@ -117,6 +117,16 @@ html{ scrollbar-gutter: stable; }          /* the layout never shifts when ink a
 .rowgroup[data-ink="wet"][data-worst="minor"]   { border-inline-start-width: 1px; }
 .rowgroup[data-flagged="true"]                  { border-inline-start-style: dashed; }
 
+/* SCENE-LEVEL: the finding is about the SCENE, not this line.
+   A scene-anchored finding opens on the scene's first row (its heading). A
+   severity border there reads as "this heading is the problem", and on a real
+   28-page script 12 of 22 headings carried one — the top level of the manuscript
+   looked flagged. So the mark keeps its hairline and loses the severity WIDTH:
+   what is claimed is the scene, and the weight is still stated in the fold's
+   meta line and still drawn on the Horizon (scene-scoped by construction).
+   Order matters: this rule must follow the width rules above to win. */
+.rowgroup[data-ink="wet"][data-placement="scene"]{ border-inline-start-width: 1px; }
+
 /* ADDRESSED: dry. The mark is a change-star in the margin, not a colour. */
 .rowgroup[data-ink="dry"] > .row::after{
   content: "★"; font-size: .7em; vertical-align: super;
@@ -166,14 +176,23 @@ html{ scrollbar-gutter: stable; }          /* the layout never shifts when ink a
 
 /* The findings inside one fold STACK in severity order. The stack is the whole
    reason there is no findings list: N findings on a line is still ONE fold. */
-.finds{ list-style: none; margin: 0; padding: 0; display: grid; gap: .6em; }
+.finds{ list-style: none; margin: 0; padding: 0; display: grid; gap: .85em; }
 .find{
   display: grid;
   grid-template-columns: 1fr auto;         /* text | provenance chip */
-  gap: .1em .75em;
+  gap: .3em .75em;
   padding-inline-start: 1ch;
   border-inline-start: 1px solid currentColor;
 }
+/* THE GRID OWNS THE SPACING, NOT THE UA.
+   `.find-issue` and `.find-evidence` are <p> elements, so they arrived with the
+   user agent's `margin: 1em 0`. In a grid every margin adds to its ROW, so a
+   22px line made a 51.5px row, and `.find-sig` — which spans both rows — inherited
+   the inflated height: every finding occupied 53px for 22px of text, and a
+   three-finding fold was 237px of mostly air. Measured in a real browser on the
+   writer's 28-page script; no offline assertion could see it, because jsdom does
+   not lay out. The gap above is the one place spacing is decided. */
+.find-issue, .find-evidence{ margin: 0; }
 .find[data-verified="false"]{ border-inline-start-style: dashed; }
 .find[data-provenance="measured"]{ font-style: italic; }   /* no craft authority claimed */
 .find-issue{ grid-column: 1; }
@@ -182,6 +201,8 @@ html{ scrollbar-gutter: stable; }          /* the layout never shifts when ink a
 .find-evidence::after{ content: "”"; }
 .find-sig{ grid-column: 2; grid-row: 1 / span 2; white-space: nowrap; opacity: .7; }
 .find-overflow{ grid-column: 1 / -1; opacity: .7; }
+/* The fold's own reason line — one per fold on a scene-placed row. */
+.fold-scene-note{ margin: 0 0 .2em; opacity: .7; font-style: italic; }
 
 /* ── §C INLINE TAKE-CASTING ────────────────────────────────────────────── */
 

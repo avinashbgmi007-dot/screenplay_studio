@@ -118,6 +118,25 @@ const DEMO = {
       why_it_matters: 'The quote is in scene 14; the scene it argues with is scene 15.',
       evidence: 'A long beat. Somewhere below, a door closes.', rule_id: 'STRC-052', verified: true,
       verification: { status: 'verified', score: 0.9 }, intent: null, dismissed: false },
+    /* A QUOTELESS finding that still cites a line's scene — the majority state on
+       a real payload (13 of 16 on the 28-page script: the deterministic
+       continuity pass cites scene numbers, not quotes). Its evidence is empty,
+       which is exactly the case that used to draw hollow quotation marks. */
+    { index: 8, finding_id: 'd9', category: 'continuity', severity: 'low', status: 'open', scene_refs: [15],
+      issue: 'Time flip: the corridor reads NIGHT here and MORNING three pages later.',
+      why_it_matters: 'The desk cites the scene number; the model offered no line to quote.',
+      evidence: '', rule_id: 'CONT-014', verification: { status: 'no_quote' },
+      intent: null, dismissed: false },
+    /* A finding that belongs to the WHOLE SCRIPT — the desk's genre pass cites no
+       scene, so there is no band to sit in and no line for the page to ink
+       (observed on a real 28-page script: 1 of 16 findings). It is counted,
+       announced at boot, and never given a line it did not claim. Its quote
+       state is `no_quote`, which is the majority state on a real payload. */
+    { index: 7, finding_id: 'd8', category: 'genre', severity: 'low', status: 'open', scene_refs: [],
+      issue: 'The dread arrives on a metronome: the horror beats are scheduled rather than found.',
+      why_it_matters: 'A note about the whole draft, not about one line of it.',
+      evidence: '', rule_id: 'GENR-010', verification: { status: 'no_quote' },
+      intent: null, dismissed: false },
     /* The corridor carries one of its own: without it the scene filter has one
        scene to filter, and the filter's whole claim — that a reading can be
        narrowed to the scene in front of the writer — cannot be exercised. Its
@@ -463,10 +482,19 @@ function attachFindings(findings) {
     S.findingsByRow.set(i, arr);
   };
   S.parked = [];
+  const scriptLevel = [], missingScene = [];
   for (const f of findings) {
     const refs = f.scene_refs?.length ? f.scene_refs : (f.scene != null ? [f.scene] : []);
     const rowsOfScene = S.rows.filter((r) => refs.includes(r.scene.scene_number));
-    if (!rowsOfScene.length) continue;                       // script-level: no band claims it
+    if (!rowsOfScene.length) {
+      /* NOTHING TO MARK — and "nothing to mark" is not "nothing to say". A
+         script-level finding names no scene; a citation naming a scene this
+         draft does not have is wrong about the draft. Both used to leave the
+         page in silence, which made the manuscript look complete. They are
+         counted here and announced once at boot (say.offPage). */
+      (refs.length ? missingScene : scriptLevel).push(f);
+      continue;
+    }
     /* THE QUOTE CLAIMS THE LINE, not the line number: line_start is documented as
        an unstable parameter that drifts between edits, so placement is a fuzzy
        match (threshold 0.72) against the quote, with line_start used only to break
@@ -508,6 +536,7 @@ function attachFindings(findings) {
     f.anchor = { rowIndex: global, score: anchor.score, exact: false, ambiguous: false, loose: true, placed: 'scene anchor' };
     push(global, f);
   }
+  S.offPage = { scriptLevel, missingScene, parked: S.parked };
   decorate();
 }
 
@@ -528,6 +557,19 @@ function decorate() {
     row.flagged = row.finds.filter(C.isFlagged).length;
     row.addressed = addressed.length > 0 && row.finds.length === 0;
     row.wet = row.finds.length > 0;
+    /* WHAT DOES THIS ROW'S CRITIQUE CLAIM — the line, or only the scene?
+       A scene-anchored finding lands on the scene's first row (its heading).
+       Drawing a severity border there claims the heading is the problem, and on
+       a real 28-page script that happened to 12 of 22 headings: the top level of
+       the manuscript looked flagged. When EVERY open finding on a row is
+       scene-anchored the row says `scene`; the mark keeps its hairline and drops
+       the severity width (ink-layer.css), the weight is still stated in the
+       fold's meta line, and the Horizon still draws it — the Horizon is
+       scene-scoped by construction, so no severity is lost anywhere.
+       A row with even one line-anchored finding is a `line` row, unchanged: at
+       least one finding really does claim the line. */
+    const sceneOnly = row.finds.length > 0 && row.finds.every((f) => f.anchor && f.anchor.placed === 'scene anchor');
+    row.placement = row.wet ? (sceneOnly ? 'scene' : 'line') : null;
 
     const g = row.group;
     if (!g) return;
@@ -553,6 +595,8 @@ function decorate() {
     }
     g.dataset.worst = row.worst;
     g.dataset.flagged = String(row.flagged > 0);
+    if (row.placement) g.dataset.placement = row.placement;
+    else delete g.dataset.placement;
     /* Quiet ≠ hidden and ≠ faded prose. Two things can recede a CRITIQUE and
        neither of them is the manuscript: the ink threshold (severity) and the
        context filter (scene · category · still-open). Prose is never filtered —
@@ -718,6 +762,16 @@ function buildFold(i) {
   row.foldBuilt = true;
   const ol = document.createElement('ol');
   ol.className = 'finds';
+  /* A fold whose whole row is scene-placed says its reason ONCE. Observed in the
+     first browser pass over a real script: three findings in one fold each
+     repeated "about this scene" — a stutter, not information. */
+  const rowIsScene = row.placement === 'scene';
+  if (rowIsScene) {
+    const note = document.createElement('p');
+    note.className = 'fold-scene-note';
+    note.textContent = C.say.foldSceneLevel();
+    ol.appendChild(note);
+  }
   const list = row.finds.slice(0, C.MAX_FINDS_PER_FOLD);
   for (const f of list) {
     const li = document.createElement('li');
@@ -731,10 +785,21 @@ function buildFold(i) {
     const issue = document.createElement('p');
     issue.className = 'find-issue';
     issue.textContent = f.issue || f.why_it_matters || '(no issue text)';
-    const ev = document.createElement('p');
-    ev.className = 'find-evidence';
-    ev.textContent = f.evidence || '';
-    if (C.isFlagged(f)) ev.textContent += '  (unverified — could not be matched to the text)';
+    /* NO HOLLOW QUOTES. `.find-evidence` carries the curlys in ::before/::after,
+       so a finding with no quote rendered as a pair of empty quotation marks —
+       and `no_quote` is the MAJORITY state on a real payload (13 of 16 on the
+       writer's 28-page script). The element exists only when something is inside
+       it; an unverified finding keeps its own sentence, so it is never silent. */
+    const flagged = C.isFlagged(f);
+    const evidenceText = f.evidence || '';
+    if (evidenceText || flagged) {
+      const ev = document.createElement('p');
+      ev.className = 'find-evidence';
+      ev.textContent = evidenceText
+        + (flagged ? `${evidenceText ? '  ' : ''}(unverified — could not be matched to the text)` : '');
+      if (!evidenceText) ev.dataset.noquote = 'true';
+      li.appendChild(ev);
+    }
     const sig = document.createElement('span');
     sig.className = 'find-sig';
     const parts = [];
@@ -745,8 +810,15 @@ function buildFold(i) {
     if (f.rule_id) parts.push(f.rule_id);
     else if (f.check_id) parts.push(`measured: ${f.check_id}`);
     if (f.verification?.score != null) parts.push(`match ${Math.round(f.verification.score * 100)}%`);
+    /* The quieter mark on the heading needs its reason readable at the moment a
+       reader looks — the same rule as everywhere else on this page. */
+    const placed = !!(f.anchor && f.anchor.placed === 'scene anchor');
+    li.dataset.placement = placed ? 'scene' : 'line';
+    // On a scene-placed row the reason is stated once, on the fold. On a MIXED
+    // row it is the only thing that tells these findings apart, so it stays here.
+    if (placed && !rowIsScene) parts.unshift('about this scene');
     sig.textContent = parts.join(' · ');
-    li.append(issue, ev, sig);
+    li.append(issue, sig);
     ol.appendChild(li);
   }
   const more = row.finds.length - list.length;
@@ -765,7 +837,8 @@ function openFold(i, { pinned = false, reason = 'focus' } = {}) {
   if (!row || !row.wet) return;
   buildFold(i);
   setFold(i, pinned ? 'pinned' : 'open');
-  announce(C.say.foldOpen({ lineNo: row.lineStart ?? i + 1, count: row.finds.length, worst: row.worst, flagged: row.flagged }));
+  announce(C.say.foldOpen({ lineNo: row.lineStart ?? i + 1, scene: row.scene?.scene_number,
+    placement: row.placement, count: row.finds.length, worst: row.worst, flagged: row.flagged }));
   requestAnimationFrame(() => {
     const r = row.group.getBoundingClientRect();
     const over = C.overflowCorrection({
@@ -1810,7 +1883,8 @@ async function boot() {
   S.el.horizon.addEventListener('focus', () => announce('Horizon. Arrow keys to step scenes, Enter to jump.'));
 
   const wet = S.rows.filter((r) => r.wet).length;
-  announce(`${wet} wet lines. Press N to walk to the first.`);
+  const offPage = C.say.offPage(S.offPage);
+  announce([`${wet} wet lines. Press N to walk to the first.`, offPage].filter(Boolean).join(' '));
 }
 
 /* Public surface. `ready` is what a host page (or a test) awaits; nothing else

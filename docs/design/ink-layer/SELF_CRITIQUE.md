@@ -504,6 +504,19 @@ and both were one request away.** The fixture is a claim about the desk; the des
 offline test in this directory passes over a world that was, in two measurable ways, softer than the
 real one.
 
+### 7.7c The browser pass, and the defect class that survived four passes
+
+Four defects came out of running the page in a real browser against the real script, and three of
+them share one property: **jsdom does not lay out.** Hollow quotation marks, a repeated sentence and a
+fold that was 26 % air were all invisible to a suite that asserts DOM state but never geometry. The
+margin bug is the sharpest: `.find-issue` is a `<p>`, so it arrived with the UA's `margin: 1em 0`, and
+in a grid every margin adds to its ROW — 53px for 22px of text on every finding in every fold. Four
+passes had looked at that markup. None had measured it.
+
+The rule this adds to the ones above: **the fixture is a claim about the desk; the desk is the fact;
+and the DOM is a claim about the page — the browser is the fact.** Each environment the work passes
+through can only falsify the layer above it.
+
 ### 7.8 Critiquing the audit itself
 
 * **I changed code in a turn whose ask was to verify and update a document.** The justification is
