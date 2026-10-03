@@ -31,6 +31,28 @@ field is itself evidence about how the earlier answers were reasoned.
 | The SPA's own loop bar is **position → nav → verbs**, with span-level ink anchors and a scene fallback *because cross-line quotes are the known case* | `app.js:6566-6660, 6949-7035` | the strip's order and the loop's mechanics are not inventions of this build — two of them are the product's existing answers |
 | The SPA badges **every** non-`verified` state "unverified"; the report does not | `app.js:4234` vs `report.py:36` | where the two disagree the page follows the report, and says so (Q12) |
 
+**Which documents were actually stale — the clarification this pass was for.** The instruction to
+read the code rather than the docs was about *drift*, not about distrust: a document may describe an
+older API. Auditing both shows the drift was real, and it was not in the repo's own docs:
+
+| Claim | `contracts_UI` (the doc I was handed) | the repo's own docs | the code |
+|---|---|---|---|
+| Verification states | **three**: `verified`, `not_found`, `no_quote` | **four** — `docs/DATA_FORMATS.md:221,271`, `docs/DEVELOPMENT.md:115` | **four** (`verifier.py:46`) |
+| `by_severity` bands | **four**: `high, major, medium, low` | not restated | **three** keys at most, tallied from the findings (`webapp_server.py:2460-2467`) |
+| How common `no_quote` is | not stated | **83 % of findings on a real script** — `docs/CRITICAL_REVIEW_2026-09-18.md:399` ("19/23 carry `no_quote` … script-level passes cite scene numbers only") | consistent with the verifier's assignment rules |
+
+So the two wrong facts in my earlier answers came from the extracted contract, and the repo's own
+documentation already agreed with the code. The lesson is narrower and more useful than "docs lie":
+**check a claim against the newest artifact that owns it** — here the code, and behind it the repo's
+own format docs — rather than against whichever document is nearest to hand.
+
+The `83 %` figure deserves to be repeated, because it changes the weight of Q12: a quoteless finding
+is not an edge case, it is the **majority** of what a real report contains. Under the flag predicate
+this build shipped before the audit, the fold's "N unverified" line would have counted 83 % of a real
+script's findings as failed searches — the normal case rendered as a defect. The fix is not a
+polish; it is the difference between a report that reads true and one that cries wolf on most of
+itself.
+
 Two defects **in this build** were found by the same reading and are fixed in the same change as this
 document: the severity collapse (Q1) and the flag predicate that counted a quoteless finding as a
 failed search (Q12). Both have tests, and the test for the second now imports the shipped predicate
@@ -368,6 +390,12 @@ one.
    parks it scene-anchored, and casting refuses it with the real reason. That behaviour was already
    right; only the counting was wrong.
 
+**How common is this, really.** The repo's own review of a live run answers it:
+`docs/CRITICAL_REVIEW_2026-09-18.md:399` reports **19 of 23 findings carrying `no_quote`** (83 %), because
+the script-level passes cite scene numbers rather than lines. The old predicate would have reported
+that as `19 unverified` — the majority of the report described as failed. This is the strongest
+justification for the change in the whole document, and it was in the repo's own docs the entire time.
+
 **Why.** Two of the four words are *reasons*, and a page that reports one reason for two causes is the
 0 px defect again: the data held the distinction and the interface threw it away. The audit's
 contribution is that the four states are per-finding facts — the `verification` block rides the row —
@@ -382,6 +410,32 @@ writer ever asks why a quoteless finding carries no caveat, the honest answer is
 verified its citation instead of its quotation, and the fold is where that gets said.
 
 ---
+
+## Alignment status, question by question
+
+The ask was to revisit every answer and verify it against the repo. This is the ledger of that
+verification: which answers the code settled, which the code confirms, and which are judgement calls
+that no amount of reading can settle.
+
+| Q | Verdict | What verified it |
+|---|---|---|
+| 1 | **Settled by code, answer corrected** | `grammar.py:50,69` (closed set), rule corpus counts, `webapp_server.py:2460-2467`. The build's collapse was fixed |
+| 2 | **Aligned with the build** | `ink-layer.js:965-1041` — the strip is authored ledger → takes → scope → reason → keys, in that append order |
+| 3 | **Aligned with the build** | `ink-layer.js:931-948, 986` — an ambiguous quote casts, the warning is said once and kept in the strip's meta line |
+| 4 | **Aligned with the build** | `core.js:999-1004` — while `editingProposal`, `Escape` → `proposal.abandon`, and the strip's key line says so |
+| 5 | **Aligned (nothing to ship)** | `ink-layer.js:1256-1315` — no "spent" state exists: the strip is removed on apply and undo is announced; the withdrawn concern stays withdrawn |
+| 6 | **Aligned with the build** | `ink-layer.js:825` (`stepWet`) walks `r.wet && !r.quiet` (filter + ink floor), `stepRow` steps every row — the asymmetry is exact |
+| 7 | **Aligned with the build** | `S.roam` is state only (`ink-layer.js:1470-1497`); no class, dataset or attribute marks the visited row |
+| 8 | **Settled by code, answer rewritten** | `finding_marks.json` vocabulary, `compute_finding_id`, the batch route's `207` body |
+| 9 | **Settled by code, answer inverted** | `setup_payoff.py:142` — only `scene_refs` rides the finding; the ask now precedes the surface |
+| 10 | **Settled by code, answer qualified** | `verifier.py` 0.72 vs `revision.py:862` 0.95; `matched_scene` correction documented |
+| 11 | **Confirmed** | `/rewrite` returns scene-scope + `scene_text` (`webapp_server.py:1993-1997`, `_strip_rewrite_noise` at 1900); `group_by=issue-text` at 2533 |
+| 12 | **Settled by code, defect fixed** | `verifier.py:46`, `report.py:36-40`, and the 83 % datum in the repo's own review |
+
+Nothing in the alignment pass came back misaligned: every answer Q2–Q7 and Q11 was either already
+what the code does or a policy recommendation (Q10's "possibly this line") the code neither confirms
+nor contradicts. The two that needed changing were both **settled by facts I had previously only
+inferred** — and both had shipped as code.
 
 ## Where these recommendations are weakest, ranked
 

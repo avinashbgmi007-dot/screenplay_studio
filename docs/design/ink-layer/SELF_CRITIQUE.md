@@ -416,6 +416,15 @@ inside a test keeps passing while the rule it mirrors drifts.
   built to absorb a band that does not exist.
 * "Verification is a three-state vocabulary" — there are four, and the fourth
   (`scene_not_found`) is the one that fires when the *citation* is wrong.
+* **The stale document was the contract, not the repo's docs.** `contracts_UI` says three
+  verification states and four severity bands; the repo's own `docs/DATA_FORMATS.md` and
+  `docs/DEVELOPMENT.md` state all four verification states and agree with the code. So the earlier
+  answers were misled by the newest-looking source rather than by the oldest one — worth recording,
+  because "trust the code over the docs" is the wrong lesson; **"check each claim against the
+  artifact that owns it"** is the right one. The same reading surfaced the datum that matters most to
+  Q12: 19 of 23 findings (83 %) carry `no_quote` on a real script
+  (`docs/CRITICAL_REVIEW_2026-09-18.md:399`), so the predicate this build shipped would have
+  described the majority of a real report as failed.
 * `INK_LAYER_SPATIAL.md` §3.6 wrote the request key as `R`; the router matches `'r'`, and only while
   a fold is open (`core.js:1045`). §3.3's table wrote `E` and `V`; the casting context routes `e` and
   `v` (`core.js:1022,1021`). Eleven glyph corrections, all checked by calling `routeKey(ev, ctx)`
@@ -445,9 +454,13 @@ the grammar holds, and it is written down rather than left to be rediscovered.
 * **No browser pass on the severity change.** A `medium` finding now draws the 8 px middle mark where
   it drew a 4 px hairline. The tests assert the geometry and the DOM values; no human has looked at
   the result, and "the middle mark is legible as a middle" is a judgement the tests cannot make.
-* **Q2, Q3, Q4, Q5, Q6, Q7 and Q11 were re-read for alignment but not re-derived from code.** The
-  document is not wholly code-proven, and saying "five answers moved" is not the same as saying the
-  other seven were verified.
+* **Q2, Q3, Q4, Q5, Q6, Q7 and Q11 were re-read for alignment but not re-derived from code on the
+  first pass.** They were re-derived in the follow-up pass, and all seven came back aligned — the
+  strip's append order, the ambiguous-cast warning, the two `Escape` semantics, the absence of a
+  spent state, the walk/arrow asymmetry and the visit's no-mark behaviour are each a `file:line`
+  result now. The ledger is in `OPEN_QUESTIONS_ANSWERS.md`. Note what "aligned" means here: those
+  answers describe the build because I wrote the build, so the check confirms self-consistency, not
+  correctness — a writer's judgement is still the missing instrument.
 * **No writer has seen any of it**, which remains the limitation of every pass in this file.
 
 ### 7.7 The environment, stated plainly — and what the substitution costs
