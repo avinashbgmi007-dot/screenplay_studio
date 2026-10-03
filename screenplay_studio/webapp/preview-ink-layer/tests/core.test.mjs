@@ -621,30 +621,57 @@ test('the same number drives the text AND the fold column — they cannot drift'
 
 /* ── §3a identity is not location: the alias table and the 0.72 gate ─────── */
 
-test('the desk speaks two severity vocabularies and canonSev collapses them by weight', () => {
-  // The findings payload says critical|major|minor; /findings/summary says
-  // high|major|medium|low. Both are legal input, and the page has ONE mark for
-  // each weight, so the collapse is explicit and total.
+test("the desk's three tiers map one-to-one onto the page's three marks", () => {
+  // Read from the producer, not from a document: `screenplay_analyzer/grammar.py:50`
+  // compiles SEVERITIES = ["low", "medium", "high"] into the findings grammar, and
+  // the findings route tallies `by_severity` from those same strings — so the desk
+  // has three tiers and no fourth. Three tiers, three marks, no collapse: every rung
+  // of the ladder is reachable from real data, which is what the pip geometry
+  // (4 / 8 / 12 px) and the three-step ink threshold were sized for.
   assert.equal(canonSev('high'), 'critical');
-  assert.equal(canonSev('blocker'), 'critical');
-  assert.equal(canonSev('critical'), 'critical');
-  assert.equal(canonSev('medium'), 'minor');
-  assert.equal(canonSev('moderate'), 'minor');
+  assert.equal(canonSev('medium'), 'major');
   assert.equal(canonSev('low'), 'minor');
+  const rungs = new Set(['low', 'medium', 'high'].map(canonSev));
+  assert.equal(rungs.size, 3, 'no two desk tiers collapse onto one mark');
+  // The page's own names read, and so do the legacy spellings in cached payloads.
+  assert.equal(canonSev('critical'), 'critical');
   assert.equal(canonSev('major'), 'major');
+  assert.equal(canonSev('minor'), 'minor');
+  assert.equal(canonSev('blocker'), 'critical');
+  assert.equal(canonSev('moderate'), 'major');
   assert.equal(canonSev('  HIGH '), 'critical', 'the word arrives as text and is read as text');
-  assert.equal(canonSev('HIGH'), 'critical');
   assert.equal(canonSev(undefined), 'none');
   assert.equal(canonSev('whatever'), 'none', 'an unknown weight is no mark, never a guess');
   for (const w of Object.keys(SEV_ALIAS)) assert.equal(canonSev(SEV_ALIAS[w]), SEV_ALIAS[w], `${w} is idempotent`);
-  // The mark a desk word produces is the mark the page has.
-  assert.equal(inkPx('high'), inkPx('critical'));
-  assert.equal(inkPx('medium'), inkPx('minor'));
+  // The mark a desk word produces is the mark the page has — all three widths live.
+  assert.equal(inkPx('high'), 12);
+  assert.equal(inkPx('medium'), 8, 'the middle width is reachable, not decorative');
   assert.equal(inkPx('low'), 4);
-  // Ordering is unchanged by the collapse — it only renames.
+  assert.equal(inkPx('high'), inkPx('critical'));
+  assert.equal(inkPx('medium'), inkPx('major'));
+  // Aliasing only renames: the ordering the filter and the threshold read is unchanged.
   assert.equal(sevRank('high'), sevRank('critical'));
-  assert.equal(sevAtLeast('high', sevRank('major')), true);
+  assert.equal(sevRank('medium'), 2);
   assert.equal(sevAtLeast('low', sevRank('major')), false);
+  assert.equal(sevAtLeast('medium', 2), true, 'the middle tier clears the middle threshold step');
+});
+
+test('only a failed SEARCH is flagged: a quoteless finding is quiet, not unverified', () => {
+  // `report.py:37` prints a warning for exactly two of the desk's four verification
+  // states — `not_found` and `scene_not_found` — and leaves `no_quote` blank. A
+  // finding that never offered a quote has nothing to verify, so calling it
+  // unverified reports a failure that never happened. The page mirrors the
+  // published report rather than the summary's arithmetic.
+  assert.equal(isFlagged({ verification: { status: 'not_found' } }), true);
+  assert.equal(isFlagged({ verification: { status: 'scene_not_found' } }), true);
+  assert.equal(isFlagged({ verification: { status: 'no_quote' } }), false);
+  assert.equal(isFlagged({ verification: { status: 'verified' } }), false);
+  assert.equal(isFlagged({ verification: 'not_found' }), true, 'the string form is tolerated');
+  assert.equal(isFlagged({ verification: 'no_quote' }), false);
+  assert.equal(isFlagged({ verified: false }), true, 'the legacy boolean still reads');
+  assert.equal(isFlagged({ verified: true }), false);
+  assert.equal(isFlagged({}), false, 'silence is not a failure');
+  assert.equal(isFlagged({ verification: { status: 'NOT_FOUND' } }), true, 'read as text, case-folded');
 });
 
 test('inkChannels reports the canonical word, because the geometry reads it', () => {

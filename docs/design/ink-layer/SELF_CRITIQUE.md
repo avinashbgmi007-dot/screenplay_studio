@@ -358,6 +358,128 @@ that lies. The reasoning is in `OPEN_QUESTIONS.md` §2 for anyone who wants to o
   asymmetry (§6) are all shaping decisions that only a writer can settle.
 * **The 0.72 gate's yield on a real screenplay is unmeasured** — the two demo data points are in
   `OPEN_QUESTIONS.md` §10, one of which falls below the gate while a human would call it obvious.
-* **The demo is now a slightly harder world than a real desk**: it deliberately carries two
-  severity vocabularies and a two-scene finding to keep the alias and the roam exercised. The
-  fixture is the test, not the product.
+* **The demo is a slightly harder world than a real desk**: it carries a two-scene finding to keep
+  the roam exercised, and its severities are spelled in the desk's own words (`high`, `medium`) so
+  the alias table is exercised rather than assumed. (This bullet used to claim the demo carried
+  *two severity vocabularies*. It does not, and never needed to — the desk has one vocabulary with
+  three members; see §7.) The fixture is the test, not the product.
+
+---
+
+## 7 · The code-audit pass — reading the producer instead of the documents
+
+### 7.1 The standard applied
+
+The previous passes reasoned from `contracts_UI`, the route map, the PRD and the architecture brief.
+This pass read **the code that produces the data** — `screenplay_analyzer/*`,
+`screenplay_studio/{webapp_server,revision}.py`, `screenplay_parser/quotematch.py`,
+`knowledge_base/rules/*.json`, and the SPA at `screenplay_studio/webapp/app.js` — on the principle
+that a document is a claim about the code and the code is the fact. Every conclusion below carries a
+`file:line`, and every one of them is falsifiable by a single command.
+
+### 7.2 What it changed
+
+Five answers in `OPEN_QUESTIONS_ANSWERS.md` moved, and the preamble's fact table was rewritten to
+name the producer rather than a document:
+
+| Question | Was | Is |
+|---|---|---|
+| Q1 severity | "pin the wire at `critical \| major \| minor`", collapsing `medium` and `low` onto one mark | the wire's vocabulary is `low \| medium \| high`, **closed by grammar** (`grammar.py:50,69`), three tiers mapping one-to-one onto three marks |
+| Q8 intent | "read the accepted vocabulary before sending anything" | the vocabulary is `addressed \| deferred`, `null` clears, keyed by a content hash, batchable (`≤500`, `207` partial) |
+| Q9 roam | "ask whether `setup_scenes`/`payoff_scenes` survive onto the finding" | **they do not** (`setup_payoff.py:142` carries only `scene_refs`), so the ask comes before the surface |
+| Q10 gate | one threshold, unqualified | two thresholds, deliberately unshared: `0.72` targeting vs `0.95` change-detection; the answer now names which question it answers, and adds the verifier's cross-scene correction |
+| Q12 verification | "three-state vocabulary" | **four** states (`verifier.py:46`), of which the report badges exactly two and leaves `no_quote` blank |
+
+### 7.3 Two defects in this build — and the worse one was in its tests
+
+1. **The severity collapse.** `medium` and `low` both drew the `minor` mark, so the middle pip width
+   (8 px) and the middle ink-threshold step were **unreachable from real data**: a part of the
+   interface that existed and did nothing. Fixed by mapping the desk's three tiers one-to-one.
+2. **The flag predicate.** `isFlagged` returned true for anything not `verified`, so a *quoteless*
+   finding — the verifier's `no_quote`, which is a citation rather than a failure — was counted into
+   the fold's "N unverified" line and reported as a failed match that never happened. Fixed against
+   `report.py:36-40`, which is the desk's own published copy for the states.
+
+The worse defect is the first one's second half: **`core.test.mjs` asserted the mis-guess**, under a
+comment that stated as fact a wire vocabulary no producer has ("The findings payload says
+critical|major|minor"). A test is where an open question goes to stop being treated as open — so a
+test that pins a wrong premise is worse than no test at all, because it converts "I should check
+this" into "this is checked". The replacement test asserts the producer's domain, and a second test
+pins the four verification states. The DOM suite's local re-implementation of `isFlagged` was
+deleted and replaced with an import, for the same reason at one remove: a copy of a shipped rule
+inside a test keeps passing while the rule it mirrors drifts.
+
+### 7.4 Document claims that were wrong, and how they were wrong
+
+* `by_severity: {high, major, medium, low}` — **four bands**. The route tallies the findings' own
+  strings (`webapp_server.py:2460-2467`); `major` is not a key and never was. The alias table was
+  built to absorb a band that does not exist.
+* "Verification is a three-state vocabulary" — there are four, and the fourth
+  (`scene_not_found`) is the one that fires when the *citation* is wrong.
+* `INK_LAYER_SPATIAL.md` §3.6 wrote the request key as `R`; the router matches `'r'`, and only while
+  a fold is open (`core.js:1045`). §3.3's table wrote `E` and `V`; the casting context routes `e` and
+  `v` (`core.js:1022,1021`). Eleven glyph corrections, all checked by calling `routeKey(ev, ctx)`
+  across five contexts rather than by reading the code and trusting my eye, plus a case-convention
+  note so the next writer does not repeat it. The behaviour was already pinned by a test — only the
+  prose had drifted, which is the failure mode a reader cannot catch without running the thing.
+
+### 7.5 A check that came back clean, and why it is worth recording
+
+An unrankable severity maps to `none`, and I expected the old 0 px defect to reappear — a critique
+present in the data and invisible on the page. It cannot: the horizon floors its pip at
+`Math.max(2, w)` (`ink-layer.js:610-613`), so an unweighted finding draws a minimal mark rather than
+nothing. The desk's own default for a missing severity is `low`; the page's answer is a minimal,
+unweighted pip instead of an invented weight. That divergence is deliberate and unreachable while
+the grammar holds, and it is written down rather than left to be rediscovered.
+
+### 7.6 What this pass did NOT prove
+
+* **No live desk.** Every "fact" above is read from source, not recorded from a running studio. That
+  is strong evidence and it is not a recording; one `curl` against a live `/findings` would upgrade
+  the whole table from read to observed.
+* **The domain is closed by the grammar, not by a validator.** `_normalize_findings` fills a missing
+  severity but does not clamp an out-of-domain one (`pipeline.py:241`). So "severity is one of three"
+  is a claim about the constrained-decoding path; a producer without that constraint could emit a
+  fourth word, and the page would render it as unweighted (see 7.5). This is the single assumption
+  the severity answer rests on, stated plainly rather than buried.
+* **No browser pass on the severity change.** A `medium` finding now draws the 8 px middle mark where
+  it drew a 4 px hairline. The tests assert the geometry and the DOM values; no human has looked at
+  the result, and "the middle mark is legible as a middle" is a judgement the tests cannot make.
+* **Q2, Q3, Q4, Q5, Q6, Q7 and Q11 were re-read for alignment but not re-derived from code.** The
+  document is not wholly code-proven, and saying "five answers moved" is not the same as saying the
+  other seven were verified.
+* **No writer has seen any of it**, which remains the limitation of every pass in this file.
+
+### 7.7 The environment, stated plainly — and what the substitution costs
+
+There are **no skills, agents, MCP connections or plugins in this environment.** I said so at the
+start of this work and it stays true. What was asked for was multiple experts, external tooling and
+live connections; what was available was one reader, this repo, and these tools.
+
+What I did instead, and its cost: I substituted **named lenses** — the findings pipeline; the SPA's
+own behaviour; the wire shapes of `/rewrite` and `/edits`; the fixtures against real payloads — and
+applied them in sequence to the same code. The cost is real and worth stating without softening:
+there was no independent implementation of any check, no second opinion, and no external tool
+confirming a payload. Every conclusion in §7 came from one pass of one reader over source files. The
+mitigations I could actually offer are the ones above: a `file:line` for each claim, falsifiers, and
+executable tests for the two defects. Nothing here is "verified by an expert"; it is checkable by
+anyone with the repo, which is a different and smaller claim.
+
+### 7.8 Critiquing the audit itself
+
+* **I changed code in a turn whose ask was to verify and update a document.** The justification is
+  that the document would otherwise have contradicted the shipped code in the same commit; the
+  honest framing is that it is a scope call, and it is cheap to overrule — one alias table, one
+  predicate, both revertible in a single edit.
+* **I read the producer's code but not the producer's tests.** The desk's test suite is where its
+  intent about the pipeline is recorded, and I did not read it. Several of my conclusions are
+  inferences from implementation rather than from asserted behaviour.
+* **`grammar.py:50` is doing more work in my argument than one line should.** "The domain is closed"
+  rests on that constant plus the corpus counts agreeing with it; the falsifier is written down in
+  7.6, which is the most I can do short of running a generation.
+* **I ranked my own earlier answers and then settled the top of that ranking myself.** Q1 step 2 was
+  listed as the second-weakest recommendation; the audit makes it moot. That is a good outcome for
+  the product and a suspicious one for a self-assessment — the item I flagged hardest is the one I
+  then declared closed. The check against that suspicion is that it closed on evidence that was
+  readable before I wrote the answer, and that the retraction is recorded in the document rather
+  than deleted from it.

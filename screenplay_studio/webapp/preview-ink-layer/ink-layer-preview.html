@@ -761,20 +761,39 @@ const SEV_ORDER = ['none', 'minor', 'major', 'critical'];
 const SEV_RANK = { none: 0, minor: 1, major: 2, critical: 3 };
 
 /**
- * THE DESK SPEAKS TWO VOCABULARIES. The findings a study emits carry
- * critical | major | minor; the summary route reports by_severity as
- * high | major | medium | low. Reading only ours scored every `high` finding as
- * `none` — no mark, no pip width, no severity at all — and a critique that
- * silently ranks an urgent note as noise is worse than no critique. The four
- * labels collapse onto the three marks by ORDER, and the collapse is stated
- * rather than hidden: `medium` and `low` are both the single mark.
- * (Open question for the product: whether the two middle tiers deserve their
- * own mark — see OPEN_QUESTIONS.md.)
+ * THE DESK'S VOCABULARY IS CLOSED, AND IT HAS THREE MEMBERS.
+ *
+ * Read from the code, not from a document: `screenplay_analyzer/grammar.py:50`
+ * declares `SEVERITIES = ["low", "medium", "high"]` and line 69 compiles that list
+ * into the findings grammar, so a severity outside those three is structurally
+ * impossible on the constrained-decoding path; `_normalize_findings` fills a
+ * missing one from the cited rule's own `severity_default`. The curated rule
+ * corpus agrees: 26 rule files, 263 rules, medium 149 / high 71 / low 43. The
+ * findings query route tallies `by_severity` from those same strings, so it can
+ * carry no other key.
+ *
+ * So the desk's three tiers and this page's three marks map ONE TO ONE, which is
+ * what the geometry was always sized for — three pip widths (4 / 8 / 12 px) and a
+ * three-step ink threshold. An earlier revision of this table collapsed `medium`
+ * and `low` onto the single `minor` mark, because the vocabulary had been guessed
+ * from the design system instead of read from the producer; that collapse left the
+ * middle pip width and the middle threshold step unreachable from real data.
+ *
+ * `critical | major | minor` are this page's INTERNAL names for the same three
+ * weights — the DOM, the CSS and the pip geometry read them, so they do not move
+ * when the wire spelling changes. `major` is never a desk tier; it survives as a
+ * readable legacy spelling because the desk's own ordering table still ranks it
+ * (`webapp_server.py:2319 SEVERITY_WEIGHT = {high: 0, major: 1, medium: 2,
+ * low: 3}`). Unknown text is `none`: a weight this page cannot rank must never be
+ * promoted into a mark it did not earn.
  */
 const SEV_ALIAS = {
-  critical: 'critical', blocker: 'critical', high: 'critical',
-  major: 'major', medium: 'minor', moderate: 'minor',
-  minor: 'minor', low: 'minor', none: 'none',
+  // this page's internal names (DOM, CSS, pip geometry)
+  critical: 'critical', major: 'major', minor: 'minor',
+  // the desk's closed grammar domain (grammar.py:50)
+  high: 'critical', medium: 'major', low: 'minor',
+  // legacy spellings that still appear in cached reports and older payloads
+  blocker: 'critical', moderate: 'major', none: 'none',
 };
 const canonSev = (s) => SEV_ALIAS[String(s ?? 'none').trim().toLowerCase()] ?? 'none';
 const sevRank = (s) => SEV_RANK[canonSev(s)];
@@ -967,13 +986,33 @@ function inkChannels(findings, { includeDismissed = false } = {}) {
   return map;
 }
 
-/** A finding is flagged when the verifier could not land its quote (0.72 gate). */
+/**
+ * A finding is FLAGGED when the verifier looked for its quote and could not land
+ * it — not merely when it did not land on `verified`.
+ *
+ * The desk's four states (`verifier.py:46`: verified | not_found | no_quote |
+ * scene_not_found) are two different facts wearing one boolean. `report.py:37`
+ * prints a warning for exactly two of them — "unverified — quote not confirmed in
+ * cited scene(s)" and "unverified — cited scene number doesn't exist" — and leaves
+ * `no_quote` **blank**, because a finding that never offered a quote has nothing to
+ * verify, and calling it unverified would report a failure that never happened. The
+ * page mirrors the published report rather than the summary's arithmetic: the two
+ * failed searches warn, a quoteless finding is quiet.
+ *
+ * This flag drives copy and counting only. What keeps a quoteless or
+ * scene-not-found finding off a line is the anchor: with no quote to match,
+ * `anchorFinding` scores it 0, parks it, and casting refuses it with the real
+ * reason — never this predicate.
+ */
+const UNVERIFIED_STATES = new Set(['not_found', 'scene_not_found', 'unverified', 'false']);
 function isFlagged(f) {
   if (f.verification && typeof f.verification === 'object' && f.verification.status) {
-    return f.verification.status !== 'verified';
+    return UNVERIFIED_STATES.has(String(f.verification.status).trim().toLowerCase());
   }
   if (typeof f.verified === 'boolean') return f.verified === false;
-  if (typeof f.verification === 'string') return f.verification !== 'verified';
+  if (typeof f.verification === 'string') {
+    return UNVERIFIED_STATES.has(String(f.verification).trim().toLowerCase());
+  }
   return false;
 }
 

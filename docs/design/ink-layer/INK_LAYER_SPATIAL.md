@@ -385,20 +385,20 @@ to the text)`. But when the writer presses `J`:
 > `"Unverified finding: its quote could not be matched to the text, so there is nothing here to cast. It is still shown, not dropped."`
 
 No candidate is invented for a claim the verifier could not land, and **no target is selected on
-the writer's behalf**. Explicit selection is honoured: `R` on the passage the writer has chosen
-casts it anyway, and the warning is retained in the strip's basis line (`writer-selected
+the writer's behalf**. Explicit selection is honoured: `r` — **lowercase, in the finding's open fold** — casts the
+passage the writer has chosen anyway, and the warning is retained in the strip's basis line (`writer-selected
 passage`), because refusing assistance outright would block legitimate work on uncertain
 diagnoses.
 
 ### 3.7 Rehearsal — the comparison mechanic, as a branch of this strip
 
-`V` in an open fold. One branch, no second surface, and the mechanic is chosen by the
+`v` in an open fold. One branch, no second surface, and the mechanic is chosen by the
 **material**, never by a setting:
 
 | Row type | Mechanic | Why |
 |---|---|---|
 | `dialogue`, `character`, `parenthetical` | **temporal** — the ring moves on a beat (`REHEARSAL_BEAT_MS`, 1400 ms), opening on the writer's own line | the question is rhythm, and rhythm can only be judged in time |
-| everything else | **spatial** — the takes stay as the stack of §3.3, each with its size, and `V` says why there is no beat | the question is magnitude, and a deletion that only passes on the beat is a deletion nobody noticed |
+| everything else | **spatial** — the takes stay as the stack of §3.3, each with its size, and `v` says why there is no beat | the question is magnitude, and a deletion that only passes on the beat is a deletion nobody noticed |
 
 Rules that make it a mode rather than a toy: the beat moves the **same ring** `J`/`K` move, so
 nothing new can reach the page; the reading **ends** rather than looping, and the end is announced
@@ -408,7 +408,7 @@ a reading that keeps moving while the writer is doing something else; and it is 
 under reduced motion, because it is a reading pace, not an animation (only the strip's colour
 steps collapse).
 
-On a structural row the stack does not move at all when `V` is pressed: the sizes are already on
+On a structural row the stack does not move at all when `v` is pressed: the sizes are already on
 the page, so the writer's place is kept and only the explanation arrives.
 
 ### 3.8 Two inks: dry by evidence, dry by choice
@@ -462,7 +462,7 @@ surface:
 |---|---|---|
 | `F` | **Context filter** — cycles `all → scene → category → status(open)` | it filters the CRITIQUE, never the prose: `quietRow` recedes a row's critique through the same opacity channel the ink threshold uses, and not one character of the manuscript moves. The scope is stated in the annunciator, and it is always about where the caret is. |
 | `O` | **Visit the other scene a finding cites**, and come back | the cheap "where else does this matter?" — no graph, no edge the payload does not assert. The return is checked FIRST, because the place a visit lands is by definition a place with nothing on it. |
-| `E` | **Edit the proposed wording in place** | the writer's words are the proposal (§3.4); the manuscript is untouched until `Enter` commits the take. |
+| `e` | **Edit the proposed wording in place** | the writer's words are the proposal (§3.4); the manuscript is untouched until `Enter` commits the take. |
 
 ---
 
@@ -484,9 +484,16 @@ window.keydown ──► routeKey(ev, ctx) ──► action id ──► switch 
 | 0·5 | **`editing`** (caret in any other contenteditable/input) | **The caret is absolute.** Every key passes through, including `⌘Z`: while a caret exists, undo belongs to the words being typed, not to the app's edit stack. The app's undo only answers once the line is committed. |
 | 1 | `Mod` chords | `⌘Z` → `edits.undo`, `⇧⌘Z` → `edits.redo` — survive every non-editing state |
 | 2 | `Escape` | Peels exactly one layer: `cast.cancel` → `fold.close` → `focus.release` → `fold.closeAll` |
-| 3 | `casting` | `j/k/→/←` own the ring (and only the ring — no write), `E` edits the take's wording, `V` rehearses, `Enter` commits, a traversal key abandons |
+| 3 | `casting` | `j/k/→/←` own the ring (and only the ring — no write), `e` edits the take's wording, `v` rehearses, `Enter` commits, a traversal key abandons |
 | 4 | `onHorizon` | The track behaves like a scrollbar (`↑↓ Home End Enter Esc`) |
-| 5 | traversal | `↑↓` rows · `n/p` wet rows · `Enter` fold · `[ ]` ink floor · `a` annunciator · `g` ground · `v` rehearsal · `f` context filter · `o` visit-and-return |
+| 5 | traversal | `↑↓` rows · `n/p` wet rows · `Enter` fold · `[ ]` ink floor · `a` annunciator · `g` ground · `f` context filter |
+| 5·5 | **an open fold** | `j/k` begin casting (§3.3) · `r` requests it for the writer's own selection (§3.6) · `v` rehearses (§3.7) · `o` visits the other cited scene and comes back |
+
+**Case convention, read from the router**: letter keys route in **lowercase** — only `j` and `k`
+accept either case — so a capital other than `J`/`K` passes through to the browser. Every claim in
+this table is a `routeKey(ev, ctx)` result in `core.js`, checked against the implementation rather
+than the other way round. (An earlier revision of §3.6 wrote the request key as `R`; the router
+matches `'r'`, and only while a fold is open.)
 
 Every action id the router can emit is enumerated in `HANDLED`, and a test proves the router never emits an id outside it — so the `switch` cannot accumulate dead arms or silently swallow a key.
 
@@ -538,10 +545,10 @@ node build-single.mjs > ink-layer-preview.html
 **Try, in order:** `n` (walk to the first wet line — you land on the unverifiable finding, and `J`
 refuses it with the reason) → `n` again → `Enter` (pin the fold and read the critique under its
 own line) → `J` (the ledger takes take 1, and **the line does not move**: nothing is written until
-you commit) → `J` `K` (audition; watch the line stay the writer's) → `E` (type your own wording
+you commit) → `J` `K` (audition; watch the line stay the writer's) → `e` (type your own wording
 into the passage; `Enter` commits the wording) → `Enter` (commit the take; the line changes, the
 fold closes, the radar's pip shrinks) → `⌘Z` (the line re-wets — the diagnosis answers back).
-Then `V` (the takes are read on a beat — any key stops it), `V` on an action line (the sizes are
+Then `v` (the takes are read on a beat — any key stops it), `v` on an action line (the sizes are
 already stacked, and the strip says why there is no beat), `F` (filter the critique to this scene,
 then this category, then what is still open), `O` on the beat finding (visit the scene it cites and
 come back), `g` (the same instrument on the lifted bench), `a`, `Esc`.
@@ -555,7 +562,7 @@ come back), `g` (the same instrument on the lifted bench), `a`, `Esc`.
 - [x] Dwell 420 ms; the armed window is cancellable with no residue; line → own fold does not cancel.
 - [x] Opening/closing never moves the focused line (only `overflow`/`collapse-above` corrections).
 - [x] `J`/`K` move the ring and **never touch the document** (the trap frame); the frame is captured once; every reading composes from it; the commit is the only write and writes exactly what the strip showed.
-- [x] `E` edits the passage inside the frame it was cut from, and a typed proposal cannot accumulate a previous one.
+- [x] `e` edits the passage inside the frame it was cut from, and a typed proposal cannot accumulate a previous one.
 - [x] `Enter` applies through `/edits/apply`, the apply response patches the page (`statusPatch`), and the summary is re-read from the server.
 - [x] Placement is `fuzzyScore` ≥ 0.72 over the evidence quote; `line_start` breaks ties and never predicts; an unplaceable finding is scene-anchored and never auto-targeted.
 - [x] Severity is one canonical vocabulary on the page (`SEV_ALIAS`), stated where the desk's word differs; the ├─ mark is a width, the fold's is ▪ blocks.

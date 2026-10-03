@@ -12,6 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
+import { isFlagged } from '../core.js';
 
 let bootCount = 0;   // each harness needs a FRESH module instance: ESM caches.
 
@@ -145,7 +146,7 @@ test('every severity the page can render has a rule to render it with', async ()
   const words = new Set(h.groupsOf().map((g) => g.dataset.worst));
   for (const w of words) assert.ok(canonical.includes(w) || w === 'none', `rendered severity is canonical: ${w}`);
   assert.ok(words.has('critical'), 'the desk\'s `high` is drawn as the page\'s critical');
-  assert.ok(words.has('minor'), 'and its `medium` as minor');
+  assert.ok(words.has('major'), 'and its `medium` as major — the middle mark, one to one');
   // The mark is geometry, and geometry is what the alias defect destroyed: a
   // line the desk called `high` drew a border 0px wide — a critique that was
   // present in the data and invisible on the page.
@@ -697,7 +698,10 @@ test('the desk marks a dry line as dry by evidence, the writer as dry by choice'
 
 test('an unlocated finding is shown, is never auto-targeted, and the strip says why', async () => {
   const h = await harness();
-  const isFlagged = (f) => (f.verification && f.verification.status !== 'verified') || f.verified === false;
+  // The shipped predicate, imported — not a local re-implementation, which is how
+  // a test keeps passing while the copy it mirrors drifts. (`no_quote` is
+  // deliberately NOT flagged — the four states and their copy are pinned in
+  // core.test.mjs.)
   const flaggedOf = (r) => (r.finds || []).find(isFlagged);
   let row = null;
   for (let i = 0; i < 40 && !row; i++) {
