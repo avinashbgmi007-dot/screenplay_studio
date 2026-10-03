@@ -466,7 +466,10 @@ the grammar holds, and it is written down rather than left to be rediscovered.
   result now. The ledger is in `OPEN_QUESTIONS_ANSWERS.md`. Note what "aligned" means here: those
   answers describe the build because I wrote the build, so the check confirms self-consistency, not
   correctness — a writer's judgement is still the missing instrument.
-* **No writer has seen any of it**, which remains the limitation of every pass in this file.
+* **No writer has seen any of it**, which remains the limitation of every pass in this file. The
+  real-script pass adds its own: the craft model was the demo engine, the sample is one script, and
+  three quote-bearing findings cannot support a rate — only the observation that the gate was not
+  stressed and that *quote presence*, not the threshold, is where the ink runs out.
 
 ### 7.7 The environment, stated plainly — and what the substitution costs
 
@@ -482,6 +485,24 @@ confirming a payload. Every conclusion in §7 came from one pass of one reader o
 mitigations I could actually offer are the ones above: a `file:line` for each claim, falsifiers, and
 executable tests for the two defects. Nothing here is "verified by an expert"; it is checkable by
 anyone with the repo, which is a different and smaller claim.
+
+### 7.7b Two more defects, and both were invisible without real payloads
+
+Found by running the real desk against a real 28-page script (`REAL_SCRIPT_RESULTS.md`):
+
+1. **Every scene heading was drawn twice.** A real payload carries `heading_raw` AND a
+   `scene_heading` element (22/22 scenes); `flatten()` pushed both, and the duplicate made a
+   heading-quoting finding tie with itself — so the page reported a false *"this quote matches more
+   than one line"* on **3 of 3** real quotes. Fixed to match the product's own renderer
+   (`app.js:5306`); the offline fixture now carries the double so the suite exercises the shape.
+2. **`applied` is a list, not a count.** The route answers `[{old,new,similarity}]`; the demo
+   returned a count, so a real apply would have announced *"Applied [object Object]"*. Fixed at the
+   copy, the caller and the adapter, with a test that forbids `[object` in any announcement.
+
+What the two incidents share is worth stating as a rule: **both were unreachable from the fixture,
+and both were one request away.** The fixture is a claim about the desk; the desk is the fact. Every
+offline test in this directory passes over a world that was, in two measurable ways, softer than the
+real one.
 
 ### 7.8 Critiquing the audit itself
 

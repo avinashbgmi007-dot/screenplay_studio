@@ -549,7 +549,16 @@ test('announcements carry the load, so no visual channel is load-bearing', () =>
   assert.match(say.castReady({ index: 1, count: 3, text: 'The door was open.' }), /Take 2 of 3: The door was open\./);
   assert.match(say.wetNone({ dir: 1 }), /below/);
   assert.match(say.inkThreshold({ floor: 2, label: 'major and above' }), /major and above/);
-  assert.match(say.applyReport({ applied: 2, skipped: 1 }), /Applied 2\. 1 skipped\./);
+  // The desk answers in LISTS (revision.py:736): `applied: [{old,new,similarity}]`,
+  // `skipped: [{old,new,reason}]`. A count is still read for compatibility, and
+  // silence is the answer when everything landed — castApplied already said it.
+  assert.equal(say.applyReport({ applied: [{}, {}], skipped: [] }), '',
+    'nothing to add when the apply simply worked');
+  assert.match(say.applyReport({ applied: [{}, {}], skipped: [{ reason: 'old spans multiple lines' }] }),
+    /2 applied, 1 skipped — old spans multiple lines\./);
+  assert.equal(say.applyReport({ applied: [], skipped: [] }), 'Nothing was applied.');
+  assert.equal(say.applyReport({ applied: 2, skipped: 0 }), '', 'the count shape is still read');
+  assert.match(say.applyReport({ applied: 0, skipped: 1 }), /0 applied, 1 skipped/);
   assert.equal(say.castSkipped({ skipped: [] }), '');
 });
 

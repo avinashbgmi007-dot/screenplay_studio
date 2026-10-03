@@ -453,6 +453,7 @@ test('Enter commits: the line takes the text the desk accepted, goes dry, and th
   assert.equal(g.querySelector('.row').dataset.cast, 'applied');
   assert.equal(h.S.casting, null);
   assert.match(h.announce(), /Applied/);
+  assert.ok(!h.announce().includes('[object'), `the announcement is prose, not a stringified object: ${h.announce()}`);
   assert.ok(h.S.summary, 'the summary was re-read');
   assert.equal(h.S.findings.find((f) => f.finding_id === 'd1').status, 'addressed',
     'the apply response told the page what the edit did to the critique');
@@ -694,6 +695,24 @@ test('the desk marks a dry line as dry by evidence, the writer as dry by choice'
   assert.match(h2.announce(), /closed by your decision/);
   assert.equal(h2.S.findings.find((f) => f.finding_id === 'd1').dismissed, true,
     'the decision is recorded on the desk, not only in the page');
+});
+
+test('a heading that arrives twice in the payload is drawn ONCE', async () => {
+  /* A real payload carries the heading twice: `heading_raw` AND a
+     `scene_heading` entry inside `elements[]` (22 of 22 scenes on a parsed
+     PDF). Pushing both drew every heading twice — and made a heading-quoting
+     finding tie with its own duplicate, so the page reported a false
+     "this quote matches more than one line" on real continuity findings. The
+     product's own renderer skips the element (app.js:5306); so does this. */
+  const h = await harness();
+  const headings = h.window.document.querySelectorAll('.row[data-type="scene_heading"]');
+  const texts = [...headings].map((n) => n.textContent);
+  const dupes = texts.filter((t, i) => texts.indexOf(t) !== i);
+  assert.deepEqual(dupes, [], `no heading is drawn twice (saw: ${texts.join(' | ')})`);
+  // The demo carries the double explicitly on scene 14 — and the heading still
+  // exists as a ROW of the manuscript, because it is text, not chrome.
+  assert.ok(texts.some((t) => t.includes('INT. RADIO STATION - BOOTH - NIGHT')),
+    'the heading whose element is skipped is still on the page');
 });
 
 test('an unlocated finding is shown, is never auto-targeted, and the strip says why', async () => {

@@ -1690,8 +1690,20 @@ const say = {
   castStale: ({ message }) =>
     `${message} The take was cut from a line that has moved since, so nothing was written — your text stands. Press J or K to ask again for a fresh take.`,
   castFrames: ({ message }) => `${message} Nothing was written. That is the desk's fault, not your text.`,
-  applyReport: ({ applied, skipped }) =>
-    applied ? `Applied ${applied}.${skipped ? ` ${skipped} skipped.` : ''}` : 'Nothing applied.',
+  applyReport: ({ applied, skipped } = {}) => {
+    /* THE DESK ANSWERS IN LISTS, and the demo once answered in counts.
+       Measured against a live desk: `applied` is `[{old,new,similarity}]` and
+       `skipped` is `[{old,new,reason}]` (revision.py:736) — so formatting the
+       number printed "Applied [object Object]" on a real apply, while the
+       offline build's count read fine and no test could see it. Both shapes are
+       read here; the count is what is said. Silence when everything landed
+       (castApplied has already said that), one honest sentence otherwise. */
+    const n = Array.isArray(applied) ? applied.length : (Number(applied) || 0);
+    const sk = Array.isArray(skipped) ? skipped.length : (Number(skipped) || 0);
+    if (!sk) return n ? '' : 'Nothing was applied.';
+    const why = Array.isArray(skipped) && skipped[0] && skipped[0].reason ? ` — ${skipped[0].reason}` : '';
+    return `${n} applied, ${sk} skipped${why}.`;
+  },
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1961,6 +1973,10 @@ const DEMO = {
       { scene_number: 14, heading_raw: 'INT. RADIO STATION - BOOTH - NIGHT', int_ext: 'INT',
         location: 'RADIO STATION - BOOTH', time_of_day: 'NIGHT', page_start: 22.1, page_end: 23.4,
         characters_present: ['CARY', 'VERA'], elements: [
+          /* A real payload delivers the heading twice — `heading_raw` AND a
+             `scene_heading` element (22 of 22 scenes on a parsed PDF). The demo
+             carries the same shape so the double is exercised, not assumed. */
+          { type: 'scene_heading', text: 'INT. RADIO STATION - BOOTH - NIGHT', line_start: 410 },
           { type: 'action', text: 'Dust turns in the light above a mixing desk that has not been touched in days.', line_start: 411 },
           { type: 'character', text: 'CARY', line_start: 413 },
           { type: 'dialogue', text: "You're late.", line_start: 414 },
@@ -2080,7 +2096,14 @@ const DEMO = {
       if (isFlaggedFinding(f)) continue;
       if (reps.some((r) => r.old.includes(f.evidence))) f.status = 'addressed';
     }
-    return { scene_number: (body && body.scene_number) ?? null, applied: reps.length, scene_text_after: null };
+    /* The answer mirrors the ROUTE's shape — `applied`/`skipped` are lists of
+       {old,new[,similarity|reason]}, not counts (revision.py:736). The demo
+       returning a count is exactly how "Applied [object Object]" survived a
+       green suite: the fixture was a softer world than the desk, and the only
+       way to see it was to run the real one. */
+    return { scene_number: (body && body.scene_number) ?? null,
+             applied: reps.map((r) => ({ old: r.old, new: r.new, similarity: 1 })),
+             skipped: [], scene_text_after: null };
   },
   async undo() { return { ok: true }; },
   /* A decision is a state change on the desk, not a local gesture: the demo
@@ -2156,12 +2179,25 @@ function flatten(script) {
   const scenes = [];
   for (const sc of script.scenes || []) {
     const scene = { number: sc.scene_number, heading: sc.heading_raw, elements: [], rowIndex: rows.length, band: null };
-    // The scene heading is a row of the manuscript, not chrome.
-    if (sc.heading_raw) {
-      rows.push(mkRow(sc, { type: 'scene_heading', text: sc.heading_raw, line_start: null }, scene));
+    const elements = sc.elements || [];
+    /* THE HEADING APPEARS ONCE — and a real payload delivers it twice.
+       Every scene of a parsed script carries BOTH `heading_raw` and a
+       `scene_heading` entry inside `elements[]` (observed on a 22-scene PDF:
+       22 of 22). Pushing both drew every heading twice in the manuscript, and —
+       worse — made a heading-quoting finding tie with its own duplicate, which
+       the page then reported as "this quote matches more than one line" on
+       three of three real quotes. The product's own renderer skips the element
+       (`app.js:5306`: `if (e.type === "scene_heading") continue;`); this does
+       the same, while keeping the heading as a real row of the manuscript —
+       skipping it as an ELEMENT, never as text. When `heading_raw` is empty the
+       element is the only copy of the heading, and is kept. */
+    const heading = sc.heading_raw || (elements.find((e) => e.type === 'scene_heading') || {}).text || null;
+    if (heading) {
+      rows.push(mkRow(sc, { type: 'scene_heading', text: heading, line_start: null }, scene));
       scene.elements.push(rows.length - 1);
     }
-    for (const el of sc.elements || []) {
+    for (const el of elements) {
+      if (el.type === 'scene_heading') continue;   // already a row above — never twice
       rows.push(mkRow(sc, el, scene));
       scene.elements.push(rows.length - 1);
     }
@@ -3139,8 +3175,11 @@ async function castApply() {
     decorate();
     horizon.paint();
     await refreshSummary();
-    announce(C.say.castApplied({ count: res?.applied ?? 1, lineNo: row.lineStart ?? applied.index + 1 })
-      + ' ' + C.say.applyReport(res || {}));
+    const appliedN = Array.isArray(res?.applied) ? res.applied.length : (res?.applied ?? 1);
+    const detail = C.say.applyReport(res || {});
+    announce([appliedN > 0
+      ? C.say.castApplied({ count: appliedN, lineNo: row.lineStart ?? applied.index + 1 })
+      : '', detail].filter(Boolean).join(' '));
   } catch (e) {
     const verdict = C.classifyApplyError(e);
     if (verdict.kind === 'stale') { refuseStale(c.index, verdict); return; }

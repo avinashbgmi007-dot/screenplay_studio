@@ -308,11 +308,17 @@ nothing there should ever be used to place a critique.
 1. **Never loosen the threshold for the auto-target decision.** The gate decides whether the page may
    point a critique at a line by itself; keep 0.72 until a measurement justifies a change, and change
    it only as a number, never with a special case.
-2. **Measure before touching it.** `anchorFinding` is a pure function: run it over the studio's own
-   scripts and findings and report the loose rate, the false-anchor rate, and the score distribution
-   of matches a human would call obvious. My two data points are in `OPEN_QUESTIONS.md` §10; the
-   worrying one (a clause quoted out of a longer line, 0.645) is the case that motivates the
-   measurement.
+2. **Measure before touching it — the measurement has now been taken, once** (`REAL_SCRIPT_RESULTS.md`
+   §2, harness at `tests/measure-anchors.mjs`). Over a real 28-page short film with its live findings
+   payload: **3 of 3 quote-bearing findings anchored, every one at score 1.000 (exact substring);
+   none in the 0.72–0.99 band; none loose; none ambiguous after the duplicate-heading defect was
+   fixed.** So on this script the gate is not the bottleneck at all — **quote *presence* is**: 13 of
+   16 findings carry no quote and can never ink a line (81 %). That reframes the question: the 0.72
+   worry (a paraphrase that lands loose) is real but *unmeasured*, while the dominant real-world cost
+   is `no_quote` findings sitting scene-anchored. One script is a sample, not a rate: a
+   paraphrase-heavy report from a real model is still the payload that would stress the gate, and
+   the recorded 43-finding session (real model, this script) is the obvious next measurement if its
+   payload can be found.
 3. **If the measurement supports it, add a *showing* rule, not a *targeting* rule** — a row may be
    marked "possibly this line" for a loose quote, while casting still refuses and the writer still
    selects the passage explicitly.

@@ -955,8 +955,20 @@ export const say = {
   castStale: ({ message }) =>
     `${message} The take was cut from a line that has moved since, so nothing was written — your text stands. Press J or K to ask again for a fresh take.`,
   castFrames: ({ message }) => `${message} Nothing was written. That is the desk's fault, not your text.`,
-  applyReport: ({ applied, skipped }) =>
-    applied ? `Applied ${applied}.${skipped ? ` ${skipped} skipped.` : ''}` : 'Nothing applied.',
+  applyReport: ({ applied, skipped } = {}) => {
+    /* THE DESK ANSWERS IN LISTS, and the demo once answered in counts.
+       Measured against a live desk: `applied` is `[{old,new,similarity}]` and
+       `skipped` is `[{old,new,reason}]` (revision.py:736) — so formatting the
+       number printed "Applied [object Object]" on a real apply, while the
+       offline build's count read fine and no test could see it. Both shapes are
+       read here; the count is what is said. Silence when everything landed
+       (castApplied has already said that), one honest sentence otherwise. */
+    const n = Array.isArray(applied) ? applied.length : (Number(applied) || 0);
+    const sk = Array.isArray(skipped) ? skipped.length : (Number(skipped) || 0);
+    if (!sk) return n ? '' : 'Nothing was applied.';
+    const why = Array.isArray(skipped) && skipped[0] && skipped[0].reason ? ` — ${skipped[0].reason}` : '';
+    return `${n} applied, ${sk} skipped${why}.`;
+  },
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
