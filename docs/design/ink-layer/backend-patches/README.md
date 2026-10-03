@@ -55,3 +55,40 @@ guard so the refusal can at least be seen and tested.
   minimum), which is a product change and not mine to make unreviewed on a design branch.
 * `webapp_apply_edits.py` block C (the `/rewrite` producer filter) is also a one-line change to the
   route above `/edits/apply` — same reasoning.
+
+---
+
+## Observed on a live desk (2026-10-03) — what happens instead, today
+
+The claim above ("a stale proposal is applied to text that has moved") deserves the sharper version,
+measured rather than reasoned. Against the running desk with the writer's own 28-page script:
+
+```
+POST /edits/apply  {scene_number: 6, replacements: [{old: "Comic books chaduthu, …", new: "…"}]}
+  → 1st call: {applied: [{old, new, similarity}], skipped: []}
+  → 2nd call, identical body, the line now moved:
+       {applied: [], skipped: [{old, new, reason: "line not found in scene"}]}   ← HTTP 200
+```
+
+So the desk's actual behaviour is **not** a silent wrong write and **not** a refusal: the replacement
+is *skipped*, with a reason, and the answer is a 200. That is honest, and the page already reads it —
+`applyReport` says **"0 applied, 1 skipped — line not found in scene"**, and the caller no longer
+claims "Line N changed" when nothing did (fixed in `ea8e1ca`).
+
+**What this costs:** the prototype's dedicated refusal state — `row[data-cast="stale"]`, the sentence
+kept in the fold until the writer answers it, `refuseStale()` — is **unreachable against the real
+desk**, because it is wired to an error the desk does not raise. It fires in the offline build only
+(the `#drift` seam simulates it). So today the writer gets a *skip message* where the design promised
+a *refusal*: same information, weaker placement, and nothing persisted until they act.
+
+Either resolution is defensible and both are one change:
+
+1. **Apply this patch** — the refusal becomes a first-class state, the trap frame's whole reason for
+   existing holds, and `refuseStale()` stops being dead code in production. This is what the
+   prototype was designed against.
+2. **Or retire the stale state** in the page and keep the skip message, which is honest as-is — and
+   delete `refuseStale()` rather than leaving a path that can never run.
+
+What is **not** acceptable is the current arrangement: a UI state that exists, is tested offline, and
+cannot happen in the product. That is the same defect class as the 0 px mark and the hollow quotes —
+a claim in the interface that no data backs.
