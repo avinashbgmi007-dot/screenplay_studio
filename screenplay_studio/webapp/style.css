@@ -4270,13 +4270,14 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 
 /* ---------- fix-queue triage (dismiss / restore) ---------- */
 
-.fq-dismiss, .fq-undismiss, .fq-toggle-dismissed {
+.fq-reopen, .fq-dismiss, .fq-undismiss, .fq-toggle-dismissed {
   font: inherit; font-size: var(--fs-xs);
   background: none; border: 1px solid var(--desk-line-dim);
   color: var(--desk-text-dim); border-radius: var(--r-sm);
   padding: var(--sp-1) var(--sp-4); cursor: pointer;
 }
 .fq-dismiss:hover { border-color: var(--desk-rust); color: var(--desk-rust); }
+.fq-reopen:hover { border-color: var(--lamp); color: var(--lamp-bright); }
 .fq-undismiss:hover { border-color: var(--desk-amber); color: var(--desk-amber); }
 .fq-toggle-dismissed { margin-left: auto; }
 .fix-row.dismissed { font-style: italic; }
@@ -6315,6 +6316,12 @@ body:not(.idea-mode) .desk {
 .finding-ink.ink-high { border-bottom-color:var(--danger); box-shadow:inset 0 -3px 0 rgba(200,80,58,.14); }
 .finding-ink.ink-medium { border-bottom-color:var(--sev-mid); box-shadow:inset 0 -3px 0 color-mix(in oklab, var(--sev-mid) 12%, transparent); }
 .finding-ink.ink-low { border-bottom-color:var(--ok); box-shadow:inset 0 -3px 0 rgba(124,196,138,.10); }
+/* D2-a: a finding the writer marked addressed, shown only because they asked
+   to see addressed findings. It keeps its place on the page but loses the
+   severity colour and the solid underline — the page must not re-flag a call
+   the writer already made. Dashed, not solid: still findable, no longer a
+   complaint. */
+.finding-ink.ink-done { border-bottom-style:dashed; border-bottom-color:var(--text-muted); box-shadow:none; }
 .ink-chip { font-style:normal; font-size:var(--fs-3xs); font-weight:700; margin-left:var(--sp-2); padding:0 5px; border-radius:999px; background:var(--lamp); color:var(--accent-ink); vertical-align:super; }
 .finding-ink.ink-halo { animation:ink-halo 4s ease-out 1; }
 @keyframes ink-halo { 0%,70% { box-shadow:0 0 0 2px var(--glow-strong), 0 0 18px var(--glow-strong); } 100% { box-shadow:none; } }
@@ -6336,6 +6343,12 @@ body:not(.idea-mode) .desk {
 .dock-arrival-retry { align-self:flex-start; appearance:none; border:1px solid var(--danger); background:var(--danger-bg,rgba(200,80,58,.10)); color:var(--danger-text); border-radius:var(--r-sm); padding:2px var(--sp-3); font-size:var(--fs-2xs); cursor:pointer; }
 .dock-arrival-retry:disabled { opacity:.6; cursor:default; }
 .dock-ghosted summary { font-size:var(--fs-2xs); color:var(--text-faint); cursor:pointer; }
+/* D2-a upgrade notice: a mark held aside, not an error. Neutral ink on the
+   seam — never a severity colour, because nothing here is wrong. */
+.dock-ambiguous-notice { border-left:2px solid var(--line); padding-left:var(--sp-5); }
+.dock-ambiguous-notice .dock-lens-hint { margin-bottom:var(--sp-3); }
+.dock-notice-close { font-size:var(--fs-3xs); color:var(--text-muted); background:none; border:1px solid var(--line); border-radius:999px; padding:2px var(--sp-5); cursor:pointer; }
+.dock-notice-close:hover { color:var(--text); border-color:var(--text-faint); }
 .dock-ghosted-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
 .dock-ghosted-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
 .dock-ghosted-intent { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; white-space:nowrap; }

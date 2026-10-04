@@ -79,6 +79,26 @@ VECTORS = [
     ("whitespace-only quote falls back", {"category": "dialogue",
                                           "evidence_quote": "   ",
                                           "issue": "fallback used"}),
+    # HIGH-1: the scene component. Both languages READ this stamped field — the
+    # analyzer writes it, the desk re-stamps old reports on read — so the
+    # vector set has to cover the ways a report can carry it: a plain slug, an
+    # occurrence-qualified one, a slug with non-ASCII/Tenglish characters (the
+    # slug is derived in PYTHON only, so anything it can emit must survive the
+    # JS read), an empty key, and a missing key.
+    ("scene key", {"category": "dialogue", "issue": "same words",
+                   "scene_refs": [4], "scene_key": "INT SIDDHUS HOUSE CONTINUOUS"}),
+    ("scene key, 2nd occurrence", {"category": "dialogue", "issue": "same words",
+                                   "scene_refs": [22],
+                                   "scene_key": "INT SIDDHUS HOUSE CONTINUOUS#2"}),
+    ("scene key, tenglish", {"category": "dialogue", "issue": "same words",
+                             "scene_refs": [3], "scene_key": "INT வீடு இரவு"}),
+    ("scene key, nbsp kept", {"category": "dialogue", "issue": "same words",
+                              "scene_refs": [3], "scene_key": "INT HOUSE\u00a0NIGHT"}),
+    ("scene key, non-bmp", {"category": "dialogue", "issue": "same words",
+                            "scene_refs": [5], "scene_key": "INT \U0001F3E0 DAY"}),
+    ("empty scene key", {"category": "dialogue", "issue": "same words", "scene_key": ""}),
+    ("quote + scene key", {"category": "voice", "evidence_quote": "She left.",
+                           "scene_refs": [2], "scene_key": "EXT ROAD DAY"}),
 ]
 
 EMOJI_ISSUE = "emoji probe 😀 in the quote"
@@ -166,23 +186,42 @@ def run(base, projects_dir, headers):
         items = queue.get("items") or []
         by_issue = {i.get("issue"): i for i in items}
 
+        # HIGH-1: the report planted here is exactly what an older build wrote
+        # — no `scene_key` — so this also exercises the serve-time annotation
+        # (`revision.annotate_report_scene_keys`). The client is handed the
+        # SERVED object, because that is the object the real app computes from:
+        # comparing the server's id against the id of a file the server has
+        # since re-keyed would compare two different findings.
+        served = {f.get("issue"): f for f in (get(base, f"/api/projects/{name}/report")
+                                              .get("findings") or [])}
         for label, vector in planted.items():
             item = by_issue.get(vector["issue"])
-            if item is None:
-                checks.ok(f"{label} finding reached /fixqueue", False,
+            row = served.get(vector["issue"])
+            if item is None or row is None:
+                checks.ok(f"{label} finding reached /fixqueue and /report", False,
+                          f"in /fixqueue: {item is not None}, in /report: {row is not None}; "
                           f"issues seen: {sorted(by_issue)[:4]}")
                 continue
+            # Every planted finding names a scene (`finding()` always sets
+            # scene_refs), so the stamp is always owed: no guard, no silent skip.
+            checks.ok(f"{label}: an old report is served with its scene key stamped",
+                      bool(row.get("scene_key")),
+                      f"scene_key={row.get('scene_key')!r} — without it the served id "
+                      "would still be the collided pre-scene-key one")
             server_id = item.get("finding_id")
-            client_id = page.evaluate("(f) => computeFindingId(f)", vector)
+            client_id = page.evaluate("(f) => computeFindingId(f)", row)
             checks.ok(f"{label}: server and client publish the same id",
                       server_id == client_id,
                       f"server={server_id} client={client_id}")
+            checks.ok(f"{label}: the /fixqueue row carries the same scene key",
+                      item.get("scene_key") == row.get("scene_key"),
+                      f"queue={item.get('scene_key')!r} report={row.get('scene_key')!r}")
 
         # ---- 3. the round trip: the client's key is the server's key ------
         # The client marks a finding by POSTing the id IT computed. The server
         # must then be able to read that mark back using the id IT computes —
         # which only holds if the two agree.
-        emoji_finding = planted["emoji"]
+        emoji_finding = served.get(EMOJI_ISSUE) or planted["emoji"]
         client_id = page.evaluate("(f) => computeFindingId(f)", emoji_finding)
         post(base, f"/api/projects/{name}/findings/intent",
              {"finding_id": client_id, "intent": "deferred"})

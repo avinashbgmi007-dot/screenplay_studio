@@ -38,7 +38,8 @@ const state = {
   // destroyed trust in every number. Show the ledger whole; the writer narrows
   // with the chips. Page ink stays naturally sparse because a finding can only
   // ink when it carries a quote (most findings are no_quote).
-  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, category: null, scene: null },
+  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, showAddressed: false, category: null, scene: null },
+  ambiguousMarks: {},     // marks the scene-key upgrade could not carry (one id, several findings)
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
@@ -4179,6 +4180,9 @@ async function loadScriptData() {
   state.findingStatus = statusById;
   // writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride /edits
   state.findingMarks = (edits && edits.finding_intents) || {};
+  // marks the scene-key upgrade could not carry (one stored id, several
+  // findings): read here, shown once in the worklist, never applied silently
+  state.ambiguousMarks = (edits && edits.ambiguous_marks) || {};
   const lp = (edits && edits.last_pass) || null;
   const arrived = !!(lp && lp.computed_at && state.lastPassKey !== lp.computed_at);
   state.lastPass = lp;
@@ -4359,6 +4363,21 @@ function renderFixQueuePanel(container) {
     actions.appendChild(locateBtn);
     actions.appendChild(rewriteBtn);
     actions.appendChild(discussBtn);
+    // D2-a undo: a row the writer marked addressed stays in this queue as
+    // `.done` — so this is the one place an addressed finding is ALWAYS on
+    // screen, and the only place the mark can be cleared without first asking
+    // to see addressed findings at all. Before it, the row read "done" with no
+    // verb that could un-say it: the mark survived, the control did not.
+    if (disp === "addressed" && fi != null) {
+      const fid = (state.findingIds && state.findingIds[fi]) || null;
+      if (fid) {
+        const reopenBtn = el("button", "fq-reopen", "Reopen");
+        reopenBtn.type = "button";
+        reopenBtn.title = "Clear your addressed mark — this finding returns to the worklist";
+        reopenBtn.addEventListener("click", () => setFindingIntent(fid, null));
+        actions.appendChild(reopenBtn);
+      }
+    }
     actions.appendChild(triageBtn);
     body.appendChild(actions);
     row.appendChild(sev);
@@ -6231,6 +6250,13 @@ function renderTier1Worklist(lens) {
   const arrival = buildArrivalStrip();
   if (arrival) lens.appendChild(arrival);
 
+  // 0b-bis. the upgrade notice (HIGH-1/D2-a): marks held aside because one
+  // stored id covered several findings. Independent of the arrival strip,
+  // which returns null when there is no pass to diff — the notice is about the
+  // writer's marks, not about the analyzer's arithmetic.
+  const heldNotice = buildAmbiguousMarksNotice();
+  if (heldNotice) lens.appendChild(heldNotice);
+
   // -- 0a. the ONE filter row (R5-b + R8): severity toggles drive ink,
   // board list, loop and counts together; category chips count and filter —
   // tap = filtered view, NO regrouping. The loop button engages the
@@ -6534,7 +6560,7 @@ const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: 
 // unless the writer asks for it.
 function findingPassesFilter(f, index) {
   const d = findingDisposition(f, index);
-  if (d === "deferred" ? !state.findingFilter.showDeferred : d !== "open") return false;
+  if (!findingAdmitted(f, index)) return false;
   const sev = (f.severity || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
   if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) return false;
@@ -6575,7 +6601,13 @@ function inkAnchorsFor(findings) {
     const q = (f.evidence_quote || "").trim();
     if (q.length < 2) continue;
     if (!findingPassesFilter(f, index)) continue;
-    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q, sev: (f.severity || "low").toLowerCase() });
+    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q,
+               sev: (f.severity || "low").toLowerCase(),
+               // D2-a: an addressed finding only reaches the page when the
+               // writer asked to see addressed findings — and then it must not
+               // paint like a live complaint. `done` mutes the ink and the
+               // title says whose call it was.
+               done: findingDisposition(f, index) === "addressed" });
   }
   const order = { high: 0, medium: 1, low: 2 };
   out.sort((a, b) => (order[a.sev] - order[b.sev]) || (b.q.length - a.q.length));
@@ -6625,7 +6657,7 @@ function decorateLineWithInk(line, text, anchors) {
   line.textContent = "";
   line.appendChild(document.createTextNode(text.slice(0, idx)));
   const mark = document.createElement("mark");
-  mark.className = "finding-ink ink-" + first.sev;
+  mark.className = "finding-ink ink-" + first.sev + (first.done ? " ink-done" : "");
   mark.dataset.findingId = first.id;
   mark.setAttribute("aria-hidden", "true"); // the margin pins + board carry semantics
   mark.title = (first.f.issue || "").slice(0, 140);
@@ -6879,6 +6911,49 @@ function buildArrivalStrip() {
   return strip;
 }
 
+/** The one-time upgrade notice: marks that could not be moved onto the ids
+ *  findings use now, because ONE stored id covered several findings (HIGH-1's
+ *  collision). The desk refuses to guess — applying one mark to nine findings
+ *  is the overclaim the mark store exists to prevent — so it says what it did
+ *  and where the marks are. Muted, not red: nothing was lost, and this is the
+ *  writer's judgment being preserved, not an error. Dismissible, remembered per
+ *  project (the writer closed it; it was not hidden from them). */
+function buildAmbiguousMarksNotice() {
+  const held = Object.values(state.ambiguousMarks || {}).filter(Boolean);
+  if (!held.length) return null;
+  const key = "ambiguous_notice_dismissed_" + (state.currentProject || "");
+  if (loadPrefs()[key]) return null;
+  const covered = held.reduce((n, h) => n + ((h.candidates || []).length || 0), 0);
+  const note = el("div", "dock-notice dock-ambiguous-notice");
+  const line = el("p", "dock-lens-hint",
+    held.length === 1
+      ? `One of your marks covers ${covered} findings, so it was held aside instead of applied.`
+      : `${held.length} of your marks cover several findings each, so they were held aside instead of applied.`);
+  line.title = "Made before findings carried their scene, a single mark stood for several findings at "
+    + "once. Applying it to any one of them would claim a judgment you did not make. Nothing was deleted — "
+    + "they are kept beside your project in finding_marks.ambiguous.json. Reopen a finding and mark it again "
+    + "to say which you meant.";
+  note.appendChild(line);
+  const det = el("details", "dock-ghosted");
+  det.appendChild(el("summary", "dock-ghosted-summary", "which marks, and what they covered"));
+  for (const h of held) {
+    const r = el("div", "dock-ghosted-row");
+    r.appendChild(el("span", "dock-ghosted-issue", String(h.issue || "finding").slice(0, 110)));
+    r.appendChild(el("span", "dock-ghosted-intent",
+      (h.intent === "addressed" ? "was marked addressed" : "was next pass")
+      + " · covered " + ((h.candidates || []).length || 0) + " findings"
+      + (h.scene_refs && h.scene_refs.length ? " · first at scene " + h.scene_refs[0] : "")));
+    det.appendChild(r);
+  }
+  note.appendChild(det);
+  const close = el("button", "dock-notice-close", "Got it");
+  close.type = "button";
+  close.title = "Hide this notice (your marks are unaffected)";
+  close.addEventListener("click", () => { savePrefs({ [key]: 1 }); note.remove(); });
+  note.appendChild(close);
+  return note;
+}
+
 // P2.14 (spec §3): the report has always carried the facts about itself the desk
 // dropped — which model wrote it, which passes errored, what the coverage pass
 // liked. Each builder below returns null when the report has nothing to say, so a
@@ -7091,6 +7166,22 @@ function findingDisposition(f, index) {
 function findingOpen(f, index) {
   return findingDisposition(f, index) === "open";
 }
+/** The disclosure half of the ONE filter: which dispositions the writer has
+ *  asked to see at all — open always, deferred behind its chip, addressed
+ *  behind its own (D2-a). Before D2-a, `addressed` fell through to the else
+ *  branch, so the card carrying the ✓ that clears a mark was filtered out by
+ *  the mark itself: marking a finding was a one-way door (HIGH-2a). Deferred
+ *  had a chip from the start; addressed was simply missing one.
+ *
+ *  Severity/category/scene stay out of this predicate so the category chips can
+ *  count over the SAME admission rule they apply when tapped — one count, one
+ *  meaning (N3, and the defect family HIGH-2b names). */
+function findingAdmitted(f, index) {
+  const d = findingDisposition(f, index);
+  return d === "open"
+    || (d === "deferred" && !!state.findingFilter.showDeferred)
+    || (d === "addressed" && !!state.findingFilter.showAddressed);
+}
 /** The ONE filter predicate (severity + category + scene). The mass strip and
  *  the fix queue both read it, so the two scopes can never drift apart.
  *  Fix-queue items carry the same three fields (/fixqueue's allowlist includes
@@ -7219,11 +7310,16 @@ function buildFindingFilterRow() {
       rerender();
     }));
   }
-  // category count-chips: counts over open findings (severity-agnostic),
-  // tap filters the board list + ink to that category, tap again clears
+  // category count-chips: counts over the findings this row ADMITS
+  // (severity-agnostic), tap filters the board list + ink to that category,
+  // tap again clears. D2-a widened the basis from "open only" to the same
+  // admission rule the list uses: with a chip pressed that shows addressed or
+  // parked rows, a "Dialogue 9" that counted only open ones would sit over a
+  // list of fifteen — one count, two meanings, which is the defect family
+  // HIGH-2b names. The count now always describes the rows its own tap shows.
   const catCounts = {};
   (state.findings || []).forEach((f, index) => {
-    if (findingDisposition(f, index) !== "open") return;
+    if (!findingAdmitted(f, index)) return;
     const c = f.category || "other";
     catCounts[c] = (catCounts[c] || 0) + 1;
   });
@@ -7238,6 +7334,21 @@ function buildFindingFilterRow() {
     state.findingFilter.showDeferred = !dp;
     rerender();
   }));
+  // D2-a: the marked findings' own way back onto the board. Deferred had this
+  // chip from the start; addressed had nothing, so the one control that shows
+  // WHICH mark a finding carries — and that clears it — disappeared with the
+  // mark. The count rides the label (N3: a label always prints the scope of
+  // the number it carries) and the basis is findingAdmitted, the same rule the
+  // list reads, so the chip cannot promise rows the board will not paint.
+  const da = state.findingFilter.showAddressed;
+  const addressedCount = (state.findings || []).filter((f, i) => findingDisposition(f, i) === "addressed").length;
+  row.appendChild(mk(`Addressed ${addressedCount}`, da,
+    da ? "Your addressed findings are shown — press ✓ again on a card to reopen it"
+       : "Show the findings you marked addressed (your marks stay; this only shows them)",
+    () => {
+      state.findingFilter.showAddressed = !da;
+      rerender();
+    }));
   // P1.7 — the scene as a FILTER DIMENSION (spec §5): one chip over the same
   // ONE filter state the severity/category chips write. Its label ALWAYS prints
   // the scope of the count it carries (the N3 counting contract), and it is

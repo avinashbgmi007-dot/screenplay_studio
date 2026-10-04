@@ -126,12 +126,41 @@ const ID_VECTORS = [
   ["emoji in issue", { category: "theme", issue: "the theme 😀 is thin" }, "fyvgmwq"],
   ["astral in issue", { category: "voice", issue: "astral probe 𝕏 in the quote" }, "f9vdpym"],
   ["zwj family emoji", { category: "voice", evidence_quote: "the family 👨‍👩‍👧‍👦 arrives" }, "f1ky8xej"],
+  // HIGH-1: the scene key rides the same key, and the two languages read the
+  // SAME stamped field — neither derives a slug of its own, which is the only
+  // reason a stamped value can be trusted to match across the wire.
+  ["scene key", { category: "dialogue", issue: "same words", scene_refs: [4],
+                  scene_key: "INT SIDDHUS HOUSE CONTINUOUS" }, "f135knc6"],
+  ["scene key, second occurrence", { category: "dialogue", issue: "same words", scene_refs: [22],
+                                     scene_key: "INT SIDDHUS HOUSE CONTINUOUS#2" }, "fl212sb"],
+  ["empty scene key == no scene key", { category: "dialogue", issue: "same words",
+                                        scene_key: "" }, "fkbquzn"],
+  // The slug keep-list runs to U+10FFFF (scenekey.py): an astral character in a
+  // heading survives into the key, and the browser must hash it by code point
+  // exactly as it does for a quote — the class the CHANGELOG's "ids agree across
+  // the boundary" entry already paid for once. Expected value from the Python twin.
+  ["scene key, non-BMP", { category: "dialogue", issue: "same words", scene_refs: [5],
+                           scene_key: "INT \u{1F3E0} DAY" }, "fvhld5h"],
 ];
 
 test("computeFindingId: matches the Python twin on every vector", () => {
   for (const [label, finding, expected] of ID_VECTORS) {
     assert.strictEqual(computeFindingId(finding), expected, `${label} diverged`);
   }
+});
+
+test("computeFindingId: a scene key is what separates two identical findings", () => {
+  // The HIGH-1 shape in miniature: same words, two places.
+  const atFour = computeFindingId({ category: "dialogue", issue: "same words",
+                                    scene_key: "INT HOUSE DAY" });
+  const atSix = computeFindingId({ category: "dialogue", issue: "same words",
+                                   scene_key: "INT HOUSE NIGHT" });
+  const unscened = computeFindingId({ category: "dialogue", issue: "same words" });
+  assert.notStrictEqual(atFour, atSix);
+  assert.notStrictEqual(atFour, unscened);
+  // absent and empty are the same key: both mean "no scene component"
+  assert.strictEqual(unscened, computeFindingId({ category: "dialogue", issue: "same words",
+                                                   scene_key: "" }));
 });
 
 test("_strHash: folds ONE code point per character, not two code units", () => {

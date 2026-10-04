@@ -393,6 +393,13 @@ def render_markdown(result: AnalysisResult) -> str:
 
 def to_findings_json(result: AnalysisResult) -> dict:
     """Machine-readable version for Piece 3 to load and reference by scene/finding."""
+    # HIGH-1: every finding carries the slugline key of its scene, because the
+    # writer's marks are keyed by the finding's content-hash id and content
+    # alone collided (9 of 16 rows on Pain_3 shared one id). Stamped here, at
+    # the one place a report is written, so the artifact is self-describing:
+    # the desk, the fix queue and the client all read the same field instead of
+    # each re-deriving a scene key (screenplay_parser/scenekey.py).
+    from screenplay_parser.scenekey import scene_key_map, stamp_scene_keys
     return {
         "title": result.doc.title,
         "source_filename": result.doc.source_filename,
@@ -403,7 +410,7 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "setup_payoff": result.setup_payoff,
         "character_dials": result.character_dials,
         "pacing": result.pacing,
-        "findings": result.findings,
+        "findings": stamp_scene_keys(result.findings, scene_key_map(result.doc)),
         "formatting_findings": result.formatting_findings,
         "stats": result.stats,
         # Counts by verification status plus the derived quote-verified rate

@@ -948,6 +948,12 @@ def _load_report_sanitized(m: ProjectManifest) -> dict:
     if not isinstance(report, dict):
         raise StoreUnreadable(m.report_findings_path,
                               f"expected a JSON object, found {type(report).__name__}")
+    # Scene keys ride the same serve-time pass as the sanitizer (revision.py
+    # says why): a report written before the field existed serves the ids a
+    # fresh analysis would produce, so the client's keys and the server's
+    # marks cannot land in two different id spaces after an upgrade.
+    from .revision import annotate_report_scene_keys
+    report = annotate_report_scene_keys(m, report)
     return _sanitize_report(report)
 
 
@@ -1883,7 +1889,8 @@ def get_edits(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    from .revision import edits_log, finding_statuses, redo_stack, finding_intents, last_pass_snapshot
+    from .revision import (edits_log, finding_statuses, redo_stack, finding_intents,
+                           last_pass_snapshot, ambiguous_marks)
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
     # writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride the same
     # fetch the client already makes on every script load — no second path
@@ -1894,7 +1901,11 @@ def get_edits(name):
     except (OSError, ValueError):
         lp = None  # unreadable snapshot must never break the edits fetch
     return jsonify({"edits": edits_log(m), "findings_status": statuses, "can_undo": bool(edits_log(m)), "can_redo": bool(redo_stack(m)),
-                    "finding_intents": intents, "last_pass": lp})
+                    "finding_intents": intents, "last_pass": lp,
+                    # marks the upgrade could not carry (one stored id, several
+                    # findings). Read, never applied — the desk says so instead
+                    # of guessing which finding the writer meant.
+                    "ambiguous_marks": ambiguous_marks(m)})
 
 
 def _strip_rewrite_noise(line: str) -> str:
@@ -2386,6 +2397,9 @@ def _fixqueue_items(m):
         items.append({
             "index": idx,
             "finding_id": compute_finding_id(f),
+            # the id's scene component, carried on the row so a consumer can
+            # recompute the same id without re-reading the report
+            "scene_key": f.get("scene_key"),
             "category": f.get("category"),
             "severity": f.get("severity"),
             "issue": f.get("issue"),
