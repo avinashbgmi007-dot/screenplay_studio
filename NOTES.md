@@ -4162,3 +4162,23 @@ browser job's to run on the PR.
   model degenerates after one apply.
 * A project analysed on the previous build shows no pass line for one generation when its
   snapshot spanned a collision.
+
+## Ink Layer: the decision, the prototype, and what is (not) in the live app (2026-10-04)
+
+Recorded because three merged PRs — #6 (the prototype and its design docs), #7 (the stale-proposal contract) and #8 (scene-aware ids,
+reversible marks) — never got a NOTES entry, and the decision behind them lived only outside the repo.
+`docs/design/ink-layer/DECISION_RECORD.md` is the reference; this entry is the pointer and the state.
+
+**Where it stands.** The Ink Layer is agreed as the architecture for the manuscript room's critique loop. It exists as a prototype at
+`/preview-ink-layer/index.html` (`webapp/preview-ink-layer/`), a separate document that nothing in the live app links to. The live SPA at `/`
+is unchanged in architecture: scene rail, manuscript, docked Context panel. #7's contract (a stale proposal is refused whole:
+`400 {error, stale: true}`) is live in the backend and in the rewrite loop. #8's id and marks changes are live in the old UI only — the
+prototype has no mark / unmark / defer control.
+
+**Open decisions (owner).** *Scope* — the decision covers one loop; the dock's other lenses, the selection floats and the rest of the master
+plan's 18 surface rows have no design. *Visual language* — Nocta, Midnight Desk (shipped, frozen as Tungsten) or the prototype's Detent.
+*Navigation* between the Ink surface and the desk. *Mark / unmark / defer* in the prototype.
+
+**Not claimed.** The prototype's pure suite is 62/62 (Node 20) but is not a CI gate; its DOM suite needs `jsdom` and was not run.
+Its real-script pass used the demo model, and so did every measurement behind D1 and D2-a; a real-model run is still owed
+(`DECISION_RECORD.md` §8).

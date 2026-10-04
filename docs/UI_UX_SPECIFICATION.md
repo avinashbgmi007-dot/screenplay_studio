@@ -412,6 +412,11 @@ historical name — plus the `style.css` NOCTA section and the `tungsten.css` ov
 
 ### 4.9 GO 2 evidence surfaces (the writer's loop + the fold)
 
+> **Direction (2026-10-04).** This section describes the *shipped* critique loop: critique cards in the dock, ink marks on the page, a
+> keyboard loop. The agreed direction for the manuscript room's critique loop is the Ink Layer — a single-surface design that exists as a
+> prototype (`webapp/preview-ink-layer/`) and has **not** replaced this section. Nothing below is superseded until it does; the decision,
+> its scope and what is still open are in `docs/design/ink-layer/DECISION_RECORD.md`.
+
 Riders on the main workspace (zero new surfaces — the Context Dock's Evidence lens IS the
 board; full rationale in `docs/PHASE_B_FV_FOLD_SPEC.md`):
 
@@ -432,7 +437,11 @@ board; full rationale in `docs/PHASE_B_FV_FOLD_SPEC.md`):
   scene slug (clipboard with execCommand fallback). Esc exits the loop — the dock stays.
 - **Intent buttons** (deep dock cards): ✓ mark-addressed / ⏭ next-pass / ⧉ copy — persisted
   to `finding_marks.json` (id-keyed via GO 1 identity, survives report regeneration);
-  deferred findings dim, leave open counts, and carry a "next pass" chip.
+  deferred findings dim, leave open counts, and carry a "next pass" chip. **A mark is reversible (D2-a):** an addressed finding
+  stays in the fix queue as a done row with a `Reopen` control (it clears the mark through the same `setFindingIntent`); an
+  `Addressed N` chip beside `Next pass` shows the marked cards in the board list (`findingAdmitted` is the one admission rule behind
+  the list and the category counts); a revealed addressed finding inks dashed and muted (`.ink-done`); and a mark the id upgrade could
+  not safely move is held aside and reported once (`.dock-ambiguous-notice`, dismissible per project).
 - **Escalation to Dr. Sushruta** (deep dock cards): 🩺 pins the finding's quote, opens the
   Sushruta lens and seeds the "why was this flagged?" question — one gesture from a card to
   the doctor WITH the finding in hand. The consult turn then rides the quote into the
@@ -700,7 +709,7 @@ dialogue_lines, dialogue_share, first_scene, last_scene, traits, interactions:
 | POST | `/projects/<name>/edits/undo` | — | `{..., findings_status}` |
 | POST | `/projects/<name>/edits/redo` | — | `{..., findings_status}` |
 | POST | `/projects/<name>/edits/reset` | — | `{ok, has_edits}` |
-| POST | `/projects/<name>/findings/intent` | `{finding_id, intent: "addressed"\|"deferred"}` | `{ok}` — the GO 2 intent store (`finding_marks.json`, id-keyed via GO 1 identity; survives regeneration) |
+| POST | `/projects/<name>/findings/intent` | `{finding_id, intent: "addressed"\|"deferred"}` | `{ok}` — the GO 2 intent store (`finding_marks.json`, id-keyed via GO 1 identity; survives regeneration. Since D1 the id also carries the finding's scene slugline key (`scene_key`); marks stored under a pre-scene-key id are carried onto the new id on first read, and a mark that covered several findings is held aside in `finding_marks.ambiguous.json` and reported by `GET /edits` as `ambiguous_marks`) |
 | POST | `/projects/<name>/findings/intent/batch` | `{intents: {finding_id: intent\|null}}` (500 max) | `{ok, applied, failed}` (200 / 207 partial) — N of the single write, same store (Report 2 §6 #3) |
 | GET | `/projects/<name>/export` | `?format=fountain|fdx|txt` | file download |
 | GET | `/projects/<name>/metrics` | — | `{avg_reply_seconds, analysis_seconds, findings_total, findings_fixed, findings_fixed_pct, discussed}` |
@@ -709,7 +718,7 @@ dialogue_lines, dialogue_share, first_scene, last_scene, traits, interactions:
 unknown}}`. `finding_intents` shape: `{<finding_id>: "addressed"\|"deferred"}`. `last_pass`
 shape: `{last_total, still_live, fixed, new, ghosted_marks}` or `null` (honest None on the
 first pass; computed lazily with an mtime guard, one generation back). All `last_pass`
-counts are **distinct finding-id counts**: duplicate ids (same category + quote/issue) are
+counts are **distinct finding-id counts**: duplicate ids (same category + quote/issue + scene key) are
 counted once, so a no-op re-analysis reports `fixed: 0, new: 0`.
 
 ### 9.5 Notes, Stash, premise

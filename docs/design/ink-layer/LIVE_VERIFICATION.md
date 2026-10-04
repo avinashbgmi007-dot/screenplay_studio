@@ -1,5 +1,7 @@
 # Live verification — the audit's claims, observed against a running studio
 
+> A dated record (2026-10-03). The ids quoted below are the ids of that day: since D1 (#8) a finding that points at a scene also carries that scene's slugline in its id, so the same finding now has a different one. See `DECISION_RECORD.md`.
+
 **What was run.** The repo's own demo entrypoint, unmodified:
 
 ```

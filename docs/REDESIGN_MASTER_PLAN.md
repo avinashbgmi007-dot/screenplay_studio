@@ -106,6 +106,8 @@ Warm lamp-lit writing room: `--ink-950` near-black warm canvas, lamp/sev-mid amb
 
 *Doc stance:* the fork is a **taste decision — yours**, made in the design discussion with the prototypes open in a browser. This doc only guarantees all three are executable behind the same gates, because §2's token consolidation happens first either way.
 
+**Update 2026-10-04 — a third vocabulary exists.** The Ink Layer prototype (`webapp/preview-ink-layer/`) carries its own visual system, **Detent** (`detent.css`; its laws are in the file header and summarised in `docs/design/ink-layer/DECISION_RECORD.md` §6). It is neither A nor B. The fork above is still open and still a taste decision; nothing here changes the frozen Tungsten rules (§5) for the shipped shell.
+
 ## 5. Frozen architecture rules (the invariant list)
 
 Carried from NOTES.md; every redesign PR asserts them:

@@ -34,6 +34,8 @@ field is itself evidence about how the earlier answers were reasoned.
 | The SPA's own loop bar is **position → nav → verbs**, with span-level ink anchors and a scene fallback *because cross-line quotes are the known case* | `app.js:6566-6660, 6949-7035` | the strip's order and the loop's mechanics are not inventions of this build — two of them are the product's existing answers |
 | The SPA badges **every** non-`verified` state "unverified"; the report does not | `app.js:4234` vs `report.py:36` | where the two disagree the page follows the report, and says so (Q12) |
 
+> **Update 2026-10-04 (D1, #8).** The `finding_id` row above is the id as first verified. Since D1 the id also carries the scene's slugline when the finding points at a scene: `compute_finding_id` appends `|s:<scene_key>` to what it hashes, the analyzer stamps `scene_key` on every finding (the desk re-stamps older reports on read), and the client only *reads* the stamp. A finding with no scene keeps its old id. The prototype is unaffected — it takes `finding_id` from the server and derives none.
+
 **Which documents were actually stale — the clarification this pass was for.** The instruction to
 read the code rather than the docs was about *drift*, not about distrust: a document may describe an
 older API. Auditing both shows the drift was real, and it was not in the repo's own docs:
