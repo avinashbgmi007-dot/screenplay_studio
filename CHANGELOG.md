@@ -40,6 +40,18 @@ fix — lives in `docs/audit/` (`FIX_TRACKER.md` is the live status table).
 - **Asset cache-busting is derived, not hand-maintained.** Every `?v=` token in
   the served document is rewritten to that asset's content hash, so editing a
   file invalidates its URL with no build step and no human step.
+- **One press no longer settles nine findings.** A finding's id was its category
+  plus its own words, so a finding repeated verbatim at several scenes shared one
+  id: a single ✓ marked all of them addressed (measured: 9 of 16 findings on one
+  id, the header jumping 0 → 9). The id now also names the scene by its slugline —
+  not its number, which renumbers when a scene is inserted. Marks, dismissals and
+  the last-pass snapshot saved under the old ids are carried onto the new ones on
+  first read; a mark that covered several findings is held aside and reported in
+  one line, never spread across them.
+- **A mark can be taken back.** Marking a finding removed the card that carried
+  the ✓ which clears the mark. An `Addressed N` chip beside `Next pass` now
+  brings those findings back, every addressed fix-queue row has a `Reopen`, and a
+  revealed addressed finding inks dashed and muted instead of severity-coloured.
 
 ### Changed
 

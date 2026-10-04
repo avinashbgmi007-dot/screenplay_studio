@@ -4070,3 +4070,95 @@ so the checks are not decorative. Full browser fleet on the final tree
 in `dock_sections` 169 → 176). Both pre-existing reds stayed green: `phase8_lifecycle`
 26 passed, `translate_mic` 22 passed.
 
+## D1 + D2-a: a finding's id names its scene, and a mark can be unmarked (2026-10-04)
+
+**Labels in this change's code comments.** They come from an end-to-end production-readiness
+review of `ceb23ae` (the review report is not in the repo). **HIGH-1** — content alone is not a
+unique key, so identical words at different scenes share one id. **HIGH-2a** — marking a finding
+was a one-way door. **HIGH-2b** — the writer-marked counters (`done_count`, the dawn meter, the
+header) and the observation counters (`by_status`, `/metrics`) are never reconciled — *not fixed
+here*. **D1** — the scene component of the id. **D2-a** — reversible marks. **D2-b** — the
+headline shown with its evidence line beneath it — *not built*.
+
+**Measured on `ceb23ae`** (demo model, `Pain_3_updated_FULL`). 16 findings hashed to 8 ids;
+`f17erkpi` carried 9 findings at scenes 1, 4, 6, 8, 11, 13, 15, 17, 20, and one press of ✓ moved
+`done_count` 0 → 9. Separately, marking a finding removed the card that carries the ✓ which
+clears the mark: with every id marked the dock rendered 17 notes, 16 fix rows and **0** intent
+buttons, and nothing in the SPA could ask for addressed findings back.
+
+**Relation to rung 20 (above) — read this before touching the id.** Rung 20 recorded that a
+shared id "is what evidence-keyed identity costs", kept the scene NUMBER out of the id
+(`test_id_survives_scene_insert_shift`, still green), and listed the quote-keyed collision as open
+pending an alias step for the real projects. This change keeps that rule: the tie-breaker is the
+scene's SLUGLINE (`screenplay_parser/scenekey.py`), never `scene_refs`, so an inserted scene moves
+nothing (`test_inserting_a_scene_moves_no_existing_key_and_scene_refs_never_key_the_id`). It is the
+first stage of that alias step — a one-time carry of every id-keyed store. Stage 2, a persistent
+alias for a *reworded* slugline, is **not built**. What it does not change: 20b stands — two notes
+about the same line, in the same scene, under one category still share an id, and
+`sharedMarkSiblings` still names them.
+
+**The id.** `category | quote-or-issue | scene_key`. The scene component is appended only when
+`scene_key` is non-empty, so a finding with no scene (script-level, or a heading that slugs empty)
+keeps its previous id byte for byte (pinned). The slug is derived in Python only: the analyzer
+stamps it, `_load_report_sanitized` / `finding_statuses` / `last_pass_snapshot` re-stamp older
+reports on read from the parse-of-record, and `core.js` reads the stamp and derives nothing. The
+first occurrence of a repeated slug keeps the bare slug; later ones take `#2`, `#3`. **The price:**
+rewording a slugline moves that scene's ids, and inserting a scene that repeats an existing
+slugline renumbers that slug's later occurrences. The slug rule itself is inside every stored id —
+changing it needs a migration.
+
+**The upgrade.** `legacy_id_candidates` is the one map; marks, dismissals and the last-pass
+snapshot all read it. One stored id → one finding: rewritten under the new id, same intent. One
+stored id → several findings, *including one that kept the legacy id*: a mark is **held aside** in
+`finding_marks.ambiguous.json` and reported in one dismissible line — never spread, never applied
+to a guess. A dismissal keeps its legacy id and its own (index, issue) pair. A snapshot that cannot
+be resolved row-for-row is dropped, so the pass line is absent for one generation instead of
+printing a fabricated "9 fixed / 9 new". No finding → left as stored (the ghosted-marks channel
+explains it). Unreadable report → nothing is touched. Measured on the writer's real collided store
+(8 legacy ids): 6 carried 1:1, 1 script-level id left as it was, 1 held aside (`covered: 9`);
+replayed through a live desk after the amend with byte-identical results, and a second read
+changes nothing.
+
+**D2-a.** `findingAdmitted` is the one rule for which dispositions the writer asked to see (open
+always, deferred behind `showDeferred`, addressed behind `showAddressed`); `findingPassesFilter`
+and the category counts both read it. New: the `Addressed N` chip beside `Next pass`, `Reopen` on
+every addressed fix-queue row, `.ink-done` (dashed, muted, never severity-coloured) for a revealed
+addressed finding, and the held-aside notice. The dock is still a worklist of *unmarked* findings
+by design — a marked finding leaving it is not a bug; what was missing was the way back.
+
+**Caught before the first push — three defects in this change's own first draft.** (1) The slug's
+keep-list stopped at U+FFFF, so most emoji were dropped: an emoji-only heading slugged to `""`, and
+two headings that differed only by an emoji shared a slug, contradicting the module's own comment.
+Widened to U+10FFFF — this rule is inside every stored id, so it had to be right before release.
+(2) `legacy_id_candidates` skipped findings whose id did not change, so a mark shared by a
+scene-keyed finding and a script-level one with the same words was carried onto the first and
+silently taken from the second. Both are now candidates and the mark is held aside. (3) The
+parity suite grew two `if`-without-`else` guards around a `check`, which took
+`test_browser_check_hygiene`'s ratchet from 23 to 25; one of them could never be false (every
+planted finding names a scene). The guards are gone and the ratchet's ceiling is untouched. (1)
+and (2) each have a test that fails on the previous code.
+
+**Gate.** `python -m pytest` → **2000 passed, 4 skipped**, 0 failed. `tests/test_finding_id_scene_key.py`
+12 passed; the emoji test and the shared-with-a-keyless-finding test fail on the previous code
+(`'INT DAY' == 'INT 🏠 DAY'`; `['flxi06k'] == ['f17erkpi', 'flxi06k']`), and the insertion test
+pins behaviour that already held. `node --test tests/js/` → 17 passed; the new non-BMP vector
+fails when its expected id is altered. Browser, headless Chromium 153.0.8010.12:
+`finding_id_parity` 12 passed (26 vectors agree across JS and Python), `counting_contract` 20,
+`one_matcher` 19, `identity_forensics` 1, `dock_sections` 176. `ruff==0.16.8 check .` clean.
+The full browser fleet (`python tests/run_browser_suites.py`) is not claimed here: it is the CI
+browser job's to run on the PR.
+
+**Still open.**
+* **HIGH-2b**: the two counter families are not reconciled. `/metrics` is a snapshot written only
+  by analysis (`record_findings`) and is served without an "as of last analysis" stamp. D2-b would
+  show the writer's number with the evidential line beneath it.
+* **Alias stage 2** (a persistent alias for a reworded slugline). **The fix-loop surface** (the
+  keyboard loop's own intent controls) was not examined; D2-a's scope may still narrow there.
+* Unfixed from the same review, measured on `ceb23ae` and not re-checked since (detail lives in
+  the review report, which is not in the repo): MEDIUM-3 `openFeedbackView()` forces
+  `setRoom("cowrite")`, so the tab's `aria-selected` never moves and there is no arrow-key
+  navigation; MEDIUM-4 copy overclaims; MEDIUM-5 `model_id` is erased by analyse; LOW-6 a method
+  mismatch answers an HTML 404; LOW-7 `/report` items carry `finding_id: null`; LOW-8 the demo
+  model degenerates after one apply.
+* A project analysed on the previous build shows no pass line for one generation when its
+  snapshot spanned a collision.

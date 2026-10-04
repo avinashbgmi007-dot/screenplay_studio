@@ -30,9 +30,10 @@ from difflib import SequenceMatcher
 
 from screenplay_parser import quotematch
 from screenplay_parser.models import ScriptDocument
+from screenplay_parser.scenekey import scene_key_map, stamp_scene_keys
 
 
-# ---------- content-hash finding identity (R1 refined) ----------
+# ---------- content-hash finding identity (R1 refined + HIGH-1 scene key) ----
 # A finding's identity is its content, not its position in the report array.
 # Key = category + evidence_quote (the quote is verified against script text,
 # so it is the stable anchor); scene_refs ride as DATA — they renumber when
@@ -41,8 +42,22 @@ from screenplay_parser.models import ScriptDocument
 # the id. Reasoning-only findings (no quote) key on category + normalized
 # issue text (documented weak tier: drift re-classifies honestly on the
 # next pass).
-# The JS twin lives in webapp/app.js (computeFindingId + _strHash) — the
-# server observes, the client displays; both MUST produce the same id.
+#
+# HIGH-1 (NOTES.md "D1 + D2-a"): content alone was not unique. The
+# demo dialogue finding repeats its issue verbatim at nine scenes, so 9 of 16
+# findings hashed to ONE id — one mark counted nine findings addressed, and
+# nine rows left the worklist together. The tie-breaker is the scene the
+# finding points at, named by its SLUGLINE (`scene_key`, stamped into the
+# report by the analyzer; `screenplay_parser/scenekey.py` derives it and says
+# what it costs). Scene_refs still never key the id: ordinals renumber on
+# insert, which is exactly what a mark must survive. A finding with no scene
+# (script-level, or a heading that slugs empty) carries no scene component and
+# keeps its pre-scene-key id — including its pre-scene-key collision, which is
+# the honest reading of two findings that say identical words about no place.
+#
+# The JS twin lives in webapp/core.js (computeFindingId + _strHash) — the
+# server observes, the client displays; both MUST produce the same id, and
+# both read the SAME stamped `scene_key` rather than deriving their own.
 _BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
@@ -69,7 +84,51 @@ def compute_finding_id(f: dict) -> str:
         norm = quote
     else:
         norm = "issue:" + " ".join((f.get("issue") or "").lower().split())[:100]
+    # the scene the finding points at, by slugline — the tie-breaker that stops
+    # two findings which say the same words about different places from sharing
+    # one id (see the header comment; "" = no scene component, unchanged id)
+    scene = (f.get("scene_key") or "").strip()
+    if scene:
+        norm += "|s:" + scene
     return "f" + _base36(_str_hash((f.get("category") or "other") + "|" + norm))
+
+
+def annotate_report_scene_keys(m, report: dict) -> dict:
+    """Stamp `scene_key` onto a stored report's findings, derived from the
+    parse-of-record.
+
+    Reports written before scene keys existed carry no `scene_key`, so every id
+    computed from them would keep the collision the key exists to fix. This
+    stamps them on READ — the same serve-time pattern `_sanitize_report` uses —
+    so an old project serves the ids a fresh analysis would produce, with no
+    re-analysis and, crucially, no second id space: `/report`, `/findings`,
+    `/fixqueue`, `finding_statuses` and `last_pass_snapshot` all read the
+    report through this function, and the client computes its ids from the
+    `/report` this returns.
+
+    The parse-of-record (not the working copy) is the anchor: the report is
+    about the analyzed text, so a heading the writer edits later must not move
+    an id until the next analysis re-derives it. An unreadable parse leaves the
+    report EXACTLY as stored — a missing file must never re-key anything.
+    """
+    if not isinstance(report, dict):
+        return report
+    findings = report.get("findings")
+    if not isinstance(findings, list):
+        return report
+    # Nothing scene-referenced is missing a key: no work, and no parse load.
+    if not any(isinstance(f, dict) and (f.get("scene_refs") or []) and not f.get("scene_key")
+               for f in findings):
+        return report
+    doc = _load_baseline_doc(m)
+    if doc is None:
+        return report
+    stamped = stamp_scene_keys(findings, scene_key_map(doc))
+    if all(a is b for a, b in zip(stamped, findings)) and len(stamped) == len(findings):
+        return report  # a scene whose heading slugs empty: stamped "" and unchanged
+    out = dict(report)
+    out["findings"] = stamped
+    return out
 
 
 def dismissed_finding_ids(m) -> set:
@@ -79,14 +138,51 @@ def dismissed_finding_ids(m) -> set:
     Missing -> empty set; DAMAGED -> StoreUnreadable. The lenient version read a
     torn triage file as "nothing dismissed", so every finding the writer had
     cleared came back, and the next dismiss overwrote the damaged file.
+
+    Ids stored before the scene key are carried onto the current ids first, the
+    same way marks are (see `_migrate_legacy_marks`): the entry's own
+    (index, issue) fallback keeps a dismissal *visible* either way, but an
+    id-keyed read that could not resolve would make Restore quietly do
+    nothing — the one dismissal failure that loses the writer's intent.
     """
     from .jsonio import StoreUnreadable, load_json_store
     path = dismissed_path(m)
     data = load_json_store(path, default=[])
     if not isinstance(data, list):
         raise StoreUnreadable(path, f"expected a list, found {type(data).__name__}")
+    data = _migrate_legacy_dismissals(m, data)
     return {d["finding_id"] for d in data
             if isinstance(d, dict) and d.get("finding_id")}
+
+
+def _migrate_legacy_dismissals(m, data: list) -> list:
+    """Dismissal entries with their `finding_id` carried onto the current id.
+
+    Same policy as marks, tightened for a shape that always carries its own
+    (index, issue) fallback: a 1:1 legacy id is rewritten; an ambiguous one
+    (one id, N findings — the collision) keeps its legacy id AND its (index,
+    issue) pair, which is enough for every reader to resolve it without
+    guessing. Nothing is dropped and nothing is spread.
+    """
+    if not any(isinstance(d, dict) and d.get("finding_id") for d in data):
+        return data
+    remap, _ = legacy_id_candidates(m)
+    if not remap:
+        return data
+    out, changed = [], False
+    for d in data:
+        if isinstance(d, dict) and d.get("finding_id") in remap:
+            cands = remap[d["finding_id"]]
+            if len(cands) == 1:
+                d = {**d, "finding_id": cands[0]}
+                changed = True
+        out.append(d)
+    if not changed:
+        return data
+    from .jsonio import atomic_write_json, lock_for
+    with lock_for(dismissed_path(m)):
+        atomic_write_json(dismissed_path(m), out)
+    return out
 
 
 # ---------- writer intent (R2-b mark-addressed + R3 defer) ----------
@@ -97,19 +193,149 @@ def finding_marks_path(m) -> str:
     return os.path.join(m.project_dir, "finding_marks.json")
 
 
+def ambiguous_marks_path(m) -> str:
+    return os.path.join(m.project_dir, "finding_marks.ambiguous.json")
+
+
+def ambiguous_marks(m) -> dict:
+    """Marks held aside by the scene-key migration: {old_id: {intent,
+    candidates, issue, scene_refs, ...}}. Missing -> {}; damaged -> {} (the
+    notice is information, and an unreadable notice must never take the marks
+    fetch down with it — the marks themselves are the store that must stay
+    strict)."""
+    from .jsonio import load_json_store
+    try:
+        data = load_json_store(ambiguous_marks_path(m), default={})
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def legacy_id_candidates(m, report: dict | None = None) -> tuple:
+    """{legacy_id: [current ids]} and {legacy_id: {issue, scene_refs}} for every
+    legacy id that at least one finding in the report has moved off.
+
+    `legacy` is the id a build before the scene key computed (no scene
+    component); `current` is the id this build computes. Every store keyed by a
+    finding id (marks, dismissals, the last-pass snapshot) reads this one map,
+    so an upgrade carries them all onto the same ids in one step — the
+    alternative, three stores each migrating on its own schedule, is three id
+    spaces and a mark that matches in one surface and not another.
+
+    The candidate list is EVERY distinct current id among the findings that
+    carried that legacy id — including a finding that kept it (a script-level
+    finding, or one whose heading slugs empty, has no scene to name). A stored
+    mark under the legacy id covered all of them; counting only the findings
+    that moved would hand the mark to one of two and silently take it from the
+    other, which is a guess about what the writer meant.
+
+    An unreadable report returns ({}, {}): callers must then leave every store
+    exactly as it is. A failed migration may leave old ids in place; it may
+    never delete a writer's judgment.
+    """
+    if report is None:
+        try:
+            with open(m.report_findings_path, "r", encoding="utf-8") as f:
+                report = json.load(f)
+        except (OSError, ValueError):
+            return {}, {}
+    report = annotate_report_scene_keys(m, report)
+    by_legacy: dict = {}
+    moved: dict = {}
+    for f in report.get("findings") or []:
+        if not isinstance(f, dict):
+            continue
+        current = compute_finding_id(f)
+        legacy = compute_finding_id({**f, "scene_key": ""})
+        cands = by_legacy.setdefault(legacy, [])
+        if current not in cands:
+            cands.append(current)
+        if current != legacy:
+            moved.setdefault(legacy, {"issue": f.get("issue"), "scene_refs": f.get("scene_refs")})
+    return {old: by_legacy[old] for old in moved}, moved
+
+
+def _migrate_legacy_marks(m, data: dict) -> dict:
+    """Carry marks made before the id learned about scenes onto the ids this
+    build computes. One-time, idempotent, and never lossy or over-claiming.
+
+    For every finding in the report: `legacy` = its id computed WITHOUT the
+    scene component (what an older build stored), `current` = the id this build
+    computes. A stored mark under `legacy` is:
+
+      * exactly one candidate  -> rewritten under `current`, same intent.
+        Lossless: one finding, one mark, no judgment invented.
+      * several candidates     -> held aside in `finding_marks.ambiguous.json`
+        (with the issue text and the candidates) and removed from the active
+        store. This is the collision itself: ONE mark, N findings — including
+        the case where one of the N kept the legacy id because it has no scene
+        to name. Spreading it would claim N findings done on the strength of
+        one press — the exact overclaim the mark store exists to avoid (the
+        review's HIGH-2b: counters that disagree) — and applying it to a
+        guessed one would be worse. So the desk declines and says so.
+      * no candidate (the finding left the report) -> left exactly as stored;
+        the ghosted-marks channel already explains those, and a migration is
+        not the place to delete the writer's judgment.
+
+    A missing or unreadable report returns `data` untouched: a failed migration
+    must never be able to destroy a mark.
+    """
+    try:
+        with open(m.report_findings_path, "r", encoding="utf-8") as f:
+            report = json.load(f)
+    except (OSError, ValueError):
+        return data
+    report = annotate_report_scene_keys(m, report)
+    remap, issues = legacy_id_candidates(m, report)
+    if not any(old in data for old in remap):
+        return data  # nothing legacy to carry — the common case, and a no-op
+    out = dict(data)
+    held: dict = {}
+    for old_id, cands in remap.items():
+        if old_id not in out:
+            continue
+        intent = out.pop(old_id)
+        if len(cands) == 1:
+            out[cands[0]] = intent
+        else:
+            held[old_id] = {"intent": intent, "candidates": cands,
+                            "covered": len(cands), "held_at": time.time(),
+                            **(issues.get(old_id) or {})}
+    from .jsonio import atomic_write_json, load_json_store, lock_for
+    with lock_for(finding_marks_path(m)):
+        atomic_write_json(finding_marks_path(m), out)
+        if held:
+            existing = load_json_store(ambiguous_marks_path(m), default={})
+            if not isinstance(existing, dict):
+                existing = {}
+            existing.update(held)
+            atomic_write_json(ambiguous_marks_path(m), existing)
+    return out
+
+
 def finding_intents(m) -> dict:
     """{finding_id: "addressed" | "deferred"} — the writer's intent marks.
 
     Missing -> {} ; damaged -> StoreUnreadable. The lenient version dropped every
     mark the writer had made (they silently reappeared as open findings) and the
     next mark then overwrote the damaged file.
+
+    Marks stored under a pre-scene-key id are carried onto the current id here,
+    on the read every surface already makes (`/edits`), so no writer has to run
+    anything for their own judgment to survive the upgrade.
     """
     from .jsonio import StoreUnreadable, load_json_store
     path = finding_marks_path(m)
     data = load_json_store(path, default={})
     if not isinstance(data, dict):
         raise StoreUnreadable(path, f"expected an object, found {type(data).__name__}")
-    return {k: v for k, v in data.items() if v in ("addressed", "deferred")}
+    data = {k: v for k, v in data.items() if v in ("addressed", "deferred")}
+    try:
+        return _migrate_legacy_marks(m, data)
+    except Exception:
+        # A migration that fails must degrade to the marks as stored — never to
+        # no marks at all. (The strict paths above already raised for damage.)
+        return data
 
 
 def set_finding_intent(m, finding_id: str, intent) -> None:
@@ -222,6 +448,31 @@ def last_pass_snapshot(m):
     snap_sig = snap.get("report_sig") if isinstance(snap, dict) else None
     with open(report_path, "r", encoding="utf-8") as f:
         report = json.load(f)
+    report = annotate_report_scene_keys(m, report)
+    # A snapshot written before the scene key holds pre-scene-key ids. Carry
+    # them forward where the map is unambiguous; where ONE stored id covered
+    # several findings (the collision), the previous pass can no longer be
+    # compared row-for-row — so the snapshot is dropped and the next pass
+    # reports "no previous pass" instead of a fabricated "9 fixed, 9 new"
+    # delta on a script nobody edited. Measured on Pain_3: that delta would
+    # have read as real progress (HIGH-2b's exact failure mode).
+    if isinstance(snap, dict) and isinstance(snap.get("ids"), list):
+        remap, _ = legacy_id_candidates(m, report)
+        if remap and any(gid in remap for gid in snap["ids"]):
+            carried, resolvable = [], True
+            for gid in snap["ids"]:
+                cands = remap.get(gid)
+                if not cands:
+                    carried.append(gid)
+                elif len(cands) == 1:
+                    carried.append(cands[0])
+                else:
+                    resolvable = False
+                    break
+            if resolvable:
+                snap = {**snap, "ids": carried}
+            else:
+                snap = None  # no comparable previous pass — recompute from here
     report_sig = _report_signature(report)
     if snap and snap.get("report_mtime") == rp_mtime and snap_sig == report_sig:
         if isinstance(snap, dict) and snap.get("parsed_sig") is None:
@@ -1028,6 +1279,10 @@ def finding_statuses(m) -> dict:
     except (FileNotFoundError, json.JSONDecodeError):
         return {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
 
+    # the ids below are the client's keys for these rows: same annotation as
+    # every other reader, so a legacy report's statuses cannot land under ids
+    # nothing else computes
+    report = annotate_report_scene_keys(m, report)
     doc = load_working(m)
     # A quote missing from the working copy only proves writer progress if the
     # line was in the script to begin with. Absence alone is not evidence: the
