@@ -156,6 +156,12 @@ class AnalysisResult:
     orchestrator record exactly which categories succeeded so a partial
     analyze (some categories OK, some not) can be resumed category-by-
     category instead of re-running everything."""
+    withdrawals: list[dict] = field(default_factory=list)
+    """Findings the integrity gate removed from the delivered set, each as
+    {index, action, reason, finding} carrying the finding's FULL content — so
+    removing a row from `findings` never loses it. Empty when the gate is off.
+    `findings` + `withdrawals` is always the pre-gate list; that invariant is
+    the "nothing lost" law made checkable (screenplay_analyzer/finding_integrity.py)."""
 
     # Deterministic passes that regenerate on EVERY analyze run and must
     # never be carried forward from a previous report during a merge.
@@ -675,6 +681,16 @@ def evidence_depth(findings) -> dict:
             "unknown": len(findings) - full - over - mixed, "total": len(findings)}
 
 
+def _integrity_gate_enabled() -> bool:
+    """The env kill-switch. `SCREENPLAY_STUDIO_INTEGRITY_GATE=0` stands the gate
+    down without a code change, so a rule that misbehaves on an unseen script
+    can be disabled in the field (this project's env namespace is
+    SCREENPLAY_STUDIO_*)."""
+    import os
+    return os.environ.get("SCREENPLAY_STUDIO_INTEGRITY_GATE", "").strip().lower() \
+        not in ("0", "false", "no", "off")
+
+
 def analyze(
     doc: ScriptDocument,
     client: LlamaServerClient,
@@ -683,6 +699,7 @@ def analyze(
     run_categories: tuple[str, ...] = None,
     progress_cb=None,
     report_language: str = "eng",
+    integrity_gate: bool = True,
 ) -> AnalysisResult:
     """progress_cb: optional callable(dict) called at every stage boundary with
     {"stage": str, "status": "running"|"complete", "detail": str} — lets a UI
@@ -690,7 +707,12 @@ def analyze(
 
     run_categories: None or ("all",) runs every category (ALL_CATEGORIES);
     any other tuple runs exactly those. An empty tuple runs only the
-    deterministic passes (no model calls beyond the mandatory resolve)."""
+    deterministic passes (no model calls beyond the mandatory resolve).
+
+    integrity_gate: run the model-free finding integrity gate as the last pass
+    (removes mechanically false findings, folds same-scene duplicate observations).
+    Removals land in `result.withdrawals`, never in silence. On by default;
+    `SCREENPLAY_STUDIO_INTEGRITY_GATE=0` overrides it to off."""
     run_categories = resolve_categories(run_categories)
     result = AnalysisResult(doc=doc)
 
@@ -1087,6 +1109,34 @@ def analyze(
     # up — in report.md, in the served findings JSON and in the live desk.
     from .dedupe import collapse_exact_duplicates
     result.findings = collapse_exact_duplicates(result.findings)
+
+    # 8d. finding integrity gate — remove the mechanically FALSE findings (a
+    # pass reporting the absence of a defect; a deterministic rule firing on
+    # names that are not the same character) and fold same-scene duplicate
+    # observations the rule-linked dedup above cannot see (it works through
+    # rule edges, not text). Placed after both dedups and
+    # BEFORE the summary and the depth for the same reason they are: every count
+    # below must describe the rows the writer actually receives. Nothing is
+    # dropped in silence — each removal lands in `result.withdrawals` with a
+    # reason and the finding's full content, so `findings` + `withdrawals` is
+    # still the whole list (screenplay_analyzer/finding_integrity.py).
+    if integrity_gate and _integrity_gate_enabled():
+        try:
+            from .finding_integrity import FindingIntegrityGate
+            gate_res = FindingIntegrityGate().run(result.findings)
+            result.findings = gate_res.findings
+            result.withdrawals = gate_res.ledger
+            if not gate_res.accounted_for:
+                # Defensive: the gate's own contract is kept + withdrawn ==
+                # original. If that ever breaks, say so rather than ship a
+                # report whose counts cannot be reconciled.
+                result.errors.append(
+                    "Integrity gate accounting mismatch — withdrawals were kept "
+                    "but the delivered + ledger counts disagree")
+        except Exception as e:
+            # A gate that cannot run must leave the findings exactly as they
+            # were, never guess at what is false — and must never fail the run.
+            result.errors.append(f"Finding integrity gate skipped: {e}")
 
     result.verification = verification_summary(result.findings)
 

@@ -269,6 +269,14 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
     "scene_length_stats": {...}, "scene_estimates": [...], "runtime_minutes": 25.0
   },
   "verification_summary": {"verified": 3, "not_found": 0, "no_quote": 2, "scene_not_found": 0},
+  "withdrawals": [                        // the integrity gate's ledger. Findings the gate REMOVED
+    {                                     //   from the delivered set, kept here so nothing is lost.
+      "index": 7,                         //   `findings` + `withdrawals` is always the pre-gate list
+      "action": "reject",                 //   (the "nothing lost" law, made checkable). Empty when
+      "reason": "reports the ABSENCE …",  //   SCREENPLAY_STUDIO_INTEGRITY_GATE=0. reject = mechanically
+      "finding": { … }                    //   false; merge = folded duplicate. See
+    }                                     //   screenplay_analyzer/finding_integrity.py
+  ],
   "errors": []
 }
 ```
