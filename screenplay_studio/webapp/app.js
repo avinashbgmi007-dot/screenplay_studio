@@ -6542,6 +6542,49 @@ function buildContextSection() {
     lens.appendChild(sec);
   }
 
+  // -- 5b. the withdrawal ledger: what left the delivered set, and why -------
+  // The integrity gate removes MECHANICALLY false findings before they are ever
+  // carded — a pass reporting the ABSENCE of a defect, a duplicate, a
+  // name-variant rule firing on two names that are not one character. The
+  // "nothing lost" law made those removals checkable (findings + withdrawals ==
+  // the pre-gate list) but not VISIBLE: a writer could not see that anything had
+  // been taken out. This is that surface. It is its OWN section, not a line
+  // under the accuracy meter, for one concrete reason: the gate and the coverage
+  // pass are independent, so a report whose coverage pass failed still carries
+  // withdrawals — and a ledger nested inside the coverage section would be
+  // invisible in exactly that case. As a section header the count shows in the
+  // stack even while collapsed. Absent on reports analysed before the gate
+  // existed, so it renders only when the field is present.
+  const wd = (state.report && state.report.withdrawals) || [];
+  if (wd.length) {
+    const nRej = wd.filter((w) => w.action === "reject").length;
+    const nMrg = wd.filter((w) => w.action === "merge").length;
+    const bits = [];
+    if (nRej) bits.push(`${nRej} false`);
+    if (nMrg) bits.push(`${nMrg} duplicate${nMrg === 1 ? "" : "s"}`);
+    const body = el("div", "dock-wd-body");
+    wd.forEach((w) => {
+      const f = w.finding || {};
+      const row = el("div", "dock-wd-row");
+      row.appendChild(el("span", "dock-wd-action",
+        w.action === "merge" ? "duplicate" : "withdrawn"));
+      row.appendChild(el("span", "dock-wd-issue",
+        String(f.issue || "(no text)").slice(0, 180)));
+      row.appendChild(el("span", "dock-wd-reason", String(w.reason || "")));
+      body.appendChild(row);
+    });
+    body.appendChild(el("p", "dock-wd-note",
+      "Nothing was deleted \u2014 every one of these stays beside your project in "
+      + "report.findings.json under \u201cwithdrawals\u201d, with its full text. The "
+      + "analysis accounts for its own removals rather than hiding them."));
+    const wdSec = dockSection("withdrawals",
+      `Withdrawals \u2014 ${wd.length} left the delivered set`
+      + (bits.length ? ` (${bits.join(", ")})` : ""), body);
+    wdSec.title = "The integrity gate removed these because they were mechanically false, "
+      + "not a craft judgement. Nothing was deleted.";
+    lens.appendChild(wdSec);
+  }
+
   // -- 6. Setup / Payoff ------------------------------------------------------
   // The ledger twice: once as a scene spine (promise structure at a glance —
   // setup/payoff markers connected by status-shaped lines), once as the full

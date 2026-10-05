@@ -6375,7 +6375,10 @@ body:not(.idea-mode) .desk {
    suite gates, and three more buttons would re-wrap it. Visually distinct from
    the intent row so the two questions never read as one control. */
 .finding-verdict-row { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; margin:0 0 var(--sp-3); }
-.finding-verdict-label { font-family:var(--font-mono); font-size:var(--fs-3xs); letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
+/* 10px, not the 9px --fs-3xs it first shipped at: a finding card's every
+   painted text layer has a 10px floor (e2e_browser_dock_sections.py measures
+   it), and the label is painted text on the card like any other. */
+.finding-verdict-label { font-family:var(--font-mono); font-size:var(--fs-2xs); letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
 .verdict-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
 .verdict-btn:hover { border-color:var(--accent); color:var(--accent); }
 .verdict-btn.active { border-color:var(--accent); color:var(--accent); font-weight:700; }
@@ -6383,6 +6386,16 @@ body:not(.idea-mode) .desk {
 .dock-accuracy { margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--line); }
 .dock-acc-head { font-size:var(--fs-sm); color:var(--text); margin:0 0 var(--sp-1); }
 .dock-acc-sub { font-size:var(--fs-2xs); color:var(--text-muted); margin:0; line-height:1.5; }
+/* The withdrawal ledger (integrity gate): what left the delivered set, and why.
+   Muted ink, never a severity colour — nothing here is a defect, it is the
+   report accounting for its own removals. The row idiom mirrors .dock-ghosted
+   (a held-aside mark is the same kind of disclosure). */
+.dock-wd-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
+.dock-wd-row:first-child { border-top:0; }
+.dock-wd-action { font-size:var(--fs-3xs); color:var(--text-faint); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+.dock-wd-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
+.dock-wd-reason { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; }
+.dock-wd-note { font-size:var(--fs-3xs); color:var(--text-faint); margin:var(--sp-2) 0 0; }
 @media (prefers-reduced-motion: reduce) {
   .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
 }
