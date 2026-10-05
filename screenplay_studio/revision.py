@@ -357,6 +357,154 @@ def set_finding_intent(m, finding_id: str, intent) -> None:
         atomic_write_json(path, data)
 
 
+# ---------- writer verdict (the truth axis) ----------
+# The intent store records what the writer will DO with a finding (addressed /
+# deferred); nothing recorded whether the finding is TRUE. Until something does,
+# "98.58 % accurate" is unfalsifiable — there is no data from which to compute
+# it. This is ONE new axis, not a redesign: it mirrors finding_marks.json
+# exactly, in its OWN file so a torn verdict store can never cost the writer
+# their intent marks (and vice versa), and it reuses the same three hard-won
+# invariants — the lock spans the READ, the write is atomic, and a damaged store
+# is refused rather than overwritten.
+#
+# The two axes are deliberately separate questions. A writer must be able to say
+# "it's true but I won't act on it": collapsing truth into intent is exactly
+# what produced the ambiguous middle that made the accuracy metric unmeasurable.
+_VERDICTS = ("correct", "partial", "incorrect")
+
+
+def finding_verdicts_path(m) -> str:
+    return os.path.join(m.project_dir, "finding_verdicts.json")
+
+
+def finding_verdicts(m) -> dict:
+    """{finding_id: "correct" | "partial" | "incorrect"} — the writer's judgment
+    on whether a finding is TRUE. Orthogonal to intent (what they will do).
+
+    Missing -> {} ; damaged -> StoreUnreadable. Separate store from marks on
+    purpose: the writer's judgment about truth and their judgment about action
+    must never be able to destroy one another.
+    """
+    from .jsonio import StoreUnreadable, load_json_store
+    path = finding_verdicts_path(m)
+    data = load_json_store(path, default={})
+    if not isinstance(data, dict):
+        raise StoreUnreadable(path, f"expected an object, found {type(data).__name__}")
+    return {k: v for k, v in data.items() if v in _VERDICTS}
+
+
+def set_finding_verdict(m, finding_id: str, verdict) -> None:
+    """Set one finding's truth verdict; `None` (or any non-verdict) clears it.
+
+    The lock spans the READ as well as the write — the same hazard the intent
+    store documents: two verdicts made at once (two tabs, or the CLI and the
+    webapp) each load the pre-mark store, and the second write drops the first.
+    A damaged store raises instead of being overwritten, so the writer's
+    judgments are never silently reset.
+    """
+    from .jsonio import StoreUnreadable, load_json_store, lock_for, atomic_write_json
+    path = finding_verdicts_path(m)
+    with lock_for(path):
+        data = load_json_store(path, default={})   # damaged -> raises: no verdict
+        if not isinstance(data, dict):             # is written over a damaged store
+            raise StoreUnreadable(path, "expected an object")
+        if verdict in _VERDICTS:
+            data[finding_id] = verdict
+        else:
+            data.pop(finding_id, None)
+        atomic_write_json(path, data)
+
+
+def verdict_accuracy(m) -> dict:
+    """The writer-agreement meter — the product's accuracy metric, computed from
+    the writer's OWN verdicts rather than from a proxy.
+
+    Population is every DISTINCT finding id the desk delivered (the same
+    identity the marks store keys on; two rows sharing an id are one finding for
+    the tally, exactly as `last_pass_snapshot` treats them). An unjudged finding
+    is NOT evidence of accuracy, so it is reported as `unjudged` and kept OUT of
+    the rate's denominator — folding it in would repeat the
+    shrinking/expanding-denominator error this metric exists to avoid, and would
+    let a writer who judges 3 of 40 findings score 7 %.
+
+        accuracy       = (correct + partial) / judged   <- the headline
+        strict         = correct / judged               <- a diagnostic
+        incorrect_rate = incorrect / judged
+
+    Why the headline is the not-wrong reading: the harm this product must avoid
+    is a writer ACTING ON A FALSE FINDING. A true-but-unsupported finding costs
+    nothing — the writer judges it. So the bar belongs on `incorrect`, and
+    raising it is verifiability's job, not a stricter truth bar. `coverage` (how
+    much of the delivered set carries a verdict) is reported beside it, because
+    a rate over 3 judged findings is not the same claim as a rate over 300.
+
+    Metric B rides along: the pipeline's own verifiability — the share of
+    delivered findings whose citation `verifier.py` could confirm. A finding can
+    be accurate (A) and unverifiable (B), or verifiable and ignored; only A
+    proves the writer trusts the output, only B proves it is checkable.
+    """
+    empty = {"total": 0, "judged": 0, "accuracy": None, "strict": None,
+             "incorrect_rate": None, "coverage": None, "target": 98.58,
+             "tally": {"correct": 0, "partial": 0, "incorrect": 0, "unjudged": 0},
+             "verifiability": {"verified": 0, "quote_bearing": 0,
+                               "rate_of_all": None, "rate_of_quoted": None},
+             "by_category": {}}
+    try:
+        with open(m.report_findings_path, "r", encoding="utf-8") as f:
+            report = json.load(f)
+    except (OSError, ValueError):
+        return empty
+    if not isinstance(report, dict):
+        return empty
+    report = annotate_report_scene_keys(m, report)
+    verdicts = finding_verdicts(m)      # damaged -> raises through to the route
+    seen: dict = {}                     # id -> category, first occurrence wins
+    for f in report.get("findings") or []:
+        if not isinstance(f, dict):
+            continue
+        fid = compute_finding_id(f)
+        if fid not in seen:
+            seen[fid] = f
+    tally = {"correct": 0, "partial": 0, "incorrect": 0, "unjudged": 0}
+    by_cat: dict = {}
+    verified = quote_bearing = 0
+    for fid, f in seen.items():
+        v = verdicts.get(fid) or "unjudged"
+        tally[v] += 1
+        cat = f.get("category") or "other"
+        bucket = by_cat.setdefault(cat, {"correct": 0, "partial": 0, "incorrect": 0, "unjudged": 0})
+        bucket[v] += 1
+        if (f.get("evidence_quote") or "").strip():
+            quote_bearing += 1
+            if (f.get("verification") or {}).get("status") == "verified":
+                verified += 1
+    judged = tally["correct"] + tally["partial"] + tally["incorrect"]
+    total = len(seen)
+
+    def pct(n: int, d: int):
+        return round(100.0 * n / d, 1) if d else None
+
+    for b in by_cat.values():
+        j = b["correct"] + b["partial"] + b["incorrect"]
+        b["accuracy"] = pct(b["correct"] + b["partial"], j)
+        b["judged"] = j
+        b["total"] = j + b["unjudged"]
+    return {
+        "total": total,
+        "judged": judged,
+        "tally": tally,
+        "accuracy": pct(tally["correct"] + tally["partial"], judged),
+        "strict": pct(tally["correct"], judged),
+        "incorrect_rate": pct(tally["incorrect"], judged),
+        "coverage": pct(judged, total),
+        "by_category": by_cat,
+        "verifiability": {"verified": verified, "quote_bearing": quote_bearing,
+                          "rate_of_all": pct(verified, total),
+                          "rate_of_quoted": pct(verified, quote_bearing)},
+        "target": 98.58,
+    }
+
+
 # ---------- last-pass scorekeeping (R4, one generation back) ----------
 def last_pass_path(m) -> str:
     return os.path.join(m.project_dir, "last_pass.json")

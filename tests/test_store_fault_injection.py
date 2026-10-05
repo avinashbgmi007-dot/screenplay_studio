@@ -156,6 +156,20 @@ CASES = [
         status="guarded",
     ),
     StoreCase(
+        # the truth axis (writer verdict) — its own file so a torn verdict store
+        # can never cost the writer their intent marks, and vice versa. Same
+        # discipline as the intent store: damage reads as damage, and a write
+        # refuses rather than overwriting it.
+        name="finding verdicts",
+        module="screenplay_studio/revision.py",
+        path=lambda m: revision.finding_verdicts_path(m),
+        read=lambda m: revision.finding_verdicts(m),
+        seed=lambda m: revision.set_finding_verdict(m, "abc123", "correct"),
+        mutate=lambda m: revision.set_finding_verdict(m, "def456", "incorrect"),
+        missing_default={},
+        status="guarded",
+    ),
+    StoreCase(
         name="dismissed findings",
         module="screenplay_studio/revision.py",
         path=lambda m: revision.dismissed_path(m),

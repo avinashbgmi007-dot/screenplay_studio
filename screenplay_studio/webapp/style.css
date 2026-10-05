@@ -6370,6 +6370,19 @@ body:not(.idea-mode) .desk {
 .intent-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
 .intent-btn:hover { border-color:var(--lamp); color:var(--lamp); }
 .intent-btn.active { border-color:var(--ok); color:var(--ok); font-weight:700; }
+/* The truth axis — its own row, its own question ("is it right?"), kept OUT of
+   .finding-note-actions on purpose: that row has a measured one-row budget the
+   suite gates, and three more buttons would re-wrap it. Visually distinct from
+   the intent row so the two questions never read as one control. */
+.finding-verdict-row { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; margin:0 0 var(--sp-3); }
+.finding-verdict-label { font-family:var(--font-mono); font-size:var(--fs-3xs); letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
+.verdict-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
+.verdict-btn:hover { border-color:var(--accent); color:var(--accent); }
+.verdict-btn.active { border-color:var(--accent); color:var(--accent); font-weight:700; }
+/* the accuracy meter, on the Coverage section: the writer's own verdicts tallied */
+.dock-accuracy { margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--line); }
+.dock-acc-head { font-size:var(--fs-sm); color:var(--text); margin:0 0 var(--sp-1); }
+.dock-acc-sub { font-size:var(--fs-2xs); color:var(--text-muted); margin:0; line-height:1.5; }
 @media (prefers-reduced-motion: reduce) {
   .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
 }

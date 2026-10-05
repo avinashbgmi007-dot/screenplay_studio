@@ -41,6 +41,7 @@ const state = {
   findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, showAddressed: false, category: null, scene: null },
   ambiguousMarks: {},     // marks the scene-key upgrade could not carry (one id, several findings)
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
+  findingVerdicts: {},    // finding id -> "correct"|"partial"|"incorrect" (truth axis, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
   passes: [],             // spec 15.4: the revision arc, one entry per analysis
@@ -4180,6 +4181,9 @@ async function loadScriptData() {
   state.findingStatus = statusById;
   // writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride /edits
   state.findingMarks = (edits && edits.finding_intents) || {};
+  // the truth axis (what the accuracy meter is computed from) rides the same
+  // fetch — one load, one findings state, no second path to go stale
+  state.findingVerdicts = (edits && edits.finding_verdicts) || {};
   // marks the scene-key upgrade could not carry (one stored id, several
   // findings): read here, shown once in the worklist, never applied silently
   state.ambiguousMarks = (edits && edits.ambiguous_marks) || {};
@@ -5017,6 +5021,35 @@ function findingNoteEl(f, index, opts = {}) {
   // dock is where the writer's judgment is made, margin pins stay read-only)
   if (opts.deep) {
     const id = (state.findingIds && state.findingIds[index]) || String(index);
+    // ---- the truth axis: "is it right?" ---------------------------------
+    // The accuracy meter is computed from THIS row and nothing else, so it is a
+    // SEPARATE row asking a SEPARATE question from the intent row below it.
+    // Never one control: a writer must be able to say "it's true but I won't act
+    // on it" — collapsing the two axes is what produced the ambiguous middle
+    // that made "98.58 % accurate" unmeasurable in the first place. It lives in
+    // its own container, not `.finding-note-actions`, because that row has a
+    // measured one-row budget the suite gates (adding three buttons to it would
+    // re-wrap it, which is the exact defect rung 17 painted out).
+    const vrow = el("div", "finding-verdict-row");
+    vrow.appendChild(el("span", "finding-verdict-label", "is it right?"));
+    const mkVerdict = (label, name, verdict, title) => {
+      const b = el("button", "verdict-btn" + (state.findingVerdicts[id] === verdict ? " active" : ""), label);
+      b.type = "button";
+      b.setAttribute("aria-label", name);
+      b.title = title;
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setFindingVerdict(id, state.findingVerdicts[id] === verdict ? null : verdict);
+      });
+      return b;
+    };
+    vrow.appendChild(mkVerdict("\u2713", "Correct \u2014 this finding is right", "correct",
+                               "Correct \u2014 this finding is right"));
+    vrow.appendChild(mkVerdict("~", "Partly right", "partial",
+                               "Partly right \u2014 true in part"));
+    vrow.appendChild(mkVerdict("\u2717", "Wrong \u2014 this finding is false", "incorrect",
+                               "Wrong \u2014 this finding is false"));
+    note.appendChild(vrow);
     // These four carry a glyph, not a word: their accessible name has to be
     // typed, because a screen reader reading "⏭" aloud names a media key, not
     // the verb the writer is being asked to press.
@@ -6473,6 +6506,38 @@ function buildContextSection() {
             + "Treat those findings as a second opinion on structure, not a reading of your pages.";
           inner.appendChild(line);
         }
+        // -- the accuracy meter: the writer's own verdicts, tallied ----------
+        // The headline is the NOT-WRONG reading, and the rationale is the whole
+        // point: the harm this product must avoid is a writer ACTING ON A FALSE
+        // finding. A true-but-unsupported one costs nothing — the writer judges
+        // it. So the bar sits on `wrong`, and raising it is verifiability's job,
+        // not a stricter truth bar. The judged count always rides the rate,
+        // because a percentage over 3 judged findings is not the same claim as
+        // one over 300.
+        const acc = accuracyMeter();
+        if (acc.total) {
+          const box = el("div", "dock-accuracy");
+          box.appendChild(el("p", "dock-acc-head", acc.judged
+            ? `Accuracy \u2014 ${acc.accuracy}% not-wrong over ${acc.judged} judged`
+            : "Accuracy \u2014 no verdicts yet"));
+          if (acc.judged) {
+            const gap = Math.round((acc.target - acc.accuracy) * 10) / 10;
+            box.appendChild(el("p", "dock-acc-sub",
+              `Target ${acc.target}% \u00B7 ${gap <= 0 ? "met" : gap + " pts to go"} \u00B7 `
+              + `${acc.tally.correct} correct \u00B7 ${acc.tally.partial} partly \u00B7 ${acc.tally.incorrect} wrong`));
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.coverage}% of ${acc.total} findings judged \u2014 judge the rest to make the number mean more`));
+          } else {
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.total} findings delivered \u2014 mark each \u2713 / ~ / \u2717 on its card to measure accuracy`));
+          }
+          const vs = state.report && state.report.verification_summary;
+          if (vs && vs.verified_pct_of_quoted != null) {
+            box.appendChild(el("p", "dock-acc-sub",
+              `Verifiability (B) \u2014 ${vs.verified_pct_of_quoted}% of quoted findings have a confirmed citation`));
+          }
+          inner.appendChild(box);
+        }
       });
     lens.appendChild(sec);
   }
@@ -6701,6 +6766,60 @@ async function setFindingIntent(findingId, intent) {
   if (intent) state.findingMarks[findingId] = intent;
   else delete state.findingMarks[findingId];
   refreshAllFindingSurfaces(); // P0.4: every mounted surface moves with the mark
+}
+
+// ---------- writer verdict (the truth axis): the accuracy metric's data ----------
+// Mirrors setFindingIntent exactly — optimistic local update, then re-render
+// every surface. The two stores are separate on the server so a failure of one
+// can never cost the other; the same holds here, where a failed verdict leaves
+// the marks untouched and vice versa.
+async function setFindingVerdict(findingId, verdict) {
+  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
+  try {
+    await api(`${base}/findings/verdict`, { method: "POST", body: JSON.stringify({ finding_id: findingId, verdict }) });
+  } catch (e) {
+    showError("Could not save your verdict: " + e.message);
+    return;
+  }
+  if (verdict) state.findingVerdicts[findingId] = verdict;
+  else delete state.findingVerdicts[findingId];
+  refreshAllFindingSurfaces();
+}
+
+/** The writer-agreement meter, computed live from the writer's own verdicts.
+ *  The server twin is `revision.verdict_accuracy` (served at
+ *  /findings/accuracy); this mirrors it so the number the writer watches move
+ *  as they judge is the same number the API reports.
+ *
+ *  Population is DISTINCT finding ids — two rows sharing an id are one finding
+ *  for the tally, exactly as the marks store keys them. Unjudged findings are
+ *  excluded from the denominator, never counted as failures: a rate over 3
+ *  judged findings is not the same claim as one over 300, which is why
+ *  `coverage` is always printed beside `accuracy`. */
+function accuracyMeter() {
+  const findings = state.findings || [];
+  const ids = state.findingIds || [];
+  const verdicts = state.findingVerdicts || {};
+  const seen = new Set();
+  const tally = { correct: 0, partial: 0, incorrect: 0, unjudged: 0 };
+  findings.forEach((f, i) => {
+    const id = ids[i] || String(i);
+    if (seen.has(id)) return;
+    seen.add(id);
+    const v = verdicts[id];
+    tally[(v === "correct" || v === "partial" || v === "incorrect") ? v : "unjudged"] += 1;
+  });
+  const judged = tally.correct + tally.partial + tally.incorrect;
+  const total = seen.size;
+  const pct = (n, d) => (d ? Math.round((1000 * n) / d) / 10 : null);
+  return {
+    total, judged, tally,
+    accuracy: pct(tally.correct + tally.partial, judged),   // the headline: not-wrong
+    strict: pct(tally.correct, judged),
+    incorrectRate: pct(tally.incorrect, judged),
+    coverage: pct(judged, total),
+    target: 98.58,
+  };
 }
 
 // ---------- arrival (R5-b peek + R9-adjacent unread dot) ----------
