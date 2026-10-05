@@ -209,6 +209,12 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
       "severity": "low",                  // low | medium | high
       "scene_refs": [1],
       "evidence_quote": "I'll tell you everything when this is over.",  // null when reasoning-only
+      "observation": "…",                 // gate 11 only: the falsifiable statement the note rests on,
+                                          //   present ONLY when the observation pass grounded a finding
+                                          //   the verifier had left at `no_quote`. The citation above is
+                                          //   the model's proposal RE-VERIFIED against the script by
+                                          //   verifier.verify_finding at the standard 0.72 threshold —
+                                          //   never the model's self-report. Absent on every other finding.
       "rule_id": null,                    // knowledge-base rule id when grounded; MUST resolve in the
                                           //   KB — the UI renders it as "Grounded in knowledge-base
                                           //   rule <id>" (app.js:4066). Omit when no rule applies.

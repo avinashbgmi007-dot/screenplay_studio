@@ -79,6 +79,26 @@ severity ::= {severity_alt}
 '''
 
 
+def observation_grounding_grammar() -> str:
+    """Grammar for gate 11's grounding reply:
+    {"observation": str, "quote": str | null, "search": str}
+
+    Deliberately has NO `grounded` boolean. The model does not get to declare
+    its own citation valid: the pipeline re-verifies `quote` against the script
+    with `verifier.verify_finding`, and a self-reported "grounded: true" is
+    exactly the confident-citation failure the verifier exists to catch. What
+    the model CAN say is the thing only it can supply — the observation, and a
+    verbatim line — and `null` for the line when the note is about an absence.
+
+    `search` is free text and never acted on: it is where an absence claim says
+    what it looked for, so the reply is auditable after the fact.
+    """
+    return f'''root ::= ws "{{" ws "\\"observation\\"" ws ":" ws string ws "," ws "\\"quote\\"" ws ":" ws (string | "null") ws "," ws "\\"search\\"" ws ":" ws string ws "}}" ws
+{_STRING}
+{_WS}
+'''
+
+
 def scene_summary_grammar() -> str:
     """Grammar for: {"summaries": [ {scene_number, summary}, ... ]}"""
     return f'''root ::= ws "{{" ws "\\"summaries\\"" ws ":" ws summaries-array ws "}}" ws

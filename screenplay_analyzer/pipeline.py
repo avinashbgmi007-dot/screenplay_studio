@@ -700,6 +700,7 @@ def analyze(
     progress_cb=None,
     report_language: str = "eng",
     integrity_gate: bool = True,
+    observation_pass: bool = True,
 ) -> AnalysisResult:
     """progress_cb: optional callable(dict) called at every stage boundary with
     {"stage": str, "status": "running"|"complete", "detail": str} — lets a UI
@@ -709,10 +710,19 @@ def analyze(
     any other tuple runs exactly those. An empty tuple runs only the
     deterministic passes (no model calls beyond the mandatory resolve).
 
-    integrity_gate: run the model-free finding integrity gate as the last pass
-    (removes mechanically false findings, folds same-scene duplicate observations).
-    Removals land in `result.withdrawals`, never in silence. On by default;
-    `SCREENPLAY_STUDIO_INTEGRITY_GATE=0` overrides it to off."""
+    integrity_gate: run the model-free finding integrity gate as the last
+    deterministic pass (removes mechanically false findings, folds same-scene
+    duplicate observations). Removals land in `result.withdrawals`, never in
+    silence. On by default; `SCREENPLAY_STUDIO_INTEGRITY_GATE=0` overrides it
+    to off.
+
+    observation_pass: gate 11 — for each finding the verifier left at `no_quote`,
+    ask the model for a falsifiable observation plus a verbatim line, then
+    re-verify that line with the SAME verifier before adopting it. Costs one
+    model call per ungrounded finding (capped), so it is the one pass a caller
+    may want off for speed; `SCREENPLAY_STUDIO_OBSERVATION_PASS=0` is the field
+    kill-switch and `SCREENPLAY_STUDIO_OBSERVATION_LIMIT` the cap. On by
+    default, because an unfalsifiable finding cannot be scored at all."""
     run_categories = resolve_categories(run_categories)
     result = AnalysisResult(doc=doc)
 
@@ -1137,6 +1147,34 @@ def analyze(
             # A gate that cannot run must leave the findings exactly as they
             # were, never guess at what is false — and must never fail the run.
             result.errors.append(f"Finding integrity gate skipped: {e}")
+
+    # 8e. observation pass (gate 11) — ground what the verifier could not. It
+    # runs AFTER the gate (there is no point grounding a finding about to be
+    # withdrawn) and BEFORE the summary below, so `verification_summary` and
+    # `evidence_depth` count the citations this pass actually landed. It is the
+    # only model-backed pass here: one call per ungrounded finding, capped, and
+    # a finding is adopted ONLY when its citation survives `verify_finding` —
+    # the model is never trusted to certify its own evidence
+    # (screenplay_analyzer/observation_pass.py).
+    if observation_pass:
+        from .observation_pass import (ObservationPass, observation_limit,
+                                       observation_pass_enabled)
+        limit = observation_limit()
+        if observation_pass_enabled() and limit:
+            try:
+                op = ObservationPass(limit=limit).run(
+                    result.findings, client, doc,
+                    on_progress=lambda stage, status, detail:
+                        emit(stage, status, detail))
+                result.findings = op.findings
+                if op.attempted:
+                    result.stats = result.stats or {}
+                    result.stats["observation_pass"] = op.summary()
+                result.errors.extend(op.errors)
+            except Exception as e:
+                # A pass that cannot run must leave the findings exactly as
+                # they were — ungrounded, still flagged, never invented.
+                result.errors.append(f"Observation pass skipped: {e}")
 
     result.verification = verification_summary(result.findings)
 

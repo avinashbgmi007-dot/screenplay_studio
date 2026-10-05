@@ -192,6 +192,18 @@ def chat_completions():
              "payoff_scenes": [2], "status": "paid", "note": "Lands."},
         ]}))
 
+    # ---- Gate 11 (observation pass) request shape ----
+    # Answers with NO citation, deliberately. The mock has no script to quote
+    # from, and a null quote is the pass's own honest "could not ground this"
+    # outcome — so the pass stays a deterministic no-op in tests rather than
+    # fabricating a citation that would then have to be verified. Without this
+    # branch the request falls through to the co-writer echo below, which is not
+    # JSON, and the client burns its 3 retries on every ungrounded finding
+    # (measured: it multiplied the whole suite's runtime by ~7).
+    if "grounding a note in a screenplay" in system.lower():
+        return _reply(json.dumps({"observation": "Mock observation.",
+                                  "quote": None, "search": "mock search"}))
+
     # ---- Piece 3 (co-writer) request shape: none of the above matched,
     # so this is a conversational turn. Echo context markers, same as
     # Piece 3's own mock, so grounding can still be verified end-to-end. ----
