@@ -101,7 +101,8 @@ VOICE_DRIFT_MARGIN = 1.0       # tells per reply the recent end must exceed
 VOICE_DRIFT_HISTORY_MAX = 20   # replies remembered per persona
 
 _AI_TELL_PATTERNS = (
-    (1, re.compile(r"\b(?:I think|I feel|maybe|perhaps|it seems like)\b", re.IGNORECASE)),
+    # Epistemic qualifiers such as "I think" and "maybe" are intentionally
+    # absent: they may express honest uncertainty, not generic-assistant drift.
     (1, re.compile(r"\b(?:actually|basically|honestly|frankly)\b", re.IGNORECASE)),
     (2, re.compile(r"^(?:Great question|Absolutely|I'?d be happy to)", re.IGNORECASE)),
     (2, re.compile(r"(?:let me know if you need anything else|I hope this helps)\s*$",
@@ -110,13 +111,16 @@ _AI_TELL_PATTERNS = (
 
 
 def count_ai_tells(reply: str) -> int:
-    """How many AI tells this reply carries. Deterministic; no model call.
+    """How many generic-AI tells this reply carries. Deterministic; no model call.
 
-    Weighted: a canned opening or closing is worth two, because either is a whole
-    register slip rather than a word choice.
+    Epistemic qualifiers are not counted as voice defects for either desk
+    persona: they may express honest uncertainty rather than generic-assistant
+    drift. Weighted: a canned opening or closing is worth two, because either
+    is a whole register slip rather than a word choice.
     """
-    return sum(weight for weight, pattern in _AI_TELL_PATTERNS
-               if pattern.search(reply or ""))
+    text = reply or ""
+    return sum(weight * sum(1 for _ in pattern.finditer(text))
+               for weight, pattern in _AI_TELL_PATTERNS)
 
 
 def voice_drift_crossed(history) -> bool:
@@ -124,8 +128,8 @@ def voice_drift_crossed(history) -> bool:
     ones — the slow slide the persona examples exist to prevent.
 
     Compares the two ENDS of the history rather than a running average: a persona
-    that always hedges a little is not drifting, and one that starts clean and
-    ends hedging is, even when the mean barely moves.
+    with a stable register is not drifting, and one that starts clean and ends
+    with more generic-AI tells is, even when the mean barely moves.
     """
     if len(history) < VOICE_DRIFT_MIN_HISTORY:
         return False
@@ -201,7 +205,7 @@ class CoWriterEngine:
         return persona in self._voice_reprime
 
     def _note_voice_tells(self, reply: str, persona: str) -> bool:
-        """Record this reply's AI-tell count; arm a re-prime if the trend crossed.
+        """Record pre-register output's AI-tell count; arm if the trend crossed.
 
         Returns whether it armed. This is where the detector ACTS: it used to log
         a warning and return the reply untouched (P1.7). The re-prime rides the
@@ -261,7 +265,7 @@ class CoWriterEngine:
     # its own conservative client config).
     CHAT_TEMPERATURE = 0.85
     CHAT_REPEAT_PENALTY = 1.15
-    FEWSHOT_CHAR_BUDGET = 24000  # drop example blocks before starving history
+    FEWSHOT_CHAR_BUDGET = 24000  # cap extra examples for a bare system prompt
     TRAIT_DEPTH = 6              # trait re-injection position from the end
 
     def _generate(self, messages, on_token=None):
@@ -316,11 +320,31 @@ class CoWriterEngine:
             return reply
         return retry
 
+    @staticmethod
+    def _history_for_persona(history, persona):
+        """Keep the model's conversational context aligned with the active lens.
+
+        The web UI stores both desk conversations in one session for display and
+        persistence. Message.partner distinguishes them, but the model API only
+        receives role/content pairs; passing the full branch made Sameer's old
+        assistant turns look like Dr. Sushruta's own words (and vice versa).
+        Keep current-persona turns, plus legacy user turns whose partner is
+        unknown. Drop legacy assistant turns because their speaker cannot be
+        established safely.
+        """
+        return [
+            message for message in history
+            if getattr(message, "partner", None) == persona
+            or (getattr(message, "partner", None) is None
+                and getattr(message, "role", None) == "user")
+        ]
+
     def _assemble_messages(self, system_prompt, history, prompt_user, persona,
                            scene_block=None, quote_context=None, reprime=False):
         """Shared turn assembly for both probe and full paths. Order matters:
-        system -> scene/quote context -> few-shot examples (budget-permitting)
-        -> [history with trait reminder at fixed depth] -> user turn ->
+        system -> scene/quote context -> examples once (reuse the base copy, or
+        add one only when missing and within budget) -> [history with trait
+        reminder at fixed depth] -> user turn ->
         post-history voice reminder (last word before generation carries the
         most weight -- the SillyTavern post-history lever).
 
@@ -345,7 +369,15 @@ class CoWriterEngine:
             system_text += "\n\n" + quote_context
         total = len(system_text)
         examples = persona_examples(persona)
-        if examples and total + len(examples) <= self.FEWSHOT_CHAR_BUDGET:
+        # build_system_prompt already carries examples in its irreducible
+        # persona block. Keep this budgeted fallback for callers that assemble
+        # a bare system prompt directly, but never repeat the same dialogue in
+        # a normal turn: duplication burns context and overweights sample names.
+        if (
+            examples
+            and examples not in system_text
+            and total + len(examples) <= self.FEWSHOT_CHAR_BUDGET
+        ):
             system_text += "\n\n" + examples
             total += len(examples)
         messages = [{"role": "system", "content": system_text}]
@@ -369,10 +401,11 @@ class CoWriterEngine:
     def send_message(self, session: Session, user_text: str, quote: dict | None = None,
                      on_token=None) -> str:
         from .peer import (
-            classify_turn, should_probe, PROBE_SYSTEM_PROMPT,
+            classify_turn, should_probe, probe_system_prompt,
             ensure_forward_momentum, cap_suggestions,
         )
         branch = session.branch
+        conversation_history = self._history_for_persona(branch.messages, branch.active_persona)
         user_text = (user_text or "").strip()
         turn_kind = classify_turn(user_text)
         # P1.7: armed by a previous reply's tell trend; rides exactly one turn.
@@ -401,6 +434,15 @@ class CoWriterEngine:
 
         was_pending = branch.awaiting_probe
         if was_pending:
+            # A probe belongs to the persona that asked it. Switching lenses,
+            # or encountering an untagged legacy speaker, abandons the pending
+            # exchange rather than guessing which voice the probe belongs to.
+            last_assistant = next(
+                (m for m in reversed(branch.messages) if m.role == "assistant"), None
+            )
+            if (last_assistant is not None
+                    and last_assistant.partner != branch.active_persona):
+                was_pending = False
             branch.awaiting_probe = False
 
         if self.memory is not None:
@@ -474,8 +516,14 @@ class CoWriterEngine:
         except Exception:
             lang_note = ""  # mirroring is an enhancement, never a dependency
 
-        if not was_pending and should_probe(user_text):
-            # Phase 1: reflect + probe, no suggestions.
+        probe_prompt = probe_system_prompt(branch.active_persona)
+        should_run_probe = (
+            not was_pending
+            and probe_prompt is not None
+            and should_probe(user_text, branch.active_persona, branch.active_mode)
+        )
+        if should_run_probe:
+            # Phase 1: persona-specific reflect + probe, no suggestions.
             system_prompt = build_system_prompt(
                 self.script_ctx, self.report_ctx, branch.active_persona, branch.active_mode,
                 relationship_card=relationship_card, cold_start_line=cold_start_line,
@@ -483,7 +531,7 @@ class CoWriterEngine:
                 mood_text=self.mood_text, doctor_case_text=doctor_case_text,
                 craft_history_text=craft_history_text,
                 budget=prompt_budget,
-            ) + "\n\n" + PROBE_SYSTEM_PROMPT
+            ) + "\n\n" + probe_prompt
             if lang_note:
                 system_prompt += "\n\n" + lang_note
             # the probe path already redirects short ideas; a QUESTION that
@@ -491,14 +539,14 @@ class CoWriterEngine:
             system_prompt += answer_first
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = self._assemble_messages(
-                system_prompt, branch.messages, prompt_user, branch.active_persona,
+                system_prompt, conversation_history, prompt_user, branch.active_persona,
                 scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
             try:
-                reply = self._generate_mirrored(messages, user_text, on_token)
+                model_reply = self._generate_mirrored(messages, user_text, on_token)
             except Exception:
                 branch.awaiting_probe = False  # never strand the writer mid-probe
                 raise
-            reply = self._guard_reply(reply, scene_refs)
+            reply = self._guard_reply(model_reply, scene_refs)
             branch.awaiting_probe = True
         else:
             system_prompt = build_system_prompt(
@@ -514,18 +562,19 @@ class CoWriterEngine:
             system_prompt += answer_first
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
             messages = self._assemble_messages(
-                system_prompt, branch.messages, prompt_user, branch.active_persona,
+                system_prompt, conversation_history, prompt_user, branch.active_persona,
                 scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
-            reply = self._generate_mirrored(messages, user_text, on_token)
-            reply = self._guard_reply(reply, scene_refs)
+            model_reply = self._generate_mirrored(messages, user_text, on_token)
+            reply = self._guard_reply(model_reply, scene_refs)
             reply = cap_suggestions(reply)
 
         reply = persona_register(reply, branch.active_persona)
-        # P1.7: consume the re-prime that just rode this turn, then count this
-        # reply and arm the next one if the trend has crossed. Order matters: the
-        # history is only complete once this reply is counted.
+        # P1.7: consume the re-prime that just rode this turn, then score the
+        # pre-register model reply and arm the next one if the trend has crossed.
+        # Scoring before deterministic persona cleanup catches drift even when filters remove it
+        # from the writer-facing text; epistemic qualifiers are not tells.
         self._consume_voice_reprime(branch.active_persona)
-        self._note_voice_tells(reply, branch.active_persona)
+        self._note_voice_tells(model_reply, branch.active_persona)
 
         reply = ensure_forward_momentum(reply, turn_kind, branch.active_persona)
 

@@ -253,12 +253,15 @@ def test_the_cli_selection_commands_survive_a_stale_chat_save(tmp_path):
     session = store.load(sid)
     _handle_command("/persona premise_doctor", session, store)
     assert store.load(sid).branch.active_persona == "premise_doctor"
+    assert store.load(sid).branch.active_mode == "concept_validation"
 
     stale_persona = _stale_snapshot(sid)  # holds Branch's default persona
     _turn(stale_persona, "later-q")
     store.save(stale_persona)
     assert store.load(sid).branch.active_persona == "premise_doctor", \
         "a chat turn undid the CLI's /persona"
+    assert store.load(sid).branch.active_mode == "concept_validation", \
+        "a chat turn undid the persona's default mode"
 
 
 def test_the_cli_mode_command_survives_a_stale_chat_save(tmp_path):

@@ -37,7 +37,7 @@ from .llm_client import LlamaServerClient, LlamaServerError
 from .context import ScriptContext, ReportContext, load_json
 from .discovery import resolve_model
 from .engine import CoWriterEngine
-from .personas import PERSONAS, MODES
+from .personas import PERSONAS, MODES, default_mode_for_persona
 
 
 HELP_TEXT = __doc__.split("In-chat slash commands:")[1]
@@ -181,9 +181,12 @@ def _handle_command(cmd: str, session: Session, store: SessionStore) -> bool:
         elif arg not in PERSONAS:
             print(f"[error] Unknown persona '{arg}'. Available: {list(PERSONAS.keys())}")
         else:
+            previous_persona = session.branch.active_persona
             session.branch.active_persona = arg
+            if arg != previous_persona:
+                session.branch.active_mode = default_mode_for_persona(arg)
             store.save(session, owns_selection=True)
-            print(f"Persona set to '{arg}' for branch '{session.current_branch}'.")
+            print(f"Persona set to '{arg}' ({session.branch.active_mode}) for branch '{session.current_branch}'.")
 
     elif name == "mode":
         if not arg:

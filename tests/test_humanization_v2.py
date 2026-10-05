@@ -43,6 +43,7 @@ def test_sameer_bible_has_bio_stance_and_quirk_budget():
 def test_doctor_bible_contrasts_and_register_rule():
     p = __import__("screenplay_cowriter.personas", fromlist=["PERSONAS"]).PERSONAS["script_consultant"]
     assert "guilty until proven innocent" in p           # contrasting stance
+    assert "confidence must match the evidence" in p      # calibrated, not forced certainty
     assert "four thousand scripts" in p                  # the biography
     assert "no exclamation marks" in p                   # register rule
     assert "Sameer" in p                                 # friction — he knows his rival exists

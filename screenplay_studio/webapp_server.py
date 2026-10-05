@@ -1099,9 +1099,11 @@ def get_config():
                            if not p.endswith("_examples")]
         cfg["modes"] = [m for m in personas_mod.MODES
                         if not m.endswith("_examples")]
+        cfg["persona_default_modes"] = dict(personas_mod.DEFAULT_MODE_BY_PERSONA)
     except CowriterUnavailableError:
         cfg["personas"] = []
         cfg["modes"] = []
+        cfg["persona_default_modes"] = {}
     return jsonify(cfg)
 
 
@@ -3526,10 +3528,13 @@ def update_settings(name, sid):
     except CowriterUnavailableError as e:
         return _error(str(e), 503)
 
+    previous_persona = session.branch.active_persona
     if persona:
         session.branch.active_persona = persona
     if mode:
         session.branch.active_mode = mode
+    elif persona and persona != previous_persona:
+        session.branch.active_mode = personas_mod.default_mode_for_persona(persona)
     store.save(session, owns_selection=True)
     return jsonify({"active_persona": session.branch.active_persona, "active_mode": session.branch.active_mode})
 
@@ -4362,10 +4367,13 @@ def idea_update_settings(idea_id, sid):
     if mode is not None and mode not in MODES:
         return _error(f"Unknown mode '{mode}'.", 400)
     branch = session.branch
+    previous_persona = branch.active_persona
     if persona:
         branch.active_persona = persona
     if mode:
         branch.active_mode = mode
+    elif persona and persona != previous_persona:
+        branch.active_mode = personas_mod.default_mode_for_persona(persona)
     store.save(session, owns_selection=True)
     return jsonify({"active_persona": branch.active_persona, "active_mode": branch.active_mode})
 

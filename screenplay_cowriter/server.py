@@ -17,7 +17,7 @@ from .llm_client import LlamaServerClient, LlamaServerError
 from .context import ScriptContext, ReportContext, load_json
 from .discovery import resolve_model
 from .engine import CoWriterEngine
-from .personas import PERSONAS, MODES
+from .personas import PERSONAS, MODES, default_mode_for_persona
 
 app = Flask(__name__)
 store: SessionStore = None  # set in main()
@@ -161,10 +161,13 @@ def update_settings(session_id):
     if mode and mode not in MODES:
         return jsonify({"error": f"unknown mode, available: {list(MODES.keys())}"}), 400
 
+    previous_persona = session.branch.active_persona
     if persona:
         session.branch.active_persona = persona
     if mode:
         session.branch.active_mode = mode
+    elif persona and persona != previous_persona:
+        session.branch.active_mode = default_mode_for_persona(persona)
     store.save(session, owns_selection=True)
     return jsonify(_session_summary(session))
 

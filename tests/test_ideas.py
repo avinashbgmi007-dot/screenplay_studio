@@ -204,8 +204,15 @@ class TestIdeaApi:
         assert meta["title"] == "Embers"
 
         s = http_client.post(f"/api/ideas/{idea_id}/chat/start").get_json()["session_id"]
-        r = http_client.post(f"/api/ideas/{idea_id}/chat/sessions/{s}/settings",
-                             json={"persona": "premise_doctor", "mode": "concept_validation"})
+        settings_url = f"/api/ideas/{idea_id}/chat/sessions/{s}/settings"
+        default_mode = http_client.post(settings_url, json={"persona": "premise_doctor"})
+        assert default_mode.status_code == 200
+        assert default_mode.get_json() == {
+            "active_persona": "premise_doctor", "active_mode": "concept_validation",
+        }
+        r = http_client.post(settings_url, json={
+            "persona": "premise_doctor", "mode": "concept_validation",
+        })
         assert r.status_code == 200
         assert r.get_json() == {"active_persona": "premise_doctor", "active_mode": "concept_validation"}
 

@@ -2,7 +2,10 @@
 # No real model needed — FakeClient simulates the llama server.
 
 import pytest
-from screenplay_cowriter.peer import classify_turn, has_embedded_reasoning, should_probe, PROBE_SYSTEM_PROMPT
+from screenplay_cowriter.peer import (
+    classify_turn, has_embedded_reasoning, should_probe, PROBE_SYSTEM_PROMPT,
+    probe_system_prompt,
+)
 
 
 def test_classify_question_by_question_mark():
@@ -35,6 +38,26 @@ def test_should_probe_only_when_reasoning_absent():
 def test_probe_prompt_forbids_suggestions():
     assert "don't jump to suggestions" in PROBE_SYSTEM_PROMPT.lower()
     assert "one question" in PROBE_SYSTEM_PROMPT.lower()
+
+
+def test_probe_policy_is_persona_and_mode_specific():
+    idea = "The middle is losing pressure."
+    assert should_probe(idea, "writing_partner", "peer")
+    assert not should_probe(idea, "writing_partner", "brainstorm")
+    assert not should_probe(idea, "script_consultant", "peer")
+    assert not should_probe(idea, "script_consultant", "evidence_discussion")
+    assert should_probe(idea, "premise_doctor", "concept_validation")
+    assert probe_system_prompt("script_consultant") is None
+    assert "development executive" in probe_system_prompt("premise_doctor").lower()
+
+
+def test_persona_defaults_match_the_two_desk_contract():
+    from screenplay_cowriter.personas import default_mode_for_persona
+
+    assert default_mode_for_persona("writing_partner") == "peer"
+    assert default_mode_for_persona("script_consultant") == "evidence_discussion"
+    assert default_mode_for_persona("premise_doctor") == "concept_validation"
+    assert default_mode_for_persona("producer") == "peer"
 
 
 # The forward nudge is a COLLABORATOR's move, so these all name the desk

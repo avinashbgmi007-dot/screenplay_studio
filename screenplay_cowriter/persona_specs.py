@@ -78,15 +78,12 @@ SAMEER_BANNED = [
 # NB: the exclamation rule is a REPLACEMENT ("!" -> "."), not a removal, so it
 # lives in reply_transforms.persona_register where the register is set. As a
 # removal pattern it would have deleted the marks instead of softening them.
+# Epistemic qualifiers are deliberately NOT banned: concise uncertainty is part
+# of precision, not a voice defect.
 SUSHRUTA_BANNED = [
-    # Hedging — the doctor never hedges
-    r"\b(?:I think|I feel|maybe|perhaps|it seems like|"
-    r"it (?:appears|looks) (?:like|as if)|"
-    r"this (?:might|could|may) be)\b",
-    # Filler words
+    # Filler words; uncertainty and degree qualifiers are deliberately retained
+    # because deleting them can turn a tentative reading into a stronger claim.
     r"\b(?:actually|basically|honestly|frankly|to be honest)\b",
-    # Softening language
-    r"\b(?:a little|somewhat|kind of|sort of|in a way)\b",
     # Compliments without substance
     r"\b(?:good (?:job|work|effort)|nice (?:work|job)|well done|great (?:work|effort))\b",
 ]

@@ -34,7 +34,7 @@ from screenplay_cowriter.personas import (
 from screenplay_cowriter.context import ScriptContext, ReportContext
 
 CLEAN = "Cut the line. The pause does it."
-DRIFTED = "I think maybe the line is actually a bit long, honestly."
+DRIFTED = "Great question! Maybe the line is actually a bit long, honestly. I hope this helps"
 
 
 # --------------------------------------------------------------------------
@@ -45,8 +45,10 @@ class TestCountingAITells:
     def test_a_plain_reply_has_none(self):
         assert count_ai_tells(CLEAN) == 0
 
-    def test_hedging_costs_one(self):
-        assert count_ai_tells("I think the scene works.") == 1
+    def test_epistemic_qualifiers_are_not_counted_as_voice_drift(self):
+        assert count_ai_tells("I think the scene works.") == 0
+        assert count_ai_tells("Maybe this is intentional.") == 0
+        assert count_ai_tells("This is basically fine.") == 1
 
     def test_filler_costs_one(self):
         assert count_ai_tells("The ending is basically fine.") == 1
@@ -57,8 +59,8 @@ class TestCountingAITells:
     def test_a_canned_closing_costs_two(self):
         assert count_ai_tells("That should do it. I hope this helps") == 2
 
-    def test_tells_accumulate(self):
-        assert count_ai_tells(DRIFTED) == 2  # hedging + filler
+    def test_tells_accumulate_without_counting_uncertainty(self):
+        assert count_ai_tells(DRIFTED) == 6  # two fillers + canned opening + closing, not "maybe"
 
     def test_an_empty_reply_is_not_an_error(self):
         assert count_ai_tells("") == 0 and count_ai_tells(None) == 0
@@ -76,12 +78,12 @@ class TestTheThreshold:
     def test_a_flat_history_does_not_cross(self):
         assert not voice_drift_crossed([1] * 20)
 
-    def test_a_persona_that_always_hedges_is_not_drifting(self):
-        """Compares the two ENDS, not a running average — a consistently
-        colloquial persona must not be flagged for being itself."""
+    def test_a_persona_with_a_stable_tell_rate_is_not_drifting(self):
+        """Compares the two ENDS, not a running average — a consistent
+        register must not be flagged for being itself."""
         assert not voice_drift_crossed([2] * 20)
 
-    def test_a_slide_from_clean_to_hedging_crosses(self):
+    def test_a_slide_from_clean_to_generic_tells_crosses(self):
         assert voice_drift_crossed([0] * 5 + [2] * 5)
 
     def test_a_slide_below_the_margin_does_not_cross(self):
@@ -244,6 +246,10 @@ class TestTheReprimeText:
         """'Re-prime the examples block' — the examples are already in the prompt
         and are never shed, so the action is to send the model back to them."""
         assert "example dialogue" in VOICE_REPRIME_REMINDER
+
+    def test_it_does_not_treat_calibrated_uncertainty_as_padding(self):
+        assert "Keep uncertainty when the evidence warrants it" in VOICE_REPRIME_REMINDER
+        assert "hedging" not in VOICE_REPRIME_REMINDER.lower()
 
     def test_it_names_no_persona(self):
         """It must be safe for all eight personas. Naming one would hand the

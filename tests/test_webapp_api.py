@@ -65,7 +65,10 @@ class TestConfig:
     def test_get_config(self, http_client):
         resp = http_client.get("/api/config")
         assert resp.status_code == 200
-        assert "server_url" in resp.get_json()
+        payload = resp.get_json()
+        assert "server_url" in payload
+        assert payload["persona_default_modes"]["script_consultant"] == "evidence_discussion"
+        assert payload["persona_default_modes"]["writing_partner"] == "peer"
 
     def test_set_config(self, http_client):
         resp = http_client.post("/api/config", json={"server_url": "http://localhost:9999"})
@@ -399,6 +402,33 @@ class TestChatFlow:
         )
         assert resp.status_code == 200
         assert resp.get_json() == {"active_persona": "producer", "active_mode": "brainstorm"}
+
+    def test_persona_only_switch_uses_that_personas_default_mode(self, http_client):
+        project = self._setup_analyzed_project(http_client)
+        sid = http_client.post(f"/api/projects/{project}/chat/start").get_json()["session_id"]
+        url = f"/api/projects/{project}/chat/sessions/{sid}/settings"
+
+        doctor = http_client.post(url, json={"persona": "script_consultant"})
+        assert doctor.status_code == 200
+        assert doctor.get_json() == {
+            "active_persona": "script_consultant",
+            "active_mode": "evidence_discussion",
+        }
+
+        sameer = http_client.post(url, json={"persona": "writing_partner"})
+        assert sameer.status_code == 200
+        assert sameer.get_json() == {"active_persona": "writing_partner", "active_mode": "peer"}
+
+        explicit_mode = http_client.post(url, json={
+            "persona": "script_consultant", "mode": "brainstorm",
+        })
+        assert explicit_mode.get_json() == {
+            "active_persona": "script_consultant", "active_mode": "brainstorm",
+        }
+        same_persona = http_client.post(url, json={"persona": "script_consultant"})
+        assert same_persona.get_json() == {
+            "active_persona": "script_consultant", "active_mode": "brainstorm",
+        }
 
     def test_invalid_persona_rejected(self, http_client):
         project = self._setup_analyzed_project(http_client)
@@ -768,7 +798,7 @@ def test_fallback_personas_stay_subset_of_server():
     graceful degradation, not a hand-synced second list."""
     import re
 
-    from screenplay_cowriter.personas import PERSONAS
+    from screenplay_cowriter.personas import PERSONAS, DEFAULT_MODE_BY_PERSONA
 
     app_js = os.path.join(os.path.dirname(webapp_server.__file__), "webapp", "app.js")
     with open(app_js, encoding="utf-8") as f:
@@ -778,6 +808,11 @@ def test_fallback_personas_stay_subset_of_server():
     fallback = re.findall(r'"([a-z_]+)"', m.group(1))
     assert fallback, "FALLBACK_PERSONAS parsed empty"
     assert set(fallback) <= set(PERSONAS.keys())
+
+    defaults_match = re.search(r"const FALLBACK_PERSONA_DEFAULT_MODES = \{(.*?)\}", js, re.S)
+    assert defaults_match, "FALLBACK_PERSONA_DEFAULT_MODES declaration not found in app.js"
+    defaults = dict(re.findall(r"([a-z_]+):\s*\"([a-z_]+)\"", defaults_match.group(1)))
+    assert defaults == DEFAULT_MODE_BY_PERSONA
 
 
 class TestAnalyzeSerializationAndOriginGuard:

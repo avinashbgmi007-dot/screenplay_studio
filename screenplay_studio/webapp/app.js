@@ -636,6 +636,27 @@ const FALLBACK_MODE_LABELS = {
   concept_validation: "Concept Validation", brainstorm: "Brainstorm",
   character_interview: "Character Interview",
 };
+const FALLBACK_PERSONA_DEFAULT_MODES = {
+  writing_partner: "peer",
+  script_consultant: "evidence_discussion",
+  premise_doctor: "concept_validation",
+};
+
+function defaultModeForPersona(persona) {
+  const serverDefaults = state.config && state.config.persona_default_modes;
+  return (serverDefaults && serverDefaults[persona]) ||
+    FALLBACK_PERSONA_DEFAULT_MODES[persona] || "peer";
+}
+
+// A lens switch follows the new persona's natural mode when the current mode
+// was the old persona's default. An explicitly chosen cross-role mode remains
+// untouched (for example, a deliberate brainstorm with Sameer).
+function modeForPersonaSwitch(nextPersona, currentPersona, currentMode) {
+  const oldDefault = defaultModeForPersona(currentPersona);
+  return (!currentMode || currentMode === oldDefault)
+    ? defaultModeForPersona(nextPersona)
+    : currentMode;
+}
 
 // ---- the settings form, filled from whatever the desk currently believes ----
 // Split out of loadConfig so OPENING the modal refreshes it too. Without that,
@@ -7668,15 +7689,17 @@ function returnChatFromDock() {
   _dockChatAdopted = null;
 }
 
-/** Lens ↔ persona: switching lenses switches WHO answers. Uses the existing
- *  settings endpoint; keeps mode untouched. */
+/** Lens ↔ persona: switching lenses switches who answers and applies the new
+ *  persona's default mode unless the writer chose a non-default mode. */
 async function dockLensPersona(lens) {
   const persona = lens === "sushruta" ? "script_consultant" : "writing_partner";
   // switch persona ONLY on the live session — no fork, no second store
   try {
     if (state.currentSession && state.branches[state.currentBranch] &&
         state.branches[state.currentBranch].active_persona !== persona) {
-      await _setPersonaMode(persona, state.branches[state.currentBranch].active_mode || "peer");
+      const branch = state.branches[state.currentBranch];
+      const mode = modeForPersonaSwitch(persona, branch.active_persona, branch.active_mode);
+      await _setPersonaMode(persona, mode);
       renderMessages();
     }
   } catch (e) { /* persona switch is best-effort; the conversation still works */ }
@@ -8014,7 +8037,8 @@ async function sendFvMessage(partner) {
     var wantPersona = partner === 'consultant' ? 'script_consultant' : 'writing_partner';
     var branchNow = currentBranchData() || {};
     if (branchNow.active_persona !== wantPersona) {
-      try { await _setPersonaMode(wantPersona, branchNow.active_mode || 'peer'); } catch (_) { /* lens still shows */ }
+      var nextMode = modeForPersonaSwitch(wantPersona, branchNow.active_persona, branchNow.active_mode);
+      try { await _setPersonaMode(wantPersona, nextMode); } catch (_) { /* lens still shows */ }
     }
     var base = '/projects/' + encodeURIComponent(state.currentProject);
     var res = await streamChatTurn(base + '/chat/sessions/' + sessionId, text, quote, typingDiv, container);

@@ -152,7 +152,9 @@ def test_settings_persists_the_persona(client, session_id):
     r = client.post(f"/sessions/{session_id}/settings", json={"persona": "premise_doctor"})
     assert r.status_code == 200, r.data[:200]
     # the summary does not echo the persona, so assert the STORE actually moved
-    assert cow_server.store.load(session_id).branch.active_persona == "premise_doctor"
+    stored = cow_server.store.load(session_id).branch
+    assert stored.active_persona == "premise_doctor"
+    assert stored.active_mode == "concept_validation"
 
 
 def test_settings_persists_the_mode(client, session_id):

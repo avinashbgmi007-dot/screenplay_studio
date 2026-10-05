@@ -65,6 +65,8 @@ def run(base):
               slot.locator("#composer").count() == 1)
         check("composer textarea contract intact (#input in the dock)",
               slot.locator("#input").count() == 1)
+        check("Sameer lens starts in peer mode",
+              page.evaluate("() => currentBranchData().active_mode") == "peer")
         check("no conversation DOM left in the room drawer",
               page.locator("#room-drawer #messages").count() == 0)
 
@@ -115,7 +117,8 @@ def run(base):
 
         # --- Sushruta lens -----------------------------------------------------
         page.locator("#dock-tab-sushruta").click()
-        page.wait_for_timeout(450)
+        page.wait_for_function(
+            "() => currentBranchData().active_mode === 'evidence_discussion'", timeout=5000)
         sush_slot = page.locator('.dock-lens[data-lens="sushruta"] .dock-chat-slot')
         check("consultant column adopted into the Sushruta lens",
               sush_slot.locator("#fv-consult-messages").count() == 1 and
@@ -123,6 +126,8 @@ def run(base):
         # the doctor's identity header rides along
         check("consultant identity header present",
               sush_slot.locator(".fv-name", has_text="Dr. Sushruta").count() >= 1)
+        check("Sushruta lens switches to grounded discussion mode",
+              page.evaluate("() => currentBranchData().active_mode") == "evidence_discussion")
 
         # send to the doctor: reply label must read Dr. Sushruta (persona routing)
         sush_slot.locator("#fv-consult-input").fill("what is the biggest problem?")

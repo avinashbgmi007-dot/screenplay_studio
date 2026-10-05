@@ -33,7 +33,8 @@ def _engine_and_turn(user_text, history=0):
     for i in range(history):
         session.branch.messages.append(
             __import__("screenplay_cowriter.models", fromlist=["Message"]).Message(
-                role="user" if i % 2 == 0 else "assistant", content=f"turn {i}"))
+                role="user" if i % 2 == 0 else "assistant", content=f"turn {i}",
+                partner="writing_partner"))
     engine.send_message(session, user_text)
     return client, session
 
@@ -106,16 +107,15 @@ def test_trait_reminder_injected_at_depth():
     assert client.messages[-1]["content"].startswith("[Voice check")
 
 
-def test_fewshot_examples_dropped_when_over_budget():
+def test_fewshot_examples_are_added_to_bare_prompts_only_when_budget_allows():
     client, _ = _engine_and_turn("What about scene 3?")
     has_examples = any("How Sameer talks" in m["content"] for m in client.messages)
-    assert has_examples  # normal context keeps them
+    assert has_examples  # build_system_prompt carries the persona's base examples
 
     engine = CoWriterEngine(_CaptureClient(), ScriptContext(), ReportContext(None))
-    engine.FEWSHOT_CHAR_BUDGET = 10  # tiny budget -> examples pushed out
-    session = Session.new("T")
-    engine.send_message(session, "What about scene 3?")
-    msgs = engine  # noqa -- re-fetch via client below
+    engine.FEWSHOT_CHAR_BUDGET = 10  # tiny budget -> no extra block on a bare prompt
+    messages = engine._assemble_messages("BARE SYSTEM", [], "question", "writing_partner")
+    assert "How Sameer talks" not in messages[0]["content"]
 
 
 def test_chat_sampling_is_warm():

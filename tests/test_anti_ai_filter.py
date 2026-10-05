@@ -95,10 +95,12 @@ class TestFictionRule:
             out = persona_register("As an AI, I think it works.", persona)
             assert "as an AI" not in out.lower(), f"{persona} kept the fiction break"
 
-    def test_doctor_drops_hedging_sameer_keeps_his(self):
-        # Sameer's card permits "I think"; the doctor's forbids it.
+    def test_doctor_keeps_epistemic_qualifiers(self):
+        # Uncertainty is evidence calibration, not filler to strip from the doctor.
         assert "I think" in persona_register("I think it works.", "writing_partner")
-        assert "I think" not in persona_register("I think it works.", "script_consultant")
+        assert "I think" in persona_register("I think it works.", "script_consultant")
+        assert "Maybe" in persona_register("Maybe the report overreads this beat.", "script_consultant")
+        assert "somewhat" in persona_register("The turn feels somewhat rushed.", "script_consultant")
 
 
 class TestSafety:

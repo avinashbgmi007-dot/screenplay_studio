@@ -16,7 +16,7 @@ _REASONING = re.compile(
     r"\b(because|since|so that|the reason|my instinct|i feel like|the thing is)\b", re.I
 )
 
-PROBE_SYSTEM_PROMPT = (
+SAMEER_PROBE_SYSTEM_PROMPT = (
     "You are Sameer, the writer's co-writing partner. The writer just shared an idea with "
     "you. This turn has ONE job: let them feel heard — reflect their idea back in your "
     "own words, naturally, like you're turning it over with them — then ask one genuine "
@@ -24,6 +24,36 @@ PROBE_SYSTEM_PROMPT = (
     "voice). Don't jump to suggestions, alternatives, fixes, or judgments yet — they "
     "didn't ask for any. One question, and make it sound like you, not a form."
 )
+
+PREMISE_DOCTOR_PROBE_SYSTEM_PROMPT = (
+    "You are the development executive helping the writer test a story idea. Reflect "
+    "the idea briefly, then ask one genuine question about its hook, audience, or the "
+    "writer's intent. Do not deliver a verdict or a list before the writer has answered. "
+    "Keep the question specific to this idea, not a form."
+)
+
+# Probing is a persona-and-mode decision, not a global reaction to every
+# statement. In particular, Dr. Sushruta is verdict-first and must never receive
+# Sameer's reflect-and-probe instruction. Brainstorming also needs material, not
+# a clarification loop. The development executive keeps a distinct probe for
+# concept validation, where questions are the intended first move.
+PROBE_PROMPTS = {
+    "writing_partner": SAMEER_PROBE_SYSTEM_PROMPT,
+    "premise_doctor": PREMISE_DOCTOR_PROBE_SYSTEM_PROMPT,
+}
+PROBE_MODES = {
+    "writing_partner": frozenset({"peer"}),
+    "premise_doctor": frozenset({"concept_validation"}),
+}
+
+# Backwards-compatible name for existing callers/tests that mean Sameer's
+# peer-mode probe. New engine code resolves the active persona explicitly.
+PROBE_SYSTEM_PROMPT = SAMEER_PROBE_SYSTEM_PROMPT
+
+
+def probe_system_prompt(persona: str) -> str | None:
+    """The probe instruction for a persona, or None when it has no probe path."""
+    return PROBE_PROMPTS.get(persona)
 
 
 def classify_turn(text: str) -> str:
@@ -49,8 +79,15 @@ def has_embedded_reasoning(text: str) -> bool:
     return bool(_REASONING.search(text or ""))
 
 
-def should_probe(text: str) -> bool:
-    """Probe only when the writer shares an idea WITHOUT embedded reasoning."""
+def should_probe(text: str, persona: str = "writing_partner", mode: str = "peer") -> bool:
+    """Whether this persona/mode should ask a first-turn clarifier.
+
+    Kept defaulted to Sameer/peer for callers of the original one-argument API.
+    Personas without an explicit policy answer normally; they never inherit
+    Sameer's probe merely because the writer used a statement.
+    """
+    if mode not in PROBE_MODES.get(persona, frozenset()):
+        return False
     return classify_turn(text) == "idea" and not has_embedded_reasoning(text)
 
 

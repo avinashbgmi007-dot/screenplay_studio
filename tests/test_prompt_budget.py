@@ -283,6 +283,54 @@ class TestFindingsTrim:
         assert "Rationale number 0" not in text
 
 
+class TestReportEvidenceQuotes:
+    def test_verified_report_wording_is_doctor_only(self):
+        report = ReportContext({"findings": [{
+            "category": "dialogue", "severity": "high", "issue": "A changed premise",
+            "evidence_quote": "MAYA: I never came here for the money.",
+            "verification": {"status": "verified"},
+        }]})
+        doctor = build_system_prompt(
+            _script(), report, "script_consultant", "evidence_discussion", budget=0
+        )
+        sameer = build_system_prompt(_script(), report, "writing_partner", "peer", budget=0)
+        assert "MAYA: I never came here for the money." in doctor
+        assert "MAYA: I never came here for the money." not in sameer
+
+    def test_unverified_wording_is_not_repeated_as_script_evidence(self):
+        report = ReportContext({"findings": [{
+            "category": "dialogue", "severity": "high", "issue": "A changed premise",
+            "evidence_quote": "MAYA: I came here for the money.",
+            "verification": {"status": "not_found"},
+        }]})
+        summary = report.compact_summary(include_evidence=True)
+        assert "MAYA: I came here for the money." not in summary
+        assert "[UNVERIFIED QUOTE]" in summary
+
+    def test_excerpt_is_bounded_and_budget_can_drop_it(self):
+        quote = "word " * 100
+        report = ReportContext({"findings": [{
+            "category": "dialogue", "severity": "high", "issue": "Long quote",
+            "evidence_quote": quote, "verification": {"status": "verified"},
+        }]})
+        summary = report.compact_summary(include_evidence=True)
+        assert "[excerpt]" in summary
+        assert len(summary) < len(quote)
+        assert "Report-cited wording" not in report.compact_summary(
+            include_evidence=True, drop_evidence=True
+        )
+
+    def test_quote_count_is_capped(self):
+        report = ReportContext({"findings": [
+            {"category": "dialogue", "severity": "high", "issue": f"Issue {i}",
+             "evidence_quote": f"line {i}", "verification": {"status": "verified"}}
+            for i in range(15)
+        ]})
+        summary = report.compact_summary(include_evidence=True)
+        assert summary.count("Report-cited wording") == 12
+        assert "3 further verified report evidence excerpt(s) omitted" in summary
+
+
 class TestScriptMapTrim:
     def test_no_cap_is_unchanged(self):
         assert _script().script_map(max_chars=0) == _script().script_map()
