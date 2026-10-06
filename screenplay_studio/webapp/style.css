@@ -6154,6 +6154,11 @@ body:not(.idea-mode) .desk {
    12px "secondary text" tier. The chrome (chips, buttons) stays at the label
    tier so the hierarchy still reads. */
 .finding-deep-why { font-size:var(--fs-sm); color:var(--text-muted); line-height:1.55; }
+/* Gate 11: the observation the note rests on — a factual claim about the page,
+   set apart from the diagnosis by a quiet left rule so the two are not read as
+   one paragraph. Same 12px reading tier as the why/quote, never the label tier:
+   it is the checkable half of the note, not chrome. */
+.finding-deep-observation { font-size:var(--fs-sm); color:var(--text); line-height:1.55; border-left:2px solid var(--line); padding-left:var(--sp-3); }
 .finding-deep-quote { font-size:var(--fs-sm); color:var(--text); font-style:italic; line-height:1.5; }
 .finding-deep-badge { align-self:flex-start; font-size:var(--fs-2xs); font-weight:600; border-radius:var(--r-sm); padding:1px var(--sp-2); }
 .finding-deep-badge.verified { color:var(--ok); border:1px solid var(--ok); }
@@ -6396,6 +6401,17 @@ body:not(.idea-mode) .desk {
 .dock-wd-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
 .dock-wd-reason { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; }
 .dock-wd-note { font-size:var(--fs-3xs); color:var(--text-faint); margin:var(--sp-2) 0 0; }
+/* The feedback ledger (gate 9): what happened to the previous run's notes.
+   Muted ink throughout — this is a record, not a verdict. The one accent is on
+   `likely_resolved`, the writer's own payoff, and it uses the ok colour rather
+   than a severity colour because nothing here is a defect. */
+.dock-ledger-head { font-size:var(--fs-2xs); color:var(--text-muted); font-weight:600; margin:var(--sp-3) 0 var(--sp-1); }
+.dock-ledger-head:first-child { margin-top:0; }
+.dock-ledger-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-1) 0; }
+.dock-ledger-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
+.dock-ledger-sim { font-size:var(--fs-3xs); color:var(--text-faint); margin-left:auto; white-space:nowrap; }
+.dock-ledger-row.dock-ledger-likely_resolved .dock-ledger-issue { color:var(--ok); }
+.dock-ledger-note { font-size:var(--fs-3xs); color:var(--text-faint); margin:var(--sp-3) 0 0; line-height:1.5; }
 @media (prefers-reduced-motion: reduce) {
   .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
 }

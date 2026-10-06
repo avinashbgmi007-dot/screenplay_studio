@@ -231,7 +231,7 @@ class TestF05RouteMapTotals:
 
     def test_census_is_what_the_audit_measured_plus_the_new_routes(self):
         counts = _source_census()
-        assert counts["screenplay_studio/webapp_server.py"] == 95, (
+        assert counts["screenplay_studio/webapp_server.py"] == 96, (
             "the count the route map pins moved: regenerate the map (its header "
             "says how) and update this pin together")
 

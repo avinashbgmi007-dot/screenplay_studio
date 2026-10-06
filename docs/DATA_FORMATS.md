@@ -223,6 +223,17 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
                                           //   Required for passes that regenerate every run —
                                           //   AnalysisResult._DETERMINISTIC_CHECK_IDS + merge() use it
                                           //   to drop stale copies on a partial retry.
+      "evidence_source": "pages",         // "pages" when the judgment rests on the manuscript,
+                                          //   "summary" when the pass reasoned from scene summaries
+                                          //   only. Drives the desk's depth disclosure: a
+                                          //   summary-sourced finding is a second opinion on
+                                          //   structure, not a reading of the writer's pages.
+      "merged_rule_ids": ["rule_x"],      // other KB rules this same evidence also answers (cross-rule
+                                          //   dedup collapsed them into this row). Omitted when none.
+      "scene_key": "INT STUDY NIGHT#1",   // the finding id's scene component, stamped at report-write
+                                          //   time (report.stamp_scene_keys). Carried so a consumer can
+                                          //   recompute the SAME content-hash id without re-reading
+                                          //   the report — see revision.compute_finding_id.
       "verification": {
         "status": "verified",             // verified | not_found | no_quote | scene_not_found
         "matched_scene": 1,               // scene the quote matched in (verified only)

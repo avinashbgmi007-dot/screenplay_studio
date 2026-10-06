@@ -20,7 +20,7 @@
 - There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
   stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
 
-**Totals:** 95 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **97**.
+**Totals:** 96 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **98**.
 (Pinned by `tests/test_audit_remediation.py::TestF05RouteMapTotals`; regenerate
 after adding or changing any `@app.route` — this map had drifted by +4 before
 the 2026-09-30 audit, and the verdict channel added 4 more on 2026-10-05.)
@@ -74,6 +74,7 @@ the 2026-09-30 audit, and the verdict channel added 4 more on 2026-10-05.)
 | POST | `/api/projects/<name>/findings/verdict` | `set_finding_verdict_route` | Set/clear one finding's truth verdict (`correct`/`partial`/`incorrect`/null). |
 | GET | `/api/projects/<name>/findings/verdicts` | `get_finding_verdicts` | The writer's truth verdicts, by finding id (the accuracy meter's data). |
 | GET | `/api/projects/<name>/findings/accuracy` | `get_finding_accuracy` | Writer-agreement meter: accuracy (not-wrong over judged) + verifiability, per category. |
+| GET | `/api/projects/<name>/feedback/ledger` | `get_feedback_ledger` | The feedback ledger (gate 9): the last two recorded runs reconciled — same / maybe / likely_resolved / not_re_raised / new. |
 | GET | `/api/projects/<name>/metrics` | `get_metrics` | Desk metrics summary. |
 | POST | `/api/projects/<name>/premise` | `save_project_premise` | Save/update the premise card (post-graduation). |
 | GET | `/api/projects/<name>/script` | `get_script` | Serve the working copy (ScriptDocument). |

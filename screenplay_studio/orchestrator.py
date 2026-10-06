@@ -139,6 +139,19 @@ class Orchestrator:
                 result.merge(m.report_findings_path)
 
             save_report(result, m.report_md_path, m.report_findings_path)
+            # Gate 9: record what this run DELIVERED in the feedback ledger —
+            # the system of record. Recording here (the one chokepoint both the
+            # webapp route and the CLI pass through) means every run is logged
+            # however it was started. A ledger write must never cost an analysis
+            # that has already produced a report, so a failure is recorded in
+            # the stage payload, not raised.
+            ledger_note = None
+            try:
+                from screenplay_analyzer.report import to_findings_json
+                from .feedback_ledger import record_run
+                record_run(m, to_findings_json(result))
+            except Exception as e:                       # noqa: BLE001 — audit trail
+                ledger_note = f"Feedback ledger not updated: {e}"
             import time as _t
             atomic_write_json(m.progress_path, {"stage": "done", "status": "complete", "detail": "Analysis complete", "ts": _t.time()})
 
@@ -163,6 +176,7 @@ class Orchestrator:
                     "partial_errors": result.errors,
                     "category_outcomes": dict(result.category_outcomes or {}),
                     "failed_categories": failed_categories,
+                    **({"ledger_error": ledger_note} if ledger_note else {}),
                 })
             else:
                 m.mark_complete("analyze", {
@@ -170,6 +184,7 @@ class Orchestrator:
                     "report_findings": m.report_findings_path,
                     "category_outcomes": dict(result.category_outcomes or {}),
                     "failed_categories": failed_categories,
+                    **({"ledger_error": ledger_note} if ledger_note else {}),
                 })
         except Exception as e:
             import time as _t2

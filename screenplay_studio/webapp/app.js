@@ -49,6 +49,7 @@ const state = {
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
   findingsSummary: null,  // server-joined counts + dawn % from /findings/summary (ONE findings-state load)
+  feedbackLedger: null,   // gate 9: the last two runs reconciled (from /feedback/ledger)
   reportStats: null,      // stats from report.findings.json
   // spec §15.3: { findings, errors, ok } — the two deterministic rule passes
   // re-run on the CURRENT text after an edit. Deliberately not `findings`:
@@ -4213,6 +4214,16 @@ async function loadScriptData() {
   try {
     summary = await api(`${base}/findings/summary`);
   } catch (_) { /* no analysis yet — same state the report fetch tolerates */ }
+  // Gate 9: the feedback ledger — the system of record across runs. Fetched on
+  // the same load as everything else (one more read of the same project, not a
+  // second surface with its own lifecycle). A damaged ledger answers 409 and is
+  // tolerated like every other optional read: the desk stays silent rather than
+  // claiming an empty history it cannot vouch for.
+  try {
+    state.feedbackLedger = await api(`${base}/feedback/ledger`);
+  } catch (_) {
+    state.feedbackLedger = null;
+  }
   if (arrived && findings.length) scheduleArrivalPeek();
   renderDraftBar();
   await renderDiffBanner();
@@ -4990,6 +5001,12 @@ function findingNoteEl(f, index, opts = {}) {
   if (opts.deep) {
     const deep = el("div", "finding-deep");
     if (f.why_it_matters) deep.appendChild(el("span", "finding-deep-why", f.why_it_matters));
+    // Gate 11: the falsifiable observation the note rests on. It sits ABOVE the
+    // quote because the quote is the EVIDENCE for the observation, not the
+    // finding itself — reading them in that order is what makes the note
+    // checkable rather than merely asserted. Present only on findings the
+    // observation pass could ground, so its absence is itself information.
+    if (f.observation) deep.appendChild(el("span", "finding-deep-observation", f.observation));
     if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
     const badge = verificationBadge(f.verification);
     if (badge) deep.appendChild(badge);
@@ -6583,6 +6600,59 @@ function buildContextSection() {
     wdSec.title = "The integrity gate removed these because they were mechanically false, "
       + "not a craft judgement. Nothing was deleted.";
     lens.appendChild(wdSec);
+  }
+
+  // -- 5c. the feedback ledger: what happened to your notes between runs -----
+  // Amendment 6: across two real runs of the same model on the same script,
+  // 65 % of the writer's marks had no counterpart — the judgment tier churns,
+  // and no identity function fixes that. So "nothing lost" cannot mean every
+  // note comes back; it means every note stays ACCOUNTED FOR. This is where the
+  // desk says which of last run's notes returned, which likely landed (marked
+  // and gone), which the model simply moved on from, and which are new. Its own
+  // section, and absent until two runs exist — there is nothing to reconcile
+  // against one, and inventing a comparison against nothing is the failure mode
+  // this whole gate exists to avoid.
+  const lg = state.feedbackLedger;
+  if (lg && lg.reconcile) {
+    const rc = lg.reconcile;
+    const body = el("div", "dock-ledger-body");
+    const rows = (list, cls) => {
+      (list || []).forEach((item) => {
+        const t = item.prev || item;                 // same/maybe wrap {prev, cur}
+        const row = el("div", "dock-ledger-row " + cls);
+        row.appendChild(el("span", "dock-ledger-issue",
+          String((t && t.issue) || "(no text)").slice(0, 160)));
+        if (item.similarity != null) {
+          row.appendChild(el("span", "dock-ledger-sim",
+            `${Math.round(item.similarity * 100)}% similar`));
+        }
+        body.appendChild(row);
+      });
+    };
+    const groups = [
+      ["same", `${rc.same.length} returned \u2014 same point, same evidence`],
+      ["maybe", `${rc.maybe.length} possibly the same point`],
+      ["likely_resolved", `${rc.likely_resolved.length} you marked \u2014 and they did not come back`],
+      ["not_re_raised", `${rc.not_re_raised.length} did not come back (you had not marked them)`],
+      ["new", `${rc.new.length} new this run`],
+    ];
+    groups.forEach(([key, label]) => {
+      const list = rc[key];
+      if (!list || !list.length) return;
+      body.appendChild(el("p", "dock-ledger-head", label));
+      rows(list, "dock-ledger-" + key);
+    });
+    body.appendChild(el("p", "dock-ledger-note",
+      "Nothing is lost between runs: every note from both runs is accounted for here, "
+      + "and each run's full set stays beside your project in feedback_ledger.json. "
+      + "The model does not always re-raise a point \u2014 this is the desk saying so "
+      + "rather than letting it vanish."));
+    const lgSec = dockSection("feedback-ledger",
+      `Feedback across runs \u2014 run ${lg.latest.run} vs run ${lg.previous.run}`
+      + ` (${lg.runs} runs recorded)`, body);
+    lgSec.title = "What happened to the notes from the previous run: which returned, "
+      + "which likely landed, which were not re-raised, and which are new.";
+    lens.appendChild(lgSec);
   }
 
   // -- 6. Setup / Payoff ------------------------------------------------------

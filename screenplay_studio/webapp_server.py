@@ -2419,6 +2419,20 @@ def _fixqueue_items(m):
             # renders both verbatim (escapeHtml at the sink, as everywhere).
             "evidence_quote": f.get("evidence_quote"),
             "verification": f.get("verification"),
+            # Gate 8 (delivery contract). The row is a public surface, and
+            # "craft attribution is the product" (Law D) is unreadable through
+            # a row that drops who says so. These four were on the report and
+            # the client already has renderers for the first two (ruleChip /
+            # finding-check) — they were simply never delivered by this route,
+            # so a consumer reading /findings (as the scene-first prototype
+            # does) saw an unattributed opinion.
+            "rule_id": f.get("rule_id"),
+            "check_id": f.get("check_id"),
+            "evidence_source": f.get("evidence_source"),
+            "merged_rule_ids": f.get("merged_rule_ids"),
+            # Gate 11: the falsifiable observation a grounded finding rests on.
+            # Delivered so the checkable half of a note is not report-only.
+            "observation": f.get("observation"),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
 
@@ -2775,6 +2789,29 @@ def get_finding_accuracy(name):
         return _error("Project not found.", 404)
     from .revision import verdict_accuracy
     return jsonify(verdict_accuracy(m))
+
+
+# ---------- the feedback ledger (gate 9) ----------
+# The system of record. Amendment 6: across two real runs of the same model on
+# the same script, 65 % of the writer's marks had no counterpart — so "nothing
+# lost" cannot mean every mark SURVIVES; it means every mark stays ACCOUNTED
+# FOR. This serves the last two recorded runs, reconciled.
+
+@app.route("/api/projects/<name>/feedback/ledger", methods=["GET"])
+def get_feedback_ledger(name):
+    """The last two runs reconciled (same / maybe / likely_resolved /
+    not_re_raised / new), plus the run count. A damaged ledger is reported as
+    damage — never as an empty history, which would read as "no runs yet"."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    from .feedback_ledger import ledger_view
+    from .jsonio import StoreUnreadable
+    try:
+        return jsonify(ledger_view(m))
+    except StoreUnreadable as e:
+        return _error(f"The feedback ledger is unreadable: {e}", 409)
 
 
 # ---------- Design Lab (preview-next) ----------

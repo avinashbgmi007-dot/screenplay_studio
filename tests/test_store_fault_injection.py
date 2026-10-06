@@ -39,7 +39,8 @@ from typing import Any, Callable, Optional
 
 import pytest
 
-from screenplay_studio import beatboard, metrics, notes, pass_history, revision, stash_store
+from screenplay_studio import (beatboard, feedback_ledger, metrics, notes,
+                               pass_history, revision, stash_store)
 from screenplay_studio.manifest import ProjectManifest
 
 
@@ -54,6 +55,15 @@ def _write_raw(path: str, text: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
+
+
+def _ledger_report(tag: str) -> dict:
+    """A minimal report whose delivered set differs by `tag`, so
+    `record_run` appends a NEW run rather than deduping against the last one
+    (it logs one run per distinct delivered set)."""
+    return {"model_used": "test-model", "findings": [
+        {"category": "dialogue", "issue": f"issue {tag}", "severity": "low",
+         "scene_refs": [1], "evidence_quote": None, "scene_key": f"INT ROOM {tag}"}]}
 
 
 @dataclass
@@ -167,6 +177,20 @@ CASES = [
         seed=lambda m: revision.set_finding_verdict(m, "abc123", "correct"),
         mutate=lambda m: revision.set_finding_verdict(m, "def456", "incorrect"),
         missing_default={},
+        status="guarded",
+    ),
+    StoreCase(
+        # the feedback ledger (gate 9) — the system of record for what each run
+        # delivered. Its own file, so a torn ledger can never cost the writer
+        # their marks, verdicts or report; damage reads as damage and a write
+        # refuses rather than overwriting it.
+        name="feedback ledger",
+        module="screenplay_studio/feedback_ledger.py",
+        path=lambda m: feedback_ledger.ledger_path(m),
+        read=lambda m: feedback_ledger.load_ledger(m),
+        seed=lambda m: feedback_ledger.record_run(m, _ledger_report("alpha")),
+        mutate=lambda m: feedback_ledger.record_run(m, _ledger_report("beta")),
+        missing_default={"runs": []},
         status="guarded",
     ),
     StoreCase(
