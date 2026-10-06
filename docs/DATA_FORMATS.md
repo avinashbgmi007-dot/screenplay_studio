@@ -303,7 +303,21 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
       "finding": { … }                    //   false; merge = folded duplicate. See
     }                                     //   screenplay_analyzer/finding_integrity.py
   ],
-  "errors": []
+  "errors": [],                           // passes that FAILED. Non-empty puts the run on the
+                                          //   orchestrator's partial-failure path and renders the
+                                          //   desk's failure banner — so nothing that succeeded may
+                                          //   be written here.
+  "recoveries": [                         // CAVEATS, not errors: a pass whose chunk raised, was
+                                          //   re-run in smaller pieces, and recovered. The pass
+                                          //   succeeded, so this stays OUT of `errors` — but a split
+                                          //   re-asks the scenes, so the finding set is
+                                          //   path-dependent (measured 8 vs 12 findings on identical
+                                          //   input) and the writer is owed the caveat. Empty on a
+                                          //   clean run. Rendered in report.md as "## Notes on this
+                                          //   run". NOT yet rendered in the desk UI — see
+                                          //   screenplay_analyzer/pipeline.py AnalysisResult.recoveries
+    "Dialogue analysis: the model's reply hit its output limit on 1 chunk(s) (scenes 4–6) …"
+  ]
 }
 ```
 

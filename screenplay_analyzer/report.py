@@ -108,6 +108,15 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append(f"- {e}")
         lines.append("")
 
+    # A caveat, not a warning — see `AnalysisResult.recoveries`. Rendered apart
+    # from the ⚠️ block on purpose: nothing failed, and a report that shouts
+    # "warning" at a split trains the writer to ignore the block that does mean it.
+    if getattr(result, "recoveries", None):
+        lines.append("## Notes on this run")
+        for n in result.recoveries:
+            lines.append(f"- {n}")
+        lines.append("")
+
     # --- Coverage ---
     if result.coverage:
         cov = result.coverage
@@ -468,6 +477,13 @@ def to_findings_json(result: AnalysisResult) -> dict:
             **_observation_coverage(result.findings),
         },
         "errors": result.errors,
+        # Caveats, not errors: a pass whose chunk had to be split mid-run. Kept
+        # out of `errors` because that list is the orchestrator's partial-failure
+        # signal and the desk's failure banner — a split means the pass succeeded
+        # in smaller pieces, so dressing it as a failure is a false alarm. Its own
+        # key so the writer can be told the finding set is path-dependent without
+        # being told the run is broken.
+        "recoveries": result.recoveries,
     }
 
 
