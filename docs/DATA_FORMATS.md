@@ -209,6 +209,12 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
       "severity": "low",                  // low | medium | high
       "scene_refs": [1],
       "evidence_quote": "I'll tell you everything when this is over.",  // null when reasoning-only
+      "observation": "…",                 // gate 11 only: the falsifiable statement the note rests on,
+                                          //   present ONLY when the observation pass grounded a finding
+                                          //   the verifier had left at `no_quote`. The citation above is
+                                          //   the model's proposal RE-VERIFIED against the script by
+                                          //   verifier.verify_finding at the standard 0.72 threshold —
+                                          //   never the model's self-report. Absent on every other finding.
       "rule_id": null,                    // knowledge-base rule id when grounded; MUST resolve in the
                                           //   KB — the UI renders it as "Grounded in knowledge-base
                                           //   rule <id>" (app.js:4066). Omit when no rule applies.
@@ -217,6 +223,17 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
                                           //   Required for passes that regenerate every run —
                                           //   AnalysisResult._DETERMINISTIC_CHECK_IDS + merge() use it
                                           //   to drop stale copies on a partial retry.
+      "evidence_source": "pages",         // "pages" when the judgment rests on the manuscript,
+                                          //   "summary" when the pass reasoned from scene summaries
+                                          //   only. Drives the desk's depth disclosure: a
+                                          //   summary-sourced finding is a second opinion on
+                                          //   structure, not a reading of the writer's pages.
+      "merged_rule_ids": ["rule_x"],      // other KB rules this same evidence also answers (cross-rule
+                                          //   dedup collapsed them into this row). Omitted when none.
+      "scene_key": "INT STUDY NIGHT#1",   // the finding id's scene component, stamped at report-write
+                                          //   time (report.stamp_scene_keys). Carried so a consumer can
+                                          //   recompute the SAME content-hash id without re-reading
+                                          //   the report — see revision.compute_finding_id.
       "verification": {
         "status": "verified",             // verified | not_found | no_quote | scene_not_found
         "matched_scene": 1,               // scene the quote matched in (verified only)
@@ -269,6 +286,14 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
     "scene_length_stats": {...}, "scene_estimates": [...], "runtime_minutes": 25.0
   },
   "verification_summary": {"verified": 3, "not_found": 0, "no_quote": 2, "scene_not_found": 0},
+  "withdrawals": [                        // the integrity gate's ledger. Findings the gate REMOVED
+    {                                     //   from the delivered set, kept here so nothing is lost.
+      "index": 7,                         //   `findings` + `withdrawals` is always the pre-gate list
+      "action": "reject",                 //   (the "nothing lost" law, made checkable). Empty when
+      "reason": "reports the ABSENCE …",  //   SCREENPLAY_STUDIO_INTEGRITY_GATE=0. reject = mechanically
+      "finding": { … }                    //   false; merge = folded duplicate. See
+    }                                     //   screenplay_analyzer/finding_integrity.py
+  ],
   "errors": []
 }
 ```

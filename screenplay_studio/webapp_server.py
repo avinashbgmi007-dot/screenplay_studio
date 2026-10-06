@@ -1890,18 +1890,23 @@ def get_edits(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
     from .revision import (edits_log, finding_statuses, redo_stack, finding_intents,
-                           last_pass_snapshot, ambiguous_marks)
+                           last_pass_snapshot, ambiguous_marks, finding_verdicts)
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
     # writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride the same
     # fetch the client already makes on every script load — no second path
     intents = finding_intents(m)
+    # the truth axis rides the same fetch for the same reason (one load, one
+    # findings state). Strict like the intent store, not lenient like the
+    # ambiguous-marks notice: a verdict IS the writer's judgment, so a damaged
+    # store must fail loud rather than silently read as "nothing judged".
+    verdicts = finding_verdicts(m)
     lp = None
     try:
         lp = last_pass_snapshot(m)
     except (OSError, ValueError):
         lp = None  # unreadable snapshot must never break the edits fetch
     return jsonify({"edits": edits_log(m), "findings_status": statuses, "can_undo": bool(edits_log(m)), "can_redo": bool(redo_stack(m)),
-                    "finding_intents": intents, "last_pass": lp,
+                    "finding_intents": intents, "finding_verdicts": verdicts, "last_pass": lp,
                     # marks the upgrade could not carry (one stored id, several
                     # findings). Read, never applied — the desk says so instead
                     # of guessing which finding the writer meant.
@@ -2414,6 +2419,20 @@ def _fixqueue_items(m):
             # renders both verbatim (escapeHtml at the sink, as everywhere).
             "evidence_quote": f.get("evidence_quote"),
             "verification": f.get("verification"),
+            # Gate 8 (delivery contract). The row is a public surface, and
+            # "craft attribution is the product" (Law D) is unreadable through
+            # a row that drops who says so. These four were on the report and
+            # the client already has renderers for the first two (ruleChip /
+            # finding-check) — they were simply never delivered by this route,
+            # so a consumer reading /findings (as the scene-first prototype
+            # does) saw an unattributed opinion.
+            "rule_id": f.get("rule_id"),
+            "check_id": f.get("check_id"),
+            "evidence_source": f.get("evidence_source"),
+            "merged_rule_ids": f.get("merged_rule_ids"),
+            # Gate 11: the falsifiable observation a grounded finding rests on.
+            # Delivered so the checkable half of a note is not report-only.
+            "observation": f.get("observation"),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
 
@@ -2686,6 +2705,113 @@ def set_finding_intent_route(name):
     from .revision import set_finding_intent
     set_finding_intent(m, fid, body.get("intent"))
     return jsonify({"ok": True, "finding_id": fid, "intent": body.get("intent")})
+
+
+# ---------- writer verdict (the truth axis) ----------
+# The intent routes above record what the writer will DO; these record whether
+# the finding is TRUE. Without this axis "98.58 % accurate" is unfalsifiable —
+# there is no data from which to compute it. The store is separate
+# (`finding_verdicts.json`) so neither judgment can destroy the other, and the
+# routes mirror the intent routes one-for-one so every guard (host, origin,
+# capability token) and every store invariant holds by construction.
+
+
+@app.route("/api/projects/<name>/findings/verdicts", methods=["GET"])
+def get_finding_verdicts(name):
+    """The writer's truth verdicts: {finding_id: correct|partial|incorrect}.
+    The read twin of `/findings/intent` — one axis, its own fetch."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    from .revision import finding_verdicts
+    return jsonify({"verdicts": finding_verdicts(m)})
+
+
+@app.route("/api/projects/<name>/findings/verdict", methods=["POST"])
+def set_finding_verdict_route(name):
+    """The writer's judgment on whether a finding is TRUE — the ground-truth
+    channel the accuracy metric is computed from. verdict=null clears it.
+    Orthogonal to /findings/intent (what they will DO): two axes, two stores."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    body = request.get_json(silent=True) or {}
+    fid = body.get("finding_id")
+    if not fid:
+        return _error("finding_id required.", 400)
+    from .revision import set_finding_verdict
+    set_finding_verdict(m, fid, body.get("verdict"))
+    return jsonify({"ok": True, "finding_id": fid, "verdict": body.get("verdict")})
+
+
+@app.route("/api/projects/<name>/findings/verdict/batch", methods=["POST"])
+def set_finding_verdicts_batch(name):
+    """Batch the truth verdicts the way the intent batch batches the marks —
+    one call, N verdicts, each through the SAME set_finding_verdict the single
+    route uses, so every store invariant (lock span, damaged-store refusal, id
+    keying) holds for the batch because it is N of the thing that already held.
+    verdict=null clears. A rejected id is skipped and reported, not swallowed."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    body = request.get_json(silent=True) or {}
+    raw = body.get("verdicts")
+    if not isinstance(raw, dict) or not raw:
+        return _error("verdicts must be a non-empty object of finding_id -> verdict.", 400)
+    if len(raw) > 500:
+        return _error("Too many verdicts in one batch (500 max).", 400)
+    from .revision import set_finding_verdict
+    applied, failed = [], []
+    for fid, verdict in raw.items():
+        if not isinstance(fid, str) or not fid.strip():
+            failed.append({"finding_id": fid, "error": "finding_id required."})
+            continue
+        try:
+            set_finding_verdict(m, fid, verdict)
+            applied.append(fid)
+        except Exception as e:  # a damaged verdict store fails loud, per id
+            failed.append({"finding_id": fid, "error": str(e)})
+    return jsonify({"ok": not failed, "applied": applied, "failed": failed}), (200 if not failed else 207)
+
+
+@app.route("/api/projects/<name>/findings/accuracy", methods=["GET"])
+def get_finding_accuracy(name):
+    """The writer-agreement meter: A (accuracy — the headline, not-wrong over
+    judged) plus B (verifiability), per category, from the writer's own
+    verdicts. This is the endpoint that makes '98.58 %' a measured number
+    rather than an assertion."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    from .revision import verdict_accuracy
+    return jsonify(verdict_accuracy(m))
+
+
+# ---------- the feedback ledger (gate 9) ----------
+# The system of record. Amendment 6: across two real runs of the same model on
+# the same script, 65 % of the writer's marks had no counterpart — so "nothing
+# lost" cannot mean every mark SURVIVES; it means every mark stays ACCOUNTED
+# FOR. This serves the last two recorded runs, reconciled.
+
+@app.route("/api/projects/<name>/feedback/ledger", methods=["GET"])
+def get_feedback_ledger(name):
+    """The last two runs reconciled (same / maybe / likely_resolved /
+    not_re_raised / new), plus the run count. A damaged ledger is reported as
+    damage — never as an empty history, which would read as "no runs yet"."""
+    try:
+        m = _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    from .feedback_ledger import ledger_view
+    from .jsonio import StoreUnreadable
+    try:
+        return jsonify(ledger_view(m))
+    except StoreUnreadable as e:
+        return _error(f"The feedback ledger is unreadable: {e}", 409)
 
 
 # ---------- Design Lab (preview-next) ----------

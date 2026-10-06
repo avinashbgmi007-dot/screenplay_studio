@@ -41,6 +41,7 @@ const state = {
   findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, showAddressed: false, category: null, scene: null },
   ambiguousMarks: {},     // marks the scene-key upgrade could not carry (one id, several findings)
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
+  findingVerdicts: {},    // finding id -> "correct"|"partial"|"incorrect" (truth axis, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
   passes: [],             // spec 15.4: the revision arc, one entry per analysis
@@ -48,6 +49,7 @@ const state = {
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
   findingsSummary: null,  // server-joined counts + dawn % from /findings/summary (ONE findings-state load)
+  feedbackLedger: null,   // gate 9: the last two runs reconciled (from /feedback/ledger)
   reportStats: null,      // stats from report.findings.json
   // spec §15.3: { findings, errors, ok } — the two deterministic rule passes
   // re-run on the CURRENT text after an edit. Deliberately not `findings`:
@@ -4180,6 +4182,9 @@ async function loadScriptData() {
   state.findingStatus = statusById;
   // writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride /edits
   state.findingMarks = (edits && edits.finding_intents) || {};
+  // the truth axis (what the accuracy meter is computed from) rides the same
+  // fetch — one load, one findings state, no second path to go stale
+  state.findingVerdicts = (edits && edits.finding_verdicts) || {};
   // marks the scene-key upgrade could not carry (one stored id, several
   // findings): read here, shown once in the worklist, never applied silently
   state.ambiguousMarks = (edits && edits.ambiguous_marks) || {};
@@ -4209,6 +4214,16 @@ async function loadScriptData() {
   try {
     summary = await api(`${base}/findings/summary`);
   } catch (_) { /* no analysis yet — same state the report fetch tolerates */ }
+  // Gate 9: the feedback ledger — the system of record across runs. Fetched on
+  // the same load as everything else (one more read of the same project, not a
+  // second surface with its own lifecycle). A damaged ledger answers 409 and is
+  // tolerated like every other optional read: the desk stays silent rather than
+  // claiming an empty history it cannot vouch for.
+  try {
+    state.feedbackLedger = await api(`${base}/feedback/ledger`);
+  } catch (_) {
+    state.feedbackLedger = null;
+  }
   if (arrived && findings.length) scheduleArrivalPeek();
   renderDraftBar();
   await renderDiffBanner();
@@ -4986,6 +5001,12 @@ function findingNoteEl(f, index, opts = {}) {
   if (opts.deep) {
     const deep = el("div", "finding-deep");
     if (f.why_it_matters) deep.appendChild(el("span", "finding-deep-why", f.why_it_matters));
+    // Gate 11: the falsifiable observation the note rests on. It sits ABOVE the
+    // quote because the quote is the EVIDENCE for the observation, not the
+    // finding itself — reading them in that order is what makes the note
+    // checkable rather than merely asserted. Present only on findings the
+    // observation pass could ground, so its absence is itself information.
+    if (f.observation) deep.appendChild(el("span", "finding-deep-observation", f.observation));
     if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
     const badge = verificationBadge(f.verification);
     if (badge) deep.appendChild(badge);
@@ -5017,6 +5038,35 @@ function findingNoteEl(f, index, opts = {}) {
   // dock is where the writer's judgment is made, margin pins stay read-only)
   if (opts.deep) {
     const id = (state.findingIds && state.findingIds[index]) || String(index);
+    // ---- the truth axis: "is it right?" ---------------------------------
+    // The accuracy meter is computed from THIS row and nothing else, so it is a
+    // SEPARATE row asking a SEPARATE question from the intent row below it.
+    // Never one control: a writer must be able to say "it's true but I won't act
+    // on it" — collapsing the two axes is what produced the ambiguous middle
+    // that made "98.58 % accurate" unmeasurable in the first place. It lives in
+    // its own container, not `.finding-note-actions`, because that row has a
+    // measured one-row budget the suite gates (adding three buttons to it would
+    // re-wrap it, which is the exact defect rung 17 painted out).
+    const vrow = el("div", "finding-verdict-row");
+    vrow.appendChild(el("span", "finding-verdict-label", "is it right?"));
+    const mkVerdict = (label, name, verdict, title) => {
+      const b = el("button", "verdict-btn" + (state.findingVerdicts[id] === verdict ? " active" : ""), label);
+      b.type = "button";
+      b.setAttribute("aria-label", name);
+      b.title = title;
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setFindingVerdict(id, state.findingVerdicts[id] === verdict ? null : verdict);
+      });
+      return b;
+    };
+    vrow.appendChild(mkVerdict("\u2713", "Correct \u2014 this finding is right", "correct",
+                               "Correct \u2014 this finding is right"));
+    vrow.appendChild(mkVerdict("~", "Partly right", "partial",
+                               "Partly right \u2014 true in part"));
+    vrow.appendChild(mkVerdict("\u2717", "Wrong \u2014 this finding is false", "incorrect",
+                               "Wrong \u2014 this finding is false"));
+    note.appendChild(vrow);
     // These four carry a glyph, not a word: their accessible name has to be
     // typed, because a screen reader reading "⏭" aloud names a media key, not
     // the verb the writer is being asked to press.
@@ -6473,8 +6523,136 @@ function buildContextSection() {
             + "Treat those findings as a second opinion on structure, not a reading of your pages.";
           inner.appendChild(line);
         }
+        // -- the accuracy meter: the writer's own verdicts, tallied ----------
+        // The headline is the NOT-WRONG reading, and the rationale is the whole
+        // point: the harm this product must avoid is a writer ACTING ON A FALSE
+        // finding. A true-but-unsupported one costs nothing — the writer judges
+        // it. So the bar sits on `wrong`, and raising it is verifiability's job,
+        // not a stricter truth bar. The judged count always rides the rate,
+        // because a percentage over 3 judged findings is not the same claim as
+        // one over 300.
+        const acc = accuracyMeter();
+        if (acc.total) {
+          const box = el("div", "dock-accuracy");
+          box.appendChild(el("p", "dock-acc-head", acc.judged
+            ? `Accuracy \u2014 ${acc.accuracy}% not-wrong over ${acc.judged} judged`
+            : "Accuracy \u2014 no verdicts yet"));
+          if (acc.judged) {
+            const gap = Math.round((acc.target - acc.accuracy) * 10) / 10;
+            box.appendChild(el("p", "dock-acc-sub",
+              `Target ${acc.target}% \u00B7 ${gap <= 0 ? "met" : gap + " pts to go"} \u00B7 `
+              + `${acc.tally.correct} correct \u00B7 ${acc.tally.partial} partly \u00B7 ${acc.tally.incorrect} wrong`));
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.coverage}% of ${acc.total} findings judged \u2014 judge the rest to make the number mean more`));
+          } else {
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.total} findings delivered \u2014 mark each \u2713 / ~ / \u2717 on its card to measure accuracy`));
+          }
+          const vs = state.report && state.report.verification_summary;
+          if (vs && vs.verified_pct_of_quoted != null) {
+            box.appendChild(el("p", "dock-acc-sub",
+              `Verifiability (B) \u2014 ${vs.verified_pct_of_quoted}% of quoted findings have a confirmed citation`));
+          }
+          inner.appendChild(box);
+        }
       });
     lens.appendChild(sec);
+  }
+
+  // -- 5b. the withdrawal ledger: what left the delivered set, and why -------
+  // The integrity gate removes MECHANICALLY false findings before they are ever
+  // carded — a pass reporting the ABSENCE of a defect, a duplicate, a
+  // name-variant rule firing on two names that are not one character. The
+  // "nothing lost" law made those removals checkable (findings + withdrawals ==
+  // the pre-gate list) but not VISIBLE: a writer could not see that anything had
+  // been taken out. This is that surface. It is its OWN section, not a line
+  // under the accuracy meter, for one concrete reason: the gate and the coverage
+  // pass are independent, so a report whose coverage pass failed still carries
+  // withdrawals — and a ledger nested inside the coverage section would be
+  // invisible in exactly that case. As a section header the count shows in the
+  // stack even while collapsed. Absent on reports analysed before the gate
+  // existed, so it renders only when the field is present.
+  const wd = (state.report && state.report.withdrawals) || [];
+  if (wd.length) {
+    const nRej = wd.filter((w) => w.action === "reject").length;
+    const nMrg = wd.filter((w) => w.action === "merge").length;
+    const bits = [];
+    if (nRej) bits.push(`${nRej} false`);
+    if (nMrg) bits.push(`${nMrg} duplicate${nMrg === 1 ? "" : "s"}`);
+    const body = el("div", "dock-wd-body");
+    wd.forEach((w) => {
+      const f = w.finding || {};
+      const row = el("div", "dock-wd-row");
+      row.appendChild(el("span", "dock-wd-action",
+        w.action === "merge" ? "duplicate" : "withdrawn"));
+      row.appendChild(el("span", "dock-wd-issue",
+        String(f.issue || "(no text)").slice(0, 180)));
+      row.appendChild(el("span", "dock-wd-reason", String(w.reason || "")));
+      body.appendChild(row);
+    });
+    body.appendChild(el("p", "dock-wd-note",
+      "Nothing was deleted \u2014 every one of these stays beside your project in "
+      + "report.findings.json under \u201cwithdrawals\u201d, with its full text. The "
+      + "analysis accounts for its own removals rather than hiding them."));
+    const wdSec = dockSection("withdrawals",
+      `Withdrawals \u2014 ${wd.length} left the delivered set`
+      + (bits.length ? ` (${bits.join(", ")})` : ""), body);
+    wdSec.title = "The integrity gate removed these because they were mechanically false, "
+      + "not a craft judgement. Nothing was deleted.";
+    lens.appendChild(wdSec);
+  }
+
+  // -- 5c. the feedback ledger: what happened to your notes between runs -----
+  // Amendment 6: across two real runs of the same model on the same script,
+  // 65 % of the writer's marks had no counterpart — the judgment tier churns,
+  // and no identity function fixes that. So "nothing lost" cannot mean every
+  // note comes back; it means every note stays ACCOUNTED FOR. This is where the
+  // desk says which of last run's notes returned, which likely landed (marked
+  // and gone), which the model simply moved on from, and which are new. Its own
+  // section, and absent until two runs exist — there is nothing to reconcile
+  // against one, and inventing a comparison against nothing is the failure mode
+  // this whole gate exists to avoid.
+  const lg = state.feedbackLedger;
+  if (lg && lg.reconcile) {
+    const rc = lg.reconcile;
+    const body = el("div", "dock-ledger-body");
+    const rows = (list, cls) => {
+      (list || []).forEach((item) => {
+        const t = item.prev || item;                 // same/maybe wrap {prev, cur}
+        const row = el("div", "dock-ledger-row " + cls);
+        row.appendChild(el("span", "dock-ledger-issue",
+          String((t && t.issue) || "(no text)").slice(0, 160)));
+        if (item.similarity != null) {
+          row.appendChild(el("span", "dock-ledger-sim",
+            `${Math.round(item.similarity * 100)}% similar`));
+        }
+        body.appendChild(row);
+      });
+    };
+    const groups = [
+      ["same", `${rc.same.length} returned \u2014 same point, same evidence`],
+      ["maybe", `${rc.maybe.length} possibly the same point`],
+      ["likely_resolved", `${rc.likely_resolved.length} you marked \u2014 and they did not come back`],
+      ["not_re_raised", `${rc.not_re_raised.length} did not come back (you had not marked them)`],
+      ["new", `${rc.new.length} new this run`],
+    ];
+    groups.forEach(([key, label]) => {
+      const list = rc[key];
+      if (!list || !list.length) return;
+      body.appendChild(el("p", "dock-ledger-head", label));
+      rows(list, "dock-ledger-" + key);
+    });
+    body.appendChild(el("p", "dock-ledger-note",
+      "Nothing is lost between runs: every note from both runs is accounted for here, "
+      + "and each run's full set stays beside your project in feedback_ledger.json. "
+      + "The model does not always re-raise a point \u2014 this is the desk saying so "
+      + "rather than letting it vanish."));
+    const lgSec = dockSection("feedback-ledger",
+      `Feedback across runs \u2014 run ${lg.latest.run} vs run ${lg.previous.run}`
+      + ` (${lg.runs} runs recorded)`, body);
+    lgSec.title = "What happened to the notes from the previous run: which returned, "
+      + "which likely landed, which were not re-raised, and which are new.";
+    lens.appendChild(lgSec);
   }
 
   // -- 6. Setup / Payoff ------------------------------------------------------
@@ -6701,6 +6879,60 @@ async function setFindingIntent(findingId, intent) {
   if (intent) state.findingMarks[findingId] = intent;
   else delete state.findingMarks[findingId];
   refreshAllFindingSurfaces(); // P0.4: every mounted surface moves with the mark
+}
+
+// ---------- writer verdict (the truth axis): the accuracy metric's data ----------
+// Mirrors setFindingIntent exactly — optimistic local update, then re-render
+// every surface. The two stores are separate on the server so a failure of one
+// can never cost the other; the same holds here, where a failed verdict leaves
+// the marks untouched and vice versa.
+async function setFindingVerdict(findingId, verdict) {
+  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
+  try {
+    await api(`${base}/findings/verdict`, { method: "POST", body: JSON.stringify({ finding_id: findingId, verdict }) });
+  } catch (e) {
+    showError("Could not save your verdict: " + e.message);
+    return;
+  }
+  if (verdict) state.findingVerdicts[findingId] = verdict;
+  else delete state.findingVerdicts[findingId];
+  refreshAllFindingSurfaces();
+}
+
+/** The writer-agreement meter, computed live from the writer's own verdicts.
+ *  The server twin is `revision.verdict_accuracy` (served at
+ *  /findings/accuracy); this mirrors it so the number the writer watches move
+ *  as they judge is the same number the API reports.
+ *
+ *  Population is DISTINCT finding ids — two rows sharing an id are one finding
+ *  for the tally, exactly as the marks store keys them. Unjudged findings are
+ *  excluded from the denominator, never counted as failures: a rate over 3
+ *  judged findings is not the same claim as one over 300, which is why
+ *  `coverage` is always printed beside `accuracy`. */
+function accuracyMeter() {
+  const findings = state.findings || [];
+  const ids = state.findingIds || [];
+  const verdicts = state.findingVerdicts || {};
+  const seen = new Set();
+  const tally = { correct: 0, partial: 0, incorrect: 0, unjudged: 0 };
+  findings.forEach((f, i) => {
+    const id = ids[i] || String(i);
+    if (seen.has(id)) return;
+    seen.add(id);
+    const v = verdicts[id];
+    tally[(v === "correct" || v === "partial" || v === "incorrect") ? v : "unjudged"] += 1;
+  });
+  const judged = tally.correct + tally.partial + tally.incorrect;
+  const total = seen.size;
+  const pct = (n, d) => (d ? Math.round((1000 * n) / d) / 10 : null);
+  return {
+    total, judged, tally,
+    accuracy: pct(tally.correct + tally.partial, judged),   // the headline: not-wrong
+    strict: pct(tally.correct, judged),
+    incorrectRate: pct(tally.incorrect, judged),
+    coverage: pct(judged, total),
+    target: 98.58,
+  };
 }
 
 // ---------- arrival (R5-b peek + R9-adjacent unread dot) ----------

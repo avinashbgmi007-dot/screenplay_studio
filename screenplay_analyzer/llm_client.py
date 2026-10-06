@@ -155,10 +155,21 @@ class LlamaServerClient(BaseLlamaClient):
             "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
         }
+        # Disable reasoning-model "thinking" on EVERY call, not just the
+        # grammar-constrained ones. A reasoning model (qwen3.x) emits hidden
+        # thinking tokens by default and will spend the entire max_tokens budget
+        # on them, returning EMPTY content: measured on qwen3.6, one non-grammar
+        # call took 11.3s and produced 0 characters of answer against 1688
+        # characters of reasoning, where the same call with thinking off took
+        # 2.1s and produced the JSON. Every call here wants structured JSON, so
+        # the reasoning is always discarded work — and because the model hits
+        # the cap before answering, it also triggers the retry ladder, which is
+        # what made a full analysis 2.7x SLOWER on the swapped model. Setting
+        # this on a model without the template hook (gemma) is a harmless no-op.
+        payload.setdefault("chat_template_kwargs", {})
+        payload["chat_template_kwargs"]["enable_thinking"] = False
         if grammar:
             payload["grammar"] = grammar
-            payload.setdefault("chat_template_kwargs", {})
-            payload["chat_template_kwargs"]["enable_thinking"] = False
             # Grammar-constrained calls degenerate into token loops ('",",",')
             # when repetition is unsuppressed — llama-server ships with
             # repeat_penalty 1.0 (off). A light penalty breaks the loop

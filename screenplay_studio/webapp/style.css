@@ -6154,6 +6154,11 @@ body:not(.idea-mode) .desk {
    12px "secondary text" tier. The chrome (chips, buttons) stays at the label
    tier so the hierarchy still reads. */
 .finding-deep-why { font-size:var(--fs-sm); color:var(--text-muted); line-height:1.55; }
+/* Gate 11: the observation the note rests on — a factual claim about the page,
+   set apart from the diagnosis by a quiet left rule so the two are not read as
+   one paragraph. Same 12px reading tier as the why/quote, never the label tier:
+   it is the checkable half of the note, not chrome. */
+.finding-deep-observation { font-size:var(--fs-sm); color:var(--text); line-height:1.55; border-left:2px solid var(--line); padding-left:var(--sp-3); }
 .finding-deep-quote { font-size:var(--fs-sm); color:var(--text); font-style:italic; line-height:1.5; }
 .finding-deep-badge { align-self:flex-start; font-size:var(--fs-2xs); font-weight:600; border-radius:var(--r-sm); padding:1px var(--sp-2); }
 .finding-deep-badge.verified { color:var(--ok); border:1px solid var(--ok); }
@@ -6370,6 +6375,43 @@ body:not(.idea-mode) .desk {
 .intent-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
 .intent-btn:hover { border-color:var(--lamp); color:var(--lamp); }
 .intent-btn.active { border-color:var(--ok); color:var(--ok); font-weight:700; }
+/* The truth axis — its own row, its own question ("is it right?"), kept OUT of
+   .finding-note-actions on purpose: that row has a measured one-row budget the
+   suite gates, and three more buttons would re-wrap it. Visually distinct from
+   the intent row so the two questions never read as one control. */
+.finding-verdict-row { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; margin:0 0 var(--sp-3); }
+/* 10px, not the 9px --fs-3xs it first shipped at: a finding card's every
+   painted text layer has a 10px floor (e2e_browser_dock_sections.py measures
+   it), and the label is painted text on the card like any other. */
+.finding-verdict-label { font-family:var(--font-mono); font-size:var(--fs-2xs); letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
+.verdict-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
+.verdict-btn:hover { border-color:var(--accent); color:var(--accent); }
+.verdict-btn.active { border-color:var(--accent); color:var(--accent); font-weight:700; }
+/* the accuracy meter, on the Coverage section: the writer's own verdicts tallied */
+.dock-accuracy { margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--line); }
+.dock-acc-head { font-size:var(--fs-sm); color:var(--text); margin:0 0 var(--sp-1); }
+.dock-acc-sub { font-size:var(--fs-2xs); color:var(--text-muted); margin:0; line-height:1.5; }
+/* The withdrawal ledger (integrity gate): what left the delivered set, and why.
+   Muted ink, never a severity colour — nothing here is a defect, it is the
+   report accounting for its own removals. The row idiom mirrors .dock-ghosted
+   (a held-aside mark is the same kind of disclosure). */
+.dock-wd-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
+.dock-wd-row:first-child { border-top:0; }
+.dock-wd-action { font-size:var(--fs-3xs); color:var(--text-faint); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+.dock-wd-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
+.dock-wd-reason { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; }
+.dock-wd-note { font-size:var(--fs-3xs); color:var(--text-faint); margin:var(--sp-2) 0 0; }
+/* The feedback ledger (gate 9): what happened to the previous run's notes.
+   Muted ink throughout — this is a record, not a verdict. The one accent is on
+   `likely_resolved`, the writer's own payoff, and it uses the ok colour rather
+   than a severity colour because nothing here is a defect. */
+.dock-ledger-head { font-size:var(--fs-2xs); color:var(--text-muted); font-weight:600; margin:var(--sp-3) 0 var(--sp-1); }
+.dock-ledger-head:first-child { margin-top:0; }
+.dock-ledger-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-1) 0; }
+.dock-ledger-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
+.dock-ledger-sim { font-size:var(--fs-3xs); color:var(--text-faint); margin-left:auto; white-space:nowrap; }
+.dock-ledger-row.dock-ledger-likely_resolved .dock-ledger-issue { color:var(--ok); }
+.dock-ledger-note { font-size:var(--fs-3xs); color:var(--text-faint); margin:var(--sp-3) 0 0; line-height:1.5; }
 @media (prefers-reduced-motion: reduce) {
   .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
 }

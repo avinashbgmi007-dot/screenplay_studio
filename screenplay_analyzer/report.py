@@ -386,9 +386,43 @@ def render_markdown(result: AnalysisResult) -> str:
                 "silently dropped — the underlying observation may still be valid even where "
                 "the model's exact quote couldn't be confirmed.*"
             )
+        if result.withdrawals:
+            # The integrity gate removed these from the delivered set — a
+            # mechanically false finding, or a duplicate folded into another.
+            # Counted in the human report too, not only the JSON ledger, so
+            # "nothing lost" is visible to the writer and not just checkable by
+            # a test.
+            n_rej = sum(1 for w in result.withdrawals if w.get("action") == "reject")
+            n_mrg = sum(1 for w in result.withdrawals if w.get("action") == "merge")
+            bits = []
+            if n_rej:
+                bits.append(f"{n_rej} withdrawn as mechanically false")
+            if n_mrg:
+                bits.append(f"{n_mrg} folded into a duplicate")
+            lines.append(
+                f"\n**Integrity gate:** {len(result.withdrawals)} finding(s) left the delivered "
+                f"set ({'; '.join(bits)}). Nothing was deleted — each is kept with its reason "
+                "and full text in `report.findings.json` under `withdrawals`."
+            )
         lines.append("")
 
     return "\n".join(lines)
+
+
+def _observation_coverage(findings: list) -> dict:
+    """Gate 11: the share of the delivered set carrying a checkable observation.
+
+    A quote makes a finding citable; an observation makes it FALSIFIABLE — the
+    contract (Law V″) is that every finding reduces to one. Reported beside the
+    quote rate because they answer different questions: "can I find the line?"
+    versus "can I check the claim?" `None` until at least one finding exists — a
+    percentage over nothing is a lie (the same rule `verification_rate` owns).
+    """
+    total = len(findings or [])
+    bearing = sum(1 for f in (findings or [])
+                  if isinstance(f, dict) and (f.get("observation") or "").strip())
+    return {"observation_bearing": bearing,
+            "observation_pct": round(100.0 * bearing / total, 1) if total else None}
 
 
 def to_findings_json(result: AnalysisResult) -> dict:
@@ -413,6 +447,12 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "findings": stamp_scene_keys(result.findings, scene_key_map(result.doc)),
         "formatting_findings": result.formatting_findings,
         "stats": result.stats,
+        # The integrity gate's ledger: findings removed from the delivered set
+        # (mechanically false, or folded duplicates), each with its reason and
+        # full content. Served so "nothing lost" is checkable rather than
+        # asserted — `findings` + `withdrawals` is the pre-gate list. Empty when
+        # the gate is off. See screenplay_analyzer/finding_integrity.py.
+        "withdrawals": result.withdrawals,
         # Counts by verification status plus the derived quote-verified rate
         # (verifier.verification_rate). Served as-is by /report, so the
         # writer's "how correct is this feedback" question has a computed
@@ -420,6 +460,12 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "verification_summary": {
             **(result.verification or {}),
             **verification_rate(result.verification),
+            # Gate 11: the share of the delivered set carrying a checkable
+            # observation. A quote makes a finding citable; an observation makes
+            # it falsifiable, and the contract is that every finding reduces to
+            # one. Reported beside the quote rate because they answer different
+            # questions: "can I find the line?" versus "can I check the claim?"
+            **_observation_coverage(result.findings),
         },
         "errors": result.errors,
     }
