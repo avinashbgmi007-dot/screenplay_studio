@@ -258,6 +258,33 @@ class TestWhatTheSurvivorKeeps:
         dedupe_related_findings(findings, kb)
         assert findings == snapshot, "the caller's findings were modified in place"
 
+    def test_the_returned_containers_do_not_alias_the_input(self, kb):
+        """The scalar check above cannot catch this: `dict(f)` copies the dict but
+        not its VALUES, so `scene_refs` — and every entry in `merged_findings` —
+        was the caller's own list. Appending to a returned finding then edited the
+        finding that was passed in."""
+        findings = [_f(ON_THE_NOSE, 2), _f(SAY_OPPOSITE, 2)]
+        snapshot = copy.deepcopy(findings)
+        out = dedupe_related_findings(findings, kb)
+
+        # the survivor's scene list
+        out[0]["scene_refs"].append(99)
+        # and the absorbed finding's, reached through the new side field
+        out[0]["merged_findings"][0]["scene_refs"].append(98)
+
+        assert findings == snapshot, (
+            "mutating a returned finding's nested list reached the caller's input")
+
+    def test_an_unmerged_finding_is_copied_too(self, kb):
+        """The pass-through branch is the easy one to miss: it also handed back
+        the caller's own list."""
+        findings = [_f(ON_THE_NOSE, 2), _f(EXPOSITION, 9)]  # different scenes: no merge
+        snapshot = copy.deepcopy(findings)
+        out = dedupe_related_findings(findings, kb)
+
+        out[0]["scene_refs"].append(99)
+        assert findings == snapshot, "the pass-through copy aliased the input"
+
     def test_nothing_is_ever_dropped_silently(self, kb):
         """Every merged-away finding is named by the survivor. This is the
         'flag, don't silently drop' contract the verifier uses for findings."""

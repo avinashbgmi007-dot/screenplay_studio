@@ -150,6 +150,27 @@ class _Union:
             self.parent[max(ra, rb)] = min(ra, rb)
 
 
+def _copy_finding(f: dict) -> dict:
+    """A copy that does not alias the input's CONTAINERS.
+
+    `dict(f)` is a shallow copy, so `scene_refs` (and any other list/dict value)
+    stays the SAME object as the caller's. The merge below rebinds `scene_refs`
+    on the survivor, which hid this on the common path — but the pass-through
+    copy for an unmerged finding, and every entry in `merged_findings`, still
+    handed the caller's own lists back. Anyone appending to a returned finding's
+    scene list would then have edited the input they passed in, which is the
+    opposite of this function's documented contract.
+
+    One level is enough for this schema: findings are flat dicts whose only
+    containers are lists of scalars and `merged_findings` (which this function
+    builds itself, so its inner dicts are already private).
+    """
+    return {
+        k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v)
+        for k, v in f.items()
+    }
+
+
 def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
     """Merge findings that report the same defect under directly-related rules in
     the same scene. Returns a new list; the input dicts are copied, not mutated.
@@ -198,7 +219,7 @@ def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
     for root in sorted(groups):
         members = groups[root]
         if len(members) == 1:
-            out.append(dict(findings[members[0]]))
+            out.append(_copy_finding(findings[members[0]]))
             continue
         # Highest severity survives; the earliest wins a tie so the report order is
         # stable across runs.
@@ -206,7 +227,7 @@ def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
             members,
             key=lambda i: (SEVERITY_ORDER.get(findings[i].get("severity"), 3), i),
         )
-        survivor = dict(findings[survivor_idx])
+        survivor = _copy_finding(findings[survivor_idx])
         others = [findings[i] for i in members if i != survivor_idx]
 
         merged_refs = [o.get("rule_id") for o in others if o.get("rule_id")]
@@ -220,7 +241,7 @@ def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
         # the claim. The integrity gate already keeps every finding it removes
         # whole (finding_integrity.py, `withdrawals`); this makes the dedupe
         # honour the same contract, so "nothing lost" is true here too.
-        survivor["merged_findings"] = [dict(o) for o in others]
+        survivor["merged_findings"] = [_copy_finding(o) for o in others]
         scenes = set(survivor.get("scene_refs") or [])
         for o in others:
             scenes |= set(o.get("scene_refs") or [])
