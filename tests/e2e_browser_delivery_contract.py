@@ -180,10 +180,13 @@ def run(base, projects_dir):
         check("the mechanical-check line renders from check_id",
               CHECK_ID in (card.get("check") or ""), str(card.get("check")))
         order = card.get("order") or []
-        if "finding-deep-observation" in order and "finding-deep-quote" in order:
-            check("the observation sits ABOVE the quote (the claim, then its evidence)",
-                  order.index("finding-deep-observation") < order.index("finding-deep-quote"),
-                  str(order))
+        # Unconditional on purpose: a check inside an `if` records NOTHING when
+        # the guard is false, which is how a suite silently stops checking.
+        # test_browser_check_hygiene ratchets that, and it is right to.
+        check("the observation sits ABOVE the quote (the claim, then its evidence)",
+              "finding-deep-observation" in order and "finding-deep-quote" in order
+              and order.index("finding-deep-observation") < order.index("finding-deep-quote"),
+              str(order))
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()
