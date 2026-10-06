@@ -93,7 +93,8 @@ def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1) -> tuple[list, list[str]]:
+def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1,
+                        recoveries: list | None = None) -> tuple[list, list[str]]:
     """
     Runs call_fn(chunk) -> list of results. On LlamaServerError, if the
     chunk has more than min_size scenes, splits it in half and retries each
@@ -110,6 +111,16 @@ def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1) -> tuple[list, 
     Returns (results, errors) — errors is non-empty only for scenes that
     still couldn't succeed even at min_size (a single scene alone was too
     much, or the server is down/broken regardless of size).
+
+    `recoveries`, when supplied, is appended to once per SPLIT: a chunk whose
+    call raised, was halved, and whose halves then succeeded. Those events are
+    deliberately NOT errors — the scenes were analysed, so the pass did not
+    fail and must not be reported as failed. But they are not nothing either:
+    measured on qwen3.6 / Pain_3, a chunk that burned its whole retry ladder
+    (typically on a truncated reply) leaves the pass reporting "ok" with an
+    empty error list, and splitting was measured to change the finding count
+    (8 vs 12 on the same input). So a caller that wants the run's own
+    accounting to be honest records these separately — see `analyze()`.
     """
     try:
         return call_fn(chunk), []
@@ -117,10 +128,41 @@ def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1) -> tuple[list, 
         if len(chunk) <= min_size:
             scene_num = chunk[0].get("scene_number", "?") if chunk else "?"
             return [], [f"Scene {scene_num}: {e}"]
+        if recoveries is not None:
+            recoveries.append({
+                "scenes": [c.get("scene_number") for c in chunk],
+                "size": len(chunk),
+                "error": str(e)[:200],
+            })
         mid = len(chunk) // 2
-        left_results, left_errors = _with_chunk_backoff(chunk[:mid], call_fn, min_size)
-        right_results, right_errors = _with_chunk_backoff(chunk[mid:], call_fn, min_size)
+        left_results, left_errors = _with_chunk_backoff(chunk[:mid], call_fn, min_size, recoveries)
+        right_results, right_errors = _with_chunk_backoff(chunk[mid:], call_fn, min_size, recoveries)
         return left_results + right_results, left_errors + right_errors
+
+
+def _chunk_recovery_note(pass_label: str, recoveries: list[dict]) -> str | None:
+    """One writer-facing line per pass that had to split a chunk.
+
+    Deliberately phrased as a caveat, not a failure: nothing was skipped, but
+    the finding set from a split chunk is path-dependent (measured 8 vs 12
+    findings on identical input), so a run that split is not interchangeable
+    with one that did not. Returns None when there is nothing to report.
+    """
+    if not recoveries:
+        return None
+    scenes = sorted({s for r in recoveries for s in (r.get("scenes") or [])
+                     if isinstance(s, int)})
+    where = ""
+    if len(scenes) == 1:
+        where = f" (scene {scenes[0]})"
+    elif len(scenes) > 1:
+        where = f" (scenes {scenes[0]}\u2013{scenes[-1]})"
+    n = len(recoveries)
+    return (
+        f"{pass_label}: the model's reply hit its output limit on {n} chunk(s){where} and the "
+        f"chunk was re-run in smaller pieces. Nothing was skipped \u2014 but a split re-asks the "
+        f"scenes, so the findings can differ from an uninterrupted run."
+    )
 
 
 def _scene_full_text(scene) -> str:
@@ -290,7 +332,31 @@ MAX_OVERVIEW_CHARS = 6000
 # needs headroom to close the array — shorter completions truncated it mid-emit
 # on every script-level category in the wild (see `run_script_level_category`),
 # so this is not a number to shave.
-SCRIPT_LEVEL_MAX_TOKENS = 4000
+#
+# MEASURED (qwen3.6-35b-a3b / Pain_3, 2026-10-06): 4000 was still too small for
+# the `character` pass, which is the heaviest of the four — its reply was cut at
+# 17,437 chars / exactly 4000 completion tokens, finish_reason='length'. theme,
+# structure and scene_function stop well inside 4000 and pay nothing for the
+# higher ceiling (the model stops when its JSON array closes). The `observation`
+# field added by gate 11 is what made each finding materially longer; budgets
+# sized before it are no longer sized at all.
+#
+# Per-pass budgets for the other long-output passes, same measurement. Every
+# discarded body on that run was finish_reason='length' with
+# completion_tokens == the cap — the reply was cut mid-JSON and lost:
+#
+#   pass             cap   reply that was being written when cut
+#   dialogue        1200   >=5,208 chars   (replayed at 4000: stops at 1,671)
+#   character_reads 1200     4,690 chars
+#   character_dials 1800     6,339 chars   (pass FAILED outright)
+#   genre           1200     4,870 chars
+#   character       4000    17,437 chars
+#
+# A cap that is never reached costs nothing; a cap that IS reached costs the
+# whole discarded generation plus up to three retries of it.
+SCRIPT_LEVEL_MAX_TOKENS = 8000
+DIALOGUE_MAX_TOKENS = 3000
+CHARACTER_READS_MAX_TOKENS = 2500
 
 TRUNCATION_MARKER = "\n[...scene text truncated for context budget...]"
 
@@ -344,7 +410,7 @@ def _extract_items(result, key: str) -> list:
     return []
 
 
-def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng") -> tuple[dict[int, str], list[str]]:
+def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng", recoveries: list | None = None) -> tuple[dict[int, str], list[str]]:
     summaries: dict[int, str] = {}
     errors: list[str] = []
     grammar = scene_summary_grammar()
@@ -366,7 +432,7 @@ def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_
         return _extract_items(result, "summaries")
 
     for chunk in _chunk_by_budget(scene_dicts, chunk_size):
-        items, errs = _with_chunk_backoff(chunk, call)
+        items, errs = _with_chunk_backoff(chunk, call, recoveries=recoveries)
         errors.extend(errs)
         for item in items:
             try:
@@ -529,7 +595,7 @@ def build_script_level_overview(overview: str, checkpoint_text: str) -> str:
     return f"{overview}\n\n{CHECKPOINT_HEADER}\n\n{checkpoint_text}"
 
 
-def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_ctx, chunk_size: int = 3, language: str = "eng") -> tuple[list[dict], list[str]]:
+def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_ctx, chunk_size: int = 3, language: str = "eng", recoveries: list | None = None) -> tuple[list[dict], list[str]]:
     findings = []
     errors: list[str] = []
     grammar = findings_grammar()
@@ -542,11 +608,11 @@ def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_
 
     def call(chunk_):
         system, user = prompts.dialogue_analysis_prompt(chunk_, rules_fragment=rules_fragment, chekhov_fragment=chekhov_fragment, language=language)
-        result = client.chat_json(system, user, grammar=grammar, max_tokens=1200)
+        result = client.chat_json(system, user, grammar=grammar, max_tokens=DIALOGUE_MAX_TOKENS)
         return _extract_items(result, "findings")
 
     for chunk in _chunk_by_budget(scene_dicts, chunk_size):
-        items, errs = _with_chunk_backoff(chunk, call)
+        items, errs = _with_chunk_backoff(chunk, call, recoveries=recoveries)
         findings.extend(items)
         errors.extend(errs)
     findings = _normalize_findings(findings, "dialogue", default_severity="low")
@@ -591,7 +657,7 @@ def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerC
         return []
     grammar = character_reads_grammar()
     system, user = prompts.character_reads_prompt(overview, doc.title, characters, language=language)
-    result = client.chat_json(system, user, grammar=grammar, max_tokens=1200, fast=True)
+    result = client.chat_json(system, user, grammar=grammar, max_tokens=CHARACTER_READS_MAX_TOKENS, fast=True)
     items = _extract_items(result, "reads")
     reads = [r for r in items if isinstance(r, dict) and r.get("character")]
     for r in reads:
@@ -842,9 +908,10 @@ def analyze(
     needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "setup_payoff", "char_reads", "character_dials", "coverage", "genre", "logline_test"))
     overview = ""
     if needs_summaries:
+        summary_recoveries: list[dict] = []
         try:
             emit("summaries", "running", "Summarizing each scene")
-            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language)
+            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language, recoveries=summary_recoveries)
             emit("summaries", "complete")
             overview = build_scene_overview_text(doc, summaries)
             result.category_outcomes["summaries"] = "failed" if summary_errors else "ok"
@@ -854,6 +921,13 @@ def analyze(
                     f"reducing batch size: {'; '.join(summary_errors[:3])}"
                     + (f" (+{len(summary_errors) - 3} more)" if len(summary_errors) > 3 else "")
                 )
+            # A split is not a failure (the scenes were summarised), but it is
+            # not nothing either — see _chunk_recovery_note. Recorded on the
+            # result rather than in `summary_errors` so a recovery never flips
+            # category_outcomes to "failed".
+            summary_note = _chunk_recovery_note("Scene summarization", summary_recoveries)
+            if summary_note:
+                result.errors.append(summary_note)
         except LlamaServerError as e:
             result.category_outcomes["summaries"] = "failed"
             result.errors.append(f"Scene summarization failed: {e}")
@@ -886,9 +960,10 @@ def analyze(
 
     # 3. scene-level dialogue analysis
     if "dialogue" in run_categories:
+        dialogue_recoveries: list[dict] = []
         try:
             emit("dialogue", "running", "Reading dialogue & action")
-            dialogue_findings, dialogue_errors = run_dialogue_analysis(doc, client, rules_ctx, chunk_size=scene_chunk_size, language=report_language)
+            dialogue_findings, dialogue_errors = run_dialogue_analysis(doc, client, rules_ctx, chunk_size=scene_chunk_size, language=report_language, recoveries=dialogue_recoveries)
             emit("dialogue", "complete")
             all_findings.extend(_tag_evidence(dialogue_findings, EVIDENCE_FULL_TEXT))
             result.category_outcomes["dialogue"] = "failed" if dialogue_errors else "ok"
@@ -898,6 +973,13 @@ def analyze(
                     f"reducing batch size: {'; '.join(dialogue_errors[:3])}"
                     + (f" (+{len(dialogue_errors) - 3} more)" if len(dialogue_errors) > 3 else "")
                 )
+            # Same rule as the summaries above: a rescued split is recorded on
+            # the result, never in `dialogue_errors` (which would mark the pass
+            # failed). Measured: a run can report dialogue "ok" while two calls
+            # burned their whole ladder — that silence is what this closes.
+            dialogue_note = _chunk_recovery_note("Dialogue analysis", dialogue_recoveries)
+            if dialogue_note:
+                result.errors.append(dialogue_note)
         except LlamaServerError as e:
             result.category_outcomes["dialogue"] = "failed"
             result.errors.append(f"Dialogue analysis failed: {e}")
