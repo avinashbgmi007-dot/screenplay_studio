@@ -43,9 +43,12 @@ Two consequences, both deliberate:
   parts of the script. The rule is "we merge only when both findings point at the
   same page".
 - **Nothing is dropped.** The survivor keeps its own text and gains a
-  `merged_rule_ids` list plus a stated clause, because a dedup that quietly deletes a
-  finding is the same failure as the one it exists to fix. Same "flag, don't
-  silently drop" policy as the verifier.
+  `merged_rule_ids` list, a `merged_findings` list carrying each absorbed
+  finding's FULL content, and a stated clause, because a dedup that quietly
+  deletes a finding is the same failure as the one it exists to fix. Same
+  "flag, don't silently drop" policy as the verifier. (`merged_rule_ids` alone
+  is attribution, not content — it names the rules that agreed but not what they
+  said; `merged_findings` is what makes the claim recoverable.)
 """
 
 from __future__ import annotations
@@ -208,6 +211,16 @@ def dedupe_related_findings(findings: list[dict], kb=None) -> list[dict]:
 
         merged_refs = [o.get("rule_id") for o in others if o.get("rule_id")]
         survivor["merged_rule_ids"] = merged_refs
+        # The absorbed findings' FULL content, not only their rule names. A rule
+        # id says "another rule agreed"; it does not say WHAT that rule said —
+        # and the absorbed `issue`, `observation`, `evidence_quote` and `severity`
+        # were previously retained NOWHERE (measured: 23 findings on Pain_3, 6 on
+        # gun_pen). `merged_rule_ids` alone was cited as proof that a merge
+        # preserved content, and it does not: it preserves the attribution, not
+        # the claim. The integrity gate already keeps every finding it removes
+        # whole (finding_integrity.py, `withdrawals`); this makes the dedupe
+        # honour the same contract, so "nothing lost" is true here too.
+        survivor["merged_findings"] = [dict(o) for o in others]
         scenes = set(survivor.get("scene_refs") or [])
         for o in others:
             scenes |= set(o.get("scene_refs") or [])

@@ -23,7 +23,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from screenplay_analyzer import pipeline  # noqa: E402
+from screenplay_analyzer import dials, genre, pipeline  # noqa: E402
 from screenplay_analyzer.rules_context import (  # noqa: E402
     KB_OMISSION_MARKER, RulesContext)
 from screenplay_parser import parse_fountain  # noqa: E402
@@ -203,3 +203,78 @@ def test_analyze_sends_the_capped_fragment(monkeypatch):
     assert client.sent, "analyze() made no model call, so this proved nothing"
     assert any(KB_OMISSION_MARKER in system for system, _ in client.sent), (
         "the model was never told the rule list is partial")
+
+
+# ---------------------------------------------------------------------------
+# 4. completion budgets are sized against MEASURED reply length
+# ---------------------------------------------------------------------------
+#
+# A completion cap is not a style preference: when the reply reaches it the
+# body is cut mid-JSON, `_extract_json` cannot parse it, the body is discarded
+# and the finding is lost (chat_json retries the same doomed call). Measured on
+# qwen3.6-35b-a3b / Pain_3: every discarded body was finish_reason='length' with
+# completion_tokens == the sent cap. So the budget for each long-output pass is
+# pinned above the cap that was OBSERVED to truncate it.
+TRUNCATED_AT = {
+    # pass -> (the cap that truncated, the reply length being written when cut)
+    "dialogue": (1200, 5208),
+    "character_reads": (1200, 4690),
+    "character_dials": (1800, 6339),
+    "genre": (1200, 4870),
+    "character": (4000, 17437),
+}
+
+BUDGETS = {
+    "dialogue": pipeline.DIALOGUE_MAX_TOKENS,
+    "character_reads": pipeline.CHARACTER_READS_MAX_TOKENS,
+    "character": pipeline.SCRIPT_LEVEL_MAX_TOKENS,
+    "character_dials": dials.DIALS_MAX_TOKENS,
+    "genre": genre.GENRE_MAX_TOKENS,
+}
+
+
+@pytest.mark.parametrize("name", sorted(TRUNCATED_AT))
+def test_every_budget_clears_the_cap_measured_to_truncate_it(name):
+    cap, reply_chars = TRUNCATED_AT[name]
+    assert BUDGETS[name] > cap, (
+        f"{name}: budget {BUDGETS[name]} is at or below the {cap}-token cap that "
+        f"was measured to cut a {reply_chars}-char reply mid-JSON — that is a "
+        f"budget that loses the finding it was paying to write")
+
+
+def test_the_truncation_table_is_consistent_with_the_replies_it_records():
+    """Rot guard: a recorded reply must actually be long enough to have reached
+    the cap it was cut by. This model emits ~4.3 chars/token, so anything under
+    3.5 chars/token would mean the pair is a typo, not evidence."""
+    for name, (cap, reply_chars) in TRUNCATED_AT.items():
+        assert reply_chars >= cap * 3.5, (
+            f"{name}: a {reply_chars}-char reply cannot have reached a {cap}-token "
+            f"cap — the recorded pair is wrong")
+
+
+# The dialogue pass, measured by running it ALONE at a deliberately generous
+# 8000-token budget on Pain_3: 9 of 11 chunks finished on their own at 736-2,096
+# tokens, while 2 filled the entire budget with ~32,000-character replies. Two
+# populations, two different problems — the healthy ceiling is 2,096, and the
+# outliers are DEGENERATION (a loop fills any cap, so a bigger cap is not a fix,
+# it is a longer loop).
+DIALOGUE_HEALTHY_MAX_TOKENS = 2096
+
+
+def test_dialogue_budget_clears_the_healthy_reply_but_stays_near_it():
+    """Both directions matter, and the second is the non-obvious one.
+
+    Too low truncates real analysis (the defect being fixed: 1200 sat BELOW the
+    healthy ceiling, so genuine replies were being cut). Too high buys nothing —
+    a degenerate chunk fills whatever it is given — and multiplies the cost of
+    the loop instead.
+    """
+    assert pipeline.DIALOGUE_MAX_TOKENS > DIALOGUE_HEALTHY_MAX_TOKENS, (
+        f"the dialogue cap ({pipeline.DIALOGUE_MAX_TOKENS}) is at or below the largest "
+        f"HEALTHY reply measured ({DIALOGUE_HEALTHY_MAX_TOKENS} tokens) — that truncates "
+        f"real analysis, which is exactly what this budget was sized to stop")
+    assert pipeline.DIALOGUE_MAX_TOKENS <= 2 * DIALOGUE_HEALTHY_MAX_TOKENS, (
+        f"the dialogue cap ({pipeline.DIALOGUE_MAX_TOKENS}) has been raised far past the "
+        f"healthy reply size ({DIALOGUE_HEALTHY_MAX_TOKENS} tokens). Measured: 2 of 11 chunks "
+        f"degenerate and fill ANY cap, so a bigger budget buys no completed analysis — only a "
+        f"longer loop. Re-measure before raising this.")

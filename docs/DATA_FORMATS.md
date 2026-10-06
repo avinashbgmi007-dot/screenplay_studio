@@ -230,6 +230,15 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
                                           //   structure, not a reading of the writer's pages.
       "merged_rule_ids": ["rule_x"],      // other KB rules this same evidence also answers (cross-rule
                                           //   dedup collapsed them into this row). Omitted when none.
+      "merged_findings": [                // the ABSORBED findings' full content, one object each with
+                                          //   the same shape as a top-level finding. `merged_rule_ids`
+                                          //   is attribution ("another rule agreed"); this is the claim
+                                          //   itself, so a merge is inspectable rather than merely
+                                          //   announced — same contract as the integrity gate's
+                                          //   `withdrawals` ledger. Omitted when nothing was absorbed.
+        {"category": "dialogue", "issue": "…", "severity": "medium", "scene_refs": [1],
+         "evidence_quote": "…", "observation": "…", "rule_id": "rule_y"}
+      ],
       "scene_key": "INT STUDY NIGHT#1",   // the finding id's scene component, stamped at report-write
                                           //   time (report.stamp_scene_keys). Carried so a consumer can
                                           //   recompute the SAME content-hash id without re-reading

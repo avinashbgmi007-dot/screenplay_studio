@@ -99,6 +99,13 @@ def conventions_for(genre: str) -> list[str]:
     return best or GENRE_CONVENTIONS.get(DEFAULT_GENRE)
 
 
+# Completion budget for the genre check. 1200 truncated the reply mid-JSON on a
+# 22-scene script (measured: cut at 4,870 chars, finish_reason='length',
+# completion_tokens == 1200) — the body was discarded and the finding lost.
+# See pipeline.SCRIPT_LEVEL_MAX_TOKENS for the full measurement.
+GENRE_MAX_TOKENS = 2500
+
+
 def run_genre_check(coverage: dict, scene_overview: str, client, rules_ctx=None, language: str = "eng") -> list[dict]:
     """Evaluate the script against its genre's conventions. Returns findings
     with category 'genre'. Raises if the model server fails."""
@@ -117,7 +124,9 @@ def run_genre_check(coverage: dict, scene_overview: str, client, rules_ctx=None,
     # Append genre rules to the user prompt if available
     if genre_rules_fragment:
         user = user + genre_rules_fragment
-    result = client.chat_json(system, user, grammar=findings_grammar(), max_tokens=1200)
+    # Sized up with headroom — see GENRE_MAX_TOKENS above. An unreached cap
+    # costs nothing.
+    result = client.chat_json(system, user, grammar=findings_grammar(), max_tokens=GENRE_MAX_TOKENS)
     # tolerate models that emit the findings as a bare JSON array
     if isinstance(result, list):
         return result

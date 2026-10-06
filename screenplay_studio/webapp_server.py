@@ -2430,6 +2430,12 @@ def _fixqueue_items(m):
             "check_id": f.get("check_id"),
             "evidence_source": f.get("evidence_source"),
             "merged_rule_ids": f.get("merged_rule_ids"),
+            # Cross-rule dedup absorbs other findings into this row. Their rule
+            # ids alone are attribution; their CONTENT is what the writer would
+            # otherwise never see. Delivered so a merge is inspectable rather
+            # than merely announced — same contract as the integrity gate's
+            # `withdrawals` ledger.
+            "merged_findings": f.get("merged_findings"),
             # Gate 11: the falsifiable observation a grounded finding rests on.
             # Delivered so the checkable half of a note is not report-only.
             "observation": f.get("observation"),
