@@ -449,6 +449,16 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None,
         os.makedirs(projects_dir)
     port = free_port()
     env = dict(os.environ)
+    # The fleet tests the UI, not the analyzer. A model-backed pipeline pass
+    # (gate 11's observation pass) adds ~24 round-trips per analyze() against
+    # the in-process demo model, and that slow analysis made the desk's
+    # auto-hide chrome re-hide before Playwright's actionability check could
+    # land its click — desk_controls lost 3 checks while nothing was broken.
+    # conftest.py disables the pass for the pytest suite for the same reason;
+    # the fleet needs its own copy because a direct
+    # `"$PY" tests/e2e_browser_*.py` run never loads conftest. `env_extra`
+    # still wins, so a suite that genuinely wants the pass can ask for it.
+    env["SCREENPLAY_STUDIO_OBSERVATION_PASS"] = "0"
     env.update(env_extra or {})
     env["PYTHONUNBUFFERED"] = "1"
     if demo_model:
