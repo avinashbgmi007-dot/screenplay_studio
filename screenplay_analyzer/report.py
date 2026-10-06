@@ -409,6 +409,22 @@ def render_markdown(result: AnalysisResult) -> str:
     return "\n".join(lines)
 
 
+def _observation_coverage(findings: list) -> dict:
+    """Gate 11: the share of the delivered set carrying a checkable observation.
+
+    A quote makes a finding citable; an observation makes it FALSIFIABLE — the
+    contract (Law V″) is that every finding reduces to one. Reported beside the
+    quote rate because they answer different questions: "can I find the line?"
+    versus "can I check the claim?" `None` until at least one finding exists — a
+    percentage over nothing is a lie (the same rule `verification_rate` owns).
+    """
+    total = len(findings or [])
+    bearing = sum(1 for f in (findings or [])
+                  if isinstance(f, dict) and (f.get("observation") or "").strip())
+    return {"observation_bearing": bearing,
+            "observation_pct": round(100.0 * bearing / total, 1) if total else None}
+
+
 def to_findings_json(result: AnalysisResult) -> dict:
     """Machine-readable version for Piece 3 to load and reference by scene/finding."""
     # HIGH-1: every finding carries the slugline key of its scene, because the
@@ -444,6 +460,12 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "verification_summary": {
             **(result.verification or {}),
             **verification_rate(result.verification),
+            # Gate 11: the share of the delivered set carrying a checkable
+            # observation. A quote makes a finding citable; an observation makes
+            # it falsifiable, and the contract is that every finding reduces to
+            # one. Reported beside the quote rate because they answer different
+            # questions: "can I find the line?" versus "can I check the claim?"
+            **_observation_coverage(result.findings),
         },
         "errors": result.errors,
     }

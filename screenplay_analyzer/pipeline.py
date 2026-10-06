@@ -249,6 +249,16 @@ def _normalize_findings(findings: list, category: str, default_severity: str = "
         f.setdefault("evidence_quote", None)
         f.setdefault("rule_id", None)
         f.setdefault("why_it_matters", "")
+        # Gate 11: the falsifiable observation the finding rests on. Normalized
+        # here like every other field real models leave out, and a whitespace or
+        # literal-"null" value is folded to None so "did the model state one?"
+        # is a single, honest test downstream (report._observation_coverage).
+        obs = f.get("observation")
+        if isinstance(obs, str):
+            obs = obs.strip()
+            f["observation"] = None if obs.lower() in ("", "null", "none") else obs
+        else:
+            f["observation"] = None
         if kb is not None and f["rule_id"]:
             f["rule_id"] = canonical_rule_id(f["rule_id"], kb) or f["rule_id"]
         out.append(f)

@@ -244,7 +244,11 @@ class _PipelineStub:
         return "stub-model"
 
     def chat_json(self, system, user, grammar=None, max_tokens=None, **kw):
-        if "falsifiable" in system:
+        # Keyed on the pass's own opening line, NOT on the word "falsifiable":
+        # gate 11 full added that word to the CATEGORY prompts too (the
+        # observation contract), so a keyword that appears in both prompts can
+        # no longer tell the two calls apart. This marker is unique to the pass.
+        if "grounding a note in a screenplay" in system:
             self.obs_calls += 1
             return {"observation": "The doctor explains the condition in one speech.",
                     "quote": self.line, "search": ""}
