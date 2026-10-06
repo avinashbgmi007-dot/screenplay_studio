@@ -215,6 +215,15 @@ def test_analyze_sends_the_capped_fragment(monkeypatch):
 # qwen3.6-35b-a3b / Pain_3: every discarded body was finish_reason='length' with
 # completion_tokens == the sent cap. So the budget for each long-output pass is
 # pinned above the cap that was OBSERVED to truncate it.
+#
+# THESE ARE NOT UNIVERSAL LIMITS. Every number below comes from ONE model on ONE
+# script. A different model can have a different healthy reply length, and a
+# different script can produce longer ones — so a failure here means "you are
+# contradicting a measurement", not "the code is wrong". The escape hatch is to
+# re-measure and update the table with the new provenance, never to widen the
+# assertion until it passes.
+MEASURED_ON = "qwen3.6-35b-a3b-pruned-v2.gguf on Pain_3"
+
 TRUNCATED_AT = {
     # pass -> (the cap that truncated, the reply length being written when cut)
     "dialogue": (1200, 5208),
@@ -239,7 +248,8 @@ def test_every_budget_clears_the_cap_measured_to_truncate_it(name):
     assert BUDGETS[name] > cap, (
         f"{name}: budget {BUDGETS[name]} is at or below the {cap}-token cap that "
         f"was measured to cut a {reply_chars}-char reply mid-JSON — that is a "
-        f"budget that loses the finding it was paying to write")
+        f"budget that loses the finding it was paying to write. "
+        f"(Measured on {MEASURED_ON}; re-measure rather than widen this.)")
 
 
 def test_the_truncation_table_is_consistent_with_the_replies_it_records():
@@ -272,9 +282,12 @@ def test_dialogue_budget_clears_the_healthy_reply_but_stays_near_it():
     assert pipeline.DIALOGUE_MAX_TOKENS > DIALOGUE_HEALTHY_MAX_TOKENS, (
         f"the dialogue cap ({pipeline.DIALOGUE_MAX_TOKENS}) is at or below the largest "
         f"HEALTHY reply measured ({DIALOGUE_HEALTHY_MAX_TOKENS} tokens) — that truncates "
-        f"real analysis, which is exactly what this budget was sized to stop")
+        f"real analysis, which is exactly what this budget was sized to stop. "
+        f"(Measured on {MEASURED_ON}.)")
     assert pipeline.DIALOGUE_MAX_TOKENS <= 2 * DIALOGUE_HEALTHY_MAX_TOKENS, (
         f"the dialogue cap ({pipeline.DIALOGUE_MAX_TOKENS}) has been raised far past the "
         f"healthy reply size ({DIALOGUE_HEALTHY_MAX_TOKENS} tokens). Measured: 2 of 11 chunks "
         f"degenerate and fill ANY cap, so a bigger budget buys no completed analysis — only a "
-        f"longer loop. Re-measure before raising this.")
+        f"longer loop. Re-measure before raising this. (Both figures are from {MEASURED_ON} — "
+        f"on another model the healthy ceiling may differ, which is a reason to re-measure, "
+        f"not to relax the bound.)")
