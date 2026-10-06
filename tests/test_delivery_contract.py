@@ -59,6 +59,8 @@ def _full_finding() -> dict:
         "check_id": None,
         "evidence_source": "pages",
         "merged_rule_ids": ["rule_x"],
+        "merged_findings": [{"category": "dialogue", "issue": "absorbed", "severity": "medium",
+                             "scene_refs": [1], "rule_id": "rule_y"}],
         "scene_key": "INT STUDY NIGHT#1",
         "verification": {"status": "verified", "matched_scene": 1,
                          "confidence": 0.95, "note": None},
