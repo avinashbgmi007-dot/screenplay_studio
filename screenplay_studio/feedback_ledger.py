@@ -34,7 +34,6 @@ read, the write is atomic, and a damaged store is refused rather than
 overwritten. A ledger write can never cost the writer their marks, verdicts or
 report — it is a separate file for exactly that reason.
 """
-import json
 import os
 import time
 
