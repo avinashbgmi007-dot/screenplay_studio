@@ -632,12 +632,12 @@ everything `partial` scores undefined-or-high.
 a product metric.
 
 
-### The gates — status as of 2026-10-05
+### The gates — status as of 2026-10-06
 | Order | Gate | Status |
 |---|---|---|
 | 1 | **Contract alignment** — real apply outcomes vs client interpretation | **EXECUTED — and CLOSED on `origin/main` (corrected 2026-10-05).** `/edits/apply` on an unlocatable target now returns **`400 {error: STALE_PROPOSAL_MESSAGE, stale: true}`** (`webapp_server.py:2067`, PR #7 merged). This supersedes the earlier *"residual"* note, which was measured on a base (`4d71c6f`) that predates the fix. Residual that remains: confirm every client parses that shape as a **conflict**, not a generic failure. |
 | 2 | **Reproducible tests from a clean checkout** — declared deps, CI-included, real-browser layout/focus | **PARTLY EXECUTED** — the ink-layer suite needs `jsdom` (undeclared, no `package.json`) and a Node ≥ 21 harness fix; **CI does not run it**. |
-| 3 | **Finding-identity durability** | **EXECUTED — DEFECT CONFIRMED ON A REAL MODEL** (§5): **80 % of marks lost**, **88 % of ids churn** across two real runs of the same model on the same script. |
+| 3 | **Finding-identity durability** | **RE-MEASURED 2026-10-06 — injectivity FIXED; survival confirmed unfixable by identity** (§5; `GATE3_REMEASUREMENT_2026-10-06.md`). **Fixed, previously unrecorded:** on the *same* 73-finding artifact, **39 collisions → 0** (`6b99fe0`'s `scene_key`, stamped on 72/73; the `no_quote` tier goes from **5 ids for 44 findings** to **44 for 44**). **Unfixable by identity:** mark survival — measured twice, independently: 4/20 carry on the real two-run pair, and the anchored key (`category\|rule_id\|scene_key`) carries **3/20 — *less* than today's id** (Amendment 6; *"it fixes collisions, not churn"*). The failure is model variance in *which points get re-raised* (65 % are not re-raised at all), not id instability. **Mitigated, not eliminated,** by GAP-7 disclosure + the Gate 9 ledger. The row closes on the **Gate 5** writer study, not on code. |
 | 4 | **Representative payloads** — real-model output, not fixtures | **EXECUTED — 2 payloads, 3 runs** with `gemma_vn26b-experts-v1-Q4_K_M`: `Pain_3` × 2 (45 / 39 findings) and `gun_pen` (22). It **overturned the demo-model premise** — real findings reach prose lines (§1). |
 | **7** | **Analysis reproducibility** — *(new gate, added 2026-10-04)* the report must not churn under the writer | **EXECUTED — DEFECT CONFIRMED** (§5): 45 → 39 findings, only 4 exact matches, 33 % same-category-different-point, quote coverage 31 % → 44 %. **Release-blocking.** |
 | 5 | **3–5 writer formative study** — task completion, mistaken acceptance, recovery, lost context | **OPEN** — the binding gate; no version of this design has been touched by a writer. |

@@ -93,6 +93,22 @@ def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
+def _classify_chunk_failure(error: Exception) -> str:
+    """Name WHY a call failed, from the error the client raised — never assumed.
+
+    `LlamaServerError` covers a truncated reply, a request timeout, a refused
+    connection and a malformed response alike, so anything reporting a cause must
+    read it off the message instead of asserting the one that happens to be
+    commonest. Only the truncated case carries a diagnosis: `chat_json` appends
+    `finish_reason='length'` via `llm_client._diagnose_parse_failure`. Everything
+    else is reported as a plain call failure, which is all that is known.
+    """
+    text = str(error)
+    if "finish_reason='length'" in text or 'finish_reason="length"' in text:
+        return "output_limit"
+    return "call_failed"
+
+
 def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1,
                         recoveries: list | None = None) -> tuple[list, list[str]]:
     """
@@ -112,15 +128,25 @@ def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1,
     still couldn't succeed even at min_size (a single scene alone was too
     much, or the server is down/broken regardless of size).
 
-    `recoveries`, when supplied, is appended to once per SPLIT: a chunk whose
-    call raised, was halved, and whose halves then succeeded. Those events are
-    deliberately NOT errors — the scenes were analysed, so the pass did not
-    fail and must not be reported as failed. But they are not nothing either:
-    measured on qwen3.6 / Pain_3, a chunk that burned its whole retry ladder
-    (typically on a truncated reply) leaves the pass reporting "ok" with an
-    empty error list, and splitting was measured to change the finding count
-    (8 vs 12 on the same input). So a caller that wants the run's own
-    accounting to be honest records these separately — see `analyze()`.
+    `recoveries`, when supplied, gains one record per SPLIT — appended **after
+    both halves have returned**, so the record describes what happened rather
+    than what was attempted:
+
+        {scenes, size, cause, recovered}
+
+      * `cause` is read off the raised error (`_classify_chunk_failure`), never
+        assumed — a timeout is not an output limit;
+      * `recovered` is True only when NO scene in the chunk ended in an error. A
+        split whose half still failed DID skip scenes, and the note must be able
+        to say so instead of claiming nothing was missed.
+
+    These are deliberately NOT errors — the scenes were analysed, so the pass did
+    not fail and must not be reported as failed. But they are not nothing either:
+    a chunk that burned its whole retry ladder leaves the pass reporting "ok" with
+    an empty error list, and splitting was measured to change the finding count
+    (8 vs 12 on the same input). So they go to `AnalysisResult.recoveries`, which
+    is a caveat channel — see the field's docstring for why `errors` is the wrong
+    home for them.
     """
     try:
         return call_fn(chunk), []
@@ -128,25 +154,36 @@ def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1,
         if len(chunk) <= min_size:
             scene_num = chunk[0].get("scene_number", "?") if chunk else "?"
             return [], [f"Scene {scene_num}: {e}"]
+        mid = len(chunk) // 2
+        left_results, left_errors = _with_chunk_backoff(chunk[:mid], call_fn, min_size, recoveries)
+        right_results, right_errors = _with_chunk_backoff(chunk[mid:], call_fn, min_size, recoveries)
+        errors = left_errors + right_errors
         if recoveries is not None:
             recoveries.append({
                 "scenes": [c.get("scene_number") for c in chunk],
                 "size": len(chunk),
-                "error": str(e)[:200],
+                "cause": _classify_chunk_failure(e),
+                "recovered": not errors,
             })
-        mid = len(chunk) // 2
-        left_results, left_errors = _with_chunk_backoff(chunk[:mid], call_fn, min_size, recoveries)
-        right_results, right_errors = _with_chunk_backoff(chunk[mid:], call_fn, min_size, recoveries)
-        return left_results + right_results, left_errors + right_errors
+        return left_results + right_results, errors
 
 
 def _chunk_recovery_note(pass_label: str, recoveries: list[dict]) -> str | None:
-    """One writer-facing line per pass that had to split a chunk.
+    """One writer-facing caveat per pass that had to split a chunk.
 
-    Deliberately phrased as a caveat, not a failure: nothing was skipped, but
-    the finding set from a split chunk is path-dependent (measured 8 vs 12
-    findings on identical input), so a run that split is not interchangeable
-    with one that did not. Returns None when there is nothing to report.
+    Deliberately phrased as a caveat, not a failure — and deliberately silent
+    about the three things it cannot know:
+
+      * **the cause.** Read from the record (`_classify_chunk_failure`), never
+        assumed. A timeout is not an output limit, and `LlamaServerError` covers
+        both.
+      * **"nothing was skipped".** Only true when EVERY record recovered. A split
+        whose half still failed left that half unanalysed, and saying otherwise
+        would contradict the error line sitting next to it.
+      * **that the run is fine.** That is the caller's job: this note goes to
+        `AnalysisResult.recoveries`, never to `errors`.
+
+    Returns None when there is nothing to report.
     """
     if not recoveries:
         return None
@@ -157,11 +194,25 @@ def _chunk_recovery_note(pass_label: str, recoveries: list[dict]) -> str | None:
         where = f" (scene {scenes[0]})"
     elif len(scenes) > 1:
         where = f" (scenes {scenes[0]}\u2013{scenes[-1]})"
+    causes = {r.get("cause") for r in recoveries}
+    if causes == {"output_limit"}:
+        why = "the model's reply hit its output limit"
+    elif causes == {"call_failed"}:
+        why = "a model call failed"
+    else:
+        why = "model calls failed"
     n = len(recoveries)
+    unresolved = [r for r in recoveries if not r.get("recovered", True)]
+    if unresolved:
+        return (
+            f"{pass_label}: {why} on {n} chunk(s){where} and the chunk was re-run in "
+            f"smaller pieces. {len(unresolved)} of those still could not be analysed in "
+            f"full \u2014 the scenes that failed are named above."
+        )
     return (
-        f"{pass_label}: the model's reply hit its output limit on {n} chunk(s){where} and the "
-        f"chunk was re-run in smaller pieces. Nothing was skipped \u2014 but a split re-asks the "
-        f"scenes, so the findings can differ from an uninterrupted run."
+        f"{pass_label}: {why} on {n} chunk(s){where} and the chunk was re-run in "
+        f"smaller pieces. Nothing was skipped \u2014 but a split re-asks the scenes, so "
+        f"the findings can differ from an uninterrupted run."
     )
 
 
@@ -193,6 +244,19 @@ class AnalysisResult:
     verification: dict = field(default_factory=dict)
     model_used: str | None = None
     errors: list[str] = field(default_factory=list)
+    recoveries: list[str] = field(default_factory=list)
+    """Writer-facing CAVEATS: a pass whose chunk had to be split mid-run.
+
+    Not errors. The pass succeeded, so `errors` and `category_outcomes` must stay
+    clean — a non-empty `errors` puts the run on the orchestrator's partial-failure
+    path (`orchestrator.py:169-176`, `partial_errors`) and renders the desk's
+    failure banner (`app.js:7221`), which is how a HEALTHY run came to be dressed
+    as a broken one. But not nothing either: a split re-asks the scenes, so the
+    finding set is path-dependent (measured 8 vs 12 findings on identical input).
+
+    So: its own channel. A caveat about how the run got here, kept separate from
+    both "this pass failed" (`errors`) and "the writer must act" (withdrawals).
+    """
     category_outcomes: dict = field(default_factory=dict)
     """Per-category result: category name -> "ok" | "failed". Lets the
     orchestrator record exactly which categories succeeded so a partial
@@ -924,10 +988,13 @@ def analyze(
             # A split is not a failure (the scenes were summarised), but it is
             # not nothing either — see _chunk_recovery_note. Recorded on the
             # result rather than in `summary_errors` so a recovery never flips
-            # category_outcomes to "failed".
+            # category_outcomes to "failed" — and in `recoveries`, NOT `errors`,
+            # so it also never trips the orchestrator's partial-failure path or
+            # the desk's failure banner. A healthy run must not be dressed as a
+            # broken one.
             summary_note = _chunk_recovery_note("Scene summarization", summary_recoveries)
             if summary_note:
-                result.errors.append(summary_note)
+                result.recoveries.append(summary_note)
         except LlamaServerError as e:
             result.category_outcomes["summaries"] = "failed"
             result.errors.append(f"Scene summarization failed: {e}")
@@ -975,11 +1042,13 @@ def analyze(
                 )
             # Same rule as the summaries above: a rescued split is recorded on
             # the result, never in `dialogue_errors` (which would mark the pass
-            # failed). Measured: a run can report dialogue "ok" while two calls
-            # burned their whole ladder — that silence is what this closes.
+            # failed) and never in `errors` (which would render the desk's
+            # failure banner on a run that succeeded). Measured: a run can report
+            # dialogue "ok" while two calls burned their whole ladder — that
+            # silence is what this closes, without inventing an alarm to close it.
             dialogue_note = _chunk_recovery_note("Dialogue analysis", dialogue_recoveries)
             if dialogue_note:
-                result.errors.append(dialogue_note)
+                result.recoveries.append(dialogue_note)
         except LlamaServerError as e:
             result.category_outcomes["dialogue"] = "failed"
             result.errors.append(f"Dialogue analysis failed: {e}")
