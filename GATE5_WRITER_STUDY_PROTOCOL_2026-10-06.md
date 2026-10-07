@@ -1,11 +1,13 @@
 # Gate 5 — the writer study: protocol and instrument
 
-**Status:** READY TO RUN. Everything the study needs now exists in the product.
+**Status:** READY TO RUN — **after the §3.5 pre-flight** (one timed analysis, no writer present).
 **Owner:** you (it needs 3–5 real screenwriters; no code can produce it).
-**Date written:** 2026-10-06. **Revised 2026-10-07** (§2, §5, §7) after PRs #11–#14 landed.
+**Date written:** 2026-10-06. **Revised 2026-10-07** — §2, §5, §7 after PRs #11–#14 landed; **§3.5, §4, §6
+after an operational review** that found the session was budgeted at ~1 hour for ~2 hours of work, the
+metric was misnamed "accuracy", and an untested surface could have been reported as a passed one.
 **Run against:** `origin/main` = **`65f4b9a`**. Pin this commit for the sessions — a study whose
-build is unstated is not reproducible, and reproducibility is exactly what Gate 7 is about. If
-`main` has moved by the time you run, re-read §7's field list: it changed on 2026-10-06/07.
+build is unstated is not reproducible, and reproducibility is exactly what Gate 7 is about. Later commits
+on `main` are documentation only, so the pin holds. If `main` moves again, re-read §7's field list.
 
 ---
 
@@ -41,7 +43,8 @@ Evidence lens carries a truth row:
 It writes `finding_verdicts.json` beside the project. The desk's Coverage section
 shows a live meter: `accuracy = (correct + partial) / judged`, with the judged
 count beside it, because a rate over 3 findings is not the same claim as a rate
-over 300.
+over 300. **⟲ The product labels it "accuracy"; read it as the *not-wrong* rate**
+(§5) — `partial` counts as acceptable, so it is not a correctness rate.
 
 **The one thing to get right:** the writer must mark **truth**, not intent. The
 row below it (addressed / deferred) is a different question and is deliberately
@@ -73,17 +76,75 @@ recovered run is healthy; dressing it as a failure would make the study measure 
 
 ---
 
-## 4. Session script (~60 minutes per writer)
+## 3.5 Pre-flight, consent, and surface exposure *(added 2026-10-07)*
+
+### Pre-flight — run this once, before the first session, with no writer present
+
+1. **Time the analysis on this machine**, on a script of comparable length. Read `stats.runtime_minutes`
+   from the finished report; do not estimate it. The 30.4 / 33.8 min figures in §4 are from one laptop
+   with ~half the model on CPU — **your number may differ, and it is the one you quote to participants.**
+2. **Confirm both surfaces appear at least once** (see below). If they do not, you have not tested them.
+3. **Confirm the data lands** — `finding_verdicts.json`, `feedback_ledger.json`, and `report.findings.json`
+   with non-empty `recoveries` where a split occurred.
+
+### Informed consent — the scripts are unpublished IP
+
+**Use the form:** `GATE5_CONSENT_FORM_2026-10-07.md` — one page, handed to the writer before import,
+signed by both. It carries the terms below in a form they can actually read and keep.
+
+This is a **privacy-first, local** product, so the study should be too, and the terms must be agreed
+**before** import, not after:
+
+- **Where the data lives:** the project directory on the machine running the study. State the path.
+- **What is collected:** their script, the generated report, `finding_verdicts.json` (their judgements),
+  and `feedback_ledger.json`. **Nothing is uploaded** — say this explicitly, because it is the product's
+  premise and the writer has no way to verify it.
+- **Retention and deletion:** agree a retention period and a deletion date; the writer may withdraw and
+  have the project directory deleted at any point, including after the session.
+- **Quoting:** ask separately for permission to quote their verbatim reactions in the write-up. A quote
+  about their own pages can identify them.
+- **Anonymise in the write-up:** writer IDs (`W1`…`W5`), not names or script titles.
+
+### Surface exposure — an untested surface is not a passed surface
+
+Two surfaces added 2026-10-07 (§2) appear **conditionally**, so a session can run cleanly and never show
+either. Record exposure explicitly and report it honestly:
+
+| surface | appears when | measured base rate |
+|---|---|---|
+| **"Also flagged under" disclosure** | the dedupe merged two findings under one rule | **common** — `stats.findings_merged` was **29** on `Pain_3` and **5** on `gun_pen` in the stored payloads, so a feature-length script will almost certainly show it |
+| **Run caveat** | a chunk hit its output limit and was split | **rare** — appeared on the qwen `Pain_3` run (1 chunk), absent on others |
+
+**Rule:** if a participant never saw a surface, that surface was **not tested**. Write "not exercised" in
+the write-up — never "passed". If you want it tested deliberately, add a short **post-marking walkthrough**
+(step 3.5 of the session) that opens one merge disclosure on screen and asks the writer to read it aloud;
+record that as a **facilitated** observation, clearly separated from the unprompted findings.
+
+---
+
+## 4. Session script (~2 hours per writer — **revised 2026-10-07**)
+
+> ⟲ **The original 60-minute budget was wrong by ~3× and is retracted.** It gave Analysis **10 min**.
+> The report records its own wall-clock as `stats.runtime_minutes`, and the measured payloads are:
+> **`Pain_3` (22 scenes) = 30.4 min** (gemma) and **33.8 min** (qwen, `I2_MEASUREMENT_2026-10-06.md`);
+> `gun_pen` (3 scenes) = 4.9 min. A feature-length script is a **~30-minute** wait, and step 5 re-runs
+> it — so the honest session is **~2 hours**, not one. Do the **pre-flight** in §3.5 first; that number,
+> on your machine, is the one to quote to participants.
 
 | # | Step | Time | What to record |
 |---|---|---|---|
-| 0 | Consent + what is being tested. Say plainly: *this is a test of the tool, not of your writing.* | 5 min | — |
-| 1 | Create a project, import their script, run Analysis. | 10 min | Did it complete? How long? Any error the writer noticed? |
+| 0 | Consent, privacy, and what is being tested (§3.5). Say plainly: *this is a test of the tool, not of your writing.* | 10 min | Signed consent; script-storage and deletion terms agreed. |
+| 1 | Create a project, import their script, run Analysis. **Start it, then brief while it runs.** | **~30 min** (measured) | `stats.runtime_minutes`. Did it complete? Any error the writer noticed? |
 | 2 | **Open the report cold.** No explanation. | 5 min | First reaction, verbatim. Do they find the findings? Do they understand what a finding is? |
-| 3 | **Mark every finding** ✓ / ~ / ✗ using the truth row. | 15 min | This is the metric. Do not help. Note hesitation points. |
+| 3 | **Mark findings** ✓ / ~ / ✗ using the truth row. **Do not require every finding** — a full census of 73 findings in 15 min is 12 s each, which is skim-reading. Ask for **one category in full plus a sample of the rest**, and record how many were judged. | 20–25 min | This is the metric. Do not help. Note hesitation points. **Record the judged count** — it is the denominator, and a partial census is legitimate. |
 | 4 | Work the fix loop on the ones they marked ✓. | 15 min | Which do they act on? Do they recover when an edit cannot apply? |
-| 5 | Re-run Analysis. | 5 min | Do they notice what changed? Do they find the Feedback-ledger section? |
-| 6 | Debrief. | 10 min | The four questions in §5. |
+| 5 | **Re-run Analysis.** | **~30 min** (measured) | Do they notice what changed? Do they find the Feedback-ledger section? **And: did a run caveat appear, and could they say what it meant?** |
+| 6 | Debrief. | 10 min | The five outcomes in §5. |
+
+**Split it if the writer prefers:** session A = steps 0–3; session B = steps 4–6. The two Analysis runs
+are long waits, not work, and a single 2-hour sitting will exhaust attention before the fix loop — which
+is the step that tests the product's core loop. **Do not compress the waits by lowering the script size**;
+a short script under-tests exactly the passes that truncate.
 
 **Facilitator notes:** if the writer stops marking and starts arguing with a
 note, that is a *finding about the note* — record it. If they mark everything
@@ -115,8 +176,11 @@ Five outcomes, plus the number:
 
 Then the number:
 
-- **Metric A (accuracy)** — `(correct + partial) / judged`, per writer and
-  pooled, from their own verdicts. Report the **judged count** beside it, always.
+- **Metric A (the *not-wrong* rate)** — `(correct + partial) / judged`, per writer and pooled, from their
+  own verdicts. **⟲ Name it the not-wrong rate, never "accuracy".** `partial` is counted as acceptable
+  by construction, so the number answers *"how often is a delivered note not false?"* — it does **not**
+  answer *"how often is a note right?"*. Always report it **with the three raw counts**
+  (`correct / partial / wrong`) **and the judged count**. A rate without its numerator is unreadable.
 - **Metric B (verifiability)** — the share of quoted findings whose citation the
   verifier confirmed, from the report's `verification_summary`.
 - **Observation coverage** — `observation_pct` from `verification_summary`; the
@@ -128,17 +192,35 @@ Then the number:
 ## 6. Pre-registered pass/fail bar
 
 Written down **before** the sessions, so the result cannot be reinterpreted
-afterwards:
+afterwards. **⟲ Revised 2026-10-07: the bar is a falsification test, not a proof.**
+
+### First, what 3–5 writers can and cannot establish
+
+This is **formative** evidence. It can **falsify** the design and **expose** gaps. It **cannot** prove a
+population-level rate, and it must never be written up as doing so.
+
+**The unit of analysis is the writer, not the finding.** Findings cluster within one script and one
+writer, so pooling 73 findings × 5 writers does not give 365 independent observations — a finding-level
+rate would badly overstate precision. Report **per writer, then pooled**, and say the clustering out loud.
+
+**The zero-event case, stated honestly.** If no writer commits a mistaken acceptance, the 95 % upper
+bound is roughly **3/n** (*rule of three*). With 5 writers that is **≈60 %** — i.e. five clean sessions
+are consistent with a majority of writers being misled. That is not a defect in the study; it is the
+study telling you the truth about its own power, and it is **why "98.58 % is demonstrated" can never be
+the claim here.** Say this in the write-up before anyone else does.
+
+### The bar
 
 | Result | Reading |
 |---|---|
-| Metric A ≥ 98.58 % pooled, ≥ 3 writers, **zero** mistaken acceptances | The target is met as a product metric. |
-| Metric A 95–98.58 %, or any mistaken acceptance | The target is **not** met. Report the gap honestly; do not round up. |
-| Metric A < 95 % | The design is wrong, not the implementation. Go back to the architecture, not to the prompts. |
-| Fewer than 3 writers complete all steps | **No result.** Do not report a number from one writer. |
+| **Zero** mistaken acceptances, and the not-wrong rate **≥ 98.58 % pooled** across **≥ 3** writers | **No falsification observed in this sample.** The design survives. It is **not** proof of the target. |
+| Not-wrong rate **95–98.58 %**, or **any** mistaken acceptance | The target is **not** met. Report the gap honestly; do not round up. |
+| Not-wrong rate **< 95 %** | The design is wrong, not the implementation. Go back to the architecture, not to the prompts. |
+| Fewer than **3** writers complete all steps | **No result.** Do not report a number from one writer. |
+| A participant never saw a surface (§3.5) | That surface is **"not exercised"**, never "passed". |
 
-**Two things that invalidate a session:** the writer marked without reading, or
-the facilitator explained what a note meant before the writer judged it.
+**Three things that invalidate a session:** the writer marked without reading; the facilitator explained
+what a note meant before the writer judged it; or the session ran on a build other than the pinned commit.
 
 ---
 
@@ -169,8 +251,8 @@ Any of these means the architecture is wrong, and no prompt change fixes it:
   script → the notes are plausible-sounding, not checkable.
 - Writers cannot tell a finding from an observation → the two-tier distinction
   is not carried by the UI.
-- Writers ignore the truth row and only use addressed/deferred → the accuracy
-  metric has no home in the product.
+- Writers ignore the truth row and only use addressed/deferred → the not-wrong
+  rate has no home in the product.
 - Writers do not notice that a note from run 1 did not come back → the ledger is
   answering a question nobody asked.
 - Writers never open the "also flagged under" disclosure, on any card, in any
@@ -188,3 +270,11 @@ If the study has not been run, the correct claim is:
 > and is tested; the number it produces is fed by one expert reviewer on two
 > scripts. Gate 5 (3–5 writers, their own scripts) is what converts that proxy
 > into a product metric.
+
+**And after it has been run, the ceiling on what may be claimed is a *falsification* result.** The
+strongest defensible sentence is:
+
+> **The design survived N writers without a mistaken acceptance; the pooled not-wrong rate was X %
+> over M judged findings (c₁ correct / c₂ partial / c₃ wrong). This is formative evidence: N writers
+> cannot establish a population rate, and with zero wrong verdicts the 95 % upper bound on the
+> writer-level error rate is ≈3/N.**
