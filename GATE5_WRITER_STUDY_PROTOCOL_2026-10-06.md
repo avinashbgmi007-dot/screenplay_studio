@@ -8,14 +8,29 @@ step 4's per-session recording happens before each writer signs.
 after an operational review** that found the session was budgeted at ~1 hour for ~2 hours of work, the
 metric was misnamed "accuracy", and an untested surface could have been reported as a passed one.
 **Run against:** `origin/main` = **`65f4b9a`**. Pin this commit for the sessions — a study whose
-build is unstated is not reproducible, and reproducibility is exactly what Gate 7 is about. **Every commit
-since that pin has been documentation or test files only**; the one product file touched, `cli.py`, changed
-only its docstring — so **no product behaviour differs** and the pin holds. **The pin stops holding the
-moment a commit changes behaviour or a default the run depends on** — executable code, a prompt, a token
-budget, the default endpoint, the model — then re-pin and re-read §7's field list. Neither "`main` moved"
-nor "a file under `screenplay_analyzer/` changed" is the trigger: `cli.py`'s docstring-only change is
-exactly such a file-touch, and the pin holds through it. What matters is whether the **run's behaviour**
-could differ, not which directory a diff touched.
+build is unstated is not reproducible, and reproducibility is exactly what Gate 7 is about.
+
+**What has changed since the pin — all 22 files, classified (`git diff --name-only 65f4b9a..origin/main`):**
+
+| kind | n | files |
+|---|---:|---|
+| markdown records | 10 | the Gate 5 docs, the measurement docs, `ARCHITECTURE.md`, the critiques |
+| design prototypes | 4 | `docs/design/scene-first/{accuracy_meter,accuracy_report,grounding_pass,observation_rewrite}.py` |
+| test files | 4 | `tests/e2e_browser_{common,export_flush,smoke}.py`, `preview-ink-layer/tests/dom.test.mjs` |
+| **test infrastructure** | **3** | **`.github/workflows/ci.yml`, `package.json`, `package-lock.json`** |
+| **product file** | **1** | **`screenplay_analyzer/cli.py`** — every changed line inside its docstring |
+
+The three test-infrastructure files are **not** documentation or tests, and are listed here rather than
+folded into those words: `package.json` declares `jsdom` and owns the test file list, and `ci.yml` runs it.
+None of the three is imported by the analyzer or the desk, so none can affect a study session — but "docs
+and tests only" was the wrong description of this diff, and a reader checking it would have found that out.
+
+**The pin stops holding the moment a commit changes behaviour or a default the run depends on** —
+executable code, a prompt, a token budget, the default endpoint, the model — then re-pin and re-read §7's
+field list. Neither "`main` moved" nor "a file under `screenplay_analyzer/` or `screenplay_studio/` changed"
+is the trigger: `cli.py`'s docstring-only change is such a file-touch, and so is a test-harness line under
+`screenplay_studio/`, and the pin holds through both. What matters is whether the **run's behaviour** could
+differ, not which directory a diff touched.
 
 ---
 
