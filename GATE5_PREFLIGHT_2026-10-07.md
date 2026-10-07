@@ -32,9 +32,12 @@ The §3.5 rule is that a surface no participant sees was *not tested*. Both were
 | **"Also flagged under" disclosure** | the dedupe merged two findings under one rule | **YES** — `stats.findings_merged = 30`; **15 of 61 delivered rows carry `merged_findings`**; 13 occurrences render in `report.md` |
 | **Run caveat** | a chunk hit its output limit and was split | **YES** — 1 recovery: *"Dialogue analysis: the model's reply hit its output limit on 1 chunk(s) (scenes 8–10) and the chunk was re-run in smaller pieces…"* |
 
-The merge disclosure is **common** (15/61 rows, ~25%); the run caveat is **rare** (1 chunk, and absent
-on other runs). A session may run cleanly and never show the caveat — so §3.5's post-marking walkthrough
-is still the only way to test that one deliberately.
+**These are observations from this run, not population rates** — 15 of 61 rows and one caveat, on one
+script, one model, one run. What they establish is that both surfaces *occur on this build*, which is
+what the pre-flight asks. Whether the disclosure is "common" is a claim about a distribution that a
+single run cannot support. What can be said: the merge *count* has appeared on every feature-length run
+so far (29 / 30 on `Pain_3`, 5 on `gun_pen`), while the caveat appeared once and may well not appear in
+a given session — so §3.5's post-marking walkthrough is still the only way to test that one deliberately.
 
 ### The composition that makes this a real check
 
