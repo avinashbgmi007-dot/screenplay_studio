@@ -26,6 +26,12 @@ What it pins:
    reading them in the other order is what makes a note feel asserted.
 4. THE ATTRIBUTION SURVIVES THE ROUTE — the KB-rule chip (rule_id) and the
    mechanical-check line (check_id) render from the injected finding.
+5. A MERGE IS INSPECTABLE — `merged_findings` (the dedupe's absorbed claims)
+   renders as a COLLAPSED disclosure on the deep card, OUTSIDE the pinned action
+   row, and opens onto the absorbed finding's own words.
+6. A RECOVERY IS NOT A FAILURE — `recoveries` renders as a quiet run caveat,
+   injected with zero errors and no failed categories, and is never nested inside
+   the failure banner (whose head reads "N passes reported a problem").
 
 Run:  python tests/e2e_browser_delivery_contract.py
 """
@@ -52,6 +58,15 @@ OBSERVATION = "MARA states the revelation aloud in one line, in scene 1."
 RULE_ID = "comedy_subtext_not_literal"          # "Dialogue Must Have Subtext"
 CHECK_ID = "voice_bleed"
 QUOTE = "I'll tell you everything when this is over."
+# The two fields added to this suite second. Both were DELIVERED on the wire and read
+# by nothing in the desk — the same class of defect as the dropped `rule_id`, caught
+# this time by asking "which renderer?" of every documented field.
+MERGED_ISSUE = "The same beat is restated instead of escalated."
+MERGED_OBS = "In scene 1 the beat repeats without raising the stakes."
+MERGED_QUOTE = "This is not what we agreed."
+MERGED_RULE = "comedy_subtext_not_literal"
+RECOVERY_NOTE = ("Dialogue analysis: the model's reply hit its output limit on 1 chunk(s) "
+                 "(scenes 4-6) and the chunk was re-run in smaller pieces.")
 
 
 def report_path(projects_dir):
@@ -112,6 +127,36 @@ CARD_JS = """() => {
   return out;
 }"""
 
+MERGED_JS = """() => {
+  const cards = [...document.querySelectorAll(
+    '.dock-lens[data-lens="evidence"] .finding-note')];
+  const card = cards.find((c) => c.querySelector('.finding-merged'));
+  const out = {cards: cards.length, found: !!card};
+  if (!card) return out;
+  const wrap = card.querySelector('.finding-merged');
+  const btn = wrap.querySelector('.finding-merged-toggle');
+  const body = wrap.querySelector('.finding-merged-body');
+  out.label = (btn && btn.textContent) || '';
+  out.expandedBefore = btn && btn.getAttribute('aria-expanded');
+  out.hiddenBefore = !!(body && body.hidden);
+  out.inActions = !!(btn && btn.closest('.finding-note-actions'));
+  out.bodyText = (body && body.textContent) || '';
+  if (btn) btn.click();
+  out.expandedAfter = btn && btn.getAttribute('aria-expanded');
+  out.hiddenAfter = !!(body && body.hidden);
+  return out;
+}"""
+
+CAVEAT_JS = """() => {
+  const lens = document.querySelector('.dock-lens[data-lens="evidence"]');
+  const caveat = lens && lens.querySelector('.run-caveat');
+  return {
+    found: !!caveat,
+    text: caveat ? caveat.textContent : '',
+    inBanner: !!(caveat && caveat.closest('.failure-banner')),
+  };
+}"""
+
 
 def run(base, projects_dir):
     with sync_playwright() as pw:
@@ -137,6 +182,21 @@ def run(base, projects_dir):
         target["evidence_source"] = "pages"
         target["evidence_quote"] = QUOTE
         target["merged_rule_ids"] = []
+        # The absorbed half of a merge: the dedupe preserves it in `merged_findings`,
+        # and until now the desk showed only the survivor.
+        target["merged_findings"] = [{
+            "category": "dialogue",
+            "issue": MERGED_ISSUE,
+            "severity": "medium",
+            "scene_refs": [1],
+            "evidence_quote": MERGED_QUOTE,
+            "observation": MERGED_OBS,
+            "rule_id": MERGED_RULE,
+        }]
+        # The run caveat. Deliberately injected with NO errors and no failed
+        # categories, so the suite proves the caveat renders on its own — a run can
+        # split a chunk and still report every pass `ok`.
+        report["recoveries"] = [RECOVERY_NOTE]
         # A SECOND finding carries only a check_id. The card shows the KB-rule
         # chip OR the mechanical-check line, never both — a check is a
         # measurement with no authority to cite, a rule is a button you can ask
@@ -147,6 +207,8 @@ def run(base, projects_dir):
         second["rule_id"] = None
         second["check_id"] = CHECK_ID
         second["evidence_quote"] = None
+        # Only ONE card carries the merge, so the probe cannot read the wrong one.
+        second["merged_findings"] = None
         findings.append(second)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(report, f)
@@ -187,6 +249,30 @@ def run(base, projects_dir):
               "finding-deep-observation" in order and "finding-deep-quote" in order
               and order.index("finding-deep-observation") < order.index("finding-deep-quote"),
               str(order))
+
+        # --- the two fields the desk dropped on the floor ---------------------
+        merged = page.evaluate(MERGED_JS)
+        check("the absorbed claims of a merge render on the card", merged["found"], str(merged))
+        check("the disclosure is COLLAPSED by default — a merge is inspectable, not shown twice",
+              merged.get("hiddenBefore") is True and merged.get("expandedBefore") == "false",
+              str(merged))
+        check("it sits OUTSIDE the pinned action row (that row is 4 verbs, one row, <=30px)",
+              merged.get("inActions") is False, str(merged))
+        check("the absorbed finding's own words and rule are inside, verbatim",
+              MERGED_ISSUE in (merged.get("bodyText") or "")
+              and MERGED_RULE in (merged.get("bodyText") or ""),
+              str(merged.get("bodyText"))[:220])
+        check("opening it flips aria-expanded and reveals the body",
+              merged.get("hiddenAfter") is False and merged.get("expandedAfter") == "true",
+              str(merged))
+
+        caveat = page.evaluate(CAVEAT_JS)
+        check("the run caveat reaches the desk (before this it reached report.md only)",
+              caveat["found"], str(caveat))
+        check("it renders the note verbatim, from disk to DOM",
+              RECOVERY_NOTE in (caveat.get("text") or ""), str(caveat.get("text"))[:220])
+        check("a recovery is NOT dressed as a failure (never inside the failure banner)",
+              caveat.get("inBanner") is False, str(caveat))
 
         check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
         browser.close()

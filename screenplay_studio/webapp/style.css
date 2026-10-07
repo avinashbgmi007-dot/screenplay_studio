@@ -6171,6 +6171,32 @@ body:not(.idea-mode) .desk {
 .finding-rule-btn:hover { color:var(--text); border-color:var(--lamp); }
 .finding-rule-btn:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
 .finding-check { align-self:flex-start; font-size:var(--fs-2xs); color:var(--text-faint); }
+/* The absorbed half of a merge, on demand. Collapsed by default: N absorbed claims
+   expanded inline is the wall of near-duplicate cards the dedupe exists to prevent,
+   and the writer asked for the merge to be INSPECTABLE, not to be shown twice.
+   The body is indented off a hairline so an expanded card still reads as ONE finding
+   with a sub-list, not as two findings that happen to be adjacent. */
+.finding-merged { display:flex; flex-direction:column; gap:var(--sp-1); }
+.finding-merged-toggle {
+  appearance:none; align-self:flex-start; background:none; border:0; padding:0;
+  font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer;
+  text-decoration:underline; text-underline-offset:2px;
+}
+.finding-merged-toggle::before { content:"\25B8\00A0"; }
+.finding-merged.open .finding-merged-toggle::before { content:"\25BE\00A0"; }
+.finding-merged-toggle:hover { color:var(--text); }
+.finding-merged-toggle:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
+.finding-merged-body {
+  display:flex; flex-direction:column; gap:var(--sp-2);
+  margin-top:var(--sp-1); padding-left:var(--sp-3); border-left:1px solid var(--line);
+}
+.finding-merged-item { display:flex; flex-direction:column; gap:var(--sp-1); }
+.finding-merged-head { display:flex; gap:var(--sp-2); align-items:baseline; flex-wrap:wrap; }
+.finding-merged-rule { font-size:var(--fs-2xs); color:var(--text-muted); font-family:var(--font-mono); }
+.finding-merged-sev { font-size:var(--fs-2xs); color:var(--text-faint); }
+.finding-merged-issue { font-size:var(--fs-sm); color:var(--text); line-height:1.55; }
+.finding-merged-obs { font-size:var(--fs-sm); color:var(--text-muted); line-height:1.55; }
+.finding-merged-quote { font-size:var(--fs-sm); color:var(--text-muted); font-style:italic; line-height:1.5; }
 /* The ledger card's clientWidth measures 342px and its own 10px side padding
    leaves the verb row a 322px content box. R6 item 3 took the rule chip OUT of
    this row — it is provenance, so it now sits with the reasoning above — and
@@ -6193,6 +6219,23 @@ body:not(.idea-mode) .desk {
    finish, or was written by a different model than the one now configured, has to
    say so before the writer reads a single finding. */
 .dock-report-model { font-size:var(--fs-3xs); color:var(--text-faint); margin:0; }
+/* A caveat, not a failure — deliberately NOT the danger palette. The pass SUCCEEDED
+   (it re-ran a section in smaller pieces); the writer is owed the note because a split
+   re-asks the scenes and the finding set is path-dependent, not because anything broke.
+   Actionless on purpose: there is nothing to rerun and nothing to fix. */
+.run-caveat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: var(--sp-3);
+}
+.run-caveat-head { font-size: var(--fs-xs); font-weight: 600; color: var(--text); margin: 0; }
+.run-caveat-note { font-size: var(--fs-2xs); color: var(--text-muted); margin: 0; line-height: 1.55; }
+
 .failure-banner {
   display: flex;
   flex-direction: column;
