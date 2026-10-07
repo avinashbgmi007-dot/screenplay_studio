@@ -51,6 +51,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# NOTE: `finding_integrity.py` in this folder is a LOCAL measurement harness and is deliberately
+# NOT published — it is a second copy of `screenplay_analyzer/finding_integrity.py`, and its own
+# header records that keeping the two side by side let them drift. So this prototype runs only in
+# the original working tree; it is checked in as evidence of method, not as a runnable tool.
 from finding_integrity import FindingIntegrityGate, score as gate_score  # noqa: E402
 
 TARGET = 0.9858

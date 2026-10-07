@@ -16,7 +16,7 @@ do, and it has not been tested. This experiment tests it:
   If it does not, the product must ship two registers and the 98.58 % bar
   attaches to the observation register only.
 
-This is the cheapest experiment that decides the plan. No tracked files.
+This is the cheapest experiment that decides the plan. It modifies no tracked files.
 """
 from __future__ import annotations
 
@@ -28,6 +28,9 @@ import time
 import urllib.request
 
 sys.path.insert(0, ".")
+# NOTE: `finding_integrity.py` in this folder is a LOCAL measurement harness, deliberately not
+# published (see its header on the drift hazard). This prototype therefore runs only in the
+# original working tree — it is checked in as evidence of method, not as a runnable tool.
 from finding_integrity import FindingIntegrityGate  # noqa: E402
 from grounding_pass import script_text  # noqa: E402
 
