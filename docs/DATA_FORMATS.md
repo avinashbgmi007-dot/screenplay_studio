@@ -236,6 +236,10 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
                                           //   itself, so a merge is inspectable rather than merely
                                           //   announced — same contract as the integrity gate's
                                           //   `withdrawals` ledger. Omitted when nothing was absorbed.
+                                          //   Rendered in the desk as a COLLAPSED disclosure on the
+                                          //   deep finding card (app.js mergedFindingsEl) — the writer
+                                          //   can read the absorbed claims without the dedupe's work
+                                          //   being undone on screen.
         {"category": "dialogue", "issue": "…", "severity": "medium", "scene_refs": [1],
          "evidence_quote": "…", "observation": "…", "rule_id": "rule_y"}
       ],
@@ -314,8 +318,10 @@ This is what Piece 3 loads to discuss findings. `report.md` renders the same con
                                           //   path-dependent (measured 8 vs 12 findings on identical
                                           //   input) and the writer is owed the caveat. Empty on a
                                           //   clean run. Rendered in report.md as "## Notes on this
-                                          //   run". NOT yet rendered in the desk UI — see
-                                          //   screenplay_analyzer/pipeline.py AnalysisResult.recoveries
+                                          //   run", and in the desk as the run caveat (app.js
+                                          //   buildRunCaveat) — beside the failure banner, never
+                                          //   inside it: a recovery is a pass that SUCCEEDED, and
+                                          //   the banner's head reads "N passes reported a problem".
     "Dialogue analysis: the model's reply hit its output limit on 1 chunk(s) (scenes 4–6) …"
   ]
 }

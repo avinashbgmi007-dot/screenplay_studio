@@ -4955,6 +4955,57 @@ function sharedMarkSiblings(index) {
   return [...seen];
 }
 
+// The absorbed half of a merge, on demand.
+//
+// The dedupe collapses findings that share a line and point at the same page. The
+// survivor used to carry only `merged_rule_ids` — rule-id STRINGS, which name who
+// agreed but not what they said — so the absorbed claims were retained NOWHERE
+// (fixed 2026-10-06). `merged_findings` now carries their full content, and this is
+// the writer's only way to read it: delivered on /findings and, until now, read by
+// nothing in the desk.
+//
+// Collapsed by default, and closed on every render. N absorbed claims expanded
+// inline is exactly the wall of near-duplicate cards the dedupe exists to prevent —
+// the writer asked for the merge to be INSPECTABLE, not to be shown twice.
+//
+// A <button> rather than <details>/<summary> because the card already routes its own
+// clicks and a <summary> would need the same stopPropagation dance; a button also
+// gives us aria-expanded for free.
+function mergedFindingsEl(merged) {
+  const wrap = el("div", "finding-merged");
+  const n = merged.length;
+  const btn = el("button", "finding-merged-toggle", n === 1
+    ? "1 other note was merged into this one"
+    : n + " other notes were merged into this one");
+  btn.type = "button";
+  btn.setAttribute("aria-expanded", "false");
+  const body = el("div", "finding-merged-body");
+  body.hidden = true;
+  merged.forEach((m) => {
+    const item = el("div", "finding-merged-item");
+    const head = el("div", "finding-merged-head");
+    if (m.rule_id) head.appendChild(el("span", "finding-merged-rule", String(m.rule_id)));
+    if (m.severity) head.appendChild(el("span", "finding-merged-sev", String(m.severity)));
+    if (head.children.length) item.appendChild(head);
+    if (m.issue) item.appendChild(el("span", "finding-merged-issue", String(m.issue)));
+    if (m.observation) item.appendChild(el("span", "finding-merged-obs", String(m.observation)));
+    if (m.evidence_quote) {
+      item.appendChild(el("span", "finding-merged-quote", "\u201C" + m.evidence_quote + "\u201D"));
+    }
+    body.appendChild(item);
+  });
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const opening = body.hidden;
+    body.hidden = !opening;
+    btn.setAttribute("aria-expanded", String(opening));
+    wrap.classList.toggle("open", opening);
+  });
+  wrap.appendChild(btn);
+  wrap.appendChild(body);
+  return wrap;
+}
+
 function findingNoteEl(f, index, opts = {}) {
   const disp = opts.disposition || "open";
   // forward-compatible states (Phase D defer / Phase E ghosting): muted
@@ -5028,6 +5079,12 @@ function findingNoteEl(f, index, opts = {}) {
     if (f.check_id && !f.rule_id) {
       deep.appendChild(el("span", "finding-check",
         "\u2699 mechanical check \u00B7 " + f.check_id));
+    }
+    // The absorbed claims, collapsed. Sits in `.finding-deep`, never in
+    // `.finding-note-actions` — that row has a measured one-row / <=30px budget the
+    // suite gates, and this is a disclosure, not a verb.
+    if (Array.isArray(f.merged_findings) && f.merged_findings.length) {
+      deep.appendChild(mergedFindingsEl(f.merged_findings));
     }
     if (deep.children.length) note.appendChild(deep);
   }
@@ -6373,6 +6430,12 @@ function buildContextSection() {
   const banner = buildFailureBanner((proj && proj.failed_categories) || [],
     (state.report && state.report.errors) || []);
   if (banner) lens.appendChild(banner);
+  // Rendered next to the banner, but a separate element — a recovered split is not
+  // one of the "problems" that box reports. `recoveries` reaches the desk here for
+  // the first time; it was delivered in report.findings.json and rendered only into
+  // report.md, so the caveat never reached the writer's eyes (spec §7's honesty gap).
+  const caveat = buildRunCaveat((state.report && state.report.recoveries) || []);
+  if (caveat) lens.appendChild(caveat);
   const modelLine = buildReportModelLine();
   if (modelLine) lens.appendChild(modelLine);
 
@@ -7215,6 +7278,28 @@ function buildWhatsWorking() {
   strengths.forEach((s) => box.appendChild(el("p", "dock-working-row", "\u2022 " + s)));
   box.title = "What the analysis thought already holds. These are not findings and"
     + " join no count — the numbers on the strip above stay untouched.";
+  return box;
+}
+
+// A run that re-ran a section in smaller pieces — a CAVEAT, never a failure.
+//
+// Deliberately NOT folded into buildFailureBanner below. That box's head reads
+// "N passes reported a problem", it offers the partial-failure rerun path, and it
+// is driven by `report.errors`. Routing a recovery through it dressed a healthy run
+// as a broken one — the bug the first version of this feature shipped, caught in
+// review. A recovery is the opposite: the pass SUCCEEDED.
+//
+// The writer is still owed it, because a split re-asks the scenes and the finding
+// set is path-dependent (measured 8 vs 12 findings on identical input), so a rerun
+// may word things differently. Quiet note, no red, no action.
+function buildRunCaveat(recoveries) {
+  const rs = (recoveries || []).filter((r) => r);
+  if (!rs.length) return null;
+  const box = el("div", "run-caveat");
+  box.appendChild(el("p", "run-caveat-head", rs.length === 1
+    ? "1 pass re-ran a section in smaller pieces"
+    : rs.length + " passes re-ran a section in smaller pieces"));
+  rs.forEach((r) => box.appendChild(el("p", "run-caveat-note", String(r))));
   return box;
 }
 
