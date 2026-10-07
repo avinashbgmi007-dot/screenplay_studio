@@ -1,0 +1,24 @@
+{
+  "finding_negative_index": {
+    "request": "POST findings/-1/dismiss",
+    "status": 405,
+    "html_body": true,
+    "classification": "P3 API-contract polish: negative index falls through to the static catch-all's HTML 405 instead of the M4 JSON 400"
+  },
+  "stale_intent_status": 200,
+  "concurrent_analyze_codes": [
+    200,
+    409
+  ],
+  "route_census": {
+    "webapp_server": 88,
+    "demo": 2,
+    "doc_claimed_total": 86,
+    "note": "doc predates rungs; delta is growth, verified by census"
+  },
+  "api_json_nosniff": {
+    "present": false,
+    "classification": "P3 hardening observation: nosniff not applied to API JSON (shipped scope is the document; MIME-confusion risk is minimal for application/json)"
+  },
+  "verdict": "PHASE 2 PROVEN"
+}
