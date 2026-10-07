@@ -1,6 +1,6 @@
 # Gate 5 — the writer study: protocol and instrument
 
-**Status:** READY TO RUN — **after the §3.5 pre-flight** (one timed analysis, no writer present).
+**Status:** READY TO RUN — ****§3.5 pre-flight steps 1–2 DONE 2026-10-07** (`GATE5_PREFLIGHT_2026-10-07.md`) — step 3 (one desk session, ~10 min) is the owner's.
 **Owner:** you (it needs 3–5 real screenwriters; no code can produce it).
 **Date written:** 2026-10-06. **Revised 2026-10-07** — §2, §5, §7 after PRs #11–#14 landed; **§3.5, §4, §6
 after an operational review** that found the session was budgeted at ~1 hour for ~2 hours of work, the
@@ -79,6 +79,16 @@ recovered run is healthy; dressing it as a failure would make the study measure 
 ## 3.5 Pre-flight, consent, and surface exposure *(added 2026-10-07)*
 
 ### Pre-flight — run this once, before the first session, with no writer present
+
+> **Status 2026-10-07: steps 1 and 2 are DONE** — see `GATE5_PREFLIGHT_2026-10-07.md`. Measured on
+> `Pain_3` with qwen3.6: **30.4 min**, and **both surfaces appear** (30 merges → **15 of 61** delivered
+> rows carry `merged_findings`; **1** run caveat). **Step 3 is the owner's** — it needs a desk session,
+> because `finding_verdicts.json` and `feedback_ledger.json` are written by the product, not the analyzer.
+>
+> **The trap, recorded:** the *stored* payloads could **not** have answered step 2. They predate the fix
+> (PR #11/#13), so they carried `stats.findings_merged` (29 / 5) while **0** rows carried
+> `merged_findings`. A pre-flight run against them would have reported "surface absent" and been wrong.
+> **Run the pre-flight on the build being tested.**
 
 1. **Time the analysis on this machine**, on a script of comparable length. Read `stats.runtime_minutes`
    from the finished report; do not estimate it. The 30.4 / 33.8 min figures in §4 are from one laptop
