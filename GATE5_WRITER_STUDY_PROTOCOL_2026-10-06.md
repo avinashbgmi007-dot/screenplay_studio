@@ -2,7 +2,10 @@
 
 **Status:** READY TO RUN. Everything the study needs now exists in the product.
 **Owner:** you (it needs 3–5 real screenwriters; no code can produce it).
-**Date written:** 2026-10-06.
+**Date written:** 2026-10-06. **Revised 2026-10-07** (§2, §5, §7) after PRs #11–#14 landed.
+**Run against:** `origin/main` = **`65f4b9a`**. Pin this commit for the sessions — a study whose
+build is unstated is not reproducible, and reproducibility is exactly what Gate 7 is about. If
+`main` has moved by the time you run, re-read §7's field list: it changed on 2026-10-06/07.
 
 ---
 
@@ -45,6 +48,16 @@ row below it (addressed / deferred) is a different question and is deliberately
 separate — "it's true but I won't act on it" must be expressible, or the metric
 collapses back into the ambiguous middle that made it unmeasurable.
 
+**Two surfaces added 2026-10-07 — both are in the instrument, and neither is decoration:**
+
+| surface | what it shows | why the study cares |
+|---|---|---|
+| **"Also flagged under" disclosure** (deep card) | the findings the dedupe **absorbed** into the survivor, with their own rule, severity, issue, observation and quote — collapsed by default | Until `65f4b9a` this content was preserved in the data and **readable by nothing**. If writers never open it, the merge is still a silent collapse to them and the fix bought nothing. |
+| **Run caveat** (above the model line) | a plain note that a chunk hit its output limit and was re-run in smaller pieces, so **this run's findings may differ from an uninterrupted one** | This is churn *disclosure*. Step 5 asks "do they notice what changed?" — this is the surface that answers it. If it appears and the writer cannot say what it means, the disclosure failed. |
+
+Note the deliberate split: a run caveat renders **beside, never inside**, the failure banner. A
+recovered run is healthy; dressing it as a failure would make the study measure a false alarm.
+
 ---
 
 ## 3. Recruitment
@@ -80,7 +93,7 @@ note, that is a *finding about the note* — record it. If they mark everything
 
 ## 5. What is measured
 
-Four outcomes, plus the number:
+Five outcomes, plus the number:
 
 1. **Task completion** — did they get from import to a worked fix loop without
    facilitator rescue? Where did they stall?
@@ -92,7 +105,13 @@ Four outcomes, plus the number:
    conclude the tool was broken?
 4. **Lost context** — did anything they had said or marked disappear between
    runs without explanation? (The Feedback-ledger section is the surface for
-   this; watch whether they find it.)
+   this; watch whether they find it.) **And if a run caveat appeared, could they
+   say what it meant** — that this run's findings may differ from an
+   uninterrupted one? A caveat the writer cannot read is not a disclosure.
+5. **Merge transparency** *(added 2026-10-07)* — on a card that says "also
+   flagged under", did they open the disclosure and see the absorbed claims, or
+   did they read the survivor as the whole story? If nobody opens it, the dedupe
+   is still collapsing silently and §2's first new surface has failed.
 
 Then the number:
 
@@ -130,7 +149,12 @@ Per project, in the project directory:
 - `finding_verdicts.json` — `{finding_id: correct|partial|incorrect}`. The metric.
 - `feedback_ledger.json` — every run's delivered set, reconciled. Answers "did
   anything they marked vanish?".
-- `report.findings.json` — `verification_summary` carries both rates.
+- `report.findings.json` — `verification_summary` carries both rates. **Also read two fields added
+  2026-10-06/07, because they are the run's own account of what it did:** `recoveries` (a list of
+  writer-facing caveats; non-empty means a chunk was split, so this run's finding set is
+  path-dependent) and, per finding, `merged_findings` (the absorbed findings' full content — the
+  data behind the "Also flagged under" disclosure). `withdrawals` carries every removal with a
+  reason, so `findings + withdrawals` reconciles against the pre-gate list.
 
 Collect the project directories at the end. `verdict_accuracy()` reads them
 directly; there is no separate export step and no second source of truth.
@@ -149,6 +173,10 @@ Any of these means the architecture is wrong, and no prompt change fixes it:
   metric has no home in the product.
 - Writers do not notice that a note from run 1 did not come back → the ledger is
   answering a question nobody asked.
+- Writers never open the "also flagged under" disclosure, on any card, in any
+  session → the merge fix is a **data** property with no **product** effect, and
+  the dedupe is still collapsing silently from where the writer sits. *(Added
+  2026-10-07; this is the honest test of whether PR #14 bought anything.)*
 
 ---
 
