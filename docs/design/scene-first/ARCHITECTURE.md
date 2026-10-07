@@ -461,7 +461,12 @@ only be a **precision measured against writer verdicts**. v3.1 has no way to cap
 ### ▶ Amendment 8 (2026-10-05) — **the accuracy baseline is measured, and the target is reachable only on the asserted tier**
 
 Amendment 7 defined the contract. This amendment **measures it** — every real finding on both payloads read
-against its evidence and judged (`docs/design/scene-first/accuracy_meter.py`; verdicts in the same folder).
+against its evidence and judged (`docs/design/scene-first/accuracy_meter.py`). **The instruments are
+in-tree; their input is not.** `accuracy_meter.py` and `accuracy_report.py` both take a required
+`--verdicts <path>`, and the per-finding verdict files (`verdicts_pain3.json`, `verdicts_gunpen.json`) are
+**kept local, not published** — they record item-by-item judgments about an unpublished script, so they are
+not ours to publish. **What this document cites is therefore the aggregate evidence only** — the readings
+below and Amendment 10's four — never the per-finding detail.
 **The instrument is now the fourth deliverable**, alongside the spec, the prototype and the ledger.
 
 **Measured (expert-proxy ground truth, 61 findings):**
