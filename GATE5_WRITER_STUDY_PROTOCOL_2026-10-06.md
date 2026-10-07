@@ -1,6 +1,8 @@
 # Gate 5 — the writer study: protocol and instrument
 
-**Status:** READY TO RUN — ****§3.5 pre-flight steps 1–2 DONE 2026-10-07** (`GATE5_PREFLIGHT_2026-10-07.md`) — step 3 (one desk session, ~10 min) is the owner's.
+**Status:** READY TO RUN — **§3.5 pre-flight: steps 1, 2 and 4 (machine half) DONE 2026-10-07; step 3
+outstanding** (`GATE5_PREFLIGHT_2026-10-07.md`) — step 3 (one desk session, ~10 min) is the owner's, and
+step 4's per-session recording happens before each writer signs.
 **Owner:** you (it needs 3–5 real screenwriters; no code can produce it).
 **Date written:** 2026-10-06. **Revised 2026-10-07** — §2, §5, §7 after PRs #11–#14 landed; **§3.5, §4, §6
 after an operational review** that found the session was budgeted at ~1 hour for ~2 hours of work, the
@@ -80,10 +82,17 @@ recovered run is healthy; dressing it as a failure would make the study measure 
 
 ### Pre-flight — run this once, before the first session, with no writer present
 
-> **Status 2026-10-07: steps 1 and 2 are DONE** — see `GATE5_PREFLIGHT_2026-10-07.md`. Measured on
-> `Pain_3` with qwen3.6: **30.4 min**, and **both surfaces appear** (30 merges → **15 of 61** delivered
-> rows carry `merged_findings`; **1** run caveat). **Step 3 is the owner's** — it needs a desk session,
-> because `finding_verdicts.json` and `feedback_ledger.json` are written by the product, not the analyzer.
+> **Status 2026-10-07: steps 1, 2 and 4 (machine half) are DONE; step 3 is the owner's** — see
+> `GATE5_PREFLIGHT_2026-10-07.md`. Measured on `Pain_3` with qwen3.6: **30.4 min**, and **both surfaces
+> appear** (30 merges → **15 of 61** delivered rows carry `merged_findings`; **1** run caveat).
+> **Step 3 needs a desk session**, because `finding_verdicts.json` and `feedback_ledger.json` are written
+> by the product, not the analyzer.
+>
+> **Step 4 has two halves, and only one is a pre-flight measurement.** Its *machine* half is done (the
+> endpoint is loopback — `cli.py:36`, and the server is bound to `127.0.0.1:8080`, not `0.0.0.0`); its
+> *per-session* half — filling the consent form's endpoint table — is **outstanding by design**, because it
+> happens before each writer signs and cannot be discharged before a session exists. So the pre-flight is
+> **not** complete yet, and this block must not be read as saying it is.
 >
 > **The trap, recorded:** the *stored* payloads could **not** have answered step 2. They predate the fix
 > (PR #11/#13), so they carried `stats.findings_merged` (29 / 5) while **0** rows carried
@@ -96,6 +105,13 @@ recovered run is healthy; dressing it as a failure would make the study measure 
 2. **Confirm both surfaces appear at least once** (see below). If they do not, you have not tested them.
 3. **Confirm the data lands** — `finding_verdicts.json`, `feedback_ledger.json`, and `report.findings.json`
    with non-empty `recoveries` where a split occurred.
+4. **Verify the model endpoint is on this machine** — *(added 2026-10-07)*. The consent form promises the
+   script never leaves the machine, and the writer cannot check that. The analyzer sends the script text
+   to whatever `--server` names, and it **explicitly supports a remote OpenAI-compatible endpoint**
+   (`cli.py`'s `--server` + `--api-key`, or `SCREENPLAY_STUDIO_API_KEY`). The promise therefore holds only
+   if the endpoint is local: **confirm the host resolves to loopback (`127.0.0.1` / `localhost`) and record
+   it on the consent form.** If it does not, reconfigure to a local server or stop — "nothing is
+   transmitted" is not something the product's design can guarantee on its own.
 
 ### Informed consent — the scripts are unpublished IP
 
@@ -107,8 +123,10 @@ This is a **privacy-first, local** product, so the study should be too, and the 
 
 - **Where the data lives:** the project directory on the machine running the study. State the path.
 - **What is collected:** their script, the generated report, `finding_verdicts.json` (their judgements),
-  and `feedback_ledger.json`. **Nothing is uploaded** — say this explicitly, because it is the product's
-  premise and the writer has no way to verify it.
+  and `feedback_ledger.json`. **Nothing is transmitted off this machine** — say this explicitly, because
+  it is the product's premise and the writer has no way to verify it — **but only after pre-flight step 4
+  confirms the model endpoint is local.** The claim is conditional on that check, not on the product's
+  design; `GATE5_CONSENT_FORM_2026-10-07.md` §3 carries the verification table.
 - **Retention and deletion:** agree a retention period and a deletion date; the writer may withdraw and
   have the project directory deleted at any point, including after the session.
 - **Quoting:** ask separately for permission to quote their verbatim reactions in the write-up. A quote
@@ -120,10 +138,10 @@ This is a **privacy-first, local** product, so the study should be too, and the 
 Two surfaces added 2026-10-07 (§2) appear **conditionally**, so a session can run cleanly and never show
 either. Record exposure explicitly and report it honestly:
 
-| surface | appears when | measured base rate |
+| surface | appears when | observed so far (a few runs — an observation, not a rate) |
 |---|---|---|
-| **"Also flagged under" disclosure** | the dedupe merged two findings under one rule | **common** — `stats.findings_merged` was **29** on `Pain_3` and **5** on `gun_pen` in the stored payloads, so a feature-length script will almost certainly show it |
-| **Run caveat** | a chunk hit its output limit and was split | **rare** — appeared on the qwen `Pain_3` run (1 chunk), absent on others |
+| **"Also flagged under" disclosure** | the dedupe merged two findings under one rule | seen on every feature-length run: merge counts **29 / 30** on `Pain_3`, **5** on `gun_pen`. Row-level *content* confirmed post-fix on the 2026-10-07 run only (**15 of 61** rows). Expect it, but do not report it as a base rate. |
+| **Run caveat** | a chunk hit its output limit and was split | **rare** — one chunk on the qwen `Pain_3` run, absent on others. May not appear in a given session at all. |
 
 **Rule:** if a participant never saw a surface, that surface was **not tested**. Write "not exercised" in
 the write-up — never "passed". If you want it tested deliberately, add a short **post-marking walkthrough**

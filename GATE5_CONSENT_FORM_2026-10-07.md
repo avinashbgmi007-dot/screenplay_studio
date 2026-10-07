@@ -26,8 +26,24 @@ confused, that is useful data — please say so out loud rather than asking for 
 
 ## 3. Where your data lives, and what is collected
 
-Everything runs **locally, on this machine**. **Nothing about your script or your judgements is uploaded,
-transmitted, or sent to any third party.** There is no account and no cloud component.
+**Everything in this study runs locally, on this machine — conditional on the check immediately below,
+which the facilitator completes before you sign.** There is no account, no cloud component, and nothing
+about your script or your judgements is stored by any third party **once that check passes**.
+
+**The check below is what makes the paragraph above true, so it is verified rather than asserted.** The
+analysis sends your script text to a language model. If that model runs on this machine, the text never
+leaves it — which is how this study is run. If the tool were pointed at a model somewhere else, your text
+*would* be transmitted to that endpoint: the product supports both, and you have no way to check it
+yourself. So the facilitator confirms the endpoint **before you sign**:
+
+| check, before consent | result |
+|---|---|
+| configured model endpoint | ______________________ |
+| host is this machine (`127.0.0.1` / `localhost` / loopback) | [ ] verified |
+| model served locally | ______________________ |
+
+**If any row cannot be confirmed, do not proceed.** The "stays on this machine" promise would then not
+be true, and you would be consenting to something we cannot stand behind.
 
 Collected, in the project directory at: ______________________________________
 
@@ -39,9 +55,8 @@ Collected, in the project directory at: ______________________________________
 | `feedback_ledger.json` | the record of which notes appeared in which run |
 | facilitator notes | your verbatim reactions, kept by the facilitator |
 
-**The analysis also calls a language model.** In this study it is a model running on this machine, so
-your script text does not leave it. Please confirm which model was used and where it ran:
-______________________
+*(The endpoint check above is what makes the previous paragraph true; its result is recorded there, not
+here.)*
 
 ## 4. Retention, deletion, and withdrawal
 

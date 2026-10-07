@@ -3,7 +3,9 @@
 **Date:** 2026-10-07 · **Run against:** `origin/main` = `fac81d3` (PRs #11–#16 merged)
 **Script:** `Pain_3` (22 scenes) · **Model:** `qwen3.6-35b-a3b-pruned-v2.gguf` (the loaded local model)
 **Command:** `python -m screenplay_analyzer real/Pain3/parsed.json --categories all -o preflight/Pain3.report.md`
-**Result:** **steps 1 and 2 PASS. Step 3 is not runnable without a desk session — it is the owner's step.**
+**Result:** **steps 1, 2 and 4 PASS — step 4's *machine* half only (§3).** Step 3 is not runnable without a
+desk session (it is the owner's step), and step 4's *per-session* half is outstanding by design. **The
+pre-flight is therefore NOT complete: it closes when step 3 is run.**
 
 ---
 
@@ -32,9 +34,12 @@ The §3.5 rule is that a surface no participant sees was *not tested*. Both were
 | **"Also flagged under" disclosure** | the dedupe merged two findings under one rule | **YES** — `stats.findings_merged = 30`; **15 of 61 delivered rows carry `merged_findings`**; 13 occurrences render in `report.md` |
 | **Run caveat** | a chunk hit its output limit and was split | **YES** — 1 recovery: *"Dialogue analysis: the model's reply hit its output limit on 1 chunk(s) (scenes 8–10) and the chunk was re-run in smaller pieces…"* |
 
-The merge disclosure is **common** (15/61 rows, ~25%); the run caveat is **rare** (1 chunk, and absent
-on other runs). A session may run cleanly and never show the caveat — so §3.5's post-marking walkthrough
-is still the only way to test that one deliberately.
+**These are observations from this run, not population rates** — 15 of 61 rows and one caveat, on one
+script, one model, one run. What they establish is that both surfaces *occur on this build*, which is
+what the pre-flight asks. Whether the disclosure is "common" is a claim about a distribution that a
+single run cannot support. What can be said: the merge *count* has appeared on every feature-length run
+so far (29 / 30 on `Pain_3`, 5 on `gun_pen`), while the caveat appeared once and may well not appear in
+a given session — so §3.5's post-marking walkthrough is still the only way to test that one deliberately.
 
 ### The composition that makes this a real check
 
@@ -50,7 +55,32 @@ without data is a fixture. This run closes the first half against the real model
 
 ---
 
-## 3. Why the pre-flight could not have been signed off earlier
+## 3. Step 4 — the model endpoint is local (machine half **DONE**)
+
+Step 4 asks that the model endpoint be **on this machine**, because the consent form's "your script never
+leaves it" promise is true only of a local endpoint and the writer cannot check it. It has two halves, and
+only one of them is a pre-flight measurement.
+
+**Machine half — DONE, verified 2026-10-07:**
+
+| check | evidence |
+|---|---|
+| the analyzer's default endpoint is loopback | `cli.py:36` → `--server` defaults to `http://localhost:8080`; this run passed **no** `--server`, so it used that default |
+| the loaded model is bound to loopback, not to all interfaces | `netstat` → `TCP 127.0.0.1:8080 … LISTENING` — **not** `0.0.0.0`, so it is unreachable from another host |
+| the desk path is loopback-guarded by default | `webapp_server.py:396 _validate_server_url` via `net_guard.is_loopback_url` (`net_guard.py:75`); a LAN model server needs the **process-level** opt-in `--allow-remote-server` / `SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER`, never grantable over HTTP |
+
+**Per-session half — OUTSTANDING by design.** The consent form's endpoint table is filled in **before each
+writer signs** (§3 of `GATE5_CONSENT_FORM_2026-10-07.md`). That is a per-session record, so a pre-flight run
+cannot discharge it, and this record must **not** be read as closing it.
+
+**Why it is still a real check:** the analyzer *explicitly supports a remote OpenAI-compatible endpoint*
+(`--server` + `--api-key`, or `SCREENPLAY_STUDIO_API_KEY`), and the desk opt-in above exists. "Nothing is
+transmitted" is therefore a property of the **configuration in force**, not of the product's design — which
+is why the consent form now states the promise conditionally on this check rather than asserting it.
+
+---
+
+## 4. Why the pre-flight could not have been signed off earlier
 
 **The artifacts on disk could not answer it.** Before this run:
 
@@ -66,7 +96,7 @@ run on the build being tested — which is what §3.5 says, and why it says it.
 
 ---
 
-## 4. What this run also shows (not part of the pre-flight)
+## 5. What this run also shows (not part of the pre-flight)
 
 - **The recovery channel works in production.** `errors = []` while `recoveries` is non-empty. Before
   PR #12 that same event either vanished or landed in `errors` — where it would have rendered the desk's
@@ -79,7 +109,7 @@ run on the build being tested — which is what §3.5 says, and why it says it.
 
 ---
 
-## 5. What is NOT proven here
+## 6. What is NOT proven here
 
 - **No writer was involved.** This says the instrument runs and the surfaces exist; it says nothing about
   whether a writer finds them useful. That is Gate 5, and only Gate 5.
@@ -94,9 +124,13 @@ run on the build being tested — which is what §3.5 says, and why it says it.
 
 ---
 
-## 6. Next
+## 7. Next
 
 1. **Step 3 (owner, ~10 min):** in the desk, mark one finding on this report and confirm
-   `finding_verdicts.json` and `feedback_ledger.json` appear. That closes the pre-flight.
-2. **Run the study** — 3–5 writers, their own scripts, per `GATE5_WRITER_STUDY_PROTOCOL_2026-10-06.md`.
+   `finding_verdicts.json` and `feedback_ledger.json` appear. **This is the last outstanding pre-flight
+   step** — steps 1, 2 and 4 are done (§1, §2, §3), with step 4's per-session half recorded per session
+   rather than here.
+2. **Step 4, per session (owner, before each signature):** fill the consent form's endpoint table. It is a
+   per-session record, not a one-off measurement — see §3.
+3. **Run the study** — 3–5 writers, their own scripts, per `GATE5_WRITER_STUDY_PROTOCOL_2026-10-06.md`.
    Quote **~30 minutes** for a feature-length script, and use `GATE5_CONSENT_FORM_2026-10-07.md`.
