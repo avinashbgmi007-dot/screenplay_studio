@@ -7,6 +7,12 @@ Usage:
         --model qwen-agentworld-35b-a3b-mxfp4_moe.gguf \\
         -o report.md
 
+**There is no subcommand.** `__main__` calls `main()` directly and the first
+positional is the input script — so `python -m screenplay_analyzer analyze
+script.json` is rejected by argparse ("unrecognized arguments: script.json"),
+because `analyze` is consumed as the input path. Use
+`python -m screenplay_analyzer script.json [options]`.
+
 If --model is omitted, whatever model llama-server has loaded is used
 (queried live from /v1/models — llama-server serves one model per instance,
 so there's only ever one real choice unless you're running multiple
