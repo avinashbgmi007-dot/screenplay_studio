@@ -1,0 +1,12 @@
+{
+  "name": "screenplay-studio-js-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "JS test toolchain for the no-build vanilla-JS SPA. There is no bundler and no build step; this manifest exists so the browser-side suites are reproducible from a clean checkout (Gate 2).",
+  "scripts": {
+    "test": "node --test \"tests/js/*.test.js\" \"screenplay_studio/webapp/preview-ink-layer/tests/*.test.mjs\""
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

@@ -6,7 +6,13 @@
  * affect: the DOM tree, the state machine, the string replacement, the keymap
  * end-to-end, the annunciator, and the geometry the Horizon is handed.
  *
- * Run: node --test tests/    (requires jsdom: npm i jsdom)
+ * Run, from the REPO ROOT:  npm ci && npm test      (both JS suites, 127 tests)
+ * Run, this suite alone:    node --test screenplay_studio/webapp/preview-ink-layer/tests/*.test.mjs
+ *
+ * NOT `node --test tests/` — on Node 22 a bare directory is treated as a module
+ * path and the run dies with `Cannot find module .../tests` (measured: 0 pass,
+ * 1 fail). Glob the files. `jsdom` is declared in the root package.json, so
+ * there is no global `npm i jsdom` step.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -52,7 +58,14 @@ async function harness({ query = '' } = {}) {
   Object.defineProperty(window.HTMLElement.prototype, 'clientHeight', { get() { return this.id === 'horizon' ? 700 : 0; }, configurable: true });
 
   global.window = window; global.document = window.document;
-  global.location = window.location; global.navigator = window.navigator;
+  global.location = window.location;
+  // Node >=21 defines `globalThis.navigator` as a GETTER-ONLY accessor, and this
+  // file is ESM (always strict mode), so `global.navigator = ...` throws
+  // `TypeError: Cannot set property navigator of #<Object> which has only a
+  // getter`. It is `configurable`, so defineProperty is the way in. Node <21 had
+  // no such global and the plain assignment was fine — which is why this went
+  // unnoticed until the suite was run on a modern Node (it was never in CI).
+  Object.defineProperty(global, 'navigator', { value: window.navigator, configurable: true, writable: true });
   global.HTMLElement = window.HTMLElement; global.Element = window.Element;
   global.KeyboardEvent = window.KeyboardEvent; global.Event = window.Event;
   global.requestAnimationFrame = (fn) => setTimeout(() => fn(Date.now()), 0);

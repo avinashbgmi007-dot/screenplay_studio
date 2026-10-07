@@ -65,8 +65,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+      - name: Install JS test dependencies
+        run: npm ci
+      # Gate 2. This job used to run only `tests/js/*.test.js` (17 tests). The
+      # ink-layer suite — preview-ink-layer/tests/{core,dom}.test.mjs (62 + 48) —
+      # imports `jsdom`, which was UNDECLARED and had no package.json to declare
+      # it in, so a clean checkout could not run it and CI never did. Worse, it
+      # had been broken on any Node >= 21 since Node added a getter-only
+      # `globalThis.navigator`; nobody saw it because it never ran here.
+      # Measured 2026-10-07: 127 tests, 127 pass. The file list lives in
+      # package.json's `test` script so CI and a local `npm test` cannot drift.
       - name: Run JS unit tests
-        run: node --test "tests/js/*.test.js"
+        run: npm test
 
   # The SPA is ~9k lines of vanilla app.js (plus 6.5k of CSS) with no build step
   # and, until 2026-09-20, no automated coverage in CI at all: the 29
