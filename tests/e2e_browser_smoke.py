@@ -30,7 +30,7 @@ import sys
 from playwright.sync_api import sync_playwright, expect
 
 from e2e_browser_common import (Checks, assert_no_js_errors, last_reply, launch,
-                                seen_visible, start_studio)
+                                reveal_and_click, seen_visible, start_studio)
 
 STREAM_OBSERVER = """() => {
   const c = document.querySelector('#messages-scroll');
@@ -115,17 +115,21 @@ def run():
             # NOTE: the Nocta auto-hide chrome hides #project-bar after 4s
             # idle (pointer-events:none). Playwright's actionability check
             # does NOT dispatch the mousemove that would re-show it, so a
-            # click >4s after load deadlocks — move the mouse to the top
-            # edge first, exactly what a real user does.
-            page.mouse.move(500, 60)
-            page.locator("#room-cowrite-btn").click()
+            # click >4s after load deadlocks — and a single mouse.move can
+            # still lose the race on a slow runner, because the 4s window can
+            # expire while the click is being retried (measured 2026-10-07:
+            # this exact click failed CI run 37573662778 while the same SHA
+            # passed on the push run). reveal_and_click re-arms per attempt.
+            co_write_clicked = reveal_and_click(page, "#room-cowrite-btn")
             drawer_cls = ""
             for _ in range(20):
                 drawer_cls = page.locator("#room-drawer").get_attribute("class") or ""
                 if "open" in drawer_cls:
                     break
                 page.wait_for_timeout(100)
-            checks.ok("partner drawer summoned", "open" in drawer_cls, drawer_cls)
+            checks.ok("partner drawer summoned",
+                      "open" in drawer_cls,
+                      f"clicked={co_write_clicked} class={drawer_cls}")
             expect(page.locator("#input")).to_be_visible()
 
             # ---- 4+5. instrument streaming, send a chat turn --------

@@ -176,6 +176,46 @@ def clicked(target, selector=None, timeout=4000):
         return False
 
 
+def reveal_and_click(page, selector, timeout=4000, attempts=6):
+    """Click a control that lives in the Nocta AUTO-HIDE CHROME. Never raises.
+
+    `#project-bar` and `#desk-toolbar` fade to `opacity: 0; pointer-events: none`
+    after 4s idle (`style.css:4712`, `app.js:10469 CHROME_HIDE_DELAY`), so any
+    control inside them stops being hit-testable. Note this is NOT a CSS-visibility
+    problem: `is_visible()` returns **True** for the hidden bar, because opacity 0
+    is still "visible" to Playwright. The failure surfaces as the actionability
+    error `element is not visible`, which is misleading.
+
+    The shipped reveal paths are a mousemove with `clientY < 120` and `focusin`
+    on either bar (`app.js:10498`, `app.js:10509`). Playwright's actionability
+    retries do NOT re-arm the idle timer, so the fleet's hand-copied single
+    `page.mouse.move(...)` before a bare `.click()` can still lose the race: the
+    4s window expires mid-retry, the bar goes `pointer-events: none`, and the
+    click times out on a control that is fine.
+
+    Measured 2026-10-07 (`C:/tmp/ss_probe/chrome_flake_probe.py`): after a 6s
+    idle, a bare `#room-cowrite-btn`.click() -> TimeoutError; with one
+    `mouse.move(500, 60)` first -> OK. This is the exact signature that failed
+    `smoke` on CI run 37573662778 while the SAME SHA (3c8bc4f) passed on the push
+    run and the suite passed locally — a flake, not a regression.
+
+    Re-arms before EVERY attempt so the window is refreshed rather than raced.
+    Still a real pointer click: if the control genuinely cannot be clicked, this
+    returns False and the caller's assertion fails. Bounded, like `clicked()`.
+
+        if not reveal_and_click(page, "#room-cowrite-btn"):
+            check("partner drawer: the Co-write control was reachable", False, "")
+    """
+    for _ in range(attempts):
+        page.mouse.move(700, 20)  # clientY < 120 -> the shipped showChrome path
+        try:
+            page.locator(selector).click(timeout=timeout)
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def note(label, value=""):
     """Print a diagnostic that is deliberately NOT a check.
 
