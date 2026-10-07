@@ -1,6 +1,8 @@
 # Gate 5 — the writer study: protocol and instrument
 
-**Status:** READY TO RUN — ****§3.5 pre-flight steps 1–2 DONE 2026-10-07** (`GATE5_PREFLIGHT_2026-10-07.md`) — step 3 (one desk session, ~10 min) is the owner's.
+**Status:** READY TO RUN — **§3.5 pre-flight: steps 1, 2 and 4 (machine half) DONE 2026-10-07; step 3
+outstanding** (`GATE5_PREFLIGHT_2026-10-07.md`) — step 3 (one desk session, ~10 min) is the owner's, and
+step 4's per-session recording happens before each writer signs.
 **Owner:** you (it needs 3–5 real screenwriters; no code can produce it).
 **Date written:** 2026-10-06. **Revised 2026-10-07** — §2, §5, §7 after PRs #11–#14 landed; **§3.5, §4, §6
 after an operational review** that found the session was budgeted at ~1 hour for ~2 hours of work, the
@@ -80,10 +82,17 @@ recovered run is healthy; dressing it as a failure would make the study measure 
 
 ### Pre-flight — run this once, before the first session, with no writer present
 
-> **Status 2026-10-07: steps 1 and 2 are DONE** — see `GATE5_PREFLIGHT_2026-10-07.md`. Measured on
-> `Pain_3` with qwen3.6: **30.4 min**, and **both surfaces appear** (30 merges → **15 of 61** delivered
-> rows carry `merged_findings`; **1** run caveat). **Step 3 is the owner's** — it needs a desk session,
-> because `finding_verdicts.json` and `feedback_ledger.json` are written by the product, not the analyzer.
+> **Status 2026-10-07: steps 1, 2 and 4 (machine half) are DONE; step 3 is the owner's** — see
+> `GATE5_PREFLIGHT_2026-10-07.md`. Measured on `Pain_3` with qwen3.6: **30.4 min**, and **both surfaces
+> appear** (30 merges → **15 of 61** delivered rows carry `merged_findings`; **1** run caveat).
+> **Step 3 needs a desk session**, because `finding_verdicts.json` and `feedback_ledger.json` are written
+> by the product, not the analyzer.
+>
+> **Step 4 has two halves, and only one is a pre-flight measurement.** Its *machine* half is done (the
+> endpoint is loopback — `cli.py:36`, and the server is bound to `127.0.0.1:8080`, not `0.0.0.0`); its
+> *per-session* half — filling the consent form's endpoint table — is **outstanding by design**, because it
+> happens before each writer signs and cannot be discharged before a session exists. So the pre-flight is
+> **not** complete yet, and this block must not be read as saying it is.
 >
 > **The trap, recorded:** the *stored* payloads could **not** have answered step 2. They predate the fix
 > (PR #11/#13), so they carried `stats.findings_merged` (29 / 5) while **0** rows carried
