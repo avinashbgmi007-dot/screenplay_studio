@@ -82,6 +82,7 @@ Key flows:
 - `docs/PRD.md` — **product requirements**: features, user stories, acceptance criteria (epics 1–7)
 - `docs/USER_PERSONAS.md` — user archetypes (aspiring screenwriter / working rewriter / idea-stage writer) + design rules they imply
 - `docs/UI_UX_SPECIFICATION.md` — **shareable UI/UX build spec**: every screen, component, state, interaction, keyboard shortcut, API contract, and an acceptance checklist (what "built & integrated" means)
+- `docs/design/ink-layer/DECISION_RECORD.md` — **the agreed UX direction (the Ink Layer) and what is built vs not.** The prototype under `webapp/preview-ink-layer/` is a separate lab document, *not* the product UI; the shipped SPA at `/` has not migrated. Read before any UI work
 - `docs/PROJECT_OVERVIEW.md` — product overview and design principles
 - `docs/CLI_REFERENCE.md` — every CLI command across the four packages
 - `docs/DATA_FORMATS.md` — JSON bridge schemas (parsed/kg/report/manifest/session/progress + all project stores)
