@@ -30,10 +30,27 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Install tesseract + Indian language packs (OCR fallback tests)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-tam tesseract-ocr-tel
+      # The `apt-get install tesseract-ocr …` step that stood here is GONE, and it
+      # must not come back without also adding `pytesseract` to the `ci` extra.
+      #
+      # It was dead weight that could cancel the entire job. Measured 2026-10-07: it
+      # stalled inside `apt-get update` for 25.3 min — the job budget — against a
+      # normal 30 s, so `test-python` was CANCELLED with `setup-python`, `Install
+      # dependencies` and `Run test suite` all SKIPPED. The suite never ran, and the
+      # result read as a flake. The log's last line before 24 min of silence was a
+      # half-finished `Get: … noble-security InRelease [126 kB]`; apt has no acquire
+      # timeout by default, so a dead socket blocks forever.
+      #
+      # Nothing needed the binary:
+      #   * `pytesseract` and `easyocr` are NOT dependencies of this project, so
+      #     `pdf_parser._get_ocr_engine()` returns None in CI either way (verified:
+      #     both raise ModuleNotFoundError, engine is None);
+      #   * `tests/test_pdf_ocr.py` monkeypatches `_get_ocr_engine` and says so in
+      #     its own docstring — "the real OCR stack is optional and
+      #     machine-dependent" (measured: 5 passed in 1.8 s with no engine).
+      # So the step bought no coverage and cost a 25-minute stall surface on the
+      # critical path. Real OCR is UNTESTED in CI, and already was; making it tested
+      # is a separate decision (add pytesseract + bound this step).
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -101,6 +118,19 @@ jobs:
       - name: Install dependencies
         run: pip install ".[ci]" -c requirements.lock.txt
       - name: Install chromium
+        # `--with-deps` shells out to apt, and this step stalled for the FULL
+        # 45-minute job budget on 2026-10-07 (normal: well under a minute),
+        # cancelling `test-browser` and SKIPPING `Run browser suites` — so the
+        # browser fleet silently did not run and the result looked like a flake.
+        # A step-level bound makes that a fast, honest step failure instead.
+        #
+        # Note this is the second instance of one cause: the two long jobs each had
+        # exactly one unbounded network fetch on the critical path, and both stalled
+        # on it (`apt-get update` 25.3 min here, `playwright install` 45 min). The
+        # pip/npm installs are left alone because pip and npm bound their own
+        # connections (pip: 15 s connect timeout + retries), so they already fail
+        # rather than hang.
+        timeout-minutes: 8
         run: python -m playwright install --with-deps chromium
       - name: Run browser suites
         run: python tests/run_browser_suites.py
