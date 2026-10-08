@@ -552,15 +552,33 @@ def _step_text(step):
     return " ".join(out)
 
 
+def _has_timeout(mapping):
+    """True only if `mapping` declares a USABLE `timeout-minutes`.
+
+    Presence is not a declaration, and this is the same defect class one level
+    down: the parser removed the *syntax* ambiguity (comments, nesting,
+    indentation) but a bare `in` test is still a PRESENCE test, not a USABILITY
+    test. `timeout-minutes:` with no value parses to None, and `null`, `~`, `''`,
+    a non-numeric string and `0` all satisfy `"timeout-minutes" in mapping`
+    while bounding nothing. Measured 2026-10-08: ten silent passes across the two
+    guards, every one of them a job or step reported as bounded.
+
+    GitHub wants a positive integer number of minutes, so that is what counts.
+    `bool` is excluded explicitly because `isinstance(True, int)` is True.
+    """
+    value = mapping.get("timeout-minutes")
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
 def _jobs_without_timeout(src):
-    """Names of jobs that declare no JOB-LEVEL `timeout-minutes`."""
+    """Names of jobs that declare no USABLE job-level `timeout-minutes`."""
     return [name for name, job in _ci_jobs(src).items()
-            if not isinstance(job, dict) or "timeout-minutes" not in job]
+            if not (isinstance(job, dict) and _has_timeout(job))]
 
 
 def _unbounded_network_steps(src):
     """`job/step` labels for steps that run an unbounded network client with no
-    step-level `timeout-minutes`."""
+    usable step-level `timeout-minutes`."""
     offenders = []
     for job, body in _ci_jobs(src).items():
         if not isinstance(body, dict):
@@ -568,10 +586,11 @@ def _unbounded_network_steps(src):
         for step in body.get("steps") or []:
             if not isinstance(step, dict):
                 continue
-            # `"timeout-minutes" not in step` is a mapping-key test, so a nested
-            # `with.timeout-minutes` is not one: it is not a key OF the step.
+            # `_has_timeout(step)` reads a KEY OF the step, so a nested
+            # `with.timeout-minutes` is not one — and a valueless
+            # `timeout-minutes:` is not one either.
             if (any(c in _step_text(step) for c in UNBOUNDED_CLIENTS)
-                    and "timeout-minutes" not in step):
+                    and not _has_timeout(step)):
                 label = step.get("name") or step.get("uses") or _step_text(step)[:40]
                 offenders.append(f"{job}/{label}")
     return offenders
@@ -812,23 +831,71 @@ jobs:
         run: echo hello   # the old apt-get step is gone
 """
 
+# A key that is PRESENT but carries no usable value. Every one of these
+# satisfies `"timeout-minutes" in mapping` while bounding nothing — the same
+# defect class one level down: presence is not usability. The parser removed the
+# SYNTAX ambiguity (comments, nesting, indentation); it cannot remove this one,
+# because "is the key there?" and "does the key mean anything?" are different
+# questions.
+_CI_JOB_EMPTY_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes:
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_JOB_NON_NUMERIC_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: soon
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_STEP_EMPTY_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        timeout-minutes:
+        run: sudo apt-get update
+"""
+
+_CI_STEP_NON_NUMERIC_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        timeout-minutes: soon
+        run: sudo apt-get update
+"""
+
 
 def test_the_timeout_guards_reject_an_inert_declaration():
     """A `timeout-minutes:` that is present but INERT must not satisfy a guard.
 
-    Four inert shapes were found in this guard, one at a time, each by a
-    different reviewer, and each fixed only after the previous fix was believed
-    to be complete:
+    Five inert shapes were found in this guard, one at a time, four of them by a
+    different reviewer and the fifth by probing the parser for its own defect
+    class:
 
       2026-10-07  `# timeout-minutes: 8` — a comment satisfied the test
       2026-10-08  `with.timeout-minutes` — an action INPUT, not a step timeout
       2026-10-08  a step's timeout satisfying the JOB guard — wrong scope
-      2026-10-08  an indentless `steps:` sequence — the splitter found no steps,
-                  so the guard reported nothing at all
+      2026-10-08  an indentless `steps:` sequence — the splitter saw no steps
+      2026-10-08  `timeout-minutes:` with NO VALUE — present, bounds nothing
 
-    The last one is why the guard is now a YAML parse rather than a set of
-    regexes: the first three were individually patchable, and patching them
-    three times produced a fourth. These cases pin all four.
+    The first four are why the guard is a YAML parse rather than a set of
+    regexes. The fifth is why it tests the VALUE and not the key's presence: a
+    parser removes the syntax ambiguity, and "is the key there?" is still a
+    different question from "does the key mean anything?". These cases pin all
+    five.
 
     The BOUND / UNBOUNDED pairs are the controls: the guards still fire when
     they should, so none of this is a silencer.
@@ -855,6 +922,12 @@ def test_the_timeout_guards_reject_an_inert_declaration():
     # 4. an INDENTLESS `steps:` sequence must still be found and judged
     assert _unbounded_network_steps(_CI_STEPS_INDENTLESS) == ["alpha/Install thing"]
     assert _unbounded_network_steps(_CI_STEPS_INDENTLESS_BOUND) == []
+    # 5. a key that is PRESENT but empty or non-numeric bounds nothing
+    assert _jobs_without_timeout(_CI_JOB_EMPTY_TIMEOUT) == ["alpha"]
+    assert _jobs_without_timeout(_CI_JOB_NON_NUMERIC_TIMEOUT) == ["alpha"]
+    assert _unbounded_network_steps(_CI_STEP_EMPTY_TIMEOUT) == ["alpha/Install thing"]
+    assert _unbounded_network_steps(_CI_STEP_NON_NUMERIC_TIMEOUT) == [
+        "alpha/Install thing"]
     # and a client named only in a comment — including a TRAILING one — is not a
     # client, which the text guard's full-line strip could never fully deliver
     assert _unbounded_network_steps(_CI_STEP_CLIENT_IN_COMMENT) == []
