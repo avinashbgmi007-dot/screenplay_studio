@@ -493,99 +493,87 @@ def test_ci_pins_its_linter_to_the_version_the_repo_uses():
         "a floating `ruff>=` is back in pyproject; the pin is the point")
 
 
-def _ci_job_blocks(src):
-    """[(job_name, block_text), ...] parsed out of a ci.yml source string."""
-    import re
-    assert "\njobs:" in src, "ci.yml no longer has a jobs: block"
-    body = src.split("\njobs:", 1)[1]
-    # job ids sit at two-space indent, their keys at four
-    starts = [m.start() for m in re.finditer(r"^  ([A-Za-z][\w-]*):[ \t]*$", body, re.M)]
-    assert starts, "no jobs parsed out of ci.yml — the file's shape changed"
-    jobs = []
-    for i, at in enumerate(starts):
-        end = starts[i + 1] if i + 1 < len(starts) else len(body)
-        block = body[at:end]
-        name = re.match(r"^  ([A-Za-z][\w-]*)", block).group(1)
-        jobs.append((name, block))
-    return jobs
-
-
-# Both guards below refuse a MISSING declaration, so the test for it must not be
-# satisfiable by a declaration that is present but INERT — commented out, or
-# nested where it does not belong. Three ways to be inert, all measured:
-#
-#   1. `# timeout-minutes: 8` — a comment. Before the line anchor this satisfied
-#      the step guard, and a commented-out job timeout satisfied the job guard
-#      (2026-10-07).
-#   2. a nested `with.timeout-minutes` — an action INPUT that merely shares the
-#      name. `r"^[ \t]*…"` accepted it at any indent, so a step taking that input
-#      and running an unbounded client reported as bounded (2026-10-08).
-#   3. a step's timeout satisfying the JOB guard — the same defect, other way.
-#
-# So each anchor names the COLUMN the key must occupy, not merely that it starts
-# a line:
-#   * a JOB key sits at 4 — literal, because the job-id regex already fixes that
-#     indent;
-#   * a STEP key sits two columns right of its `-`, DERIVED per step rather than
-#     hardcoded, so the anchor cannot desync from the splitter that found the step.
-#
-# A YAML parse would express all of this directly and is deliberately NOT used:
-# PyYAML is in neither the `ci` extra nor requirements.lock.txt (it reaches a dev
-# venv only via transformers/huggingface_hub), so `import yaml` in a test would
-# fail the `test-python` job. Taking a dependency to make a guard tidier is the
-# wrong trade for a lock this deliberately tight.
-_JOB_TIMEOUT_KEY = r"^ {4}timeout-minutes[ \t]*:"
-
 # Clients that will block forever on a dead socket if left unbounded.
 UNBOUNDED_CLIENTS = ("apt-get", "playwright install")
 
 
-def _step_timeout_key(step):
-    """Regex matching a step's OWN `timeout-minutes`, at its own indent.
+def _ci_jobs(src):
+    """{job_name: job_mapping} parsed out of a ci.yml source string.
 
-    A step is `      - name: …`, or `      -` on its own line with the keys
-    below it; either way its properties start two columns right of the dash. A
-    key deeper than that — under `with:` or `env:` — is NESTED, and a nested
-    `timeout-minutes` is an action input, not a step timeout.
+    Parsed as YAML, not scanned as text. The text-based version of this guard
+    produced FOUR silent passes, one shape at a time, each invisible to a regex:
+
+      * `# timeout-minutes: 8` — a comment satisfied "is it declared?"
+      * `with.timeout-minutes` — an action INPUT that merely shares the key's
+        name and does not bound the step
+      * a step's timeout satisfying the JOB guard — wrong scope
+      * an indentless sequence under `steps:` — `steps:` followed by `- name: …`
+        at the SAME column is valid YAML, and the `^      - ` splitter found no
+        steps at all, so the guard reported no offenders
+
+    A parser makes all four unrepresentable rather than individually patched:
+    comments are discarded, `with:` keys stay nested where they belong, a key is
+    a key of the mapping it is actually in, and a sequence is a sequence however
+    it is indented. The cost is one CI-only dependency (`pyproject.toml`'s `ci`
+    extra, pinned in the lock) — cheaper than a guard that keeps being wrong.
     """
-    import re
-    m = re.match(r"^( *)-", step)
-    indent = (len(m.group(1)) + 2) if m else 8
-    return re.compile(r"^ {%d}timeout-minutes[ \t]*:" % indent, re.M)
+    import yaml
+    doc = yaml.safe_load(src)
+    jobs = doc.get("jobs") if isinstance(doc, dict) else None
+    assert isinstance(jobs, dict) and jobs, (
+        "ci.yml no longer has a non-empty `jobs:` mapping — the file's shape "
+        "changed, so these guards would silently check nothing")
+    return jobs
+
+
+def _step_text(step):
+    """Every string a step carries, comments excluded.
+
+    Comments are not filtered here — they are already gone, because YAML
+    discarded them before this saw the step. That closes the text guard's last
+    residual in BOTH directions: a client named in a comment no longer counts,
+    and neither does one named in a TRAILING comment, which the line-based
+    comment strip could never have removed.
+    """
+    out = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                out.append(str(key))
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+        elif node is not None:
+            out.append(str(node))
+
+    walk(step)
+    return " ".join(out)
 
 
 def _jobs_without_timeout(src):
     """Names of jobs that declare no JOB-LEVEL `timeout-minutes`."""
-    import re
-    return [n for n, block in _ci_job_blocks(src)
-            if not re.search(_JOB_TIMEOUT_KEY, block, re.M)]
+    return [name for name, job in _ci_jobs(src).items()
+            if not isinstance(job, dict) or "timeout-minutes" not in job]
 
 
 def _unbounded_network_steps(src):
     """`job/step` labels for steps that run an unbounded network client with no
     step-level `timeout-minutes`."""
-    import re
     offenders = []
-    for job, block in _ci_job_blocks(src):
-        # `- name: …` and a bare `-` with the keys below it are both legal, so
-        # the dash must not be required to be followed by a space.
-        step_starts = [m.start() for m in re.finditer(r"^      -(?: |$)", block, re.M)]
-        for j, sat in enumerate(step_starts):
-            send = step_starts[j + 1] if j + 1 < len(step_starts) else len(block)
-            step = block[sat:send]
-            # Clients are detected on COMMENT-STRIPPED text: this workflow's own
-            # comments legitimately name `apt-get` while explaining the defect,
-            # so scanning the raw block would report the explanation as the crime.
-            # (Residual, deliberately not closed: a client named in a TRAILING
-            # comment is still counted. That direction is a noisy failure, not a
-            # silent pass, and closing it needs a YAML parse, not a regex.)
-            code = "\n".join(
-                ln for ln in step.splitlines() if not ln.strip().startswith("#"))
-            if (any(c in code for c in UNBOUNDED_CLIENTS)
-                    and not _step_timeout_key(step).search(step)):
-                label = re.search(r"name: (.+)", step)
-                offenders.append(
-                    f"{job}/{(label.group(1).strip() if label else code.strip()[:40])}")
+    for job, body in _ci_jobs(src).items():
+        if not isinstance(body, dict):
+            continue
+        for step in body.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            # `"timeout-minutes" not in step` is a mapping-key test, so a nested
+            # `with.timeout-minutes` is not one: it is not a key OF the step.
+            if (any(c in _step_text(step) for c in UNBOUNDED_CLIENTS)
+                    and "timeout-minutes" not in step):
+                label = step.get("name") or step.get("uses") or _step_text(step)[:40]
+                offenders.append(f"{job}/{label}")
     return offenders
 
 
@@ -606,8 +594,8 @@ def test_every_ci_job_declares_a_timeout():
     also be REAL — see `test_the_timeout_guards_reject_an_inert_declaration`.
     """
     src = open(".github/workflows/ci.yml", encoding="utf-8").read()
-    jobs = _ci_job_blocks(src)
-    assert len(jobs) >= 5, f"expected the five CI jobs, parsed {[n for n, _ in jobs]}"
+    jobs = _ci_jobs(src)
+    assert len(jobs) >= 5, f"expected the five CI jobs, parsed {sorted(jobs)}"
     unbounded = _jobs_without_timeout(src)
     assert not unbounded, (
         f"CI job(s) {unbounded} declare no timeout-minutes — a hang there runs to "
@@ -786,22 +774,64 @@ jobs:
         run: sudo apt-get update
 """
 
+# An INDENTLESS sequence: `steps:` followed by `- name: …` at the same column.
+# Valid YAML, and the shape that defeated the text guard entirely — a
+# `^      - ` splitter found no steps, so it reported no offenders at all.
+_CI_STEPS_INDENTLESS = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - name: Install thing
+      run: sudo apt-get update
+"""
+
+# …and the same shape with a real timeout, as the control for it.
+_CI_STEPS_INDENTLESS_BOUND = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - name: Install thing
+      timeout-minutes: 8
+      run: sudo apt-get update
+"""
+
+# A client named in a TRAILING comment. The text guard stripped full-line
+# comments only, so this counted as an offender — a false POSITIVE, and the one
+# residual it could not close. A parser drops the comment outright.
+_CI_STEP_CLIENT_IN_TRAILING_COMMENT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Note
+        run: echo hello   # the old apt-get step is gone
+"""
+
 
 def test_the_timeout_guards_reject_an_inert_declaration():
     """A `timeout-minutes:` that is present but INERT must not satisfy a guard.
 
-    Measured 2026-10-07, before the fix: it did. Commenting out the chromium
-    step's `timeout-minutes: 8` left `test_unbounded_network_steps_declare_a_timeout`
-    passing, and commenting out a job's `timeout-minutes: 25` left
-    `test_every_ci_job_declares_a_timeout` passing — both guards reporting
-    "bounded" for something a stalled socket could still run to the job budget.
+    Four inert shapes were found in this guard, one at a time, each by a
+    different reviewer, and each fixed only after the previous fix was believed
+    to be complete:
 
-    Measured 2026-10-08, second shape: the step anchor accepted the key at ANY
-    indent, so a `with.timeout-minutes` — an action INPUT, not a step timeout —
-    satisfied it too.
+      2026-10-07  `# timeout-minutes: 8` — a comment satisfied the test
+      2026-10-08  `with.timeout-minutes` — an action INPUT, not a step timeout
+      2026-10-08  a step's timeout satisfying the JOB guard — wrong scope
+      2026-10-08  an indentless `steps:` sequence — the splitter found no steps,
+                  so the guard reported nothing at all
 
-    The BOUND / UNBOUNDED pairs are the control: the guards still fire when they
-    should, so each fix is an anchor, not a silencer.
+    The last one is why the guard is now a YAML parse rather than a set of
+    regexes: the first three were individually patchable, and patching them
+    three times produced a fourth. These cases pin all four.
+
+    The BOUND / UNBOUNDED pairs are the controls: the guards still fire when
+    they should, so none of this is a silencer.
     """
     # control — the guard fires on a genuinely unbounded job / step
     assert _jobs_without_timeout(_CI_JOB_ONLY_STEP_TIMEOUT) == ["alpha"]
@@ -809,22 +839,26 @@ def test_the_timeout_guards_reject_an_inert_declaration():
     # …and stays quiet when the declaration is real
     assert _jobs_without_timeout(_CI_JOB_BOUND) == []
     assert _unbounded_network_steps(_CI_STEP_BOUND) == []
-    # regression 1 — a COMMENT is not a declaration
+    # 1. a COMMENT is not a declaration
     assert _jobs_without_timeout(_CI_JOB_COMMENTED) == ["alpha"]
     assert _unbounded_network_steps(_CI_STEP_COMMENTED) == ["alpha/Install thing"]
-    # regression 2 — a NESTED `with.timeout-minutes` is an action input, not a
-    # step timeout, so the step is still unbounded …
+    # 2. a NESTED `with.timeout-minutes` is an action input, not a step timeout
     assert _unbounded_network_steps(_CI_STEP_NESTED_INPUT_TIMEOUT) == [
         "alpha/Install thing"]
-    # … and the same must hold for a step whose keys hang below a bare dash
     assert _unbounded_network_steps(_CI_STEP_BARE_DASH_NESTED) == [
         "alpha/Install thing"]
-    # control — a real step timeout still counts, with or without a nested input
+    # …and it must not MASK a real one
     assert _unbounded_network_steps(_CI_STEP_NESTED_AND_REAL) == []
     assert _unbounded_network_steps(_CI_STEP_BARE_DASH) == []
-    # and a client named only in a comment is not a client (why the client scan
-    # must keep stripping comments rather than reading the raw block)
+    # 3. a step's timeout must not satisfy the JOB guard
+    assert _jobs_without_timeout(_CI_JOB_ONLY_STEP_TIMEOUT) == ["alpha"]
+    # 4. an INDENTLESS `steps:` sequence must still be found and judged
+    assert _unbounded_network_steps(_CI_STEPS_INDENTLESS) == ["alpha/Install thing"]
+    assert _unbounded_network_steps(_CI_STEPS_INDENTLESS_BOUND) == []
+    # and a client named only in a comment — including a TRAILING one — is not a
+    # client, which the text guard's full-line strip could never fully deliver
     assert _unbounded_network_steps(_CI_STEP_CLIENT_IN_COMMENT) == []
+    assert _unbounded_network_steps(_CI_STEP_CLIENT_IN_TRAILING_COMMENT) == []
 
 
 # ---- R7b: dependencies are pinned, and CI actually installs from the lock ----
