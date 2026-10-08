@@ -493,23 +493,9 @@ def test_ci_pins_its_linter_to_the_version_the_repo_uses():
         "a floating `ruff>=` is back in pyproject; the pin is the point")
 
 
-def test_every_ci_job_declares_a_timeout():
-    """R9 (2026-09-21): a GitHub job with no `timeout-minutes` inherits the
-    platform default of **360 minutes**, so one hung suite can burn six hours of
-    CI before anything notices. All four jobs do declare one today — which is
-    exactly why nothing was watching it.
-
-    The per-job timeouts are also what makes the "is the budget big enough?"
-    question answerable at all. Measured 2026-09-21: the browser gate is
-    **303 s (5.05 min) for 28 suites**, sequential, against a 45-minute budget —
-    roughly 9x headroom, so the audit's "125-minute worst case" reads as a sum of
-    per-suite worst-case waits, not an expected runtime.
-
-    This asserts the DECLARATION, not a duration: it cannot know how fast a
-    runner is, but it can refuse a job that is unbounded.
-    """
+def _ci_job_blocks(src):
+    """[(job_name, block_text), ...] parsed out of a ci.yml source string."""
     import re
-    src = open(".github/workflows/ci.yml", encoding="utf-8").read()
     assert "\njobs:" in src, "ci.yml no longer has a jobs: block"
     body = src.split("\njobs:", 1)[1]
     # job ids sit at two-space indent, their keys at four
@@ -521,8 +507,84 @@ def test_every_ci_job_declares_a_timeout():
         block = body[at:end]
         name = re.match(r"^  ([A-Za-z][\w-]*)", block).group(1)
         jobs.append((name, block))
-    assert len(jobs) >= 4, f"expected the four CI jobs, parsed {[n for n, _ in jobs]}"
-    unbounded = [n for n, block in jobs if "timeout-minutes:" not in block]
+    return jobs
+
+
+# Both guards below refuse a MISSING declaration, so the test for it must not be
+# satisfiable by a declaration that is present but inert. A YAML key starts a
+# line, so anchor on that: `# timeout-minutes: 8` is a comment, does not start a
+# line with the key, and cannot count.
+#
+# Measured 2026-10-07, before the anchor: commenting out the chromium step's
+# `timeout-minutes: 8` left `test_unbounded_network_steps_declare_a_timeout`
+# PASSING, and commenting out a job's `timeout-minutes: 25` left
+# `test_every_ci_job_declares_a_timeout` passing. A guard a comment can satisfy
+# is worse than no guard — it reports "bounded" for something unbounded, and the
+# whole point of these two is to be the thing that notices.
+#
+# The job key is matched at EXACTLY four spaces because job keys sit at four and
+# step keys at eight. Without the indent a step's timeout would satisfy the JOB
+# guard — the same defect pointing the other way.
+_JOB_TIMEOUT_KEY = r"^ {4}timeout-minutes[ \t]*:"
+_STEP_TIMEOUT_KEY = r"^[ \t]*timeout-minutes[ \t]*:"
+
+# Clients that will block forever on a dead socket if left unbounded.
+UNBOUNDED_CLIENTS = ("apt-get", "playwright install")
+
+
+def _jobs_without_timeout(src):
+    """Names of jobs that declare no JOB-LEVEL `timeout-minutes`."""
+    import re
+    return [n for n, block in _ci_job_blocks(src)
+            if not re.search(_JOB_TIMEOUT_KEY, block, re.M)]
+
+
+def _unbounded_network_steps(src):
+    """`job/step` labels for steps that run an unbounded network client with no
+    step-level `timeout-minutes`."""
+    import re
+    offenders = []
+    for job, block in _ci_job_blocks(src):
+        step_starts = [m.start() for m in re.finditer(r"^      - ", block, re.M)]
+        for j, sat in enumerate(step_starts):
+            send = step_starts[j + 1] if j + 1 < len(step_starts) else len(block)
+            step = block[sat:send]
+            # Clients are detected on COMMENT-STRIPPED text: this workflow's own
+            # comments legitimately name `apt-get` while explaining the defect,
+            # so scanning the raw block would report the explanation as the crime.
+            # (Residual, deliberately not closed: a client named in a TRAILING
+            # comment is still counted. That direction is a noisy failure, not a
+            # silent pass, and closing it needs a YAML parse, not a regex.)
+            code = "\n".join(
+                ln for ln in step.splitlines() if not ln.strip().startswith("#"))
+            if (any(c in code for c in UNBOUNDED_CLIENTS)
+                    and not re.search(_STEP_TIMEOUT_KEY, step, re.M)):
+                label = re.search(r"name: (.+)", step)
+                offenders.append(
+                    f"{job}/{(label.group(1).strip() if label else code.strip()[:40])}")
+    return offenders
+
+
+def test_every_ci_job_declares_a_timeout():
+    """R9 (2026-09-21): a GitHub job with no `timeout-minutes` inherits the
+    platform default of **360 minutes**, so one hung suite can burn six hours of
+    CI before anything notices. All five jobs do declare one today — which is
+    exactly why nothing was watching it.
+
+    The per-job timeouts are also what makes the "is the budget big enough?"
+    question answerable at all. Measured 2026-09-21: the browser gate is
+    **303 s (5.05 min) for 28 suites**, sequential, against a 45-minute budget —
+    roughly 9x headroom, so the audit's "125-minute worst case" reads as a sum of
+    per-suite worst-case waits, not an expected runtime.
+
+    This asserts the DECLARATION, not a duration: it cannot know how fast a
+    runner is, but it can refuse a job that is unbounded. The declaration must
+    also be REAL — see `test_the_timeout_guards_reject_an_inert_declaration`.
+    """
+    src = open(".github/workflows/ci.yml", encoding="utf-8").read()
+    jobs = _ci_job_blocks(src)
+    assert len(jobs) >= 5, f"expected the five CI jobs, parsed {[n for n, _ in jobs]}"
+    unbounded = _jobs_without_timeout(src)
     assert not unbounded, (
         f"CI job(s) {unbounded} declare no timeout-minutes — a hang there runs to "
         f"the 360-minute platform default")
@@ -557,39 +619,118 @@ def test_unbounded_network_steps_declare_a_timeout():
     is, but it can refuse a step that is unbounded. It finds no offender today —
     that is the point of a regression guard.
     """
-    import re
     src = open(".github/workflows/ci.yml", encoding="utf-8").read()
-    assert "\njobs:" in src, "ci.yml no longer has a jobs: block"
-    body = src.split("\njobs:", 1)[1]
-    starts = [m.start() for m in re.finditer(r"^  ([A-Za-z][\w-]*):[ \t]*$", body, re.M)]
-    assert starts, "no jobs parsed out of ci.yml — the file's shape changed"
-
-    # Clients that will block forever on a dead socket if left unbounded.
-    UNBOUNDED_CLIENTS = ("apt-get", "playwright install")
-
-    offenders = []
-    for i, at in enumerate(starts):
-        end = starts[i + 1] if i + 1 < len(starts) else len(body)
-        block = body[at:end]
-        job = re.match(r"^  ([A-Za-z][\w-]*)", block).group(1)
-        step_starts = [m.start() for m in re.finditer(r"^      - ", block, re.M)]
-        for j, sat in enumerate(step_starts):
-            send = step_starts[j + 1] if j + 1 < len(step_starts) else len(block)
-            step = block[sat:send]
-            # Ignore comments: these steps carry the explanation of this very
-            # defect, and a comment is not a command.
-            code = "\n".join(
-                ln for ln in step.splitlines() if not ln.strip().startswith("#"))
-            if any(c in code for c in UNBOUNDED_CLIENTS) and "timeout-minutes:" not in step:
-                label = re.search(r"name: (.+)", step)
-                offenders.append(
-                    f"{job}/{(label.group(1).strip() if label else code.strip()[:40])}")
-
+    offenders = _unbounded_network_steps(src)
     assert not offenders, (
         f"CI step(s) {offenders} run an unbounded network client "
         f"({' / '.join(UNBOUNDED_CLIENTS)}) with no step-level timeout-minutes — a "
         f"stalled socket there runs to the JOB budget and reports as `cancelled`, "
         f"hiding that the tests never ran")
+
+
+# --- the guards must reject an INERT declaration -------------------------
+#
+# Each source below is the smallest ci.yml that exercises one guard, so the
+# regression can be pinned without editing the real workflow. `_COMMENTED` is the
+# case that was broken: the guard tested for the raw substring
+# `"timeout-minutes:"`, so `# timeout-minutes: 8` read as a bound.
+
+_CI_JOB_BOUND = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_JOB_COMMENTED = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    # timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_JOB_ONLY_STEP_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install thing
+        timeout-minutes: 8
+        run: sudo apt-get update
+"""
+
+_CI_STEP_UNBOUNDED = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        run: sudo apt-get update
+"""
+
+_CI_STEP_BOUND = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        timeout-minutes: 8
+        run: sudo apt-get update
+"""
+
+_CI_STEP_COMMENTED = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        # timeout-minutes: 8
+        run: sudo apt-get update
+"""
+
+_CI_STEP_CLIENT_IN_COMMENT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Note
+        # the old `apt-get install tesseract-ocr` step is gone
+        run: echo hello
+"""
+
+
+def test_the_timeout_guards_reject_an_inert_declaration():
+    """A commented-out `timeout-minutes:` must NOT satisfy either guard.
+
+    Measured 2026-10-07, before the fix: it did. Commenting out the chromium
+    step's `timeout-minutes: 8` left `test_unbounded_network_steps_declare_a_timeout`
+    passing, and commenting out a job's `timeout-minutes: 25` left
+    `test_every_ci_job_declares_a_timeout` passing — both guards reporting
+    "bounded" for something a stalled socket could still run to the job budget.
+
+    The BOUND / UNBOUNDED pairs are the control: the guard still fires when it
+    should, so the fix is an anchor, not a silencer.
+    """
+    # control — the guard fires on a genuinely unbounded job / step
+    assert _jobs_without_timeout(_CI_JOB_ONLY_STEP_TIMEOUT) == ["alpha"]
+    assert _unbounded_network_steps(_CI_STEP_UNBOUNDED) == ["alpha/Install thing"]
+    # …and stays quiet when the declaration is real
+    assert _jobs_without_timeout(_CI_JOB_BOUND) == []
+    assert _unbounded_network_steps(_CI_STEP_BOUND) == []
+    # the regression — an inert declaration is not a declaration
+    assert _jobs_without_timeout(_CI_JOB_COMMENTED) == ["alpha"]
+    assert _unbounded_network_steps(_CI_STEP_COMMENTED) == ["alpha/Install thing"]
+    # and a client named only in a comment is not a client (why the client scan
+    # must keep stripping comments rather than reading the raw block)
+    assert _unbounded_network_steps(_CI_STEP_CLIENT_IN_COMMENT) == []
 
 
 # ---- R7b: dependencies are pinned, and CI actually installs from the lock ----
