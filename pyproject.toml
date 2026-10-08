@@ -32,7 +32,16 @@ stt = ["faster-whisper>=1.0.0"]
 # test_packaging_data_files.py *builds* a wheel and an sdist and asserts their
 # contents — it needs the build backend importable, not just available to pip's
 # isolated build env. Add pytest-cov when coverage runs are wanted.
-ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "ruff==0.16.8", "setuptools>=68"]
+#
+# PyYAML is CI-ONLY and drives tests, never the product: the CI timeout guards in
+# test_production_readiness.py parse .github/workflows/ci.yml as YAML instead of
+# scanning it as text. The text version produced four separate silent passes
+# (a commented-out declaration, a nested `with.timeout-minutes`, a step timeout
+# satisfying the job guard, and an indentless `steps:` sequence the splitter
+# could not see), each fixed only after the previous fix was believed complete.
+# A parser makes those shapes unrepresentable. It must NOT move to the runtime
+# dependencies: nothing the app ships parses YAML.
+ci = ["pytest>=8.0", "pytest-asyncio>=0.26", "pytest-cov>=7.1", "playwright>=1.61", "pypdfium2>=4.30", "PyYAML>=6.0", "ruff==0.16.8", "setuptools>=68"]
 
 [tool.setuptools]
 packages = ["screenplay_parser", "screenplay_analyzer", "screenplay_cowriter", "screenplay_studio", "knowledge_base"]
