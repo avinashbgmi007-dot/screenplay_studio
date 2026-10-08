@@ -528,6 +528,70 @@ def test_every_ci_job_declares_a_timeout():
         f"the 360-minute platform default")
 
 
+def test_unbounded_network_steps_declare_a_timeout():
+    """2026-10-07: the job-level guard above is not enough on its own, because a
+    JOB timeout ends the run as **`cancelled`** — which reads as a flake, not a
+    failure, and hides that the tests never ran.
+
+    Measured on one SHA, both jobs losing the whole budget to a stalled socket:
+
+      * `test-python` — `apt-get update` ran **25.3 min** against a 25-minute job
+        budget (normal: 30 s). The run ended `cancelled` with `setup-python`,
+        `Install dependencies` and `Run test suite` all **SKIPPED**. The log's last
+        line before 24 minutes of silence was a half-finished
+        `Get: … noble-security InRelease [126 kB]`.
+      * `test-browser` — `playwright install --with-deps chromium` ran **45.0 min**
+        against a 45-minute budget, so `Run browser suites` never ran at all.
+
+    In both cases the green-looking outcome was `cancelled`, and `gh pr checks`
+    surfaced it as one red check that looked like infrastructure noise. A step
+    timeout turns that into a fast, honest step failure.
+
+    Scoped to clients that bound nothing themselves. apt has **no acquire timeout
+    by default**, so a dead socket blocks forever; `playwright install` likewise.
+    pip and npm are deliberately NOT required to declare one — they bound their own
+    connections (pip: 15 s connect timeout plus retries), so they already fail
+    rather than hang.
+
+    This asserts the DECLARATION, not a duration: it cannot know how fast a runner
+    is, but it can refuse a step that is unbounded. It finds no offender today —
+    that is the point of a regression guard.
+    """
+    import re
+    src = open(".github/workflows/ci.yml", encoding="utf-8").read()
+    assert "\njobs:" in src, "ci.yml no longer has a jobs: block"
+    body = src.split("\njobs:", 1)[1]
+    starts = [m.start() for m in re.finditer(r"^  ([A-Za-z][\w-]*):[ \t]*$", body, re.M)]
+    assert starts, "no jobs parsed out of ci.yml — the file's shape changed"
+
+    # Clients that will block forever on a dead socket if left unbounded.
+    UNBOUNDED_CLIENTS = ("apt-get", "playwright install")
+
+    offenders = []
+    for i, at in enumerate(starts):
+        end = starts[i + 1] if i + 1 < len(starts) else len(body)
+        block = body[at:end]
+        job = re.match(r"^  ([A-Za-z][\w-]*)", block).group(1)
+        step_starts = [m.start() for m in re.finditer(r"^      - ", block, re.M)]
+        for j, sat in enumerate(step_starts):
+            send = step_starts[j + 1] if j + 1 < len(step_starts) else len(block)
+            step = block[sat:send]
+            # Ignore comments: these steps carry the explanation of this very
+            # defect, and a comment is not a command.
+            code = "\n".join(
+                ln for ln in step.splitlines() if not ln.strip().startswith("#"))
+            if any(c in code for c in UNBOUNDED_CLIENTS) and "timeout-minutes:" not in step:
+                label = re.search(r"name: (.+)", step)
+                offenders.append(
+                    f"{job}/{(label.group(1).strip() if label else code.strip()[:40])}")
+
+    assert not offenders, (
+        f"CI step(s) {offenders} run an unbounded network client "
+        f"({' / '.join(UNBOUNDED_CLIENTS)}) with no step-level timeout-minutes — a "
+        f"stalled socket there runs to the JOB budget and reports as `cancelled`, "
+        f"hiding that the tests never ran")
+
+
 # ---- R7b: dependencies are pinned, and CI actually installs from the lock ----
 LOCKFILE = "requirements.lock.txt"
 
