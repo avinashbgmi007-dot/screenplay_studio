@@ -24,7 +24,7 @@ import urllib.request
 
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import Checks, free_port, launch, start_studio
+from e2e_browser_common import Checks, free_port, launch, reveal_and_click, start_studio
 
 checks = Checks()
 
@@ -239,9 +239,10 @@ def main() -> None:
             fake.server_close()
 
             # ---- B. pagehide flush of pending idea autosave ----
-            # wake the chrome before the top-bar click (same pattern)
-            page.mouse.move(700, 20)
-            page.locator("#room-cowrite-btn").click()
+            # wake the chrome before the top-bar click (same pattern) — re-armed
+            # per attempt, because a single mouse.move can lose the race against
+            # the 4s idle-hide on a slow runner (see reveal_and_click).
+            reveal_and_click(page, "#room-cowrite-btn")
             # The script room auto-collapses the shelf (wireframe contract: the
             # manuscript owns the room, no permanent left nav). Reopen it from
             # its edge tab before hovering a control that lives inside it.

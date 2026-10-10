@@ -51,8 +51,8 @@ SEVERITIES = ["low", "medium", "high"]
 
 
 def findings_grammar() -> str:
-    """Grammar for: {"findings": [ {category, issue, why_it_matters, severity,
-    scene_refs, evidence_quote, rule_id}, ... ]}
+    """Grammar for: {"findings": [ {category, observation, issue,
+    why_it_matters, severity, scene_refs, evidence_quote, rule_id}, ... ]}
 
     'issue' and 'why_it_matters' replace what used to be a single prose
     'finding' string — this is the structured-diagnosis schema: a short
@@ -60,6 +60,14 @@ def findings_grammar() -> str:
     a problem. This is what lets a UI render the two consistently without
     parsing prose, and keeps every category's output shape identical whether
     it's a scene-level, script-level, or Principles Engine finding.
+
+    'observation' is gate 11's field and it comes FIRST, before the judgment
+    (Law V″: a finding is an observation with the craft evaluation attached, not
+    an evaluation wearing a citation). It is the falsifiable claim about what is
+    on the page; `issue` is the reading of it. Nullable because a model that
+    genuinely cannot state one must be able to say so rather than invent a claim
+    — the verifier checks the quote, and an invented observation would be the
+    exact failure this field exists to make visible.
 
     'rule_id' ties a finding back to the specific knowledge-base rule it was
     judged against, where applicable (null for findings that aren't grounded
@@ -70,10 +78,30 @@ def findings_grammar() -> str:
 
     return f'''root ::= ws "{{" ws "\\"findings\\"" ws ":" ws findings-array ws "}}" ws
 findings-array ::= "[" ws (finding (ws "," ws finding)*)? ws "]"
-finding ::= "{{" ws "\\"category\\"" ws ":" ws category ws "," ws "\\"issue\\"" ws ":" ws string ws "," ws "\\"why_it_matters\\"" ws ":" ws string ws "," ws "\\"severity\\"" ws ":" ws severity ws "," ws "\\"scene_refs\\"" ws ":" ws int-array ws "," ws "\\"evidence_quote\\"" ws ":" ws (string | "null") ws "," ws "\\"rule_id\\"" ws ":" ws (string | "null") ws "}}"
+finding ::= "{{" ws "\\"category\\"" ws ":" ws category ws "," ws "\\"observation\\"" ws ":" ws (string | "null") ws "," ws "\\"issue\\"" ws ":" ws string ws "," ws "\\"why_it_matters\\"" ws ":" ws string ws "," ws "\\"severity\\"" ws ":" ws severity ws "," ws "\\"scene_refs\\"" ws ":" ws int-array ws "," ws "\\"evidence_quote\\"" ws ":" ws (string | "null") ws "," ws "\\"rule_id\\"" ws ":" ws (string | "null") ws "}}"
 category ::= {category_alt}
 severity ::= {severity_alt}
 {_INT_ARRAY}
+{_STRING}
+{_WS}
+'''
+
+
+def observation_grounding_grammar() -> str:
+    """Grammar for gate 11's grounding reply:
+    {"observation": str, "quote": str | null, "search": str}
+
+    Deliberately has NO `grounded` boolean. The model does not get to declare
+    its own citation valid: the pipeline re-verifies `quote` against the script
+    with `verifier.verify_finding`, and a self-reported "grounded: true" is
+    exactly the confident-citation failure the verifier exists to catch. What
+    the model CAN say is the thing only it can supply — the observation, and a
+    verbatim line — and `null` for the line when the note is about an absence.
+
+    `search` is free text and never acted on: it is where an absence claim says
+    what it looked for, so the reply is auditable after the fact.
+    """
+    return f'''root ::= ws "{{" ws "\\"observation\\"" ws ":" ws string ws "," ws "\\"quote\\"" ws ":" ws (string | "null") ws "," ws "\\"search\\"" ws ":" ws string ws "}}" ws
 {_STRING}
 {_WS}
 '''

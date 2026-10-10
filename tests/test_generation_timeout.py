@@ -160,7 +160,8 @@ def test_default_budget_applies_without_opt_in():
 class FlakyThenOkClient:
     """Fails the FIRST chat_json call overall (the summaries stage's), succeeds
     from then on. Responses are shaped by max_tokens: summaries ask for 800,
-    char_reads for 1200 — so one client can serve the whole analyze() run."""
+    char_reads for CHARACTER_READS_MAX_TOKENS (2500, sized against measured
+    reply length) — so one client can serve the whole analyze() run."""
 
     def __init__(self):
         self.calls = 0
@@ -172,7 +173,7 @@ class FlakyThenOkClient:
         if max_tokens == 800:  # scene summaries (the cheap tier)
             self.summary_calls += 1
             return {"summaries": [{"scene_number": 1, "summary": "Rahul hesitates at the door."}]}
-        if max_tokens == 1200:  # the char_reads call
+        if max_tokens == pipeline.CHARACTER_READS_MAX_TOKENS:  # the char_reads call
             self.read_calls += 1
             if self.read_calls == 1:
                 raise LlamaServerError("llama-server busy: no slot available")

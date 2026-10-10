@@ -28,6 +28,12 @@ TRAITS = [
 ]
 
 MAX_DIAL_CHARACTERS = 8
+# Completion budget for the dials call. 1800 truncated on EVERY attempt of a
+# 22-scene script (measured: cut at 5,887-6,339 chars, finish_reason='length',
+# completion_tokens == 1800), which made this pass FAIL outright rather than
+# degrade — the dials panel came back empty. See pipeline.SCRIPT_LEVEL_MAX_TOKENS
+# for the full measurement.
+DIALS_MAX_TOKENS = 3000
 
 
 def run_character_dials(doc, overview: str, client, characters: list[str], language: str = "eng") -> list[dict]:
@@ -41,7 +47,8 @@ def run_character_dials(doc, overview: str, client, characters: list[str], langu
         data = client.chat_json(
             system, user,
             grammar=character_dials_grammar(),
-            max_tokens=1800,
+            # Sized up with headroom — see DIALS_MAX_TOKENS above.
+            max_tokens=DIALS_MAX_TOKENS,
             temperature=0.3,
         )
     except Exception:

@@ -2,10 +2,15 @@
 CLI for Piece 2 (Analyzer).
 
 Usage:
-    python -m screenplay_analyzer analyze script.json \\
+    python -m screenplay_analyzer script.json \\
         --server http://localhost:8080 \\
-        --model qwen-agentworld-35b-a3b-mxfp4_moe.gguf \\
+        --model <id from /v1/models> \\
         -o report.md
+
+**Trap:** there is no subcommand — `__main__` calls `main()` directly, and the
+first positional is the input script. Adding one (`... analyze script.json`)
+makes argparse consume `analyze` as the input path and reject the real one
+("unrecognized arguments: script.json").
 
 If --model is omitted, whatever model llama-server has loaded is used
 (queried live from /v1/models — llama-server serves one model per instance,

@@ -38,8 +38,10 @@ const state = {
   // destroyed trust in every number. Show the ledger whole; the writer narrows
   // with the chips. Page ink stays naturally sparse because a finding can only
   // ink when it carries a quote (most findings are no_quote).
-  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, category: null, scene: null },
+  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, showAddressed: false, category: null, scene: null },
+  ambiguousMarks: {},     // marks the scene-key upgrade could not carry (one id, several findings)
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
+  findingVerdicts: {},    // finding id -> "correct"|"partial"|"incorrect" (truth axis, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
   passes: [],             // spec 15.4: the revision arc, one entry per analysis
@@ -47,6 +49,7 @@ const state = {
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
   findingsSummary: null,  // server-joined counts + dawn % from /findings/summary (ONE findings-state load)
+  feedbackLedger: null,   // gate 9: the last two runs reconciled (from /feedback/ledger)
   reportStats: null,      // stats from report.findings.json
   // spec §15.3: { findings, errors, ok } — the two deterministic rule passes
   // re-run on the CURRENT text after an edit. Deliberately not `findings`:
@@ -207,6 +210,12 @@ async function _apiOnce(path, options, _retry) {
     // like a dead server.
     err.status = resp.status;
     err.stillWorking = !!(data && data.still_working);
+    // A refused proposal is a STATE its caller renders, not a transport
+    // failure: `stale: true` (contracts_UI §3.4) means the text this frame was
+    // cut from no longer stands in the scene, so the frame can never apply.
+    // Carried on the error for the same reason as `stillWorking` — the caller
+    // decides from the flag, never by matching the sentence.
+    err.stale = !!(data && data.stale);
     throw err;
   }
   return data;
@@ -4259,6 +4268,12 @@ async function loadScriptData() {
   state.findingStatus = statusById;
   // writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride /edits
   state.findingMarks = (edits && edits.finding_intents) || {};
+  // the truth axis (what the accuracy meter is computed from) rides the same
+  // fetch — one load, one findings state, no second path to go stale
+  state.findingVerdicts = (edits && edits.finding_verdicts) || {};
+  // marks the scene-key upgrade could not carry (one stored id, several
+  // findings): read here, shown once in the worklist, never applied silently
+  state.ambiguousMarks = (edits && edits.ambiguous_marks) || {};
   const lp = (edits && edits.last_pass) || null;
   const arrived = !!(lp && lp.computed_at && state.lastPassKey !== lp.computed_at);
   state.lastPass = lp;
@@ -4285,6 +4300,16 @@ async function loadScriptData() {
   try {
     summary = await api(`${base}/findings/summary`);
   } catch (_) { /* no analysis yet — same state the report fetch tolerates */ }
+  // Gate 9: the feedback ledger — the system of record across runs. Fetched on
+  // the same load as everything else (one more read of the same project, not a
+  // second surface with its own lifecycle). A damaged ledger answers 409 and is
+  // tolerated like every other optional read: the desk stays silent rather than
+  // claiming an empty history it cannot vouch for.
+  try {
+    state.feedbackLedger = await api(`${base}/feedback/ledger`);
+  } catch (_) {
+    state.feedbackLedger = null;
+  }
   if (arrived && findings.length) scheduleArrivalPeek();
   else if (analysisCompletedFor === target && findings.length) {
     // A first analysis has no `last_pass` to arrive — the completion event
@@ -4446,6 +4471,21 @@ function renderFixQueuePanel(container) {
     actions.appendChild(locateBtn);
     actions.appendChild(rewriteBtn);
     actions.appendChild(discussBtn);
+    // D2-a undo: a row the writer marked addressed stays in this queue as
+    // `.done` — so this is the one place an addressed finding is ALWAYS on
+    // screen, and the only place the mark can be cleared without first asking
+    // to see addressed findings at all. Before it, the row read "done" with no
+    // verb that could un-say it: the mark survived, the control did not.
+    if (disp === "addressed" && fi != null) {
+      const fid = (state.findingIds && state.findingIds[fi]) || null;
+      if (fid) {
+        const reopenBtn = el("button", "fq-reopen", "Reopen");
+        reopenBtn.type = "button";
+        reopenBtn.title = "Clear your addressed mark — this finding returns to the worklist";
+        reopenBtn.addEventListener("click", () => setFindingIntent(fid, null));
+        actions.appendChild(reopenBtn);
+      }
+    }
     actions.appendChild(triageBtn);
     body.appendChild(actions);
     row.appendChild(sev);
@@ -5008,6 +5048,57 @@ function sharedMarkSiblings(index) {
   return [...seen];
 }
 
+// The absorbed half of a merge, on demand.
+//
+// The dedupe collapses findings that share a line and point at the same page. The
+// survivor used to carry only `merged_rule_ids` — rule-id STRINGS, which name who
+// agreed but not what they said — so the absorbed claims were retained NOWHERE
+// (fixed 2026-10-06). `merged_findings` now carries their full content, and this is
+// the writer's only way to read it: delivered on /findings and, until now, read by
+// nothing in the desk.
+//
+// Collapsed by default, and closed on every render. N absorbed claims expanded
+// inline is exactly the wall of near-duplicate cards the dedupe exists to prevent —
+// the writer asked for the merge to be INSPECTABLE, not to be shown twice.
+//
+// A <button> rather than <details>/<summary> because the card already routes its own
+// clicks and a <summary> would need the same stopPropagation dance; a button also
+// gives us aria-expanded for free.
+function mergedFindingsEl(merged) {
+  const wrap = el("div", "finding-merged");
+  const n = merged.length;
+  const btn = el("button", "finding-merged-toggle", n === 1
+    ? "1 other note was merged into this one"
+    : n + " other notes were merged into this one");
+  btn.type = "button";
+  btn.setAttribute("aria-expanded", "false");
+  const body = el("div", "finding-merged-body");
+  body.hidden = true;
+  merged.forEach((m) => {
+    const item = el("div", "finding-merged-item");
+    const head = el("div", "finding-merged-head");
+    if (m.rule_id) head.appendChild(el("span", "finding-merged-rule", String(m.rule_id)));
+    if (m.severity) head.appendChild(el("span", "finding-merged-sev", String(m.severity)));
+    if (head.children.length) item.appendChild(head);
+    if (m.issue) item.appendChild(el("span", "finding-merged-issue", String(m.issue)));
+    if (m.observation) item.appendChild(el("span", "finding-merged-obs", String(m.observation)));
+    if (m.evidence_quote) {
+      item.appendChild(el("span", "finding-merged-quote", "\u201C" + m.evidence_quote + "\u201D"));
+    }
+    body.appendChild(item);
+  });
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const opening = body.hidden;
+    body.hidden = !opening;
+    btn.setAttribute("aria-expanded", String(opening));
+    wrap.classList.toggle("open", opening);
+  });
+  wrap.appendChild(btn);
+  wrap.appendChild(body);
+  return wrap;
+}
+
 function findingNoteEl(f, index, opts = {}) {
   const disp = opts.disposition || "open";
   // forward-compatible states (Phase D defer / Phase E ghosting): muted
@@ -5054,6 +5145,12 @@ function findingNoteEl(f, index, opts = {}) {
   if (opts.deep) {
     const deep = el("div", "finding-deep");
     if (f.why_it_matters) deep.appendChild(el("span", "finding-deep-why", f.why_it_matters));
+    // Gate 11: the falsifiable observation the note rests on. It sits ABOVE the
+    // quote because the quote is the EVIDENCE for the observation, not the
+    // finding itself — reading them in that order is what makes the note
+    // checkable rather than merely asserted. Present only on findings the
+    // observation pass could ground, so its absence is itself information.
+    if (f.observation) deep.appendChild(el("span", "finding-deep-observation", f.observation));
     if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
     const badge = verificationBadge(f.verification);
     if (badge) deep.appendChild(badge);
@@ -5076,6 +5173,12 @@ function findingNoteEl(f, index, opts = {}) {
       deep.appendChild(el("span", "finding-check",
         "\u2699 mechanical check \u00B7 " + f.check_id));
     }
+    // The absorbed claims, collapsed. Sits in `.finding-deep`, never in
+    // `.finding-note-actions` — that row has a measured one-row / <=30px budget the
+    // suite gates, and this is a disclosure, not a verb.
+    if (Array.isArray(f.merged_findings) && f.merged_findings.length) {
+      deep.appendChild(mergedFindingsEl(f.merged_findings));
+    }
     if (deep.children.length) note.appendChild(deep);
   }
 
@@ -5085,6 +5188,35 @@ function findingNoteEl(f, index, opts = {}) {
   // dock is where the writer's judgment is made, margin pins stay read-only)
   if (opts.deep) {
     const id = (state.findingIds && state.findingIds[index]) || String(index);
+    // ---- the truth axis: "is it right?" ---------------------------------
+    // The accuracy meter is computed from THIS row and nothing else, so it is a
+    // SEPARATE row asking a SEPARATE question from the intent row below it.
+    // Never one control: a writer must be able to say "it's true but I won't act
+    // on it" — collapsing the two axes is what produced the ambiguous middle
+    // that made "98.58 % accurate" unmeasurable in the first place. It lives in
+    // its own container, not `.finding-note-actions`, because that row has a
+    // measured one-row budget the suite gates (adding three buttons to it would
+    // re-wrap it, which is the exact defect rung 17 painted out).
+    const vrow = el("div", "finding-verdict-row");
+    vrow.appendChild(el("span", "finding-verdict-label", "is it right?"));
+    const mkVerdict = (label, name, verdict, title) => {
+      const b = el("button", "verdict-btn" + (state.findingVerdicts[id] === verdict ? " active" : ""), label);
+      b.type = "button";
+      b.setAttribute("aria-label", name);
+      b.title = title;
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setFindingVerdict(id, state.findingVerdicts[id] === verdict ? null : verdict);
+      });
+      return b;
+    };
+    vrow.appendChild(mkVerdict("\u2713", "Correct \u2014 this finding is right", "correct",
+                               "Correct \u2014 this finding is right"));
+    vrow.appendChild(mkVerdict("~", "Partly right", "partial",
+                               "Partly right \u2014 true in part"));
+    vrow.appendChild(mkVerdict("\u2717", "Wrong \u2014 this finding is false", "incorrect",
+                               "Wrong \u2014 this finding is false"));
+    note.appendChild(vrow);
     // These four carry a glyph, not a word: their accessible name has to be
     // typed, because a screen reader reading "⏭" aloud names a media key, not
     // the verb the writer is being asked to press.
@@ -6318,6 +6450,13 @@ function renderTier1Worklist(lens) {
   const arrival = buildArrivalStrip();
   if (arrival) lens.appendChild(arrival);
 
+  // 0b-bis. the upgrade notice (HIGH-1/D2-a): marks held aside because one
+  // stored id covered several findings. Independent of the arrival strip,
+  // which returns null when there is no pass to diff — the notice is about the
+  // writer's marks, not about the analyzer's arithmetic.
+  const heldNotice = buildAmbiguousMarksNotice();
+  if (heldNotice) lens.appendChild(heldNotice);
+
   // -- 0a. the ONE filter row (R5-b + R8): severity toggles drive ink,
   // board list, loop and counts together; category chips count and filter —
   // tap = filtered view, NO regrouping. The loop button engages the
@@ -6384,6 +6523,12 @@ function buildContextSection() {
   const banner = buildFailureBanner((proj && proj.failed_categories) || [],
     (state.report && state.report.errors) || []);
   if (banner) lens.appendChild(banner);
+  // Rendered next to the banner, but a separate element — a recovered split is not
+  // one of the "problems" that box reports. `recoveries` reaches the desk here for
+  // the first time; it was delivered in report.findings.json and rendered only into
+  // report.md, so the caveat never reached the writer's eyes (spec §7's honesty gap).
+  const caveat = buildRunCaveat((state.report && state.report.recoveries) || []);
+  if (caveat) lens.appendChild(caveat);
   const modelLine = buildReportModelLine();
   if (modelLine) lens.appendChild(modelLine);
 
@@ -6534,8 +6679,136 @@ function buildContextSection() {
             + "Treat those findings as a second opinion on structure, not a reading of your pages.";
           inner.appendChild(line);
         }
+        // -- the accuracy meter: the writer's own verdicts, tallied ----------
+        // The headline is the NOT-WRONG reading, and the rationale is the whole
+        // point: the harm this product must avoid is a writer ACTING ON A FALSE
+        // finding. A true-but-unsupported one costs nothing — the writer judges
+        // it. So the bar sits on `wrong`, and raising it is verifiability's job,
+        // not a stricter truth bar. The judged count always rides the rate,
+        // because a percentage over 3 judged findings is not the same claim as
+        // one over 300.
+        const acc = accuracyMeter();
+        if (acc.total) {
+          const box = el("div", "dock-accuracy");
+          box.appendChild(el("p", "dock-acc-head", acc.judged
+            ? `Accuracy \u2014 ${acc.accuracy}% not-wrong over ${acc.judged} judged`
+            : "Accuracy \u2014 no verdicts yet"));
+          if (acc.judged) {
+            const gap = Math.round((acc.target - acc.accuracy) * 10) / 10;
+            box.appendChild(el("p", "dock-acc-sub",
+              `Target ${acc.target}% \u00B7 ${gap <= 0 ? "met" : gap + " pts to go"} \u00B7 `
+              + `${acc.tally.correct} correct \u00B7 ${acc.tally.partial} partly \u00B7 ${acc.tally.incorrect} wrong`));
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.coverage}% of ${acc.total} findings judged \u2014 judge the rest to make the number mean more`));
+          } else {
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.total} findings delivered \u2014 mark each \u2713 / ~ / \u2717 on its card to measure accuracy`));
+          }
+          const vs = state.report && state.report.verification_summary;
+          if (vs && vs.verified_pct_of_quoted != null) {
+            box.appendChild(el("p", "dock-acc-sub",
+              `Verifiability (B) \u2014 ${vs.verified_pct_of_quoted}% of quoted findings have a confirmed citation`));
+          }
+          inner.appendChild(box);
+        }
       });
     lens.appendChild(sec);
+  }
+
+  // -- 5b. the withdrawal ledger: what left the delivered set, and why -------
+  // The integrity gate removes MECHANICALLY false findings before they are ever
+  // carded — a pass reporting the ABSENCE of a defect, a duplicate, a
+  // name-variant rule firing on two names that are not one character. The
+  // "nothing lost" law made those removals checkable (findings + withdrawals ==
+  // the pre-gate list) but not VISIBLE: a writer could not see that anything had
+  // been taken out. This is that surface. It is its OWN section, not a line
+  // under the accuracy meter, for one concrete reason: the gate and the coverage
+  // pass are independent, so a report whose coverage pass failed still carries
+  // withdrawals — and a ledger nested inside the coverage section would be
+  // invisible in exactly that case. As a section header the count shows in the
+  // stack even while collapsed. Absent on reports analysed before the gate
+  // existed, so it renders only when the field is present.
+  const wd = (state.report && state.report.withdrawals) || [];
+  if (wd.length) {
+    const nRej = wd.filter((w) => w.action === "reject").length;
+    const nMrg = wd.filter((w) => w.action === "merge").length;
+    const bits = [];
+    if (nRej) bits.push(`${nRej} false`);
+    if (nMrg) bits.push(`${nMrg} duplicate${nMrg === 1 ? "" : "s"}`);
+    const body = el("div", "dock-wd-body");
+    wd.forEach((w) => {
+      const f = w.finding || {};
+      const row = el("div", "dock-wd-row");
+      row.appendChild(el("span", "dock-wd-action",
+        w.action === "merge" ? "duplicate" : "withdrawn"));
+      row.appendChild(el("span", "dock-wd-issue",
+        String(f.issue || "(no text)").slice(0, 180)));
+      row.appendChild(el("span", "dock-wd-reason", String(w.reason || "")));
+      body.appendChild(row);
+    });
+    body.appendChild(el("p", "dock-wd-note",
+      "Nothing was deleted \u2014 every one of these stays beside your project in "
+      + "report.findings.json under \u201cwithdrawals\u201d, with its full text. The "
+      + "analysis accounts for its own removals rather than hiding them."));
+    const wdSec = dockSection("withdrawals",
+      `Withdrawals \u2014 ${wd.length} left the delivered set`
+      + (bits.length ? ` (${bits.join(", ")})` : ""), body);
+    wdSec.title = "The integrity gate removed these because they were mechanically false, "
+      + "not a craft judgement. Nothing was deleted.";
+    lens.appendChild(wdSec);
+  }
+
+  // -- 5c. the feedback ledger: what happened to your notes between runs -----
+  // Amendment 6: across two real runs of the same model on the same script,
+  // 65 % of the writer's marks had no counterpart — the judgment tier churns,
+  // and no identity function fixes that. So "nothing lost" cannot mean every
+  // note comes back; it means every note stays ACCOUNTED FOR. This is where the
+  // desk says which of last run's notes returned, which likely landed (marked
+  // and gone), which the model simply moved on from, and which are new. Its own
+  // section, and absent until two runs exist — there is nothing to reconcile
+  // against one, and inventing a comparison against nothing is the failure mode
+  // this whole gate exists to avoid.
+  const lg = state.feedbackLedger;
+  if (lg && lg.reconcile) {
+    const rc = lg.reconcile;
+    const body = el("div", "dock-ledger-body");
+    const rows = (list, cls) => {
+      (list || []).forEach((item) => {
+        const t = item.prev || item;                 // same/maybe wrap {prev, cur}
+        const row = el("div", "dock-ledger-row " + cls);
+        row.appendChild(el("span", "dock-ledger-issue",
+          String((t && t.issue) || "(no text)").slice(0, 160)));
+        if (item.similarity != null) {
+          row.appendChild(el("span", "dock-ledger-sim",
+            `${Math.round(item.similarity * 100)}% similar`));
+        }
+        body.appendChild(row);
+      });
+    };
+    const groups = [
+      ["same", `${rc.same.length} returned \u2014 same point, same evidence`],
+      ["maybe", `${rc.maybe.length} possibly the same point`],
+      ["likely_resolved", `${rc.likely_resolved.length} you marked \u2014 and they did not come back`],
+      ["not_re_raised", `${rc.not_re_raised.length} did not come back (you had not marked them)`],
+      ["new", `${rc.new.length} new this run`],
+    ];
+    groups.forEach(([key, label]) => {
+      const list = rc[key];
+      if (!list || !list.length) return;
+      body.appendChild(el("p", "dock-ledger-head", label));
+      rows(list, "dock-ledger-" + key);
+    });
+    body.appendChild(el("p", "dock-ledger-note",
+      "Nothing is lost between runs: every note from both runs is accounted for here, "
+      + "and each run's full set stays beside your project in feedback_ledger.json. "
+      + "The model does not always re-raise a point \u2014 this is the desk saying so "
+      + "rather than letting it vanish."));
+    const lgSec = dockSection("feedback-ledger",
+      `Feedback across runs \u2014 run ${lg.latest.run} vs run ${lg.previous.run}`
+      + ` (${lg.runs} runs recorded)`, body);
+    lgSec.title = "What happened to the notes from the previous run: which returned, "
+      + "which likely landed, which were not re-raised, and which are new.";
+    lens.appendChild(lgSec);
   }
 
   // -- 6. Setup / Payoff ------------------------------------------------------
@@ -6621,7 +6894,7 @@ const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: 
 // unless the writer asks for it.
 function findingPassesFilter(f, index) {
   const d = findingDisposition(f, index);
-  if (d === "deferred" ? !state.findingFilter.showDeferred : d !== "open") return false;
+  if (!findingAdmitted(f, index)) return false;
   const sev = (f.severity || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
   if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) return false;
@@ -6662,7 +6935,13 @@ function inkAnchorsFor(findings) {
     const q = (f.evidence_quote || "").trim();
     if (q.length < 2) continue;
     if (!findingPassesFilter(f, index)) continue;
-    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q, sev: (f.severity || "low").toLowerCase() });
+    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q,
+               sev: (f.severity || "low").toLowerCase(),
+               // D2-a: an addressed finding only reaches the page when the
+               // writer asked to see addressed findings — and then it must not
+               // paint like a live complaint. `done` mutes the ink and the
+               // title says whose call it was.
+               done: findingDisposition(f, index) === "addressed" });
   }
   const order = { high: 0, medium: 1, low: 2 };
   out.sort((a, b) => (order[a.sev] - order[b.sev]) || (b.q.length - a.q.length));
@@ -6712,7 +6991,7 @@ function decorateLineWithInk(line, text, anchors) {
   line.textContent = "";
   line.appendChild(document.createTextNode(text.slice(0, idx)));
   const mark = document.createElement("mark");
-  mark.className = "finding-ink ink-" + first.sev;
+  mark.className = "finding-ink ink-" + first.sev + (first.done ? " ink-done" : "");
   mark.dataset.findingId = first.id;
   mark.setAttribute("aria-hidden", "true"); // the margin pins + board carry semantics
   mark.title = (first.f.issue || "").slice(0, 140);
@@ -6756,6 +7035,60 @@ async function setFindingIntent(findingId, intent) {
   if (intent) state.findingMarks[findingId] = intent;
   else delete state.findingMarks[findingId];
   refreshAllFindingSurfaces(); // P0.4: every mounted surface moves with the mark
+}
+
+// ---------- writer verdict (the truth axis): the accuracy metric's data ----------
+// Mirrors setFindingIntent exactly — optimistic local update, then re-render
+// every surface. The two stores are separate on the server so a failure of one
+// can never cost the other; the same holds here, where a failed verdict leaves
+// the marks untouched and vice versa.
+async function setFindingVerdict(findingId, verdict) {
+  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
+  try {
+    await api(`${base}/findings/verdict`, { method: "POST", body: JSON.stringify({ finding_id: findingId, verdict }) });
+  } catch (e) {
+    showError("Could not save your verdict: " + e.message);
+    return;
+  }
+  if (verdict) state.findingVerdicts[findingId] = verdict;
+  else delete state.findingVerdicts[findingId];
+  refreshAllFindingSurfaces();
+}
+
+/** The writer-agreement meter, computed live from the writer's own verdicts.
+ *  The server twin is `revision.verdict_accuracy` (served at
+ *  /findings/accuracy); this mirrors it so the number the writer watches move
+ *  as they judge is the same number the API reports.
+ *
+ *  Population is DISTINCT finding ids — two rows sharing an id are one finding
+ *  for the tally, exactly as the marks store keys them. Unjudged findings are
+ *  excluded from the denominator, never counted as failures: a rate over 3
+ *  judged findings is not the same claim as one over 300, which is why
+ *  `coverage` is always printed beside `accuracy`. */
+function accuracyMeter() {
+  const findings = state.findings || [];
+  const ids = state.findingIds || [];
+  const verdicts = state.findingVerdicts || {};
+  const seen = new Set();
+  const tally = { correct: 0, partial: 0, incorrect: 0, unjudged: 0 };
+  findings.forEach((f, i) => {
+    const id = ids[i] || String(i);
+    if (seen.has(id)) return;
+    seen.add(id);
+    const v = verdicts[id];
+    tally[(v === "correct" || v === "partial" || v === "incorrect") ? v : "unjudged"] += 1;
+  });
+  const judged = tally.correct + tally.partial + tally.incorrect;
+  const total = seen.size;
+  const pct = (n, d) => (d ? Math.round((1000 * n) / d) / 10 : null);
+  return {
+    total, judged, tally,
+    accuracy: pct(tally.correct + tally.partial, judged),   // the headline: not-wrong
+    strict: pct(tally.correct, judged),
+    incorrectRate: pct(tally.incorrect, judged),
+    coverage: pct(judged, total),
+    target: 98.58,
+  };
 }
 
 // ---------- arrival (R5-b peek + R9-adjacent unread dot) ----------
@@ -6977,6 +7310,49 @@ function buildArrivalStrip() {
   return strip;
 }
 
+/** The one-time upgrade notice: marks that could not be moved onto the ids
+ *  findings use now, because ONE stored id covered several findings (HIGH-1's
+ *  collision). The desk refuses to guess — applying one mark to nine findings
+ *  is the overclaim the mark store exists to prevent — so it says what it did
+ *  and where the marks are. Muted, not red: nothing was lost, and this is the
+ *  writer's judgment being preserved, not an error. Dismissible, remembered per
+ *  project (the writer closed it; it was not hidden from them). */
+function buildAmbiguousMarksNotice() {
+  const held = Object.values(state.ambiguousMarks || {}).filter(Boolean);
+  if (!held.length) return null;
+  const key = "ambiguous_notice_dismissed_" + (state.currentProject || "");
+  if (loadPrefs()[key]) return null;
+  const covered = held.reduce((n, h) => n + ((h.candidates || []).length || 0), 0);
+  const note = el("div", "dock-notice dock-ambiguous-notice");
+  const line = el("p", "dock-lens-hint",
+    held.length === 1
+      ? `One of your marks covers ${covered} findings, so it was held aside instead of applied.`
+      : `${held.length} of your marks cover several findings each, so they were held aside instead of applied.`);
+  line.title = "Made before findings carried their scene, a single mark stood for several findings at "
+    + "once. Applying it to any one of them would claim a judgment you did not make. Nothing was deleted — "
+    + "they are kept beside your project in finding_marks.ambiguous.json. Reopen a finding and mark it again "
+    + "to say which you meant.";
+  note.appendChild(line);
+  const det = el("details", "dock-ghosted");
+  det.appendChild(el("summary", "dock-ghosted-summary", "which marks, and what they covered"));
+  for (const h of held) {
+    const r = el("div", "dock-ghosted-row");
+    r.appendChild(el("span", "dock-ghosted-issue", String(h.issue || "finding").slice(0, 110)));
+    r.appendChild(el("span", "dock-ghosted-intent",
+      (h.intent === "addressed" ? "was marked addressed" : "was next pass")
+      + " · covered " + ((h.candidates || []).length || 0) + " findings"
+      + (h.scene_refs && h.scene_refs.length ? " · first at scene " + h.scene_refs[0] : "")));
+    det.appendChild(r);
+  }
+  note.appendChild(det);
+  const close = el("button", "dock-notice-close", "Got it");
+  close.type = "button";
+  close.title = "Hide this notice (your marks are unaffected)";
+  close.addEventListener("click", () => { savePrefs({ [key]: 1 }); note.remove(); });
+  note.appendChild(close);
+  return note;
+}
+
 // P2.14 (spec §3): the report has always carried the facts about itself the desk
 // dropped — which model wrote it, which passes errored, what the coverage pass
 // liked. Each builder below returns null when the report has nothing to say, so a
@@ -7006,6 +7382,28 @@ function buildWhatsWorking() {
   strengths.forEach((s) => box.appendChild(el("p", "dock-working-row", "\u2022 " + s)));
   box.title = "What the analysis thought already holds. These are not findings and"
     + " join no count — the numbers on the strip above stay untouched.";
+  return box;
+}
+
+// A run that re-ran a section in smaller pieces — a CAVEAT, never a failure.
+//
+// Deliberately NOT folded into buildFailureBanner below. That box's head reads
+// "N passes reported a problem", it offers the partial-failure rerun path, and it
+// is driven by `report.errors`. Routing a recovery through it dressed a healthy run
+// as a broken one — the bug the first version of this feature shipped, caught in
+// review. A recovery is the opposite: the pass SUCCEEDED.
+//
+// The writer is still owed it, because a split re-asks the scenes and the finding
+// set is path-dependent (measured 8 vs 12 findings on identical input), so a rerun
+// may word things differently. Quiet note, no red, no action.
+function buildRunCaveat(recoveries) {
+  const rs = (recoveries || []).filter((r) => r);
+  if (!rs.length) return null;
+  const box = el("div", "run-caveat");
+  box.appendChild(el("p", "run-caveat-head", rs.length === 1
+    ? "1 pass re-ran a section in smaller pieces"
+    : rs.length + " passes re-ran a section in smaller pieces"));
+  rs.forEach((r) => box.appendChild(el("p", "run-caveat-note", String(r))));
   return box;
 }
 
@@ -7189,6 +7587,22 @@ function findingDisposition(f, index) {
 function findingOpen(f, index) {
   return findingDisposition(f, index) === "open";
 }
+/** The disclosure half of the ONE filter: which dispositions the writer has
+ *  asked to see at all — open always, deferred behind its chip, addressed
+ *  behind its own (D2-a). Before D2-a, `addressed` fell through to the else
+ *  branch, so the card carrying the ✓ that clears a mark was filtered out by
+ *  the mark itself: marking a finding was a one-way door (HIGH-2a). Deferred
+ *  had a chip from the start; addressed was simply missing one.
+ *
+ *  Severity/category/scene stay out of this predicate so the category chips can
+ *  count over the SAME admission rule they apply when tapped — one count, one
+ *  meaning (N3, and the defect family HIGH-2b names). */
+function findingAdmitted(f, index) {
+  const d = findingDisposition(f, index);
+  return d === "open"
+    || (d === "deferred" && !!state.findingFilter.showDeferred)
+    || (d === "addressed" && !!state.findingFilter.showAddressed);
+}
 /** The ONE filter predicate (severity + category + scene). The mass strip and
  *  the fix queue both read it, so the two scopes can never drift apart.
  *  Fix-queue items carry the same three fields (/fixqueue's allowlist includes
@@ -7317,11 +7731,16 @@ function buildFindingFilterRow() {
       rerender();
     }));
   }
-  // category count-chips: counts over open findings (severity-agnostic),
-  // tap filters the board list + ink to that category, tap again clears
+  // category count-chips: counts over the findings this row ADMITS
+  // (severity-agnostic), tap filters the board list + ink to that category,
+  // tap again clears. D2-a widened the basis from "open only" to the same
+  // admission rule the list uses: with a chip pressed that shows addressed or
+  // parked rows, a "Dialogue 9" that counted only open ones would sit over a
+  // list of fifteen — one count, two meanings, which is the defect family
+  // HIGH-2b names. The count now always describes the rows its own tap shows.
   const catCounts = {};
   (state.findings || []).forEach((f, index) => {
-    if (findingDisposition(f, index) !== "open") return;
+    if (!findingAdmitted(f, index)) return;
     const c = f.category || "other";
     catCounts[c] = (catCounts[c] || 0) + 1;
   });
@@ -7336,6 +7755,21 @@ function buildFindingFilterRow() {
     state.findingFilter.showDeferred = !dp;
     rerender();
   }));
+  // D2-a: the marked findings' own way back onto the board. Deferred had this
+  // chip from the start; addressed had nothing, so the one control that shows
+  // WHICH mark a finding carries — and that clears it — disappeared with the
+  // mark. The count rides the label (N3: a label always prints the scope of
+  // the number it carries) and the basis is findingAdmitted, the same rule the
+  // list reads, so the chip cannot promise rows the board will not paint.
+  const da = state.findingFilter.showAddressed;
+  const addressedCount = (state.findings || []).filter((f, i) => findingDisposition(f, i) === "addressed").length;
+  row.appendChild(mk(`Addressed ${addressedCount}`, da,
+    da ? "Your addressed findings are shown — press ✓ again on a card to reopen it"
+       : "Show the findings you marked addressed (your marks stay; this only shows them)",
+    () => {
+      state.findingFilter.showAddressed = !da;
+      rerender();
+    }));
   // P1.7 — the scene as a FILTER DIMENSION (spec §5): one chip over the same
   // ONE filter state the severity/category chips write. Its label ALWAYS prints
   // the scope of the count it carries (the N3 counting contract), and it is
@@ -8588,7 +9022,20 @@ async function applyOneRewrite(rep, row) {
     await afterScriptEdit();
   } catch (e) {
     status.className = "rewrite-status error";
-    status.textContent = "Apply failed: " + e.message;
+    if (e.stale) {
+      // A refusal is terminal, not retryable: the text this proposal was cut
+      // from is gone from the scene, so Apply can never land, and the row must
+      // stop riding the next bulk "Apply changes" (bulk collects `cb.checked &&
+      // !cb.disabled`). Marking it exactly the way a decided row is marked is
+      // what makes the interface stop offering an action that cannot succeed —
+      // the same rule the "disabled but left checked" defect taught this modal.
+      // The sentence stays on screen until the writer answers it by
+      // regenerating, which is what the refusal is FOR.
+      _markProposalRow(row, "stale", true);
+      status.textContent = e.message;
+    } else {
+      status.textContent = "Apply failed: " + e.message;
+    }
   }
 }
 

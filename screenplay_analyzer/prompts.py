@@ -13,8 +13,29 @@ Every prompt instructs the model to ground findings in an exact quote and
 scene number, since verifier.py depends on that to check the work.
 """
 
+# Gate 11 / Law V″: a finding IS an observation — a falsifiable claim about what
+# is on the page — with the craft evaluation attached as an evaluation. An
+# observation is something a reader could confirm or deny by looking (a scene
+# number, a count, who speaks, a repeated element, the ABSENCE of a named
+# thing). "The dialogue is too long" is not an observation; it is an opinion, and
+# an opinion with nothing under it cannot be checked. So the model states the
+# observation FIRST and SEPARATELY, then gives the judgment as its reading of it.
+# Nullable on purpose: a model that genuinely cannot state one must say so rather
+# than invent a claim to fill the field — the verifier checks the quote, and an
+# invented observation is exactly the failure this field exists to expose.
+OBSERVATION_INSTRUCTION = (
+    "State each finding as an OBSERVATION first: a falsifiable claim about what is "
+    "ON THE PAGE that a reader could confirm or deny by looking — a scene number, a "
+    "count, a repeated element, who speaks, or the ABSENCE of a named thing. Put it "
+    "in 'observation'. Then give the craft judgment in 'issue' and 'why_it_matters' "
+    "as your READING of that observation, not as a fact. If you cannot state a "
+    "checkable observation for a finding, set observation to null rather than "
+    "inventing one. "
+)
+
 CITATION_INSTRUCTION = (
-    "For every finding, split your observation into two fields: 'issue' (a short, "
+    OBSERVATION_INSTRUCTION
+    + "For every finding, split your observation into two fields: 'issue' (a short, "
     "specific label of what's wrong — one sentence) and 'why_it_matters' (the causal "
     "explanation — why this is actually a problem for the story, not just that it "
     "exists). Include the scene number(s) it applies to in scene_refs, and in "
@@ -33,7 +54,8 @@ CITATION_INSTRUCTION = (
 # so asking them for a verbatim quote from the original script would be asking them
 # to fabricate one. Their citation mechanism is the scene number, not a quote.
 CITATION_INSTRUCTION_SUMMARY = (
-    "For every finding, split your observation into two fields: 'issue' (a short, "
+    OBSERVATION_INSTRUCTION
+    + "For every finding, split your observation into two fields: 'issue' (a short, "
     "specific label of what's wrong — one sentence) and 'why_it_matters' (the causal "
     "explanation — why this is actually a problem for the story, not just that it "
     "exists). Include the specific scene number(s) it applies to in scene_refs — that "

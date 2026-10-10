@@ -107,9 +107,12 @@ function shortModelId(id) {
 // (`dismissed_findings.json`), ghost detection, and the doctor's case file. If
 // the two implementations disagree, every one of those silently stops matching.
 //
-// Key = category + verified evidence_quote; scene_refs ride as data
-// (insert-shift keeps the id); severity is a judgment, not identity. The
-// no_quote tier keys on category + the normalized issue (documented weak tier).
+// Key = category + verified evidence_quote + the scene's slugline key
+// (`scene_key`, stamped server-side); scene_refs ride as data (insert-shift
+// keeps the id); severity is a judgment, not identity. The no_quote tier keys
+// on category + the normalized issue (documented weak tier). Scene keys were
+// added by HIGH-1: content alone collided, and a mark on a collided id
+// counted nine findings done.
 //
 // This lives here rather than in app.js because it is a DOM-free pure helper,
 // and core.js is the home for those — which is what makes it unit-testable
@@ -142,7 +145,17 @@ function _base36(h) {
 
 function computeFindingId(f) {
   const quote = (f.evidence_quote || "").trim();
-  const norm = quote ? quote : "issue:" + (f.issue || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 100);
+  let norm = quote ? quote : "issue:" + (f.issue || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 100);
+  // HIGH-1: the scene the finding points at, by slugline — the tie-breaker
+  // that stops two findings which say the same words about different places
+  // from sharing one id (9 of 16 rows on Pain_3 did, so one mark counted nine
+  // findings addressed). The value is STAMPED, not derived here: the analyzer
+  // writes `scene_key` when it writes the report and the desk re-stamps old
+  // reports on read, so this side reads one field rather than owning a second
+  // slug derivation that could drift from the Python one. Empty/absent means
+  // no scene component — the pre-scene-key id, unchanged.
+  const scene = (f.scene_key || "").trim();
+  if (scene) norm += "|s:" + scene;
   return "f" + _base36(_strHash((f.category || "other") + "|" + norm));
 }
 

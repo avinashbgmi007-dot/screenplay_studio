@@ -665,6 +665,18 @@ def _decide_reply(messages: list) -> str:
              "status": "paid", "note": "Lands."},
         ])
 
+    if "grounding a note in a screenplay" in system_l:
+        # Gate 11 (observation pass). The demo model has no real script to
+        # quote from, so it answers with a NULL quote — which is the pass's own
+        # honest "could not ground this" outcome, never a fabricated citation
+        # that the verifier would then have to reject. Without this branch the
+        # request falls through to the conversational reply (plain text, not
+        # JSON), and the client burns its whole retry ladder on every ungrounded
+        # finding — which is slow enough to break the browser fleet's timing.
+        return j(observation="[demo] The built-in demo model has no script to "
+                             "quote from, so no citation is offered.",
+                 quote=None, search="[demo]")
+
     # none of the structured shapes matched -> conversational turn
     return _conversational_reply(messages)
 

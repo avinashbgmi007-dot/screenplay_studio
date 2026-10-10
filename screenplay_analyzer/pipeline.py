@@ -94,7 +94,24 @@ def _chunk(items: list, size: int) -> list[list]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1) -> tuple[list, list[str]]:
+def _classify_chunk_failure(error: Exception) -> str:
+    """Name WHY a call failed, from the error the client raised — never assumed.
+
+    `LlamaServerError` covers a truncated reply, a request timeout, a refused
+    connection and a malformed response alike, so anything reporting a cause must
+    read it off the message instead of asserting the one that happens to be
+    commonest. Only the truncated case carries a diagnosis: `chat_json` appends
+    `finish_reason='length'` via `llm_client._diagnose_parse_failure`. Everything
+    else is reported as a plain call failure, which is all that is known.
+    """
+    text = str(error)
+    if "finish_reason='length'" in text or 'finish_reason="length"' in text:
+        return "output_limit"
+    return "call_failed"
+
+
+def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1,
+                        recoveries: list | None = None) -> tuple[list, list[str]]:
     """
     Runs call_fn(chunk) -> list of results. On LlamaServerError, if the
     chunk has more than min_size scenes, splits it in half and retries each
@@ -111,6 +128,26 @@ def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1) -> tuple[list, 
     Returns (results, errors) — errors is non-empty only for scenes that
     still couldn't succeed even at min_size (a single scene alone was too
     much, or the server is down/broken regardless of size).
+
+    `recoveries`, when supplied, gains one record per SPLIT — appended **after
+    both halves have returned**, so the record describes what happened rather
+    than what was attempted:
+
+        {scenes, size, cause, recovered}
+
+      * `cause` is read off the raised error (`_classify_chunk_failure`), never
+        assumed — a timeout is not an output limit;
+      * `recovered` is True only when NO scene in the chunk ended in an error. A
+        split whose half still failed DID skip scenes, and the note must be able
+        to say so instead of claiming nothing was missed.
+
+    These are deliberately NOT errors — the scenes were analysed, so the pass did
+    not fail and must not be reported as failed. But they are not nothing either:
+    a chunk that burned its whole retry ladder leaves the pass reporting "ok" with
+    an empty error list, and splitting was measured to change the finding count
+    (8 vs 12 on the same input). So they go to `AnalysisResult.recoveries`, which
+    is a caveat channel — see the field's docstring for why `errors` is the wrong
+    home for them.
     """
     try:
         return call_fn(chunk), []
@@ -119,9 +156,65 @@ def _with_chunk_backoff(chunk: list, call_fn, min_size: int = 1) -> tuple[list, 
             scene_num = chunk[0].get("scene_number", "?") if chunk else "?"
             return [], [f"Scene {scene_num}: {e}"]
         mid = len(chunk) // 2
-        left_results, left_errors = _with_chunk_backoff(chunk[:mid], call_fn, min_size)
-        right_results, right_errors = _with_chunk_backoff(chunk[mid:], call_fn, min_size)
-        return left_results + right_results, left_errors + right_errors
+        left_results, left_errors = _with_chunk_backoff(chunk[:mid], call_fn, min_size, recoveries)
+        right_results, right_errors = _with_chunk_backoff(chunk[mid:], call_fn, min_size, recoveries)
+        errors = left_errors + right_errors
+        if recoveries is not None:
+            recoveries.append({
+                "scenes": [c.get("scene_number") for c in chunk],
+                "size": len(chunk),
+                "cause": _classify_chunk_failure(e),
+                "recovered": not errors,
+            })
+        return left_results + right_results, errors
+
+
+def _chunk_recovery_note(pass_label: str, recoveries: list[dict]) -> str | None:
+    """One writer-facing caveat per pass that had to split a chunk.
+
+    Deliberately phrased as a caveat, not a failure — and deliberately silent
+    about the three things it cannot know:
+
+      * **the cause.** Read from the record (`_classify_chunk_failure`), never
+        assumed. A timeout is not an output limit, and `LlamaServerError` covers
+        both.
+      * **"nothing was skipped".** Only true when EVERY record recovered. A split
+        whose half still failed left that half unanalysed, and saying otherwise
+        would contradict the error line sitting next to it.
+      * **that the run is fine.** That is the caller's job: this note goes to
+        `AnalysisResult.recoveries`, never to `errors`.
+
+    Returns None when there is nothing to report.
+    """
+    if not recoveries:
+        return None
+    scenes = sorted({s for r in recoveries for s in (r.get("scenes") or [])
+                     if isinstance(s, int)})
+    where = ""
+    if len(scenes) == 1:
+        where = f" (scene {scenes[0]})"
+    elif len(scenes) > 1:
+        where = f" (scenes {scenes[0]}\u2013{scenes[-1]})"
+    causes = {r.get("cause") for r in recoveries}
+    if causes == {"output_limit"}:
+        why = "the model's reply hit its output limit"
+    elif causes == {"call_failed"}:
+        why = "a model call failed"
+    else:
+        why = "model calls failed"
+    n = len(recoveries)
+    unresolved = [r for r in recoveries if not r.get("recovered", True)]
+    if unresolved:
+        return (
+            f"{pass_label}: {why} on {n} chunk(s){where} and the chunk was re-run in "
+            f"smaller pieces. {len(unresolved)} of those still could not be analysed in "
+            f"full \u2014 the scenes that failed are named above."
+        )
+    return (
+        f"{pass_label}: {why} on {n} chunk(s){where} and the chunk was re-run in "
+        f"smaller pieces. Nothing was skipped \u2014 but a split re-asks the scenes, so "
+        f"the findings can differ from an uninterrupted run."
+    )
 
 
 def _scene_full_text(scene) -> str:
@@ -157,11 +250,30 @@ class AnalysisResult:
     retried, and succeeded used to be invisible — the writer saw only a
     spinner that took longer than usual, or nothing at all. Errors stay in
     `errors`; a notice says "this was bumpy but it landed"."""
+    recoveries: list[str] = field(default_factory=list)
+    """Writer-facing CAVEATS: a pass whose chunk had to be split mid-run.
+
+    Not errors. The pass succeeded, so `errors` and `category_outcomes` must stay
+    clean — a non-empty `errors` puts the run on the orchestrator's partial-failure
+    path (`orchestrator.py:169-176`, `partial_errors`) and renders the desk's
+    failure banner (`app.js:7221`), which is how a HEALTHY run came to be dressed
+    as a broken one. But not nothing either: a split re-asks the scenes, so the
+    finding set is path-dependent (measured 8 vs 12 findings on identical input).
+
+    So: its own channel. A caveat about how the run got here, kept separate from
+    both "this pass failed" (`errors`) and "the writer must act" (withdrawals).
+    """
     category_outcomes: dict = field(default_factory=dict)
     """Per-category result: category name -> "ok" | "failed". Lets the
     orchestrator record exactly which categories succeeded so a partial
     analyze (some categories OK, some not) can be resumed category-by-
     category instead of re-running everything."""
+    withdrawals: list[dict] = field(default_factory=list)
+    """Findings the integrity gate removed from the delivered set, each as
+    {index, action, reason, finding} carrying the finding's FULL content — so
+    removing a row from `findings` never loses it. Empty when the gate is off.
+    `findings` + `withdrawals` is always the pre-gate list; that invariant is
+    the "nothing lost" law made checkable (screenplay_analyzer/finding_integrity.py)."""
 
     # Deterministic passes that regenerate on EVERY analyze run and must
     # never be carried forward from a previous report during a merge.
@@ -249,6 +361,16 @@ def _normalize_findings(findings: list, category: str, default_severity: str = "
         f.setdefault("evidence_quote", None)
         f.setdefault("rule_id", None)
         f.setdefault("why_it_matters", "")
+        # Gate 11: the falsifiable observation the finding rests on. Normalized
+        # here like every other field real models leave out, and a whitespace or
+        # literal-"null" value is folded to None so "did the model state one?"
+        # is a single, honest test downstream (report._observation_coverage).
+        obs = f.get("observation")
+        if isinstance(obs, str):
+            obs = obs.strip()
+            f["observation"] = None if obs.lower() in ("", "null", "none") else obs
+        else:
+            f["observation"] = None
         if kb is not None and f["rule_id"]:
             f["rule_id"] = canonical_rule_id(f["rule_id"], kb) or f["rule_id"]
         out.append(f)
@@ -280,7 +402,31 @@ MAX_OVERVIEW_CHARS = 6000
 # needs headroom to close the array — shorter completions truncated it mid-emit
 # on every script-level category in the wild (see `run_script_level_category`),
 # so this is not a number to shave.
-SCRIPT_LEVEL_MAX_TOKENS = 4000
+#
+# MEASURED (qwen3.6-35b-a3b / Pain_3, 2026-10-06): 4000 was still too small for
+# the `character` pass, which is the heaviest of the four — its reply was cut at
+# 17,437 chars / exactly 4000 completion tokens, finish_reason='length'. theme,
+# structure and scene_function stop well inside 4000 and pay nothing for the
+# higher ceiling (the model stops when its JSON array closes). The `observation`
+# field added by gate 11 is what made each finding materially longer; budgets
+# sized before it are no longer sized at all.
+#
+# Per-pass budgets for the other long-output passes, same measurement. Every
+# discarded body on that run was finish_reason='length' with
+# completion_tokens == the cap — the reply was cut mid-JSON and lost:
+#
+#   pass             cap   reply that was being written when cut
+#   dialogue        1200   >=5,208 chars   (replayed at 4000: stops at 1,671)
+#   character_reads 1200     4,690 chars
+#   character_dials 1800     6,339 chars   (pass FAILED outright)
+#   genre           1200     4,870 chars
+#   character       4000    17,437 chars
+#
+# A cap that is never reached costs nothing; a cap that IS reached costs the
+# whole discarded generation plus up to three retries of it.
+SCRIPT_LEVEL_MAX_TOKENS = 8000
+DIALOGUE_MAX_TOKENS = 3000
+CHARACTER_READS_MAX_TOKENS = 2500
 
 TRUNCATION_MARKER = "\n[...scene text truncated for context budget...]"
 
@@ -334,7 +480,7 @@ def _extract_items(result, key: str) -> list:
     return []
 
 
-def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng", should_cancel=None) -> tuple[dict[int, str], list[str]]:
+def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng", should_cancel=None, recoveries: list | None = None) -> tuple[dict[int, str], list[str]]:
     summaries: dict[int, str] = {}
     errors: list[str] = []
     # A cancel requested before the first chunk starts must never reach the
@@ -365,7 +511,7 @@ def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_
         # (a chunk's own generation always finishes).
         if should_cancel is not None and should_cancel():
             raise AnalysisCancelled("Analysis cancelled at the writer's request.")
-        items, errs = _with_chunk_backoff(chunk, call)
+        items, errs = _with_chunk_backoff(chunk, call, recoveries=recoveries)
         errors.extend(errs)
         for item in items:
             try:
@@ -528,7 +674,7 @@ def build_script_level_overview(overview: str, checkpoint_text: str) -> str:
     return f"{overview}\n\n{CHECKPOINT_HEADER}\n\n{checkpoint_text}"
 
 
-def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_ctx, chunk_size: int = 3, language: str = "eng") -> tuple[list[dict], list[str]]:
+def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_ctx, chunk_size: int = 3, language: str = "eng", recoveries: list | None = None) -> tuple[list[dict], list[str]]:
     findings = []
     errors: list[str] = []
     grammar = findings_grammar()
@@ -541,11 +687,11 @@ def run_dialogue_analysis(doc: ScriptDocument, client: LlamaServerClient, rules_
 
     def call(chunk_):
         system, user = prompts.dialogue_analysis_prompt(chunk_, rules_fragment=rules_fragment, chekhov_fragment=chekhov_fragment, language=language)
-        result = client.chat_json(system, user, grammar=grammar, max_tokens=1200)
+        result = client.chat_json(system, user, grammar=grammar, max_tokens=DIALOGUE_MAX_TOKENS)
         return _extract_items(result, "findings")
 
     for chunk in _chunk_by_budget(scene_dicts, chunk_size):
-        items, errs = _with_chunk_backoff(chunk, call)
+        items, errs = _with_chunk_backoff(chunk, call, recoveries=recoveries)
         findings.extend(items)
         errors.extend(errs)
     findings = _normalize_findings(findings, "dialogue", default_severity="low")
@@ -630,9 +776,8 @@ def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerC
         return []
     grammar = character_reads_grammar()
     system, user = prompts.character_reads_prompt(overview, doc.title, characters, language=language)
-
     def _call():
-        return client.chat_json(system, user, grammar=grammar, max_tokens=1200, fast=True)
+        return client.chat_json(system, user, grammar=grammar, max_tokens=CHARACTER_READS_MAX_TOKENS, fast=True)
 
     try:
         result = _with_retries(_call, on_retry=on_retry)
@@ -750,6 +895,16 @@ class AnalysisCancelled(Exception):
     """
 
 
+def _integrity_gate_enabled() -> bool:
+    """The env kill-switch. `SCREENPLAY_STUDIO_INTEGRITY_GATE=0` stands the gate
+    down without a code change, so a rule that misbehaves on an unseen script
+    can be disabled in the field (this project's env namespace is
+    SCREENPLAY_STUDIO_*)."""
+    import os
+    return os.environ.get("SCREENPLAY_STUDIO_INTEGRITY_GATE", "").strip().lower() \
+        not in ("0", "false", "no", "off")
+
+
 def analyze(
     doc: ScriptDocument,
     client: LlamaServerClient,
@@ -759,6 +914,8 @@ def analyze(
     progress_cb=None,
     report_language: str = "eng",
     should_cancel=None,
+    integrity_gate: bool = True,
+    observation_pass: bool = True,
 ) -> AnalysisResult:
     """progress_cb: optional callable(dict) called at every stage boundary with
     {"stage": str, "status": "running"|"complete", "detail": str} — lets a UI
@@ -771,7 +928,21 @@ def analyze(
 
     run_categories: None or ("all",) runs every category (ALL_CATEGORIES);
     any other tuple runs exactly those. An empty tuple runs only the
-    deterministic passes (no model calls beyond the mandatory resolve)."""
+    deterministic passes (no model calls beyond the mandatory resolve).
+
+    integrity_gate: run the model-free finding integrity gate as the last
+    deterministic pass (removes mechanically false findings, folds same-scene
+    duplicate observations). Removals land in `result.withdrawals`, never in
+    silence. On by default; `SCREENPLAY_STUDIO_INTEGRITY_GATE=0` overrides it
+    to off.
+
+    observation_pass: gate 11 — for each finding the verifier left at `no_quote`,
+    ask the model for a falsifiable observation plus a verbatim line, then
+    re-verify that line with the SAME verifier before adopting it. Costs one
+    model call per ungrounded finding (capped), so it is the one pass a caller
+    may want off for speed; `SCREENPLAY_STUDIO_OBSERVATION_PASS=0` is the field
+    kill-switch and `SCREENPLAY_STUDIO_OBSERVATION_LIMIT` the cap. On by
+    default, because an unfalsifiable finding cannot be scored at all."""
     run_categories = resolve_categories(run_categories)
     result = AnalysisResult(doc=doc)
 
@@ -890,9 +1061,10 @@ def analyze(
     needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "setup_payoff", "char_reads", "character_dials", "coverage", "genre", "logline_test"))
     overview = ""
     if needs_summaries:
+        summary_recoveries: list[dict] = []
         try:
             emit("summaries", "running", "Summarizing each scene")
-            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language, should_cancel=should_cancel)
+            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language, should_cancel=should_cancel, recoveries=summary_recoveries)
             emit("summaries", "complete")
             overview = build_scene_overview_text(doc, summaries)
             result.category_outcomes["summaries"] = "failed" if summary_errors else "ok"
@@ -902,6 +1074,16 @@ def analyze(
                     f"reducing batch size: {'; '.join(summary_errors[:3])}"
                     + (f" (+{len(summary_errors) - 3} more)" if len(summary_errors) > 3 else "")
                 )
+            # A split is not a failure (the scenes were summarised), but it is
+            # not nothing either — see _chunk_recovery_note. Recorded on the
+            # result rather than in `summary_errors` so a recovery never flips
+            # category_outcomes to "failed" — and in `recoveries`, NOT `errors`,
+            # so it also never trips the orchestrator's partial-failure path or
+            # the desk's failure banner. A healthy run must not be dressed as a
+            # broken one.
+            summary_note = _chunk_recovery_note("Scene summarization", summary_recoveries)
+            if summary_note:
+                result.recoveries.append(summary_note)
         except LlamaServerError as e:
             result.category_outcomes["summaries"] = "failed"
             result.errors.append(f"Scene summarization failed: {e}")
@@ -935,9 +1117,10 @@ def analyze(
     # 3. scene-level dialogue analysis
     _cp()
     if "dialogue" in run_categories:
+        dialogue_recoveries: list[dict] = []
         try:
             emit("dialogue", "running", "Reading dialogue & action")
-            dialogue_findings, dialogue_errors = run_dialogue_analysis(doc, client, rules_ctx, chunk_size=scene_chunk_size, language=report_language)
+            dialogue_findings, dialogue_errors = run_dialogue_analysis(doc, client, rules_ctx, chunk_size=scene_chunk_size, language=report_language, recoveries=dialogue_recoveries)
             emit("dialogue", "complete")
             all_findings.extend(_tag_evidence(dialogue_findings, EVIDENCE_FULL_TEXT))
             result.category_outcomes["dialogue"] = "failed" if dialogue_errors else "ok"
@@ -947,6 +1130,15 @@ def analyze(
                     f"reducing batch size: {'; '.join(dialogue_errors[:3])}"
                     + (f" (+{len(dialogue_errors) - 3} more)" if len(dialogue_errors) > 3 else "")
                 )
+            # Same rule as the summaries above: a rescued split is recorded on
+            # the result, never in `dialogue_errors` (which would mark the pass
+            # failed) and never in `errors` (which would render the desk's
+            # failure banner on a run that succeeded). Measured: a run can report
+            # dialogue "ok" while two calls burned their whole ladder — that
+            # silence is what this closes, without inventing an alarm to close it.
+            dialogue_note = _chunk_recovery_note("Dialogue analysis", dialogue_recoveries)
+            if dialogue_note:
+                result.recoveries.append(dialogue_note)
         except LlamaServerError as e:
             result.category_outcomes["dialogue"] = "failed"
             result.errors.append(f"Dialogue analysis failed: {e}")
@@ -1201,6 +1393,62 @@ def analyze(
     # up — in report.md, in the served findings JSON and in the live desk.
     from .dedupe import collapse_exact_duplicates
     result.findings = collapse_exact_duplicates(result.findings)
+
+    # 8d. finding integrity gate — remove the mechanically FALSE findings (a
+    # pass reporting the absence of a defect; a deterministic rule firing on
+    # names that are not the same character) and fold same-scene duplicate
+    # observations the rule-linked dedup above cannot see (it works through
+    # rule edges, not text). Placed after both dedups and
+    # BEFORE the summary and the depth for the same reason they are: every count
+    # below must describe the rows the writer actually receives. Nothing is
+    # dropped in silence — each removal lands in `result.withdrawals` with a
+    # reason and the finding's full content, so `findings` + `withdrawals` is
+    # still the whole list (screenplay_analyzer/finding_integrity.py).
+    if integrity_gate and _integrity_gate_enabled():
+        try:
+            from .finding_integrity import FindingIntegrityGate
+            gate_res = FindingIntegrityGate().run(result.findings)
+            result.findings = gate_res.findings
+            result.withdrawals = gate_res.ledger
+            if not gate_res.accounted_for:
+                # Defensive: the gate's own contract is kept + withdrawn ==
+                # original. If that ever breaks, say so rather than ship a
+                # report whose counts cannot be reconciled.
+                result.errors.append(
+                    "Integrity gate accounting mismatch — withdrawals were kept "
+                    "but the delivered + ledger counts disagree")
+        except Exception as e:
+            # A gate that cannot run must leave the findings exactly as they
+            # were, never guess at what is false — and must never fail the run.
+            result.errors.append(f"Finding integrity gate skipped: {e}")
+
+    # 8e. observation pass (gate 11) — ground what the verifier could not. It
+    # runs AFTER the gate (there is no point grounding a finding about to be
+    # withdrawn) and BEFORE the summary below, so `verification_summary` and
+    # `evidence_depth` count the citations this pass actually landed. It is the
+    # only model-backed pass here: one call per ungrounded finding, capped, and
+    # a finding is adopted ONLY when its citation survives `verify_finding` —
+    # the model is never trusted to certify its own evidence
+    # (screenplay_analyzer/observation_pass.py).
+    if observation_pass:
+        from .observation_pass import (ObservationPass, observation_limit,
+                                       observation_pass_enabled)
+        limit = observation_limit()
+        if observation_pass_enabled() and limit:
+            try:
+                op = ObservationPass(limit=limit).run(
+                    result.findings, client, doc,
+                    on_progress=lambda stage, status, detail:
+                        emit(stage, status, detail))
+                result.findings = op.findings
+                if op.attempted:
+                    result.stats = result.stats or {}
+                    result.stats["observation_pass"] = op.summary()
+                result.errors.extend(op.errors)
+            except Exception as e:
+                # A pass that cannot run must leave the findings exactly as
+                # they were — ungrounded, still flagged, never invented.
+                result.errors.append(f"Observation pass skipped: {e}")
 
     result.verification = verification_summary(result.findings)
 
