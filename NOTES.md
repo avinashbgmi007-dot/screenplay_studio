@@ -3,6 +3,18 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+
+### 2026-10-10 — Pulled origin/main into feature/post-analysis-ia (merge 5c8d24f)
+
+**What.** `git fetch` + merge of `origin/main` (78 commits: PRs 22-31, verdict channel, integrity gate, CI timeout guards) into this branch (12 ahead). 5 conflicted files, all resolved keep-both:
+- `pipeline.py`: `AnalysisResult` keeps HEAD `notices` (M2 retry good-news) + origin `recoveries` (chunk-split caveats); `build_scene_summaries`/`analyze` take `should_cancel` + `recoveries`/`integrity_gate` + `observation_pass`; char reads keeps retry wrapper on `CHARACTER_READS_MAX_TOKENS` (2500).
+- `report.py`: renders both note sections, JSON carries both keys (desk reads `recoveries` via `buildRunCaveat`).
+- `e2e_browser_common.py`: keeps `became_true` + `reveal_chrome` + `reveal_and_click` (5/6/4 callers).
+- `API_ROUTE_MAP.md` + `TestF05RouteMapTotals`: re-measured totals 98+2=100 (HEAD R2 cancel + R7 library/backup; origin 5 verdict routes).
+- Merge-induced red fixed: origin's `test_unbounded_network_steps_declare_a_timeout` caught HEAD's two new CI jobs missing step timeouts → `timeout-minutes: 8` on both Install chromium steps. HEAD-only `test_generation_timeout.py` client re-pointed 1200 → `CHARACTER_READS_MAX_TOKENS`.
+**Verification.** Full suite green: 2128 passed + 3 skipped (incl. previously-failing readiness test), `test_store_concurrency`/`test_lock_order` 76 passed, `ci.yml` YAML-valid. Stash of pre-pull line-ending state popped clean; tree clean except untracked `.gsk/` (local tooling, kept out of the merge).
+**Watch.** Local `main` still diverged (6 local audit commits on `ddac2df`); `core.autocrlf=true` with no `.gitattributes` shows phantom M entries — content diff is zero.
+
 ### 2026-10-02 — IA wireframe built: *Arrive Quiet, Fix by Scene* (preview-ia)
 
 **What it is.** `screenplay_studio/webapp/preview-ia/index.html` + `_ia.js` — the
