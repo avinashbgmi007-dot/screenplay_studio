@@ -65,3 +65,11 @@ def test_long_script_untouched():
     )
     P.apply_short_form_gate(r.findings, page_count=28.0)
     assert r.findings[0].get("form_mismatch", False) is False
+
+
+def test_untranslated_barrier_finding_is_filtered():
+    from screenplay_analyzer.feedback_filter import is_non_writing_feedback
+    assert is_non_writing_feedback({
+        "issue": "Dialogue relies on untranslated foreign language that obscures meaning.",
+        "why_it_matters": "The audience cannot follow the stakes without translation.",
+    }) is True

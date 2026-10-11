@@ -46,6 +46,9 @@ _SUBTITLE_PATTERNS = [
     re.compile(r"(foreign|international|western) (viewer|audience)", re.I),
     re.compile(r"translat\w+ (is |would be )?(needed|required)", re.I),
     re.compile(r"needs? (either )?subtitles", re.I),
+    re.compile(r"untranslated", re.I),
+    re.compile(r"(obscures|blocks|barrier to) (meaning|understanding)", re.I),
+    re.compile(r"mix(es|ed|ing) languages without", re.I),
 ]
 
 
