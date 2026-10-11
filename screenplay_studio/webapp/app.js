@@ -4456,6 +4456,21 @@ function renderFixQueuePanel(container) {
     const row = el("div", "fix-row" + (disp === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
     row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
+    // accuracy kit A follow-up: demoted rows wear the reason. Collected
+    // here, mounted with sev below — el() nodes have no parent yet, so
+    // sev.after() would be a silent no-op. Static literals only, never
+    // finding text, so no new sink.
+    const rowFlags = [];
+    if (item.contested) {
+      const flag = el("span", "row-flag row-flag-contested", "contested");
+      flag.title = "Its own observation argues against this note — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
+    if (item.ungrounded) {
+      const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
+      flag.title = "No quote or checkable observation backs this note yet";
+      rowFlags.push(flag);
+    }
     const act = el("span", "act-chip", item.act_name || "Script-level");
     const sceneLabel = item.scene_heading ? `Scene ${(item.scene_refs || [])[0]} — ${item.scene_heading}` : "General";
     const body = el("div", "fix-row-body");
@@ -4518,6 +4533,7 @@ function renderFixQueuePanel(container) {
     actions.appendChild(triageBtn);
     body.appendChild(actions);
     row.appendChild(sev);
+    for (const flag of rowFlags) row.appendChild(flag);
     row.appendChild(act);
     const vb = verificationBadge(item.verification);
     if (vb) row.appendChild(vb);

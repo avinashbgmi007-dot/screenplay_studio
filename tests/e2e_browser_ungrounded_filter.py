@@ -33,6 +33,7 @@ from e2e_browser_common import (Checks, assert_no_js_errors, became_true,  # noq
                                 studio_headers)
 
 MARKER = "UNGROUNDED-PROBE-Z9"
+CONTEST_MARKER = "CONTESTED-PROBE-Z9"
 
 DOCK_QUEUE = '.dock-lens[data-lens="evidence"] .dock-section-fixqueue'
 QUEUE_TITLE = DOCK_QUEUE + " .craft-panel-title"
@@ -95,6 +96,13 @@ def run(base, projects_dir):
     target = findings[0]
     target["ungrounded"] = True
     target["issue"] = (target.get("issue") or "first row") + f" {MARKER}"
+    # A second planted row: contested but grounded (carries a quote), so it
+    # stays visible by default AND must wear its contested mark. D1.
+    if len(findings) > 1:
+        second = findings[1]
+        second["contested"] = True
+        second["evidence_quote"] = second.get("evidence_quote") or "a quoted line"
+        second["issue"] = (second.get("issue") or "second row") + f" {CONTEST_MARKER}"
     # Deterministic fixture: the demo pipeline's own evidence floor may flag
     # every row (demo rows carry no quote/observation), which would leave the
     # queue ALL-hidden and prove nothing about the default view. One planted
@@ -118,6 +126,11 @@ def run(base, projects_dir):
     nungr = sum(1 for i in served.get("items", []) if i.get("ungrounded"))
     checks.ok("exactly the planted row is ungrounded on the wire", nungr == 1,
               f"ungrounded rows={nungr} items={len(served.get('items', []))}")
+    ncont = [i for i in served.get("items", [])
+             if CONTEST_MARKER in (i.get("issue") or "")]
+    checks.ok("GET /fixqueue carries contested on the row",
+              len(ncont) == 1 and ncont[0].get("contested") is True,
+              str(ncont and {k: ncont[0].get(k) for k in ("issue", "contested")}))
     checks.ok("enough rows for a hide-one/show-rest assertion", n_items >= 2,
               f"{n_items} items")
     if n_items < 2:
@@ -139,6 +152,16 @@ def run(base, projects_dir):
         text = queue_text(page)
         checks.ok("default: the ungrounded row is hidden from the queue",
                   MARKER not in text, text[:220])
+        checks.ok("default: the contested row stays visible (grounded)",
+                  CONTEST_MARKER in text, text[:220])
+        contest_row = page.evaluate(
+            f"() => {{ const rows = Array.from(document.querySelectorAll("
+            f"'{DOCK_QUEUE} .fix-row')); const hit = rows.find("
+            f"n => (n.textContent || '').includes('{CONTEST_MARKER}')); "
+            f"return hit ? !!hit.querySelector('.row-flag-contested') : null; }}")
+        checks.ok("default: the contested row wears its mark",
+                  contest_row is True,
+                  "no .row-flag-contested badge on the contested row")
         title = queue_title(page)
         m = TITLE_RE.search(title)
         checks.ok("default: the queue header renders counts", m is not None,
@@ -167,6 +190,14 @@ def run(base, projects_dir):
                 timeout=15000)
             checks.ok("toggle: the ungrounded row returns", back,
                       queue_text(page)[:220])
+            ungr_row = page.evaluate(
+                f"() => {{ const rows = Array.from(document.querySelectorAll("
+                f"'{DOCK_QUEUE} .fix-row')); const hit = rows.find("
+                f"n => (n.textContent || '').includes('{MARKER}')); "
+                f"return hit ? !!hit.querySelector('.row-flag-ungrounded') : null; }}")
+            checks.ok("toggle: the returned row wears its ungrounded mark",
+                      ungr_row is True,
+                      "no .row-flag-ungrounded badge on the returned row")
             title2 = queue_title(page)
             m2 = TITLE_RE.search(title2)
             checks.ok("toggle: header shown includes it again",

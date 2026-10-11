@@ -1917,6 +1917,20 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .sev-badge.sev-high { color: var(--danger-text); border-color: color-mix(in oklab, var(--danger) 60%, transparent); background: var(--danger-bg); }
 .sev-badge.sev-medium { color: var(--sev-mid-text); border-color: color-mix(in oklab, var(--sev-mid) 50%, transparent); }
 .sev-badge.sev-low { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 50%, transparent); }
+/* accuracy kit A follow-up: demotion flags ride the same tokens as
+ * .sev-badge, so both themes inherit its measured contrast. */
+.row-flag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xs);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: var(--sp-1);
+}
+.row-flag-contested { color: var(--sev-mid-text); border-color: color-mix(in oklab, var(--sev-mid) 50%, transparent); }
+.row-flag-ungrounded { color: var(--text-muted); border-style: dashed; }
 .act-chip {
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
