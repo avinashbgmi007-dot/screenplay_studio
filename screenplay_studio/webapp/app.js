@@ -48,6 +48,7 @@ const state = {
   editsData: null,        // { edits, findings_status } from /edits
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
+  fixQueueShowUngrounded: false, // accuracy kit A: ungrounded rows hide by default, one toggle away
   findingsSummary: null,  // server-joined counts + dawn % from /findings/summary (ONE findings-state load)
   feedbackLedger: null,   // gate 9: the last two runs reconciled (from /feedback/ledger)
   reportStats: null,      // stats from report.findings.json
@@ -4364,18 +4365,56 @@ function renderFixQueuePanel(container) {
   // severity/category the chips hide stay in the report but out of the
   // writer's to-do view — page, board and queue cannot disagree (N3).
   // Dismissed rows keep their separate toggle; addressed ride as before.
-  const inFilter = inFindingFilter; // ONE predicate: the queue cannot drift from the strip
+  // queue and strip share ONE predicate (inFindingFilter), so the two scopes
+  // cannot drift apart — N3. Disposition bypass lives inside it.
+  const inFilter = inFindingFilter;
   const shown = items.filter((i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed);
   // ONE counter (N3): the header's open/total come from queueCounts() — the
   // writer's intent (findingMarks) moves this header exactly like the chips
   // and the dawn meter; the raw server-observed item.status never counts.
   const counts = queueCounts();
   const shownCounts = queueCounts(shown);
+  // accuracy kit A: ungrounded rows hide by default but stay one toggle
+  // away (flag-don't-drop) — mirrors the dismissed toggle below. Built once
+  // because the empty branch needs it too: an all-ungrounded queue must still
+  // offer the way back.
+  const ungroundedCount = items.filter((i) => i.ungrounded).length;
+  const maybeAddUngroundedToggle = (head) => {
+    if (!ungroundedCount) return;
+    const showU = !!state.fixQueueShowUngrounded;
+    const toggleU = el("button", "fq-toggle-ungrounded", showU ? `Hide ungrounded (${ungroundedCount})` : `Show ungrounded (${ungroundedCount})`);
+    toggleU.type = "button";
+    toggleU.addEventListener("click", async () => {
+      state.fixQueueShowUngrounded = !showU;
+      await reloadFixQueue();
+      renderManuscript(document.getElementById('manuscript-container'));
+    });
+    head.appendChild(toggleU);
+  };
+  // triage: dismissed findings stay in the report but out of the writer's way.
+  // Declared up here (not below) because the empty branch returns early — a
+  // queue emptied by dismissing its last visible row must still offer the
+  // way back, and const declarations do not hoist.
+  const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
+  const maybeAddDismissedToggle = (head) => {
+    if (!dismissedCount) return;
+    const show = !!state.fixQueueShowDismissed;
+    const toggleBtn = el("button", "fq-toggle-dismissed", show ? `Hide dismissed (${dismissedCount})` : `Show dismissed (${dismissedCount})`);
+    toggleBtn.type = "button";
+    toggleBtn.addEventListener("click", async () => {
+      state.fixQueueShowDismissed = !show;
+      await reloadFixQueue();
+      renderManuscript(document.getElementById('manuscript-container'));
+    });
+    head.appendChild(toggleBtn);
+  };
   if (!shown.length) {
     if (!items.length && !state.fixQueueShowDismissed) return;
     const panel = el("div", "craft-panel fix-queue");
     const head = el("div", "craft-panel-head");
     head.appendChild(el("span", "craft-panel-title", "Fix queue — 0 shown / " + counts.total + " total"));
+    maybeAddUngroundedToggle(head);
+    maybeAddDismissedToggle(head);
     panel.appendChild(head);
     const hint = el("p", "fix-row-why", "No rows match the current filter — toggle a severity or category chip on the Evidence board to widen the to-do.");
     panel.appendChild(hint);
@@ -4397,19 +4436,9 @@ function renderFixQueuePanel(container) {
   dm.querySelector(".dawn-fill").style.width = dawnPct + "%";
   dm.querySelector(".dawn-pct").textContent = dawnPct + "%";
   head.appendChild(dm);
-  // triage: dismissed findings stay in the report but out of the writer's way
-  const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
-  if (dismissedCount) {
-    const show = !!state.fixQueueShowDismissed;
-    const toggleBtn = el("button", "fq-toggle-dismissed", show ? `Hide dismissed (${dismissedCount})` : `Show dismissed (${dismissedCount})`);
-    toggleBtn.type = "button";
-    toggleBtn.addEventListener("click", async () => {
-      state.fixQueueShowDismissed = !show;
-      await reloadFixQueue();
-      renderManuscript(document.getElementById('manuscript-container'));
-    });
-    head.appendChild(toggleBtn);
-  }
+  // triage: dismissed findings stay in the report but out of the writer's way.
+  maybeAddDismissedToggle(head);
+  maybeAddUngroundedToggle(head);
   panel.appendChild(head);
   // P1.10: the queue's own gesture, printed where it is used (the deep cards
   // explain ✓ / next-pass on the card; Dismiss exists only here).
@@ -7606,7 +7635,11 @@ function findingAdmitted(f, index) {
 /** The ONE filter predicate (severity + category + scene). The mass strip and
  *  the fix queue both read it, so the two scopes can never drift apart.
  *  Fix-queue items carry the same three fields (/fixqueue's allowlist includes
- *  scene_refs), so they pass through it unchanged. */
+ *  scene_refs), so they pass through it unchanged.
+ *  Accuracy kit A appends the groundedness clause below. Writer-dispositioned
+ *  rows (parked/deferred/finished) bypass ONLY that clause: hiding the
+ *  writer's own triage state would strand their workflow with no path back.
+ *  Chips still apply to them — this never overrides an explicit filter. */
 function inFindingFilter(f) {
   const sev = ((f && f.severity) || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
@@ -7617,6 +7650,14 @@ function inFindingFilter(f) {
   // contract exists to prevent (the writer scoped the view; the scope says so).
   const sc = state.findingFilter.scene;
   if (sc != null && !findingOnScene(f, sc)) return false;
+  // accuracy kit A: ungrounded rows hide by default (flag-don't-drop keeps
+  // them one toggle away) — the toggle mirrors the dismissed one
+  if (f && f.ungrounded && !state.fixQueueShowUngrounded) {
+    const fi = (typeof queueItemFindingIndex === "function") ? queueItemFindingIndex(f) : null;
+    const d = fi != null ? findingDisposition((state.findings || [])[fi], fi)
+      : (f.status === "addressed" ? "addressed" : "open");
+    if (d !== "addressed" && d !== "deferred") return false;
+  }
   return true;
 }
 /** Scope + disposition counts — the second half of the N3 counting contract.
@@ -7689,6 +7730,12 @@ function queueCounts(items) {
       ? (item.dismissed ? "dismissed" : (item.status === "addressed" ? "addressed" : "open"))
       : findingDisposition((state.findings || [])[index], index);
     if (d === "dismissed") continue;
+    // accuracy kit A: rows hidden behind the ungrounded toggle sit out of
+    // the ledger's totals exactly like dismissed rows do — same counter.
+    // Writer-dispositioned rows bypass (mirrors queueRowVisible): parking or
+    // finishing a note is the writer's own workflow, not a groundedness claim.
+    if (item.ungrounded && !state.fixQueueShowUngrounded
+        && d !== "addressed" && d !== "deferred") continue;
     c.total += 1;
     if (d === "open") c.open += 1;
   }

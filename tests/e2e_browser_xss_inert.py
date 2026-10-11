@@ -481,6 +481,15 @@ def run(base, projects_dir, headers):
         page.wait_for_timeout(2500)
         page.evaluate("() => openDock('evidence')")
         page.wait_for_timeout(1200)
+        # Accuracy kit A parks ungrounded rows behind an explicit toggle, and
+        # the demo baseline rows are ungrounded in full — opt in so the sweep
+        # covers every row (the toggle contract itself is pinned in
+        # e2e_browser_ungrounded_filter.py). Planted rows carry no flag and
+        # show either way; the baseline needs the opt-in to be scannable.
+        ungr = page.locator(".dock-section-fixqueue .fq-toggle-ungrounded")
+        if ungr.count():
+            ungr.first.click()
+            page.wait_for_timeout(800)
 
         # --- the exploit itself ---
         fired = page.evaluate(

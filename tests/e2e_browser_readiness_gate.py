@@ -469,6 +469,14 @@ def run(base, name):
                                    timeout=30000)
             page.evaluate("() => openDock('evidence')")
             page.wait_for_selector("#context-dock.open", timeout=5000)
+            # Accuracy kit A parks ungrounded rows (the whole demo ledger)
+            # behind an explicit toggle — opt in so the sweep measures every
+            # rendered control, badges included (toggle contract pinned in
+            # e2e_browser_ungrounded_filter.py).
+            ungr = page.locator(".dock-section-fixqueue .fq-toggle-ungrounded")
+            if ungr.count():
+                ungr.first.click()
+                page.wait_for_timeout(800)
             open_dock_section_holding(page, ".sev-badge")
             page.wait_for_timeout(400)
             checks.ok(f"{theme}: the desk is still on that theme",

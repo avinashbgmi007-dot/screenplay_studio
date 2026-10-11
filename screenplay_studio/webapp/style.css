@@ -4270,7 +4270,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 
 /* ---------- fix-queue triage (dismiss / restore) ---------- */
 
-.fq-reopen, .fq-dismiss, .fq-undismiss, .fq-toggle-dismissed {
+.fq-reopen, .fq-dismiss, .fq-undismiss, .fq-toggle-dismissed, .fq-toggle-ungrounded {
   font: inherit; font-size: var(--fs-xs);
   background: none; border: 1px solid var(--desk-line-dim);
   color: var(--desk-text-dim); border-radius: var(--r-sm);

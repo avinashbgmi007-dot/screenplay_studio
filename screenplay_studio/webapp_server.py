@@ -730,6 +730,37 @@ def _load_manifest(name: str) -> ProjectManifest:
     return ProjectManifest.load(_project_dir(name))
 
 
+# Mirror of the parser's dispatch table (`screenplay_parser._EXT_DISPATCH`):
+# the extensions `parse_screenplay` accepts. Kept as a local constant because
+# this module must not import the parser at load (AGENTS.md: no cross-package
+# imports at module load); drift is pinned by
+# `tests/test_upload_validation.py::test_supported_extensions_mirror_parser_dispatch`.
+SUPPORTED_UPLOAD_EXTS = frozenset({".fdx", ".pdf", ".txt", ".fountain", ".md"})
+
+
+def _supported_upload_ext(filename: str) -> str | None:
+    """Extension gate shared by every upload route (create, draft, graduate).
+
+    Returns the lower-cased extension when the parser can handle it, else
+    None — the caller answers 400 with the supported list. One guard here
+    beats one per route: an unsupported upload used to reach `parse_screenplay`,
+    raise ValueError, and escape as a 500 ("Could not process uploaded file"),
+    a client error dressed as a server error. Callers run this BEFORE claiming
+    directories or saving bytes, so a rejection leaves no shelf litter behind.
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    return ext if ext in SUPPORTED_UPLOAD_EXTS else None
+
+
+def _unsupported_ext_error(filename: str):
+    """The 400 every upload route answers for a rejected extension — one
+    message source so create/draft/graduate never drift apart."""
+    given = os.path.splitext(filename)[1] or "(none)"
+    return _error(
+        f"Unsupported file type '{given}'. Upload a screenplay as one of: "
+        + ", ".join(sorted(SUPPORTED_UPLOAD_EXTS)) + ".", 400)
+
+
 def _manifest_summary(m: ProjectManifest) -> dict:
     sessions = []
     if os.path.isdir(m.sessions_dir):
@@ -1270,8 +1301,15 @@ def create_project():
         return _error("The uploaded file is empty (0 bytes). Choose the screenplay file you meant to import.", 400)
     upload.seek(0)
 
+    # Unsupported-type gate BEFORE the claim: the parser raises ValueError for
+    # these, which used to escape as a 500 after a directory was already
+    # claimed (and left on the shelf). Nothing exists yet here, so a rejection
+    # needs no cleanup.
+    ext = _supported_upload_ext(upload.filename)
+    if ext is None:
+        return _unsupported_ext_error(upload.filename)
+
     project_dir = _claim_project_dir(safe_name)
-    ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
     upload.save(tmp_path)
 
@@ -2569,6 +2607,10 @@ def _fixqueue_items(m):
             # Gate 11: the falsifiable observation a grounded finding rests on.
             # Delivered so the checkable half of a note is not report-only.
             "observation": f.get("observation"),
+            # Accuracy kit A: the desk default-hides ungrounded rows, so the
+            # flag must ride the row like evidence_quote does.
+            "ungrounded": bool(f.get("ungrounded")),
+            "contested": bool(f.get("contested")),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
 
@@ -3409,7 +3451,15 @@ def upload_draft(name):
     if not upload.filename:
         return _error("Empty filename.")
 
-    tmp_path = os.path.join(m.project_dir, "_draft_upload" + os.path.splitext(upload.filename)[1].lower() or ".txt")
+    # Same gate as create/graduate: before any byte is saved. (This line also
+    # fixes a precedence bug: `"_draft_upload" + ext or ".txt"` always took
+    # the left side, so an extensionless upload produced an extensionless temp
+    # file instead of the intended ".txt" fallback.)
+    ext = _supported_upload_ext(upload.filename)
+    if ext is None:
+        return _unsupported_ext_error(upload.filename)
+
+    tmp_path = os.path.join(m.project_dir, f"_draft_upload{ext}")
     upload.save(tmp_path)
     try:
         from .diff import upload_new_draft
@@ -4655,8 +4705,12 @@ def graduate_idea(idea_id):
     # title answered 400 and could not be done at all. Same fold as the other
     # two create paths.
     safe_name = safe_dir_name(title)
+    # Same gate as create_project, before the claim (see above): a rejected
+    # graduation must not leave a claimed directory behind.
+    ext = _supported_upload_ext(upload.filename)
+    if ext is None:
+        return _unsupported_ext_error(upload.filename)
     project_dir = _claim_project_dir(safe_name)
-    ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
     upload.save(tmp_path)
     try:

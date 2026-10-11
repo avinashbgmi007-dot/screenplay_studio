@@ -377,8 +377,11 @@ def check_scene_filter(page, lens):
           "(red-team W2)",
           whole_cards == whole_ledger and whole_ledger > 0,
           f"cards={whole_cards} ledger={whole_ledger}")
-    check("P1.7: with no scene set the mass strip claims no narrowing",
-          "shown by filter" not in mass_strip_text(lens), mass_strip_text(lens))
+    check("P1.7: with no scene set no scene clause is active (the strip may still"
+          " name non-scene narrowing — groundedness now narrows by default, pinned"
+          " by the ungrounded-filter suite)",
+          page.evaluate("() => state.findingFilter.scene") is None,
+          page.evaluate("() => state.findingFilter.scene"))
 
     scoped = page.evaluate(OPEN_ON_SCENE_JS, scene)
     ink_before = page.evaluate(INK_BY_SCENE_JS)
