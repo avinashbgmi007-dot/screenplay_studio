@@ -129,7 +129,7 @@ class TestEveryPassDeclaresItsSource:
 
     def test_the_summary_based_passes_are_tagged_overview(self):
         src = self._src()
-        assert "dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx), EVIDENCE_OVERVIEW)" in src
+        assert "dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx, doc=doc), EVIDENCE_OVERVIEW)" in src
         assert "genre_findings, EVIDENCE_OVERVIEW)" in src
 
     def test_the_document_reading_passes_are_tagged_full_text(self):

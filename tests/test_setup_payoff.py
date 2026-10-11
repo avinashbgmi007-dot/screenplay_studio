@@ -233,3 +233,14 @@ def test_fold_in_without_doc_keeps_old_shape():
                "status": "dangling", "note": "Never lit."}]
     findings = dangling_findings(ledger, [])
     assert findings[0]["evidence_quote"] is None
+
+
+def test_ledger_verified_fields_reach_json():
+    from screenplay_analyzer.report import to_findings_json
+    from screenplay_analyzer.pipeline import AnalysisResult
+    r = AnalysisResult(doc=_parse(SAMPLE))
+    r.setup_payoff = [{"setup": "The cigar", "kind": "object",
+                       "setup_scenes": [1], "payoff_scenes": [2],
+                       "status": "paid", "note": "Lands.",
+                       "verified": True, "verify_note": "terms recur in scene 2"}]
+    assert to_findings_json(r)["setup_payoff"][0]["verified"] is True
