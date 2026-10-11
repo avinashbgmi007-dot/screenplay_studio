@@ -220,7 +220,12 @@ def _chunk_recovery_note(pass_label: str, recoveries: list[dict]) -> str | None:
 def _scene_full_text(scene) -> str:
     """Full scene text for the MODEL passes — capped so a long scene can
     never fill the context window by itself (see MAX_SCENE_CHARS)."""
-    return _cap_scene_text("\n".join(e.text for e in scene.elements))
+    texts = []
+    for e in scene.elements or []:
+        t = getattr(e, "text", None) or (e.get("text") if isinstance(e, dict) else "")
+        if t:
+            texts.append(str(t))
+    return _cap_scene_text("\n".join(texts))
 
 
 @dataclass
@@ -532,6 +537,23 @@ def build_scene_overview_text(doc: ScriptDocument, summaries: dict[int, str]) ->
     if len(overview) > MAX_OVERVIEW_CHARS:
         overview = overview[:MAX_OVERVIEW_CHARS].rstrip() + "\n[...scene overview truncated for context budget...]"
     return overview
+
+
+def build_script_level_source(doc, overview: str, stats: dict) -> tuple[str, str]:
+    """Full text when it fits MAX_OVERVIEW_CHARS, else the summary path.
+    Returns (overview_text, source_bucket). Records the choice in stats so
+    the report can name what the passes actually read."""
+    texts = []
+    for s in doc.scenes or []:
+        t = _scene_full_text(s)
+        if t:
+            texts.append(t)
+    full = "\n".join(texts)
+    if full and len(full) <= MAX_OVERVIEW_CHARS:
+        stats["script_level_source"] = "full_text"
+        return full, EVIDENCE_FULL_TEXT
+    stats["script_level_source"] = "overview"
+    return overview, EVIDENCE_OVERVIEW
 
 
 # ---------------------------------------------------------------------------
@@ -1167,14 +1189,17 @@ def analyze(
     # passes already filed (the most-flagged scenes), and because it is only
     # needed once the summaries exist to sit alongside it. Deterministic — no
     # model call — and recorded on the result so the report can name the scenes.
-    script_level_overview = overview
+    script_level_overview, _sl_source = build_script_level_source(doc, overview, result.stats)
     checkpoint_scenes: list[int] = []
     checkpoint_text = ""
-    if overview and any(c in run_categories for c in SCRIPT_LEVEL_CATEGORIES):
+    if script_level_overview and any(c in run_categories for c in SCRIPT_LEVEL_CATEGORIES):
         checkpoint_scenes = select_checkpoint_scenes(doc, all_findings)
         checkpoint_text = build_checkpoint_text(doc, checkpoint_scenes)
         if checkpoint_text:
-            script_level_overview = build_script_level_overview(overview, checkpoint_text)
+            # Append to whatever the base is — summaries on large scripts,
+            # full text on small ones (B1). Either way the passes receive a
+            # superset, and the stamp below stays honest.
+            script_level_overview = build_script_level_overview(script_level_overview, checkpoint_text)
         else:
             # Nothing fit the budget — never claim a reading that did not happen.
             checkpoint_scenes = []
@@ -1187,6 +1212,10 @@ def analyze(
     # really did read pages, plain overview when they did not.
     script_level_source = (EVIDENCE_OVERVIEW_AND_CHECKPOINTS if checkpoint_scenes
                            else EVIDENCE_OVERVIEW)
+    if _sl_source == EVIDENCE_FULL_TEXT:
+        # Small scripts are read whole: the passes saw full text, not
+        # summaries — the mixed bucket must not overwrite that source.
+        script_level_source = EVIDENCE_FULL_TEXT
 
     # 3. scene-level dialogue analysis
     _cp()

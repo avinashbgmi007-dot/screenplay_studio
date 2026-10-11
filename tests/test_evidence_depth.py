@@ -174,6 +174,18 @@ def full_run(doc):
     return pipeline.analyze(doc, _Client(), run_categories=None, progress_cb=None)
 
 
+@pytest.fixture(scope="module")
+def big_run(tmp_path_factory):
+    """An over-budget doc (recall kit B1): script-level passes must read
+    summaries PLUS checkpoint pages here, keeping the mixed bucket alive on
+    large scripts while small docs honestly report full text."""
+    from screenplay_parser import parse_fountain
+    src = tmp_path_factory.mktemp("big") / "big.fountain"
+    src.write_bytes((open(FIXTURE, "rb").read() + b"\n") * 3)
+    return pipeline.analyze(parse_fountain(str(src)), _Client(),
+                            run_categories=None, progress_cb=None)
+
+
 class TestAFullRunLeavesNothingUnknown:
     def test_no_finding_is_unattributed(self, full_run):
         depth = (full_run.stats or {}).get("evidence_depth")
@@ -194,14 +206,21 @@ class TestAFullRunLeavesNothingUnknown:
         assert depth["full_text"] > 0, "no pass read the pages?"
         assert depth["overview"] > 0, "no summary-derived findings?"
 
-    def test_the_script_level_passes_are_mixed_not_pure_overview(self, full_run):
+    def test_the_script_level_passes_are_mixed_not_pure_overview(self, full_run, big_run):
         """§5 item 2: they now read the summaries AND the raw checkpoint pages,
-        so they must not report as a pure summary read."""
-        depth = full_run.stats["evidence_depth"]
-        assert depth["overview_and_checkpoints"] > 0, (
-            "the script-level passes report as pure overview — either the "
-            "checkpoints did not reach them or the tag regressed"
-        )
+        so they must not report as a pure summary read. Small docs (recall kit
+        B1) honestly report full text instead — the mixed bucket lives on for
+        large docs, pinned by big_run."""
+        small = [f for f in full_run.findings
+                 if f.get("category") in pipeline.SCRIPT_LEVEL_CATEGORIES]
+        assert small, "no script-level findings to judge"
+        assert all(f.get("evidence_source") == EVIDENCE_FULL_TEXT for f in small), (
+            "small-doc script-level findings must read full text, not summaries")
+        big = [f for f in big_run.findings
+               if f.get("category") in pipeline.SCRIPT_LEVEL_CATEGORIES]
+        assert any(f.get("evidence_source") == pipeline.EVIDENCE_OVERVIEW_AND_CHECKPOINTS
+                   for f in big), (
+            "large-doc script-level passes lost the checkpoint pages")
 
     def test_every_finding_carries_a_source(self, full_run):
         for f in full_run.findings:
