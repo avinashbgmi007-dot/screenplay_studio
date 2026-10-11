@@ -177,3 +177,41 @@ def test_pipeline_flags_weak_observations_and_demotes():
     assert rows[0]["severity"] == "medium"
     assert rows[1].get("observation_weak", False) is False
     assert rows[1]["severity"] == "medium"
+
+
+def test_template_flood_across_scenes_demoted_by_similarity():
+    """D3: sixteen near-identical 'Uncomplicated outcome' rows on distinct
+    scenes must not all survive — same anchor key never fires there."""
+    from screenplay_analyzer import pipeline as P
+    template = ("Uncomplicated 'yes' outcome: the protagonist achieves his goal "
+                "of SCENE{} without cost and no new problem arises.")
+    rows = [
+        {"category": "scene_function", "issue": template.format(i),
+         "severity": "medium", "scene_refs": [i],
+         "evidence_quote": None, "observation": f"Scene {i} ends quietly."}
+        for i in range(1, 9)
+    ]
+    P.apply_absence_and_caps(rows, page_count=28.0)
+    assert sum(1 for f in rows if f.get("capped")) >= 4, \
+        "template flood across scenes must demote"
+
+
+def test_distinct_issues_in_category_not_capped():
+    from screenplay_analyzer import pipeline as P
+    rows = [
+        {"category": "scene_function",
+         "issue": "The montage compresses a week of rehearsal into seconds.",
+         "severity": "medium", "scene_refs": [1],
+         "evidence_quote": "Montage:", "observation": "A montage opens the act."},
+        {"category": "scene_function",
+         "issue": "The interrogation inverts power with a single prop move.",
+         "severity": "medium", "scene_refs": [2],
+         "evidence_quote": "He slides the photo.", "observation": "A photo moves."},
+        {"category": "scene_function",
+         "issue": "The farewell lands without setup and earns no tears.",
+         "severity": "medium", "scene_refs": [3],
+         "evidence_quote": "Goodbye.", "observation": "A farewell closes."},
+    ]
+    P.apply_absence_and_caps(rows, page_count=28.0)
+    assert not [f for f in rows if f.get("capped")], \
+        "distinct issues must never trip the similarity cap"

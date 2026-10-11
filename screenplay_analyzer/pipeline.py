@@ -971,12 +971,23 @@ def apply_short_form_gate(findings: list, page_count) -> None:
 _ABSENCE_RE = None  # compiled lazily to keep module import light
 CATEGORY_CAPS_SHORT = {"character": 6, "dialogue": 8, "scene_function": 6}
 CATEGORY_CAPS_LONG = {"character": 12, "dialogue": 20, "scene_function": 14}
+# Template floods share wording across scenes, so anchor counting never
+# fires on them (trial rerun: sixteen near-identical scene_function rows on
+# sixteen scenes). Similarity clusters catch what anchors miss.
+ISSUE_SIMILARITY_THRESHOLD = 0.75
+SIMILARITY_CLUSTER_CAP = 3
+
+
+def _issue_key(text: str) -> str:
+    import re
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", str(text or "").lower())).strip()
 
 
 def apply_absence_and_caps(findings: list, page_count) -> None:
     """Drop absence rows (non-findings, same precedent as step-8 filter);
     demote same-anchor pileups past the per-category cap. Mutates in place."""
     import re
+    from difflib import SequenceMatcher
     kept = [f for f in (findings or [])
             if isinstance(f, dict)
             and not re.match(r"\s*n/a\b", str(f.get("issue") or ""), re.I)]
@@ -995,6 +1006,29 @@ def apply_absence_and_caps(findings: list, page_count) -> None:
         if cap is not None and seen_anchors[key] > cap:
             f["capped"] = True
             f["severity"] = "low"
+    # Similarity clusters within a category: near-identical issue text on
+    # distinct anchors is one template filed many times. First rows per
+    # cluster keep full weight; the rest demote. difflib only, no model.
+    by_category: dict = {}
+    for f in findings:
+        by_category.setdefault(str(f.get("category") or ""), []).append(f)
+    for cat, rows in by_category.items():
+        if cat not in caps:
+            continue
+        clusters: list = []
+        for f in rows:
+            key = _issue_key(f.get("issue"))
+            placed = False
+            for c in clusters:
+                if SequenceMatcher(None, key, c[0]).ratio() >= ISSUE_SIMILARITY_THRESHOLD:
+                    c.append(key)
+                    placed = True
+                    break
+            if not placed:
+                clusters.append([key])
+            if placed and len(c) > SIMILARITY_CLUSTER_CAP:
+                f["capped"] = True
+                f["severity"] = "low"
 
 
 class AnalysisCancelled(Exception):
