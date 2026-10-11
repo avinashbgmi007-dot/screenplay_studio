@@ -212,3 +212,24 @@ def test_setup_absent_from_setup_scenes_is_marked():
         "status": "paid", "note": "Lands."}], _doc_two_scenes())
     assert entries[0].get("setup_ungrounded") is True
     assert entries[0]["status"] == "paid"
+
+
+def test_fold_in_rows_carry_the_setup_line():
+    from screenplay_analyzer.setup_payoff import dangling_findings
+    doc = _doc_two_scenes()
+    ledger = [{"setup": "The cigar", "kind": "object",
+               "setup_scenes": [1], "payoff_scenes": None,
+               "status": "dangling", "note": "Never lit."}]
+    findings = dangling_findings(ledger, [], doc=doc)
+    assert len(findings) == 1
+    assert findings[0]["evidence_quote"] is not None
+    assert "cigar" in findings[0]["evidence_quote"].lower()
+
+
+def test_fold_in_without_doc_keeps_old_shape():
+    from screenplay_analyzer.setup_payoff import dangling_findings
+    ledger = [{"setup": "The cigar", "kind": "object",
+               "setup_scenes": [1], "payoff_scenes": None,
+               "status": "dangling", "note": "Never lit."}]
+    findings = dangling_findings(ledger, [])
+    assert findings[0]["evidence_quote"] is None

@@ -109,8 +109,42 @@ def run_setup_payoff_ledger(
     return cleaned[:MAX_LEDGER_ENTRIES], []
 
 
+def _setup_quote(entry: dict, doc) -> str | None:
+    """Best-matching setup-scene line for the entry's terms (windowed
+    matcher, 0.72 floor shared with the verifier; token-overlap fallback
+    mirrors _terms_in_scenes — a lone content term can never reach the
+    fuzzy floor against a full line, but its presence still grounds the
+    row). None when nothing qualifies — the row then keeps today's
+    ungrounded path."""
+    from screenplay_analyzer.verifier import (
+        _normalize, _best_fuzzy_match, _token_overlap,
+        FUZZY_MATCH_THRESHOLD,
+    )
+    from screenplay_parser.quotematch import find_scene_text
+    terms = sorted(_content_terms(entry.get("setup")))
+    if not terms or not doc:
+        return None
+    joined = _normalize(" ".join(terms))
+    best, best_conf = None, 0.0
+    for n in entry.get("setup_scenes") or []:
+        text = find_scene_text(doc, n)
+        if not text:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if len(line.split()) < 3:
+                continue
+            lnorm = _normalize(line)
+            conf = _best_fuzzy_match(joined, lnorm)
+            if conf < FUZZY_MATCH_THRESHOLD and _token_overlap(joined, lnorm) < 0.5:
+                continue
+            if conf > best_conf:
+                best, best_conf = line, conf
+    return best
+
+
 def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
-                      rules_ctx=None) -> list[dict]:
+                      rules_ctx=None, doc=None) -> list[dict]:
     """Fold dangling/abandoned ledger entries into findings for the Fix Queue,
     deduped against existing plot_thread findings (e.g. the Principles
     Engine's 'Promise never fulfilled' for the same candidate).
@@ -133,6 +167,7 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
         if setup and setup.lower()[:40] in haystack:
             continue  # already reported by the Principles Engine
         label = "Setup left dangling" if e.get("status") == "dangling" else "Setup abandoned"
+        quote = _setup_quote(e, doc) if doc is not None else None
         findings.append({
             "category": "plot_thread",
             "rule_id": "setup_payoff_general",
@@ -140,7 +175,7 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
             "why_it_matters": e.get("note") or "Set up on the page, never paid off.",
             "severity": _severity_for(rules_ctx, "setup_payoff_general"),
             "scene_refs": e.get("setup_scenes") or [],
-            "evidence_quote": None,
+            "evidence_quote": quote,
         })
     return findings
 

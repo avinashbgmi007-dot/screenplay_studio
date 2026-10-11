@@ -1409,7 +1409,7 @@ def analyze(
             from .setup_payoff import adjudicate_ledger
             ledger = adjudicate_ledger(ledger, doc)
             existing_plot = [f for f in all_findings if f.get("category") == "plot_thread"]
-            all_findings.extend(_tag_evidence(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx), EVIDENCE_OVERVIEW))
+            all_findings.extend(_tag_evidence(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx, doc=doc), EVIDENCE_OVERVIEW))
             result.category_outcomes["setup_payoff"] = "failed" if ledger_errors else "ok"
             if ledger_errors:
                 result.errors.extend(ledger_errors)
