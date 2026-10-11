@@ -143,3 +143,74 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
             "evidence_quote": None,
         })
     return findings
+
+
+def _content_terms(text: str) -> set:
+    import re
+    from screenplay_analyzer.verifier import _STOPWORDS
+    return {w for w in re.sub(r"[^a-z0-9 ]", " ",
+            str(text or "").lower()).split()
+            if w not in _STOPWORDS}
+
+
+def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
+    """True + first matching scene when a strict majority of terms lands in
+    one cited scene (windowed fuzzy first, token overlap second)."""
+    from screenplay_analyzer.verifier import (
+        _normalize, _best_fuzzy_match, _token_overlap,
+        FUZZY_MATCH_THRESHOLD,
+    )
+    from screenplay_parser.quotematch import find_scene_text
+    for n in scenes or []:
+        text = find_scene_text(doc, n)
+        if not text:
+            continue
+        tnorm = _normalize(text)
+        joined = " ".join(sorted(terms))
+        if _best_fuzzy_match(_normalize(joined), tnorm) >= FUZZY_MATCH_THRESHOLD:
+            return True, n
+        if _token_overlap(" ".join(sorted(terms)), tnorm) >= 0.5:
+            return True, n
+    return False, None
+
+
+def adjudicate_ledger(entries: list, doc) -> list:
+    """Mechanical re-read of every model verdict (accuracy follow-up).
+    Asymmetric: recurrence proves payoff (flip + note), absence proves
+    nothing (keep + mark). Mutates entries in place, returns them."""
+    for e in entries or []:
+        if not isinstance(e, dict):
+            continue
+        terms = _content_terms(e.get("setup"))
+        setup_ok, setup_at = _terms_in_scenes(
+            terms, doc, e.get("setup_scenes") or [])
+        if terms and not setup_ok:
+            e["setup_ungrounded"] = True
+            e["verified"] = False
+            e["verify_note"] = "setup terms not found in the cited setup scenes"
+            continue
+        if e.get("status") == "paid":
+            ok, at = _terms_in_scenes(terms, doc, e.get("payoff_scenes") or [])
+            e["verified"] = bool(ok)
+            e["verify_note"] = (
+                f"payoff terms recur in scene {at}" if ok
+                else "payoff scenes carry no matching terms (kept: absence proves nothing)")
+            if not ok:
+                e["payoff_unproven"] = True
+        elif e.get("status") in ("dangling", "abandoned"):
+            later = [s.scene_number for s in (doc.scenes or [])
+                     if s.scene_number not in (e.get("setup_scenes") or [])]
+            ok, at = _terms_in_scenes(terms, doc, later)
+            if ok:
+                old_status = e.get("status")
+                e["status"] = "paid"
+                e["payoff_scenes"] = [at]
+                e["verified"] = True
+                e["verify_note"] = f"setup terms recur in scene {at} — paid, not {old_status}"
+            else:
+                e["verified"] = False
+                e["verify_note"] = "no later recurrence found (kept: absence proves nothing)"
+        else:
+            e["verified"] = False
+            e["verify_note"] = "status outside the adjudicated set, kept as written"
+    return entries

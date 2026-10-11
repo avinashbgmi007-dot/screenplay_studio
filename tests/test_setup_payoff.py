@@ -169,3 +169,46 @@ def test_pipeline_integration():
     assert "🚩 Dangling" in md
     j = to_findings_json(result)
     assert j["setup_payoff"] == result.setup_payoff
+
+
+def _doc_two_scenes():
+    return _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "MARA holds a small CIGAR, turning it over.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "The CIGAR sits on the table, untouched.\n")
+
+
+def test_false_dangling_flips_to_paid_with_proof():
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    entries = adjudicate_ledger([{
+        "setup": "The cigar", "kind": "object",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "dangling", "note": "Never lit."}], _doc_two_scenes())
+    assert entries[0]["status"] == "paid"
+    assert entries[0]["verified"] is True
+    assert "2" in entries[0]["verify_note"]
+    assert "dangling" in entries[0]["verify_note"], \
+        "the note must name what the verdict was, not what it became"
+
+
+def test_true_dangling_keeps_verdict():
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    entries = adjudicate_ledger([{
+        "setup": "The moonstone amulet", "kind": "object",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "dangling", "note": "Never seen again."}], _doc_two_scenes())
+    assert entries[0]["status"] == "dangling"
+    assert entries[0]["verified"] is False
+
+
+def test_setup_absent_from_setup_scenes_is_marked():
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    entries = adjudicate_ledger([{
+        "setup": "The moonstone amulet", "kind": "object",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "paid", "note": "Lands."}], _doc_two_scenes())
+    assert entries[0].get("setup_ungrounded") is True
+    assert entries[0]["status"] == "paid"

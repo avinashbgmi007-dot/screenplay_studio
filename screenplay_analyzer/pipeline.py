@@ -1406,6 +1406,8 @@ def analyze(
                 doc.scene_count, language=report_language,
             )
             result.setup_payoff = ledger
+            from .setup_payoff import adjudicate_ledger
+            ledger = adjudicate_ledger(ledger, doc)
             existing_plot = [f for f in all_findings if f.get("category") == "plot_thread"]
             all_findings.extend(_tag_evidence(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx), EVIDENCE_OVERVIEW))
             result.category_outcomes["setup_payoff"] = "failed" if ledger_errors else "ok"
