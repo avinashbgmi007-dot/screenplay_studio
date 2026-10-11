@@ -110,7 +110,8 @@ class _TScene:
 class _TDoc:
     all_characters = ["RAJ", "GUN GUY", "PEN GUY"]
     scenes = [
-        _TScene(1, ["INT. FLAT - DAY", "Raj enters, exhausted.", "RAJ: life is choices."],
+        _TScene(1, ["INT. FLAT - DAY", "Raj enters, exhausted.", "RAJ: life is choices.",
+                    "RAJ: The feeling is very high from good decisions."],
                 ["RAJ"]),
         _TScene(2, ["INT. FLAT - NIGHT", "Gun Guy loads his weapon.",
                     "GUN GUY: Who are you?", "PEN GUY: A journalist."],
@@ -234,3 +235,28 @@ def test_plot_point_and_catalyst_markers_skip_shorts():
     P.apply_short_form_gate(rows, page_count=6.0)
     assert all(f.get("form_mismatch") for f in rows)
     assert all(f["severity"] == "low" for f in rows)
+
+
+def test_possessive_apostrophe_is_not_a_quote_opener():
+    """Trial rerun: "Raj's ... 'choices'" built a 16-word span from the
+    possessive to the next quote, which matched nothing and misfired."""
+    from screenplay_analyzer.verifier import verify_observation
+    f = {"category": "character", "scene_refs": [1],
+         "evidence_quote": None,
+         "observation": "Raj's internal monologue references decisions."}
+    assert verify_observation(f, _TDoc()) is True
+
+
+def test_gloss_paraphrase_is_supported_but_invention_is_not():
+    """A quoted gloss shares content words with the scene even when fuzzy
+    matching rejects the rewording (0.44 here); a fabricated line shares
+    almost none (0.38, zero overlap). Ratios measured, not assumed."""
+    from screenplay_analyzer.verifier import verify_observation
+    gloss = {"category": "dialogue", "scene_refs": [1],
+             "evidence_quote": None,
+             "observation": 'Raj says "decisions bring a high" twice.'}
+    assert verify_observation(gloss, _TDoc()) is True
+    invented = {"category": "dialogue", "scene_refs": [1],
+                "evidence_quote": None,
+                "observation": 'Raj declares "yes indeed sir, I agree" twice.'}
+    assert verify_observation(invented, _TDoc()) is False

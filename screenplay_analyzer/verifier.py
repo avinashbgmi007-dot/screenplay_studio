@@ -165,7 +165,7 @@ def verify_observation(finding: dict, doc) -> bool | None:
             if name not in present:
                 return False
 
-    for frag in re.findall(r"\"([^\"]+)\"|'([^']+)'", observation):
+    for frag in re.findall(r"(?<!\w)\"([^\"]+)\"|(?<!\w)'([^']+)'", observation):
         text = (frag[0] or frag[1]).strip()
         if len(text.split()) < 3:
             continue
@@ -175,11 +175,37 @@ def verify_observation(finding: dict, doc) -> bool | None:
             for s in cited
         )
         if not supported:
+            # Gloss leniency (same generosity as quote verification): an
+            # observation often restates a line in other words ("feeling is
+            # very high" for a Tenglish V.O.). If most content words land in
+            # the cited scenes, the fragment is grounded even when unfuzzy.
+            supported = any(
+                _token_overlap(frag_norm, _normalize(_scene_full_text(doc, s.scene_number) or "")) >= 0.5
+                for s in cited
+            )
+        if not supported:
             whole = _normalize("\n".join(
                 _scene_full_text(doc, s.scene_number) or "" for s in (doc.scenes or [])))
-            if _best_fuzzy_match(frag_norm, whole) < FUZZY_MATCH_THRESHOLD:
+            if _best_fuzzy_match(frag_norm, whole) < FUZZY_MATCH_THRESHOLD \
+                    and _token_overlap(frag_norm, whole) < 0.5:
                 return False
     return True
+
+
+_STOPWORDS = frozenset(
+    "is are was were be been being the a an of to in on and or very so as at "
+    "by for with from that this it its it s".split())
+
+
+def _token_overlap(frag_norm: str, haystack_norm: str) -> float:
+    """Share of the fragment's content words present in the haystack. Catches
+    gloss-paraphrases fuzzy matching rejects, without blessing inventions
+    (a fabricated line shares almost no content words with the scene)."""
+    words = [w for w in frag_norm.split() if w not in _STOPWORDS]
+    if not words:
+        return 0.0
+    hay = set(haystack_norm.split())
+    return sum(1 for w in words if w in hay) / len(words)
 
 
 def verification_summary(findings: list[dict]) -> dict:
