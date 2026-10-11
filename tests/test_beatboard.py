@@ -227,26 +227,25 @@ class TestBeatBoardAPI:
 
 
 def _upload_unparsed(http_client):
-    """A project whose upload parse FAILED.
+    """A project whose parse stage never completed.
 
-    /api/projects persists the manifest before it parses, so a parse failure (an
-    unsupported .docx here) leaves a project on disk with parse != complete and
-    no parsed.json at all — the state L3 was reproduced in.
+    Built through the supported path: upload a valid script, then fail the
+    parse stage and remove the parsed output — the state L3 was reproduced in.
+    (It used to be built by uploading an unsupported .docx, which 500'd and
+    left the half-claimed project behind; unsupported types now 400 up front
+    with nothing left on the shelf, so that setup no longer exists.)
     """
-    resp = http_client.post(
-        "/api/projects",
-        data={"file": (io.BytesIO(b"not a screenplay"), "script.docx"), "title": "Unparsed"},
-        content_type="multipart/form-data",
-    )
-    assert resp.status_code == 500, resp.get_data(as_text=True)
-    projects = http_client.get("/api/projects").get_json()
-    assert len(projects) == 1, projects
-    name = projects[0]["project"]
+    project = _upload(http_client).get_json()["project"]
+    m = ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project))
+    m.mark_failed("parse", "fixture: parse never completed")
+    m.save()
+    if os.path.exists(m.parsed_path):
+        os.remove(m.parsed_path)
 
-    m = ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, name))
+    m = ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project))
     assert m.stage("parse").status != "complete", "precondition: the parse stage never completed"
     assert not os.path.exists(m.parsed_path), "precondition: there is no parsed script on disk"
-    return name
+    return project
 
 
 class TestBeatBoardBeforeParse:

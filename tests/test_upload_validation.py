@@ -92,3 +92,48 @@ def test_whitespace_only_upload_rejected(http_client):
     # either guard may catch it — the reason must be one of the two truths
     reason = resp.get_json()["error"].lower()
     assert ("empty" in reason) or ("no readable scenes" in reason)
+
+
+def test_supported_extensions_mirror_parser_dispatch():
+    """The upload gate must never drift from what the parser accepts."""
+    from screenplay_parser import _EXT_DISPATCH
+    assert webapp_server.SUPPORTED_UPLOAD_EXTS == set(_EXT_DISPATCH.keys())
+
+
+def test_unsupported_extension_rejected_400_with_supported_list(http_client):
+    resp = _post(http_client, b"MZ" + b"x" * 100, name="evil.exe")
+    assert resp.status_code == 400, "a client error (bad file type), not a server 500"
+    reason = resp.get_json()["error"]
+    assert ".exe" in reason
+    for ext in (".fdx", ".fountain", ".md", ".pdf", ".txt"):
+        assert ext in reason, "the writer is told what a valid upload looks like"
+
+
+def test_unsupported_extension_leaves_no_directory(http_client, tmp_path):
+    resp = _post(http_client, b"MZ" + b"x" * 100, name="evil.exe")
+    assert resp.status_code == 400
+    assert os.listdir(webapp_server.PROJECTS_DIR) == [], \
+        "fail-fast runs before the claim, so nothing is left on the shelf"
+    listing = http_client.get("/api/projects").get_json()
+    projects = listing if isinstance(listing, list) else listing.get("projects", [])
+    assert projects == []
+
+
+def test_draft_unsupported_extension_rejected_400(http_client):
+    project = _post(http_client, SAMPLE).get_json()["project"]
+    resp = http_client.post(
+        f"/api/projects/{project}/drafts",
+        data={"file": (io.BytesIO(b"MZ" + b"x" * 100), "evil.exe")},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 400
+
+
+def test_graduate_unsupported_extension_rejected_400(http_client):
+    idea_id = http_client.post("/api/ideas", json={"title": "Embers"}).get_json()["id"]
+    resp = http_client.post(
+        f"/api/ideas/{idea_id}/graduate",
+        data={"file": (io.BytesIO(b"MZ" + b"x" * 100), "embers.exe"), "title": "Embers"},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 400
