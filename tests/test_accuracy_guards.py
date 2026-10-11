@@ -39,3 +39,29 @@ def test_refuting_observation_demotes_one_step():
     P.apply_evidence_floor(r)
     assert r.findings[0].get("contested") is True
     assert r.findings[0]["severity"] == "medium"
+
+
+SHORT_SCRIPT_PAGES = 6.0
+
+
+def test_framework_demand_on_short_demoted_with_marker():
+    from screenplay_analyzer import pipeline as P
+    r = _result_with(
+        {"category": "structure", "issue": "No midpoint shift from reaction to action.",
+         "severity": "medium", "scene_refs": [2],
+         "evidence_quote": "INT. SAME APARTMENT - LATE EVENING", "observation": None},
+    )
+    P.apply_short_form_gate(r.findings, page_count=SHORT_SCRIPT_PAGES)
+    assert r.findings[0].get("form_mismatch") is True
+    assert r.findings[0]["severity"] == "low"
+
+
+def test_long_script_untouched():
+    from screenplay_analyzer import pipeline as P
+    r = _result_with(
+        {"category": "structure", "issue": "No midpoint shift from reaction to action.",
+         "severity": "medium", "scene_refs": [2],
+         "evidence_quote": "INT. SAME APARTMENT - LATE EVENING", "observation": None},
+    )
+    P.apply_short_form_gate(r.findings, page_count=28.0)
+    assert r.findings[0].get("form_mismatch", False) is False

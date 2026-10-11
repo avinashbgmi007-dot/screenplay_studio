@@ -901,6 +901,34 @@ def apply_evidence_floor(result_or_findings) -> None:
             demote_contested(f)
 
 
+SHORT_FORM_PAGE_LIMIT = 15.0
+SHORT_FORM_SKIP_MARKERS = frozenset({
+    "three-act", "three act", "midpoint", "mid-point", "second act",
+    "act two", "climax", "second half",
+})
+SHORT_FORM_SKIP_CATEGORIES = frozenset({"structure", "genre"})
+
+
+def apply_short_form_gate(findings: list, page_count) -> None:
+    """Demote framework demands a short cannot meet (demote, never drop).
+    Model findings carry no check_id, so this keys on category plus marker
+    phrases in the issue text."""
+    try:
+        pages = float(page_count or 0)
+    except (TypeError, ValueError):
+        return
+    if pages <= 0 or pages >= SHORT_FORM_PAGE_LIMIT:
+        return
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if str(f.get("category") or "") not in SHORT_FORM_SKIP_CATEGORIES:
+            continue
+        if any(m in str(f.get("issue") or "").lower() for m in SHORT_FORM_SKIP_MARKERS):
+            f["form_mismatch"] = True
+            f["severity"] = "low"
+
+
 class AnalysisCancelled(Exception):
     """Raised between stages when the caller asked the run to stop.
 
@@ -1471,6 +1499,7 @@ def analyze(
     # nor an observation is demoted, never deleted — flag-don't-drop holds,
     # but the Fix Queue default view must not present it as a grounded note.
     apply_evidence_floor(result.findings)
+    apply_short_form_gate(result.findings, getattr(doc, "estimated_page_count", None))
 
     result.verification = verification_summary(result.findings)
 
