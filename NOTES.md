@@ -4,6 +4,17 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-11 — Accuracy kit A done (6 tasks, subagent-driven with review)
+
+Evidence floor + refutation demotion + short-form gate + language patterns + absence/caps in `pipeline.py`/`feedback_filter.py`; fix queue default-hides ungrounded with toggle + writer-disposition bypass (`app.js`, `webapp_server.py` allowlist). Fallout fixed same day: dismissed-toggle TDZ trap in empty branch, toggle contrast class, 5 e2e suites opted in (counting, dock P1.7, xss, readiness, phase6), one N3 guard test survived UNCHANGED after reunifying the predicate. Acceptance on live pain3 re-analyze: 59 findings, 0 high-severity ungrounded, 2 contested, full suite green. Real-model output barely trips the floor (all 59 quoted/observed) — mass-hide is a demo-data phenomenon.
+
+### 2026-10-10 — H2 fixed + fresh e2e verified live (uncommitted, on feature/post-analysis-ia)
+
+**H2 `.exe`-upload-500 fixed.** Shared `_supported_upload_ext` gate + one 400 message in `webapp_server.py`, wired into create/draft/graduate before any claim (also fixes the `"_draft_upload"+ext or ".txt"` precedence bug). 5 new tests red-then-green; `test_beatboard.py` L3 fixture rebuilt off the removed 500 path (valid upload + `mark_failed("parse")`), same assertions. Full suite 2158 passed. Live: `.exe` and extensionless both 400 with the list, shelf empty.
+**H1 cancel closed without code.** 3 of 4 live trials land (startup, mid-run, force re-run all restore + heartbeat, no report); first rangetest run completed despite ACKed cancel, unreproduced — on record, not actionable.
+**Live totals.** 650 browser checks green, 2 real-model analyzes (27 + 33 findings, ~88-100% verified/quoted), guards/409/503/backup-bytes proven, zero server tracebacks. Snapshot branch `qa/e2e-verified-2026-10-10` at ec2b219 (pre-fix base).
+**Still pending.** H2 uncommitted (3 files); restore route parked as feature decision; local `main` diverged (6 audit commits); pre-existing HIGH-2b/alias/MEDIUM-3..LOW-8 untouched.
+
 ### 2026-10-10 — Pulled origin/main into feature/post-analysis-ia (merge 5c8d24f)
 
 **What.** `git fetch` + merge of `origin/main` (78 commits: PRs 22-31, verdict channel, integrity gate, CI timeout guards) into this branch (12 ahead). 5 conflicted files, all resolved keep-both:
