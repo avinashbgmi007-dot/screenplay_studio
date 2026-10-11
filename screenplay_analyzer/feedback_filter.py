@@ -96,8 +96,14 @@ def is_refuted(finding: dict) -> bool:
     return _matches_any(str(finding.get("observation") or ""), _CONTRADICTION_PATTERNS)
 
 
-def demote_contested(finding: dict) -> None:
+def demote_severity(finding: dict) -> None:
+    """One step down the ladder (high→medium→low); the shared primitive so
+    every demotion path spells severity the same way."""
     sev = str(finding.get("severity") or "low").lower()
     if sev in _SEVERITY_LADDER[1:]:
         finding["severity"] = _SEVERITY_LADDER[_SEVERITY_LADDER.index(sev) - 1]
+
+
+def demote_contested(finding: dict) -> None:
+    demote_severity(finding)
     finding["contested"] = True

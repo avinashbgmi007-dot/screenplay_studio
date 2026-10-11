@@ -93,3 +93,87 @@ def test_absence_rows_dropped_and_caps_demote():
         "absence is not a finding"
     kept = [f for f in rows if f.get("category") == "character"]
     assert sum(1 for f in kept if f.get("capped")) >= 3, "same-anchor pileup demoted"
+
+
+class _TEl:
+    def __init__(self, text):
+        self.text = text
+
+
+class _TScene:
+    def __init__(self, number, texts, characters):
+        self.scene_number = number
+        self.elements = [_TEl(t) for t in texts]
+        self.characters_present = characters
+
+
+class _TDoc:
+    all_characters = ["RAJ", "GUN GUY", "PEN GUY"]
+    scenes = [
+        _TScene(1, ["INT. FLAT - DAY", "Raj enters, exhausted.", "RAJ: life is choices."],
+                ["RAJ"]),
+        _TScene(2, ["INT. FLAT - NIGHT", "Gun Guy loads his weapon.",
+                    "GUN GUY: Who are you?", "PEN GUY: A journalist."],
+                ["GUN GUY", "PEN GUY"]),
+    ]
+
+
+def test_observation_naming_absent_character_is_contradicted():
+    """D2 acceptance case (trial rerun #9): the observation puts Raj in a
+    confrontation his scene never contains."""
+    from screenplay_analyzer.verifier import verify_observation
+    f = {"category": "character", "scene_refs": [2],
+         "evidence_quote": None,
+         "observation": "Gun Guy and Pen Guy exist solely to facilitate "
+                        "a confrontation with Raj."}
+    assert verify_observation(f, _TDoc()) is False
+
+
+def test_supported_observation_passes():
+    from screenplay_analyzer.verifier import verify_observation
+    f = {"category": "character", "scene_refs": [2],
+         "evidence_quote": None,
+         "observation": "Gun Guy loads his weapon while Pen Guy watches."}
+    assert verify_observation(f, _TDoc()) is True
+
+
+def test_missing_observation_is_skipped_not_weak():
+    from screenplay_analyzer.verifier import verify_observation
+    assert verify_observation({"scene_refs": [1]}, _TDoc()) is None
+    assert verify_observation({"scene_refs": [1], "observation": "  "},
+                              _TDoc()) is None
+
+
+def test_fabricated_quoted_fragment_is_contradicted():
+    from screenplay_analyzer.verifier import verify_observation
+    f = {"category": "dialogue", "scene_refs": [1],
+         "evidence_quote": None,
+         "observation": 'Raj declares "yes indeed sir, I agree completely" twice.'}
+    assert verify_observation(f, _TDoc()) is False
+
+
+def test_stage_directions_are_not_characters():
+    """ALL-CAPS non-names (CUT TO, THE END) must never count as characters."""
+    from screenplay_analyzer.verifier import verify_observation
+    f = {"category": "scene_function", "scene_refs": [1],
+         "evidence_quote": None,
+         "observation": "CUT TO after Raj enters. THE END follows."}
+    assert verify_observation(f, _TDoc()) is True
+
+
+def test_pipeline_flags_weak_observations_and_demotes():
+    from screenplay_analyzer import pipeline as P
+    rows = [
+        {"category": "character", "issue": "No motivation.", "severity": "high",
+         "scene_refs": [2], "evidence_quote": None,
+         "observation": "Gun Guy and Pen Guy exist solely to facilitate "
+                        "a confrontation with Raj."},
+        {"category": "character", "issue": "Flat arc.", "severity": "medium",
+         "scene_refs": [2], "evidence_quote": None,
+         "observation": "Gun Guy loads his weapon while Pen Guy watches."},
+    ]
+    P.apply_observation_check(rows, _TDoc())
+    assert rows[0].get("observation_weak") is True
+    assert rows[0]["severity"] == "medium"
+    assert rows[1].get("observation_weak", False) is False
+    assert rows[1]["severity"] == "medium"

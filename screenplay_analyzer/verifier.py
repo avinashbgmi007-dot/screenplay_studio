@@ -122,6 +122,66 @@ def verify_findings(findings: list[dict], doc: ScriptDocument) -> list[dict]:
     return [verify_finding(f, doc) for f in findings]
 
 
+def _norm_name(text: str) -> str:
+    import re
+    return re.sub(r"\s+", " ", str(text or "").upper().replace("_", " ")).strip()
+
+
+def verify_observation(finding: dict, doc) -> bool | None:
+    """Check an observation's CONTENT against the script text — quotes are
+    verified elsewhere, but the prose around them can still invent (a
+    confrontation a character never attends, a line never spoken).
+
+    Returns True (supported), False (contradicted), or None (nothing to
+    check: no observation, no cited scenes). Deliberately lenient like the
+    quote check: only a positive contradiction fails. A lone mismatch never
+    deletes the finding — callers demote and flag.
+    """
+    import re
+    if not isinstance(finding, dict):
+        return None
+    observation = finding.get("observation") or ""
+    if not observation.strip():
+        return None
+    scene_refs = finding.get("scene_refs") or []
+    if not scene_refs:
+        return None
+
+    cited = [s for s in (doc.scenes or [])
+             if getattr(s, "scene_number", None) in scene_refs]
+    if not cited:
+        return None
+    present = set()
+    for s in cited:
+        for c in (getattr(s, "characters_present", None) or []):
+            present.add(_norm_name(c))
+    known = {_norm_name(c) for c in (getattr(doc, "all_characters", None) or [])}
+
+    obs_norm = _norm_name(observation)
+    for name in known:
+        if not name:
+            continue
+        if re.search(r"\b" + re.escape(name) + r"\b", obs_norm):
+            if name not in present:
+                return False
+
+    for frag in re.findall(r"\"([^\"]+)\"|'([^']+)'", observation):
+        text = (frag[0] or frag[1]).strip()
+        if len(text.split()) < 3:
+            continue
+        frag_norm = _normalize(text)
+        supported = any(
+            _best_fuzzy_match(frag_norm, _normalize(_scene_full_text(doc, s.scene_number) or "")) >= FUZZY_MATCH_THRESHOLD
+            for s in cited
+        )
+        if not supported:
+            whole = _normalize("\n".join(
+                _scene_full_text(doc, s.scene_number) or "" for s in (doc.scenes or [])))
+            if _best_fuzzy_match(frag_norm, whole) < FUZZY_MATCH_THRESHOLD:
+                return False
+    return True
+
+
 def verification_summary(findings: list[dict]) -> dict:
     counts = {"verified": 0, "not_found": 0, "no_quote": 0, "scene_not_found": 0}
     for f in findings:

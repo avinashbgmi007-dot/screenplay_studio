@@ -924,6 +924,22 @@ def apply_evidence_floor(result_or_findings) -> None:
             demote_contested(f)
 
 
+def apply_observation_check(findings: list, doc) -> None:
+    """Flag observations the script text contradicts (D2): `observation_weak`
+    plus one severity step down. Runs in 8f after the observation pass, so it
+    judges what the model actually wrote — never the pre-grounding draft.
+    Lenient by design (see `verify_observation`): only a positive
+    contradiction fails, and nothing is ever deleted."""
+    from .feedback_filter import demote_severity
+    from .verifier import verify_observation
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if verify_observation(f, doc) is False:
+            f["observation_weak"] = True
+            demote_severity(f)
+
+
 SHORT_FORM_PAGE_LIMIT = 15.0
 SHORT_FORM_SKIP_MARKERS = frozenset({
     "three-act", "three act", "midpoint", "mid-point", "second act",
@@ -1567,6 +1583,11 @@ def analyze(
     apply_evidence_floor(result.findings)
     apply_short_form_gate(result.findings, getattr(doc, "estimated_page_count", None))
     apply_absence_and_caps(result.findings, getattr(doc, "estimated_page_count", None))
+    # 8g. observation check (accuracy follow-up D2): observations that invent
+    # (a confrontation a character never attends, a line never spoken) are
+    # flagged and demoted. Runs after the observation pass and the floor, so
+    # it judges grounded rows only — ungrounded rows have nothing to check.
+    apply_observation_check(result.findings, doc)
 
     result.verification = verification_summary(result.findings)
 
