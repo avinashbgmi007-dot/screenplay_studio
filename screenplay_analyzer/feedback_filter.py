@@ -71,3 +71,30 @@ def is_non_writing_feedback(finding: dict) -> bool:
 def filter_findings(findings) -> list:
     """Drop non-writing feedback findings, preserving order of the rest."""
     return [f for f in (findings or []) if isinstance(f, dict) and not is_non_writing_feedback(f)]
+
+
+# --- patterns where the observation rebuts the note (accuracy kit A) ---
+_CONTRADICTION_PATTERNS = [
+    re.compile(r"\bhowever\b", re.I),
+    re.compile(r"\bactually\b.{0,30}\b(not|no)\b", re.I),
+    re.compile(r"\bcontradicts?\b", re.I),
+    re.compile(r"\bno evidence\b", re.I),
+    re.compile(r"\bclaims?\b.{0,30}\b(but|yet)\b", re.I),
+]
+
+_SEVERITY_LADDER = ("low", "medium", "high")
+
+
+def is_refuted(finding: dict) -> bool:
+    """True when the finding's own observation rebuts its note. Checks the
+    observation only — the issue is the claim under test, never the judge."""
+    if not isinstance(finding, dict):
+        return False
+    return _matches_any(str(finding.get("observation") or ""), _CONTRADICTION_PATTERNS)
+
+
+def demote_contested(finding: dict) -> None:
+    sev = str(finding.get("severity") or "low").lower()
+    if sev in _SEVERITY_LADDER[1:]:
+        finding["severity"] = _SEVERITY_LADDER[_SEVERITY_LADDER.index(sev) - 1]
+    finding["contested"] = True

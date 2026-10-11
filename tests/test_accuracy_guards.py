@@ -26,3 +26,16 @@ def test_quoteless_observationless_row_is_flagged_not_dropped():
     assert r.findings[0]["severity"] == "low"
     assert r.findings[1].get("ungrounded", False) is False
     assert r.findings[1]["severity"] == "medium"
+
+
+def test_refuting_observation_demotes_one_step():
+    from screenplay_analyzer import pipeline as P
+    r = _result_with(
+        {"category": "character", "issue": "Supporting character lacks motivation.",
+         "severity": "high", "scene_refs": [3],
+         "evidence_quote": "Who asked you?",
+         "observation": "The note claims no motivation; however, the script explicitly shows a direct confrontation."},
+    )
+    P.apply_evidence_floor(r)
+    assert r.findings[0].get("contested") is True
+    assert r.findings[0]["severity"] == "medium"

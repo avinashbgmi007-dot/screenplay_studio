@@ -896,6 +896,9 @@ def apply_evidence_floor(result_or_findings) -> None:
         if not f.get("evidence_quote") and not f.get("observation"):
             f["ungrounded"] = True
             f["severity"] = "low"
+        from .feedback_filter import is_refuted, demote_contested
+        if not f.get("ungrounded") and is_refuted(f):
+            demote_contested(f)
 
 
 class AnalysisCancelled(Exception):
