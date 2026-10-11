@@ -884,6 +884,20 @@ def evidence_depth(findings) -> dict:
             "unknown": len(findings) - full - over - mixed, "total": len(findings)}
 
 
+def apply_evidence_floor(result_or_findings) -> None:
+    """Demote ungrounded rows in place: severity forced low plus
+    `ungrounded: True`. Rows with a quote or an observation are untouched."""
+    findings = (result_or_findings.findings
+                if hasattr(result_or_findings, "findings")
+                else result_or_findings)
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if not f.get("evidence_quote") and not f.get("observation"):
+            f["ungrounded"] = True
+            f["severity"] = "low"
+
+
 class AnalysisCancelled(Exception):
     """Raised between stages when the caller asked the run to stop.
 
@@ -1449,6 +1463,11 @@ def analyze(
                 # A pass that cannot run must leave the findings exactly as
                 # they were — ungrounded, still flagged, never invented.
                 result.errors.append(f"Observation pass skipped: {e}")
+
+    # 8f. evidence floor (accuracy kit A): a finding with neither a quote
+    # nor an observation is demoted, never deleted — flag-don't-drop holds,
+    # but the Fix Queue default view must not present it as a grounded note.
+    apply_evidence_floor(result.findings)
 
     result.verification = verification_summary(result.findings)
 
