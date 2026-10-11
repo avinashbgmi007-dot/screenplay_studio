@@ -244,3 +244,58 @@ def test_ledger_verified_fields_reach_json():
                        "status": "paid", "note": "Lands.",
                        "verified": True, "verify_note": "terms recur in scene 2"}]
     assert to_findings_json(r)["setup_payoff"][0]["verified"] is True
+
+
+def test_cited_payoff_before_setup_is_distrusted():
+    """A model-cited payoff at or before the setup is confusion, not proof:
+    sc2 setup 'paid' via a sc1 mention must come back unverified."""
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "The X mark is burned here.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "He looks at the X mark and sighs.\n")
+    entries = adjudicate_ledger([{
+        "setup": "The X mark", "kind": "object",
+        "setup_scenes": [2], "payoff_scenes": [1],
+        "status": "paid", "note": "Lands."}], doc)
+    assert entries[0]["status"] == "paid"
+    assert entries[0]["verified"] is False
+    assert entries[0].get("payoff_unproven") is True
+
+
+def test_meta_words_dont_sink_setup_match():
+    """Trial rerun: 'Rishi's promise to drop something (Scene 10)' failed
+    setup match on scene/promise/something/someone meta words."""
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "RISHI\nUndu nen drop chestha.\n")
+    entries = adjudicate_ledger([{
+        "setup": "Rishi's promise to drop something (Scene 1)", "kind": "promise",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "dangling", "note": "Never kept."}], doc)
+    assert "setup_ungrounded" not in entries[0], entries[0].get("verify_note")
+
+
+def test_payoff_search_never_runs_backwards():
+    """Trial rerun: a sc17 setup 'paid' via a sc4 recurrence. Payoff must
+    come strictly after the setup in narrative order — even when the setup
+    terms are found in BOTH scenes, only the later one counts."""
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "The X mark is burned here.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "He looks at the X mark and sighs.\n")
+    entries = adjudicate_ledger([{
+        "setup": "The X mark", "kind": "object",
+        "setup_scenes": [2], "payoff_scenes": None,
+        "status": "abandoned", "note": "Gone."}], doc)
+    assert entries[0]["status"] == "abandoned"
+    assert entries[0]["verified"] is False

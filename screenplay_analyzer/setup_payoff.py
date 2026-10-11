@@ -183,14 +183,25 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
 def _content_terms(text: str) -> set:
     import re
     from screenplay_analyzer.verifier import _STOPWORDS
+    # Ledger setups are model prose ("Rishi's promise to drop something
+    # (Scene 10)"), not script text: scene refs, role words, and digits
+    # would sink every match, so they are stopwords here, not content.
+    META = {"scene", "scenes", "sc", "setup", "payoff", "promise",
+            "stated", "mentioned", "described"}
     return {w for w in re.sub(r"[^a-z0-9 ]", " ",
             str(text or "").lower()).split()
-            if w not in _STOPWORDS}
+            if w not in _STOPWORDS and w not in META
+            and not w.isdigit() and len(w) > 1}
 
 
 def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
-    """True + first matching scene when a strict majority of terms lands in
-    one cited scene (windowed fuzzy first, token overlap second)."""
+    """True + first matching scene when the terms land in one cited scene
+    (windowed fuzzy first, token overlap second). Majority is by overlap
+    share (see `_token_overlap`), not a strict count — setup strings are
+    short and scenes are long. Underscores become spaces on the haystack
+    side: script cues read `X_COMPANY`/`GUN_GUY` while setups say
+    `X Company`/`gun guy`, and the shared normaliser keeps `_` (pinned by
+    verifier/status-engine contract tests — do not change it there)."""
     from screenplay_analyzer.verifier import (
         _normalize, _best_fuzzy_match, _token_overlap,
         FUZZY_MATCH_THRESHOLD,
@@ -200,7 +211,7 @@ def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
         text = find_scene_text(doc, n)
         if not text:
             continue
-        tnorm = _normalize(text)
+        tnorm = _normalize(text).replace("_", " ")
         joined = " ".join(sorted(terms))
         if _best_fuzzy_match(_normalize(joined), tnorm) >= FUZZY_MATCH_THRESHOLD:
             return True, n
@@ -225,7 +236,14 @@ def adjudicate_ledger(entries: list, doc) -> list:
             e["verify_note"] = "setup terms not found in the cited setup scenes"
             continue
         if e.get("status") == "paid":
-            ok, at = _terms_in_scenes(terms, doc, e.get("payoff_scenes") or [])
+            # Chronological sanity, same rule as the dangling branch: a cited
+            # payoff scene at or before the setup is confusion, not a payoff
+            # (trial rerun: sc17 setup "paid" via a sc4 mention). Such scenes
+            # are dropped from the check, never trusted.
+            setup_after = max(e.get("setup_scenes") or [0])
+            cited = [n for n in (e.get("payoff_scenes") or []) if n > setup_after] \
+                if e.get("setup_scenes") else (e.get("payoff_scenes") or [])
+            ok, at = _terms_in_scenes(terms, doc, cited)
             e["verified"] = bool(ok)
             e["verify_note"] = (
                 f"payoff terms recur in scene {at}" if ok
@@ -233,8 +251,15 @@ def adjudicate_ledger(entries: list, doc) -> list:
             if not ok:
                 e["payoff_unproven"] = True
         elif e.get("status") in ("dangling", "abandoned"):
-            later = [s.scene_number for s in (doc.scenes or [])
-                     if s.scene_number not in (e.get("setup_scenes") or [])]
+            # Narrative order only: a payoff must come AFTER its setup. Any
+            # earlier recurrence is backstory or coincidence, never a payoff
+            # (trial rerun: sc17 setup "paid" via a sc4 mention).
+            setup_after = max(e.get("setup_scenes") or [0])
+            if e.get("setup_scenes"):
+                later = [s.scene_number for s in (doc.scenes or [])
+                         if s.scene_number > setup_after]
+            else:
+                later = [s.scene_number for s in (doc.scenes or [])]
             ok, at = _terms_in_scenes(terms, doc, later)
             if ok:
                 old_status = e.get("status")
