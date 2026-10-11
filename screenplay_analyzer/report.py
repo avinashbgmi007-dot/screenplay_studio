@@ -236,6 +236,20 @@ def render_markdown(result: AnalysisResult) -> str:
                 lines.append(f"  - {note}")
             lines.append("")
 
+    # --- Story mechanics (deterministic reveal scan) ---
+    if getattr(result, "reveal_candidates", None):
+        lines.append("## Story mechanics worth a second look")
+        lines.append(
+            "*Single lines that may flip the story's meaning (a dream, a "
+            "waking, a death undone). Found by text scan, not judgment — "
+            "check them against the pages before believing any finding that "
+            "contradicts one.*"
+        )
+        lines.append("")
+        for c in result.reveal_candidates:
+            lines.append(f"- Scene {c.get('scene')}: '{c.get('line', '')}'")
+        lines.append("")
+
     # --- Pacing (deterministic per-scene pace index) ---
     if result.pacing:
         lines.append("## Pacing — where the script drags")
@@ -459,6 +473,10 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "character_reads": result.character_reads,
         "logline_test": result.logline_test,
         "setup_payoff": result.setup_payoff,
+        # Recall kit B2: deterministic reveal candidates. Serialized (not just
+        # threaded into prompts) so the desk, the eval runner, and any reader
+        # can see what the scan found — an unserialized scan is a silent one.
+        "reveal_candidates": list(getattr(result, "reveal_candidates", None) or []),
         "character_dials": result.character_dials,
         "pacing": result.pacing,
         "findings": stamp_scene_keys(result.findings, scene_key_map(result.doc)),

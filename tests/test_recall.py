@@ -46,3 +46,21 @@ def test_dream_reveal_detected():
     assert any("dream" in f["match"].lower() for f in found), \
         "the gunpen acceptance case: 'It was a dream.' must surface"
     assert found[0]["scene"] == 1
+
+
+def test_reveal_candidates_reach_report_json_and_markdown():
+    """B2 is only real if the candidates survive serialization: the scan runs
+    in-memory, so a missing JSON key silently drops the whole feature."""
+    import os
+    from screenplay_parser import parse_fountain
+    from screenplay_analyzer.pipeline import AnalysisResult
+    from screenplay_analyzer import report as report_mod
+    fixture = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "fixtures", "pain_tenglish.fountain")
+    r = AnalysisResult(parse_fountain(fixture))
+    r.reveal_candidates = [{"scene": 3, "line": "It was a dream.",
+                            "match": "dream"}]
+    payload = report_mod.to_findings_json(r)
+    assert payload["reveal_candidates"] == r.reveal_candidates
+    md = report_mod.render_markdown(r)
+    assert "Story mechanics" in md and "It was a dream." in md
