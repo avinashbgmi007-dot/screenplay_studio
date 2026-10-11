@@ -75,6 +75,13 @@ Scripts fitting the context budget run script-level passes on full parsed text,
 not summaries. Bounded to small scripts, where the summary telephone game hurts
 most (the dream reveal died in one action line).
 
+As built: checkpoints APPEND to the full-text base
+(`build_script_level_overview(script_level_overview, checkpoint_text)`) rather
+than replacing the summary base, and the stamp stays `EVIDENCE_FULL_TEXT`.
+Skipping checkpoints was rejected during implementation: it would strand the
+mixed-bucket pin tests and drop the summaries those tests (rightly) require.
+Cost is bounded because the base only qualifies under budget.
+
 ### B2. Reveal retrieval
 
 Deterministic pre-pass scans for reveal mechanics (dream/wake/kalaa/dreamt,
