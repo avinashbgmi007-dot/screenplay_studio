@@ -236,6 +236,7 @@ class AnalysisResult:
     character_reads: list[dict] = field(default_factory=list)
     logline_test: dict | None = None
     setup_payoff: list[dict] = field(default_factory=list)
+    reveal_candidates: list = field(default_factory=list)
     character_dials: list[dict] = field(default_factory=list)
     """Per-character trait scores: [{character, traits: [{trait, score,
     scene_refs, note}]}] — the ScreenplayIQ-style dials read."""
@@ -1184,6 +1185,9 @@ def analyze(
             result.category_outcomes["summaries"] = "failed"
             result.errors.append(f"Scene summarization failed: {e}")
 
+    from .reveal_scan import scan_reveals
+    result.reveal_candidates = scan_reveals(doc)
+
     # 2b. selective raw-text access for the script-level passes (§5 item 2).
     # Runs HERE because the checkpoint set depends on the findings the earlier
     # passes already filed (the most-flagged scenes), and because it is only
@@ -1259,6 +1263,10 @@ def analyze(
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
+                from .reveal_scan import reveal_context_block
+                _reveal_block = reveal_context_block(result.reveal_candidates)
+                if _reveal_block:
+                    rules_fragment = (rules_fragment + "\n\n" + _reveal_block) if rules_fragment else _reveal_block
                 all_findings.extend(_tag_evidence(
                     run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language),
                     script_level_source))

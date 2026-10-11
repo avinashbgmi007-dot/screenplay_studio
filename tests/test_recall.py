@@ -33,3 +33,16 @@ def test_large_script_keeps_summary_path():
     overview, source = P.build_script_level_source(big, "summary text", stats)
     assert source == "overview"
     assert overview == "summary text"
+
+
+def test_dream_reveal_detected():
+    from screenplay_analyzer.reveal_scan import scan_reveals
+
+    class _E(dict):
+        pass
+
+    doc = _Doc()
+    found = scan_reveals(doc)
+    assert any("dream" in f["match"].lower() for f in found), \
+        "the gunpen acceptance case: 'It was a dream.' must surface"
+    assert found[0]["scene"] == 1
