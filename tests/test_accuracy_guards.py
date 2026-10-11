@@ -73,3 +73,23 @@ def test_untranslated_barrier_finding_is_filtered():
         "issue": "Dialogue relies on untranslated foreign language that obscures meaning.",
         "why_it_matters": "The audience cannot follow the stakes without translation.",
     }) is True
+
+
+def test_absence_rows_dropped_and_caps_demote():
+    from screenplay_analyzer import pipeline as P
+    rows = [
+        {"category": "dialogue", "issue": "N/A - No dialogue present to evaluate.",
+         "severity": "low", "scene_refs": [5],
+         "evidence_quote": None, "observation": "Scene 5 has no dialogue."},
+    ]
+    rows += [
+        {"category": "character", "issue": f"Protagonist lacks trait {i}.",
+         "severity": "high", "scene_refs": [1],
+         "evidence_quote": "He enters.", "observation": "Enters quietly."}
+        for i in range(9)
+    ]
+    P.apply_absence_and_caps(rows, page_count=6.0)
+    assert not [f for f in rows if (f.get("issue") or "").strip().lower().startswith("n/a")], \
+        "absence is not a finding"
+    kept = [f for f in rows if f.get("category") == "character"]
+    assert sum(1 for f in kept if f.get("capped")) >= 3, "same-anchor pileup demoted"

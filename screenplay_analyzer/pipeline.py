@@ -929,6 +929,35 @@ def apply_short_form_gate(findings: list, page_count) -> None:
             f["severity"] = "low"
 
 
+_ABSENCE_RE = None  # compiled lazily to keep module import light
+CATEGORY_CAPS_SHORT = {"character": 6, "dialogue": 8, "scene_function": 6}
+CATEGORY_CAPS_LONG = {"character": 12, "dialogue": 20, "scene_function": 14}
+
+
+def apply_absence_and_caps(findings: list, page_count) -> None:
+    """Drop absence rows (non-findings, same precedent as step-8 filter);
+    demote same-anchor pileups past the per-category cap. Mutates in place."""
+    import re
+    kept = [f for f in (findings or [])
+            if isinstance(f, dict)
+            and not re.match(r"\s*n/a\b", str(f.get("issue") or ""), re.I)]
+    findings[:] = kept
+    try:
+        short = float(page_count or 0) < SHORT_FORM_PAGE_LIMIT
+    except (TypeError, ValueError):
+        short = False
+    caps = CATEGORY_CAPS_SHORT if short else CATEGORY_CAPS_LONG
+    seen_anchors: dict = {}
+    for f in findings:
+        key = (str(f.get("category") or ""),
+               tuple(f.get("scene_refs") or []))
+        seen_anchors[key] = seen_anchors.get(key, 0) + 1
+        cap = caps.get(str(f.get("category") or ""))
+        if cap is not None and seen_anchors[key] > cap:
+            f["capped"] = True
+            f["severity"] = "low"
+
+
 class AnalysisCancelled(Exception):
     """Raised between stages when the caller asked the run to stop.
 
@@ -1500,6 +1529,7 @@ def analyze(
     # but the Fix Queue default view must not present it as a grounded note.
     apply_evidence_floor(result.findings)
     apply_short_form_gate(result.findings, getattr(doc, "estimated_page_count", None))
+    apply_absence_and_caps(result.findings, getattr(doc, "estimated_page_count", None))
 
     result.verification = verification_summary(result.findings)
 
