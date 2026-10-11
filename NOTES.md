@@ -4,6 +4,10 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-11 — Ledger precision done + trial acceptance (D1-D4 follow-ups, full suite 2191)
+
+Ledger Tasks 1-3 via subagents with review; trial acceptance on fresh gunpen (26) + pain3 (78) real-model runs. Adjudicator flips with proof (Rishi promise→sc8, letter→sc9, drop→sc14, itlane→sc19, comic→sc22, senior→sc20/14, gun/newspaper→sc3); X Company correctly kept abandoned; backwards citations distrusted; meta-word/underscore/possessive matching fixed with measured-ratio tests. Zero high-severity ungrounded ledger rows on either report. Goldens: gunpen 4/5 (dream still missed), pain3 5/5. Full suite 2191 passed. NOTES: pycache-staleness fooled one probe run (same-second edits) — clear __pycache__ when re-probing rapidly edited modules.
+
 ### 2026-10-11 — Accuracy kit A done (6 tasks, subagent-driven with review)
 
 Evidence floor + refutation demotion + short-form gate + language patterns + absence/caps in `pipeline.py`/`feedback_filter.py`; fix queue default-hides ungrounded with toggle + writer-disposition bypass (`app.js`, `webapp_server.py` allowlist). Fallout fixed same day: dismissed-toggle TDZ trap in empty branch, toggle contrast class, 5 e2e suites opted in (counting, dock P1.7, xss, readiness, phase6), one N3 guard test survived UNCHANGED after reunifying the predicate. Acceptance on live pain3 re-analyze: 59 findings, 0 high-severity ungrounded, 2 contested, full suite green. Real-model output barely trips the floor (all 59 quoted/observed) — mass-hide is a demo-data phenomenon.
