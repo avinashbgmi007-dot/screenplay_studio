@@ -215,3 +215,22 @@ def test_distinct_issues_in_category_not_capped():
     P.apply_absence_and_caps(rows, page_count=28.0)
     assert not [f for f in rows if f.get("capped")], \
         "distinct issues must never trip the similarity cap"
+
+
+def test_plot_point_and_catalyst_markers_skip_shorts():
+    """D4: the trial rerun's Plot-Point-1 demand on a 6-page short sailed
+    through — the marker set named midpoints but not plot points."""
+    from screenplay_analyzer import pipeline as P
+    rows = [
+        {"category": "structure",
+         "issue": "No clear Plot Point 1 or Catalyst to enter Confrontation.",
+         "severity": "high", "scene_refs": [1, 2, 3],
+         "evidence_quote": "Some line.", "observation": "Three scenes."},
+        {"category": "structure",
+         "issue": "No Call to Adventure or Inciting Incident in Act One.",
+         "severity": "high", "scene_refs": [1],
+         "evidence_quote": "Some line.", "observation": "Opens quiet."},
+    ]
+    P.apply_short_form_gate(rows, page_count=6.0)
+    assert all(f.get("form_mismatch") for f in rows)
+    assert all(f["severity"] == "low" for f in rows)

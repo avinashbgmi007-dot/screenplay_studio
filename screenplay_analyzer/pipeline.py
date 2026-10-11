@@ -943,7 +943,8 @@ def apply_observation_check(findings: list, doc) -> None:
 SHORT_FORM_PAGE_LIMIT = 15.0
 SHORT_FORM_SKIP_MARKERS = frozenset({
     "three-act", "three act", "midpoint", "mid-point", "second act",
-    "act two", "climax", "second half",
+    "act two", "climax", "second half", "plot point", "catalyst",
+    "call to adventure", "inciting incident",
 })
 SHORT_FORM_SKIP_CATEGORIES = frozenset({"structure", "genre"})
 
