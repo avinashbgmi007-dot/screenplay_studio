@@ -172,6 +172,22 @@ DEFECT_MARK = re.compile(
     re.I,
 )
 
+# "absolute absence, falsified by presence" — trial-10 #4 ("objects do
+# not recur" while the pen recurs two scenes later). Same narrow
+# contract as ABSENCE/PRAISE above: unhedged phrasing required, positive
+# proof required, quotes never scanned.
+ABSENCE_CLAIM = re.compile(
+    r"\bdo\s+not\s+recur\b|\bnever\s+(referenced|mentioned|seen|reappear"
+    r"s?|recur\w*|addressed)\b"
+    r"|\bno\s+dialogue\b|\bnever\s+speaks?\b|\bno\s+action\s+lines?\b"
+    r"|\bno\s+confrontation\b|\babsent\s+from\b",
+    re.I,
+)
+HEDGE = re.compile(
+    r"\b(appears?|seems?|may|might|arguably|suggests?|possibly|likely)\b",
+    re.I,
+)
+
 # "these two names are the same character" — the deterministic name-variant rule
 NAME_VARIANT = re.compile(
     r"\b(variant|spelling|spelled|two names|same character|inconsistent name|"
@@ -339,6 +355,16 @@ class FindingIntegrityGate:
         if DEFECT_MARK.search(text):
             return None
         return "praise filed as a finding — a compliment or neutral description with no defect claim"
+
+    # -- 4c. absence claim falsified by presence ---------------------------
+    def _absence_falsified(self, f: dict, doc) -> str | None:
+        issue = f.get("issue") or ""
+        if doc is None or not ABSENCE_CLAIM.search(issue):
+            return None
+        text = f"{issue} {f.get('observation') or ''}"
+        if HEDGE.search(text) or DEFECT_MARK.search(text):
+            return None
+        return None  # Task 2 note: presence checks land here
 
     # -- run ---------------------------------------------------------------
     def run(self, findings: list[dict]) -> GateResult:

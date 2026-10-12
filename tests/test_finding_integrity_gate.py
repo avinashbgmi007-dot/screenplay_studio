@@ -347,3 +347,26 @@ def test_markdown_discloses_what_left_the_delivered_set():
 def test_markdown_stays_silent_when_nothing_was_withdrawn():
     result = AnalysisResult(doc=_doc())
     assert "Integrity gate:" not in render_markdown(result)
+
+
+def test_falsified_non_recurrence_is_rejected():
+    """Trial-10 #4 shape: 'do not recur' while the object recurs."""
+    from screenplay_parser import parse_fountain
+    import os
+    import tempfile
+    text = ("Title: T\nAuthor: T\n\nINT. ROOM - NIGHT\n\n"
+            "A gun lies on the floor here.\n\nCUT TO:\n\n"
+            "INT. HALL - DAY\n\nHe picks up the gun again.\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as fh:
+        fh.write(text)
+        path = fh.name
+    try:
+        doc = parse_fountain(path)
+    finally:
+        os.unlink(path)
+    rows = [_f("The gun does not recur or get referenced later.",
+               category="dialogue", scenes=(1,),
+               quote="A gun lies on the floor here.")]
+    res = FindingIntegrityGate().run(rows, doc=doc)
+    assert res.summary["reject"] == 1
+    assert "falsified" in res.of("reject")[0].reason
