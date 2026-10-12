@@ -13,13 +13,29 @@ is this script in".
 
 The filter is deliberately conservative: it only drops findings whose
 issue/why_it_matters is dominated by language identification or
-subtitle/accessibility meta-commentary. Craft feedback that quotes a
+subtitle/accessibility meta-commentary, plus notes whose whole complaint is
+that non-English dialogue is hard to read (language named in the
+observation, incomprehension pleaded in the claim). Craft feedback that quotes a
 Tenglish line as evidence, or discusses a character's voice, is kept.
 """
 
 from __future__ import annotations
 
 import re
+
+# --- patterns for "I can't read this" claims (trial 5: a Tamil exchange was
+# filed high-severity "opaque text, impossible to assess" with the language
+# mention sitting in `observation`, which no pattern scanned) ---
+_INCOMPREHENSION_PATTERNS = [
+    re.compile(r"opaque", re.I),
+    re.compile(r"impossible to assess", re.I),
+    re.compile(r"cann?ot be (assessed|evaluated|understood)", re.I),
+    re.compile(r"unable to (assess|evaluate|understand)", re.I),
+    re.compile(r"without (context or )?subtitles", re.I),
+    re.compile(r"phonetic", re.I),
+    re.compile(r"language mixing", re.I),
+    re.compile(r"creates? confusion", re.I),
+]
 
 # --- patterns for commentary that identifies / classifies the language ---
 _LANGUAGE_ID_PATTERNS = [
@@ -47,6 +63,7 @@ _SUBTITLE_PATTERNS = [
     re.compile(r"translat\w+ (is |would be )?(needed|required)", re.I),
     re.compile(r"needs? (either )?subtitles", re.I),
     re.compile(r"untranslated", re.I),
+    re.compile(r"phonetic (transcription|transliteration|script)", re.I),
     re.compile(r"(obscures|blocks|barrier to) (meaning|understanding)", re.I),
     re.compile(r"mix(es|ed|ing) languages without", re.I),
 ]
@@ -62,13 +79,23 @@ def is_non_writing_feedback(finding: dict) -> bool:
     """True when the finding is meta-commentary about the script's language
     rather than feedback on the writing. Looks at issue + why_it_matters
     (the finding's claims); evidence_quote is exempt since it's verbatim
-    script text by design."""
+    script text by design. The observation IS scanned for language
+    identification, but only together with an "I can't read this" claim —
+    a craft note that quotes a Tenglish line as evidence is kept, while a
+    note whose whole complaint is that the dialogue is in another language
+    (trial 5: Tamil filed "opaque, impossible to assess") is dropped."""
     if not isinstance(finding, dict):
         return False
     issue = str(finding.get("issue") or "")
     why = str(finding.get("why_it_matters") or "")
     combined = f"{issue} {why}"
-    return _matches_any(combined, _LANGUAGE_ID_PATTERNS) or _matches_any(combined, _SUBTITLE_PATTERNS)
+    if _matches_any(combined, _LANGUAGE_ID_PATTERNS) or _matches_any(combined, _SUBTITLE_PATTERNS):
+        return True
+    obs = str(finding.get("observation") or "")
+    return (
+        (_matches_any(obs, _LANGUAGE_ID_PATTERNS) or _matches_any(obs, _SUBTITLE_PATTERNS))
+        and _matches_any(combined, _INCOMPREHENSION_PATTERNS)
+    )
 
 
 def filter_findings(findings) -> list:

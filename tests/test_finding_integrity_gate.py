@@ -140,7 +140,7 @@ def test_visual_claim_filed_as_dialogue_is_reclassified():
     res = FindingIntegrityGate().run(rows)
     assert res.summary["reclassify"] == 1
     d = res.of("reclassify")[0]
-    assert d.finding["category"] == "scene"
+    assert d.finding["category"] == "scene_function"
     assert d.finding["_category_was"] == "dialogue"
 
 
@@ -150,6 +150,23 @@ def test_spoken_claim_in_dialogue_is_NOT_reclassified():
     res = FindingIntegrityGate().run(rows)
     assert res.withdrawals == []
     assert res.summary["keep"] == 1
+
+
+def test_gate_never_emits_a_category_outside_the_taxonomy():
+    """Trial-5 regression: the gate reclassified a visual dialogue claim to
+    category "scene", which is not in FINDING_CATEGORIES — a label the
+    grammar can never produce and the report map never names. Reclassified
+    rows must land inside the taxonomy (visual claims → scene_function)."""
+    from screenplay_analyzer.grammar import FINDING_CATEGORIES
+    rows = [
+        _f("The ash falls from the cigar in a slow shot.", category="dialogue"),
+        _f("The theme is not clearly defined as a cause-and-effect statement."),
+        _f("A clean note about the opening image.", category="scene"),
+    ]
+    res = FindingIntegrityGate().run(rows)
+    delivered, _ = gate_findings(rows)
+    for f in delivered:
+        assert f["category"] in FINDING_CATEGORIES, f["category"]
 
 
 def test_generic_craft_template_is_NOT_withdrawn():

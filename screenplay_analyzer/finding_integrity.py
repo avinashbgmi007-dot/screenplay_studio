@@ -312,6 +312,14 @@ class FindingIntegrityGate:
         for i, original in enumerate(findings):
             f = copy.deepcopy(original)  # never mutate the caller's finding
 
+            reason_bits: list[str] = []
+            if (f.get("category") or "").lower() == "scene":
+                # "scene" was never in FINDING_CATEGORIES (trial 5: an older
+                # gate revision wrote it). Intake normalization, not a
+                # verdict — the row is still judged on its merits below.
+                f["category"] = "scene_function"
+                reason_bits.append("intake category normalized: scene → scene_function")
+
             if i in merge_map:
                 res.decisions.append(Decision(
                     i, "merge",
@@ -329,7 +337,7 @@ class FindingIntegrityGate:
                 res.decisions.append(Decision(i, "reject", fp, f))
                 continue
 
-            reason_bits: list[str] = []
+            reason_bits: list[str]
             if absorbed.get(i):
                 f["merged_from"] = absorbed[i]
                 reason_bits.append(f"absorbed duplicate(s) {absorbed[i]}")
@@ -339,7 +347,7 @@ class FindingIntegrityGate:
                 # reclassify rather than drop: the observation may be real,
                 # only its category is wrong.
                 f["_category_was"] = f.get("category")
-                f["category"] = "scene" if "visual" in mismatch else "character"
+                f["category"] = "scene_function" if "visual" in mismatch else "character"
                 reason_bits.append(f"category corrected: {mismatch}")
                 res.decisions.append(Decision(i, "reclassify", "; ".join(reason_bits), f))
                 continue

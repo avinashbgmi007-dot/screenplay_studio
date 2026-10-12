@@ -260,3 +260,40 @@ def test_gloss_paraphrase_is_supported_but_invention_is_not():
                 "evidence_quote": None,
                 "observation": 'Raj declares "yes indeed sir, I agree" twice.'}
     assert verify_observation(invented, _TDoc()) is False
+
+
+def test_quoteless_scene_function_row_flagged_and_demoted():
+    """Trial-5 follow-up: a scene note with no evidence_quote is a summary
+    opinion — flagged summary_only, one severity step down, never dropped."""
+    from screenplay_analyzer import pipeline as P
+    rows = [
+        {"category": "scene_function", "issue": "Transitional bridge scene.",
+         "severity": "medium", "scene_refs": [18],
+         "evidence_quote": None, "observation": "Single action block."},
+        {"category": "scene_function", "issue": "Static rehearsal scene.",
+         "severity": "medium", "scene_refs": [8],
+         "evidence_quote": "Rishi as he roams to and fro",
+         "observation": "Speaks to himself."},
+        {"category": "dialogue", "issue": "On-the-nose line.",
+         "severity": "medium", "scene_refs": [2],
+         "evidence_quote": None, "observation": "States the plan outright."},
+    ]
+    P.apply_scene_quote_rule(rows)
+    assert len(rows) == 3
+    assert rows[0].get("summary_only") is True
+    assert rows[0]["severity"] == "low"
+    assert rows[1].get("summary_only", False) is False
+    assert rows[1]["severity"] == "medium"
+    assert rows[2].get("summary_only", False) is False
+    assert rows[2]["severity"] == "medium"
+
+
+def test_quoteless_scene_function_low_row_flagged_not_double_demoted():
+    """Already-low rows take the flag but severity floors at low."""
+    from screenplay_analyzer import pipeline as P
+    rows = [{"category": "scene_function", "issue": "Slow opening.",
+             "severity": "low", "scene_refs": [7],
+             "evidence_quote": None, "observation": "Walking and a call."}]
+    P.apply_scene_quote_rule(rows)
+    assert rows[0].get("summary_only") is True
+    assert rows[0]["severity"] == "low"

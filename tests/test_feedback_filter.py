@@ -92,6 +92,59 @@ class TestFilterUnit:
         f = {"issue": "probably Telugu dialogue", "why_it_matters": "x"}
         assert is_non_writing_feedback(f) is True
 
+    def test_untranslated_language_filed_as_opaque_dropped(self):
+        # Trial-5 live finding (pain3 #19): Tamil dialogue filed high-severity
+        # "opaque text, impossible to assess", language mention in observation.
+        f = {
+            "category": "dialogue",
+            "issue": "The dialogue is presented as opaque text, making it impossible to assess subtext, rhythm, or character voice for the reader.",
+            "observation": "Scene 14 contains a sequence where Rishi and Siddhu speak in an untranslated language (likely Tamil) without context or subtitles.",
+            "why_it_matters": "Without understanding the content, the 'Distinct Character Voice' and 'Subtext' rules cannot be evaluated.",
+            "severity": "high",
+            "scene_refs": [14],
+            "evidence_quote": "Eedki theeskochinv endhi ra Siddhu?",
+        }
+        assert is_non_writing_feedback(f) is True
+        assert f["issue"] not in [g["issue"] for g in filter_findings([f, CRAFT_FINDING])]
+
+    def test_language_in_observation_with_real_claim_kept(self):
+        # Observation naming the language must not doom a genuine craft note.
+        f = {
+            "category": "dialogue",
+            "issue": "The line states the plan outright instead of implying it.",
+            "observation": "Rishi says the Tamil line twice, word for word.",
+            "why_it_matters": "Repetition without variation reads as a lecture, not a plea.",
+            "severity": "medium",
+            "scene_refs": [14],
+            "evidence_quote": "Eedki theeskochinv endhi ra Siddhu?",
+        }
+        assert is_non_writing_feedback(f) is False
+
+    def test_incomprehension_claim_without_language_kept(self):
+        # "Opaque" alone, with no language identification anywhere, is a
+        # craft complaint (e.g. about staging), not language meta-commentary.
+        f = {
+            "category": "scene_function",
+            "issue": "The staging is opaque and impossible to assess on the page.",
+            "why_it_matters": "The reader cannot tell who moves where.",
+        }
+        assert is_non_writing_feedback(f) is False
+
+    def test_phonetic_transcription_complaint_dropped(self):
+        # Trial-8 live findings (gunpen #4/#5): transliterated Tenglish V.O.
+        # filed as "phonetic transcription" / "language mixing creates
+        # confusion" — the same incomprehension family as the Tamil case.
+        for issue, obs in [
+            ("Dialogue is presented as phonetic transcription rather than readable text.",
+             "The V.O. line appears to be a phonetic transliteration of a specific language (likely Tamil)."),
+            ("Inconsistent language mixing in Voice Over creates confusion about the intended dialogue.",
+             "The V.O. line uses mixed English and phonetic script without clear separation or translation."),
+        ]:
+            f = {"category": "dialogue", "issue": issue, "observation": obs,
+                 "why_it_matters": "The reader cannot follow it.",
+                 "evidence_quote": "decison theeskunnam ane feelingalla"}
+            assert is_non_writing_feedback(f) is True, issue
+
 
 SAMPLE_SCRIPT = b"""Title: Filter Test
 Author: Test

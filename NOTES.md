@@ -4232,3 +4232,27 @@ browser job's to run on the PR.
   model degenerates after one apply.
 * A project analysed on the previous build shows no pass line for one generation when its
   snapshot spanned a collision.
+
+### 2026-10-12 — Trial 5 (accuracy7) audit verdict, post Kits A+B + ledger precision + twist pass
+* Fresh real-model runs (qwen3.6-35b): gunpen 31 findings (twist dream present, quoted alarm line), pain3 62 findings (twist null — correct).
+* Finding-by-finding audit from current files: gunpen SOLID 24/31 (77%), pain3 SOLID 52/62 (84%); combined 76/93 = 82% solid, 86/93 = 93% honest-or-flagged. Unflagged weak 5/62 on pain3 (one-line voice demands, Tamil-as-defect, silence filing, pronoun/comic misreads). The Good-Luck/metro ledger rows first scored weak were rechecked against full text: each QUOTE grounds the setup while the abandoned verdict claims only no-payoff, so both are consistent true notes (low value, not false) — counted solid.
+* Goldens (keyword eval): gunpen 5/5, pain3 3/5 (MISS debt-payoff — no named thread in report; MISS silence-facts — sc16 content exists, keyword absent). Combined 8/10.
+* New bugs filed by audit (not blocking): (1) `scene`-category leakage persists (pain3 #22) — root cause is the integrity gate itself (`finding_integrity.py:342` writes `"scene"`, outside `FINDING_CATEGORIES`); (2) untranslated-language-as-defect pattern (pain3 #19: Tamil dialogue filed high-severity "opaque" — slips past `feedback_filter` because the language mention sits in `observation`, which is never scanned); (3) summary-only `scene_function` rows (50/51/53, Q None) carry full weight — quoteless scene notes need a demote/flag rule. Retracted: the filed "ledger verdict contradicts its own quote" bug was a false alarm on full-text recheck (setup-quote + abandoned-verdict are consistent).
+* Caution: mid-audit reads briefly mixed row-numbering across trial files; verdict above re-derived entirely from current accuracy7 files (bycat + per-index flags + full-text dump, sums check).
+
+### 2026-10-12 — Trial-5 follow-ups implemented (guards, not verdicts)
+* User approved all five in order, with one substitution: the "ledger verdict contradicts quote" item was retracted on full-text recheck (setup-quote + abandoned-verdict are consistent), replaced by the genuine Tamil-as-defect guardrail.
+* `feedback_filter.py`: new `_INCOMPREHENSION_PATTERNS` — a finding is non-writing feedback when `observation` names a language AND issue/why pleads incomprehension (opaque / impossible to assess / cannot be evaluated). Catches pain3 #19 shape; craft notes quoting dialect lines kept (3 new tests).
+* `pipeline.py` 8h `apply_scene_quote_rule`: quoteless `scene_function` rows take `summary_only: True` + one severity step down (demote, never drop; 2 new tests).
+* `finding_integrity.py`: reclassify target `"scene"` → `"scene_function"` (root cause of the leak) + intake normalization of legacy `"scene"`; regression test pins all delivered categories inside `FINDING_CATEGORIES`.
+* `tests/eval_recall.py`: normalization + token-overlap (>= 0.5) fallback, per-fact [exact]/[overlap] reporting, usage error, docstring states the eval understates recall and must not gate trials. Trial-5 re-eval unchanged: gunpen 5/5, pain3 3/5.
+* Suite: 2205 passed + 3 skipped (up 6: the new tests); `ruff check` clean; `eval_recall --selftest` OK.
+* Rigor trial (accuracy8 repeat pair under new code) launched in background; no held-out screenplay on hand (Downloads has only the two trial scripts) — held-out validation pending a third script from the user.
+
+### 2026-10-12 — Trial 8 (accuracy8) repeat-pair verdict: variance dominates
+* Same scripts, same model, code family + trial-5 fixes: gunpen n=25 (was 31), pain3 n=74 (was 62). Goldens: gunpen 5/5 (dream-reveal via the new twist channel — zero findings say "dream"), pain3 5/5 (was 3/5; asterisk: anchors like "money"/"job" are loose single words, near-guaranteed hits at n=74).
+* Audits: gunpen-8 solid 14/25 (56%), weak-unflagged 2 (the phonetic-transcription / language-mixing pair #4/#5 — same family as the Tamil case, uncaught by v1 patterns); pain3-8 solid ~60/74 (81%), weak-unflagged ~7 (silence-filing, trait-list demand, quoteless framework notes). Honest-or-flagged: 23/25 (92%) + ~67/74 (91%).
+* Fix validation on real output: zero `scene` labels on either report (gate fix holds); `summary_only` fired 3x gunpen + 4x pain3 (scene-quote rule holds); pain3-8 sc14 Tamil exchange drew only quoted voice/monologue notes, no language complaint (filter holds — untested by direct hit this run).
+* Follow-up shipped the same session: `_INCOMPREHENSION_PATTERNS` + obs-side `phonetic` pattern cover the gunpen-8 #4/#5 shapes (trial-8 regression tests); eval searches `twist_verdict`/`reveal_candidates`.
+* Suite final: 2206 passed + 3 skipped; ruff clean; eval selftest OK (incl. twist-channel case).
+* Standing conclusion, now measured twice: run-to-run swings (n=62→74, goldens 3/5→5/5) exceed any trial-to-trial "improvement" claimed so far — report ranges from repeats, never point deltas. Next: phonetic-extension validation run + held-out third script (user to supply).

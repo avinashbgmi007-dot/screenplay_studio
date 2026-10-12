@@ -943,6 +943,23 @@ def apply_observation_check(findings: list, doc) -> None:
             demote_severity(f)
 
 
+def apply_scene_quote_rule(findings: list) -> None:
+    """Flag quoteless scene_function rows (trial-5 follow-up): a scene note
+    with no evidence_quote is a summary opinion, not a cited defect — one
+    severity step down plus `summary_only: True`. Demote, never drop; the
+    Fix Queue keeps showing the row, just never as a grounded note."""
+    from .feedback_filter import demote_severity
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if str(f.get("category") or "") != "scene_function":
+            continue
+        if f.get("evidence_quote"):
+            continue
+        f["summary_only"] = True
+        demote_severity(f)
+
+
 SHORT_FORM_PAGE_LIMIT = 15.0
 SHORT_FORM_SKIP_MARKERS = frozenset({
     "three-act", "three act", "midpoint", "mid-point", "second act",
@@ -1638,6 +1655,11 @@ def analyze(
     # flagged and demoted. Runs after the observation pass and the floor, so
     # it judges grounded rows only — ungrounded rows have nothing to check.
     apply_observation_check(result.findings, doc)
+    # 8h. scene quote rule (trial-5 follow-up): quoteless scene_function rows
+    # are summary opinions. Flagged and demoted here, beside the other
+    # demote-never-drop guards, so the summary below counts what the writer
+    # is shown.
+    apply_scene_quote_rule(result.findings)
 
     result.verification = verification_summary(result.findings)
 
