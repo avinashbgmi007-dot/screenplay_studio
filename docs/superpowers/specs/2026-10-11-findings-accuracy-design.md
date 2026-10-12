@@ -97,6 +97,23 @@ deadline outcome, job resolution, silence facts). Measured by a local eval scrip
 in the `gun_pen_audit` style — real model required, so NOT CI-blocking. Hit rate
 reported per run; no blind target asserted.
 
+### B4. Twist confirmation pass (experiment-validated 2026-10-11)
+
+Context injection failed three trials running: script-level passes ignore
+background twist hints. A direct probe question answered correctly 3/3
+positive (gunpen dream, scene 3) plus 1/1 true negative (pain3, correctly
+distinguishing temporal shifts from unreality) against qwen3.6-35b.
+
+`confirm_twist(doc, client)`: runs only when `scan_reveals` finds candidates
+(bounded cost: one call, candidate-gated). Sends full text (9000-char cap)
+with a short-reasoning prompt demanding one trailing JSON line; parses the
+first `{...}` block; unparseable answers, negatives, and candidate-free docs
+all yield None (change nothing). A confirmed verdict stores `twist_verdict
+{twist, scene, line, kind}` on the result, serializes to JSON plus a markdown
+section mirroring reveal candidates, and upgrades the script-level context
+block from candidate to confirmed. Contradiction-checking old findings
+against the verdict is explicitly out of v1.
+
 ## Rollout and risks
 
 A first (mechanical, test-pinned), then B (model-cost on small scripts only).
