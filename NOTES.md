@@ -4261,3 +4261,10 @@ browser job's to run on the PR.
 * Fresh project, committed code: n=26, goldens 5/5 (dream-reveal exact in findings this time), twist dream present. Zero language-family findings; all six `scene_function` rows carry quotes (no `summary_only` needed — the rule correctly fires only on quoteless rows).
 * Audit: solid 19/26 (73%), one unflagged weak (#19 "uncomplicated success" misread, quoted), six correctly flagged (U/C/FM). Honest-or-flagged 25/26 = 96%. Novel genuine catches this run: #7 (dummy-barrel trick undercuts the gun's weight without narrative work), #23 (sc3 treats the dream gun as a literal waking prop).
 * Gunpen ranges across three runs (31/25/26 findings): goldens 5/5 x3, twist 3/3, solid 56–77%, honest 92–96%. The honest band is tight; the solid band moves with model wording luck and flag coverage — exactly why the verdict cites honest-or-flagged, not solid alone.
+
+### 2026-10-12 — Filter ledger + golden tightening (eval now measures, not flatters)
+* `partition_findings` splits kept/removed under one predicate; pipeline step 8 ledgers removals into `stats["language_filtered"]` (count + issues). The phonetic filter's future firings are now observable in every report.
+* Golden curation, evidence-driven: per-anchor hit audit across all five stored reports. Dropped dead anchors (amount/bye/wave/deadline/two days/shortlist/kalaa/RAJ — zero hits in 2–3 runs each) and loose ones ("money" hit montage mentions, "article" hit incidental rows, "RAJ" hit 11–16 rows/run). Kept/added distinctive forms (parcel, Local Gangs, article by, X COMPANY, Good Luck, Doesnt knw).
+* Eval overlap fallback hardened twice: content-tokens-only + ≥2-token minimum (killed the "3 mints"→"3" false hit), then glue-word stopwords (killed the "money within the parcel"→{"the","within"} false hit).
+* Rescored matrix, every MISS verified genuine by text search: gunpen 5/5, 3/5 (acc8: zero countdown text anywhere, no article-chain row — real recall gaps), 5/5; pain3 3/5 (no debt content, silence content differed), 5/5.
+* Suite: 2208 passed + 3 skipped; ruff clean; eval selftest OK.

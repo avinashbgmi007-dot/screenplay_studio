@@ -100,7 +100,21 @@ def is_non_writing_feedback(finding: dict) -> bool:
 
 def filter_findings(findings) -> list:
     """Drop non-writing feedback findings, preserving order of the rest."""
-    return [f for f in (findings or []) if isinstance(f, dict) and not is_non_writing_feedback(f)]
+    kept, _ = partition_findings(findings)
+    return kept
+
+
+def partition_findings(findings) -> tuple[list, list]:
+    """(kept, removed) under the same predicate — the removed half comes
+    back so callers can record what left. A guardrail whose firings are
+    unobservable cannot be validated by any trial (trial 9); non-dict
+    garbage is dropped on the floor as before, never ledgered."""
+    kept, removed = [], []
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        (removed if is_non_writing_feedback(f) else kept).append(f)
+    return kept, removed
 
 
 # --- patterns where the observation rebuts the note (accuracy kit A) ---

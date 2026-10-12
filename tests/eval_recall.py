@@ -31,18 +31,42 @@ def _overlap(a: set, b: set) -> float:
     return len(a & b) / len(a)
 
 
+# Minimal stopwords for the overlap fallback (inline: this script must stay
+# import-free — run as `python tests/eval_recall.py`, it cannot see the
+# analyzer packages). Without these, glue words carry false hits (trial 9:
+# "money within the parcel" hit on {"the", "within"}).
+_OVERLAP_STOPWORDS = frozenset({
+    "the", "and", "with", "from", "that", "this", "for", "are", "was",
+    "were", "has", "have", "had", "but", "not", "you", "your", "his",
+    "her", "its", "our", "their", "she", "him", "them", "they", "who",
+    "what", "when", "into", "over", "such", "than", "then", "there",
+})
+
+
+def _content_tokens(text: str) -> set:
+    """Anchor tokens that carry meaning: alphabetic, longer than 2 chars,
+    not glue words. Without this floor the overlap fallback fires on scraps — trial 9: the
+    anchor "3 mints" hit a report containing no "mints" anywhere, on the
+    token "3" alone."""
+    return {w for w in _norm(text).split()
+            if w.isalpha() and len(w) > 2 and w not in _OVERLAP_STOPWORDS}
+
+
 def _anchor_hit(anchor: str, texts: list[str]) -> tuple[bool, str]:
     """(hit, method) — "exact" for substring, "overlap" for shared content
-    words at the floor, else (False, "")."""
+    words at the floor, else (False, ""). Overlap needs at least two
+    content tokens in the anchor; anything shorter is exact-only."""
     anem = _norm(anchor)
     if not anem:
         return False, ""
     for t in texts:
         if anem in t:
             return True, "exact"
-    atok = set(anem.split())
+    atok = _content_tokens(anchor)
+    if len(atok) < 2:
+        return False, ""
     for t in texts:
-        if _overlap(atok, set(t.split())) >= TOKEN_OVERLAP_FLOOR:
+        if _overlap(atok, _content_tokens(t)) >= TOKEN_OVERLAP_FLOOR:
             return True, "overlap"
     return False, ""
 

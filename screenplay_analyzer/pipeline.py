@@ -29,7 +29,7 @@ from . import prompts
 from .grammar import findings_grammar, scene_summary_grammar, coverage_grammar, logline_test_grammar, character_reads_grammar
 from .formatting_check import check_formatting
 from .verifier import verify_findings, verification_summary
-from .feedback_filter import filter_findings
+from .feedback_filter import partition_findings
 from .llm_client import LlamaServerClient, LlamaServerError
 from .rules_context import RulesContext
 from .principles_engine import run_principles_engine
@@ -1562,8 +1562,16 @@ def analyze(
     # 8. drop non-writing feedback — meta-commentary about the script's
     # language (dialect identification, subtitles for non-native speakers)
     # is noise for the writer, not feedback. Filter after verification so
-    # the summary reflects exactly what the writer will see.
-    result.findings = filter_findings(result.findings)
+    # the summary reflects exactly what the writer will see. Removals are
+    # ledgered in stats (trial 9): a guardrail whose firings are
+    # unobservable cannot be validated by any trial.
+    result.findings, _lang_removed = partition_findings(result.findings)
+    if _lang_removed:
+        result.stats = result.stats or {}
+        result.stats["language_filtered"] = {
+            "count": len(_lang_removed),
+            "issues": [str(f.get("issue") or "")[:200] for f in _lang_removed],
+        }
 
     # 8b. cross-rule dedup (§5 item 3) — the same defect filed under related rules
     # in the same scene becomes one finding, which STATES what it absorbed. Runs

@@ -84,6 +84,15 @@ class TestFilterUnit:
         out = filter_findings([DIALECT_FINDING, CRAFT_FINDING, VOICE_FINDING])
         assert out == [CRAFT_FINDING, VOICE_FINDING]
 
+    def test_partition_returns_removed_half_for_the_ledger(self):
+        from screenplay_analyzer.feedback_filter import partition_findings
+        kept, removed = partition_findings(
+            [DIALECT_FINDING, CRAFT_FINDING, None, "x", VOICE_FINDING])
+        assert kept == [CRAFT_FINDING, VOICE_FINDING]
+        assert removed == [DIALECT_FINDING]
+        # garbage is dropped on the floor, never ledgered
+        assert len(kept) + len(removed) == 3
+
     def test_filter_tolerates_garbage(self):
         assert filter_findings(None) == []
         assert filter_findings([None, "x", {}, {"issue": "reads as regional"}]) == [{}]
@@ -280,3 +289,26 @@ class TestFilterInPipeline:
         issues = [f["issue"] for f in result.findings]
         assert DIALECT_FINDING["issue"] not in issues
         assert CRAFT_FINDING["issue"] in issues
+
+    def test_analyze_ledgers_language_filter_removals(self):
+        """Trial 9: removals are observable in stats (count + issues), so a
+        trial can tell a working filter from one that never fires."""
+        import sys
+        import tempfile
+        from screenplay_parser import parse_fountain
+        from screenplay_analyzer.pipeline import analyze
+
+        with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as f:
+            f.write(SAMPLE_SCRIPT.decode("utf-8"))
+            path = f.name
+        try:
+            doc = parse_fountain(path)
+        finally:
+            os.unlink(path)
+
+        client = _StubClient()
+        result = analyze(doc, client, run_categories=("dialogue",))
+        ledger = (result.stats or {}).get("language_filtered")
+        assert ledger is not None
+        assert ledger["count"] == 1
+        assert ledger["issues"] == [DIALECT_FINDING["issue"]]
