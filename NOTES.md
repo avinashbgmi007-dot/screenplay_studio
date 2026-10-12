@@ -4287,3 +4287,10 @@ browser job's to run on the PR.
 * Standing numbers: gunpen honest-or-flagged 91–96% across four runs, goldens 5/5-3/5-5/5-5/5; pain3 89–91% honest, goldens 3/5-5/5; twist 4/4; suite 2212; ruff clean.
 * Closed without building: quoteless-rule generalization (evidence never showed falsehood, only arguable notes — metric comfort over writer value, won't do).
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
+
+### 2026-10-12 — Trial 11: held-out script (#Character_guy_darshi, 11sc/~25pp Tenglish)
+* Run: n=69, twist null (no dream/wake markers in source — consistent), no `scene` leak. Language filter fired 3x on unseen data, all correct family ("unreadable transliteration", "untranslated regional dialect", "language shift") — observable in `stats["language_filtered"]`. Strongest guardrail confirmation to date.
+* Audit: solid 40/69 (58%), weak-unflagged 4, flagged 25. Honest-or-flagged 65/69 = 94% — inside the 89–96% trials band. Guards transfer; the lower solid rate is more flagged thin notes (36% flagged vs 15% on pain3-5), not missed falsehoods.
+* Seeder on unseen data: genuine hit #59 ("Em gelkakunda oka 2 mints undu" → finding, quoted) + noise #60 (absolute clock time "around 6 PM" filed as setup). Refinement available (not built): exclude absolute clock times, keep relative countdowns + countdown/deadline words.
+* New families: praise-as-finding (#13 "contains multiple subtext layers", #15 "reflects cultural context" filed as defects — integrity gate covers absence-inversion, not this); scene-ref hallucination (#28 cites sc[16] on an 11-scene doc); ledger slop (person-as-OBJECT #64, relationship-as-setup #63 — both U-caught).
+* Generalization verdict: no overfitting detected. Thresholds, caps, seeder, and filters behave on unseen data within measured bands. n=3 scripts is still small — the claim is "transfers so far", not "general".
