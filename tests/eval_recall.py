@@ -76,7 +76,8 @@ def _search_texts(report: dict) -> list[str]:
     writer through twist_verdict/reveal_candidates, not through a finding
     (trial 8: no finding says "dream", the verdict does) — recall that
     ignores it measures wording luck, not what the report delivers."""
-    texts = [_norm(f"{f.get('issue', '')} {f.get('observation', '')} {f.get('evidence_quote', '')}")
+    texts = [_norm(f"{f.get('issue', '')} {f.get('observation', '')} "
+                   f"{f.get('why_it_matters', '')} {f.get('evidence_quote', '')}")
              for f in report.get("findings", [])]
     tv = report.get("twist_verdict") or {}
     if isinstance(tv, dict):
@@ -112,7 +113,8 @@ def _selftest():
     tmp = tempfile.mkdtemp()
     rep = os.path.join(tmp, "report.findings.json")
     json.dump({"findings": [
-        {"issue": "The countdown pays at 00:00.", "observation": "", "evidence_quote": ""},
+        {"issue": "Something happens.", "observation": "",
+         "why_it_matters": "The countdown pays at 00:00.", "evidence_quote": ""},
         {"issue": "The clock keeps ticking loudly.", "observation": "", "evidence_quote": ""},
     ],
         "twist_verdict": {"twist": True, "kind": "dream", "line": "He wakes up."}}, open(rep, "w", encoding="utf-8"))
