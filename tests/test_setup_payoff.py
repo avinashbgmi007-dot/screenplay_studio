@@ -335,6 +335,24 @@ def test_time_pressure_seeds_absent_without_time_lines():
     assert _time_pressure_seeds(None) == []
 
 
+def test_wall_clock_set_dressing_does_not_seed():
+    """Trial-11 noise: 'Time is around 6 PM or so on the wall clock' is
+    set dressing, not a beat. Bare 'clock' is not a keyword; a ringing
+    alarm still seeds."""
+    from screenplay_analyzer.setup_payoff import _time_pressure_seeds
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "Time is around 6 PM or so on the wall clock here.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "The phone alarm rings loudly across the room now.\n")
+    seeds = _time_pressure_seeds(doc)
+    assert len(seeds) == 1, seeds
+    assert "(scene 2)" in seeds[0]
+    assert "alarm" in seeds[0].lower()
+
+
 def test_time_pressure_seeds_capped():
     """Six ticking scenes seed at most MAX_TIME_SEEDS — the seed block must
     not grow with script length."""

@@ -35,14 +35,18 @@ from .rules_context import severity_for as _severity_for
 # blow the output budget or the grammar's patience.
 MAX_LEDGER_ENTRIES = 12
 
-# Time-pressure expressions: countdowns, clock times, deadlines. A countdown
-# buried in dialogue is neither a KG prop nor a promise-shaped line, so
-# without these the ledger is never asked about it (trial-9 recall audit:
-# the 'Inka 3 mints / 00:00' beat reached neither findings nor ledger).
+# Time-pressure expressions: relative countdowns, clock-face countdown
+# displays, and the words that announce them. A countdown buried in
+# dialogue is neither a KG prop nor a promise-shaped line, so without these
+# the ledger is never asked about it (trial-9 recall audit: the 'Inka 3
+# mints / 00:00' beat reached neither findings nor ledger). Bare "clock" is
+# deliberately NOT a keyword (trial 11: a wall clock mentioned as set
+# dressing seeded noise) — "alarm"/"timer" stay, because a ringing alarm is
+# a beat, while a clock on the wall usually is not.
 _TIME_PATTERNS = [
     re.compile(r"\b\d+\s*(?:mints?|minutes?|mins?|seconds?|secs?|hours?|hrs?)\b", re.I),
     re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b"),
-    re.compile(r"\b(?:count\s?downs?|deadlines?|ticking|timers?|alarms?|clock)\b", re.I),
+    re.compile(r"\b(?:count\s?downs?|deadlines?|ticking|timers?|alarms?)\b", re.I),
 ]
 MAX_TIME_SEEDS = 4
 

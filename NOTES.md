@@ -4294,6 +4294,10 @@ browser job's to run on the PR.
 * Regression proof, not just unit tests: the rule run over all 19 stored trial reports (hundreds of findings scored solid across sessions) fires on exactly the 2 known trial-11 rows and nothing else.
 * Suite 2216 passed + 3 skipped; ruff clean.
 
+### 2026-10-12 — Seeder clock narrowing (trial-11 noise fix)
+* Trial-11 #60 showed the failure: bare "clock" matched wall-clock set dressing ("Time is around 6 PM or so on the wall clock") and the model filed it as an abandoned setup. "clock" dropped from `_TIME_PATTERNS`; alarm/timer/countdown/deadline/ticking/durations/colon-times stay — a ringing alarm is a beat, a clock on the wall usually is not.
+* Verified on the real trial-11 doc: the genuine sc3 "2 mints" seed stays, the wall-clock noise is gone. Suite 2217 passed + 3 skipped; ruff clean.
+
 ### 2026-10-12 — Trial 11: held-out script (#Character_guy_darshi, 11sc/~25pp Tenglish)
 * Run: n=69, twist null (no dream/wake markers in source — consistent), no `scene` leak. Language filter fired 3x on unseen data, all correct family ("unreadable transliteration", "untranslated regional dialect", "language shift") — observable in `stats["language_filtered"]`. Strongest guardrail confirmation to date.
 * Audit: solid 40/69 (58%), weak-unflagged 4, flagged 25. Honest-or-flagged 65/69 = 94% — inside the 89–96% trials band. Guards transfer; the lower solid rate is more flagged thin notes (36% flagged vs 15% on pain3-5), not missed falsehoods.
