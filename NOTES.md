@@ -4287,6 +4287,12 @@ browser job's to run on the PR.
 * Standing numbers: gunpen honest-or-flagged 91–96% across four runs, goldens 5/5-3/5-5/5-5/5; pain3 89–91% honest, goldens 3/5-5/5; twist 4/4; suite 2212; ruff clean.
 * Closed without building: quoteless-rule generalization (evidence never showed falsehood, only arguable notes — metric comfort over writer value, won't do).
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`).
+
+### 2026-10-12 — Trial 12: floor run with all gates active (gunpen #5)
+* n=23, twist null (probe declined despite a sc3 dream candidate — conservative miss by design), jam thread absent everywhere, countdown present only as a paraphrased ledger entry ("undi (exam)"). Goldens 3/5 — the recall floor, all three gaps text-verified genuine.
+* Audit: solid 14/23 (61%), weak-unflagged 2 (#3 register-contrast-as-defect, the bias family in new phrasing the filter misses; #21 prop-misunderstanding claim its own obs disproves — "no X indicating Y; instead explicitly Z" shape, candidate for a refutation pattern), flagged 7. Honest 21/23 = 91% — precision holds the band even on the worst recall run.
+* Withdrawal rate first measured live: 1/24 (4%) — the pre-existing name-variant rule, correctly applied (GUN_GUY/PEN_GUY distinctness claim withdrawn). Praise/absence gates: zero live firings again (no shapes present in five runs now — restraint confirmed, utility still only corpus-proven).
 * Resume update 2026-10-12: held-out script supplied (#Character_guy_darshi) and measured — see trial 11 below. Remaining: overconfidence design, harness.
 
 ### 2026-10-12 — Praise-as-finding gate class (trial-11 follow-up)
