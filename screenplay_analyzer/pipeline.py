@@ -1022,17 +1022,18 @@ def apply_absence_and_caps(findings: list, page_count) -> None:
         clusters: list = []
         for f in rows:
             key = _issue_key(f.get("issue"))
-            placed = False
+            matched = None
             for c in clusters:
                 if SequenceMatcher(None, key, c[0]).ratio() >= ISSUE_SIMILARITY_THRESHOLD:
-                    c.append(key)
-                    placed = True
+                    matched = c
                     break
-            if not placed:
+            if matched is None:
                 clusters.append([key])
-            if placed and len(c) > SIMILARITY_CLUSTER_CAP:
-                f["capped"] = True
-                f["severity"] = "low"
+            else:
+                matched.append(key)
+                if len(matched) > SIMILARITY_CLUSTER_CAP:
+                    f["capped"] = True
+                    f["severity"] = "low"
 
 
 class AnalysisCancelled(Exception):
