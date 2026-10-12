@@ -152,6 +152,58 @@ def test_spoken_claim_in_dialogue_is_NOT_reclassified():
     assert res.summary["keep"] == 1
 
 
+def test_praise_filed_as_finding_is_rejected():
+    """Trial-11 live rows: neutral/positive descriptions filed as defects."""
+    rows = [
+        _f("Dialogue contains multiple subtext layers.",
+           category="dialogue", scenes=(5,),
+           quote="Ajay doesnt look at his father",
+           over={"observation": "The script contains exactly two instances of dialogue."}),
+        _f("Dialogue reflects cultural context.",
+           category="dialogue", scenes=(5,),
+           quote="Alantide kotha book koni ichesthe?",
+           over={"observation": "The character named 'RAM' is only listed as a speaker once."}),
+    ]
+    res = FindingIntegrityGate().run(rows)
+    assert res.summary["reject"] == 2
+    assert all("praise" in d.reason for d in res.of("reject"))
+    # nothing lost: the ledger carries both rows whole
+    assert res.accounted_for
+
+
+def test_mixed_praise_with_contrast_is_NOT_rejected():
+    """Precision sibling: 'rich but unearned' is a real defect — the
+    contrast turn exempts it."""
+    rows = [_f("The theme is rich but unearned by the plot.",
+               over={"observation": "Stated in voiceover, never tested."})]
+    res = FindingIntegrityGate().run(rows)
+    assert res.withdrawals == []
+    assert res.summary["keep"] == 1
+
+
+def test_praise_with_defect_marker_is_NOT_rejected():
+    """Precision sibling: any defect marker in issue or observation keeps
+    the row, even beside a praise word."""
+    rows = [
+        _f("The pacing is effective without payoff in act three.",
+           over={"observation": "Moves well, lands nowhere."}),
+        _f("Strong opening, weak midpoint.",
+           over={"observation": "The midpoint sags."}),
+    ]
+    res = FindingIntegrityGate().run(rows)
+    assert res.withdrawals == []
+    assert res.summary["keep"] == 2
+
+
+def test_praise_in_quote_does_not_fire():
+    """Quotes are verbatim script text and are never scanned."""
+    rows = [_f("The line states the plan outright with no subtext.",
+               quote="What a beautiful plan, perfectly effective.")]
+    res = FindingIntegrityGate().run(rows)
+    assert res.withdrawals == []
+    assert res.summary["keep"] == 1
+
+
 def test_gate_never_emits_a_category_outside_the_taxonomy():
     """Trial-5 regression: the gate reclassified a visual dialogue claim to
     category "scene", which is not in FINDING_CATEGORIES — a label the

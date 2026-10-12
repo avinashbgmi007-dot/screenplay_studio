@@ -4287,6 +4287,12 @@ browser job's to run on the PR.
 * Standing numbers: gunpen honest-or-flagged 91–96% across four runs, goldens 5/5-3/5-5/5-5/5; pain3 89–91% honest, goldens 3/5-5/5; twist 4/4; suite 2212; ruff clean.
 * Closed without building: quoteless-rule generalization (evidence never showed falsehood, only arguable notes — metric comfort over writer value, won't do).
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
+* Resume update 2026-10-12: held-out script supplied (#Character_guy_darshi) and measured — see trial 11 below. Remaining: overconfidence design, harness.
+
+### 2026-10-12 — Praise-as-finding gate class (trial-11 follow-up)
+* `finding_integrity.py`: `_praise_filed` + PRAISE/DEFECT_MARK lexicons in the module's own ABSENCE/CONSEQUENCE shape — issue must carry a praise marker with zero defect markers or contrast turns in issue+observation; quotes never scanned; rejects to the withdrawals ledger like inverted.
+* Regression proof, not just unit tests: the rule run over all 19 stored trial reports (hundreds of findings scored solid across sessions) fires on exactly the 2 known trial-11 rows and nothing else.
+* Suite 2216 passed + 3 skipped; ruff clean.
 
 ### 2026-10-12 — Trial 11: held-out script (#Character_guy_darshi, 11sc/~25pp Tenglish)
 * Run: n=69, twist null (no dream/wake markers in source — consistent), no `scene` leak. Language filter fired 3x on unseen data, all correct family ("unreadable transliteration", "untranslated regional dialect", "language shift") — observable in `stats["language_filtered"]`. Strongest guardrail confirmation to date.

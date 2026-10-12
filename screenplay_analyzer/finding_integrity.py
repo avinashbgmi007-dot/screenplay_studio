@@ -53,9 +53,9 @@ Actions
                   real; only its shelf was wrong)
     merge       — folded into an earlier finding that states what it absorbed;
                   the duplicate's full text is preserved in the ledger
-    reject      — provably false (inverted, or a deterministic rule firing on
-                  names that are not the same); removed from the delivered set,
-                  preserved in the ledger
+    reject      — provably a non-finding (inverted, praise-as-finding, or a
+                  deterministic rule firing on names that are not the same);
+                  removed from the delivered set, preserved in the ledger
 """
 from __future__ import annotations
 
@@ -142,6 +142,35 @@ ABSENCE = re.compile(
 # a counter-signal: the sentence does flag a consequence after all
 CONSEQUENCE = re.compile(r"\b(but|however|although|yet|undercuts|weakens|"
                          r"fails|reduces|costs|at the expense)\b", re.I)
+
+# "praise filed as a finding" — a compliment or neutral description with no
+# defect claim (trial 11: "Dialogue contains multiple subtext layers" and
+# "Dialogue reflects cultural context" filed as defects). Deliberately
+# NARROW, same contract as ABSENCE above: the issue must carry a praise
+# marker AND neither issue nor observation may carry a defect marker or a
+# contrast turn (but/however/although...). A mixed note ("rich but
+# unearned") is a real defect and is kept; only unalloyed praise is
+# withdrawn. Quotes are never scanned — verbatim script text by design.
+# Known cost: praise worded without these markers is not caught. That is the
+# accepted side of the precision/recall trade this module declares.
+PRAISE = re.compile(
+    r"\bcontains\s+multiple\b"
+    r"|\breflects?\b"
+    r"|\brich\b|\beffective\b|\bcompelling\b|\bexcellent\b|\bnuanced\b"
+    r"|\bimpressive\b|\bbeautiful\b|\bpowerful\b|\bwell[\s-]?crafted\b",
+    re.I,
+)
+# a counter-signal: the sentence does flag a defect after all (superset of
+# CONSEQUENCE, which only covers contrast turns)
+DEFECT_MARK = re.compile(
+    r"\b(but|however|although|yet|undercuts|weakens|fails|reduces|costs|"
+    r"at the expense)\b"
+    r"|\b(not|n't|never|no)\b"
+    r"|\b(lack\w*|fail\w*|miss\w*|weak\w*|without|absent|inconsistent|"
+    r"unclear|generic|static|poor|bad|flat|forced|abrupt|unearned|passive|"
+    r"repetitive|redundant|vague|confus\w*|disrupt\w*|problem|flaw|defect)\b",
+    re.I,
+)
 
 # "these two names are the same character" — the deterministic name-variant rule
 NAME_VARIANT = re.compile(
@@ -301,6 +330,16 @@ class FindingIntegrityGate:
             return "reports the ABSENCE of a defect — a clean bill of health filed as a finding"
         return None
 
+    # -- 4b. praise filed as a finding --------------------------------------
+    def _praise_filed(self, f: dict) -> str | None:
+        issue = f.get("issue") or ""
+        if not PRAISE.search(issue):
+            return None
+        text = f"{issue} {f.get('observation') or ''}"
+        if DEFECT_MARK.search(text):
+            return None
+        return "praise filed as a finding — a compliment or neutral description with no defect claim"
+
     # -- run ---------------------------------------------------------------
     def run(self, findings: list[dict]) -> GateResult:
         res = GateResult()
@@ -330,6 +369,11 @@ class FindingIntegrityGate:
             inv = self._inverted(f)
             if inv:
                 res.decisions.append(Decision(i, "reject", inv, f))
+                continue
+
+            praise = self._praise_filed(f)
+            if praise:
+                res.decisions.append(Decision(i, "reject", praise, f))
                 continue
 
             fp = self._deterministic_fp(f)
