@@ -4281,3 +4281,9 @@ browser job's to run on the PR.
 
 ### 2026-10-12 — Eval covers ledger entries (measurement complete)
 * `_search_texts` now includes `setup_payoff` setups + notes (paid entries live only there; withdrawals excluded — a removed row must never count). Selftest pins the channel. Final matrix across all six stored reports: gunpen 5/5, 3/5, 5/5, 5/5; pain3 3/5, 5/5. The acc10 pen-article HIT arrives via the paid Newspaper/Article ledger entry — the exact blind spot this closes. Every MISS re-verified genuine by text search.
+
+### 2026-10-12 — Accuracy program closed (banked)
+* Shipped across trials 5–10: language-incomprehension filter (+phonetic extension, both live-validated), scene quote rule (8h `summary_only`), integrity-gate taxonomy fix (no more `scene`), filter removal ledger (`stats["language_filtered"]`), time-pressure seeder (live-validated seed → ledger → finding), eval v2 (normalization, overlap with content-token + stopword floors, twist channel, ledger channel, why-text).
+* Standing numbers: gunpen honest-or-flagged 91–96% across four runs, goldens 5/5-3/5-5/5-5/5; pain3 89–91% honest, goldens 3/5-5/5; twist 4/4; suite 2212; ruff clean.
+* Closed without building: quoteless-rule generalization (evidence never showed falsehood, only arguable notes — metric comfort over writer value, won't do).
+* Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
