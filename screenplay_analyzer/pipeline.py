@@ -237,6 +237,9 @@ class AnalysisResult:
     logline_test: dict | None = None
     setup_payoff: list[dict] = field(default_factory=list)
     reveal_candidates: list = field(default_factory=list)
+    twist_verdict: dict | None = None
+    """Confirmed reality twist ({twist, scene, line, kind}) or None. Set by
+    one candidate-gated probe call; a missing verdict changes nothing."""
     character_dials: list[dict] = field(default_factory=list)
     """Per-character trait scores: [{character, traits: [{trait, score,
     scene_refs, note}]}] — the ScreenplayIQ-style dials read."""
@@ -1238,6 +1241,14 @@ def analyze(
 
     from .reveal_scan import scan_reveals
     result.reveal_candidates = scan_reveals(doc)
+    # Twist confirmation (one candidate-gated model call): a direct question
+    # the scan alone cannot answer. Never fails the run — an unconfirmed
+    # twist changes nothing downstream, so a probe bug must not either.
+    try:
+        from .reveal_scan import confirm_twist
+        result.twist_verdict = confirm_twist(doc, client)
+    except Exception:
+        result.twist_verdict = None
 
     # 2b. selective raw-text access for the script-level passes (§5 item 2).
     # Runs HERE because the checkpoint set depends on the findings the earlier
@@ -1314,8 +1325,9 @@ def analyze(
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
-                from .reveal_scan import reveal_context_block
-                _reveal_block = reveal_context_block(result.reveal_candidates)
+                from .reveal_scan import reveal_context_block, confirmed_twist_block
+                _reveal_block = confirmed_twist_block(result.twist_verdict) \
+                    or reveal_context_block(result.reveal_candidates)
                 if _reveal_block:
                     rules_fragment = (rules_fragment + "\n\n" + _reveal_block) if rules_fragment else _reveal_block
                 all_findings.extend(_tag_evidence(

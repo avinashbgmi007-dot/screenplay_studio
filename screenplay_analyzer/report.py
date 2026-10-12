@@ -250,6 +250,17 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append(f"- Scene {c.get('scene')}: '{c.get('line', '')}'")
         lines.append("")
 
+    # --- Confirmed twist (candidate-gated probe call) ---
+    twist = getattr(result, "twist_verdict", None)
+    if isinstance(twist, dict) and twist.get("twist") is True:
+        lines.append("## Confirmed twist — read everything after it twice")
+        lines.append(
+            f"A direct probe confirmed a {twist.get('kind', 'twist')} in "
+            f"Scene {twist.get('scene')}: '{twist.get('line', '')}'. Findings "
+            "that treat those events as literal waking-plot are suspect."
+        )
+        lines.append("")
+
     # --- Pacing (deterministic per-scene pace index) ---
     if result.pacing:
         lines.append("## Pacing — where the script drags")
@@ -477,6 +488,9 @@ def to_findings_json(result: AnalysisResult) -> dict:
         # threaded into prompts) so the desk, the eval runner, and any reader
         # can see what the scan found — an unserialized scan is a silent one.
         "reveal_candidates": list(getattr(result, "reveal_candidates", None) or []),
+        # Twist confirmation verdict (candidate-gated probe call). None unless
+        # confirmed — served so the desk and eval can see the verdict.
+        "twist_verdict": getattr(result, "twist_verdict", None),
         "character_dials": result.character_dials,
         "pacing": result.pacing,
         "findings": stamp_scene_keys(result.findings, scene_key_map(result.doc)),
