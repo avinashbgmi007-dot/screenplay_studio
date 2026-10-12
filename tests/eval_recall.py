@@ -89,6 +89,14 @@ def _search_texts(report: dict) -> list[str]:
             texts.append(_norm(str(c.get("line", ""))))
         else:
             texts.append(_norm(str(c)))
+    # Ledger entries: paid setups live only here (trial 10: the article
+    # chain reached the writer through a paid ledger entry no finding
+    # names). Dangling entries already surface as findings, so this adds
+    # only what findings cannot see. Withdrawals are excluded — a removed
+    # row must never count toward recall.
+    for e in report.get("setup_payoff") or []:
+        if isinstance(e, dict):
+            texts.append(_norm(f"{e.get('setup', '')} {e.get('note', '')}"))
     return texts
 
 
@@ -117,17 +125,20 @@ def _selftest():
          "why_it_matters": "The countdown pays at 00:00.", "evidence_quote": ""},
         {"issue": "The clock keeps ticking loudly.", "observation": "", "evidence_quote": ""},
     ],
-        "twist_verdict": {"twist": True, "kind": "dream", "line": "He wakes up."}}, open(rep, "w", encoding="utf-8"))
+        "twist_verdict": {"twist": True, "kind": "dream", "line": "He wakes up."},
+        "setup_payoff": [{"setup": "The firearm", "note": "Paid off when shown."}]},
+        open(rep, "w", encoding="utf-8"))
     gold = os.path.join(tmp, "gold.json")
     json.dump({"facts": [{"id": "a", "anchors": ["00:00"]},
                          {"id": "b", "anchors": ["never-mentioned-xyz"]},
                          {"id": "c", "anchors": ["ticking clock"]},
-                         {"id": "d", "anchors": ["dream"]}]},
+                         {"id": "d", "anchors": ["dream"]},
+                         {"id": "e", "anchors": ["firearm"]}]},
               open(gold, "w", encoding="utf-8"))
     rows = hit_rate(rep, gold)
-    assert rows == [("a", True), ("b", False), ("c", True), ("d", True)], rows
+    assert rows == [("a", True), ("b", False), ("c", True), ("d", True),
+                    ("e", True)], rows
     print("selftest OK")
-
 
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
