@@ -417,7 +417,26 @@ class FindingIntegrityGate:
             m = re.search(r"\bdo(?:es)?\s+not\s+recur\b|\bnever\s+(?:referenced|"
                           r"mentioned|seen|reappears?|recur\w*)\b", issue, re.I)
             before = issue[:m.start()] if m else issue
-            terms = _content_terms(before)
+            # The named object, not the framing prose: "… (gun, newspaper,
+            # pen) do not recur" carries framing words (chekhov/emphasis/
+            # narrative/objects/given) that hold single-scene overlap below
+            # the 0.5 floor even when the objects do recur. Prefer (a) the
+            # parenthesized span immediately before the marker, else (b) a
+            # quoted span in the issue, else (c) the full prefix as before.
+            terms = None
+            pm = re.search(r"\(([^()]+)\)\s*$", before)
+            if pm:
+                scoped = _content_terms(pm.group(1))
+                if scoped:
+                    terms = scoped
+            if terms is None:
+                qm = re.search(r'"([^"]+)"', issue)
+                if qm:
+                    scoped = _content_terms(qm.group(1))
+                    if scoped:
+                        terms = scoped
+            if terms is None:
+                terms = _content_terms(before)
             if not terms:
                 return None
             if {t.lower() for t in terms} <= pronouns:

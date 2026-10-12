@@ -399,3 +399,30 @@ def test_hedged_absence_is_NOT_rejected():
     res = FindingIntegrityGate().run(rows)
     assert res.withdrawals == []
     assert res.summary["keep"] == 1
+
+
+def test_falsified_parenthesized_object_list_is_rejected():
+    """Spec-implementation gap: framing prose around the named object must
+    not sink the recurrence check — terms come from the parenthesized span
+    immediately before the marker, not the full prefix."""
+    from screenplay_parser import parse_fountain
+    import os
+    import tempfile
+    text = ("Title: T\nAuthor: T\n\nINT. ROOM - NIGHT\n\n"
+            "A gun and a newspaper and a pen lie here.\n\nCUT TO:\n\n"
+            "INT. HALL - DAY\n\nHe picks up the gun and the newspaper "
+            "and the pen again.\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as fh:
+        fh.write(text)
+        path = fh.name
+    try:
+        doc = parse_fountain(path)
+    finally:
+        os.unlink(path)
+    rows = [_f("Chekhov's Gun: Objects given narrative emphasis "
+               "(gun, newspaper, pen) do not recur or get referenced later.",
+               category="plot_thread", scenes=(1,),
+               quote="A gun and a newspaper and a pen lie here.")]
+    res = FindingIntegrityGate().run(rows, doc=doc)
+    assert res.summary["reject"] == 1
+    assert "falsified" in res.of("reject")[0].reason
