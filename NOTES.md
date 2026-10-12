@@ -4256,3 +4256,8 @@ browser job's to run on the PR.
 * Follow-up shipped the same session: `_INCOMPREHENSION_PATTERNS` + obs-side `phonetic` pattern cover the gunpen-8 #4/#5 shapes (trial-8 regression tests); eval searches `twist_verdict`/`reveal_candidates`.
 * Suite final: 2206 passed + 3 skipped; ruff clean; eval selftest OK (incl. twist-channel case).
 * Standing conclusion, now measured twice: run-to-run swings (n=62→74, goldens 3/5→5/5) exceed any trial-to-trial "improvement" claimed so far — report ranges from repeats, never point deltas. Next: phonetic-extension validation run + held-out third script (user to supply).
+
+### 2026-10-12 — Trial 9: gunpen third run validates the phonetic extension
+* Fresh project, committed code: n=26, goldens 5/5 (dream-reveal exact in findings this time), twist dream present. Zero language-family findings; all six `scene_function` rows carry quotes (no `summary_only` needed — the rule correctly fires only on quoteless rows).
+* Audit: solid 19/26 (73%), one unflagged weak (#19 "uncomplicated success" misread, quoted), six correctly flagged (U/C/FM). Honest-or-flagged 25/26 = 96%. Novel genuine catches this run: #7 (dummy-barrel trick undercuts the gun's weight without narrative work), #23 (sc3 treats the dream gun as a literal waking prop).
+* Gunpen ranges across three runs (31/25/26 findings): goldens 5/5 x3, twist 3/3, solid 56–77%, honest 92–96%. The honest band is tight; the solid band moves with model wording luck and flag coverage — exactly why the verdict cites honest-or-flagged, not solid alone.
