@@ -177,7 +177,7 @@ DEFECT_MARK = re.compile(
 # contract as ABSENCE/PRAISE above: unhedged phrasing required, positive
 # proof required, quotes never scanned.
 ABSENCE_CLAIM = re.compile(
-    r"\bdo\s+not\s+recur\b|\bnever\s+(referenced|mentioned|seen|reappear"
+    r"\bdo(?:es)?\s+not\s+recur\b|\bnever\s+(referenced|mentioned|seen|reappear"
     r"s?|recur\w*|addressed)\b"
     r"|\bno\s+dialogue\b|\bnever\s+speaks?\b|\bno\s+action\s+lines?\b"
     r"|\bno\s+confrontation\b|\babsent\s+from\b",
@@ -362,12 +362,131 @@ class FindingIntegrityGate:
         if doc is None or not ABSENCE_CLAIM.search(issue):
             return None
         text = f"{issue} {f.get('observation') or ''}"
-        if HEDGE.search(text) or DEFECT_MARK.search(text):
+        if HEDGE.search(text) or CONSEQUENCE.search(text):
             return None
-        return None  # Task 2 note: presence checks land here
+        refs = f.get("scene_refs") or []
+        if not refs:
+            return None
+        scenes = getattr(doc, "scenes", None) or []
+        valid = {s.scene_number for s in scenes}
+        if any(r not in valid for r in refs):
+            return None
+        # Pronoun subjects carry no resolvable referent — never guess.
+        if re.match(r"\s*(he|she|they)\b", issue, re.I):
+            return None
+        pronouns = {"he", "she", "they", "him", "her", "them"}
+
+        # -- missing lines: X has a cue in the cited range -----------------
+        if re.search(r"\bno\s+dialogue\b|\bnever\s+speaks?\b"
+                     r"|\bno\s+action\s+lines?\b", issue, re.I):
+            name = None
+            m = re.search(r"(?i:\bno\s+dialogue\s+(?:lines?\s+)?for\s+)"
+                          r"([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)", issue)
+            if not m:
+                m = re.search(r"(?i:\bno\s+action\s+lines?\s+for\s+)"
+                              r"([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)", issue)
+            if not m:
+                m = re.search(r"\b([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)"
+                              r"\s+(?i:never\s+speaks?)\b", issue)
+            if m:
+                name = m.group(1)
+            if not name:
+                return None
+            first = name.strip().split()[0].lower() if name.strip() else ""
+            if first in pronouns:
+                return None
+            want = norm(name)
+            if not want:
+                return None
+            for r in sorted(refs):
+                sc = next((s for s in scenes if s.scene_number == r), None)
+                if sc is None:
+                    continue
+                present = {norm(c) for c in (sc.characters_present or [])}
+                if want in present:
+                    return f"absence claim falsified by presence in scene(s) {r}"
+                for el in (sc.elements or []):
+                    if getattr(el, "character", None) and norm(el.character) == want:
+                        return f"absence claim falsified by presence in scene(s) {r}"
+            return None
+
+        # -- non-recurrence: object terms recur after the cited range ------
+        if re.search(r"\bdo(?:es)?\s+not\s+recur\b|\bnever\s+(?:referenced|"
+                     r"mentioned|seen|reappears?|recur\w*)\b", issue, re.I):
+            from screenplay_analyzer.setup_payoff import _content_terms, _terms_in_scenes
+            m = re.search(r"\bdo(?:es)?\s+not\s+recur\b|\bnever\s+(?:referenced|"
+                          r"mentioned|seen|reappears?|recur\w*)\b", issue, re.I)
+            before = issue[:m.start()] if m else issue
+            terms = _content_terms(before)
+            if not terms:
+                return None
+            if {t.lower() for t in terms} <= pronouns:
+                return None
+            max_ref = max(refs)
+            later = sorted(s.scene_number for s in scenes if s.scene_number > max_ref)
+            if not later:
+                return None
+            hit, at = _terms_in_scenes(terms, doc, later)
+            if hit:
+                return f"absence claim falsified by presence in scene(s) {at}"
+            return None
+
+        # -- missing beats: beat content lands in the cited range ----------
+        if re.search(r"\bno\s+confrontation\b|\babsent\s+from\b"
+                     r"|\bnever\s+addressed\b", issue, re.I):
+            from screenplay_analyzer.setup_payoff import _content_terms, _terms_in_scenes
+            m_af = re.search(r"\babsent\s+from\b", issue, re.I)
+            if m_af:
+                before_af = issue[:m_af.start()]
+                before_clean = re.sub(r"\b(is|was|are|were)\s*$", "",
+                                      before_af, flags=re.I).strip()
+                m_name = re.search(r"([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)\s*$",
+                                   before_clean)
+                if m_name:
+                    name = m_name.group(1)
+                    first = name.strip().split()[0].lower() if name.strip() else ""
+                    if first in pronouns:
+                        return None
+                    if first not in ("the", "a", "an", "this", "that",
+                                     "these", "those", "it"):
+                        want = norm(name)
+                        if want:
+                            for r in sorted(refs):
+                                sc = next((s for s in scenes
+                                           if s.scene_number == r), None)
+                                if sc is None:
+                                    continue
+                                present = {norm(c) for c in
+                                           (sc.characters_present or [])}
+                                if want in present:
+                                    return ("absence claim falsified by presence "
+                                            f"in scene(s) {r}")
+                                for el in (sc.elements or []):
+                                    if getattr(el, "character", None) and \
+                                            norm(el.character) == want:
+                                        return ("absence claim falsified by presence "
+                                                f"in scene(s) {r}")
+                            return None
+            m_beat = re.search(r"(?i:\bno\s+)(confrontation)\b", issue)
+            if m_beat:
+                beat_text = m_beat.group(1)
+            else:
+                m2 = re.search(r"\babsent\s+from\b|\bnever\s+addressed\b",
+                               issue, re.I)
+                beat_text = issue[:m2.start()] if m2 else issue
+            terms = _content_terms(beat_text)
+            if not terms:
+                return None
+            if {t.lower() for t in terms} <= pronouns:
+                return None
+            hit, at = _terms_in_scenes(terms, doc, sorted(refs))
+            if hit:
+                return f"absence claim falsified by presence in scene(s) {at}"
+            return None
+        return None
 
     # -- run ---------------------------------------------------------------
-    def run(self, findings: list[dict]) -> GateResult:
+    def run(self, findings: list[dict], doc=None) -> GateResult:
         res = GateResult()
         merge_map = self._dedupe(findings)
         absorbed: dict[int, list[int]] = collections.defaultdict(list)
@@ -400,6 +519,11 @@ class FindingIntegrityGate:
             praise = self._praise_filed(f)
             if praise:
                 res.decisions.append(Decision(i, "reject", praise, f))
+                continue
+
+            falsified = self._absence_falsified(f, doc)
+            if falsified:
+                res.decisions.append(Decision(i, "reject", falsified, f))
                 continue
 
             fp = self._deterministic_fp(f)

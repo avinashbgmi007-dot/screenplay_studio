@@ -1609,7 +1609,7 @@ def analyze(
     if integrity_gate and _integrity_gate_enabled():
         try:
             from .finding_integrity import FindingIntegrityGate
-            gate_res = FindingIntegrityGate().run(result.findings)
+            gate_res = FindingIntegrityGate().run(result.findings, doc=doc)
             result.findings = gate_res.findings
             result.withdrawals = gate_res.ledger
             if not gate_res.accounted_for:
