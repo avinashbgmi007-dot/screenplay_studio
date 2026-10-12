@@ -38,7 +38,7 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `continuity.py` | `run_continuity_analysis` | Deterministic continuity pass: unmarked time-of-day flips, character-name variants |
 | `pacing.py` | `per_scene_pace`, `drag_findings` | Deterministic per-scene pace index + drag flags |
 | `dials.py` | `run_character_dials` | Model-scored per-character dials (grammar-constrained) |
-| `setup_payoff.py` | `run_setup_payoff_ledger`, `dangling_findings` | End-of-pipeline whole-script setup/payoff audit; dangling entries feed Plot Economy |
+| `setup_payoff.py` | `run_setup_payoff_ledger`, `dangling_findings`, `adjudicate_ledger`, `_seed_candidates`, `_time_pressure_seeds` | End-of-pipeline whole-script setup/payoff audit; dangling entries feed Plot Economy; adjudicator flips paid on later recurrence, never trusts backwards citations; seeds add one capped TIME-PRESSURE line per ticking scene (`MAX_TIME_SEEDS`) so countdowns reach the model |
 | `rules_context.py` | `RulesContext` | Injects knowledge-base rules into prompts (a `_NullRulesContext` fallback lives in `pipeline.py`) |
 | `prompts.py` | `scene_summary_prompt`, `dialogue_analysis_prompt`, `theme_analysis_prompt`, `character_analysis_prompt`, `structure_analysis_prompt`, `scene_function_prompt`, `logline_test_prompt`, `character_reads_prompt`, `principle_judgment_prompt`, `genre_check_prompt`, `coverage_prompt`, `character_dials_prompt`, `setup_payoff_ledger_prompt`, `language_instruction` | Two-tier citation prompts |
 | `report.py` | `render_markdown`, `to_findings_json`, `save_report` | `.md` + `.findings.json` output; `to_findings_json` stamps every finding's `scene_key` (`scenekey.stamp_scene_keys`) — the scene component of its id |

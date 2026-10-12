@@ -24,6 +24,8 @@ reported twice.
 
 from __future__ import annotations
 
+import re
+
 from . import prompts
 from .grammar import setup_payoff_ledger_grammar
 from .deterministic_utils import int_list
@@ -33,13 +35,26 @@ from .rules_context import severity_for as _severity_for
 # blow the output budget or the grammar's patience.
 MAX_LEDGER_ENTRIES = 12
 
+# Time-pressure expressions: countdowns, clock times, deadlines. A countdown
+# buried in dialogue is neither a KG prop nor a promise-shaped line, so
+# without these the ledger is never asked about it (trial-9 recall audit:
+# the 'Inka 3 mints / 00:00' beat reached neither findings nor ledger).
+_TIME_PATTERNS = [
+    re.compile(r"\b\d+\s*(?:mints?|minutes?|mins?|seconds?|secs?|hours?|hrs?)\b", re.I),
+    re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b"),
+    re.compile(r"\b(?:count\s?downs?|deadlines?|ticking|timers?|alarms?|clock)\b", re.I),
+]
+MAX_TIME_SEEDS = 4
+
 _STATUS_ORDER = {"dangling": 0, "abandoned": 1, "red_herring": 2, "paid": 3}
 
 
-def _seed_candidates(kg) -> list[str]:
+def _seed_candidates(kg, doc=None) -> list[str]:
     """Compact seed list of mechanically-flagged candidates — props and
     dialogue promises — with the scenes they appear in, straight from the
-    knowledge graph (real text, no paraphrase)."""
+    knowledge graph (real text, no paraphrase). Time-pressure lines come
+    from the document itself (see `_time_pressure_seeds`); `doc` may be
+    None, in which case that family is skipped."""
     seeds = []
     for p in sorted(kg.prop_candidates, key=lambda c: -c.mention_count):
         scenes = ", ".join(f"S{s}" for s in p.scenes_mentioned)
@@ -47,6 +62,36 @@ def _seed_candidates(kg) -> list[str]:
     for p in kg.promise_candidates:
         text = (p.text or "").strip()[:120]
         seeds.append(f"- PROMISE (by {p.character}, scene {p.scene_number}): \"{text}\"")
+    seeds.extend(_time_pressure_seeds(doc))
+    return seeds
+
+
+def _time_pressure_seeds(doc) -> list[str]:
+    """One seed per scene containing a time-pressure line, capped. Candidate
+    generation only — the model still judges whether the beat matters."""
+    if doc is None:
+        return []
+    from screenplay_parser.quotematch import find_scene_text
+    seeds = []
+    for s in (doc.scenes or []):
+        n = getattr(s, "scene_number", None)
+        if not n:
+            continue
+        try:
+            text = find_scene_text(doc, n)
+        except Exception:
+            continue
+        if not text:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if len(line.split()) < 3:
+                continue
+            if any(p.search(line) for p in _TIME_PATTERNS):
+                seeds.append(f"- TIME-PRESSURE (scene {n}): \"{line[:120]}\"")
+                break
+        if len(seeds) >= MAX_TIME_SEEDS:
+            break
     return seeds
 
 
@@ -57,14 +102,19 @@ def run_setup_payoff_ledger(
     rules_fragment: str = "",
     total_scenes: int = 0,
     language: str = "eng",
+    doc=None,
 ) -> tuple[list[dict], list[str]]:
     """One whole-script call producing the setup/payoff ledger.
 
     Returns (entries, errors). entries is a list of:
       {setup, kind, setup_scenes, payoff_scenes (list|None), status, note}
     status is one of paid | dangling | abandoned | red_herring.
+
+    `doc` is optional: when present its scenes contribute time-pressure
+    seeds; without it that family is skipped (all existing callers keep
+    working).
     """
-    seeds = _seed_candidates(kg)
+    seeds = _seed_candidates(kg, doc)
     seed_block = "\n".join(seeds) if seeds else (
         "(none mechanically flagged — judge from the overview alone)"
     )

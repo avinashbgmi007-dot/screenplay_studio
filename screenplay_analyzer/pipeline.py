@@ -1433,7 +1433,7 @@ def analyze(
             emit("setup_payoff", "running", "Auditing setups & payoffs across the whole script")
             ledger, ledger_errors = run_setup_payoff_ledger(
                 overview, _kg, client, rules_ctx.prompt_fragment_for_category("plot_thread"),
-                doc.scene_count, language=report_language,
+                doc.scene_count, language=report_language, doc=doc,
             )
             result.setup_payoff = ledger
             from .setup_payoff import adjudicate_ledger

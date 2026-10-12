@@ -299,3 +299,73 @@ def test_payoff_search_never_runs_backwards():
         "status": "abandoned", "note": "Gone."}], doc)
     assert entries[0]["status"] == "abandoned"
     assert entries[0]["verified"] is False
+
+
+TIME_DOC = """Title: T
+Author: T
+
+INT. ROOM - NIGHT
+
+MARA
+Inka 3 mints a undi, hurry up now.
+
+CUT TO:
+
+INT. HALL - DAY
+
+The wall clock reads 00:00 sharp and stops.
+"""
+
+
+def test_time_pressure_seeds_found_per_scene():
+    """Trial-9 recall gap: a countdown in dialogue is neither a KG prop nor
+    a promise-shaped line. One seed per scene that carries a time line."""
+    from screenplay_analyzer.setup_payoff import _time_pressure_seeds
+    seeds = _time_pressure_seeds(_parse(TIME_DOC))
+    assert len(seeds) == 2, seeds
+    assert seeds[0].startswith("- TIME-PRESSURE (scene 1)")
+    assert "3 mints" in seeds[0]
+    assert seeds[1].startswith("- TIME-PRESSURE (scene 2)")
+    assert "00:00" in seeds[1]
+
+
+def test_time_pressure_seeds_absent_without_time_lines():
+    from screenplay_analyzer.setup_payoff import _time_pressure_seeds
+    assert _time_pressure_seeds(_parse(SAMPLE)) == []
+    assert _time_pressure_seeds(None) == []
+
+
+def test_time_pressure_seeds_capped():
+    """Six ticking scenes seed at most MAX_TIME_SEEDS — the seed block must
+    not grow with script length."""
+    from screenplay_analyzer.setup_payoff import (
+        _time_pressure_seeds, MAX_TIME_SEEDS)
+    scenes = "\n\nCUT TO:\n\n".join(
+        f"INT. ROOM {i} - NIGHT\n\nHe has 5 minutes left to decide now."
+        for i in range(6))
+    seeds = _time_pressure_seeds(_parse(f"Title: T\nAuthor: T\n\n{scenes}\n"))
+    assert len(seeds) == MAX_TIME_SEEDS, seeds
+
+
+def test_time_seeds_reach_the_ledger_prompt():
+    """The model can only judge what it is asked about: the seed block in
+    the user prompt carries the TIME-PRESSURE lines."""
+    from screenplay_analyzer.setup_payoff import _seed_candidates
+
+    class RecordingClient(FakeClient):
+        def __init__(self):
+            super().__init__(ledger={"ledger": []})
+            self.users = []
+
+        def chat_json(self, system, user, grammar=None, max_tokens=0, temperature=0.0):
+            self.users.append(user)
+            return super().chat_json(system, user, grammar, max_tokens, temperature)
+
+    doc = _parse(TIME_DOC)
+    kg = build_knowledge_graph(doc)
+    assert any("TIME-PRESSURE" in s for s in _seed_candidates(kg, doc))
+    client = RecordingClient()
+    run_setup_payoff_ledger("overview", kg, client, "", 2, doc=doc)
+    assert len(client.users) == 1
+    assert "TIME-PRESSURE" in client.users[0]
+    assert "3 mints" in client.users[0]

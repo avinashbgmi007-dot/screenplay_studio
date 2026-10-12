@@ -4268,3 +4268,8 @@ browser job's to run on the PR.
 * Eval overlap fallback hardened twice: content-tokens-only + ≥2-token minimum (killed the "3 mints"→"3" false hit), then glue-word stopwords (killed the "money within the parcel"→{"the","within"} false hit).
 * Rescored matrix, every MISS verified genuine by text search: gunpen 5/5, 3/5 (acc8: zero countdown text anywhere, no article-chain row — real recall gaps), 5/5; pain3 3/5 (no debt content, silence content differed), 5/5.
 * Suite: 2208 passed + 3 skipped; ruff clean; eval selftest OK.
+
+### 2026-10-12 — Time-pressure seeder (first recall-side fix)
+* Ledger audit of acc8 gunpen showed the countdown beat ("Inka 3 mints / 00:00") in neither findings nor ledger: a countdown in dialogue is neither a KG prop nor a promise, so the ledger was never asked. The article thread, by contrast, was covered by a paid ledger entry — findings-only eval was blind to it.
+* `setup_payoff.py`: `_time_pressure_seeds(doc)` emits one capped (`MAX_TIME_SEEDS = 4`) TIME-PRESSURE seed per ticking scene (N minutes/mints/mins/seconds/hours, clock times, countdown/deadline/ticking/timer/alarm/clock); wired through `run_setup_payoff_ledger(..., doc=doc)` (optional, existing callers unaffected) and the pipeline call site. Candidate generation only — the model still judges significance, per the KG-proposes/LLM-judges split.
+* Tests (no model): seeds found per scene, absent on clean text and `doc=None`, cap holds at 6 ticking scenes, seeds reach the user prompt verbatim. Suite 2212 passed + 3 skipped; ruff clean.
