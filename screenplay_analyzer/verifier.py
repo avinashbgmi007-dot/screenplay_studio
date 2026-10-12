@@ -151,10 +151,14 @@ def verify_observation(finding: dict, doc) -> bool | None:
              if getattr(s, "scene_number", None) in scene_refs]
     if not cited:
         return None
-    present = set()
+    # Presence means named IN THE SCENE TEXT, not in characters_present:
+    # parse attribution gaps (a present-but-cueless character) must never
+    # punish a true observation (trial rerun: Senior drives sc18 yet the
+    # present list is empty). Token-subset per scene, all name words.
+    cited_tokens = []
     for s in cited:
-        for c in (getattr(s, "characters_present", None) or []):
-            present.add(_norm_name(c))
+        text = _scene_full_text(doc, s.scene_number) or ""
+        cited_tokens.append(set(_normalize(text).split()))
     known = {_norm_name(c) for c in (getattr(doc, "all_characters", None) or [])}
 
     obs_norm = _norm_name(observation)
@@ -162,7 +166,9 @@ def verify_observation(finding: dict, doc) -> bool | None:
         if not name:
             continue
         if re.search(r"\b" + re.escape(name) + r"\b", obs_norm):
-            if name not in present:
+            # Lowercase: cited tokens come from _normalize (lowercase), names
+            # from _norm_name (upper) — compare in one case.
+            if not any(set(name.lower().split()) <= toks for toks in cited_tokens):
                 return False
 
     for frag in re.findall(r"(?<!\w)\"([^\"]+)\"|(?<!\w)'([^']+)'", observation):
