@@ -134,7 +134,11 @@ LANGUAGE_META_INSTRUCTION = (
     "language or dialect it's written in (e.g. \"reads as regional\", \"probably "
     "Telugu\", \"mixed language\", \"code-switching\"), and never mention subtitles, "
     "translation, or what non-native speakers will or won't understand. Keep every "
-    "note about story, character, dialogue, structure, and craft."
+    "note about story, character, dialogue, structure, and craft. The same ban "
+    "covers the script's REGISTER: never file transliteration, code-mixing, "
+    "dialect, or script choice as a defect, and never call dialogue confusing, "
+    "opaque, or unnatural because of the language it is written in. Judge voice "
+    "by word choice, rhythm, and content — never by the vehicle."
 )
 
 # Some local models (reasoning / JSON-tuned distills) decide on their own to

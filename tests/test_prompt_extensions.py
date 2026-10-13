@@ -23,6 +23,25 @@ def test_dialogue_prompt_has_idiolect_instruction():
     assert "Idiolect consistency" in sys
 
 
+def test_dialogue_prompt_bans_register_as_defect():
+    """Trial-11/12 family: 'phonetic transcription', 'language mixing
+    creates confusion', register-contrast-as-defect. The ban rides in the
+    shared instruction, witnessed here on the dialogue prompt."""
+    sys, _ = prompts.dialogue_analysis_prompt([{"scene_number": 1, "heading_raw": "INT. X - DAY", "full_text": "hi"}])
+    assert "never file transliteration" in sys.lower()
+    assert "never by the vehicle" in sys.lower()
+
+
+def test_register_ban_rides_all_category_prompts():
+    """The instruction is shared, not per-pass: every category prompt that
+    carries LANGUAGE_META_INSTRUCTION carries the register ban."""
+    from screenplay_analyzer.prompts import LANGUAGE_META_INSTRUCTION
+    assert "REGISTER" in LANGUAGE_META_INSTRUCTION
+    for build in (prompts.theme_analysis_prompt, prompts.scene_function_prompt):
+        sys, _ = build("overview", "T")
+        assert "never by the vehicle" in sys.lower()
+
+
 def test_pipeline_runs_continuity_stage():
     # The deterministic passes must be wired into analyze() — the continuity
     # module is importable from the pipeline's own namespace usage and the

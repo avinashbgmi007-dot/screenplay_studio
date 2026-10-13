@@ -4289,6 +4289,12 @@ browser job's to run on the PR.
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
 * Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
 
+### 2026-10-13 — Prompt-level register ban (filter whack-a-mole ends here)
+* Three trials of bias notes in fresh phrasing ("phonetic transcription", "language mixing creates confusion", register-contrast-as-pacing-defect) kept slipping past the deterministic filter. Root fix at the source: `LANGUAGE_META_INSTRUCTION` extended — never file transliteration/code-mixing/dialect/script-choice as a defect, never call dialogue confusing/opaque/unnatural for its language; judge voice by word choice/rhythm/content, never the vehicle.
+* Applied to both constants (analyzer `prompts.py` rides all 14 category prompts; cowriter `context.py` kept in sync per the standing rule). Deterministic filter stays as backstop — defense in depth, not replacement.
+* Tests: ban witnessed on dialogue/theme/scene-function prompts + cowriter system prompt; all pinned language-rule tests still green. Suite 2224 passed + 3 skipped; ruff clean.
+* Validation owed: live run scored on `stats["language_filtered"]` — empty ledger means the instruction worked, non-empty means it didn't. Proposed next.
+
 ### 2026-10-13 — User Pain_3 re-analyzed live (duplicate/locatability verdict)
 * User complaint verified on their actual Oct-1 report (43 rows): 1 byte-identical pair, ~10 pairs ≥0.75, ~150 pairs ≥0.45; 29/43 quoteless, 0 observations, 0 scene_keys. Report predated every dedupe/flag/grounding mechanism.
 * Desk UI verified: Fix Queue rows show "Scene N — heading" + Locate + badges; finding cards carry scope labels on all list surfaces (margin pins exempt by pinned browser test); report.md prints scenes + quotes. No UI change needed — the approved scope-label build was correctly stood down.

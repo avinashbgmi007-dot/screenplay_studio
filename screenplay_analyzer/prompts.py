@@ -123,7 +123,11 @@ LANGUAGE_META_INSTRUCTION = (
     "language\", \"code-switching\"), and never mention subtitles, translation, or "
     "what non-native speakers will or won't understand. The writer knows what "
     "language their pages are in. Feedback is about story, character, dialogue, "
-    "structure, and craft — nothing else."
+    "structure, and craft — nothing else. The same ban covers the script's "
+    "REGISTER: never file transliteration, code-mixing, dialect, or script choice "
+    "as a defect, and never call dialogue confusing, opaque, or unnatural because "
+    "of the language it is written in. Judge voice by word choice, rhythm, and "
+    "content — never by the vehicle."
 )
 
 
