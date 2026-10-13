@@ -4369,6 +4369,10 @@ browser job's to run on the PR.
 * Self-inflicted red during build: a helper-move edit duplicated a backup route decorator; the route-census tests caught it (98→99). Fixed, census back to 98.
 * Suite 2238 passed + 3 skipped (incl. 7 new code-revision tests); ruff clean.
 
+### 2026-10-13 — Cite-the-candidate fallback (twist evidence grounded)
+* `confirm_twist`: a confirmed citation matching no candidate and carrying no twist vocabulary (or wake words) falls back to the first deterministic candidate line+scene. Model's own matching/waking citations kept.
+* Caught live by its own tests mid-build: the wake-word keep was missing and the null-scene test failed — added, green. Suite 2242 passed + 3 skipped; ruff clean.
+
 ### 2026-10-13 — Twist decline fixed (scene-null accepted)
 * Autopsy result: 6/12 declines on identical input; live 8-probe rerun 7 TWIST / 1 null, and the null was `twist:true, scene:null` — confirmation hedged on location, destroyed by the int-only parser. All 6 stored verdicts carry scene None anyway.
 * Fix: `parse_twist_verdict` accepts null scene (non-int still rejected); semantic bar unchanged. Live re-run of the 8-probe experiment: 8/8 TWIST. Suite 2240 green; ruff clean.

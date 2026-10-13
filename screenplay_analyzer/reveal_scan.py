@@ -123,7 +123,8 @@ def confirm_twist(doc, client, system_prompt: str = TWIST_PROMPT) -> dict | None
     model errors all leave the run exactly as it was. A cited scene number
     outside the script is dropped to None (the detection stands; the false
     precision does not — trial acceptance caught scene 4 of 3)."""
-    if not scan_reveals(doc):
+    candidates = scan_reveals(doc)
+    if not candidates:
         return None
     text = _full_text(doc)
     if not text.strip():
@@ -136,7 +137,40 @@ def confirm_twist(doc, client, system_prompt: str = TWIST_PROMPT) -> dict | None
     verdict = parse_twist_verdict(reply)
     if verdict is None:
         return None
+    verdict = _ground_citation(verdict, candidates)
     real = {s.scene_number for s in doc.scenes or []}
     if verdict.get("scene") not in real:
         verdict["scene"] = None
     return verdict
+
+
+def _ground_citation(verdict: dict, candidates: list) -> dict:
+    """The model confirms reliably but cites sloppily (measured: 3/8 live
+    confirmations pointed at an unrelated beat). When the cited line matches
+    no candidate and carries no twist vocabulary itself, fall back to the
+    first deterministic candidate — a real line from the scan, in range by
+    construction. Never invents: with no candidates there is no verdict to
+    ground (confirm_twist returns earlier)."""
+    line = verdict.get("line") or ""
+    lownorm = _cite_norm(line)
+    for c in candidates:
+        cline = _cite_norm(c.get("line") or "")
+        if cline and (cline in lownorm or lownorm in cline):
+            return verdict
+    if any(p.search(line) for p in REVEAL_PATTERNS):
+        return verdict
+    # Waking is the twist's own vocabulary even when no pattern names it:
+    # a cited waking beat is a plausible citation, not a wrong one.
+    if re.search(r"\bwake[sd]?\b|\bwaking\b|\bwoke\b", line, re.I):
+        return verdict
+    first = candidates[0]
+    verdict["line"] = first.get("line", "")
+    verdict["scene"] = first.get("scene")
+    return verdict
+
+
+def _cite_norm(text: str) -> str:
+    import re
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(text or "")).lower()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", s)).strip()

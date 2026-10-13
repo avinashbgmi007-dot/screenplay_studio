@@ -157,6 +157,31 @@ def test_non_int_scene_is_still_rejected():
                                 "line": "He wakes up.", "kind": "dream"}) is None
 
 
+def test_unrelated_cited_line_falls_back_to_candidate():
+    """Live 8-probe finding: 3 confirmations cited an unrelated beat.
+    The deterministic candidate replaces the model's pick."""
+    from screenplay_analyzer.reveal_scan import confirm_twist
+    client = _TwistClient(reply={"twist": True, "scene": 2,
+                                 "line": "He writes the article.",
+                                 "kind": "dream"})
+    verdict = confirm_twist(_twist_doc(), client)
+    assert verdict is not None and verdict["twist"] is True
+    assert verdict["line"] == "Raj wakes. It was a dream."
+    assert verdict["scene"] == 1
+
+
+def test_matching_cited_line_is_kept():
+    """A citation that matches the candidate (or carries twist vocabulary)
+    is the model's to keep."""
+    from screenplay_analyzer.reveal_scan import confirm_twist
+    client = _TwistClient(reply={"twist": True, "scene": 2,
+                                 "line": "It was a dream.",
+                                 "kind": "dream"})
+    verdict = confirm_twist(_twist_doc(), client)
+    assert verdict is not None
+    assert verdict["line"] == "It was a dream."
+
+
 def test_confirmed_block_replaces_candidate_block():
     from screenplay_analyzer.reveal_scan import confirmed_twist_block
     assert confirmed_twist_block(None) == ""
