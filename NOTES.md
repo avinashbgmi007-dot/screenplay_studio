@@ -4305,6 +4305,11 @@ browser job's to run on the PR.
 * Backtest over all 19 stored reports: exactly 2 new firings — trial-13 #1/#2, both WEAK-scored. Zero solid-hits.
 * Suite 2226 passed + 3 skipped; ruff clean.
 
+### 2026-10-13 — Trial 14: three validations at once (gunpen #7)
+* Removal ledger: 2 removals, both correct trash (one redundant with old rule, one code-switch). New claim-side rule still without an EXCLUSIVE live firing — covered, not proven. Prompt ban failed again (2 complaints generated under it). Name-variant falsehood regenerated 13/13 runs, withdrawn 13/13.
+* Audit: solid 14/26 (54%), weak 4 (#3 cannot-judge-as-defect, #5/#9/#20 self-rebutting rows), flagged 8. Honest 22/26 = 85%. Twist dream present (5th of 7 gunpen runs). Goldens 4/5 (jam absent, text-verified).
+* New named family: UNMARKED SELF-REBUTTAL — obs contradicts issue with no discourse marker (#20 "rather than concluding with uncomplicated success", #9 "'high' indicating evolution", #5 "directly mirrors"). Six rows across trials 12–14; `is_refuted` blind by construction. Needs semantic judgment — regex patching explicitly deferred as unsafe.
+
 ### 2026-10-13 — Removal audit: the other direction (all rows ever dropped)
 * Enumerated every `language_filtered` removal and every gate withdrawal across all 20 stored reports + the user's fresh Pain_3. Filter removals: 5 total (3 darshi + 1 trial-13 + 1 user Pain_3 code-switching note) — all correct-family trash, zero legitimate notes. Gate withdrawals: 12 total, all the same GUN_GUY/PEN_GUY name-variant falsehood rejected once per gunpen run — correct every time.
 * Cost side clean: nothing legitimate was ever removed. Flank exposed, not built: the same false name-variant claim regenerates 12/12 runs and is caught downstream every time — a prompt-level candidate for later.
