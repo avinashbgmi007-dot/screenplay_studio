@@ -139,6 +139,33 @@ class TestFilterUnit:
         }
         assert is_non_writing_feedback(f) is False
 
+    def test_claim_side_transliteration_complaint_dropped(self):
+        """Trial-13 live rows: both halves claim-side, no observation
+        language mention for the older rule to see."""
+        for issue, why in [
+            ("The script uses an untransliterated foreign language without providing context or translation.",
+             "The emotional intent is inaccessible to non-speakers."),
+            ("The entire script uses a transliterated language without providing an English equivalent.",
+             "It is impossible to evaluate the narrative content."),
+        ]:
+            f = {"category": "dialogue", "issue": issue,
+                 "observation": "Scene 1 contains a block of dialogue.",
+                 "why_it_matters": why,
+                 "evidence_quote": "life antene decisions meeda"}
+            assert is_non_writing_feedback(f) is True, issue
+
+    def test_single_half_claim_side_kept(self):
+        """Either half alone is legitimate: vehicle praise without harm,
+        or harm without a vehicle complaint."""
+        assert is_non_writing_feedback({
+            "issue": "The Romanized Tamil dialogue is punchy and distinct.",
+            "why_it_matters": "The voice carries the scene.",
+        }) is False
+        assert is_non_writing_feedback({
+            "issue": "The timeline is impossible to evaluate on the page.",
+            "why_it_matters": "The reader cannot tell what happens first.",
+        }) is False
+
     def test_phonetic_transcription_complaint_dropped(self):
         # Trial-8 live findings (gunpen #4/#5): transliterated Tenglish V.O.
         # filed as "phonetic transcription" / "language mixing creates

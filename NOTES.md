@@ -4300,6 +4300,11 @@ browser job's to run on the PR.
 * Tests: ban witnessed on dialogue/theme/scene-function prompts + cowriter system prompt; all pinned language-rule tests still green. Suite 2224 passed + 3 skipped; ruff clean.
 * Validation owed: live run scored on `stats["language_filtered"]` — empty ledger means the instruction worked, non-empty means it didn't. Proposed next.
 
+### 2026-10-13 — Claim-side transliteration rule (trial-13 follow-up, built)
+* New deterministic clause in `is_non_writing_feedback`: claim-side vehicle signal (transliterat*, untransliterated, foreign language, romanized) AND claim-side incomprehension plea (inaccessible/unintelligible/impossible-to-evaluate/without-translation-context-equivalent) on issue+why, quotes exempt. Either half alone kept (unit-pinned both directions).
+* Backtest over all 19 stored reports: exactly 2 new firings — trial-13 #1/#2, both WEAK-scored. Zero solid-hits.
+* Suite 2226 passed + 3 skipped; ruff clean.
+
 ### 2026-10-13 — User Pain_3 re-analyzed live (duplicate/locatability verdict)
 * User complaint verified on their actual Oct-1 report (43 rows): 1 byte-identical pair, ~10 pairs ≥0.75, ~150 pairs ≥0.45; 29/43 quoteless, 0 observations, 0 scene_keys. Report predated every dedupe/flag/grounding mechanism.
 * Desk UI verified: Fix Queue rows show "Scene N — heading" + Locate + badges; finding cards carry scope labels on all list surfaces (margin pins exempt by pinned browser test); report.md prints scenes + quotes. No UI change needed — the approved scope-label build was correctly stood down.

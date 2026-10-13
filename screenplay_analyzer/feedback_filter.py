@@ -37,6 +37,27 @@ _INCOMPREHENSION_PATTERNS = [
     re.compile(r"creates? confusion", re.I),
 ]
 
+# --- claim-side transliteration complaints (trial 13: both halves of the
+# pattern sit in the claim — "untransliterated foreign language ...
+# inaccessible to non-speakers", "transliterated language ... impossible
+# to evaluate" — where the observation-side rule cannot see them). Both
+# halves must hit on issue+why_it_matters (quotes exempt, as throughout):
+# a language-vehicle signal AND an incomprehension plea. Either half alone
+# is a legitimate note ("the Romanized Tamil dialogue is punchy" judges
+# voice; "the timeline is impossible to evaluate" is about staging).
+_REGISTER_LANG = [
+    re.compile(r"transliterat\w*", re.I),
+    re.compile(r"untransliterated", re.I),
+    re.compile(r"foreign language", re.I),
+    re.compile(r"romanized", re.I),
+]
+_REGISTER_HARM = [
+    re.compile(r"inaccessible", re.I),
+    re.compile(r"unintelligible", re.I),
+    re.compile(r"impossible to (evaluate|assess|understand)", re.I),
+    re.compile(r"without (providing )?(context|translation|an? english equivalent|subtitles)", re.I),
+]
+
 # --- patterns for commentary that identifies / classifies the language ---
 _LANGUAGE_ID_PATTERNS = [
     re.compile(r"reads as (a )?(regional|tenglish|hinglish|indian)", re.I),
@@ -83,7 +104,9 @@ def is_non_writing_feedback(finding: dict) -> bool:
     identification, but only together with an "I can't read this" claim —
     a craft note that quotes a Tenglish line as evidence is kept, while a
     note whose whole complaint is that the dialogue is in another language
-    (trial 5: Tamil filed "opaque, impossible to assess") is dropped."""
+    (trial 5: Tamil filed "opaque, impossible to assess") is dropped, as is
+    a claim-side transliteration complaint pairing the vehicle with
+    incomprehension (trial 13)."""
     if not isinstance(finding, dict):
         return False
     issue = str(finding.get("issue") or "")
@@ -92,10 +115,11 @@ def is_non_writing_feedback(finding: dict) -> bool:
     if _matches_any(combined, _LANGUAGE_ID_PATTERNS) or _matches_any(combined, _SUBTITLE_PATTERNS):
         return True
     obs = str(finding.get("observation") or "")
-    return (
-        (_matches_any(obs, _LANGUAGE_ID_PATTERNS) or _matches_any(obs, _SUBTITLE_PATTERNS))
-        and _matches_any(combined, _INCOMPREHENSION_PATTERNS)
-    )
+    if ((_matches_any(obs, _LANGUAGE_ID_PATTERNS) or _matches_any(obs, _SUBTITLE_PATTERNS))
+            and _matches_any(combined, _INCOMPREHENSION_PATTERNS)):
+        return True
+    return (_matches_any(combined, _REGISTER_LANG)
+            and _matches_any(combined, _REGISTER_HARM))
 
 
 def filter_findings(findings) -> list:
