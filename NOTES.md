@@ -4287,6 +4287,12 @@ browser job's to run on the PR.
 * Standing numbers: gunpen honest-or-flagged 91–96% across four runs, goldens 5/5-3/5-5/5-5/5; pain3 89–91% honest, goldens 3/5-5/5; twist 4/4; suite 2212; ruff clean.
 * Closed without building: quoteless-rule generalization (evidence never showed falsehood, only arguable notes — metric comfort over writer value, won't do).
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
+
+### 2026-10-13 — User Pain_3 re-analyzed live (duplicate/locatability verdict)
+* User complaint verified on their actual Oct-1 report (43 rows): 1 byte-identical pair, ~10 pairs ≥0.75, ~150 pairs ≥0.45; 29/43 quoteless, 0 observations, 0 scene_keys. Report predated every dedupe/flag/grounding mechanism.
+* Desk UI verified: Fix Queue rows show "Scene N — heading" + Locate + badges; finding cards carry scope labels on all list surfaces (margin pins exempt by pinned browser test); report.md prints scenes + quotes. No UI change needed — the approved scope-label build was correctly stood down.
+* Re-ran their Pain_3 with current code (~40 min): 62 findings, 48 quotes (was 14), 56 observations (was 0), 62 scene_keys (was 0), 10 flagged rows, 1 language-filter removal (code-switching note), twist null (correct). Dup scan: 6 pairs ≥0.45, max 0.98 (three deterministic time-flips differing only in scene numbers — accepted: distinct defects, Locate disambiguates). Goldens 4/5 (debt MISS, same pattern as trial 7).
 * Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`).
 
 ### 2026-10-12 — Trial 12: floor run with all gates active (gunpen #5)
