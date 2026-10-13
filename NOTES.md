@@ -4289,6 +4289,11 @@ browser job's to run on the PR.
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
 * Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
 
+### 2026-10-13 — Eval coverage saga, closed (findings → twist → ledger → merged → coverage/reads)
+* Trial-15 audit forced three eval extensions in one round: `why_it_matters` (countdown HIT hid there), merged-findings content (acc12's only "jam"), coverage/character_reads (acc15's dream). Each extension then caught luck: dial pole "Grounded/Dreamy" and logline title-drops match words without tracking threads — excluded via explicit include-list (findings, twist, reveals, ledger, coverage, reads only).
+* Final verified matrix: gunpen 5/5, 4/5, 5/5, 5/5, 4/5, 4/5, 4/5; pain3 3/5, 5/5. Every MISS text-verified absent across all searched channels; every HIT spot-checked genuine (acc12 dream lives in solid finding #19, acc15 dream in a coverage weakness).
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
+
 ### 2026-10-13 — Repeat offender killed at the source (not a prompt rule)
 * The 13-run GUN_GUY/PEN_GUY falsehood was deterministic, not model prose: continuity's co-presence guard compared raw cue text (`GUN_GUY`) against normalized `characters_present` (`GUN GUY`) — underscore vs space never equal, so the guard was dead for underscored names. Fix normalizes both sides (`normalize_character_name().upper()`); verified the false row is gone on the real trial-14 doc while true typos (GUN_GUY/GUN_GUYY) still fire.
 * Suite 2228 passed + 3 skipped (11 continuity tests incl. 2 new); ruff clean.

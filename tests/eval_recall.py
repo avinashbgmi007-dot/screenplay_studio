@@ -79,6 +79,14 @@ def _search_texts(report: dict) -> list[str]:
     texts = [_norm(f"{f.get('issue', '')} {f.get('observation', '')} "
                    f"{f.get('why_it_matters', '')} {f.get('evidence_quote', '')}")
              for f in report.get("findings", [])]
+    # Absorbed duplicates: merged rows survive inside their keeper, one
+    # click away in the desk (trial 12: the only "jam" in the report lived
+    # in a merged observation). Same visibility argument as the ledger.
+    for f in report.get("findings", []):
+        for m in (f.get("merged_findings") or []):
+            if isinstance(m, dict):
+                texts.append(_norm(f"{m.get('issue', '')} {m.get('observation', '')} "
+                                    f"{m.get('evidence_quote', '')}"))
     tv = report.get("twist_verdict") or {}
     if isinstance(tv, dict):
         texts.append(_norm(f"{tv.get('kind', '')} {tv.get('line', '')}"))
@@ -97,7 +105,25 @@ def _search_texts(report: dict) -> list[str]:
     for e in report.get("setup_payoff") or []:
         if isinstance(e, dict):
             texts.append(_norm(f"{e.get('setup', '')} {e.get('note', '')}"))
+    # Everything else the writer sees as ANALYSIS (trial 15: the dream
+    # lived in the coverage synopsis while findings, twist, and ledger all
+    # missed the word). Explicit include-list: scores, labels, summaries,
+    # and bookkeeping stay out (trial 15: the dial pole "Grounded/Dreamy"
+    # and the logline title-drop match words without tracking threads).
+    # Withdrawals stay excluded — a removed row must never count.
+    for key in ("coverage", "character_reads"):
+        value = report.get(key)
+        if value is not None:
+            texts.append(_norm(_flatten(value)))
     return texts
+
+
+def _flatten(value) -> str:
+    if isinstance(value, dict):
+        return " ".join(_flatten(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return " ".join(_flatten(v) for v in value)
+    return str(value or "")
 
 
 def hit_rate(report_path, golden_path):
