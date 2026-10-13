@@ -996,6 +996,95 @@ def apply_observation_check(findings: list, doc) -> None:
             demote_severity(f)
 
 
+_IDENTITY_ACTION_VERBS = re.compile(r"\b(calls|addresses|greets|names)\b", re.I)
+
+
+def _identity_name_pat(name: str) -> str:
+    """Regex matching a normalized cue name with flexible inner spacing."""
+    return r"\s*".join(re.escape(w) for w in name.split())
+
+
+def _identity_el_type(e) -> str:
+    t = getattr(e, "type", None)
+    return str(getattr(t, "value", t) or "").lower()
+
+
+def _identity_el_character(e) -> str:
+    from screenplay_parser.heuristics import normalize_character_name
+    return normalize_character_name(str(getattr(e, "character", None) or "")).upper()
+
+
+def _identity_names_in(text: str, *names: str) -> bool:
+    norm = re.sub(r"\s+", " ", str(text or "").upper().replace("_", " "))
+    return all(re.search(r"\b" + _identity_name_pat(n) + r"\b", norm) for n in names)
+
+
+def _identity_proven(f: dict, parties: tuple[str, str], scenes: list) -> bool:
+    """True when the cited scenes explicitly settle the identity verdict:
+    (a) an equation element — a DIALOGUE line whose speaker is one party and
+    whose text names the other, an ACTION line with an addressing verb naming
+    both, a parenthetical `(as Y)` attached to X's cue/line, or a heading in
+    `X=Y`/`X-AS-Y` form; or (b) dialogue co-presence — both parties speak in
+    one cited scene. Anything else returns False. Quotes are evidence, never
+    scanned — only scene elements are read."""
+    a, b = parties
+    for s in scenes or []:
+        speakers = set()
+        for e in getattr(s, "elements", None) or []:
+            t = _identity_el_type(e)
+            chn = _identity_el_character(e)
+            text = getattr(e, "text", None) or ""
+            if t == "dialogue" and chn in (a, b):
+                speakers.add(chn)
+                other = b if chn == a else a
+                if _identity_names_in(text, other):
+                    return True
+            elif t == "action" and _IDENTITY_ACTION_VERBS.search(text):
+                if _identity_names_in(text, a, b):
+                    return True
+            elif t == "parenthetical" and chn in (a, b):
+                other = b if chn == a else a
+                if re.search(r"\(\s*as\s+" + _identity_name_pat(other) + r"\s*\)", text, re.I):
+                    return True
+            elif t == "scene_heading":
+                for x, y in ((a, b), (b, a)):
+                    xp, yp = _identity_name_pat(x), _identity_name_pat(y)
+                    if re.search(xp + r"\s*=\s*" + yp, text, re.I):
+                        return True
+                    if re.search(xp + r"\s+as\s+" + yp, text, re.I):
+                        return True
+                    if re.search(xp + r"\s*-\s*as\s*-\s*" + yp, text, re.I):
+                        return True
+        if {a, b} <= speakers:
+            return True
+    return False
+
+
+def apply_identity_check(findings: list, doc) -> None:
+    """Flag identity verdicts the text cannot settle (trial-10 #12):
+    `identity_uncertain: True` plus one severity step down. Demote, never
+    drop — uncertainty is not falsehood. Explicit equations and dialogue
+    co-presence keep the row; everything else verifiable is out of scope
+    for this check (pronouns, ref-less rows, missing docs)."""
+    from .feedback_filter import demote_severity
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        parties = _identity_parties(f)
+        if parties is None or doc is None:
+            continue
+        refs = [r for r in (f.get("scene_refs") or []) if isinstance(r, int)]
+        if not refs:
+            continue
+        scenes = {s.scene_number: s for s in (doc.scenes or [])}
+        if any(r not in scenes for r in refs):
+            continue
+        if _identity_proven(f, parties, [scenes[r] for r in sorted(refs)]):
+            continue
+        f["identity_uncertain"] = True
+        demote_severity(f)
+
+
 def apply_scene_quote_rule(findings: list) -> None:
     """Flag quoteless scene_function rows (trial-5 follow-up): a scene note
     with no evidence_quote is a summary opinion, not a cited defect — one
@@ -1716,7 +1805,11 @@ def analyze(
     # flagged and demoted. Runs after the observation pass and the floor, so
     # it judges grounded rows only — ungrounded rows have nothing to check.
     apply_observation_check(result.findings, doc)
-    # 8h. scene quote rule (trial-5 follow-up): quoteless scene_function rows
+    # 8h. identity check (trial-10 #12): identity verdicts the text cannot
+    # settle are flagged and demoted. Runs beside the other demote-never-drop
+    # guards, so the summary below counts what the writer is shown.
+    apply_identity_check(result.findings, doc)
+    # 8i. scene quote rule (trial-5 follow-up): quoteless scene_function rows
     # are summary opinions. Flagged and demoted here, beside the other
     # demote-never-drop guards, so the summary below counts what the writer
     # is shown.

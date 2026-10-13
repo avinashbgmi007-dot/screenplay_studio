@@ -312,3 +312,55 @@ def test_identity_single_name_returns_none():
     from screenplay_analyzer import pipeline as P
     assert P._identity_parties({"issue": "Rahul never appears after scene 4."}) is None
     assert P._identity_parties({"issue": "He never speaks to her."}) is None
+
+
+class _CEl:
+    """Dialogue-capable element stub: mirrors _TEl plus the type/character
+    attributes apply_identity_check reads on dialogue elements."""
+    def __init__(self, text, type="action", character=None):
+        self.type = type
+        self.text = text
+        self.character = character
+
+
+class _CScene:
+    def __init__(self, number, elements, characters):
+        self.scene_number = number
+        self.elements = elements
+        self.characters_present = characters
+
+
+class _CopresentDoc:
+    all_characters = ["RAJ", "PEN GUY"]
+    scenes = [
+        _CScene(1, [_CEl("INT. FLAT - DAY", type="scene_heading"),
+                    _CEl("Raj enters, exhausted."),
+                    _CEl("Nuvvu evaru ra?", type="dialogue", character="RAJ"),
+                    _CEl("A journalist.", type="dialogue", character="PEN GUY")],
+                ["RAJ", "PEN GUY"]),
+    ]
+
+
+def test_identity_uncertain_flagged_and_demoted():
+    from screenplay_analyzer import pipeline as P
+    rows = [{"category": "character",
+             "issue": "Raj does not appear to be the Pen Guy.",
+             "observation": "Pen Guy is a distinct entity not named Raj.",
+             "severity": "high", "scene_refs": [2],
+             "evidence_quote": "Nuvvu evaru ra?"}]
+    P.apply_identity_check(rows, _TDoc())
+    assert rows[0].get("identity_uncertain") is True
+    assert rows[0]["severity"] == "medium"
+
+
+def test_identity_with_dialogue_copresence_kept():
+    """Both names speaking in one cited scene supports distinctness."""
+    from screenplay_analyzer import pipeline as P
+    rows = [{"category": "character",
+             "issue": "Raj is not Pen Guy.",
+             "observation": "Two speaking parts.",
+             "severity": "medium", "scene_refs": [1],
+             "evidence_quote": "Nuvvu evaru ra?"}]
+    P.apply_identity_check(rows, _CopresentDoc())
+    assert rows[0].get("identity_uncertain", False) is False
+    assert rows[0]["severity"] == "medium"
