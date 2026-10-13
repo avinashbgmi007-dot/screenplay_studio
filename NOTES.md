@@ -4305,6 +4305,10 @@ browser job's to run on the PR.
 * Backtest over all 19 stored reports: exactly 2 new firings — trial-13 #1/#2, both WEAK-scored. Zero solid-hits.
 * Suite 2226 passed + 3 skipped; ruff clean.
 
+### 2026-10-13 — Removal audit: the other direction (all rows ever dropped)
+* Enumerated every `language_filtered` removal and every gate withdrawal across all 20 stored reports + the user's fresh Pain_3. Filter removals: 5 total (3 darshi + 1 trial-13 + 1 user Pain_3 code-switching note) — all correct-family trash, zero legitimate notes. Gate withdrawals: 12 total, all the same GUN_GUY/PEN_GUY name-variant falsehood rejected once per gunpen run — correct every time.
+* Cost side clean: nothing legitimate was ever removed. Flank exposed, not built: the same false name-variant claim regenerates 12/12 runs and is caught downstream every time — a prompt-level candidate for later.
+
 ### 2026-10-13 — User Pain_3 re-analyzed live (duplicate/locatability verdict)
 * User complaint verified on their actual Oct-1 report (43 rows): 1 byte-identical pair, ~10 pairs ≥0.75, ~150 pairs ≥0.45; 29/43 quoteless, 0 observations, 0 scene_keys. Report predated every dedupe/flag/grounding mechanism.
 * Desk UI verified: Fix Queue rows show "Scene N — heading" + Locate + badges; finding cards carry scope labels on all list surfaces (margin pins exempt by pinned browser test); report.md prints scenes + quotes. No UI change needed — the approved scope-label build was correctly stood down.
