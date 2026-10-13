@@ -4289,6 +4289,12 @@ browser job's to run on the PR.
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
 * Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
 
+### 2026-10-13 — Coverage-drift test (eval maintains itself now)
+* `tests/test_eval_coverage.py`: fails when `to_findings_json` gains a section in neither `SEARCHED_SECTIONS` nor `EXCLUDED_SECTIONS`; withdrawals pinned excluded; search coverage smoke-tested.
+* Classification calls made explicit: loglines EXCLUDED (title-drops name threads without tracking them — caught acc8 pen hitting via logline), dials/counts/metadata/bookkeeping out; findings(+merged, why), twist, reveals, ledger, coverage, reads, formatting, pacing in.
+* Final matrix verified flip-by-flip: gunpen 5/5, 4/5, 5/5, 5/5, 4/5, 4/5, 4/5; pain3 3/5, 5/5. Acc8 dream HIT re-verified via twist channel; acc8 pen HIT via merged props+article obs (borderline, disclosed); acc15 dream via coverage weakness (genuine prose).
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
+
 ### 2026-10-13 — Eval coverage saga, closed (findings → twist → ledger → merged → coverage/reads)
 * Trial-15 audit forced three eval extensions in one round: `why_it_matters` (countdown HIT hid there), merged-findings content (acc12's only "jam"), coverage/character_reads (acc15's dream). Each extension then caught luck: dial pole "Grounded/Dreamy" and logline title-drops match words without tracking threads — excluded via explicit include-list (findings, twist, reveals, ledger, coverage, reads only).
 * Final verified matrix: gunpen 5/5, 4/5, 5/5, 5/5, 4/5, 4/5, 4/5; pain3 3/5, 5/5. Every MISS text-verified absent across all searched channels; every HIT spot-checked genuine (acc12 dream lives in solid finding #19, acc15 dream in a coverage weakness).

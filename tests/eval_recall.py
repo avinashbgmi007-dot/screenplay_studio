@@ -16,6 +16,21 @@ import sys
 
 TOKEN_OVERLAP_FLOOR = 0.5
 
+# Report sections the eval searches, and sections it deliberately skips.
+# A test (tests/test_eval_coverage.py) fails when to_findings_json gains a
+# top-level section in neither set, so new writer-visible output cannot
+# silently leave recall coverage. Withdrawals stay excluded by principle —
+# a removed row must never count toward recall.
+SEARCHED_SECTIONS = frozenset({
+    "findings", "twist_verdict", "reveal_candidates", "setup_payoff",
+    "coverage", "character_reads", "formatting_findings", "pacing",
+})
+EXCLUDED_SECTIONS = frozenset({
+    "withdrawals", "stats", "errors", "notices", "recoveries",
+    "character_dials", "verification_summary", "logline_test",
+    "model_used", "source_filename", "title",
+})
+
 
 def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", str(text or "").lower())).strip()
@@ -105,13 +120,14 @@ def _search_texts(report: dict) -> list[str]:
     for e in report.get("setup_payoff") or []:
         if isinstance(e, dict):
             texts.append(_norm(f"{e.get('setup', '')} {e.get('note', '')}"))
-    # Everything else the writer sees as ANALYSIS (trial 15: the dream
-    # lived in the coverage synopsis while findings, twist, and ledger all
-    # missed the word). Explicit include-list: scores, labels, summaries,
-    # and bookkeeping stay out (trial 15: the dial pole "Grounded/Dreamy"
-    # and the logline title-drop match words without tracking threads).
-    # Withdrawals stay excluded — a removed row must never count.
-    for key in ("coverage", "character_reads"):
+    # Further writer-visible analysis (trial 15: the dream lived in the
+    # coverage synopsis while findings, twist, and ledger all missed the
+    # word). Only ANALYSIS sections: loglines stay out (a title-drop names
+    # a thread without tracking it — trial 15 review), as do dials
+    # (labels), counts, metadata, and bookkeeping.
+    for key in ("coverage", "character_reads",
+                "formatting_findings", "pacing"):
+        assert key in SEARCHED_SECTIONS, key
         value = report.get(key)
         if value is not None:
             texts.append(_norm(_flatten(value)))
