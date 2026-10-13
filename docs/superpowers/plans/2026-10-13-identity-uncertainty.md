@@ -60,10 +60,6 @@ _IDENTITY_PATTERNS = [
     re.compile(r"\bdistinct\s+entit\w*\b", re.I),
     re.compile(r"\bsame\s+character\b", re.I),
     re.compile(r"\bdoes\s+not\s+appear\s+to\s+be\b", re.I),
-    re.compile(r"\bnever\s+appears\b", re.I),
-    re.compile(r"\bdoes\s+not\s+appear\b", re.I),
-    re.compile(r"\bno\b.{0,20}\bpresent\b", re.I),
-    re.compile(r"\babsent\b", re.I),
 ]
 _HEDGE_PATTERNS = [
     # Affirmative hedging only: "does NOT appear to be X" asserts absence
@@ -299,4 +295,33 @@ Expected: all passed, 3 skipped.
 ```bash
 git add docs/CODEBASE_MAP.md NOTES.md screenplay_studio/webapp/app.js screenplay_studio/webapp/style.css
 git commit -m "feat(accuracy): identity-uncertainty flag display and backtest"
+```
+
+### Task 5: Narrow trigger after backtest STOP (29 firings, solid-hits)
+
+**Files:**
+- Modify: `screenplay_analyzer/pipeline.py` (`_IDENTITY_PATTERNS`, `_identity_parties` signature + cast check)
+- Test: `tests/test_accuracy_guards.py` (update + narrow-case tests)
+
+**Interfaces:**
+- Consumes: Tasks 1–2 as committed (2cff3e6, ca583fa).
+- Produces: `_identity_parties(f, doc=None)` returning None unless both names are script characters.
+
+- [x] **Step 1: Update the two Task-1 tests for the new signature**
+
+Existing calls `P._identity_parties(f)` keep working (`doc` defaults None) — but with `doc=None` the cast check cannot run, so the function returns None and the old expectations fail. Update: pass a stub doc with `all_characters` (a `types.SimpleNamespace(all_characters=[...])` suffices — the implementation must read only `doc.all_characters`, never parse), and add:
+  - title-words rejected: finding about "Three Line Rule" + "Plot Point" with a real doc returns None;
+  - non-cast pair rejected: two capitalized non-characters with a real doc returns None.
+
+- [x] **Step 2: Run to verify fail, implement, re-run**
+
+Run: `python -m pytest tests/test_accuracy_guards.py -q -p no:cacheprovider -k "identity"`
+Expected first: FAIL. Then in `_identity_parties(f, doc=None)`: drop the absence-family patterns from `_IDENTITY_PATTERNS` (keep `is/is-not/really/same character/distinct entity/does not appear to be`); after resolving names, return None unless `doc` is not None and both names are in `{normalize_character_name(c).upper() for c in (doc.all_characters or [])}`. Re-run: PASS whole file.
+
+- [x] **Step 3: Re-backtest (Task-4 procedure), suite, commit**
+
+Backtest must show: trial-10 #12 STILL fires; zero solid-hits (re-verify every firing against NOTES audits by hand — no batch assertion). Then ruff + full suite + commit:
+```bash
+git add screenplay_analyzer/pipeline.py tests/test_accuracy_guards.py docs/superpowers/plans/2026-10-13-identity-uncertainty.md
+git commit -m "fix(accuracy): identity trigger requires cast members"
 ```

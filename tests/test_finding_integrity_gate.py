@@ -434,6 +434,7 @@ class _EqDoc:
     explicit equation settling the identity the verdict denies."""
 
     def __init__(self):
+        self.all_characters = ["RAJ", "PEN GUY"]
         self.scenes = [SimpleNamespace(
             scene_number=2,
             characters_present=["RAJ", "PEN GUY"],

@@ -300,18 +300,43 @@ def test_quoteless_scene_function_low_row_flagged_not_double_demoted():
 
 
 def test_identity_parties_from_observation():
+    import types
     from screenplay_analyzer import pipeline as P
+    doc = types.SimpleNamespace(all_characters=["RAJ", "PEN GUY", "GUN GUY"])
     f = {"category": "character",
          "issue": "Protagonist Identity Ambiguity: Raj's role is unclear because he does not appear to be the 'Pen Guy'.",
          "observation": "The character labeled 'PEN_GUY' is a distinct entity not named Raj.",
          "severity": "high", "scene_refs": [1, 2, 3]}
-    assert P._identity_parties(f) == ("RAJ", "PEN GUY")
+    assert P._identity_parties(f, doc) == ("RAJ", "PEN GUY")
 
 
 def test_identity_single_name_returns_none():
     from screenplay_analyzer import pipeline as P
     assert P._identity_parties({"issue": "Rahul never appears after scene 4."}) is None
     assert P._identity_parties({"issue": "He never speaks to her."}) is None
+
+
+def test_identity_title_words_rejected():
+    """Craft terms are not cast members: a trigger binding two capitalized
+    non-characters resolves names, but the cast check rejects them."""
+    import types
+    from screenplay_analyzer import pipeline as P
+    doc = types.SimpleNamespace(all_characters=["RAJ", "PEN GUY"])
+    f = {"category": "structure",
+         "issue": "The Plot Point is not the Chekhov Gun payoff.",
+         "observation": "Plot Point and Chekhov Gun differ in function."}
+    assert P._identity_parties(f, doc) is None
+
+
+def test_identity_non_cast_pair_rejected():
+    """Two real-looking names outside the cast never fire."""
+    import types
+    from screenplay_analyzer import pipeline as P
+    doc = types.SimpleNamespace(all_characters=["RAJ", "PEN GUY"])
+    f = {"category": "character",
+         "issue": "John Matrix is not Alan Sharp.",
+         "observation": "Two speaking parts."}
+    assert P._identity_parties(f, doc) is None
 
 
 class _CEl:

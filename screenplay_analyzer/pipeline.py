@@ -934,10 +934,6 @@ _IDENTITY_PATTERNS = [
     re.compile(r"\bdistinct\s+entit\w*\b", re.I),
     re.compile(r"\bsame\s+character\b", re.I),
     re.compile(r"\bdoes\s+not\s+appear\s+to\s+be\b", re.I),
-    re.compile(r"\bnever\s+appears\b", re.I),
-    re.compile(r"\bdoes\s+not\s+appear\b", re.I),
-    re.compile(r"\bno\b.{0,20}\bpresent\b", re.I),
-    re.compile(r"\babsent\b", re.I),
 ]
 _HEDGE_PATTERNS = [
     # Affirmative hedging only: "does NOT appear to be X" asserts absence
@@ -951,10 +947,12 @@ _HEDGE_PATTERNS = [
 _NAME_RE = re.compile(r"[A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*")
 
 
-def _identity_parties(f: dict) -> tuple[str, str] | None:
+def _identity_parties(f: dict, doc=None) -> tuple[str, str] | None:
     """Two normalized names bound by an unhedged identity assertion in
     issue+observation, else None. Quotes are evidence, never the claim —
-    names resolve from issue/observation text only."""
+    names resolve from issue/observation text only. Both names must be
+    script characters (normalized against `doc.all_characters`, the only
+    doc attribute read) — title words and non-cast pairs never fire."""
     from screenplay_parser.heuristics import normalize_character_name
     text = f"{f.get('issue') or ''} {f.get('observation') or ''}"
     if not any(p.search(text) for p in _IDENTITY_PATTERNS):
@@ -976,6 +974,11 @@ def _identity_parties(f: dict) -> tuple[str, str] | None:
         if name not in seen:
             seen.append(name)
     if len(seen) < 2:
+        return None
+    if doc is None:
+        return None
+    cast = {normalize_character_name(c).upper() for c in (doc.all_characters or [])}
+    if seen[0] not in cast or seen[1] not in cast:
         return None
     return seen[0], seen[1]
 
@@ -1070,7 +1073,7 @@ def apply_identity_check(findings: list, doc) -> None:
     for f in findings or []:
         if not isinstance(f, dict):
             continue
-        parties = _identity_parties(f)
+        parties = _identity_parties(f, doc)
         if parties is None or doc is None:
             continue
         refs = [r for r in (f.get("scene_refs") or []) if isinstance(r, int)]

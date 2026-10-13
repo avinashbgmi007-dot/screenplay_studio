@@ -548,7 +548,7 @@ class FindingIntegrityGate:
         # (verified with `python -c "import screenplay_analyzer.finding_integrity"`).
         from .pipeline import _identity_parties
         from screenplay_parser.heuristics import normalize_character_name
-        parties = _identity_parties(f)
+        parties = _identity_parties(f, doc)
         if parties is None:
             return None
         text = f"{f.get('issue') or ''} {f.get('observation') or ''}"
