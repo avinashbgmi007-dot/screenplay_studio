@@ -4363,3 +4363,8 @@ browser job's to run on the PR.
 ### 2026-10-13 — User gun_pen re-analyzed + stale-server catch
 * Fresh report: 18 findings, 13 quotes, 16 obs, 18 scene_keys, 4 flagged, dup scan zero pairs ≥0.45, goldens 5/5, twist null (3rd decline in 9 gunpen runs — probe conservatism, not a code defect).
 * Catch: the desk server predated the continuity fix, so this report still carries the withdrawn name-variant row (correctly withdrawn, harmless). Server restarted on current code; future runs get all fixes. Lesson: long-lived servers silently serve stale code — restart the desk after every product-code commit.
+
+### 2026-10-13 — Stale-code guard (the desk tells the truth about its code)
+* `webapp_server.py`: `_code_revision()` (`<short-hash>[+dirty]`, never raises) stamped at import as `_CODE_REV_AT_STARTUP`; `/api/health` reports it; both analyze answers carry `code_rev` + `stale_code` warning (None when fresh) via `_manifest_summary_with_code`. Non-blocking by design — a warning, not a refusal.
+* Self-inflicted red during build: a helper-move edit duplicated a backup route decorator; the route-census tests caught it (98→99). Fixed, census back to 98.
+* Suite 2238 passed + 3 skipped (incl. 7 new code-revision tests); ruff clean.

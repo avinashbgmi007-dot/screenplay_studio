@@ -54,6 +54,56 @@ WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 
 app = Flask(__name__, static_folder=None)
 
+
+def _code_revision(root=None):
+    """The code this process analyzes with, as `"<short-hash>[+dirty]"`.
+
+    A long-lived desk loads modules once at boot and never again, so an
+    analysis can silently run week-old code (measured 2026-10-13: a re-run
+    served pre-fix findings with no signal anywhere). Best-effort and
+    never raising: no git, no checkout, or any error answers "unknown".
+    """
+    import subprocess
+    root = root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=root,
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=root,
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+    except Exception:
+        return "unknown"
+    if not head:
+        return "unknown"
+    return head + ("+dirty" if dirty else "")
+
+
+def _stale_code_warning(boot_rev, now_rev):
+    """None when the tree matches boot, else a plain-language warning.
+
+    "unknown" on either side means "cannot tell" — warn too, because an
+    unverifiable runner is no better than a stale one for this purpose.
+    """
+    if not boot_rev or not now_rev:
+        return "Could not determine the server's code revision."
+    if "unknown" in (boot_rev, now_rev):
+        return ("Could not verify the server is running current code "
+                "(revision unknown) — restart the desk before trusting "
+                "this analysis to reflect the latest fixes.")
+    if boot_rev != now_rev:
+        return (f"Server code changed since boot (booted at {boot_rev}, tree "
+                f"is now {now_rev}) — this analysis ran the booted code, "
+                "not the current tree. Restart the desk and re-run.")
+    return None
+
+
+# Stamped once at import (= process boot): every analysis this process runs
+# uses these modules, whatever lands in the tree afterwards.
+_CODE_REV_AT_STARTUP = _code_revision()
+
 # BE-3 (audit 2026-09-24): the desk ships no telemetry, so this file IS the
 # support channel. Configured by main(); a module logger so a handler can log
 # even if startup never got that far.
@@ -790,6 +840,17 @@ def _manifest_summary(m: ProjectManifest) -> dict:
     }
 
 
+def _manifest_summary_with_code(m):
+    """The manifest summary plus what code produced it: the boot revision
+    and a staleness warning (None when the tree matches boot). Both
+    /analyze and /analyze/retry-failed answer through here, so a stale
+    runner is visible on every path that runs the model."""
+    resp = _manifest_summary(m)
+    resp["code_rev"] = _CODE_REV_AT_STARTUP
+    resp["stale_code"] = _stale_code_warning(_CODE_REV_AT_STARTUP, _code_revision())
+    return resp
+
+
 def _make_client(m: ProjectManifest):
     from screenplay_analyzer.llm_client import LlamaServerClient
     # The manifest is a file on disk, so it can predate this guard or be edited
@@ -1086,7 +1147,8 @@ def real_server_check():
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "server_url": CONFIG.get("server_url"),
-                     "demo_model": _DEMO_MODEL_ACTIVE})
+                    "demo_model": _DEMO_MODEL_ACTIVE,
+                    "code_rev": _CODE_REV_AT_STARTUP})
 
 
 @app.route("/api/rules/<rule_id>", methods=["GET"])
@@ -1630,7 +1692,7 @@ def _analyze_locked(m, name):
     from .metrics import record_analysis
     record_analysis(m, _t.time() - _t0)
     _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
-    return jsonify(_manifest_summary(m))
+    return jsonify(_manifest_summary_with_code(m))
 
 
 @app.route("/api/projects/<name>/analyze/retry-failed", methods=["POST"])
@@ -1692,7 +1754,7 @@ def _retry_failed_locked(m):
     from .metrics import record_analysis
     record_analysis(m, _t.time() - _t0)
     _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
-    return jsonify(_manifest_summary(m))
+    return jsonify(_manifest_summary_with_code(m))
 
 
 @app.route("/api/projects/<name>/backup", methods=["GET"])
