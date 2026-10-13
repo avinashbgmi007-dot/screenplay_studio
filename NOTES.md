@@ -4385,3 +4385,7 @@ browser job's to run on the PR.
 ### 2026-10-13 — Stale-code chip in the desk (guard gets an observer)
 * Status strip gains `code <rev>` (short hash +dirty honest) with explanatory title; conn-card hover adds the code row; analyze completion raises a persistent banner when `stale_code` is non-null. Zero new CSS (reuses `.status-item`); no new fetch surface beyond existing `/api/health`.
 * Verified live in headless Chromium against the running desk: chip renders, title correct, zero page errors. Suite 2238 green; node --check clean.
+
+### 2026-10-13 — Citation fallback validated live (6/6 uniform verdicts)
+* Re-ran the probe experiment through the fallback: 6/6 TWIST, all citing the kalaa candidate at sc3 — alarm-line and pen-line citations both replaced, out-of-range sc4 gone with them. Uniform deterministic verdicts from stochastic replies; strictly better evidence than any single model citation.
+* Residual accepted: the alarm line (the waking trigger) is a reasonable citation the fallback now always replaces. The kalaa line ("realize it was a dream") is the stronger evidence for a dream verdict, so the trade favors correctness over variety.
