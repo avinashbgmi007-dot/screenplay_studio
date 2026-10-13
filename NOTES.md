@@ -4369,6 +4369,10 @@ browser job's to run on the PR.
 * Self-inflicted red during build: a helper-move edit duplicated a backup route decorator; the route-census tests caught it (98→99). Fixed, census back to 98.
 * Suite 2238 passed + 3 skipped (incl. 7 new code-revision tests); ruff clean.
 
+### 2026-10-13 — Twist decline fixed (scene-null accepted)
+* Autopsy result: 6/12 declines on identical input; live 8-probe rerun 7 TWIST / 1 null, and the null was `twist:true, scene:null` — confirmation hedged on location, destroyed by the int-only parser. All 6 stored verdicts carry scene None anyway.
+* Fix: `parse_twist_verdict` accepts null scene (non-int still rejected); semantic bar unchanged. Live re-run of the 8-probe experiment: 8/8 TWIST. Suite 2240 green; ruff clean.
+
 ### 2026-10-13 — Twist-decline autopsy (mechanism found, live experiment)
 * 14 gunpen runs: candidates in 12, verdicts in 6 — exact 50% decline on identical input. Live 8-probe rerun with reply capture: 7 TWIST, 1 null. The null was `twist:true, scene:null` — model confirms, hedges location, strict parser (`isinstance int` required) converts to null.
 * Supporting evidence: all 6 stored TWIST verdicts carry scene None anyway (pipeline strips out-of-range ints like the repeated sc4-of-3). The int requirement buys nothing — valid path already ends at null.

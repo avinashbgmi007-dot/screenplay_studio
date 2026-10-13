@@ -102,7 +102,14 @@ def parse_twist_verdict(reply) -> dict | None:
         return None
     if data.get("twist") is not True:
         return None
-    if not isinstance(data.get("scene"), int) or not data.get("line"):
+    # Scene may be null: the model confirmed the mechanic but hedged on
+    # location (measured 7/8 live probes). The caller already drops
+    # out-of-range ints to None, so accepting null here changes nothing
+    # downstream — it only stops destroying true confirmations. The
+    # semantic bar (twist:true + known kind + non-empty line) is unchanged.
+    if data.get("scene") is not None and not isinstance(data.get("scene"), int):
+        return None
+    if not data.get("line"):
         return None
     if data.get("kind") not in ("dream", "hallucination", "flashback"):
         return None

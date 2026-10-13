@@ -138,6 +138,25 @@ def test_impossible_scene_number_is_kept_honest():
     assert verdict["scene"] is None
 
 
+def test_confirmed_twist_with_null_scene_is_kept():
+    """Autopsy 2026-10-13: 7/8 live probes confirmed the dream; the null
+    came from scene:null (location hedge), which the parser rejected.
+    Every stored verdict carries scene None anyway — accept it."""
+    from screenplay_analyzer.reveal_scan import confirm_twist
+    client = _TwistClient(reply={"twist": True, "scene": None,
+                                 "line": "He wakes up.", "kind": "dream"})
+    assert confirm_twist(_twist_doc(), client) == {
+        "twist": True, "scene": None,
+        "line": "He wakes up.", "kind": "dream"}
+
+
+def test_non_int_scene_is_still_rejected():
+    """Null is a hedge; a string scene is garbage — the bar stays."""
+    from screenplay_analyzer.reveal_scan import parse_twist_verdict
+    assert parse_twist_verdict({"twist": True, "scene": "three",
+                                "line": "He wakes up.", "kind": "dream"}) is None
+
+
 def test_confirmed_block_replaces_candidate_block():
     from screenplay_analyzer.reveal_scan import confirmed_twist_block
     assert confirmed_twist_block(None) == ""
