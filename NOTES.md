@@ -4289,6 +4289,11 @@ browser job's to run on the PR.
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
 * Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
 
+### 2026-10-13 — Trial 13: prompt ban scored live (instruction fails, backstop holds)
+* Sixth gunpen run under the register ban: `language_filtered` count=1 ("untranslated foreign language... unintelligible") — the model still generates the complaint, the filter catches it. Instruction insufficient as sole defense; defense-in-depth validated as architecture.
+* Two sibling phrasings survived undropped (#1 "untransliterated foreign language... inaccessible to non-speakers", #2 "transliterated language... impossible to evaluate") — both signals claim-side, current rule needs obs-side language mention. Narrow deterministic extension sketched (claim-side transliteration signal + claim-side incomprehension, quotes exempt), not built.
+* Audit: solid 15/25 (60%), weak 3 (#1, #2, #23 self-rebutting no-clock claim), flagged 7. Honest 22/25 = 88%. Twist null (2nd in 6 runs), goldens 3/5 (dream + pen-article absent, text-verified).
+
 ### 2026-10-13 — Prompt-level register ban (filter whack-a-mole ends here)
 * Three trials of bias notes in fresh phrasing ("phonetic transcription", "language mixing creates confusion", register-contrast-as-pacing-defect) kept slipping past the deterministic filter. Root fix at the source: `LANGUAGE_META_INSTRUCTION` extended — never file transliteration/code-mixing/dialect/script-choice as a defect, never call dialogue confusing/opaque/unnatural for its language; judge voice by word choice/rhythm/content, never the vehicle.
 * Applied to both constants (analyzer `prompts.py` rides all 14 category prompts; cowriter `context.py` kept in sync per the standing rule). Deterministic filter stays as backstop — defense in depth, not replacement.
