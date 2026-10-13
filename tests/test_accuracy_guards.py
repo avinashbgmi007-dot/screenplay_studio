@@ -297,3 +297,18 @@ def test_quoteless_scene_function_low_row_flagged_not_double_demoted():
     P.apply_scene_quote_rule(rows)
     assert rows[0].get("summary_only") is True
     assert rows[0]["severity"] == "low"
+
+
+def test_identity_parties_from_observation():
+    from screenplay_analyzer import pipeline as P
+    f = {"category": "character",
+         "issue": "Protagonist Identity Ambiguity: Raj's role is unclear because he does not appear to be the 'Pen Guy'.",
+         "observation": "The character labeled 'PEN_GUY' is a distinct entity not named Raj.",
+         "severity": "high", "scene_refs": [1, 2, 3]}
+    assert P._identity_parties(f) == ("RAJ", "PEN GUY")
+
+
+def test_identity_single_name_returns_none():
+    from screenplay_analyzer import pipeline as P
+    assert P._identity_parties({"issue": "Rahul never appears after scene 4."}) is None
+    assert P._identity_parties({"issue": "He never speaks to her."}) is None

@@ -19,6 +19,7 @@ Returns an AnalysisResult with everything report.py needs.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -925,6 +926,58 @@ def apply_evidence_floor(result_or_findings) -> None:
         from .feedback_filter import is_refuted, demote_contested
         if not f.get("ungrounded") and is_refuted(f):
             demote_contested(f)
+
+
+_IDENTITY_PATTERNS = [
+    re.compile(r"\bis\s+not\b", re.I),
+    re.compile(r"\bis\s+really\b", re.I),
+    re.compile(r"\bdistinct\s+entit\w*\b", re.I),
+    re.compile(r"\bsame\s+character\b", re.I),
+    re.compile(r"\bdoes\s+not\s+appear\s+to\s+be\b", re.I),
+    re.compile(r"\bnever\s+appears\b", re.I),
+    re.compile(r"\bdoes\s+not\s+appear\b", re.I),
+    re.compile(r"\bno\b.{0,20}\bpresent\b", re.I),
+    re.compile(r"\babsent\b", re.I),
+]
+_HEDGE_PATTERNS = [
+    # Affirmative hedging only: "does NOT appear to be X" asserts absence
+    # (the trial-10 #12 shape) and must not veto — the lookbehind excludes
+    # the negated form.
+    re.compile(r"(?<!not\s)\bappears\s+to\s+be\b", re.I),
+    re.compile(r"\bmay\s+be\b", re.I),
+    re.compile(r"\bpossibly\b", re.I),
+    re.compile(r"\breads?\s+as\b", re.I),
+]
+_NAME_RE = re.compile(r"[A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*")
+
+
+def _identity_parties(f: dict) -> tuple[str, str] | None:
+    """Two normalized names bound by an unhedged identity assertion in
+    issue+observation, else None. Quotes are evidence, never the claim —
+    names resolve from issue/observation text only."""
+    from screenplay_parser.heuristics import normalize_character_name
+    text = f"{f.get('issue') or ''} {f.get('observation') or ''}"
+    if not any(p.search(text) for p in _IDENTITY_PATTERNS):
+        return None
+    if any(p.search(text) for p in _HEDGE_PATTERNS):
+        return None
+    seen = []
+    for m in _NAME_RE.finditer(text):
+        # Title-case sentence starts ("Protagonist Identity Ambiguity")
+        # are not names: real cue names run to two words max. Possessives
+        # ("Raj's") strip to their owner before comparing.
+        words = m.group(0).split()
+        if len(words) > 2:
+            continue
+        name = normalize_character_name(
+            re.sub(r"['’][sS]$", "", m.group(0).strip("\"'‘’“”"))).upper()
+        if not name or name in {"THE", "AND", "SCENE"}:
+            continue
+        if name not in seen:
+            seen.append(name)
+    if len(seen) < 2:
+        return None
+    return seen[0], seen[1]
 
 
 def apply_observation_check(findings: list, doc) -> None:
