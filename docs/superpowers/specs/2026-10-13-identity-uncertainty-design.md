@@ -25,8 +25,11 @@ Trigger patterns over issue PLUS observation combined (the verdict
 often lives in the observation — see motivating row above; Law V" calls
 the observation the falsifiable claim for exactly this reason), binding
 two capitalized names: `X is Y`, `X is not Y`, `X is really`,
-`distinct entit`, `same character`, `no X present`, `X absent`,
-`X never appears`, `X does not appear`, `does not appear to be`.
+`distinct entit`, `same character`, `does not appear to be`. Deliberately
+NOT covered: bare absence shapes (`X never appears`, `X absent`,
+`no X present`) — those are absence-gate territory, and an un-falsifiable
+absence stays delivered rather than flagged (backtest 2026-10-13: the
+absence-family patterns fired 29 rows including solid-scored ones).
 Hedged variants (`appears to be`, `may be`, `possibly`, `reads as`) skip —
 affirmative hedging only: "does NOT appear to be X" asserts absence (the
 trial-10 #12 shape) and does not veto.
@@ -34,7 +37,10 @@ Fewer than two capitalized names in the combined text skips (pronoun-only
 subjects like `he never speaks` carry nothing to resolve).
 Single-name rows skip. Names normalize via
 `normalize_character_name().upper()` (the continuity lesson: raw cue text
-and normalized presence must meet).
+and normalized presence must meet). Both names must be script characters
+(normalized `doc.all_characters`): identity verdicts are about the cast —
+"Three Line Rule", "Plot Point", and "Chekhov" can never be parties
+(backtest 2026-10-13: title-words were the main false-party source).
 
 ## §2 — Evidence ladder (approved)
 

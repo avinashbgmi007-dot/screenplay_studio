@@ -4485,6 +4485,11 @@ function renderFixQueuePanel(container) {
       flag.title = "Its own observation argues against this note — read the observation before acting on it";
       rowFlags.push(flag);
     }
+    if (item.identity_uncertain) {
+      const flag = el("span", "row-flag row-flag-identity", "identity?");
+      flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
     if (item.ungrounded) {
       const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
       flag.title = "No quote or checkable observation backs this note yet";
