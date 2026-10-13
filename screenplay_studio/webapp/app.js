@@ -704,6 +704,12 @@ async function loadConfig() {
   } catch (e) {
     console.warn("Could not load config:", e);
   }
+  try {
+    const health = await api("/health");
+    state.codeRev = (health && health.code_rev) || null;
+  } catch (e) {
+    console.warn("Could not read server code revision:", e);
+  }
   updateStatusStrip();
   applyDemoDisclosure();
   checkConnection();
@@ -955,6 +961,16 @@ function updateStatusStrip() {
   else if (url) text = `llama · ${url.replace(/^https?:\/\//, "")}`;
   else text = "model server not set";
   label.textContent = text;
+  const code = $("#status-code");
+  if (code) {
+    if (state.codeRev) {
+      code.textContent = `code ${state.codeRev}`;
+      code.title = `Code revision this desk process analyzes with (${state.codeRev}). Restart the desk after updating the code.`;
+    } else {
+      code.textContent = "code ?";
+      code.title = "Code revision this desk process analyzes with (unreadable)";
+    }
+  }
 }
 
 // Hover card on the bottom-left: which brain, which server, how connected.
@@ -972,6 +988,8 @@ function renderConnCard() {
     `<div class="conn-card-row ${cls}"><b>${escapeHtml(stateTxt)}</b></div>` +
     `<div class="conn-card-row">model <b>${escapeHtml(demo ? "demo craft model" : (mid || "—"))}</b></div>` +
     `<div class="conn-card-row">server <b>${escapeHtml(url)}</b></div>` +
+    (state.codeRev
+      ? `<div class="conn-card-row">code <b>${escapeHtml(state.codeRev)}</b></div>` : "") +
     (demo && state.realServer && state.realServer.available
       ? `<div class="conn-card-row switch">your model is back — click "switch" beside</div>` : "");
 }
@@ -2999,9 +3017,10 @@ async function runAnalysis() {
   startAnalysisProgressUI(startedAt);
 
   try {
-    await analyzePromise;
+    const ack = await analyzePromise;
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
+    if (ack && ack.stale_code) showError(ack.stale_code, true);
     appendSystemNote("Analysis complete. The report is now grounding this conversation.");
     await loadProjects();  // refreshDeskToolbar rides inside the project open path
     // script pane is shared — refresh it in either room after analysis

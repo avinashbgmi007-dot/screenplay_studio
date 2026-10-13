@@ -4368,3 +4368,7 @@ browser job's to run on the PR.
 * `webapp_server.py`: `_code_revision()` (`<short-hash>[+dirty]`, never raises) stamped at import as `_CODE_REV_AT_STARTUP`; `/api/health` reports it; both analyze answers carry `code_rev` + `stale_code` warning (None when fresh) via `_manifest_summary_with_code`. Non-blocking by design — a warning, not a refusal.
 * Self-inflicted red during build: a helper-move edit duplicated a backup route decorator; the route-census tests caught it (98→99). Fixed, census back to 98.
 * Suite 2238 passed + 3 skipped (incl. 7 new code-revision tests); ruff clean.
+
+### 2026-10-13 — Stale-code chip in the desk (guard gets an observer)
+* Status strip gains `code <rev>` (short hash +dirty honest) with explanatory title; conn-card hover adds the code row; analyze completion raises a persistent banner when `stale_code` is non-null. Zero new CSS (reuses `.status-item`); no new fetch surface beyond existing `/api/health`.
+* Verified live in headless Chromium against the running desk: chip renders, title correct, zero page errors. Suite 2238 green; node --check clean.
