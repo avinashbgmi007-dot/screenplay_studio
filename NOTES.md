@@ -4289,6 +4289,10 @@ browser job's to run on the PR.
 * Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
 * Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
 
+### 2026-10-13 — Repeat offender killed at the source (not a prompt rule)
+* The 13-run GUN_GUY/PEN_GUY falsehood was deterministic, not model prose: continuity's co-presence guard compared raw cue text (`GUN_GUY`) against normalized `characters_present` (`GUN GUY`) — underscore vs space never equal, so the guard was dead for underscored names. Fix normalizes both sides (`normalize_character_name().upper()`); verified the false row is gone on the real trial-14 doc while true typos (GUN_GUY/GUN_GUYY) still fire.
+* Suite 2228 passed + 3 skipped (11 continuity tests incl. 2 new); ruff clean.
+
 ### 2026-10-13 — Trial 13: prompt ban scored live (instruction fails, backstop holds)
 * Sixth gunpen run under the register ban: `language_filtered` count=1 ("untranslated foreign language... unintelligible") — the model still generates the complaint, the filter catches it. Instruction insufficient as sole defense; defense-in-depth validated as architecture.
 * Two sibling phrasings survived undropped (#1 "untransliterated foreign language... inaccessible to non-speakers", #2 "transliterated language... impossible to evaluate") — both signals claim-side, current rule needs obs-side language mention. Narrow deterministic extension sketched (claim-side transliteration signal + claim-side incomprehension, quotes exempt), not built.
