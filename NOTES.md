@@ -4369,6 +4369,11 @@ browser job's to run on the PR.
 * Self-inflicted red during build: a helper-move edit duplicated a backup route decorator; the route-census tests caught it (98→99). Fixed, census back to 98.
 * Suite 2238 passed + 3 skipped (incl. 7 new code-revision tests); ruff clean.
 
+### 2026-10-13 — Twist-decline autopsy (mechanism found, live experiment)
+* 14 gunpen runs: candidates in 12, verdicts in 6 — exact 50% decline on identical input. Live 8-probe rerun with reply capture: 7 TWIST, 1 null. The null was `twist:true, scene:null` — model confirms, hedges location, strict parser (`isinstance int` required) converts to null.
+* Supporting evidence: all 6 stored TWIST verdicts carry scene None anyway (pipeline strips out-of-range ints like the repeated sc4-of-3). The int requirement buys nothing — valid path already ends at null.
+* Proposed fix (not built): accept scene null in `parse_twist_verdict`; semantic bar (twist:true + kind + non-empty line) unchanged. Expected: declines fall to exceptions-only. Residual, out of scope: confirmed lines sometimes cite the wrong beat (pen-gun line as the dream line).
+
 ### 2026-10-13 — Stale-code chip in the desk (guard gets an observer)
 * Status strip gains `code <rev>` (short hash +dirty honest) with explanatory title; conn-card hover adds the code row; analyze completion raises a persistent banner when `stale_code` is non-null. Zero new CSS (reuses `.status-item`); no new fetch surface beyond existing `/api/health`.
 * Verified live in headless Chromium against the running desk: chip renders, title correct, zero page errors. Suite 2238 green; node --check clean.
