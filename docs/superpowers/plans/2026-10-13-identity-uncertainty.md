@@ -66,7 +66,10 @@ _IDENTITY_PATTERNS = [
     re.compile(r"\babsent\b", re.I),
 ]
 _HEDGE_PATTERNS = [
-    re.compile(r"\bappears\s+to\s+be\b", re.I),
+    # Affirmative hedging only: "does NOT appear to be X" asserts absence
+    # (the trial-10 #12 shape) and must not veto — the lookbehind excludes
+    # the negated form.
+    re.compile(r"(?<!not\s)\bappears\s+to\s+be\b", re.I),
     re.compile(r"\bmay\s+be\b", re.I),
     re.compile(r"\bpossibly\b", re.I),
     re.compile(r"\breads?\s+as\b", re.I),
@@ -86,7 +89,14 @@ def _identity_parties(f: dict) -> tuple[str, str] | None:
         return None
     seen = []
     for m in _NAME_RE.finditer(text):
-        name = normalize_character_name(m.group(0)).upper()
+        # Title-case sentence starts ("Protagonist Identity Ambiguity")
+        # are not names: real cue names run to two words max. Possessives
+        # ("Raj's") strip to their owner before comparing.
+        words = m.group(0).split()
+        if len(words) > 2:
+            continue
+        name = normalize_character_name(
+            re.sub(r"['\u2019][sS]$", "", m.group(0))).upper()
         if not name or name in {"THE", "AND", "SCENE"}:
             continue
         if name not in seen:

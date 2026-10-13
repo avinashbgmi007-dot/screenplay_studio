@@ -27,7 +27,9 @@ the observation the falsifiable claim for exactly this reason), binding
 two capitalized names: `X is Y`, `X is not Y`, `X is really`,
 `distinct entit`, `same character`, `no X present`, `X absent`,
 `X never appears`, `X does not appear`, `does not appear to be`.
-Hedged variants (`appears to be`, `may be`, `possibly`, `reads as`) skip.
+Hedged variants (`appears to be`, `may be`, `possibly`, `reads as`) skip —
+affirmative hedging only: "does NOT appear to be X" asserts absence (the
+trial-10 #12 shape) and does not veto.
 Fewer than two capitalized names in the combined text skips (pronoun-only
 subjects like `he never speaks` carry nothing to resolve).
 Single-name rows skip. Names normalize via
