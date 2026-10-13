@@ -91,12 +91,15 @@ def _identity_parties(f: dict) -> tuple[str, str] | None:
     for m in _NAME_RE.finditer(text):
         # Title-case sentence starts ("Protagonist Identity Ambiguity")
         # are not names: real cue names run to two words max. Possessives
-        # ("Raj's") strip to their owner before comparing.
+        # ("Raj's") strip to their owner, surrounding quotes ("'Pen Guy'")
+        # strip to the name — normalize only rstrips periods.
+        # (Both guards added after a worker caught the verbatim code
+        # failing its own test on the motivating row.)
         words = m.group(0).split()
         if len(words) > 2:
             continue
         name = normalize_character_name(
-            re.sub(r"['\u2019][sS]$", "", m.group(0))).upper()
+            re.sub(r"['\u2019][sS]$", "", m.group(0).strip("\"'\u2018\u2019\u201c\u201d"))).upper()
         if not name or name in {"THE", "AND", "SCENE"}:
             continue
         if name not in seen:
