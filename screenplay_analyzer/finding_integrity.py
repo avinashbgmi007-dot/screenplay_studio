@@ -193,6 +193,38 @@ NAME_VARIANT = re.compile(
     r"\b(variant|spelling|spelled|two names|same character|inconsistent name|"
     r"name.{0,12}(vary|varies|inconsist)|character.{0,12}(name|named))\b", re.I)
 
+# "identity verdict contradicted by explicit equation" — trial-10 #12's
+# mirror. The pipeline demotes identity verdicts the text cannot settle;
+# when the text DOES settle one — an explicit equation (X addressed as Y)
+# beside a verdict that X is NOT Y — the verdict is provably false and is
+# withdrawn, not demoted. Deliberately NARROW, same contract as the rules
+# above: only a distinctness verdict beside sameness evidence fires. A
+# sameness verdict ("is really Y", "same character") beside an equation is
+# supported, not contradicted, so it is kept; dialogue co-presence (both
+# parties speak) supports a distinctness verdict and is never a
+# contradiction — only the equation branch of the pipeline's
+# `_identity_proven` rule is mirrored here, never its co-presence branch.
+# Quotes are never scanned — verbatim script text by design.
+# Known cost: sameness verdicts falsified by co-presence are not caught.
+# That is the accepted side of the precision/recall trade this module declares.
+_IDENTITY_SAMENESS = re.compile(r"\bis\s+really\b|\bsame\s+character\b", re.I)
+_IDENTITY_EQUATION_VERB = re.compile(r"\b(calls|addresses|greets|names)\b", re.I)
+
+
+def _identity_eq_name_pat(name: str) -> str:
+    """Regex matching a normalized cue name with flexible inner spacing."""
+    return r"\s*".join(re.escape(w) for w in name.split())
+
+
+def _identity_eq_type(e) -> str:
+    t = getattr(e, "type", None)
+    return str(getattr(t, "value", t) or "").lower()
+
+
+def _identity_eq_names_in(text: str, *names: str) -> bool:
+    normed = re.sub(r"\s+", " ", str(text or "").upper().replace("_", " "))
+    return all(re.search(r"\b" + _identity_eq_name_pat(n) + r"\b", normed) for n in names)
+
 
 # ---------------------------------------------------------------------- result
 @dataclass
@@ -504,6 +536,66 @@ class FindingIntegrityGate:
             return None
         return None
 
+    # -- 4d. identity verdict contradicted by explicit equation -----------
+    def _identity_contradicted(self, f: dict, doc) -> str | None:
+        """A distinctness verdict ("X is not Y") beside an explicit equation
+        (the text addressing X as Y) is provably false — withdraw it. The
+        equation supports the OPPOSITE of the claim, which is what makes it
+        a contradiction rather than support."""
+        if doc is None:
+            return None
+        # Lazy: the pipeline never imports the gate at module load, so no cycle
+        # (verified with `python -c "import screenplay_analyzer.finding_integrity"`).
+        from .pipeline import _identity_parties
+        from screenplay_parser.heuristics import normalize_character_name
+        parties = _identity_parties(f)
+        if parties is None:
+            return None
+        text = f"{f.get('issue') or ''} {f.get('observation') or ''}"
+        if _IDENTITY_SAMENESS.search(text):
+            # A sameness verdict beside an equation is supported, not
+            # contradicted — any doubt keeps the row.
+            return None
+        refs = [r for r in (f.get("scene_refs") or []) if isinstance(r, int)]
+        if not refs:
+            return None
+        scenes = {s.scene_number: s for s in (getattr(doc, "scenes", None) or [])}
+        if any(r not in scenes for r in refs):
+            return None
+        a, b = parties
+        for r in sorted(refs):
+            for e in getattr(scenes[r], "elements", None) or []:
+                t = _identity_eq_type(e)
+                chn = normalize_character_name(str(getattr(e, "character", None) or "")).upper()
+                etext = getattr(e, "text", None) or ""
+                if t == "dialogue" and chn in (a, b):
+                    other = b if chn == a else a
+                    if _identity_eq_names_in(etext, other):
+                        return ("identity verdict contradicted by explicit equation "
+                                f"in scene(s) {r}")
+                elif t == "action" and _IDENTITY_EQUATION_VERB.search(etext):
+                    if _identity_eq_names_in(etext, a, b):
+                        return ("identity verdict contradicted by explicit equation "
+                                f"in scene(s) {r}")
+                elif t == "parenthetical" and chn in (a, b):
+                    other = b if chn == a else a
+                    if re.search(r"\(\s*as\s+" + _identity_eq_name_pat(other) + r"\s*\)", etext, re.I):
+                        return ("identity verdict contradicted by explicit equation "
+                                f"in scene(s) {r}")
+                elif t == "scene_heading":
+                    for x, y in ((a, b), (b, a)):
+                        xp, yp = _identity_eq_name_pat(x), _identity_eq_name_pat(y)
+                        if re.search(xp + r"\s*=\s*" + yp, etext, re.I):
+                            return ("identity verdict contradicted by explicit equation "
+                                    f"in scene(s) {r}")
+                        if re.search(xp + r"\s+as\s+" + yp, etext, re.I):
+                            return ("identity verdict contradicted by explicit equation "
+                                    f"in scene(s) {r}")
+                        if re.search(xp + r"\s*-\s*as\s*-\s*" + yp, etext, re.I):
+                            return ("identity verdict contradicted by explicit equation "
+                                    f"in scene(s) {r}")
+        return None
+
     # -- run ---------------------------------------------------------------
     def run(self, findings: list[dict], doc=None) -> GateResult:
         res = GateResult()
@@ -549,6 +641,12 @@ class FindingIntegrityGate:
             if fp:
                 res.decisions.append(Decision(i, "reject", fp, f))
                 continue
+
+            if doc is not None:
+                contra = self._identity_contradicted(f, doc)
+                if contra:
+                    res.decisions.append(Decision(i, "reject", contra, f))
+                    continue
 
             reason_bits: list[str]
             if absorbed.get(i):

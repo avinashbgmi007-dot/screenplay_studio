@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import copy
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -426,3 +427,26 @@ def test_falsified_parenthesized_object_list_is_rejected():
     res = FindingIntegrityGate().run(rows, doc=doc)
     assert res.summary["reject"] == 1
     assert "falsified" in res.of("reject")[0].reason
+
+
+class _EqDoc:
+    """Minimal stub: one scene where RAJ's cue names PEN GUY — an
+    explicit equation settling the identity the verdict denies."""
+
+    def __init__(self):
+        self.scenes = [SimpleNamespace(
+            scene_number=2,
+            characters_present=["RAJ", "PEN GUY"],
+            elements=[SimpleNamespace(type="dialogue", character="RAJ",
+                                       text="Pen Guy, come here.")])]
+
+
+def test_identity_claim_contradicted_by_equation_is_rejected():
+    """Claim 'X is not Y' beside text addressing X as Y is provably
+    false — withdraw, don't demote."""
+    rows = [_f("Raj is not Pen Guy.", category="character", scenes=(2,),
+               quote="Nuvvu evaru ra?",
+               over={"observation": "Pen Guy answers when Raj calls him by name."})]
+    res = FindingIntegrityGate().run(rows, doc=_EqDoc())
+    assert res.summary["reject"] == 1
+    assert "contradict" in res.of("reject")[0].reason
