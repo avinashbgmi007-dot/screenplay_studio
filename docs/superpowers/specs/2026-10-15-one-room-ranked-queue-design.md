@@ -887,3 +887,70 @@ the gate defect is then a named, tested exception rather than an unenforced inva
 
 Track B does not start until this is decided. Writing `IMPACT` against a taxonomy that cannot
 rank a tenth of its own rows is how a ranking ships broken.
+
+---
+
+## §14. Track B §1 decision taken, and the ranking tables land
+
+Ruling: **Option B**, with requirements 1–3 from review. Option A stays ruled out
+(rewrites the LLM grammar and invites the model to duplicate the deterministic passes);
+Option C stays ruled out (a rename across report, queue and pinned tests for what is one
+missing exception).
+
+### 14.1 What ships
+
+`voice` and `subtext` are laned to **Line** — they are line-level craft notes with quotes
+and scene refs — and carry `IMPACT` entries alongside every other category. Marked
+UNCALIBRATED like the rest of v0. The tables live in `core.js` beside `CATEGORY_LABELS`, so
+they are testable without a browser, which is the only reason this could be verified from a
+workspace with no Playwright.
+
+`findingLane`, `sceneRefCount`, `rankScore` and `rankReasonText` are exported through the
+existing Node test hook.
+
+### 14.2 Three corrections to the spec's own sketch, made by opening the lines
+
+1. **The sticky term reads `"addressed"`, not `"fix"`.** The spec sketch says "+5 if marked
+   fix"; the value the product actually writes is `state.findingMarks[id] === "addressed"`
+   (`app.js:43`, `:4288`). A rank term keyed on a mark value nothing ever writes is a constant
+   zero wearing the costume of a tiebreaker.
+2. **`state.findingMarks` is read through a `typeof` guard.** `core.js` loads before `app.js`,
+   so a bare reference would throw the moment `rankScore` was called in a context without
+   global state — taking the whole queue down rather than ranking it.
+3. **Unknown categories score 0, not `NaN`.** `rankScore` uses
+   `hasOwnProperty` rather than indexing blind. That is the structural fix for the §13 defect,
+   independent of the coverage test: even a category nobody thought of cannot poison the sort.
+
+### 14.3 The coverage guard, and why it reads source instead of a list
+
+`tests/test_queue_lane_coverage.py` enumerates every `"category": "..."` literal the analyzer
+writes into a finding dict, by scanning the analyzer's own source, and asserts `IMPACT` and
+`LANE_OF` cover each one. Reading source rather than importing `FINDING_CATEGORIES` is the
+whole point: that constant constrains the **LLM grammar only**, and the gap between it and
+what deterministic passes actually emit *is* the defect.
+
+It also pins the decision back: a test asserts `voice` and `subtext` are **still absent** from
+`FINDING_CATEGORIES`, so a future contributor cannot quietly make the change that was ruled
+out. And `test_the_emitter_scan_actually_found_categories` guards the guard — an empty scan
+would make every other assertion in the file pass vacuously, which is the failure mode this
+whole module exists to end.
+
+Verified non-vacuous: deleting `voice` and `subtext` from both tables produces three failures
+naming exactly those two categories.
+
+### 14.4 The gate invariant, amended and exercised
+
+`test_finding_integrity_gate.py` previously asserted `category in FINDING_CATEGORIES` over
+three hand-built rows, and passed — because none of them were the categories that break it.
+Now the delivered taxonomy is written down as the union, `voice` and `subtext` rows are in the
+fixture, the gate is asserted not to *drop* them (`AGENTS.md:66`), and a companion test pins
+that `voice.py` really emits them and `pipeline.py` really runs it — so the amendment rests on
+a verified premise rather than on the fixture being taken at face value.
+
+### 14.5 A test I wrote that contradicted the spec
+
+My first `queue_lanes.test.js` asserted that `theme` **with** scene refs is queued. It is not:
+§1.2 puts `theme` and `genre` in Observation unconditionally, because a thesis is not a task and
+a scene anchor does not turn one into a task. The implementation was right and the test was
+wrong. Corrected, and the correction now asserts the spec's rule directly rather than the
+inference I had mistaken it for.

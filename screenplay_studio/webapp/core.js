@@ -187,6 +187,129 @@ function verificationReadoutText(vs) {
     : null;
 }
 
+// ============ Queue lanes and rank v0 (Track B) ============
+//
+// IMPACT is a hand-authored judgment stated as reviewable data. It is
+// UNCALIBRATED and ships labelled as such: the numbers encode a hypothesis about
+// what a writer should fix first, and no calibration run has ever validated it.
+// Track C exists to test it. Do not tune these from a demo run - the verifier
+// and the analyzer are deterministic, but the WEIGHTS are a product decision
+// that a real writer sitting has to make, not something a synthetic score can.
+//
+// Coverage is the load-bearing property, not the values. Every category that
+// can reach a finding MUST have an entry: an absent one makes
+// IMPACT[category] undefined, undefined * 10 is NaN, and NaN in a sort
+// comparator is unspecified behaviour. `tests/test_queue_lane_coverage.py`
+// fails the build if that happens again.
+const IMPACT = {
+  structure: 5, plot_thread: 5, character: 4,
+  scene_function: 3, dialogue: 3,
+  // Track B requirement 1 and 2: `voice` and `subtext` are real finding
+  // categories - voice.py emits them and pipeline.py:1331-1341 runs those
+  // passes - and they are absent from FINDING_CATEGORIES, which constrains only
+  // what the LLM grammar may emit (grammar.py:76). They are line-level craft
+  // notes with quotes and scene refs, so they belong in the Line lane, and they
+  // need weights or they score NaN.
+  voice: 3, subtext: 3,
+  continuity: 2, theme: 1, genre: 1,
+};
+
+// Lane assignment. `observation` is NOT a queue lane: a finding with no
+// scene_refs has nothing to locate, and a thesis or a conformance note is not a
+// task. It is still shown, just never queued.
+const LANE_OF = {
+  structure: "structure", plot_thread: "structure",
+  dialogue: "line", scene_function: "line",
+  voice: "line", subtext: "line",
+  character: "line",          // binned by span at rank time (spec 1.2)
+  continuity: "deterministic",
+};
+
+const LANE_LABELS = {
+  structure: "Structure",
+  line: "Line",
+  deterministic: "Deterministic",
+};
+
+/**
+ * Does this finding belong in the queue at all?
+ *
+ * Membership requires a scene and a verb. A finding with no scene_refs cannot
+ * be located, so it is an observation, not a task - and an observation is not
+ * silently dropped (AGENTS.md:66, "Flag, don't drop"): it is shown outside the
+ * queue. Unknown categories are queued, because AGENTS.md:66 outranks any
+ * tidiness argument about the table above.
+ */
+function findingLane(f) {
+  if (!f) return "observation";
+  const cat = (f.category || "").toLowerCase();
+  // theme and genre are observations UNCONDITIONALLY: a thesis or a conformance
+  // note is not a task, and a scene anchor does not turn one into a task. They
+  // are absent from LANE_OF for the same reason - see spec 1.2.
+  if (cat === "theme" || cat === "genre") return "observation";
+  const refs = f.scene_refs;
+  if (!Array.isArray(refs) || refs.length === 0) return "observation";
+  return LANE_OF[cat] || "line";
+}
+
+/** How many scenes this finding touches, tolerating numeric AND string refs.
+ *  findingOnScene (app.js) already tests both forms; this must agree with it or
+ *  the span bonus is computed off a different rule than the filter admits. */
+function sceneRefCount(f) {
+  if (!f || !Array.isArray(f.scene_refs)) return 0;
+  return f.scene_refs.length;
+}
+
+/**
+ * rank v0 — WITHIN A LANE ONLY. Never across lanes: the deterministic lane is
+ * not sorted to the bottom, it is a group of equal weight with its own header,
+ * because six continuity notes are one kind of fix and interleaving them with
+ * structural notes destroys the batching they exist for.
+ *
+ *   score = IMPACT[category] * 10
+ *         + 3 if verified
+ *         + (min(sceneRefs, 3) - 1)
+ *         + 5 if the writer addressed it
+ *
+ * NOTE: the spec sketch says "+5 if marked fix"; the mark value that actually
+ * ships in state.findingMarks is "addressed" (app.js:43, 4288). The code follows
+ * the shipped vocabulary, because a rank term keyed on a mark value nothing ever
+ * writes is a constant 0 wearing the costume of a tiebreaker.
+ *
+ * UNCALIBRATED. See the note above.
+ */
+function rankScore(f) {
+  if (!f) return 0;
+  const cat = (f.category || "").toLowerCase();
+  const impact = Object.prototype.hasOwnProperty.call(IMPACT, cat)
+    ? IMPACT[cat]
+    : 0;
+  const verified = f.verification && f.verification.status === "verified" ? 3 : 0;
+  const span = Math.max(0, Math.min(sceneRefCount(f), 3) - 1);
+  // Writer intent is sticky. `state.findingMarks` lives in app.js, which loads
+  // after core.js, so it is read through a typeof guard rather than a bare
+  // reference: a rank function that throws when the writer has marked nothing
+  // would take the whole queue down.
+  const marks = (typeof state !== "undefined" && state && state.findingMarks) || null;
+  const sticky = (marks && marks[computeFindingId(f)] === "addressed") ? 5 : 0;
+  return impact * 10 + verified + span + sticky;
+}
+
+/** The string that makes a rank auditable (spec 1.5). A row that cannot print
+ *  its own reason is not ranked, it is sorted by something nobody can audit. */
+function rankReasonText(f) {
+  if (!f) return "";
+  const cat = (f.category || "").toLowerCase();
+  const lane = findingLane(f);
+  const parts = [LANE_LABELS[lane] || cat || "Uncategorised"];
+  const impact = Object.prototype.hasOwnProperty.call(IMPACT, cat) ? IMPACT[cat] : null;
+  if (impact != null) parts.push(`impact ${impact}`);
+  if (f.verification && f.verification.status === "verified") parts.push("verified");
+  const refs = sceneRefCount(f);
+  if (refs > 1) parts.push(`spans ${refs} scenes`);
+  return "ranked here: " + parts.join(", ");
+}
+
 // ---- Node test hook (browsers never take this branch) ----
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -202,5 +325,12 @@ if (typeof module !== "undefined" && module.exports) {
     _base36,
     _stageStep,
     verificationReadoutText,
+    IMPACT,
+    LANE_OF,
+    LANE_LABELS,
+    findingLane,
+    sceneRefCount,
+    rankScore,
+    rankReasonText,
   };
 }

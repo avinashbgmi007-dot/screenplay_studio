@@ -205,21 +205,80 @@ def test_praise_in_quote_does_not_fire():
     assert res.summary["keep"] == 1
 
 
-def test_gate_never_emits_a_category_outside_the_taxonomy():
-    """Trial-5 regression: the gate reclassified a visual dialogue claim to
-    category "scene", which is not in FINDING_CATEGORIES — a label the
-    grammar can never produce and the report map never names. Reclassified
-    rows must land inside the taxonomy (visual claims → scene_function)."""
-    from screenplay_analyzer.grammar import FINDING_CATEGORIES
+# The deterministic craft passes (voice.py, run by pipeline.py:1331-1341) emit
+# categories that FINDING_CATEGORIES deliberately does NOT contain: that constant
+# constrains only what the LLM grammar may emit (grammar.py:76), and widening it
+# would invite the model to duplicate the deterministic passes. So the delivered
+# taxonomy is the union, and it is written down here rather than left implicit.
+#
+# This amendment was forced by the Track B falsifier. The previous version of
+# this test asserted `category in FINDING_CATEGORIES` and passed - because its
+# three rows never included the deterministic categories, so the invariant was
+# never exercised against the shapes that actually broke it. An invariant whose
+# fixtures exclude the violating class is the mechanism of the defect.
+DETERMINISTIC_PASS_CATEGORIES = {"voice", "subtext"}
+DELIVERED_TAXONOMY = None  # built lazily below; grammar import is deferred
+
+
+def _delivered_taxonomy() -> set:
+    global DELIVERED_TAXONOMY
+    if DELIVERED_TAXONOMY is None:
+        from screenplay_analyzer.grammar import FINDING_CATEGORIES
+        DELIVERED_TAXONOMY = set(FINDING_CATEGORIES) | DETERMINISTIC_PASS_CATEGORIES
+    return DELIVERED_TAXONOMY
+
+
+def test_gate_never_emits_a_category_outside_the_delivered_taxonomy():
+    """Trial-5 regression, widened. The gate once reclassified a visual dialogue
+    claim to category "scene", which no producer names; intake now folds it to
+    scene_function. This asserts the delivered taxonomy explicitly, and the rows
+    include the deterministic-pass categories so the invariant is exercised on
+    the shapes that actually occur in production."""
     rows = [
         _f("The ash falls from the cigar in a slow shot.", category="dialogue"),
         _f("The theme is not clearly defined as a cause-and-effect statement."),
         _f("A clean note about the opening image.", category="scene"),
+        # Deterministic passes - these were the gap. `voice` and `subtext` reach
+        # a finding dict via voice.py:130,217,253 and are queued by the product,
+        # so the invariant has to cover them or it covers nothing real.
+        _f("SHE spills the drink, her register identical to RAMAN's.",
+           category="voice", scenes=(3,)),
+        _f("SAY IT OUT LOUD — the subtext lands flat on the ear.",
+           category="subtext", scenes=(4,)),
     ]
-    res = FindingIntegrityGate().run(rows)
     delivered, _ = gate_findings(rows)
-    for f in delivered:
-        assert f["category"] in FINDING_CATEGORIES, f["category"]
+    delivered_cats = {f["category"] for f in delivered}
+    assert delivered_cats <= _delivered_taxonomy(), (
+        f"gate delivered categories outside the taxonomy: "
+        f"{sorted(delivered_cats - _delivered_taxonomy())}"
+    )
+    # The deterministic rows must SURVIVE the gate, not be quietly dropped:
+    # AGENTS.md:66, "Flag, don't drop".
+    assert {"voice", "subtext"} <= delivered_cats, (
+        "the deterministic-pass findings were dropped or recategorised: "
+        f"delivered {sorted(delivered_cats)}"
+    )
+
+
+def test_the_deterministic_categories_are_really_reachable():
+    """Pins the premise the test above now rests on: voice.py really does emit
+    these categories, and the pipeline really does run it. Without this, the
+    rows above would be fiction and the amendment above would be cargo cult."""
+    import re
+    from screenplay_analyzer import voice, pipeline
+    src = open(voice.__file__, encoding="utf-8").read()
+    for cat in sorted(DETERMINISTIC_PASS_CATEGORIES):
+        assert re.search(rf'["\']category["\']\s*:\s*["\']{cat}["\']', src), (
+            f"voice.py no longer emits category {cat!r}. If that pass was removed, "
+            "drop it from DETERMINISTIC_PASS_CATEGORIES and from the Track B "
+            "lane/IMPACT tables deliberately — do not leave it asserted by "
+            "tests only."
+        )
+    psrc = open(pipeline.__file__, encoding="utf-8").read()
+    assert "run_voice_analysis" in psrc, (
+        "the pipeline no longer runs the voice pass, so its findings never "
+        "reach a finding dict."
+    )
 
 
 def test_generic_craft_template_is_NOT_withdrawn():
