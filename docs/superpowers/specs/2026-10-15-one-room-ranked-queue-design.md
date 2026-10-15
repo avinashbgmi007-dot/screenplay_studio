@@ -716,11 +716,34 @@ So the `@media print` hide rule has exactly two layers of coverage, both static:
 in rendered print output has no browser check that can catch it** — which is precisely how the
 absorbed `display: block !important` survived four rounds of review.
 
-Closing it is small and well-specified: one Playwright run with `media="print"` emulated,
-asserting `#sidebar`, `#desk-toolbar`, `#project-bar`, `#status-strip`, `#context-dock` and
-`#scene-index` are not visible while `#manuscript-workspace` is. It is deliberately not written
-here, because it cannot be verified from this workspace and shipping an unverified browser test
-is the failure mode this arc has spent nine rounds refusing.
+**CLOSED 2026-10-15, by execution.** A runner reproduced the regression under
+`page.emulate_media(media="print")` with a failing-then-passing pair: on `6510e2f` (broken) 10
+chrome elements were visible and the manuscript was crushed to 187px; on `c28cb50` (fixed) every
+chrome element was hidden and the manuscript rendered 1438x898. That probe now lives in the repo
+as `tests/e2e_browser_print_media.py`.
+
+It asserts three things, and the first is the one that makes the other two mean anything:
+
+1. **Control:** the sidebar and the manuscript are both visible under `emulate_media("screen")`
+   first. Without this, "print hides the chrome" and "the chrome was never there" are
+   indistinguishable, and a suite that passes because the page never loaded is worse than no
+   suite.
+2. All 31 selectors in the `@media print` hide list are hidden.
+3. `#manuscript-workspace` is visible **and wider than 1000px**. A bare `display != none` would
+   pass on the broken build's crushed 187px box.
+
+**Drift between the CSS and the suite is now a pytest failure.**
+`test_the_print_suite_covers_every_selector_the_css_hides` compares the suite's `PRINT_CHROME`
+list against the live stylesheet in both directions. Verified non-vacuous by adding a
+`#made-up-drift-probe` selector to the CSS and watching the assertion name it. Otherwise someone
+adds a selector to the hide list, the browser suite silently stops covering it, and the only
+signal is a regression nobody catches — which is how the print rule survived four rounds in the
+first place.
+
+**On the runner's self-critique, recorded because it generalises.** The probe was run against the
+fixed tree first and the broken tree second, so the favourable result came first and the
+confirmatory one second — exactly the sequence that lets a flawed probe survive. The
+non-vacuity run redeemed it this time. The discipline: **broken first, fixed second, always.**
 
 ### 12.10 The guard's correctness is now evidenced in-repo, not by claim
 

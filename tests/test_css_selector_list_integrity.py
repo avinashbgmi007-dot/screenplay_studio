@@ -244,3 +244,34 @@ def test_the_guard_accepts_the_healthy_spotlight_rule() -> None:
     assert "display: none !important" in rule, f"healthy fixture rejected: {rule!r}"
     for selector in ("#desk-toolbar", "#draft-bar", "#diff-banner", "#room-drawer"):
         assert f".spotlight-mode {selector}" in rule
+
+def test_the_print_suite_covers_every_selector_the_css_hides() -> None:
+    """`e2e_browser_print_media.py` asserts each chrome selector is hidden under
+    emulated print media. If someone adds a selector to the CSS hide list and
+    does not add it there, the browser suite silently stops covering it and the
+    only signal is a regression nobody catches.
+
+    Checked here rather than in the browser suite because it is a pure source
+    comparison, and because the browser suite cannot run without Playwright.
+    Drift fails fast in pytest instead of quietly passing in CI.
+    """
+    import os
+    suite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "e2e_browser_print_media.py")
+    with open(suite_path, encoding="utf-8") as fh:
+        suite_src = fh.read()
+    block = re.search(r"PRINT_CHROME = \[(.*?)\]", suite_src, re.S).group(1)
+    suite_sels = set(re.findall(r'"([#.][a-z0-9-]+)"', block))
+
+    printed = _print_block(open(CSS_PATH, encoding="utf-8").read())
+    rule = _rule_body(printed, "#sidebar")
+    css_sels = set(re.findall(r"[#.][a-z0-9-]+", rule.split("{")[0]))
+
+    assert css_sels - suite_sels == set(), (
+        "these selectors are hidden by @media print but are not asserted by "
+        f"e2e_browser_print_media.py: {sorted(css_sels - suite_sels)}"
+    )
+    assert suite_sels - css_sels == set(), (
+        "e2e_browser_print_media.py asserts selectors that @media print no "
+        f"longer hides: {sorted(suite_sels - css_sels)}"
+    )
