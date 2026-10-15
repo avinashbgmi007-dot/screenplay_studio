@@ -6,6 +6,14 @@ working tree clean, no local modifications to `app.js` / `index.html` / `style.c
 `screenplay_analyzer/` at the time of reading. Re-verify with `git rev-parse HEAD` before trusting a
 line number.
 
+> **REVISION 3 (2026-10-15), after second external review.** §4a's "neither" bin is **struck**.
+> It deleted locatable, one-line-fixable `continuity` findings from the worklist to fix a
+> classification problem, which is a product cut smuggled in as architecture. Replaced with a
+> membership principle: every finding has one home; queue membership requires a scene and a verb;
+> script-level and deterministic findings get lanes, never deletion. The `scene_refs` threshold is
+> demoted from a membership test to a ranking input, which removes the uncalibrated-threshold charge
+> against it. **Attribution is left unresolved and deliberately not hardened** — see §4c.
+>
 > **REVISION 2 (2026-10-15), after external review.** Three factual errors corrected: the finding
 > taxonomy is **eight** categories at `grammar.py:45-48`, not the twelve *passes* at
 > `pipeline.py:847`; `SEVERITIES` is at `grammar.py:50`, not `:52`. Two substantive gaps closed:
@@ -364,7 +372,7 @@ All four positions, converged. Ordered by cost-to-ship, cheapest first.
 | 4 | Sameer converges to exactly two homes (desk panel, dock lens). No more. | `index.html:279, 402, 419, 455` | Low |
 | 5 | Run Analysis is never behind auto-hide chrome. Add an ETA to the button. Keep Stop. | `style.css:4742-4743`, `index.html:178-184` | Low |
 | 6 | Severity becomes two keys: craft impact, then verification state. An unverified quote never outranks a verified one. **Confidence-vs-craft-cost is NOT resolved here** — see the revision note; it is analyzer-side work. | `grammar.py:50`, `AGENTS.md:66` | Medium |
-| 7 | Sort bins are **fix this line** and **fix this structure**. The 8-to-2 mapping is specified below, not left as a slogan. | `grammar.py:45-48`, D3/D5 | Medium |
+| 7 | Sort bins are **fix this line** and **fix this structure**, governed by the membership principle in §4a. **No category is deleted from the surface**; script-level and deterministic findings get lanes. | `grammar.py:45-48`, `AGENTS.md:66`, D3/D5 | Medium |
 | 8 | ~~The dock is mode-aware: triage 44rem+~~ **WITHDRAWN — fails the layout gate.** See the critique doc, D1. The legal ceiling is 676px. | `style.css:5507-5510`, `layout_audit.py:442` | Blocked |
 | 9 | Coverage verdict, comparables, logline test, and dials leave the primary path. Dials reveal on request. | D1, D4 | Medium |
 | 10 | Promote the **existing** "What's working (N)" (`app.js:7446-7451`) out of Tier 2 into Tier 1, and add per-scene strongest-scene selection. Promotion, not invention. | D7, `app.js:7446-7451` | Medium (was Large) |
@@ -374,26 +382,61 @@ All four positions, converged. Ordered by cost-to-ship, cheapest first.
 
 ### 4a. The 8-to-2 bin mapping (specification, not slogan)
 
-Added in revision. `FINDING_CATEGORIES` is **eight** (`grammar.py:45-48`). Mapping every one:
+Added in revision 2, **corrected in revision 3**. `FINDING_CATEGORIES` is **eight**
+(`grammar.py:45-48`). Revision 2 put `theme`, `genre` and `continuity` in a "neither, not queue
+rows at all" bin. **That was a scope cut dressed as a taxonomy, and it is struck.** Continuity
+findings are produced by `run_continuity_analysis(doc)` (`pipeline.py:1353`), describe time-of-day
+flips and character presence *across scenes*, and reach the same unconditional Locate button as
+every other category (`app.js:4512`, `app.js:5345` — neither is guarded by category). Dropping them
+would delete fixable one-line notes from the surface whose promise is "every fixable note, one home."
+That is GAP-1's lesson applied selectively.
 
-| Category | Bin | Rule |
+**Membership principle (adopted, in place of the void bin):**
+
+> **Every finding gets exactly one home. Queue membership requires a scene and a verb. Script-level
+> and deterministic findings get their own lanes inside the same surface, never a deleted surface.**
+
+This is arguable from the repo's own rules (`AGENTS.md:66` flag-don't-drop; one home per finding) and
+it leaves no category homeless.
+
+| Category | Disposition | Basis |
 |---|---|---|
-| `structure` | **Fix this structure** | missing turn / event-chain |
-| `plot_thread` | **Fix this structure** | setup and payoff economy |
-| `scene_function` | **Fix this line** | the scene changes nothing |
-| `dialogue` | **Fix this line** | characters state what is known |
-| `character` | **conditional** | `len(scene_refs) <= 2` → line bin; `>= 3` → structure bin. Passivity in a scene is a page problem; an arc that never turns is a script problem. |
-| `theme` | **neither** | not a defect, an observation. Not a queue row. |
-| `genre` | **neither** | conformance is a Coverage note, not a fix. Not a queue row. |
-| `continuity` | **neither** | deterministic mechanical check, `check_id` present. Batches to the bottom. |
+| `structure` | **Structure bin** | missing turn / event-chain |
+| `plot_thread` | **Structure bin** | setup and payoff economy |
+| `dialogue` | **Line bin** | characters state what is known |
+| `scene_function` | **Line bin** | the scene changes nothing |
+| `character` | **Queue, bin by span** | `SCRIPT_LEVEL_CATEGORIES` includes `character` (`pipeline.py:589`), so it may arrive script-level |
+| `theme` | **Observation lane** | script-level thesis, not locatable to a line |
+| `genre` | **Observation lane** | conformance is a Coverage note |
+| `continuity` | **Deterministic lane** | locatable, `scene_refs` present, ranks low via `check_id`, **never deleted** |
 
-**Net effect: the queue's category surface drops from eight to five (four fixed plus a conditional),
-and three categories stop being queue rows at all.**
+**Key correction to revision 2:** the `scene_refs <= 2 vs >= 3` threshold is a **ranking** input, not a
+**membership** input. Membership is decided by the principle above (has a scene, has a verb). The
+threshold only orders rows already in the queue. This dissolves the "uncalibrated threshold" charge
+in the revision that provoked it, and it is why the `character` row above no longer needs a magic
+number to be safe: a character finding with no scenes goes to the observation lane by the principle,
+and one with scenes goes to the queue regardless of how many.
 
-This strengthens the two-agent panel's agreement 5 rather than merely supporting it. That panel ruled
-`theme`/`genre` script-level rows should get **no Locate button**. The correct fix is one step
-further: they should not be rows in the fix queue at all, so there is no button to get wrong. A
-`Locate` button with nothing to locate is exactly the architect's own R3 violated.
+Net effect: **all eight categories keep a home; five are queue rows; three are lanes.** Nothing is
+deleted from the surface.
+
+### 4c. Attribution: unresolved, and it does not change any decision
+
+A reviewer asserts the two-agent synthesis under discussion was their own work. The counter-claim was
+that it came from a separate session. **Evidence cannot settle it**, and the honest move is to stop
+arguing and record the limit:
+
+- The two-agent synthesis was **never committed to any branch**. `origin/arena/01a1087a-screenplay-studio`
+  contains only the pre-existing `docs/debates/sam-vs-premise-doctor-2026-08-15.md`, and its newest
+  commit is `26f2e26 Improve persona-aware co-writer behavior` (product work). There is no artifact
+  anywhere in this repo bearing on authorship.
+- The claim is also unfalsifiable from this checkout, and it sits in tension with its own framing:
+  the same reviewer is critiquing an adversarial review of that synthesis.
+
+**Resolution: the "three independent voices" upgrade is withdrawn and is NOT a spec input.** The
+convergence that matters survives either way: the rewrite-order-over-severity idea arrived in at
+least two documents authored separately. That is enough to justify building it. What is withdrawn is
+the rhetorical multiplier, not the conclusion. Recorded here so it does not harden into a premise.
 
 ### 4b. Falsifier for agreement #13 ("no rewrite")
 
