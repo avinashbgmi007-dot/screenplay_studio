@@ -187,36 +187,46 @@ it is sorted by something nobody can audit.
 ### 1.6 Cross-lane read order (the gap in "rows 1–5 are the rewrite order")
 
 Ranking runs **within** a lane (§1.3) and lanes carry **equal** visual weight (§1.2). So "rows 1–5
-are the rewrite order" is true inside one lane and **undefined across** them. Stated:
+are the rewrite order" is true inside one lane and **undefined across** them.
 
-> **Cross-lane order is the lane's maximum `IMPACT`, descending. It is not a second hand-authored
-> list — it is the same constant table, projected.**
+> **Cross-lane order: Structure → Line → Deterministic. Observation is not queued.**
 
-| Lane | Max IMPACT | Read position |
-|---|---|---|
-| Structure | 5 (`structure`, `plot_thread`) | 1st |
-| Line | 3 (`dialogue`, `scene_function`) | 2nd |
-| Deterministic | 2 (`continuity`) | 3rd |
-| Observation | 1 (`theme`, `genre`) | not queued; its own surface |
+**RETRACTED after §9a ran: "one table, two projections."** An earlier draft of this section derived
+lane order from `IMPACT` maxima, on the reasoning that one table should serve both. The calibration
+run falsified it. See §9a: calibrating `IMPACT` to Expert D's own craft ordering
+(structure 50 > dialogue 40 > character 30 > plot_thread 20 > scene_function 10) puts **Line above
+Structure**, because D3 ranks exposition above dangling setup and those live in different lanes.
 
-**One table, two projections.** `IMPACT` already orders within a lane; it now also orders the lanes.
-There is no second place to keep in sync, which is the property that matters.
+**The retraction exposes a real category error in the original claim.** Two different questions were
+being merged:
 
-Three properties this buys, stated so they are testable:
+| Question | Answered by |
+|---|---|
+| "What kills a script?" | Expert D's craft list (§1.3 `IMPACT`) |
+| "If I can only fix one thing, what is it?" | lane order — **fix upstream before downstream** |
 
-1. **Stable across runs.** Lane order is fixed by the table, never recomputed per script. A queue that
+D3 ranks by the first. Structure-first is the second. They need not agree, and forcing one to derive
+from the other was the error. **Lane order is a declared product decision with its own rationale, not
+a projection of the impact table.**
+
+Three properties, restated so they are testable:
+
+1. **Stable across runs.** Lane order is declared, never recomputed per script. A queue that
    reorders itself between sessions cannot be learned.
-2. **Structure first is the writer's own claim.** Expert D's ordering ("what actually kills a script,
-   in the order I care": turn → exposition → passivity → dangling setup → inert scenes) is upstream
-   of line work. Fixing lines in a structurally broken script discards the work.
-3. **Calibration moves both projections together.** If §9 concludes dialogue outranks structure,
-   the table changes and within-lane rank *and* cross-lane order move with it. No second edit.
+2. **Upstream first.** Line work in a structurally broken script is discarded by the structural fix.
+   This is the craft argument, and it is *why the declaration exists* — not a consequence of `IMPACT`.
+3. **Calibration touches one thing.** §9a calibrates `IMPACT` (within-lane rank). It does **not**
+   re-derive lane order. Changing one does not move the other.
 
 **Tiebreak:** equal lane maxima fall back to declaration order in the lane table. Declared, not
 discovered.
 
-**G9 (acceptance):** the rendered queue's lane headers appear in descending max-`IMPACT` order, and
-the order is byte-identical across two loads of the same script.
+**G9 (acceptance):** lane headers render in the declared order, byte-identical across two loads of
+the same script, and unaffected by any `IMPACT` recalibration.
+
+**Implementation note:** rows in the Observation lane must be excluded from `score()` entirely, not
+scored and then not displayed. A real report exercises this — see §9a, where a `theme` finding
+carries `scene_refs: [2]` yet is unqueued. Scoring it produces a number no reader ever sees.
 
 ## §2. Delete the room tablist (#1)
 
@@ -372,19 +382,53 @@ exists.
 
 ---
 
-## §9. Calibration plan (must run before §1 ships)
+## §9. Calibration
 
-The `IMPACT` table and the `+3 / +1` weights are **v0 placeholders.** Calibration on three reports
-before the numbers harden:
+**Split, because the original plan contradicted the ship order.** §9's header once read "must run
+before §1 ships" while §11 shipped §1 first and calibrated last. Resolved into two phases with
+different prerequisites.
 
-| Report | What it stresses |
+### §9a. `IMPACT` values — BLOCKED, needs a real model
+
+**What ran.** Demo-model pipeline over `tests/fixtures/pain_tenglish.fountain` via
+`webapp_server --demo-model`. 7 findings, full report captured.
+
+**Why it cannot calibrate, three measured reasons:**
+
+| Finding | Evidence |
 |---|---|
-| `tests/fixtures/pain_tenglish.fountain` | small, deterministic, already seeded by the layout audit |
-| `gun_pen.pdf` (the existing audit subject, `docs/FULL_FEEDBACK_AUDIT_VERDICTS.md`) | 9 findings / 7 distinct ids, the GAP-3 duplicate case |
-| one full-length real screenplay | the only case with enough findings for lane balance to mean anything |
+| **Severity carries zero signal** | all 7 findings are `severity: low`. No ranking can be validated against a field with one value. |
+| **4 of 7 findings are filler** | 4 are literally `[demo] Sample <category> finding — demo model, not a real analysis.` They carry no craft content. |
+| **6 of 7 have no quote** | `no_quote: 6`, `quote_bearing: 1`, `verified: 1`, `verified_pct_of_quoted: 100.0` |
 
-**Pass condition:** a reviewer can read the queue top to bottom and agree with the order. If they
-cannot name *why* row 3 outranks row 4, the weights are wrong, not the reviewer.
+**Two side results worth keeping:**
+
+1. **The "11% verified" figure is a `no_quote` artifact.** Here 100% of *quoted* findings verify. The
+   gun_pen figure of `1 of 9 (11%)` (`docs/FULL_FEEDBACK_AUDIT_VERDICTS.md` row C1) therefore measures
+   **how many findings quote anything**, not whether the quotes are true. Any UI reading it as a
+   quality score is misreading it. This vindicates flagging D6's number as `[weak data]`.
+2. **`genre` arrived with `scene_refs: []`** — a script-level finding with no scene, exactly the case
+   §1.2's membership principle routes to the Observation lane. **The rule is exercised by real data,
+   not hypothetical.** (`theme` also arrived with `scene_refs: [2]` and is unqueued by rule, which is
+   the implementation note at the end of §1.6.)
+
+**What this means:** the two reports named in the original plan are both demo-model runs. **The
+third, "one full-length real screenplay," requires a live `llama-server`, which this environment does
+not have.** `IMPACT` therefore stays **v0, explicitly uncalibrated** — which is the correct outcome,
+not a deferral. Do not calibrate against demo output; it will flatten every weight toward zero
+because filler findings carry no craft signal.
+
+### §9b. Rendered-order calibration — runs after §1 ships
+
+Once the queue renders, check the order against §1.6's declared lane order and §1.5's rank-reason
+string. **Pass condition:** a reviewer reads the queue top to bottom and agrees with the order. If
+they cannot say why row 3 outranks row 4, the weights are wrong, not the reviewer.
+
+### §9c. Ship-order correction
+
+**Original §11 shipped §1 first and calibrated last, contradicting this section's header.** The
+correct order is: **§9a is an input to §1, not a follow-up** — and it is currently blocked, so §1
+ships with v0 weights *explicitly marked as such in the UI copy*, never silently. §9b follows §1.
 
 ## §10. What could rot
 
@@ -392,6 +436,12 @@ cannot name *why* row 3 outranks row 4, the weights are wrong, not the reviewer.
   category is added server-side and not here, it scores `undefined`. **Fail loud:** an unknown
   category must render an explicit "unranked" marker, not sort to 0 silently. This is the
   `app.js:5179` `CATEGORY_LABELS[f.category] || f.category` pattern already in use.
+- **`IMPACT` silently reads as settled.** §9a is blocked, so §1 ships with placeholder weights.
+  The rank-reason string (§1.5) must say so: *"ranked here: Line (impact 3, v0 — uncalibrated)"*.
+  A ranking that pretends to be settled is the failure this spec exists to prevent.
+- **Calibrating against demo output.** §9a measured why it cannot: 4 of 7 findings were literal
+  `[demo]` filler and all 7 were `severity: low`. A future calibration pass run against the demo model
+  will flatten every weight toward zero and look like a successful result.
 - **A lane with no batch verb.** §1.2 promises one per lane; a lane that ships without it is the
   "second-class queue by another name" failure, restated.
 - **Group headers as a second filter.** If a header ever filters without going through
@@ -399,11 +449,13 @@ cannot name *why* row 3 outranks row 4, the weights are wrong, not the reviewer.
 
 ## §11. Ship order
 
-1. §1 (membership + lanes + rank v0) — the only behavioural change
-2. §7 (filter row collapse + clickable headers) — depends on §1
-3. §2, §3, §4, §5 — independent deletions, parallelisable
-4. §6 — independent, no measurement dependency
-5. §9 calibration, then re-tune §1's weights
+1. **§9a gate (blocked — see §9).** `IMPACT` ships v0 with an explicit uncalibrated marker in the
+   rank-reason string, so a writer is never shown a ranking that pretends to be settled.
+2. §1 (membership + lanes + rank v0) — the only behavioural change
+3. §7 (filter row collapse + clickable headers) — depends on §1
+4. §2, §3, §4, §5 — independent deletions, parallelisable
+5. §6 — independent, no measurement dependency
+6. §9b rendered-order calibration, then re-tune `IMPACT`
 
 **Write the letter to yourself for a second pull request:** every change here is a deletion, and
 deletions are invisible in a diff. Record what was removed and what measurement justified it.
