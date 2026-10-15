@@ -703,3 +703,38 @@ FAIL against the real broken file from `6510e2f` and to pass against the fix.
 `.craft-shelf` and `.script-level-notes` are **deliberately absent**: both were already dead at
 `538d2df`, with zero occurrences anywhere in the DOM. Dropping them is cleanup of pre-existing
 debt, not collateral damage, and that distinction was checked rather than assumed.
+
+### 12.9 Print CSS is source-guarded and never rendered — recorded limit
+
+Confirmed by runner sweep on `c28cb50`: **nothing in the suite corpus renders print media.**
+`emulate_media` appears once across the corpus, for `reduced_motion` only. No `page.pdf()`, no
+`media="print"`, no print-preview snapshot.
+
+So the `@media print` hide rule has exactly two layers of coverage, both static:
+`test_spa_contract.py`'s `@media print` rule count, and
+`test_css_selector_list_integrity.py`'s selector-list guard. **A regression that only manifests
+in rendered print output has no browser check that can catch it** — which is precisely how the
+absorbed `display: block !important` survived four rounds of review.
+
+Closing it is small and well-specified: one Playwright run with `media="print"` emulated,
+asserting `#sidebar`, `#desk-toolbar`, `#project-bar`, `#status-strip`, `#context-dock` and
+`#scene-index` are not visible while `#manuscript-workspace` is. It is deliberately not written
+here, because it cannot be verified from this workspace and shipping an unverified browser test
+is the failure mode this arc has spent nine rounds refusing.
+
+### 12.10 The guard's correctness is now evidenced in-repo, not by claim
+
+`test_css_selector_list_integrity.py` originally asserted fail-on-broken **in a commit message**.
+That is a claim, and the runner declined to reproduce it, correctly. The two real breakages are
+now literal fixtures in the module — the exact selector lists as they stood in `6510e2f` — and
+the guard must reject them.
+
+Verified non-vacuous three ways: the two broken strings genuinely lack
+`display: none !important` while the healthy string has it; mutating `_rule_body` to return the
+whole stylesheet is caught; and the guard fails against the real broken file from `6510e2f` with
+the merged selector list printed in the assertion.
+
+A first mutation attempt was itself wrong — it neutered the *fixture's* assertion to `assert
+True`, which passes trivially and tests nothing. The mutation has to break the guard's lookup,
+not the test's expectation. Worth recording because it is the same shape as the arc's standing
+error: a check that cannot fail looks identical to a check that passes.

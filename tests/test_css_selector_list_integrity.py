@@ -167,3 +167,80 @@ def test_print_rule_hides_chrome_and_shows_only_the_manuscript(code: str) -> Non
     assert "display: block !important" in show, (
         f"the manuscript is not restored to `display: block` in print: {show!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Negative fixtures.
+#
+# These exist so the guard's correctness is evidenced BY THE REPOSITORY rather
+# than by whoever wrote it claiming they once saw it fail. Each fixture is the
+# real breakage from the real commit; each must be REJECTED. If someone
+# refactors the predicates into something that accepts a broken stylesheet,
+# these fail and say so.
+#
+# The first draft of this module asserted fail-on-broken only in the commit
+# message. That is a claim, not evidence. Reviewers are right not to trust it.
+# ---------------------------------------------------------------------------
+
+BROKEN_SPOTLIGHT = """
+.spotlight-mode #project-bar,
+.spotlight-mode #desk-toolbar,
+.spotlight-mode #draft-bar,
+.spotlight-mode #diff-banner,
+
+.spotlight-mode #manuscript-container { padding-top: 26px; }
+"""
+
+BROKEN_PRINT = """
+@media print {
+  #sidebar, #error-banner, #welcome-view,
+  #beatboard-view, #compare-view, #palette-modal, #settings-modal,
+  #rewrite-modal, #desk-toolbar, #draft-bar, #diff-banner,
+  #composer, .note-add, .finding-note-actions, #project-bar,
+  #room-chip, #partner-card, #feedback-tabs,
+  .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
+  #cowrite-panel, #feedback-panel, #status-strip,
+  #manuscript-workspace { display: block !important; }
+}
+"""
+
+HEALTHY_SPOTLIGHT = """
+.spotlight-mode #project-bar,
+.spotlight-mode #desk-toolbar,
+.spotlight-mode #draft-bar,
+.spotlight-mode #diff-banner,
+.spotlight-mode #room-drawer { display: none !important; }
+"""
+
+
+def test_the_guard_rejects_the_broken_spotlight_rule() -> None:
+    """The exact rule as it stood in 6510e2f. It must be rejected."""
+    rule = _rule_body(BROKEN_SPOTLIGHT, ".spotlight-mode #project-bar")
+    assert "display: none !important" not in rule, (
+        "the guard no longer detects a spotlight list that lost its declaration "
+        f"— it accepted: {rule!r}"
+    )
+
+
+def test_the_guard_rejects_the_broken_print_rule() -> None:
+    """The exact print block as it stood in 6510e2f: the chrome list absorbed
+    `display: block !important`, so the sidebar and toolbars would print."""
+    printed = _print_block(BROKEN_PRINT)
+    hide = _rule_body(printed, "#sidebar")
+    assert "display: none !important" not in hide, (
+        "the guard no longer detects a print list that lost its declaration "
+        f"— it accepted: {hide!r}"
+    )
+    show = _rule_body(printed, "#manuscript-workspace")
+    assert "#manuscript-workspace" in show, (
+        "the guard no longer sees the workspace rule that the chrome list "
+        f"absorbed into: {show!r}"
+    )
+
+
+def test_the_guard_accepts_the_healthy_spotlight_rule() -> None:
+    """A guard that rejects everything is not a guard. The fixed rule must pass."""
+    rule = _rule_body(HEALTHY_SPOTLIGHT, ".spotlight-mode #project-bar")
+    assert "display: none !important" in rule, f"healthy fixture rejected: {rule!r}"
+    for selector in ("#desk-toolbar", "#draft-bar", "#diff-banner", "#room-drawer"):
+        assert f".spotlight-mode {selector}" in rule
