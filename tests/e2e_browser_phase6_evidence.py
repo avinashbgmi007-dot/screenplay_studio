@@ -183,10 +183,21 @@ def run(base):
         depth_el = lens.locator(".dock-cov-depth")
         depth_txt = depth_el.first.inner_text() if depth_el.count() else ""
         check("evidence depth line renders in the coverage section", depth_el.count() > 0, depth_txt)
-        check("it names the raw pages the script-level passes actually read",
-              "raw pages of the key scenes" in depth_txt, depth_txt)
-        check("it names which scenes were read as pages",
-              re.search(r"scenes \d", depth_txt) is not None, depth_txt)
+        # Kit B changed what this line CAN say: small scripts are read whole,
+        # so their findings stamp full_text and no checkpoint bucket exists.
+        # Assert the agreement with the report's own stats, not a fixed shape.
+        _depth_rep = requests.get(f"{base}/api/projects/{analyzed}/report",
+                                  headers=studio_headers(base), timeout=30).json()
+        _depth = ((_depth_rep or {}).get("stats") or {}).get("evidence_depth") or {}
+        _mixed = _depth.get("overview_and_checkpoints", 0) or 0
+        if _mixed:
+            check("it names the raw pages the script-level passes actually read",
+                  "raw pages of the key scenes" in depth_txt, depth_txt)
+            check("it names which scenes were read as pages",
+                  re.search(r"scenes \d", depth_txt) is not None, depth_txt)
+        else:
+            check("it names the full-text reading when no checkpoint bucket exists",
+                  "from the full script text" in depth_txt, depth_txt)
         check("it still warns this is not a full reading",
               "not a reading of your pages" in (depth_el.first.get_attribute("title") or "")
               if depth_el.count() else False, depth_txt)
