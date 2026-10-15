@@ -200,7 +200,13 @@ def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
     """Move the mouse where a writer's would be, then poll until the control is
     genuinely the hit target. Returns True/False — never raises.
 
-    `#desk-toolbar` and `#project-bar` are auto-hiding chrome: while idle they
+    Track A section 6 made #desk-toolbar exempt from auto-hide, so for
+    #desk-analyze-btn this is now a safety net rather than a requirement: the
+    first poll succeeds without the mousemove. It stays because #project-bar
+    (same helper, same idle timer) still hides, and a helper that assumes it is
+    load-bearing is how a future chrome change slips through unnoticed.
+
+    `#project-bar` is auto-hiding chrome: while idle it
     carry `opacity: 0; pointer-events: none` (style.css `.auto-hide-chrome`), and
     a mousemove with `clientY < 120` is what brings them back for 4s
     (`CHROME_HIDE_DELAY`, app.js). Playwright's `is_visible()` ignores opacity, so
@@ -240,7 +246,7 @@ def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
 def reveal_and_click(page, selector, timeout=4000, attempts=6):
     """Click a control that lives in the Nocta AUTO-HIDE CHROME. Never raises.
 
-    `#project-bar` and `#desk-toolbar` fade to `opacity: 0; pointer-events: none`
+    `#project-bar` fades to `opacity: 0; pointer-events: none`
     after 4s idle (`style.css:4712`, `app.js:10469 CHROME_HIDE_DELAY`), so any
     control inside them stops being hit-testable. Note this is NOT a CSS-visibility
     problem: `is_visible()` returns **True** for the hidden bar, because opacity 0

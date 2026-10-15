@@ -632,3 +632,38 @@ HEAD with all changes stashed). The one node failure,
 runner. The two `smoke`/`export_flush` migrations are the live risk — they move from
 `openRoomDrawer()` to the dock's Sameer lens, a different surface, and their assertions may
 read drawer-specific DOM. If they fail, §2 is over-scoped and the failing assertion will say so.
+
+### 12.7 Section 6 shipped: Run Analysis is never behind auto-hide chrome
+
+`.auto-hide-chrome #desk-toolbar` carried `opacity: 0; pointer-events: none` after 4s idle.
+Run Analysis — the control that starts the product's entire reason for existing — was inside
+it, so on a first visit the writer saw a clean desk with no visible way to begin. The only
+recovery was a mousemove with `clientY < 120`, which a keyboard user and a trackpad user both
+fail.
+
+`#desk-toolbar` is now exempt. `#project-bar` still auto-hides. **No DOM moved and no layout
+shifted** — `opacity` cannot be undone per-child, so the only way to keep one button lit inside
+a faded parent is to stop fading the parent.
+
+**The rest of §6 was already true and was left alone.** `#desk-analyze-progress` carries the
+stage caption in `.ap-stage` and the client-measured elapsed in `.ap-beat`
+(`app.js:2831-2832`), both direct children and always visible — the hover-only part is
+`.stage-ladder`, which is a separate, deeper affordance. Recording this rather than "adding"
+it: the spec described a gap that the code had already closed.
+
+**No ETA, and none added.** `stageElapsedText` (`app.js:2740`) renders
+`"working… 12s on this pass"` or `"no word from the model — waiting 1m 20s"`. Both are measured
+client-side. A predicted duration would be a fabricated number, which is deferred until the
+server emits stage durations.
+
+**Test impact: none, and the check was done before the edit, not after.** `reveal_chrome` and
+`reveal` are defensive helpers — they move a mouse then poll for the hit target — so they
+return `True` immediately when nothing hides. `phase13:230` asserts *spotlight* hides the
+toolbar, which is a separate rule (`.spotlight-mode #desk-toolbar`, `style.css:3439-3442`) and
+untouched. `phase8:216` asserts the toolbar sits above the manuscript row, a geometric check
+`opacity` never affected. Three docstrings describing the toolbar as auto-hiding were
+corrected, and `reveal_chrome`'s docstring now records why the helper stays even though it is
+no longer load-bearing for the analyze button.
+
+**Track A is complete: sections 2, 3, 4, 5, 6.** Section 5 fell out of 2 and 3 and needed no
+commit of its own.

@@ -4684,15 +4684,27 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
    ============================================================ */
 
 /* ---- Auto-hide chrome ----
-   Toolbar and project bar fade in on mouse proximity, fade out after 4s idle. */
-.auto-hide-chrome #project-bar,
-.auto-hide-chrome #desk-toolbar {
+   Track A section 6: only the project bar auto-hides now. #desk-toolbar is
+   excluded because it holds Run Analysis - the control that starts the
+   product's entire reason for existing. On a first visit the writer saw a
+   clean desk with no visible way to begin, and the only recovery was a
+   mousemove, which a keyboard user and a trackpad user both fail.
+
+   opacity cannot be undone per-child, so the toolbar cannot be faded while
+   keeping one button lit. Excluding the toolbar is the whole change; no DOM
+   moved and no layout shifted.
+
+   The rest of section 6 was already true and is left alone: #desk-analyze-
+   progress carries the stage caption in .ap-stage and the client-measured
+   elapsed in .ap-beat, both direct children and always visible. There is no
+   ETA anywhere: stageElapsedText renders "working... 12s on this pass" or
+   "no word from the model - waiting 1m 20s", both measured, neither predicted. */
+.auto-hide-chrome #project-bar {
   opacity: 0;
   pointer-events: none;
   transition: opacity 200ms ease-out;
 }
-.auto-hide-chrome.chrome-visible #project-bar,
-.auto-hide-chrome.chrome-visible #desk-toolbar {
+.auto-hide-chrome.chrome-visible #project-bar {
   opacity: 1;
   pointer-events: auto;
 }
@@ -4701,8 +4713,7 @@ a.report-export { text-decoration: none; display: inline-flex; align-items: cent
    invisible (the 4s idle hide only tracks mouse proximity); without this
    rule focus lands on unseeable buttons. Same :focus-within pattern as the
    hover-reveal rows (pass 6). */
-.auto-hide-chrome #project-bar:focus-within,
-.auto-hide-chrome #desk-toolbar:focus-within {
+.auto-hide-chrome #project-bar:focus-within {
   opacity: 1;
   pointer-events: auto;
 }

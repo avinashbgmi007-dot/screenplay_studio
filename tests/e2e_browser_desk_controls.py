@@ -129,7 +129,7 @@ def stages(base, project):
 def reveal(page, sel, timeout=8000):
     """Hover the auto-hiding chrome until `sel` is genuinely the hit target.
 
-    `#desk-toolbar` is `.auto-hide-chrome`: idle it carries `opacity: 0;
+    `#project-bar` is `.auto-hide-chrome`: idle it carries `opacity: 0;
     pointer-events: none`, so Playwright's is_visible() ignores opacity and a
     bare .click() dies with "intercepts pointer events". Same trap phase8_lifecycle
     root-caused on 2026-09-23.
