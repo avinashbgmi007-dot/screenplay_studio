@@ -221,12 +221,82 @@ Three properties, restated so they are testable:
 **Tiebreak:** equal lane maxima fall back to declaration order in the lane table. Declared, not
 discovered.
 
+**OPEN, not closed (review amendment, accepted).** This section previously read "closed." That
+overcorrected. The evidence is *divided*: upstream-first is defensible craft practice and rewrite
+rooms run structure-down, but it contradicts Expert D's own ordering, which ranks exposition (#2)
+above dangling setup (#4). **A decision with divided evidence is a hypothesis, not a premise.** The
+upstream-first default ships, and lane order rides into the writer sitting as an explicit open
+question alongside the uncalibrated weights — see §10.1. Closed decisions do not get revisited;
+hypotheses do, and this one has not earned closure.
+
 **G9 (acceptance):** lane headers render in the declared order, byte-identical across two loads of
 the same script, and unaffected by any `IMPACT` recalibration.
 
 **Implementation note:** rows in the Observation lane must be excluded from `score()` entirely, not
 scored and then not displayed. A real report exercises this — see §9a, where a `theme` finding
 carries `scene_refs: [2]` yet is unqueued. Scoring it produces a number no reader ever sees.
+
+### 1.7 DEFECT FOUND IN CALIBRATION — the two verification readouts disagree, and the server inflates
+
+**Outside the #1–#7 scope. Recorded, not adopted.** Found while reconciling Result 3 of the external
+review. The review claimed the product displays "the wrong number" for verification and that the fix
+is "two numbers." **The two numbers already exist** — and the real defect is worse and in a
+different place.
+
+**What already ships.** `verificationReadoutText()` (`core.js:176-188`) prints:
+
+```
+N of M quotes verified (P%) · K carried no quote
+```
+
+Both numbers, one line, unit-tested at `tests/js/verification_readout.test.js:16-20`. So "add a
+coverage number" is already done.
+
+**The actual defect: two implementations, opposite rules, and the server inflates.**
+
+| | denominator | verdict |
+|---|---|---|
+| `screenplay_analyzer/verifier.py:235` | `verified + not_found` — **excludes** `scene_not_found` | inflates |
+| `screenplay_studio/webapp/core.js:178` | `verified + not_found + scene_not_found` — **includes** it | correct |
+
+**Arithmetic proof.** `verified=1, not_found=0, scene_not_found=1`:
+
+- `verifier.py` → `1 / 1` = **100.0%**
+- `core.js` → `1 / 2` = **50.0%**
+
+**One of two citations confirmed. The server reports "100% verified."** The delta scales with
+`scene_not_found`: at 5/2/3 the two disagree by **21.4 points**.
+
+**The docstring has the logic inverted.** `verifier.py:230-232` justifies the exclusion: *"`scene_not_found`
+is excluded too (it IS a check result, and folding a failure into the denominator would flatter the
+rate)."* Removing a failure from a denominator **raises** the rate — that is what flattering *is*.
+Including it is the stricter measure, and `core.js` takes it.
+
+**Two tests, near-identical names, opposite assertions** — which is how this survived:
+
+- `tests/js/verification_readout.test.js:32` — *"scene_not_found is a failure, **not a denominator
+  exclusion**"* → asserts `1 of 2 (50%)`, includes it
+- `tests/test_verification_summary_surface.py:99` — comment *"a FAILURE, **not a denominator**"* →
+  asserts `quote_bearing == 3`, `66.7%`, excludes it
+
+**Blast radius.** `verified_pct_of_quoted` feeds the Context section's "Verifiability (B)" line
+(`app.js:6779`) and the exported report (`report.py:385-388`). Both can overstate. It does **not**
+reach the canonical trust line (`app.js:7214` → core.js), so the two readouts disagree *within one
+surface* — the exact failure `app.js:7211` warns about: *"two honest-looking numbers that disagree is
+how a writer stops trusting both."* Its comment also claims to be *"The ONLY reader of
+report.verification_summary"*; `buildContextSection` (`app.js:6576`) is a second reader. **That
+comment is false.**
+
+**Recommendation, for a separate spec — not folded into §1.** Fix `verification_rate()` to include
+`scene_not_found`, update the two pinned tests to agree, and route `buildContextSection` through
+`verificationReadout()` so one implementation serves every surface. **Do not "fix" this inside the
+ranking work:** it touches a server metric, an exported report, and four test files, and it deserves
+its own falsifiers.
+
+**What this changes about the reviewer's Result 3.** The verdict on D6 moves from "weak data" to
+**"the metric has a second, contradicting implementation on the server."** That is stronger *and*
+more actionable than "wrong number" — but it is a different defect, in a different layer, and it is
+still not evidence about how often quotes verify.
 
 ## §2. Delete the room tablist (#1)
 
@@ -447,15 +517,39 @@ ships with v0 weights *explicitly marked as such in the UI copy*, never silently
 - **Group headers as a second filter.** If a header ever filters without going through
   `findingPassesFilter`, GAP-1 returns.
 
+### 10.1 Open questions for the writer sitting
+
+`docs/REAL_WRITER_VALIDATION.md` is the only gate that counts, and it has never been run. Two
+questions from this spec go into that sitting, both as **hypotheses**, neither as a closed decision:
+
+| Question | Carried because |
+|---|---|
+| **Read the queue top to bottom. Does Structure-first match what you would actually do first?** | §1.6's evidence is divided — upstream-first is craft practice but contradicts D3's own ordering |
+| **Do the ranked rows feel like your rewrite order, or like a report?** | §9a is blocked; `IMPACT` ships v0 and is explicitly marked uncalibrated (§10) |
+
+A writer who cannot say why row 3 outranks row 4 has answered the second question badly, and the
+weights are wrong — not the reviewer.
+
 ## §11. Ship order
 
-1. **§9a gate (blocked — see §9).** `IMPACT` ships v0 with an explicit uncalibrated marker in the
-   rank-reason string, so a writer is never shown a ranking that pretends to be settled.
-2. §1 (membership + lanes + rank v0) — the only behavioural change
-3. §7 (filter row collapse + clickable headers) — depends on §1
-4. §2, §3, §4, §5 — independent deletions, parallelisable
-5. §6 — independent, no measurement dependency
-6. §9b rendered-order calibration, then re-tune `IMPACT`
+**Restructured: deletions first, in parallel with the calibration wait** (review amendment,
+accepted). §2–§6 need no calibrated weight. The falsifier, the predicate traps, and gates G1–G4 and
+G10 are all specified and testable today, and nothing about them blocks on §9a.
 
-**Write the letter to yourself for a second pull request:** every change here is a deletion, and
+| # | Step | Gate |
+|---|---|---|
+| **A** | **§2–§6, the deletions.** Independent of calibration. Parallelisable across three people. | G1, G2, G3, G10; falsifier 3 satisfied by `deep_links.py:209` unmodified |
+| **B** | **§1 + §7**, membership and ranking. Ship with `IMPACT` **v0**, rank-reason string marked uncalibrated. | G4, G5, G6, G7, G9 |
+| **C** | **§9b** rendered-order calibration, then re-tune `IMPACT`. | §9b pass condition |
+| **D** | **§1.7**, the verification-rate defect — **separate spec**, do not fold into B. | its own falsifiers |
+
+**Why deletions lead.** They are the whole of the original complaint — one finding in five places,
+three spines, a verb hidden behind a hover — and they are the half that needs no new judgment. A
+ranking over an undeduplicated surface orders the clutter; it does not remove it.
+
+**Why §1.7 must not ride along.** It changes a server metric (`verifier.py`), an exported report
+(`report.py`), the canonical client function (`core.js`), and four pinned tests, including two that
+currently disagree with each other. Bolting that onto the ranking PR means one revert undoes both.
+
+**Write the letter to yourself for the next pull request:** every change here is a deletion, and
 deletions are invisible in a diff. Record what was removed and what measurement justified it.
