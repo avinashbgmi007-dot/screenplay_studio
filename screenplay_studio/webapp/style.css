@@ -4020,6 +4020,14 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   background: var(--accent);
   border-color: var(--accent);
 }
+.dock-section-hint {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-style: italic;
+  color: var(--text-faint);
+  margin-left: auto;
+  padding-left: var(--sp-4);
+}
 /* Gate G6. Quiet by default: the reason is there when the writer looks for it
    and does not shout over the finding itself. */
 .dock-rank-reason {

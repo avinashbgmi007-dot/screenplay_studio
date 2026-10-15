@@ -190,11 +190,18 @@ function verificationReadoutText(vs) {
 // ============ Queue lanes and rank v0 (Track B) ============
 //
 // IMPACT is a hand-authored judgment stated as reviewable data. It is
-// UNCALIBRATED and ships labelled as such: the numbers encode a hypothesis about
-// what a writer should fix first, and no calibration run has ever validated it.
-// Track C exists to test it. Do not tune these from a demo run - the verifier
-// and the analyzer are deterministic, but the WEIGHTS are a product decision
-// that a real writer sitting has to make, not something a synthetic score can.
+// UNCALIBRATED, and the UI says so. The numbers encode a hypothesis about what a
+// writer should fix first. A real-model calibration has now run over three
+// scripts (spec 14.10) and a reviewer agreed the resulting order was defensible -
+// which is evidence the ORDERING is sane, not that these values are correct.
+// Track C and a writer sitting are what would settle that. Do not tune these
+// from a demo run: the verifier and the analyzer are deterministic, but the
+// WEIGHTS are a product decision no synthetic score can make.
+//
+// NOTE: an earlier version of this comment claimed these weights "ship labelled
+// as such" while the only occurrences of the word UNCALIBRATED were in this
+// file. The writer saw nothing. Section 9c requires the marking in the UI COPY,
+// and it now lives in the ledger section head.
 //
 // Coverage is the load-bearing property, not the values. Every category that
 // can reach a finding MUST have an entry: an absent one makes

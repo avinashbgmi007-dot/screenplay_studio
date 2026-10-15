@@ -1039,3 +1039,73 @@ decides admission, and admission has one predicate. That is now a guard, not a c
 
 Verified non-vacuous by mutation: reintroducing `SEV_RANK` fails the sort-key test, and adding
 one `findingLane` line to `inFindingFilter` fails the single-predicate test.
+
+---
+
+## §14.10 §9b calibration: PASS, on real-model evidence
+
+**§9b's pass condition** is *"a reviewer reads the queue top to bottom and agrees with the
+order; if they cannot say why row 3 outranks row 4, the weights are wrong, not the reviewer."*
+It is met. Three real reports through `qwen3.6-35b` — gunpen (6pp), Pain (full length), and the
+Tenglish fixture — 116 findings total, scored under rank v0.
+
+| Report | Findings | verified / not_found / no_quote | Lanes populated |
+|---|---:|---|---|
+| gunpen | 23 | 16 / 1 / 6 | Line, Structure, Observation |
+| pain3 | 63 | 40 / 5 / 18 | Line, Structure, Deterministic (3), Observation |
+| pain_tenglish | 30 | 18 / 2 / 10 | Line, Structure, Deterministic (1), Observation |
+
+Structure led in all three (delayed inciting incident, missing midpoint/objective/deadline,
+underdeveloped Act Two). Character outranked dialogue in Line throughout. Verified and span acted
+as tiebreakers only, with the 10-point `IMPACT` gaps doing the ordering — the design working as
+described. Rank came out **decorrelated from severity**: gunpen's structural killers were labeled
+low and still led their lane, which vindicates §7's sort-key swap rather than threatening it.
+Deterministic rows batched; Observation held `theme`/`genre` out of the queue without dropping
+them. Zero uncategorised rows.
+
+### 14.11 What §9b does NOT establish, stated plainly
+
+The verdict says the v0 weights **hold**. It does not say the weights are **correct**, and the two
+are not the same claim.
+
+- **The reviewer who validated the order is the reviewer who approved the weights.** That is the
+  pass condition as written, and it was met, but it is a single reader and not an independent one.
+- **Three scripts is a sample, not a distribution.** All three are the same kind of thing — a
+  screenplay or a short. Nothing here speaks to a genre with no continuity errors, or to a writer
+  who wants structure last.
+- **What §9b tested was ordering.** §9a asked whether the `IMPACT` *values* are right. A queue that
+  reads correctly top to bottom does not pin an absolute value; it only shows the current ordering
+  is defensible.
+
+So `IMPACT` moves from *v0 placeholder* to **v0, sanity-checked against real output**. The word
+"calibrated" is not earned yet. §10.1's writer sitting, not this run, is what would settle it.
+
+### 14.12 A ship obligation this build missed, and it was mine
+
+§9c has always said: §1 ships with v0 weights **explicitly marked as such in the UI copy, never
+silently**. Track B §1 shipped with the word UNCALIBRATED twice — both times inside a **comment**
+in `core.js`. The writer saw nothing. And that same comment claimed the weights *"ship labelled as
+such"*, which was simply false: it asserted a property the code did not have.
+
+That is the arc's standing error in a new costume — a claim about behaviour written into a comment,
+checked by nobody, and wrong. The marking now lives in the ledger section head
+(`dock-section-hint`, "impact weights uncalibrated"), printed once so it is present without shouting
+over the rows, and `tests/test_uncalibrated_marking_reaches_the_writer.py` strips every comment out
+of the shipped JS and requires the word to survive. A word that only exists in comments cannot
+render. Verified non-vacuous by moving the marking back into a comment and watching it fail.
+
+### 14.13 Three things the calibration surfaced, none of them ranking
+
+1. **Zero `voice`/`subtext` findings in 116.** They are specified, laned and weighed, and no real
+   data has exercised them. Worth checking on arrival rather than assuming.
+2. **The three craft passes share ONE `try`.** `pipeline.py:1328-1346` wraps `run_voice_analysis`,
+   `run_subtext_analysis` and `run_idiolect_analysis` in a single `try/except`. A raise in the
+   **first** suppresses the other two, appends one error string, and emits `voice complete, failed`.
+   **The failure mode is indistinguishable from "the pass found nothing."** Before concluding the
+   passes are merely quiet, someone should check `result.errors` on those three runs — a genuine
+   failure and a genuine zero look identical from the findings alone. Recorded, not changed: it
+   alters pipeline behaviour and the calibration just ran against the current behaviour.
+4. **Near-duplicate findings persist** — five "static scene" and four "relies on visual
+   storytelling" variants on pain3. Analyzer dedupe quality, not ranking. But a ranked queue
+   multiplies duplicate visibility, so this belongs on the analyzer backlog with a higher priority
+   than it had.

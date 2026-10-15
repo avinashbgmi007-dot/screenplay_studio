@@ -6744,6 +6744,10 @@ function buildContextSection() {
       ? `Live findings the sections above did not card — grouped into lanes, heaviest `
         + `first (${carded.size} more carded in this scene / script level)`
       : "Every live finding, grouped into lanes, heaviest first";
+    // Spec 9c, and an obligation this build originally missed: the weights are a
+    // hypothesis and the WRITER must see that, not a code comment. Printed once,
+    // on the section head, so it is present without being shouted over the rows.
+    head.appendChild(el("span", "dock-section-hint", "impact weights uncalibrated"));
     lens.appendChild(dockSection("by-category", head, groups));
   }
   // honest emptiness: findings exist but the filter hides them all — the
