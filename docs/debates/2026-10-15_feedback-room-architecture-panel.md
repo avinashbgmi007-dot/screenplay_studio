@@ -1,6 +1,18 @@
 # Panel Debate — the Post-Analysis Feedback Room
 
 **Date:** 2026-10-15 · **Branch:** `arena/e6a57b71-screenplay-studio` · **Base:** `5c1b953`
+**Read from:** `avinashbgmi007-dot/screenplay_studio` @ `origin/arena/e6a57b71-screenplay-studio`,
+working tree clean, no local modifications to `app.js` / `index.html` / `style.css` /
+`screenplay_analyzer/` at the time of reading. Re-verify with `git rev-parse HEAD` before trusting a
+line number.
+
+> **REVISION 2 (2026-10-15), after external review.** Three factual errors corrected: the finding
+> taxonomy is **eight** categories at `grammar.py:45-48`, not the twelve *passes* at
+> `pipeline.py:847`; `SEVERITIES` is at `grammar.py:50`, not `:52`. Two substantive gaps closed:
+> #10 reframed as promotion of an existing component (`app.js:7446-7451`), and the 8-to-2 bin mapping
+> is now specified in §4a. **#8 is WITHDRAWN** as illegal against `tests/e2e_browser_layout_audit.py`
+> (legal dock ceiling 676px) — see `2026-10-15_critique-two-agent-panel.md` §2. The branch was absent
+> from `origin` during the first draft, so this document was not reproducible; it now is.
 **Question put to the panel:** the Feedback room is visually cluttered after analysis. What belongs
 in it, how should it align screen-wise, and what is the architecture-level cause?
 **Method:** every claim below is grounded in a file and line read from this checkout. Where a claim
@@ -50,7 +62,14 @@ Every expert received the same brief before any position was taken.
 - Desk toolbar is `.auto-hide-chrome` (`style.css:4742-4743`).
 - Dawn control appears twice: `#dawn-btn` sidebar (`index.html:78`) and `#status-dawn` status strip
   (`index.html:474`).
-- Twelve analyzer categories (`pipeline.py:847`), severities `low / medium / high` (`grammar.py:52`).
+- **Eight finding categories** (`grammar.py:45-48`): theme, character, structure, dialogue,
+  scene_function, plot_thread, genre, continuity. `CATEGORY_LABELS` (`app.js:4232-4236`) carries ten
+  keys, two of them (`voice`, `subtext`) stale: they appear in neither `FINDING_CATEGORIES` nor
+  `ALL_CATEGORIES`.
+- **Twelve model-based analysis passes** (`pipeline.py:847`), which is a *different* set and not a
+  finding taxonomy: dialogue, theme, character, structure, scene_function, principles,
+  setup_payoff, char_reads, character_dials, coverage, genre, logline_test.
+- Severities `low / medium / high` (`grammar.py:50`).
 
 **The prior audit's verdict was Option A+, and it shipped.** `renderTier1Worklist` and the Tier 2
 Context disclosure are live. The legacy panel is deleted. So the panel is **not** re-litigating
@@ -242,7 +261,7 @@ should be a drawer nobody opens twice. I know what I want to do. I do not know w
 doing wrong, and those are different questions.
 
 **D2. Your "high" is a confidence value wearing a craft costume.**
-`SEVERITIES = ["low","medium","high"]` (`grammar.py:52`) is assigned by a model that also had to
+`SEVERITIES = ["low","medium","high"]` (`grammar.py:50`) is assigned by a model that also had to
 decide whether it was sure. A high-confidence note about a comma splice ranks beside a
 high-confidence note that the middle of the script has no turn. Those are not the same class of
 problem. Show me two numbers, not one: how sure you are, and how much page this costs.
@@ -254,7 +273,7 @@ problem. Show me two numbers, not one: how sure you are, and how much page this 
 4. Setup with no payoff in the last act (`setup_payoff`)
 5. Scenes that change nothing (`scene_function`)
 
-Everything else is a footnote. Twelve categories is a filing system that matches your module layout,
+Everything else is a footnote. Eight categories is a filing system that matches your module layout,
 not a diagnosis that matches my afternoon.
 
 **D4. The dials are a waste of my time.**
@@ -344,14 +363,51 @@ All four positions, converged. Ordered by cost-to-ship, cheapest first.
 | 3 | Delete the duplicate Dawn control. Two controls, one state. | `index.html:78, 474` | Low |
 | 4 | Sameer converges to exactly two homes (desk panel, dock lens). No more. | `index.html:279, 402, 419, 455` | Low |
 | 5 | Run Analysis is never behind auto-hide chrome. Add an ETA to the button. Keep Stop. | `style.css:4742-4743`, `index.html:178-184` | Low |
-| 6 | Severity becomes two keys: craft impact, then verification state. An unverified quote never outranks a verified one. | `grammar.py:52`, `AGENTS.md:66` | Medium |
-| 7 | Sort bins are **fix this line** and **fix this structure**. Category becomes metadata inside each. | `pipeline.py:847`, D3/D5 | Medium |
-| 8 | The dock is mode-aware: triage 44rem+, revision ~200px, manuscript reclaims the difference. | `style.css:5507-5510`, `AGENTS.md:56` | Medium |
+| 6 | Severity becomes two keys: craft impact, then verification state. An unverified quote never outranks a verified one. **Confidence-vs-craft-cost is NOT resolved here** — see the revision note; it is analyzer-side work. | `grammar.py:50`, `AGENTS.md:66` | Medium |
+| 7 | Sort bins are **fix this line** and **fix this structure**. The 8-to-2 mapping is specified below, not left as a slogan. | `grammar.py:45-48`, D3/D5 | Medium |
+| 8 | ~~The dock is mode-aware: triage 44rem+~~ **WITHDRAWN — fails the layout gate.** See the critique doc, D1. The legal ceiling is 676px. | `style.css:5507-5510`, `layout_audit.py:442` | Blocked |
 | 9 | Coverage verdict, comparables, logline test, and dials leave the primary path. Dials reveal on request. | D1, D4 | Medium |
-| 10 | Ship a **"don't touch" list**: strongest scenes, paid setups, consistent voice. The app currently shows only defects. | D7 | Large |
+| 10 | Promote the **existing** "What's working (N)" (`app.js:7446-7451`) out of Tier 2 into Tier 1, and add per-scene strongest-scene selection. Promotion, not invention. | D7, `app.js:7446-7451` | Medium (was Large) |
 | 11 | Keep the arrival strip and the provenance line. They are not chrome, they are why the numbers are believed. | GAP-3, GAP-4, B1 | Keep |
 | 12 | Report.md's finale becomes a writer's letter: what changed, why, still open, deliberately untouched. | D10 | Large |
 | 13 | Everything ships as deletion or unification. **No rewrite.** 1,983 test functions across 222 files bind to the current shell. | `tests/*.py` | Constraint |
+
+### 4a. The 8-to-2 bin mapping (specification, not slogan)
+
+Added in revision. `FINDING_CATEGORIES` is **eight** (`grammar.py:45-48`). Mapping every one:
+
+| Category | Bin | Rule |
+|---|---|---|
+| `structure` | **Fix this structure** | missing turn / event-chain |
+| `plot_thread` | **Fix this structure** | setup and payoff economy |
+| `scene_function` | **Fix this line** | the scene changes nothing |
+| `dialogue` | **Fix this line** | characters state what is known |
+| `character` | **conditional** | `len(scene_refs) <= 2` → line bin; `>= 3` → structure bin. Passivity in a scene is a page problem; an arc that never turns is a script problem. |
+| `theme` | **neither** | not a defect, an observation. Not a queue row. |
+| `genre` | **neither** | conformance is a Coverage note, not a fix. Not a queue row. |
+| `continuity` | **neither** | deterministic mechanical check, `check_id` present. Batches to the bottom. |
+
+**Net effect: the queue's category surface drops from eight to five (four fixed plus a conditional),
+and three categories stop being queue rows at all.**
+
+This strengthens the two-agent panel's agreement 5 rather than merely supporting it. That panel ruled
+`theme`/`genre` script-level rows should get **no Locate button**. The correct fix is one step
+further: they should not be rows in the fix queue at all, so there is no button to get wrong. A
+`Locate` button with nothing to locate is exactly the architect's own R3 violated.
+
+### 4b. Falsifier for agreement #13 ("no rewrite")
+
+Added in revision, because self-critique item 3 said the claim is untested. **#13 falls if any of
+these is true**, and each is checkable before a line of UI code is written:
+
+1. Fixing agreement #8's replacement requires changing the manuscript resize observer contract
+   (currently implicit in `#context-dock`'s width transition, `style.css:5507-5516`).
+2. Agreement #6 or #7 requires a new field on the finding object that `dedupe.py` whole-row
+   collapsing would silently drop (`screenplay_analyzer/dedupe.py:242`).
+3. Any of #1-#5 requires editing a `role="tablist"`/`aria-controls` pair that
+   `tests/e2e_browser_deep_links.py` or `tests/e2e_browser_one_matcher.py` pins.
+
+If any holds, #13 is wrong and this panel's central constraint fails. That is the test.
 
 **What was rejected, and by whom:**
 - A3 "make the default do the work" → rejected by B, C, and D. Invisible automation caused GAP-1, 3, 4.
@@ -405,7 +461,7 @@ All four positions, converged. Ordered by cost-to-ship, cheapest first.
 ## EXPERT D — Veteran Screenwriter, every pointer
 
 1. Coverage's CONSIDER/RECOMMEND/PASS is a producer's memo. Not asked for.
-2. `grammar.py:52` severity is a confidence value, not a craft priority. Ship two numbers.
+2. `grammar.py:50` severity is a confidence value, not a craft priority. Ship two numbers.
 3. The five things that kill scripts, in order: turn, exposition, passivity, dangling setup, inert scenes.
 4. Character dials are the machine grading itself. Reveal on request.
 5. Two bins: fix this line, fix this structure. Category is metadata.
