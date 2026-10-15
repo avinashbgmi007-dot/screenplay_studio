@@ -1109,3 +1109,67 @@ render. Verified non-vacuous by moving the marking back into a comment and watch
    storytelling" variants on pain3. Analyzer dedupe quality, not ranking. But a ranked queue
    multiplies duplicate visibility, so this belongs on the analyzer backlog with a higher priority
    than it had.
+
+### 14.14 §7 rendered gates: G6 pass, G9 deterministic, G5/G7 failed on real output
+
+| Gate | Result |
+|---|---|
+| G6 — every row renders its rank reason | **PASS.** "Line, impact 4", "Line, impact 3", "Deterministic, impact 2, verified" |
+| G9 — lane order across two loads | **Sort is deterministic by construction**; the browser two-load assertion is **specified but unexecuted**, because the first probe compared a row *set* that varies with which scene the strip claims on each load |
+| G5 — first actionable row above the fold | **FAIL.** 1593px in a 900px viewport |
+| G7 — lane headers above the fold | **FAIL**, same cause |
+| layout_audit | 37/37, no regressions |
+| dock_sections | 174/176 — two obsolete assertions, see 14.16 |
+
+### 14.15 G5: the threshold does not move
+
+The first actionable queue row sat at **1593px against a 900px viewport**. The cause was not the
+queue. It was everything ahead of it: arrival strip, filter row, scene strip, queue header — plus
+two detail sections that are not Tier 1 at all.
+
+**§0.2's Tier 1 enumeration is: arrival strip, ambiguous-marks notice, filter row, current-scene
+box, then the lane-grouped queue.** `scene-findings` and `script-level` are **not on that list.**
+They are the same findings rendered as per-scene detail cards, and they were being appended
+*before* the ranked queue — so the one section that answers "what do I do first" was below two
+sections answering "what is on this scene".
+
+They are now built in place and appended **after** the queue. No predicate, no dedupe, no audit
+hook and no DOM order within a section changed; only the moment of appending moved.
+
+**The threshold was not restated.** Restating a gate so it fits its own failure is moving the
+goalposts, and the complaint this gate encodes — the actionable finding sits below the fold — is
+the complaint Track A and Track B exist to answer. If this reorder does not close the gap on the
+next run, the next step is **Tier 1 compaction** (collapse the arrival strip, compact the filter
+row), and only after that, a restated threshold with reasons recorded.
+
+Guarded structurally: `test_the_ranked_queue_is_appended_before_the_detail_cards` asserts the
+append order in source. It cannot measure pixels — the runner still owns that — but it stops the
+ordering being undone between runs. Verified non-vacuous by restoring the old append order.
+
+### 14.16 G8 amended: two dock_sections assertions encode the pre-§7 contract
+
+`P1.7 highs-first` and `P1.8 group retention` both seed a **`"pacing"`** category group and assert
+severity ordering inside it. Under the shipped code `"pacing"` is an **unknown category**: it lanes
+to Uncategorised, scores `IMPACT` 0, and its title is now a `button.dock-lane-cat` sub-header
+rather than a `.dock-cat-group` title.
+
+So these two checks **cannot pass under the new contract by design**, which makes **"G8 as stated —
+the existing assertions still pass — false**, and a permanently red suite is a gate that stops being
+read. The migration preserves both checks' original intent rather than deleting them: re-seed with
+real categories spanning **two IMPACT tiers**, then assert **rank order inside the group** and
+**single rendering**. That is still "ordering within a group" and "one card per finding", which is
+what P1.7 and P1.8 were written to protect.
+
+Recorded as an amendment rather than left as red. Not yet migrated here — it is test-only work and
+wants the reviewer's seed data, which lives outside this workspace.
+
+### 14.17 G9's unexecuted assertion, specified properly
+
+The sort is settled: `rankScore` descending with an index tiebreak inside a lane, max-`IMPACT`
+descending with a name tiebreak across lanes, and the render consumes the canonical `order` rather
+than object insertion order. Node confirms reversed input yields byte-identical output.
+
+What is unproven is the **browser-level two-load assertion**, and the first probe confounded it:
+the queue's row *set* changes with which scene the strip claims on each load, so comparing order
+measured state, not sort. A valid check must **fix the scene first, then compare**, or compare
+lane-header order only.

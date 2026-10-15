@@ -132,3 +132,25 @@ def test_severity_is_still_an_attribute_not_an_ordering(app_js: str) -> None:
         "the severity filter disappeared. Section 7 keeps severity chips; it "
         "only stops severity being the ORDER."
     )
+
+def test_the_ranked_queue_is_appended_before_the_detail_cards(app_js: str) -> None:
+    """Gate G5, checked structurally. The queue must be APPENDED to the lens
+    before the per-scene and script-level detail sections, or the first
+    actionable row sits below them — 1593px in a 900px viewport, which is the
+    original complaint surviving implementation intact.
+
+    Source-level because the rendered position needs a browser and this catches
+    the regression the moment someone inlines the appends again. The browser
+    gate G5 remains the one that measures pixels; this is the cheap one that
+    stops the ordering being undone between runs."""
+    m = re.search(r'lens\.appendChild\(dockSection\("by-category"', app_js)
+    assert m, "the lane queue is no longer appended by that literal — re-check G5"
+    queue_at = m.start()
+    for name in ("lens.appendChild(sceneSection)", "lens.appendChild(scriptSection)"):
+        i = app_js.find(name)
+        assert i != -1, f"{name} is missing; the detail sections are not being appended"
+        assert i > queue_at, (
+            f"{name} is appended BEFORE the lane queue. The ranked queue must "
+            "lead the lens or gate G5 cannot pass and the writer's first "
+            "actionable row is a screen below the fold."
+        )

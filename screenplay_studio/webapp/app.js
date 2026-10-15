@@ -6611,25 +6611,35 @@ function buildContextSection() {
   const sceneFindings = sceneNum != null
     ? (data.byScene[sceneNum] || []).filter(({ f, index }) => findingPassesFilter(f, index))
     : [];
+  // Track B section 7 follow-up (gate G5): these two sections are BUILT here but
+  // APPENDED after the lane queue below. They are the same findings shown as
+  // per-scene detail cards; the lane queue is the same findings as one ranked,
+  // actionable list. Leading with the detail cards put the thing the writer is
+  // meant to act on FIRST below them — 1593px in a 900px viewport, which is the
+  // original complaint surviving implementation intact.
+  //
+  // Neither section moved in the DOM order, only in when it is appended, so the
+  // ONE predicate, the `carded` dedupe, and every audit hook are untouched.
+  let sceneSection = null;
   if (sceneFindings.length) {
     const list = el("div", "dock-finding-list");
     for (const { f, index } of sceneFindings) {
       // Addressed / Still Present rides along (MD §7 preserve list)
       list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     }
-    const sec = dockSection("scene-findings",
+    sceneSection = dockSection("scene-findings",
       sceneNum != null ? `Findings — Scene ${sceneNum}` : "Findings — script level", list);
-    sec.classList.add("dock-section-scene-findings"); // hook kept for the audits
-    lens.appendChild(sec);
+    sceneSection.classList.add("dock-section-scene-findings"); // hook kept for the audits
   }
   // script-level findings ride beneath the scene's own
   const scriptLevel = (data.scriptLevel || []).filter(({ f, index }) => findingPassesFilter(f, index));
+  let scriptSection = null;
   if (scriptLevel.length) {
     const list = el("div", "dock-finding-list");
     for (const { f, index } of scriptLevel) {
       list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
     }
-    lens.appendChild(dockSection("script-level", "Script-level findings", list));
+    scriptSection = dockSection("script-level", "Script-level findings", list);
   }
 
   // -- 4. findings grouped by category (How serious, organized) ------------
@@ -6750,6 +6760,9 @@ function buildContextSection() {
     head.appendChild(el("span", "dock-section-hint", "impact weights uncalibrated"));
     lens.appendChild(dockSection("by-category", head, groups));
   }
+  // ...and now the per-scene and script-level detail cards, beneath the queue.
+  if (sceneSection) lens.appendChild(sceneSection);
+  if (scriptSection) lens.appendChild(scriptSection);
   // honest emptiness: findings exist but the filter hides them all — the
   // writer asked for a narrower view, and the board says so (never a blank).
   // NOT a section: there is nothing to collapse, and a notice the writer has
