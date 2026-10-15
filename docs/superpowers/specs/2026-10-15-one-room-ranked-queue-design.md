@@ -553,3 +553,82 @@ currently disagree with each other. Bolting that onto the ranking PR means one r
 
 **Write the letter to yourself for the next pull request:** every change here is a deletion, and
 deletions are invisible in a diff. Record what was removed and what measurement justified it.
+
+---
+
+## §12. Track A execution record (2026-10-15)
+
+Sections 3, 4 and 2 shipped on `arena/e6a57b71-screenplay-studio`. Three of this spec's
+claims were wrong when written and are corrected here, because each one cost a wrong
+prediction and the next reader deserves the corrected number.
+
+| § | Item | Commit | State |
+|---|---|---|---|
+| 3 | Gutter | `e3c8f17` | shipped, 1 test file touched |
+| 4 | Duplicate Dawn | `ad21fa4` | shipped, 1 test file touched |
+| 2 | Room tablist + route fix | `463aa29` | shipped, 5 test files touched |
+| 5 | Sameer converges | — | **falls out of §2 and §3; nothing left to do** |
+| 6 | Run Analysis | — | not started |
+
+### 12.1 §4's blast radius was wrong by 2 sites in my own favour, then 1 against
+
+The spec treated §4 as a deletion with no test migration. Reality: six call sites referenced
+`#dawn-btn`, but **only two actually break** — `_ui_capture.py:296,310`. The other four were
+already written to tolerate absence: `_p1_visual_gate.py` falls back to `#status-dawn` on its
+*next line*; `pass_arc:109` tries both selectors; `phase12:308,318` null-guard
+`getElementById`.
+
+The first breakage table I produced claimed `_p1_visual_gate.py:157` was a hard locator. It
+read the line, not the block. That is probe bug #3 — validating the probe before trusting its
+output — committed in the same round I flagged it in someone else's analysis.
+
+### 12.2 §2's test table undercounted by one file and missed a failure mode
+
+The spec listed four sites. There are five files. The omission mattered:
+`e2e_browser_phase9_idea_canvas.py:133` writes
+`check("Premise Doctor reachable...", !!b && b.offsetParent !== null)`. With the button
+deleted, `b` is `null`, the expression is `false`, and the suite **records a failure** rather
+than raising. A structural scan for "will this throw?" would have cleared it.
+
+`e2e_browser_common.py` also referenced the old id, but only in a `reveal_and_click` docstring
+— the function takes its selector as a parameter, so it carries no live dependency.
+
+### 12.3 `#room-chip` is kept, against the spec's own delete list
+
+§2 listed `#room-chip` for deletion. It is **not vestigial**: `setIdeaLens()` renders
+`"✍️ Idea Room"` vs `"📋 Concept Validation"` through it, making it the live room indicator in
+the idea room. Deleting it would discard rendered information to satisfy a list entry, which is
+the exact failure this arc has been correcting against. The tablist is gone; the readout stays.
+
+### 12.4 What §2 actually fixed, beyond the deletion
+
+`openFeedbackView()` no longer forces `setRoom("cowrite")`. The replacement control
+(`#room-evidence-btn`) calls `setRoom("feedback")` first, so `buildRoute()` emits
+`#/<project>/feedback` — the route `deep_links.py:209` has always asserted and that **no
+visible control previously produced**. `deep_links.py` gained a second assertion that clicks
+the control and fails if the hash says `/cowrite`.
+
+Two unguarded `classList` dereferences of the deleted buttons (`syncRoomUI`, `applyIdeaLens`)
+would have thrown on every room change. They are replaced by an `aria-pressed` toggle on the
+single control.
+
+### 12.5 A ratchet fired and was right to
+
+The new deep-links check was first written inside `if page.locator(...).count():`. That guard
+would let the block skip itself and still print PASS if the control vanished — precisely the
+regression under test. `test_browser_check_hygiene` refused the 24th if-guarded check against a
+ceiling of 23. Correct response: **remove the guard**, not raise the ceiling. The control is
+promised to exist, so its absence must fail loudly.
+
+### 12.6 Verification status
+
+`CSS balanced 1451/1451`, `app.js` parses under `node --check`, 2254 python tests pass, 86/87
+node. Two `test_repo_hygiene` failures are pre-existing (`ModuleNotFoundError`, reproduced at
+HEAD with all changes stashed). The one node failure,
+`preview-ink-layer/tests/dom.test.mjs`, is pre-existing at HEAD.
+
+**Not yet verified:** every browser suite. `smoke`, `export_flush`, `render_scale`,
+`phase9_idea_canvas`, `phase12`, `readiness_gate` and `deep_links` all require a Playwright
+runner. The two `smoke`/`export_flush` migrations are the live risk — they move from
+`openRoomDrawer()` to the dock's Sameer lens, a different surface, and their assertions may
+read drawer-specific DOM. If they fail, §2 is over-scoped and the failing assertion will say so.
