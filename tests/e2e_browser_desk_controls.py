@@ -48,7 +48,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import requests  # noqa: E402
 from e2e_browser_common import (  # noqa: E402
-    Checks, launch, open_studio, studio_headers, assert_no_js_errors)
+    Checks, assert_no_js_errors, launch, open_studio, reveal_chrome,
+    studio_headers)
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
@@ -113,32 +114,6 @@ def wait_or_false(page, js, timeout):
         return True
     except Exception:  # noqa: BLE001 - the caller's check IS the report
         return False
-
-
-def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
-    """Move the mouse where a writer's would be, then poll until the control is
-    the hit target (auto-hiding chrome: opacity 0 + pointer-events none until a
-    top-edge mousemove brings it back). Returns True/False — never raises.
-    Copied from phase8_lifecycle's identical helper (that suite owns it; this
-    one needed the same contract for the re-homed Re-parse button)."""
-    import time
-    page.mouse.move(700, 8)
-    deadline = time.time() + timeout / 1000
-    hit = "missing"
-    while time.time() < deadline:
-        hit = page.evaluate(
-            """(sel) => {
-              const e = document.querySelector(sel);
-              if (!e) return 'missing';
-              const r = e.getBoundingClientRect();
-              const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-              if (!t) return 'none';
-              return (e === t || e.contains(t)) ? 'ok' : t.tagName + '#' + (t.id || '-');
-            }""", sel)
-        if hit == "ok":
-            return True
-        page.wait_for_timeout(100)
-    return False
 
 
 def api_get(base, path):

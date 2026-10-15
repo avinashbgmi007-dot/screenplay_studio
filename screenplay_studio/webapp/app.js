@@ -48,6 +48,7 @@ const state = {
   editsData: null,        // { edits, findings_status } from /edits
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
+  fixQueueShowUngrounded: false, // accuracy kit A: ungrounded rows hide by default, one toggle away
   findingsSummary: null,  // server-joined counts + dawn % from /findings/summary (ONE findings-state load)
   feedbackLedger: null,   // gate 9: the last two runs reconciled (from /feedback/ledger)
   reportStats: null,      // stats from report.findings.json
@@ -244,6 +245,38 @@ function _tokenError(resp, data) {
   err.status = resp.status;
   err.tokenStale = true;
   return err;
+}
+
+// ---- authenticated download (audit R7) ----
+// A bare <a href> cannot carry the X-Studio-Token header, so on a token-
+// protected server a click would save the 403 error page instead of the
+// file. Fetch the bytes WITH the header, hand the blob to the browser as a
+// download, and surface a real failure as a writer-facing message instead
+// of a silently corrupted save.
+async function downloadBackup(path, filename) {
+  try {
+    const headers = {};
+    const tok = await _ensureStudioToken();
+    if (tok) headers["X-Studio-Token"] = tok;
+    let resp;
+    resp = await fetch(API + path, { headers });
+    if (!resp.ok) {
+      let msg = `backup failed (HTTP ${resp.status})`;
+      try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (_) { /* no body */ }
+      throw new Error(msg);
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    showError("Couldn't download the backup: " + (e.message || e));
+  }
 }
 
 // ---- streaming chat turn (SSE) ----
@@ -671,6 +704,12 @@ async function loadConfig() {
   } catch (e) {
     console.warn("Could not load config:", e);
   }
+  try {
+    const health = await api("/health");
+    state.codeRev = (health && health.code_rev) || null;
+  } catch (e) {
+    console.warn("Could not read server code revision:", e);
+  }
   updateStatusStrip();
   applyDemoDisclosure();
   checkConnection();
@@ -922,6 +961,16 @@ function updateStatusStrip() {
   else if (url) text = `llama · ${url.replace(/^https?:\/\//, "")}`;
   else text = "model server not set";
   label.textContent = text;
+  const code = $("#status-code");
+  if (code) {
+    if (state.codeRev) {
+      code.textContent = `code ${state.codeRev}`;
+      code.title = `Code revision this desk process analyzes with (${state.codeRev}). Restart the desk after updating the code.`;
+    } else {
+      code.textContent = "code ?";
+      code.title = "Code revision this desk process analyzes with (unreadable)";
+    }
+  }
 }
 
 // Hover card on the bottom-left: which brain, which server, how connected.
@@ -939,6 +988,8 @@ function renderConnCard() {
     `<div class="conn-card-row ${cls}"><b>${escapeHtml(stateTxt)}</b></div>` +
     `<div class="conn-card-row">model <b>${escapeHtml(demo ? "demo craft model" : (mid || "—"))}</b></div>` +
     `<div class="conn-card-row">server <b>${escapeHtml(url)}</b></div>` +
+    (state.codeRev
+      ? `<div class="conn-card-row">code <b>${escapeHtml(state.codeRev)}</b></div>` : "") +
     (demo && state.realServer && state.realServer.available
       ? `<div class="conn-card-row switch">your model is back — click "switch" beside</div>` : "");
 }
@@ -962,6 +1013,19 @@ function renderDashboard() {
   if (!grid) return;
   grid.innerHTML = "";
   const projects = state.projects || [];
+
+  // Library-wide backup (audit R7/M5): the shelf-saving sibling of each
+  // card's ⬇ Backup link. Hidden on an empty shelf — backing up nothing is
+  // a button that can only confuse. Wired once; the flag survives re-renders.
+  const allBtn = document.getElementById("dash-backup-all");
+  if (allBtn) {
+    allBtn.hidden = !projects.length;
+    if (projects.length && !allBtn.dataset.wired) {
+      allBtn.dataset.wired = "1";
+      allBtn.addEventListener("click", () =>
+        downloadBackup("/api/library/backup", "script-doctor-library-backup.zip"));
+    }
+  }
 
   if (!projects.length) {
     const empty = el("p", "dash-empty", "Nothing here yet — lay a manuscript on the desk above, or open the sample page.");
@@ -2377,8 +2441,9 @@ async function openProject(name) {
     state.script = null;
     state.findings = [];
     state.findingStatus = {};
-    state.fixQueue = null;
-    state.reportStats = null;
+  state.fixQueue = null;
+  state.reportStats = null;
+  state.report = null;  // carried the analysis-time verification_summary; readout must not leak it
     state.lint = null;
     state.premise = null;
     $("#premise-view").style.display = "none";
@@ -2719,6 +2784,26 @@ function startAnalysisProgressUI(startedAt) {
   if (analysisUi) analysisUi.stop();
   const btn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs the lifecycle
   const deskChip = $("#desk-analyze-progress");
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) {
+    cancelBtn.disabled = false;
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = async () => {
+      // Stop asks the server; the run itself decides when it is safe (the
+      // current stage finishes). The button goes inert the moment the ask
+      // lands — one click is one request, and the poller reports the result.
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = "Stopping…";
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/cancel`, { method: "POST" });
+      } catch (e) {
+        // 409 = the run already finished on its own between the click and
+        // the request; the next poll lands the real state either way.
+        cancelBtn.textContent = "■ Stop";
+        cancelBtn.disabled = false;
+      }
+    };
+  }
   if (btn) { btn.disabled = true; btn.classList.add("analyzing"); }
   if (deskChip) deskChip.style.display = "flex";
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
@@ -2772,6 +2857,24 @@ function startAnalysisProgressUI(startedAt) {
         finished = true;
         analysisUi = null;
         hideAnalysisProgressUI();
+        // RE-B4 audit (2026-10-01): the report-arrival peek used to be gated
+        // on `last_pass` changing — which does not exist on a FIRST analysis,
+        // so the writer's first completed run produced no unread dot and no
+        // halo at all (measured 60s post-completion). This in-session flag is
+        // the first-pass arrival signal; the load path consumes it once.
+        analysisCompletedFor = state.currentProject;
+        await loadProjects();
+        return;
+      }
+      if (p.status === "cancelled") {
+        // R2: the writer stopped the run. The server restored the stage to
+        // its pre-run state; nothing was written. Say so plainly, no error.
+        clearInterval(poll);
+        clearInterval(timer);
+        finished = true;
+        analysisUi = null;
+        hideAnalysisProgressUI();
+        appendSystemNote("Analysis stopped at your request — the script and any previous report are unchanged.", true);
         await loadProjects();
         return;
       }
@@ -2818,6 +2921,8 @@ function hideAnalysisProgressUI() {
   if (deskChip) deskChip.style.display = "none";
   const btn = $("#desk-analyze-btn");
   if (btn) { btn.disabled = false; btn.classList.remove("analyzing"); }
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = "■ Stop"; }
 }
 
 // ---------- Phase 8: the desk toolbar — analysis lifecycle beside the page ----------
@@ -2912,9 +3017,10 @@ async function runAnalysis() {
   startAnalysisProgressUI(startedAt);
 
   try {
-    await analyzePromise;
+    const ack = await analyzePromise;
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
+    if (ack && ack.stale_code) showError(ack.stale_code, true);
     appendSystemNote("Analysis complete. The report is now grounding this conversation.");
     await loadProjects();  // refreshDeskToolbar rides inside the project open path
     // script pane is shared — refresh it in either room after analysis
@@ -4225,6 +4331,13 @@ async function loadScriptData() {
     state.feedbackLedger = null;
   }
   if (arrived && findings.length) scheduleArrivalPeek();
+  else if (analysisCompletedFor === target && findings.length) {
+    // A first analysis has no `last_pass` to arrive — the completion event
+    // IS the arrival. Consumed once, so a plain reload of an already-read
+    // report never fakes a fresh one.
+    analysisCompletedFor = null;
+    scheduleArrivalPeek();
+  }
   renderDraftBar();
   await renderDiffBanner();
   // the second wave of awaits is long enough for the writer to have switched
@@ -4271,18 +4384,56 @@ function renderFixQueuePanel(container) {
   // severity/category the chips hide stay in the report but out of the
   // writer's to-do view — page, board and queue cannot disagree (N3).
   // Dismissed rows keep their separate toggle; addressed ride as before.
-  const inFilter = inFindingFilter; // ONE predicate: the queue cannot drift from the strip
+  // queue and strip share ONE predicate (inFindingFilter), so the two scopes
+  // cannot drift apart — N3. Disposition bypass lives inside it.
+  const inFilter = inFindingFilter;
   const shown = items.filter((i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed);
   // ONE counter (N3): the header's open/total come from queueCounts() — the
   // writer's intent (findingMarks) moves this header exactly like the chips
   // and the dawn meter; the raw server-observed item.status never counts.
   const counts = queueCounts();
   const shownCounts = queueCounts(shown);
+  // accuracy kit A: ungrounded rows hide by default but stay one toggle
+  // away (flag-don't-drop) — mirrors the dismissed toggle below. Built once
+  // because the empty branch needs it too: an all-ungrounded queue must still
+  // offer the way back.
+  const ungroundedCount = items.filter((i) => i.ungrounded).length;
+  const maybeAddUngroundedToggle = (head) => {
+    if (!ungroundedCount) return;
+    const showU = !!state.fixQueueShowUngrounded;
+    const toggleU = el("button", "fq-toggle-ungrounded", showU ? `Hide ungrounded (${ungroundedCount})` : `Show ungrounded (${ungroundedCount})`);
+    toggleU.type = "button";
+    toggleU.addEventListener("click", async () => {
+      state.fixQueueShowUngrounded = !showU;
+      await reloadFixQueue();
+      renderManuscript(document.getElementById('manuscript-container'));
+    });
+    head.appendChild(toggleU);
+  };
+  // triage: dismissed findings stay in the report but out of the writer's way.
+  // Declared up here (not below) because the empty branch returns early — a
+  // queue emptied by dismissing its last visible row must still offer the
+  // way back, and const declarations do not hoist.
+  const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
+  const maybeAddDismissedToggle = (head) => {
+    if (!dismissedCount) return;
+    const show = !!state.fixQueueShowDismissed;
+    const toggleBtn = el("button", "fq-toggle-dismissed", show ? `Hide dismissed (${dismissedCount})` : `Show dismissed (${dismissedCount})`);
+    toggleBtn.type = "button";
+    toggleBtn.addEventListener("click", async () => {
+      state.fixQueueShowDismissed = !show;
+      await reloadFixQueue();
+      renderManuscript(document.getElementById('manuscript-container'));
+    });
+    head.appendChild(toggleBtn);
+  };
   if (!shown.length) {
     if (!items.length && !state.fixQueueShowDismissed) return;
     const panel = el("div", "craft-panel fix-queue");
     const head = el("div", "craft-panel-head");
     head.appendChild(el("span", "craft-panel-title", "Fix queue — 0 shown / " + counts.total + " total"));
+    maybeAddUngroundedToggle(head);
+    maybeAddDismissedToggle(head);
     panel.appendChild(head);
     const hint = el("p", "fix-row-why", "No rows match the current filter — toggle a severity or category chip on the Evidence board to widen the to-do.");
     panel.appendChild(hint);
@@ -4304,19 +4455,9 @@ function renderFixQueuePanel(container) {
   dm.querySelector(".dawn-fill").style.width = dawnPct + "%";
   dm.querySelector(".dawn-pct").textContent = dawnPct + "%";
   head.appendChild(dm);
-  // triage: dismissed findings stay in the report but out of the writer's way
-  const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
-  if (dismissedCount) {
-    const show = !!state.fixQueueShowDismissed;
-    const toggleBtn = el("button", "fq-toggle-dismissed", show ? `Hide dismissed (${dismissedCount})` : `Show dismissed (${dismissedCount})`);
-    toggleBtn.type = "button";
-    toggleBtn.addEventListener("click", async () => {
-      state.fixQueueShowDismissed = !show;
-      await reloadFixQueue();
-      renderManuscript(document.getElementById('manuscript-container'));
-    });
-    head.appendChild(toggleBtn);
-  }
+  // triage: dismissed findings stay in the report but out of the writer's way.
+  maybeAddDismissedToggle(head);
+  maybeAddUngroundedToggle(head);
   panel.appendChild(head);
   // P1.10: the queue's own gesture, printed where it is used (the deep cards
   // explain ✓ / next-pass on the card; Dismiss exists only here).
@@ -4334,6 +4475,26 @@ function renderFixQueuePanel(container) {
     const row = el("div", "fix-row" + (disp === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
     row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
+    // accuracy kit A follow-up: demoted rows wear the reason. Collected
+    // here, mounted with sev below — el() nodes have no parent yet, so
+    // sev.after() would be a silent no-op. Static literals only, never
+    // finding text, so no new sink.
+    const rowFlags = [];
+    if (item.contested) {
+      const flag = el("span", "row-flag row-flag-contested", "contested");
+      flag.title = "Its own observation argues against this note — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
+    if (item.identity_uncertain) {
+      const flag = el("span", "row-flag row-flag-identity", "identity?");
+      flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
+    if (item.ungrounded) {
+      const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
+      flag.title = "No quote or checkable observation backs this note yet";
+      rowFlags.push(flag);
+    }
     const act = el("span", "act-chip", item.act_name || "Script-level");
     const sceneLabel = item.scene_heading ? `Scene ${(item.scene_refs || [])[0]} — ${item.scene_heading}` : "General";
     const body = el("div", "fix-row-body");
@@ -4396,6 +4557,7 @@ function renderFixQueuePanel(container) {
     actions.appendChild(triageBtn);
     body.appendChild(actions);
     row.appendChild(sev);
+    for (const flag of rowFlags) row.appendChild(flag);
     row.appendChild(act);
     const vb = verificationBadge(item.verification);
     if (vb) row.appendChild(vb);
@@ -7003,12 +7165,23 @@ function accuracyMeter() {
 // tab carries a lasting unread dot until the Evidence lens is opened. No
 // other ambience runs during the window (one-ambient-event cap, R8).
 let arrivalTimer = null;
+// RE-B4 audit: set by the analysis poll when a run finishes in-session and
+// consumed once by the project-load path — the first pass's arrival signal
+// (last_pass does not exist yet on a first analysis).
+let analysisCompletedFor = null;
 function scheduleArrivalPeek() {
   clearTimeout(arrivalTimer);
   arrivalTimer = setTimeout(() => {
     const tab = document.getElementById("dock-tab-evidence");
-    if (tab && !(document.getElementById("context-dock") || {}).classList?.contains("open")) {
+    const edge = document.getElementById("right-edge-affordance");
+    if (tab && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
       tab.classList.add("has-unread");
+    }
+    // The edge affordance is the ONLY dock surface visible while the dock is
+    // closed — the tab's dot hides with the panel. The report-ready signal
+    // must live where the writer is looking.
+    if (edge && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
+      edge.classList.add("has-unread");
     }
     const firstInk = document.querySelector(".finding-ink");
     if (firstInk) {
@@ -7020,6 +7193,8 @@ function scheduleArrivalPeek() {
 function clearEvidenceUnread() {
   const tab = document.getElementById("dock-tab-evidence");
   if (tab) tab.classList.remove("has-unread");
+  const edge = document.getElementById("right-edge-affordance");
+  if (edge) edge.classList.remove("has-unread");
 }
 
 // ---------- arrival strip (R4 + N1 + N2 + P1.9): the "finally" ----------
@@ -7037,18 +7212,16 @@ function clearEvidenceUnread() {
  *  when there was nothing to check). Both orientation strips print this string;
  *  two honest-looking numbers that disagree is how a writer stops trusting both. */
 function verificationReadout() {
+  // The ONLY reader of report.verification_summary. The server now recomputes
+  // this block at serve time from the rows being served (_sanitize_report), so
+  // every report — including ones analysed before the field existed — renders
+  // the readout. Old projects must not leak a previous script's numbers when a
+  // new one has no report yet, so the project switch resets state.report.
   const vs = state.report && state.report.verification_summary;
   if (!vs) return null;
-  const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
-  const unquoted = vs.no_quote || 0;
-  if (checkable) {
-    return (vs.verified || 0) + " of " + checkable + " quotes verified ("
-      + Math.round(100 * (vs.verified || 0) / checkable) + "%)"
-      + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "");
-  }
-  return unquoted
-    ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"
-    : null;
+  // The words live in core.js (unit-tested under node --test); this wrapper
+  // keeps the report-data access in one place for both orientation strips.
+  return verificationReadoutText(vs);
 }
 
 // spec 15.4: pass_history keeps the ledger's open count beyond one generation,
@@ -7502,7 +7675,11 @@ function findingAdmitted(f, index) {
 /** The ONE filter predicate (severity + category + scene). The mass strip and
  *  the fix queue both read it, so the two scopes can never drift apart.
  *  Fix-queue items carry the same three fields (/fixqueue's allowlist includes
- *  scene_refs), so they pass through it unchanged. */
+ *  scene_refs), so they pass through it unchanged.
+ *  Accuracy kit A appends the groundedness clause below. Writer-dispositioned
+ *  rows (parked/deferred/finished) bypass ONLY that clause: hiding the
+ *  writer's own triage state would strand their workflow with no path back.
+ *  Chips still apply to them — this never overrides an explicit filter. */
 function inFindingFilter(f) {
   const sev = ((f && f.severity) || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
@@ -7513,6 +7690,14 @@ function inFindingFilter(f) {
   // contract exists to prevent (the writer scoped the view; the scope says so).
   const sc = state.findingFilter.scene;
   if (sc != null && !findingOnScene(f, sc)) return false;
+  // accuracy kit A: ungrounded rows hide by default (flag-don't-drop keeps
+  // them one toggle away) — the toggle mirrors the dismissed one
+  if (f && f.ungrounded && !state.fixQueueShowUngrounded) {
+    const fi = (typeof queueItemFindingIndex === "function") ? queueItemFindingIndex(f) : null;
+    const d = fi != null ? findingDisposition((state.findings || [])[fi], fi)
+      : (f.status === "addressed" ? "addressed" : "open");
+    if (d !== "addressed" && d !== "deferred") return false;
+  }
   return true;
 }
 /** Scope + disposition counts — the second half of the N3 counting contract.
@@ -7585,6 +7770,12 @@ function queueCounts(items) {
       ? (item.dismissed ? "dismissed" : (item.status === "addressed" ? "addressed" : "open"))
       : findingDisposition((state.findings || [])[index], index);
     if (d === "dismissed") continue;
+    // accuracy kit A: rows hidden behind the ungrounded toggle sit out of
+    // the ledger's totals exactly like dismissed rows do — same counter.
+    // Writer-dispositioned rows bypass (mirrors queueRowVisible): parking or
+    // finishing a note is the writer's own workflow, not a groundedness claim.
+    if (item.ungrounded && !state.fixQueueShowUngrounded
+        && d !== "addressed" && d !== "deferred") continue;
     c.total += 1;
     if (d === "open") c.open += 1;
   }

@@ -244,15 +244,34 @@ class TestThePassesActuallyReceiveThePages:
 
     def test_the_summaries_are_still_there(self, run):
         """The pages are an addition to the overview, not a replacement: a pass
-        that lost the summaries would lose the whole-story view."""
+        that lost the summaries would lose the whole-story view. On small
+        scripts (recall kit B1) the whole story rides as full text instead —
+        either way the complete story must reach the passes."""
         _, rec, _ = run
-        assert any("Something happens." in u for u in rec.script_level_calls())
+        calls = rec.script_level_calls()
+        assert any("Something happens." in u or RAW_LINE in u for u in calls), (
+            "neither the summaries nor the full text reached the script-level passes")
 
     def test_script_level_findings_are_tagged_mixed(self, run):
         _, _, result = run
+        # Small fixture takes the full-text path (recall kit B1): the honest
+        # stamp is full_text, and only script-level categories may carry it
+        # here. The mixed bucket itself is pinned on over-budget docs below.
+        sources = {f.get("evidence_source") for f in result.findings
+                   if f.get("category") in pipeline.SCRIPT_LEVEL_CATEGORIES}
+        assert sources <= {pipeline.EVIDENCE_FULL_TEXT}, (
+            f"script-level findings mis-stamped: {sources}")
+        assert pipeline.EVIDENCE_FULL_TEXT in sources, "no script-level finding reads pages"
+
+    def test_mixed_bucket_survives_on_over_budget_docs(self):
+        """The old invariant did not go away — it moved to large scripts, where
+        summaries plus checkpoint pages is still exactly what the passes get."""
+        doc = _doc(20, text="x" * 1500)
+        rec = _Recorder()
+        result = pipeline.analyze(doc, rec, progress_cb=None)
         mixed = [f for f in result.findings
                  if f.get("evidence_source") == pipeline.EVIDENCE_OVERVIEW_AND_CHECKPOINTS]
-        assert mixed, "no finding carries the mixed bucket"
+        assert mixed, "no finding carries the mixed bucket on an over-budget doc"
         assert {f["category"] for f in mixed} <= set(pipeline.SCRIPT_LEVEL_CATEGORIES)
 
     def test_no_script_level_finding_is_still_tagged_pure_overview(self, run):

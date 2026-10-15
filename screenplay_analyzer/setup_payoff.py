@@ -24,6 +24,8 @@ reported twice.
 
 from __future__ import annotations
 
+import re
+
 from . import prompts
 from .grammar import setup_payoff_ledger_grammar
 from .deterministic_utils import int_list
@@ -33,13 +35,30 @@ from .rules_context import severity_for as _severity_for
 # blow the output budget or the grammar's patience.
 MAX_LEDGER_ENTRIES = 12
 
+# Time-pressure expressions: relative countdowns, clock-face countdown
+# displays, and the words that announce them. A countdown buried in
+# dialogue is neither a KG prop nor a promise-shaped line, so without these
+# the ledger is never asked about it (trial-9 recall audit: the 'Inka 3
+# mints / 00:00' beat reached neither findings nor ledger). Bare "clock" is
+# deliberately NOT a keyword (trial 11: a wall clock mentioned as set
+# dressing seeded noise) — "alarm"/"timer" stay, because a ringing alarm is
+# a beat, while a clock on the wall usually is not.
+_TIME_PATTERNS = [
+    re.compile(r"\b\d+\s*(?:mints?|minutes?|mins?|seconds?|secs?|hours?|hrs?)\b", re.I),
+    re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b"),
+    re.compile(r"\b(?:count\s?downs?|deadlines?|ticking|timers?|alarms?)\b", re.I),
+]
+MAX_TIME_SEEDS = 4
+
 _STATUS_ORDER = {"dangling": 0, "abandoned": 1, "red_herring": 2, "paid": 3}
 
 
-def _seed_candidates(kg) -> list[str]:
+def _seed_candidates(kg, doc=None) -> list[str]:
     """Compact seed list of mechanically-flagged candidates — props and
     dialogue promises — with the scenes they appear in, straight from the
-    knowledge graph (real text, no paraphrase)."""
+    knowledge graph (real text, no paraphrase). Time-pressure lines come
+    from the document itself (see `_time_pressure_seeds`); `doc` may be
+    None, in which case that family is skipped."""
     seeds = []
     for p in sorted(kg.prop_candidates, key=lambda c: -c.mention_count):
         scenes = ", ".join(f"S{s}" for s in p.scenes_mentioned)
@@ -47,6 +66,36 @@ def _seed_candidates(kg) -> list[str]:
     for p in kg.promise_candidates:
         text = (p.text or "").strip()[:120]
         seeds.append(f"- PROMISE (by {p.character}, scene {p.scene_number}): \"{text}\"")
+    seeds.extend(_time_pressure_seeds(doc))
+    return seeds
+
+
+def _time_pressure_seeds(doc) -> list[str]:
+    """One seed per scene containing a time-pressure line, capped. Candidate
+    generation only — the model still judges whether the beat matters."""
+    if doc is None:
+        return []
+    from screenplay_parser.quotematch import find_scene_text
+    seeds = []
+    for s in (doc.scenes or []):
+        n = getattr(s, "scene_number", None)
+        if not n:
+            continue
+        try:
+            text = find_scene_text(doc, n)
+        except Exception:
+            continue
+        if not text:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if len(line.split()) < 3:
+                continue
+            if any(p.search(line) for p in _TIME_PATTERNS):
+                seeds.append(f"- TIME-PRESSURE (scene {n}): \"{line[:120]}\"")
+                break
+        if len(seeds) >= MAX_TIME_SEEDS:
+            break
     return seeds
 
 
@@ -57,14 +106,19 @@ def run_setup_payoff_ledger(
     rules_fragment: str = "",
     total_scenes: int = 0,
     language: str = "eng",
+    doc=None,
 ) -> tuple[list[dict], list[str]]:
     """One whole-script call producing the setup/payoff ledger.
 
     Returns (entries, errors). entries is a list of:
       {setup, kind, setup_scenes, payoff_scenes (list|None), status, note}
     status is one of paid | dangling | abandoned | red_herring.
+
+    `doc` is optional: when present its scenes contribute time-pressure
+    seeds; without it that family is skipped (all existing callers keep
+    working).
     """
-    seeds = _seed_candidates(kg)
+    seeds = _seed_candidates(kg, doc)
     seed_block = "\n".join(seeds) if seeds else (
         "(none mechanically flagged — judge from the overview alone)"
     )
@@ -109,8 +163,42 @@ def run_setup_payoff_ledger(
     return cleaned[:MAX_LEDGER_ENTRIES], []
 
 
+def _setup_quote(entry: dict, doc) -> str | None:
+    """Best-matching setup-scene line for the entry's terms (windowed
+    matcher, 0.72 floor shared with the verifier; token-overlap fallback
+    mirrors _terms_in_scenes — a lone content term can never reach the
+    fuzzy floor against a full line, but its presence still grounds the
+    row). None when nothing qualifies — the row then keeps today's
+    ungrounded path."""
+    from screenplay_analyzer.verifier import (
+        _normalize, _best_fuzzy_match, _token_overlap,
+        FUZZY_MATCH_THRESHOLD,
+    )
+    from screenplay_parser.quotematch import find_scene_text
+    terms = sorted(_content_terms(entry.get("setup")))
+    if not terms or not doc:
+        return None
+    joined = _normalize(" ".join(terms))
+    best, best_conf = None, 0.0
+    for n in entry.get("setup_scenes") or []:
+        text = find_scene_text(doc, n)
+        if not text:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if len(line.split()) < 3:
+                continue
+            lnorm = _normalize(line)
+            conf = _best_fuzzy_match(joined, lnorm)
+            if conf < FUZZY_MATCH_THRESHOLD and _token_overlap(joined, lnorm) < 0.5:
+                continue
+            if conf > best_conf:
+                best, best_conf = line, conf
+    return best
+
+
 def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
-                      rules_ctx=None) -> list[dict]:
+                      rules_ctx=None, doc=None) -> list[dict]:
     """Fold dangling/abandoned ledger entries into findings for the Fix Queue,
     deduped against existing plot_thread findings (e.g. the Principles
     Engine's 'Promise never fulfilled' for the same candidate).
@@ -133,6 +221,7 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
         if setup and setup.lower()[:40] in haystack:
             continue  # already reported by the Principles Engine
         label = "Setup left dangling" if e.get("status") == "dangling" else "Setup abandoned"
+        quote = _setup_quote(e, doc) if doc is not None else None
         findings.append({
             "category": "plot_thread",
             "rule_id": "setup_payoff_general",
@@ -140,6 +229,102 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
             "why_it_matters": e.get("note") or "Set up on the page, never paid off.",
             "severity": _severity_for(rules_ctx, "setup_payoff_general"),
             "scene_refs": e.get("setup_scenes") or [],
-            "evidence_quote": None,
+            "evidence_quote": quote,
         })
     return findings
+
+
+def _content_terms(text: str) -> set:
+    import re
+    from screenplay_analyzer.verifier import _STOPWORDS
+    # Ledger setups are model prose ("Rishi's promise to drop something
+    # (Scene 10)"), not script text: scene refs, role words, and digits
+    # would sink every match, so they are stopwords here, not content.
+    META = {"scene", "scenes", "sc", "setup", "payoff", "promise",
+            "stated", "mentioned", "described"}
+    return {w for w in re.sub(r"[^a-z0-9 ]", " ",
+            str(text or "").lower()).split()
+            if w not in _STOPWORDS and w not in META
+            and not w.isdigit() and len(w) > 1}
+
+
+def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
+    """True + first matching scene when the terms land in one cited scene
+    (windowed fuzzy first, token overlap second). Majority is by overlap
+    share (see `_token_overlap`), not a strict count — setup strings are
+    short and scenes are long. Underscores become spaces on the haystack
+    side: script cues read `X_COMPANY`/`GUN_GUY` while setups say
+    `X Company`/`gun guy`, and the shared normaliser keeps `_` (pinned by
+    verifier/status-engine contract tests — do not change it there)."""
+    from screenplay_analyzer.verifier import (
+        _normalize, _best_fuzzy_match, _token_overlap,
+        FUZZY_MATCH_THRESHOLD,
+    )
+    from screenplay_parser.quotematch import find_scene_text
+    for n in scenes or []:
+        text = find_scene_text(doc, n)
+        if not text:
+            continue
+        tnorm = _normalize(text).replace("_", " ")
+        joined = " ".join(sorted(terms))
+        if _best_fuzzy_match(_normalize(joined), tnorm) >= FUZZY_MATCH_THRESHOLD:
+            return True, n
+        if _token_overlap(" ".join(sorted(terms)), tnorm) >= 0.5:
+            return True, n
+    return False, None
+
+
+def adjudicate_ledger(entries: list, doc) -> list:
+    """Mechanical re-read of every model verdict (accuracy follow-up).
+    Asymmetric: recurrence proves payoff (flip + note), absence proves
+    nothing (keep + mark). Mutates entries in place, returns them."""
+    for e in entries or []:
+        if not isinstance(e, dict):
+            continue
+        terms = _content_terms(e.get("setup"))
+        setup_ok, setup_at = _terms_in_scenes(
+            terms, doc, e.get("setup_scenes") or [])
+        if terms and not setup_ok:
+            e["setup_ungrounded"] = True
+            e["verified"] = False
+            e["verify_note"] = "setup terms not found in the cited setup scenes"
+            continue
+        if e.get("status") == "paid":
+            # Chronological sanity, same rule as the dangling branch: a cited
+            # payoff scene at or before the setup is confusion, not a payoff
+            # (trial rerun: sc17 setup "paid" via a sc4 mention). Such scenes
+            # are dropped from the check, never trusted.
+            setup_after = max(e.get("setup_scenes") or [0])
+            cited = [n for n in (e.get("payoff_scenes") or []) if n > setup_after] \
+                if e.get("setup_scenes") else (e.get("payoff_scenes") or [])
+            ok, at = _terms_in_scenes(terms, doc, cited)
+            e["verified"] = bool(ok)
+            e["verify_note"] = (
+                f"payoff terms recur in scene {at}" if ok
+                else "payoff scenes carry no matching terms (kept: absence proves nothing)")
+            if not ok:
+                e["payoff_unproven"] = True
+        elif e.get("status") in ("dangling", "abandoned"):
+            # Narrative order only: a payoff must come AFTER its setup. Any
+            # earlier recurrence is backstory or coincidence, never a payoff
+            # (trial rerun: sc17 setup "paid" via a sc4 mention).
+            setup_after = max(e.get("setup_scenes") or [0])
+            if e.get("setup_scenes"):
+                later = [s.scene_number for s in (doc.scenes or [])
+                         if s.scene_number > setup_after]
+            else:
+                later = [s.scene_number for s in (doc.scenes or [])]
+            ok, at = _terms_in_scenes(terms, doc, later)
+            if ok:
+                old_status = e.get("status")
+                e["status"] = "paid"
+                e["payoff_scenes"] = [at]
+                e["verified"] = True
+                e["verify_note"] = f"setup terms recur in scene {at} — paid, not {old_status}"
+            else:
+                e["verified"] = False
+                e["verify_note"] = "no later recurrence found (kept: absence proves nothing)"
+        else:
+            e["verified"] = False
+            e["verify_note"] = "status outside the adjudicated set, kept as written"
+    return entries

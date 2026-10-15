@@ -144,7 +144,8 @@ def write_proofs(c, base):
         # ---- the tripwire: no NEW untokened write path in the SPA ----
         # A behaviour test can only prove the two writes it knows about. This
         # proves there are no others: the only raw fetch() allowed in app.js are
-        # api() itself and the SSE turn (which sets the header by hand).
+        # api() itself, the SSE turn, and the R7 library-backup download (each
+        # carries the header by hand).
         # Exempt, and only these: the licence re-mint, which GETs the HTML
         # document to receive the cookie. It cannot be a write — a document route
         # has no write handler and the call carries no method — so the census

@@ -54,6 +54,56 @@ WEBAPP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
 
 app = Flask(__name__, static_folder=None)
 
+
+def _code_revision(root=None):
+    """The code this process analyzes with, as `"<short-hash>[+dirty]"`.
+
+    A long-lived desk loads modules once at boot and never again, so an
+    analysis can silently run week-old code (measured 2026-10-13: a re-run
+    served pre-fix findings with no signal anywhere). Best-effort and
+    never raising: no git, no checkout, or any error answers "unknown".
+    """
+    import subprocess
+    root = root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=root,
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=root,
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+    except Exception:
+        return "unknown"
+    if not head:
+        return "unknown"
+    return head + ("+dirty" if dirty else "")
+
+
+def _stale_code_warning(boot_rev, now_rev):
+    """None when the tree matches boot, else a plain-language warning.
+
+    "unknown" on either side means "cannot tell" — warn too, because an
+    unverifiable runner is no better than a stale one for this purpose.
+    """
+    if not boot_rev or not now_rev:
+        return "Could not determine the server's code revision."
+    if "unknown" in (boot_rev, now_rev):
+        return ("Could not verify the server is running current code "
+                "(revision unknown) — restart the desk before trusting "
+                "this analysis to reflect the latest fixes.")
+    if boot_rev != now_rev:
+        return (f"Server code changed since boot (booted at {boot_rev}, tree "
+                f"is now {now_rev}) — this analysis ran the booted code, "
+                "not the current tree. Restart the desk and re-run.")
+    return None
+
+
+# Stamped once at import (= process boot): every analysis this process runs
+# uses these modules, whatever lands in the tree afterwards.
+_CODE_REV_AT_STARTUP = _code_revision()
+
 # BE-3 (audit 2026-09-24): the desk ships no telemetry, so this file IS the
 # support channel. Configured by main(); a module logger so a handler can log
 # even if startup never got that far.
@@ -730,6 +780,37 @@ def _load_manifest(name: str) -> ProjectManifest:
     return ProjectManifest.load(_project_dir(name))
 
 
+# Mirror of the parser's dispatch table (`screenplay_parser._EXT_DISPATCH`):
+# the extensions `parse_screenplay` accepts. Kept as a local constant because
+# this module must not import the parser at load (AGENTS.md: no cross-package
+# imports at module load); drift is pinned by
+# `tests/test_upload_validation.py::test_supported_extensions_mirror_parser_dispatch`.
+SUPPORTED_UPLOAD_EXTS = frozenset({".fdx", ".pdf", ".txt", ".fountain", ".md"})
+
+
+def _supported_upload_ext(filename: str) -> str | None:
+    """Extension gate shared by every upload route (create, draft, graduate).
+
+    Returns the lower-cased extension when the parser can handle it, else
+    None — the caller answers 400 with the supported list. One guard here
+    beats one per route: an unsupported upload used to reach `parse_screenplay`,
+    raise ValueError, and escape as a 500 ("Could not process uploaded file"),
+    a client error dressed as a server error. Callers run this BEFORE claiming
+    directories or saving bytes, so a rejection leaves no shelf litter behind.
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    return ext if ext in SUPPORTED_UPLOAD_EXTS else None
+
+
+def _unsupported_ext_error(filename: str):
+    """The 400 every upload route answers for a rejected extension — one
+    message source so create/draft/graduate never drift apart."""
+    given = os.path.splitext(filename)[1] or "(none)"
+    return _error(
+        f"Unsupported file type '{given}'. Upload a screenplay as one of: "
+        + ", ".join(sorted(SUPPORTED_UPLOAD_EXTS)) + ".", 400)
+
+
 def _manifest_summary(m: ProjectManifest) -> dict:
     sessions = []
     if os.path.isdir(m.sessions_dir):
@@ -757,6 +838,17 @@ def _manifest_summary(m: ProjectManifest) -> dict:
         # the frontend offers a one-click "retry failed" when this is non-empty
         "failed_categories": (m.stage("analyze").output_paths or {}).get("failed_categories") or [],
     }
+
+
+def _manifest_summary_with_code(m):
+    """The manifest summary plus what code produced it: the boot revision
+    and a staleness warning (None when the tree matches boot). Both
+    /analyze and /analyze/retry-failed answer through here, so a stale
+    runner is visible on every path that runs the model."""
+    resp = _manifest_summary(m)
+    resp["code_rev"] = _CODE_REV_AT_STARTUP
+    resp["stale_code"] = _stale_code_warning(_CODE_REV_AT_STARTUP, _code_revision())
+    return resp
 
 
 def _make_client(m: ProjectManifest):
@@ -1055,7 +1147,8 @@ def real_server_check():
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "server_url": CONFIG.get("server_url"),
-                     "demo_model": _DEMO_MODEL_ACTIVE})
+                    "demo_model": _DEMO_MODEL_ACTIVE,
+                    "code_rev": _CODE_REV_AT_STARTUP})
 
 
 @app.route("/api/rules/<rule_id>", methods=["GET"])
@@ -1262,8 +1355,23 @@ def create_project():
     # safe_dir_name keeps the display `title` in the manifest untouched.
     safe_name = safe_dir_name(title)
 
+    # R5 (audit M3): an EMPTY file is rejected before any project exists —
+    # the parser "succeeds" on 0 bytes, so only this guard gives the writer
+    # the real reason (a 0-byte drop) instead of a generic parse error.
+    upload.seek(0, os.SEEK_END)
+    if upload.tell() == 0:
+        return _error("The uploaded file is empty (0 bytes). Choose the screenplay file you meant to import.", 400)
+    upload.seek(0)
+
+    # Unsupported-type gate BEFORE the claim: the parser raises ValueError for
+    # these, which used to escape as a 500 after a directory was already
+    # claimed (and left on the shelf). Nothing exists yet here, so a rejection
+    # needs no cleanup.
+    ext = _supported_upload_ext(upload.filename)
+    if ext is None:
+        return _unsupported_ext_error(upload.filename)
+
     project_dir = _claim_project_dir(safe_name)
-    ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
     upload.save(tmp_path)
 
@@ -1279,6 +1387,34 @@ def create_project():
         orch.run_parse()
     except Exception as e:
         return _error(f"Could not process uploaded file: {e}", 500)
+
+    # R5 (audit M3), the scene-less case: the parser also "succeeds" on a
+    # prose file with no scene headings, so the project USED to be created
+    # (201) and the failure only surfaced minutes later as an analyze 502
+    # ("Document has no parsed scenes") — after the writer had left the
+    # desk believing the import worked. The parse stage records the truth;
+    # read it back here, reject with actionable guidance, and REMOVE the
+    # claimed directory so the shelf never lists a project that cannot be
+    # analyzed. (The write of parsed.json is the same file run_parse just
+    # finished — no sharing violation is expected; the bounded retry covers
+    # a stray Windows handle as elsewhere in this file.)
+    try:
+        from screenplay_parser.models import ScriptDocument
+        doc = ScriptDocument.load(manifest.parsed_path)
+        sceneless = not doc.scenes
+    except Exception:
+        sceneless = False  # unreadable parse output keeps the OLD behavior: a 201 whose analyze fails loudly
+    if sceneless:
+        import shutil
+        try:
+            retry_permission(lambda: shutil.rmtree(project_dir))
+        except OSError:
+            pass  # worst case: one half-claimed dir lingers; the 400 is what matters
+        return _error(
+            "This file contains no readable scenes (no scene headings like 'INT. ROOM - DAY'). "
+            "Nothing was added to your library — export the screenplay as Fountain or plain text "
+            "with scene headings and try again.",
+            400)
 
     return jsonify(_manifest_summary(manifest)), 201
 
@@ -1358,6 +1494,10 @@ def delete_project(name):
 # collected while it is the thing providing mutual exclusion.
 _ANALYZE_LOCKS: dict[str, threading.Lock] = {}
 _ANALYZE_LOCKS_GUARD = threading.Lock()
+# Per-project cancel events (R2): set by /analyze/cancel, checked co-operatively
+# by the running pipeline at stage boundaries. Lives only as long as the run:
+# created lazily by the cancel route, popped when the run's request returns.
+_ANALYZE_CANCEL: dict[str, threading.Event] = {}
 
 
 def _analyze_lock(name: str) -> threading.Lock:
@@ -1377,9 +1517,31 @@ def analyze_project(name):
         return _error("An analysis is already running for this project — "
                       "wait for it to finish before starting another.", 409)
     try:
-        return _analyze_locked(m)
+        return _analyze_locked(m, name)
     finally:
         lock.release()
+        # The run is over (completed, failed, or cancelled) — a stale event
+        # must never outlive it, or the NEXT run would cancel on arrival.
+        _ANALYZE_CANCEL.pop(name, None)
+
+
+@app.route("/api/projects/<name>/analyze/cancel", methods=["POST"])
+def cancel_analyze(name):
+    """Ask the running analysis to stop (RE-B4 audit R2).
+
+    Co-operative: the event is checked at stage boundaries and between
+    scene-summary chunks, so the current category finishes — a cancel lands
+    within one stage of the click, never mid-write. 409 when nothing is
+    running (double-click, or the run just finished on its own)."""
+    try:
+        _load_manifest(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+    ev = _ANALYZE_CANCEL.get(name)
+    if ev is None or not _analyze_lock(name).locked():
+        return _error("No analysis is running for this project.", 409)
+    ev.set()
+    return jsonify({"cancel_requested": True})
 
 
 def _start_progress_heartbeat(m) -> None:
@@ -1457,7 +1619,7 @@ def _record_pass(m) -> None:
         traceback.print_exc()
 
 
-def _analyze_locked(m):
+def _analyze_locked(m, name):
     # The pre-flight lives OUTSIDE the pipeline's try below, and it does real
     # work: it rewrites the manifest and resets the progress heartbeat. An
     # exception here used to escape the handler entirely, and a Flask dev server
@@ -1483,6 +1645,13 @@ def _analyze_locked(m):
         body = request.get_json(silent=True) or {}
         if body.get("force"):
             from .manifest import StageStatus
+            # Snapshot BEFORE the reset (R2): a CANCELLED run must restore the
+            # stage the writer had before they pressed Re-run — a first run
+            # back to pending, a re-run back to complete with its report paths
+            # and partial record intact. (A FAILED run restores nothing: the
+            # orchestrator's own failure record is the truth there, as before.)
+            prev_stage = {"status": m.stage("analyze").status,
+                          "output_paths": dict(m.stage("analyze").output_paths) if m.stage("analyze").output_paths else None}
             # Resetting the stage to pending is what forces the re-run: the
             # orchestrator short-circuits on `stage.status == "complete"`, not on the
             # report files existing. The report files used to be deleted here too,
@@ -1503,8 +1672,17 @@ def _analyze_locked(m):
     orch = Orchestrator(m)
     import time as _t
     _t0 = _t.time()
+    cancel_event = _ANALYZE_CANCEL.setdefault(name, threading.Event())
+    from screenplay_analyzer.pipeline import AnalysisCancelled  # lazy: see AGENTS.md
     try:
-        orch.run_analyze(report_language=report_language)
+        orch.run_analyze(report_language=report_language,
+                         should_cancel=cancel_event.is_set,
+                         prev_stage=prev_stage if body.get("force") else None)
+    except AnalysisCancelled:
+        # The writer stopped the run: not an error, not a metric, not a point
+        # on the revision arc. The orchestrator already restored the stage and
+        # written the cancelled heartbeat; answer plainly.
+        return jsonify({"cancelled": True, **_manifest_summary(m)})
     except OrchestratorError as e:
         return _error(str(e), 502)
     except Exception as e:
@@ -1514,7 +1692,7 @@ def _analyze_locked(m):
     from .metrics import record_analysis
     record_analysis(m, _t.time() - _t0)
     _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
-    return jsonify(_manifest_summary(m))
+    return jsonify(_manifest_summary_with_code(m))
 
 
 @app.route("/api/projects/<name>/analyze/retry-failed", methods=["POST"])
@@ -1576,7 +1754,7 @@ def _retry_failed_locked(m):
     from .metrics import record_analysis
     record_analysis(m, _t.time() - _t0)
     _record_pass(m)  # spec 15.4: every completed/partial analysis is a point on the arc
-    return jsonify(_manifest_summary(m))
+    return jsonify(_manifest_summary_with_code(m))
 
 
 @app.route("/api/projects/<name>/backup", methods=["GET"])
@@ -1607,6 +1785,58 @@ def backup_project(name):
     buf.seek(0)
     return send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"{name}-backup.zip")
+
+
+@app.route("/api/library/backup", methods=["GET"])
+def backup_library():
+    """The WHOLE library as one .zip (audit R7/M5): every project directory,
+    plus a manifest of what was included. The per-project backup above saves
+    one desk; this saves the shelf — the writer's entire body of work in a
+    single click, nothing leaving the machine. The gap this closes: until it
+    existed, the only full copy of a writer's library was a manual, error-
+    prone copy of PROJECTS_DIR from inside the app's own data folder.
+
+    Per-project failures are contained: a damaged or half-deleted project is
+    recorded in the manifest (so the writer KNOWS) instead of failing the
+    whole archive. Lock sidecars and mid-flight temp files are excluded, as
+    in the per-project backup."""
+    buf = io.BytesIO()
+    included, failed = [], []
+    stamp = time.strftime("%Y%m%d-%H%M")
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if os.path.isdir(PROJECTS_DIR):
+            for name in sorted(os.listdir(PROJECTS_DIR)):
+                # Same exclusions as the shelf listing: the profile store is
+                # internal data, not a project; a lock sidecar is a file.
+                if name == "writer_profile.json" or not os.path.isdir(os.path.join(PROJECTS_DIR, name)):
+                    continue
+                project_dir = os.path.realpath(_project_dir(name))
+                try:
+                    n_files = 0
+                    for root, _dirs, files in os.walk(project_dir):
+                        for fname in files:
+                            if fname.endswith(".lock") or fname.endswith(".tmp"):
+                                continue
+                            full = os.path.join(root, fname)
+                            try:
+                                zf.write(full, os.path.join(name, os.path.relpath(full, project_dir)))
+                                n_files += 1
+                            except OSError:
+                                continue  # a file vanishing mid-zip: skip it, keep the archive
+                    included.append({"project": name, "files": n_files})
+                except OSError as e:
+                    # One unreadable project must not destroy the backup of
+                    # the other twenty — and must not be silent about it.
+                    failed.append({"project": name, "error": str(e)})
+        zf.writestr("library-backup.json", json.dumps({
+            "kind": "script-doctor-library-backup",
+            "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "projects": included,
+            "failed": failed,
+        }, indent=2), zipfile.ZIP_DEFLATED)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name=f"script-doctor-library-backup-{stamp}.zip")
 
 
 @app.route("/api/projects/<name>/reparse", methods=["POST"])
@@ -2439,6 +2669,10 @@ def _fixqueue_items(m):
             # Gate 11: the falsifiable observation a grounded finding rests on.
             # Delivered so the checkable half of a note is not report-only.
             "observation": f.get("observation"),
+            # Accuracy kit A: the desk default-hides ungrounded rows, so the
+            # flag must ride the row like evidence_quote does.
+            "ungrounded": bool(f.get("ungrounded")),
+            "contested": bool(f.get("contested")),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
 
@@ -3279,7 +3513,15 @@ def upload_draft(name):
     if not upload.filename:
         return _error("Empty filename.")
 
-    tmp_path = os.path.join(m.project_dir, "_draft_upload" + os.path.splitext(upload.filename)[1].lower() or ".txt")
+    # Same gate as create/graduate: before any byte is saved. (This line also
+    # fixes a precedence bug: `"_draft_upload" + ext or ".txt"` always took
+    # the left side, so an extensionless upload produced an extensionless temp
+    # file instead of the intended ".txt" fallback.)
+    ext = _supported_upload_ext(upload.filename)
+    if ext is None:
+        return _unsupported_ext_error(upload.filename)
+
+    tmp_path = os.path.join(m.project_dir, f"_draft_upload{ext}")
     upload.save(tmp_path)
     try:
         from .diff import upload_new_draft
@@ -4525,8 +4767,12 @@ def graduate_idea(idea_id):
     # title answered 400 and could not be done at all. Same fold as the other
     # two create paths.
     safe_name = safe_dir_name(title)
+    # Same gate as create_project, before the claim (see above): a rejected
+    # graduation must not leave a claimed directory behind.
+    ext = _supported_upload_ext(upload.filename)
+    if ext is None:
+        return _unsupported_ext_error(upload.filename)
     project_dir = _claim_project_dir(safe_name)
-    ext = os.path.splitext(upload.filename)[1].lower() or ".txt"
     tmp_path = os.path.join(project_dir, f"_upload{ext}")
     upload.save(tmp_path)
     try:
@@ -4634,8 +4880,13 @@ def main():
     # recorded somewhere durable rather than only printed to a console nobody is
     # watching. A read-only install directory returns None and is reported below.
     _log_file = _configure_logging(PROJECTS_DIR)
-    # env-var demo trigger already pointed CONFIG at the demo server at import
-    # time -- don't clobber it back to :8080 (keeps flag/env parity honest).
+    # The demo decision is re-made here against the URL the writer ACTUALLY
+    # passed (RE-B4): the import-time probe could only test the default. Undo
+    # an auto-fallback first so --server lands on a clean config, then apply.
+    # The env-var demo trigger and an explicit --demo-model keep their
+    # import/flag behavior untouched; only the AUTO fallback is re-decided.
+    if _DEMO_FALLBACK_AUTO:
+        _undo_demo_fallback()
     if not _DEMO_MODEL_ACTIVE:
         try:
             CONFIG["server_url"] = args.server
@@ -4645,6 +4896,17 @@ def main():
             parser.error(str(e))
     if args.demo_model:
         _use_demo_model()
+    else:
+        # The false-positive rescue (RE-B4): --server points at a live
+        # llama-server that the default-address probe never saw. Stands down
+        # under pytest (same escape hatch the import-time fallback honours,
+        # so the E2E fleet's deterministic boots are never second-guessed)
+        # and unless the import-time AUTO fallback is what put the demo in
+        # charge — an env/flag demo choice is never overridden here.
+        under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
+            any("pytest" in str(a).lower() for a in __import__("sys").argv)
+        if not under_pytest:
+            _recheck_fallback_after_args()
 
     # The token can also come from the environment, so a launcher script does not
     # have to put a secret on a command line (where it lands in shell history and
@@ -4677,12 +4939,18 @@ def main():
 
 _DEMO_MODEL_ACTIVE = False
 _DEMO_URL = None  # the in-process demo server's URL while active
+# True only while the desk runs on the IMPORT-TIME auto-fallback (the writer
+# never asked for demo; the default url just looked dead). Explicit demo —
+# env trigger or --demo-model — keeps this False, so main()'s re-check never
+# second-guesses a mode the writer chose.
+_DEMO_FALLBACK_AUTO = False
 
 
-def _use_demo_model() -> str:
+def _use_demo_model(auto: bool = False) -> str:
     """Point CONFIG at the built-in demo craft model (started in-process).
-    Opt-in only — never runs unless asked for by flag or env."""
-    global _DEMO_MODEL_ACTIVE, _DEMO_URL
+    Opt-in only — never runs unless asked for by flag or env (or by the
+    startup fallback, which marks itself with auto=True)."""
+    global _DEMO_MODEL_ACTIVE, _DEMO_URL, _DEMO_FALLBACK_AUTO
     try:
         from .demo_model import start_demo_server
         url = start_demo_server()
@@ -4693,11 +4961,71 @@ def _use_demo_model() -> str:
         CONFIG["server_url"] = url
         _DEMO_URL = url
         _DEMO_MODEL_ACTIVE = True
+        _DEMO_FALLBACK_AUTO = auto
         print("DEMO MODEL active (in-process) — no real llama-server needed.")
         return url
     except Exception:  # demo is a convenience — never block startup on it
         print("Demo model unavailable; keeping the configured server.")
         return CONFIG["server_url"]
+
+
+def _server_reachable(url: str) -> bool:
+    """Can the desk talk to this model server right now? Module-level so both
+    the import-time fallback below and main()'s re-check probe the SAME way."""
+    try:
+        from screenplay_analyzer.llm_client import LlamaServerClient
+        return LlamaServerClient(
+            base_url=url,
+            extra_headers=_auth_headers(CONFIG.get("api_key")),
+        ).is_reachable()
+    except Exception:
+        return False
+
+
+def _undo_demo_fallback() -> None:
+    """Undo what the import-time auto-fallback did, before it is re-decided.
+
+    This is exactly `_use_demo_model()` in reverse — including the deliberate
+    DO-NOTHINGs: `start_demo_server()`'s thread is never stopped (stopping it
+    would pull the port out from under the strip and any tab holding it; the
+    thread keeps running but stops answering the desk once the globals move,
+    the same lifetime the switch-back flow already accepts); and if the writer
+    chose a server_url through /api/config between import and main() — which
+    cannot happen on the shipped launch path — that choice would be clobbered
+    by restoring `real_server_url` and, worse, `real_server_url` would be
+    wiped. Accepted: the window is empty in practice and the fallback re-check
+    below runs microseconds after import.
+    """
+    global _DEMO_MODEL_ACTIVE, _DEMO_URL, _DEMO_FALLBACK_AUTO
+    if not _DEMO_MODEL_ACTIVE:
+        return
+    real = CONFIG.get("real_server_url")
+    if real:
+        CONFIG["server_url"] = real
+        CONFIG["real_server_url"] = None
+    _DEMO_MODEL_ACTIVE = False
+    _DEMO_URL = None
+    _DEMO_FALLBACK_AUTO = False
+
+
+def _recheck_fallback_after_args() -> None:
+    """Re-decide the auto-fallback once main() knows the real --server.
+
+    The import-time probe ran against the DEFAULT url; this one runs against
+    what the writer actually pointed the desk at (main() applies --server
+    first). Gated on `_DEMO_FALLBACK_AUTO`, so it stands down for explicit
+    demo mode AND for a clean import (real server found, nothing to undo).
+    The under-pytest rule lives at the main() call site — it protects the
+    E2E fleet's deterministic BOOT path, not the helper itself, which stays
+    unit-testable.
+    """
+    if not _DEMO_FALLBACK_AUTO:
+        return  # explicit demo, or import found a reachable server: stand down
+    if _server_reachable(CONFIG["server_url"]):
+        print("Your model server is reachable — continuing with it. (The startup "
+              "probe had only tested the default address before --server was "
+              "parsed; the fallback was a false positive for your launch.)")
+        _undo_demo_fallback()
 
 
 # The flask CLI path (`flask --app screenplay_studio.webapp_server run`) never
@@ -4706,19 +5034,16 @@ def _use_demo_model() -> str:
 #   2. Auto-fallback: the configured model server is unreachable at startup,
 #      so instead of a dead desk, run on the built-in demo craft model.
 # A reachable llama-server ALWAYS wins — the real flow is never hijacked.
+# KNOWN EDGE (bounded, now re-checked in main()): this probe can only see the
+# DEFAULT url — `--server` is not parsed until main(). A desk pointed at a live
+# non-default server used to silently demo whenever the default was down; the
+# `python -m screenplay_studio.webapp_server --server http://127.0.0.1:8099`
+# launch (llama.cpp binds IPv4, `localhost` resolves `::1` first on Windows)
+# was exactly that desk. main() now re-runs the decision against the real URL
+# and undoes a demo fallback the real server proves wrong.
 if _env_flag("SCREENPLAY_STUDIO_DEMO_MODEL"):
     _use_demo_model()
 else:
-    def _server_reachable(url: str) -> bool:
-        try:
-            from screenplay_analyzer.llm_client import LlamaServerClient
-            return LlamaServerClient(
-                base_url=url,
-                extra_headers=_auth_headers(CONFIG.get("api_key")),
-            ).is_reachable()
-        except Exception:
-            return False
-
     under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
         any("pytest" in str(a).lower() for a in __import__("sys").argv)
     if not under_pytest and not _server_reachable(CONFIG["server_url"]):
@@ -4726,7 +5051,7 @@ else:
               "to the built-in DEMO craft model so the desk still works.")
         print("It is used again automatically whenever your llama-server is up; "
               "set SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback.")
-        _use_demo_model()
+        _use_demo_model(auto=True)
 
 
 if __name__ == "__main__":

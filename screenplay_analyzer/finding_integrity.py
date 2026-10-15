@@ -53,9 +53,9 @@ Actions
                   real; only its shelf was wrong)
     merge       — folded into an earlier finding that states what it absorbed;
                   the duplicate's full text is preserved in the ledger
-    reject      — provably false (inverted, or a deterministic rule firing on
-                  names that are not the same); removed from the delivered set,
-                  preserved in the ledger
+    reject      — provably a non-finding (inverted, praise-as-finding, or a
+                  deterministic rule firing on names that are not the same);
+                  removed from the delivered set, preserved in the ledger
 """
 from __future__ import annotations
 
@@ -143,10 +143,87 @@ ABSENCE = re.compile(
 CONSEQUENCE = re.compile(r"\b(but|however|although|yet|undercuts|weakens|"
                          r"fails|reduces|costs|at the expense)\b", re.I)
 
+# "praise filed as a finding" — a compliment or neutral description with no
+# defect claim (trial 11: "Dialogue contains multiple subtext layers" and
+# "Dialogue reflects cultural context" filed as defects). Deliberately
+# NARROW, same contract as ABSENCE above: the issue must carry a praise
+# marker AND neither issue nor observation may carry a defect marker or a
+# contrast turn (but/however/although...). A mixed note ("rich but
+# unearned") is a real defect and is kept; only unalloyed praise is
+# withdrawn. Quotes are never scanned — verbatim script text by design.
+# Known cost: praise worded without these markers is not caught. That is the
+# accepted side of the precision/recall trade this module declares.
+PRAISE = re.compile(
+    r"\bcontains\s+multiple\b"
+    r"|\breflects?\b"
+    r"|\brich\b|\beffective\b|\bcompelling\b|\bexcellent\b|\bnuanced\b"
+    r"|\bimpressive\b|\bbeautiful\b|\bpowerful\b|\bwell[\s-]?crafted\b",
+    re.I,
+)
+# a counter-signal: the sentence does flag a defect after all (superset of
+# CONSEQUENCE, which only covers contrast turns)
+DEFECT_MARK = re.compile(
+    r"\b(but|however|although|yet|undercuts|weakens|fails|reduces|costs|"
+    r"at the expense)\b"
+    r"|\b(not|n't|never|no)\b"
+    r"|\b(lack\w*|fail\w*|miss\w*|weak\w*|without|absent|inconsistent|"
+    r"unclear|generic|static|poor|bad|flat|forced|abrupt|unearned|passive|"
+    r"repetitive|redundant|vague|confus\w*|disrupt\w*|problem|flaw|defect)\b",
+    re.I,
+)
+
+# "absolute absence, falsified by presence" — trial-10 #4 ("objects do
+# not recur" while the pen recurs two scenes later). Same narrow
+# contract as ABSENCE/PRAISE above: unhedged phrasing required, positive
+# proof required, quotes never scanned.
+ABSENCE_CLAIM = re.compile(
+    r"\bdo(?:es)?\s+not\s+recur\b|\bnever\s+(referenced|mentioned|seen|reappear"
+    r"s?|recur\w*|addressed)\b"
+    r"|\bno\s+dialogue\b|\bnever\s+speaks?\b|\bno\s+action\s+lines?\b"
+    r"|\bno\s+confrontation\b|\babsent\s+from\b",
+    re.I,
+)
+HEDGE = re.compile(
+    r"\b(appears?|seems?|may|might|arguably|suggests?|possibly|likely)\b",
+    re.I,
+)
+
 # "these two names are the same character" — the deterministic name-variant rule
 NAME_VARIANT = re.compile(
     r"\b(variant|spelling|spelled|two names|same character|inconsistent name|"
     r"name.{0,12}(vary|varies|inconsist)|character.{0,12}(name|named))\b", re.I)
+
+# "identity verdict contradicted by explicit equation" — trial-10 #12's
+# mirror. The pipeline demotes identity verdicts the text cannot settle;
+# when the text DOES settle one — an explicit equation (X addressed as Y)
+# beside a verdict that X is NOT Y — the verdict is provably false and is
+# withdrawn, not demoted. Deliberately NARROW, same contract as the rules
+# above: only a distinctness verdict beside sameness evidence fires. A
+# sameness verdict ("is really Y", "same character") beside an equation is
+# supported, not contradicted, so it is kept; dialogue co-presence (both
+# parties speak) supports a distinctness verdict and is never a
+# contradiction — only the equation branch of the pipeline's
+# `_identity_proven` rule is mirrored here, never its co-presence branch.
+# Quotes are never scanned — verbatim script text by design.
+# Known cost: sameness verdicts falsified by co-presence are not caught.
+# That is the accepted side of the precision/recall trade this module declares.
+_IDENTITY_SAMENESS = re.compile(r"\bis\s+really\b|\bsame\s+character\b", re.I)
+_IDENTITY_EQUATION_VERB = re.compile(r"\b(calls|addresses|greets|names)\b", re.I)
+
+
+def _identity_eq_name_pat(name: str) -> str:
+    """Regex matching a normalized cue name with flexible inner spacing."""
+    return r"\s*".join(re.escape(w) for w in name.split())
+
+
+def _identity_eq_type(e) -> str:
+    t = getattr(e, "type", None)
+    return str(getattr(t, "value", t) or "").lower()
+
+
+def _identity_eq_names_in(text: str, *names: str) -> bool:
+    normed = re.sub(r"\s+", " ", str(text or "").upper().replace("_", " "))
+    return all(re.search(r"\b" + _identity_eq_name_pat(n) + r"\b", normed) for n in names)
 
 
 # ---------------------------------------------------------------------- result
@@ -301,8 +378,226 @@ class FindingIntegrityGate:
             return "reports the ABSENCE of a defect — a clean bill of health filed as a finding"
         return None
 
+    # -- 4b. praise filed as a finding --------------------------------------
+    def _praise_filed(self, f: dict) -> str | None:
+        issue = f.get("issue") or ""
+        if not PRAISE.search(issue):
+            return None
+        text = f"{issue} {f.get('observation') or ''}"
+        if DEFECT_MARK.search(text):
+            return None
+        return "praise filed as a finding — a compliment or neutral description with no defect claim"
+
+    # -- 4c. absence claim falsified by presence ---------------------------
+    def _absence_falsified(self, f: dict, doc) -> str | None:
+        issue = f.get("issue") or ""
+        if doc is None or not ABSENCE_CLAIM.search(issue):
+            return None
+        text = f"{issue} {f.get('observation') or ''}"
+        if HEDGE.search(text) or CONSEQUENCE.search(text):
+            return None
+        refs = f.get("scene_refs") or []
+        if not refs:
+            return None
+        scenes = getattr(doc, "scenes", None) or []
+        valid = {s.scene_number for s in scenes}
+        if any(r not in valid for r in refs):
+            return None
+        # Pronoun subjects carry no resolvable referent — never guess.
+        if re.match(r"\s*(he|she|they)\b", issue, re.I):
+            return None
+        pronouns = {"he", "she", "they", "him", "her", "them"}
+
+        # -- missing lines: X has a cue in the cited range -----------------
+        if re.search(r"\bno\s+dialogue\b|\bnever\s+speaks?\b"
+                     r"|\bno\s+action\s+lines?\b", issue, re.I):
+            name = None
+            m = re.search(r"(?i:\bno\s+dialogue\s+(?:lines?\s+)?for\s+)"
+                          r"([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)", issue)
+            if not m:
+                m = re.search(r"(?i:\bno\s+action\s+lines?\s+for\s+)"
+                              r"([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)", issue)
+            if not m:
+                m = re.search(r"\b([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)"
+                              r"\s+(?i:never\s+speaks?)\b", issue)
+            if m:
+                name = m.group(1)
+            if not name:
+                return None
+            first = name.strip().split()[0].lower() if name.strip() else ""
+            if first in pronouns:
+                return None
+            want = norm(name)
+            if not want:
+                return None
+            for r in sorted(refs):
+                sc = next((s for s in scenes if s.scene_number == r), None)
+                if sc is None:
+                    continue
+                present = {norm(c) for c in (sc.characters_present or [])}
+                if want in present:
+                    return f"absence claim falsified by presence in scene(s) {r}"
+                for el in (sc.elements or []):
+                    if getattr(el, "character", None) and norm(el.character) == want:
+                        return f"absence claim falsified by presence in scene(s) {r}"
+            return None
+
+        # -- non-recurrence: object terms recur after the cited range ------
+        if re.search(r"\bdo(?:es)?\s+not\s+recur\b|\bnever\s+(?:referenced|"
+                     r"mentioned|seen|reappears?|recur\w*)\b", issue, re.I):
+            from screenplay_analyzer.setup_payoff import _content_terms, _terms_in_scenes
+            m = re.search(r"\bdo(?:es)?\s+not\s+recur\b|\bnever\s+(?:referenced|"
+                          r"mentioned|seen|reappears?|recur\w*)\b", issue, re.I)
+            before = issue[:m.start()] if m else issue
+            # The named object, not the framing prose: "… (gun, newspaper,
+            # pen) do not recur" carries framing words (chekhov/emphasis/
+            # narrative/objects/given) that hold single-scene overlap below
+            # the 0.5 floor even when the objects do recur. Prefer (a) the
+            # parenthesized span immediately before the marker, else (b) a
+            # quoted span in the issue, else (c) the full prefix as before.
+            terms = None
+            pm = re.search(r"\(([^()]+)\)\s*$", before)
+            if pm:
+                scoped = _content_terms(pm.group(1))
+                if scoped:
+                    terms = scoped
+            if terms is None:
+                qm = re.search(r'"([^"]+)"', issue)
+                if qm:
+                    scoped = _content_terms(qm.group(1))
+                    if scoped:
+                        terms = scoped
+            if terms is None:
+                terms = _content_terms(before)
+            if not terms:
+                return None
+            if {t.lower() for t in terms} <= pronouns:
+                return None
+            max_ref = max(refs)
+            later = sorted(s.scene_number for s in scenes if s.scene_number > max_ref)
+            if not later:
+                return None
+            hit, at = _terms_in_scenes(terms, doc, later)
+            if hit:
+                return f"absence claim falsified by presence in scene(s) {at}"
+            return None
+
+        # -- missing beats: beat content lands in the cited range ----------
+        if re.search(r"\bno\s+confrontation\b|\babsent\s+from\b"
+                     r"|\bnever\s+addressed\b", issue, re.I):
+            from screenplay_analyzer.setup_payoff import _content_terms, _terms_in_scenes
+            m_af = re.search(r"\babsent\s+from\b", issue, re.I)
+            if m_af:
+                before_af = issue[:m_af.start()]
+                before_clean = re.sub(r"\b(is|was|are|were)\s*$", "",
+                                      before_af, flags=re.I).strip()
+                m_name = re.search(r"([A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*)\s*$",
+                                   before_clean)
+                if m_name:
+                    name = m_name.group(1)
+                    first = name.strip().split()[0].lower() if name.strip() else ""
+                    if first in pronouns:
+                        return None
+                    if first not in ("the", "a", "an", "this", "that",
+                                     "these", "those", "it"):
+                        want = norm(name)
+                        if want:
+                            for r in sorted(refs):
+                                sc = next((s for s in scenes
+                                           if s.scene_number == r), None)
+                                if sc is None:
+                                    continue
+                                present = {norm(c) for c in
+                                           (sc.characters_present or [])}
+                                if want in present:
+                                    return ("absence claim falsified by presence "
+                                            f"in scene(s) {r}")
+                                for el in (sc.elements or []):
+                                    if getattr(el, "character", None) and \
+                                            norm(el.character) == want:
+                                        return ("absence claim falsified by presence "
+                                                f"in scene(s) {r}")
+                            return None
+            m_beat = re.search(r"(?i:\bno\s+)(confrontation)\b", issue)
+            if m_beat:
+                beat_text = m_beat.group(1)
+            else:
+                m2 = re.search(r"\babsent\s+from\b|\bnever\s+addressed\b",
+                               issue, re.I)
+                beat_text = issue[:m2.start()] if m2 else issue
+            terms = _content_terms(beat_text)
+            if not terms:
+                return None
+            if {t.lower() for t in terms} <= pronouns:
+                return None
+            hit, at = _terms_in_scenes(terms, doc, sorted(refs))
+            if hit:
+                return f"absence claim falsified by presence in scene(s) {at}"
+            return None
+        return None
+
+    # -- 4d. identity verdict contradicted by explicit equation -----------
+    def _identity_contradicted(self, f: dict, doc) -> str | None:
+        """A distinctness verdict ("X is not Y") beside an explicit equation
+        (the text addressing X as Y) is provably false — withdraw it. The
+        equation supports the OPPOSITE of the claim, which is what makes it
+        a contradiction rather than support."""
+        if doc is None:
+            return None
+        # Lazy: the pipeline never imports the gate at module load, so no cycle
+        # (verified with `python -c "import screenplay_analyzer.finding_integrity"`).
+        from .pipeline import _identity_parties
+        from screenplay_parser.heuristics import normalize_character_name
+        parties = _identity_parties(f, doc)
+        if parties is None:
+            return None
+        text = f"{f.get('issue') or ''} {f.get('observation') or ''}"
+        if _IDENTITY_SAMENESS.search(text):
+            # A sameness verdict beside an equation is supported, not
+            # contradicted — any doubt keeps the row.
+            return None
+        refs = [r for r in (f.get("scene_refs") or []) if isinstance(r, int)]
+        if not refs:
+            return None
+        scenes = {s.scene_number: s for s in (getattr(doc, "scenes", None) or [])}
+        if any(r not in scenes for r in refs):
+            return None
+        a, b = parties
+        for r in sorted(refs):
+            for e in getattr(scenes[r], "elements", None) or []:
+                t = _identity_eq_type(e)
+                chn = normalize_character_name(str(getattr(e, "character", None) or "")).upper()
+                etext = getattr(e, "text", None) or ""
+                if t == "dialogue" and chn in (a, b):
+                    other = b if chn == a else a
+                    if _identity_eq_names_in(etext, other):
+                        return ("identity verdict contradicted by explicit equation "
+                                f"in scene(s) {r}")
+                elif t == "action" and _IDENTITY_EQUATION_VERB.search(etext):
+                    if _identity_eq_names_in(etext, a, b):
+                        return ("identity verdict contradicted by explicit equation "
+                                f"in scene(s) {r}")
+                elif t == "parenthetical" and chn in (a, b):
+                    other = b if chn == a else a
+                    if re.search(r"\(\s*as\s+" + _identity_eq_name_pat(other) + r"\s*\)", etext, re.I):
+                        return ("identity verdict contradicted by explicit equation "
+                                f"in scene(s) {r}")
+                elif t == "scene_heading":
+                    for x, y in ((a, b), (b, a)):
+                        xp, yp = _identity_eq_name_pat(x), _identity_eq_name_pat(y)
+                        if re.search(xp + r"\s*=\s*" + yp, etext, re.I):
+                            return ("identity verdict contradicted by explicit equation "
+                                    f"in scene(s) {r}")
+                        if re.search(xp + r"\s+as\s+" + yp, etext, re.I):
+                            return ("identity verdict contradicted by explicit equation "
+                                    f"in scene(s) {r}")
+                        if re.search(xp + r"\s*-\s*as\s*-\s*" + yp, etext, re.I):
+                            return ("identity verdict contradicted by explicit equation "
+                                    f"in scene(s) {r}")
+        return None
+
     # -- run ---------------------------------------------------------------
-    def run(self, findings: list[dict]) -> GateResult:
+    def run(self, findings: list[dict], doc=None) -> GateResult:
         res = GateResult()
         merge_map = self._dedupe(findings)
         absorbed: dict[int, list[int]] = collections.defaultdict(list)
@@ -311,6 +606,14 @@ class FindingIntegrityGate:
 
         for i, original in enumerate(findings):
             f = copy.deepcopy(original)  # never mutate the caller's finding
+
+            reason_bits: list[str] = []
+            if (f.get("category") or "").lower() == "scene":
+                # "scene" was never in FINDING_CATEGORIES (trial 5: an older
+                # gate revision wrote it). Intake normalization, not a
+                # verdict — the row is still judged on its merits below.
+                f["category"] = "scene_function"
+                reason_bits.append("intake category normalized: scene → scene_function")
 
             if i in merge_map:
                 res.decisions.append(Decision(
@@ -324,12 +627,28 @@ class FindingIntegrityGate:
                 res.decisions.append(Decision(i, "reject", inv, f))
                 continue
 
+            praise = self._praise_filed(f)
+            if praise:
+                res.decisions.append(Decision(i, "reject", praise, f))
+                continue
+
+            falsified = self._absence_falsified(f, doc)
+            if falsified:
+                res.decisions.append(Decision(i, "reject", falsified, f))
+                continue
+
             fp = self._deterministic_fp(f)
             if fp:
                 res.decisions.append(Decision(i, "reject", fp, f))
                 continue
 
-            reason_bits: list[str] = []
+            if doc is not None:
+                contra = self._identity_contradicted(f, doc)
+                if contra:
+                    res.decisions.append(Decision(i, "reject", contra, f))
+                    continue
+
+            reason_bits: list[str]
             if absorbed.get(i):
                 f["merged_from"] = absorbed[i]
                 reason_bits.append(f"absorbed duplicate(s) {absorbed[i]}")
@@ -339,7 +658,7 @@ class FindingIntegrityGate:
                 # reclassify rather than drop: the observation may be real,
                 # only its category is wrong.
                 f["_category_was"] = f.get("category")
-                f["category"] = "scene" if "visual" in mismatch else "character"
+                f["category"] = "scene_function" if "visual" in mismatch else "character"
                 reason_bits.append(f"category corrected: {mismatch}")
                 res.decisions.append(Decision(i, "reclassify", "; ".join(reason_bits), f))
                 continue

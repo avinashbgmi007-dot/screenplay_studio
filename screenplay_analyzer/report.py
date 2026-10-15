@@ -108,8 +108,16 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append(f"- {e}")
         lines.append("")
 
+    if result.notices:
+        # M2: recoveries get their own voice, distinct from warnings — the
+        # writer should know a pass wobbled and landed, not that something
+        # is wrong with their script.
+        lines.append("## ℹ️ Run Notes")
+        for n in result.notices:
+            lines.append(f"- {n}")
+        lines.append("")
     # A caveat, not a warning — see `AnalysisResult.recoveries`. Rendered apart
-    # from the ⚠️ block on purpose: nothing failed, and a report that shouts
+    # from the warning block on purpose: nothing failed, and a report that shouts
     # "warning" at a split trains the writer to ignore the block that does mean it.
     if getattr(result, "recoveries", None):
         lines.append("## Notes on this run")
@@ -227,6 +235,31 @@ def render_markdown(result: AnalysisResult) -> str:
             if note:
                 lines.append(f"  - {note}")
             lines.append("")
+
+    # --- Story mechanics (deterministic reveal scan) ---
+    if getattr(result, "reveal_candidates", None):
+        lines.append("## Story mechanics worth a second look")
+        lines.append(
+            "*Single lines that may flip the story's meaning (a dream, a "
+            "waking, a death undone). Found by text scan, not judgment — "
+            "check them against the pages before believing any finding that "
+            "contradicts one.*"
+        )
+        lines.append("")
+        for c in result.reveal_candidates:
+            lines.append(f"- Scene {c.get('scene')}: '{c.get('line', '')}'")
+        lines.append("")
+
+    # --- Confirmed twist (candidate-gated probe call) ---
+    twist = getattr(result, "twist_verdict", None)
+    if isinstance(twist, dict) and twist.get("twist") is True:
+        lines.append("## Confirmed twist — read everything after it twice")
+        lines.append(
+            f"A direct probe confirmed a {twist.get('kind', 'twist')} in "
+            f"Scene {twist.get('scene')}: '{twist.get('line', '')}'. Findings "
+            "that treat those events as literal waking-plot are suspect."
+        )
+        lines.append("")
 
     # --- Pacing (deterministic per-scene pace index) ---
     if result.pacing:
@@ -451,6 +484,13 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "character_reads": result.character_reads,
         "logline_test": result.logline_test,
         "setup_payoff": result.setup_payoff,
+        # Recall kit B2: deterministic reveal candidates. Serialized (not just
+        # threaded into prompts) so the desk, the eval runner, and any reader
+        # can see what the scan found — an unserialized scan is a silent one.
+        "reveal_candidates": list(getattr(result, "reveal_candidates", None) or []),
+        # Twist confirmation verdict (candidate-gated probe call). None unless
+        # confirmed — served so the desk and eval can see the verdict.
+        "twist_verdict": getattr(result, "twist_verdict", None),
         "character_dials": result.character_dials,
         "pacing": result.pacing,
         "findings": stamp_scene_keys(result.findings, scene_key_map(result.doc)),
@@ -477,6 +517,7 @@ def to_findings_json(result: AnalysisResult) -> dict:
             **_observation_coverage(result.findings),
         },
         "errors": result.errors,
+        "notices": result.notices,
         # Caveats, not errors: a pass whose chunk had to be split mid-run. Kept
         # out of `errors` because that list is the orchestrator's partial-failure
         # signal and the desk's failure banner — a split means the pass succeeded

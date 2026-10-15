@@ -19,6 +19,8 @@ Returns an AnalysisResult with everything report.py needs.
 
 from __future__ import annotations
 
+import re
+import time
 from dataclasses import dataclass, field
 
 from screenplay_parser.models import ScriptDocument
@@ -28,7 +30,7 @@ from . import prompts
 from .grammar import findings_grammar, scene_summary_grammar, coverage_grammar, logline_test_grammar, character_reads_grammar
 from .formatting_check import check_formatting
 from .verifier import verify_findings, verification_summary
-from .feedback_filter import filter_findings
+from .feedback_filter import partition_findings
 from .llm_client import LlamaServerClient, LlamaServerError
 from .rules_context import RulesContext
 from .principles_engine import run_principles_engine
@@ -219,7 +221,12 @@ def _chunk_recovery_note(pass_label: str, recoveries: list[dict]) -> str | None:
 def _scene_full_text(scene) -> str:
     """Full scene text for the MODEL passes — capped so a long scene can
     never fill the context window by itself (see MAX_SCENE_CHARS)."""
-    return _cap_scene_text("\n".join(e.text for e in scene.elements))
+    texts = []
+    for e in scene.elements or []:
+        t = getattr(e, "text", None) or (e.get("text") if isinstance(e, dict) else "")
+        if t:
+            texts.append(str(t))
+    return _cap_scene_text("\n".join(texts))
 
 
 @dataclass
@@ -230,6 +237,10 @@ class AnalysisResult:
     character_reads: list[dict] = field(default_factory=list)
     logline_test: dict | None = None
     setup_payoff: list[dict] = field(default_factory=list)
+    reveal_candidates: list = field(default_factory=list)
+    twist_verdict: dict | None = None
+    """Confirmed reality twist ({twist, scene, line, kind}) or None. Set by
+    one candidate-gated probe call; a missing verdict changes nothing."""
     character_dials: list[dict] = field(default_factory=list)
     """Per-character trait scores: [{character, traits: [{trait, score,
     scene_refs, note}]}] — the ScreenplayIQ-style dials read."""
@@ -244,6 +255,11 @@ class AnalysisResult:
     verification: dict = field(default_factory=dict)
     model_used: str | None = None
     errors: list[str] = field(default_factory=list)
+    notices: list[str] = field(default_factory=list)
+    """Recoveries worth REPORTING as good news (audit M2): a pass that failed,
+    retried, and succeeded used to be invisible — the writer saw only a
+    spinner that took longer than usual, or nothing at all. Errors stay in
+    `errors`; a notice says "this was bumpy but it landed"."""
     recoveries: list[str] = field(default_factory=list)
     """Writer-facing CAVEATS: a pass whose chunk had to be split mid-run.
 
@@ -474,9 +490,13 @@ def _extract_items(result, key: str) -> list:
     return []
 
 
-def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng", recoveries: list | None = None) -> tuple[dict[int, str], list[str]]:
+def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_size: int = 6, language: str = "eng", should_cancel=None, recoveries: list | None = None) -> tuple[dict[int, str], list[str]]:
     summaries: dict[int, str] = {}
     errors: list[str] = []
+    # A cancel requested before the first chunk starts must never reach the
+    # model.
+    if should_cancel is not None and should_cancel():
+        raise AnalysisCancelled("Analysis cancelled at the writer's request.")
     grammar = scene_summary_grammar()
     scene_dicts = [
         {
@@ -496,6 +516,11 @@ def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_
         return _extract_items(result, "summaries")
 
     for chunk in _chunk_by_budget(scene_dicts, chunk_size):
+        # Cancellation checks per chunk: on a 120-scene script this loop is
+        # the longest stage, and per-chunk is the finest honest granularity
+        # (a chunk's own generation always finishes).
+        if should_cancel is not None and should_cancel():
+            raise AnalysisCancelled("Analysis cancelled at the writer's request.")
         items, errs = _with_chunk_backoff(chunk, call, recoveries=recoveries)
         errors.extend(errs)
         for item in items:
@@ -517,6 +542,23 @@ def build_scene_overview_text(doc: ScriptDocument, summaries: dict[int, str]) ->
     if len(overview) > MAX_OVERVIEW_CHARS:
         overview = overview[:MAX_OVERVIEW_CHARS].rstrip() + "\n[...scene overview truncated for context budget...]"
     return overview
+
+
+def build_script_level_source(doc, overview: str, stats: dict) -> tuple[str, str]:
+    """Full text when it fits MAX_OVERVIEW_CHARS, else the summary path.
+    Returns (overview_text, source_bucket). Records the choice in stats so
+    the report can name what the passes actually read."""
+    texts = []
+    for s in doc.scenes or []:
+        t = _scene_full_text(s)
+        if t:
+            texts.append(t)
+    full = "\n".join(texts)
+    if full and len(full) <= MAX_OVERVIEW_CHARS:
+        stats["script_level_source"] = "full_text"
+        return full, EVIDENCE_FULL_TEXT
+    stats["script_level_source"] = "overview"
+    return overview, EVIDENCE_OVERVIEW
 
 
 # ---------------------------------------------------------------------------
@@ -713,15 +755,63 @@ def _top_characters(stats: dict, doc: ScriptDocument, limit: int = 8) -> list[st
     return (ordered + rest)[:limit]
 
 
-def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerClient, characters: list[str], language: str = "eng") -> list[dict]:
+def _with_retries(call, attempts: int = 2, delays=(2.0, 5.0), on_retry=None):
+    """Bounded retry for ONE-SHOT category calls (char_reads, logline test).
+
+    chat_json already retries JSON-parse failures internally; what it cannot
+    retry is a generation that never ARRIVES — llama-server 503/busy after its
+    own busy window, a transient disconnect mid-generation. On the real server
+    that used to surface as char_reads stalling minutes on a hung generation
+    and then dying as failed_categories with no diagnosis in report.errors.
+    Two quick retries (2s, 5s), then the final exception propagates to the
+    category's own failed path — bounded (worst case adds ~7s + 2 quick
+    generations), never a second stall.
+
+    on_retry(n, exc) fires after the n-th failed attempt, before the delay —
+    so a successful recovery can be reported (audit M2) instead of the retry
+    being invisible to the writer.
+    """
+    last_exc = None
+    for attempt in range(attempts):
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 — the caller's failure path owns the category
+            last_exc = exc
+            if attempt < attempts - 1:
+                if on_retry is not None:
+                    try:
+                        on_retry(attempt + 1, exc)
+                    except Exception:
+                        pass  # a reporting hook must never break the retry it reports
+                time.sleep(delays[min(attempt, len(delays) - 1)])
+    raise last_exc
+
+
+def run_character_reads(doc: ScriptDocument, overview: str, client: LlamaServerClient, characters: list[str], language: str = "eng", on_retry=None) -> list[dict]:
     """The character-perception read: how each character actually comes across
     to a stranger vs. what the script appears to intend. Evidence quotes get
-    the same verification as findings."""
+    the same verification as findings.
+
+    One bounded retry pass wraps the call: a hung/busy generation on the real
+    llama-server (the probe's 3-minute stall then failed_categories) gets two
+    quick attempts before the category fails and the reason lands in
+    report.errors — and after the retry the failure is RECORDED, not just
+    raised blind. `on_retry(n, exc)` rides along so a successful recovery can
+    be surfaced (audit M2) instead of the bump being invisible.
+    """
     if not characters:
         return []
     grammar = character_reads_grammar()
     system, user = prompts.character_reads_prompt(overview, doc.title, characters, language=language)
-    result = client.chat_json(system, user, grammar=grammar, max_tokens=CHARACTER_READS_MAX_TOKENS, fast=True)
+    def _call():
+        return client.chat_json(system, user, grammar=grammar, max_tokens=CHARACTER_READS_MAX_TOKENS, fast=True)
+
+    try:
+        result = _with_retries(_call, on_retry=on_retry)
+    except Exception as exc:
+        raise LlamaServerError(
+            "character-perception read failed after 1 retry "
+            f"({type(exc).__name__}: {exc})") from exc
     items = _extract_items(result, "reads")
     reads = [r for r in items if isinstance(r, dict) and r.get("character")]
     for r in reads:
@@ -821,6 +911,304 @@ def evidence_depth(findings) -> dict:
             "unknown": len(findings) - full - over - mixed, "total": len(findings)}
 
 
+def apply_evidence_floor(result_or_findings) -> None:
+    """Demote ungrounded rows in place: severity forced low plus
+    `ungrounded: True`. Rows with a quote or an observation are untouched."""
+    findings = (result_or_findings.findings
+                if hasattr(result_or_findings, "findings")
+                else result_or_findings)
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if not f.get("evidence_quote") and not f.get("observation"):
+            f["ungrounded"] = True
+            f["severity"] = "low"
+        from .feedback_filter import is_refuted, demote_contested
+        if not f.get("ungrounded") and is_refuted(f):
+            demote_contested(f)
+
+
+_IDENTITY_PATTERNS = [
+    re.compile(r"\bis\s+not\b", re.I),
+    re.compile(r"\bis\s+really\b", re.I),
+    re.compile(r"\bdistinct\s+entit\w*\b", re.I),
+    re.compile(r"\bsame\s+character\b", re.I),
+    re.compile(r"\bdoes\s+not\s+appear\s+to\s+be\b", re.I),
+]
+_HEDGE_PATTERNS = [
+    # Affirmative hedging only: "does NOT appear to be X" asserts absence
+    # (the trial-10 #12 shape) and must not veto — the lookbehind excludes
+    # the negated form.
+    re.compile(r"(?<!not\s)\bappears\s+to\s+be\b", re.I),
+    re.compile(r"\bmay\s+be\b", re.I),
+    re.compile(r"\bpossibly\b", re.I),
+    re.compile(r"\breads?\s+as\b", re.I),
+]
+_NAME_RE = re.compile(r"[A-Z][\w\-']*(?:\s+[A-Z][\w\-']*)*")
+
+
+def _identity_parties(f: dict, doc=None) -> tuple[str, str] | None:
+    """Two normalized names bound by an unhedged identity assertion in
+    issue+observation, else None. Quotes are evidence, never the claim —
+    names resolve from issue/observation text only. Both names must be
+    script characters (normalized against `doc.all_characters`, the only
+    doc attribute read) — title words and non-cast pairs never fire."""
+    from screenplay_parser.heuristics import normalize_character_name
+    text = f"{f.get('issue') or ''} {f.get('observation') or ''}"
+    if not any(p.search(text) for p in _IDENTITY_PATTERNS):
+        return None
+    if any(p.search(text) for p in _HEDGE_PATTERNS):
+        return None
+    seen = []
+    for m in _NAME_RE.finditer(text):
+        # Title-case sentence starts ("Protagonist Identity Ambiguity")
+        # are not names: real cue names run to two words max. Possessives
+        # ("Raj's") strip to their owner before comparing.
+        words = m.group(0).split()
+        if len(words) > 2:
+            continue
+        name = normalize_character_name(
+            re.sub(r"['’][sS]$", "", m.group(0).strip("\"'‘’“”"))).upper()
+        if not name or name in {"THE", "AND", "SCENE"}:
+            continue
+        if name not in seen:
+            seen.append(name)
+    if len(seen) < 2:
+        return None
+    if doc is None:
+        return None
+    cast = {normalize_character_name(c).upper() for c in (doc.all_characters or [])}
+    if seen[0] not in cast or seen[1] not in cast:
+        return None
+    return seen[0], seen[1]
+
+
+def apply_observation_check(findings: list, doc) -> None:
+    """Flag observations the script text contradicts (D2): `observation_weak`
+    plus one severity step down. Runs in 8f after the observation pass, so it
+    judges what the model actually wrote — never the pre-grounding draft.
+    Lenient by design (see `verify_observation`): only a positive
+    contradiction fails, and nothing is ever deleted."""
+    from .feedback_filter import demote_severity
+    from .verifier import verify_observation
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if verify_observation(f, doc) is False:
+            f["observation_weak"] = True
+            demote_severity(f)
+
+
+_IDENTITY_ACTION_VERBS = re.compile(r"\b(calls|addresses|greets|names)\b", re.I)
+
+
+def _identity_name_pat(name: str) -> str:
+    """Regex matching a normalized cue name with flexible inner spacing."""
+    return r"\s*".join(re.escape(w) for w in name.split())
+
+
+def _identity_el_type(e) -> str:
+    t = getattr(e, "type", None)
+    return str(getattr(t, "value", t) or "").lower()
+
+
+def _identity_el_character(e) -> str:
+    from screenplay_parser.heuristics import normalize_character_name
+    return normalize_character_name(str(getattr(e, "character", None) or "")).upper()
+
+
+def _identity_names_in(text: str, *names: str) -> bool:
+    norm = re.sub(r"\s+", " ", str(text or "").upper().replace("_", " "))
+    return all(re.search(r"\b" + _identity_name_pat(n) + r"\b", norm) for n in names)
+
+
+def _identity_proven(f: dict, parties: tuple[str, str], scenes: list) -> bool:
+    """True when the cited scenes explicitly settle the identity verdict:
+    (a) an equation element — a DIALOGUE line whose speaker is one party and
+    whose text names the other, an ACTION line with an addressing verb naming
+    both, a parenthetical `(as Y)` attached to X's cue/line, or a heading in
+    `X=Y`/`X-AS-Y` form; or (b) dialogue co-presence — both parties speak in
+    one cited scene. Anything else returns False. Quotes are evidence, never
+    scanned — only scene elements are read."""
+    a, b = parties
+    for s in scenes or []:
+        speakers = set()
+        for e in getattr(s, "elements", None) or []:
+            t = _identity_el_type(e)
+            chn = _identity_el_character(e)
+            text = getattr(e, "text", None) or ""
+            if t == "dialogue" and chn in (a, b):
+                speakers.add(chn)
+                other = b if chn == a else a
+                if _identity_names_in(text, other):
+                    return True
+            elif t == "action" and _IDENTITY_ACTION_VERBS.search(text):
+                if _identity_names_in(text, a, b):
+                    return True
+            elif t == "parenthetical" and chn in (a, b):
+                other = b if chn == a else a
+                if re.search(r"\(\s*as\s+" + _identity_name_pat(other) + r"\s*\)", text, re.I):
+                    return True
+            elif t == "scene_heading":
+                for x, y in ((a, b), (b, a)):
+                    xp, yp = _identity_name_pat(x), _identity_name_pat(y)
+                    if re.search(xp + r"\s*=\s*" + yp, text, re.I):
+                        return True
+                    if re.search(xp + r"\s+as\s+" + yp, text, re.I):
+                        return True
+                    if re.search(xp + r"\s*-\s*as\s*-\s*" + yp, text, re.I):
+                        return True
+        if {a, b} <= speakers:
+            return True
+    return False
+
+
+def apply_identity_check(findings: list, doc) -> None:
+    """Flag identity verdicts the text cannot settle (trial-10 #12):
+    `identity_uncertain: True` plus one severity step down. Demote, never
+    drop — uncertainty is not falsehood. Explicit equations and dialogue
+    co-presence keep the row; everything else verifiable is out of scope
+    for this check (pronouns, ref-less rows, missing docs)."""
+    from .feedback_filter import demote_severity
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        parties = _identity_parties(f, doc)
+        if parties is None or doc is None:
+            continue
+        refs = [r for r in (f.get("scene_refs") or []) if isinstance(r, int)]
+        if not refs:
+            continue
+        scenes = {s.scene_number: s for s in (doc.scenes or [])}
+        if any(r not in scenes for r in refs):
+            continue
+        if _identity_proven(f, parties, [scenes[r] for r in sorted(refs)]):
+            continue
+        f["identity_uncertain"] = True
+        demote_severity(f)
+
+
+def apply_scene_quote_rule(findings: list) -> None:
+    """Flag quoteless scene_function rows (trial-5 follow-up): a scene note
+    with no evidence_quote is a summary opinion, not a cited defect — one
+    severity step down plus `summary_only: True`. Demote, never drop; the
+    Fix Queue keeps showing the row, just never as a grounded note."""
+    from .feedback_filter import demote_severity
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if str(f.get("category") or "") != "scene_function":
+            continue
+        if f.get("evidence_quote"):
+            continue
+        f["summary_only"] = True
+        demote_severity(f)
+
+
+SHORT_FORM_PAGE_LIMIT = 15.0
+SHORT_FORM_SKIP_MARKERS = frozenset({
+    "three-act", "three act", "midpoint", "mid-point", "second act",
+    "act two", "climax", "second half", "plot point", "catalyst",
+    "call to adventure", "inciting incident",
+})
+SHORT_FORM_SKIP_CATEGORIES = frozenset({"structure", "genre"})
+
+
+def apply_short_form_gate(findings: list, page_count) -> None:
+    """Demote framework demands a short cannot meet (demote, never drop).
+    Model findings carry no check_id, so this keys on category plus marker
+    phrases in the issue text."""
+    try:
+        pages = float(page_count or 0)
+    except (TypeError, ValueError):
+        return
+    if pages <= 0 or pages >= SHORT_FORM_PAGE_LIMIT:
+        return
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        if str(f.get("category") or "") not in SHORT_FORM_SKIP_CATEGORIES:
+            continue
+        if any(m in str(f.get("issue") or "").lower() for m in SHORT_FORM_SKIP_MARKERS):
+            f["form_mismatch"] = True
+            f["severity"] = "low"
+
+
+_ABSENCE_RE = None  # compiled lazily to keep module import light
+CATEGORY_CAPS_SHORT = {"character": 6, "dialogue": 8, "scene_function": 6}
+CATEGORY_CAPS_LONG = {"character": 12, "dialogue": 20, "scene_function": 14}
+# Template floods share wording across scenes, so anchor counting never
+# fires on them (trial rerun: sixteen near-identical scene_function rows on
+# sixteen scenes). Similarity clusters catch what anchors miss.
+ISSUE_SIMILARITY_THRESHOLD = 0.75
+SIMILARITY_CLUSTER_CAP = 3
+
+
+def _issue_key(text: str) -> str:
+    import re
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", str(text or "").lower())).strip()
+
+
+def apply_absence_and_caps(findings: list, page_count) -> None:
+    """Drop absence rows (non-findings, same precedent as step-8 filter);
+    demote same-anchor pileups past the per-category cap. Mutates in place."""
+    import re
+    from difflib import SequenceMatcher
+    kept = [f for f in (findings or [])
+            if isinstance(f, dict)
+            and not re.match(r"\s*n/a\b", str(f.get("issue") or ""), re.I)]
+    findings[:] = kept
+    try:
+        short = float(page_count or 0) < SHORT_FORM_PAGE_LIMIT
+    except (TypeError, ValueError):
+        short = False
+    caps = CATEGORY_CAPS_SHORT if short else CATEGORY_CAPS_LONG
+    seen_anchors: dict = {}
+    for f in findings:
+        key = (str(f.get("category") or ""),
+               tuple(f.get("scene_refs") or []))
+        seen_anchors[key] = seen_anchors.get(key, 0) + 1
+        cap = caps.get(str(f.get("category") or ""))
+        if cap is not None and seen_anchors[key] > cap:
+            f["capped"] = True
+            f["severity"] = "low"
+    # Similarity clusters within a category: near-identical issue text on
+    # distinct anchors is one template filed many times. First rows per
+    # cluster keep full weight; the rest demote. difflib only, no model.
+    by_category: dict = {}
+    for f in findings:
+        by_category.setdefault(str(f.get("category") or ""), []).append(f)
+    for cat, rows in by_category.items():
+        if cat not in caps:
+            continue
+        clusters: list = []
+        for f in rows:
+            key = _issue_key(f.get("issue"))
+            matched = None
+            for c in clusters:
+                if SequenceMatcher(None, key, c[0]).ratio() >= ISSUE_SIMILARITY_THRESHOLD:
+                    matched = c
+                    break
+            if matched is None:
+                clusters.append([key])
+            else:
+                matched.append(key)
+                if len(matched) > SIMILARITY_CLUSTER_CAP:
+                    f["capped"] = True
+                    f["severity"] = "low"
+
+
+class AnalysisCancelled(Exception):
+    """Raised between stages when the caller asked the run to stop.
+
+    Co-operative cancellation: the desk's Stop button sets a per-project event,
+    and the run honors it at the next stage boundary (and between scene-summary
+    chunks). The CURRENT category finishes — a category can hold minutes of
+    model work, and aborting mid-generation would strand a half-written report
+    — so a cancel request lands within one stage of the click, never mid-write.
+    """
+
+
 def _integrity_gate_enabled() -> bool:
     """The env kill-switch. `SCREENPLAY_STUDIO_INTEGRITY_GATE=0` stands the gate
     down without a code change, so a rule that misbehaves on an unseen script
@@ -839,12 +1227,18 @@ def analyze(
     run_categories: tuple[str, ...] = None,
     progress_cb=None,
     report_language: str = "eng",
+    should_cancel=None,
     integrity_gate: bool = True,
     observation_pass: bool = True,
 ) -> AnalysisResult:
     """progress_cb: optional callable(dict) called at every stage boundary with
     {"stage": str, "status": "running"|"complete", "detail": str} — lets a UI
     show live per-stage progress instead of a frozen spinner.
+
+    should_cancel: optional callable returning True when the writer asked the
+    run to stop; checked at every stage boundary and between scene-summary
+    chunks. When it fires, AnalysisCancelled propagates and nothing is written
+    (the report is assembled and saved by the caller, only on success).
 
     run_categories: None or ("all",) runs every category (ALL_CATEGORIES);
     any other tuple runs exactly those. An empty tuple runs only the
@@ -869,6 +1263,14 @@ def analyze(
     def emit(stage, status, detail=""):
         if progress_cb:
             progress_cb({"stage": stage, "status": status, "detail": detail})
+
+    def _cp():
+        if should_cancel is not None and should_cancel():
+            raise AnalysisCancelled("Analysis cancelled at the writer's request.")
+
+    # First check BEFORE any work — a cancel that arrives while the run is
+    # starting must not wait for the deterministic passes.
+    _cp()
 
     try:
         rules_ctx = RulesContext()
@@ -969,13 +1371,14 @@ def analyze(
         emit("pacing", "complete", f"failed: {e}")
 
     # 2. scene summaries (needed for every script-level category + coverage)
+    _cp()
     needs_summaries = any(c in run_categories for c in ("theme", "character", "structure", "scene_function", "setup_payoff", "char_reads", "character_dials", "coverage", "genre", "logline_test"))
     overview = ""
     if needs_summaries:
         summary_recoveries: list[dict] = []
         try:
             emit("summaries", "running", "Summarizing each scene")
-            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language, recoveries=summary_recoveries)
+            summaries, summary_errors = build_scene_summaries(doc, client, chunk_size=summary_chunk_size, language=report_language, should_cancel=should_cancel, recoveries=summary_recoveries)
             emit("summaries", "complete")
             overview = build_scene_overview_text(doc, summaries)
             result.category_outcomes["summaries"] = "failed" if summary_errors else "ok"
@@ -999,19 +1402,33 @@ def analyze(
             result.category_outcomes["summaries"] = "failed"
             result.errors.append(f"Scene summarization failed: {e}")
 
+    from .reveal_scan import scan_reveals
+    result.reveal_candidates = scan_reveals(doc)
+    # Twist confirmation (one candidate-gated model call): a direct question
+    # the scan alone cannot answer. Never fails the run — an unconfirmed
+    # twist changes nothing downstream, so a probe bug must not either.
+    try:
+        from .reveal_scan import confirm_twist
+        result.twist_verdict = confirm_twist(doc, client)
+    except Exception:
+        result.twist_verdict = None
+
     # 2b. selective raw-text access for the script-level passes (§5 item 2).
     # Runs HERE because the checkpoint set depends on the findings the earlier
     # passes already filed (the most-flagged scenes), and because it is only
     # needed once the summaries exist to sit alongside it. Deterministic — no
     # model call — and recorded on the result so the report can name the scenes.
-    script_level_overview = overview
+    script_level_overview, _sl_source = build_script_level_source(doc, overview, result.stats)
     checkpoint_scenes: list[int] = []
     checkpoint_text = ""
-    if overview and any(c in run_categories for c in SCRIPT_LEVEL_CATEGORIES):
+    if script_level_overview and any(c in run_categories for c in SCRIPT_LEVEL_CATEGORIES):
         checkpoint_scenes = select_checkpoint_scenes(doc, all_findings)
         checkpoint_text = build_checkpoint_text(doc, checkpoint_scenes)
         if checkpoint_text:
-            script_level_overview = build_script_level_overview(overview, checkpoint_text)
+            # Append to whatever the base is — summaries on large scripts,
+            # full text on small ones (B1). Either way the passes receive a
+            # superset, and the stamp below stays honest.
+            script_level_overview = build_script_level_overview(script_level_overview, checkpoint_text)
         else:
             # Nothing fit the budget — never claim a reading that did not happen.
             checkpoint_scenes = []
@@ -1024,8 +1441,13 @@ def analyze(
     # really did read pages, plain overview when they did not.
     script_level_source = (EVIDENCE_OVERVIEW_AND_CHECKPOINTS if checkpoint_scenes
                            else EVIDENCE_OVERVIEW)
+    if _sl_source == EVIDENCE_FULL_TEXT:
+        # Small scripts are read whole: the passes saw full text, not
+        # summaries — the mixed bucket must not overwrite that source.
+        script_level_source = EVIDENCE_FULL_TEXT
 
     # 3. scene-level dialogue analysis
+    _cp()
     if "dialogue" in run_categories:
         dialogue_recoveries: list[dict] = []
         try:
@@ -1062,9 +1484,15 @@ def analyze(
     }
     for cat, (fn, args) in category_prompts.items():
         if cat in run_categories and overview:
+            _cp()
             try:
                 emit(cat, "running", f"Analyzing {cat.replace('_', ' ')}")
                 rules_fragment = rules_ctx.fragment_for_pass(cat)
+                from .reveal_scan import reveal_context_block, confirmed_twist_block
+                _reveal_block = confirmed_twist_block(result.twist_verdict) \
+                    or reveal_context_block(result.reveal_candidates)
+                if _reveal_block:
+                    rules_fragment = (rules_fragment + "\n\n" + _reveal_block) if rules_fragment else _reveal_block
                 all_findings.extend(_tag_evidence(
                     run_script_level_category(fn, client, rules_fragment, *args, category=cat, language=report_language),
                     script_level_source))
@@ -1085,6 +1513,7 @@ def analyze(
     # knowledge graph as the candidate source. Runs independent of the
     # summary-based overview (it works directly off the knowledge graph),
     # so it's not gated behind `overview` like the script-level categories above.
+    _cp()
     if "principles" in run_categories:
         try:
             emit("principles", "running", "Checking setups & payoffs")
@@ -1101,15 +1530,31 @@ def analyze(
     # 4c. character-perception read — how each character comes across to a
     # stranger vs. apparent intent. Needs the overview + character list; runs
     # after the character arc pass so the deterministic stats are ready.
+    _cp()
     if "char_reads" in run_categories and overview:
         try:
             emit("char_reads", "running", "Reading how characters come across")
+            retries_used = {"n": 0}
+
+            def _char_retry(n, exc):
+                retries_used["n"] = n
+                emit("char_reads", "running", f"Model hiccup on the character read — retrying ({n})")
+
             result.character_reads = run_character_reads(
                 doc, overview, client,
                 _top_characters(result.stats, doc),
                 language=report_language,
+                on_retry=_char_retry,
             )
             result.category_outcomes["char_reads"] = "ok"
+            if retries_used["n"]:
+                # M2: the retry succeeded — say so. A pass that silently ate a
+                # 2s/5s retry looked identical to a clean one; the writer had
+                # no way to know the read wobbled and recovered.
+                result.notices.append(
+                    f"The character-perception read hit a model hiccup but recovered on retry "
+                    f"#{retries_used['n']} — no findings were lost."
+                )
             emit("char_reads", "complete")
         except LlamaServerError as e:
             result.category_outcomes["char_reads"] = "failed"
@@ -1127,16 +1572,19 @@ def analyze(
     # against the Principles Engine's per-candidate findings) so they reach
     # the Fix Queue; the ledger itself is also carried on the result as its
     # own report section.
+    _cp()
     if "setup_payoff" in run_categories and overview:
         try:
             emit("setup_payoff", "running", "Auditing setups & payoffs across the whole script")
             ledger, ledger_errors = run_setup_payoff_ledger(
                 overview, _kg, client, rules_ctx.prompt_fragment_for_category("plot_thread"),
-                doc.scene_count, language=report_language,
+                doc.scene_count, language=report_language, doc=doc,
             )
             result.setup_payoff = ledger
+            from .setup_payoff import adjudicate_ledger
+            ledger = adjudicate_ledger(ledger, doc)
             existing_plot = [f for f in all_findings if f.get("category") == "plot_thread"]
-            all_findings.extend(_tag_evidence(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx), EVIDENCE_OVERVIEW))
+            all_findings.extend(_tag_evidence(dangling_findings(ledger, existing_plot, rules_ctx=rules_ctx, doc=doc), EVIDENCE_OVERVIEW))
             result.category_outcomes["setup_payoff"] = "failed" if ledger_errors else "ok"
             if ledger_errors:
                 result.errors.extend(ledger_errors)
@@ -1149,6 +1597,7 @@ def analyze(
     # 4e. character dials — ScreenplayIQ-style trait scores for the main
     # cast. Needs the overview + character stats; runs after the character
     # reads so the deterministic stats are ready.
+    _cp()
     if "character_dials" in run_categories and overview:
         try:
             emit("character_dials", "running", "Scoring character dials")
@@ -1176,6 +1625,7 @@ def analyze(
     emit("verification", "complete")
 
     # 6. coverage
+    _cp()
     if "coverage" in run_categories and overview:
         try:
             emit("coverage", "running", "Writing coverage")
@@ -1189,6 +1639,7 @@ def analyze(
 
     # 6a. logline test — does the premise land in one sentence? Diagnosis only;
     # runs after coverage because it judges the coverage pass's logline.
+    _cp()
     if "logline_test" in run_categories and overview and result.coverage and result.coverage.get("logline"):
         try:
             emit("logline_test", "running", "Testing the logline")
@@ -1210,6 +1661,7 @@ def analyze(
 
     # 6b. genre-convention check — uses the genre coverage just produced, so it
     # runs after coverage and only when a genre was reported.
+    _cp()
     if "genre" in run_categories and result.coverage and result.coverage.get("genre"):
         try:
             emit("genre", "running", "Checking genre conventions")
@@ -1255,8 +1707,16 @@ def analyze(
     # 8. drop non-writing feedback — meta-commentary about the script's
     # language (dialect identification, subtitles for non-native speakers)
     # is noise for the writer, not feedback. Filter after verification so
-    # the summary reflects exactly what the writer will see.
-    result.findings = filter_findings(result.findings)
+    # the summary reflects exactly what the writer will see. Removals are
+    # ledgered in stats (trial 9): a guardrail whose firings are
+    # unobservable cannot be validated by any trial.
+    result.findings, _lang_removed = partition_findings(result.findings)
+    if _lang_removed:
+        result.stats = result.stats or {}
+        result.stats["language_filtered"] = {
+            "count": len(_lang_removed),
+            "issues": [str(f.get("issue") or "")[:200] for f in _lang_removed],
+        }
 
     # 8b. cross-rule dedup (§5 item 3) — the same defect filed under related rules
     # in the same scene becomes one finding, which STATES what it absorbed. Runs
@@ -1294,7 +1754,7 @@ def analyze(
     if integrity_gate and _integrity_gate_enabled():
         try:
             from .finding_integrity import FindingIntegrityGate
-            gate_res = FindingIntegrityGate().run(result.findings)
+            gate_res = FindingIntegrityGate().run(result.findings, doc=doc)
             result.findings = gate_res.findings
             result.withdrawals = gate_res.ledger
             if not gate_res.accounted_for:
@@ -1336,6 +1796,27 @@ def analyze(
                 # A pass that cannot run must leave the findings exactly as
                 # they were — ungrounded, still flagged, never invented.
                 result.errors.append(f"Observation pass skipped: {e}")
+
+    # 8f. evidence floor (accuracy kit A): a finding with neither a quote
+    # nor an observation is demoted, never deleted — flag-don't-drop holds,
+    # but the Fix Queue default view must not present it as a grounded note.
+    apply_evidence_floor(result.findings)
+    apply_short_form_gate(result.findings, getattr(doc, "estimated_page_count", None))
+    apply_absence_and_caps(result.findings, getattr(doc, "estimated_page_count", None))
+    # 8g. observation check (accuracy follow-up D2): observations that invent
+    # (a confrontation a character never attends, a line never spoken) are
+    # flagged and demoted. Runs after the observation pass and the floor, so
+    # it judges grounded rows only — ungrounded rows have nothing to check.
+    apply_observation_check(result.findings, doc)
+    # 8h. identity check (trial-10 #12): identity verdicts the text cannot
+    # settle are flagged and demoted. Runs beside the other demote-never-drop
+    # guards, so the summary below counts what the writer is shown.
+    apply_identity_check(result.findings, doc)
+    # 8i. scene quote rule (trial-5 follow-up): quoteless scene_function rows
+    # are summary opinions. Flagged and demoted here, beside the other
+    # demote-never-drop guards, so the summary below counts what the writer
+    # is shown.
+    apply_scene_quote_rule(result.findings)
 
     result.verification = verification_summary(result.findings)
 

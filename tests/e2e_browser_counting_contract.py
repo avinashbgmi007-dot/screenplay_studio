@@ -31,8 +31,9 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
-from e2e_browser_common import (Checks, assert_no_js_errors, launch,  # noqa: E402
-                                open_dock_section_holding, studio_headers)
+from e2e_browser_common import (Checks, assert_no_js_errors, became_true,  # noqa: E402
+                                 launch,
+                                 open_dock_section_holding, studio_headers)
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 
@@ -139,6 +140,19 @@ def test_intent_updates_every_mounted_surface(base, checks):
         # unclickable until the disclosure itself is expanded (a closed body
         # is visibility:hidden — the same contract every ledger section has).
         page.evaluate("() => { openDock('evidence'); setEvidenceTier(2); }")
+        # Accuracy kit A parks ungrounded rows behind an explicit toggle, and
+        # the demo ledger is ungrounded in full — without opting in there are
+        # no cards to click. This suite proves every surface reads ONE ledger,
+        # so it takes the full view first; the toggle's own hide/show contract
+        # lives in e2e_browser_ungrounded_filter.py.
+        ungr = page.locator(".dock-section-fixqueue .fq-toggle-ungrounded")
+        if ungr.count():
+            ungr.first.click()
+        checks.ok("intent-e2e: the full ledger is visible (ungrounded opted in)",
+                  became_true(page, "() => document.querySelectorAll("
+                              "'.dock-lens[data-lens=\"evidence\"] .finding-note'"
+                              ").length > 0"),
+                  "no finding cards after opting into ungrounded")
         page.wait_for_selector('.dock-lens[data-lens="evidence"] .finding-note',
                                state="attached", timeout=15000)
         # the context expansion is a 0.18s grid-rows transition; inner section
@@ -245,6 +259,16 @@ def run(base, projects_dir, headers):
         page.wait_for_selector(DOCK_QUEUE_TITLE, state="attached", timeout=15000)
         page.wait_for_selector("#finding-summary .fs-chip.open",
                                state="attached", timeout=15000)
+        # Accuracy kit A parks ungrounded rows (the whole demo ledger) behind
+        # an explicit toggle. This suite asserts the counting contract over
+        # the FULL ledger, so it opts in first — same proviso as above.
+        ungr = page.locator(".dock-section-fixqueue .fq-toggle-ungrounded")
+        if ungr.count():
+            ungr.first.click()
+        checks.ok("the full ledger is visible (ungrounded opted in)",
+                  became_true(page, "() => document.querySelectorAll("
+                              "'.dock-section-fixqueue .fix-row').length > 0"),
+                  "no fix-queue rows after opting into ungrounded")
 
 
         # ---- baseline: unmarked, the surfaces agree (control) ---------------

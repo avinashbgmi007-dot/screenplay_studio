@@ -311,3 +311,37 @@ class TestEgressGuard:
         with pytest.raises(ValueError) as exc:
             webapp_server._make_client(m)
         assert "--allow-remote-server" in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# Bind — the studio listens on loopback only (prod scope: loopback-only desk)
+# ---------------------------------------------------------------------------
+
+class TestLoopbackBind:
+    """The HTTP surface itself must be unreachable off-machine: `main()` takes
+    no `--host` flag and passes `host="127.0.0.1"` to `app.run`. A future
+    `--host 0.0.0.0` convenience would silently void every loopback guard
+    above (Host check, Origin check, token threat model), so the absence of
+    the flag is pinned, not just the default."""
+
+    def test_default_bind_is_loopback_only(self, tmp_path, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(webapp_server, "_API_TOKEN", None)
+        monkeypatch.setattr(webapp_server, "_DEMO_MODEL_ACTIVE", False)
+        monkeypatch.setattr(webapp_server.app, "run",
+                            lambda **kw: captured.update(kw))
+        monkeypatch.delenv("SCREENPLAY_STUDIO_ALLOW_REMOTE_SERVER", raising=False)
+        monkeypatch.setattr(sys, "argv", [
+            "webapp_server", "--port", "8598", "--projects-dir", str(tmp_path)])
+        webapp_server.main()
+        assert captured.get("host") == "127.0.0.1", \
+            f"the studio must bind loopback only, got: {captured!r}"
+
+    def test_no_host_flag_can_widen_the_bind(self, tmp_path, monkeypatch):
+        """`--host 0.0.0.0` must fail at argparse, not bind the LAN."""
+        monkeypatch.setattr(webapp_server.app, "run", lambda **kw: None)
+        monkeypatch.setattr(sys, "argv", [
+            "webapp_server", "--port", "8598", "--projects-dir", str(tmp_path),
+            "--host", "0.0.0.0"])
+        with pytest.raises(SystemExit):
+            webapp_server.main()

@@ -20,10 +20,11 @@
 - There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
   stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
 
-**Totals:** 96 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **98**.
+**Totals:** 98 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **100**.
 (Pinned by `tests/test_audit_remediation.py::TestF05RouteMapTotals`; regenerate
 after adding or changing any `@app.route` — this map had drifted by +4 before
-the 2026-09-30 audit, and the verdict channel added 4 more on 2026-10-05.)
+the 2026-09-30 audit, the verdict channel added 5 more, and this branch added
+analyze/cancel (R2) plus library/backup (R7).)
 
 ---
 
@@ -59,6 +60,7 @@ the 2026-09-30 audit, and the verdict channel added 4 more on 2026-10-05.)
 | GET | `/api/projects/<name>` | `get_project` | Project summary (`_manifest_summary`). |
 | DELETE | `/api/projects/<name>` | `delete_project` | Delete a project (guarded inside `PROJECTS_DIR`). |
 | POST | `/api/projects/<name>/analyze` | `analyze_project` | Run the 12-pass analysis (resumable; `?force` resets). |
+| POST | `/api/projects/<name>/analyze/cancel` | `cancel_analyze` | Ask the running analysis to stop (co-operative; restores the pre-run stage). |
 | POST | `/api/projects/<name>/analyze/retry-failed` | `retry_failed_categories` | Re-run only failed analysis categories. |
 | POST | `/api/projects/<name>/reparse` | `reparse_project` | Re-parse source, regenerate KG, invalidate analysis. |
 | GET | `/api/projects/<name>/backup` | `backup_project` | Download the whole project dir as a zip. |
@@ -163,6 +165,7 @@ the 2026-09-30 audit, and the verdict channel added 4 more on 2026-10-05.)
 | POST | `/api/writer-memory/observations/<obs_id>/suppress` | `suppress_writer_observation` | Forget a scoped observation. |
 | POST | `/api/writer-memory/refresh` | `refresh_writer_memory` | Recompute the relationship card. |
 | GET | `/api/writer-library` | `get_writer_library` | Digest of every parsed project (PAST WORK block). |
+| GET | `/api/library/backup` | `backup_library` | Download EVERY project as one zip (with an embedded library manifest). |
 
 ## Ideas (collection + single)
 

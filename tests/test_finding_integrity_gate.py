@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import copy
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -140,7 +141,7 @@ def test_visual_claim_filed_as_dialogue_is_reclassified():
     res = FindingIntegrityGate().run(rows)
     assert res.summary["reclassify"] == 1
     d = res.of("reclassify")[0]
-    assert d.finding["category"] == "scene"
+    assert d.finding["category"] == "scene_function"
     assert d.finding["_category_was"] == "dialogue"
 
 
@@ -150,6 +151,75 @@ def test_spoken_claim_in_dialogue_is_NOT_reclassified():
     res = FindingIntegrityGate().run(rows)
     assert res.withdrawals == []
     assert res.summary["keep"] == 1
+
+
+def test_praise_filed_as_finding_is_rejected():
+    """Trial-11 live rows: neutral/positive descriptions filed as defects."""
+    rows = [
+        _f("Dialogue contains multiple subtext layers.",
+           category="dialogue", scenes=(5,),
+           quote="Ajay doesnt look at his father",
+           over={"observation": "The script contains exactly two instances of dialogue."}),
+        _f("Dialogue reflects cultural context.",
+           category="dialogue", scenes=(5,),
+           quote="Alantide kotha book koni ichesthe?",
+           over={"observation": "The character named 'RAM' is only listed as a speaker once."}),
+    ]
+    res = FindingIntegrityGate().run(rows)
+    assert res.summary["reject"] == 2
+    assert all("praise" in d.reason for d in res.of("reject"))
+    # nothing lost: the ledger carries both rows whole
+    assert res.accounted_for
+
+
+def test_mixed_praise_with_contrast_is_NOT_rejected():
+    """Precision sibling: 'rich but unearned' is a real defect — the
+    contrast turn exempts it."""
+    rows = [_f("The theme is rich but unearned by the plot.",
+               over={"observation": "Stated in voiceover, never tested."})]
+    res = FindingIntegrityGate().run(rows)
+    assert res.withdrawals == []
+    assert res.summary["keep"] == 1
+
+
+def test_praise_with_defect_marker_is_NOT_rejected():
+    """Precision sibling: any defect marker in issue or observation keeps
+    the row, even beside a praise word."""
+    rows = [
+        _f("The pacing is effective without payoff in act three.",
+           over={"observation": "Moves well, lands nowhere."}),
+        _f("Strong opening, weak midpoint.",
+           over={"observation": "The midpoint sags."}),
+    ]
+    res = FindingIntegrityGate().run(rows)
+    assert res.withdrawals == []
+    assert res.summary["keep"] == 2
+
+
+def test_praise_in_quote_does_not_fire():
+    """Quotes are verbatim script text and are never scanned."""
+    rows = [_f("The line states the plan outright with no subtext.",
+               quote="What a beautiful plan, perfectly effective.")]
+    res = FindingIntegrityGate().run(rows)
+    assert res.withdrawals == []
+    assert res.summary["keep"] == 1
+
+
+def test_gate_never_emits_a_category_outside_the_taxonomy():
+    """Trial-5 regression: the gate reclassified a visual dialogue claim to
+    category "scene", which is not in FINDING_CATEGORIES — a label the
+    grammar can never produce and the report map never names. Reclassified
+    rows must land inside the taxonomy (visual claims → scene_function)."""
+    from screenplay_analyzer.grammar import FINDING_CATEGORIES
+    rows = [
+        _f("The ash falls from the cigar in a slow shot.", category="dialogue"),
+        _f("The theme is not clearly defined as a cause-and-effect statement."),
+        _f("A clean note about the opening image.", category="scene"),
+    ]
+    res = FindingIntegrityGate().run(rows)
+    delivered, _ = gate_findings(rows)
+    for f in delivered:
+        assert f["category"] in FINDING_CATEGORIES, f["category"]
 
 
 def test_generic_craft_template_is_NOT_withdrawn():
@@ -278,3 +348,106 @@ def test_markdown_discloses_what_left_the_delivered_set():
 def test_markdown_stays_silent_when_nothing_was_withdrawn():
     result = AnalysisResult(doc=_doc())
     assert "Integrity gate:" not in render_markdown(result)
+
+
+def test_falsified_non_recurrence_is_rejected():
+    """Trial-10 #4 shape: 'do not recur' while the object recurs."""
+    from screenplay_parser import parse_fountain
+    import os
+    import tempfile
+    text = ("Title: T\nAuthor: T\n\nINT. ROOM - NIGHT\n\n"
+            "A gun lies on the floor here.\n\nCUT TO:\n\n"
+            "INT. HALL - DAY\n\nHe picks up the gun again.\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as fh:
+        fh.write(text)
+        path = fh.name
+    try:
+        doc = parse_fountain(path)
+    finally:
+        os.unlink(path)
+    rows = [_f("The gun does not recur or get referenced later.",
+               category="dialogue", scenes=(1,),
+               quote="A gun lies on the floor here.")]
+    res = FindingIntegrityGate().run(rows, doc=doc)
+    assert res.summary["reject"] == 1
+    assert "falsified" in res.of("reject")[0].reason
+
+
+def test_falsified_missing_lines_is_rejected():
+    """'No dialogue for Raj' while Raj has a cue in range."""
+    from screenplay_parser import parse_fountain
+    import os
+    import tempfile
+    text = ("Title: T\nAuthor: T\n\nINT. ROOM - NIGHT\n\n"
+            "RAJ\nI am staying right here.\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as fh:
+        fh.write(text)
+        path = fh.name
+    try:
+        doc = parse_fountain(path)
+    finally:
+        os.unlink(path)
+    rows = [_f("There is no dialogue for Raj in this scene.",
+               category="dialogue", scenes=(1,))]
+    res = FindingIntegrityGate().run(rows, doc=doc)
+    assert res.summary["reject"] == 1
+
+
+def test_hedged_absence_is_NOT_rejected():
+    """A careful model is never punished for hedging."""
+    rows = [_f("The gun appears to never recur after this scene.",
+               category="dialogue", scenes=(1,))]
+    res = FindingIntegrityGate().run(rows)
+    assert res.withdrawals == []
+    assert res.summary["keep"] == 1
+
+
+def test_falsified_parenthesized_object_list_is_rejected():
+    """Spec-implementation gap: framing prose around the named object must
+    not sink the recurrence check — terms come from the parenthesized span
+    immediately before the marker, not the full prefix."""
+    from screenplay_parser import parse_fountain
+    import os
+    import tempfile
+    text = ("Title: T\nAuthor: T\n\nINT. ROOM - NIGHT\n\n"
+            "A gun and a newspaper and a pen lie here.\n\nCUT TO:\n\n"
+            "INT. HALL - DAY\n\nHe picks up the gun and the newspaper "
+            "and the pen again.\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as fh:
+        fh.write(text)
+        path = fh.name
+    try:
+        doc = parse_fountain(path)
+    finally:
+        os.unlink(path)
+    rows = [_f("Chekhov's Gun: Objects given narrative emphasis "
+               "(gun, newspaper, pen) do not recur or get referenced later.",
+               category="plot_thread", scenes=(1,),
+               quote="A gun and a newspaper and a pen lie here.")]
+    res = FindingIntegrityGate().run(rows, doc=doc)
+    assert res.summary["reject"] == 1
+    assert "falsified" in res.of("reject")[0].reason
+
+
+class _EqDoc:
+    """Minimal stub: one scene where RAJ's cue names PEN GUY — an
+    explicit equation settling the identity the verdict denies."""
+
+    def __init__(self):
+        self.all_characters = ["RAJ", "PEN GUY"]
+        self.scenes = [SimpleNamespace(
+            scene_number=2,
+            characters_present=["RAJ", "PEN GUY"],
+            elements=[SimpleNamespace(type="dialogue", character="RAJ",
+                                       text="Pen Guy, come here.")])]
+
+
+def test_identity_claim_contradicted_by_equation_is_rejected():
+    """Claim 'X is not Y' beside text addressing X as Y is provably
+    false — withdraw, don't demote."""
+    rows = [_f("Raj is not Pen Guy.", category="character", scenes=(2,),
+               quote="Nuvvu evaru ra?",
+               over={"observation": "Pen Guy answers when Raj calls him by name."})]
+    res = FindingIntegrityGate().run(rows, doc=_EqDoc())
+    assert res.summary["reject"] == 1
+    assert "contradict" in res.of("reject")[0].reason
