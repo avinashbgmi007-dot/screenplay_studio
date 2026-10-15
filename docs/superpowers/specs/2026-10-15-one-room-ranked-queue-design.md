@@ -667,3 +667,39 @@ no longer load-bearing for the analyze button.
 
 **Track A is complete: sections 2, 3, 4, 5, 6.** Section 5 fell out of 2 and 3 and needed no
 commit of its own.
+
+### 12.8 §7: the section 3 edit destroyed two CSS rules, and one was invisible
+
+The §3 deletion removed the `.gutter` selector from two comma-separated selector lists. In
+both, the edit took the list's shared `{ display: none !important; }` block with it. What
+remained was a **dangling selector list**, which is valid CSS — the survivors merged into
+whatever rule came next and inherited its declarations.
+
+| Rule | What happened | Caught by |
+|---|---|---|
+| Spotlight hide | 4 selectors absorbed `padding-top: 26px`; **nothing hid under spotlight** | `e2e_browser_phase13` |
+| `@media print` hide | ~25 chrome selectors absorbed `display: block !important` from `#manuscript-workspace`, so the sidebar, both toolbars, the modals and the project bar would have **printed** on top of the script | **nobody** |
+
+The print rule was the more serious of the two and it survived four rounds of review, three
+of them after it was broken, because no suite renders print media.
+
+**Why the existing checks passed.** Brace balance held (1451/1451) and `node --check` passed
+on the destroyed stylesheet. Neither looks at whether a selector kept its declaration, because
+losing one unbalances nothing.
+
+**Why a parser cannot catch it either.** The broken spotlight rule was syntactically valid:
+
+```css
+.spotlight-mode #diff-banner,
+.spotlight-mode #manuscript-container { padding-top: 26px; }
+```
+
+Well-formed, merely wrong. So the guard pins the rules that carry product behaviour rather
+than inferring intent from syntax — `tests/test_css_selector_list_integrity.py`, verified to
+FAIL against the real broken file from `6510e2f` and to pass against the fix.
+
+**Selector disposition, stated as required.** `.gutter` is gone because §3 deleted the element.
+`#room-drawer` is **restored** to the spotlight list — the element still exists in the DOM.
+`.craft-shelf` and `.script-level-notes` are **deliberately absent**: both were already dead at
+`538d2df`, with zero occurrences anywhere in the DOM. Dropping them is cleanup of pre-existing
+debt, not collateral damage, and that distinction was checked rather than assumed.

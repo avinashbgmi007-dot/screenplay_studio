@@ -3432,14 +3432,22 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .idea-explore .explore-chip:hover { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 50%, transparent); }
 
 /* ---- Spotlight mode: nothing but the page ----
-   The power mode: project bar, desk toolbar and drawer
-   all vanish; the manuscript owns the screen. The status strip keeps only
+   The power mode: project bar, desk toolbar, draft bar, diff banner and
+   drawer all vanish; the manuscript owns the screen. The status strip keeps only
    what a session uses — project/room orientation, the sprint timer, the
-   mood toggle. Everything else is one ⌘K or one key away. */
+   mood toggle. Everything else is one ⌘K or one key away.
+
+   Track A section 7: the section 3 edit removed the `.gutter` selector but took
+   the shared `{ display: none !important; }` with it, leaving four dangling
+   selectors that merged into the next rule and inherited `padding-top: 26px`.
+   Nothing hid under spotlight. `.craft-shelf` and `.script-level-notes` are
+   deliberately absent: both were already dead at 538d2df, with zero occurrences
+   anywhere in the DOM. */
 .spotlight-mode #project-bar,
 .spotlight-mode #desk-toolbar,
 .spotlight-mode #draft-bar,
 .spotlight-mode #diff-banner,
+.spotlight-mode #room-drawer { display: none !important; }
 
 /* the manuscript breathes — wider pages, no toolbar crowding above */
 .spotlight-mode #manuscript-container { padding-top: 26px; }
@@ -3620,6 +3628,10 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   #room-chip, #partner-card, #feedback-tabs,
   .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
   #cowrite-panel, #feedback-panel, #status-strip,
+  .drawer, .desk,
+  #context-dock, #right-edge-affordance, #scene-index {
+    display: none !important;
+  }
   #manuscript-workspace { display: block !important; }
   /* the row's scene-index reservation is screen chrome, not paper — the
      printed column must stay centred on the full sheet */
