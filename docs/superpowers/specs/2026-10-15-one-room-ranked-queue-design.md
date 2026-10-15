@@ -739,15 +739,37 @@ The controls are now split by view, because the two elements never share one:
 Then print emulation asserts all 31 chrome selectors hidden, and the manuscript visible **and
 wider than 1000px** — a bare `display != none` passes on the broken build's crushed 187px box.
 
-**On the reviewer's stated reason for the sidebar split.** The runner reported that opening a
-project "legitimately hides" `#sidebar`. That does not hold in the code: `#sidebar` is a
-permanent `<aside>` (`index.html:31`), `openProject` never touches it, and the only rules that
-hide it are `body.focus-mode #sidebar` and `@media (max-width: 640px)` — neither active at the
-suite's 1440x900 viewport. I could not reproduce the observation from this workspace. The split
-was adopted anyway, because it is correct under **both** hypotheses and costs nothing; what was
-not adopted is the reasoning, which the evidence does not support. Not shipping a change on a
-disproved reason, and not overruling a runner observation I cannot reproduce, are both cheaper
-than guessing which one is wrong.
+**Print suite verified by execution, both directions.** Broken-first on `6510e2f`: 8/9, failing
+only on "print hides all chrome selectors" with 20 named visible selectors and all five controls
+passing — so the red is meaningful rather than environmental. Fixed tree: **9/9**. Green on the
+tree it was written for, red on the regression it was written for.
+
+**The sidebar disagreement, dissolved by measurement — and the spec's own claim above was
+wrong.** The runner reported Playwright seeing `#sidebar` invisible on the desk view. The code
+reading here said nothing hides it. Both were right. Measured on the desk view with a project
+open: `display=flex visibility=visible box=0x872` — a **present-but-zero-pixel** element, the case
+where "visible" means three different things to CSS, to Playwright, and to a writer.
+
+`openProject` *does* touch it: `app.js:2484` calls `toggleSidebar(true, false)`, which adds
+`sidebar-collapsed` — `width: 0; padding: 0; overflow: hidden`, with `> * { display: none }`. That
+is exactly the measured `0x872`: full height, zero width. The earlier claim that "`openProject`
+never touches it" was wrong, and the mechanism is **not** flex collapsing the child.
+
+**Intentional, and documented at the call site.** `app.js:2480-2483`:
+
+> WIREFRAME ALIGNMENT — the writing environment has no permanent left navigation: the shelf
+> slides away so the Scene Index owns x:0-44 and the 700px manuscript column can centre on the
+> viewport. Not persisted (persist=false) — the landing desk keeps the writer's shelf preference,
+> and the edge tab brings the shelf back at any time.
+
+The idea canvas does the same (`app.js:1565-1567`); `toggleSidebar`'s own docstring
+(`app.js:1305-1307`) gives the `persist=false` reason; and `.sidebar-edge-tab` is the affordance
+that brings the shelf back. **Deliberate behaviour carrying its own rationale, not a latent
+defect** — the disposition question is closed.
+
+**The generalisable hazard is recorded as a hazard, not a bug.** A zero-width element that
+Playwright counts as present will trip the next suite that asserts on it with `count()` instead
+of by box. Real trap for future work here; not a defect in this tree.
 
 **Drift between the CSS and the suite is now a pytest failure.**
 `test_the_print_suite_covers_every_selector_the_css_hides` compares the suite's `PRINT_CHROME`
