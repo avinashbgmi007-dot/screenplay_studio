@@ -229,6 +229,7 @@ const LANE_LABELS = {
   structure: "Structure",
   line: "Line",
   deterministic: "Deterministic",
+  uncategorised: "Uncategorised",
 };
 
 /**
@@ -249,7 +250,19 @@ function findingLane(f) {
   if (cat === "theme" || cat === "genre") return "observation";
   const refs = f.scene_refs;
   if (!Array.isArray(refs) || refs.length === 0) return "observation";
-  return LANE_OF[cat] || "line";
+  // An unknown category gets its OWN lane rather than falling into "line".
+  //
+  // Both alternatives were wrong. Falling into "line" while scoring IMPACT 0 is
+  // a 30-point demotion - an unknown row tops out at 5 against a known
+  // `dialogue` floor of 30 - which is the silent demotion section 1.3 ruled out
+  // ("penalising a row twice for the same property is how a ranking silently
+  // becomes a demotion"). Sending it to "observation" would drop it from the
+  // queue, and AGENTS.md:66 says flag, don't drop.
+  //
+  // A lane is the one option that is neither: the row is visible, it is not
+  // ranked against rows it has no opinion about, and a category nobody weighed
+  // becomes a group header someone can SEE instead of a diff nobody notices.
+  return LANE_OF[cat] || "uncategorised";
 }
 
 /** How many scenes this finding touches, tolerating numeric AND string refs.
@@ -302,8 +315,9 @@ function rankReasonText(f) {
   const cat = (f.category || "").toLowerCase();
   const lane = findingLane(f);
   const parts = [LANE_LABELS[lane] || cat || "Uncategorised"];
-  const impact = Object.prototype.hasOwnProperty.call(IMPACT, cat) ? IMPACT[cat] : null;
-  if (impact != null) parts.push(`impact ${impact}`);
+  const weighed = Object.prototype.hasOwnProperty.call(IMPACT, cat);
+  if (weighed) parts.push(`impact ${IMPACT[cat]}`);
+  else parts.push("unweighed");
   if (f.verification && f.verification.status === "verified") parts.push("verified");
   const refs = sceneRefCount(f);
   if (refs > 1) parts.push(`spans ${refs} scenes`);

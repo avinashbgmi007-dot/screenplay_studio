@@ -141,6 +141,19 @@ def test_the_lane_table_matches_the_helper(source_dir=ANALYZER) -> None:
     )
 
 
+def test_the_uncategorised_lane_exists_in_the_labels(core_js) -> None:
+    """A category nobody weighed must still have a home that is VISIBLE, not a
+    silent demotion into the bottom of another lane (see findingLane's comment
+    and spec 1.3). If this lane label disappears, unknown rows go back to being
+    ranked against rows they have no opinion about."""
+    labels = _node_const(core_js, "LANE_LABELS")
+    assert "uncategorised" in labels, (
+        "LANE_LABELS has no 'uncategorised' entry, so unknown-category rows "
+        "would render with no lane header and effectively vanish from the queue. "
+        f"Present: {sorted(labels)}"
+    )
+
+
 def test_voice_and_subtext_are_laned_to_line(lane_of) -> None:
     """Requirement 1 of the Track B ruling, pinned directly: they are line-level
     craft notes with quotes and scene refs."""

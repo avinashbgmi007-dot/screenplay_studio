@@ -97,6 +97,34 @@ test('impact dominates every other term (weights are uncalibrated but ordered)',
   );
 });
 
+test('an unknown category gets its own lane, not a demotion', () => {
+  // The failure this prevents: unknown -> "line" with IMPACT 0 scores at most 5,
+  // against a known `dialogue` floor of 30. That is a 30-point demotion, which
+  // is the silent demotion spec 1.3 ruled out.
+  assert.equal(core.findingLane(f('brand_new_category', [1])), 'uncategorised');
+  const unknownBest = core.rankScore(
+    f('brand_new_category', [1, 2, 3], { verification: { status: 'verified' } }),
+  );
+  const knownFloor = core.rankScore(f('dialogue', [1]));
+  assert.ok(
+    unknownBest < knownFloor,
+    'the point is that unknown CANNOT compete in Line, which is why it needs its '
+      + 'own lane — this assertion documents the gap, not a desired ranking',
+  );
+  // ...and it is not dropped either. AGENTS.md:66.
+  assert.notEqual(core.findingLane(f('brand_new_category', [1])), 'observation');
+});
+
+test('an unweighed row says it is unweighed', () => {
+  // An unknown category has no IMPACT value. Printing "impact 0" would imply a
+  // judgement was made; the row must admit none was.
+  const text = core.rankReasonText(f('brand_new_category', [1, 2]));
+  assert.match(text, /unweighed/);
+  assert.doesNotMatch(text, /impact 0/);
+  // A weighed row still prints its number.
+  assert.match(core.rankReasonText(f('dialogue', [1])), /impact 3/);
+});
+
 test('every row can print its own reason (spec 1.5)', () => {
   for (const cat of Object.keys(core.IMPACT)) {
     const text = core.rankReasonText(f(cat, [1, 2]));

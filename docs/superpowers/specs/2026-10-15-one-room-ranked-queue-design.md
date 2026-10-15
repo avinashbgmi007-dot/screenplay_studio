@@ -954,3 +954,40 @@ My first `queue_lanes.test.js` asserted that `theme` **with** scene refs is queu
 a scene anchor does not turn one into a task. The implementation was right and the test was
 wrong. Corrected, and the correction now asserts the spec's rule directly rather than the
 inference I had mistaken it for.
+
+### 14.6 The lane default for unknown categories — decided, and the review's premise was inverted
+
+Review raised it as a §7 decision: an unknown category scores `IMPACT` 0 and lands in Line,
+so does it float among high-attention rows or sink? Measured rather than argued:
+
+```
+  45  line        character (known, verified, 3 scenes)
+  32  line        dialogue  (known, 3 scenes)
+  31  line        voice     (known, 2 scenes)
+   5  line        brand_new (unknown, verified, 3 scenes — the UNKNOWN CEILING)
+  30  line        dialogue  (known, 1 scene — the KNOWN FLOOR)
+```
+
+**It sinks, and that is worse than floating.** An unknown row tops out at 5 against a known
+`dialogue` floor of 30: a 30-point demotion. §1.3 explicitly ruled this out — *"penalising a row
+twice for the same property is how a ranking silently becomes a demotion."* And it is the §13
+defect one step from shipping as designed: had `voice` and `subtext` reached §1 with only the
+`hasOwnProperty` NaN guard and no coverage test, **every voice and subtext finding would have
+sunk to the bottom of Line.** The guard stopped the crash; it did not stop the demotion.
+
+Three options, and the two obvious ones are both wrong:
+
+| Option | Verdict |
+|---|---|
+| fall back to `line` at impact 0 | **wrong** — a 30-point silent demotion for rows `AGENTS.md:66` says must not be buried |
+| fall back to `observation` | **wrong** — that removes them from the queue entirely; "flag, don't drop" |
+| their own `uncategorised` lane | **chosen** |
+
+A lane is the only option that is neither. The row is visible, it is not ranked against rows it
+has no opinion about, and a category nobody weighed becomes a **group header someone can see**
+instead of a diff nobody notices. That last property is the real argument: this failure mode has
+now hidden twice — once as `NaN`, once as a demotion — and both times invisibly.
+
+`rankReasonText` prints `unweighed` rather than `impact 0` for these rows, because "impact 0"
+implies a judgement was made. `tests/test_queue_lane_coverage.py` pins that `LANE_LABELS`
+carries the lane, so deleting it cannot quietly return these rows to the bottom of Line.
