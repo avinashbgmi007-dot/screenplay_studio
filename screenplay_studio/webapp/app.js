@@ -6773,10 +6773,16 @@ function buildContextSection() {
             box.appendChild(el("p", "dock-acc-sub",
               `${acc.total} findings delivered \u2014 mark each \u2713 / ~ / \u2717 on its card to measure accuracy`));
           }
-          const vs = state.report && state.report.verification_summary;
-          if (vs && vs.verified_pct_of_quoted != null) {
+          // ONE trust line, not two. This used to re-derive the percentage from
+          // report.verification_summary directly and print a bare "X% of quoted
+          // findings" — same denominator, but no numerator, no denominator and
+          // no coverage clause, so it read as a trust score the trust line
+          // contradicted. It now delegates to verificationReadout(), which owns
+          // the wording and the rule.
+          const trustLine = verificationReadout();
+          if (trustLine) {
             box.appendChild(el("p", "dock-acc-sub",
-              `Verifiability (B) \u2014 ${vs.verified_pct_of_quoted}% of quoted findings have a confirmed citation`));
+              `Verifiability (B) \u2014 ${trustLine}`));
           }
           inner.appendChild(box);
         }
@@ -7212,7 +7218,7 @@ function clearEvidenceUnread() {
  *  when there was nothing to check). Both orientation strips print this string;
  *  two honest-looking numbers that disagree is how a writer stops trusting both. */
 function verificationReadout() {
-  // The ONLY reader of report.verification_summary. The server now recomputes
+  // The reader of record for report.verification_summary's wording. The server recomputes
   // this block at serve time from the rows being served (_sanitize_report), so
   // every report — including ones analysed before the field existed — renders
   // the readout. Old projects must not leak a previous script's numbers when a
