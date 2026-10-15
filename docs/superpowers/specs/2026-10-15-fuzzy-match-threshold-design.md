@@ -1,7 +1,8 @@
 # The Fuzzy-Match Threshold Is Stricter Than Its Stated Intent
 
-**Date:** 2026-10-15 · **Status:** draft for review · **Found during:** the Track D investigation
-(the verification-rate denominator fix), one layer down
+**Date:** 2026-10-15 (rev 2) · **Status:** draft for review · **Found during:** the Track D
+investigation (the verification-rate denominator fix), one layer down
+**Harness:** `tests/test_verifier_perturbation_bands.py` — 7 tests, green, no model, no server
 **Predecessor:** `2026-10-15-verification-rate-denominator-design.md` (`93786c4`)
 
 > Track D fixes the **arithmetic** of the trust metric. This concerns its **input**. Both readers and
@@ -9,42 +10,56 @@
 
 ---
 
-## §0. Finding
+## §0. Finding — CORRECTED after independent reproduction
 
-`FUZZY_MATCH_THRESHOLD = 0.72` (`verifier.py:27`) is the sole arbiter of `verified` vs `not_found`.
-Measured through the real `verify_finding` path against `tests/fixtures/pain_tenglish.fountain`:
+**An earlier version of this section reported 0.63 / 0.61 / 0.28 and claimed the threshold sat
+*above* the discrimination band. That was wrong**, and it was an artifact of a Tenglish fixture. An
+independent English probe reproduced neither those numbers nor that conclusion.
 
-| Quote handed to the verifier | status | confidence |
+Now measured by `tests/test_verifier_perturbation_bands.py` (7 tests, green, no model, no server,
+run with `pytest -v -s`):
+
+| Quote | single-element scene | full six-line scene |
 |---|---|---|
-| exact line from the script | `verified` | 1.0 |
-| **one word altered** | **`not_found`** | **0.63** |
-| two words altered | `not_found` | 0.61 |
-| fabricated, unrelated sentence | `not_found` | 0.28 |
+| exact | verified 1.00 | verified 1.00 |
+| one word altered | verified 0.95 | verified 0.88 |
+| two words altered | verified 0.89 | verified 0.83 |
+| **heavy paraphrase** | **verified 0.74** | **not_found 0.63** |
+| fabricated | not_found 0.36 | not_found 0.43 |
 
-**The threshold sits above the entire discrimination band.**
+**The threshold (0.72) sits INSIDE the paraphrase band, not above it.** In both shapes the heavy
+paraphrase lands within 0.09 of the line. And the harness pins the consequence directly:
 
 ```
-0.28 ───────────── 0.61 ── 0.63 ──────────── 0.72 (threshold)
-  fabrication        2-word   1-word            rejects all three
+test_scene_shape_alone_does_not_change_the_band
+  => drifted labels whose verdict depends on scene composition alone:
+     ['heavy_paraphrase']
 ```
 
-The separation the metric should exploit runs **0.28 → 0.63**. The threshold is drawn at 0.72, above
-it. So `not_found` does not mean "fabricated" — it means "fabricated *or* a real quote with a word
-changed," and the tool cannot tell those apart.
+**Same quote, same threshold, same code. The verdict flips on how much other text is in the scene.**
 
-## §1. The stated intent says the opposite
+### 0.1 The band is language-register dependent — the real finding
 
-`verifier.py:26-27`, immediately above the constant:
+| Probe | fabrication | paraphrase ceiling | threshold 0.72 is |
+|---|---|---|---|
+| English, synthetic scenes | 0.36 – 0.43 | 0.88 – 0.95 | **inside** the band |
+| Tenglish, `pain_tenglish.fountain` | 0.28 | 0.63 | **above** the band |
 
-> *"Verification is LENIENT on purpose: a model paraphrases a real line, and calling a real quote
-> fabricated is the expensive error here."*
+The product ships English, Tenglish, Hindi, Telugu and Tamil (`USER_PERSONAS.md` derived rule 4).
+**The metric's relationship to its own threshold is not the same in every register.** English gives
+partial, scene-shape-dependent acceptance; Tenglish gives uniform rejection of paraphrase. **There is
+no single constant that behaves correctly across the registers the product claims to serve.** That is
+a larger problem than a mis-set number, and it is the finding this section should have led with.
 
-**The constant implements strictness; the comment describes leniency.** A model that paraphrases a
-real line — which the comment names as the expected case — lands at 0.63 and is reported as fabricated.
+### 0.2 Probe honesty — a bug in the first version of this section
 
-This is the **second inverted comment in the same subsystem** (the first is the denominator docstring
-at `verifier.py:230-232`, recorded in the Track D spec). Two adjacent comments in one file describing
-the opposite of what the code does is a signal about the file, not about either comment.
+The first probe set `tokens[1] = "detective"` on a sentence whose token 1 already *was* "detective".
+The "one word altered" bucket was therefore testing the verbatim quote twice, and reported
+`verified / 1.0`. The bug inflated the apparent separation and produced the wrong §0. It was caught
+by noticing that a perturbation which changes nothing cannot raise a confidence score.
+
+Recorded because `docs/FULL_FEEDBACK_AUDIT_VERDICTS.md` carries a "Probe honesty note" for exactly
+this class of error, and because the corrected numbers are what the harness now pins.
 
 ## §2. Why it outranks the denominator bug
 
