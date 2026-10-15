@@ -4374,6 +4374,9 @@ browser job's to run on the PR.
 * Self-inflicted red during build: a helper-move edit duplicated a backup route decorator; the route-census tests caught it (98→99). Fixed, census back to 98.
 * Suite 2238 passed + 3 skipped (incl. 7 new code-revision tests); ruff clean.
 
+### 2026-10-15 — PR #32 merged to main
+* Pushed `feature/post-analysis-ia` (92 commits), opened PR #32, merged via merge commit (`55c5a18`) after green CI with two exceptions handled: phase6-evidence red was a real Kit-B regression in the test (fixed in `f7ca61b`, verified green locally headless + CI Linux); test-browser-windows ideas_v3/phase14 reds were flakes (identical rerun green). Branch left on remote; local `main` not switched.
+
 ### 2026-10-13 — Cite-the-candidate fallback (twist evidence grounded)
 * `confirm_twist`: a confirmed citation matching no candidate and carrying no twist vocabulary (or wake words) falls back to the first deterministic candidate line+scene. Model's own matching/waking citations kept.
 * Caught live by its own tests mid-build: the wake-word keep was missing and the null-scene test failed — added, green. Suite 2242 passed + 3 skipped; ruff clean.
