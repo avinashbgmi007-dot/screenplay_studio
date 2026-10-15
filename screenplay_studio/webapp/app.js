@@ -10531,6 +10531,13 @@ function init() {
   // deep_links.py:209 has always asserted. openFeedbackView() no longer
   // overrides it. openFeedbackRoom() still covers the idea room, where there
   // is no project to route to.
+  // Track A section 2 regression fix: the tablist's #room-cowrite-btn was the
+  // only POINTER caller of openCowriteRoom(). Deleting the tablist left the
+  // partner drawer reachable only from the palette, the keyboard ("c") and
+  // internal callers — a pointer user could not summon Sameer at all. The
+  // smoke suite caught it by clicking #dock-tab-sameer and then waiting on
+  // #room-drawer.open: a dock lens is not a drawer.
+  $("#room-partner-btn").addEventListener("click", openCowriteRoom);
   $("#room-evidence-btn").addEventListener("click", () => {
     if (state.currentProject) { setRoom("feedback"); openFeedbackView(); }
     else openFeedbackRoom();

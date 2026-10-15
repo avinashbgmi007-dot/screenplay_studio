@@ -305,7 +305,13 @@ def main():
             page.wait_for_timeout(400)
 
             # dawn theme toggle keeps hierarchy (contextual illumination)
-            page.evaluate("() => { const b = document.getElementById('dawn-btn'); if (b) b.click(); }")
+            # Track A section 4 regression fix: these clicked #dawn-btn behind
+            # `if (b)`. The button was deleted, so the click SILENTLY skipped
+            # and the state assertion below failed with dawn: false — a guarded
+            # click plus a state assertion is a silent skip plus a loud failure.
+            # The guard is gone for the same reason as the deep_links one: the
+            # control is promised to exist, so absence must throw.
+            page.evaluate("() => document.getElementById('status-dawn').click()")
             page.wait_for_timeout(600)
             dawn = page.evaluate("""() => {
                 const root = getComputedStyle(document.documentElement);
@@ -315,7 +321,7 @@ def main():
             }""")
             check("dawn theme: light room keeps paper surface hierarchy",
                   dawn["dawn"] and dawn["paper"].startswith('#'), json.dumps(dawn))
-            page.evaluate("() => { const b = document.getElementById('dawn-btn'); if (b) b.click(); }")
+            page.evaluate("() => document.getElementById('status-dawn').click()")
             page.wait_for_timeout(400)
 
             assert_no_js_errors(checks, errors)
