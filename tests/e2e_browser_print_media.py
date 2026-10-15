@@ -77,6 +77,39 @@ _JS = """(sel) => {
 }"""
 
 
+def _dims(detail: dict):
+    """(width, height) from a probe detail's '1438x898' box string."""
+    box = str(detail.get("box") or "")
+    parts = box.split("x")
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return 0, 0
+    return int(parts[0]), int(parts[1])
+
+
+def _wait_for_project_open(page):
+    """Open the sample page and wait for the desk to actually be there.
+
+    Two waits, not one. `openProject` flips the title and reveals `.workspace`
+    in the same tick, but the async load can settle either order — smoke.py
+    learned this the hard way, when a title-only wait passed on a stale
+    placeholder.
+    """
+    page.locator("#sample-btn").click()
+    try:
+        page.wait_for_function(
+            """() => {
+                 const t = document.getElementById('project-title');
+                 if (!t) return false;
+                 const s = (t.textContent || '').trim();
+                 return s.length > 0 && s !== '\u2014';
+               }""",
+            timeout=30000)
+        page.wait_for_selector(".workspace", state="visible", timeout=30000)
+    except Exception as exc:  # noqa: BLE001 - the check below IS the report
+        return False, str(exc)
+    return True, ""
+
+
 def main():
     with open_studio() as base:
         with sync_playwright() as pw:
@@ -84,26 +117,42 @@ def main():
             page.goto(base + "/", wait_until="networkidle")
             page.wait_for_timeout(600)
 
-            # ---- 0. the screen state is the control ------------------------
-            # Emulating print without ever having seen the screen state leaves
-            # "everything is hidden" indistinguishable from "print is correct".
-            # Assert the chrome IS visible first, so a PASS below means print
-            # suppressed it, not that it was never there.
-            page.emulate_media(media="screen")
-            page.wait_for_timeout(200)
-            CHECKS.ok("control: the sidebar is visible on screen",
+            # ---- 0a. control, welcome view ---------------------------------
+            # The sidebar is asserted HERE, while the welcome screen is up.
+            # This is the view it certainly lives in. The first draft asserted
+            # it and the manuscript together in one block, which could not work:
+            # `#manuscript-workspace` has no box at all until a project is open,
+            # so the manuscript control was measuring 0x0 and passing/failing
+            # for reasons unrelated to print.
+            CHECKS.ok("control: the shelf is visible on the welcome screen",
                       page.locator("#sidebar").is_visible())
+            CHECKS.ok("control: the welcome screen is up",
+                      page.locator("#welcome-view").is_visible())
+
+            # ---- 0b. open a project so a manuscript exists -----------------
+            opened, why = _wait_for_project_open(page)
+            CHECKS.ok("control: the sample page opened onto the desk",
+                      opened, why)
+
+            # ---- 0c. control, desk view -----------------------------------
             CHECKS.ok("control: the manuscript is visible on screen",
                       page.locator(PRINT_PAPER).is_visible())
+            # A bare is_visible() on a container that has just appeared is
+            # weak, so the control also insists it has real area. Without this
+            # the suite could sail past a manuscript that is present but empty,
+            # and then say something confident about its printed width.
+            on_screen = page.evaluate(_JS, PRINT_PAPER)
+            sw, sh = _dims(on_screen)
+            CHECKS.ok("control: the manuscript has real area on screen",
+                      sw > 1000 and sh > 300,
+                      f"screen box {on_screen.get('box')} (want >1000x>300)")
 
-            # ---- 1. print media ---------------------------------------------
+            # ---- 1. print media --------------------------------------------
             page.emulate_media(media="print")
             page.wait_for_timeout(400)
 
             visible_chrome = []
             for sel in PRINT_CHROME:
-                # Only probe selectors that are actually on screen; the point
-                # is that print removes what the screen showed.
                 if page.locator(sel).count() == 0:
                     continue
                 detail = page.evaluate(_JS, sel)
@@ -121,13 +170,13 @@ def main():
                       paper.get("present") and paper.get("display") != "none",
                       str(paper))
 
-            # A manuscript crushed to a sliver is the specific symptom of the
+            # The manuscript crushed to a sliver is the specific symptom of the
             # broken build: the chrome absorbed `display: block` and crowded it
-            # out. A bare "not display:none" would pass on a 187px box.
-            box_w = paper.get("box", "").split("x")[0]
+            # out. A bare "not display:none" passes on the broken build's 187px.
+            pw_, ph = _dims(paper)
             CHECKS.ok("print gives the manuscript the page width (not crushed)",
-                      int(box_w) > 1000 if box_w.isdigit() else False,
-                      f"manuscript box {paper.get('box')} (broken build renders 187x)")
+                      pw_ > 1000,
+                      f"print box {paper.get('box')} (broken build renders 187x)")
 
             assert_no_js_errors(CHECKS, errors)
             CHECKS.finish()

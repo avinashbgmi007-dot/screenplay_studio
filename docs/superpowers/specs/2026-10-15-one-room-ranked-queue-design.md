@@ -722,15 +722,32 @@ chrome elements were visible and the manuscript was crushed to 187px; on `c28cb5
 chrome element was hidden and the manuscript rendered 1438x898. That probe now lives in the repo
 as `tests/e2e_browser_print_media.py`.
 
-It asserts three things, and the first is the one that makes the other two mean anything:
+**The first committed version of this suite never passed anywhere, and could not have.** It
+asserted on `#manuscript-workspace` from the welcome screen, where no project is open and the
+element has a 0x0 box. A width assertion against a nonexistent manuscript is vacuous in exactly
+the sense the suite's own control section warns about. Runner execution caught it: 4/6 on the
+fixed tree, 3/6 on the broken one, with the manuscript checks red on both.
 
-1. **Control:** the sidebar and the manuscript are both visible under `emulate_media("screen")`
-   first. Without this, "print hides the chrome" and "the chrome was never there" are
-   indistinguishable, and a suite that passes because the page never loaded is worse than no
-   suite.
-2. All 31 selectors in the `@media print` hide list are hidden.
-3. `#manuscript-workspace` is visible **and wider than 1000px**. A bare `display != none` would
-   pass on the broken build's crushed 187px box.
+The controls are now split by view, because the two elements never share one:
+
+| Check | View | Why |
+|---|---|---|
+| `#sidebar` and `#welcome-view` visible | welcome | the view the shelf certainly lives in |
+| sample page opens; `.workspace` visible | transition | `openProject` flips the title and reveals the workspace in the same tick, so **both** are waited on — smoke.py learned this when a title-only wait passed on a stale placeholder |
+| `#manuscript-workspace` visible **and larger than 1000x300** | desk | a bare `is_visible()` on a container that has just appeared is weak; the control insists it has real area |
+
+Then print emulation asserts all 31 chrome selectors hidden, and the manuscript visible **and
+wider than 1000px** — a bare `display != none` passes on the broken build's crushed 187px box.
+
+**On the reviewer's stated reason for the sidebar split.** The runner reported that opening a
+project "legitimately hides" `#sidebar`. That does not hold in the code: `#sidebar` is a
+permanent `<aside>` (`index.html:31`), `openProject` never touches it, and the only rules that
+hide it are `body.focus-mode #sidebar` and `@media (max-width: 640px)` — neither active at the
+suite's 1440x900 viewport. I could not reproduce the observation from this workspace. The split
+was adopted anyway, because it is correct under **both** hypotheses and costs nothing; what was
+not adopted is the reasoning, which the evidence does not support. Not shipping a change on a
+disproved reason, and not overruling a runner observation I cannot reproduce, are both cheaper
+than guessing which one is wrong.
 
 **Drift between the CSS and the suite is now a pytest failure.**
 `test_the_print_suite_covers_every_selector_the_css_hides` compares the suite's `PRINT_CHROME`
