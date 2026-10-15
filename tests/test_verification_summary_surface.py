@@ -89,22 +89,34 @@ class TestQuotelessCitationsAreChecked:
 # ---------------------------------------------------------------------------
 
 class TestVerificationRateRule:
-    def test_the_rate_counts_only_checkable_findings(self):
+    def test_the_rate_counts_every_row_a_check_ran_a_verdict_on(self):
+        # `scene_not_found` is a citation that pointed at scenes which do not
+        # exist: the verifier ran and the citation failed. Dropping it from the
+        # denominator raises the rate, which is the flattering the old rule
+        # claimed to prevent. It stays in.
         counts = verification_summary([
             {"verification": {"status": "verified"}},
             {"verification": {"status": "verified"}},
             {"verification": {"status": "not_found"}},
-            {"verification": {"status": "no_quote"}},          # excluded
-            {"verification": {"status": "scene_not_found"}},   # a FAILURE, not a denominator
+            {"verification": {"status": "no_quote"}},          # nothing to check — excluded
+            {"verification": {"status": "scene_not_found"}},   # a failed check — INCLUDED
         ])
         rate = verification_rate(counts)
-        assert rate["quote_bearing"] == 3
-        assert rate["verified_pct_of_quoted"] == 66.7
+        assert rate["quote_bearing"] == 4
+        assert rate["verified_pct_of_quoted"] == 50.0
 
-    def test_no_checkable_finding_means_no_percentage(self):
-        rate = verification_rate({"no_quote": 5, "scene_not_found": 1})
+    def test_an_empty_denominator_means_no_percentage(self):
+        rate = verification_rate({"no_quote": 5, "verified": 0,
+                                  "not_found": 0, "scene_not_found": 0})
         assert rate["quote_bearing"] == 0
         assert rate["verified_pct_of_quoted"] is None
+
+    def test_an_all_failures_denominator_is_zero_not_absent(self):
+        # Not the same state as an empty denominator. The check ran, every
+        # citation failed, and 0% is a true number the writer can act on.
+        rate = verification_rate({"no_quote": 5, "scene_not_found": 1})
+        assert rate["quote_bearing"] == 1
+        assert rate["verified_pct_of_quoted"] == 0.0
 
     def test_empty_and_none_input_do_not_crash(self):
         assert verification_rate({})["verified_pct_of_quoted"] is None
@@ -147,7 +159,10 @@ class TestTheServedReportCarriesTheSummary:
         assert isinstance(vs, dict) and "verified" in vs
         # internal consistency: the rate's denominator is exactly the two
         # statuses a mechanical check can judge
-        assert vs["quote_bearing"] == vs["verified"] + vs["not_found"]
+        # every status the verifier reaches a verdict on — no_quote is the only
+        # exclusion, because there was nothing to check in the first place
+        assert vs["quote_bearing"] == (vs["verified"] + vs["not_found"]
+                                       + vs["scene_not_found"])
         rows = rep["findings"]
         assert sum(vs[k] for k in ("verified", "not_found", "no_quote", "scene_not_found")) \
             == len(rows), "the block must describe the rows it is served with"

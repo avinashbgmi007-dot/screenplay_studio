@@ -378,15 +378,19 @@ def render_markdown(result: AnalysisResult) -> str:
                 "not as quietly fine."
             )
         # The one number a writer can act on: of the findings whose citation a
-        # machine CAN judge (they carry a quotable line), how many held up.
-        # Deliberately absent when nothing was quote-checkable — a percentage
-        # over nothing is a lie (verifier.verification_rate owns the rule).
+        # machine reached a verdict on, how many held up. That includes a
+        # citation that pointed at scenes which do not exist — the check ran and
+        # the citation failed, which is a real failure and belongs in the
+        # denominator. Only findings with nothing to check (no_quote) are out.
+        # Deliberately absent when nothing was checkable — a percentage over an
+        # EMPTY denominator is a lie (verifier.verification_rate owns the rule).
         rate = verification_rate(v)
         if rate["quote_bearing"]:
             lines.append(
                 f"\n**Quote-verified rate: {rate['verified_pct_of_quoted']}%** "
-                f"({v.get('verified', 0)} of {rate['quote_bearing']} findings that cite quotable "
-                "text; summary-reasoned findings cite scene numbers and are excluded)."
+                f"({v.get('verified', 0)} of {rate['quote_bearing']} findings whose citation "
+                "the checker could judge — including citations that pointed at a scene "
+                "that does not exist. Findings with nothing to check are excluded)."
             )
         # Evidence depth (§5 item 4): the paragraph above describes the ceiling in
         # prose; this states its SIZE. A count is what makes an invisible

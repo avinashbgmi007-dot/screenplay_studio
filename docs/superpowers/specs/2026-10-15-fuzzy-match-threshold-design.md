@@ -101,6 +101,22 @@ metric is calibratable today, and it has a measured defect.
 3. **Add a golden-set test** pinning the band, so a future change to `windowed_similarity` cannot
    silently move it. None exists today.
 
+## §5.5 Three resolutions, not one constant (review amendment, accepted)
+
+An earlier draft carried "recalibrate 0.72" as the change. That smuggles in the assumption that
+**one scalar can fix a value that is a function of (register, scene composition).** It cannot. The
+honest options:
+
+| Option | What it changes | Cost | Risk |
+|---|---|---|---|
+| **A. Per-register threshold** | a small table keyed by detected script instead of one constant | detect register (heuristics already exist in the parser) | register detection misfires; five arms to maintain |
+| **B. Composition-aware rule** | keep one threshold, but score against a bounded window or normalise by scene length | rework `windowed_similarity` or its call site | changes every existing score; the harness will show the band move |
+| **C. Third verdict state** | return `contested` for the zone around the threshold instead of forcing verified/not_found | a new status; touches `verification_summary`, the badges, the denominators, the UI | widest blast radius; but it stops pretending the binary is clean |
+
+**Recommendation: measure first, then choose.** None of the three can be evaluated without the band
+data in four registers, which §6 says does not exist yet. Choosing now would repeat the error this
+document already made once — asserting a structural claim from a single probe.
+
 ## §6. Calibration method — what a real answer needs
 
 §0 is a **probe, not a calibration**: one line from one short fixture. It is enough to show the
@@ -117,9 +133,37 @@ Telugu/Tamil — `USER_PERSONAS.md` derived rule 4):
 | **heavy paraphrase** | ~50% of words altered | `not_found` |
 | **fabricated** | unrelated, topically adjacent | `not_found` |
 
-Only after those five bands are measured with real counts should the number move. **The expected
-shape is a threshold strictly between the heavy-paraphrase band and the light-paraphrase band** —
-somewhere below 0.61 on this single probe, but a single probe cannot set a product constant.
+Only after those five bands are measured with real counts should anything move.
+
+### 6.1 The register material does not exist in this repo — VERIFIED
+
+Checked, because it bounds everything above:
+
+| Fixture | Non-Latin codepoints |
+|---|---|
+| `tests/fixtures/pain_tenglish.fountain` | **0** Devanagari / Telugu / Tamil. It is *transliterated* Latin — "Tenglish" is Tamil speech written in Latin script, 3,606 Latin letters. |
+| `tests/fixtures/Pain_FD_4_scenes_recoverable.pdf` | **0** after `pdfplumber` extraction (4,834 chars, 151 lines). |
+| every other fixture | English |
+
+**A first scan of this claim returned Devanagari and Tamil, and was wrong.** It read the PDF's
+*compressed bytes* with `errors='ignore'`; byte values that land in those Unicode ranges decoded
+into apparent script characters. **Probe bug #2 in this document's history** (the first was the
+no-op word swap in §0.2). Same class both times: a measurement taken without validating the input,
+which is precisely the failure the harness in this repo exists to prevent — applied here by hand
+before the harness was written.
+
+**So the external review's claim is correct in full: there is no Hindi, Telugu or Tamil material
+here.** The golden set needs real script lines in those registers, which means the writer's own
+scripts or a deliberate fixture contribution. Synthetic registers invented by a reviewer would
+calibrate the threshold against the reviewer's own imagination, which is worse than having no data.
+**The harness is the skeleton; the material is the blocker, and it is not a harness problem.**
+
+### 6.2 What the skeleton can do meanwhile
+
+`tests/test_verifier_perturbation_bands.py` runs on English today and will run on any register
+material that arrives: point `BUCKETS`/`SCENES` at real lines per register and the band report is
+the calibration table. **Nothing about the missing material blocks building the harness further —
+only finishing the calibration.**
 
 ## §7. Falsifiers
 

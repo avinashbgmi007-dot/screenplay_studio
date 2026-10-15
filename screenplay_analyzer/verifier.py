@@ -225,14 +225,25 @@ def verification_summary(findings: list[dict]) -> dict:
 def verification_rate(counts: dict) -> dict:
     """The derived accuracy number over `verification_summary` counts.
 
-    Quote-bearing findings are the ones a mechanical check can judge:
-    verified or not_found. `no_quote` is excluded (nothing to check — by
-    design for the summary-reasoning categories) and `scene_not_found` is
-    excluded too (it IS a check result, and folding a failure into the
-    denominator would flatter the rate). None until at least one finding
-    carries a checkable quote — a percentage over nothing is a lie."""
+    Quote-bearing findings are the ones a mechanical check ran a verdict on:
+    `verified`, `not_found`, and `scene_not_found`. A `scene_not_found` row is
+    a citation that pointed at scenes which do not exist — the verifier ran,
+    and the citation failed, so it belongs in the denominator. Excluding a
+    failure from a denominator RAISES the rate; that is what flattering one
+    means. The earlier version of this docstring argued the opposite, and the
+    code followed it, which is how the desk reported 100% verified when half
+    the citations had failed.
+
+    `no_quote` is the one exclusion, and it is not a judgement about quality:
+    those findings cite scene numbers instead of quotable lines, so there is
+    nothing for the check to act on.
+
+    None until at least one finding carries a checkable citation — a
+    percentage over an EMPTY denominator is a lie. A denominator where every
+    check failed is not empty, and 0% is true and actionable."""
     counts = counts or {}
-    quote_bearing = counts.get("verified", 0) + counts.get("not_found", 0)
+    quote_bearing = (counts.get("verified", 0) + counts.get("not_found", 0)
+                     + counts.get("scene_not_found", 0))
     return {
         "quote_bearing": quote_bearing,
         "verified_pct_of_quoted": (
