@@ -1173,3 +1173,43 @@ What is unproven is the **browser-level two-load assertion**, and the first prob
 the queue's row *set* changes with which scene the strip claims on each load, so comparing order
 measured state, not sort. A valid check must **fix the scene first, then compare**, or compare
 lane-header order only.
+
+### 14.18 One-home audit: the Fix Queue and the lane queue are the same findings, rendered twice
+
+Runner's G5 re-measure produced two different answers, and the disagreement was the finding.
+
+| Surface | First row bottom | Verdict |
+|---|---:|---|
+| Fix Queue panel | 834px | above the fold |
+| `by-category` lane queue | 1493px | below it |
+
+G5 says "first actionable queue row" and does not say which surface it means. **That ambiguity is
+not a drafting nit**, because both surfaces render the same findings.
+
+**Confirmed by reading the source, not inferred from the screenshot.** `renderFixQueuePanel`
+(`app.js:4379-4380`) renders `state.fixQueue.items` from `/api/projects/<name>/fixqueue`, and
+`_fixqueue_items` (`webapp_server.py:2609`) iterates `report.get("findings", [])` — **the exact
+array** the lane queue reads via `state.report.findings`. The server's own docstring states the
+purpose: *"shared by `/fixqueue` and `/findings` so the two lists cannot drift. One build, two
+shapes."* They do not drift because they are **the same list**, rendered in two places, in two
+presentations: a full card with Locate/Rewrite/Discuss/Dismiss, and a lane row.
+
+**This violates agreement #1 from the first debate and §1.1's membership principle.** §7 built
+lanes inside `by-category` and left the Fix Queue panel rendering alongside it. §0.2's Tier 1 list
+contains *two queues* and the spec never noticed.
+
+**The decision, and it is forced by a principle rather than by preference:** one finding, one home.
+
+- The Fix Queue is the surface that **opens by default** and carries the action verbs.
+- The lane queue carries **ranking and lane identity**, which is this Track's entire contribution.
+
+So the resolution is to **move the lanes and the rank into the Fix Queue panel and retire
+`by-category` as a second queue** — not to delete either. Deleting the Fix Queue would remove the
+verbs; deleting the lanes would discard the ranking Track B was built to produce. Merging keeps
+both and satisfies the principle.
+
+**G5's target is therefore disambiguated by the merge, not by a wording change**: after it, there
+is one queue surface and "first actionable queue row" means one thing.
+
+This is the largest remaining item in the arc and it is **not started**. It is recorded here,
+with the evidence and the decision, rather than half-applied.

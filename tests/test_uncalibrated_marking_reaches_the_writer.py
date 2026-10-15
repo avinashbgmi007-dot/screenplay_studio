@@ -45,15 +45,30 @@ def test_the_marking_exists_in_rendering_code_not_only_in_comments() -> None:
     )
 
 
-def test_the_marking_is_attached_to_the_queue_section_head() -> None:
-    """Not merely present — attached to the thing the writer is looking at."""
+def test_the_marking_rides_the_panel_that_opens_by_default() -> None:
+    """Not merely present — attached where the writer STARTS.
+
+    It first rode the by-category lane section head, where the runner measured it
+    rendering at y1174: a screen below the fold. The writer met the ranked queue
+    before ever reaching the sentence saying the ranking is uncalibrated. Text
+    that marks something and then hides the thing it marks is not a marking."""
     path = os.path.join(WEBAPP, "app.js")
     with open(path, encoding="utf-8") as fh:
         code = _strip_comments(fh.read())
     assert "dock-section-hint" in code, (
-        "the hint class is gone; the uncalibrated marking is either detached "
-        "from the queue section head or has been renamed without updating this."
+        "the hint class is gone; the uncalibrated marking is either detached or "
+        "has been renamed without updating this."
     )
     assert re.search(r'el\("span", "dock-section-hint",\s*"[^"]*uncalibrated', code, re.I), (
-        "the ledger section head no longer carries the uncalibrated marking."
+        "the uncalibrated marking is no longer attached to a rendered element."
+    )
+    # The Fix Queue panel is the one that carries `defaultOpen: true`, so it is
+    # the surface the writer lands on. The hint must be inside it.
+    fq = re.search(r"function renderFixQueuePanel\(container\) \{(.*?)\n\}", code, re.S)
+    assert fq, "renderFixQueuePanel not found"
+    assert "dock-section-hint" in fq.group(1), (
+        "the uncalibrated marking is not inside the Fix Queue panel. That panel "
+        "opens by default and is the surface the writer reads first; marking the "
+        "ranking as uncalibrated while hiding the ranking below the fold defeats "
+        "the marking."
     )

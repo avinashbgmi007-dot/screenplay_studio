@@ -4441,6 +4441,13 @@ function renderFixQueuePanel(container) {
   const panel = el("div", "craft-panel fix-queue");
   const head = el("div", "craft-panel-head");
   head.appendChild(el("span", "craft-panel-title", `Fix queue — ${shownCounts.open} open / ${shown.length} shown / ${counts.total} total`));
+  // Spec 9c: the impact weights are a hypothesis and the WRITER must see that.
+  // This sat on the by-category lane section head, where it rendered at y1174 -
+  // a screen below the fold, so the writer met the ranked queue before ever
+  // reaching the sentence saying the ranking is uncalibrated. Text that marks
+  // something and then hides the thing it marks is not a marking. It now rides
+  // the panel that OPENS BY DEFAULT, which is where the reader starts.
+  head.appendChild(el("span", "dock-section-hint", "impact weights uncalibrated"));
   // dawn meter: night → dawn as findings get resolved (the room literally warms)
   const dm = el("div", "dawn-meter");
   dm.title = "The dawn meter — the share of findings you've resolved. The room warms as it climbs.";
@@ -6757,7 +6764,7 @@ function buildContextSection() {
     // Spec 9c, and an obligation this build originally missed: the weights are a
     // hypothesis and the WRITER must see that, not a code comment. Printed once,
     // on the section head, so it is present without being shouted over the rows.
-    head.appendChild(el("span", "dock-section-hint", "impact weights uncalibrated"));
+    // (the uncalibrated marking moved to the Fix Queue head - see below)
     lens.appendChild(dockSection("by-category", head, groups));
   }
   // ...and now the per-scene and script-level detail cards, beneath the queue.
