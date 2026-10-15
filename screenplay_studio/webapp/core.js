@@ -232,6 +232,16 @@ const LANE_LABELS = {
   uncategorised: "Uncategorised",
 };
 
+// Why a lane is a group rather than a rank position. These strings are the
+// product answering the obvious question - "why is this above that?" - before
+// the writer has to ask it.
+const LANE_BLURB = {
+  structure: "Missing turns and setup-payoff economy. The fixes that change what the script is about.",
+  line: "The scene says it, the character states it, and it lands flat. Craft notes on the words themselves.",
+  deterministic: "Locatable, one-line fixes - continuity breaks. Not ranked below the others: six of these are one kind of fix and read best in one pass.",
+  uncategorised: "Findings in a category nothing weighs. Never dropped and never ranked against rows the table has no opinion about - they are here so the gap is visible.",
+};
+
 /**
  * Does this finding belong in the queue at all?
  *
@@ -308,6 +318,57 @@ function rankScore(f) {
   return impact * 10 + verified + span + sticky;
 }
 
+/**
+ * The order lanes appear in: descending MAX impact, so the lane holding the
+ * heaviest thing on the desk leads.
+ *
+ * This is a rendering order, never a quality verdict. The deterministic lane is
+ * NOT last: six continuity notes are one kind of fix, and burying them below
+ * structural notes destroys the batching they exist for. Where two lanes tie on
+ * max impact the tie breaks on the lane NAME, so two loads of the same script
+ * produce the same order - a queue that reshuffles itself between loads is a
+ * queue the writer stops trusting.
+ */
+function laneOrder(groups) {
+  const maxImpact = (lane) => {
+    let max = -1;
+    for (const item of groups[lane] || []) {
+      const cat = ((item && item.f && item.f.category) || "").toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(IMPACT, cat)) max = Math.max(max, IMPACT[cat]);
+    }
+    return max;
+  };
+  return Object.keys(groups).sort((a, b) =>
+    (maxImpact(b) - maxImpact(a)) || String(a).localeCompare(String(b)));
+}
+
+/**
+ * Group findings into lanes for display.
+ *
+ * Lane order is descending max-IMPACT; row order inside a lane is rankScore,
+ * descending. Observation rows are NOT returned: a finding with nothing to
+ * locate is not a task and must not occupy the queue. They are still SHOWN
+ * elsewhere - this function filters a view, it does not drop a finding
+ * (AGENTS.md:66, "Flag, don't drop").
+ *
+ * Pure: takes entries, returns groups. No DOM, no state, no filtering by
+ * chips - the ONE predicate upstream decides what is admitted here, so this
+ * cannot fork GAP-1's single-predicate contract.
+ */
+function groupByLane(entries) {
+  const groups = {};
+  for (const item of entries || []) {
+    const lane = findingLane(item && item.f);
+    if (lane === "observation") continue;   // not a task; shown, not queued
+    (groups[lane] = groups[lane] || []).push(item);
+  }
+  for (const lane of Object.keys(groups)) {
+    groups[lane].sort((a, b) =>
+      (rankScore(b && b.f) - rankScore(a && a.f)) || ((a && a.index || 0) - (b && b.index || 0)));
+  }
+  return { groups, order: laneOrder(groups) };
+}
+
 /** The string that makes a rank auditable (spec 1.5). A row that cannot print
  *  its own reason is not ranked, it is sorted by something nobody can audit. */
 function rankReasonText(f) {
@@ -342,9 +403,12 @@ if (typeof module !== "undefined" && module.exports) {
     IMPACT,
     LANE_OF,
     LANE_LABELS,
+    LANE_BLURB,
     findingLane,
     sceneRefCount,
     rankScore,
     rankReasonText,
+    laneOrder,
+    groupByLane,
   };
 }

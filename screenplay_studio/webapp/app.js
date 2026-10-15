@@ -6654,17 +6654,24 @@ function buildContextSection() {
   // W2: a scene-scoped default renders a dead panel on clean scenes and hides
   // the cross-scene crown jewels — theme/structure/setup-payoff). The scene
   // only ever enters through the ONE filter's scene clause above.
-  const SEV_RANK = { high: 0, medium: 1, low: 2 };
-  const sevRank = (o) => (SEV_RANK[String(o.f.severity || "low").toLowerCase()] != null
-    ? SEV_RANK[String(o.f.severity || "low").toLowerCase()] : 9);
-  for (const cat of Object.keys(byCat)) {
-    byCat[cat].sort((a, b) => (sevRank(a) - sevRank(b)) || (a.index - b.index));
-  }
-  const catKeys = Object.keys(byCat).sort((a, b) =>
-    (sevRank(byCat[a][0]) - sevRank(byCat[b][0]))        // groups holding highs lead
-    || (byCat[b].length - byCat[a].length)               // then the biggest group
-    || a.localeCompare(b));
-  if (catKeys.length) {
+  // Track B section 7: the ORDERING key is craft impact, not severity.
+  // Severity stops being the sort and stays an ATTRIBUTE - the rim/mass/label
+  // language in DESIGN.md is verified in use and is not being touched.
+  //
+  // The groups are LANES now, ordered by descending max IMPACT (core.js
+  // groupByLane). Rows inside a lane sort by rankScore. Both live in core.js so
+  // they are testable without a browser, which is the only reason this change
+  // is verifiable from a workspace with no Playwright.
+  //
+  // GAP-1 is preserved by construction: groupByLane is PURE. It does not filter.
+  // It is handed entries the ONE predicate (findingPassesFilter) already
+  // admitted, so no second predicate was forked and the page and the ledger
+  // still cannot disagree.
+  const laneCut = groupByLane(
+    Object.keys(byCat).flatMap((cat) => byCat[cat]));
+  const laneKeys = laneCut.order;
+  const laneGroups = laneCut.groups;
+  if (laneKeys.length) {
     // ONE collapsible "Live findings" section holding the per-category groups:
     // the groups keep their own sub-heads (and their counts), the section is
     // the single thing to open — the collapsed header prints the total, so the
@@ -6672,16 +6679,59 @@ function buildContextSection() {
     // it is the hook the audits and the e2e harness open the section by.)
     const groups = el("div", "dock-cat-groups");
     let total = 0;
-    for (const cat of catKeys) {
-      const list = byCat[cat];
+    for (const lane of laneKeys) {
+      const list = laneGroups[lane] || [];
       total += list.length;
-      const group = el("div", "dock-cat-group");
-      const title = el("div", "dock-section-title");
-      title.appendChild(el("span", "", CATEGORY_LABELS[cat] || cat));
-      title.appendChild(el("span", "dock-section-count", String(list.length)));
-      group.appendChild(title);
+      const group = el("div", "dock-cat-group dock-lane-group");
+      group.dataset.lane = lane;
+
+      // The LANE header. Identity, not a filter: a lane spans several
+      // categories, so there is no single category value it could set, and
+      // section 1.4 trap 4 forbids a header owning a filter the predicates
+      // cannot express.
+      const laneTitle = el("div", "dock-section-title dock-lane-title");
+      laneTitle.appendChild(el("span", "", LANE_LABELS[lane] || lane));
+      laneTitle.appendChild(el("span", "dock-section-count", String(list.length)));
+      laneTitle.title = LANE_BLURB[lane] || "";
+      group.appendChild(laneTitle);
+
+      // CATEGORY sub-headers inside the lane are what replaced the filter-row
+      // chips, and they set exactly the field the chips set today:
+      // state.findingFilter.category. That is the whole of the migration, and
+      // it is why GAP-1's single-predicate contract still holds.
       const wrap = el("div", "dock-finding-list");
-      for (const { f, index } of list) wrap.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
+      let lastCat = null;
+      for (const { f, index } of list) {
+        const cat = f.category || "other";
+        if (cat !== lastCat) {
+          lastCat = cat;
+          const active = state.findingFilter.category === cat;
+          const chip = el("button", "dock-lane-cat" + (active ? " active" : ""));
+          chip.type = "button";
+          chip.dataset.category = cat;
+          chip.appendChild(el("span", "", CATEGORY_LABELS[cat] || cat));
+          chip.appendChild(el("span", "dock-section-count",
+            String(list.filter((o) => (o.f.category || "other") === cat).length)));
+          chip.title = active
+            ? "Showing all categories — press again to widen"
+            : `Show only ${CATEGORY_LABELS[cat] || cat}`;
+          chip.addEventListener("click", () => {
+            state.findingFilter.category = active ? null : cat;
+            rerender();
+          });
+          wrap.appendChild(chip);
+        }
+        const row = findingNoteEl(f, index, {
+          addressed: isAddressed(f, index),
+          disposition: findingDisposition(f, index),
+          deep: true,
+        });
+        // Gate G6: every row states why it is ranked where it is. A row that
+        // cannot print its own reason is not ranked, it is sorted by something
+        // nobody can audit (spec 1.5).
+        row.appendChild(el("div", "dock-rank-reason", rankReasonText(f)));
+        wrap.appendChild(row);
+      }
       group.appendChild(wrap);
       groups.appendChild(group);
     }
@@ -6691,9 +6741,9 @@ function buildContextSection() {
     // scope honesty (N3): after P1.8 this section holds the findings the two
     // above did NOT card, so its count must not read as the whole ledger's.
     head.title = carded.size
-      ? `Live findings the sections above did not card — highs first, grouped by `
-        + `category (${carded.size} more carded in this scene / script level)`
-      : "Every live finding, highs first, grouped by category";
+      ? `Live findings the sections above did not card — grouped into lanes, heaviest `
+        + `first (${carded.size} more carded in this scene / script level)`
+      : "Every live finding, grouped into lanes, heaviest first";
     lens.appendChild(dockSection("by-category", head, groups));
   }
   // honest emptiness: findings exist but the filter hides them all — the
@@ -6704,7 +6754,8 @@ function buildContextSection() {
   if (!anyBoardCards && Object.keys(byCat).length === 0 && (state.findings || []).length) {
     const notice = el("div", "dock-notice");
     notice.appendChild(el("div", "dock-lens-hint",
-      "No findings match the current filter — toggle a severity or category chip above to widen the view."));
+      "No findings match the current filter — toggle a severity chip above, or press "
+      + "a lane's category header to clear that filter."));
     lens.appendChild(notice);
   }
 
@@ -7829,18 +7880,14 @@ function buildFindingFilterRow() {
   // parked rows, a "Dialogue 9" that counted only open ones would sit over a
   // list of fifteen — one count, two meanings, which is the defect family
   // HIGH-2b names. The count now always describes the rows its own tap shows.
-  const catCounts = {};
-  (state.findings || []).forEach((f, index) => {
-    if (!findingAdmitted(f, index)) return;
-    const c = f.category || "other";
-    catCounts[c] = (catCounts[c] || 0) + 1;
-  });
-  for (const c of Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a])) {
-    const active = state.findingFilter.category === c;
-    row.appendChild(mk((CATEGORY_LABELS[c] || c) + " " + catCounts[c], active,
-      (active ? "Showing all categories" : "Show only " + (CATEGORY_LABELS[c] || c)),
-      () => { state.findingFilter.category = active ? null : c; rerender(); }));
-  }
+  // Track B section 7: the category count-chips LEFT this row. They now live as
+  // clickable category headers inside each lane of the queue, setting exactly
+  // the same state.findingFilter.category this loop set - so the single-filter
+  // contract (GAP-1) is preserved by construction and the filter row stops
+  // spending its width on a taxonomy the queue already shows.
+  //
+  // The counts moved with them: each lane's category header carries its own
+  // count, over the rows that lane actually holds.
   const dp = state.findingFilter.showDeferred;
   row.appendChild(mk("Next pass", dp, dp ? "Deferred findings shown" : "Deferred findings parked", () => {
     state.findingFilter.showDeferred = !dp;

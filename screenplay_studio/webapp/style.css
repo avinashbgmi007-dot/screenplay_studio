@@ -3986,6 +3986,50 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
    controls and the dock lens tabs. */
 
 
+/* ---- Track B: lane groups in the findings ledger ----
+   The lane header is identity, not a control — a lane spans several
+   categories, so there is no single filter value it could set. The CATEGORY
+   headers inside it are the controls, and they set exactly the field the
+   filter-row chips used to set. */
+.dock-lane-group { margin-bottom: var(--sp-4); }
+.dock-lane-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ink-900);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.dock-lane-cat {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  padding: 2px var(--sp-3);
+  margin: var(--sp-2) 0 var(--sp-1);
+  cursor: pointer;
+}
+.dock-lane-cat:hover { color: var(--text); border-color: var(--line); }
+.dock-lane-cat.active {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+/* Gate G6. Quiet by default: the reason is there when the writer looks for it
+   and does not shout over the finding itself. */
+.dock-rank-reason {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  padding: 0 var(--sp-3) var(--sp-2);
+}
+
 /* pace bars in the report + dials */
 .pacing-svg .bar-pace { fill: var(--accent-deep); opacity: 0.75; cursor: pointer; }
 .pacing-svg .bar-pace:hover { opacity: 1; fill: var(--accent); }

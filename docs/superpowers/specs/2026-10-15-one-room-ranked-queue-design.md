@@ -991,3 +991,51 @@ now hidden twice — once as `NaN`, once as a demotion — and both times invisi
 `rankReasonText` prints `unweighed` rather than `impact 0` for these rows, because "impact 0"
 implies a judgement was made. `tests/test_queue_lane_coverage.py` pins that `LANE_LABELS`
 carries the lane, so deleting it cannot quietly return these rows to the bottom of Line.
+
+### 14.7 §7 shipped: craft impact is the sort key, and the queue is lane-grouped
+
+Three changes, and one thing deliberately left alone.
+
+**Changed.** The ledger's `SEV_RANK` ordering table is gone. Rows sort by `rankScore` inside a
+lane; lanes sort by descending max `IMPACT`, tie-broken on lane name so two loads of the same
+script produce the same order — a queue that reshuffles itself between loads is a queue the
+writer stops trusting. **Severity is still displayed and still filters.** It stopped being the
+order, not the attribute; DESIGN.md's rim/mass/label language is verified in use.
+
+**Category chips left the filter row** and now ride as clickable headers inside each lane. They
+set exactly the field they set before, `state.findingFilter.category`, which is the whole reason
+GAP-1's single-predicate contract survives the migration by construction. Each carries its own
+count over the rows its lane actually holds — a count has to describe what its own press will
+show, which is the defect family the old chips already had one round of.
+
+**Left alone, on purpose:** a **lane** header is identity, not a control. A lane spans several
+categories, so there is no single `category` value it could set, and §1.4 trap 4 forbids a
+header owning a filter the predicates cannot express. The clickable controls are the category
+sub-headers inside it.
+
+**The grouping is PURE.** `groupByLane` filters nothing; it is handed rows `findingPassesFilter`
+already admitted. No second predicate was forked. §1.4 trap 2 is respected structurally rather
+than by care.
+
+**G6 landed in the same commit:** every row appends `rankReasonText(f)`.
+
+### 14.8 The section key stayed `"by-category"`, and that is not a bug
+
+The obvious refactor is to rename the dock section from `by-category` to `by-lane`. **Doing so
+would silently unhook `e2e_browser_dock_sections.py`**, which opens the section by that literal
+in ~21 places (G8). The key is a harness hook, not a name, so it stays and a guard now pins it.
+
+### 14.9 Two predicates exist, and this work did not make that worse
+
+§1.4 trap 2 says `findingPassesFilter` is "the ONE filter". There are in fact two:
+`findingPassesFilter` (`:6968`, disposition + severity + category + scene) and `inFindingFilter`
+(`:7689`, severity + category + scene + groundedness). Both carry overlapping clauses and both
+are documented as "the ONE". That is **pre-existing debt, not something §7 introduced**, and
+refactoring it belongs in its own change with its own blast radius.
+
+What §7 must not do is grow either into a lane check, because a lane clause inside a predicate
+decides admission, and admission has one predicate. That is now a guard, not a convention:
+`tests/test_queue_lane_rendering.py` fails if either predicate calls `findingLane`.
+
+Verified non-vacuous by mutation: reintroducing `SEV_RANK` fails the sort-key test, and adding
+one `findingLane` line to `inFindingFilter` fails the single-predicate test.
