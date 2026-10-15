@@ -1802,7 +1802,6 @@ function setIdeaLens(room) {
   cowriteBtnEl.setAttribute("aria-selected", room === "cowrite" ? "true" : "false");
   feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
   setDrawerIdentity(room, true);
-  syncGutter();
 }
 
 async function applyIdeaLens(room) {
@@ -2559,7 +2558,6 @@ function openRoomDrawer() {
   dockYieldToRoom();
   const d = $("#room-drawer");
   if (d) d.classList.add("open");
-  syncGutter();
   // Summoning the partner hands the keyboard to the composer: the keys typed
   // right after a summon must land in the CHAT, not wherever focus happened
   // to be sitting — on the idea page that meant text silently became canvas
@@ -2577,14 +2575,9 @@ function openRoomDrawer() {
 function closeRoomDrawer() {
   const d = $("#room-drawer");
   if (d) d.classList.remove("open");
-  syncGutter();
 }
-function syncGutter() {
-  const sam = state.view !== "feedback";
-  const gs = $("#gutter-sam"), gd = $("#gutter-doc");
-  if (gs) gs.classList.toggle("on", sam);
-  if (gd) gd.classList.toggle("on", !sam);
-}
+// Track A section 3: syncGutter() is gone with the gutter. Every call site was
+// only toggling an `on` class on the two deleted tab buttons.
 function setDrawerIdentity(room, idea) {
   const av = $("#drawer-av"), name = $("#drawer-name");
   if (!av || !name) return;
@@ -2622,7 +2615,6 @@ function setRoom(room) {
   }
   document.body.dataset.room = room;       // drives CSS theming
   setDrawerIdentity(room, false);
-  syncGutter();
   const chip = $("#room-chip");
   if (chip) chip.textContent = room === "feedback" ? "📋 Consultant's Desk" : "✍️ Writer's Desk";
   const cowriteBtnEl = $("#room-cowrite-btn");
@@ -10535,12 +10527,9 @@ function init() {
     if (state.currentProject) openFeedbackView();
     else openFeedbackRoom();
   });
-  // Manuscript Stage: the gutter tabs summon the partner drawer
-  $("#gutter-sam").addEventListener("click", openCowriteRoom);
-  $("#gutter-doc").addEventListener("click", () => {
-    if (state.currentProject) openFeedbackView();
-    else openFeedbackRoom();
-  });
+  // Track A section 3: the gutter tab handlers are deleted with the gutter.
+  // Sameer and the consultant are reachable from the dock lens tabs
+  // (`#dock-tab-sameer`, `#dock-tab-sushruta`) and the room controls.
   $("#drawer-close").addEventListener("click", closeRoomDrawer);
   $("#bb-icon").addEventListener("click", () => { closeOverflow(); openBeatboardView(); });
   $("#compare-icon").addEventListener("click", () => { closeOverflow(); openCompareView(); });

@@ -450,11 +450,11 @@
       <div id="feedback-panel" style="display:none;"></div>
       </div>
 
-      <!-- the edge tabs — the only chrome on the right -->
-      <div class="gutter">
-        <button class="gutter-tab sam on" id="gutter-sam" type="button"><span class="dot"></span>Sameer</button>
-        <button class="gutter-tab doc" id="gutter-doc" type="button">Consultant</button>
-      </div>
+      <!-- Track A section 3: the right-edge gutter is deleted. It duplicated dock
+           lenses 2 and 3 (`#dock-tab-sameer`, `#dock-tab-sushruta`) exactly, and was
+           already `display:none` under 900px — chrome that outlived its own
+           breakpoint. The dock lens tabs and the room controls are the reachable
+           routes to both partners. -->
 
     </div>
 

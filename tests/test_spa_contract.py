@@ -38,8 +38,9 @@ reader reached an unlabelled cluster of buttons — and the toggle's only name w
 **Why there is no browser check for the hiding.** An inline `display:none` is
 defeated only by an `!important` rule. The stylesheet's 19 `display:...!important`
 declarations were enumerated: 13 are inside `@media print` (they hide, they do not
-show) and the six outside it target `.gutter`, `.script-level-notes`,
-`.finding-summary` and `#cowrite-panel` — none of them these controls. The only
+show) and the ones outside it target `.script-level-notes`,
+`.finding-summary` and `#cowrite-panel` — none of them these controls. (The
+`.gutter` rule that used to be listed here was removed in Track A section 3.) The only
 rule naming `#undo-btn`/`#redo-btn` is `style.css:3572`, inside `@media print`. So
 the computed value is determined by the markup and a browser adds nothing.
 `tests/test_spa_contract.py` therefore stays a source check: fast, and it runs on

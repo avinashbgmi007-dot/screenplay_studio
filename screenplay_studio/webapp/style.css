@@ -304,7 +304,7 @@
   --z-dock-sheet: 420;      /* context dock mobile sheet */
   --z-rail: 520;            /* struct rail, desk toolbar */
   --z-drawer: 590;          /* room drawer (chat) */
-  --z-above-drawer: 600;    /* desk gutter, lang menu, conn card — clear 590 */
+  --z-above-drawer: 600;    /* dock, lang menu, conn card — clear 590 */
   --z-edge-affordance: 610; /* right-edge affordance above drawer + panels */
   --z-scene-float: 620;     /* scene index above dock sheet (420) + drawer */
   --z-quote: 700;           /* quote float */
@@ -3411,10 +3411,9 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .idea-item:hover .idea-rename { opacity: 1; }
 .idea-rename:hover { color: var(--accent); }
 
-/* idea phase: no scripts shelf, no gutter — the page and its rooms only.
+/* idea phase: no scripts shelf, no edge chrome — the page and its rooms only.
    (Phase 9: the room toggle STAYS — it's how the writer summons the Premise
    Doctor on demand; Co-write = Sameer, Feedback = the doctor.) */
-body.idea-mode .gutter { display: none !important; }
 
 /* explore chips live inside the Sameer chat sheet, not on the blank page */
 .idea-explore { padding: 0 var(--sp-6) var(--sp-4); }
@@ -3431,7 +3430,7 @@ body.idea-mode .gutter { display: none !important; }
 .idea-explore .explore-chip:hover { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 50%, transparent); }
 
 /* ---- Spotlight mode: nothing but the page ----
-   The power mode: project bar, desk toolbar, gutter and drawer
+   The power mode: project bar, desk toolbar and drawer
    all vanish; the manuscript owns the screen. The status strip keeps only
    what a session uses — project/room orientation, the sprint timer, the
    mood toggle. Everything else is one ⌘K or one key away. */
@@ -3439,10 +3438,6 @@ body.idea-mode .gutter { display: none !important; }
 .spotlight-mode #desk-toolbar,
 .spotlight-mode #draft-bar,
 .spotlight-mode #diff-banner,
-.spotlight-mode .gutter,
-.spotlight-mode #room-drawer,
-.spotlight-mode .craft-shelf,
-.spotlight-mode .script-level-notes { display: none !important; }
 
 /* the manuscript breathes — wider pages, no toolbar crowding above */
 .spotlight-mode #manuscript-container { padding-top: 26px; }
@@ -3570,9 +3565,8 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 
 @media (max-width: 900px) {
   .scene-window { display: none; }
-  /* narrow desks: the gutter is chrome the page can't spare — the drawer
+  /* narrow desks: the edge tabs are chrome the page can't spare — the drawer
      docks flush to the edge and is summoned by the room toggle instead */
-  .gutter { display: none; }
   .drawer { right: 0; }
   /* Phase 5/11: the dock's edge tab stays summonable on narrow desks —
      it becomes the bottom-sheet handle. Without this, ≤900px had a styled
@@ -3624,10 +3618,6 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   #room-toggle, #room-chip, #partner-card, #feedback-tabs,
   .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
   #cowrite-panel, #feedback-panel, #status-strip,
-  .drawer, .gutter, .desk,
-  #context-dock, #right-edge-affordance, #scene-index {
-    display: none !important;
-  }
   #manuscript-workspace { display: block !important; }
   /* the row's scene-index reservation is screen chrome, not paper — the
      printed column must stay centred on the full sheet */
@@ -3875,16 +3865,16 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 
 
 /* ============================================================
-   Manuscript Stage — the partner drawer + the right-edge gutter
+   Manuscript Stage — the partner drawer
    Sameer and the consultant live in a drawer that slides in from
    the edge when summoned, and leave the page alone the rest of
-   the time. The gutter tabs are the only chrome on the right.
+   the time. The dock's lens tabs are the chrome on the right.
    ============================================================ */
 
 .drawer {
   position: absolute;
   /* WIREFRAME ALIGNMENT — the 56px right offset reserved space for the
-     partner gutter, which is now retired (display:none). At right:56px the
+     retired 56px partner-gutter clearance. At right:56px the
      closed drawer (translateX 110% of 380 = 418) landed at x=1422, leaving
      an 18px sliver on-screen that intercepted every click aimed at the
      right-edge affordance (x:1408-1440). Anchor flush to the edge so the
@@ -3976,56 +3966,10 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
    head owns the identity now; the card keeps its action buttons */
 .drawer .partner-name { display: none; }
 
-.gutter {
-  /* WIREFRAME ALIGNMENT — the contract gives the right edge ONE 32px hit
-     area (State 4, x:1408-1440) that summons the Context Dock; the dock's
-     lens tabs then switch Sameer / Sushruta / Evidence. This 56px strip was
-     a THIRD, older partner switcher duplicating both the project bar's
-     Co-write/Feedback toggle and the dock lenses — and it sat exactly on
-     top of the affordance once the row stopped reserving 56px for it.
-     Retired: partners are reached from the project bar or the dock. */
-  display: none;
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  width: 56px;
-  z-index: var(--z-above-drawer);
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-5);
-}
-.gutter-tab {
-  writing-mode: vertical-rl;
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  border: 1px solid var(--line-soft);
-  border-right: none;
-  background: var(--ink-900);
-  color: var(--text-muted);
-  padding: var(--sp-8) var(--sp-4);
-  cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-  border-radius: var(--r-md) 0 0 var(--r-md);
-}
-.gutter-tab:hover { color: var(--text); }
-.gutter-tab.sam:hover { border-color: #8a4b2f; color: #b97a54; }
-.gutter-tab.doc:hover { border-color: #2f4b6b; color: #6d9ec2; }
-.gutter-tab.on { background: var(--ink-800); color: var(--text); border-color: var(--line); }
-.gutter-tab .dot {
-  display: inline-block;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: #8a4b2f;
-  margin-right: var(--sp-3);
-  vertical-align: middle;
-  animation: dotPulse 2s ease-in-out infinite;
-}
-@keyframes dotPulse {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 1; }
-}
+/* Track A section 3: the right-edge gutter is deleted. Its last rule already
+   read `display: none` — a prior pass retired it visually and left the DOM,
+   the handlers and syncGutter() behind. Partners are reached from the room
+   controls and the dock lens tabs. */
 
 
 /* pace bars in the report + dials */
@@ -5034,8 +4978,7 @@ body.river-read #flow-btn.active {
   z-index: var(--z-river);
   padding: var(--sp-7) var(--sp-3);
 }
-/* the partner gutter owns the right edge — the current nav lives beside it,
-   not under it (the gutter otherwise intercepts the dot clicks) */
+/* the dock owns the right edge — the current nav lives beside it, not under it */
 body.river-read #river-current { right: 68px; display: flex; }
 #river-current::before {
   content: "";
@@ -5967,8 +5910,8 @@ body:not(.idea-mode) .desk {
 }
 
 /* ============================================================
-   Phase 5/6 mobile repair: the narrow-desk gutter hide never
-   worked — the base .gutter { display:flex } (line ~3644) sits
+   Phase 5/6 mobile repair: the narrow-desk edge-tab hide never
+   worked — the base rule (display:flex) sits
    LATER in source order than the ≤900px override (~line 3203),
    so equal specificity let flex win. The absolute gutter then
    painted over the dock's edge tab (z 421 < 600) and ate the
@@ -5976,7 +5919,6 @@ body:not(.idea-mode) .desk {
    finally honors it; pointer-events belt-and-suspenders.
    ============================================================ */
 @media (max-width: 900px) {
-  .gutter { display: none !important; pointer-events: none !important; }
 }
 
 /* ============================================================
