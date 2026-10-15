@@ -114,33 +114,48 @@ def run(base):
         # contradict each other ("6 open of 6" over "0 shown / 6 total").
         # The honest empty state is STILL the contract; it is now reached by
         # the writer narrowing, not by a partial default. Both sides asserted.
+        # Option A+ (Report 2 §4): the cards live in Tier 2 (Context); the ONE
+        # filter row lives in Tier 1 (Worklist). The loop below drives the
+        # chips on the worklist and reads the board in the context tier — the
+        # same cross-tier gesture a writer makes.
+        page.evaluate("() => setEvidenceTier(2)")
+        page.wait_for_selector(
+            '.dock-lens[data-lens="evidence"] .finding-note, '
+            '.dock-lens[data-lens="evidence"] .dock-lens-hint',
+            state="attached", timeout=15000)
         notes = lens.locator(".finding-note")
         check("board: default ledger is whole (all severities shown)",
               notes.count() > 0, f"default notes={notes.count()}")
         # narrow to High only: turn Medium + Low OFF via the severity chips.
         # This fixture's findings are all medium/low, so the board empties -- and
         # must SAY so rather than render blank.
+        page.evaluate("() => setEvidenceTier(1)")  # the chips are worklist chrome
         for label in ["Medium", "Low"]:
             chip = lens.locator(".fchip", has_text=label).first
             if chip.count() and "active" in (chip.get_attribute("class") or ""):
                 chip.click()
                 page.wait_for_timeout(400)
+        page.evaluate("() => setEvidenceTier(2)")
+        page.wait_for_timeout(400)
         check("board: narrowed-to-empty filter shows the honest hint (not blank)",
               lens.locator(".dock-lens-hint", has_text="No findings match").count() > 0,
               f"notes after narrowing={lens.locator('.finding-note').count()}")
         # widen back: turn Medium + Low ON again and the cards return
+        page.evaluate("() => setEvidenceTier(1)")  # chips + queue are worklist
         for label in ["Medium", "Low"]:
             chip = lens.locator(".fchip", has_text=label).first
             if chip.count() and "active" not in (chip.get_attribute("class") or ""):
                 chip.click()
                 page.wait_for_timeout(400)
+        check("fix queue rows carry the severity badge (after widening)",
+              lens.locator(".fix-row .sev-badge").count() > 0)
+        page.evaluate("() => setEvidenceTier(2)")
+        page.wait_for_timeout(400)
         notes = lens.locator(".finding-note")
         check("board: widened filter reveals the finding cards (findingNoteEl reuse)",
               notes.count() > 0, f"count={notes.count()}")
         check("finding cards carry Locate/Rewrite/Discuss actions",
               lens.locator(".finding-note-actions button").count() > 0)
-        check("fix queue rows carry the severity badge (after widening)",
-              lens.locator(".fix-row .sev-badge").count() > 0)
 
         # -- 4. findings by category sections --------------------------------
         # P1.6: a section's body is collapsed by default and a closed body is not
@@ -168,10 +183,21 @@ def run(base):
         depth_el = lens.locator(".dock-cov-depth")
         depth_txt = depth_el.first.inner_text() if depth_el.count() else ""
         check("evidence depth line renders in the coverage section", depth_el.count() > 0, depth_txt)
-        check("it names the raw pages the script-level passes actually read",
-              "raw pages of the key scenes" in depth_txt, depth_txt)
-        check("it names which scenes were read as pages",
-              re.search(r"scenes \d", depth_txt) is not None, depth_txt)
+        # Kit B changed what this line CAN say: small scripts are read whole,
+        # so their findings stamp full_text and no checkpoint bucket exists.
+        # Assert the agreement with the report's own stats, not a fixed shape.
+        _depth_rep = requests.get(f"{base}/api/projects/{analyzed}/report",
+                                  headers=studio_headers(base), timeout=30).json()
+        _depth = ((_depth_rep or {}).get("stats") or {}).get("evidence_depth") or {}
+        _mixed = _depth.get("overview_and_checkpoints", 0) or 0
+        if _mixed:
+            check("it names the raw pages the script-level passes actually read",
+                  "raw pages of the key scenes" in depth_txt, depth_txt)
+            check("it names which scenes were read as pages",
+                  re.search(r"scenes \d", depth_txt) is not None, depth_txt)
+        else:
+            check("it names the full-text reading when no checkpoint bucket exists",
+                  "from the full script text" in depth_txt, depth_txt)
         check("it still warns this is not a full reading",
               "not a reading of your pages" in (depth_el.first.get_attribute("title") or "")
               if depth_el.count() else False, depth_txt)
@@ -262,7 +288,9 @@ def run(base):
         else:
             check("Discuss present on finding cards", False, "no Discuss button found")
 
-        # Dismiss / Restore through the fix queue rows
+        # Dismiss / Restore through the fix queue rows (worklist tier)
+        page.evaluate("() => setEvidenceTier(1)")
+        page.wait_for_timeout(400)
         check("P1.6: the fix-queue section opens for its row actions",
               open_dock_section(page, "fix-queue"))
         dismiss = lens.locator(".fix-row-actions .fq-dismiss").first
@@ -307,6 +335,8 @@ def run(base):
                   "no dismissable rows (queue state)")
 
         # --- scene strip tracks scrolling ------------------------------------
+        page.evaluate("() => setEvidenceTier(1)")  # the scene strip is worklist
+        page.wait_for_timeout(400)
         dock_scrolls = page.locator('.dock-lens[data-lens="evidence"] .dock-scene-num')
         strip_before = dock_scrolls.first.inner_text() if dock_scrolls.count() else ""
         page.locator("#manuscript-container").evaluate(

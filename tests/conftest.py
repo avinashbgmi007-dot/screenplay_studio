@@ -42,6 +42,16 @@ def pytest_configure(config):
     import route_recorder
     route_recorder.install()
 
+    # Gate 11 (the observation pass) is model-backed: one call per ungrounded
+    # finding. The mock server produces findings with no quotes, so in the suite
+    # EVERY finding is a target — ~24 extra round-trips per analyze(), which
+    # multiplied the runtime of the analysis-heavy files by ~4x while testing
+    # nothing those files are about. The pass has its own suite
+    # (tests/test_observation_pass.py) that drives it with stubs and turns it
+    # back on explicitly; everything else runs with it off. `setdefault` so an
+    # operator who exports the flag still gets what they asked for.
+    os.environ.setdefault("SCREENPLAY_STUDIO_OBSERVATION_PASS", "0")
+
 
 def pytest_collection_modifyitems(session, config, items):
     """Run `route_coverage`-marked tests LAST.

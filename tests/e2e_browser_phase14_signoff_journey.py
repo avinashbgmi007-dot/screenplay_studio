@@ -31,8 +31,9 @@ import zipfile
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import (Checks, clicked, filled, launch, note,
-                                seen_visible, start_studio, studio_headers)
+from e2e_browser_common import (Checks, became_true, clicked, filled, launch,
+                                note, reveal_chrome, seen_visible, start_studio,
+                                studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 checks = Checks()
@@ -148,7 +149,19 @@ def run(base):
               page.locator("#desk-retry-failed-btn").count() == 0)
 
         # ================= 8. RUN ANALYSIS -> PROGRESS -> COMPLETE ===========
-        page.locator("#desk-analyze-btn").click()
+        # The desk toolbar is auto-hiding chrome: after 4s idle it is opacity 0 +
+        # pointer-events none, so a blind click is intercepted by
+        # #manuscript-workspace and waits out Playwright's 30s timeout — this
+        # suite went red exactly there on the Windows CI runner 2026-10-01, where
+        # the upload's render gap pushed the click past the idle timer. Do what
+        # the writer does (arrive via the top edge, wait for the real hit test),
+        # and report a control that never becomes clickable by NAME rather than
+        # aborting the journey on a 30s timeout.
+        reachable = reveal_chrome(page, "#desk-analyze-btn")
+        check("analysis: Run Analysis is reachable on the desk", reachable,
+              "#desk-analyze-btn never became the hit target")
+        started = reachable and clicked(page, "#desk-analyze-btn")
+        check("analysis: the desk click starts the run", started)
         page.wait_for_timeout(800)
         chip = page.locator("#desk-analyze-progress")
         running_seen = chip.is_visible()
@@ -264,23 +277,25 @@ def run(base):
               cands_seen and cand.count() > 0,
               f"generateClicked={gen_clicked} candidates={cand.count()}")
         apply_clicked = clicked(page, "#rewrite-apply")
-        page.wait_for_timeout(2500)
-        demo_line = page.locator("#manuscript-container", has_text="[demo] The line lands quieter")
+        # The apply is an async round trip — poll for the line instead of sleeping
+        # 2500ms, the same fixed-sleep race the undo pair lost on the Windows
+        # runner (2026-10-02).
+        landed_js = ("() => [...document.querySelectorAll('#manuscript-container [class^=el-]')]"
+                     ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
+        landed = became_true(page, landed_js, timeout=15000)
         check("inline edit: the change lands in the manuscript",
-              apply_clicked and demo_line.count() > 0, f"applyClicked={apply_clicked}")
-        # keyboard parity: Ctrl+Z unwinds, Ctrl+Shift+Z restores
+              apply_clicked and landed, f"applyClicked={apply_clicked} landed={landed}")
+        # keyboard parity: Ctrl+Z unwinds, Ctrl+Shift+Z restores — both async, so
+        # wait for the observable change. A fixed 1800ms sleep turned this check
+        # red on the Windows runner while the identical commit passed on the
+        # parallel run; the contract asserted is unchanged (gone, then back), and
+        # a state that never arrives still fails by name.
         page.keyboard.press("Control+z")
-        page.wait_for_timeout(1800)
-        gone = page.evaluate(
-            "() => ![...document.querySelectorAll('#manuscript-container [class^=el-]')]"
-            ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
-        check("undo: Ctrl+Z removes the applied edit", gone)
+        gone_js = ("() => ![...document.querySelectorAll('#manuscript-container [class^=el-]')]"
+                   ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
+        check("undo: Ctrl+Z removes the applied edit", became_true(page, gone_js))
         page.keyboard.press("Control+Shift+z")
-        page.wait_for_timeout(1800)
-        back = page.evaluate(
-            "() => [...document.querySelectorAll('#manuscript-container [class^=el-]')]"
-            ".some(el => el.textContent.includes('[demo] The line lands quieter'))")
-        check("redo: Ctrl+Shift+Z restores it", back)
+        check("redo: Ctrl+Shift+Z restores it", became_true(page, landed_js))
 
         if not armed:
             # An armed-modal failure leaves the modal OPEN, and an open overlay
@@ -389,14 +404,15 @@ def run(base):
               restored["proj"] == proj, str(restored))
         check("session restore: scene pages render after reload",
               page.locator("#manuscript-container .scene-page").count() > 0)
-        # and leaving via Home clears it — wake the auto-hide chrome first
-        # (the project bar fades out on idle; mouse proximity restores it)
-        page.mouse.move(700, 20)
-        page.wait_for_timeout(600)
-        page.locator("#home-btn").click()
+        # and leaving via Home clears it — wake the auto-hide chrome first and
+        # wait for the real hit test (the project bar fades out on idle; only a
+        # top-edge mousemove restores it), then click bounded so an unreachable
+        # button is a named failure, not a 30s timeout that aborts the journey
+        home_clicked = (reveal_chrome(page, "#home-btn")
+                        and clicked(page, "#home-btn"))
         page.wait_for_timeout(700)
         check("return: home clears the session honestly",
-              page.locator("#welcome-view").is_visible())
+              home_clicked and page.locator("#welcome-view").is_visible())
 
         # ================= 20. VIEWPORT SWEEP (desktop/tablet/mobile) =======
         for name, w, h in (("tablet", 900, 1200), ("mobile", 390, 844), ("desktop", 1440, 900)):

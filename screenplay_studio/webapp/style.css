@@ -1917,6 +1917,21 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 .sev-badge.sev-high { color: var(--danger-text); border-color: color-mix(in oklab, var(--danger) 60%, transparent); background: var(--danger-bg); }
 .sev-badge.sev-medium { color: var(--sev-mid-text); border-color: color-mix(in oklab, var(--sev-mid) 50%, transparent); }
 .sev-badge.sev-low { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 50%, transparent); }
+/* accuracy kit A follow-up: demotion flags ride the same tokens as
+ * .sev-badge, so both themes inherit its measured contrast. */
+.row-flag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xs);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: var(--sp-1);
+}
+.row-flag-contested { color: var(--sev-mid-text); border-color: color-mix(in oklab, var(--sev-mid) 50%, transparent); }
+.row-flag-identity { color: var(--text-muted); border-color: color-mix(in oklab, var(--text-muted) 50%, transparent); }
+.row-flag-ungrounded { color: var(--text-muted); border-style: dashed; }
 .act-chip {
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
@@ -2468,8 +2483,13 @@ body.focus-mode #script-pane { background: var(--ink-950); }
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   line-height: 1.5;
-  color: var(--text);
-  background: var(--surface);
+  /* The banner OWNS its colors instead of borrowing the room's tokens: it
+     renders in the dock, the idea canvas, and the retired-panel's old home —
+     rooms that paint with their own palettes (idea-mode, dawn, tungsten), and
+     a disclosure that re-derives contrast per room is a disclosure that fails
+     one of them. A fixed dark-amber plate clears 4.5:1 on every ground. */
+  color: #f5e9d0;
+  background: rgba(43, 32, 19, 0.92);
   border: 1px solid var(--sev-mid);
   border-left-width: 3px;
   border-radius: var(--r-sm);
@@ -2925,10 +2945,13 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 .rewrite-candidate-actions .rc-apply { border-color: var(--ok); color: var(--ok); }
 .rewrite-candidate-actions .rc-reject:hover { border-color: var(--danger); color: var(--danger-text); }
 /* a proposal that has been acted on keeps its diff visible, greyed — the writer
-   can still see what they took or parked */
-.rewrite-candidate-applied, .rewrite-candidate-stashed { opacity: 0.55; }
+   can still see what they took or parked. A REFUSED one is here for the same
+   reason: its text moved under it, so it cannot be applied, and the row must
+   read as decided rather than as one still offering an action. */
+.rewrite-candidate-applied, .rewrite-candidate-stashed, .rewrite-candidate-stale { opacity: 0.55; }
 .rewrite-candidate-applied { border-color: var(--ok); }
 .rewrite-candidate-stashed { border-color: var(--accent); }
+.rewrite-candidate-stale { border-color: var(--danger); }
 .rewrite-status.ok { color: var(--ok); }
 
 /* command palette */
@@ -4262,13 +4285,14 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 
 /* ---------- fix-queue triage (dismiss / restore) ---------- */
 
-.fq-dismiss, .fq-undismiss, .fq-toggle-dismissed {
+.fq-reopen, .fq-dismiss, .fq-undismiss, .fq-toggle-dismissed, .fq-toggle-ungrounded {
   font: inherit; font-size: var(--fs-xs);
   background: none; border: 1px solid var(--desk-line-dim);
   color: var(--desk-text-dim); border-radius: var(--r-sm);
   padding: var(--sp-1) var(--sp-4); cursor: pointer;
 }
 .fq-dismiss:hover { border-color: var(--desk-rust); color: var(--desk-rust); }
+.fq-reopen:hover { border-color: var(--lamp); color: var(--lamp-bright); }
 .fq-undismiss:hover { border-color: var(--desk-amber); color: var(--desk-amber); }
 .fq-toggle-dismissed { margin-left: auto; }
 .fix-row.dismissed { font-style: italic; }
@@ -4311,6 +4335,21 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 }
 .dash-conn.ok { color: var(--desk-ok); border-color: color-mix(in oklab, var(--desk-ok) 50%, transparent); }
 .dash-conn.fail { color: var(--desk-rust); border-color: color-mix(in oklab, var(--desk-rust) 50%, transparent); }
+/* R7: the shelf-saving backup button rides the head's right side, beside the
+   connection pill (which yields its auto margin to this button). */
+.dash-backup-all {
+  margin-left: auto;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: var(--fs-xs);
+  padding: var(--sp-1) var(--sp-4);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--desk-line-dim);
+  background: transparent;
+  color: var(--desk-text-dim);
+  cursor: pointer;
+}
+.dash-backup-all:hover { color: var(--desk-amber); border-color: var(--desk-amber); }
+.dash-head .dash-conn { margin-left: 0; }
 
 .dash-grid {
   display: grid;
@@ -5693,6 +5732,49 @@ body.river-read #right-edge-affordance { display: none; }
 }
 /* the honest-empty notice is NOT a section — nothing to collapse */
 .dock-notice { margin-bottom: var(--sp-8); min-width: 0; }
+/* ---- Option A+ (audit 2026-09-30): the two-tier Evidence lens ----------
+   Tier 1 opens on the worklist; Tier 2 is the summoned Context. The switch
+   is the lens's first element — a labelled landmark, never a hover. */
+.dock-tier-switch {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+.dock-tier-btn {
+  flex: 1 1 0;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: var(--sp-2) var(--sp-4);
+  cursor: pointer;
+}
+.dock-tier-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.dock-tier-btn.on {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.dock-tier-btn:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 1px; }
+/* Tier 2 is a titled group, not a dock-section (its children are the real
+   sections and keep their own prefs) — one rhythm line above them. */
+.dock-context { min-width: 0; }
+.dock-context > .dock-section-title { margin-bottom: var(--sp-4); }
+/* display dedupe: the scene-count chip on a shared note (scene_refs is the
+   only field the grouped rows differ by — carry it, lose nothing) */
+.finding-note-scenes {
+  display: inline-block;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 var(--sp-3);
+}
 /* by-category groups inside the one "By category" section */
 .dock-cat-group + .dock-cat-group { margin-top: var(--sp-7); }
 .dock-section-count {
@@ -6102,6 +6184,11 @@ body:not(.idea-mode) .desk {
    12px "secondary text" tier. The chrome (chips, buttons) stays at the label
    tier so the hierarchy still reads. */
 .finding-deep-why { font-size:var(--fs-sm); color:var(--text-muted); line-height:1.55; }
+/* Gate 11: the observation the note rests on — a factual claim about the page,
+   set apart from the diagnosis by a quiet left rule so the two are not read as
+   one paragraph. Same 12px reading tier as the why/quote, never the label tier:
+   it is the checkable half of the note, not chrome. */
+.finding-deep-observation { font-size:var(--fs-sm); color:var(--text); line-height:1.55; border-left:2px solid var(--line); padding-left:var(--sp-3); }
 .finding-deep-quote { font-size:var(--fs-sm); color:var(--text); font-style:italic; line-height:1.5; }
 .finding-deep-badge { align-self:flex-start; font-size:var(--fs-2xs); font-weight:600; border-radius:var(--r-sm); padding:1px var(--sp-2); }
 .finding-deep-badge.verified { color:var(--ok); border:1px solid var(--ok); }
@@ -6114,6 +6201,32 @@ body:not(.idea-mode) .desk {
 .finding-rule-btn:hover { color:var(--text); border-color:var(--lamp); }
 .finding-rule-btn:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
 .finding-check { align-self:flex-start; font-size:var(--fs-2xs); color:var(--text-faint); }
+/* The absorbed half of a merge, on demand. Collapsed by default: N absorbed claims
+   expanded inline is the wall of near-duplicate cards the dedupe exists to prevent,
+   and the writer asked for the merge to be INSPECTABLE, not to be shown twice.
+   The body is indented off a hairline so an expanded card still reads as ONE finding
+   with a sub-list, not as two findings that happen to be adjacent. */
+.finding-merged { display:flex; flex-direction:column; gap:var(--sp-1); }
+.finding-merged-toggle {
+  appearance:none; align-self:flex-start; background:none; border:0; padding:0;
+  font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer;
+  text-decoration:underline; text-underline-offset:2px;
+}
+.finding-merged-toggle::before { content:"\25B8\00A0"; }
+.finding-merged.open .finding-merged-toggle::before { content:"\25BE\00A0"; }
+.finding-merged-toggle:hover { color:var(--text); }
+.finding-merged-toggle:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
+.finding-merged-body {
+  display:flex; flex-direction:column; gap:var(--sp-2);
+  margin-top:var(--sp-1); padding-left:var(--sp-3); border-left:1px solid var(--line);
+}
+.finding-merged-item { display:flex; flex-direction:column; gap:var(--sp-1); }
+.finding-merged-head { display:flex; gap:var(--sp-2); align-items:baseline; flex-wrap:wrap; }
+.finding-merged-rule { font-size:var(--fs-2xs); color:var(--text-muted); font-family:var(--font-mono); }
+.finding-merged-sev { font-size:var(--fs-2xs); color:var(--text-faint); }
+.finding-merged-issue { font-size:var(--fs-sm); color:var(--text); line-height:1.55; }
+.finding-merged-obs { font-size:var(--fs-sm); color:var(--text-muted); line-height:1.55; }
+.finding-merged-quote { font-size:var(--fs-sm); color:var(--text-muted); font-style:italic; line-height:1.5; }
 /* The ledger card's clientWidth measures 342px and its own 10px side padding
    leaves the verb row a 322px content box. R6 item 3 took the rule chip OUT of
    this row — it is provenance, so it now sits with the reasoning above — and
@@ -6136,6 +6249,23 @@ body:not(.idea-mode) .desk {
    finish, or was written by a different model than the one now configured, has to
    say so before the writer reads a single finding. */
 .dock-report-model { font-size:var(--fs-3xs); color:var(--text-faint); margin:0; }
+/* A caveat, not a failure — deliberately NOT the danger palette. The pass SUCCEEDED
+   (it re-ran a section in smaller pieces); the writer is owed the note because a split
+   re-asks the scenes and the finding set is path-dependent, not because anything broke.
+   Actionless on purpose: there is nothing to rerun and nothing to fix. */
+.run-caveat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: var(--sp-3);
+}
+.run-caveat-head { font-size: var(--fs-xs); font-weight: 600; color: var(--text); margin: 0; }
+.run-caveat-note { font-size: var(--fs-2xs); color: var(--text-muted); margin: 0; line-height: 1.55; }
+
 .failure-banner {
   display: flex;
   flex-direction: column;
@@ -6259,17 +6389,32 @@ body:not(.idea-mode) .desk {
 .fchip:hover { color:var(--text); border-color:var(--lamp); }
 .fchip.active { background:var(--lamp); border-color:var(--lamp); color:var(--accent-ink); font-weight:600; }
 .fchip:focus-visible { outline:2px solid var(--lamp); outline-offset:1px; }
+/* R2: the desk progress chip's Stop control — small, inline, never the
+   primary button style, so it reads as an abort not an action. */
+.ap-cancel { font-size: var(--fs-2xs); padding: 2px 8px; }
+.ap-cancel:disabled { opacity: .55; cursor: default; }
 .fchip-loop { margin-left:auto; border-style:dashed; }
 .finding-ink { background:transparent; color:inherit; font:inherit; border-bottom:2px solid var(--lamp); cursor:help; border-radius:1px; }
 .finding-ink.ink-high { border-bottom-color:var(--danger); box-shadow:inset 0 -3px 0 rgba(200,80,58,.14); }
 .finding-ink.ink-medium { border-bottom-color:var(--sev-mid); box-shadow:inset 0 -3px 0 color-mix(in oklab, var(--sev-mid) 12%, transparent); }
 .finding-ink.ink-low { border-bottom-color:var(--ok); box-shadow:inset 0 -3px 0 rgba(124,196,138,.10); }
+/* D2-a: a finding the writer marked addressed, shown only because they asked
+   to see addressed findings. It keeps its place on the page but loses the
+   severity colour and the solid underline — the page must not re-flag a call
+   the writer already made. Dashed, not solid: still findable, no longer a
+   complaint. */
+.finding-ink.ink-done { border-bottom-style:dashed; border-bottom-color:var(--text-muted); box-shadow:none; }
 .ink-chip { font-style:normal; font-size:var(--fs-3xs); font-weight:700; margin-left:var(--sp-2); padding:0 5px; border-radius:999px; background:var(--lamp); color:var(--accent-ink); vertical-align:super; }
 .finding-ink.ink-halo { animation:ink-halo 4s ease-out 1; }
 @keyframes ink-halo { 0%,70% { box-shadow:0 0 0 2px var(--glow-strong), 0 0 18px var(--glow-strong); } 100% { box-shadow:none; } }
 .finding-ink.flash { animation:ink-flash 1.6s ease-out 1; }
 @keyframes ink-flash { 0%,60% { background:var(--glow); } 100% { background:transparent; } }
 #dock-tab-evidence.has-unread::after { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lamp); margin-left:4px; box-shadow:0 0 8px var(--glow-strong); }
+/* The edge affordance is the only dock surface visible while the dock is
+   closed — the report-ready dot must live here too, or a first analysis
+   completes with no visible signal at all (RE-B4 audit 2026-10-01). */
+#right-edge-affordance.has-unread::after { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lamp); margin-left:6px; box-shadow:0 0 8px var(--glow-strong); }
+#right-edge-affordance.has-unread { border-color:var(--lamp); box-shadow:0 0 12px var(--glow); }
 .dock-arrival-strip { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-3); border:1px solid var(--lamp); border-radius:var(--r-md); background:var(--glow); }
 .dock-arrival-head { display:flex; align-items:baseline; gap:var(--sp-3); flex-wrap:wrap; }
 /* P1.9 (spec §6): the strip's visual hierarchy now follows the writer's
@@ -6285,6 +6430,12 @@ body:not(.idea-mode) .desk {
 .dock-arrival-retry { align-self:flex-start; appearance:none; border:1px solid var(--danger); background:var(--danger-bg,rgba(200,80,58,.10)); color:var(--danger-text); border-radius:var(--r-sm); padding:2px var(--sp-3); font-size:var(--fs-2xs); cursor:pointer; }
 .dock-arrival-retry:disabled { opacity:.6; cursor:default; }
 .dock-ghosted summary { font-size:var(--fs-2xs); color:var(--text-faint); cursor:pointer; }
+/* D2-a upgrade notice: a mark held aside, not an error. Neutral ink on the
+   seam — never a severity colour, because nothing here is wrong. */
+.dock-ambiguous-notice { border-left:2px solid var(--line); padding-left:var(--sp-5); }
+.dock-ambiguous-notice .dock-lens-hint { margin-bottom:var(--sp-3); }
+.dock-notice-close { font-size:var(--fs-3xs); color:var(--text-muted); background:none; border:1px solid var(--line); border-radius:999px; padding:2px var(--sp-5); cursor:pointer; }
+.dock-notice-close:hover { color:var(--text); border-color:var(--text-faint); }
 .dock-ghosted-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
 .dock-ghosted-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
 .dock-ghosted-intent { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; white-space:nowrap; }
@@ -6306,6 +6457,43 @@ body:not(.idea-mode) .desk {
 .intent-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
 .intent-btn:hover { border-color:var(--lamp); color:var(--lamp); }
 .intent-btn.active { border-color:var(--ok); color:var(--ok); font-weight:700; }
+/* The truth axis — its own row, its own question ("is it right?"), kept OUT of
+   .finding-note-actions on purpose: that row has a measured one-row budget the
+   suite gates, and three more buttons would re-wrap it. Visually distinct from
+   the intent row so the two questions never read as one control. */
+.finding-verdict-row { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; margin:0 0 var(--sp-3); }
+/* 10px, not the 9px --fs-3xs it first shipped at: a finding card's every
+   painted text layer has a 10px floor (e2e_browser_dock_sections.py measures
+   it), and the label is painted text on the card like any other. */
+.finding-verdict-label { font-family:var(--font-mono); font-size:var(--fs-2xs); letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
+.verdict-btn { appearance:none; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); padding:1px var(--sp-2); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
+.verdict-btn:hover { border-color:var(--accent); color:var(--accent); }
+.verdict-btn.active { border-color:var(--accent); color:var(--accent); font-weight:700; }
+/* the accuracy meter, on the Coverage section: the writer's own verdicts tallied */
+.dock-accuracy { margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--line); }
+.dock-acc-head { font-size:var(--fs-sm); color:var(--text); margin:0 0 var(--sp-1); }
+.dock-acc-sub { font-size:var(--fs-2xs); color:var(--text-muted); margin:0; line-height:1.5; }
+/* The withdrawal ledger (integrity gate): what left the delivered set, and why.
+   Muted ink, never a severity colour — nothing here is a defect, it is the
+   report accounting for its own removals. The row idiom mirrors .dock-ghosted
+   (a held-aside mark is the same kind of disclosure). */
+.dock-wd-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-2) 0; border-top:1px dashed var(--line-soft); }
+.dock-wd-row:first-child { border-top:0; }
+.dock-wd-action { font-size:var(--fs-3xs); color:var(--text-faint); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+.dock-wd-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
+.dock-wd-reason { font-size:var(--fs-3xs); color:var(--text-faint); font-style:italic; margin-left:auto; }
+.dock-wd-note { font-size:var(--fs-3xs); color:var(--text-faint); margin:var(--sp-2) 0 0; }
+/* The feedback ledger (gate 9): what happened to the previous run's notes.
+   Muted ink throughout — this is a record, not a verdict. The one accent is on
+   `likely_resolved`, the writer's own payoff, and it uses the ok colour rather
+   than a severity colour because nothing here is a defect. */
+.dock-ledger-head { font-size:var(--fs-2xs); color:var(--text-muted); font-weight:600; margin:var(--sp-3) 0 var(--sp-1); }
+.dock-ledger-head:first-child { margin-top:0; }
+.dock-ledger-row { display:flex; gap:var(--sp-3); align-items:baseline; padding:var(--sp-1) 0; }
+.dock-ledger-issue { font-size:var(--fs-2xs); color:var(--text-muted); }
+.dock-ledger-sim { font-size:var(--fs-3xs); color:var(--text-faint); margin-left:auto; white-space:nowrap; }
+.dock-ledger-row.dock-ledger-likely_resolved .dock-ledger-issue { color:var(--ok); }
+.dock-ledger-note { font-size:var(--fs-3xs); color:var(--text-faint); margin:var(--sp-3) 0 0; line-height:1.5; }
 @media (prefers-reduced-motion: reduce) {
   .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
 }

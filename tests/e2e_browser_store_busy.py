@@ -127,12 +127,13 @@ def main():
             shown = _wait_for(page, "() => { const b = document.getElementById("
                                     "'error-banner'); return !!b && "
                                     "getComputedStyle(b).display !== 'none'; }", 30000)
-            # `showError` reveals the banner and `announce()` lands the words on the
-            # NEXT animation frame — that deferral is the point of UX-1 (a role="alert"
-            # region only announces if it is already rendered). So the instant this poll
-            # returns true the banner is visible with empty text, and reading it there
-            # measured a state the product holds for one frame. Measured on 2026-09-27:
-            # the same tree gave 7/0 and 5/2 on two runs. The text gets its own wait.
+            # `showError` reveals the banner and lands the words in the SAME task
+            # (the 2026-09-30 sync fix), so by the time this poll returns true the
+            # text is already in. Before that fix the text arrived one animation
+            # frame late (the UX-1 deferral), and reading at this instant measured
+            # a state the product held for one frame — the same tree gave 7/0 and
+            # 5/2 on two runs on 2026-09-27. The text gets its own wait anyway:
+            # the poll must not depend on which half of showError it races.
             _wait_for(page, "() => { const t = document.getElementById("
                             "'error-banner-text'); return !!t && "
                             "t.textContent.trim() !== ''; }", 5000)

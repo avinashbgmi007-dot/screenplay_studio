@@ -107,6 +107,28 @@ class Checks:
         sys.exit(1 if self.failed else 0)
 
 
+def banner_text(page, timeout=5000):
+    """The error banner's text, once it is there (kept from the deferral era).
+
+    Before 2026-09-30 announce() cleared the element and set the message in
+    the NEXT animation frame, so a read issued the moment the banner became
+    visible could see "" — server_url_guard failed on CI that day on exactly
+    this (banner visible, both text checks empty, every surrounding check
+    green). showError now writes the text synchronously, but this helper
+    stays: it is cheap, it still bounds the read, and it keeps every banner
+    reader independent of how showError is sequenced internally.
+    Waits (bounded) for the text to exist and returns it stripped; "" if the
+    banner never carries text within the timeout.
+    """
+    try:
+        page.wait_for_function(
+            "() => { const e = document.getElementById('error-banner-text');"
+            " return e && e.textContent; }", timeout=timeout)
+    except Exception:
+        pass
+    return (page.locator("#error-banner-text").inner_text() or "").strip()
+
+
 def seen_visible(target, selector=None, timeout=8000):
     """Bounded poll: True if the target becomes visible within `timeout`.
 
@@ -152,6 +174,107 @@ def clicked(target, selector=None, timeout=4000):
         return True
     except Exception:
         return False
+
+
+def became_true(page, js, timeout=8000):
+    """Poll a JS predicate until it is TRUE; False if it never gets there.
+
+    Never raises. The companion to `seen_visible` for state that is not a
+    visibility question: an async round trip (undo POSTs and the manuscript
+    re-renders, a rewrite applies) whose settle time is machine-dependent. A
+    fixed `wait_for_timeout` after such a write is a race — the Windows CI VM
+    lost two of them in one run (2026-10-02) while the same commit passed on
+    the parallel run. Poll the observable change, then assert; a state that
+    never arrives still fails by name.
+
+        check("undo: Ctrl+Z removes the applied edit", became_true(page, gone_js))
+    """
+    try:
+        page.wait_for_function(js, timeout=timeout)
+        return True
+    except Exception:  # noqa: BLE001 - the caller's check IS the report
+        return False
+
+
+def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
+    """Move the mouse where a writer's would be, then poll until the control is
+    genuinely the hit target. Returns True/False — never raises.
+
+    `#desk-toolbar` and `#project-bar` are auto-hiding chrome: while idle they
+    carry `opacity: 0; pointer-events: none` (style.css `.auto-hide-chrome`), and
+    a mousemove with `clientY < 120` is what brings them back for 4s
+    (`CHROME_HIDE_DELAY`, app.js). Playwright's `is_visible()` ignores opacity, so
+    a `check(name, el.is_visible())` passes on a button no writer could actually
+    click, and the following `.click()` dies with
+    `<div id="manuscript-workspace">… intercepts pointer events` — Playwright
+    checks the hit target BEFORE it moves the mouse, so its own retries never
+    recover and the 30s timeout aborts the run (root-caused 2026-09-23:
+    phase8_lifecycle's first click landed past the 4s idle timer; the same trap
+    turned phase14_signoff_journey red on the Windows CI runner 2026-10-01,
+    where the upload's render gap pushed its desk click past the timer).
+
+    Emulating the writer — arrive via the top edge, wait for the real hit test —
+    is what makes the click the writer's click. Polling also covers the second
+    transition in the way: `#sidebar.sidebar-collapsed` animates 264px -> 0 and
+    briefly overlays the toolbar's left edge, where Run Analysis sits.
+    """
+    page.mouse.move(700, 8)
+    deadline = time.time() + timeout / 1000
+    hit = "missing"
+    while time.time() < deadline:
+        hit = page.evaluate(
+            """(sel) => {
+              const e = document.querySelector(sel);
+              if (!e) return 'missing';
+              const r = e.getBoundingClientRect();
+              const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+              if (!t) return 'none';
+              return (e === t || e.contains(t)) ? 'ok' : t.tagName + '#' + (t.id || '-');
+            }""", sel)
+        if hit == "ok":
+            return True
+        page.wait_for_timeout(100)
+    return False
+
+
+def reveal_and_click(page, selector, timeout=4000, attempts=6):
+    """Click a control that lives in the Nocta AUTO-HIDE CHROME. Never raises.
+
+    `#project-bar` and `#desk-toolbar` fade to `opacity: 0; pointer-events: none`
+    after 4s idle (`style.css:4712`, `app.js:10469 CHROME_HIDE_DELAY`), so any
+    control inside them stops being hit-testable. Note this is NOT a CSS-visibility
+    problem: `is_visible()` returns **True** for the hidden bar, because opacity 0
+    is still "visible" to Playwright. The failure surfaces as the actionability
+    error `element is not visible`, which is misleading.
+
+    The shipped reveal paths are a mousemove with `clientY < 120` and `focusin`
+    on either bar (`app.js:10498`, `app.js:10509`). Playwright's actionability
+    retries do NOT re-arm the idle timer, so the fleet's hand-copied single
+    `page.mouse.move(...)` before a bare `.click()` can still lose the race: the
+    4s window expires mid-retry, the bar goes `pointer-events: none`, and the
+    click times out on a control that is fine.
+
+    Measured 2026-10-07 (`C:/tmp/ss_probe/chrome_flake_probe.py`): after a 6s
+    idle, a bare `#room-cowrite-btn`.click() -> TimeoutError; with one
+    `mouse.move(500, 60)` first -> OK. This is the exact signature that failed
+    `smoke` on CI run 37573662778 while the SAME SHA (3c8bc4f) passed on the push
+    run and the suite passed locally — a flake, not a regression.
+
+    Re-arms before EVERY attempt so the window is refreshed rather than raced.
+    Still a real pointer click: if the control genuinely cannot be clicked, this
+    returns False and the caller's assertion fails. Bounded, like `clicked()`.
+
+        if not reveal_and_click(page, "#room-cowrite-btn"):
+            check("partner drawer: the Co-write control was reachable", False, "")
+    """
+    for _ in range(attempts):
+        page.mouse.move(700, 20)  # clientY < 120 -> the shipped showChrome path
+        try:
+            page.locator(selector).click(timeout=timeout)
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def note(label, value=""):
@@ -427,6 +550,16 @@ def start_studio(projects_dir=None, env_extra=None, timeout=60, server_url=None,
         os.makedirs(projects_dir)
     port = free_port()
     env = dict(os.environ)
+    # The fleet tests the UI, not the analyzer. A model-backed pipeline pass
+    # (gate 11's observation pass) adds ~24 round-trips per analyze() against
+    # the in-process demo model, and that slow analysis made the desk's
+    # auto-hide chrome re-hide before Playwright's actionability check could
+    # land its click — desk_controls lost 3 checks while nothing was broken.
+    # conftest.py disables the pass for the pytest suite for the same reason;
+    # the fleet needs its own copy because a direct
+    # `"$PY" tests/e2e_browser_*.py` run never loads conftest. `env_extra`
+    # still wins, so a suite that genuinely wants the pass can ask for it.
+    env["SCREENPLAY_STUDIO_OBSERVATION_PASS"] = "0"
     env.update(env_extra or {})
     env["PYTHONUNBUFFERED"] = "1"
     if demo_model:

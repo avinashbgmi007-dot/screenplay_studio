@@ -68,6 +68,11 @@ python -m screenplay_studio.webapp_server --port 8500 --projects-dir ./studio_pr
 
 Then open http://127.0.0.1:8500.
 
+- **Loopback-only by design.** The studio binds `127.0.0.1` (no `--host` flag
+  exists to widen it), the model URL must be loopback unless you pass
+  `--allow-remote-server`, and writes carry a per-process token. Nothing about
+  the app is hardened for a LAN or the open internet: do not put it behind a
+  reverse proxy or port-forward it and assume the guards travel with it.
 - **`--port`** defaults to `8500`; pass another if it's taken.
 - **`--projects-dir`** defaults to `./studio_projects` — keep passing the same
   value across restarts, or your shelf will look empty.

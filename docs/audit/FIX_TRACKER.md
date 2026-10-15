@@ -4,6 +4,183 @@
 without re-deriving it from `git log`. Source audit:
 `docs/audit/production_readiness_2026-09-21.md`.
 
+**Last updated:** 2026-10-02 (branch `feature/readiness-remediations`, stacked on PR #4 — **the seven
+production-readiness remediations from the 2026-10-01 audit, R1→R7, each pinned by tests.** Full
+dispositions in `docs/audit/production_readiness_2026-10-01.md`. (1) R1 arrival gap: a FIRST
+analysis never scheduled the arrival peek — `last_pass` only exists from the second pass on — so
+the writer got no fresh-report signal; a first completion now sets an in-session
+`analysisCompletedFor` flag that the project-load path consumes exactly once (a plain reload of an
+already-read report never fakes a fresh one), and the right-edge affordance — the only dock
+surface visible while the dock is closed — joins the evidence tab in carrying the unread dot.
+(2) R2 cancel: `POST /api/analyze/cancel` flips a per-module cancel flag; `run_analyze` restores
+the stage to its pre-run state (snapshot taken on the force path too) so a cancelled run leaves
+nothing written and the SPA poller says so plainly instead of erroring, with a Stop button in the
+progress chip; also fixed a latent NameError in `_analyze_locked` that had been 500ing EVERY
+analyze call. (3) R4 generation timeouts: `chat_json` runs under a 600s wall-clock budget
+(monotonic deadline, per-attempt slices, the final error names the actual attempts made and the
+budget), the base client can pin a longer socket timeout, and the pipeline's retry hook surfaces
+as a visible "retrying" beat plus Run Notices (`AnalysisResult.notices` → "## ℹ️ Run Notes" in the
+report and `notices` in the findings JSON). (4) R5 upload validation: 0-byte files are rejected at
+create (400, "empty (0 bytes)") and scene-less parse results are rejected with Fountain guidance
+and a retry permission, instead of a project that parses "OK" with 0 scenes and can only fail
+later. (5) R3+R6 CI: `test-live-model` (ubuntu-24.04, gated on the `STUDIO_LIVE_LLM_URL` repo
+variable, drives the live gun_pen_audit via `E2E_BASE`) and `test-browser-windows` (windows-latest,
+full fleet, bash shell, chromium without `--with-deps`) — the fleet now gates on the platform
+writers actually use. (6) R7 library backup: `GET /api/library/backup` zips every project (skips
+`writer_profile.json` and non-project entries, excludes `.lock`/`.tmp`, collects per-project
+failures non-fatally) with an embedded `library-backup.json` manifest, and the dashboard's "Back
+up all" button downloads it through a token-carrying fetch + blob (a bare `<a>` cannot carry
+`X-Studio-Token`); route census 91→93 with the API route map and its test pin updated. OUTCOME:
+full pytest 2012 passed / 3 skipped (the pre-existing store_fault_injection skip), ruff clean,
+JS 23/23, browser fleet 60 suites — 59 passed / 1 skipped (gun_pen_audit, live-only, unchanged) /
+0 failed, 1514 checks; four new suites (test_analyze_cancel, test_generation_timeout,
+test_upload_validation, test_library_backup) add 26 checks.)
+
+**Follow-up (2026-10-02, same branch):** the new Windows browser gate then went RED once on the
+push-event run — `phase14_signoff_journey`, 44s elapsed against 41s for its whole green run, a 30s
+Playwright click timeout with `#manuscript-workspace` intercepting. Root cause: the suite's
+`#desk-analyze-btn` click was the fleet's last blind click on auto-hiding chrome (idle = `opacity:
+0` + `pointer-events: none`; only a `clientY < 120` mousemove wakes it for 4s), and the upload's
+render gap pushed it past the idle timer — Playwright checks the hit target BEFORE it moves the
+mouse, so its own retries never recover. Fixed by promoting phase8's `reveal_chrome` into
+`e2e_browser_common` (phase8 and desk_controls had been carrying two copies; all three now share
+one) and having phase14 wake + hit-test before both chrome clicks (`#desk-analyze-btn`,
+`#home-btn`), with the desk click bounded so an unreachable control is a named failure instead of
+a journey-aborting timeout; its two new checks lift a full green fleet by 2 (1514 → 1516 at equal
+coverage). `run_browser_suites._error_detail` now reports the traceback's raising frame alongside
+the six-line tail — the red line showed the action log alone, which is why the call site had to be
+re-derived by hand — with `tests/test_production_readiness.py` pinning both the frame and the
+no-traceback shape. The next Windows run then showed what that job is for: with the click fixed,
+two fixed-sleep races surfaced that a slower runner loses — phase14's `Ctrl+Z` undo pair and
+`text_popup`'s Stash round trip, both red on the push run with the identical commit green on the
+PR run. Both now wait for the observable change instead: `e2e_browser_common.became_true` (a JS
+predicate poll, the companion to `seen_visible`) for the apply/undo/redo trio, and a bounded
+server-count poll in `text_popup`. The contract each check asserts is unchanged, and a state that
+never arrives still fails by name — a fixed sleep is never a sync point.
+
+**Last updated:** 2026-10-01 (branch `feature/post-trust-hardening`, PR #4 — **three edges the real-model
+probe + Pain_3 validation left on the table, all fixed and pinned.** (1) RE-B4, the demo-fallback
+false positive: the import-time reachability probe can only test the DEFAULT url — `--server` is
+parsed later in `main()` — so a desk pointed at a LIVE non-default llama-server while the default
+was down silently ran the demo craft model for the whole session (llama.cpp binds IPv4;
+`localhost` resolves `::1` first on Windows). Fix: the auto-fallback marks itself
+(`_DEMO_FALLBACK_AUTO`), `main()` undoes it, applies the writer's actual `--server`, and
+re-decides with a real probe; explicit demo choices (env / `--demo-model`) are never
+second-guessed; the flask-CLI path keeps its import-time behavior; the E2E fleet's
+`PYTEST_CURRENT_TEST` escape hatch moved to the `main()` call site so deterministic boots are
+untouched. (2) char_reads resilience: the pass is ONE one-shot `chat_json` call, so a generation
+that never arrives (the probe's 3-minute stall then bare `failed_categories`) now gets a bounded
+retry (2 attempts, 2s/5s backoff) and, on final failure, an exception that names the pass and
+carries the original reason into `report.errors`. (3) SPA trust line: the readout's words moved
+into `core.js` (`verificationReadoutText`, node-tested — `no_quote` never sits in the
+denominator; nothing-checkable prints a count, never 0%), `verificationReadout()` delegates, and
+`openProject` resets `state.report` so a previous script's numbers cannot leak into a
+report-less project; a NEW e2e (`tests/e2e_browser_trust_line.py`, 5 checks) drives the full
+chain from a PRE-BUNDLE report on disk through the serve-time stamp to the dock strips — the
+chain no suite had ever run as a whole (dock_sections seeds the block by hand). OUTCOME: full
+pytest 1986 passed / 3 skipped, ruff clean, JS 23/23, trust e2e 5/5, dock_sections 176/176.)
+
+**Last updated:** 2026-10-01 (branch `feature/feedback-trust`, PR #3, stacked on PR #2 — **the
+A+B feedback-trust bundle: findings now carry a machine-checked honesty signal end to end.**
+Part A: quote-less findings (theme/character/structure/scene_function, which reason from scene
+summaries and were previously unverifiable) now get a scene-EXISTENCE check — `_quoteless()` in
+`verify_finding` maps every cited scene_ref against the parsed script and returns `no_quote`
+when ≥1 ref is real or `scene_not_found` when none are; the prompts already forced
+`evidence_quote: null` for these categories, so no prompt or model-call changed. Part B: the
+aggregate quote-verified rate is surfaced on all four read paths — report JSON
+(`verification_summary`, recomputed at SERVE time inside `_sanitize_report` from the exact rows
+being served, so pre-bundle reports gain the block on read with no re-analysis), markdown
+(`**Quote-verified rate:**` line, rendered only when quote_bearing > 0 — a percentage over
+nothing is a lie), `/findings/summary` (`"verification"` key), and pass-history
+(`verification_counts`, back-compat: key kept ABSENT when the caller omits it, damaged fields
+stripped on read, pre-field entries load unchanged). `verification_rate()` counts
+`quote_bearing = verified + not_found` and excludes `no_quote` (nothing to check) and
+`scene_not_found` (a failure, not a denominator). Guarantees held: no prompt/model-call
+changes, no findings added or removed, zero app.js edits (no SPA census risk), fix-queue 1:1
+untouched. Tests: 16 new in `tests/test_verification_summary_surface.py` (quote-less rules,
+rate rule, served-report incl. old-report-gains-block-on-read, pass-history incl. back-compat
++ damaged-block); the shape pin at `tests/test_webapp_api.py:1067` deliberately gained
+`verification_counts` — a named contract change, not a silent one. Full pytest 1977 passed /
+3 skipped, ruff clean, CI 10/10 across both events (run 36799024419).
+
+**REAL-MODEL BASELINE (2026-10-01, live llama-server):** the probe
+(`docs/audit/feedback_probe_session.py`, untracked by design) ran the bundled sample against
+the local server — model `gemma_vn26b-experts-v1-Q4_K_M.gguf`, probe self-reports
+`model_used`/`real_model` so a demo fallback cannot fake the numbers. Analyze 200 in 621s;
+15 findings: dialogue 2/2 with quotes, BOTH `verified` (rate 100.0% of quote-bearing); 13
+quote-less findings all correctly `no_quote` (0 `not_found`, 0 `scene_not_found`); all four
+Part-B surfaces verified byte-real on the served report JSON, the markdown, `/findings/summary`
+and `pass_history.json`; persona turns landed (Sameer 74s, Sushruta 70s). The design split is
+visible in real data: quotable categories verify at 100%, summary-reasoned categories are
+honest about having no quote to check.
+
+**PRODUCTION-SCALE VALIDATION (2026-10-01, `Pain_3_updated_FULL`, 22 scenes, 43 findings):** the
+writer's own full-length analysis (desk on 8500/model 8099, booted PRE-bundle so its stored
+artifacts are old-code) was re-verified OFFLINE with the bundle's verifier — pure CPU, no model
+calls: verdicts are BYTE-IDENTICAL to stored (13 verified / 1 not_found / 29 no_quote / 0
+scene_not_found, zero flips), the derived rate lands at **92.9%** (13 of 14 quote-bearing), and
+the one `not_found` is the flag-don't-drop policy doing its job on a genuine quote mismatch.
+No-regression proof on real data: the bundle changes nothing about existing verdicts. Old-code
+surfaces on this project confirmed the back-compat premise (markdown lacks the rate line,
+pass-history lacks verification_counts); after a desk restart on this branch, the served JSON
+surfaces upgrade on read with no re-analysis — the markdown rate line arrives on the NEXT
+analysis, since markdown is stamped at analysis time.
+
+**Product edges found and REPORTED, deliberately not fixed in this bundle:** (1) the demo
+fallback decision runs at MODULE IMPORT, before `main()` parses `--server` — a desk pointed at
+a live non-default server still silently demos if the DEFAULT url (`http://localhost:8080`,
+which resolves `::1` first on Windows while llama-server binds IPv4 only) is down at import;
+the probe works around it with `SCREENPLAY_STUDIO_DEMO_MODEL=0` set before import. (2) On the
+real run, the `char_reads` category FAILED (`failed_categories`); its findings simply don't
+exist and never enter the denominators, so the trust numbers stay truthful — but the category's
+real-model reliability is its own follow-up.)
+
+**Last updated:** 2026-10-01 (branch `feature/audit-remediation`, PR #2 — **the one-frame
+visible-but-empty error banner window is dead at the source.** `showError` routed its text
+through `announce()`, which clears the element and lands the message in the NEXT animation
+frame — deliberate UX-1, and correct for the always-rendered `#a11y-status`, but on the
+`role="alert"` banner it held the region visible with empty words for one frame. That window
+is what flaked `server_url_guard` twice on CI (the test-side `banner_text()` helper was the
+workaround); it is now impossible for every reader: the reveal and the text land in the SAME
+task — the canonical role="alert" show-with-content pattern — so the announcement fires on
+the mutation that both shows and fills the alert. `announce()` is untouched for its remaining
+callers (all target `#a11y-status`). The `live_regions` mutation-order check survives
+unchanged; its repeat-error clear check had to become a rAF frame sampler pinning the real
+regression (no rendered frame with empty text), because the intermediate empty write it
+looked for WAS that window. Accepted trade: a repeated identical error no longer gets
+announce()'s clear-then-rewrite diff signal — the window and the diff signal were the same
+16ms, and the window was the worse half. OUTCOME: commit `de04459`; live_regions 22/22 with
+both new sampler checks, store_busy/server_url_guard/branch_ui/session_breaks/stale_socket_recovery
+all green (72 checks), JS units 16/16, full pytest 1961 passed / 3 skipped.)
+
+**Last updated:** 2026-09-30 (branch `feature/audit-remediation`, PR #2 — **the session_breaks
+"CI-only flake" was a real product bug: recovery had one trigger where the restart produces
+two.** The capability token is per process and the client re-minted only on HTTP 403 — but the
+first fetch a tab attempts against the restarted process can land on a keep-alive socket the OLD
+process held open, and Chromium discovers the dead socket BELOW HTTP (`TypeError: Failed to
+fetch`, no request sent, so no 403 ever comes back and the recovery never fires). Linux holds
+those dead pooled connections (close without RST); Windows evicts them instantly — hence 23/23
+locally every run, L1b/L1c/L1d twice on CI on 2026-09-30, and the failure JSON naming the
+network-level banner text rather than the token string. Fix: a shared `_staleRecovery` in
+`app.js` (used by `_apiOnce` AND the SSE `streamChatTurn` path) treats the network-level
+TypeError as a second trigger — a passive re-mint via `/` that DECAYS (every 250ms across a 2.5s
+wall-clock deadline, because the page can hold ~six corpse connections and
+Chromium needs ~2s to reap them; CI's own rerun showed the recovery firing
+but giving up before the pool cleared), with per-trigger retry safety:
+a below-HTTP death never sent anything, so the retry runs whenever the re-mint proves the
+server is up; a 403 was received and rejected, so it still requires the token to have moved.
+A truly unreachable studio now fails with a readable sentence instead of a raw `TypeError`.
+Pinned deterministically by the new `tests/e2e_browser_stale_socket_recovery.py` — 14 checks:
+one intercepted below-HTTP death must re-mint, retry and land silently; every attempt dying
+must surface the readable sentence, bounded, storing nothing. A real kill reproduces the
+poisoned socket only by luck, which is why a kill-based suite could never have pinned it.
+OUTCOME: commits `8bea3ea`+`689c3e1`+`024f93d` — session_breaks passed FIRST TRY on the
+pull_request event that flaked three times (23/23 in 9s), the new guard ran green in CI,
+and PR #2 went fully CLEAN across both events with no reruns. A second, unrelated latent
+flake surfaced and was fixed in `024f93d`: announce() lands banner text in the NEXT
+animation frame (UX-1), so suites reading #error-banner-text the instant the banner
+becomes visible can read "" — the harness now has banner_text(), which waits (bounded).)
+
 **Last updated:** 2026-09-21 (pass 14b — **a dropped connection was hiding a missing error
 message.** The analyze pre-flight sat OUTSIDE the handler's `try`, so a refused
 `os.remove(progress.json)` escaped it — and Werkzeug answers an exception it cannot convert by

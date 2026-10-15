@@ -169,3 +169,221 @@ def test_pipeline_integration():
     assert "🚩 Dangling" in md
     j = to_findings_json(result)
     assert j["setup_payoff"] == result.setup_payoff
+
+
+def _doc_two_scenes():
+    return _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "MARA holds a small CIGAR, turning it over.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "The CIGAR sits on the table, untouched.\n")
+
+
+def test_false_dangling_flips_to_paid_with_proof():
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    entries = adjudicate_ledger([{
+        "setup": "The cigar", "kind": "object",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "dangling", "note": "Never lit."}], _doc_two_scenes())
+    assert entries[0]["status"] == "paid"
+    assert entries[0]["verified"] is True
+    assert "2" in entries[0]["verify_note"]
+    assert "dangling" in entries[0]["verify_note"], \
+        "the note must name what the verdict was, not what it became"
+
+
+def test_true_dangling_keeps_verdict():
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    entries = adjudicate_ledger([{
+        "setup": "The moonstone amulet", "kind": "object",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "dangling", "note": "Never seen again."}], _doc_two_scenes())
+    assert entries[0]["status"] == "dangling"
+    assert entries[0]["verified"] is False
+
+
+def test_setup_absent_from_setup_scenes_is_marked():
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    entries = adjudicate_ledger([{
+        "setup": "The moonstone amulet", "kind": "object",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "paid", "note": "Lands."}], _doc_two_scenes())
+    assert entries[0].get("setup_ungrounded") is True
+    assert entries[0]["status"] == "paid"
+
+
+def test_fold_in_rows_carry_the_setup_line():
+    from screenplay_analyzer.setup_payoff import dangling_findings
+    doc = _doc_two_scenes()
+    ledger = [{"setup": "The cigar", "kind": "object",
+               "setup_scenes": [1], "payoff_scenes": None,
+               "status": "dangling", "note": "Never lit."}]
+    findings = dangling_findings(ledger, [], doc=doc)
+    assert len(findings) == 1
+    assert findings[0]["evidence_quote"] is not None
+    assert "cigar" in findings[0]["evidence_quote"].lower()
+
+
+def test_fold_in_without_doc_keeps_old_shape():
+    from screenplay_analyzer.setup_payoff import dangling_findings
+    ledger = [{"setup": "The cigar", "kind": "object",
+               "setup_scenes": [1], "payoff_scenes": None,
+               "status": "dangling", "note": "Never lit."}]
+    findings = dangling_findings(ledger, [])
+    assert findings[0]["evidence_quote"] is None
+
+
+def test_ledger_verified_fields_reach_json():
+    from screenplay_analyzer.report import to_findings_json
+    from screenplay_analyzer.pipeline import AnalysisResult
+    r = AnalysisResult(doc=_parse(SAMPLE))
+    r.setup_payoff = [{"setup": "The cigar", "kind": "object",
+                       "setup_scenes": [1], "payoff_scenes": [2],
+                       "status": "paid", "note": "Lands.",
+                       "verified": True, "verify_note": "terms recur in scene 2"}]
+    assert to_findings_json(r)["setup_payoff"][0]["verified"] is True
+
+
+def test_cited_payoff_before_setup_is_distrusted():
+    """A model-cited payoff at or before the setup is confusion, not proof:
+    sc2 setup 'paid' via a sc1 mention must come back unverified."""
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "The X mark is burned here.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "He looks at the X mark and sighs.\n")
+    entries = adjudicate_ledger([{
+        "setup": "The X mark", "kind": "object",
+        "setup_scenes": [2], "payoff_scenes": [1],
+        "status": "paid", "note": "Lands."}], doc)
+    assert entries[0]["status"] == "paid"
+    assert entries[0]["verified"] is False
+    assert entries[0].get("payoff_unproven") is True
+
+
+def test_meta_words_dont_sink_setup_match():
+    """Trial rerun: 'Rishi's promise to drop something (Scene 10)' failed
+    setup match on scene/promise/something/someone meta words."""
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "RISHI\nUndu nen drop chestha.\n")
+    entries = adjudicate_ledger([{
+        "setup": "Rishi's promise to drop something (Scene 1)", "kind": "promise",
+        "setup_scenes": [1], "payoff_scenes": None,
+        "status": "dangling", "note": "Never kept."}], doc)
+    assert "setup_ungrounded" not in entries[0], entries[0].get("verify_note")
+
+
+def test_payoff_search_never_runs_backwards():
+    """Trial rerun: a sc17 setup 'paid' via a sc4 recurrence. Payoff must
+    come strictly after the setup in narrative order — even when the setup
+    terms are found in BOTH scenes, only the later one counts."""
+    from screenplay_analyzer.setup_payoff import adjudicate_ledger
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "The X mark is burned here.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "He looks at the X mark and sighs.\n")
+    entries = adjudicate_ledger([{
+        "setup": "The X mark", "kind": "object",
+        "setup_scenes": [2], "payoff_scenes": None,
+        "status": "abandoned", "note": "Gone."}], doc)
+    assert entries[0]["status"] == "abandoned"
+    assert entries[0]["verified"] is False
+
+
+TIME_DOC = """Title: T
+Author: T
+
+INT. ROOM - NIGHT
+
+MARA
+Inka 3 mints a undi, hurry up now.
+
+CUT TO:
+
+INT. HALL - DAY
+
+The wall clock reads 00:00 sharp and stops.
+"""
+
+
+def test_time_pressure_seeds_found_per_scene():
+    """Trial-9 recall gap: a countdown in dialogue is neither a KG prop nor
+    a promise-shaped line. One seed per scene that carries a time line."""
+    from screenplay_analyzer.setup_payoff import _time_pressure_seeds
+    seeds = _time_pressure_seeds(_parse(TIME_DOC))
+    assert len(seeds) == 2, seeds
+    assert seeds[0].startswith("- TIME-PRESSURE (scene 1)")
+    assert "3 mints" in seeds[0]
+    assert seeds[1].startswith("- TIME-PRESSURE (scene 2)")
+    assert "00:00" in seeds[1]
+
+
+def test_time_pressure_seeds_absent_without_time_lines():
+    from screenplay_analyzer.setup_payoff import _time_pressure_seeds
+    assert _time_pressure_seeds(_parse(SAMPLE)) == []
+    assert _time_pressure_seeds(None) == []
+
+
+def test_wall_clock_set_dressing_does_not_seed():
+    """Trial-11 noise: 'Time is around 6 PM or so on the wall clock' is
+    set dressing, not a beat. Bare 'clock' is not a keyword; a ringing
+    alarm still seeds."""
+    from screenplay_analyzer.setup_payoff import _time_pressure_seeds
+    doc = _parse(
+        "Title: T\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "Time is around 6 PM or so on the wall clock here.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "The phone alarm rings loudly across the room now.\n")
+    seeds = _time_pressure_seeds(doc)
+    assert len(seeds) == 1, seeds
+    assert "(scene 2)" in seeds[0]
+    assert "alarm" in seeds[0].lower()
+
+
+def test_time_pressure_seeds_capped():
+    """Six ticking scenes seed at most MAX_TIME_SEEDS — the seed block must
+    not grow with script length."""
+    from screenplay_analyzer.setup_payoff import (
+        _time_pressure_seeds, MAX_TIME_SEEDS)
+    scenes = "\n\nCUT TO:\n\n".join(
+        f"INT. ROOM {i} - NIGHT\n\nHe has 5 minutes left to decide now."
+        for i in range(6))
+    seeds = _time_pressure_seeds(_parse(f"Title: T\nAuthor: T\n\n{scenes}\n"))
+    assert len(seeds) == MAX_TIME_SEEDS, seeds
+
+
+def test_time_seeds_reach_the_ledger_prompt():
+    """The model can only judge what it is asked about: the seed block in
+    the user prompt carries the TIME-PRESSURE lines."""
+    from screenplay_analyzer.setup_payoff import _seed_candidates
+
+    class RecordingClient(FakeClient):
+        def __init__(self):
+            super().__init__(ledger={"ledger": []})
+            self.users = []
+
+        def chat_json(self, system, user, grammar=None, max_tokens=0, temperature=0.0):
+            self.users.append(user)
+            return super().chat_json(system, user, grammar, max_tokens, temperature)
+
+    doc = _parse(TIME_DOC)
+    kg = build_knowledge_graph(doc)
+    assert any("TIME-PRESSURE" in s for s in _seed_candidates(kg, doc))
+    client = RecordingClient()
+    run_setup_payoff_ledger("overview", kg, client, "", 2, doc=doc)
+    assert len(client.users) == 1
+    assert "TIME-PRESSURE" in client.users[0]
+    assert "3 mints" in client.users[0]

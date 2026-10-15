@@ -198,14 +198,20 @@ class BaseLlamaClient:
             return bool(re.search(r"(busy|in progress|already running|another request)", body or "", re.IGNORECASE))
         return False
 
-    def _post_chat(self, payload: dict, busy_retries: int = 6) -> dict:
-        """POST to /v1/chat/completions with busy-retry. Returns the parsed JSON data."""
+    def _post_chat(self, payload: dict, busy_retries: int = 6, timeout: float | None = None) -> dict:
+        """POST to /v1/chat/completions with busy-retry. Returns the parsed JSON data.
+
+        `timeout` overrides self.timeout for THIS request (seconds). The chat
+        layer passes a shrinking value when it is enforcing a wall-clock
+        budget across its retries, so N attempts can never take N x timeout
+        (audit M1). None keeps the client's configured timeout."""
+        eff_timeout = self.timeout if timeout is None else timeout
         attempt = 0
         while True:
             try:
                 resp = requests.post(
                     f"{self.base_url}/v1/chat/completions",
-                    json=payload, timeout=self.timeout, headers=self.extra_headers,
+                    json=payload, timeout=eff_timeout, headers=self.extra_headers,
                 )
                 status = getattr(resp, "status_code", 200)
                 if self._check_busy(status, getattr(resp, "text", "") or "") and attempt < busy_retries:
@@ -218,7 +224,7 @@ class BaseLlamaClient:
                 raise LlamaServerError(f"Could not connect to llama-server at {self.base_url}.") from e
             except requests.exceptions.Timeout as e:
                 raise LlamaServerError(
-                    f"Request to {self.base_url} timed out after {self.timeout}s. "
+                    f"Request to {self.base_url} timed out after {eff_timeout}s. "
                     f"For a large/slow local model, consider raising the client timeout."
                 ) from e
             except requests.exceptions.HTTPError as e:

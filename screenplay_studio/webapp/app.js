@@ -38,14 +38,19 @@ const state = {
   // destroyed trust in every number. Show the ledger whole; the writer narrows
   // with the chips. Page ink stays naturally sparse because a finding can only
   // ink when it carries a quote (most findings are no_quote).
-  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, category: null, scene: null },
+  findingFilter: { severities: ["high", "medium", "low"], showDeferred: false, showAddressed: false, category: null, scene: null },
+  ambiguousMarks: {},     // marks the scene-key upgrade could not carry (one id, several findings)
   findingMarks: {},       // finding id -> "addressed" | "deferred" (writer intent, server-persisted)
+  findingVerdicts: {},    // finding id -> "correct"|"partial"|"incorrect" (truth axis, server-persisted)
   lastPass: null,         // arrival scorekeeping from the server (R4 diff) — null = first pass
   lastPassKey: null,      // computed_at of the last seen pass (arrival detection)
   passes: [],             // spec 15.4: the revision arc, one entry per analysis
   editsData: null,        // { edits, findings_status } from /edits
   drafts: null,           // { active_draft, drafts } from /drafts
   fixQueue: null,         // { items, acts, dismissed_flags } from /fixqueue
+  fixQueueShowUngrounded: false, // accuracy kit A: ungrounded rows hide by default, one toggle away
+  findingsSummary: null,  // server-joined counts + dawn % from /findings/summary (ONE findings-state load)
+  feedbackLedger: null,   // gate 9: the last two runs reconciled (from /feedback/ledger)
   reportStats: null,      // stats from report.findings.json
   // spec §15.3: { findings, errors, ok } — the two deterministic rule passes
   // re-run on the CURRENT text after an edit. Deliberately not `findings`:
@@ -100,6 +105,62 @@ async function _ensureStudioToken() {
   return _studioToken();
 }
 
+// The capability token is per server PROCESS, and restart recovery has TWO
+// triggers, not one. The obvious one is a 403. The hidden one is a
+// network-level TypeError ("Failed to fetch"): the first fetch a tab attempts
+// against the NEW process can land on a keep-alive socket the OLD process
+// held open, and the browser discovers the dead socket BELOW HTTP — no
+// request is ever sent, so no 403 ever comes back and a 403-only recovery
+// never fired. (Windows' instant-RST socket close evicts the dead connection
+// immediately, which is why local Windows runs always passed while Linux CI
+// flaked.) One shared contract for both triggers: passively re-mint via the
+// document once, retry the request ONCE if the licence actually moved, and
+// never spin — while a retry is in flight _staleRetried caps it, and a
+// genuinely dead server cannot mint a new token, so the caller's failure is
+// readable instead of a loop.
+let _staleRounds = 0;
+async function _staleRecovery(prevTok, retryFn, requireTokenMove) {
+  // The re-mint can land on the NEXT poisoned pooled socket: Linux CI held
+  // SIX corpse connections and Chromium needed ~2s to reap them (that exact
+  // window is what made session_breaks L1 flake). So the re-mint DECAYS —
+  // retried every 250ms across a 2.5s wall-clock deadline, returning the
+  // moment one lands. Still passive GETs, still bounded: a truly unreachable
+  // studio ends the wait at the same deadline and the caller fails readable.
+  const deadline = Date.now() + 2500;
+  for (;;) {
+    try { await fetch("/", { cache: "no-store" }); break; }
+    catch (_) {
+      if (Date.now() >= deadline) return null; /* unreachable: fail readable */
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  const tok = _studioToken();
+  // A below-HTTP death never sent the request, so one retry is always safe
+  // when the re-mint proved the server is up (requireTokenMove=False). A 403
+  // was received and rejected, so only a genuinely moved licence justifies a
+  // retry there (requireTokenMove=True) — unchanged from the W1 contract.
+  const moved = tok && tok !== prevTok;
+  if ((moved || !requireTokenMove) && _staleRounds < 2) {
+    _staleRounds++;
+    try {
+      // The retried request may ITSELF die below HTTP — another stale pooled
+      // socket — and its own catch calls back in here for round two, bounded.
+      return await retryFn();
+    } finally {
+      _staleRounds--;
+    }
+  }
+  return null; // no recovery happened; the caller keeps its own failure
+}
+
+function _deadStudioError() {
+  const e = new Error(
+    "The studio is not reachable right now. If it was restarted, reload this page to keep writing.");
+  e.status = 0;
+  e.tokenStale = true;
+  return e;
+}
+
 async function api(path, options = {}) {
   const data = await _apiOnce(path, options);
   return data;
@@ -113,7 +174,20 @@ async function _apiOnce(path, options, _retry) {
   );
   const tok = await _ensureStudioToken();
   if (tok) headers["X-Studio-Token"] = tok;
-  const resp = await fetch(API + path, { ...options, headers });
+  let resp;
+  try {
+    resp = await fetch(API + path, { ...options, headers });
+  } catch (e) {
+    // Network-level death (poisoned keep-alive socket, server gone): no HTTP
+    // status exists, so the 403 branch below can never see it. This is the
+    // recovery trigger the restart scenario actually produces on Linux.
+    if (e instanceof TypeError) {
+      const out = await _staleRecovery(tok, () => _apiOnce(path, options, true), false);
+      if (out !== null) return out;
+      throw _deadStudioError();
+    }
+    throw e;
+  }
   let data = null;
   try { data = await resp.json(); } catch (_) { /* no body */ }
   if (!resp.ok) {
@@ -125,12 +199,9 @@ async function _apiOnce(path, options, _retry) {
     // (Cache-Control: no-cache, so this is the live document, not a cached one),
     // so one silent reload of the document and one retry covers the whole
     // restart case. Never retried twice: a second 403 is a real rejection.
-    if (resp.status === 403 && !_retry) {
-      try { await fetch('/', { cache: 'no-store' }); }
-      catch (_) { /* offline/dead: fall through to the readable message below */ }
-      if (_studioToken() && _studioToken() !== tok) {
-        return _apiOnce(path, options, true);
-      }
+    if (resp.status === 403 && _staleRounds === 0) {
+      const out = await _staleRecovery(tok, () => _apiOnce(path, options, true), true);
+      if (out !== null) return out;
       throw _tokenError(resp, data);
     }
     const message = (data && data.error) || `Request failed (${resp.status})`;
@@ -140,6 +211,12 @@ async function _apiOnce(path, options, _retry) {
     // like a dead server.
     err.status = resp.status;
     err.stillWorking = !!(data && data.still_working);
+    // A refused proposal is a STATE its caller renders, not a transport
+    // failure: `stale: true` (contracts_UI §3.4) means the text this frame was
+    // cut from no longer stands in the scene, so the frame can never apply.
+    // Carried on the error for the same reason as `stillWorking` — the caller
+    // decides from the flag, never by matching the sentence.
+    err.stale = !!(data && data.stale);
     throw err;
   }
   return data;
@@ -170,6 +247,38 @@ function _tokenError(resp, data) {
   return err;
 }
 
+// ---- authenticated download (audit R7) ----
+// A bare <a href> cannot carry the X-Studio-Token header, so on a token-
+// protected server a click would save the 403 error page instead of the
+// file. Fetch the bytes WITH the header, hand the blob to the browser as a
+// download, and surface a real failure as a writer-facing message instead
+// of a silently corrupted save.
+async function downloadBackup(path, filename) {
+  try {
+    const headers = {};
+    const tok = await _ensureStudioToken();
+    if (tok) headers["X-Studio-Token"] = tok;
+    let resp;
+    resp = await fetch(API + path, { headers });
+    if (!resp.ok) {
+      let msg = `backup failed (HTTP ${resp.status})`;
+      try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (_) { /* no body */ }
+      throw new Error(msg);
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    showError("Couldn't download the backup: " + (e.message || e));
+  }
+}
+
 // ---- streaming chat turn (SSE) ----
 // Raw tokens stream into the pending bubble AS the model writes them — the
 // perceived-latency win for slow local models. The final SSE event carries
@@ -181,11 +290,24 @@ async function streamChatTurn(base, text, quote, bubble, scrollContainer, _retry
   const _h = { "Content-Type": "application/json" };
   const _tok = await _ensureStudioToken();
   if (_tok) _h["X-Studio-Token"] = _tok;
-  const resp = await fetch(API + base + "/messages/stream", {
-    method: "POST",
-    headers: _h,
-    body,
-  });
+  let resp;
+  try {
+    resp = await fetch(API + base + "/messages/stream", {
+      method: "POST",
+      headers: _h,
+      body,
+    });
+  } catch (e) {
+    // Same network-level trigger as _apiOnce: a restart's first chat turn can
+    // die below HTTP on the old process's keep-alive socket.
+    if (e instanceof TypeError) {
+      const out = await _staleRecovery(_tok, () =>
+        streamChatTurn(base, text, quote, bubble, scrollContainer, true), false);
+      if (out !== null) return out;
+      throw _deadStudioError();
+    }
+    throw e;
+  }
   if (resp.status === 404 || !resp.body) {
     return api(`${base}/messages`, { method: "POST", body });
   }
@@ -201,12 +323,10 @@ async function streamChatTurn(base, text, quote, bubble, scrollContainer, _retry
     // facing message. A turn that gets this far was never stored (the server
     // appends the user message only after the model call succeeds), so the
     // silent retry cannot duplicate it.
-    if (resp.status === 403 && !_retry) {
-      try { await fetch("/", { cache: "no-store" }); }
-      catch (_) { /* offline/dead: fall through to the readable message */ }
-      if (_studioToken() && _studioToken() !== _tok) {
-        return streamChatTurn(base, text, quote, bubble, scrollContainer, true);
-      }
+    if (resp.status === 403 && _staleRounds === 0) {
+      const out = await _staleRecovery(_tok, () =>
+        streamChatTurn(base, text, quote, bubble, scrollContainer, true), true);
+      if (out !== null) return out;
       throw _tokenError(resp, data);
     }
     const err = new Error((data && data.error) || `Request failed (${resp.status})`);
@@ -273,6 +393,21 @@ function announceReply(res) {
 }
 
 // ---- finding triage: reload just the fix queue ----
+/** Re-pull the server-joined findings summary (Report 2 §6 API 1).
+ *  Loaded once per script load and refreshed after every finding-affecting
+ *  mutation, so `state.findingsSummary` stays the warm mirror of the queue —
+ *  the store the two-tier lens renders from when the full lists have not
+ *  landed yet, and the number an API consumer (or a future Tier-1 chip)
+ *  reads without re-deriving counts across three payloads. The LIVE surfaces
+ *  (queue header, dawn meter) keep their own one-counter contract (N3): the
+ *  summary never overrides a number the writer just moved. */
+async function refreshFindingsSummary() {
+  if (!state.currentProject) return;
+  try {
+    state.findingsSummary = await api(`/projects/${encodeURIComponent(state.currentProject)}/findings/summary`);
+  } catch (_) { /* no analysis yet */ }
+}
+
 async function reloadFixQueue() {
   try {
     state.fixQueue = await api(`/projects/${encodeURIComponent(state.currentProject)}/fixqueue${state.fixQueueShowDismissed ? "?include_dismissed=1" : ""}`);
@@ -314,7 +449,6 @@ async function retryFailedCategories(anchor) {
     await loadProjects();
     await loadScriptData();
     renderManuscript(document.getElementById('manuscript-container'));
-    loadFeedbackPanels();
     refreshMetrics();
   } catch (e) {
     showError("Retry failed: " + e.message, true);
@@ -470,7 +604,9 @@ let errorBannerTimeout = null;
 //
 //  * the write must land while the region is RENDERED. A `role="alert"` region
 //    that is `display:none` is not in the accessibility tree, so writing its
-//    text there is announced to nobody. Hence reveal-first, write-after.
+//    text there is announced to nobody. show() and write() land in the same
+//    task; this helper is for already-rendered regions only (#a11y-status —
+//    every caller left) — see showError for the hidden-region pattern.
 //  * the write must BE a content change. `textContent = sameString` replaces the
 //    text node either way — the DOM does change — but a screen reader that diffs
 //    the CONTENT sees no difference and stays silent, so a repeated error would
@@ -498,9 +634,16 @@ function showError(message, persistent) {
   const banner = $("#error-banner");
   // UX-1: this used to set the text while the banner was still display:none —
   // announced to nobody, so every error in the app was silent to a screen
-  // reader. The banner is role="alert" now, and the reveal has to come first.
+  // reader. The banner is role="alert" now.
+  //
+  // The reveal and the text land in the SAME task: show-with-content is what a
+  // role="alert" expects, and splitting them (the announce() deferral) held
+  // the banner visible with empty words for one frame — a window CI can read
+  // (server_url_guard, twice on 2026-09-30) and every reader must poll around.
+  // announce()'s rAF half remains only for the always-rendered #a11y-status,
+  // where the one-frame gap is free.
   banner.style.display = "flex";
-  announce(message, $("#error-banner-text"));
+  $("#error-banner-text").textContent = message;
   if (errorBannerTimeout) clearTimeout(errorBannerTimeout);
   if (!persistent) errorBannerTimeout = setTimeout(hideError, 10000);
 }
@@ -560,6 +703,12 @@ async function loadConfig() {
     fillSettingsForm();
   } catch (e) {
     console.warn("Could not load config:", e);
+  }
+  try {
+    const health = await api("/health");
+    state.codeRev = (health && health.code_rev) || null;
+  } catch (e) {
+    console.warn("Could not read server code revision:", e);
   }
   updateStatusStrip();
   applyDemoDisclosure();
@@ -812,6 +961,16 @@ function updateStatusStrip() {
   else if (url) text = `llama · ${url.replace(/^https?:\/\//, "")}`;
   else text = "model server not set";
   label.textContent = text;
+  const code = $("#status-code");
+  if (code) {
+    if (state.codeRev) {
+      code.textContent = `code ${state.codeRev}`;
+      code.title = `Code revision this desk process analyzes with (${state.codeRev}). Restart the desk after updating the code.`;
+    } else {
+      code.textContent = "code ?";
+      code.title = "Code revision this desk process analyzes with (unreadable)";
+    }
+  }
 }
 
 // Hover card on the bottom-left: which brain, which server, how connected.
@@ -829,6 +988,8 @@ function renderConnCard() {
     `<div class="conn-card-row ${cls}"><b>${escapeHtml(stateTxt)}</b></div>` +
     `<div class="conn-card-row">model <b>${escapeHtml(demo ? "demo craft model" : (mid || "—"))}</b></div>` +
     `<div class="conn-card-row">server <b>${escapeHtml(url)}</b></div>` +
+    (state.codeRev
+      ? `<div class="conn-card-row">code <b>${escapeHtml(state.codeRev)}</b></div>` : "") +
     (demo && state.realServer && state.realServer.available
       ? `<div class="conn-card-row switch">your model is back — click "switch" beside</div>` : "");
 }
@@ -852,6 +1013,19 @@ function renderDashboard() {
   if (!grid) return;
   grid.innerHTML = "";
   const projects = state.projects || [];
+
+  // Library-wide backup (audit R7/M5): the shelf-saving sibling of each
+  // card's ⬇ Backup link. Hidden on an empty shelf — backing up nothing is
+  // a button that can only confuse. Wired once; the flag survives re-renders.
+  const allBtn = document.getElementById("dash-backup-all");
+  if (allBtn) {
+    allBtn.hidden = !projects.length;
+    if (projects.length && !allBtn.dataset.wired) {
+      allBtn.dataset.wired = "1";
+      allBtn.addEventListener("click", () =>
+        downloadBackup("/api/library/backup", "script-doctor-library-backup.zip"));
+    }
+  }
 
   if (!projects.length) {
     const empty = el("p", "dash-empty", "Nothing here yet — lay a manuscript on the desk above, or open the sample page.");
@@ -2157,7 +2331,13 @@ async function openViewByName(view, scene) {
   else if (view === "compare") await openCompareView();
   else if (view === "revision") await openRevisionView();
   else if (view === "premise") await openPremiseView();
-  else if (view === "feedback") { await openFeedbackRoom(); pagesOnScreen = true; }
+  else if (view === "feedback") {
+    // Option A+ (Report 2 §4 move 2): the deep-link-only legacy panel is
+    // retired — the link redirects to the desk + the Evidence lens, which has
+    // carried the same report/queue data since the route fold (1A).
+    if (state.currentProject) { await openFeedbackView(); }
+    else { await openFeedbackRoom(); pagesOnScreen = true; }
+  }
   else { await openScriptView(); pagesOnScreen = true; }   // default: the writing desk
   // A scene anchor only means something where the pages are actually on screen,
   // and a hand-typed `#/p/revision/nonsense` must not raise "Scene NaN isn't in
@@ -2261,8 +2441,9 @@ async function openProject(name) {
     state.script = null;
     state.findings = [];
     state.findingStatus = {};
-    state.fixQueue = null;
-    state.reportStats = null;
+  state.fixQueue = null;
+  state.reportStats = null;
+  state.report = null;  // carried the analysis-time verification_summary; readout must not leak it
     state.lint = null;
     state.premise = null;
     $("#premise-view").style.display = "none";
@@ -2303,9 +2484,7 @@ async function openProject(name) {
     $("#project-title").textContent = project.title;
     $("#project-title").title = project.title;
 
-    $("#analyze-btn").textContent = project.stages.analyze === "complete" ? "Re-run Analysis" : "Run Analysis";
-    $("#analyze-btn").disabled = project.stages.parse !== "complete";
-    refreshDeskToolbar(); // Phase 8: the desk toolbar mirrors the lifecycle
+    refreshDeskToolbar(); // Phase 8: the desk toolbar owns the analysis lifecycle
 
     // a previous analysis may still be running (e.g. the page was reloaded
     // mid-analysis, or a background run is in flight) — resume the live
@@ -2313,10 +2492,6 @@ async function openProject(name) {
     if (project.stages.analyze === "running") {
       startAnalysisProgressUI(Date.now());
     }
-
-    // report language follows the project; defaults to English
-    const langSel = $("#report-lang-select");
-    if (langSel) langSel.value = project.report_language || "eng";
 
     if (project.stages.analyze === "failed" && project.errors && project.errors.analyze) {
       showError("Last analysis attempt failed: " + project.errors.analyze, true);
@@ -2457,7 +2632,8 @@ function setRoom(room) {
   cowriteBtnEl.setAttribute("aria-selected", room === "cowrite" ? "true" : "false");
   feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
   $("#cowrite-panel").style.display = room === "cowrite" ? "flex" : "none";
-  $("#feedback-panel").style.display = room === "feedback" ? "flex" : "none";
+  // (the legacy #feedback-panel is an empty retired marker div — Option A+;
+  // the Feedback room's conversation lives in #room-drawer + the dock lenses)
   // the composer speaks in the active partner's voice: Sameer at the writing
   // desk, the doctor at the consultant's desk
   const inputEl = $("#input");
@@ -2497,7 +2673,6 @@ function openFeedbackRoom() {
   if (state.view === "feedback") { openRoomDrawer(); return; }
   setRoom("feedback");
   if (state.inIdea) { renderMessages(); openRoomDrawer(); return; }  // unreachable — kept for safety
-  if (typeof loadFeedbackPanels === "function") loadFeedbackPanels();  // defined in Task 10
   openRoomDrawer();
 }
 
@@ -2607,14 +2782,29 @@ function renderStageLadder(container, currentKey, startedTs, timeoutSeconds) {
 
 function startAnalysisProgressUI(startedAt) {
   if (analysisUi) analysisUi.stop();
-  const btn = $("#analyze-btn");
-  const chip = $("#analyze-progress");
-  const deskBtn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs
-  const deskChip = $("#desk-analyze-progress"); // the same lifecycle in parallel
-  btn.disabled = true;
-  btn.classList.add("analyzing");
-  chip.style.display = "flex";
-  if (deskBtn) { deskBtn.disabled = true; deskBtn.classList.add("analyzing"); deskBtn.textContent = "Analyzing…"; }
+  const btn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs the lifecycle
+  const deskChip = $("#desk-analyze-progress");
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) {
+    cancelBtn.disabled = false;
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = async () => {
+      // Stop asks the server; the run itself decides when it is safe (the
+      // current stage finishes). The button goes inert the moment the ask
+      // lands — one click is one request, and the poller reports the result.
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = "Stopping…";
+      try {
+        await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/cancel`, { method: "POST" });
+      } catch (e) {
+        // 409 = the run already finished on its own between the click and
+        // the request; the next poll lands the real state either way.
+        cancelBtn.textContent = "■ Stop";
+        cancelBtn.disabled = false;
+      }
+    };
+  }
+  if (btn) { btn.disabled = true; btn.classList.add("analyzing"); }
   if (deskChip) deskChip.style.display = "flex";
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   const timeoutSeconds = (state.config && state.config.timeout) || 600;
@@ -2638,7 +2828,7 @@ function startAnalysisProgressUI(startedAt) {
       ? `⚠ ${stage.label} reported a problem — the rest of the run continues`
       : stage.caption;
     const beat = stageElapsedText(since, Date.now(), timeoutSeconds);
-    for (const host of [chip, deskChip]) {
+    for (const host of [deskChip]) {
       if (!host) continue;
       host.querySelector(".ap-stage").textContent = line;
       host.querySelector(".ap-beat").textContent = beat;
@@ -2653,8 +2843,7 @@ function startAnalysisProgressUI(startedAt) {
       }
     }
     ladderFor = currentKey;
-    btn.textContent = `Analyzing — ${stage.label}`;
-    if (deskBtn) deskBtn.textContent = "Analyzing…";
+    if (btn) btn.textContent = `Analyzing — ${stage.label}`;
   };
 
   const timer = setInterval(refresh, 1000);
@@ -2668,6 +2857,24 @@ function startAnalysisProgressUI(startedAt) {
         finished = true;
         analysisUi = null;
         hideAnalysisProgressUI();
+        // RE-B4 audit (2026-10-01): the report-arrival peek used to be gated
+        // on `last_pass` changing — which does not exist on a FIRST analysis,
+        // so the writer's first completed run produced no unread dot and no
+        // halo at all (measured 60s post-completion). This in-session flag is
+        // the first-pass arrival signal; the load path consumes it once.
+        analysisCompletedFor = state.currentProject;
+        await loadProjects();
+        return;
+      }
+      if (p.status === "cancelled") {
+        // R2: the writer stopped the run. The server restored the stage to
+        // its pre-run state; nothing was written. Say so plainly, no error.
+        clearInterval(poll);
+        clearInterval(timer);
+        finished = true;
+        analysisUi = null;
+        hideAnalysisProgressUI();
+        appendSystemNote("Analysis stopped at your request — the script and any previous report are unchanged.", true);
         await loadProjects();
         return;
       }
@@ -2710,14 +2917,12 @@ function startAnalysisProgressUI(startedAt) {
 }
 
 function hideAnalysisProgressUI() {
-  const chip = $("#analyze-progress");
-  if (chip) chip.style.display = "none";
   const deskChip = $("#desk-analyze-progress");
   if (deskChip) deskChip.style.display = "none";
-  const btn = $("#analyze-btn");
+  const btn = $("#desk-analyze-btn");
   if (btn) { btn.disabled = false; btn.classList.remove("analyzing"); }
-  const deskBtn = $("#desk-analyze-btn");
-  if (deskBtn) { deskBtn.disabled = false; deskBtn.classList.remove("analyzing"); }
+  const cancelBtn = $("#desk-analyze-cancel");
+  if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = "■ Stop"; }
 }
 
 // ---------- Phase 8: the desk toolbar — analysis lifecycle beside the page ----------
@@ -2801,34 +3006,31 @@ function refreshDeskToolbar() {
 
 async function runAnalysis() {
   if (analysisUi) return; // already running — one lifecycle at a time
-  const btn = $("#analyze-btn");
   const base = `/projects/${encodeURIComponent(state.currentProject)}`;
   const startedAt = Date.now();
 
   // fire the (blocking) analyze request, and show live stage progress in
   // parallel. force: true so "Re-run Analysis" genuinely re-runs (the
   // orchestrator would otherwise short-circuit on an already-complete stage).
-  const reportLanguage = ($("#report-lang-select") || {}).value || "eng";
+  const reportLanguage = "eng"; // the legacy language select retired with the panel; the API default stands
   const analyzePromise = api(`${base}/analyze`, { method: "POST", body: JSON.stringify({ force: true, report_language: reportLanguage }) });
   startAnalysisProgressUI(startedAt);
 
   try {
-    await analyzePromise;
+    const ack = await analyzePromise;
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
-    btn.textContent = "Re-run Analysis";
+    if (ack && ack.stale_code) showError(ack.stale_code, true);
     appendSystemNote("Analysis complete. The report is now grounding this conversation.");
     await loadProjects();  // refreshDeskToolbar rides inside the project open path
     // script pane is shared — refresh it in either room after analysis
     await loadScriptData();
     renderManuscript(document.getElementById('manuscript-container'));
-    if (state.view === "feedback") loadFeedbackPanels();
     refreshMetrics();
     refreshDeskToolbar(); // Phase 8: complete state on the desk
   } catch (e) {
     if (analysisUi) analysisUi.stop();
     hideAnalysisProgressUI();
-    btn.textContent = "Run Analysis";
     showError("Analysis failed: " + e.message, true);
     appendSystemNote("Analysis failed: " + e.message, true);
     await loadProjects(); // stage state changed — sync the desk honestly
@@ -2841,26 +3043,19 @@ async function reparseProject() {
   // the fix for a mis-parsed script — formatting/classification errors show
   // up in the pane and poison the report, so re-parsing then re-running
   // analysis regenerates everything from a clean parse.
-  const btn = $("#reparse-btn");
   const project = state.currentProject;
   if (!project) return;
   if (!confirm(`Re-parse "${project}" from its source file?\n\nThe script is re-parsed with the current parser and the analysis is reset — Run Analysis again to regenerate the report and fix queue.`)) return;
-  btn.disabled = true;
   try {
     await api(`/projects/${encodeURIComponent(project)}/reparse`, { method: "POST" });
     appendSystemNote("Script re-parsed. The analysis was reset — Run Analysis to regenerate the report from the fresh parse.");
     await loadProjects();
     await loadScriptData();
     renderManuscript(document.getElementById('manuscript-container'));
-    const ab = $("#analyze-btn");
-    if (ab) { ab.textContent = "Run Analysis"; ab.disabled = false; }
-    if (state.view === "feedback") loadFeedbackPanels();
     refreshMetrics();
   } catch (e) {
     showError("Re-parse failed: " + e.message, true);
     appendSystemNote("Re-parse failed: " + e.message, true);
-  } finally {
-    btn.disabled = false;
   }
 }
 
@@ -4093,6 +4288,12 @@ async function loadScriptData() {
   state.findingStatus = statusById;
   // writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride /edits
   state.findingMarks = (edits && edits.finding_intents) || {};
+  // the truth axis (what the accuracy meter is computed from) rides the same
+  // fetch — one load, one findings state, no second path to go stale
+  state.findingVerdicts = (edits && edits.finding_verdicts) || {};
+  // marks the scene-key upgrade could not carry (one stored id, several
+  // findings): read here, shown once in the worklist, never applied silently
+  state.ambiguousMarks = (edits && edits.ambiguous_marks) || {};
   const lp = (edits && edits.last_pass) || null;
   const arrived = !!(lp && lp.computed_at && state.lastPassKey !== lp.computed_at);
   state.lastPass = lp;
@@ -4111,12 +4312,43 @@ async function loadScriptData() {
   } catch (_) {
     state.fixQueue = { items: [], acts: [] };
   }
+  // ONE findings-state load (Report 2 §4 move 2): the server-joined summary
+  // (counts × severity/category/status + dawn %) rides the same load as the
+  // report and the queue — one fetch replaces three payloads re-counted
+  // client-side, and every counter surface reads the same numbers.
+  let summary = null;
+  try {
+    summary = await api(`${base}/findings/summary`);
+  } catch (_) { /* no analysis yet — same state the report fetch tolerates */ }
+  // Gate 9: the feedback ledger — the system of record across runs. Fetched on
+  // the same load as everything else (one more read of the same project, not a
+  // second surface with its own lifecycle). A damaged ledger answers 409 and is
+  // tolerated like every other optional read: the desk stays silent rather than
+  // claiming an empty history it cannot vouch for.
+  try {
+    state.feedbackLedger = await api(`${base}/feedback/ledger`);
+  } catch (_) {
+    state.feedbackLedger = null;
+  }
   if (arrived && findings.length) scheduleArrivalPeek();
+  else if (analysisCompletedFor === target && findings.length) {
+    // A first analysis has no `last_pass` to arrive — the completion event
+    // IS the arrival. Consumed once, so a plain reload of an already-read
+    // report never fakes a fresh one.
+    analysisCompletedFor = null;
+    scheduleArrivalPeek();
+  }
   renderDraftBar();
   await renderDiffBanner();
   // the second wave of awaits is long enough for the writer to have switched
   // projects — same rule as above: a load may only publish the project it is for
   if (state.currentProject !== target) return;
+  state.findingsSummary = summary;
+  // The report's takeable-away affordance follows the report's own arrival —
+  // paint it here, where state.report is fresh, not only on the next
+  // manuscript re-render (the retired report pane used to re-paint it as a
+  // side effect; now the data-driven moment owns it).
+  paintReportExport();
   // The desk status line reads state.findings, which this function just set.
   // At project-open the toolbar refresh runs BEFORE this async load resolves, so
   // without this re-render a 36-finding desk read "a clean bill" forever (audit
@@ -4152,18 +4384,56 @@ function renderFixQueuePanel(container) {
   // severity/category the chips hide stay in the report but out of the
   // writer's to-do view — page, board and queue cannot disagree (N3).
   // Dismissed rows keep their separate toggle; addressed ride as before.
-  const inFilter = inFindingFilter; // ONE predicate: the queue cannot drift from the strip
+  // queue and strip share ONE predicate (inFindingFilter), so the two scopes
+  // cannot drift apart — N3. Disposition bypass lives inside it.
+  const inFilter = inFindingFilter;
   const shown = items.filter((i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed);
   // ONE counter (N3): the header's open/total come from queueCounts() — the
   // writer's intent (findingMarks) moves this header exactly like the chips
   // and the dawn meter; the raw server-observed item.status never counts.
   const counts = queueCounts();
   const shownCounts = queueCounts(shown);
+  // accuracy kit A: ungrounded rows hide by default but stay one toggle
+  // away (flag-don't-drop) — mirrors the dismissed toggle below. Built once
+  // because the empty branch needs it too: an all-ungrounded queue must still
+  // offer the way back.
+  const ungroundedCount = items.filter((i) => i.ungrounded).length;
+  const maybeAddUngroundedToggle = (head) => {
+    if (!ungroundedCount) return;
+    const showU = !!state.fixQueueShowUngrounded;
+    const toggleU = el("button", "fq-toggle-ungrounded", showU ? `Hide ungrounded (${ungroundedCount})` : `Show ungrounded (${ungroundedCount})`);
+    toggleU.type = "button";
+    toggleU.addEventListener("click", async () => {
+      state.fixQueueShowUngrounded = !showU;
+      await reloadFixQueue();
+      renderManuscript(document.getElementById('manuscript-container'));
+    });
+    head.appendChild(toggleU);
+  };
+  // triage: dismissed findings stay in the report but out of the writer's way.
+  // Declared up here (not below) because the empty branch returns early — a
+  // queue emptied by dismissing its last visible row must still offer the
+  // way back, and const declarations do not hoist.
+  const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
+  const maybeAddDismissedToggle = (head) => {
+    if (!dismissedCount) return;
+    const show = !!state.fixQueueShowDismissed;
+    const toggleBtn = el("button", "fq-toggle-dismissed", show ? `Hide dismissed (${dismissedCount})` : `Show dismissed (${dismissedCount})`);
+    toggleBtn.type = "button";
+    toggleBtn.addEventListener("click", async () => {
+      state.fixQueueShowDismissed = !show;
+      await reloadFixQueue();
+      renderManuscript(document.getElementById('manuscript-container'));
+    });
+    head.appendChild(toggleBtn);
+  };
   if (!shown.length) {
     if (!items.length && !state.fixQueueShowDismissed) return;
     const panel = el("div", "craft-panel fix-queue");
     const head = el("div", "craft-panel-head");
     head.appendChild(el("span", "craft-panel-title", "Fix queue — 0 shown / " + counts.total + " total"));
+    maybeAddUngroundedToggle(head);
+    maybeAddDismissedToggle(head);
     panel.appendChild(head);
     const hint = el("p", "fix-row-why", "No rows match the current filter — toggle a severity or category chip on the Evidence board to widen the to-do.");
     panel.appendChild(hint);
@@ -4185,20 +4455,9 @@ function renderFixQueuePanel(container) {
   dm.querySelector(".dawn-fill").style.width = dawnPct + "%";
   dm.querySelector(".dawn-pct").textContent = dawnPct + "%";
   head.appendChild(dm);
-  // triage: dismissed findings stay in the report but out of the writer's way
-  const dismissedCount = (state.fixQueue && state.fixQueue.dismissed_count) || 0;
-  if (dismissedCount) {
-    const show = !!state.fixQueueShowDismissed;
-    const toggleBtn = el("button", "fq-toggle-dismissed", show ? `Hide dismissed (${dismissedCount})` : `Show dismissed (${dismissedCount})`);
-    toggleBtn.type = "button";
-    toggleBtn.addEventListener("click", async () => {
-      state.fixQueueShowDismissed = !show;
-      await reloadFixQueue();
-      if (state.view === "feedback") loadFeedbackPanels();
-      else     renderManuscript(document.getElementById('manuscript-container'));
-    });
-    head.appendChild(toggleBtn);
-  }
+  // triage: dismissed findings stay in the report but out of the writer's way.
+  maybeAddDismissedToggle(head);
+  maybeAddUngroundedToggle(head);
   panel.appendChild(head);
   // P1.10: the queue's own gesture, printed where it is used (the deep cards
   // explain ✓ / next-pass on the card; Dismiss exists only here).
@@ -4216,6 +4475,26 @@ function renderFixQueuePanel(container) {
     const row = el("div", "fix-row" + (disp === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
     row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
+    // accuracy kit A follow-up: demoted rows wear the reason. Collected
+    // here, mounted with sev below — el() nodes have no parent yet, so
+    // sev.after() would be a silent no-op. Static literals only, never
+    // finding text, so no new sink.
+    const rowFlags = [];
+    if (item.contested) {
+      const flag = el("span", "row-flag row-flag-contested", "contested");
+      flag.title = "Its own observation argues against this note — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
+    if (item.identity_uncertain) {
+      const flag = el("span", "row-flag row-flag-identity", "identity?");
+      flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
+    if (item.ungrounded) {
+      const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
+      flag.title = "No quote or checkable observation backs this note yet";
+      rowFlags.push(flag);
+    }
     const act = el("span", "act-chip", item.act_name || "Script-level");
     const sceneLabel = item.scene_heading ? `Scene ${(item.scene_refs || [])[0]} — ${item.scene_heading}` : "General";
     const body = el("div", "fix-row-body");
@@ -4260,9 +4539,25 @@ function renderFixQueuePanel(container) {
     actions.appendChild(locateBtn);
     actions.appendChild(rewriteBtn);
     actions.appendChild(discussBtn);
+    // D2-a undo: a row the writer marked addressed stays in this queue as
+    // `.done` — so this is the one place an addressed finding is ALWAYS on
+    // screen, and the only place the mark can be cleared without first asking
+    // to see addressed findings at all. Before it, the row read "done" with no
+    // verb that could un-say it: the mark survived, the control did not.
+    if (disp === "addressed" && fi != null) {
+      const fid = (state.findingIds && state.findingIds[fi]) || null;
+      if (fid) {
+        const reopenBtn = el("button", "fq-reopen", "Reopen");
+        reopenBtn.type = "button";
+        reopenBtn.title = "Clear your addressed mark — this finding returns to the worklist";
+        reopenBtn.addEventListener("click", () => setFindingIntent(fid, null));
+        actions.appendChild(reopenBtn);
+      }
+    }
     actions.appendChild(triageBtn);
     body.appendChild(actions);
     row.appendChild(sev);
+    for (const flag of rowFlags) row.appendChild(flag);
     row.appendChild(act);
     const vb = verificationBadge(item.verification);
     if (vb) row.appendChild(vb);
@@ -4822,6 +5117,57 @@ function sharedMarkSiblings(index) {
   return [...seen];
 }
 
+// The absorbed half of a merge, on demand.
+//
+// The dedupe collapses findings that share a line and point at the same page. The
+// survivor used to carry only `merged_rule_ids` — rule-id STRINGS, which name who
+// agreed but not what they said — so the absorbed claims were retained NOWHERE
+// (fixed 2026-10-06). `merged_findings` now carries their full content, and this is
+// the writer's only way to read it: delivered on /findings and, until now, read by
+// nothing in the desk.
+//
+// Collapsed by default, and closed on every render. N absorbed claims expanded
+// inline is exactly the wall of near-duplicate cards the dedupe exists to prevent —
+// the writer asked for the merge to be INSPECTABLE, not to be shown twice.
+//
+// A <button> rather than <details>/<summary> because the card already routes its own
+// clicks and a <summary> would need the same stopPropagation dance; a button also
+// gives us aria-expanded for free.
+function mergedFindingsEl(merged) {
+  const wrap = el("div", "finding-merged");
+  const n = merged.length;
+  const btn = el("button", "finding-merged-toggle", n === 1
+    ? "1 other note was merged into this one"
+    : n + " other notes were merged into this one");
+  btn.type = "button";
+  btn.setAttribute("aria-expanded", "false");
+  const body = el("div", "finding-merged-body");
+  body.hidden = true;
+  merged.forEach((m) => {
+    const item = el("div", "finding-merged-item");
+    const head = el("div", "finding-merged-head");
+    if (m.rule_id) head.appendChild(el("span", "finding-merged-rule", String(m.rule_id)));
+    if (m.severity) head.appendChild(el("span", "finding-merged-sev", String(m.severity)));
+    if (head.children.length) item.appendChild(head);
+    if (m.issue) item.appendChild(el("span", "finding-merged-issue", String(m.issue)));
+    if (m.observation) item.appendChild(el("span", "finding-merged-obs", String(m.observation)));
+    if (m.evidence_quote) {
+      item.appendChild(el("span", "finding-merged-quote", "\u201C" + m.evidence_quote + "\u201D"));
+    }
+    body.appendChild(item);
+  });
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const opening = body.hidden;
+    body.hidden = !opening;
+    btn.setAttribute("aria-expanded", String(opening));
+    wrap.classList.toggle("open", opening);
+  });
+  wrap.appendChild(btn);
+  wrap.appendChild(body);
+  return wrap;
+}
+
 function findingNoteEl(f, index, opts = {}) {
   const disp = opts.disposition || "open";
   // forward-compatible states (Phase D defer / Phase E ghosting): muted
@@ -4842,12 +5188,38 @@ function findingNoteEl(f, index, opts = {}) {
   note.appendChild(top);
   note.appendChild(el("span", "finding-note-text", f.issue));
 
+  // Display dedupe (Report 2 §4 move 3): several report rows can carry the
+  // byte-identical issue text — one note repeated per scene (the audit measured
+  // the demo report saying the same sentence on scenes 1 and 4, the only field
+  // differing being scene_refs). Collapse them for the READER: one card, and a
+  // scene-count chip carrying exactly the field that differed. Underlying rows
+  // and their per-scene marks stay whole — rung 20's no-information-loss rule,
+  // honored at the display layer.
+  const twins = (state.findings || []).filter((g, gi) =>
+    g && g.issue === f.issue && gi !== index);
+  if (twins.length) {
+    const scenes = [...new Set([
+      ...((f.scene_refs || []).map((n) => "S" + n)),
+      ...twins.flatMap((g) => (g.scene_refs || []).map((n) => "S" + n)),
+    ])];
+    const chip = el("span", "finding-note-scenes",
+      scenes.length ? scenes.join(", ") : `${twins.length + 1}× same note`);
+    chip.title = `${twins.length + 1} findings share this note. Every row and mark stays in the report — these are the scenes it points at.`;
+    note.appendChild(chip);
+  }
+
   // evidence-deep (opt-in): diagnosis + verified quote + trust badge — the
   // card answers WHY the doctor says it and WHERE it was verified. Dock lens
   // only; margin pins and feedback-room buckets stay shallow.
   if (opts.deep) {
     const deep = el("div", "finding-deep");
     if (f.why_it_matters) deep.appendChild(el("span", "finding-deep-why", f.why_it_matters));
+    // Gate 11: the falsifiable observation the note rests on. It sits ABOVE the
+    // quote because the quote is the EVIDENCE for the observation, not the
+    // finding itself — reading them in that order is what makes the note
+    // checkable rather than merely asserted. Present only on findings the
+    // observation pass could ground, so its absence is itself information.
+    if (f.observation) deep.appendChild(el("span", "finding-deep-observation", f.observation));
     if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
     const badge = verificationBadge(f.verification);
     if (badge) deep.appendChild(badge);
@@ -4870,6 +5242,12 @@ function findingNoteEl(f, index, opts = {}) {
       deep.appendChild(el("span", "finding-check",
         "\u2699 mechanical check \u00B7 " + f.check_id));
     }
+    // The absorbed claims, collapsed. Sits in `.finding-deep`, never in
+    // `.finding-note-actions` — that row has a measured one-row / <=30px budget the
+    // suite gates, and this is a disclosure, not a verb.
+    if (Array.isArray(f.merged_findings) && f.merged_findings.length) {
+      deep.appendChild(mergedFindingsEl(f.merged_findings));
+    }
     if (deep.children.length) note.appendChild(deep);
   }
 
@@ -4879,6 +5257,35 @@ function findingNoteEl(f, index, opts = {}) {
   // dock is where the writer's judgment is made, margin pins stay read-only)
   if (opts.deep) {
     const id = (state.findingIds && state.findingIds[index]) || String(index);
+    // ---- the truth axis: "is it right?" ---------------------------------
+    // The accuracy meter is computed from THIS row and nothing else, so it is a
+    // SEPARATE row asking a SEPARATE question from the intent row below it.
+    // Never one control: a writer must be able to say "it's true but I won't act
+    // on it" — collapsing the two axes is what produced the ambiguous middle
+    // that made "98.58 % accurate" unmeasurable in the first place. It lives in
+    // its own container, not `.finding-note-actions`, because that row has a
+    // measured one-row budget the suite gates (adding three buttons to it would
+    // re-wrap it, which is the exact defect rung 17 painted out).
+    const vrow = el("div", "finding-verdict-row");
+    vrow.appendChild(el("span", "finding-verdict-label", "is it right?"));
+    const mkVerdict = (label, name, verdict, title) => {
+      const b = el("button", "verdict-btn" + (state.findingVerdicts[id] === verdict ? " active" : ""), label);
+      b.type = "button";
+      b.setAttribute("aria-label", name);
+      b.title = title;
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setFindingVerdict(id, state.findingVerdicts[id] === verdict ? null : verdict);
+      });
+      return b;
+    };
+    vrow.appendChild(mkVerdict("\u2713", "Correct \u2014 this finding is right", "correct",
+                               "Correct \u2014 this finding is right"));
+    vrow.appendChild(mkVerdict("~", "Partly right", "partial",
+                               "Partly right \u2014 true in part"));
+    vrow.appendChild(mkVerdict("\u2717", "Wrong \u2014 this finding is false", "incorrect",
+                               "Wrong \u2014 this finding is false"));
+    note.appendChild(vrow);
     // These four carry a glyph, not a word: their accessible name has to be
     // typed, because a screen reader reading "⏭" aloud names a media key, not
     // the verb the writer is being asked to press.
@@ -6003,29 +6410,121 @@ function renderDockEvidence() {
     return;
   }
 
+  // the tier switch (Report 2 §5 a11y): a labelled landmark toggle, never a
+  // hover — the summon is keyboard-reachable and visible on first paint.
+  lens.appendChild(buildTierSwitch());
+
+  const tier = evidenceTier();
+
+  // ---- Option A+ (audit 2026-09-30, Report 2 §4): two tiers, one lens ------
+  // Tier 1 is the worklist — arrival strip, ONE filter row, fix queue, scene
+  // strip. Tier 2 is the Context DISCLOSURE AT THE LENS FOOT (§4: "a single
+  // 'Context' disclosure at the lens foot") — one collapsed section holding
+  // the context half of the old stack. Both live in the DOM: the collapsed
+  // context is a single header row to scroll past, and every inner section
+  // keeps its own key (and its own stored open/closed preference). The
+  // measured clutter mechanism (~12 stacked sections, Report 2 §2.1) becomes
+  // sections-before-first-action ≤ 1.
+  renderTier1Worklist(lens);
+  lens.appendChild(buildContextSection());
+
+  // any lens rebuild mid-loop (filter toggle, intent change) wiped the
+  // transient bar + card state — re-dock it here (idempotent when inactive)
+  renderLoopBar();
+}
+
+/** Which tier the lens opens on (Report 2 §4): 1 = the worklist (default),
+ *  2 = the Context summoned. The writer's choice is a per-project preference. */
+function evidenceTier() {
+  return loadPrefs()["evidence_tier_" + (state.currentProject || "")] === 2 ? 2 : 1;
+}
+
+/** Summon a tier (Report 2 §5 — a labelled landmark toggle, not a hover).
+ *  Both tiers share one DOM, so summoning is a gesture, not a re-render:
+ *  Tier 2 expands the Context disclosure at the lens foot and walks the eye
+ *  down to it; Tier 1 walks the eye back up to the worklist (nothing is
+ *  collapsed — the writer's disclosure choice is a preference). The scroll
+ *  targets the section's actual scrollable ancestor: the lens itself doesn't
+ *  scroll (the dock body does), and a bare scrollIntoView scrolls the PAGE
+ *  under the fixed dock — moving everything except what the writer reads. */
+function setEvidenceTier(tier) {
+  const lens = document.querySelector('.dock-lens[data-lens="evidence"]');
+  if (lens) {
+    const ctx = lens.querySelector('.dock-section[data-key="context"]');
+    if (tier === 2 && ctx) {
+      if (ctx.dataset.open !== "true") setDockSectionOpen(ctx, true);
+      // The expansion is a 0.18s grid-rows transition (dockSection's CSS);
+      // measuring before it settles reads the collapsed rect and scrolls to a
+      // stale target. Wait out the transition, then bring the disclosure to
+      // the top of whichever ancestor actually scrolls. Direct scrollTop
+      // assignment, not scrollTo({smooth}): the dock body is a grid box, and
+      // Chromium silently no-ops a smooth scrollTo on it (verified live) — a
+      // summon that scrolls nothing is a summon that does nothing.
+      setTimeout(() => {
+        let scroller = ctx.parentElement;
+        while (scroller && scroller.scrollHeight <= scroller.clientHeight + 2) {
+          scroller = scroller.parentElement;
+        }
+        if (!scroller) return;
+        const sr = scroller.getBoundingClientRect();
+        const cr = ctx.getBoundingClientRect();
+        scroller.scrollTop = scroller.scrollTop + cr.top - sr.top;
+      }, 260);
+    } else {
+      let scroller = lens.parentElement;
+      while (scroller && scroller.scrollHeight <= scroller.clientHeight + 2) {
+        scroller = scroller.parentElement;
+      }
+      if (scroller) scroller.scrollTop = 0;
+    }
+  }
+  // the pressed state moves NOW, in place — a re-render would reset the
+  // scroll this gesture just made (visual-verified defect, 2026-09-30)
+  document.querySelectorAll(".dock-tier-btn").forEach((b, i) => {
+    const on = (i === 0) === (tier === 1);
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  savePrefs({ ["evidence_tier_" + (state.currentProject || "")]: tier === 2 ? 2 : 1 });
+}
+
+/** The Tier 1 ↔ Tier 2 switch: two labelled buttons, aria-pressed carrying
+ *  the state (Report 2 §5 — a labelled landmark toggle, not a hover). It is
+ *  the FIRST element in the lens, so keyboard users land on the worklist and
+ *  can summon Context without scrolling. */
+function buildTierSwitch() {
+  const tier = evidenceTier();
+  const sw = el("div", "dock-tier-switch");
+  sw.setAttribute("role", "group");
+  sw.setAttribute("aria-label", "Evidence lens tier — the worklist or the context behind it");
+  const mk = (label, target, title) => {
+    const b = el("button", "dock-tier-btn" + (tier === target ? " on" : ""), label);
+    b.type = "button";
+    b.setAttribute("aria-pressed", tier === target ? "true" : "false");
+    b.title = title;
+    b.addEventListener("click", () => setEvidenceTier(target));
+    return b;
+  };
+  sw.appendChild(mk("Worklist", 1, "The to-do: arrival, filters, fix queue, this scene"));
+  sw.appendChild(mk("Context", 2, "Everything orienting — coverage, strengths, mass, craft, provenance"));
+  return sw;
+}
+
+/** Tier 1 — the worklist the lens opens on (Report 2 §4 move 1). `lens` is the
+ *  evidence lens element. The queue leads; the scene strip is a slim header
+ *  under it, because the queue already answers per-scene via Locate. */
+function renderTier1Worklist(lens) {
   // -- 0b. the arrival strip (R4): the "finally" — scorekeeping + trust +
   // inline retry + ghosted marks, at the top of the board where arrival lands.
   const arrival = buildArrivalStrip();
   if (arrival) lens.appendChild(arrival);
 
-  // -- 0b2. the revision arc (spec 15.4): one line, under the strip that only
-  // remembers the last two passes.
-  const arc = buildPassArcLine();
-  if (arc) lens.appendChild(arc);
-
-  // -- 0c. strengths first (spec §6): the desk only ever arrived holding its
-  // complaints, so praise the analysis had already written stayed buried in the
-  // coverage section below. This is that list, rendered once, up front.
-  const working = buildWhatsWorking();
-  if (working) lens.appendChild(working);
-
-  // -- 0d. which model wrote this, and what it could not finish (spec §3) -----
-  const proj = (state.projects || []).find((p) => p.project === state.currentProject);
-  const banner = buildFailureBanner((proj && proj.failed_categories) || [],
-    (state.report && state.report.errors) || []);
-  if (banner) lens.appendChild(banner);
-  const modelLine = buildReportModelLine();
-  if (modelLine) lens.appendChild(modelLine);
+  // 0b-bis. the upgrade notice (HIGH-1/D2-a): marks held aside because one
+  // stored id covered several findings. Independent of the arrival strip,
+  // which returns null when there is no pass to diff — the notice is about the
+  // writer's marks, not about the analyzer's arithmetic.
+  const heldNotice = buildAmbiguousMarksNotice();
+  if (heldNotice) lens.appendChild(heldNotice);
 
   // -- 0a. the ONE filter row (R5-b + R8): severity toggles drive ink,
   // board list, loop and counts together; category chips count and filter —
@@ -6040,12 +6539,11 @@ function renderDockEvidence() {
   filterRow.appendChild(loopBtn);
   lens.appendChild(filterRow);
 
-  // -- 0. script mass strip + ruler (orientation) ---------------------------
-  const strip = buildScriptMassStrip();
-  if (strip.children.length) lens.appendChild(strip);
-  lens.appendChild(buildScriptRuler());
-
   // -- 1. current-scene strip (What is wrong HERE? Where?) ----------------
+  // Stays Tier 1 (Report 2 §4 move 1), ABOVE the queue: it is the worklist's
+  // slim header, and its severity dots are pinned on-screen at the desk by the
+  // readiness gate's contrast sweep — below an open queue they fell off the
+  // measured viewport, exactly the regression class the gate exists to catch.
   const sceneBox = el("div", "dock-evidence-scene");
   renderDockEvidenceSceneBox(sceneBox);
   lens.appendChild(sceneBox);
@@ -6065,6 +6563,48 @@ function renderDockEvidence() {
     lens.appendChild(dockSection("fix-queue", "Fix queue", fqWrap,
                                  { defaultOpen: true }));
   }
+}
+
+/** Tier 2 — the Context DISCLOSURE at the lens foot (Report 2 §4 move 1).
+ *  ONE collapsible section holding the context half of the old stack: pass
+ *  arc, strengths, provenance (model line + failure banner beside what they
+ *  explain), script mass + ruler, finding cards, coverage, setup/payoff,
+ *  formatting, live check, craft panels. It reuses the dock-section collapse
+ *  (key "context", default closed, preference-persisted), so a closed body
+ *  leaves the a11y and hit-test trees exactly like every other ledger
+ *  section; its inner sections keep their own keys and prefs. */
+function buildContextSection() {
+  const lens = el("div", "dock-context");
+
+  // -- 0b2. the revision arc (spec 15.4): one line, under the strip that only
+  // remembers the last two passes.
+  const arc = buildPassArcLine();
+  if (arc) lens.appendChild(arc);
+
+  // -- 0c. strengths first (spec §6): the desk only ever arrived holding its
+  // complaints, so praise the analysis had already written stayed buried in the
+  // coverage section below. This is that list, rendered once, up front.
+  const working = buildWhatsWorking();
+  if (working) lens.appendChild(working);
+
+  // -- 0d. which model wrote this, and what it could not finish (spec §3) -----
+  const proj = (state.projects || []).find((p) => p.project === state.currentProject);
+  const banner = buildFailureBanner((proj && proj.failed_categories) || [],
+    (state.report && state.report.errors) || []);
+  if (banner) lens.appendChild(banner);
+  // Rendered next to the banner, but a separate element — a recovered split is not
+  // one of the "problems" that box reports. `recoveries` reaches the desk here for
+  // the first time; it was delivered in report.findings.json and rendered only into
+  // report.md, so the caveat never reached the writer's eyes (spec §7's honesty gap).
+  const caveat = buildRunCaveat((state.report && state.report.recoveries) || []);
+  if (caveat) lens.appendChild(caveat);
+  const modelLine = buildReportModelLine();
+  if (modelLine) lens.appendChild(modelLine);
+
+  // -- 0. script mass strip + ruler (orientation) ---------------------------
+  const strip = buildScriptMassStrip();
+  if (strip.children.length) lens.appendChild(strip);
+  lens.appendChild(buildScriptRuler());
 
   // -- 3. findings on the current scene (Where, precisely) -----------------
   const data = prepareManuscriptData(); // the single source of truth
@@ -6208,8 +6748,136 @@ function renderDockEvidence() {
             + "Treat those findings as a second opinion on structure, not a reading of your pages.";
           inner.appendChild(line);
         }
+        // -- the accuracy meter: the writer's own verdicts, tallied ----------
+        // The headline is the NOT-WRONG reading, and the rationale is the whole
+        // point: the harm this product must avoid is a writer ACTING ON A FALSE
+        // finding. A true-but-unsupported one costs nothing — the writer judges
+        // it. So the bar sits on `wrong`, and raising it is verifiability's job,
+        // not a stricter truth bar. The judged count always rides the rate,
+        // because a percentage over 3 judged findings is not the same claim as
+        // one over 300.
+        const acc = accuracyMeter();
+        if (acc.total) {
+          const box = el("div", "dock-accuracy");
+          box.appendChild(el("p", "dock-acc-head", acc.judged
+            ? `Accuracy \u2014 ${acc.accuracy}% not-wrong over ${acc.judged} judged`
+            : "Accuracy \u2014 no verdicts yet"));
+          if (acc.judged) {
+            const gap = Math.round((acc.target - acc.accuracy) * 10) / 10;
+            box.appendChild(el("p", "dock-acc-sub",
+              `Target ${acc.target}% \u00B7 ${gap <= 0 ? "met" : gap + " pts to go"} \u00B7 `
+              + `${acc.tally.correct} correct \u00B7 ${acc.tally.partial} partly \u00B7 ${acc.tally.incorrect} wrong`));
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.coverage}% of ${acc.total} findings judged \u2014 judge the rest to make the number mean more`));
+          } else {
+            box.appendChild(el("p", "dock-acc-sub",
+              `${acc.total} findings delivered \u2014 mark each \u2713 / ~ / \u2717 on its card to measure accuracy`));
+          }
+          const vs = state.report && state.report.verification_summary;
+          if (vs && vs.verified_pct_of_quoted != null) {
+            box.appendChild(el("p", "dock-acc-sub",
+              `Verifiability (B) \u2014 ${vs.verified_pct_of_quoted}% of quoted findings have a confirmed citation`));
+          }
+          inner.appendChild(box);
+        }
       });
     lens.appendChild(sec);
+  }
+
+  // -- 5b. the withdrawal ledger: what left the delivered set, and why -------
+  // The integrity gate removes MECHANICALLY false findings before they are ever
+  // carded — a pass reporting the ABSENCE of a defect, a duplicate, a
+  // name-variant rule firing on two names that are not one character. The
+  // "nothing lost" law made those removals checkable (findings + withdrawals ==
+  // the pre-gate list) but not VISIBLE: a writer could not see that anything had
+  // been taken out. This is that surface. It is its OWN section, not a line
+  // under the accuracy meter, for one concrete reason: the gate and the coverage
+  // pass are independent, so a report whose coverage pass failed still carries
+  // withdrawals — and a ledger nested inside the coverage section would be
+  // invisible in exactly that case. As a section header the count shows in the
+  // stack even while collapsed. Absent on reports analysed before the gate
+  // existed, so it renders only when the field is present.
+  const wd = (state.report && state.report.withdrawals) || [];
+  if (wd.length) {
+    const nRej = wd.filter((w) => w.action === "reject").length;
+    const nMrg = wd.filter((w) => w.action === "merge").length;
+    const bits = [];
+    if (nRej) bits.push(`${nRej} false`);
+    if (nMrg) bits.push(`${nMrg} duplicate${nMrg === 1 ? "" : "s"}`);
+    const body = el("div", "dock-wd-body");
+    wd.forEach((w) => {
+      const f = w.finding || {};
+      const row = el("div", "dock-wd-row");
+      row.appendChild(el("span", "dock-wd-action",
+        w.action === "merge" ? "duplicate" : "withdrawn"));
+      row.appendChild(el("span", "dock-wd-issue",
+        String(f.issue || "(no text)").slice(0, 180)));
+      row.appendChild(el("span", "dock-wd-reason", String(w.reason || "")));
+      body.appendChild(row);
+    });
+    body.appendChild(el("p", "dock-wd-note",
+      "Nothing was deleted \u2014 every one of these stays beside your project in "
+      + "report.findings.json under \u201cwithdrawals\u201d, with its full text. The "
+      + "analysis accounts for its own removals rather than hiding them."));
+    const wdSec = dockSection("withdrawals",
+      `Withdrawals \u2014 ${wd.length} left the delivered set`
+      + (bits.length ? ` (${bits.join(", ")})` : ""), body);
+    wdSec.title = "The integrity gate removed these because they were mechanically false, "
+      + "not a craft judgement. Nothing was deleted.";
+    lens.appendChild(wdSec);
+  }
+
+  // -- 5c. the feedback ledger: what happened to your notes between runs -----
+  // Amendment 6: across two real runs of the same model on the same script,
+  // 65 % of the writer's marks had no counterpart — the judgment tier churns,
+  // and no identity function fixes that. So "nothing lost" cannot mean every
+  // note comes back; it means every note stays ACCOUNTED FOR. This is where the
+  // desk says which of last run's notes returned, which likely landed (marked
+  // and gone), which the model simply moved on from, and which are new. Its own
+  // section, and absent until two runs exist — there is nothing to reconcile
+  // against one, and inventing a comparison against nothing is the failure mode
+  // this whole gate exists to avoid.
+  const lg = state.feedbackLedger;
+  if (lg && lg.reconcile) {
+    const rc = lg.reconcile;
+    const body = el("div", "dock-ledger-body");
+    const rows = (list, cls) => {
+      (list || []).forEach((item) => {
+        const t = item.prev || item;                 // same/maybe wrap {prev, cur}
+        const row = el("div", "dock-ledger-row " + cls);
+        row.appendChild(el("span", "dock-ledger-issue",
+          String((t && t.issue) || "(no text)").slice(0, 160)));
+        if (item.similarity != null) {
+          row.appendChild(el("span", "dock-ledger-sim",
+            `${Math.round(item.similarity * 100)}% similar`));
+        }
+        body.appendChild(row);
+      });
+    };
+    const groups = [
+      ["same", `${rc.same.length} returned \u2014 same point, same evidence`],
+      ["maybe", `${rc.maybe.length} possibly the same point`],
+      ["likely_resolved", `${rc.likely_resolved.length} you marked \u2014 and they did not come back`],
+      ["not_re_raised", `${rc.not_re_raised.length} did not come back (you had not marked them)`],
+      ["new", `${rc.new.length} new this run`],
+    ];
+    groups.forEach(([key, label]) => {
+      const list = rc[key];
+      if (!list || !list.length) return;
+      body.appendChild(el("p", "dock-ledger-head", label));
+      rows(list, "dock-ledger-" + key);
+    });
+    body.appendChild(el("p", "dock-ledger-note",
+      "Nothing is lost between runs: every note from both runs is accounted for here, "
+      + "and each run's full set stays beside your project in feedback_ledger.json. "
+      + "The model does not always re-raise a point \u2014 this is the desk saying so "
+      + "rather than letting it vanish."));
+    const lgSec = dockSection("feedback-ledger",
+      `Feedback across runs \u2014 run ${lg.latest.run} vs run ${lg.previous.run}`
+      + ` (${lg.runs} runs recorded)`, body);
+    lgSec.title = "What happened to the notes from the previous run: which returned, "
+      + "which likely landed, which were not re-raised, and which are new.";
+    lens.appendChild(lgSec);
   }
 
   // -- 6. Setup / Payoff ------------------------------------------------------
@@ -6276,9 +6944,7 @@ function renderDockEvidence() {
   }
   if (craftWrap.children.length) lens.appendChild(craftWrap);
 
-  // any lens rebuild mid-loop (filter toggle, intent change) wiped the
-  // transient bar + card state — re-dock it here (idempotent when inactive)
-  renderLoopBar();
+  return dockSection("context", "Context", lens);
 }
 
 // ---------- evidence orientation helpers (mass strip / script ruler / sp spine) ----------
@@ -6297,7 +6963,7 @@ const SP_STATUS = { paid: "✓ Paid off", dangling: "🚩 Dangling", abandoned: 
 // unless the writer asks for it.
 function findingPassesFilter(f, index) {
   const d = findingDisposition(f, index);
-  if (d === "deferred" ? !state.findingFilter.showDeferred : d !== "open") return false;
+  if (!findingAdmitted(f, index)) return false;
   const sev = (f.severity || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
   if (state.findingFilter.category && (f.category || "other") !== state.findingFilter.category) return false;
@@ -6338,7 +7004,13 @@ function inkAnchorsFor(findings) {
     const q = (f.evidence_quote || "").trim();
     if (q.length < 2) continue;
     if (!findingPassesFilter(f, index)) continue;
-    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q, sev: (f.severity || "low").toLowerCase() });
+    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index), q,
+               sev: (f.severity || "low").toLowerCase(),
+               // D2-a: an addressed finding only reaches the page when the
+               // writer asked to see addressed findings — and then it must not
+               // paint like a live complaint. `done` mutes the ink and the
+               // title says whose call it was.
+               done: findingDisposition(f, index) === "addressed" });
   }
   const order = { high: 0, medium: 1, low: 2 };
   out.sort((a, b) => (order[a.sev] - order[b.sev]) || (b.q.length - a.q.length));
@@ -6388,7 +7060,7 @@ function decorateLineWithInk(line, text, anchors) {
   line.textContent = "";
   line.appendChild(document.createTextNode(text.slice(0, idx)));
   const mark = document.createElement("mark");
-  mark.className = "finding-ink ink-" + first.sev;
+  mark.className = "finding-ink ink-" + first.sev + (first.done ? " ink-done" : "");
   mark.dataset.findingId = first.id;
   mark.setAttribute("aria-hidden", "true"); // the margin pins + board carry semantics
   mark.title = (first.f.issue || "").slice(0, 140);
@@ -6434,17 +7106,82 @@ async function setFindingIntent(findingId, intent) {
   refreshAllFindingSurfaces(); // P0.4: every mounted surface moves with the mark
 }
 
+// ---------- writer verdict (the truth axis): the accuracy metric's data ----------
+// Mirrors setFindingIntent exactly — optimistic local update, then re-render
+// every surface. The two stores are separate on the server so a failure of one
+// can never cost the other; the same holds here, where a failed verdict leaves
+// the marks untouched and vice versa.
+async function setFindingVerdict(findingId, verdict) {
+  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
+  try {
+    await api(`${base}/findings/verdict`, { method: "POST", body: JSON.stringify({ finding_id: findingId, verdict }) });
+  } catch (e) {
+    showError("Could not save your verdict: " + e.message);
+    return;
+  }
+  if (verdict) state.findingVerdicts[findingId] = verdict;
+  else delete state.findingVerdicts[findingId];
+  refreshAllFindingSurfaces();
+}
+
+/** The writer-agreement meter, computed live from the writer's own verdicts.
+ *  The server twin is `revision.verdict_accuracy` (served at
+ *  /findings/accuracy); this mirrors it so the number the writer watches move
+ *  as they judge is the same number the API reports.
+ *
+ *  Population is DISTINCT finding ids — two rows sharing an id are one finding
+ *  for the tally, exactly as the marks store keys them. Unjudged findings are
+ *  excluded from the denominator, never counted as failures: a rate over 3
+ *  judged findings is not the same claim as one over 300, which is why
+ *  `coverage` is always printed beside `accuracy`. */
+function accuracyMeter() {
+  const findings = state.findings || [];
+  const ids = state.findingIds || [];
+  const verdicts = state.findingVerdicts || {};
+  const seen = new Set();
+  const tally = { correct: 0, partial: 0, incorrect: 0, unjudged: 0 };
+  findings.forEach((f, i) => {
+    const id = ids[i] || String(i);
+    if (seen.has(id)) return;
+    seen.add(id);
+    const v = verdicts[id];
+    tally[(v === "correct" || v === "partial" || v === "incorrect") ? v : "unjudged"] += 1;
+  });
+  const judged = tally.correct + tally.partial + tally.incorrect;
+  const total = seen.size;
+  const pct = (n, d) => (d ? Math.round((1000 * n) / d) / 10 : null);
+  return {
+    total, judged, tally,
+    accuracy: pct(tally.correct + tally.partial, judged),   // the headline: not-wrong
+    strict: pct(tally.correct, judged),
+    incorrectRate: pct(tally.incorrect, judged),
+    coverage: pct(judged, total),
+    target: 98.58,
+  };
+}
+
 // ---------- arrival (R5-b peek + R9-adjacent unread dot) ----------
 // One ambient window per arrival: the first inked line gets a halo, the dock
 // tab carries a lasting unread dot until the Evidence lens is opened. No
 // other ambience runs during the window (one-ambient-event cap, R8).
 let arrivalTimer = null;
+// RE-B4 audit: set by the analysis poll when a run finishes in-session and
+// consumed once by the project-load path — the first pass's arrival signal
+// (last_pass does not exist yet on a first analysis).
+let analysisCompletedFor = null;
 function scheduleArrivalPeek() {
   clearTimeout(arrivalTimer);
   arrivalTimer = setTimeout(() => {
     const tab = document.getElementById("dock-tab-evidence");
-    if (tab && !(document.getElementById("context-dock") || {}).classList?.contains("open")) {
+    const edge = document.getElementById("right-edge-affordance");
+    if (tab && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
       tab.classList.add("has-unread");
+    }
+    // The edge affordance is the ONLY dock surface visible while the dock is
+    // closed — the tab's dot hides with the panel. The report-ready signal
+    // must live where the writer is looking.
+    if (edge && !(document.getElementById("context-dock") || {})?.classList?.contains("open")) {
+      edge.classList.add("has-unread");
     }
     const firstInk = document.querySelector(".finding-ink");
     if (firstInk) {
@@ -6456,6 +7193,8 @@ function scheduleArrivalPeek() {
 function clearEvidenceUnread() {
   const tab = document.getElementById("dock-tab-evidence");
   if (tab) tab.classList.remove("has-unread");
+  const edge = document.getElementById("right-edge-affordance");
+  if (edge) edge.classList.remove("has-unread");
 }
 
 // ---------- arrival strip (R4 + N1 + N2 + P1.9): the "finally" ----------
@@ -6473,18 +7212,16 @@ function clearEvidenceUnread() {
  *  when there was nothing to check). Both orientation strips print this string;
  *  two honest-looking numbers that disagree is how a writer stops trusting both. */
 function verificationReadout() {
+  // The ONLY reader of report.verification_summary. The server now recomputes
+  // this block at serve time from the rows being served (_sanitize_report), so
+  // every report — including ones analysed before the field existed — renders
+  // the readout. Old projects must not leak a previous script's numbers when a
+  // new one has no report yet, so the project switch resets state.report.
   const vs = state.report && state.report.verification_summary;
   if (!vs) return null;
-  const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
-  const unquoted = vs.no_quote || 0;
-  if (checkable) {
-    return (vs.verified || 0) + " of " + checkable + " quotes verified ("
-      + Math.round(100 * (vs.verified || 0) / checkable) + "%)"
-      + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "");
-  }
-  return unquoted
-    ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"
-    : null;
+  // The words live in core.js (unit-tested under node --test); this wrapper
+  // keeps the report-data access in one place for both orientation strips.
+  return verificationReadoutText(vs);
 }
 
 // spec 15.4: pass_history keeps the ledger's open count beyond one generation,
@@ -6642,6 +7379,49 @@ function buildArrivalStrip() {
   return strip;
 }
 
+/** The one-time upgrade notice: marks that could not be moved onto the ids
+ *  findings use now, because ONE stored id covered several findings (HIGH-1's
+ *  collision). The desk refuses to guess — applying one mark to nine findings
+ *  is the overclaim the mark store exists to prevent — so it says what it did
+ *  and where the marks are. Muted, not red: nothing was lost, and this is the
+ *  writer's judgment being preserved, not an error. Dismissible, remembered per
+ *  project (the writer closed it; it was not hidden from them). */
+function buildAmbiguousMarksNotice() {
+  const held = Object.values(state.ambiguousMarks || {}).filter(Boolean);
+  if (!held.length) return null;
+  const key = "ambiguous_notice_dismissed_" + (state.currentProject || "");
+  if (loadPrefs()[key]) return null;
+  const covered = held.reduce((n, h) => n + ((h.candidates || []).length || 0), 0);
+  const note = el("div", "dock-notice dock-ambiguous-notice");
+  const line = el("p", "dock-lens-hint",
+    held.length === 1
+      ? `One of your marks covers ${covered} findings, so it was held aside instead of applied.`
+      : `${held.length} of your marks cover several findings each, so they were held aside instead of applied.`);
+  line.title = "Made before findings carried their scene, a single mark stood for several findings at "
+    + "once. Applying it to any one of them would claim a judgment you did not make. Nothing was deleted — "
+    + "they are kept beside your project in finding_marks.ambiguous.json. Reopen a finding and mark it again "
+    + "to say which you meant.";
+  note.appendChild(line);
+  const det = el("details", "dock-ghosted");
+  det.appendChild(el("summary", "dock-ghosted-summary", "which marks, and what they covered"));
+  for (const h of held) {
+    const r = el("div", "dock-ghosted-row");
+    r.appendChild(el("span", "dock-ghosted-issue", String(h.issue || "finding").slice(0, 110)));
+    r.appendChild(el("span", "dock-ghosted-intent",
+      (h.intent === "addressed" ? "was marked addressed" : "was next pass")
+      + " · covered " + ((h.candidates || []).length || 0) + " findings"
+      + (h.scene_refs && h.scene_refs.length ? " · first at scene " + h.scene_refs[0] : "")));
+    det.appendChild(r);
+  }
+  note.appendChild(det);
+  const close = el("button", "dock-notice-close", "Got it");
+  close.type = "button";
+  close.title = "Hide this notice (your marks are unaffected)";
+  close.addEventListener("click", () => { savePrefs({ [key]: 1 }); note.remove(); });
+  note.appendChild(close);
+  return note;
+}
+
 // P2.14 (spec §3): the report has always carried the facts about itself the desk
 // dropped — which model wrote it, which passes errored, what the coverage pass
 // liked. Each builder below returns null when the report has nothing to say, so a
@@ -6671,6 +7451,28 @@ function buildWhatsWorking() {
   strengths.forEach((s) => box.appendChild(el("p", "dock-working-row", "\u2022 " + s)));
   box.title = "What the analysis thought already holds. These are not findings and"
     + " join no count — the numbers on the strip above stay untouched.";
+  return box;
+}
+
+// A run that re-ran a section in smaller pieces — a CAVEAT, never a failure.
+//
+// Deliberately NOT folded into buildFailureBanner below. That box's head reads
+// "N passes reported a problem", it offers the partial-failure rerun path, and it
+// is driven by `report.errors`. Routing a recovery through it dressed a healthy run
+// as a broken one — the bug the first version of this feature shipped, caught in
+// review. A recovery is the opposite: the pass SUCCEEDED.
+//
+// The writer is still owed it, because a split re-asks the scenes and the finding
+// set is path-dependent (measured 8 vs 12 findings on identical input), so a rerun
+// may word things differently. Quiet note, no red, no action.
+function buildRunCaveat(recoveries) {
+  const rs = (recoveries || []).filter((r) => r);
+  if (!rs.length) return null;
+  const box = el("div", "run-caveat");
+  box.appendChild(el("p", "run-caveat-head", rs.length === 1
+    ? "1 pass re-ran a section in smaller pieces"
+    : rs.length + " passes re-ran a section in smaller pieces"));
+  rs.forEach((r) => box.appendChild(el("p", "run-caveat-note", String(r))));
   return box;
 }
 
@@ -6854,10 +7656,30 @@ function findingDisposition(f, index) {
 function findingOpen(f, index) {
   return findingDisposition(f, index) === "open";
 }
+/** The disclosure half of the ONE filter: which dispositions the writer has
+ *  asked to see at all — open always, deferred behind its chip, addressed
+ *  behind its own (D2-a). Before D2-a, `addressed` fell through to the else
+ *  branch, so the card carrying the ✓ that clears a mark was filtered out by
+ *  the mark itself: marking a finding was a one-way door (HIGH-2a). Deferred
+ *  had a chip from the start; addressed was simply missing one.
+ *
+ *  Severity/category/scene stay out of this predicate so the category chips can
+ *  count over the SAME admission rule they apply when tapped — one count, one
+ *  meaning (N3, and the defect family HIGH-2b names). */
+function findingAdmitted(f, index) {
+  const d = findingDisposition(f, index);
+  return d === "open"
+    || (d === "deferred" && !!state.findingFilter.showDeferred)
+    || (d === "addressed" && !!state.findingFilter.showAddressed);
+}
 /** The ONE filter predicate (severity + category + scene). The mass strip and
  *  the fix queue both read it, so the two scopes can never drift apart.
  *  Fix-queue items carry the same three fields (/fixqueue's allowlist includes
- *  scene_refs), so they pass through it unchanged. */
+ *  scene_refs), so they pass through it unchanged.
+ *  Accuracy kit A appends the groundedness clause below. Writer-dispositioned
+ *  rows (parked/deferred/finished) bypass ONLY that clause: hiding the
+ *  writer's own triage state would strand their workflow with no path back.
+ *  Chips still apply to them — this never overrides an explicit filter. */
 function inFindingFilter(f) {
   const sev = ((f && f.severity) || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
@@ -6868,6 +7690,14 @@ function inFindingFilter(f) {
   // contract exists to prevent (the writer scoped the view; the scope says so).
   const sc = state.findingFilter.scene;
   if (sc != null && !findingOnScene(f, sc)) return false;
+  // accuracy kit A: ungrounded rows hide by default (flag-don't-drop keeps
+  // them one toggle away) — the toggle mirrors the dismissed one
+  if (f && f.ungrounded && !state.fixQueueShowUngrounded) {
+    const fi = (typeof queueItemFindingIndex === "function") ? queueItemFindingIndex(f) : null;
+    const d = fi != null ? findingDisposition((state.findings || [])[fi], fi)
+      : (f.status === "addressed" ? "addressed" : "open");
+    if (d !== "addressed" && d !== "deferred") return false;
+  }
   return true;
 }
 /** Scope + disposition counts — the second half of the N3 counting contract.
@@ -6940,6 +7770,12 @@ function queueCounts(items) {
       ? (item.dismissed ? "dismissed" : (item.status === "addressed" ? "addressed" : "open"))
       : findingDisposition((state.findings || [])[index], index);
     if (d === "dismissed") continue;
+    // accuracy kit A: rows hidden behind the ungrounded toggle sit out of
+    // the ledger's totals exactly like dismissed rows do — same counter.
+    // Writer-dispositioned rows bypass (mirrors queueRowVisible): parking or
+    // finishing a note is the writer's own workflow, not a groundedness claim.
+    if (item.ungrounded && !state.fixQueueShowUngrounded
+        && d !== "addressed" && d !== "deferred") continue;
     c.total += 1;
     if (d === "open") c.open += 1;
   }
@@ -6982,11 +7818,16 @@ function buildFindingFilterRow() {
       rerender();
     }));
   }
-  // category count-chips: counts over open findings (severity-agnostic),
-  // tap filters the board list + ink to that category, tap again clears
+  // category count-chips: counts over the findings this row ADMITS
+  // (severity-agnostic), tap filters the board list + ink to that category,
+  // tap again clears. D2-a widened the basis from "open only" to the same
+  // admission rule the list uses: with a chip pressed that shows addressed or
+  // parked rows, a "Dialogue 9" that counted only open ones would sit over a
+  // list of fifteen — one count, two meanings, which is the defect family
+  // HIGH-2b names. The count now always describes the rows its own tap shows.
   const catCounts = {};
   (state.findings || []).forEach((f, index) => {
-    if (findingDisposition(f, index) !== "open") return;
+    if (!findingAdmitted(f, index)) return;
     const c = f.category || "other";
     catCounts[c] = (catCounts[c] || 0) + 1;
   });
@@ -7001,6 +7842,21 @@ function buildFindingFilterRow() {
     state.findingFilter.showDeferred = !dp;
     rerender();
   }));
+  // D2-a: the marked findings' own way back onto the board. Deferred had this
+  // chip from the start; addressed had nothing, so the one control that shows
+  // WHICH mark a finding carries — and that clears it — disappeared with the
+  // mark. The count rides the label (N3: a label always prints the scope of
+  // the number it carries) and the basis is findingAdmitted, the same rule the
+  // list reads, so the chip cannot promise rows the board will not paint.
+  const da = state.findingFilter.showAddressed;
+  const addressedCount = (state.findings || []).filter((f, i) => findingDisposition(f, i) === "addressed").length;
+  row.appendChild(mk(`Addressed ${addressedCount}`, da,
+    da ? "Your addressed findings are shown — press ✓ again on a card to reopen it"
+       : "Show the findings you marked addressed (your marks stay; this only shows them)",
+    () => {
+      state.findingFilter.showAddressed = !da;
+      rerender();
+    }));
   // P1.7 — the scene as a FILTER DIMENSION (spec §5): one chip over the same
   // ONE filter state the severity/category chips write. Its label ALWAYS prints
   // the scope of the count it carries (the N3 counting contract), and it is
@@ -7226,14 +8082,10 @@ function refreshDockEvidence() {
 function refreshAllFindingSurfaces() {
   refreshDockEvidence(); // no-op unless the dock is open on the Evidence lens
   renderManuscript();    // ink + #finding-summary chips + craft shelf (P1.10: no queue)
-  // the queue's other homes — re-rendered through the SAME renderer, never a
-  // forked path; skipped when the container was never mounted (the tab's
-  // self-heal renders it on first open instead)
-  const fq = $("#feedback-fixqueue");
-  if (fq && fq.children.length) {
-    fq.innerHTML = "";
-    renderFixQueuePanel(fq);
-  }
+  refreshFindingsSummary(); // keep the server-joined store warm (fire-and-forget)
+  // the queue's OTHER home — the Revision view's findings column — re-renders
+  // through the same ledger data (the legacy Fix-Queue tab is retired with the
+  // panel; the Evidence lens is the queue's only other renderer now)
   if (state.view === "revision" && $("#revision-findings")) renderRevisionView();
   updateDawnMeter();
   refreshMetrics();
@@ -7407,121 +8259,29 @@ function maybeShowWelcome() {
   }
 }
 
+/** Retired with the legacy Report/Fix-Queue panel (Option A+, Report 2 §4
+ *  move 2): the panel was a third surface projecting the same findings state
+ *  as the Evidence lens, reachable only by deep link — unverified surface
+ *  area, and the historical source of the ONE-filter/ONE-counter drift the
+ *  N3/R5-b contracts keep patching. Callers redirect to the desk + Evidence
+ *  lens, which has carried the same data since the route fold (1A). Kept as a
+ *  named shim so external callers (and bookmarks of old call sites) land
+ *  somewhere intentional instead of on a TypeError. */
 async function loadFeedbackPanels() {
-  // NOTE: no leading /api here — the api() wrapper already prefixes API = "/api";
-  // a doubled prefix 404s and the room shows "No analysis yet" after a good run
-  const base = `/projects/${encodeURIComponent(state.currentProject)}`;
-  try {
-    if (!state.report) state.report = await api(`${base}/report`);
-  } catch (_) { /* no analysis yet */ }
-  try {
-    if (!state.fixQueue) state.fixQueue = await api(`${base}/fixqueue`);
-  } catch (_) { /* no analysis yet */ }
-  // P2.16: the one-click rerun for a partial report lives in the ledger's failure
-  // banner (buildFailureBanner), not in a header button beside it.
-  const hasReport = !!(state.report && (state.report.findings || state.report.coverage));
-  const empty = $("#feedback-empty");
-  const tabs = $("#feedback-tabs");
-  if (empty) empty.style.display = hasReport ? "none" : "block";
-  if (tabs) tabs.style.display = hasReport ? "flex" : "none";
-  if (hasReport) {
-    renderReportPanel();
-    const fq = $("#feedback-fixqueue");
-    if (fq) {
-      fq.innerHTML = "";
-      renderFixQueuePanel(fq);   // existing function, reused verbatim
-    }
-    switchFeedbackTab("report");  // show the Report pane (both panes start hidden)
+  if (state.currentProject && typeof openFeedbackView === "function") {
+    await openFeedbackView();
+    return;
   }
+  await loadScriptData();
 }
 
-function switchFeedbackTab(tab) {
-  const reportBtn = $("#tab-report-btn");
-  const fqBtn = $("#tab-fixqueue-btn");
-  const report = $("#feedback-report");
-  const fq = $("#feedback-fixqueue");
-  if (reportBtn) reportBtn.classList.toggle("active", tab === "report");
-  if (fqBtn) fqBtn.classList.toggle("active", tab === "fixqueue");
-  if (report) report.style.display = tab === "report" ? "block" : "none";
-  if (fq) fq.style.display = tab === "fixqueue" ? "block" : "none";
-  // self-heal: a tab should never show a blank pane — if the target is empty
-  // but data exists in memory, render it now (e.g. a render was skipped when
-  // the room opened before the report fetch landed)
-  if (tab === "fixqueue" && fq && !fq.children.length && state.fixQueue) {
-    renderFixQueuePanel(fq);
-  }
-}
+// (switchFeedbackTab retired with the legacy Report/Fix-Queue tabs —
+// Option A+, Report 2 §4 move 2: one findings state, one lens)
 
-function renderReportPanel() {
-  const c = $("#feedback-report");
-  if (!c) return;
-  // the doctor's report is the writer's document — let them take it away
-  paintReportExport();
-  c.innerHTML = "";
-  const cov = state.report && state.report.coverage;
-  if (cov) {
-    const card = el("div", "craft-panel");
-    const head = el("div", "craft-panel-head");
-    head.appendChild(el("span", "craft-panel-title", `Coverage — ${(cov.recommendation || "").toUpperCase()}`));
-    card.appendChild(head);
-    if (cov.logline) card.appendChild(el("p", "", `Logline: ${cov.logline}`));
-    if (cov.one_page_synopsis) card.appendChild(el("p", "", cov.one_page_synopsis));
-    (cov.weaknesses || []).forEach((w) => card.appendChild(el("p", "fix-row-why", `• ${w}`)));
-    c.appendChild(card);
-  }
-  // Setup / Payoff — the end-of-pipeline whole-script audit (paid / dangling /
-  // abandoned / red herring). Rendered as its own card above the findings.
-  const sp = state.report && state.report.setup_payoff;
-  if (sp && sp.length) {
-    const spCard = el("div", "craft-panel");
-    const spHead = el("div", "craft-panel-head");
-    spHead.appendChild(el("span", "craft-panel-title", "Setup / Payoff"));
-    spCard.appendChild(spHead);
-    sp.forEach((e) => {
-      const setScenes = (e.setup_scenes || []).map((n) => "S" + n).join(", ") || "General";
-      const payScenes = (e.payoff_scenes && e.payoff_scenes.length) ? e.payoff_scenes.map((n) => "S" + n).join(", ") : "never";
-      const row = el("p", "fix-row-issue", `[${SP_STATUS[e.status] || e.status}] ${e.setup} — set up in ${setScenes}, payoff: ${payScenes}`);
-      if (e.note) row.appendChild(el("p", "fix-row-why", e.note));
-      spCard.appendChild(row);
-    });
-    c.appendChild(spCard);
-  }
+// (renderReportPanel retired with the legacy Report pane: the Evidence lens
+// carries the same coverage / setup-payoff / dials / mirror / category data,
+// with the deep cards and the ONE filter that pane never had)
 
-  // P1.10: the per-scene pace chart used to be drawn a SECOND time here under
-  // the same "Pacing" title as the shelf's words-per-page chart, with different
-  // data. Both metrics now live in renderPacingPanel: one panel, two blocks.
-
-  // Character dials -- the ONE shared panel (re-homed out of the dead
-  // #struct-rail by the 2026-09-19 gaps pass; it used to render only here
-  // and in the rail, so the live desk had none).
-  renderCharacterDialsPanel(c);
-
-  // Writer's Mirror — how the premise lands in one sentence + how each
-  // character reads to a stranger. Same panel as the craft shelf, reused
-  // verbatim so the doctor's desk carries the whole analysis.
-  renderWriterMirrorPanel(c);
-
-  const byCat = {};
-  (state.report.findings || []).forEach((f) => { (byCat[f.category] = byCat[f.category] || []).push(f); });
-  for (const [cat, list] of Object.entries(byCat)) {
-    const card = el("div", "craft-panel");
-    const head = el("div", "craft-panel-head");
-    head.appendChild(el("span", "craft-panel-title", CATEGORY_LABELS[cat] || cat));
-    card.appendChild(head);
-    list.forEach((f) => {
-      const refs = (f.scene_refs || []).map((n) => "Scene " + n).join(", ") || "General";
-      const issue = el("p", "fix-row-issue", `[${(f.severity || "low").toUpperCase()}] ${refs}: ${f.issue}`);
-      if (f.why_it_matters) issue.appendChild(el("p", "fix-row-why", f.why_it_matters));
-      const rowBtns = el("span", "fix-row-locate", "🎯 Locate");
-      rowBtns.title = "Jump to the exact line in the script";
-      rowBtns.style.cursor = "pointer";
-      rowBtns.addEventListener("click", () => locateFinding(f));
-      issue.appendChild(rowBtns);
-      card.appendChild(issue);
-    });
-    c.appendChild(card);
-  }
-}
 
 // ---- compare (side-by-side drafts) ----
 
@@ -8349,7 +9109,20 @@ async function applyOneRewrite(rep, row) {
     await afterScriptEdit();
   } catch (e) {
     status.className = "rewrite-status error";
-    status.textContent = "Apply failed: " + e.message;
+    if (e.stale) {
+      // A refusal is terminal, not retryable: the text this proposal was cut
+      // from is gone from the scene, so Apply can never land, and the row must
+      // stop riding the next bulk "Apply changes" (bulk collects `cb.checked &&
+      // !cb.disabled`). Marking it exactly the way a decided row is marked is
+      // what makes the interface stop offering an action that cannot succeed —
+      // the same rule the "disabled but left checked" defect taught this modal.
+      // The sentence stays on screen until the writer answers it by
+      // regenerating, which is what the refusal is FOR.
+      _markProposalRow(row, "stale", true);
+      status.textContent = e.message;
+    } else {
+      status.textContent = "Apply failed: " + e.message;
+    }
   }
 }
 
@@ -9549,9 +10322,11 @@ function init() {
   const routeScrollPane = getManuscriptContainer();
   if (routeScrollPane) routeScrollPane.addEventListener("scroll", scheduleRouteSync, { passive: true });
 
-  $("#analyze-btn").addEventListener("click", runAnalysis);
-  $("#reparse-btn").addEventListener("click", reparseProject);
   // Phase 8: the desk toolbar — same lifecycle actions beside the page. The
+  // re-homed Re-parse rides it too (its old home was the retired panel header).
+  const reparseBtn = $("#reparse-btn");
+  if (reparseBtn) reparseBtn.addEventListener("click", reparseProject);
+  // The
   // partial-report rerun is NOT here: it is the ledger banner's job (P2.16).
   const deskAnalyzeBtn = $("#desk-analyze-btn");
   if (deskAnalyzeBtn) deskAnalyzeBtn.addEventListener("click", runAnalysis);
@@ -9790,8 +10565,7 @@ function init() {
       btn.textContent = original;
     }
   });
-  $("#tab-report-btn").addEventListener("click", () => switchFeedbackTab("report"));
-  $("#tab-fixqueue-btn").addEventListener("click", () => switchFeedbackTab("fixqueue"));
+  // (the legacy Report/Fix-Queue tab buttons retired with the panel)
   $("#print-btn").addEventListener("click", () => { closeOverflow();
     if (state.view === "cowrite" || state.view === "feedback") window.print();
   });

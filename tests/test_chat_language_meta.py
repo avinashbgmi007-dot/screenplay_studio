@@ -90,6 +90,15 @@ class TestPromptRule:
             prompt = build_system_prompt(ScriptContext({"title": "T"}), ReportContext(None), persona, "brainstorm")
             assert "Never comment on the script's LANGUAGE itself" in prompt
 
+    def test_system_prompt_bans_register_as_defect(self):
+        """Kept in sync with the analyzer instruction: transliteration /
+        code-mixing / dialect must never be filed as a defect in chat."""
+        prompt = build_system_prompt(
+            ScriptContext({"title": "T"}), ReportContext(None), "script_consultant", "evidence_discussion"
+        )
+        assert "REGISTER" in prompt
+        assert "never by the vehicle" in prompt.lower()
+
     def test_writing_partner_embeds_example_dialogue(self):
         # The character-card lever: example exchanges lock the voice better
         # than adjectives. Sameer's examples must ride the writing_partner prompt.

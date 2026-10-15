@@ -84,6 +84,15 @@ class TestFilterUnit:
         out = filter_findings([DIALECT_FINDING, CRAFT_FINDING, VOICE_FINDING])
         assert out == [CRAFT_FINDING, VOICE_FINDING]
 
+    def test_partition_returns_removed_half_for_the_ledger(self):
+        from screenplay_analyzer.feedback_filter import partition_findings
+        kept, removed = partition_findings(
+            [DIALECT_FINDING, CRAFT_FINDING, None, "x", VOICE_FINDING])
+        assert kept == [CRAFT_FINDING, VOICE_FINDING]
+        assert removed == [DIALECT_FINDING]
+        # garbage is dropped on the floor, never ledgered
+        assert len(kept) + len(removed) == 3
+
     def test_filter_tolerates_garbage(self):
         assert filter_findings(None) == []
         assert filter_findings([None, "x", {}, {"issue": "reads as regional"}]) == [{}]
@@ -91,6 +100,86 @@ class TestFilterUnit:
     def test_severity_missing_still_filtered(self):
         f = {"issue": "probably Telugu dialogue", "why_it_matters": "x"}
         assert is_non_writing_feedback(f) is True
+
+    def test_untranslated_language_filed_as_opaque_dropped(self):
+        # Trial-5 live finding (pain3 #19): Tamil dialogue filed high-severity
+        # "opaque text, impossible to assess", language mention in observation.
+        f = {
+            "category": "dialogue",
+            "issue": "The dialogue is presented as opaque text, making it impossible to assess subtext, rhythm, or character voice for the reader.",
+            "observation": "Scene 14 contains a sequence where Rishi and Siddhu speak in an untranslated language (likely Tamil) without context or subtitles.",
+            "why_it_matters": "Without understanding the content, the 'Distinct Character Voice' and 'Subtext' rules cannot be evaluated.",
+            "severity": "high",
+            "scene_refs": [14],
+            "evidence_quote": "Eedki theeskochinv endhi ra Siddhu?",
+        }
+        assert is_non_writing_feedback(f) is True
+        assert f["issue"] not in [g["issue"] for g in filter_findings([f, CRAFT_FINDING])]
+
+    def test_language_in_observation_with_real_claim_kept(self):
+        # Observation naming the language must not doom a genuine craft note.
+        f = {
+            "category": "dialogue",
+            "issue": "The line states the plan outright instead of implying it.",
+            "observation": "Rishi says the Tamil line twice, word for word.",
+            "why_it_matters": "Repetition without variation reads as a lecture, not a plea.",
+            "severity": "medium",
+            "scene_refs": [14],
+            "evidence_quote": "Eedki theeskochinv endhi ra Siddhu?",
+        }
+        assert is_non_writing_feedback(f) is False
+
+    def test_incomprehension_claim_without_language_kept(self):
+        # "Opaque" alone, with no language identification anywhere, is a
+        # craft complaint (e.g. about staging), not language meta-commentary.
+        f = {
+            "category": "scene_function",
+            "issue": "The staging is opaque and impossible to assess on the page.",
+            "why_it_matters": "The reader cannot tell who moves where.",
+        }
+        assert is_non_writing_feedback(f) is False
+
+    def test_claim_side_transliteration_complaint_dropped(self):
+        """Trial-13 live rows: both halves claim-side, no observation
+        language mention for the older rule to see."""
+        for issue, why in [
+            ("The script uses an untransliterated foreign language without providing context or translation.",
+             "The emotional intent is inaccessible to non-speakers."),
+            ("The entire script uses a transliterated language without providing an English equivalent.",
+             "It is impossible to evaluate the narrative content."),
+        ]:
+            f = {"category": "dialogue", "issue": issue,
+                 "observation": "Scene 1 contains a block of dialogue.",
+                 "why_it_matters": why,
+                 "evidence_quote": "life antene decisions meeda"}
+            assert is_non_writing_feedback(f) is True, issue
+
+    def test_single_half_claim_side_kept(self):
+        """Either half alone is legitimate: vehicle praise without harm,
+        or harm without a vehicle complaint."""
+        assert is_non_writing_feedback({
+            "issue": "The Romanized Tamil dialogue is punchy and distinct.",
+            "why_it_matters": "The voice carries the scene.",
+        }) is False
+        assert is_non_writing_feedback({
+            "issue": "The timeline is impossible to evaluate on the page.",
+            "why_it_matters": "The reader cannot tell what happens first.",
+        }) is False
+
+    def test_phonetic_transcription_complaint_dropped(self):
+        # Trial-8 live findings (gunpen #4/#5): transliterated Tenglish V.O.
+        # filed as "phonetic transcription" / "language mixing creates
+        # confusion" — the same incomprehension family as the Tamil case.
+        for issue, obs in [
+            ("Dialogue is presented as phonetic transcription rather than readable text.",
+             "The V.O. line appears to be a phonetic transliteration of a specific language (likely Tamil)."),
+            ("Inconsistent language mixing in Voice Over creates confusion about the intended dialogue.",
+             "The V.O. line uses mixed English and phonetic script without clear separation or translation."),
+        ]:
+            f = {"category": "dialogue", "issue": issue, "observation": obs,
+                 "why_it_matters": "The reader cannot follow it.",
+                 "evidence_quote": "decison theeskunnam ane feelingalla"}
+            assert is_non_writing_feedback(f) is True, issue
 
 
 SAMPLE_SCRIPT = b"""Title: Filter Test
@@ -227,3 +316,26 @@ class TestFilterInPipeline:
         issues = [f["issue"] for f in result.findings]
         assert DIALECT_FINDING["issue"] not in issues
         assert CRAFT_FINDING["issue"] in issues
+
+    def test_analyze_ledgers_language_filter_removals(self):
+        """Trial 9: removals are observable in stats (count + issues), so a
+        trial can tell a working filter from one that never fires."""
+        import sys
+        import tempfile
+        from screenplay_parser import parse_fountain
+        from screenplay_analyzer.pipeline import analyze
+
+        with tempfile.NamedTemporaryFile("w", suffix=".fountain", delete=False, encoding="utf-8") as f:
+            f.write(SAMPLE_SCRIPT.decode("utf-8"))
+            path = f.name
+        try:
+            doc = parse_fountain(path)
+        finally:
+            os.unlink(path)
+
+        client = _StubClient()
+        result = analyze(doc, client, run_categories=("dialogue",))
+        ledger = (result.stats or {}).get("language_filtered")
+        assert ledger is not None
+        assert ledger["count"] == 1
+        assert ledger["issues"] == [DIALECT_FINDING["issue"]]

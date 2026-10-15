@@ -145,13 +145,18 @@ class TestInAppDisclosure:
             "the banner must start hidden — it is revealed by config, not by layout"
         )
 
-    def test_the_banner_sits_outside_the_flex_header(self):
-        """`.feedback-header` is a flex row; a banner inside it would become a
-        flex item and push the toolbar sideways."""
+    def test_the_banner_lives_with_the_conversation_not_in_a_flex_header(self):
+        """Option A+ (audit 2026-09-30): the legacy panel header retired, and
+        the conversation disclosure moved into #room-drawer — the drawer serves
+        BOTH rooms' conversations, so one banner discloses the demo partner in
+        whichever room is lit. A banner inside a flex header would become a
+        flex item and push the toolbar sideways; the drawer stacks vertically."""
         html = self._index_html()
-        header_at = html.index('class="feedback-header"')
-        banner_at = html.index('data-demo-banner')
-        assert banner_at < header_at
+        assert 'class="feedback-header"' not in html, (
+            "the legacy panel header must stay retired")
+        drawer_at = html.index('id="room-drawer"')
+        banner_at = html.index("data-demo-banner", drawer_at)
+        assert banner_at > drawer_at
 
     def test_the_project_report_surface_carries_a_banner_too(self):
         """A PROJECT renders its report in the dock; #feedback-panel is the

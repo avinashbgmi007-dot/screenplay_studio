@@ -21,7 +21,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from e2e_browser_common import Checks, assert_no_js_errors, launch, start_studio  # noqa: E402
+from e2e_browser_common import (  # noqa: E402
+    Checks, assert_no_js_errors, banner_text, launch, start_studio,
+)
 from playwright.sync_api import expect, sync_playwright  # noqa: E402
 
 # Non-routable by standard (RFC 5737 / RFC 2606): a regression cannot reach a
@@ -75,7 +77,7 @@ def run():
             page.fill("#server-url-input", REMOTE)
             page.click("#settings-save")
             expect(page.locator("#error-banner")).to_be_visible(timeout=20000)
-            banner = page.locator("#error-banner-text").inner_text()
+            banner = banner_text(page)
             checks.ok("Save surfaces the refusal in the error banner",
                       "Refusing" in banner, banner[:120])
             checks.ok("the banner names the opt-in",

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" data-ground="instrument">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Ink Layer — single surface</title>
+<!--
+  THE INK LAYER — Architecture I.
+  Single uninterrupted surface. No sidebars, no drawers, no modals, no tabs.
+  The document's only interactive furniture is one 12px track on the extreme
+  right edge and one off-screen annunciator. Everything else is the manuscript.
+
+  DOM CONTRACT (what ink-layer.js may assume about this file):
+    #surface      the scroller (the page itself). Owns scroll, nothing else.
+    #manuscript   the column. Populated with .scene > .rowgroup > .row + .fold
+    #horizon      absolutely positioned, in flow-free space, never squeezes text
+    #annunciator  role=status, aria-live=polite — the ONLY text outside the script
+  Anything added to this file must be justified by one of the three mechanisms.
+-->
+<link rel="stylesheet" href="./ink-layer.css">
+<!-- The colour pass. ink-layer.css owns structure and the state machine;
+     detent.css paints it and typesets the interface voice. Loaded second and
+     never the other way round: the second sheet may read the first sheet's
+     elements, never redefine their geometry. -->
+<link rel="stylesheet" href="./detent.css">
+</head>
+<body>
+
+  <!-- ── THE SINGLE SURFACE ──────────────────────────────────────────────── -->
+  <main class="surface" id="surface">
+    <article class="manuscript" id="manuscript"
+             role="document" aria-label="Screenplay manuscript" aria-busy="true">
+      <!-- ink-layer.js injects: section.scene > div.rowgroup > div.row + div.fold -->
+    </article>
+  </main>
+
+  <!-- ── THE HORIZON ─────────────────────────────────────────────────────── -->
+  <!-- A true-proportion silhouette of the whole document. 12px wide, absolute,
+       out of flow. Its own height is the full document; its client height is
+       the viewport. One child <g> is the coordinate system. -->
+  <div class="horizon" id="horizon"
+       role="slider" tabindex="0"
+       aria-orientation="vertical"
+       aria-label="Document horizon: scene proportion, ink, and viewport position"
+       aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+       aria-valuetext="Top of script">
+    <svg class="hz-track" id="hzTrack" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <g id="hzBands"></g>   <!-- one rect per scene, integer-tiled, ≥1px -->
+      <g id="hzInk"></g>     <!-- one pip per ink channel; width = severity -->
+      <rect id="hzWindow" class="hz-window" x="0" width="100%" height="0"></rect>
+    </svg>
+  </div>
+
+  <!-- ── THE ANNUNCIATOR ─────────────────────────────────────────────────── -->
+  <!-- Not a status bar: no controls, no layout, 1px until a writer opts in with
+       the a key. It is why every mechanism works with the screen off. -->
+  <p class="annunciator" id="annunciator" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <noscript>
+    <p style="padding:2rem;font:1rem ui-monospace,monospace">
+      The Ink Layer is a manuscript editor and needs scripting enabled.
+    </p>
+  </noscript>
+
+  <script type="module" src="./ink-layer.js"></script>
+</body>
+</html>

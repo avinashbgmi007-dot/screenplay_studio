@@ -11,9 +11,10 @@ rejects two things the app's older grammars relied on:
   2. `\x00-\x1f` hex ranges and backslash escapes inside character classes.
 
 These tests pin the invariants so a future edit can't silently reintroduce
-either pattern, and pin the client-side half of the fix: grammar-constrained
-calls disable thinking so the constrained JSON lands in `content` (which the
-client parses) instead of `reasoning_content`.
+either pattern, and pin the client-side half of the fix: thinking is disabled on
+every call so the JSON lands in `content` (which the client parses) instead of
+`reasoning_content` — a grammar alone does NOT stop a reasoning model from
+thinking, so the flag is load-bearing on all of them.
 """
 
 import json
@@ -106,8 +107,19 @@ def test_payload_disables_thinking_when_grammar_present(monkeypatch):
     assert payload.get("chat_template_kwargs") == {"enable_thinking": False}
 
 
-def test_payload_keeps_thinking_when_no_grammar(monkeypatch):
-    """Conversational calls (no grammar) should not force thinking off."""
+def test_payload_always_disables_thinking(monkeypatch):
+    """Thinking is disabled on EVERY call, grammar or not.
+
+    This used to assert the opposite ("conversational calls should not force
+    thinking off"), which encoded a call pattern `chat_json` does not have: it
+    PARSES JSON, so a "conversational" caller is a contradiction — every caller
+    (all twelve analyzer passes) wants JSON. Measured on a reasoning model
+    (qwen3.6), leaving thinking on makes the model spend the whole max_tokens
+    budget in `reasoning_content` and return EMPTY `content`, which the client
+    cannot parse. A grammar does NOT prevent this — the model still reasons
+    around it — so the flag is the only thing that works, and it must be set
+    wherever `chat_json` is used. The co-writer client already always sets it.
+    """
     captured = {}
 
     class FakeResp:
@@ -128,4 +140,4 @@ def test_payload_keeps_thinking_when_no_grammar(monkeypatch):
     client._resolved_model = "test-model"
 
     client.chat_json("sys", "usr")
-    assert "chat_template_kwargs" not in captured["payload"]
+    assert captured["payload"].get("chat_template_kwargs") == {"enable_thinking": False}

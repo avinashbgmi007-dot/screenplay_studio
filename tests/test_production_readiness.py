@@ -493,10 +493,113 @@ def test_ci_pins_its_linter_to_the_version_the_repo_uses():
         "a floating `ruff>=` is back in pyproject; the pin is the point")
 
 
+# Clients that will block forever on a dead socket if left unbounded.
+UNBOUNDED_CLIENTS = ("apt-get", "playwright install")
+
+
+def _ci_jobs(src):
+    """{job_name: job_mapping} parsed out of a ci.yml source string.
+
+    Parsed as YAML, not scanned as text. The text-based version of this guard
+    produced FOUR silent passes, one shape at a time, each invisible to a regex:
+
+      * `# timeout-minutes: 8` — a comment satisfied "is it declared?"
+      * `with.timeout-minutes` — an action INPUT that merely shares the key's
+        name and does not bound the step
+      * a step's timeout satisfying the JOB guard — wrong scope
+      * an indentless sequence under `steps:` — `steps:` followed by `- name: …`
+        at the SAME column is valid YAML, and the `^      - ` splitter found no
+        steps at all, so the guard reported no offenders
+
+    A parser makes all four unrepresentable rather than individually patched:
+    comments are discarded, `with:` keys stay nested where they belong, a key is
+    a key of the mapping it is actually in, and a sequence is a sequence however
+    it is indented. The cost is one CI-only dependency (`pyproject.toml`'s `ci`
+    extra, pinned in the lock) — cheaper than a guard that keeps being wrong.
+    """
+    import yaml
+    doc = yaml.safe_load(src)
+    jobs = doc.get("jobs") if isinstance(doc, dict) else None
+    assert isinstance(jobs, dict) and jobs, (
+        "ci.yml no longer has a non-empty `jobs:` mapping — the file's shape "
+        "changed, so these guards would silently check nothing")
+    return jobs
+
+
+def _step_text(step):
+    """Every string a step carries, comments excluded.
+
+    Comments are not filtered here — they are already gone, because YAML
+    discarded them before this saw the step. That closes the text guard's last
+    residual in BOTH directions: a client named in a comment no longer counts,
+    and neither does one named in a TRAILING comment, which the line-based
+    comment strip could never have removed.
+    """
+    out = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                out.append(str(key))
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+        elif node is not None:
+            out.append(str(node))
+
+    walk(step)
+    return " ".join(out)
+
+
+def _has_timeout(mapping):
+    """True only if `mapping` declares a USABLE `timeout-minutes`.
+
+    Presence is not a declaration, and this is the same defect class one level
+    down: the parser removed the *syntax* ambiguity (comments, nesting,
+    indentation) but a bare `in` test is still a PRESENCE test, not a USABILITY
+    test. `timeout-minutes:` with no value parses to None, and `null`, `~`, `''`,
+    a non-numeric string and `0` all satisfy `"timeout-minutes" in mapping`
+    while bounding nothing. Measured 2026-10-08: ten silent passes across the two
+    guards, every one of them a job or step reported as bounded.
+
+    GitHub wants a positive integer number of minutes, so that is what counts.
+    `bool` is excluded explicitly because `isinstance(True, int)` is True.
+    """
+    value = mapping.get("timeout-minutes")
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _jobs_without_timeout(src):
+    """Names of jobs that declare no USABLE job-level `timeout-minutes`."""
+    return [name for name, job in _ci_jobs(src).items()
+            if not (isinstance(job, dict) and _has_timeout(job))]
+
+
+def _unbounded_network_steps(src):
+    """`job/step` labels for steps that run an unbounded network client with no
+    usable step-level `timeout-minutes`."""
+    offenders = []
+    for job, body in _ci_jobs(src).items():
+        if not isinstance(body, dict):
+            continue
+        for step in body.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            # `_has_timeout(step)` reads a KEY OF the step, so a nested
+            # `with.timeout-minutes` is not one — and a valueless
+            # `timeout-minutes:` is not one either.
+            if (any(c in _step_text(step) for c in UNBOUNDED_CLIENTS)
+                    and not _has_timeout(step)):
+                label = step.get("name") or step.get("uses") or _step_text(step)[:40]
+                offenders.append(f"{job}/{label}")
+    return offenders
+
+
 def test_every_ci_job_declares_a_timeout():
     """R9 (2026-09-21): a GitHub job with no `timeout-minutes` inherits the
     platform default of **360 minutes**, so one hung suite can burn six hours of
-    CI before anything notices. All four jobs do declare one today — which is
+    CI before anything notices. All five jobs do declare one today — which is
     exactly why nothing was watching it.
 
     The per-job timeouts are also what makes the "is the budget big enough?"
@@ -506,26 +609,329 @@ def test_every_ci_job_declares_a_timeout():
     per-suite worst-case waits, not an expected runtime.
 
     This asserts the DECLARATION, not a duration: it cannot know how fast a
-    runner is, but it can refuse a job that is unbounded.
+    runner is, but it can refuse a job that is unbounded. The declaration must
+    also be REAL — see `test_the_timeout_guards_reject_an_inert_declaration`.
     """
-    import re
     src = open(".github/workflows/ci.yml", encoding="utf-8").read()
-    assert "\njobs:" in src, "ci.yml no longer has a jobs: block"
-    body = src.split("\njobs:", 1)[1]
-    # job ids sit at two-space indent, their keys at four
-    starts = [m.start() for m in re.finditer(r"^  ([A-Za-z][\w-]*):[ \t]*$", body, re.M)]
-    assert starts, "no jobs parsed out of ci.yml — the file's shape changed"
-    jobs = []
-    for i, at in enumerate(starts):
-        end = starts[i + 1] if i + 1 < len(starts) else len(body)
-        block = body[at:end]
-        name = re.match(r"^  ([A-Za-z][\w-]*)", block).group(1)
-        jobs.append((name, block))
-    assert len(jobs) >= 4, f"expected the four CI jobs, parsed {[n for n, _ in jobs]}"
-    unbounded = [n for n, block in jobs if "timeout-minutes:" not in block]
+    jobs = _ci_jobs(src)
+    assert len(jobs) >= 5, f"expected the five CI jobs, parsed {sorted(jobs)}"
+    unbounded = _jobs_without_timeout(src)
     assert not unbounded, (
         f"CI job(s) {unbounded} declare no timeout-minutes — a hang there runs to "
         f"the 360-minute platform default")
+
+
+def test_unbounded_network_steps_declare_a_timeout():
+    """2026-10-07: the job-level guard above is not enough on its own, because a
+    JOB timeout ends the run as **`cancelled`** — which reads as a flake, not a
+    failure, and hides that the tests never ran.
+
+    Measured on one SHA, both jobs losing the whole budget to a stalled socket:
+
+      * `test-python` — `apt-get update` ran **25.3 min** against a 25-minute job
+        budget (normal: 30 s). The run ended `cancelled` with `setup-python`,
+        `Install dependencies` and `Run test suite` all **SKIPPED**. The log's last
+        line before 24 minutes of silence was a half-finished
+        `Get: … noble-security InRelease [126 kB]`.
+      * `test-browser` — `playwright install --with-deps chromium` ran **45.0 min**
+        against a 45-minute budget, so `Run browser suites` never ran at all.
+
+    In both cases the green-looking outcome was `cancelled`, and `gh pr checks`
+    surfaced it as one red check that looked like infrastructure noise. A step
+    timeout turns that into a fast, honest step failure.
+
+    Scoped to clients that bound nothing themselves. apt has **no acquire timeout
+    by default**, so a dead socket blocks forever; `playwright install` likewise.
+    pip and npm are deliberately NOT required to declare one — they bound their own
+    connections (pip: 15 s connect timeout plus retries), so they already fail
+    rather than hang.
+
+    This asserts the DECLARATION, not a duration: it cannot know how fast a runner
+    is, but it can refuse a step that is unbounded. It finds no offender today —
+    that is the point of a regression guard.
+    """
+    src = open(".github/workflows/ci.yml", encoding="utf-8").read()
+    offenders = _unbounded_network_steps(src)
+    assert not offenders, (
+        f"CI step(s) {offenders} run an unbounded network client "
+        f"({' / '.join(UNBOUNDED_CLIENTS)}) with no step-level timeout-minutes — a "
+        f"stalled socket there runs to the JOB budget and reports as `cancelled`, "
+        f"hiding that the tests never ran")
+
+
+# --- the guards must reject an INERT declaration -------------------------
+#
+# Each source below is the smallest ci.yml that exercises one guard, so the
+# regression can be pinned without editing the real workflow. `_COMMENTED` is the
+# case that was broken: the guard tested for the raw substring
+# `"timeout-minutes:"`, so `# timeout-minutes: 8` read as a bound.
+
+_CI_JOB_BOUND = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_JOB_COMMENTED = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    # timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_JOB_ONLY_STEP_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install thing
+        timeout-minutes: 8
+        run: sudo apt-get update
+"""
+
+_CI_STEP_UNBOUNDED = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        run: sudo apt-get update
+"""
+
+_CI_STEP_BOUND = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        timeout-minutes: 8
+        run: sudo apt-get update
+"""
+
+_CI_STEP_COMMENTED = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        # timeout-minutes: 8
+        run: sudo apt-get update
+"""
+
+_CI_STEP_CLIENT_IN_COMMENT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Note
+        # the old `apt-get install tesseract-ocr` step is gone
+        run: echo hello
+"""
+
+# A `with.timeout-minutes` is an ACTION INPUT that merely shares the name. It
+# does not bound the step, so a step carrying one is still unbounded.
+_CI_STEP_NESTED_INPUT_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        with:
+          timeout-minutes: 5
+        run: sudo apt-get update
+"""
+
+# …and it must not MASK a real one either: a nested input beside a genuine step
+# timeout is bounded, so this one stays quiet.
+_CI_STEP_NESTED_AND_REAL = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        timeout-minutes: 8
+        with:
+          timeout-minutes: 5
+        run: sudo apt-get update
+"""
+
+# A step whose keys hang below a bare dash — the other legal YAML shape, and the
+# reason the indent is derived from the step rather than hardcoded.
+_CI_STEP_BARE_DASH = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      -
+        name: Install thing
+        timeout-minutes: 8
+        run: sudo apt-get update
+"""
+
+_CI_STEP_BARE_DASH_NESTED = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      -
+        name: Install thing
+        with:
+          timeout-minutes: 5
+        run: sudo apt-get update
+"""
+
+# An INDENTLESS sequence: `steps:` followed by `- name: …` at the same column.
+# Valid YAML, and the shape that defeated the text guard entirely — a
+# `^      - ` splitter found no steps, so it reported no offenders at all.
+_CI_STEPS_INDENTLESS = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - name: Install thing
+      run: sudo apt-get update
+"""
+
+# …and the same shape with a real timeout, as the control for it.
+_CI_STEPS_INDENTLESS_BOUND = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - name: Install thing
+      timeout-minutes: 8
+      run: sudo apt-get update
+"""
+
+# A client named in a TRAILING comment. The text guard stripped full-line
+# comments only, so this counted as an offender — a false POSITIVE, and the one
+# residual it could not close. A parser drops the comment outright.
+_CI_STEP_CLIENT_IN_TRAILING_COMMENT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Note
+        run: echo hello   # the old apt-get step is gone
+"""
+
+# A key that is PRESENT but carries no usable value. Every one of these
+# satisfies `"timeout-minutes" in mapping` while bounding nothing — the same
+# defect class one level down: presence is not usability. The parser removed the
+# SYNTAX ambiguity (comments, nesting, indentation); it cannot remove this one,
+# because "is the key there?" and "does the key mean anything?" are different
+# questions.
+_CI_JOB_EMPTY_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes:
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_JOB_NON_NUMERIC_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: soon
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CI_STEP_EMPTY_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        timeout-minutes:
+        run: sudo apt-get update
+"""
+
+_CI_STEP_NON_NUMERIC_TIMEOUT = """
+jobs:
+  alpha:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Install thing
+        timeout-minutes: soon
+        run: sudo apt-get update
+"""
+
+
+def test_the_timeout_guards_reject_an_inert_declaration():
+    """A `timeout-minutes:` that is present but INERT must not satisfy a guard.
+
+    Five inert shapes were found in this guard, one at a time, four of them by a
+    different reviewer and the fifth by probing the parser for its own defect
+    class:
+
+      2026-10-07  `# timeout-minutes: 8` — a comment satisfied the test
+      2026-10-08  `with.timeout-minutes` — an action INPUT, not a step timeout
+      2026-10-08  a step's timeout satisfying the JOB guard — wrong scope
+      2026-10-08  an indentless `steps:` sequence — the splitter saw no steps
+      2026-10-08  `timeout-minutes:` with NO VALUE — present, bounds nothing
+
+    The first four are why the guard is a YAML parse rather than a set of
+    regexes. The fifth is why it tests the VALUE and not the key's presence: a
+    parser removes the syntax ambiguity, and "is the key there?" is still a
+    different question from "does the key mean anything?". These cases pin all
+    five.
+
+    The BOUND / UNBOUNDED pairs are the controls: the guards still fire when
+    they should, so none of this is a silencer.
+    """
+    # control — the guard fires on a genuinely unbounded job / step
+    assert _jobs_without_timeout(_CI_JOB_ONLY_STEP_TIMEOUT) == ["alpha"]
+    assert _unbounded_network_steps(_CI_STEP_UNBOUNDED) == ["alpha/Install thing"]
+    # …and stays quiet when the declaration is real
+    assert _jobs_without_timeout(_CI_JOB_BOUND) == []
+    assert _unbounded_network_steps(_CI_STEP_BOUND) == []
+    # 1. a COMMENT is not a declaration
+    assert _jobs_without_timeout(_CI_JOB_COMMENTED) == ["alpha"]
+    assert _unbounded_network_steps(_CI_STEP_COMMENTED) == ["alpha/Install thing"]
+    # 2. a NESTED `with.timeout-minutes` is an action input, not a step timeout
+    assert _unbounded_network_steps(_CI_STEP_NESTED_INPUT_TIMEOUT) == [
+        "alpha/Install thing"]
+    assert _unbounded_network_steps(_CI_STEP_BARE_DASH_NESTED) == [
+        "alpha/Install thing"]
+    # …and it must not MASK a real one
+    assert _unbounded_network_steps(_CI_STEP_NESTED_AND_REAL) == []
+    assert _unbounded_network_steps(_CI_STEP_BARE_DASH) == []
+    # 3. a step's timeout must not satisfy the JOB guard
+    assert _jobs_without_timeout(_CI_JOB_ONLY_STEP_TIMEOUT) == ["alpha"]
+    # 4. an INDENTLESS `steps:` sequence must still be found and judged
+    assert _unbounded_network_steps(_CI_STEPS_INDENTLESS) == ["alpha/Install thing"]
+    assert _unbounded_network_steps(_CI_STEPS_INDENTLESS_BOUND) == []
+    # 5. a key that is PRESENT but empty or non-numeric bounds nothing
+    assert _jobs_without_timeout(_CI_JOB_EMPTY_TIMEOUT) == ["alpha"]
+    assert _jobs_without_timeout(_CI_JOB_NON_NUMERIC_TIMEOUT) == ["alpha"]
+    assert _unbounded_network_steps(_CI_STEP_EMPTY_TIMEOUT) == ["alpha/Install thing"]
+    assert _unbounded_network_steps(_CI_STEP_NON_NUMERIC_TIMEOUT) == [
+        "alpha/Install thing"]
+    # and a client named only in a comment — including a TRAILING one — is not a
+    # client, which the text guard's full-line strip could never fully deliver
+    assert _unbounded_network_steps(_CI_STEP_CLIENT_IN_COMMENT) == []
+    assert _unbounded_network_steps(_CI_STEP_CLIENT_IN_TRAILING_COMMENT) == []
 
 
 # ---- R7b: dependencies are pinned, and CI actually installs from the lock ----
@@ -763,6 +1169,36 @@ def test_a_suite_that_records_no_checks_cannot_pass(monkeypatch):
 
     assert status == "FAIL", "zero checks recorded is not a pass"
     assert "0 checks" in detail
+
+
+def test_a_crashed_suite_reports_the_line_that_raised():
+    """An ERRORed suite must name WHERE it raised, not just what it saw.
+
+    Measured 2026-10-01: the Windows `test-browser-windows` job reported
+    phase14's Playwright click timeout as the action log alone — the element that
+    intercepted the click (`#manuscript-workspace`) with no call site — so which
+    click had flaked had to be reconstructed from the suite's elapsed time. The
+    detail now carries the traceback's last `File "…", line N, in …` frame
+    alongside the tail, and keeps the old shape when there is no traceback.
+    """
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import run_browser_suites as rbs
+
+    out = (
+        "Traceback (most recent call last):\n"
+        '  File "tests/e2e_browser_phase14_signoff_journey.py", line 151, in run\n'
+        '    _clicked = page.locator("#desk-analyze-btn").click()\n'
+        "playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.\n"
+        "Call log:\n"
+        '  - <div id="manuscript-workspace">…</div> intercepts pointer events\n'
+        "  - retrying click action\n"
+        "  - waiting 500ms\n"
+    )
+    detail = rbs._error_detail(out, 1)
+    assert "line 151" in detail, f"the raising frame must be named: {detail!r}"
+    assert "manuscript-workspace" in detail, "the action log must survive too"
+    assert rbs._error_detail("", 3) == "no summary; exit 3"
 
 
 # ---- B4: the "never off the machine" STT guard must not be prefix-bypassable --

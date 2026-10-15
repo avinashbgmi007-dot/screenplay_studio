@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from screenplay_parser.models import ElementType, ScriptDocument
 from screenplay_parser.knowledge_graph import TIME_SKIP_RE
+from screenplay_parser.heuristics import normalize_character_name
 
 from .deterministic_utils import dialogue_lines_by_character
 
@@ -125,11 +126,17 @@ def _name_variant_findings(doc: ScriptDocument, by_char: dict) -> list[dict]:
             if not _looks_like_variant(a, b):
                 continue
             # True variants never share a scene — if they appear together,
-            # they're deliberately different characters.
+            # they're deliberately different characters. Compare NORMALIZED
+            # names on both sides: cue text keeps underscores ("GUN_GUY")
+            # while characters_present is normalized ("GUN GUY"), and an
+            # un-normalized comparison never sees them together (trial 14:
+            # the same false GUN_GUY/PEN_GUY row regenerated 13 runs).
+            a_norm = normalize_character_name(a).upper()
+            b_norm = normalize_character_name(b).upper()
             a_scenes = {s.scene_number for s in doc.scenes
-                        if a.upper() in {c.upper() for c in s.characters_present}}
+                        if a_norm in {normalize_character_name(c).upper() for c in s.characters_present}}
             b_scenes = {s.scene_number for s in doc.scenes
-                        if b.upper() in {c.upper() for c in s.characters_present}}
+                        if b_norm in {normalize_character_name(c).upper() for c in s.characters_present}}
             if a_scenes & b_scenes:
                 continue
             findings.append({

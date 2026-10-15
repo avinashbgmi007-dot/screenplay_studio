@@ -676,6 +676,8 @@ Unreadable projects return `{project, title, unreadable: true, stages: {...}, se
 | GET | `/projects/<name>/report` | — | full `report.findings.json` (sanitized) |
 | GET | `/projects/<name>/report/export` | `?` | `.html` report download |
 | GET | `/projects/<name>/fixqueue` | `?include_dismissed=1` | `{items, acts, dismissed_count, total_count}` |
+| GET | `/projects/<name>/findings/summary` | — | counts by severity × category × status + `dawn_pct`, one call (audit 2026-09-30, Report 2 §6 #1) |
+| GET | `/projects/<name>/findings` | `?scene=&status=&severity=&category=&include_dismissed=&group_by=issue-text` | queryable fixqueue rows; `group_by` returns display groups with scene_refs preserved (Report 2 §6 #2) |
 | POST | `/projects/<name>/findings/<index>/dismiss` | `{issue}` | `{ok, index}` |
 | POST | `/projects/<name>/findings/<index>/undismiss` | — | `{ok, index}` |
 | GET | `/projects/<name>/characters` | — | `{characters: [track...]}` |
@@ -699,6 +701,7 @@ dialogue_lines, dialogue_share, first_scene, last_scene, traits, interactions:
 | POST | `/projects/<name>/edits/redo` | — | `{..., findings_status}` |
 | POST | `/projects/<name>/edits/reset` | — | `{ok, has_edits}` |
 | POST | `/projects/<name>/findings/intent` | `{finding_id, intent: "addressed"\|"deferred"}` | `{ok}` — the GO 2 intent store (`finding_marks.json`, id-keyed via GO 1 identity; survives regeneration) |
+| POST | `/projects/<name>/findings/intent/batch` | `{intents: {finding_id: intent\|null}}` (500 max) | `{ok, applied, failed}` (200 / 207 partial) — N of the single write, same store (Report 2 §6 #3) |
 | GET | `/projects/<name>/export` | `?format=fountain|fdx|txt` | file download |
 | GET | `/projects/<name>/metrics` | — | `{avg_reply_seconds, analysis_seconds, findings_total, findings_fixed, findings_fixed_pct, discussed}` |
 

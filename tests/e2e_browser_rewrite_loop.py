@@ -284,7 +284,12 @@ def _run_bulk_apply_probes(page):
     The probes drive the real modal with crafted replacements and capture the
     actual /edits/apply payloads, so the assertion is on what the client
     SENDS, not on how the DOM happens to look. The old texts are deliberately
-    absent from the fixture, so the server skips them and writes nothing.
+    absent from the fixture, so the server REFUSES them — 400 with `stale: true`
+    (`_assert_proposal_is_fresh` in revision.py) — and writes nothing. That
+    makes the individual-apply probe the refusal probe too: a refused row must
+    be marked decided, or it rides the bulk Apply below. Before the guard
+    landed the server skipped these frames at 200 and the two shapes were
+    indistinguishable from here.
     """
     posted = []
 
@@ -317,7 +322,9 @@ def _run_bulk_apply_probes(page):
                        {"old": "ZZZ-NO-SUCH-LINE-THREE", "new": "three"}],
               f"sent={sent}")
 
-        # ---- an individually-applied row must not ride the bulk apply ----
+        # ---- an individually-decided row must not ride the bulk apply ----
+        # (decided here by REFUSAL, not by a successful apply: the crafted text
+        # is not in the fixture, so the guard answers 400 `stale: true`.)
         posted.clear()
         page.evaluate("""() => {
             openRewriteModal(1, null);
@@ -333,6 +340,24 @@ def _run_bulk_apply_probes(page):
               posted is not None and len(posted) >= 1
               and posted[0] == [{"old": "ZZZ-NO-SUCH-LINE-ONE", "new": "one"}],
               f"posted={posted}")
+        # The refusal is a state the row KEEPS, not an error the modal unwinds:
+        # no action left to offer, and the sentence still on screen when the
+        # writer looks. Both are what makes the payload assertion below true
+        # rather than lucky.
+        refused = page.locator("#rewrite-candidates .rewrite-candidate").first
+        check("stale: the refused row is marked decided",
+              refused.evaluate(
+                  "el => el.classList.contains('rewrite-candidate-stale')"
+                  " && !el.querySelector('.rewrite-candidate-actions')"))
+        # Not just "the sentence is somewhere": the refusal must be shown AS the
+        # refusal. The generic `Apply failed: …` prefix would still contain the
+        # server's sentence while telling the writer their click broke, which is
+        # the misreading the state exists to prevent.
+        status_text = page.locator("#rewrite-status").inner_text().strip()
+        check("stale: the refusal is kept as the refusal, not a generic failure",
+              "Stale proposal" in status_text
+              and not status_text.startswith("Apply failed"),
+              status_text)
         page.locator("#rewrite-apply").click()
         page.wait_for_timeout(1500)
         sent2 = posted[-1] if posted else None

@@ -220,11 +220,70 @@ class TestWhatTheSurvivorKeeps:
         findings = [_f(ON_THE_NOSE, 2), _f(SAY_OPPOSITE, 2)]
         assert dedupe_related_findings(findings, kb)[0]["merged_rule_ids"] == [SAY_OPPOSITE]
 
+    def test_it_records_the_absorbed_findings_full_content(self, kb):
+        """`merged_rule_ids` is ATTRIBUTION — it names the rule that agreed, not
+        what it said. The absorbed finding's own issue/observation/quote were
+        previously retained nowhere (measured: 23 on Pain_3, 6 on gun_pen), so a
+        merge announced a claim it had already thrown away. Same contract as the
+        integrity gate's `withdrawals` ledger: the content survives the removal."""
+        findings = [_f(ON_THE_NOSE, 2, issue="the survivor"),
+                    _f(SAY_OPPOSITE, 2, severity="high", issue="the absorbed claim")]
+        out = dedupe_related_findings(findings, kb)
+        # highest severity survives, so the MEDIUM one is what got absorbed
+        assert out[0]["issue"] == "the absorbed claim"
+        absorbed = out[0]["merged_findings"]
+        assert len(absorbed) == 1, f"the absorbed finding's content is gone: {absorbed}"
+        assert absorbed[0]["issue"] == "the survivor"
+        assert absorbed[0]["rule_id"] == ON_THE_NOSE
+        assert absorbed[0]["severity"] == "medium"
+
+    def test_the_absorbed_content_is_a_copy_not_a_live_reference(self, kb):
+        findings = [_f(ON_THE_NOSE, 2, issue="a"),
+                    _f(SAY_OPPOSITE, 2, severity="high", issue="b")]
+        out = dedupe_related_findings(findings, kb)
+        out[0]["merged_findings"][0]["issue"] = "mutated"
+        assert findings[0]["issue"] == "a", (
+            "the survivor holds a live reference to the caller's finding")
+
+    def test_a_finding_that_absorbed_nothing_carries_no_merged_findings(self, kb):
+        """Absent, not empty: the field is evidence of a merge, so a row that
+        merged nothing must not claim the shape."""
+        out = dedupe_related_findings([_f(ON_THE_NOSE, 2), _f(VOICE, 2)], kb)
+        assert len(out) == 2
+        assert all("merged_findings" not in f for f in out)
+
     def test_it_never_mutates_the_input(self, kb):
         findings = [_f(ON_THE_NOSE, 2), _f(SAY_OPPOSITE, 2)]
         snapshot = copy.deepcopy(findings)
         dedupe_related_findings(findings, kb)
         assert findings == snapshot, "the caller's findings were modified in place"
+
+    def test_the_returned_containers_do_not_alias_the_input(self, kb):
+        """The scalar check above cannot catch this: `dict(f)` copies the dict but
+        not its VALUES, so `scene_refs` — and every entry in `merged_findings` —
+        was the caller's own list. Appending to a returned finding then edited the
+        finding that was passed in."""
+        findings = [_f(ON_THE_NOSE, 2), _f(SAY_OPPOSITE, 2)]
+        snapshot = copy.deepcopy(findings)
+        out = dedupe_related_findings(findings, kb)
+
+        # the survivor's scene list
+        out[0]["scene_refs"].append(99)
+        # and the absorbed finding's, reached through the new side field
+        out[0]["merged_findings"][0]["scene_refs"].append(98)
+
+        assert findings == snapshot, (
+            "mutating a returned finding's nested list reached the caller's input")
+
+    def test_an_unmerged_finding_is_copied_too(self, kb):
+        """The pass-through branch is the easy one to miss: it also handed back
+        the caller's own list."""
+        findings = [_f(ON_THE_NOSE, 2), _f(EXPOSITION, 9)]  # different scenes: no merge
+        snapshot = copy.deepcopy(findings)
+        out = dedupe_related_findings(findings, kb)
+
+        out[0]["scene_refs"].append(99)
+        assert findings == snapshot, "the pass-through copy aliased the input"
 
     def test_nothing_is_ever_dropped_silently(self, kb):
         """Every merged-away finding is named by the survivor. This is the

@@ -148,6 +148,42 @@ def test_name_variant_sharing_scene_not_flagged():
     assert _rules(doc, "character_name_variant") == []
 
 
+UNDERSCORED_SHARED = """Title: Underscored
+Author: T
+
+INT. ROOM - NIGHT
+
+GUN_GUY
+Freeze right there.
+
+PEN_GUY
+Journalist, you should know better.
+"""
+
+
+def test_underscored_names_sharing_scene_not_flagged():
+    """Trial-14 root cause: cue text keeps underscores (GUN_GUY) while
+    characters_present is normalized (GUN GUY). The co-presence guard must
+    normalize both sides, or two leads sharing every scene read as one
+    person spelled twice — 13 straight false rows on gun_pen."""
+    doc = _parse(UNDERSCORED_SHARED)
+    assert _rules(doc, "character_name_variant") == []
+
+
+def test_underscored_true_variant_still_flagged():
+    """The fix must not blind the check: an underscored typo that never
+    shares a scene still fires."""
+    doc = _parse(
+        "Title: UnderscoredTypo\nAuthor: T\n\n"
+        "INT. ROOM - NIGHT\n\n"
+        "GUN_GUY\nFreeze.\n\n"
+        "CUT TO:\n\n"
+        "INT. HALL - DAY\n\n"
+        "GUN_GUYY\nDo not move.\n")
+    findings = _rules(doc, "character_name_variant")
+    assert len(findings) == 1
+
+
 # ---- idiolect consistency ----
 
 SHIFT = """Title: Shift

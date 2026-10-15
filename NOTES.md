@@ -3,6 +3,76 @@
 Work-in-progress log for the current session. Update as you go; keep entries short and dated.
 
 ## Completed
+
+### 2026-10-11 — Ledger precision done + trial acceptance (D1-D4 follow-ups, full suite 2191)
+
+Ledger Tasks 1-3 via subagents with review; trial acceptance on fresh gunpen (26) + pain3 (78) real-model runs. Adjudicator flips with proof (Rishi promise→sc8, letter→sc9, drop→sc14, itlane→sc19, comic→sc22, senior→sc20/14, gun/newspaper→sc3); X Company correctly kept abandoned; backwards citations distrusted; meta-word/underscore/possessive matching fixed with measured-ratio tests. Zero high-severity ungrounded ledger rows on either report. Goldens: gunpen 4/5 (dream still missed), pain3 5/5. Full suite 2191 passed. NOTES: pycache-staleness fooled one probe run (same-second edits) — clear __pycache__ when re-probing rapidly edited modules.
+
+### 2026-10-11 — Accuracy kit A done (6 tasks, subagent-driven with review)
+
+Evidence floor + refutation demotion + short-form gate + language patterns + absence/caps in `pipeline.py`/`feedback_filter.py`; fix queue default-hides ungrounded with toggle + writer-disposition bypass (`app.js`, `webapp_server.py` allowlist). Fallout fixed same day: dismissed-toggle TDZ trap in empty branch, toggle contrast class, 5 e2e suites opted in (counting, dock P1.7, xss, readiness, phase6), one N3 guard test survived UNCHANGED after reunifying the predicate. Acceptance on live pain3 re-analyze: 59 findings, 0 high-severity ungrounded, 2 contested, full suite green. Real-model output barely trips the floor (all 59 quoted/observed) — mass-hide is a demo-data phenomenon.
+
+### 2026-10-10 — H2 fixed + fresh e2e verified live (uncommitted, on feature/post-analysis-ia)
+
+**H2 `.exe`-upload-500 fixed.** Shared `_supported_upload_ext` gate + one 400 message in `webapp_server.py`, wired into create/draft/graduate before any claim (also fixes the `"_draft_upload"+ext or ".txt"` precedence bug). 5 new tests red-then-green; `test_beatboard.py` L3 fixture rebuilt off the removed 500 path (valid upload + `mark_failed("parse")`), same assertions. Full suite 2158 passed. Live: `.exe` and extensionless both 400 with the list, shelf empty.
+**H1 cancel closed without code.** 3 of 4 live trials land (startup, mid-run, force re-run all restore + heartbeat, no report); first rangetest run completed despite ACKed cancel, unreproduced — on record, not actionable.
+**Live totals.** 650 browser checks green, 2 real-model analyzes (27 + 33 findings, ~88-100% verified/quoted), guards/409/503/backup-bytes proven, zero server tracebacks. Snapshot branch `qa/e2e-verified-2026-10-10` at ec2b219 (pre-fix base).
+**Still pending.** H2 uncommitted (3 files); restore route parked as feature decision; local `main` diverged (6 audit commits); pre-existing HIGH-2b/alias/MEDIUM-3..LOW-8 untouched.
+
+### 2026-10-10 — Pulled origin/main into feature/post-analysis-ia (merge 5c8d24f)
+
+**What.** `git fetch` + merge of `origin/main` (78 commits: PRs 22-31, verdict channel, integrity gate, CI timeout guards) into this branch (12 ahead). 5 conflicted files, all resolved keep-both:
+- `pipeline.py`: `AnalysisResult` keeps HEAD `notices` (M2 retry good-news) + origin `recoveries` (chunk-split caveats); `build_scene_summaries`/`analyze` take `should_cancel` + `recoveries`/`integrity_gate` + `observation_pass`; char reads keeps retry wrapper on `CHARACTER_READS_MAX_TOKENS` (2500).
+- `report.py`: renders both note sections, JSON carries both keys (desk reads `recoveries` via `buildRunCaveat`).
+- `e2e_browser_common.py`: keeps `became_true` + `reveal_chrome` + `reveal_and_click` (5/6/4 callers).
+- `API_ROUTE_MAP.md` + `TestF05RouteMapTotals`: re-measured totals 98+2=100 (HEAD R2 cancel + R7 library/backup; origin 5 verdict routes).
+- Merge-induced red fixed: origin's `test_unbounded_network_steps_declare_a_timeout` caught HEAD's two new CI jobs missing step timeouts → `timeout-minutes: 8` on both Install chromium steps. HEAD-only `test_generation_timeout.py` client re-pointed 1200 → `CHARACTER_READS_MAX_TOKENS`.
+**Verification.** Full suite green: 2128 passed + 3 skipped (incl. previously-failing readiness test), `test_store_concurrency`/`test_lock_order` 76 passed, `ci.yml` YAML-valid. Stash of pre-pull line-ending state popped clean; tree clean except untracked `.gsk/` (local tooling, kept out of the merge).
+**Watch.** Local `main` still diverged (6 local audit commits on `ddac2df`); `core.autocrlf=true` with no `.gitattributes` shows phantom M entries — content diff is zero.
+
+### 2026-10-02 — IA wireframe built: *Arrive Quiet, Fix by Scene* (preview-ia)
+
+**What it is.** `screenplay_studio/webapp/preview-ia/index.html` + `_ia.js` — the
+grayscale, populated wireframe for the IA doc. Five frames: arrival line (fresh + quiet
+return), the per-scene fix loop with the whole-script structural stop, the tiered ledger
+(counts → facets → cards; mechanical checklist; setup/payoff), the two registers with a
+pinned finding, and the idea-room door rule v2 (sample copy — no idea on this shelf).
+Served by the studio at `/preview-ia/index.html`; reads the Design Lab feed
+(`/api/preview/data/<name>`) and prefers `gun_pen_2` → `Pain_3_updated_FULL` → `gun_pen`.
+**Data note.** `studio_projects/gun_pen` currently holds a DEMO re-analysis ("[demo]
+Sample…" findings), so the wireframe shows `Pain_3_updated_FULL` — the production 26B
+run: 43 findings · 14 high · 10 mechanical checks · 5 threads · 22 scenes. When the real
+`gun_pen_2` project is back on the shelf it wins automatically.
+**Verification.** `node --check` clean; one-off Playwright walk at 1440×900 against a
+copy of the projects dir (demo studio): 13/13 checks — live badge, "14 high" arrival
+line, 22-scene rail with 5 clean ticks, ledger "43 open · 14 high", "0 of 14 highs
+cleared", 5 h2 frames, skip link, switcher, annotation contrast ≥ 4.8:1, zero JS errors;
+screenshot `impl-shots/runs/latest/ia/ia-wireframe.png` (gitignored).
+`pytest tests/test_webapp_text_hygiene.py tests/test_repo_hygiene.py` → 10 passed.
+**Review fixes applied** from the Vercel Web Interface Guidelines + ui-ux-pro-max UX
+rules: darkened annotation tokens (held ≥ 4.5:1), h2 frame captions, skip link,
+`:focus-visible`/hover states, `aria-hidden` on decorative glyphs, rail as a real list,
+`tabular-nums`, `translate="no"` on the spec path. Controls are sketches — nothing is wired.
+
+### 2026-10-02 — IA design written: *Arrive Quiet, Fix by Scene* (post-analysis feedback + premise room)
+
+**What it is.** `docs/superpowers/specs/2026-10-02-post-analysis-ia-design.md` — the
+2026-10-02 design thread's deliverable, layered on the already-shipped One Desk, One
+Ledger (which fixed the duplication clutter; this doc fixes arrival + traversal).
+**Locked in the thread:** guided fix loop is the default post-analysis mode; loop unit =
+the scene; everything counted + one tap away (folded, never hidden); and the idea-room
+door rule v2 — Sameer is the default presence, the Premise Doctor's test is opt-in and
+labeled with a state-dependent *invitation* (dormant / labeled affordance / one
+dismissible offer; never auto-start; per-idea, not per-room).
+**Contents:** arrival sequence (Arrive → Guide → Reference), the per-scene fix loop,
+two registers in one rail, the projection matrix, three trust tiers
+(Mechanical/Judgment/Structural), the premise pass (5-7 questions → readiness verdict +
+one fix, never a verified-finding badge), the kill list, phasing A-E, open questions,
+draft acceptance criteria with candidate gates.
+**Status.** Draft for user review; no code touched, docs only. Next artifacts: writer
+review of the doc, then the grayscale populated wireframe with real Gun_Pen data, then
+visual design (fork still parked, `REDESIGN_MASTER_PLAN.md` §4/§10).
+
 ### Production-readiness audit pass 4: the states pass 2 could not put on screen
 
 Pass 2 closed with a gap it named itself: *"the sweep does not reach the disposition
@@ -4070,3 +4140,267 @@ so the checks are not decorative. Full browser fleet on the final tree
 in `dock_sections` 169 → 176). Both pre-existing reds stayed green: `phase8_lifecycle`
 26 passed, `translate_mic` 22 passed.
 
+## D1 + D2-a: a finding's id names its scene, and a mark can be unmarked (2026-10-04)
+
+**Labels in this change's code comments.** They come from an end-to-end production-readiness
+review of `ceb23ae` (the review report is not in the repo). **HIGH-1** — content alone is not a
+unique key, so identical words at different scenes share one id. **HIGH-2a** — marking a finding
+was a one-way door. **HIGH-2b** — the writer-marked counters (`done_count`, the dawn meter, the
+header) and the observation counters (`by_status`, `/metrics`) are never reconciled — *not fixed
+here*. **D1** — the scene component of the id. **D2-a** — reversible marks. **D2-b** — the
+headline shown with its evidence line beneath it — *not built*.
+
+**Measured on `ceb23ae`** (demo model, `Pain_3_updated_FULL`). 16 findings hashed to 8 ids;
+`f17erkpi` carried 9 findings at scenes 1, 4, 6, 8, 11, 13, 15, 17, 20, and one press of ✓ moved
+`done_count` 0 → 9. Separately, marking a finding removed the card that carries the ✓ which
+clears the mark: with every id marked the dock rendered 17 notes, 16 fix rows and **0** intent
+buttons, and nothing in the SPA could ask for addressed findings back.
+
+**Relation to rung 20 (above) — read this before touching the id.** Rung 20 recorded that a
+shared id "is what evidence-keyed identity costs", kept the scene NUMBER out of the id
+(`test_id_survives_scene_insert_shift`, still green), and listed the quote-keyed collision as open
+pending an alias step for the real projects. This change keeps that rule: the tie-breaker is the
+scene's SLUGLINE (`screenplay_parser/scenekey.py`), never `scene_refs`, so an inserted scene moves
+nothing (`test_inserting_a_scene_moves_no_existing_key_and_scene_refs_never_key_the_id`). It is the
+first stage of that alias step — a one-time carry of every id-keyed store. Stage 2, a persistent
+alias for a *reworded* slugline, is **not built**. What it does not change: 20b stands — two notes
+about the same line, in the same scene, under one category still share an id, and
+`sharedMarkSiblings` still names them.
+
+**The id.** `category | quote-or-issue | scene_key`. The scene component is appended only when
+`scene_key` is non-empty, so a finding with no scene (script-level, or a heading that slugs empty)
+keeps its previous id byte for byte (pinned). The slug is derived in Python only: the analyzer
+stamps it, `_load_report_sanitized` / `finding_statuses` / `last_pass_snapshot` re-stamp older
+reports on read from the parse-of-record, and `core.js` reads the stamp and derives nothing. The
+first occurrence of a repeated slug keeps the bare slug; later ones take `#2`, `#3`. **The price:**
+rewording a slugline moves that scene's ids, and inserting a scene that repeats an existing
+slugline renumbers that slug's later occurrences. The slug rule itself is inside every stored id —
+changing it needs a migration.
+
+**The upgrade.** `legacy_id_candidates` is the one map; marks, dismissals and the last-pass
+snapshot all read it. One stored id → one finding: rewritten under the new id, same intent. One
+stored id → several findings, *including one that kept the legacy id*: a mark is **held aside** in
+`finding_marks.ambiguous.json` and reported in one dismissible line — never spread, never applied
+to a guess. A dismissal keeps its legacy id and its own (index, issue) pair. A snapshot that cannot
+be resolved row-for-row is dropped, so the pass line is absent for one generation instead of
+printing a fabricated "9 fixed / 9 new". No finding → left as stored (the ghosted-marks channel
+explains it). Unreadable report → nothing is touched. Measured on the writer's real collided store
+(8 legacy ids): 6 carried 1:1, 1 script-level id left as it was, 1 held aside (`covered: 9`);
+replayed through a live desk after the amend with byte-identical results, and a second read
+changes nothing.
+
+**D2-a.** `findingAdmitted` is the one rule for which dispositions the writer asked to see (open
+always, deferred behind `showDeferred`, addressed behind `showAddressed`); `findingPassesFilter`
+and the category counts both read it. New: the `Addressed N` chip beside `Next pass`, `Reopen` on
+every addressed fix-queue row, `.ink-done` (dashed, muted, never severity-coloured) for a revealed
+addressed finding, and the held-aside notice. The dock is still a worklist of *unmarked* findings
+by design — a marked finding leaving it is not a bug; what was missing was the way back.
+
+**Caught before the first push — three defects in this change's own first draft.** (1) The slug's
+keep-list stopped at U+FFFF, so most emoji were dropped: an emoji-only heading slugged to `""`, and
+two headings that differed only by an emoji shared a slug, contradicting the module's own comment.
+Widened to U+10FFFF — this rule is inside every stored id, so it had to be right before release.
+(2) `legacy_id_candidates` skipped findings whose id did not change, so a mark shared by a
+scene-keyed finding and a script-level one with the same words was carried onto the first and
+silently taken from the second. Both are now candidates and the mark is held aside. (3) The
+parity suite grew two `if`-without-`else` guards around a `check`, which took
+`test_browser_check_hygiene`'s ratchet from 23 to 25; one of them could never be false (every
+planted finding names a scene). The guards are gone and the ratchet's ceiling is untouched. (1)
+and (2) each have a test that fails on the previous code.
+
+**Gate.** `python -m pytest` → **2000 passed, 4 skipped**, 0 failed. `tests/test_finding_id_scene_key.py`
+12 passed; the emoji test and the shared-with-a-keyless-finding test fail on the previous code
+(`'INT DAY' == 'INT 🏠 DAY'`; `['flxi06k'] == ['f17erkpi', 'flxi06k']`), and the insertion test
+pins behaviour that already held. `node --test tests/js/` → 17 passed; the new non-BMP vector
+fails when its expected id is altered. Browser, headless Chromium 153.0.8010.12:
+`finding_id_parity` 12 passed (26 vectors agree across JS and Python), `counting_contract` 20,
+`one_matcher` 19, `identity_forensics` 1, `dock_sections` 176. `ruff==0.16.8 check .` clean.
+The full browser fleet (`python tests/run_browser_suites.py`) is not claimed here: it is the CI
+browser job's to run on the PR.
+
+**Still open.**
+* **HIGH-2b**: the two counter families are not reconciled. `/metrics` is a snapshot written only
+  by analysis (`record_findings`) and is served without an "as of last analysis" stamp. D2-b would
+  show the writer's number with the evidential line beneath it.
+* **Alias stage 2** (a persistent alias for a reworded slugline). **The fix-loop surface** (the
+  keyboard loop's own intent controls) was not examined; D2-a's scope may still narrow there.
+* Unfixed from the same review, measured on `ceb23ae` and not re-checked since (detail lives in
+  the review report, which is not in the repo): MEDIUM-3 `openFeedbackView()` forces
+  `setRoom("cowrite")`, so the tab's `aria-selected` never moves and there is no arrow-key
+  navigation; MEDIUM-4 copy overclaims; MEDIUM-5 `model_id` is erased by analyse; LOW-6 a method
+  mismatch answers an HTML 404; LOW-7 `/report` items carry `finding_id: null`; LOW-8 the demo
+  model degenerates after one apply.
+* A project analysed on the previous build shows no pass line for one generation when its
+  snapshot spanned a collision.
+
+### 2026-10-12 — Trial 5 (accuracy7) audit verdict, post Kits A+B + ledger precision + twist pass
+* Fresh real-model runs (qwen3.6-35b): gunpen 31 findings (twist dream present, quoted alarm line), pain3 62 findings (twist null — correct).
+* Finding-by-finding audit from current files: gunpen SOLID 24/31 (77%), pain3 SOLID 52/62 (84%); combined 76/93 = 82% solid, 86/93 = 93% honest-or-flagged. Unflagged weak 5/62 on pain3 (one-line voice demands, Tamil-as-defect, silence filing, pronoun/comic misreads). The Good-Luck/metro ledger rows first scored weak were rechecked against full text: each QUOTE grounds the setup while the abandoned verdict claims only no-payoff, so both are consistent true notes (low value, not false) — counted solid.
+* Goldens (keyword eval): gunpen 5/5, pain3 3/5 (MISS debt-payoff — no named thread in report; MISS silence-facts — sc16 content exists, keyword absent). Combined 8/10.
+* New bugs filed by audit (not blocking): (1) `scene`-category leakage persists (pain3 #22) — root cause is the integrity gate itself (`finding_integrity.py:342` writes `"scene"`, outside `FINDING_CATEGORIES`); (2) untranslated-language-as-defect pattern (pain3 #19: Tamil dialogue filed high-severity "opaque" — slips past `feedback_filter` because the language mention sits in `observation`, which is never scanned); (3) summary-only `scene_function` rows (50/51/53, Q None) carry full weight — quoteless scene notes need a demote/flag rule. Retracted: the filed "ledger verdict contradicts its own quote" bug was a false alarm on full-text recheck (setup-quote + abandoned-verdict are consistent).
+* Caution: mid-audit reads briefly mixed row-numbering across trial files; verdict above re-derived entirely from current accuracy7 files (bycat + per-index flags + full-text dump, sums check).
+
+### 2026-10-12 — Trial-5 follow-ups implemented (guards, not verdicts)
+* User approved all five in order, with one substitution: the "ledger verdict contradicts quote" item was retracted on full-text recheck (setup-quote + abandoned-verdict are consistent), replaced by the genuine Tamil-as-defect guardrail.
+* `feedback_filter.py`: new `_INCOMPREHENSION_PATTERNS` — a finding is non-writing feedback when `observation` names a language AND issue/why pleads incomprehension (opaque / impossible to assess / cannot be evaluated). Catches pain3 #19 shape; craft notes quoting dialect lines kept (3 new tests).
+* `pipeline.py` 8h `apply_scene_quote_rule`: quoteless `scene_function` rows take `summary_only: True` + one severity step down (demote, never drop; 2 new tests).
+* `finding_integrity.py`: reclassify target `"scene"` → `"scene_function"` (root cause of the leak) + intake normalization of legacy `"scene"`; regression test pins all delivered categories inside `FINDING_CATEGORIES`.
+* `tests/eval_recall.py`: normalization + token-overlap (>= 0.5) fallback, per-fact [exact]/[overlap] reporting, usage error, docstring states the eval understates recall and must not gate trials. Trial-5 re-eval unchanged: gunpen 5/5, pain3 3/5.
+* Suite: 2205 passed + 3 skipped (up 6: the new tests); `ruff check` clean; `eval_recall --selftest` OK.
+* Rigor trial (accuracy8 repeat pair under new code) launched in background; no held-out screenplay on hand (Downloads has only the two trial scripts) — held-out validation pending a third script from the user.
+
+### 2026-10-12 — Trial 8 (accuracy8) repeat-pair verdict: variance dominates
+* Same scripts, same model, code family + trial-5 fixes: gunpen n=25 (was 31), pain3 n=74 (was 62). Goldens: gunpen 5/5 (dream-reveal via the new twist channel — zero findings say "dream"), pain3 5/5 (was 3/5; asterisk: anchors like "money"/"job" are loose single words, near-guaranteed hits at n=74).
+* Audits: gunpen-8 solid 14/25 (56%), weak-unflagged 2 (the phonetic-transcription / language-mixing pair #4/#5 — same family as the Tamil case, uncaught by v1 patterns); pain3-8 solid ~60/74 (81%), weak-unflagged ~7 (silence-filing, trait-list demand, quoteless framework notes). Honest-or-flagged: 23/25 (92%) + ~67/74 (91%).
+* Fix validation on real output: zero `scene` labels on either report (gate fix holds); `summary_only` fired 3x gunpen + 4x pain3 (scene-quote rule holds); pain3-8 sc14 Tamil exchange drew only quoted voice/monologue notes, no language complaint (filter holds — untested by direct hit this run).
+* Follow-up shipped the same session: `_INCOMPREHENSION_PATTERNS` + obs-side `phonetic` pattern cover the gunpen-8 #4/#5 shapes (trial-8 regression tests); eval searches `twist_verdict`/`reveal_candidates`.
+* Suite final: 2206 passed + 3 skipped; ruff clean; eval selftest OK (incl. twist-channel case).
+* Standing conclusion, now measured twice: run-to-run swings (n=62→74, goldens 3/5→5/5) exceed any trial-to-trial "improvement" claimed so far — report ranges from repeats, never point deltas. Next: phonetic-extension validation run + held-out third script (user to supply).
+
+### 2026-10-12 — Trial 9: gunpen third run validates the phonetic extension
+* Fresh project, committed code: n=26, goldens 5/5 (dream-reveal exact in findings this time), twist dream present. Zero language-family findings; all six `scene_function` rows carry quotes (no `summary_only` needed — the rule correctly fires only on quoteless rows).
+* Audit: solid 19/26 (73%), one unflagged weak (#19 "uncomplicated success" misread, quoted), six correctly flagged (U/C/FM). Honest-or-flagged 25/26 = 96%. Novel genuine catches this run: #7 (dummy-barrel trick undercuts the gun's weight without narrative work), #23 (sc3 treats the dream gun as a literal waking prop).
+* Gunpen ranges across three runs (31/25/26 findings): goldens 5/5 x3, twist 3/3, solid 56–77%, honest 92–96%. The honest band is tight; the solid band moves with model wording luck and flag coverage — exactly why the verdict cites honest-or-flagged, not solid alone.
+
+### 2026-10-12 — Filter ledger + golden tightening (eval now measures, not flatters)
+* `partition_findings` splits kept/removed under one predicate; pipeline step 8 ledgers removals into `stats["language_filtered"]` (count + issues). The phonetic filter's future firings are now observable in every report.
+* Golden curation, evidence-driven: per-anchor hit audit across all five stored reports. Dropped dead anchors (amount/bye/wave/deadline/two days/shortlist/kalaa/RAJ — zero hits in 2–3 runs each) and loose ones ("money" hit montage mentions, "article" hit incidental rows, "RAJ" hit 11–16 rows/run). Kept/added distinctive forms (parcel, Local Gangs, article by, X COMPANY, Good Luck, Doesnt knw).
+* Eval overlap fallback hardened twice: content-tokens-only + ≥2-token minimum (killed the "3 mints"→"3" false hit), then glue-word stopwords (killed the "money within the parcel"→{"the","within"} false hit).
+* Rescored matrix, every MISS verified genuine by text search: gunpen 5/5, 3/5 (acc8: zero countdown text anywhere, no article-chain row — real recall gaps), 5/5; pain3 3/5 (no debt content, silence content differed), 5/5.
+* Suite: 2208 passed + 3 skipped; ruff clean; eval selftest OK.
+
+### 2026-10-12 — Time-pressure seeder (first recall-side fix)
+* Ledger audit of acc8 gunpen showed the countdown beat ("Inka 3 mints / 00:00") in neither findings nor ledger: a countdown in dialogue is neither a KG prop nor a promise, so the ledger was never asked. The article thread, by contrast, was covered by a paid ledger entry — findings-only eval was blind to it.
+* `setup_payoff.py`: `_time_pressure_seeds(doc)` emits one capped (`MAX_TIME_SEEDS = 4`) TIME-PRESSURE seed per ticking scene (N minutes/mints/mins/seconds/hours, clock times, countdown/deadline/ticking/timer/alarm/clock); wired through `run_setup_payoff_ledger(..., doc=doc)` (optional, existing callers unaffected) and the pipeline call site. Candidate generation only — the model still judges significance, per the KG-proposes/LLM-judges split.
+* Tests (no model): seeds found per scene, absent on clean text and `doc=None`, cap holds at 6 ticking scenes, seeds reach the user prompt verbatim. Suite 2212 passed + 3 skipped; ruff clean.
+
+### 2026-10-12 — Trial 10: seeder validated end to end
+* Seeder fires on the real gap doc (sc2 "Inka 3 mints", sc3 alarm). Fourth gunpen run: ledger carries "Time pressure/phone alarm (Scene 2)" as dangling, folded to Fix Queue finding #21 (low, correctly `ungrounded`-flagged as overview-sourced). Seed → ledger → finding chain complete; n=22, no `scene` leak, twist dream, `language_filtered` null (observable non-firing).
+* Eval fix from the same run: `_search_texts` ignored `why_it_matters`, hiding the countdown HIT in #21's why. Now searched (selftest pins the channel). Final verified matrix — gunpen 5/5, 3/5 (both acc8 gaps text-verified absent), 5/5, 5/5; pain3 3/5, 5/5.
+* Trial-10 content audit (22 rows, completing the validation): solid 16/22 (73%) incl. novel sharps #10 (sweat/energy rule vs stunt) and #19 (dream events conflated with literal plot); weak-unflagged 2 (#4 false non-recurrence claim on gun/newspaper/pen, #12 overconfident Raj-vs-Pen-Guy distinctness); flagged 4 (OW/FM x2/U). Honest 20/22 = 91%. The n=22 thinness is model luck (zero genre rows), not seed crowding — passes are separate calls, four seed lines cannot displace a category.
+
+### 2026-10-12 — Eval covers ledger entries (measurement complete)
+* `_search_texts` now includes `setup_payoff` setups + notes (paid entries live only there; withdrawals excluded — a removed row must never count). Selftest pins the channel. Final matrix across all six stored reports: gunpen 5/5, 3/5, 5/5, 5/5; pain3 3/5, 5/5. The acc10 pen-article HIT arrives via the paid Newspaper/Article ledger entry — the exact blind spot this closes. Every MISS re-verified genuine by text search.
+
+### 2026-10-12 — Accuracy program closed (banked)
+* Shipped across trials 5–10: language-incomprehension filter (+phonetic extension, both live-validated), scene quote rule (8h `summary_only`), integrity-gate taxonomy fix (no more `scene`), filter removal ledger (`stats["language_filtered"]`), time-pressure seeder (live-validated seed → ledger → finding), eval v2 (normalization, overlap with content-token + stopword floors, twist channel, ledger channel, why-text).
+* Standing numbers: gunpen honest-or-flagged 91–96% across four runs, goldens 5/5-3/5-5/5-5/5; pain3 89–91% honest, goldens 3/5-5/5; twist 4/4; suite 2212; ruff clean.
+* Closed without building: quoteless-rule generalization (evidence never showed falsehood, only arguable notes — metric comfort over writer value, won't do).
+* Resume triggers: held-out third script (user supplies) → overconfidence-ambiguity design → trial harness once ≥3 scripts exist.
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
+
+### 2026-10-13 — Coverage-drift test (eval maintains itself now)
+* `tests/test_eval_coverage.py`: fails when `to_findings_json` gains a section in neither `SEARCHED_SECTIONS` nor `EXCLUDED_SECTIONS`; withdrawals pinned excluded; search coverage smoke-tested.
+* Classification calls made explicit: loglines EXCLUDED (title-drops name threads without tracking them — caught acc8 pen hitting via logline), dials/counts/metadata/bookkeeping out; findings(+merged, why), twist, reveals, ledger, coverage, reads, formatting, pacing in.
+* Final matrix verified flip-by-flip: gunpen 5/5, 4/5, 5/5, 5/5, 4/5, 4/5, 4/5; pain3 3/5, 5/5. Acc8 dream HIT re-verified via twist channel; acc8 pen HIT via merged props+article obs (borderline, disclosed); acc15 dream via coverage weakness (genuine prose).
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
+
+### 2026-10-13 — Eval coverage saga, closed (findings → twist → ledger → merged → coverage/reads)
+* Trial-15 audit forced three eval extensions in one round: `why_it_matters` (countdown HIT hid there), merged-findings content (acc12's only "jam"), coverage/character_reads (acc15's dream). Each extension then caught luck: dial pole "Grounded/Dreamy" and logline title-drops match words without tracking threads — excluded via explicit include-list (findings, twist, reveals, ledger, coverage, reads only).
+* Final verified matrix: gunpen 5/5, 4/5, 5/5, 5/5, 4/5, 4/5, 4/5; pain3 3/5, 5/5. Every MISS text-verified absent across all searched channels; every HIT spot-checked genuine (acc12 dream lives in solid finding #19, acc15 dream in a coverage weakness).
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`); user-reported duplicates traced to their Oct-1 pre-program report — see below.
+
+### 2026-10-13 — Repeat offender killed at the source (not a prompt rule)
+* The 13-run GUN_GUY/PEN_GUY falsehood was deterministic, not model prose: continuity's co-presence guard compared raw cue text (`GUN_GUY`) against normalized `characters_present` (`GUN GUY`) — underscore vs space never equal, so the guard was dead for underscored names. Fix normalizes both sides (`normalize_character_name().upper()`); verified the false row is gone on the real trial-14 doc while true typos (GUN_GUY/GUN_GUYY) still fire.
+* Suite 2228 passed + 3 skipped (11 continuity tests incl. 2 new); ruff clean.
+
+### 2026-10-13 — Trial 13: prompt ban scored live (instruction fails, backstop holds)
+* Sixth gunpen run under the register ban: `language_filtered` count=1 ("untranslated foreign language... unintelligible") — the model still generates the complaint, the filter catches it. Instruction insufficient as sole defense; defense-in-depth validated as architecture.
+* Two sibling phrasings survived undropped (#1 "untransliterated foreign language... inaccessible to non-speakers", #2 "transliterated language... impossible to evaluate") — both signals claim-side, current rule needs obs-side language mention. Narrow deterministic extension sketched (claim-side transliteration signal + claim-side incomprehension, quotes exempt), not built.
+* Audit: solid 15/25 (60%), weak 3 (#1, #2, #23 self-rebutting no-clock claim), flagged 7. Honest 22/25 = 88%. Twist null (2nd in 6 runs), goldens 3/5 (dream + pen-article absent, text-verified).
+
+### 2026-10-13 — Prompt-level register ban (filter whack-a-mole ends here)
+* Three trials of bias notes in fresh phrasing ("phonetic transcription", "language mixing creates confusion", register-contrast-as-pacing-defect) kept slipping past the deterministic filter. Root fix at the source: `LANGUAGE_META_INSTRUCTION` extended — never file transliteration/code-mixing/dialect/script-choice as a defect, never call dialogue confusing/opaque/unnatural for its language; judge voice by word choice/rhythm/content, never the vehicle.
+* Applied to both constants (analyzer `prompts.py` rides all 14 category prompts; cowriter `context.py` kept in sync per the standing rule). Deterministic filter stays as backstop — defense in depth, not replacement.
+* Tests: ban witnessed on dialogue/theme/scene-function prompts + cowriter system prompt; all pinned language-rule tests still green. Suite 2224 passed + 3 skipped; ruff clean.
+* Validation owed: live run scored on `stats["language_filtered"]` — empty ledger means the instruction worked, non-empty means it didn't. Proposed next.
+
+### 2026-10-13 — Claim-side transliteration rule (trial-13 follow-up, built)
+* New deterministic clause in `is_non_writing_feedback`: claim-side vehicle signal (transliterat*, untransliterated, foreign language, romanized) AND claim-side incomprehension plea (inaccessible/unintelligible/impossible-to-evaluate/without-translation-context-equivalent) on issue+why, quotes exempt. Either half alone kept (unit-pinned both directions).
+* Backtest over all 19 stored reports: exactly 2 new firings — trial-13 #1/#2, both WEAK-scored. Zero solid-hits.
+* Suite 2226 passed + 3 skipped; ruff clean.
+
+### 2026-10-13 — Trial 14: three validations at once (gunpen #7)
+* Removal ledger: 2 removals, both correct trash (one redundant with old rule, one code-switch). New claim-side rule still without an EXCLUSIVE live firing — covered, not proven. Prompt ban failed again (2 complaints generated under it). Name-variant falsehood regenerated 13/13 runs, withdrawn 13/13.
+* Audit: solid 14/26 (54%), weak 4 (#3 cannot-judge-as-defect, #5/#9/#20 self-rebutting rows), flagged 8. Honest 22/26 = 85%. Twist dream present (5th of 7 gunpen runs). Goldens 4/5 (jam absent, text-verified).
+* New named family: UNMARKED SELF-REBUTTAL — obs contradicts issue with no discourse marker (#20 "rather than concluding with uncomplicated success", #9 "'high' indicating evolution", #5 "directly mirrors"). Six rows across trials 12–14; `is_refuted` blind by construction. Needs semantic judgment — regex patching explicitly deferred as unsafe.
+
+### 2026-10-13 — Removal audit: the other direction (all rows ever dropped)
+* Enumerated every `language_filtered` removal and every gate withdrawal across all 20 stored reports + the user's fresh Pain_3. Filter removals: 5 total (3 darshi + 1 trial-13 + 1 user Pain_3 code-switching note) — all correct-family trash, zero legitimate notes. Gate withdrawals: 12 total, all the same GUN_GUY/PEN_GUY name-variant falsehood rejected once per gunpen run — correct every time.
+* Cost side clean: nothing legitimate was ever removed. Flank exposed, not built: the same false name-variant claim regenerates 12/12 runs and is caught downstream every time — a prompt-level candidate for later.
+
+### 2026-10-13 — User Pain_3 re-analyzed live (duplicate/locatability verdict)
+* User complaint verified on their actual Oct-1 report (43 rows): 1 byte-identical pair, ~10 pairs ≥0.75, ~150 pairs ≥0.45; 29/43 quoteless, 0 observations, 0 scene_keys. Report predated every dedupe/flag/grounding mechanism.
+* Desk UI verified: Fix Queue rows show "Scene N — heading" + Locate + badges; finding cards carry scope labels on all list surfaces (margin pins exempt by pinned browser test); report.md prints scenes + quotes. No UI change needed — the approved scope-label build was correctly stood down.
+* Re-ran their Pain_3 with current code (~40 min): 62 findings, 48 quotes (was 14), 56 observations (was 0), 62 scene_keys (was 0), 10 flagged rows, 1 language-filter removal (code-switching note), twist null (correct). Dup scan: 6 pairs ≥0.45, max 0.98 (three deterministic time-flips differing only in scene numbers — accepted: distinct defects, Locate disambiguates). Goldens 4/5 (debt MISS, same pattern as trial 7).
+* Resume update 2026-10-12: held-out supplied and measured (trial 11); overconfidence design built via spec→plan→subagents (absence-falsification gate, `72a68d1`).
+
+### 2026-10-12 — Trial 12: floor run with all gates active (gunpen #5)
+* n=23, twist null (probe declined despite a sc3 dream candidate — conservative miss by design), jam thread absent everywhere, countdown present only as a paraphrased ledger entry ("undi (exam)"). Goldens 3/5 — the recall floor, all three gaps text-verified genuine.
+* Audit: solid 14/23 (61%), weak-unflagged 2 (#3 register-contrast-as-defect, the bias family in new phrasing the filter misses; #21 prop-misunderstanding claim its own obs disproves — "no X indicating Y; instead explicitly Z" shape, candidate for a refutation pattern), flagged 7. Honest 21/23 = 91% — precision holds the band even on the worst recall run.
+* Withdrawal rate first measured live: 1/24 (4%) — the pre-existing name-variant rule, correctly applied (GUN_GUY/PEN_GUY distinctness claim withdrawn). Praise/absence gates: zero live firings again (no shapes present in five runs now — restraint confirmed, utility still only corpus-proven).
+* Resume update 2026-10-12: held-out script supplied (#Character_guy_darshi) and measured — see trial 11 below. Remaining: overconfidence design, harness.
+
+### 2026-10-12 — Praise-as-finding gate class (trial-11 follow-up)
+* `finding_integrity.py`: `_praise_filed` + PRAISE/DEFECT_MARK lexicons in the module's own ABSENCE/CONSEQUENCE shape — issue must carry a praise marker with zero defect markers or contrast turns in issue+observation; quotes never scanned; rejects to the withdrawals ledger like inverted.
+* Regression proof, not just unit tests: the rule run over all 19 stored trial reports (hundreds of findings scored solid across sessions) fires on exactly the 2 known trial-11 rows and nothing else.
+* Suite 2216 passed + 3 skipped; ruff clean.
+
+### 2026-10-12 — Seeder clock narrowing (trial-11 noise fix)
+* Trial-11 #60 showed the failure: bare "clock" matched wall-clock set dressing ("Time is around 6 PM or so on the wall clock") and the model filed it as an abandoned setup. "clock" dropped from `_TIME_PATTERNS`; alarm/timer/countdown/deadline/ticking/durations/colon-times stay — a ringing alarm is a beat, a clock on the wall usually is not.
+* Verified on the real trial-11 doc: the genuine sc3 "2 mints" seed stays, the wall-clock noise is gone. Suite 2217 passed + 3 skipped; ruff clean.
+
+### 2026-10-12 — Trial 11: held-out script (#Character_guy_darshi, 11sc/~25pp Tenglish)
+* Run: n=69, twist null (no dream/wake markers in source — consistent), no `scene` leak. Language filter fired 3x on unseen data, all correct family ("unreadable transliteration", "untranslated regional dialect", "language shift") — observable in `stats["language_filtered"]`. Strongest guardrail confirmation to date.
+* Audit: solid 40/69 (58%), weak-unflagged 4, flagged 25. Honest-or-flagged 65/69 = 94% — inside the 89–96% trials band. Guards transfer; the lower solid rate is more flagged thin notes (36% flagged vs 15% on pain3-5), not missed falsehoods.
+* Seeder on unseen data: genuine hit #59 ("Em gelkakunda oka 2 mints undu" → finding, quoted) + noise #60 (absolute clock time "around 6 PM" filed as setup). Refinement available (not built): exclude absolute clock times, keep relative countdowns + countdown/deadline words.
+* New families: praise-as-finding (#13 "contains multiple subtext layers", #15 "reflects cultural context" filed as defects — integrity gate covers absence-inversion, not this); scene-ref hallucination (#28 cites sc[16] on an 11-scene doc); ledger slop (person-as-OBJECT #64, relationship-as-setup #63 — both U-caught).
+* Generalization verdict: no overfitting detected. Thresholds, caps, seeder, and filters behave on unseen data within measured bands. n=3 scripts is still small — the claim is "transfers so far", not "general".
+
+### 2026-10-13 — Trial 16: darshi second run (gates unfired, quality highest yet)
+* n=48, zero withdrawals, zero filter removals, zero identity flags, twist null (source-consistent). The model generated no praise/absence/identity shapes at all — second straight run with nothing for the three newest guards to catch.
+* Audit: solid 42/48 (88%), weak 2 (#29 thin non-sequitur obs, #39 self-rebutting redundant-scenes claim), flagged 4. Honest 46/48 = 96% — best band of the program on the held-out script.
+* Standing note: praise/absence/identity rules remain backtest-proven, live-unfired across two darshi runs. Restraint confirmed twice; utility still theoretical.
+* Absence-falsification backtest (19 stored reports, all with parsed.json beside them so none skipped): 0 firings, 0 solid-hits — nothing to narrow, gate stays as landed. Recall note (not a precision hit): the known trial-10 #4-shaped row (accuracy10/gunpen idx 4, "gun, newspaper, pen ... do not recur", cites sc[1]) does not fire — its 8-term content set carries framing words (chekhov/emphasis/narrative/objects/given) that hold single-scene overlap below the 0.5 floor even though "pen" lands in sc2 and "gun/newspaper" in sc3.
+* Suite: 2220 passed + 3 skipped (baseline 2217 + 3 new gate tests); ruff clean on `finding_integrity.py`, `pipeline.py`, `test_finding_integrity_gate.py`.
+* Absence-falsification recall fix: non-recurrence terms now scope to the named object — parenthesized span immediately before the marker, else quoted span, else full prefix — so trial-10 #4 fires (`falsified by presence in scene(s) 2`); 19-report backtest 1 firing / 0 solid-hits, suite 2221 passed + 3 skipped, ruff clean.
+
+### 2026-10-13 — User gun_pen re-analyzed + stale-server catch
+* Fresh report: 18 findings, 13 quotes, 16 obs, 18 scene_keys, 4 flagged, dup scan zero pairs ≥0.45, goldens 5/5, twist null (3rd decline in 9 gunpen runs — probe conservatism, not a code defect).
+* Catch: the desk server predated the continuity fix, so this report still carries the withdrawn name-variant row (correctly withdrawn, harmless). Server restarted on current code; future runs get all fixes. Lesson: long-lived servers silently serve stale code — restart the desk after every product-code commit.
+
+### 2026-10-13 — Stale-code guard (the desk tells the truth about its code)
+* `webapp_server.py`: `_code_revision()` (`<short-hash>[+dirty]`, never raises) stamped at import as `_CODE_REV_AT_STARTUP`; `/api/health` reports it; both analyze answers carry `code_rev` + `stale_code` warning (None when fresh) via `_manifest_summary_with_code`. Non-blocking by design — a warning, not a refusal.
+* Self-inflicted red during build: a helper-move edit duplicated a backup route decorator; the route-census tests caught it (98→99). Fixed, census back to 98.
+* Suite 2238 passed + 3 skipped (incl. 7 new code-revision tests); ruff clean.
+
+### 2026-10-13 — Cite-the-candidate fallback (twist evidence grounded)
+* `confirm_twist`: a confirmed citation matching no candidate and carrying no twist vocabulary (or wake words) falls back to the first deterministic candidate line+scene. Model's own matching/waking citations kept.
+* Caught live by its own tests mid-build: the wake-word keep was missing and the null-scene test failed — added, green. Suite 2242 passed + 3 skipped; ruff clean.
+
+### 2026-10-13 — Twist decline fixed (scene-null accepted)
+* Autopsy result: 6/12 declines on identical input; live 8-probe rerun 7 TWIST / 1 null, and the null was `twist:true, scene:null` — confirmation hedged on location, destroyed by the int-only parser. All 6 stored verdicts carry scene None anyway.
+* Fix: `parse_twist_verdict` accepts null scene (non-int still rejected); semantic bar unchanged. Live re-run of the 8-probe experiment: 8/8 TWIST. Suite 2240 green; ruff clean.
+
+### 2026-10-13 — Twist-decline autopsy (mechanism found, live experiment)
+* 14 gunpen runs: candidates in 12, verdicts in 6 — exact 50% decline on identical input. Live 8-probe rerun with reply capture: 7 TWIST, 1 null. The null was `twist:true, scene:null` — model confirms, hedges location, strict parser (`isinstance int` required) converts to null.
+* Supporting evidence: all 6 stored TWIST verdicts carry scene None anyway (pipeline strips out-of-range ints like the repeated sc4-of-3). The int requirement buys nothing — valid path already ends at null.
+* Proposed fix (not built): accept scene null in `parse_twist_verdict`; semantic bar (twist:true + kind + non-empty line) unchanged. Expected: declines fall to exceptions-only. Residual, out of scope: confirmed lines sometimes cite the wrong beat (pen-gun line as the dream line).
+
+### 2026-10-13 — Stale-code chip in the desk (guard gets an observer)
+* Status strip gains `code <rev>` (short hash +dirty honest) with explanatory title; conn-card hover adds the code row; analyze completion raises a persistent banner when `stale_code` is non-null. Zero new CSS (reuses `.status-item`); no new fetch surface beyond existing `/api/health`.
+* Verified live in headless Chromium against the running desk: chip renders, title correct, zero page errors. Suite 2238 green; node --check clean.
+
+### 2026-10-13 — Citation fallback validated live (6/6 uniform verdicts)
+* Re-ran the probe experiment through the fallback: 6/6 TWIST, all citing the kalaa candidate at sc3 — alarm-line and pen-line citations both replaced, out-of-range sc4 gone with them. Uniform deterministic verdicts from stochastic replies; strictly better evidence than any single model citation.
+* Residual accepted: the alarm line (the waking trigger) is a reasonable citation the fallback now always replaces. The kalaa line ("realize it was a dream") is the stronger evidence for a dream verdict, so the trade favors correctness over variety.
+
+### 2026-10-13 — Identity-uncertainty Task 4: backtest STOPs the task (chip + CSS landed uncommitted)
+* Backtest (plan Step 1 verbatim, stored reports): 29 firings across 15 reports — expected "only trial-10 #12 shapes", got generic-issue matches (`is not`/`absent`/`never appears` plus any two capitalized words as "parties": darshi #10 on-the-nose dialogue, pain3 Three-Line-Rule rows, Chekhov rows, Plot-Point rows).
+* SOLID hits (STOP per plan, nothing narrowed): acc13/gunpen #9, acc8/gunpen #14, acc9/gunpen #25 — all unflagged, none in their trials' named weak rows, so solid by elimination against the NOTES audits (solid 15/25, 14/25, 19/26); plus acc7/pain3 #25/#53, outside the five described weak families. Trial-10 #12 (the target) fires correctly; trial-10 #18 fires but is FM-flagged, not a solid-hit.
+* UI left uncommitted with the rest: Fix Queue `identity?` chip (`row-flag-identity`, muted non-alarm mirror of contested) + CSS beside `.row-flag-contested` — judged NOT independently safe, since the committed Task-2 detector would paint it on solid rows. Suite 2247 passed + 3 skipped; ruff clean on the Python files (the plan's ruff line includes app.js, which ruff parses as Python — 41345 bogus errors, pre-existing); node --check clean. Map updated (both rows), no commit.
+* RESOLVED by Task 5: trigger narrowed to identity predicates + cast-membership rule; re-backtest 1 firing (trial-10 #12, weak) / 0 solid-hits. UI + map + spec deltas below all ship with it.
+
+### 2026-10-13 — Poison-rate census (the cost question, answered)
+* Ran every guardrail detector over all 1048 findings in 20 stored reports: filter 10 (0.95/100), praise 2 (0.19), absence 1 (0.10), identity-flag 1 (0.10). Combined 1.43 per 100. Every firing hand-judged a true positive — including 5 filter hits from pre-audit trials, all bias-family by text.
+* Verdict: keep all. Precision total, code deterministic and tested, alternative is those rows reaching writers. Second finding: identity trigger fired twice, flagged once — the ladder's keep-path works (acc14 #24 supported, kept).

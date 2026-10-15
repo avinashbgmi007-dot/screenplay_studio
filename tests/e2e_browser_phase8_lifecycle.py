@@ -21,7 +21,8 @@ import time
 import requests
 from playwright.sync_api import sync_playwright
 
-from e2e_browser_common import studio_headers, Checks, launch, note, start_studio
+from e2e_browser_common import (Checks, launch, note, reveal_chrome,
+                                start_studio, studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -50,42 +51,6 @@ def open_project(page, base, name):
     # Idempotent: it opens the project it just seeded, every time.
     page.evaluate("(n) => openProject(n)", name)
     page.wait_for_selector("#manuscript-container .scene-page", timeout=20000)
-
-
-def reveal_chrome(page, sel="#desk-analyze-btn", timeout=8000):
-    """Move the mouse where a writer's would be, then poll until the control is
-    genuinely the hit target. Returns True/False — never raises.
-
-    `#desk-toolbar` and `#project-bar` are auto-hiding chrome: while idle they
-    carry `opacity: 0; pointer-events: none` (style.css `.auto-hide-chrome`), and
-    a mousemove with `clientY < 120` is what brings them back for 4s. Playwright's
-    `is_visible()` ignores opacity, so the old `check(name, desk_btn.is_visible())`
-    passed on a button no writer could actually click, and the following `.click()`
-    timed out with `<div id="manuscript-workspace">… intercepts pointer events`
-    (root-caused 2026-09-23: P1's heavier `openProject` pushed the first click
-    past the 4s idle timer, which is what turned this suite red).
-
-    Polling the real hit test also covers the second transition in the way —
-    `#sidebar.sidebar-collapsed` animates 264px -> 0 and briefly overlays the
-    toolbar's left edge, where this button sits.
-    """
-    page.mouse.move(700, 8)
-    deadline = time.time() + timeout / 1000
-    hit = "missing"
-    while time.time() < deadline:
-        hit = page.evaluate(
-            """(sel) => {
-              const e = document.querySelector(sel);
-              if (!e) return 'missing';
-              const r = e.getBoundingClientRect();
-              const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-              if (!t) return 'none';
-              return (e === t || e.contains(t)) ? 'ok' : t.tagName + '#' + (t.id || '-');
-            }""", sel)
-        if hit == "ok":
-            return True
-        page.wait_for_timeout(100)
-    return False
 
 
 def check_stage_ladder(page):

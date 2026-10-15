@@ -30,10 +30,27 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Install tesseract + Indian language packs (OCR fallback tests)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-tam tesseract-ocr-tel
+      # The `apt-get install tesseract-ocr …` step that stood here is GONE, and it
+      # must not come back without also adding `pytesseract` to the `ci` extra.
+      #
+      # It was dead weight that could cancel the entire job. Measured 2026-10-07: it
+      # stalled inside `apt-get update` for 25.3 min — the job budget — against a
+      # normal 30 s, so `test-python` was CANCELLED with `setup-python`, `Install
+      # dependencies` and `Run test suite` all SKIPPED. The suite never ran, and the
+      # result read as a flake. The log's last line before 24 min of silence was a
+      # half-finished `Get: … noble-security InRelease [126 kB]`; apt has no acquire
+      # timeout by default, so a dead socket blocks forever.
+      #
+      # Nothing needed the binary:
+      #   * `pytesseract` and `easyocr` are NOT dependencies of this project, so
+      #     `pdf_parser._get_ocr_engine()` returns None in CI either way (verified:
+      #     both raise ModuleNotFoundError, engine is None);
+      #   * `tests/test_pdf_ocr.py` monkeypatches `_get_ocr_engine` and says so in
+      #     its own docstring — "the real OCR stack is optional and
+      #     machine-dependent" (measured: 5 passed in 1.8 s with no engine).
+      # So the step bought no coverage and cost a 25-minute stall surface on the
+      # critical path. Real OCR is UNTESTED in CI, and already was; making it tested
+      # is a separate decision (add pytesseract + bound this step).
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -65,8 +82,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+      - name: Install JS test dependencies
+        run: npm ci
+      # Gate 2. This job used to run only `tests/js/*.test.js` (17 tests). The
+      # ink-layer suite — preview-ink-layer/tests/{core,dom}.test.mjs (62 + 48) —
+      # imports `jsdom`, which was UNDECLARED and had no package.json to declare
+      # it in, so a clean checkout could not run it and CI never did. Worse, it
+      # had been broken on any Node >= 21 since Node added a getter-only
+      # `globalThis.navigator`; nobody saw it because it never ran here.
+      # Measured 2026-10-07: 127 tests, 127 pass. The file list lives in
+      # package.json's `test` script so CI and a local `npm test` cannot drift.
       - name: Run JS unit tests
-        run: node --test "tests/js/*.test.js"
+        run: npm test
 
   # The SPA is ~9k lines of vanilla app.js (plus 6.5k of CSS) with no build step
   # and, until 2026-09-20, no automated coverage in CI at all: the 29
@@ -90,6 +118,19 @@ jobs:
       - name: Install dependencies
         run: pip install ".[ci]" -c requirements.lock.txt
       - name: Install chromium
+        # `--with-deps` shells out to apt, and this step stalled for the FULL
+        # 45-minute job budget on 2026-10-07 (normal: well under a minute),
+        # cancelling `test-browser` and SKIPPING `Run browser suites` — so the
+        # browser fleet silently did not run and the result looked like a flake.
+        # A step-level bound makes that a fast, honest step failure instead.
+        #
+        # Note this is the second instance of one cause: the two long jobs each had
+        # exactly one unbounded network fetch on the critical path, and both stalled
+        # on it (`apt-get update` 25.3 min here, `playwright install` 45 min). The
+        # pip/npm installs are left alone because pip and npm bound their own
+        # connections (pip: 15 s connect timeout + retries), so they already fail
+        # rather than hang.
+        timeout-minutes: 8
         run: python -m playwright install --with-deps chromium
       - name: Run browser suites
         run: python tests/run_browser_suites.py
@@ -133,3 +174,68 @@ jobs:
           tests/test_revision.py
           tests/test_webapp_revision.py
           tests/test_stash.py
+
+  # R3 (audit H3): the fleet skips gun_pen_audit everywhere it runs, because it
+  # POSTs a live /analyze and needs a llama-server. That means the one suite
+  # exercising a real end-to-end analysis through the browser NEVER runs
+  # unattended — its assertions exist only on a developer's machine. This job
+  # runs exactly that suite against an operator-provided studio, and only when
+  # the operator has declared one: set the repository VARIABLE
+  # STUDIO_LIVE_LLM_URL (Settings → Secrets and variables → Actions → Variables)
+  # to the base URL of a studio that has a model loaded, and the job runs;
+  # leave it unset and the job shows as skipped, so the green build does not
+  # silently lose its only real-model coverage. It is a variable, not a secret,
+  # on purpose: a URL is not a credential, and a secret would not be visible
+  # in the `if:` guard.
+  test-live-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    if: ${{ vars.STUDIO_LIVE_LLM_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ".[ci]" -c requirements.lock.txt
+      - name: Install chromium
+        # Same bound as test-browser's Install chromium above: `--with-deps`
+        # shells out to apt (unbounded), so a stall must fail this step fast
+        # instead of running to the 45-minute job budget as `cancelled`.
+        timeout-minutes: 8
+        run: python -m playwright install --with-deps chromium
+      - name: Run the live-model browser suite (gun_pen_audit)
+        env:
+          E2E_BASE: ${{ vars.STUDIO_LIVE_LLM_URL }}
+        # Suite-name filter, not the whole fleet: every other suite boots its
+        # own private demo studio, which would ignore E2E_BASE — only
+        # gun_pen_audit is REQUIRES_LIVE_STUDIO.
+        run: python tests/run_browser_suites.py gun_pen_audit
+
+  # R6 (audit M4): the browser fleet ran on Linux only, but the shipping
+  # platform is Windows — where the studio is actually launched (jsonio's
+  # msvcrt locking, retry_permission on sharing violations, path shapes in the
+  # report/export links). The fleet measured 60 suites / 1,514 checks green on
+  # Windows locally; this job makes that the case in CI too, instead of
+  # trusting a machine that happens to sit on someone's desk.
+  test-browser-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ".[ci]" -c requirements.lock.txt
+      - name: Install chromium
+        # Unbounded network fetch (browser download) with no client-side
+        # bound of its own: a stall must fail this step fast instead of
+        # running to the 60-minute job budget as `cancelled`.
+        timeout-minutes: 8
+        run: python -m playwright install chromium
+      - name: Run browser suites
+        shell: bash
+        run: python tests/run_browser_suites.py

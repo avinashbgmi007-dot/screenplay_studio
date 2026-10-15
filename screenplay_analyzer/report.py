@@ -9,6 +9,7 @@ import os
 import tempfile
 
 from .pipeline import AnalysisResult
+from .verifier import verification_rate
 
 
 def _atomic_write_text(path: str, text: str) -> None:
@@ -105,6 +106,23 @@ def render_markdown(result: AnalysisResult) -> str:
         lines.append("## ⚠️ Analysis Warnings")
         for e in result.errors:
             lines.append(f"- {e}")
+        lines.append("")
+
+    if result.notices:
+        # M2: recoveries get their own voice, distinct from warnings — the
+        # writer should know a pass wobbled and landed, not that something
+        # is wrong with their script.
+        lines.append("## ℹ️ Run Notes")
+        for n in result.notices:
+            lines.append(f"- {n}")
+        lines.append("")
+    # A caveat, not a warning — see `AnalysisResult.recoveries`. Rendered apart
+    # from the warning block on purpose: nothing failed, and a report that shouts
+    # "warning" at a split trains the writer to ignore the block that does mean it.
+    if getattr(result, "recoveries", None):
+        lines.append("## Notes on this run")
+        for n in result.recoveries:
+            lines.append(f"- {n}")
         lines.append("")
 
     # --- Coverage ---
@@ -218,6 +236,31 @@ def render_markdown(result: AnalysisResult) -> str:
                 lines.append(f"  - {note}")
             lines.append("")
 
+    # --- Story mechanics (deterministic reveal scan) ---
+    if getattr(result, "reveal_candidates", None):
+        lines.append("## Story mechanics worth a second look")
+        lines.append(
+            "*Single lines that may flip the story's meaning (a dream, a "
+            "waking, a death undone). Found by text scan, not judgment — "
+            "check them against the pages before believing any finding that "
+            "contradicts one.*"
+        )
+        lines.append("")
+        for c in result.reveal_candidates:
+            lines.append(f"- Scene {c.get('scene')}: '{c.get('line', '')}'")
+        lines.append("")
+
+    # --- Confirmed twist (candidate-gated probe call) ---
+    twist = getattr(result, "twist_verdict", None)
+    if isinstance(twist, dict) and twist.get("twist") is True:
+        lines.append("## Confirmed twist — read everything after it twice")
+        lines.append(
+            f"A direct probe confirmed a {twist.get('kind', 'twist')} in "
+            f"Scene {twist.get('scene')}: '{twist.get('line', '')}'. Findings "
+            "that treat those events as literal waking-plot are suspect."
+        )
+        lines.append("")
+
     # --- Pacing (deterministic per-scene pace index) ---
     if result.pacing:
         lines.append("## Pacing — where the script drags")
@@ -327,6 +370,24 @@ def render_markdown(result: AnalysisResult) -> str:
             f"expected for theme/character/structure/scene-function findings, which reason from scene "
             f"summaries rather than full text)."
         )
+        if v.get("scene_not_found", 0):
+            lines.append(
+                f"\n**{v.get('scene_not_found', 0)} findings cite scenes that do not exist in the "
+                "script** (⚠️ flagged in place). Quote-less findings cite scene numbers — those "
+                "numbers are checked too, and a citation that cannot exist reads as unverified, "
+                "not as quietly fine."
+            )
+        # The one number a writer can act on: of the findings whose citation a
+        # machine CAN judge (they carry a quotable line), how many held up.
+        # Deliberately absent when nothing was quote-checkable — a percentage
+        # over nothing is a lie (verifier.verification_rate owns the rule).
+        rate = verification_rate(v)
+        if rate["quote_bearing"]:
+            lines.append(
+                f"\n**Quote-verified rate: {rate['verified_pct_of_quoted']}%** "
+                f"({v.get('verified', 0)} of {rate['quote_bearing']} findings that cite quotable "
+                "text; summary-reasoned findings cite scene numbers and are excluded)."
+            )
         # Evidence depth (§5 item 4): the paragraph above describes the ceiling in
         # prose; this states its SIZE. A count is what makes an invisible
         # false-negative risk visible — "reason from scene summaries" is a caveat,
@@ -367,13 +428,54 @@ def render_markdown(result: AnalysisResult) -> str:
                 "silently dropped — the underlying observation may still be valid even where "
                 "the model's exact quote couldn't be confirmed.*"
             )
+        if result.withdrawals:
+            # The integrity gate removed these from the delivered set — a
+            # mechanically false finding, or a duplicate folded into another.
+            # Counted in the human report too, not only the JSON ledger, so
+            # "nothing lost" is visible to the writer and not just checkable by
+            # a test.
+            n_rej = sum(1 for w in result.withdrawals if w.get("action") == "reject")
+            n_mrg = sum(1 for w in result.withdrawals if w.get("action") == "merge")
+            bits = []
+            if n_rej:
+                bits.append(f"{n_rej} withdrawn as mechanically false")
+            if n_mrg:
+                bits.append(f"{n_mrg} folded into a duplicate")
+            lines.append(
+                f"\n**Integrity gate:** {len(result.withdrawals)} finding(s) left the delivered "
+                f"set ({'; '.join(bits)}). Nothing was deleted — each is kept with its reason "
+                "and full text in `report.findings.json` under `withdrawals`."
+            )
         lines.append("")
 
     return "\n".join(lines)
 
 
+def _observation_coverage(findings: list) -> dict:
+    """Gate 11: the share of the delivered set carrying a checkable observation.
+
+    A quote makes a finding citable; an observation makes it FALSIFIABLE — the
+    contract (Law V″) is that every finding reduces to one. Reported beside the
+    quote rate because they answer different questions: "can I find the line?"
+    versus "can I check the claim?" `None` until at least one finding exists — a
+    percentage over nothing is a lie (the same rule `verification_rate` owns).
+    """
+    total = len(findings or [])
+    bearing = sum(1 for f in (findings or [])
+                  if isinstance(f, dict) and (f.get("observation") or "").strip())
+    return {"observation_bearing": bearing,
+            "observation_pct": round(100.0 * bearing / total, 1) if total else None}
+
+
 def to_findings_json(result: AnalysisResult) -> dict:
     """Machine-readable version for Piece 3 to load and reference by scene/finding."""
+    # HIGH-1: every finding carries the slugline key of its scene, because the
+    # writer's marks are keyed by the finding's content-hash id and content
+    # alone collided (9 of 16 rows on Pain_3 shared one id). Stamped here, at
+    # the one place a report is written, so the artifact is self-describing:
+    # the desk, the fix queue and the client all read the same field instead of
+    # each re-deriving a scene key (screenplay_parser/scenekey.py).
+    from screenplay_parser.scenekey import scene_key_map, stamp_scene_keys
     return {
         "title": result.doc.title,
         "source_filename": result.doc.source_filename,
@@ -382,13 +484,47 @@ def to_findings_json(result: AnalysisResult) -> dict:
         "character_reads": result.character_reads,
         "logline_test": result.logline_test,
         "setup_payoff": result.setup_payoff,
+        # Recall kit B2: deterministic reveal candidates. Serialized (not just
+        # threaded into prompts) so the desk, the eval runner, and any reader
+        # can see what the scan found — an unserialized scan is a silent one.
+        "reveal_candidates": list(getattr(result, "reveal_candidates", None) or []),
+        # Twist confirmation verdict (candidate-gated probe call). None unless
+        # confirmed — served so the desk and eval can see the verdict.
+        "twist_verdict": getattr(result, "twist_verdict", None),
         "character_dials": result.character_dials,
         "pacing": result.pacing,
-        "findings": result.findings,
+        "findings": stamp_scene_keys(result.findings, scene_key_map(result.doc)),
         "formatting_findings": result.formatting_findings,
         "stats": result.stats,
-        "verification_summary": result.verification,
+        # The integrity gate's ledger: findings removed from the delivered set
+        # (mechanically false, or folded duplicates), each with its reason and
+        # full content. Served so "nothing lost" is checkable rather than
+        # asserted — `findings` + `withdrawals` is the pre-gate list. Empty when
+        # the gate is off. See screenplay_analyzer/finding_integrity.py.
+        "withdrawals": result.withdrawals,
+        # Counts by verification status plus the derived quote-verified rate
+        # (verifier.verification_rate). Served as-is by /report, so the
+        # writer's "how correct is this feedback" question has a computed
+        # answer instead of a vibe.
+        "verification_summary": {
+            **(result.verification or {}),
+            **verification_rate(result.verification),
+            # Gate 11: the share of the delivered set carrying a checkable
+            # observation. A quote makes a finding citable; an observation makes
+            # it falsifiable, and the contract is that every finding reduces to
+            # one. Reported beside the quote rate because they answer different
+            # questions: "can I find the line?" versus "can I check the claim?"
+            **_observation_coverage(result.findings),
+        },
         "errors": result.errors,
+        "notices": result.notices,
+        # Caveats, not errors: a pass whose chunk had to be split mid-run. Kept
+        # out of `errors` because that list is the orchestrator's partial-failure
+        # signal and the desk's failure banner — a split means the pass succeeded
+        # in smaller pieces, so dressing it as a failure is a false alarm. Its own
+        # key so the writer can be told the finding set is path-dependent without
+        # being told the run is broken.
+        "recoveries": result.recoveries,
     }
 
 

@@ -30,9 +30,10 @@ from difflib import SequenceMatcher
 
 from screenplay_parser import quotematch
 from screenplay_parser.models import ScriptDocument
+from screenplay_parser.scenekey import scene_key_map, stamp_scene_keys
 
 
-# ---------- content-hash finding identity (R1 refined) ----------
+# ---------- content-hash finding identity (R1 refined + HIGH-1 scene key) ----
 # A finding's identity is its content, not its position in the report array.
 # Key = category + evidence_quote (the quote is verified against script text,
 # so it is the stable anchor); scene_refs ride as DATA — they renumber when
@@ -41,8 +42,22 @@ from screenplay_parser.models import ScriptDocument
 # the id. Reasoning-only findings (no quote) key on category + normalized
 # issue text (documented weak tier: drift re-classifies honestly on the
 # next pass).
-# The JS twin lives in webapp/app.js (computeFindingId + _strHash) — the
-# server observes, the client displays; both MUST produce the same id.
+#
+# HIGH-1 (NOTES.md "D1 + D2-a"): content alone was not unique. The
+# demo dialogue finding repeats its issue verbatim at nine scenes, so 9 of 16
+# findings hashed to ONE id — one mark counted nine findings addressed, and
+# nine rows left the worklist together. The tie-breaker is the scene the
+# finding points at, named by its SLUGLINE (`scene_key`, stamped into the
+# report by the analyzer; `screenplay_parser/scenekey.py` derives it and says
+# what it costs). Scene_refs still never key the id: ordinals renumber on
+# insert, which is exactly what a mark must survive. A finding with no scene
+# (script-level, or a heading that slugs empty) carries no scene component and
+# keeps its pre-scene-key id — including its pre-scene-key collision, which is
+# the honest reading of two findings that say identical words about no place.
+#
+# The JS twin lives in webapp/core.js (computeFindingId + _strHash) — the
+# server observes, the client displays; both MUST produce the same id, and
+# both read the SAME stamped `scene_key` rather than deriving their own.
 _BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
@@ -69,7 +84,51 @@ def compute_finding_id(f: dict) -> str:
         norm = quote
     else:
         norm = "issue:" + " ".join((f.get("issue") or "").lower().split())[:100]
+    # the scene the finding points at, by slugline — the tie-breaker that stops
+    # two findings which say the same words about different places from sharing
+    # one id (see the header comment; "" = no scene component, unchanged id)
+    scene = (f.get("scene_key") or "").strip()
+    if scene:
+        norm += "|s:" + scene
     return "f" + _base36(_str_hash((f.get("category") or "other") + "|" + norm))
+
+
+def annotate_report_scene_keys(m, report: dict) -> dict:
+    """Stamp `scene_key` onto a stored report's findings, derived from the
+    parse-of-record.
+
+    Reports written before scene keys existed carry no `scene_key`, so every id
+    computed from them would keep the collision the key exists to fix. This
+    stamps them on READ — the same serve-time pattern `_sanitize_report` uses —
+    so an old project serves the ids a fresh analysis would produce, with no
+    re-analysis and, crucially, no second id space: `/report`, `/findings`,
+    `/fixqueue`, `finding_statuses` and `last_pass_snapshot` all read the
+    report through this function, and the client computes its ids from the
+    `/report` this returns.
+
+    The parse-of-record (not the working copy) is the anchor: the report is
+    about the analyzed text, so a heading the writer edits later must not move
+    an id until the next analysis re-derives it. An unreadable parse leaves the
+    report EXACTLY as stored — a missing file must never re-key anything.
+    """
+    if not isinstance(report, dict):
+        return report
+    findings = report.get("findings")
+    if not isinstance(findings, list):
+        return report
+    # Nothing scene-referenced is missing a key: no work, and no parse load.
+    if not any(isinstance(f, dict) and (f.get("scene_refs") or []) and not f.get("scene_key")
+               for f in findings):
+        return report
+    doc = _load_baseline_doc(m)
+    if doc is None:
+        return report
+    stamped = stamp_scene_keys(findings, scene_key_map(doc))
+    if all(a is b for a, b in zip(stamped, findings)) and len(stamped) == len(findings):
+        return report  # a scene whose heading slugs empty: stamped "" and unchanged
+    out = dict(report)
+    out["findings"] = stamped
+    return out
 
 
 def dismissed_finding_ids(m) -> set:
@@ -79,14 +138,51 @@ def dismissed_finding_ids(m) -> set:
     Missing -> empty set; DAMAGED -> StoreUnreadable. The lenient version read a
     torn triage file as "nothing dismissed", so every finding the writer had
     cleared came back, and the next dismiss overwrote the damaged file.
+
+    Ids stored before the scene key are carried onto the current ids first, the
+    same way marks are (see `_migrate_legacy_marks`): the entry's own
+    (index, issue) fallback keeps a dismissal *visible* either way, but an
+    id-keyed read that could not resolve would make Restore quietly do
+    nothing — the one dismissal failure that loses the writer's intent.
     """
     from .jsonio import StoreUnreadable, load_json_store
     path = dismissed_path(m)
     data = load_json_store(path, default=[])
     if not isinstance(data, list):
         raise StoreUnreadable(path, f"expected a list, found {type(data).__name__}")
+    data = _migrate_legacy_dismissals(m, data)
     return {d["finding_id"] for d in data
             if isinstance(d, dict) and d.get("finding_id")}
+
+
+def _migrate_legacy_dismissals(m, data: list) -> list:
+    """Dismissal entries with their `finding_id` carried onto the current id.
+
+    Same policy as marks, tightened for a shape that always carries its own
+    (index, issue) fallback: a 1:1 legacy id is rewritten; an ambiguous one
+    (one id, N findings — the collision) keeps its legacy id AND its (index,
+    issue) pair, which is enough for every reader to resolve it without
+    guessing. Nothing is dropped and nothing is spread.
+    """
+    if not any(isinstance(d, dict) and d.get("finding_id") for d in data):
+        return data
+    remap, _ = legacy_id_candidates(m)
+    if not remap:
+        return data
+    out, changed = [], False
+    for d in data:
+        if isinstance(d, dict) and d.get("finding_id") in remap:
+            cands = remap[d["finding_id"]]
+            if len(cands) == 1:
+                d = {**d, "finding_id": cands[0]}
+                changed = True
+        out.append(d)
+    if not changed:
+        return data
+    from .jsonio import atomic_write_json, lock_for
+    with lock_for(dismissed_path(m)):
+        atomic_write_json(dismissed_path(m), out)
+    return out
 
 
 # ---------- writer intent (R2-b mark-addressed + R3 defer) ----------
@@ -97,19 +193,149 @@ def finding_marks_path(m) -> str:
     return os.path.join(m.project_dir, "finding_marks.json")
 
 
+def ambiguous_marks_path(m) -> str:
+    return os.path.join(m.project_dir, "finding_marks.ambiguous.json")
+
+
+def ambiguous_marks(m) -> dict:
+    """Marks held aside by the scene-key migration: {old_id: {intent,
+    candidates, issue, scene_refs, ...}}. Missing -> {}; damaged -> {} (the
+    notice is information, and an unreadable notice must never take the marks
+    fetch down with it — the marks themselves are the store that must stay
+    strict)."""
+    from .jsonio import load_json_store
+    try:
+        data = load_json_store(ambiguous_marks_path(m), default={})
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def legacy_id_candidates(m, report: dict | None = None) -> tuple:
+    """{legacy_id: [current ids]} and {legacy_id: {issue, scene_refs}} for every
+    legacy id that at least one finding in the report has moved off.
+
+    `legacy` is the id a build before the scene key computed (no scene
+    component); `current` is the id this build computes. Every store keyed by a
+    finding id (marks, dismissals, the last-pass snapshot) reads this one map,
+    so an upgrade carries them all onto the same ids in one step — the
+    alternative, three stores each migrating on its own schedule, is three id
+    spaces and a mark that matches in one surface and not another.
+
+    The candidate list is EVERY distinct current id among the findings that
+    carried that legacy id — including a finding that kept it (a script-level
+    finding, or one whose heading slugs empty, has no scene to name). A stored
+    mark under the legacy id covered all of them; counting only the findings
+    that moved would hand the mark to one of two and silently take it from the
+    other, which is a guess about what the writer meant.
+
+    An unreadable report returns ({}, {}): callers must then leave every store
+    exactly as it is. A failed migration may leave old ids in place; it may
+    never delete a writer's judgment.
+    """
+    if report is None:
+        try:
+            with open(m.report_findings_path, "r", encoding="utf-8") as f:
+                report = json.load(f)
+        except (OSError, ValueError):
+            return {}, {}
+    report = annotate_report_scene_keys(m, report)
+    by_legacy: dict = {}
+    moved: dict = {}
+    for f in report.get("findings") or []:
+        if not isinstance(f, dict):
+            continue
+        current = compute_finding_id(f)
+        legacy = compute_finding_id({**f, "scene_key": ""})
+        cands = by_legacy.setdefault(legacy, [])
+        if current not in cands:
+            cands.append(current)
+        if current != legacy:
+            moved.setdefault(legacy, {"issue": f.get("issue"), "scene_refs": f.get("scene_refs")})
+    return {old: by_legacy[old] for old in moved}, moved
+
+
+def _migrate_legacy_marks(m, data: dict) -> dict:
+    """Carry marks made before the id learned about scenes onto the ids this
+    build computes. One-time, idempotent, and never lossy or over-claiming.
+
+    For every finding in the report: `legacy` = its id computed WITHOUT the
+    scene component (what an older build stored), `current` = the id this build
+    computes. A stored mark under `legacy` is:
+
+      * exactly one candidate  -> rewritten under `current`, same intent.
+        Lossless: one finding, one mark, no judgment invented.
+      * several candidates     -> held aside in `finding_marks.ambiguous.json`
+        (with the issue text and the candidates) and removed from the active
+        store. This is the collision itself: ONE mark, N findings — including
+        the case where one of the N kept the legacy id because it has no scene
+        to name. Spreading it would claim N findings done on the strength of
+        one press — the exact overclaim the mark store exists to avoid (the
+        review's HIGH-2b: counters that disagree) — and applying it to a
+        guessed one would be worse. So the desk declines and says so.
+      * no candidate (the finding left the report) -> left exactly as stored;
+        the ghosted-marks channel already explains those, and a migration is
+        not the place to delete the writer's judgment.
+
+    A missing or unreadable report returns `data` untouched: a failed migration
+    must never be able to destroy a mark.
+    """
+    try:
+        with open(m.report_findings_path, "r", encoding="utf-8") as f:
+            report = json.load(f)
+    except (OSError, ValueError):
+        return data
+    report = annotate_report_scene_keys(m, report)
+    remap, issues = legacy_id_candidates(m, report)
+    if not any(old in data for old in remap):
+        return data  # nothing legacy to carry — the common case, and a no-op
+    out = dict(data)
+    held: dict = {}
+    for old_id, cands in remap.items():
+        if old_id not in out:
+            continue
+        intent = out.pop(old_id)
+        if len(cands) == 1:
+            out[cands[0]] = intent
+        else:
+            held[old_id] = {"intent": intent, "candidates": cands,
+                            "covered": len(cands), "held_at": time.time(),
+                            **(issues.get(old_id) or {})}
+    from .jsonio import atomic_write_json, load_json_store, lock_for
+    with lock_for(finding_marks_path(m)):
+        atomic_write_json(finding_marks_path(m), out)
+        if held:
+            existing = load_json_store(ambiguous_marks_path(m), default={})
+            if not isinstance(existing, dict):
+                existing = {}
+            existing.update(held)
+            atomic_write_json(ambiguous_marks_path(m), existing)
+    return out
+
+
 def finding_intents(m) -> dict:
     """{finding_id: "addressed" | "deferred"} — the writer's intent marks.
 
     Missing -> {} ; damaged -> StoreUnreadable. The lenient version dropped every
     mark the writer had made (they silently reappeared as open findings) and the
     next mark then overwrote the damaged file.
+
+    Marks stored under a pre-scene-key id are carried onto the current id here,
+    on the read every surface already makes (`/edits`), so no writer has to run
+    anything for their own judgment to survive the upgrade.
     """
     from .jsonio import StoreUnreadable, load_json_store
     path = finding_marks_path(m)
     data = load_json_store(path, default={})
     if not isinstance(data, dict):
         raise StoreUnreadable(path, f"expected an object, found {type(data).__name__}")
-    return {k: v for k, v in data.items() if v in ("addressed", "deferred")}
+    data = {k: v for k, v in data.items() if v in ("addressed", "deferred")}
+    try:
+        return _migrate_legacy_marks(m, data)
+    except Exception:
+        # A migration that fails must degrade to the marks as stored — never to
+        # no marks at all. (The strict paths above already raised for damage.)
+        return data
 
 
 def set_finding_intent(m, finding_id: str, intent) -> None:
@@ -129,6 +355,154 @@ def set_finding_intent(m, finding_id: str, intent) -> None:
             data.pop(finding_id, None)
         from .jsonio import atomic_write_json
         atomic_write_json(path, data)
+
+
+# ---------- writer verdict (the truth axis) ----------
+# The intent store records what the writer will DO with a finding (addressed /
+# deferred); nothing recorded whether the finding is TRUE. Until something does,
+# "98.58 % accurate" is unfalsifiable — there is no data from which to compute
+# it. This is ONE new axis, not a redesign: it mirrors finding_marks.json
+# exactly, in its OWN file so a torn verdict store can never cost the writer
+# their intent marks (and vice versa), and it reuses the same three hard-won
+# invariants — the lock spans the READ, the write is atomic, and a damaged store
+# is refused rather than overwritten.
+#
+# The two axes are deliberately separate questions. A writer must be able to say
+# "it's true but I won't act on it": collapsing truth into intent is exactly
+# what produced the ambiguous middle that made the accuracy metric unmeasurable.
+_VERDICTS = ("correct", "partial", "incorrect")
+
+
+def finding_verdicts_path(m) -> str:
+    return os.path.join(m.project_dir, "finding_verdicts.json")
+
+
+def finding_verdicts(m) -> dict:
+    """{finding_id: "correct" | "partial" | "incorrect"} — the writer's judgment
+    on whether a finding is TRUE. Orthogonal to intent (what they will do).
+
+    Missing -> {} ; damaged -> StoreUnreadable. Separate store from marks on
+    purpose: the writer's judgment about truth and their judgment about action
+    must never be able to destroy one another.
+    """
+    from .jsonio import StoreUnreadable, load_json_store
+    path = finding_verdicts_path(m)
+    data = load_json_store(path, default={})
+    if not isinstance(data, dict):
+        raise StoreUnreadable(path, f"expected an object, found {type(data).__name__}")
+    return {k: v for k, v in data.items() if v in _VERDICTS}
+
+
+def set_finding_verdict(m, finding_id: str, verdict) -> None:
+    """Set one finding's truth verdict; `None` (or any non-verdict) clears it.
+
+    The lock spans the READ as well as the write — the same hazard the intent
+    store documents: two verdicts made at once (two tabs, or the CLI and the
+    webapp) each load the pre-mark store, and the second write drops the first.
+    A damaged store raises instead of being overwritten, so the writer's
+    judgments are never silently reset.
+    """
+    from .jsonio import StoreUnreadable, load_json_store, lock_for, atomic_write_json
+    path = finding_verdicts_path(m)
+    with lock_for(path):
+        data = load_json_store(path, default={})   # damaged -> raises: no verdict
+        if not isinstance(data, dict):             # is written over a damaged store
+            raise StoreUnreadable(path, "expected an object")
+        if verdict in _VERDICTS:
+            data[finding_id] = verdict
+        else:
+            data.pop(finding_id, None)
+        atomic_write_json(path, data)
+
+
+def verdict_accuracy(m) -> dict:
+    """The writer-agreement meter — the product's accuracy metric, computed from
+    the writer's OWN verdicts rather than from a proxy.
+
+    Population is every DISTINCT finding id the desk delivered (the same
+    identity the marks store keys on; two rows sharing an id are one finding for
+    the tally, exactly as `last_pass_snapshot` treats them). An unjudged finding
+    is NOT evidence of accuracy, so it is reported as `unjudged` and kept OUT of
+    the rate's denominator — folding it in would repeat the
+    shrinking/expanding-denominator error this metric exists to avoid, and would
+    let a writer who judges 3 of 40 findings score 7 %.
+
+        accuracy       = (correct + partial) / judged   <- the headline
+        strict         = correct / judged               <- a diagnostic
+        incorrect_rate = incorrect / judged
+
+    Why the headline is the not-wrong reading: the harm this product must avoid
+    is a writer ACTING ON A FALSE FINDING. A true-but-unsupported finding costs
+    nothing — the writer judges it. So the bar belongs on `incorrect`, and
+    raising it is verifiability's job, not a stricter truth bar. `coverage` (how
+    much of the delivered set carries a verdict) is reported beside it, because
+    a rate over 3 judged findings is not the same claim as a rate over 300.
+
+    Metric B rides along: the pipeline's own verifiability — the share of
+    delivered findings whose citation `verifier.py` could confirm. A finding can
+    be accurate (A) and unverifiable (B), or verifiable and ignored; only A
+    proves the writer trusts the output, only B proves it is checkable.
+    """
+    empty = {"total": 0, "judged": 0, "accuracy": None, "strict": None,
+             "incorrect_rate": None, "coverage": None, "target": 98.58,
+             "tally": {"correct": 0, "partial": 0, "incorrect": 0, "unjudged": 0},
+             "verifiability": {"verified": 0, "quote_bearing": 0,
+                               "rate_of_all": None, "rate_of_quoted": None},
+             "by_category": {}}
+    try:
+        with open(m.report_findings_path, "r", encoding="utf-8") as f:
+            report = json.load(f)
+    except (OSError, ValueError):
+        return empty
+    if not isinstance(report, dict):
+        return empty
+    report = annotate_report_scene_keys(m, report)
+    verdicts = finding_verdicts(m)      # damaged -> raises through to the route
+    seen: dict = {}                     # id -> category, first occurrence wins
+    for f in report.get("findings") or []:
+        if not isinstance(f, dict):
+            continue
+        fid = compute_finding_id(f)
+        if fid not in seen:
+            seen[fid] = f
+    tally = {"correct": 0, "partial": 0, "incorrect": 0, "unjudged": 0}
+    by_cat: dict = {}
+    verified = quote_bearing = 0
+    for fid, f in seen.items():
+        v = verdicts.get(fid) or "unjudged"
+        tally[v] += 1
+        cat = f.get("category") or "other"
+        bucket = by_cat.setdefault(cat, {"correct": 0, "partial": 0, "incorrect": 0, "unjudged": 0})
+        bucket[v] += 1
+        if (f.get("evidence_quote") or "").strip():
+            quote_bearing += 1
+            if (f.get("verification") or {}).get("status") == "verified":
+                verified += 1
+    judged = tally["correct"] + tally["partial"] + tally["incorrect"]
+    total = len(seen)
+
+    def pct(n: int, d: int):
+        return round(100.0 * n / d, 1) if d else None
+
+    for b in by_cat.values():
+        j = b["correct"] + b["partial"] + b["incorrect"]
+        b["accuracy"] = pct(b["correct"] + b["partial"], j)
+        b["judged"] = j
+        b["total"] = j + b["unjudged"]
+    return {
+        "total": total,
+        "judged": judged,
+        "tally": tally,
+        "accuracy": pct(tally["correct"] + tally["partial"], judged),
+        "strict": pct(tally["correct"], judged),
+        "incorrect_rate": pct(tally["incorrect"], judged),
+        "coverage": pct(judged, total),
+        "by_category": by_cat,
+        "verifiability": {"verified": verified, "quote_bearing": quote_bearing,
+                          "rate_of_all": pct(verified, total),
+                          "rate_of_quoted": pct(verified, quote_bearing)},
+        "target": 98.58,
+    }
 
 
 # ---------- last-pass scorekeeping (R4, one generation back) ----------
@@ -222,6 +596,31 @@ def last_pass_snapshot(m):
     snap_sig = snap.get("report_sig") if isinstance(snap, dict) else None
     with open(report_path, "r", encoding="utf-8") as f:
         report = json.load(f)
+    report = annotate_report_scene_keys(m, report)
+    # A snapshot written before the scene key holds pre-scene-key ids. Carry
+    # them forward where the map is unambiguous; where ONE stored id covered
+    # several findings (the collision), the previous pass can no longer be
+    # compared row-for-row — so the snapshot is dropped and the next pass
+    # reports "no previous pass" instead of a fabricated "9 fixed, 9 new"
+    # delta on a script nobody edited. Measured on Pain_3: that delta would
+    # have read as real progress (HIGH-2b's exact failure mode).
+    if isinstance(snap, dict) and isinstance(snap.get("ids"), list):
+        remap, _ = legacy_id_candidates(m, report)
+        if remap and any(gid in remap for gid in snap["ids"]):
+            carried, resolvable = [], True
+            for gid in snap["ids"]:
+                cands = remap.get(gid)
+                if not cands:
+                    carried.append(gid)
+                elif len(cands) == 1:
+                    carried.append(cands[0])
+                else:
+                    resolvable = False
+                    break
+            if resolvable:
+                snap = {**snap, "ids": carried}
+            else:
+                snap = None  # no comparable previous pass — recompute from here
     report_sig = _report_signature(report)
     if snap and snap.get("report_mtime") == rp_mtime and snap_sig == report_sig:
         if isinstance(snap, dict) and snap.get("parsed_sig") is None:
@@ -418,6 +817,88 @@ def save_working(m, doc: ScriptDocument, record: dict | None = None) -> None:
         clear_redo(m)
 
 
+STALE_PROPOSAL_MESSAGE = "Stale proposal: the text was modified manually."
+
+
+class StaleProposalError(ValueError):
+    """A proposal no longer matches the working copy it was cut from.
+
+    Raised from inside `apply_edit`'s `lock_for('working.json')` section, before
+    anything is written — the mutation is refused, never half-applied.
+
+    Subclasses ValueError on purpose: every layer that already answers a
+    ValueError with a 400 keeps working anywhere the stale contract is not
+    named, so a route that forgets to catch this can never turn a stale
+    proposal into a 500.
+    """
+
+    def __init__(self, message: str = STALE_PROPOSAL_MESSAGE):
+        super().__init__(message)
+
+
+def _still_holds(lines: list[bytes], wanted: bytes) -> bool:
+    """Is `wanted` present, byte for byte, as one line or a consecutive run?
+
+    Whole-value equality at every granularity — never containment. Containment
+    is wrong in the one way that matters: a writer who types "!" onto the end of
+    the proposed line leaves the old text as an exact substring, so a substring
+    test passes and the frame commits over a line the writer had just changed.
+    Exact equality of the whole value is the only comparison that can tell "the
+    text still stands" from "the text was edited", which is the entire question
+    this guard asks.
+
+    The run window exists so a proposal spanning a line break (a dialogue
+    exchange, an action paragraph the model copied across lines) is verified by
+    the same rule rather than a looser one.
+    """
+    if wanted in lines:
+        return True
+    span = wanted.count(b"\n") + 1
+    if span == 1 or span > len(lines):
+        return False
+    return any(b"\n".join(lines[i:i + span]) == wanted
+               for i in range(len(lines) - span + 1))
+
+
+def _assert_proposal_is_fresh(doc, scene_number: int, replacements) -> None:
+    """Verify every proposal frame against the live working copy, verbatim.
+
+    `/rewrite` hands the SPA candidates cut from a snapshot of one scene, and
+    the writer keeps editing for as long as the model takes to answer. By the
+    time a candidate is accepted the line it was cut from may have been
+    retyped; applying it anyway would overwrite words the writer never saw, in a
+    document whose whole promise is that edits are deliberate. So a frame is
+    applied only while its `old` text still stands in the scene, byte for byte,
+    at the instant the lock is held.
+
+    Reads the scene through `scene_text` — the same serializer `/rewrite` echoed
+    to the client — so the comparison is apples-to-apples with the snapshot the
+    proposal was cut from rather than a second opinion about what the scene
+    says. No strip, no case-fold, no Unicode normalisation anywhere: a
+    whitespace difference IS the manual edit this guard exists to catch.
+
+    Known, bounded limitation: a scene holding two byte-identical lines cannot
+    say which one a frame targets (the payload carries text, not offsets), so a
+    manual edit to the other copy of a duplicated line is not detected here.
+    """
+    lines = scene_text(doc, scene_number).encode("utf-8").split(b"\n")
+    for rep in replacements:
+        if not _still_holds(lines, rep["old"].encode("utf-8")):
+            raise StaleProposalError()
+
+
+def proposal_is_landable(doc, scene_number: int, old: str) -> bool:
+    """True when `old` still stands in the scene verbatim.
+
+    The producer's half of the same predicate: `/rewrite` shows a candidate only
+    if this returns True, `_assert_proposal_is_fresh` refuses the rest, and both
+    answer from `_still_holds` — so the desk can never offer a proposal the
+    apply path will reject, and can never accept one the writer has outrun.
+    """
+    return _still_holds(scene_text(doc, scene_number).encode("utf-8").split(b"\n"),
+                        old.encode("utf-8"))
+
+
 def apply_edit(m, scene_number: int, replacements: list[dict],
                record: dict | None = None) -> dict:
     """Apply line replacements to the working copy as ONE critical section.
@@ -456,6 +937,10 @@ def apply_edit(m, scene_number: int, replacements: list[dict],
     from .jsonio import lock_for
     with lock_for(working_path(m)):
         doc = load_working(m)
+        # Verification and mutation are ONE critical section (BE-1): a pre-check
+        # in the route would read outside this lock and race the very write it
+        # is meant to protect. Raises StaleProposalError before anything moves.
+        _assert_proposal_is_fresh(doc, scene_number, replacements)
         result = apply_replacements(doc, scene_number, replacements)
         if result["applied"]:
             entry = {
@@ -942,6 +1427,10 @@ def finding_statuses(m) -> dict:
     except (FileNotFoundError, json.JSONDecodeError):
         return {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
 
+    # the ids below are the client's keys for these rows: same annotation as
+    # every other reader, so a legacy report's statuses cannot land under ids
+    # nothing else computes
+    report = annotate_report_scene_keys(m, report)
     doc = load_working(m)
     # A quote missing from the working copy only proves writer progress if the
     # line was in the script to begin with. Absence alone is not evidence: the
