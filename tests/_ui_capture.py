@@ -293,7 +293,7 @@ def main():
 
             # ---- dawn (light register) ----------------------------------
             def dawn():
-                page.click("#dawn-btn", timeout=5000)
+                page.click("#status-dawn", timeout=5000)
                 page.wait_for_timeout(1100)
                 shot(page, "25_dawn")
             go(page, "25_dawn", dawn)
@@ -307,7 +307,7 @@ def main():
             def back_to_night():
                 page.keyboard.press("Escape")
                 page.wait_for_timeout(300)
-                page.click("#dawn-btn", timeout=5000)
+                page.click("#status-dawn", timeout=5000)
                 page.wait_for_timeout(800)
             go(page, "27_back_to_night", back_to_night)
 

@@ -1914,8 +1914,8 @@ function savePrefs(patch) {
 
 function applyDawn(dawn) {
   document.body.classList.toggle("dawn", !!dawn);
-  const btn = $("#dawn-btn");
-  if (btn) btn.textContent = dawn ? "🌙 Night" : "☀ Dawn";
+  // Track A section 4: the duplicate sidebar Dawn is gone; #status-dawn is the
+  // single control, so its label is the only one to keep in sync.
   const statusBtn = $("#status-dawn");
   if (statusBtn) statusBtn.textContent = dawn ? "🌙 Night" : "☀ Dawn";
 }
@@ -10202,11 +10202,6 @@ function init() {
   applyReaderMode(prefs.reader);
   applyFocusMode(prefs.focus);
   wireSprint();
-  $("#dawn-btn").addEventListener("click", () => {
-    const dawn = !document.body.classList.contains("dawn");
-    applyDawn(dawn);
-    savePrefs({ dawn });
-  });
   $("#reader-btn").addEventListener("click", () => {
     const on = !document.body.classList.contains("reader-mode");
     applyReaderMode(on);
