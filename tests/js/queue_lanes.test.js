@@ -147,3 +147,58 @@ test('the reason string credits verification without hiding anything', () => {
   const bad = core.rankReasonText(f('dialogue', [1], { verification: { status: 'refuted' } }));
   assert.doesNotMatch(bad, /verified/);
 });
+
+// ---------------------------------------------------------------------------
+// Spec 14.20: the e2e scene-filter fixture's contract, pinned WITHOUT a browser.
+//
+// `tests/e2e_browser_dock_sections.py` migrates P1.7/P1.8 onto the merged Fix
+// Queue, and its assertions about ORDER cannot run here — no Playwright. These
+// are the same expectations against the same functions the browser will call,
+// so a fixture that silently stops discriminating fails in CI instead of on the
+// runner's machine.
+//
+// The fixture is the interesting part. Its two Line-lane rows share a category,
+// so they share IMPACT, and the ONLY thing separating them is the verified
+// term. The verified row is the LOW-severity one, so "highs first" and "rank
+// first" order the pair in OPPOSITE directions. A first draft seeded the
+// verified row as high severity; the assertions passed and proved nothing,
+// because both keys agreed. This test exists so that mistake cannot recur
+// unnoticed.
+test('the scene-filter fixture discriminates: rank beats severity', () => {
+  const mk = (cat, sev, scene, issue, ver) => Object.assign(
+    { category: cat, severity: sev, scene_refs: [scene], issue }, ver ? { verification: { status: ver } } : {});
+  const fixture = [
+    mk('dialogue', 'low', 1, 'SEED low dialogue on 1', 'verified'),
+    mk('dialogue', 'high', 1, 'SEED high dialogue on 1'),
+    mk('structure', 'medium', 2, 'SEED medium structure on 2'),
+    mk('structure', 'high', 2, 'SEED high structure on 2'),
+  ];
+  const cut = core.groupByLane(fixture.map((f, index) => ({ f, index })));
+  const line = cut.groups.line || [];
+
+  assert.equal(line.length, 2, 'the Line lane must hold the fixture pair');
+  assert.ok(line[0].f.issue.startsWith('SEED low'),
+    'the LOW-severity row must lead the Line lane; it leads only because it is verified');
+  assert.ok(line[1].f.issue.startsWith('SEED high'),
+    'the HIGH-severity row must follow. If the fixture is re-seeded so severity and rank agree, these assertions stop proving anything.');
+  assert.ok(core.rankScore(line[0].f) > core.rankScore(line[1].f),
+    'and it must win on rankScore, not by accident of ordering');
+});
+
+test('the fixture ranks lanes by descending max IMPACT, with none forced last', () => {
+  const mk = (cat, scene) => ({ category: cat, severity: 'low', scene_refs: [scene], issue: cat });
+  const cut = core.groupByLane([
+    { f: mk('dialogue', 1), index: 0 }, { f: mk('structure', 2), index: 1 },
+  ]);
+  assert.deepEqual(cut.order.slice(0, 2), ['structure', 'line'],
+    'structure is impact 5 and line is impact 3, so structure leads');
+});
+
+test('the fixture rows each print a reason that names the term that decided it', () => {
+  const f = { category: 'dialogue', severity: 'low', scene_refs: [1],
+    verification: { status: 'verified' }, issue: 'x' };
+  const why = core.rankReasonText(f);
+  assert.match(why, /verified/, 'the verified term is why this row leads and it must be printed');
+  assert.doesNotMatch(why, /severity/i,
+    'severity is an attribute, not a rank term; printing it would imply it sorted the row');
+});

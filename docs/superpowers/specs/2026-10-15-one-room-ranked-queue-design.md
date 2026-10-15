@@ -1278,3 +1278,52 @@ exists in the DOM. **P1.7 and P1.8 must be re-pointed at the Fix Queue panel** �
 categories spanning two IMPACT tiers, assert rank order inside the lane, assert one rendering per
 finding. That is now checkable in its strongest form, because "one rendering per finding" is a
 property of a single surface rather than of an ordering between two.
+
+### 14.24 P1.7 / P1.8 migrated to the merged queue, and what the migration actually found
+
+The migration was **not** a selector re-point. Re-seeding surfaced a hole that would have made every
+assertion meaningless:
+
+> `SEED_JS` set `state.findings` and `state.report.findings` but **not `state.fixQueue.items`**,
+> which is what the Fix Queue renders from. Before the merge that did not matter — the ledger read
+> `report.findings`. After it, the seed left the queue rendering stale server rows and the whole
+> fixture would have been measuring the wrong findings.
+
+`SEED_JS` now populates `state.fixQueue.items`, and the `pacing` seed is gone.
+
+**The fixture now discriminates instead of agreeing with itself.** The old seed gave the two Line-lane
+rows a single unknown category, `"pacing"`, which now lanes to Uncategorised at impact 0 — so the old
+"highs first" assertion had nothing to say. Re-seeded with two **real** categories at two **IMPACT**
+tiers (`structure` 5, `dialogue` 3), which gives lane order and row order as separate things to assert.
+
+**A defect caught before shipping, recorded because it is the kind that passes.** The first draft
+seeded the *verified* row at **high** severity. Every assertion held — and proved nothing, because
+severity and rank happened to order the pair identically. The fixture now seeds the verified row at
+**low** severity, so "highs first" and "rank first" order it in **opposite** directions:
+
+| Lane | Order | Why |
+|---|---|---|
+| Structure | medium, high | both impact 5; index tiebreak |
+| Line | **low (33)**, high (30) | same impact; verified +3 decides it |
+
+So the Line lane leads with its **low**-severity row, which is only correct because rank changed.
+
+**Verified without a browser.** `groupByLane`, `rankScore` and `rankReasonText` were run in node
+against the real `core.js` with the exact seeded fixture, and every expectation holds: lane order
+`['structure','line']`, Line `[low, high]`, scores `33 > 30`, reason
+`"ranked here: Line, impact 3, verified"`, findex set `0,1,2,3`. Those four are now permanent tests
+in `tests/js/queue_lanes.test.js`, so a fixture that stops discriminating fails in CI rather than on
+the runner's machine.
+
+**Also migrated:** the collapse-contract block borrowed `"by-category"` as a **vehicle** for
+dockSection's close/persist/motion behaviour. The vehicle is now `"coverage"` and the content probe
+is generic (`.dock-section-body *`) rather than `.finding-note`, because the merge turned the
+finding-bearing sections into pointers and a collapse test should not depend on which element a body
+contains. Prefs keys follow: `dock_section_coverage`.
+
+**New guard:** `test_the_e2e_does_not_reach_for_the_retired_section_key`. A Playwright locator naming a
+removed key either trips an assertion or, worse, silently stops testing anything — which is how a
+suite can go green against the wrong tree.
+
+**Still unverified:** the DOM selectors themselves. There is no Playwright in this workspace. The
+ordering contract is proven in node; the selectors that read it out of the page are the runner's.

@@ -208,17 +208,46 @@ SEED_JS = """(args) => {
     description: issue + " (seeded for the scene-filter fixture)",
     evidence_quote: quote,
   });
+  // Same, but the verifier scored this citation "verified". rankScore reads
+  // f.verification.status === "verified" for +3, so this is the knob that
+  // separates two rows of equal IMPACT inside one lane.
+  const mkVerified = (cat, sev, scene, quote, issue) =>
+    Object.assign(mk(cat, sev, scene, quote, issue),
+                  { verification: { status: "verified" } });
   const a = args.a, b = args.b;
   const fs = [
-    mk("dialogue", "low", a.scene, a.lines[0], "SEED low dialogue on " + a.scene),
+    // The verified row is seeded at LOW severity on purpose, and the plain row
+    // at HIGH. Same category, so same IMPACT: the only thing that can separate
+    // them in the Line lane is the verified term (+3) in rankScore. So the LOW
+    // severity row has to come FIRST. Under the pre-7 "highs first" contract it
+    // came second, which is precisely what makes this pair an assertion that the
+    // sort key changed rather than a test that happens to pass.
+    // (A first draft seeded the verified row as high severity. It passed — and
+    // proved nothing, because severity and rank agreed. Checked in node against
+    // the real rankScore before shipping; 33 vs 30 the wrong way round.)
+    mkVerified("dialogue", "low", a.scene, a.lines[0], "SEED low dialogue on " + a.scene),
     mk("dialogue", "high", a.scene, a.lines[1], "SEED high dialogue on " + a.scene),
-    // Scene B carries TWO findings of one category on purpose: since P1.8 the
-    // current scene's pair is carded in the scene strip and out of the
-    // categorized list, so the highs-first group has to be a group the scene
-    // strip does NOT claim.
-    mk("pacing", "medium", b.scene, b.lines[0], "SEED medium pacing on " + b.scene),
-    mk("pacing", "high", b.scene, b.lines[1], "SEED high pacing on " + b.scene),
+    mk("structure", "medium", b.scene, b.lines[0], "SEED medium structure on " + b.scene),
+    mk("structure", "high", b.scene, b.lines[1], "SEED high structure on " + b.scene),
   ];
+  // SPEC 14.20, THE FIXTURE HAD A HOLE. The seed set state.findings and
+  // state.report.findings but NOT state.fixQueue.items, which is what the Fix
+  // Queue actually renders from (_fixqueue_items -> state.fixQueue.items).
+  // Before the merge that did not matter because the ledger read
+  // report.findings. After it, a seed that leaves fixQueue alone renders the
+  // queue from stale server rows and every assertion below would have been
+  // measuring the wrong findings entirely. This is the single most important
+  // line in the migrated fixture.
+  state.fixQueue.items = fs.map((f, index) => ({
+    index, finding_id: computeFindingId(f),
+    category: f.category, severity: f.severity, issue: f.issue,
+    description: f.description, evidence_quote: f.evidence_quote,
+    verification: f.verification || null,
+    scene_refs: f.scene_refs, scene_key: f.scene_key || null,
+    scene_heading: "Scene " + f.scene_refs[0], act_name: "Act I",
+    status: "open", dismissed: false, ungrounded: false,
+    contested: false, identity_uncertain: false, why_it_matters: null,
+  }));
   state.findings = fs;
   state.report = Object.assign({}, state.report || {}, { findings: fs });
   state.findingIds = fs.map((f) => computeFindingId(f));
@@ -281,20 +310,29 @@ RAIL_MARKS_JS = """() => {
   });
 }"""
 
-# The cards of one category group, in render order — the highs-first contract.
-GROUP_CARDS_JS = """(label) => {
-  const sec = document.querySelector(
-    '.dock-lens[data-lens="evidence"] .dock-section[data-key="by-category"]');
-  if (!sec) return null;
-  const group = [...sec.querySelectorAll(".dock-cat-group")]
-    .find((g) => {
-      const t = g.querySelector(".dock-section-title");
-      return t && (t.textContent || "").toLowerCase().includes(label.toLowerCase());
-    });
+# SPEC 14.20: the queue IS the ledger. Rows live in `.craft-panel.fix-queue`
+# inside `.dock-lane-group[data-lane]`, and a row is a `.fix-row` carrying the
+# verbs. `.dock-cat-group[data-lane]` is retained as a second selector because
+# the queue rows are wrapped in the same class - the lane identity is what the
+# assertion turns on, not the tag name.
+LANE_CARDS_JS = """(lane) => {
+  const panel = document.querySelector(
+    '.dock-lens[data-lens="evidence"] .craft-panel.fix-queue');
+  if (!panel) return null;
+  const group = panel.querySelector('.dock-lane-group[data-lane="' + lane + '"]');
   if (!group) return null;
-  return [...group.querySelectorAll(".finding-note .finding-note-text")]
-    .map((n) => (n.textContent || "").trim());
+  return [...group.querySelectorAll('.fix-row')].map((r) => ({
+    text: ((r.querySelector('.fix-row-issue') || {}).textContent || '').trim(),
+    reason: ((r.querySelector('.dock-rank-reason') || {}).textContent || '').trim(),
+    findex: r.dataset.findex || null,
+  }));
 }"""
+
+# Lane ORDER as rendered, top to bottom. The queue opens by default, so this is
+# readable without unfolding anything.
+LANE_ORDER_JS = """() => [...document.querySelectorAll(
+    '.dock-lens[data-lens="evidence"] .craft-panel.fix-queue .dock-lane-group')]
+  .map((g) => g.dataset.lane)"""
 
 
 def chip_label(lens):
@@ -308,13 +346,15 @@ def live_cards(lens):
     a finding is carded exactly ONCE (this scene's in the scene strip, the rest
     in the categorized live list), so the ledger's whole card count is the
     number comparable with the counting contract and with the page's ink."""
-    return lens.locator(".finding-note").count()
+    return lens.locator(".craft-panel.fix-queue .fix-row").count()
 
 
 def section_cards(lens, key):
     """Cards inside one ledger section (hidden nodes count: the question is
     WHERE a finding is rendered, not whether it is currently unfolded)."""
-    return lens.locator(f'.dock-section[data-key="{key}"] .finding-note').count()
+    sel = (f'.dock-section[data-key="{key}"] .fix-row' if key == "fix-queue"
+           else f'.dock-section[data-key="{key}"] .finding-note')
+    return lens.locator(sel).count()
 
 
 # The card surface, asked of the DOM rather than of the app's own arithmetic:
@@ -322,16 +362,22 @@ def section_cards(lens, key):
 # sections shows up as one index with two section keys. Before P1.8 the current
 # scene's findings answered as `3:scene-findings+by-category` (and a script-level
 # one as `?:script-level+by-category`) — the spec §5 "not three times" defect.
+# That whole class of defect is gone as of spec 14.20: the ledger and the queue
+# were the same list, and there is now one rendering surface instead of three
+# sections that could disagree about which of them owned a finding.
 LEDGER_DUPES_JS = """() => {
   const seen = {};
-  document.querySelectorAll('.dock-lens[data-lens="evidence"] .finding-note')
+  const dupes = [];
+  document.querySelectorAll('.dock-lens[data-lens="evidence"] [data-findex]')
     .forEach((n) => {
-      const k = n.dataset.findingIndex || "?";
-      const sec = n.closest(".dock-section");
-      (seen[k] = seen[k] || []).push((sec && sec.dataset.key) || "?");
+      const k = n.dataset.findex;
+      if (!k || k === "?") return;
+      const where = n.closest(".dock-section");
+      const key = (where && where.dataset.key) || "?";
+      if (seen[k]) dupes.push(k + " in " + seen[k] + " and " + key);
+      else seen[k] = key;
     });
-  return Object.keys(seen).filter((k) => seen[k].length > 1)
-    .map((k) => `${k} (${seen[k].join(" + ")})`);
+  return dupes;
 }"""
 
 
@@ -366,7 +412,8 @@ def check_scene_filter(page, lens):
           scene is not None, f"currentManuscriptScene()={scene!r}")
     if scene is None:
         return
-    check("P1.7: the ledger's live list is open", open_dock_section(page, "by-category"))
+    check("P1.7: the queue is open (it opens by default; open_dock_section is "
+          "a no-op when it already is)", open_dock_section(page, "fix-queue"))
 
     whole_ledger = page.evaluate(OPEN_ON_SCENE_JS, None)
     whole_cards = live_cards(lens)
@@ -474,7 +521,7 @@ def check_seeded_scene_filter(page, lens):
     page.wait_for_timeout(350)
     check("P1.7/seed: after the re-render the desk is back on scene A",
           str(relanded) == str(scene_a), f"landed on {relanded!r}, wanted {scene_a!r}")
-    check("P1.7/seed: the live section is open", open_dock_section(page, "by-category"))
+    check("P1.7/seed: the queue is open", open_dock_section(page, "fix-queue"))
 
     cards = live_cards(lens)
     ink = page.evaluate(INK_BY_SCENE_JS)
@@ -489,45 +536,69 @@ def check_seeded_scene_filter(page, lens):
     # The ledger has three card sections (this scene / script-level / by
     # category) and before P1.8 a finding on the scene being read was carded in
     # TWO of them — the same heavy card, twice, an empty line apart.
+    # --- P1.8 (spec 14.20, ONE HOME) -------------------------------------
+    # Was: "no finding is carded in two ledger sections", plus a count split
+    # across scene-findings / by-category. Both were statements about ORDERING
+    # between three card surfaces. There is one card surface now, so the
+    # contract is stronger and simpler: every finding renders exactly once, on
+    # the Fix Queue, and the two Tier 2 sections are pointers.
     dupes = page.evaluate(LEDGER_DUPES_JS) or []
-    check("P1.8: no finding is carded in two ledger sections (chip off)",
+    check("P1.8: every finding renders exactly once (chip off)",
           not dupes, "; ".join(dupes))
-    check("P1.8: this scene's findings are carded once, in the scene strip, and "
-          "the categorized list holds only the rest of the script",
-          section_cards(lens, "scene-findings") == 2
-          and section_cards(lens, "by-category") == 2
-          and live_cards(lens) == 4,
-          f"scene={section_cards(lens, 'scene-findings')} "
-          f"live={section_cards(lens, 'by-category')}")
-    check("P1.8: the scene strip stays the 'where, precisely' surface — it holds "
-          "THIS scene's cards",
-          page.evaluate(
-              """(scene) => [...document.querySelectorAll(
-                   '.dock-section[data-key="scene-findings"] .finding-note')]
-                   .every((n) => ((state.findings || [])[n.dataset.findingIndex]
-                                   || {}).scene_refs?.includes(Number(scene)))""",
-              scene_a))
+    check("P1.8: the queue holds all four seeded findings",
+          live_cards(lens) == 4, f"rows={live_cards(lens)}")
+    check("P1.8: the scene section is a POINTER, not a second rendering — it "
+          "states the count and renders no cards",
+          section_cards(lens, "scene-findings") == 0
+          and "Fix queue" in (lens.locator(
+              '.dock-section[data-key="scene-findings"]').first.inner_text() or ""),
+          f"cards={section_cards(lens, 'scene-findings')}")
 
-    group = page.evaluate(GROUP_CARDS_JS, "Pacing") or []
-    check("P1.7: the live groups read highs first",
-          len(group) == 2 and group[0].startswith("SEED high")
-          and group[1].startswith("SEED medium"), f"{group}")
-    check("P1.8: a group the scene strip does not claim keeps every one of its "
-          "cards in the categorized list",
-          len(group) == 2 and section_cards(lens, "by-category") == 2, f"{group}")
+    # --- P1.7 (spec 7): rank order, not severity --------------------------
+    # Was: "the live groups read highs first", seeded with an UNKNOWN category
+    # ("pacing") that now lanes to Uncategorised at impact 0. Re-seeded with two
+    # REAL categories at two IMPACT tiers, and the assertion turned from
+    # severity order onto rank order.
+    line = page.evaluate(LANE_CARDS_JS, "line") or []
+    check("P1.7: inside the Line lane the LOW-severity row outranks the "
+          "HIGH-severity one — the sort key is craft impact, not severity",
+          len(line) == 2
+          and line[0]["text"].startswith("SEED low dialogue")
+          and line[1]["text"].startswith("SEED high dialogue"),
+          f"{line}")
+    check("P1.7: and the reason it won is printed on the row (G6), naming the "
+          "verified term rather than the severity",
+          len(line) == 2 and "verified" in line[0]["reason"]
+          and "severity" not in line[0]["reason"].lower(),
+          f"{line}")
+    check("P1.7: every lane row states why it is ranked where it is (G6)",
+          len(line) == 2 and all(r["reason"] for r in line), f"{line}")
+
+    structure = page.evaluate(LANE_CARDS_JS, "structure") or []
+    check("P1.7: the Structure lane holds its own pair, still in rank order",
+          len(structure) == 2
+          and structure[0]["text"].startswith("SEED medium structure")
+          and structure[1]["text"].startswith("SEED high structure"),
+          f"{structure}")
+
+    lanes = page.evaluate(LANE_ORDER_JS) or []
+    check("P1.7: lanes lead by descending MAX IMPACT — structure (5) above "
+          "line (3) — with no lane forced last",
+          lanes[:2] == ["structure", "line"], f"{lanes}")
+    check("P1.8: each finding carries its own row in the one surface that "
+          "renders findings",
+          sorted(r["findex"] for r in (line + structure)) == ["0", "1", "2", "3"],
+          f"line={line} structure={structure}")
 
     check("P1.7/seed: clicking the chip lands", click_scene_chip(page, lens))
     cards_on = live_cards(lens)
     ink_on = page.evaluate(INK_BY_SCENE_JS)
     check("P1.7/seed: chip on — the list narrows to the current scene's two findings",
           cards_on == 2, f"cards={cards_on}")
-    check("P1.8: chip on — the narrowed ledger is still one card per finding "
-          "(the scene strip claims them; the live list renders none twice)",
+    check("P1.8: chip on — the narrowed queue is still one row per finding",
           not (page.evaluate(LEDGER_DUPES_JS) or [])
-          and section_cards(lens, "scene-findings") == 2
-          and section_cards(lens, "by-category") == 0,
-          f"scene={section_cards(lens, 'scene-findings')} "
-          f"live={section_cards(lens, 'by-category')} "
+          and section_cards(lens, "fix-queue") == 2,
+          f"queue={section_cards(lens, 'fix-queue')} "
           f"dupes={page.evaluate(LEDGER_DUPES_JS)}")
     check("P1.7/seed: chip on — the ink narrows IDENTICALLY (ink count == list count)",
           sum(ink_on.values()) == cards_on == 2
@@ -1651,7 +1722,7 @@ def run(base):
               bool(states) and all(v == "false" for k, v in zip(keys, states)
                                    if k not in ("fix-queue", "context")),
               str(list(zip(keys, states))))
-        for key in ("fix-queue", "by-category", "coverage"):
+        for key in ("fix-queue", "coverage", "livecheck"):
             check(f"the plan's section set includes {key!r}", key in keys, str(keys))
         check("the fix-queue section keeps its hook class",
               lens.locator(".dock-section-fixqueue").count() == 1,
@@ -1685,18 +1756,25 @@ def run(base):
                        return !!s && !s.closest(".dock-section"); }""")
               and lens.locator(".dock-evidence-scene").is_visible())
 
-        # --- 3. by-category: closed → open, for real -------------------------
-        sec = lens.locator('.dock-section[data-key="by-category"]')
-        check("the by-category section exists exactly once", sec.count() == 1, sec.count())
+        # --- 3. a Tier 2 section: closed → open, for real --------------------
+        # The VEHICLE changed, not the contract. This block exercises
+        # dockSection's collapse/persist/motion behaviour; it borrowed
+        # "by-category" only because that section happened to hold cards. It now
+        # borrows "coverage", and the content probe is generic rather than
+        # `.finding-note` — the merge turned the finding-bearing sections into
+        # pointers, and a collapse test should not depend on which kind of
+        # element a section's body happens to contain.
+        sec = lens.locator('.dock-section[data-key="coverage"]')
+        check("the coverage section exists exactly once", sec.count() == 1, sec.count())
         if not sec.count():
             check("the collapse contract was exercised", False,
-                  "no by-category section to open (the checks above failed first)")
+                  "no coverage section to open (the checks above failed first)")
             check("no JS page errors", len(errors) == 0, "; ".join(errors[:3]))
             browser.close()
             checks.finish()
         head = sec.locator(".dock-section-head")
         body = sec.locator(".dock-section-body")
-        card = sec.locator(".finding-note").first
+        card = sec.locator(".dock-section-body *").first
         check("it starts data-open=false", sec.get_attribute("data-open") == "false",
               sec.get_attribute("data-open"))
         check("its body is hidden while closed",
@@ -1714,7 +1792,7 @@ def run(base):
         check("the body is actually shown", body.is_visible())
         check("and so are the cards inside it", card.count() > 0 and card.is_visible())
 
-        stored = page.evaluate(f"() => ({PREFS_JS})['dock_section_by-category']")
+        stored = page.evaluate(f"() => ({PREFS_JS})['dock_section_coverage']")
         check("the open state is written to prefs[dock_section_<key>]",
               stored is True, repr(stored))
 
@@ -1731,7 +1809,7 @@ def run(base):
         open_dock(page)
         page.wait_for_selector('.dock-lens[data-lens="evidence"] .dock-section[data-key]',
                                timeout=20000)
-        sec = lens.locator('.dock-section[data-key="by-category"]')
+        sec = lens.locator('.dock-section[data-key="coverage"]')
         check("the open state survives page.reload()",
               sec.count() == 1 and sec.get_attribute("data-open") == "true",
               sec.get_attribute("data-open") if sec.count() else "no section")
@@ -1742,7 +1820,7 @@ def run(base):
             keyed.nth(i).get_attribute("data-open")
             for i in range(keyed.count())
             if keyed.nth(i).get_attribute("data-key")
-            not in ("by-category", "fix-queue", "context")
+            not in ("coverage", "fix-queue", "context")
         ]
         check("the sections the writer never opened are still closed",
               all(v == "false" for v in others), str(others))
@@ -1760,11 +1838,11 @@ def run(base):
         page.wait_for_timeout(350)
         check("its body is hidden again", not sec.locator(".dock-section-body").is_visible())
         check("the closed state is written back to prefs too",
-              page.evaluate(f"() => ({PREFS_JS})['dock_section_by-category']") is False,
-              page.evaluate(f"() => ({PREFS_JS})['dock_section_by-category']"))
+              page.evaluate(f"() => ({PREFS_JS})['dock_section_coverage']") is False,
+              page.evaluate(f"() => ({PREFS_JS})['dock_section_coverage']"))
 
         # --- 6. motion: the height animation is opt-in -----------------------
-        body_sel = '.dock-section[data-key="by-category"] .dock-section-body'
+        body_sel = '.dock-section[data-key="coverage"] .dock-section-body'
         page.emulate_media(reduced_motion="reduce")
         reduced = transition_duration(page, body_sel)
         check("under prefers-reduced-motion: reduce the body has no height animation",

@@ -191,3 +191,34 @@ def test_the_ranked_queue_leads_the_default_open_surface(app_js: str) -> None:
         "the fix-queue dock section no longer opens by default; the ranked rows "
         "would sit behind a closed header, which is the original fold complaint."
     )
+
+
+E2E_DOCK = os.path.join(ROOT, "tests", "e2e_browser_dock_sections.py")
+
+
+def test_the_e2e_does_not_reach_for_the_retired_section_key() -> None:
+    """Spec 14.20. `by-category` no longer exists in the DOM.
+
+    A selector naming it cannot fail loudly in a Playwright run — a locator that
+    matches nothing either trips an assertion or, worse, is used as a "vehicle"
+    that silently stops testing anything. The 176/0 result the runner withdrew
+    was a suite that ran against the wrong tree; this is the guard that would
+    have made the retirement visible in CI instead.
+    """
+    with open(E2E_DOCK, encoding="utf-8") as fh:
+        lines = fh.readlines()
+    live = [
+        (i + 1, ln.rstrip()) for i, ln in enumerate(lines)
+        if "by-category" in ln and not ln.lstrip().startswith("#")
+    ]
+    # Comments may name it — they are the migration record. CODE may not, in any
+    # form. An earlier version of this guard exempted lines containing
+    # data-key="by-category", which is exactly the selector form it exists to
+    # catch, so the mutation test passed against a vacuous guard.
+    offenders = [(n, t.strip()) for n, t in live]
+    assert not offenders, (
+        "the e2e still references the retired by-category dock section at "
+        f"{offenders}. It was removed at spec 14.20; the ledger moved INTO the "
+        "Fix Queue. Re-point it at the queue, or at another live section if it "
+        "is only a vehicle for the collapse contract."
+    )
