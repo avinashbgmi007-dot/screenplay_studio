@@ -120,7 +120,7 @@ def run():
             # expire while the click is being retried (measured 2026-10-07:
             # this exact click failed CI run 37573662778 while the same SHA
             # passed on the push run). reveal_and_click re-arms per attempt.
-            co_write_clicked = reveal_and_click(page, "#room-cowrite-btn")
+            co_write_clicked = reveal_and_click(page, "#dock-tab-sameer")
             drawer_cls = ""
             for _ in range(20):
                 drawer_cls = page.locator("#room-drawer").get_attribute("class") or ""

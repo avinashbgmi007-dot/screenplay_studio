@@ -255,7 +255,7 @@ def reveal_and_click(page, selector, timeout=4000, attempts=6):
     click times out on a control that is fine.
 
     Measured 2026-10-07 (`C:/tmp/ss_probe/chrome_flake_probe.py`): after a 6s
-    idle, a bare `#room-cowrite-btn`.click() -> TimeoutError; with one
+    idle, a bare `#dock-tab-sameer`.click() -> TimeoutError; with one
     `mouse.move(500, 60)` first -> OK. This is the exact signature that failed
     `smoke` on CI run 37573662778 while the SAME SHA (3c8bc4f) passed on the push
     run and the suite passed locally — a flake, not a regression.
@@ -264,7 +264,7 @@ def reveal_and_click(page, selector, timeout=4000, attempts=6):
     Still a real pointer click: if the control genuinely cannot be clicked, this
     returns False and the caller's assertion fails. Bounded, like `clicked()`.
 
-        if not reveal_and_click(page, "#room-cowrite-btn"):
+        if not reveal_and_click(page, "#dock-tab-sameer"):
             check("partner drawer: the Co-write control was reachable", False, "")
     """
     for _ in range(attempts):

@@ -130,7 +130,7 @@ def run(base):
         # --- Premise Doctor on demand (idea room routes feedback → premise) ----
         # the app exposes the doctor via the room toggle in idea mode
         doctor_reachable = page.evaluate("""() => {
-            const b = document.getElementById('room-feedback-btn');
+            const b = document.getElementById('room-evidence-btn');
             return !!b && b.offsetParent !== null;
         }""")
         check("Premise Doctor reachable from the idea room (on demand)", doctor_reachable)

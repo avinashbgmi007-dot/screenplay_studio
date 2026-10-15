@@ -30,7 +30,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import requests  # noqa: E402
-from e2e_browser_common import studio_headers, Checks, launch, open_studio, assert_no_js_errors  # noqa: E402
+from e2e_browser_common import studio_headers, Checks, launch, open_studio, assert_no_js_errors, reveal_and_click  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 for _s in (sys.stdout, sys.stderr):
@@ -217,6 +217,33 @@ def main():
             # scene anchor too — hence "contains", not "ends with".
             check("switching to the Consultant's Desk is in the address bar",
                   f"/{project}/feedback" in desk["hash"], desk["hash"] + settled)
+
+            # ---------- Track A section 2: the replacement control routes -------
+            # The assertion above calls setRoom('feedback') DIRECTLY, so it
+            # passes even when nothing a writer can click produces that route —
+            # which was the defect: the old Feedback tab forced
+            # setRoom("cowrite") and wrote /cowrite into the hash. This block
+            # closes that hole by driving the real control.
+            #
+            # Ship condition: #room-evidence-btn, clicked, leaves the address
+            # bar on /feedback. If this fails, the tablist deletion cut the
+            # product's only visible route to the Evidence lens.
+            # No `if page.locator(...).count()` guard here on purpose. A guard
+            # would let this block skip itself and still print PASS if the
+            # control were missing — which is precisely the regression this
+            # asserts against. Track A section 2 promises the control exists,
+            # so its absence must fail loudly.
+            reveal_and_click(page, "#room-evidence-btn")
+            settled = settle(
+                page,
+                settled_when(
+                    f"location.hash.indexOf('/' + {P} + '/feedback') !== -1"),
+                3000, "the Evidence control put /feedback in the address bar")
+            desk = reading(page)
+            check("clicking the Evidence control writes /feedback, not /cowrite",
+                  f"/{project}/feedback" in desk["hash"]
+                  and f"/{project}/cowrite" not in desk["hash"],
+                  desk["hash"] + settled)
 
             # ---------- a deep link lands where it says -----------------------
             page.goto(route_of(base, f"{project}/revision"))

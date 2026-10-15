@@ -242,7 +242,7 @@ def main() -> None:
             # wake the chrome before the top-bar click (same pattern) — re-armed
             # per attempt, because a single mouse.move can lose the race against
             # the 4s idle-hide on a slow runner (see reveal_and_click).
-            reveal_and_click(page, "#room-cowrite-btn")
+            reveal_and_click(page, "#dock-tab-sameer")
             # The script room auto-collapses the shelf (wireframe contract: the
             # manuscript owns the room, no permanent left nav). Reopen it from
             # its edge tab before hovering a control that lives inside it.

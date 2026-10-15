@@ -1795,12 +1795,15 @@ function setIdeaLens(room) {
   }
   const chip = $("#room-chip");
   if (chip) chip.textContent = room === "feedback" ? "📋 Concept Validation" : "✍️ Idea Room";
-  const cowriteBtnEl = $("#room-cowrite-btn");
-  const feedbackBtnEl = $("#room-feedback-btn");
-  cowriteBtnEl.classList.toggle("active", room === "cowrite");
-  feedbackBtnEl.classList.toggle("active", room === "feedback");
-  cowriteBtnEl.setAttribute("aria-selected", room === "cowrite" ? "true" : "false");
-  feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
+  // Track A section 2: one room control, not two tabs. It is no longer a
+  // tab (role="tablist" and aria-selected are gone), so it reports pressed
+  // state instead. These two lines were UNGUARDED dereferences of the deleted
+  // buttons and would have thrown on every room change.
+  const evBtn = $("#room-evidence-btn");
+  if (evBtn) {
+    evBtn.classList.toggle("active", room === "feedback");
+    evBtn.setAttribute("aria-pressed", room === "feedback" ? "true" : "false");
+  }
   setDrawerIdentity(room, true);
 }
 
@@ -2617,12 +2620,15 @@ function setRoom(room) {
   setDrawerIdentity(room, false);
   const chip = $("#room-chip");
   if (chip) chip.textContent = room === "feedback" ? "📋 Consultant's Desk" : "✍️ Writer's Desk";
-  const cowriteBtnEl = $("#room-cowrite-btn");
-  const feedbackBtnEl = $("#room-feedback-btn");
-  cowriteBtnEl.classList.toggle("active", room === "cowrite");
-  feedbackBtnEl.classList.toggle("active", room === "feedback");
-  cowriteBtnEl.setAttribute("aria-selected", room === "cowrite" ? "true" : "false");
-  feedbackBtnEl.setAttribute("aria-selected", room === "feedback" ? "true" : "false");
+  // Track A section 2: one room control, not two tabs. It is no longer a
+  // tab (role="tablist" and aria-selected are gone), so it reports pressed
+  // state instead. These two lines were UNGUARDED dereferences of the deleted
+  // buttons and would have thrown on every room change.
+  const evBtn = $("#room-evidence-btn");
+  if (evBtn) {
+    evBtn.classList.toggle("active", room === "feedback");
+    evBtn.setAttribute("aria-pressed", room === "feedback" ? "true" : "false");
+  }
   $("#cowrite-panel").style.display = room === "cowrite" ? "flex" : "none";
   // (the legacy #feedback-panel is an empty retired marker div — Option A+;
   // the Feedback room's conversation lives in #room-drawer + the dock lenses)
@@ -8422,7 +8428,10 @@ function closeRevisionView() {
 // and the dock carries both partners — one real manuscript, no shrunken
 // clone, one ledger. The old 3-panel #feedback-view was deleted in P0.1.
 async function openFeedbackView() {
-  if (state.view !== "cowrite") setRoom("cowrite");
+  // Track A section 2: the forced `setRoom("cowrite")` is gone. It made the
+  // Feedback tab show the Co-write panel and write /cowrite to the hash, which
+  // contradicted `state.view === "feedback"` and defeated the route the
+  // deep-links test pins. The caller now chooses the room.
   if (state.currentProject && !state.script) {
     try { await loadScriptData(); } catch (e) { showError("Could not load the script: " + e.message); }
   }
@@ -10517,9 +10526,13 @@ function init() {
   });
 
   // rooms
-  $("#room-cowrite-btn").addEventListener("click", openCowriteRoom);
-  $("#room-feedback-btn").addEventListener("click", () => {
-    if (state.currentProject) openFeedbackView();
+  // Track A section 2: the replacement Evidence control drives setRoom
+  // ("feedback") FIRST, so buildRoute() emits #/<project>/feedback — the route
+  // deep_links.py:209 has always asserted. openFeedbackView() no longer
+  // overrides it. openFeedbackRoom() still covers the idea room, where there
+  // is no project to route to.
+  $("#room-evidence-btn").addEventListener("click", () => {
+    if (state.currentProject) { setRoom("feedback"); openFeedbackView(); }
     else openFeedbackRoom();
   });
   // Track A section 3: the gutter tab handlers are deleted with the gutter.

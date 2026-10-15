@@ -150,10 +150,18 @@
         <div id="branch-switcher" class="branch-switcher"></div>
       </div>
       <div class="project-bar-right">
-        <div id="room-toggle" class="room-toggle" role="tablist" aria-label="Rooms">
-          <button id="room-cowrite-btn" class="room-toggle-btn active" role="tab" aria-selected="true" aria-controls="cowrite-panel" type="button">Co-write</button>
-          <button id="room-feedback-btn" class="room-toggle-btn" role="tab" aria-selected="false" aria-controls="room-drawer" type="button">Feedback</button>
-        </div>
+        <!-- Track A section 2: the two-tab room tablist is deleted. The Feedback
+             tab called openFeedbackView(), which forced setRoom("cowrite") and
+             then opened the Evidence lens — so clicking "Feedback" wrote
+             /cowrite into the address bar and showed the Co-write panel. Both
+             tabs landed in the same physical room.
+
+             The replacement is ONE control, labelled by what it opens rather
+             than by which room it teleports you to, and it drives the route the
+             deep-links test has always pinned. Sameer is reachable from the dock
+             lens (#dock-tab-sameer); the doctor from #dock-tab-sushruta. -->
+        <button id="room-evidence-btn" class="room-evidence-btn" type="button"
+                title="Open the Evidence lens — every finding, ranked">Evidence</button>
         <span id="room-chip" class="room-chip">Writer's Desk</span>
         <button id="palette-btn" class="palette-btn" title="Command palette (Ctrl+K)" type="button">⌘K</button>
       </div>
@@ -418,7 +426,9 @@
         </div>
 
       <!-- Co-write room: the writer's desk -->
-      <section id="cowrite-panel" class="room-panel" role="tabpanel" aria-labelledby="room-cowrite-btn">
+      <!-- Track A section 2: a plain panel, not a tabpanel. There is no tablist
+           left to label it, and aria-labelledby pointed at a deleted id. -->
+      <section id="cowrite-panel" class="room-panel">
         <div id="partner-card" class="partner-card">
           <span class="avatar">S</span>
           <span class="partner-name">Sameer — AI writing partner</span>
@@ -447,8 +457,8 @@
            Evidence lens, reachable only by deep link. The Feedback room now
            hosts the partner conversation and the drawer only; every findings
            surface is the dock's Evidence lens (Tier 1 worklist / Tier 2
-           context). aria-controls on #room-feedback-btn now points at
-           #room-drawer, which is what the button actually opens. -->
+           context). Track A section 2 deleted the room tablist, so the
+           aria-controls note that used to sit here is retired with it. -->
       <div id="feedback-panel" style="display:none;"></div>
       </div>
 

@@ -48,7 +48,7 @@ METRICS = """() => {
   const de = document.documentElement;
   const c = document.getElementById('manuscript-container');
   const page = document.querySelector('.scene-page');
-  const btn = document.getElementById('room-cowrite-btn');
+  const btn = document.getElementById('room-evidence-btn');
   const body = document.body;
   return {
     dpr: window.devicePixelRatio,

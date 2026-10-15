@@ -1063,8 +1063,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
 }
 .project-bar-right { display: flex; align-items: center; gap: var(--sp-6); }
 
-.room-toggle { display: flex; background: var(--ink-800); border: 1px solid var(--line); border-radius: var(--r-pill); padding: var(--sp-1); gap: var(--sp-1); }
-.room-toggle-btn {
+/* Track A section 2: the pill-shaped room tablist is gone. One control, the
+   same pill geometry and the same active state, so the project bar keeps its
+   rhythm without advertising two rooms. */
+.room-evidence-btn {
   font-family: var(--font-typewriter);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -1075,8 +1077,8 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.room-toggle-btn:hover { color: var(--text); }
-.room-toggle-btn.active {
+.room-evidence-btn:hover { color: var(--text); }
+.room-evidence-btn.active {
   background: var(--accent);
   color: var(--accent-ink);
   box-shadow: 0 0 16px -2px var(--glow-strong);
@@ -3615,7 +3617,7 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
   #beatboard-view, #compare-view, #palette-modal, #settings-modal,
   #rewrite-modal, #desk-toolbar, #draft-bar, #diff-banner,
   #composer, .note-add, .finding-note-actions, #project-bar,
-  #room-toggle, #room-chip, #partner-card, #feedback-tabs,
+  #room-chip, #partner-card, #feedback-tabs,
   .note-mine-actions, #print-btn, #undo-btn, #redo-btn, #reset-edits-btn,
   #cowrite-panel, #feedback-panel, #status-strip,
   #manuscript-workspace { display: block !important; }
