@@ -800,3 +800,90 @@ A first mutation attempt was itself wrong — it neutered the *fixture's* assert
 True`, which passes trivially and tests nothing. The mutation has to break the guard's lookup,
 not the test's expectation. Worth recording because it is the same shape as the arc's standing
 error: a check that cannot fail looks identical to a check that passes.
+
+---
+
+## §13. Track B falsifier: two real finding categories have no lane and no IMPACT value
+
+Run before writing any Track B code, per the discipline adopted after §12.8: every file-and-line
+claim in a spec gets opened before the spec lands, not after a runner measures around it. §1's
+seven cited claims were opened. Five held exactly. Two drifted. Opening them surfaced a
+shippable-blocking defect in Track B's own premise.
+
+### 13.1 The claim audit
+
+| Claim | Cited | Actual | Verdict |
+|---|---|---|---|
+| `FINDING_CATEGORIES`, eight of them | `grammar.py:45-48` | exact, 8 | ✅ |
+| "Flag, don't drop" | `AGENTS.md:66` | exact | ✅ |
+| `SCRIPT_LEVEL_CATEGORIES` contains `character` | `pipeline.py:589` | exact | ✅ |
+| `CATEGORY_LABELS` | `app.js:4232` | `app.js:4230` | ⚠️ drift, and **11 entries** |
+| `findingOnScene` tests numeric and string refs | `app.js:6978-6981` | `app.js:6981-6985` | ⚠️ drift, claim holds |
+| `findingPassesFilter` is the one predicate | `app.js:6964-6973` | `app.js:6971+` | ⚠️ drift, claim holds |
+| `findingFilter.category` is a single-category filter | `app.js:6970` | `app.js:6975` | ⚠️ drift, claim holds |
+
+Every line number in §1.2–§1.4 is off by 2–7 lines. The **claims** survive; only the coordinates
+are stale. That is the cheap failure. The expensive one is what the `CATEGORY_LABELS` drift
+exposed.
+
+### 13.2 The defect: `voice` and `subtext` are real finding categories
+
+`CATEGORY_LABELS` (`app.js:4230`) names **eleven** categories. `FINDING_CATEGORIES`
+(`grammar.py:45-48`) names **eight**. The two extras are `voice` and `subtext`, and they are not
+vestigial labels:
+
+- `screenplay_analyzer/voice.py:130, 217` emit `"category": "voice"` (voice-bleed, idiolect drift).
+- `screenplay_analyzer/voice.py:253` emits `"category": "subtext"` (on-the-nose dialogue).
+- `pipeline.py:1331-1341` runs all three analyses, so these findings are **reachable in
+  production**, not dormant code.
+- `report.py:52-53` maps both, with a comment recording that they "existed in
+  `report.findings.json` and the Fix Queue but silently never rendered."
+
+### 13.3 It is already a live invariant violation, not a Track B concern
+
+`tests/test_finding_integrity_gate.py:208-222` pins
+`test_gate_never_emits_a_category_outside_the_taxonomy`: every delivered finding's category must
+be in `FINDING_CATEGORIES`. That test passes — but only because its three hand-built rows never
+include `voice` or `subtext`. **The invariant is not enforced on real output.**
+
+Executed directly against the gate:
+
+```
+gate_findings([{category: "voice"}, {category: "subtext"}])
+  -> delivered categories: ['voice', 'subtext']
+  -> in FINDING_CATEGORIES:  False, False
+  -> VIOLATIONS: ['voice', 'subtext']
+```
+
+Ordering confirms it cannot be caught upstream: the voice passes run at `pipeline.py:1331-1341`,
+`FindingIntegrityGate().run(...)` at `pipeline.py:1756-1757`. The gate runs **after**, and
+normalizes only one out-of-taxonomy label — `scene` → `scene_function`
+(`finding_integrity.py:611-615`), with a comment saying `"scene" was never in FINDING_CATEGORIES`.
+The gate has precedent for this exact repair and missed the two legitimate categories.
+
+### 13.4 Why this blocks Track B as specified
+
+1. **§1.2 has no lane for them.** The lane table is explicitly "the disposition of all eight
+   `FINDING_CATEGORIES`". A `voice` finding satisfies the membership principle (it has
+   `scene_refs`), so it is queued — and lands in no lane.
+2. **§1.3 scores them `NaN`.** `IMPACT` has eight entries. `IMPACT["voice"]` is `undefined`,
+   `undefined × 10` is `NaN`, and `NaN` in a sort comparator is unspecified behaviour.
+3. **"Every finding gets exactly one home" is already false** for these rows before Track B
+   writes a line.
+
+### 13.5 The decision Track B cannot skip
+
+Not a number to tune — a taxonomy question, and the three real options differ in blast radius:
+
+| Option | Effect | Risk |
+|---|---|---|
+| **A.** Add `voice`, `subtext` to `FINDING_CATEGORIES` | fixes lanes, IMPACT, and the gate invariant in one move | `grammar.py:76` builds the LLM findings grammar from this list, so the model is newly *invited* to emit voice/subtext as observation findings, duplicating the deterministic passes. Needs a read-only distinction. |
+| **B.** Leave the grammar alone; extend only §1.2 lanes and §1.3 `IMPACT` | smallest change, no LLM surface touched | leaves the gate invariant violated; two category sources stay permanently split |
+| **C.** Deterministic passes write their own category namespace (`voice_bleed`, `subtext_flag`) | cleanest separation, no grammar collision | renames categories across report, queue, and any pinned test |
+
+**Recommendation: B, with the gate invariant amended to admit deterministic-pass categories
+explicitly.** It is the only option that does not change what the model is asked to produce, and
+the gate defect is then a named, tested exception rather than an unenforced invariant.
+
+Track B does not start until this is decided. Writing `IMPACT` against a taxonomy that cannot
+rank a tenth of its own rows is how a ranking ships broken.
