@@ -184,6 +184,40 @@ it is sorted by something nobody can audit.
 
 ---
 
+### 1.6 Cross-lane read order (the gap in "rows 1–5 are the rewrite order")
+
+Ranking runs **within** a lane (§1.3) and lanes carry **equal** visual weight (§1.2). So "rows 1–5
+are the rewrite order" is true inside one lane and **undefined across** them. Stated:
+
+> **Cross-lane order is the lane's maximum `IMPACT`, descending. It is not a second hand-authored
+> list — it is the same constant table, projected.**
+
+| Lane | Max IMPACT | Read position |
+|---|---|---|
+| Structure | 5 (`structure`, `plot_thread`) | 1st |
+| Line | 3 (`dialogue`, `scene_function`) | 2nd |
+| Deterministic | 2 (`continuity`) | 3rd |
+| Observation | 1 (`theme`, `genre`) | not queued; its own surface |
+
+**One table, two projections.** `IMPACT` already orders within a lane; it now also orders the lanes.
+There is no second place to keep in sync, which is the property that matters.
+
+Three properties this buys, stated so they are testable:
+
+1. **Stable across runs.** Lane order is fixed by the table, never recomputed per script. A queue that
+   reorders itself between sessions cannot be learned.
+2. **Structure first is the writer's own claim.** Expert D's ordering ("what actually kills a script,
+   in the order I care": turn → exposition → passivity → dangling setup → inert scenes) is upstream
+   of line work. Fixing lines in a structurally broken script discards the work.
+3. **Calibration moves both projections together.** If §9 concludes dialogue outranks structure,
+   the table changes and within-lane rank *and* cross-lane order move with it. No second edit.
+
+**Tiebreak:** equal lane maxima fall back to declaration order in the lane table. Declared, not
+discovered.
+
+**G9 (acceptance):** the rendered queue's lane headers appear in descending max-`IMPACT` order, and
+the order is byte-identical across two loads of the same script.
+
 ## §2. Delete the room tablist (#1)
 
 **Delete** `#room-toggle`, `#room-cowrite-btn`, `#room-feedback-btn`, `#room-chip`
@@ -202,6 +236,46 @@ opens."* (`index.html:448-449`).
 **Replacement:** one control, labelled by what it opens, not by which room it teleports you to.
 Keyboard `f` (`app.js:9324`) and the palette entry both keep working and now mean the same thing as
 the button. `#cowrite-panel` becomes a plain panel, not a tabpanel.
+
+#### The route-preservation corollary, and the defect it uncovered
+
+Corollary raised in review: the deep-links test pins `/feedback` in the hash, so the replacement
+control **must drive the same route**, or the spec's own "textually unmodified" ship condition fails.
+
+Following it surfaced something larger. **Today, nothing a user can click writes `/feedback`.**
+
+The chain, verified end to end:
+
+1. `buildRoute()` derives the hash from `state.view` — `app.js:2273-2274`.
+2. The Feedback button calls `openFeedbackView()` — `app.js:10528-10531`.
+3. `openFeedbackView()` forces `setRoom("cowrite")` — `app.js:8427`.
+4. `setRoom` → `saveSession()` → `syncRoute()` — `app.js:2237`.
+5. `buildRoute()` therefore emits **`#/project/cowrite`**.
+
+So clicking "Feedback" writes **`/cowrite`** into the address bar. The deep-links test
+(`deep_links.py:209`) passes only because it calls `setRoom('feedback')` **directly**, bypassing the
+click handler — it pins a route the product's own visible control does not produce. `app.js:2259`
+states the governing principle: *"The hash is DERIVED from `state`, never the source of truth."*
+That principle is what makes this a real defect rather than a naming preference: `state.view` is
+`"cowrite"` while the URL says `feedback`.
+
+**Fix, in §2:** the replacement control drives **`setRoom("feedback")` then `openDock("evidence")`**,
+not `openFeedbackView()`. `openFeedbackView()` keeps only its load half
+(`loadScriptData()` when `!state.script`, `app.js:8428-8430`) and loses the `setRoom("cowrite")` line.
+
+Side effect, and a desirable one: `setRoom("feedback")` hides `#cowrite-panel`
+(`app.js:2634`), which is what the two rooms actually mean. Forcing `cowrite` was the vestigial half
+of the tablist: it kept showing the Co-write panel inside the "Feedback" room.
+
+**Now check the corollary's second horn:** `openViewByName("feedback")` routes through
+`openFeedbackView()` (`app.js:2338`), and its comment claims the deep link "redirects to the desk +
+the Evidence lens". `syncRoute()` early-returns while `routeApplying` is true (`app.js:2285`), so a
+URL arrival keeps the `/feedback` hash while showing the Co-write room. The comment says redirect;
+the hash does not move. That divergence closes when the `setRoom("cowrite")` line goes.
+
+**Ship condition, tightened:** `deep_links.py:209` unmodified **AND** clicking the replacement
+control results in `location.hash === "#/<project>/feedback"`. The second clause is new and is the
+one the existing test cannot catch.
 
 **Test migration (falsifier 3, §0.1 — required, not optional):**
 
@@ -286,6 +360,8 @@ dock geometry. Each is a hard assertion, not a screenshot.
 | G6 | every fix-queue row renders its rank-reason string (§1.5) |
 | G7 | lane headers for all present lanes, and **no lane header is below the fold** |
 | G8 | the existing `by-category` assertions in `tests/e2e_browser_dock_sections.py` (21 references) still pass |
+| G9 | lane headers render in descending max-`IMPACT` order and the order is identical across two loads of the same script (§1.6) |
+| G10 | **clicking the replacement control yields `location.hash === "#/<project>/feedback"`** — the clause `deep_links.py:209` cannot catch (§2) |
 
 **Tier 1 contents enumerated for G5**, per §0.2 — arrival strip, ambiguous-marks notice, filter row
 (severity + This-scene + loop), current-scene box, then the lane-grouped queue. The Top-5 stack and
