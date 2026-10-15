@@ -22,6 +22,8 @@
 | #10 promote "What's working" | Already renders (`app.js:7446-7451`); it is a Tier 2→Tier 1 move with its own scope. |
 | #12 the writer's letter | Needs the writer sitting (`docs/REAL_WRITER_VALIDATION.md`). |
 | **Severity semantics** (D2's charge: severity conflates model confidence with craft cost) | **Analyzer-side.** Deliberately *not* silently dropped. Agreement #6 below partially answers it and says exactly where the rest lives. |
+| **Verdict line in Tier 1** (two-agent panel's clash-2 ruling) | **Unfunded as written** — see §0.2. Its budget included deleting arrival arithmetic, which agreement #11 protects. |
+| **Top-5 rewrite-order stack** | **Declined** — it is the ranked queue's rows 1–5. A second home for five rows is the defect, not the feature (§0.2). |
 
 **Falsifiers. Agreement #13 ("no rewrite") falls if any of these is true, checked before §2:**
 
@@ -29,10 +31,67 @@
    `#context-dock`'s width transition, `style.css:5507-5516`).
 2. §1 or §7 requires a new field on the finding object that whole-row dedupe would silently drop
    (`screenplay_analyzer/dedupe.py:242` keys on `json.dumps(f, sort_keys=True)`).
-3. §2–§5 requires editing a `role="tablist"` / `aria-controls` pair that
-   `tests/e2e_browser_deep_links.py` or `tests/e2e_browser_one_matcher.py` pins.
+3. ~~§2–§5 requires editing a pinned `role="tablist"` / `aria-controls` pair.~~
+   **FIRED — see §0.1. Agreement #13 survives, narrowed.**
 
 ---
+
+### §0.1 Falsifier 3 result: it fired, on four sites, and agreement #13 survives
+
+The first draft asserted falsifier 3 before checking it. Checked, it fires.
+
+`setRoom` is driven **by name** and is load-bearing in three roles unrelated to the tablist:
+
+| Role | Evidence |
+|---|---|
+| **Route verb** — deep links must keep working | `tests/e2e_browser_deep_links.py:209` drives `setRoom('feedback')` then asserts `location.hash` contains `/feedback` |
+| **Return stack** for four full-screen tools | `setRoom(premisePrevRoom)` `app.js:1842`, `setRoom(comparePrevRoom)` `:8307`, `setRoom(revisionPrevRoom)` `:8420`, `setRoom(bbPrevRoom)` `:8738` |
+| **Idea-room lens switch** | `applyIdeaLens(room)` inside `setRoom` (`app.js:2614`) |
+
+Driving sites, not one but four:
+
+- `tests/e2e_browser_deep_links.py:209` — `setRoom('feedback')` + route assertion
+- `tests/e2e_browser_phase12_visual_motion.py:235` — `setRoom('feedback')`
+- `tests/e2e_browser_phase12_visual_motion.py:245` — `setRoom('cowrite')`
+- `tests/e2e_browser_readiness_gate.py:563` — `setRoom('feedback'); openRoomDrawer()`
+
+**Ruling: the falsifier fires, but it falsifies the *UI* cut, not the function.** `setRoom` is the
+router's verb and the full-screen tools' stack discipline. **It survives intact.** §2 deletes the
+tablist that *drove* it, never `setRoom` itself.
+
+**Agreement #13 status: survives, narrowed.** The original claim was "everything ships as deletion
+or unification, no rewrite." The narrow, accurate claim is **no new state machine.** §2's cost is
+migrating four tests from "drive `setRoom`, expect tablist ARIA" to "drive `setRoom`, expect dock
+Evidence lens." The route assertion at `deep_links.py:209` must pass **unchanged**.
+
+That is what the falsifier was for. It fired, the cost is named, and the spec is corrected in text
+rather than discovered in CI.
+
+### §0.2 Tier-1 contents: the Top-5 and the verdict line are resolved, not omitted
+
+An earlier draft left Tier 1's contents under-specified while G5 asserted a height against them.
+Both disputed blocks are now disposed of, and neither disposition is "forgot it."
+
+**Top-5 rewrite-order stack: DECLINED, because the ranked queue already is one.** After §1.3 the
+queue is ordered by craft impact, verification, span, and writer intent. **Rows 1–5 are the rewrite
+order.** Rendering a separate Top-5 block above the queue draws the same five findings twice on one
+surface, which is the multi-surface duplication this entire spec exists to remove
+(`docs/debates/2026-10-15_critique-two-agent-panel.md` §1). A second home for five rows is the
+defect, not the feature.
+
+**Verdict line (coverage + logline + counts): DEFERRED, and the cross-panel conflict is named.**
+The two panels ruled opposite. The four-expert panel's agreement #9 puts the Coverage verdict, logline
+test and comparables **out** of the primary path. The two-agent panel's clash-2 ruling put a verdict
+line **in** Tier 1 — funded by deleting *"the arrival strip's arithmetic, the ghosted details, and
+the category chips."*
+
+**That funding is void.** This spec deletes the category chips (§7) but **keeps** the arrival
+strip, because agreement #11 keeps it, and that question was independently endorsed as settled.
+One third of clash-2's budget is protected, so the ruling is unfunded as written. G5 is therefore
+asserted against a Tier 1 that does not gain two blocks.
+
+**If the verdict line is wanted later, it is a new argument with new funding** — not a line item
+carried over from a ruling that can no longer pay for it.
 
 ## §1. Queue membership, lanes, and rank v0
 
@@ -128,7 +187,11 @@ it is sorted by something nobody can audit.
 ## §2. Delete the room tablist (#1)
 
 **Delete** `#room-toggle`, `#room-cowrite-btn`, `#room-feedback-btn`, `#room-chip`
-(`index.html:151-156`) and every `setRoom()` caller that exists only to service it.
+(`index.html:151-156`).
+
+**`setRoom()` SURVIVES.** It is the router's verb and the return stack for four full-screen tools
+(§0.1). Only the tablist goes. Deleting `setRoom` would break four deep-link-driving tests and the
+`prevRoom` restore path for Premise, Compare, Revision and Beat Board.
 
 **Evidence this is vestigial:** `openFeedbackView()` (`app.js:8426-8431`) does
 `setRoom("cowrite")` then `openDock("evidence")` — the Feedback tab *moves the writer into the
@@ -140,7 +203,17 @@ opens."* (`index.html:448-449`).
 Keyboard `f` (`app.js:9324`) and the palette entry both keep working and now mean the same thing as
 the button. `#cowrite-panel` becomes a plain panel, not a tabpanel.
 
-**Touches:** `role="tablist"`/`aria-controls` pairs. **Check falsifier 3 first.**
+**Test migration (falsifier 3, §0.1 — required, not optional):**
+
+| Site | Before | After |
+|---|---|---|
+| `e2e_browser_deep_links.py:209` | `setRoom('feedback')` + hash assertion | **unchanged** — the route assertion must keep passing verbatim |
+| `e2e_browser_deep_links.py:76` (docstring) | documents route-sync timing around `setRoom` | unchanged; `setRoom` is untouched |
+| `e2e_browser_phase12_visual_motion.py:235, :245` | drive `setRoom`, assert motion/ARIA | re-point the assertion at the dock Evidence lens; keep the motion timing checks |
+| `e2e_browser_readiness_gate.py:563` | `setRoom('feedback'); openRoomDrawer()` | keep both calls; the readiness gate does not depend on the tablist |
+
+**Ship condition for §2:** all four sites green, with `deep_links.py:209` **textually unmodified**.
+If that one assertion has to change to make §2 pass, §2 has cut something it should not have.
 
 ## §3. Delete the gutter (#2)
 
@@ -209,10 +282,14 @@ dock geometry. Each is a hard assertion, not a screenshot.
 | G2 | exactly one element with id `status-dawn` |
 | G3 | `#desk-analyze-btn` computed `opacity === 1` with a project open and the pointer parked away from the top edge |
 | G4 | fix-queue filter row chip count `<= 6` (severities + This-scene + loop) |
-| G5 | **Tier 1 first actionable queue row has `getBoundingClientRect().bottom < 900`** at 1440×900, dock open |
+| G5 | **Tier 1 first actionable queue row has `getBoundingClientRect().bottom < 900`** at 1440×900, dock open — measured against the **enumerated** Tier 1 of §0.2, not an assumed one |
 | G6 | every fix-queue row renders its rank-reason string (§1.5) |
 | G7 | lane headers for all present lanes, and **no lane header is below the fold** |
 | G8 | the existing `by-category` assertions in `tests/e2e_browser_dock_sections.py` (21 references) still pass |
+
+**Tier 1 contents enumerated for G5**, per §0.2 — arrival strip, ambiguous-marks notice, filter row
+(severity + This-scene + loop), current-scene box, then the lane-grouped queue. The Top-5 stack and
+the verdict line are **not** in that list, by ruling, not by omission.
 
 G5 is the one the panel could not previously make. It is measurable **today** because the instrument
 exists.
