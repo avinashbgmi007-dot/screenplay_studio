@@ -4268,6 +4268,7 @@ browser job's to run on the PR.
 * Eval overlap fallback hardened twice: content-tokens-only + ≥2-token minimum (killed the "3 mints"→"3" false hit), then glue-word stopwords (killed the "money within the parcel"→{"the","within"} false hit).
 * Rescored matrix, every MISS verified genuine by text search: gunpen 5/5, 3/5 (acc8: zero countdown text anywhere, no article-chain row — real recall gaps), 5/5; pain3 3/5 (no debt content, silence content differed), 5/5.
 * Suite: 2208 passed + 3 skipped; ruff clean; eval selftest OK.
+* Post-merge flake audit (2026-10-15): the two test-browser-windows reds (ideas_v3 reload-resume, phase14 drawer-open) are fixed-sleep-before-async-state assertions (600–2000ms sleeps guarding restore fetch, debounce, and drawer animation; sibling checks in the same files use 8–20s condition waits). Timing-dependent by construction, unrelated to this branch (neither touches chat/ideas code paths) — identical rerun green confirms. Merge stands.
 
 ### 2026-10-12 — Time-pressure seeder (first recall-side fix)
 * Ledger audit of acc8 gunpen showed the countdown beat ("Inka 3 mints / 00:00") in neither findings nor ledger: a countdown in dialogue is neither a KG prop nor a promise, so the ledger was never asked. The article thread, by contrast, was covered by a paid ledger entry — findings-only eval was blind to it.
