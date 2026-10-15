@@ -4376,7 +4376,11 @@ function verificationBadge(v) {
   return badge;
 }
 
-function renderFixQueuePanel(container) {
+function renderFixQueuePanel(container, opts) {
+  // opts.lanes — render lane-grouped and rank-ordered (the merged queue). The
+  // report page passes neither and keeps the flat list: there the Fix Queue is
+  // the only queue, so there is nothing to dedupe against.
+  const options = opts || {};
   const items = (state.fixQueue && state.fixQueue.items) || [];
   // the ONE filter applies to the queue too (R5-b completed): rows whose
   // severity/category the chips hide stay in the report but out of the
@@ -4469,7 +4473,9 @@ function renderFixQueuePanel(container) {
   panel.appendChild(el("p", "finding-intent-hint",
     "Dismiss — takes the row out of this to-do; the finding stays in the report"));
 
-  for (const item of shown) {
+  // ONE row builder, shared by the flat and the lane path, so the verbs
+  // (Locate/Rewrite/Discuss/Dismiss/Reopen) cannot drift between them.
+  const buildFixRow = (item) => {
     // row state reads the SAME disposition ledger the header counts (N3) — a
     // finding the writer marked addressed shows done on every surface, not
     // only where the server-observed item.status has already moved
@@ -4567,7 +4573,64 @@ function renderFixQueuePanel(container) {
     const vb = verificationBadge(item.verification);
     if (vb) row.appendChild(vb);
     row.appendChild(body);
-    panel.appendChild(row);
+    return row;
+  };
+
+  if (options.lanes) {
+    // Spec 14.19: the lanes live HERE, in the queue, not in a second section
+    // beside it. groupByLane stays PURE — it does not filter. It is handed
+    // entries the existing predicates already admitted, so no second predicate
+    // was forked and the page and the queue still cannot disagree.
+    const entries = [];
+    for (const item of shown) {
+      const f = (state.findings || [])[item.index];
+      if (f) entries.push({ f, index: item.index });
+    }
+    const byIndex = new Map(items.map((i) => [i.index, i]));
+    const laneCut = groupByLane(entries);
+    for (const lane of laneCut.order) {
+      const list = laneCut.groups[lane] || [];
+      const group = el("div", "dock-cat-group dock-lane-group");
+      group.dataset.lane = lane;
+      const laneTitle = el("div", "dock-section-title dock-lane-title");
+      laneTitle.appendChild(el("span", "", LANE_LABELS[lane] || lane));
+      laneTitle.appendChild(el("span", "dock-section-count", String(list.length)));
+      laneTitle.title = LANE_BLURB[lane] || "";
+      group.appendChild(laneTitle);
+      const wrap = el("div", "dock-finding-list");
+      let lastCat = null;
+      for (const { f, index } of list) {
+        const item = byIndex.get(index);
+        if (!item) continue;
+        const cat = f.category || "other";
+        if (cat !== lastCat) {
+          lastCat = cat;
+          const active = state.findingFilter.category === cat;
+          const chip = el("button", "dock-lane-cat" + (active ? " active" : ""));
+          chip.type = "button";
+          chip.dataset.category = cat;
+          chip.appendChild(el("span", "", CATEGORY_LABELS[cat] || cat));
+          chip.title = active
+            ? "Showing all categories — press again to widen"
+            : `Show only ${CATEGORY_LABELS[cat] || cat}`;
+          chip.addEventListener("click", () => {
+            state.findingFilter.category = active ? null : cat;
+            rerender();
+          });
+          wrap.appendChild(chip);
+        }
+        const row = buildFixRow(item);
+        // Gate G6: every row states why it is ranked where it is. A row that
+        // cannot print its own reason is not ranked, it is sorted by something
+        // nobody can audit (spec 1.5).
+        row.appendChild(el("div", "dock-rank-reason", rankReasonText(f)));
+        wrap.appendChild(row);
+      }
+      group.appendChild(wrap);
+      panel.appendChild(group);
+    }
+  } else {
+    for (const item of shown) panel.appendChild(buildFixRow(item));
   }
   addPanel(container, panel);
   updateDawnMeter();
@@ -6287,41 +6350,25 @@ function revealDockSectionFor(node) {
 }
 
 /**
- * P1.8 (spec §5): ONE rendering per finding per panel.
+ * P1.8 (spec §5) — RETIRED as a mechanism, HONOURED as a guarantee.
  *
- * The ledger has three card sections — this scene, script-level, and the
- * categorized "Live findings" list — and the live list is a view over EVERY
- * finding that passes the filter, so without a claim the same finding was
- * carded twice: once where the writer is reading, once again under its
- * category (measured on the demo report: `6 (scene-findings + by-category)` and
- * `7 (script-level + by-category)`). `dedupeDockFindings` takes the indices the
- * higher-precedence sections already rendered and returns the set the later
- * sections skip. Precedence: this-scene strip → script-level → live list, i.e.
- * the most contextual rendering wins and the categorized list is the catch-all.
+ * This used to be enforced by `dedupeDockFindings`: the ledger had three card
+ * sections (this scene, script-level, the categorized "Live findings" list) and
+ * the live list viewed EVERY finding passing the filter, so on the demo report
+ * the same finding was carded twice — measured at `6 (scene-findings +
+ * by-category)` and `7 (script-level + by-category)`.
  *
- * The fix queue is deliberately NOT a claimer. /fixqueue emits exactly one row
- * per report finding (webapp_server.get_fixqueue), so letting the queue claim
- * ids would empty the categorized ledger on every analyzed project — and §5
- * wants both sections to exist: the queue is the compact to-do line
- * (Locate/Rewrite/Discuss/Dismiss), the card is the evidence view (quote +
- * verification + intent). What must never repeat is the CARD.
- */
-function dedupeDockFindings(...claimedIndexLists) {
-  const claimed = new Set();
-  for (const list of claimedIndexLists) {
-    for (const index of (list || [])) claimed.add(index);
-  }
-  return claimed;
-}
-
-/** The live check (spec §15.3): the two deterministic rule passes re-run on the
- *  writer's CURRENT text, milliseconds after an edit, with no model call.
+ * The dedupe only ever ordered THIS panel against itself. It could not see the
+ * Fix Queue, because the Fix Queue is in Tier 1 and this is Tier 2, and
+ * /fixqueue emits exactly one row per report finding (webapp_server.get_fixqueue)
+ * — so the queue rendered every finding a second time anyway, with its own set
+ * of verbs. The panel was internally consistent and globally duplicated.
  *
- *  It is NOT the ledger. No model judged these rows, they cover two of the
- *  twenty passes, and `findingCounts()` never sees them — so the header has to
- *  say what it is, in its own words, rather than borrow the report's authority.
- *  Built here and mounted twice: after the report's own formatting rows, and on
- *  the unanalysed desk, where it is the only evidence anyone has.
+ * Spec 14.20 removes the duplication at the source instead of ordering around
+ * it: there is now ONE place a finding is rendered — the lane-grouped Fix Queue
+ * in Tier 1 — and the two sections below are pointers that state a count and
+ * where the rows went. The guarantee P1.8 was written to protect is unchanged;
+ * the mechanism is gone because there is nothing left for it to arbitrate.
  */
 function buildLiveCheckSection() {
   const lint = state.lint;
@@ -6563,7 +6610,7 @@ function renderTier1Worklist(lens) {
   // stored preference over this default.
   // addPanel() appends the .craft-panel straight into this section div.
   const fqWrap = el("div", "dock-section-fixqueue");
-  renderFixQueuePanel(fqWrap); // existing function, reused verbatim
+  renderFixQueuePanel(fqWrap, { lanes: true }); // the lanes live IN the queue (spec 14.20)
   if (fqWrap.children.length) {
     lens.appendChild(dockSection("fix-queue", "Fix queue", fqWrap,
                                  { defaultOpen: true }));
@@ -6626,14 +6673,22 @@ function buildContextSection() {
   // original complaint surviving implementation intact.
   //
   // Neither section moved in the DOM order, only in when it is appended, so the
-  // ONE predicate, the `carded` dedupe, and every audit hook are untouched.
+  // ONE predicate and every audit hook are untouched. (The `carded` dedupe is
+  // NOT untouched: it is gone, because the ledger it arbitrated is gone. The
+  // P1.8 docblock above records why.)
   let sceneSection = null;
   if (sceneFindings.length) {
-    const list = el("div", "dock-finding-list");
-    for (const { f, index } of sceneFindings) {
-      // Addressed / Still Present rides along (MD §7 preserve list)
-      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
-    }
+    // ONE HOME (spec 14.20). This rendered every current-scene finding as a
+    // full card. The Fix Queue above now holds every finding, laned and ranked,
+    // WITH the verbs — so each of these cards was one finding rendered twice on
+    // one page, which is what agreement #1 from the first debate forbids. The
+    // section keeps its job ("where, precisely") by stating the count and where
+    // the rows went. It keeps its key and its audit hook.
+    const list = el("div", "dock-pointers");
+    list.appendChild(el("p", "dock-pointer-line",
+      `${sceneFindings.length} finding${sceneFindings.length === 1 ? "" : "s"} here`
+      + (sceneNum != null ? ` on Scene ${sceneNum}` : "")
+      + " — ranked with their verbs in the Fix queue above."));
     sceneSection = dockSection("scene-findings",
       sceneNum != null ? `Findings — Scene ${sceneNum}` : "Findings — script level", list);
     sceneSection.classList.add("dock-section-scene-findings"); // hook kept for the audits
@@ -6642,10 +6697,11 @@ function buildContextSection() {
   const scriptLevel = (data.scriptLevel || []).filter(({ f, index }) => findingPassesFilter(f, index));
   let scriptSection = null;
   if (scriptLevel.length) {
-    const list = el("div", "dock-finding-list");
-    for (const { f, index } of scriptLevel) {
-      list.appendChild(findingNoteEl(f, index, { addressed: isAddressed(f, index), disposition: findingDisposition(f, index), deep: true }));
-    }
+    // One home, same reason as the scene section above.
+    const list = el("div", "dock-pointers");
+    list.appendChild(el("p", "dock-pointer-line",
+      `${scriptLevel.length} script-level finding${scriptLevel.length === 1 ? "" : "s"}`
+      + " — ranked with their verbs in the Fix queue above."));
     scriptSection = dockSection("script-level", "Script-level findings", list);
   }
 
@@ -6654,119 +6710,29 @@ function buildContextSection() {
   // findingNoteEl card (actions intact) instead of the read-only row.
   // The ONE filter applies here too (R5-b): the chips above drive what
   // shows, so the board and the page agree by construction.
-  // P1.8: and it is the CATCH-ALL — the two sections above already carded
-  // these findings where they belong, so this one skips their indices and the
-  // ledger renders each finding exactly once (spec §5).
-  const carded = dedupeDockFindings(sceneFindings.map((o) => o.index),
-    scriptLevel.map((o) => o.index));
-  const byCat = {};
-  (state.report && state.report.findings || []).forEach((f, i) => {
-    const index = f.index != null ? f.index : i;
-    if (carded.has(index)) return;
-    if (!findingPassesFilter(f, index)) return;
-    (byCat[f.category] = byCat[f.category] || []).push({ f, index });
-  });
-  // "Live findings" — the ledger's default cut (spec §5): ALL live findings,
-  // highs first, grouped by category. NEVER scene-scoped by default (red-team
-  // W2: a scene-scoped default renders a dead panel on clean scenes and hides
-  // the cross-scene crown jewels — theme/structure/setup-payoff). The scene
-  // only ever enters through the ONE filter's scene clause above.
-  // Track B section 7: the ORDERING key is craft impact, not severity.
-  // Severity stops being the sort and stays an ATTRIBUTE - the rim/mass/label
-  // language in DESIGN.md is verified in use and is not being touched.
+  // SPEC 14.20, ONE HOME. The "Live findings" ledger that stood here is gone.
   //
-  // The groups are LANES now, ordered by descending max IMPACT (core.js
-  // groupByLane). Rows inside a lane sort by rankScore. Both live in core.js so
-  // they are testable without a browser, which is the only reason this change
-  // is verifiable from a workspace with no Playwright.
+  // It was not redundant styling, it was a second rendering of the same rows:
+  // `_fixqueue_items` (webapp_server.py) iterates report["findings"], so this
+  // ledger and the Fix Queue above were ONE list drawn twice on one page, each
+  // copy with its own controls. That is what agreement #1 from the first debate
+  // forbids, and the runner caught it as an ambiguous G5 (Fix Queue's first row
+  // at 834px, this one's at 1493px) before the cause was readable.
   //
-  // GAP-1 is preserved by construction: groupByLane is PURE. It does not filter.
-  // It is handed entries the ONE predicate (findingPassesFilter) already
-  // admitted, so no second predicate was forked and the page and the ledger
-  // still cannot disagree.
-  const laneCut = groupByLane(
-    Object.keys(byCat).flatMap((cat) => byCat[cat]));
-  const laneKeys = laneCut.order;
-  const laneGroups = laneCut.groups;
-  if (laneKeys.length) {
-    // ONE collapsible "Live findings" section holding the per-category groups:
-    // the groups keep their own sub-heads (and their counts), the section is
-    // the single thing to open — the collapsed header prints the total, so the
-    // closed state still says how much is in there. (The key stays "by-category":
-    // it is the hook the audits and the e2e harness open the section by.)
-    const groups = el("div", "dock-cat-groups");
-    let total = 0;
-    for (const lane of laneKeys) {
-      const list = laneGroups[lane] || [];
-      total += list.length;
-      const group = el("div", "dock-cat-group dock-lane-group");
-      group.dataset.lane = lane;
+  // The lanes did not die with it. groupByLane, the lane order, the category
+  // sub-headers and the per-row rank reason all moved UP into
+  // renderFixQueuePanel, so the ranking Track B was built to produce is still
+  // on screen - it is just on the surface that opens by default, above the
+  // fold, with Locate/Rewrite/Discuss/Dismiss attached to every row.
+  //
+  // `carded` went with it and that was DELIBERATE: it existed only to stop this
+  // ledger repeating the two sections below, and neither of those renders a
+  // finding any more - they are pointers now. Nothing cards anything, so
+  // nothing needs de-duplicating.
+  //
+  // Key "by-category" is gone from the DOM on purpose. The e2e harness opened
+  // the section by that key; it is being re-pointed at the queue.
 
-      // The LANE header. Identity, not a filter: a lane spans several
-      // categories, so there is no single category value it could set, and
-      // section 1.4 trap 4 forbids a header owning a filter the predicates
-      // cannot express.
-      const laneTitle = el("div", "dock-section-title dock-lane-title");
-      laneTitle.appendChild(el("span", "", LANE_LABELS[lane] || lane));
-      laneTitle.appendChild(el("span", "dock-section-count", String(list.length)));
-      laneTitle.title = LANE_BLURB[lane] || "";
-      group.appendChild(laneTitle);
-
-      // CATEGORY sub-headers inside the lane are what replaced the filter-row
-      // chips, and they set exactly the field the chips set today:
-      // state.findingFilter.category. That is the whole of the migration, and
-      // it is why GAP-1's single-predicate contract still holds.
-      const wrap = el("div", "dock-finding-list");
-      let lastCat = null;
-      for (const { f, index } of list) {
-        const cat = f.category || "other";
-        if (cat !== lastCat) {
-          lastCat = cat;
-          const active = state.findingFilter.category === cat;
-          const chip = el("button", "dock-lane-cat" + (active ? " active" : ""));
-          chip.type = "button";
-          chip.dataset.category = cat;
-          chip.appendChild(el("span", "", CATEGORY_LABELS[cat] || cat));
-          chip.appendChild(el("span", "dock-section-count",
-            String(list.filter((o) => (o.f.category || "other") === cat).length)));
-          chip.title = active
-            ? "Showing all categories — press again to widen"
-            : `Show only ${CATEGORY_LABELS[cat] || cat}`;
-          chip.addEventListener("click", () => {
-            state.findingFilter.category = active ? null : cat;
-            rerender();
-          });
-          wrap.appendChild(chip);
-        }
-        const row = findingNoteEl(f, index, {
-          addressed: isAddressed(f, index),
-          disposition: findingDisposition(f, index),
-          deep: true,
-        });
-        // Gate G6: every row states why it is ranked where it is. A row that
-        // cannot print its own reason is not ranked, it is sorted by something
-        // nobody can audit (spec 1.5).
-        row.appendChild(el("div", "dock-rank-reason", rankReasonText(f)));
-        wrap.appendChild(row);
-      }
-      group.appendChild(wrap);
-      groups.appendChild(group);
-    }
-    const head = el("span", "dock-section-title");
-    head.appendChild(el("span", "", "Live findings"));
-    head.appendChild(el("span", "dock-section-count", String(total)));
-    // scope honesty (N3): after P1.8 this section holds the findings the two
-    // above did NOT card, so its count must not read as the whole ledger's.
-    head.title = carded.size
-      ? `Live findings the sections above did not card — grouped into lanes, heaviest `
-        + `first (${carded.size} more carded in this scene / script level)`
-      : "Every live finding, grouped into lanes, heaviest first";
-    // Spec 9c, and an obligation this build originally missed: the weights are a
-    // hypothesis and the WRITER must see that, not a code comment. Printed once,
-    // on the section head, so it is present without being shouted over the rows.
-    // (the uncalibrated marking moved to the Fix Queue head - see below)
-    lens.appendChild(dockSection("by-category", head, groups));
-  }
   // ...and now the per-scene and script-level detail cards, beneath the queue.
   if (sceneSection) lens.appendChild(sceneSection);
   if (scriptSection) lens.appendChild(scriptSection);
@@ -6775,7 +6741,12 @@ function buildContextSection() {
   // NOT a section: there is nothing to collapse, and a notice the writer has
   // to click open is exactly the blank it exists to prevent.
   const anyBoardCards = sceneFindings.length + scriptLevel.length;
-  if (!anyBoardCards && Object.keys(byCat).length === 0 && (state.findings || []).length) {
+  const shownViaFilter = (state.report && state.report.findings || [])
+    .filter((f, i) => findingPassesFilter(f, f.index != null ? f.index : i)).length;
+  // The Tier 2 ledger is gone (spec 14.20), so the queue owns the only filtered
+  // rendering of a finding. That makes this notice the queue's job too: if the
+  // filter hides everything, the writer must still be told, not shown a blank.
+  if (!(state.findings || []).length || !shownViaFilter) {
     const notice = el("div", "dock-notice");
     notice.appendChild(el("div", "dock-lens-hint",
       "No findings match the current filter — toggle a severity chip above, or press "

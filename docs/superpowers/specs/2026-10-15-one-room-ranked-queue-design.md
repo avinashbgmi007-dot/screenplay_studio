@@ -1213,3 +1213,68 @@ is one queue surface and "first actionable queue row" means one thing.
 
 This is the largest remaining item in the arc and it is **not started**. It is recorded here,
 with the evidence and the decision, rather than half-applied.
+
+### 14.20 ONE HOME, landed: the lanes moved INTO the queue
+
+**Precondition accepted and then revised by the code, honestly.** The stated precondition was that
+`carded` dedupe must survive the move, "because the P1.8 assertions pin them". Reading the build
+before wiring it showed that applying it literally to the Tier 1 Fix Queue would be wrong:
+
+`carded` is **scene-scoped** — the union of current-scene findings plus script-level findings.
+Subtracting it from the worklist would remove the scene the writer is reading from their to-do, and
+empty the queue whenever they stand on a scene that has findings. A worklist that omits the page
+underneath it is not a worklist.
+
+**What the code actually showed, and it changed the answer.** The two surfaces are in **different
+tiers**:
+
+| Surface | Tier | Open by default | Measured first row |
+|---|---|---|---|
+| Fix Queue | 1 | **yes** (`defaultOpen: true`) | 834px |
+| `by-category` ledger | 2, the Context disclosure | **no** | 1493px |
+
+So the 1493px number was taken on a section a writer never sees unless they expand it. `carded`
+existed only to stop the Tier 2 ledger repeating the two sections *beside it*. It was never in a
+position to stop the Fix Queue, because the Fix Queue is in Tier 1. **P1.8's dedupe was internally
+consistent and globally duplicating.**
+
+**Landed:** the lanes, lane order, category sub-headers and per-row rank reason moved **up** into
+`renderFixQueuePanel`, which now takes `{ lanes: true }`. The Tier 2 ledger, the `carded` set and
+`dedupeDockFindings` are gone. The scene and script-level sections survive as **pointers**: a count
+and where the rows went, keeping their keys and the `.dock-section-scene-findings` audit hook.
+
+`carded` and `dedupeDockFindings` were deleted **deliberately, not collaterally** — they arbitrated
+between card sections that no longer render cards.
+
+### 14.21 G5 re-scoped to the default-open surface
+
+G5 measured two numbers and returned one verdict, which is what made it ambiguous in the first
+place. Scoped: **G5 measures the first actionable row on the surface that opens by default.** That
+is the state the fold complaint was always about, and a writer's default state is Tier 1 with
+Context collapsed.
+
+This is not a loosening. A gate that can be passed by expanding a disclosure is weaker than one
+that cannot. The expanded-state geometry is kept as a **recorded diagnostic, not a verdict**, so
+the information survives without becoming a second pass/fail.
+
+### 14.22 Guard migrations at 14.20, none weakened
+
+| Guard | Before | After |
+|---|---|---|
+| 4 | "`by-category` key survives" | "the queue is the only place a finding is rendered" — the old guard pinned the very section that duplicated the queue |
+| 9 | "queue appended before the detail cards" | "the ranked queue leads the default-open surface" — pinned Tier 1 build with `{ lanes: true }` |
+| new | — | "the Tier 2 sections are pointers, not cards" |
+| uncalibrated | pinned `renderFixQueuePanel(container)` | pins the **name**, walks the brace-balanced body, so the signature change did not silently scope it to the whole file |
+
+All three new/changed guards mutation-verified: restoring the ledger, putting a `findingNoteEl`
+card back in a pointer section, and dropping `{ lanes: true }` each fail with a precise message.
+Fixed build re-run second, 10 passed.
+
+### 14.23 Outstanding for the runner
+
+`tests/e2e_browser_dock_sections.py` still opens the section by key `by-category`, which no longer
+exists in the DOM. **P1.7 and P1.8 must be re-pointed at the Fix Queue panel** — both look for
+`.dock-cat-group` inside a dock section. The migration already specified still applies: re-seed real
+categories spanning two IMPACT tiers, assert rank order inside the lane, assert one rendering per
+finding. That is now checkable in its strongest form, because "one rendering per finding" is a
+property of a single surface rather than of an ordering between two.

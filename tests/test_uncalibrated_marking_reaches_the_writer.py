@@ -64,9 +64,27 @@ def test_the_marking_rides_the_panel_that_opens_by_default() -> None:
     )
     # The Fix Queue panel is the one that carries `defaultOpen: true`, so it is
     # the surface the writer lands on. The hint must be inside it.
-    fq = re.search(r"function renderFixQueuePanel\(container\) \{(.*?)\n\}", code, re.S)
-    assert fq, "renderFixQueuePanel not found"
-    assert "dock-section-hint" in fq.group(1), (
+    # Match the NAME, not the arity. The signature grew an `opts` parameter at
+    # spec 14.20 (lanes + the merged queue); pinning `(container)` would have
+    # failed this guard for a change that is none of its business.
+    start = re.search(r"function renderFixQueuePanel\(container(?:,\s*\w+)?\) \{", code)
+    assert start, "renderFixQueuePanel not found"
+    # Walk to the brace that closes the function, counting nesting, so the check
+    # is genuinely scoped to this function rather than to the whole file.
+    depth = 0
+    end = None
+    for i in range(code.index("{", start.start()), len(code)):
+        ch = code[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    assert end, "could not find the end of renderFixQueuePanel"
+    body = code[start.start(): end]
+    assert "dock-section-hint" in body, (
         "the uncalibrated marking is not inside the Fix Queue panel. That panel "
         "opens by default and is the surface the writer reads first; marking the "
         "ranking as uncalibrated while hiding the ranking below the fold defeats "

@@ -6516,3 +6516,34 @@ body:not(.idea-mode) .desk {
 @media (prefers-reduced-motion: reduce) {
   .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
 }
+
+/* Spec 14.20, ONE HOME. The Tier 2 "Findings — Scene N" and "Script-level
+ * findings" sections used to print every finding as a full card, duplicating the
+ * Fix Queue above. They are pointers now: a count and where the rows went. The
+ * type is deliberately quieter than .dock-section-title so the pointer reads as
+ * a note about the queue, not as a second list competing with it. */
+.dock-pointers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dock-pointer-line {
+  margin: 0;
+  padding: 2px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  opacity: 0.82;
+}
+/* The lane groups now live inside the Fix Queue panel rather than inside a dock
+ * section, so they need their own separation from the panel head. */
+.craft-panel.fix-queue .dock-lane-group {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.craft-panel.fix-queue .dock-lane-group:first-of-type {
+  margin-top: 8px;
+  border-top: none;
+  padding-top: 0;
+}

@@ -18,9 +18,13 @@ already caught first.
 3. **`findingPassesFilter` is still the only lane-bearing predicate.** §1.4 trap
    2: a second predicate is how GAP-1 comes back — the page and the ledger
    disagreeing, 15 cards against 9 rows.
-4. **The "by-category" dockSection key survives.** It is the hook
-   `e2e_browser_dock_sections.py` opens the section by. Renaming it to
-   "by-lane" for tidiness would silently unhook the whole suite.
+4. **The queue is the only place a finding is rendered.** Spec 14.20, ONE HOME.
+   `renderFixQueuePanel` carries the lanes now, and the Tier 2 scene/script
+   sections are pointers. This replaced the old "the by-category key survives"
+   guard, which pinned the very section that duplicated the queue.
+
+**Migrated at 14.20.** No assertion was dropped. Guards 4 and 9 were rewritten
+because their subject genuinely moved; guards 1-3, 5-8 are untouched.
 """
 import os
 import re
@@ -82,12 +86,47 @@ def test_no_second_predicate_grew_a_lane_check(app_js: str) -> None:
         )
 
 
-def test_the_by_category_section_hook_survives(app_js: str) -> None:
-    """G8. The dock section key is the harness hook, not a name."""
-    assert 'dockSection("by-category"' in app_js, (
-        'the ledger section key changed. e2e_browser_dock_sections.py opens '
-        'this section by the literal "by-category" in 21 places; renaming it '
-        "for tidiness silently unhooks the suite."
+def test_the_queue_is_the_only_place_a_finding_is_rendered(app_js: str) -> None:
+    """Spec 14.20, ONE HOME. Was: "the by-category dockSection key survives."
+
+    It pinned the Tier 2 ledger, which is exactly the surface that duplicated
+    the Fix Queue. The guard has to move with the architecture: the section is
+    gone, and what must now hold is that the ledger does NOT come back and that
+    nothing below the queue renders findings as cards."""
+    assert 'dockSection("by-category"' not in app_js, (
+        'the Tier 2 "by-category" ledger is back. It renders report["findings"], '
+        "which is the same array the Fix Queue renders, so restoring it puts "
+        "every finding on the page twice with two sets of verbs. ONE HOME."
+    )
+    # the lanes moved UP into the queue, they did not die
+    assert "groupByLane" in app_js, "the lane grouping left app.js entirely"
+
+
+def test_the_tier_two_sections_are_pointers_not_cards(app_js: str) -> None:
+    """The scene and script-level sections keep their keys and their audit hook,
+    and keep telling the writer how many findings are there and where they
+    went. They must not render finding bodies."""
+    for key in ('"scene-findings"', '"script-level"'):
+        assert key in app_js, f"the {key} section key vanished; audits open it by key"
+    assert 'classList.add("dock-section-scene-findings")' in app_js, (
+        "the audit hook on the scene-findings section is gone"
+    )
+    # `findingNoteEl` is the deep card renderer. It must NOT appear inside the
+    # two Tier 2 pointer sections any more - that is precisely what made each
+    # finding render twice on one page.
+    ptr = re.search(r"let sceneSection = null;.*?sceneSection = dockSection\(\s*\n?", app_js, re.S)
+    tail = app_js[app_js.index("let sceneSection = null;"): app_js.index("let scriptSection = null;")]
+    assert "findingNoteEl" not in tail, (
+        "the scene-findings section is rendering finding cards again. It is a "
+        "pointer now; a card here duplicates the queue."
+    )
+    tail2 = app_js[app_js.index("let scriptSection = null;"): app_js.index("scriptSection = dockSection")]
+    assert "findingNoteEl" not in tail2, (
+        "the script-level section is rendering finding cards again."
+    )
+    assert "dock-pointer-line" in app_js, (
+        "the Tier 2 sections are no longer pointers - either they went missing "
+        "or they went back to rendering finding cards beside the queue."
     )
 
 
@@ -133,24 +172,22 @@ def test_severity_is_still_an_attribute_not_an_ordering(app_js: str) -> None:
         "only stops severity being the ORDER."
     )
 
-def test_the_ranked_queue_is_appended_before_the_detail_cards(app_js: str) -> None:
-    """Gate G5, checked structurally. The queue must be APPENDED to the lens
-    before the per-scene and script-level detail sections, or the first
-    actionable row sits below them — 1593px in a 900px viewport, which is the
-    original complaint surviving implementation intact.
+def test_the_ranked_queue_leads_the_default_open_surface(app_js: str) -> None:
+    """Gate G5, checked structurally. Was: "the queue is appended before the
+    detail cards" - true while two queues existed.
 
-    Source-level because the rendered position needs a browser and this catches
-    the regression the moment someone inlines the appends again. The browser
-    gate G5 remains the one that measures pixels; this is the cheap one that
-    stops the ordering being undone between runs."""
-    m = re.search(r'lens\.appendChild\(dockSection\("by-category"', app_js)
-    assert m, "the lane queue is no longer appended by that literal — re-check G5"
-    queue_at = m.start()
-    for name in ("lens.appendChild(sceneSection)", "lens.appendChild(scriptSection)"):
-        i = app_js.find(name)
-        assert i != -1, f"{name} is missing; the detail sections are not being appended"
-        assert i > queue_at, (
-            f"{name} is appended BEFORE the lane queue. The ranked queue must "
-            "lead the lens or gate G5 cannot pass and the writer's first "
-            "actionable row is a screen below the fold."
-        )
+    Now there is one queue, so the structural fact worth pinning is that it is
+    built in TIER 1, the tier that opens by default. Lanes landing back in Tier
+    2 would put the ranking behind a collapsed disclosure again."""
+    fq = re.search(r"const fqWrap = el\(\"div\", \"dock-section-fixqueue\"\);", app_js)
+    assert fq, "the dock's fix-queue section wrapper is gone"
+    call = app_js.find("renderFixQueuePanel(fqWrap, { lanes: true })")
+    assert call != -1, (
+        "the Tier 1 queue is no longer built with the lanes. Either { lanes: "
+        "true } was dropped or the call moved, and either way the ranking is "
+        "not on the surface that opens by default."
+    )
+    assert 'defaultOpen: true' in app_js[call: call + 300], (
+        "the fix-queue dock section no longer opens by default; the ranked rows "
+        "would sit behind a closed header, which is the original fold complaint."
+    )
