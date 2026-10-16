@@ -447,8 +447,13 @@ dock geometry. Each is a hard assertion, not a screenshot.
 (severity + This-scene + loop), current-scene box, then the lane-grouped queue. The Top-5 stack and
 the verdict line are **not** in that list, by ruling, not by omission.
 
-G5 is the one the panel could not previously make. It is measurable **today** because the instrument
-exists.
+G5 passed on the identity-anchored `bd86a8e` re-anchor at **882px**, with **18px** of headroom
+(§14.51). This is a result for the measured input, not a guarantee for every report.
+
+**Standing regression requirement:** every future Tier 1 addition or geometry-affecting change must
+re-measure G5. Assert served-tree identity first, then measure at 1440×900 with the dock's default-open
+worklist, lens scroll 0 and no manual scrolling. Report the first actionable row's top, bottom and
+remaining margin. The hard assertion stays `bottom < 900`; source/Node checks cannot waive it.
 
 ---
 
@@ -1741,7 +1746,8 @@ attached the Python import error to both. See §14.50 for the dependency-complet
 ### 14.46 What green does NOT mean, stated before it is claimed elsewhere
 
 A green suite is one instrument. Recorded so a later reader does not over-read it.
-The G5 status below was current at `fa81dba`; §14.48 records the subsequent anchored failure.
+The G5/print statuses below were current at `fa81dba`. §14.48 records the subsequent G5 failure;
+§14.51 records the later passing G5 and print re-anchors at `bd86a8e`.
 
 - **G5 has never been re-measured as a named check since the merge.** The merge disambiguated it —
   there is one queue surface now, so "first actionable queue row" names one thing — but a
@@ -1853,7 +1859,45 @@ files. Safety tag `safety/g5-reclone-20261016T120654Z` preserves snapshot `0e20d
 was byte-identical to origin `fa81dba`; resetting the session branch to that origin left a clean
 worktree before this change. The safety tag is retained.
 
-**G5 remains FAIL at its last anchored measurement.** Next: assert served-tree identity on the
-pushed repair, repeat the same G5 measurement and retain the band inventory. Then re-anchor
+**Status before the re-anchor:** G5 remained FAIL at 1007px. The next action was a served-tree
+identity check on the pushed repair, the same G5 measurement, then re-anchors of
 `tests/e2e_browser_dock_sections.py` and `tests/e2e_browser_print_media.py`. No predicted pixel saving
-is reported as a result. Register material and writer validation remain separate missing inputs.
+was reported as a result. §14.51 records the completed re-anchor.
+
+
+### 14.51 Original fold complaint closed: all three re-anchors green on `bd86a8e`
+
+The runner confirmed served-tree identity for all three runs on
+`bd86a8eb45c8a027c2fe2fc869d725a682b685d4` and reported a cleaned worktree.
+
+| Instrument | Anchored result | Exit |
+|---|---|---|
+| Named G5 probe, 1440×900 | **PASS**, first actionable row bottom **882px**, no page errors or scrolling | 0 |
+| `tests/e2e_browser_dock_sections.py` | **187 passed, 0 failed** | 0 |
+| `tests/e2e_browser_print_media.py` | **9 passed, 0 failed** | 0 |
+
+| G5 geometry | `fa81dba` | `bd86a8e` |
+|---|---|---|
+| First row top | 746px | 621px |
+| First row bottom | 1007px | 882px |
+| Deep-card height | 261px | 261px |
+| Margin to the unchanged 900px boundary | -107px | 18px |
+
+The observed saving is **125px**, entirely before the unchanged-height deep card. The empty-lane
+hypothesis was rejected, not implemented. Preamble compaction and the first-of-type spacing repair
+closed the measured defect without weakening depth or moving the threshold.
+
+The full dock re-anchor retains chip-click coverage, geometry, N3 counting, both membership halves,
+depth, binding and verbs. The print re-anchor closes the outstanding pre-depth-DOM verification.
+All three results belong to `bd86a8e`, not to the later documentation commit recording them.
+
+### 14.52 The 18px margin is watched, not chased
+
+The original complaint is closed on the measured input. An 18px margin is thin; it is not a reason
+for speculative compaction or a wider threshold. The §8 regression requirement makes remeasurement
+mandatory for future Tier 1 additions or geometry changes. A future failure is measured against the
+same `<900px` gate, not excused by this passing anchor.
+
+Remaining inputs for this arc: a real writer for lane-order/impact validation and real register
+material for threshold A/B/C. `IMPACT` v0 stays visibly uncalibrated; the fuzzy-match threshold stays
+at `0.72`. No additional product or test changes are justified by this closure report.

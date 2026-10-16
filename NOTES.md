@@ -4,18 +4,23 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
-### 2026-10-16 — G5 preamble compaction, browser re-measure pending
+### 2026-10-16 — G5 closed on `bd86a8e`; full browser re-anchor green
 
-Runner G5 at `fa81dba`: first card bottom 1007px at 1440×900, 2/2 identical, no page errors.
-Source and executed DOM reject the empty-lane hypothesis. Compact the stacked queue header,
-share lane identity with its first category, and replace the ineffective first-of-type spacing
-exemption. Deep cards, predicates, visible uncalibrated copy and horizontal verb budget stay intact.
-`tests/js/queue_preamble.test.js`: 6 checks, old tree 4 fail/2 pass, six discriminating mutations fail,
-fixed tree 6 pass. Full Python 2292 pass/4 skip after installing the missing Playwright import;
-full Node 166 pass/0 fail after `npm ci`. No local browser result. Spec §14.48–§14.50 records the
-anchored failure, repair, guard limits and byte-identical re-clone recovery with retained safety tag.
-Next: identity-anchored G5 re-measure, then `tests/e2e_browser_dock_sections.py` and
-`tests/e2e_browser_print_media.py` re-anchors. Do not mark G5 passed from source/DOM checks.
+Runner confirmed served-tree identity on all three runs at `bd86a8e`: G5 **PASS**, first actionable
+row bottom **882px** at 1440×900, exit 0, no page errors or scrolling;
+`tests/e2e_browser_dock_sections.py` **187/0**, exit 0;
+`tests/e2e_browser_print_media.py` **9/0**, exit 0. First-row top 746→621 and bottom 1007→882:
+**125px measured saving**, deep-card height unchanged at 261px, margin 18px. Original fold complaint
+closed with the unchanged `<900px` gate. Spec §14.51–§14.52 records closure; §8 now requires a new
+identity-anchored G5 measurement for every Tier 1 addition or geometry change. No margin-chasing.
+
+Repair and guards: stacked preamble compacted, first category beside lane identity, ineffective
+first-of-type spacing exemption replaced. Empty-lane hypothesis rejected by source and executed DOM.
+`tests/js/queue_preamble.test.js`: six checks, six discriminating mutations. Last local suites on the
+repair: Python **2292 pass/4 skip**, Node **166 pass/0 fail** with test dependencies installed.
+This closure update is documentation only; no new local suite or browser run is claimed.
+Next: writer/register inputs for calibration. Keep impact v0 visibly uncalibrated and threshold 0.72;
+re-measure G5 before accepting any future Tier 1 geometry change.
 
 ### 2026-10-11 — Ledger precision done + trial acceptance (D1-D4 follow-ups, full suite 2191)
 
