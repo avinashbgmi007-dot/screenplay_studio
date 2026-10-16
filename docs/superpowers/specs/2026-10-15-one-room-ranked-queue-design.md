@@ -1626,3 +1626,56 @@ queueing *every* scene-less finding while ignoring provenance also fails. The la
 because it pins the other half of the rule — the exception is narrow, not a general loosening.
 
 112 node tests, up from 108.
+
+### 14.38 The two item-3 assertions contradicted the ruling, and are rewritten not deleted
+
+Anchored 179/6. The item-3 script finding is seeded as `category: "theme"`, `scene_refs: []`, with
+neither `rule_id` nor `check_id` — so under §14.37 it is an observation on **two independent
+grounds**. "All three reached a deep card" and "says it is about the whole script" therefore
+contradict the ruling as written, and no product change short of un-ruling could make them pass.
+
+**Rewritten to cover both halves, which is stronger than deleting them.** The script finding is
+re-seeded as a **scene-less mechanical finding** — `continuity` with `rule_id: timeline_consistency`,
+no scene — which is exactly the shape the exception exists for, so the browser now exercises the
+exception *and* the whole-script scope label through the real render path. A `theme` opinion is seeded
+beside it and asserted to **stay out of the queue**, with a scene.
+
+The node suite already pinned both halves. **The browser pinned neither**, and the phantom `rerender`
+is the standing precedent for what an unexercised path does.
+
+### 14.39 The verb collapse, implemented
+
+The queue's four stay inline — **Locate, Rewrite, Discuss, Dismiss** — because that is the queue's
+grammar and P1.10 puts it there. The card's intent cluster (**addressed / next-pass / copy / why /
+pin**) collapses behind a `<details>` labelled **"marks & tools"**, a real `<summary>`, so it is
+keyboard-reachable and announces its state with no line of JS. The card already prints what those
+marks cost in `finding-intent-hint`, so nothing is learned by hiding them.
+
+**Gated on `opts.collapseIntents`, and off everywhere else.** The report page and margin pins keep the
+flat row: only the queue stacks its Dismiss on top of the card's controls and only the queue overflows
+the measured budget. The cluster binding is a hoisted `let`, because the disclosure is built after the
+`opts.deep` block closes and a `const` inside it would throw on every shallow card.
+
+### 14.40 The N3 label predicate, implemented
+
+`openFindingsOnScene` walked `state.findings`, which includes rows the queue **hides** behind the Kit
+A toggle. So the This-scene chip printed a grounded count beside an unfiltered list: two numbers, both
+true, neither agreeing. It now counts `state.fixQueue.items` through `bindQueueItems` using the
+**same exclusion rule as `queueCounts`** — dismissed out, Kit A hidden unless asked for,
+writer-dispositioned rows bypassing the groundedness claim. One rule, three surfaces.
+
+### 14.41 Guards, and one that was too weak
+
+| Guard | Mutation it catches |
+|---|---|
+| scene chip counts the list's scope | label walks `state.findings` again |
+| scene chip counts the list's scope | Kit A exclusion dropped from the label |
+| one surface opts into the collapse | disclosure wrap made unconditional |
+
+The third caught nothing at first. It counted `collapseIntents: true` call sites, which stays at one
+even when the **wrap** is unconditional — so making the collapse global passed. It now pins the gate
+expression itself. 2289 python tests, 112 node.
+
+Both new tests were written without their `app_js` fixture parameter and failed on the fixture object
+rather than the assertion. Fixed; noted because it happened twice in this arc and a test that errors
+before asserting is not a test.

@@ -422,3 +422,55 @@ def test_every_seed_that_writes_findings_also_writes_queue_items() -> None:
         "but never write state.fixQueue.items. They render ZERO queue rows and "
         "every assertion downstream of them reads zero."
     )
+
+
+def test_the_scene_chip_counts_the_scope_the_list_shows(app_js: str) -> None:
+    """N3. The This-scene chip's number and the list printed beside it must be
+    the same scope.
+
+    `openFindingsOnScene` walked `state.findings`, which includes rows the queue
+    HIDES behind the Kit A ungrounded toggle. The chip therefore printed a
+    grounded count next to an unfiltered list: two numbers, both true, not
+    agreeing. The fix counts `state.fixQueue.items` through the SAME exclusion
+    rule as `queueCounts`, so there is one rule and three surfaces."""
+    fn = app_js[app_js.index("function openFindingsOnScene"):]
+    fn = fn[: fn.index("\n}\n")]
+    assert "state.fixQueue.items" in fn, (
+        "the scene chip's count no longer walks the queue's items, so it can "
+        "disagree with the list beside it. That is the N3 violation."
+    )
+    assert "fixQueueShowUngrounded" in fn, (
+        "the scene chip's count ignores the Kit A toggle, so a hidden ungrounded "
+        "row is counted by the label and not shown in the list."
+    )
+    # and it must not have gone back to reading state.findings directly
+    assert "state.findings || []).forEach" not in fn, (
+        "the chip counts findings, not queue rows, which is how the two scopes "
+        "started disagreeing."
+    )
+
+
+def test_the_queue_is_the_only_surface_that_opts_into_the_collapse(app_js: str) -> None:
+    """Spec 14.38. The intent cluster collapses on the queue row only.
+
+    Off everywhere else on purpose: the report page and margin pins keep the
+    flat row, because only the queue stacks its Dismiss on top of the card's
+    controls and only the queue overflows the measured budget."""
+    assert app_js.count("collapseIntents: true") == 1, (
+        "exactly one call site opts into the collapsed intent cluster. More than "
+        "one means a surface that keeps its own budget was changed too; zero "
+        "means the nine-control row is back."
+    )
+    assert 'const intentCluster = opts.collapseIntents' not in app_js, (
+        "the intent cluster must be a hoisted `let`, not a const inside the deep "
+        "block: the disclosure that wraps it is built after that block closes."
+    )
+    # The gate itself, not just the call-site count. Counting call sites passes
+    # even when the wrap is unconditional, which is the mutation this missed
+    # first: the collapse silently became global and every other surface lost
+    # its flat row.
+    assert "if (opts.collapseIntents && intentCluster !== actions)" in app_js, (
+        "the disclosure is no longer gated on opts.collapseIntents, so the "
+        "collapse applies to every surface. The report page and margin pins keep "
+        "the flat row on purpose; only the queue overflows its budget."
+    )

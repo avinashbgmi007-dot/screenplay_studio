@@ -4676,6 +4676,7 @@ function renderFixQueuePanel(container, opts) {
           addressed: isAddressed(f, index),
           disposition: findingDisposition(f, index),
           deep: true,
+          collapseIntents: true,
         });
         const fi = f != null
           ? (state.findings || []).indexOf(f)
@@ -5413,6 +5414,10 @@ function findingNoteEl(f, index, opts = {}) {
   }
 
   const actions = el("div", "finding-note-actions");
+  // Declared HERE, not inside the `if (opts.deep)` block: the disclosure that
+  // wraps it is built after that block closes, and a `const` declared inside it
+  // would be a ReferenceError on every shallow card.
+  let intentCluster = actions;
   if (opts.pin) note.classList.add("finding-pin");
   // writer intent + copy (deep cards only — the loop's home surface; the
   // dock is where the writer's judgment is made, margin pins stay read-only)
@@ -5461,16 +5466,26 @@ function findingNoteEl(f, index, opts = {}) {
       });
       return b;
     };
-    actions.appendChild(mkIntent("\u2713", "My call: addressed", "addressed",
+    // SPEC 14.38, THE VERB-ROW BUDGET. Nine controls do not fit one row: the
+    // queue's four stay inline (Locate, Rewrite, Discuss, Dismiss - that is the
+    // queue's grammar and P1.10 puts it there) and the INTENT cluster collapses
+    // behind a disclosure. The cluster is not decoration: it is addressed /
+    // next-pass / copy / why / pin, and the card already prints what those marks
+    // COST in finding-intent-hint, so nothing is learned by hiding them.
+    //
+    // Off by default. The report page and margin pins keep the flat row; only
+    // the queue opts in, because only the queue stacks its Dismiss on top.
+    intentCluster = opts.collapseIntents ? el("div", "finding-intent-cluster") : actions;
+    intentCluster.appendChild(mkIntent("\u2713", "My call: addressed", "addressed",
                                  "My call: addressed (survives re-analysis)"));
-    actions.appendChild(mkIntent("\u23ED", "Park for the next pass", "deferred",
+    intentCluster.appendChild(mkIntent("\u23ED", "Park for the next pass", "deferred",
                                  "Park for the next pass"));
     const cp = el("button", "intent-btn", "\u29C9");
     cp.type = "button";
     cp.setAttribute("aria-label", "Copy the finding's evidence");
     cp.title = "Copy the evidence + scene slug";
     cp.addEventListener("click", (e) => { e.stopPropagation(); copyFindingEvidence(f); });
-    actions.appendChild(cp);
+    intentCluster.appendChild(cp);
     // GAP-4: the escalation gesture — ask Dr. Sushruta WHY this was flagged,
     // with the finding (and its quote) riding into the consult turn
     const why = el("button", "intent-btn", "\uD83E\uDE7A");
@@ -5478,7 +5493,7 @@ function findingNoteEl(f, index, opts = {}) {
     why.setAttribute("aria-label", "Ask Dr. Sushruta why this was flagged");
     why.title = "Ask Dr. Sushruta why this was flagged — the finding rides along";
     why.addEventListener("click", (e) => { e.stopPropagation(); discussWithDoctor(f, index); });
-    actions.appendChild(why);
+    intentCluster.appendChild(why);
     // spec §14.2: the desk's one-way doors were copy and Discuss. A finding worth
     // keeping is worth a margin note — the writer's own store, on the finding's
     // scene, quoting the same evidence. No new backend: this is the endpoint the
@@ -5491,7 +5506,7 @@ function findingNoteEl(f, index, opts = {}) {
       pinFindingToNotes(f, pin);
     });
     paintPinState(pin, f);
-    actions.appendChild(pin);
+    intentCluster.appendChild(pin);
   }
   // R6 item 3: the glyph comes off here, not as decoration. The card's clientWidth
   // measures 342px, its 10px side padding leaves the verb row 322px, and the eight
@@ -5531,6 +5546,14 @@ function findingNoteEl(f, index, opts = {}) {
   if (!opts.pin) {
     actions.appendChild(rewriteBtn);
     actions.appendChild(discussBtn);
+  }
+  if (opts.collapseIntents && intentCluster !== actions) {
+    const det = el("details", "finding-intent-disclosure");
+    det.appendChild(el("summary", "", "marks & tools"));
+    det.appendChild(intentCluster);
+    // The queue's Dismiss lives in the same row and must stay outside the
+    // disclosure, so append the row first and the disclosure second.
+    actions.appendChild(det);
   }
   note.appendChild(actions);
   // P1.10 (spec §8: learnable, not by punishment): the card says what its own
@@ -7128,11 +7151,31 @@ function findingOnScene(f, n) {
  *  same severity rule the category chips use (severity-agnostic orientation). */
 function openFindingsOnScene(n) {
   if (n == null) return 0;
+  // N3, THE COUNTING CONTRACT. This number and the list printed beside it must
+  // be the same scope. It used to walk state.findings, which includes rows the
+  // queue HIDES behind the Kit A ungrounded toggle - so the chip printed a
+  // grounded count next to an unfiltered list, and the writer had two numbers
+  // that were both true and did not agree.
+  //
+  // Count what the queue actually renders, using the SAME exclusion rule as
+  // queueCounts and queueRowVisible. One rule, three surfaces, no drift.
+  const items = (state.fixQueue && state.fixQueue.items) || [];
+  const bound = bindQueueItems(items, state.findings, state.findingIds);
   let count = 0;
-  (state.findings || []).forEach((f, index) => {
-    if (findingDisposition(f, index) !== "open") return;
-    if (findingOnScene(f, n)) count += 1;
-  });
+  for (const item of items) {
+    if (item.dismissed) continue;
+    const at = bound[item.index];
+    const f = at >= 0 ? (state.findings || [])[at] : null;
+    const d = f ? findingDisposition(f, at)
+                : (item.status === "addressed" ? "addressed" : "open");
+    if (d === "dismissed" || d !== "open") continue;
+    // identical to queueCounts: kit A hides ungrounded rows unless the writer
+    // asked for them, and a writer-dispositioned row bypasses the claim.
+    if (item.ungrounded && !state.fixQueueShowUngrounded
+        && d !== "addressed" && d !== "deferred") continue;
+    const refs = (f && f.scene_refs) || item.scene_refs || [];
+    if (refs.includes(n) || refs.includes(String(n))) count += 1;
+  }
   return count;
 }
 

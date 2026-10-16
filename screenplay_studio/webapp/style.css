@@ -6562,3 +6562,35 @@ body:not(.idea-mode) .desk {
 .craft-panel.fix-queue .queue-row.dismissed {
   opacity: 0.55;
 }
+
+/* Spec 14.38. Nine controls do not fit the queue's one action row. The queue's
+ * four (Locate, Rewrite, Discuss, Dismiss) stay inline; the intent cluster
+ * collapses here. The summary is a real <summary>, so it is keyboard-reachable
+ * and announces expanded/collapsed without a line of JS. */
+.finding-intent-disclosure {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.finding-intent-disclosure > summary {
+  display: inline-block;
+  padding: 2px 7px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--ink-2);
+  list-style: none;
+}
+.finding-intent-disclosure > summary::-webkit-details-marker { display: none; }
+.finding-intent-disclosure[open] > summary { color: var(--ink); border-color: var(--ink-3); }
+/* The cluster lays out as its own inline row once opened, so opening it must
+ * not re-wrap the four controls the budget is about. */
+.finding-intent-cluster {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}

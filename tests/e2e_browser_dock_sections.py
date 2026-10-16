@@ -1505,8 +1505,21 @@ TYPOLOGY_SEED_JS = """(args) => {
     mk({ category: "structure", severity: "medium", scene_refs: [4, 5],
          issue: "TYPE scenes seed", evidence_quote: null,
          verification: { status: "no_quote", matched_scene: null, confidence: null } }),
-    mk({ category: "theme", severity: "low", scene_refs: [],
+    // SPEC 14.37. This used to be `category: "theme"` with no scene and no
+    // provenance, which is an observation on TWO independent grounds, so it
+    // could never reach a card and the assertions below contradicted the ruling
+    // as written. Re-seeded as a scene-less MECHANICAL finding - the shape the
+    // exception exists for ("this clock jump has no slugline" cannot cite a
+    // slugline) - so the browser exercises the exception AND the whole-script
+    // scope label through the real render path.
+    mk({ category: "continuity", severity: "low", scene_refs: [], rule_id: "timeline_consistency",
          issue: "TYPE script seed", evidence_quote: null,
+         verification: { status: "no_quote", matched_scene: null, confidence: null } }),
+    // ...and a THEME opinion beside it, asserted to stay OUT. Both halves of
+    // the ruling now have browser coverage; the node suite pins them, but the
+    // phantom `rerender` is the precedent for what an unexercised path does.
+    mk({ category: "theme", severity: "low", scene_refs: [1],
+         issue: "TYPE theme opinion", evidence_quote: null,
          verification: { status: "no_quote", matched_scene: null, confidence: null } }),
   ];
   state.findings = fs;
@@ -1633,16 +1646,27 @@ def check_evidence_typing_and_row(page, lens):
     line_card = card_shape(page, "TYPE line seed")
     scenes_card = card_shape(page, "TYPE scenes seed")
     script_card = card_shape(page, "TYPE script seed")
-    check("item 3: all three seeded findings reached a deep card",
+    check("item 3: all three queued findings reached a deep card",
           bool(line_card) and bool(scenes_card) and bool(script_card),
           f"line={line_card is not None} scenes={scenes_card is not None} "
           f"script={script_card is not None}")
     check("item 3: a finding cited to two scenes names BOTH scenes as its scope",
           scenes_card is not None and scenes_card["scope"] == "Scenes 4, 5",
           repr(scenes_card and scenes_card["scope"]))
-    check("item 3: a finding with no scene cited says it is about the whole script",
+    check("item 3: a scene-less MECHANICAL finding is queued and says it is "
+          "about the whole script (the 14.37 exception, end to end)",
           script_card is not None and script_card["scope"] == "Whole script",
           repr(script_card and script_card["scope"]))
+    # The other half of the ruling, in the browser. A theme opinion has no verb
+    # and must not appear in the worklist however deeply it is scened.
+    check("item 3: a THEME opinion stays out of the queue entirely, even with a "
+          "scene - it is an observation, not a task",
+          page.evaluate("""() => [...document.querySelectorAll(
+              '.dock-section-fixqueue .finding-note-text')]
+            .every((n) => !/TYPE theme opinion/.test(n.textContent || ''))"""),
+          str(page.evaluate("""() => [...document.querySelectorAll(
+              '.dock-section-fixqueue .finding-note-text')]
+            .map((n) => (n.textContent || '').slice(0, 24))""")))
 
     # -- 2. scope is the ANALYZER's claim, never the verifier's answer --------
     # The quote matched in Scene 1 while the finding cites Scene 2. Printing the
