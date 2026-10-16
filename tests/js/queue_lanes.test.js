@@ -202,3 +202,61 @@ test('the fixture rows each print a reason that names the term that decided it',
   assert.doesNotMatch(why, /severity/i,
     'severity is an attribute, not a rank term; printing it would imply it sorted the row');
 });
+
+// ---------------------------------------------------------------------------
+// Spec 14.35: the queue's id join, pinned by the ONLY mutation that can tell it
+// apart from positional binding.
+//
+// The 14.29 join was inline in the render path and contained
+// `at = item._seen == null ? -1`. `seen` starts at 0, so 0 never equalled -1,
+// `hit` stayed -1, `_seen` was never written, and EVERY row fell back to
+// positional binding on every render. The suite was green the whole time,
+// including a shared-mark seed whose clone "passed", because the code under
+// test never executed. A guard that cannot distinguish the new code from the
+// old code certifies the old code.
+//
+// So these run against core.js bindQueueItems, and the reorder case below is
+// the one that positional binding cannot pass.
+const item = (index, finding_id) => ({ index, finding_id });
+const fid = (f) => core.computeFindingId(f);
+
+test('id binding survives a re-run that reorders findings', () => {
+  const A = { category: 'dialogue', issue: 'A', scene_refs: [1] };
+  const B = { category: 'structure', issue: 'B', scene_refs: [2] };
+  const findings = [A, B];
+  const ids = findings.map(fid);
+
+  // POSITIONAL binding answers [0, 1] here, and that is wrong: item 0 carries
+  // B's id, so it must resolve to position 1.
+  const bound = core.bindQueueItems([item(0, ids[1]), item(1, ids[0])], findings, ids);
+  assert.deepEqual(bound, [1, 0],
+    'items must follow their finding_id, not their .index');
+});
+
+test('two items sharing one content id get two different findings', () => {
+  // The same quote judged by two rules is real and shipped: Rain_C courier_7
+  // and gun_pen_2 both do it. computeFindingId keys on category + quote +
+  // scene_key, so identical evidence collapses to one id on purpose.
+  const shared = { category: 'dialogue', evidence_quote: 'the courier never blinks', scene_key: 'INT', issue: 'one' };
+  const dup = { category: 'dialogue', evidence_quote: 'the courier never blinks', scene_key: 'INT', issue: 'two' };
+  const findings = [shared, dup];
+  const id = fid(shared);
+  assert.equal(fid(dup), id, 'the fixture must actually collide, or this proves nothing');
+
+  // indexOf() sends BOTH items to findings[0] and renders the same card twice.
+  const bound = core.bindQueueItems([item(0, id), item(1, id)], findings, [id, id]);
+  assert.deepEqual(bound, [0, 1],
+    'the Nth item with an id must get the Nth finding carrying it');
+});
+
+test('an item with no finding_id still binds positionally', () => {
+  // Older server payloads carry no id. That path must keep working.
+  const findings = [{ category: 'dialogue', issue: 'A' }, { category: 'structure', issue: 'B' }];
+  assert.deepEqual(core.bindQueueItems([{ index: 1 }], findings, ['nope', 'nada']), [1]);
+});
+
+test('an id that matches nothing falls back instead of dropping the row', () => {
+  const findings = [{ category: 'dialogue', issue: 'A' }];
+  assert.deepEqual(core.bindQueueItems([item(3, 'f-unknown')], findings, ['f-other']), [3],
+    'a row must never disappear because its id could not be resolved');
+});

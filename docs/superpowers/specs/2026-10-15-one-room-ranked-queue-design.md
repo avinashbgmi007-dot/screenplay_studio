@@ -1523,3 +1523,61 @@ The shared seed block stamps `ungrounded: !f.evidence_quote`. A CHECK finding an
 finding legitimately carry no quote, so five checks were reading Kit A doing its job as a product
 failure. Seeds now set `state.fixQueueShowUngrounded = true`. Kit A's hidden-by-default behaviour has
 its own suite (`e2e_browser_ungrounded_filter.py`) with its own seeds, so this cannot weaken it.
+
+### 14.35 The 14.29 join ruling was NOT implemented. It is now.
+
+**Record the correction plainly: 14.29 claimed a join that never ran.** The inline code was
+
+```js
+const at = item._seen == null ? -1 : item._seen[item.finding_id] || 0;
+```
+
+`seen` starts at `0`, so `0 === -1` is never true, `hit` stays -1, `_seen` is never written, and
+**every row fell back to positional binding on every render**. The shared-mark clone "passed"
+because aligned arrays happen to agree positionally. The reorder robustness the ruling was for is
+not implemented.
+
+The deeper lesson is the runner's, and it is the one worth keeping: **a mutation test that cannot
+distinguish the new code from the old code is certifying the old code.** The 14.29 guard
+mutation-verified the presence of a call, never its reachability. The code under test never
+executed, and the suite stayed green.
+
+**The fix is structural, not a one-character edit.** The join moved to `core.js` as
+`bindQueueItems(items, findings, findingIds)` — a pure function, so it is testable without a
+browser, exactly as `groupByLane` is. The queue cannot now bind differently from the tests.
+
+Two details the move also fixed:
+
+- Lane entries carry the finding's **true array position**, not `item.index`. When the two disagree
+  the card previously stamped `data-finding-index` pointing at the wrong row.
+- `itemAt` is keyed by that true position, so the row and the verb row resolve the same finding.
+
+**Four tests, and the mutation is the one that matters.** The reorder case — items whose ids point
+away from their positions — cannot pass under positional binding. Both mutations were run broken
+first:
+
+| Mutation | Result |
+|---|---|
+| the exact 14.29 defect (`nth` undefined on first use) | reorder binds `[0,1]` instead of `[1,0]`, **test fails** |
+| `indexOf`, first match wins | duplicate-id test **fails** |
+
+108 node tests pass, up from 104. 14.29 should be read as "decided but not delivered" for that
+commit; this is the delivery.
+
+### 14.36 Open, with the ruling made
+
+**The verb row is now a real budget question, and it is mine, not the writer's.** The duplication
+theory is exhausted and the wrap persists: one action row per finding does not hold nine verbs at
+current control sizes. **Ruling: the queue's own four stay inline — Locate, Rewrite, Discuss,
+Dismiss — because that is the queue's grammar and P1.10 puts it there. The card's intent and verdict
+cluster (✓, ⏹, the pin and why glyphs) collapses behind a disclosure**, with their existing
+`finding-intent-hint` line explaining what the marks cost before the click rather than after it. Not
+implemented this round; recorded so the next one does not reopen the question.
+
+**The label-scope mismatch is not a toggle leak to be patched, it is N3.** The chip-on label counts
+grounded-open-in-scene while the list beside it shows all-open-in-scene. Two surfaces printing
+different scopes side by side is exactly what the counting contract forbids, and the honest repair is
+for the label to count what the list contains.
+
+**Three missing cards:** every static element of the admit path is verified clean by the runner, so
+what remains is runtime state between the seed and the assertion. Not guessed at.

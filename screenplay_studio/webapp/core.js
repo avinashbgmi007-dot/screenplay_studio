@@ -325,6 +325,48 @@ function rankScore(f) {
   return impact * 10 + verified + span + sticky;
 }
 
+
+/**
+ * SPEC 14.35. Bind queue items to findings BY ID, as a consuming multimap.
+ *
+ * Why this lives in core.js and not in app.js: the 14.29 version of this join
+ * was inline in the render path, and the guard that mutation-verified it could
+ * not tell the new code from the old one. An inline `if (item._seen == null) at
+ * = -1` made the id path UNREACHABLE on every render, so every row fell back to
+ * positional binding and the suite still went green. The defect was invisible
+ * to every check because the thing under test was never executed.
+ *
+ * So the join is a pure function here, and tests/js/queue_lanes.test.js pins it
+ * with the only mutation that distinguishes id-binding from positional binding:
+ * findings in one order, items in another, ids that disagree with position.
+ *
+ * The consuming counter is what makes duplicate ids correct. Two findings can
+ * share one content id - the same quote judged by two rules is real and shipped
+ * (Rain_C courier_7, gun_pen_2) - and indexOf() sends both items to the first
+ * one, which renders the same card twice.
+ *
+ * Positional binding remains the fallback ONLY for an older server payload that
+ * carries no `finding_id` at all.
+ */
+function bindQueueItems(items, findings, findingIds) {
+  const fs = findings || [];
+  const ids = findingIds || fs.map(computeFindingId);
+  const taken = Object.create(null);
+  return (items || []).map((item) => {
+    if (!item || !item.finding_id) return item ? item.index : -1;
+    const nth = taken[item.finding_id] || 0;
+    let seen = 0, hit = -1;
+    for (let k = 0; k < ids.length; k++) {
+      if (ids[k] !== item.finding_id) continue;
+      if (seen === nth) { hit = k; break; }
+      seen++;
+    }
+    if (hit < 0) return item.index;          // id absent: positional fallback
+    taken[item.finding_id] = nth + 1;
+    return hit;
+  });
+}
+
 /**
  * The order lanes appear in: descending MAX impact, so the lane holding the
  * heaviest thing on the desk leads.
@@ -415,6 +457,7 @@ if (typeof module !== "undefined" && module.exports) {
     sceneRefCount,
     rankScore,
     rankReasonText,
+    bindQueueItems,
     laneOrder,
     groupByLane,
   };
