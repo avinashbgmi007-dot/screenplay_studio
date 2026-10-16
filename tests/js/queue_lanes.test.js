@@ -260,3 +260,42 @@ test('an id that matches nothing falls back instead of dropping the row', () => 
   assert.deepEqual(core.bindQueueItems([item(3, 'f-unknown')], findings, ['f-other']), [3],
     'a row must never disappear because its id could not be resolved');
 });
+
+// ---------------------------------------------------------------------------
+// Spec 14.37: the membership ruling. Scene-less findings split on provenance.
+test('a mechanical check with no scene is a TASK and is queued', () => {
+  // "This clock jump has no slugline" cannot cite a slugline. The old rule made
+  // the scene requirement circular and the row reached no card surface at all.
+  assert.equal(core.findingLane({ category: 'continuity', rule_id: 'timeline_consistency' }), 'deterministic');
+  assert.equal(core.findingLane({ category: 'continuity', check_id: 'unmarked_time_flip' }), 'deterministic');
+  // No provenance and no scene: an opinion with nowhere to point. Not a task.
+  assert.equal(core.findingLane({ category: 'dialogue' }), 'observation');
+  assert.equal(core.findingLane({ category: 'continuity' }), 'observation',
+    'a scene-less finding with no rule/check is still an observation');
+});
+
+test('theme and genre stay observations even WITH a scene', () => {
+  assert.equal(core.findingLane({ category: 'theme', scene_refs: [1] }), 'observation');
+  assert.equal(core.findingLane({ category: 'genre', scene_refs: [1] }), 'observation');
+});
+
+test('a scene-less mechanical check never becomes a silent demotion', () => {
+  // It must be weighted, not parked at impact 0 like an unknown category.
+  const f = { category: 'continuity', rule_id: 'timeline_consistency' };
+  assert.ok(core.IMPACT.continuity > 0, 'continuity is weighed');
+  assert.ok(core.rankScore(f) >= core.IMPACT.continuity * 10,
+    `a queued scene-less check scores ${core.rankScore(f)}, below its own impact floor`);
+});
+
+test('a scene-less mechanical check still reaches the queue, not just a lane', () => {
+  // findingLane returning a real lane is necessary but not sufficient: the
+  // grouping step drops `observation` entries. This is the check that would
+  // have caught the original "shown outside the queue" claim being false.
+  const cut = core.groupByLane([
+    { f: { category: 'continuity', rule_id: 'r' }, index: 0 },
+    { f: { category: 'dialogue' }, index: 1 },
+  ]);
+  assert.deepEqual(cut.order, ['deterministic'],
+    'the queued check is grouped; the scene-less opinion is not');
+  assert.equal((cut.groups.deterministic || []).length, 1);
+});

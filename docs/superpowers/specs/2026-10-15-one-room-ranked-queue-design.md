@@ -1581,3 +1581,48 @@ for the label to count what the list contains.
 
 **Three missing cards:** every static element of the admit path is verified clean by the runner, so
 what remains is runtime state between the seed and the assertion. Not guessed at.
+
+### 14.37 The membership ruling: scene-less findings split on provenance
+
+Anchored 177/8, and the runner closed the missing-cards thread with three corrections, two of them
+to their own prior analysis, which is worth noting because it is why this took four rounds.
+
+**Correction owed and made: the Kit A theory was a red herring** for the three missing cards. The
+toggle work was real and needed elsewhere. The clue that should have been taken two rounds earlier is
+**invariance across implementations** — the symptom survived three different join implementations
+unchanged, which meant it was never about the join.
+
+**Root cause, confirmed by reading `core.js`, not inferred:** `findingLane:269` returned
+`"observation"` for any finding with empty `scene_refs`, and `groupByLane:411` drops observation
+entries from the queue. The three missing cards are exactly the scene-less seeded findings.
+
+**The comment above it was false, and that is the part that matters.** It said an observation "is
+shown outside the queue". Every render path was searched: writer-memory observations (a different
+concept), per-finding observation text, flag titles. **No dock surface renders observation-lane
+findings as cards.** A comment claiming a guarantee that does not exist is worse than the gap it
+conceals, because it reads as one. Rewritten to state what is true: an observation is not on the
+desk because it is not something you act on there; it stays in the report and the export, so nothing
+is dropped, it is simply not worklist.
+
+**The ruling.** Not "build an observations surface and leave the tests red until it exists" — that
+defers the drop rather than ending it, and AGENTS.md:66 is not satisfied by a surface promised for
+later.
+
+The scene requirement exists because **locating is how you act on a finding**. That is *circular* for
+a mechanical check whose subject is the missing anchor: "this clock jump has no slugline" cannot cite
+a slugline, so the rule ate the defect it described. So:
+
+| Finding | Lane |
+|---|---|
+| `theme` / `genre`, with or without a scene | `observation`, unconditional |
+| no `scene_refs`, no `rule_id`/`check_id` | `observation` — an opinion with nowhere to point |
+| **no `scene_refs`, but `rule_id` or `check_id`** | **queued**, `LANE_OF[cat] \|\| "uncategorised"` |
+
+The signal is `rule_id` / `check_id`, which the analyzer really sets (`continuity.py:91-92, 157-158`)
+— not a category invented for this argument.
+
+**Four tests, mutation-verified both directions, broken first:** reverting the exception fails, and
+queueing *every* scene-less finding while ignoring provenance also fails. The last one matters
+because it pins the other half of the rule — the exception is narrow, not a general loosening.
+
+112 node tests, up from 108.

@@ -252,10 +252,18 @@ const LANE_BLURB = {
 /**
  * Does this finding belong in the queue at all?
  *
- * Membership requires a scene and a verb. A finding with no scene_refs cannot
- * be located, so it is an observation, not a task - and an observation is not
- * silently dropped (AGENTS.md:66, "Flag, don't drop"): it is shown outside the
- * queue. Unknown categories are queued, because AGENTS.md:66 outranks any
+ * Membership requires a verb, and usually a scene to locate it by.
+ *
+ * This comment used to say an observation "is shown outside the queue". That was
+ * false and was searched for and confirmed false: no dock surface renders
+ * observation-lane findings as cards. A false claim about graceful degradation
+ * is worse than the degradation, because it reads as a guarantee.
+ *
+ * The honest statement: an observation is not on the desk because it is not
+ * something you act on there. It stays in the report and the export, so nothing
+ * is dropped (AGENTS.md:66) - it is simply not worklist. See 14.37 for the
+ * mechanical-check exception, which exists because the old rule ate its own
+ * defect. Unknown categories are queued, because AGENTS.md:66 outranks any
  * tidiness argument about the table above.
  */
 function findingLane(f) {
@@ -266,7 +274,25 @@ function findingLane(f) {
   // are absent from LANE_OF for the same reason - see spec 1.2.
   if (cat === "theme" || cat === "genre") return "observation";
   const refs = f.scene_refs;
-  if (!Array.isArray(refs) || refs.length === 0) return "observation";
+  if (!Array.isArray(refs) || refs.length === 0) {
+    // SPEC 14.37, THE MEMBERSHIP RULING. A scene-less finding used to be an
+    // observation unconditionally, on the reasoning that it "cannot be located,
+    // so it is not a task". That reasoning is CIRCULAR for a mechanical check,
+    // whose subject is frequently the missing anchor itself: "this clock jump
+    // has no slugline" cannot cite a slugline. Requiring one makes the rule eat
+    // the defect it describes, and the row then reached no card surface at all.
+    //
+    // A finding that a rule or check produced is therefore a TASK even with no
+    // scene. The signal is `rule_id` / `check_id`, which the analyzer really does
+    // set (continuity.py:91-92, 157-158), not a new category invented for this.
+    //
+    // A scene-less finding with NO mechanical provenance stays an observation:
+    // an opinion with nowhere to point is a thought, and the worklist is for
+    // things you act on. It remains in the report and the export - not dropped,
+    // simply not on the desk.
+    if (f.rule_id || f.check_id) return LANE_OF[cat] || "uncategorised";
+    return "observation";
+  }
   // An unknown category gets its OWN lane rather than falling into "line".
   //
   // Both alternatives were wrong. Falling into "line" while scoring IMPACT 0 is
