@@ -4381,6 +4381,9 @@ function renderFixQueuePanel(container, opts) {
   // report page passes neither and keeps the flat list: there the Fix Queue is
   // the only queue, so there is nothing to dedupe against.
   const options = opts || {};
+  // G5 compacts only the merged dock queue. The report's flat panel keeps its
+  // existing layout, and a filtered-empty queue uses the same compact header.
+  const panelClass = "craft-panel fix-queue" + (options.lanes ? " fix-queue-ranked" : "");
   const items = (state.fixQueue && state.fixQueue.items) || [];
   // the ONE filter applies to the queue too (R5-b completed): rows whose
   // severity/category the chips hide stay in the report but out of the
@@ -4429,22 +4432,29 @@ function renderFixQueuePanel(container, opts) {
     });
     head.appendChild(toggleBtn);
   };
+  const addQueueToggles = (head) => {
+    const toggles = options.lanes ? el("div", "fix-queue-toggles") : head;
+    maybeAddDismissedToggle(toggles);
+    maybeAddUngroundedToggle(toggles);
+    if (toggles !== head && toggles.children.length) head.appendChild(toggles);
+  };
   if (!shown.length) {
     if (!items.length && !state.fixQueueShowDismissed) return;
-    const panel = el("div", "craft-panel fix-queue");
+    const panel = el("div", panelClass);
     const head = el("div", "craft-panel-head");
     head.appendChild(el("span", "craft-panel-title", "Fix queue — 0 shown / " + counts.total + " total"));
-    maybeAddUngroundedToggle(head);
-    maybeAddDismissedToggle(head);
+    addQueueToggles(head);
     panel.appendChild(head);
     const hint = el("p", "fix-row-why", "No rows match the current filter — toggle a severity or category chip on the Evidence board to widen the to-do.");
     panel.appendChild(hint);
     addPanel(container, panel); // container may be an array (craft shelf) or a node
     return;
   }
-  const panel = el("div", "craft-panel fix-queue");
+  const panel = el("div", panelClass);
   const head = el("div", "craft-panel-head");
-  head.appendChild(el("span", "craft-panel-title", `Fix queue — ${shownCounts.open} open / ${shown.length} shown / ${counts.total} total`));
+  // The dock section already names the queue; keep all three scoped counts
+  // without spending another line on the same name. The flat report needs it.
+  head.appendChild(el("span", "craft-panel-title", `${options.lanes ? "" : "Fix queue — "}${shownCounts.open} open / ${shown.length} shown / ${counts.total} total`));
   // Spec 9c: the impact weights are a hypothesis and the WRITER must see that.
   // This sat on the by-category lane section head, where it rendered at y1174 -
   // a screen below the fold, so the writer met the ranked queue before ever
@@ -4465,13 +4475,13 @@ function renderFixQueuePanel(container, opts) {
   dm.querySelector(".dawn-pct").textContent = dawnPct + "%";
   head.appendChild(dm);
   // triage: dismissed findings stay in the report but out of the writer's way.
-  maybeAddDismissedToggle(head);
-  maybeAddUngroundedToggle(head);
+  addQueueToggles(head);
   panel.appendChild(head);
   // P1.10: the queue's own gesture, printed where it is used (the deep cards
   // explain ✓ / next-pass on the card; Dismiss exists only here).
-  panel.appendChild(el("p", "finding-intent-hint",
-    "Dismiss — takes the row out of this to-do; the finding stays in the report"));
+  panel.appendChild(el("p", "finding-intent-hint", options.lanes
+    ? "Dismiss: out of this to-do, kept in the report."
+    : "Dismiss — takes the row out of this to-do; the finding stays in the report"));
 
   // ONE verb row, shared by both render paths, so Locate/Rewrite/Discuss/
   // Dismiss/Reopen cannot drift between the flat list and the lanes.
@@ -4625,11 +4635,15 @@ function renderFixQueuePanel(container, opts) {
       const list = laneCut.groups[lane] || [];
       const group = el("div", "dock-cat-group dock-lane-group");
       group.dataset.lane = lane;
+      // The first category belongs beside its lane identity, not on a second
+      // pre-card row. Later category changes remain beside their own rows.
+      const laneHead = el("div", "dock-lane-head");
       const laneTitle = el("div", "dock-section-title dock-lane-title");
       laneTitle.appendChild(el("span", "", LANE_LABELS[lane] || lane));
       laneTitle.appendChild(el("span", "dock-section-count", String(list.length)));
       laneTitle.title = LANE_BLURB[lane] || "";
-      group.appendChild(laneTitle);
+      laneHead.appendChild(laneTitle);
+      group.appendChild(laneHead);
       const wrap = el("div", "dock-finding-list");
       let lastCat = null;
       for (const { f, index } of list) {
@@ -4657,7 +4671,8 @@ function renderFixQueuePanel(container, opts) {
             // itself wraps.
             refreshAllFindingSurfaces();
           });
-          wrap.appendChild(chip);
+          if (wrap.children.length) wrap.appendChild(chip);
+          else laneHead.appendChild(chip);
         }
         // SPEC 14.25, THE REGRESSION THE MERGE INTRODUCED. This lane row used
         // to be a deep card (findingNoteEl: quote, rule chip, observation, truth

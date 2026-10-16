@@ -6535,18 +6535,77 @@ body:not(.idea-mode) .desk {
   color: var(--ink-2);
   opacity: 0.82;
 }
-/* The lane groups now live inside the Fix Queue panel rather than inside a dock
- * section, so they need their own separation from the panel head. */
-.craft-panel.fix-queue .dock-lane-group {
+/* G5: separate successive lanes, not the first lane from its own panel head.
+ * :first-of-type did not exempt that lane: .craft-panel-head is an earlier div.
+ * The sibling selector below applies only once an actual lane precedes it. */
+.craft-panel.fix-queue > .dock-lane-group {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.craft-panel.fix-queue > .dock-lane-group ~ .dock-lane-group {
   margin-top: 14px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
 }
-.craft-panel.fix-queue .dock-lane-group:first-of-type {
-  margin-top: 8px;
-  border-top: none;
-  padding-top: 0;
+/* One compact header for the first category and the lane it belongs to. Keep
+ * the header sticky over the whole group; putting a sticky title inside a
+ * non-sticky, one-row parent would pin it only over that parent's own height. */
+.craft-panel.fix-queue .dock-lane-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ink-900);
+  margin-bottom: 4px;
 }
+.craft-panel.fix-queue .dock-lane-head > .dock-lane-title {
+  position: static;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+.craft-panel.fix-queue .dock-lane-head > .dock-lane-cat { margin: 0; }
+
+/* G5 preamble compaction, merged dock queue ONLY. Counts get one line; the
+ * visible uncalibrated caveat and the same dawn value share the next. Triage
+ * toggles share a wrapping row when present. No clipping, smaller type, fixed
+ * heights or card-anatomy changes: the browser still measures the <900px gate.
+ * Side padding is unchanged so the already-green 322px verb budget stays put. */
+.dock-section .fix-queue.fix-queue-ranked {
+  padding-top: 4px;
+}
+.dock-section .fix-queue.fix-queue-ranked > .craft-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.dock-section .fix-queue-ranked > .craft-panel-head > .craft-panel-title {
+  grid-column: 1 / -1;
+  min-width: 0;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.dock-section .fix-queue-ranked > .craft-panel-head > .dock-section-hint {
+  padding-left: 0;
+  margin-left: 0;
+}
+.dock-section .fix-queue-ranked .dawn-meter { gap: 4px; }
+.dock-section .fix-queue-ranked .dawn-track { width: 44px; }
+.dock-section .fix-queue-ranked .fix-queue-toggles {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dock-section .fix-queue-ranked > .finding-intent-hint { margin: 0 0 4px; }
 
 /* Spec 14.25: the queue row is a DEEP card with the verb row on it. The deep
  * card is a block, so the verbs ride under it rather than in the old one-line

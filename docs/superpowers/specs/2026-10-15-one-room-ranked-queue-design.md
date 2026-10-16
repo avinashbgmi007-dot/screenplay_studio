@@ -1733,12 +1733,15 @@ red-by-design, red-pending-ruling, or red-pending-investigation.
 | 14.38 verb budget | five items, one row, 322px |
 | 14.43 pin placement | disclosure opened first, note lands, button says it took |
 
-Local: **2290 python pass**, **112 node pass**. The 2 `test_repo_hygiene` failures and the 1
-`preview-ink-layer` failure are pre-existing and unrelated (`ModuleNotFoundError: playwright`).
+Local at recording: **2290 Python pass**, **112 Node pass**. The two failures in
+`tests/test_repo_hygiene.py` were `ModuleNotFoundError: playwright`; the separate Node failure was
+`screenplay_studio/webapp/preview-ink-layer/tests/dom.test.mjs`. The previous wording incorrectly
+attached the Python import error to both. See §14.50 for the dependency-complete run.
 
 ### 14.46 What green does NOT mean, stated before it is claimed elsewhere
 
-A green suite is one instrument. Recorded so a later reader does not over-read it:
+A green suite is one instrument. Recorded so a later reader does not over-read it.
+The G5 status below was current at `fa81dba`; §14.48 records the subsequent anchored failure.
 
 - **G5 has never been re-measured as a named check since the merge.** The merge disambiguated it —
   there is one queue surface now, so "first actionable queue row" names one thing — but a
@@ -1763,3 +1766,94 @@ The pattern that kept paying was reporting the **mechanism**, not the verdict, a
 run judge it. Three times in this arc the first answer was wrong in a way only measurement caught:
 the highs-first seed that passed while proving nothing, the multimap that certified its own fallback,
 and the `display` declaration that was inert under a flex parent.
+
+
+### 14.48 G5 measured on the merged queue: FAIL, 1007px
+
+The runner confirmed served-tree identity at `fa81dba` on both runs. At 1440×900, lens scroll 0,
+no manual scrolling and no page errors, the first actionable card bottom was **1007px**, identical
+on both runs. The `<900px` gate remains unchanged and **failed**.
+
+| Band | Measured extent |
+|---|---|
+| Top chrome, not individually itemized | 0–303px |
+| Tier switch | 303–330px |
+| Filters | 338–390px |
+| Current scene | 390–453px |
+| Queue section header | 467–500px |
+| Queue preamble before the first card | 500–746px |
+| First deep card | 746–1007px, 261px high |
+
+The card's depth is not the remedy target. The runner's thin-input caveat stands: this output
+admits one queue row. Two identical runs establish the failure on that input, not a margin for
+other reports.
+
+**Empty lane headers were a hypothesis, not the measured mechanism.** The full
+`renderFixQueuePanel` path filters items before building entries; `groupByLane` creates only
+populated groups. The new DOM test also runs the original renderer against a hidden Structure
+row, a theme observation with a scene, a scene-less opinion and one admitted Line row. Only the
+Line header renders. There is no evidence for an empty-lane suppression fix.
+
+### 14.49 Compact the queue preamble, not the card or the gate
+
+Source inspection identifies the pre-card occupants: the inner count/caveat/meter header, the
+queue's Dismiss explanation, then lane identity and its first category chip on separate rows.
+There is also a concrete spacing defect: `.dock-lane-group:first-of-type` never exempts the first
+lane because the earlier `.craft-panel-head` is itself a `div`. These facts do not apportion the
+246px into independently measured heights.
+
+Implemented in `screenplay_studio/webapp/app.js` and `screenplay_studio/webapp/style.css`:
+
+- The lane path opts into `fix-queue-ranked`, including the filtered-empty branch. The flat report
+  keeps its layout and its explicit Fix Queue label. The dock section already supplies that label,
+  so the compact inner count line retains all three counts without repeating the name.
+- Counts occupy one grid row. The visible `impact weights uncalibrated` caveat and the same dawn
+  percentage share the next. The track is shorter, not a different progress calculation. Conditional
+  dismissed/ungrounded toggles share one wrapping row. Neither toggle is removed.
+- The Dismiss explanation stays visible before the cards, in shorter copy with the same consequence:
+  `Dismiss: out of this to-do, kept in the report.`
+- The first category chip deliberately moves from `.dock-finding-list` into `.dock-lane-head`,
+  beside `.dock-lane-title`. Later category changes retain their subheaders beside the relevant rows.
+  All category-chip classes and the shared refresh callback survive. The combined heading stays sticky.
+- A real lane-sibling selector adds separation only between successive lanes. The ineffective
+  `:first-of-type` selector was **deliberately replaced**, not lost as collateral.
+
+No selectors for finding anatomy or actions were dropped. No card renderer, membership rule,
+counting predicate, rank weight, route, return stack or threshold changed. Side padding and type
+sizes are unchanged. Nothing is clipped, scaled, given a fixed height or put behind a new disclosure.
+The 0–303px arrival band is untouched.
+
+### 14.50 Reachable-render guards, complete local suites, browser verdict pending
+
+`tests/js/queue_preamble.test.js` executes the shipped `renderFixQueuePanel` with real core binding,
+lanes and ranking in jsdom. Deep cards and unrelated application services are explicitly stubbed.
+It checks the actual populated and filtered-empty branches, the flat-path exclusion, retained
+counts/caveat/meter/toggles/explanation, first-category relocation and later-category ordering,
+category clicks narrowing **and** widening through the shared refresh, absence of empty headers,
+and CSS selectors matching the real first lane. **It has no layout engine and proves no pixels.**
+
+Before the product edits, four new checks failed and two existing-behavior checks passed. Six
+subsequent mutations each failed: unreachable compact opt-in; restored separate category row;
+restored ineffective first-of-type exemption; restored stacked flex header; a refresh call present
+but unreachable inside `if (false)`; global rather than queue-only compaction. Files were restored
+byte-identically, then all six checks passed again.
+
+Local verification after installing the declared missing test dependencies:
+
+- `/tmp/ss/bin/python -m pytest tests/ -q -rf`: **2292 passed, 4 skipped**, exit 0. Before installing
+  the Playwright Python package, the same run was 2290 passed and the two known import failures in
+  `tests/test_repo_hygiene.py`. No browser binary or browser suite was run locally.
+- `npm test`: **166 passed, 0 failed**, exit 0 after `npm ci`. No changes to the preview-ink-layer
+  suite were needed. Do not carry forward the earlier environment's 112/1 result as a current failure.
+- `node --check` for the changed application/test JS and `git diff --check`: pass. Existing Python
+  queue, uncalibrated-copy, CSS-integrity and SPA guards were not weakened.
+
+Recovery before editing: the checkout had reset to `5c1b953` with the prior work as uncommitted
+files. Safety tag `safety/g5-reclone-20261016T120654Z` preserves snapshot `0e20dcc`. Its complete tree
+was byte-identical to origin `fa81dba`; resetting the session branch to that origin left a clean
+worktree before this change. The safety tag is retained.
+
+**G5 remains FAIL at its last anchored measurement.** Next: assert served-tree identity on the
+pushed repair, repeat the same G5 measurement and retain the band inventory. Then re-anchor
+`tests/e2e_browser_dock_sections.py` and `tests/e2e_browser_print_media.py`. No predicted pixel saving
+is reported as a result. Register material and writer validation remain separate missing inputs.

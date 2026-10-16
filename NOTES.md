@@ -4,6 +4,19 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-16 — G5 preamble compaction, browser re-measure pending
+
+Runner G5 at `fa81dba`: first card bottom 1007px at 1440×900, 2/2 identical, no page errors.
+Source and executed DOM reject the empty-lane hypothesis. Compact the stacked queue header,
+share lane identity with its first category, and replace the ineffective first-of-type spacing
+exemption. Deep cards, predicates, visible uncalibrated copy and horizontal verb budget stay intact.
+`tests/js/queue_preamble.test.js`: 6 checks, old tree 4 fail/2 pass, six discriminating mutations fail,
+fixed tree 6 pass. Full Python 2292 pass/4 skip after installing the missing Playwright import;
+full Node 166 pass/0 fail after `npm ci`. No local browser result. Spec §14.48–§14.50 records the
+anchored failure, repair, guard limits and byte-identical re-clone recovery with retained safety tag.
+Next: identity-anchored G5 re-measure, then `tests/e2e_browser_dock_sections.py` and
+`tests/e2e_browser_print_media.py` re-anchors. Do not mark G5 passed from source/DOM checks.
+
 ### 2026-10-11 — Ledger precision done + trial acceptance (D1-D4 follow-ups, full suite 2191)
 
 Ledger Tasks 1-3 via subagents with review; trial acceptance on fresh gunpen (26) + pain3 (78) real-model runs. Adjudicator flips with proof (Rishi promise→sc8, letter→sc9, drop→sc14, itlane→sc19, comic→sc22, senior→sc20/14, gun/newspaper→sc3); X Company correctly kept abandoned; backwards citations distrusted; meta-word/underscore/possessive matching fixed with measured-ratio tests. Zero high-severity ungrounded ledger rows on either report. Goldens: gunpen 4/5 (dream still missed), pain3 5/5. Full suite 2191 passed. NOTES: pycache-staleness fooled one probe run (same-second edits) — clear __pycache__ when re-probing rapidly edited modules.
