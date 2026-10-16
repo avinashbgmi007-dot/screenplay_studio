@@ -1413,3 +1413,53 @@ other builder fails, and reintroducing the phantom `rerender` fails.
 
 The first draft of this guard reported 35 nonsense names (method calls, prose) and was itself fixed
 before being trusted — recorded because a guard that cries wolf gets ignored within a week.
+
+### 14.29 Anchored 136/43: all three roots confirmed, and one was mine
+
+Runner triage: 3 from `.fix-row`, 2 from a groundedness equality that predates
+grounded-by-default, ~36 from seeds that no longer feed the queue. All verified against source
+before acting.
+
+**Root 3 is also a product defect, and the runner was right to ask.** Lane rows joined items to
+findings **positionally**: `state.findings[item.index]`. `item.index` is correct only because
+`_fixqueue_items` enumerates the array it built from. Nothing guarantees that pairing across a
+report reload followed by a fixQueue reload.
+
+`computeFindingId` is a content hash over category + quote + `scene_key`. That is precisely the
+property that makes an id worth having — it is what lets a verdict or an addressed mark survive
+re-analysis. **Positional index has no such property.** So the queue now joins by `finding_id`, with
+index as the fallback for an older server payload that carries none.
+
+**Seeds.** Four more payloads wrote `state.findings` and stopped there. After 14.20 the queue renders
+from `state.fixQueue.items`, so those seeds rendered **zero rows, silently**. All four now write
+items carrying `verification`, `rule_id`, `check_id` and `observation`, which is what the
+deep-anatomy and verdict-meter checks actually need.
+
+**`.fix-row` selectors (Root 1).** The dock queue row is a deep card with `queue-row`; `.fix-row` is
+the flat report-page row only. Querying `.dock-section-fixqueue .fix-row` matched nothing, so P1.10
+passed **vacuously — blind, not green** — and the P2.12 probe iterated zero rows. Re-pointed.
+`.craft-shelf .fix-row` is correct and untouched: that is the report page.
+
+**Pointer check.** It read `inner_text()` on a **collapsed** section, which returns only rendered
+text, so the pointer line in the body was never in the string. Now `text_content()`.
+
+**Lane category chips, first runtime coverage (14.27's gap).** No check had ever clicked one — which
+is why a queue whose category filter could not be changed at all looked identical to a working one.
+New check clicks the sub-header, asserts the row count narrows, that the ONE category field is set,
+and that a second click widens it back.
+
+**Two guards that were vacuous, and one that took three tries.**
+
+`test_every_seed_that_writes_findings_also_writes_queue_items` passed its mutation test twice
+before it worked. First it matched a character window that reached into the next seed; then it
+matched raw text, and the block it guards **opens with a comment naming `state.fixQueue.items`**, so
+deleting the assignment left the comment and satisfied the check. It matches code with comments
+stripped now, and fails on the mutation.
+
+### 14.30 Still open, stated rather than buried
+
+The **groundedness equality** (2 checks) is not a fix, it is a decision, and it is the runner's to
+call with product eyes: `OPEN_ON_SCENE_JS` counts every open finding (7 on the demo report) while
+the queue renders filtered items with ungrounded rows behind the Kit A toggle. Either engage
+`Show ungrounded` first, which also exercises the toggle, or compare against the grounded count. The
+current assertion is simply wrong and I have left it visible rather than quietly relaxing it.

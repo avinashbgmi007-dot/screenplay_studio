@@ -231,26 +231,32 @@ SEED_JS = """(args) => {
     mk("structure", "high", b.scene, b.lines[1], "SEED high structure on " + b.scene),
   ];
   // SPEC 14.20, THE FIXTURE HAD A HOLE. The seed set state.findings and
-  // state.report.findings but NOT state.fixQueue.items, which is what the Fix
-  // Queue actually renders from (_fixqueue_items -> state.fixQueue.items).
-  // Before the merge that did not matter because the ledger read
-  // report.findings. After it, a seed that leaves fixQueue alone renders the
-  // queue from stale server rows and every assertion below would have been
-  // measuring the wrong findings entirely. This is the single most important
-  // line in the migrated fixture.
-  state.fixQueue.items = fs.map((f, index) => ({
-    index, finding_id: computeFindingId(f),
-    category: f.category, severity: f.severity, issue: f.issue,
-    description: f.description, evidence_quote: f.evidence_quote,
-    verification: f.verification || null,
-    scene_refs: f.scene_refs, scene_key: f.scene_key || null,
-    scene_heading: "Scene " + f.scene_refs[0], act_name: "Act I",
-    status: "open", dismissed: false, ungrounded: false,
-    contested: false, identity_uncertain: false, why_it_matters: null,
-  }));
   state.findings = fs;
   state.report = Object.assign({}, state.report || {}, { findings: fs });
   state.findingIds = fs.map((f) => computeFindingId(f));
+  // SPEC 14.29: a seed that writes state.findings but NOT state.fixQueue.items
+  // renders ZERO queue rows. The merged queue renders from the items, joined to
+  // findings by id, so client-injected findings with no matching item are not
+  // merely mis-ordered, they are absent. The join fix in app.js makes surviving
+  // items bind correctly; only a seed that writes items can make a finding
+  // exist at all.
+  state.fixQueue = state.fixQueue || {};
+  state.fixQueue.dismissed_flags = [];
+  state.fixQueue.items = fs.map((f, index) => ({
+    index, finding_id: state.findingIds[index],
+    category: f.category, severity: f.severity, issue: f.issue,
+    description: f.description, evidence_quote: f.evidence_quote,
+    verification: f.verification || null,
+    rule_id: f.rule_id || null, check_id: f.check_id || null,
+    observation: f.observation || null,
+    scene_refs: f.scene_refs, scene_key: f.scene_key || null,
+    scene_heading: f.scene_refs && f.scene_refs[0]
+      ? ("Scene " + f.scene_refs[0]) : null,
+    act_name: "Act I", status: "open", dismissed: false,
+    ungrounded: !f.evidence_quote,
+    contested: !!f.contested, identity_uncertain: !!f.identity_uncertain,
+    why_it_matters: f.why_it_matters || null,
+  }));
   state.findingStatus = {};
   state.findingMarks = {};
   state.ghostedIds = new Set();
@@ -484,8 +490,13 @@ SCROLL_TO_SCENE_JS = """(n) => {
 
 
 def check_seeded_scene_filter(page, lens):
-    """P1.7 — the seeded fixture: ink/list parity in both states, highs first,
-    and the rail's clean-scene ✓ (spec §14.3, findingDisposition-driven)."""
+    """P1.7 — the seeded fixture: ink/list parity in both states, RANK order
+    within each lane, and the rail's clean-scene ✓ (spec §14.3).
+
+    The docstring used to say "highs first". It stopped being true at spec 7 and
+    this function kept asserting it until 14.24, which is why P1.7 could not pass
+    by design. The seeded pair is now ordered by rank: the LOW-severity verified
+    row leads the Line lane."""
     scene_a = page.evaluate("() => currentManuscriptScene()")
     check("P1.7/seed: the current scene is known", scene_a is not None, f"{scene_a!r}")
     if scene_a is None:
@@ -550,12 +561,18 @@ def check_seeded_scene_filter(page, lens):
           not dupes, "; ".join(dupes))
     check("P1.8: the queue holds all four seeded findings",
           live_cards(lens) == 4, f"rows={live_cards(lens)}")
+    # text_content(), NOT inner_text(): the Tier 2 sections are collapsed, and
+    # inner_text returns only RENDERED text, so the pointer line in the body is
+    # not in it. That is why this read as "the section exists and is card-free
+    # but does not say Fix queue" — it was never asked.
+    _pointer = lens.locator('.dock-section[data-key="scene-findings"]')
+    _pointer_txt = (_pointer.first.text_content() or "") if _pointer.count() else ""
     check("P1.8: the scene section is a POINTER, not a second rendering — it "
-          "states the count and renders no cards",
+          "states the count, says where the rows went, and renders no cards",
           section_cards(lens, "scene-findings") == 0
-          and "Fix queue" in (lens.locator(
-              '.dock-section[data-key="scene-findings"]').first.inner_text() or ""),
-          f"cards={section_cards(lens, 'scene-findings')}")
+          and "Fix queue" in _pointer_txt
+          and "2 findings here" in _pointer_txt,
+          f"cards={section_cards(lens, 'scene-findings')} text={_pointer_txt!r}")
 
     # --- P1.7 (spec 7): rank order, not severity --------------------------
     # Was: "the live groups read highs first", seeded with an UNKNOWN category
@@ -588,6 +605,36 @@ def check_seeded_scene_filter(page, lens):
     check("P1.7: lanes lead by descending MAX IMPACT — structure (5) above "
           "line (3) — with no lane forced last",
           lanes[:2] == ["structure", "line"], f"{lanes}")
+
+    # SPEC 14.27, THE COVERAGE GAP. Every lane category sub-header calls
+    # refreshAllFindingSurfaces; before 14.27 it called a `rerender` that did not
+    # exist, and NOTHING clicked one, so a queue where the category filter could
+    # not be changed at all looked identical to a queue where it worked. This is
+    # the first check in the arc that exercises that path at runtime.
+    chip = lens.locator('.dock-lane-group[data-lane="structure"] .dock-lane-cat')
+    check("the Structure lane's category sub-header renders", chip.count() == 1,
+          f"chips={chip.count()}")
+    if chip.count():
+        rows_before = live_cards(lens)
+        clicked(chip.first)
+        page.wait_for_timeout(350)
+        rows_after = live_cards(lens)
+        narrowed = rows_after < rows_before
+        clause = page.evaluate("() => state.findingFilter.category")
+        check("clicking a lane category sub-header narrows the queue",
+              narrowed, f"before={rows_before} after={rows_after}")
+        check("...and sets the ONE category filter field the predicate reads",
+              clause == "structure", repr(clause))
+        # No page-error assertion here: `errors` is not in this helper's scope,
+        # and the suite already fails on ANY uncaught page error, which covers a
+        # throwing handler. The filter being set AND the row count moving is the
+        # direct evidence that the handler ran to completion.
+        clicked(lens.locator(
+            '.dock-lane-group[data-lane="structure"] .dock-lane-cat').first)
+        page.wait_for_timeout(350)
+        check("clicking it again widens the queue back to every finding",
+              live_cards(lens) == rows_before,
+              f"before={rows_before} after={live_cards(lens)}")
     check("P1.8: each finding carries its own row in the one surface that "
           "renders findings",
           sorted(r["findex"] for r in (line + structure)) == ["0", "1", "2", "3"],
@@ -713,7 +760,12 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
     page.wait_for_timeout(300)
     # -- 1. the craft shelf defers to the ledger -----------------------------
     in_shelf = page.locator(".craft-shelf .fix-row").count()
-    in_ledger = lens.locator(".dock-section-fixqueue .fix-row").count()
+    # SPEC 14.25: the dock queue row is a deep CARD (findingNoteEl), not the
+    # shallow `.fix-row` the flat report-page path uses. Querying `.fix-row` here
+    # matched nothing, so this check passed VACUOUSLY - blind, not green - and
+    # the P2.12 probe below iterated zero rows. `.craft-shelf .fix-row` above is
+    # correct and is untouched: that is the report page.
+    in_ledger = lens.locator(".dock-section-fixqueue .queue-row").count()
     check("P1.10: the craft shelf no longer embeds a second fix queue",
           in_shelf == 0, f"shelf rows={in_shelf} (the ledger keeps {in_ledger})")
     check("P1.10: the queue rows live in exactly one place — the ledger",
@@ -727,7 +779,7 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
       const items = (state.fixQueue && state.fixQueue.items) || [];
       const byIndex = new Map(items.map((i) => [String(i.index), i]));
       let withV = 0, badge = 0; const bad = [];
-      document.querySelectorAll('.dock-section-fixqueue .fix-row').forEach((r) => {
+      document.querySelectorAll('.dock-section-fixqueue .queue-row').forEach((r) => {
         const it = byIndex.get(r.dataset.findex);
         if (!it) return;
         const want = verificationBadge(it.verification);
@@ -879,6 +931,29 @@ HONESTY_SEED_JS = """(args) => {
   state.findings = fs;
   state.report = Object.assign({}, state.report || {}, { findings: fs });
   state.findingIds = fs.map((f) => computeFindingId(f));
+  // SPEC 14.29: a seed that writes state.findings but NOT state.fixQueue.items
+  // renders ZERO queue rows. The merged queue renders from the items, joined to
+  // findings by id, so client-injected findings with no matching item are not
+  // merely mis-ordered, they are absent. The join fix in app.js makes surviving
+  // items bind correctly; only a seed that writes items can make a finding
+  // exist at all.
+  state.fixQueue = state.fixQueue || {};
+  state.fixQueue.dismissed_flags = [];
+  state.fixQueue.items = fs.map((f, index) => ({
+    index, finding_id: state.findingIds[index],
+    category: f.category, severity: f.severity, issue: f.issue,
+    description: f.description, evidence_quote: f.evidence_quote,
+    verification: f.verification || null,
+    rule_id: f.rule_id || null, check_id: f.check_id || null,
+    observation: f.observation || null,
+    scene_refs: f.scene_refs, scene_key: f.scene_key || null,
+    scene_heading: f.scene_refs && f.scene_refs[0]
+      ? ("Scene " + f.scene_refs[0]) : null,
+    act_name: "Act I", status: "open", dismissed: false,
+    ungrounded: !f.evidence_quote,
+    contested: !!f.contested, identity_uncertain: !!f.identity_uncertain,
+    why_it_matters: f.why_it_matters || null,
+  }));
   state.findingStatus = {};
   state.findingMarks = {};
   state.ghostedIds = new Set();
@@ -1351,6 +1426,29 @@ TYPOLOGY_SEED_JS = """(args) => {
   state.findings = fs;
   state.report = Object.assign({}, state.report || {}, { findings: fs });
   state.findingIds = fs.map((f) => computeFindingId(f));
+  // SPEC 14.29: a seed that writes state.findings but NOT state.fixQueue.items
+  // renders ZERO queue rows. The merged queue renders from the items, joined to
+  // findings by id, so client-injected findings with no matching item are not
+  // merely mis-ordered, they are absent. The join fix in app.js makes surviving
+  // items bind correctly; only a seed that writes items can make a finding
+  // exist at all.
+  state.fixQueue = state.fixQueue || {};
+  state.fixQueue.dismissed_flags = [];
+  state.fixQueue.items = fs.map((f, index) => ({
+    index, finding_id: state.findingIds[index],
+    category: f.category, severity: f.severity, issue: f.issue,
+    description: f.description, evidence_quote: f.evidence_quote,
+    verification: f.verification || null,
+    rule_id: f.rule_id || null, check_id: f.check_id || null,
+    observation: f.observation || null,
+    scene_refs: f.scene_refs, scene_key: f.scene_key || null,
+    scene_heading: f.scene_refs && f.scene_refs[0]
+      ? ("Scene " + f.scene_refs[0]) : null,
+    act_name: "Act I", status: "open", dismissed: false,
+    ungrounded: !f.evidence_quote,
+    contested: !!f.contested, identity_uncertain: !!f.identity_uncertain,
+    why_it_matters: f.why_it_matters || null,
+  }));
   state.findingStatus = {};
   state.findingMarks = {};
   state.ghostedIds = new Set();
@@ -1600,6 +1698,29 @@ SHARED_MARK_SEED_JS = """() => {
   state.findings = fs;
   state.report = Object.assign({}, state.report || {}, { findings: fs });
   state.findingIds = fs.map((f) => computeFindingId(f));
+  // SPEC 14.29: a seed that writes state.findings but NOT state.fixQueue.items
+  // renders ZERO queue rows. The merged queue renders from the items, joined to
+  // findings by id, so client-injected findings with no matching item are not
+  // merely mis-ordered, they are absent. The join fix in app.js makes surviving
+  // items bind correctly; only a seed that writes items can make a finding
+  // exist at all.
+  state.fixQueue = state.fixQueue || {};
+  state.fixQueue.dismissed_flags = [];
+  state.fixQueue.items = fs.map((f, index) => ({
+    index, finding_id: state.findingIds[index],
+    category: f.category, severity: f.severity, issue: f.issue,
+    description: f.description, evidence_quote: f.evidence_quote,
+    verification: f.verification || null,
+    rule_id: f.rule_id || null, check_id: f.check_id || null,
+    observation: f.observation || null,
+    scene_refs: f.scene_refs, scene_key: f.scene_key || null,
+    scene_heading: f.scene_refs && f.scene_refs[0]
+      ? ("Scene " + f.scene_refs[0]) : null,
+    act_name: "Act I", status: "open", dismissed: false,
+    ungrounded: !f.evidence_quote,
+    contested: !!f.contested, identity_uncertain: !!f.identity_uncertain,
+    why_it_matters: f.why_it_matters || null,
+  }));
   state.findingStatus = {};
   state.findingMarks = {};
   state.ghostedIds = new Set();

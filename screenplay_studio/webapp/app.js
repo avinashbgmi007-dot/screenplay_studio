@@ -4589,7 +4589,23 @@ function renderFixQueuePanel(container, opts) {
     // was forked and the page and the queue still cannot disagree.
     const entries = [];
     for (const item of shown) {
-      const f = (state.findings || [])[item.index];
+      // SPEC 14.29, JOIN BY ID NOT BY POSITION. `item.index` is only correct
+      // because _fixqueue_items enumerates the same array it was built from.
+      // Nothing guarantees that pairing survives a report reload followed by a
+      // fixQueue reload, and a re-run that reorders findings would rebind every
+      // queue row to the wrong finding: right badges, wrong rows, silently.
+      //
+      // computeFindingId is a content hash over category + quote + scene_key,
+      // which is exactly the property that makes an id worth having — it is
+      // what lets a verdict or an addressed mark survive re-analysis. Positional
+      // index has no such property. So resolve by id, fall back to index only
+      // when the item carries none (an older server payload).
+      let f = null;
+      if (item.finding_id && state.findingIds) {
+        const at = state.findingIds.indexOf(item.finding_id);
+        if (at >= 0) f = (state.findings || [])[at];
+      }
+      if (!f) f = (state.findings || [])[item.index];
       if (f) entries.push({ f, index: item.index });
     }
     const byIndex = new Map(items.map((i) => [i.index, i]));
@@ -4650,8 +4666,10 @@ function renderFixQueuePanel(container, opts) {
           disposition: findingDisposition(f, index),
           deep: true,
         });
-        const fi = queueItemFindingIndex(item);
-        const disp = fi != null
+        const fi = state.findingIds && item.finding_id
+          ? state.findingIds.indexOf(item.finding_id)
+          : queueItemFindingIndex(item);
+        const disp = fi != null && fi >= 0
           ? findingDisposition((state.findings || [])[fi], fi)
           : (item.dismissed ? "dismissed" : item.status);
         if (item.dismissed) row.classList.add("dismissed");

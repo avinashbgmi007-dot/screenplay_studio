@@ -357,3 +357,47 @@ def test_the_queue_renders_no_function_scoped_dependency(app_js: str) -> None:
         "is invoked before that declaration runs, so the lens throws and renders "
         "nothing. `isAddressed` did exactly this and it shipped."
     )
+
+
+E2E_DOCK_2 = E2E_DOCK
+
+
+def test_every_seed_that_writes_findings_also_writes_queue_items() -> None:
+    """Spec 14.29. Roughly 36 anchored failures traced to one omission.
+
+    A seed that replaces `state.findings` and calls `refreshAllFindingSurfaces`
+    used to be enough, because the ledger read `report.findings`. After 14.20
+    the queue renders from `state.fixQueue.items`, so a seed that writes only
+    `state.findings` produces ZERO queue rows — not mis-ordered rows, absent
+    ones. That is silent: the seed reports success and every downstream check
+    reads zero.
+
+    The fix for rows mis-binding to shifted indices was in app.js; this is the
+    other half. An id-accurate join cannot conjure an item that was never
+    written, so each seed must write its own items.
+
+    Payloads are matched as WHOLE triple-quoted strings, not as a character
+    window: a window version of this guard passed while a mutation deleted one
+    seed's items block, because the window reached into the next seed and found
+    that one's block instead."""
+    with open(E2E_DOCK_2, encoding="utf-8") as fh:
+        code = fh.read()
+    payloads = code.split('\"\"\"')
+    # odd indices are the JS payloads between the triple quotes
+    seeds = [(i, p) for i, p in enumerate(payloads) if i % 2 == 1
+             and re.search(r"state\.findings\s*=\s*\w+;", p)]
+    assert len(seeds) >= 4, (
+        f"expected at least 4 seeded payloads writing state.findings, found "
+        f"{len(seeds)} - has the fixture moved?"
+    )
+    # Match on CODE, not on the file text: the block this guard is about opens
+    # with a comment that NAMES state.fixQueue.items, so a text match was
+    # satisfied by the comment alone. Deleting the assignment left the comment
+    # and the guard passed - it took a second mutation to notice.
+    missing = [i for i, payload in seeds
+               if "state.fixQueue.items" not in _js_only(payload)]
+    assert not missing, (
+        f"seed payload(s) at quote-block index {missing} write state.findings "
+        "but never write state.fixQueue.items. They render ZERO queue rows and "
+        "every assertion downstream of them reads zero."
+    )
