@@ -4473,45 +4473,9 @@ function renderFixQueuePanel(container, opts) {
   panel.appendChild(el("p", "finding-intent-hint",
     "Dismiss — takes the row out of this to-do; the finding stays in the report"));
 
-  // ONE row builder, shared by the flat and the lane path, so the verbs
-  // (Locate/Rewrite/Discuss/Dismiss/Reopen) cannot drift between them.
-  const buildFixRow = (item) => {
-    // row state reads the SAME disposition ledger the header counts (N3) — a
-    // finding the writer marked addressed shows done on every surface, not
-    // only where the server-observed item.status has already moved
-    const fi = queueItemFindingIndex(item);
-    const disp = fi != null
-      ? findingDisposition((state.findings || [])[fi], fi)
-      : (item.dismissed ? "dismissed" : item.status);
-    const row = el("div", "fix-row" + (disp === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
-    row.dataset.findex = String(item.index);
-    const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
-    // accuracy kit A follow-up: demoted rows wear the reason. Collected
-    // here, mounted with sev below — el() nodes have no parent yet, so
-    // sev.after() would be a silent no-op. Static literals only, never
-    // finding text, so no new sink.
-    const rowFlags = [];
-    if (item.contested) {
-      const flag = el("span", "row-flag row-flag-contested", "contested");
-      flag.title = "Its own observation argues against this note — read the observation before acting on it";
-      rowFlags.push(flag);
-    }
-    if (item.identity_uncertain) {
-      const flag = el("span", "row-flag row-flag-identity", "identity?");
-      flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
-      rowFlags.push(flag);
-    }
-    if (item.ungrounded) {
-      const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
-      flag.title = "No quote or checkable observation backs this note yet";
-      rowFlags.push(flag);
-    }
-    const act = el("span", "act-chip", item.act_name || "Script-level");
-    const sceneLabel = item.scene_heading ? `Scene ${(item.scene_refs || [])[0]} — ${item.scene_heading}` : "General";
-    const body = el("div", "fix-row-body");
-    const issue = el("div", "fix-row-issue", `${sceneLabel}: ${item.issue}`);
-    if (item.why_it_matters) issue.appendChild(el("div", "fix-row-why", item.why_it_matters));
-    body.appendChild(issue);
+  // ONE verb row, shared by both render paths, so Locate/Rewrite/Discuss/
+  // Dismiss/Reopen cannot drift between the flat list and the lanes.
+  const buildFixActions = (item, disp, fi) => {
     const actions = el("div", "fix-row-actions");
     // R6 item 3: one spelling for one verb. The dock renders this queue in the
     // same ~320px column as the ledger cards (style.css: .dock-section .fix-row
@@ -4566,7 +4530,49 @@ function renderFixQueuePanel(container, opts) {
       }
     }
     actions.appendChild(triageBtn);
-    body.appendChild(actions);
+    return actions;
+  };
+
+  // ONE row builder for the FLAT path (the report page, where the Fix Queue is
+  // the only queue and no lane headers are wanted).
+  const buildFixRow = (item) => {
+    // row state reads the SAME disposition ledger the header counts (N3) — a
+    // finding the writer marked addressed shows done on every surface, not
+    // only where the server-observed item.status has already moved
+    const fi = queueItemFindingIndex(item);
+    const disp = fi != null
+      ? findingDisposition((state.findings || [])[fi], fi)
+      : (item.dismissed ? "dismissed" : item.status);
+    const row = el("div", "fix-row" + (disp === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
+    row.dataset.findex = String(item.index);
+    const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
+    // accuracy kit A follow-up: demoted rows wear the reason. Collected
+    // here, mounted with sev below — el() nodes have no parent yet, so
+    // sev.after() would be a silent no-op. Static literals only, never
+    // finding text, so no new sink.
+    const rowFlags = [];
+    if (item.contested) {
+      const flag = el("span", "row-flag row-flag-contested", "contested");
+      flag.title = "Its own observation argues against this note — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
+    if (item.identity_uncertain) {
+      const flag = el("span", "row-flag row-flag-identity", "identity?");
+      flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
+      rowFlags.push(flag);
+    }
+    if (item.ungrounded) {
+      const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
+      flag.title = "No quote or checkable observation backs this note yet";
+      rowFlags.push(flag);
+    }
+    const act = el("span", "act-chip", item.act_name || "Script-level");
+    const sceneLabel = item.scene_heading ? `Scene ${(item.scene_refs || [])[0]} — ${item.scene_heading}` : "General";
+    const body = el("div", "fix-row-body");
+    const issue = el("div", "fix-row-issue", `${sceneLabel}: ${item.issue}`);
+    if (item.why_it_matters) issue.appendChild(el("div", "fix-row-why", item.why_it_matters));
+    body.appendChild(issue);
+    actions = buildFixActions(item, disp, fi);
     row.appendChild(sev);
     for (const flag of rowFlags) row.appendChild(flag);
     row.appendChild(act);
@@ -4619,7 +4625,31 @@ function renderFixQueuePanel(container, opts) {
           });
           wrap.appendChild(chip);
         }
-        const row = buildFixRow(item);
+        // SPEC 14.25, THE REGRESSION THE MERGE INTRODUCED. This lane row used
+        // to be a deep card (findingNoteEl: quote, rule chip, observation, truth
+        // verdict, expand) and it became a .fix-row, which is badges + issue +
+        // verbs. That silently deleted four agreements from the first debate
+        // off the PRIMARY worklist: the evidence quote, who said so, the
+        // finding's own observation, and the verdict the accuracy meter counts.
+        //
+        // The ruling is that depth is not negotiable and verbs are additive: the
+        // lane row is the deep card WITH the verbs on it. A reviewer choosing
+        // "shallow rows" would have had to retire the evidence agreement and
+        // rewire the meter; neither is a design change I would accept by
+        // default, and neither was written down anywhere, so it does not get to
+        // happen by omission.
+        const row = findingNoteEl(f, index, {
+          addressed: isAddressed(f, index),
+          disposition: findingDisposition(f, index),
+          deep: true,
+        });
+        const fi = queueItemFindingIndex(item);
+        const disp = fi != null
+          ? findingDisposition((state.findings || [])[fi], fi)
+          : (item.dismissed ? "dismissed" : item.status);
+        if (item.dismissed) row.classList.add("dismissed");
+        row.classList.add("queue-row");
+        row.appendChild(buildFixActions(item, disp, fi));
         // Gate G6: every row states why it is ranked where it is. A row that
         // cannot print its own reason is not ranked, it is sorted by something
         // nobody can audit (spec 1.5).

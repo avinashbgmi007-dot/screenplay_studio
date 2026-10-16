@@ -6547,3 +6547,18 @@ body:not(.idea-mode) .desk {
   border-top: none;
   padding-top: 0;
 }
+
+/* Spec 14.25: the queue row is a DEEP card with the verb row on it. The deep
+ * card is a block, so the verbs ride under it rather than in the old one-line
+ * .fix-row strip; without this they would sit flush against the card's edge. */
+.craft-panel.fix-queue .queue-row .fix-row-actions {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.craft-panel.fix-queue .queue-row .dock-rank-reason {
+  margin-top: 6px;
+}
+.craft-panel.fix-queue .queue-row.dismissed {
+  opacity: 0.55;
+}

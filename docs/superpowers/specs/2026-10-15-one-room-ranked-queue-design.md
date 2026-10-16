@@ -1327,3 +1327,47 @@ suite can go green against the wrong tree.
 
 **Still unverified:** the DOM selectors themselves. There is no Playwright in this workspace. The
 ordering contract is proven in node; the selectors that read it out of the page are the runner's.
+
+### 14.25 RULING: the queue row keeps its depth and gains the verbs
+
+Anchored run on `2ce132a`: **134 passed, 45 failed**. The failures are not one thing, and the
+largest group is not a test bug.
+
+**I introduced a regression at 14.20 and recorded it as a merge.** The Tier 2 ledger rendered its
+rows with `findingNoteEl(f, index, {deep: true})` — a deep card carrying the evidence quote, the
+rule/attribution chip, the finding's own observation, and the truth-axis verdict. The Fix Queue
+renders `.fix-row` via `buildFixRow`: badges, issue, why, verbs. The merge adopted the Fix Queue's
+renderer, so **every finding in the worklist lost its depth**. The runner's DOM audit found no quote,
+no rule chip, no pin, no verdict row, no expand handler on a queue row.
+
+Two consequences, neither of which is taste:
+
+1. **The verdict judgments lost their surface.** The accuracy meter counts verdicts that nothing
+   renders. That is a shipped feature deleted by omission.
+2. **Evidence visibility failed.** The quote is not behind a disclosure; it is absent. The agreement
+   both panels signed requires it on the card.
+
+**The ruling:** depth is not negotiable; verbs are additive. **The lane row is the deep card with the
+verb row attached.** `buildFixActions` was extracted so the flat report-page path and the lane path
+share one verb row and cannot drift, while the lane path renders `findingNoteEl(..., {deep: true})`.
+
+A reviewer choosing shallow rows would have had to retire the evidence agreement and rewire the
+meter. That is a real design change and it was never written down, so it does not get to happen
+because a merge happened to route rows through a different function.
+
+**Test bugs fixed (3), all confirmed against code:**
+
+- The two P1.7 lane assertions matched with `startswith`; the card prints `"Scene N — "`. Now
+  substring, with the prefix stripped in the helper. **The sort needed no change** — the observed
+  order was correct rank order.
+- `livecheck` was asserted in the always-render set. `buildLiveCheckSection` returns null without
+  lint state on every tree; it was never unconditional. Now asserted as present **exactly when**
+  `state.lint` exists.
+
+**Helper obsolescence fixed:** `live_cards`, `section_cards` and the dupe probe counted
+`.fix-row`/`data-findex`. They now follow the deep-card contract (`.finding-note`,
+`data-finding-index`) again, so every count-based assertion means something.
+
+**New guard:** `test_the_queue_row_keeps_its_depth_and_gains_the_verbs`. That regression passed every
+other check in this file, including the one-home guard. Mutation-verified both ways — reverting to
+the shallow row fails, and keeping depth while dropping the verbs also fails.

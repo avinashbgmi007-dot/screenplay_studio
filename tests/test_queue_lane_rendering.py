@@ -222,3 +222,28 @@ def test_the_e2e_does_not_reach_for_the_retired_section_key() -> None:
         "Fix Queue. Re-point it at the queue, or at another live section if it "
         "is only a vehicle for the collapse contract."
     )
+
+
+def test_the_queue_row_keeps_its_depth_and_gains_the_verbs(app_js: str) -> None:
+    """Spec 14.25. The merge replaced the deep card with the Fix Queue's
+    `.fix-row` and deleted four agreements from the first debate off the primary
+    worklist: the evidence quote, who said so, the finding's own observation,
+    and the verdict the accuracy meter counts.
+
+    The ruling: depth is not negotiable, verbs are additive. The lane row is the
+    deep card WITH the verb row on it. This guard is here because that
+    regression passed every other check in this file."""
+    lane = app_js[app_js.index("if (options.lanes) {"):]
+    assert "findingNoteEl(f, index, {" in lane, (
+        "the lane row is no longer a deep card. Evidence, attribution, the "
+        "observation and the truth verdict stop being visible in the worklist, "
+        "and the accuracy meter has no surface to count."
+    )
+    assert "deep: true" in lane, "the lane row is not built with deep anatomy"
+    assert "buildFixActions(item, disp, fi)" in lane, (
+        "the lane row lost the verb row. Shallow rows were ruled out, not "
+        "chosen: the verbs are additive, so a lane row without them means "
+        "someone half-reverted the merge."
+    )
+    # ...and the shallow row must not have quietly become the only renderer.
+    assert "buildFixRow(item)" in app_js, "the flat report-page path lost its row"

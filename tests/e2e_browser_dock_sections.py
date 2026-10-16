@@ -321,10 +321,14 @@ LANE_CARDS_JS = """(lane) => {
   if (!panel) return null;
   const group = panel.querySelector('.dock-lane-group[data-lane="' + lane + '"]');
   if (!group) return null;
-  return [...group.querySelectorAll('.fix-row')].map((r) => ({
-    text: ((r.querySelector('.fix-row-issue') || {}).textContent || '').trim(),
+  return [...group.querySelectorAll('.finding-note')].map((r) => ({
+    // The card prints "Scene N — <issue>"; strip the prefix so an assertion
+    // reads the finding, not the layout. (A first draft matched with startswith
+    // and failed for exactly this reason while the ORDER underneath was right.)
+    text: ((r.querySelector('.finding-note-text') || {}).textContent || '')
+      .replace(/^Scene\s+\S+\s+[—-]\s*/, '').trim(),
     reason: ((r.querySelector('.dock-rank-reason') || {}).textContent || '').trim(),
-    findex: r.dataset.findex || null,
+    findex: r.dataset.findingIndex || null,
   }));
 }"""
 
@@ -346,14 +350,13 @@ def live_cards(lens):
     a finding is carded exactly ONCE (this scene's in the scene strip, the rest
     in the categorized live list), so the ledger's whole card count is the
     number comparable with the counting contract and with the page's ink."""
-    return lens.locator(".craft-panel.fix-queue .fix-row").count()
+    return lens.locator(".craft-panel.fix-queue .finding-note").count()
 
 
 def section_cards(lens, key):
     """Cards inside one ledger section (hidden nodes count: the question is
     WHERE a finding is rendered, not whether it is currently unfolded)."""
-    sel = (f'.dock-section[data-key="{key}"] .fix-row' if key == "fix-queue"
-           else f'.dock-section[data-key="{key}"] .finding-note')
+    sel = f'.dock-section[data-key="{key}"] .finding-note'
     return lens.locator(sel).count()
 
 
@@ -368,9 +371,9 @@ def section_cards(lens, key):
 LEDGER_DUPES_JS = """() => {
   const seen = {};
   const dupes = [];
-  document.querySelectorAll('.dock-lens[data-lens="evidence"] [data-findex]')
+  document.querySelectorAll('.dock-lens[data-lens="evidence"] .finding-note')
     .forEach((n) => {
-      const k = n.dataset.findex;
+      const k = n.dataset.findingIndex;
       if (!k || k === "?") return;
       const where = n.closest(".dock-section");
       const key = (where && where.dataset.key) || "?";
@@ -563,8 +566,8 @@ def check_seeded_scene_filter(page, lens):
     check("P1.7: inside the Line lane the LOW-severity row outranks the "
           "HIGH-severity one — the sort key is craft impact, not severity",
           len(line) == 2
-          and line[0]["text"].startswith("SEED low dialogue")
-          and line[1]["text"].startswith("SEED high dialogue"),
+          and "SEED low dialogue" in line[0]["text"]
+          and "SEED high dialogue" in line[1]["text"],
           f"{line}")
     check("P1.7: and the reason it won is printed on the row (G6), naming the "
           "verified term rather than the severity",
@@ -577,8 +580,8 @@ def check_seeded_scene_filter(page, lens):
     structure = page.evaluate(LANE_CARDS_JS, "structure") or []
     check("P1.7: the Structure lane holds its own pair, still in rank order",
           len(structure) == 2
-          and structure[0]["text"].startswith("SEED medium structure")
-          and structure[1]["text"].startswith("SEED high structure"),
+          and "SEED medium structure" in structure[0]["text"]
+          and "SEED high structure" in structure[1]["text"],
           f"{structure}")
 
     lanes = page.evaluate(LANE_ORDER_JS) or []
@@ -1722,8 +1725,20 @@ def run(base):
               bool(states) and all(v == "false" for k, v in zip(keys, states)
                                    if k not in ("fix-queue", "context")),
               str(list(zip(keys, states))))
-        for key in ("fix-queue", "coverage", "livecheck"):
+        for key in ("fix-queue", "coverage"):
             check(f"the plan's section set includes {key!r}", key in keys, str(keys))
+        # livecheck is NOT in the always-render set and never was:
+        # buildLiveCheckSection returns null unless state.lint exists, so on any
+        # tree without a lint run its absence is correct behaviour, not a
+        # regression. A prior draft asserted it unconditionally and failed on
+        # every tree.
+        # buildLiveCheckSection() returns null unless state.lint exists, so
+        # livecheck is present EXACTLY when a lint run has happened. A prior
+        # draft put it in the always-render tuple and failed on every tree.
+        has_lint = bool(page.evaluate("() => !!(window.state && state.lint)"))
+        check("livecheck is present exactly when lint state exists, as designed",
+              ("livecheck" in keys) == has_lint,
+              f"livecheck_in_keys={'livecheck' in keys} has_lint={has_lint} keys={keys}")
         check("the fix-queue section keeps its hook class",
               lens.locator(".dock-section-fixqueue").count() == 1,
               lens.locator(".dock-section-fixqueue").count())
