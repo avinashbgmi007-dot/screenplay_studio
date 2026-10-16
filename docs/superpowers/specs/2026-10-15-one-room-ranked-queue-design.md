@@ -1371,3 +1371,45 @@ because a merge happened to route rows through a different function.
 **New guard:** `test_the_queue_row_keeps_its_depth_and_gains_the_verbs`. That regression passed every
 other check in this file, including the one-home guard. Mutation-verified both ways — reverting to
 the shallow row fails, and keeping depth while dropping the verbs also fails.
+
+### 14.26 The dock rendered NOTHING: a temporal dead zone, and what it proves
+
+Anchored run on `43f1622`: **3 passed, 14 failed, zero `.dock-section` elements**. One throw.
+
+`isAddressed` was a `const` arrow declared inside the Context builder at line 6694.
+`renderFixQueuePanel` called it at 4642, and is itself invoked at 6643 — all three inside that same
+function body. First use, then declaration, in the same tick: **TDZ, `ReferenceError`, the Evidence
+lens aborted before a single section mounted.** All 45 previous failures, including the
+collapse-contract gate that exits early, were downstream of that single throw.
+
+I introduced it at 14.25 by calling `isAddressed` from the queue without checking where it was bound.
+Hoisted to a module-scope `function` declaration, which is immune to ordering.
+
+### 14.27 The guard found a SECOND defect on its first honest run
+
+`rerender` — the call every lane category sub-header made — **does not exist**. The only binding in
+the file is a `const` local to `buildFilterRow` (app.js:7909). Calling it from the chip handler was a
+`ReferenceError` **on every click**. The category sub-headers shipped broken at §7 and nothing caught
+it: python and node both went green, because the call is inside a callback and never executes during
+a render.
+
+It now calls `refreshAllFindingSurfaces()`, the ONE re-render entry point (P0.4) and exactly what
+`rerender` itself wraps.
+
+**Two defect classes in this arc that only the browser run could see** — CSS selector-list
+destruction (§14 note), and now execution-order defects in render code. Neither `node --check` nor
+pytest evaluates a browser render path. The runner is not a convenience; it is the only instrument
+covering a whole category of failure.
+
+### 14.28 Guard: `test_the_queue_renders_no_function_scoped_dependency`
+
+Strips comments and string literals, folds in `core.js` (a classic `<script>` tag, so its top-level
+functions are **globals**, not app.js bindings — without that, `groupByLane` and `rankReasonText`
+read as phantom callees), then walks the queue's body and fails on any **bare** identifier it calls
+that is neither module-scope nor function-local. `x.foo(` is a method and is excluded.
+
+Mutation-verified twice, broken first and fixed second: restoring `isAddressed` as a `const` in the
+other builder fails, and reintroducing the phantom `rerender` fails.
+
+The first draft of this guard reported 35 nonsense names (method calls, prose) and was itself fixed
+before being trusted — recorded because a guard that cries wolf gets ignored within a week.

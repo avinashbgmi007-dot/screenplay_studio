@@ -247,3 +247,113 @@ def test_the_queue_row_keeps_its_depth_and_gains_the_verbs(app_js: str) -> None:
     )
     # ...and the shallow row must not have quietly become the only renderer.
     assert "buildFixRow(item)" in app_js, "the flat report-page path lost its row"
+
+
+def _js_only(code: str) -> str:
+    """Strip comments and string/template literals.
+
+    Without this the callee scan reads prose ("they disagree(") and quoted
+    selectors, which is how the first draft of this guard produced 35 nonsense
+    names and failed on a build that was fine."""
+    out, i, n = [], 0, len(code)
+    while i < n:
+        c = code[i]
+        if c == "/" and i + 1 < n and code[i + 1] == "/":
+            while i < n and code[i] != "\n":
+                i += 1
+        elif c == "/" and i + 1 < n and code[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (code[i] == "*" and code[i + 1] == "/"):
+                i += 1
+            i += 2
+        elif c in "\"'`":
+            quote = c
+            i += 1
+            while i < n and code[i] != quote:
+                i += 2 if code[i] == "\\" else 1
+            i += 1
+            out.append(' "" ')
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def _module_scope_names(code: str) -> set:
+    """Every binding visible at module scope, including destructured imports.
+
+    core.js is pulled in as a destructured const, so a plain `^const NAME =`
+    regex misses `groupByLane` and `rankReasonText` and reports them as phantom
+    callees."""
+    names = set(re.findall(r"^(?:async\s+)?(?:function|class)\s+([A-Za-z_$][\w$]*)", code, re.M))
+    for m in re.finditer(r"^(?:const|let|var)\s+([^=\n]+)=", code, re.M):
+        for part in m.group(1).split(","):
+            part = part.strip()
+            name = part.split(":")[-1].strip()
+            if re.fullmatch(r"[A-Za-z_$][\w$]*", name):
+                names.add(name)
+    return names
+
+
+def test_the_queue_renders_no_function_scoped_dependency(app_js: str) -> None:
+    """Spec 14.26. Catches TEMPORAL DEAD ZONE defects in the queue's render path.
+
+    `isAddressed` was a `const` arrow declared inside the Context builder at line
+    6694. `renderFixQueuePanel` called it at 4642 and is itself invoked at 6643,
+    all inside that same builder. First use, then declaration, same tick: a
+    ReferenceError that aborted the Evidence lens before a single `.dock-section`
+    mounted. The anchored run saw 3 passed / 14 failed and zero sections.
+
+    Neither `node --check` nor pytest evaluates a browser render path, so this
+    walks the queue's body, collects the BARE identifiers it calls, and fails on
+    any that is neither declared at module scope nor declared inside the
+    function. A callee bound to a `const` in another builder is exactly the
+    defect, and this is the only check in the repository that can see it."""
+    with open(os.path.join(ROOT, "screenplay_studio", "webapp", "core.js"),
+              encoding="utf-8") as fh:
+        core = fh.read()
+    # core.js is loaded by a plain <script src="core.js"> tag, so its top-level
+    # `function` declarations land on window and are visible from app.js as
+    # bare globals. Without folding them in, groupByLane and rankReasonText read
+    # as phantom callees.
+    code = _js_only(app_js + "\n" + core)
+    m = re.search(r"function renderFixQueuePanel\(([^)]*)\)\s*\{", code)
+    assert m, "renderFixQueuePanel not found"
+    start = code.index("{", m.start())
+    depth, end = 0, None
+    for i in range(start, len(code)):
+        if code[i] == "{":
+            depth += 1
+        elif code[i] == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    assert end, "could not find the end of renderFixQueuePanel"
+    body = code[start:end]
+
+    module_scope = _module_scope_names(code)
+    local = set(re.findall(r"\b(?:const|let|var|function)\s+([A-Za-z_$][\w$]*)", body))
+    for pm in re.finditer(r"\b(?:const|let|var)\s+([^=\n{]+)=", body):
+        name = pm.group(1).split(",")[0].strip()
+        if re.fullmatch(r"[A-Za-z_$][\w$]*", name):
+            local.add(name)
+    local |= {p.strip() for p in m.group(1).split(",") if re.fullmatch(r"[A-Za-z_$][\w$]*", p.strip())}
+
+    BUILTIN = {
+        "if", "for", "while", "switch", "catch", "return", "typeof", "await",
+        "function", "Array", "Object", "String", "Number", "Boolean", "Math",
+        "JSON", "Date", "Map", "Set", "Promise", "Error", "parseInt", "parseFloat",
+        "isNaN", "encodeURIComponent", "decodeURIComponent", "require",
+        "async", "fetch",
+    }
+    # only BARE calls - `x.foo(` is a method, and `x . foo(` is never a TDZ bug
+    called = set(re.findall(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(", body))
+    unresolved = sorted(called - module_scope - local - BUILTIN)
+    assert not unresolved, (
+        f"renderFixQueuePanel calls {unresolved}, which is not declared at module "
+        "scope and not declared inside the function. If one of them is a `const` "
+        "in some other builder, that is a TEMPORAL DEAD ZONE defect: this function "
+        "is invoked before that declaration runs, so the lens throws and renders "
+        "nothing. `isAddressed` did exactly this and it shipped."
+    )

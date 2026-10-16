@@ -4621,7 +4621,14 @@ function renderFixQueuePanel(container, opts) {
             : `Show only ${CATEGORY_LABELS[cat] || cat}`;
           chip.addEventListener("click", () => {
             state.findingFilter.category = active ? null : cat;
-            rerender();
+            // NOT `rerender()`: there is no such binding. The only `rerender`
+            // in this file is a `const` local to buildFilterRow (app.js:7909),
+            // so calling it from here was a ReferenceError on every click -
+            // the category sub-headers shipped broken at spec 7 and the guard
+            // added at 14.26 is what finally found it. refreshAllFindingSurfaces
+            // is the ONE re-render entry point (P0.4) and is what `rerender`
+            // itself wraps.
+            refreshAllFindingSurfaces();
           });
           wrap.appendChild(chip);
         }
@@ -5264,6 +5271,26 @@ function mergedFindingsEl(merged) {
   wrap.appendChild(btn);
   wrap.appendChild(body);
   return wrap;
+}
+
+/** Is this finding marked addressed by the writer?
+ *
+ * SPEC 14.26, THIS IS A FUNCTION DECLARATION AND IT HAS TO STAY ONE. It used to
+ * be a `const` arrow declared inside the Context builder, at line 6694, while
+ * `renderFixQueuePanel` called it at line 4642 and is itself invoked at 6643 —
+ * all inside the same function body. First use, then declaration, same tick:
+ * temporal dead zone, ReferenceError, and the Evidence lens aborted before a
+ * single `.dock-section` mounted. The anchored run reported 3 passed / 14
+ * failed with zero sections rendered; every failure was downstream of that one
+ * throw.
+ *
+ * A function declaration is hoisted, so ordering stops being load-bearing. Keep
+ * it that way: converting this back to a `const` arrow reintroduces a defect
+ * that no static check in this repository can see, because neither `node
+ * --check` nor pytest evaluates browser render paths.
+ */
+function isAddressed(f, index) {
+  return findingStatusOf(f, index) === "addressed";
 }
 
 function findingNoteEl(f, index, opts = {}) {
@@ -6691,7 +6718,6 @@ function buildContextSection() {
   // -- 3. findings on the current scene (Where, precisely) -----------------
   const data = prepareManuscriptData(); // the single source of truth
   const sceneNum = currentManuscriptScene();
-  const isAddressed = (f, index) => findingStatusOf(f, index) === "addressed";
   const sceneFindings = sceneNum != null
     ? (data.byScene[sceneNum] || []).filter(({ f, index }) => findingPassesFilter(f, index))
     : [];
