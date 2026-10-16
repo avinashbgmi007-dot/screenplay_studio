@@ -474,3 +474,38 @@ def test_the_queue_is_the_only_surface_that_opts_into_the_collapse(app_js: str) 
         "collapse applies to every surface. The report page and margin pins keep "
         "the flat row on purpose; only the queue overflows its budget."
     )
+
+
+def test_the_disclosure_is_a_flex_item_not_a_block(app_js: str) -> None:
+    """Spec 14.42, the geometry lesson.
+
+    The first collapse attempt set `display: inline-block` on the disclosure and
+    it changed nothing, because `.finding-note-actions` is `display: flex` and a
+    flex child's `display` is blockified whatever it says. The disclosure was
+    already a flex ITEM in the row; the row wrapped on WIDTH, not layout mode.
+
+    So the budget fix is the label, not the display mode, and the CSS pins the
+    flex behaviour rather than pretending a `display` declaration is load-bearing."""
+    css_path = os.path.join(ROOT, "screenplay_studio", "webapp", "style.css")
+    with open(css_path, encoding="utf-8") as fh:
+        css = fh.read()
+    assert ".dock-section .finding-note-actions { flex-wrap: wrap" in css, (
+        "the actions row no longer wraps; the pin-rewrap check measures that same "
+        "second row, so the rule and the gate have drifted apart."
+    )
+    block = css[css.index(".finding-intent-disclosure {"):]
+    block = block[: block.index("}")]
+    assert "flex: 0 0 auto" in block, (
+        "the disclosure is not pinned as a non-shrinking flex item, so it can be "
+        "squeezed and the row wraps for a reason that is not the label length."
+    )
+    # the visible word is short enough to fit; the full phrase lives in the name
+    assert 'el("summary", "", "marks")' in app_js, (
+        'the disclosure label is long again ("marks & tools" cost ~90px of a '
+        "322px budget and put the fifth item on a second row)."
+    )
+    assert 'setAttribute("aria-label", "Marks and tools")' in app_js, (
+        "shortening the visible label must not remove the full phrase from the "
+        "accessible name; P1.10 wants the gesture learnable, and a screen reader "
+        "user gets only the name."
+    )

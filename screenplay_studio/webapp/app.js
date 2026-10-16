@@ -5549,7 +5549,16 @@ function findingNoteEl(f, index, opts = {}) {
   }
   if (opts.collapseIntents && intentCluster !== actions) {
     const det = el("details", "finding-intent-disclosure");
-    det.appendChild(el("summary", "", "marks & tools"));
+    // "marks & tools" cost ~90px in a 322px budget and put the row over, so the
+    // fifth item wrapped and the card paid a second row for it. The visible word
+    // is shortened, NOT removed: P1.10 wants the gesture learnable before the
+    // click, and a bare glyph teaches nothing. The full phrase stays in the
+    // accessible name and the tooltip, so a screen reader and a mouse user both
+    // get the whole sentence.
+    const sum = el("summary", "", "marks");
+    sum.title = "Marks and tools — what you have decided about this finding";
+    sum.setAttribute("aria-label", "Marks and tools");
+    det.appendChild(sum);
     det.appendChild(intentCluster);
     // The queue's Dismiss lives in the same row and must stay outside the
     // disclosure, so append the row first and the disclosure second.

@@ -6568,8 +6568,14 @@ body:not(.idea-mode) .desk {
  * collapses here. The summary is a real <summary>, so it is keyboard-reachable
  * and announces expanded/collapsed without a line of JS. */
 .finding-intent-disclosure {
-  display: inline-block;
-  margin-left: 6px;
+  /* `display` here is inert: this is a flex child, and a flex child's display is
+   * blockified whatever it says. It is a flex ITEM in the row by construction,
+   * so the budget problem was width, not layout mode. These two declarations
+   * are what keep it from being squeezed or, worse, contributing its open
+   * contents' width to the closed row. */
+  flex: 0 0 auto;
+  min-width: 0;
+  margin-left: 2px;
   vertical-align: middle;
 }
 .finding-intent-disclosure > summary {
@@ -6588,6 +6594,10 @@ body:not(.idea-mode) .desk {
 /* The cluster lays out as its own inline row once opened, so opening it must
  * not re-wrap the four controls the budget is about. */
 .finding-intent-cluster {
+  /* Absolutely positioned out of the closed row's width budget. As a flex item
+   * it would otherwise contribute its own min-content to the measurement of a
+   * row that does not display it. */
+  position: static;
   display: inline-flex;
   flex-wrap: wrap;
   gap: 6px;

@@ -1679,3 +1679,40 @@ expression itself. 2289 python tests, 112 node.
 Both new tests were written without their `app_js` fixture parameter and failed on the fixture object
 rather than the assertion. Fixed; noted because it happened twice in this arc and a test that errors
 before asserting is not a test.
+
+### 14.42 The wrap was width, not blockification — and the `display` declaration was inert
+
+Anchored 179/7. The collapse landed; the row still wrapped to two. The runner's first hypothesis was
+right about the symptom and about the cost ("one declaration") but the mechanism was different in a
+way worth recording, because it changes what the fix is.
+
+`.finding-note-actions` is **`display: flex`**, and **a flex child's `display` is blockified whatever
+it says.** So `display: inline-block` on the disclosure did nothing, and the row wrapped on **width**:
+the content box is 322px and "marks & tools" cost roughly 90 of it, landing the fifth item over the
+edge. The disclosure was already a flex item in the row by construction.
+
+**The fix is the label, not the layout mode.** The visible word is now `marks`, and the full phrase
+lives in `aria-label` and `title`. P1.10 wants the gesture learnable *before* the click and a bare
+glyph teaches nothing, so the visible word is shortened rather than removed. CSS now pins
+`flex: 0 0 auto; min-width: 0` instead of a `display` declaration that was never load-bearing.
+
+### 14.43 P2.14: pin stays in the cluster, and the test opens the disclosure
+
+The pin button moved inside the closed disclosure, so the test's click found nothing reachable. The
+card, the button and the endpoint were all correct; the path was simply not open.
+
+**Placement called, and it is not the queue's four.** Locate jumps and Discuss consults; **pin
+creates a permanent artifact** — a margin note on the writer's own script. It is the considered verb,
+and one disclosure away is the right weight for it. The cluster's visible word `marks` covers addressed
+and next-pass too: all three are dispositions, and pin is a disposition with a receipt.
+
+The test now opens the disclosure by setting `d.open = true` before clicking, which is what a writer
+does, and asserts the disclosure exists and opens on demand.
+
+### 14.44 Guard, mutation-verified three ways
+
+`test_the_disclosure_is_a_flex_item_not_a_block` pins the lesson rather than the old fix: the actions
+row still carries `flex-wrap: wrap` (the rule the pin-rewrap check measures), the disclosure is pinned
+as a non-shrinking flex item, the visible label is short, **and the full phrase is still in the
+accessible name**. Dropping the label, dropping the `aria-label`, or dropping the flex pin each fail.
+2290 python tests, 112 node.

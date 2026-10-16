@@ -1380,10 +1380,32 @@ def check_report_honesty_surfaces(page, lens, base, name):
     open_dock_section_holding(page, ".finding-note")
     page.wait_for_timeout(400)
     cards = lens.locator(".finding-note")
+    # SPEC 14.42. The pin lives in the intent cluster, which the queue collapses
+    # behind "marks". So the verb is one disclosure-open away, and the test has
+    # to open it the way a writer would. It used to click the button directly
+    # and found nothing reachable - the card, the button and the endpoint were
+    # all correct and the path was simply not open.
+    #
+    # Pin STAYS in the cluster rather than moving inline with the queue's four.
+    # Locate jumps and Discuss consults; pin creates a permanent artifact, a
+    # margin note on the writer's own script. It is the considered verb, and one
+    # disclosure away is the right weight for it. The cluster's visible word is
+    # "marks", which covers addressed and next-pass too - all three are
+    # dispositions, and pin is a disposition with a receipt.
+    opened = page.evaluate("""() => {
+      const d = document.querySelector(
+        '.dock-section-fixqueue .finding-intent-disclosure');
+      if (!d) return false;
+      d.open = true;
+      return d.open;
+    }""")
+    check("P2.14: the marks disclosure is on the queue row and opens on demand",
+          opened is True,
+          f"disclosure found={opened}")
     pin = lens.locator(".finding-pin-btn")
-    check("P2.14: a deep card offers the note-keeping verb",
+    check("P2.14: a deep card offers the note-keeping verb behind it",
           cards.count() > 0 and pin.count() >= 1,
-          f"{cards.count()} cards, {pin.count()} pin buttons")
+          f"{cards.count()} cards, {pin.count()} pin buttons after opening")
     card_issue = (pin.first.evaluate(
         "(b) => (b.closest('.finding-note').querySelector('.finding-note-text') || {}).textContent")
         or "").strip() if pin.count() else ""
