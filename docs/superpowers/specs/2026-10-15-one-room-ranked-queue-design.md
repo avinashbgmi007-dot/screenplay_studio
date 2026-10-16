@@ -1716,3 +1716,50 @@ row still carries `flex-wrap: wrap` (the rule the pin-rewrap check measures), th
 as a non-shrinking flex item, the visible label is short, **and the full phrase is still in the
 accessible name**. Dropping the label, dropping the `aria-label`, or dropping the flex pin each fail.
 2290 python tests, 112 node.
+
+### 14.45 GREEN: 187/0, exit 0, anchored
+
+The first fully green run of `e2e_browser_dock_sections.py` since the merge. Nothing is
+red-by-design, red-pending-ruling, or red-pending-investigation.
+
+**Held simultaneously in one anchored run:**
+
+| Contract | Proven by |
+|---|---|
+| 14.25 depth on every admitted row | quote, chip, pin, verdict, scope present at runtime |
+| 14.29 join, true-position multimap | node-pinned against reorder AND duplicate-id mutations |
+| 14.37 membership exception | both halves browser-exercised, not just node |
+| single-predicate counting (N3) | chip label, queue rows and counts agree |
+| 14.38 verb budget | five items, one row, 322px |
+| 14.43 pin placement | disclosure opened first, note lands, button says it took |
+
+Local: **2290 python pass**, **112 node pass**. The 2 `test_repo_hygiene` failures and the 1
+`preview-ink-layer` failure are pre-existing and unrelated (`ModuleNotFoundError: playwright`).
+
+### 14.46 What green does NOT mean, stated before it is claimed elsewhere
+
+A green suite is one instrument. Recorded so a later reader does not over-read it:
+
+- **G5 has never been re-measured as a named check since the merge.** The merge disambiguated it —
+  there is one queue surface now, so "first actionable queue row" names one thing — but a
+  disambiguated gate that has not been run is disambiguated, not passed. **This is the original
+  complaint of the entire arc and it is the one gate still outstanding.**
+- The print suite last passed against pre-depth DOM. Rows changed shape twice since (deep card, then
+  the collapsed intent cluster). It needs one re-anchor, not a fix.
+- Lane order and the `IMPACT` values await a real writer. Threshold A/B/C awaits real register
+  material. Those are inputs that never arrived, not regressions.
+- Every one of the seven rounds' findings above came from the browser run. Python and node were green
+  while the dock rendered nothing, while the category chips threw on every click, while the join was
+  dead code, and while a membership rule ate its own defect.
+
+### 14.47 The collaboration record
+
+Seven anchored rounds: one ship-blocker (TDZ), one guard-only fix driven to runtime coverage (the
+chip click), one dead-code join exposed and structurally repaired, one false comment corrected, one
+membership ruling with both halves browser-pinned, one width misdiagnosis corrected before it became
+a declaration that did nothing.
+
+The pattern that kept paying was reporting the **mechanism**, not the verdict, and letting the next
+run judge it. Three times in this arc the first answer was wrong in a way only measurement caught:
+the highs-first seed that passed while proving nothing, the multimap that certified its own fallback,
+and the `display` declaration that was inert under a flex parent.
