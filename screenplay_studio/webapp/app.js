@@ -4475,29 +4475,45 @@ function renderFixQueuePanel(container, opts) {
 
   // ONE verb row, shared by both render paths, so Locate/Rewrite/Discuss/
   // Dismiss/Reopen cannot drift between the flat list and the lanes.
-  const buildFixActions = (item, disp, fi) => {
-    const actions = el("div", "fix-row-actions");
-    // R6 item 3: one spelling for one verb. The dock renders this queue in the
-    // same ~320px column as the ledger cards (style.css: .dock-section .fix-row
-    // wraps for exactly that reason), and the card side proved "🎯 Locate" costs
-    // 15px the row does not have. Measured here: Locate 53 + Rewrite 56 +
-    // Discuss 57 + Dismiss 57 + three gaps = 235px in a 319px column, one line —
-    // so this label was never the problem. It matches the card because the writer
-    // should not read the same action two ways on two surfaces one column apart.
-    const locateBtn = el("button", "", "Locate");
-    locateBtn.type = "button";
-    locateBtn.title = "Jump to the exact line in the script";
-    locateBtn.addEventListener("click", () => locateFinding(item, item.index));
-    const rewriteBtn = el("button", "", "Rewrite");
-    rewriteBtn.type = "button";
-    rewriteBtn.addEventListener("click", () => {
-      const refs = item.scene_refs || [];
-      openRewriteModal(refs[0] || 1, item, item.index);
-    });
-    const discussBtn = el("button", "", "Discuss");
-    discussBtn.type = "button";
-    discussBtn.addEventListener("click", () => discussFinding(item, item.index));
-    const triageBtn = el("button", item.dismissed ? "fq-undismiss" : "fq-dismiss", item.dismissed ? "Restore" : "Dismiss");
+  // SPEC 14.31. TRIAGE vs FULL VERB SET.
+  //
+  // On a merged queue row the verbs rendered TWICE: the deep card already
+  // renders Locate (always) and Rewrite/Discuss (whenever `!opts.pin`, which the
+  // queue does not set), and this function appended a second Locate/Rewrite/
+  // Discuss on top. Six buttons doing three jobs is what pushed the row past the
+  // pinned one-row action budget and made one finding read as four competing
+  // surfaces at once.
+  //
+  // The card's own comment already states the rule: "Rewrite and Discuss are
+  // the writer's judgment and have one home each." So on the card path this
+  // function contributes TRIAGE ONLY - Dismiss and Reopen, which the card does
+  // not have and which P1.10 says belong in the queue. It is mounted INTO the
+  // card's existing `.finding-note-actions` row, so the one-row budget is
+  // unchanged and no geometry check needed amending.
+  const buildFixActions = (item, disp, fi, triageOnly) => {
+    const actions = el("div", triageOnly ? "fix-row-triage" : "fix-row-actions");
+    if (!triageOnly) {
+      const locateBtn = el("button", "", "Locate");
+      locateBtn.type = "button";
+      locateBtn.title = "Jump to the exact line in the script";
+      locateBtn.addEventListener("click", () => locateFinding(item, item.index));
+      // R6 item 3: one spelling for one verb, so the writer does not read the
+      // same action two ways on two surfaces one column apart.
+      const rewriteBtn = el("button", "", "Rewrite");
+      rewriteBtn.type = "button";
+      rewriteBtn.addEventListener("click", () => {
+        const refs = item.scene_refs || [];
+        openRewriteModal(refs[0] || 1, item, item.index);
+      });
+      const discussBtn = el("button", "", "Discuss");
+      discussBtn.type = "button";
+      discussBtn.addEventListener("click", () => discussFinding(item, item.index));
+      actions.appendChild(locateBtn);
+      actions.appendChild(rewriteBtn);
+      actions.appendChild(discussBtn);
+    }
+    const triageBtn = el("button", item.dismissed ? "fq-undismiss" : "fq-dismiss",
+                         item.dismissed ? "Restore" : "Dismiss");
     triageBtn.type = "button";
     triageBtn.title = item.dismissed
       ? "Put this finding back in the queue"
@@ -4511,9 +4527,6 @@ function renderFixQueuePanel(container, opts) {
         refreshAllFindingSurfaces(); // P0.4: one entry point, no stale surface
       } catch (err) { showError("Triage failed: " + err.message); }
     });
-    actions.appendChild(locateBtn);
-    actions.appendChild(rewriteBtn);
-    actions.appendChild(discussBtn);
     // D2-a undo: a row the writer marked addressed stays in this queue as
     // `.done` — so this is the one place an addressed finding is ALWAYS on
     // screen, and the only place the mark can be cleared without first asking
@@ -4602,8 +4615,18 @@ function renderFixQueuePanel(container, opts) {
       // when the item carries none (an older server payload).
       let f = null;
       if (item.finding_id && state.findingIds) {
-        const at = state.findingIds.indexOf(item.finding_id);
-        if (at >= 0) f = (state.findings || [])[at];
+        const at = item._seen == null ? -1 : item._seen[item.finding_id] || 0;
+        let seen = 0, hit = -1;
+        for (let k = 0; k < state.findingIds.length; k++) {
+          if (state.findingIds[k] !== item.finding_id) continue;
+          if (seen === at) { hit = k; break; }
+          seen++;
+        }
+        if (hit >= 0) {
+          f = (state.findings || [])[hit];
+          if (!item._seen) item._seen = {};
+          item._seen[item.finding_id] = at + 1;
+        }
       }
       if (!f) f = (state.findings || [])[item.index];
       if (f) entries.push({ f, index: item.index });
@@ -4666,15 +4689,22 @@ function renderFixQueuePanel(container, opts) {
           disposition: findingDisposition(f, index),
           deep: true,
         });
-        const fi = state.findingIds && item.finding_id
-          ? state.findingIds.indexOf(item.finding_id)
-          : queueItemFindingIndex(item);
+        const fi = f != null
+          ? (state.findings || []).indexOf(f)
+          : (state.findingIds && item.finding_id
+             ? state.findingIds.indexOf(item.finding_id)
+             : queueItemFindingIndex(item));
         const disp = fi != null && fi >= 0
           ? findingDisposition((state.findings || [])[fi], fi)
           : (item.dismissed ? "dismissed" : item.status);
         if (item.dismissed) row.classList.add("dismissed");
         row.classList.add("queue-row");
-        row.appendChild(buildFixActions(item, disp, fi));
+        // Mounted into the card's OWN action row, not appended as a second row
+        // below it, so there is exactly one action row per finding.
+        const cardActions = row.querySelector(".finding-note-actions");
+        const triage = buildFixActions(item, disp, fi, true);
+        if (cardActions) cardActions.appendChild(triage);
+        else row.appendChild(triage);
         // Gate G6: every row states why it is ranked where it is. A row that
         // cannot print its own reason is not ranked, it is sorted by something
         // nobody can audit (spec 1.5).

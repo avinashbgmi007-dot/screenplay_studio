@@ -1463,3 +1463,63 @@ call with product eyes: `OPEN_ON_SCENE_JS` counts every open finding (7 on the d
 the queue renders filtered items with ungrounded rows behind the Kit A toggle. Either engage
 `Show ungrounded` first, which also exercises the toggle, or compare against the grounded count. The
 current assertion is simply wrong and I have left it visible rather than quietly relaxing it.
+
+### 14.31 The verb row was not a budget collision. It was me duplicating the verbs.
+
+The runner called the three geometry failures a collision between the 14.25 depth ruling and an
+older one-row action budget, and put the decision to the writer. **It was neither.** Reading the
+code:
+
+- `findingNoteEl` renders `.finding-note-actions` with **Locate always**, and **Rewrite/Discuss
+  whenever `!opts.pin`** — and the queue does not set `pin`, so all three render.
+- `buildFixActions` then appended **a second Locate/Rewrite/Discuss** on top.
+
+Six buttons doing three jobs. And the card's own comment, directly above those buttons, already
+states the rule:
+
+> *"Rewrite and Discuss are the writer's judgment and have one home each… Rendering them here too is
+> what made one finding read as four competing surfaces at once."*
+
+So the budget never had to move. The queue now contributes **triage only** — Dismiss and Reopen,
+which the card does not have and which P1.10 puts in the queue — mounted **into the card's existing
+action row** so there is exactly one action row per finding. The 14.25 depth ruling is untouched.
+
+The runner also caught, correctly, that **my previous fix contained a second defect**: the join used
+`indexOf`, which returns the first match, so two items sharing one content id both bound to
+`findings[0]`. The shared-mark seed proves it — both cards render, the second is a clone. The join
+is now a **consuming multimap**: the Nth item carrying an id gets the Nth finding carrying it, with
+the index fallback retained and first-item-first-finding order kept. That defect arrived *inside* the
+fix for the last one, which is worth recording rather than regretting.
+
+### 14.32 The groundedness call, ruled
+
+"Every live finding is in the queue" was never the contract and never was true. Kit A hides rows
+with no evidence quote by default and puts them one toggle away. The honest contract has two halves
+and the suite now states both:
+
+1. every **grounded** live finding is in the queue, and
+2. ungrounded ones are reachable through the documented toggle, **not dropped**.
+
+`OPEN_ON_SCENE_JS` takes `(scene, groundedOnly)`. The reachability half is ONE unconditional check
+rather than an `if`: a guarded check with no `else` records nothing when the guard is false while
+the suite still prints PASS, and an `else` asserting a literal trips the hygiene ratchet. Folding
+the branch into the condition is what the ratchet asks for. `IF_GUARD_CEILING` was **not** raised.
+
+### 14.33 P2.12: the probe was reading the wrong attribute
+
+`byIndex.get(r.dataset.findex)` on a `.queue-row` — but the merged row is a `.finding-note` and
+carries `data-finding-index`. Every lookup was `undefined`, every row skipped, so `0/0` was a
+statement about a broken probe, not about the payload.
+
+The payload claim itself was also in the wrong place. It ran on the **demo report**, whose findings
+carry no verification, so `withV > 0` could never hold and its failure was not a missing field. The
+claim moved to the seeded path, where the seeded finding *has* a verdict. What stays on the real
+report is the parity claim, which is meaningful either way: a row with a verdict paints one, and no
+row paints a stray.
+
+### 14.34 Seeds engage the Kit A toggle
+
+The shared seed block stamps `ungrounded: !f.evidence_quote`. A CHECK finding and a SCENE/SCRIPT
+finding legitimately carry no quote, so five checks were reading Kit A doing its job as a product
+failure. Seeds now set `state.fixQueueShowUngrounded = true`. Kit A's hidden-by-default behaviour has
+its own suite (`e2e_browser_ungrounded_filter.py`) with its own seeds, so this cannot weaken it.

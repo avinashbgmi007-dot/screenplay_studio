@@ -240,11 +240,32 @@ def test_the_queue_row_keeps_its_depth_and_gains_the_verbs(app_js: str) -> None:
         "and the accuracy meter has no surface to count."
     )
     assert "deep: true" in lane, "the lane row is not built with deep anatomy"
-    assert "buildFixActions(item, disp, fi)" in lane, (
-        "the lane row lost the verb row. Shallow rows were ruled out, not "
-        "chosen: the verbs are additive, so a lane row without them means "
-        "someone half-reverted the merge."
+    # SPEC 14.31: the lane row contributes TRIAGE only. The deep card already
+    # renders Locate/Rewrite/Discuss; appending a second set is what duplicated
+    # six buttons doing three jobs and broke the one-row action budget.
+    assert "buildFixActions(item, disp, fi, true)" in lane, (
+        "the lane row is not mounting its triage verbs. The card has no Dismiss "
+        "and P1.10 puts that gesture in the queue, so losing it here means "
+        "nothing can be triaged from the worklist."
     )
+    assert 'row.querySelector(".finding-note-actions")' in lane, (
+        "triage must mount INTO the card's own action row. Appending it as a "
+        "second row below is what broke the pinned one-row budget."
+    )
+    # Each verb is constructed exactly ONCE in the shared helper. The deep card
+    # builds its own copy; a second construction here is the duplication back.
+    # Scoped to the helper's body — a count taken to end-of-file also counts the
+    # unrelated pin popup, and the first draft of this assertion failed on a
+    # build that was correct.
+    helper = app_js[app_js.index("const buildFixActions"):]
+    helper = helper[: helper.index("\n  const buildFixRow")]
+    for verb in ('"Locate"', '"Rewrite"', '"Discuss"'):
+        assert helper.count(verb) == 1, (
+            f"{verb} is constructed {helper.count(verb)} times in the shared verb "
+            "helper. It must be built once; the card renders its own and "
+            "re-rendering it here is what made one finding look like four "
+            "competing surfaces."
+        )
     # ...and the shallow row must not have quietly become the only renderer.
     assert "buildFixRow(item)" in app_js, "the flat report-page path lost its row"
 

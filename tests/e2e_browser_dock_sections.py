@@ -150,12 +150,22 @@ SCENE_CHIP = ".fchip-scene"
 # through the app's own contract function — never a second counter in the test —
 # under the severity rule the default chips apply, so the number is directly
 # comparable with the DOM counts below.
-OPEN_ON_SCENE_JS = """(scene) => {
+# SPEC 14.32, THE GROUNDEDNESS CALL. Accuracy kit A hides rows with no evidence
+# quote by default and puts them one toggle away. So "every live finding is in
+# the queue" was never true and never was the contract: the contract is "every
+# GROUNDED live finding is in the queue, and the ungrounded ones are one toggle
+# away". This takes (scene, groundedOnly) so one probe can state both halves.
+# The old single-argument form counted ungrounded rows too, which is why the
+# equality could not hold and why it was wrong rather than merely stale.
+OPEN_ON_SCENE_JS = """(args) => {
+  const scene = args && args.scene != null ? args.scene : null;
+  const groundedOnly = !!(args && args.groundedOnly);
   const sevs = ["high", "medium", "low"];
   let n = 0;
   (state.findings || []).forEach((f, i) => {
     if (findingDisposition(f, i) !== "open") return;
     if (!sevs.includes(((f && f.severity) || "low").toLowerCase())) return;
+    if (groundedOnly && !(f && f.evidence_quote)) return;
     if (scene == null) { n += 1; return; }
     const refs = (f && f.scene_refs) || [];
     if (refs.includes(scene) || refs.includes(String(scene))) n += 1;
@@ -242,6 +252,22 @@ SEED_JS = """(args) => {
   // exist at all.
   state.fixQueue = state.fixQueue || {};
   state.fixQueue.dismissed_flags = [];
+  // Accuracy kit A hides ungrounded rows by default. A CHECK finding and a
+  // SCENE/SCRIPT finding legitimately carry no quote, so these seeds wrote
+  // findings the queue correctly hid, and the assertions read the toggle doing
+  // its job as a product failure. Engaged here so the anatomy checks can see
+  // every seeded row. Kit A's hidden-by-default behaviour has its own suite
+  // (e2e_browser_ungrounded_filter.py) with its own seeds, so this cannot
+  // weaken it.
+  state.fixQueueShowUngrounded = true;
+  // Accuracy kit A hides ungrounded rows by default. A CHECK finding and a
+  // SCENE/SCRIPT finding legitimately carry no quote, so the seeds below wrote
+  // findings the queue correctly hid, and the assertions read the toggle doing
+  // its job as a product failure. Engaged here so the anatomy checks can see
+  // every seeded row. Kit A's hidden-by-default behaviour has its own suite
+  // (e2e_browser_ungrounded_filter.py) with its own seeds, so this cannot
+  // weaken it.
+  state.fixQueueShowUngrounded = true;
   state.fixQueue.items = fs.map((f, index) => ({
     index, finding_id: state.findingIds[index],
     category: f.category, severity: f.severity, issue: f.issue,
@@ -262,6 +288,14 @@ SEED_JS = """(args) => {
   state.ghostedIds = new Set();
   state.fixQueue = state.fixQueue || {};
   state.fixQueue.dismissed_flags = [];
+  // Accuracy kit A hides ungrounded rows by default. A CHECK finding and a
+  // SCENE/SCRIPT finding legitimately carry no quote, so these seeds wrote
+  // findings the queue correctly hid, and the assertions read the toggle doing
+  // its job as a product failure. Engaged here so the anatomy checks can see
+  // every seeded row. Kit A's hidden-by-default behaviour has its own suite
+  // (e2e_browser_ungrounded_filter.py) with its own seeds, so this cannot
+  // weaken it.
+  state.fixQueueShowUngrounded = true;
   refreshAllFindingSurfaces(); // the ONE re-render entry point (P0.4)
   return { ids: state.findingIds };
 }"""
@@ -424,22 +458,38 @@ def check_scene_filter(page, lens):
     check("P1.7: the queue is open (it opens by default; open_dock_section is "
           "a no-op when it already is)", open_dock_section(page, "fix-queue"))
 
-    whole_ledger = page.evaluate(OPEN_ON_SCENE_JS, None)
+    whole_ledger = page.evaluate(OPEN_ON_SCENE_JS, {"scene": None, "groundedOnly": True})
     whole_cards = live_cards(lens)
     off_label = chip_label(lens)
     check("P1.7: chip off — the label prints the scope of its count ('N open')",
           re.match(r"^This scene \u00b7 \d+ open$", off_label) is not None, off_label)
-    check("P1.7: the DEFAULT ledger is every live finding, not the current scene's "
-          "(red-team W2)",
+    check("P1.7: the DEFAULT queue is every GROUNDED live finding, not the "
+          "current scene's (red-team W2). Ungrounded rows are one Kit A toggle "
+          "away, asserted separately below — they are hidden by design, not "
+          "missing.",
           whole_cards == whole_ledger and whole_ledger > 0,
-          f"cards={whole_cards} ledger={whole_ledger}")
+          f"cards={whole_cards} grounded={whole_ledger}")
+
+    # The other half of the same contract, stated rather than assumed.
+    ungrounded_n = page.evaluate(OPEN_ON_SCENE_JS,
+                                 {"scene": None, "groundedOnly": False}) - whole_ledger
+    # ONE unconditional check rather than an `if`. A guarded check with no else
+    # reports nothing when the guard is false and the suite still prints PASS;
+    # an else asserting a literal trips the hygiene ratchet. Folding the branch
+    # INTO the condition is what the ratchet is asking for: hold vacuously when
+    # there is nothing ungrounded, fail when there is and no toggle exists.
+    toggle_count = lens.locator(".dock-section-fixqueue .fq-toggle-ungrounded").count()
+    check("P1.7: ungrounded rows are reachable through the documented toggle, "
+          "not dropped (vacuous when this report has none)",
+          ungrounded_n == 0 or toggle_count == 1,
+          f"ungrounded={ungrounded_n} toggles={toggle_count}")
     check("P1.7: with no scene set no scene clause is active (the strip may still"
           " name non-scene narrowing — groundedness now narrows by default, pinned"
           " by the ungrounded-filter suite)",
           page.evaluate("() => state.findingFilter.scene") is None,
           page.evaluate("() => state.findingFilter.scene"))
 
-    scoped = page.evaluate(OPEN_ON_SCENE_JS, scene)
+    scoped = page.evaluate(OPEN_ON_SCENE_JS, {"scene": scene, "groundedOnly": True})
     ink_before = page.evaluate(INK_BY_SCENE_JS)
     check("P1.7: this scene holds some of the ledger, not all of it (so narrowing "
           "is provable here)",
@@ -527,7 +577,8 @@ def check_seeded_scene_filter(page, lens):
     page.wait_for_timeout(400)
     ids = seeded.get("ids") or []
     check("P1.7/seed: the fixture ledger is in place (4 open findings across 2 scenes)",
-          page.evaluate(OPEN_ON_SCENE_JS, None) == 4, f"ids={ids}")
+          page.evaluate(OPEN_ON_SCENE_JS, {"scene": None, "groundedOnly": True}) == 4,
+          f"ids={ids}")
     # the ledger re-render collapses the manuscript scroll — the writer scrolls
     # back to the scene they were reading, and THAT is the scene "this scene"
     # means when the chip is clicked.
@@ -591,6 +642,20 @@ def check_seeded_scene_filter(page, lens):
           len(line) == 2 and "verified" in line[0]["reason"]
           and "severity" not in line[0]["reason"].lower(),
           f"{line}")
+    # P2.12's payload claim, on an input that HAS a verdict. The demo report has
+    # none, so this cannot be asserted there - see the note at the real-report
+    # probe. The seeded finding is verified, so the badge must paint.
+    check("P2.12: the queue payload carries verification and the row paints it",
+          page.evaluate("""() => {
+            const items = (state.fixQueue && state.fixQueue.items) || [];
+            const withV = items.filter((i) => i.verification && i.verification.status).length;
+            const rows = document.querySelectorAll(
+              '.dock-section-fixqueue .queue-row .finding-deep-badge').length;
+            return withV > 0 && withV === rows;
+          }"""),
+          page.evaluate("() => JSON.stringify((state.fixQueue.items || [])"
+                        ".map((i) => i.verification && i.verification.status))"))
+
     check("P1.7: every lane row states why it is ranked where it is (G6)",
           len(line) == 2 and all(r["reason"] for r in line), f"{line}")
 
@@ -635,6 +700,11 @@ def check_seeded_scene_filter(page, lens):
         check("clicking it again widens the queue back to every finding",
               live_cards(lens) == rows_before,
               f"before={rows_before} after={live_cards(lens)}")
+    else:
+        # Without this the whole click exercise would be skipped and the suite
+        # would still print PASS — the ratchet exists for exactly that shape.
+        check("the lane category sub-header is clickable at all", False,
+              "no .dock-lane-cat rendered inside the Structure lane")
     check("P1.8: each finding carries its own row in the one surface that "
           "renders findings",
           sorted(r["findex"] for r in (line + structure)) == ["0", "1", "2", "3"],
@@ -779,21 +849,29 @@ def check_shelf_defers_and_one_pacing(page, lens, base, name):
       const items = (state.fixQueue && state.fixQueue.items) || [];
       const byIndex = new Map(items.map((i) => [String(i.index), i]));
       let withV = 0, badge = 0; const bad = [];
+      // data-findingIndex, NOT data-findex: the merged queue row is the deep
+      // card, and findingNoteEl stamps `finding-note` with data-finding-index.
+      // Reading dataset.findex gave undefined for every row, so this probe
+      // skipped all of them and reported 0/0 as if the input had no verdicts.
       document.querySelectorAll('.dock-section-fixqueue .queue-row').forEach((r) => {
-        const it = byIndex.get(r.dataset.findex);
+        const it = byIndex.get(r.dataset.findingIndex);
         if (!it) return;
         const want = verificationBadge(it.verification);
         const got = r.querySelector('.finding-deep-badge');
         if (it.verification && it.verification.status) withV++;
         if (got) badge++;
         if ((want ? want.textContent : null) !== (got ? got.textContent : null)) {
-          bad.push(r.dataset.findex + ':' + (got ? got.textContent : 'none'));
+          bad.push(r.dataset.findingIndex + ':' + (got ? got.textContent : 'none'));
         }
       });
       return { rows: items.length, withV, badge, bad: bad.slice(0, 3) };
     }""")
-    check("P2.12: the queue payload carries verification for real findings",
-          p212["withV"] > 0, str(p212))
+    # "the payload carries verification" is NOT assertable here. This probe runs
+    # on the demo report, whose findings carry no verification at all, so withV
+    # is 0 and that is correct output for that input, not a missing field. The
+    # payload claim moved to check_seeded_scene_filter, where the seeded finding
+    # HAS a verdict. What stays here is the parity claim, which is meaningful
+    # either way: a row with a verdict paints one, and no row paints a stray.
     check("P2.12: every row with a verdict paints one, and no row paints a stray",
           p212["withV"] == p212["badge"], str(p212))
     check("P2.12: the row's badge is the SAME builder's output as the card's",
@@ -939,6 +1017,14 @@ HONESTY_SEED_JS = """(args) => {
   // exist at all.
   state.fixQueue = state.fixQueue || {};
   state.fixQueue.dismissed_flags = [];
+  // Accuracy kit A hides ungrounded rows by default. A CHECK finding and a
+  // SCENE/SCRIPT finding legitimately carry no quote, so these seeds wrote
+  // findings the queue correctly hid, and the assertions read the toggle doing
+  // its job as a product failure. Engaged here so the anatomy checks can see
+  // every seeded row. Kit A's hidden-by-default behaviour has its own suite
+  // (e2e_browser_ungrounded_filter.py) with its own seeds, so this cannot
+  // weaken it.
+  state.fixQueueShowUngrounded = true;
   state.fixQueue.items = fs.map((f, index) => ({
     index, finding_id: state.findingIds[index],
     category: f.category, severity: f.severity, issue: f.issue,
@@ -1434,6 +1520,14 @@ TYPOLOGY_SEED_JS = """(args) => {
   // exist at all.
   state.fixQueue = state.fixQueue || {};
   state.fixQueue.dismissed_flags = [];
+  // Accuracy kit A hides ungrounded rows by default. A CHECK finding and a
+  // SCENE/SCRIPT finding legitimately carry no quote, so these seeds wrote
+  // findings the queue correctly hid, and the assertions read the toggle doing
+  // its job as a product failure. Engaged here so the anatomy checks can see
+  // every seeded row. Kit A's hidden-by-default behaviour has its own suite
+  // (e2e_browser_ungrounded_filter.py) with its own seeds, so this cannot
+  // weaken it.
+  state.fixQueueShowUngrounded = true;
   state.fixQueue.items = fs.map((f, index) => ({
     index, finding_id: state.findingIds[index],
     category: f.category, severity: f.severity, issue: f.issue,
@@ -1454,6 +1548,14 @@ TYPOLOGY_SEED_JS = """(args) => {
   state.ghostedIds = new Set();
   state.fixQueue = state.fixQueue || {};
   state.fixQueue.dismissed_flags = [];
+  // Accuracy kit A hides ungrounded rows by default. A CHECK finding and a
+  // SCENE/SCRIPT finding legitimately carry no quote, so these seeds wrote
+  // findings the queue correctly hid, and the assertions read the toggle doing
+  // its job as a product failure. Engaged here so the anatomy checks can see
+  // every seeded row. Kit A's hidden-by-default behaviour has its own suite
+  // (e2e_browser_ungrounded_filter.py) with its own seeds, so this cannot
+  // weaken it.
+  state.fixQueueShowUngrounded = true;
   refreshAllFindingSurfaces(); // the ONE re-render entry point (P0.4)
   return { n: fs.length };
 }"""
@@ -1706,6 +1808,14 @@ SHARED_MARK_SEED_JS = """() => {
   // exist at all.
   state.fixQueue = state.fixQueue || {};
   state.fixQueue.dismissed_flags = [];
+  // Accuracy kit A hides ungrounded rows by default. A CHECK finding and a
+  // SCENE/SCRIPT finding legitimately carry no quote, so these seeds wrote
+  // findings the queue correctly hid, and the assertions read the toggle doing
+  // its job as a product failure. Engaged here so the anatomy checks can see
+  // every seeded row. Kit A's hidden-by-default behaviour has its own suite
+  // (e2e_browser_ungrounded_filter.py) with its own seeds, so this cannot
+  // weaken it.
+  state.fixQueueShowUngrounded = true;
   state.fixQueue.items = fs.map((f, index) => ({
     index, finding_id: state.findingIds[index],
     category: f.category, severity: f.severity, issue: f.issue,
