@@ -4,6 +4,29 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-17: Browser walk found a binding defect the fixtures could not (spec §14.55)
+
+Ran the remaining 14.54 verification — browser traversal of the loop/queue on the pushed repair
+(`64da684`). New suite `tests/e2e_browser_loop_queue_parity.py` (22 checks, two-phase fixture: discover
+the rendered task rows, plant an ungrounded marker on the first, reload, walk the loop, flip the
+toggle). It went **19 pass / 3 fail**: the planted row's marker stayed visible in the toggle-off view,
+the loop expected `['f6nu9ut', …]` while the rows carried `['f1xw6ybi', …]`, and a step landed no card.
+
+Root cause, pre-existing since the ranked queue shipped: `/fixqueue` sorts by severity/act/index
+(`webapp_server.py:2677`), so payload positions differ from `item.index` (measured `[0,1,3,2,4]`), but
+the two consumers of `bindQueueItems` — `queueProjection`'s entry loop + `byIndex`, and
+`openFindingsOnScene` — read `bound[item.index]`: a positional array fetched with a non-positional key.
+Reordered rows exchanged partners. Every prior fixture wrote items in index order, where the defect is
+invisible. Fixed by keying positionally (`bound[k]`) in both consumers; `bindQueueItems` untouched.
+
+Failing-then-passing: new node test "a rank-reordered payload binds each row to its OWN finding (14.55)"
+(red: `row 3 must carry its own item`; then 13/13 green); browser suite 22/22 green after.
+Node **179 pass / 0 fail**; Python **2293 pass / 3 skip**. Suite lands without an if-guarded check, so
+the IF_GUARD_CEILING ratchet stays at 23; `docs/TESTING.md` runnable-suite count 34 → 35. Spec §14.55
+records the ruling (pair items positionally; a consumer using `item.index` re-introduces the defect).
+Next: identity-anchored regression spot-checks (layout_audit, ungrounded_filter, dock_sections) on the
+pushed 14.55 HEAD; writer validation and register calibration remain the standing open inputs.
+
 ### 2026-10-17: Loop/queue traversal repaired — one ordered projection (spec §14.54)
 
 The 14.53 gap is closed in code. `loopList` now walks `core.js queueProjection()` — the same
@@ -17,7 +40,7 @@ clause via the ONE `ungroundedRowVisible()` helper now read by `inFindingFilter`
 `tests/js/queue_loop_parity.test.js`: 12 tests running the shipped `loopList`; **12/12 red on the old
 code** (order test reproduced the 14.53 `[0,1]` vs `[1,0]` diff), green on the repair. Suites:
 Python **2293 pass / 3 skip**; Node **178 pass / 0 fail** (was 166). Two source guards updated to
-follow the clause to its helper. Next: browser traversal of the loop on the pushed HEAD; writer
+follow the clause to its helper. Browser traversal followed in the §14.55 entry above; writer
 validation and register calibration remain the standing open inputs.
 
 ### 2026-10-17: Simulated senior-writer review complete; loop/queue follow-up open

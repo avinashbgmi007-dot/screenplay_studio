@@ -7187,9 +7187,15 @@ function openFindingsOnScene(n) {
   const items = (state.fixQueue && state.fixQueue.items) || [];
   const bound = bindQueueItems(items, state.findings, state.findingIds);
   let count = 0;
-  for (const item of items) {
+  for (let k = 0; k < items.length; k++) {
+    const item = items[k];
     if (item.dismissed) continue;
-    const at = bound[item.index];
+    // SPEC 14.55: bindQueueItems returns one binding per item, so the
+    // binding for items[k] is bound[k]. Reading bound[item.index] (the shape
+    // this held before) swapped the bindings of rows the /fixqueue sort
+    // reordered — the chip then counted a different finding than the row
+    // shows. Positional keying is the one contract (same as queueProjection).
+    const at = bound[k];
     const f = at >= 0 ? (state.findings || [])[at] : null;
     const d = f ? findingDisposition(f, at)
                 : (item.status === "addressed" ? "addressed" : "open");

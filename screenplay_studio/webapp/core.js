@@ -464,9 +464,11 @@ function groupByLane(entries) {
  * Returns { groups, order, entries, byIndex }:
  *   groups/order — exactly what groupByLane returned (the renderer walks it);
  *   entries — the same members flattened in render order (the loop walks it);
- *   byIndex — the renderer's finding-position -> queue-item map, kept
- *   identical to the inline version this replaced, including its last-wins
- *   behaviour if two items ever bind to the same position.
+ *   byIndex — the renderer's finding-position -> queue-item map (last-wins if
+ *   two items ever bind to one position). Its keying is POSITIONAL
+ *   (bound[k] for items[k], spec 14.55): the shape this replaced read
+ *   bound[item.index], which swapped bindings on the rank-reordered
+ *   /fixqueue payload (see the loop below).
  *
  * Binding runs over the FULL item list before admission: the multimap's
  * consuming counter must see every item, exactly as the queue's first render
@@ -477,10 +479,24 @@ function queueProjection(items, findings, findingIds, admit) {
   const all = items || [];
   const bound = bindQueueItems(all, findings, findingIds);
   const byIndex = new Map();
-  for (const item of all) byIndex.set(bound[item.index], item);
   const entries = [];
-  for (const item of all) {
-    const at = bound[item.index];
+  for (let k = 0; k < all.length; k++) {
+    const item = all[k];
+    // SPEC 14.55 — POSITIONAL keying. bindQueueItems returns one binding PER
+    // ITEM, so the binding for items[k] is bound[k] (queue_lanes.test.js pins
+    // exactly that). Reading bound[item.index] (the shape this replaced)
+    // only agreed while the payload happened to be index-ordered; /fixqueue
+    // sorts by severity/act (webapp_server.py:2677), and on the reordered
+    // payloads two rows then bind to EACH OTHER's findings — measured on the
+    // demo desk (items [0,1,3,2,4]): the "Setup left dangling" row carried
+    // the character row's item and vice versa, silently, because both rows
+    // looked plausible. The browser traversal check is what caught it.
+    const at = bound[k];
+    // itemAt/byIndex is keyed by the finding's TRUE array position, so the
+    // renderer's byIndex.get(entry.index) fetches the item that binds to
+    // THIS finding. Last-wins if two items ever bind to one position —
+    // unchanged from the inline version this replaced.
+    byIndex.set(at, item);
     const f = at >= 0 ? (findings || [])[at] : null;
     if (!f) continue;
     if (typeof admit === "function" && !admit(item, f, at)) continue;

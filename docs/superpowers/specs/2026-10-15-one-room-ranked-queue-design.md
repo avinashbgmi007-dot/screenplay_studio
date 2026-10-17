@@ -1970,3 +1970,44 @@ the rule to its new home and assert the helper itself carries the toggle clause 
 **Not yet claimed:** browser traversal on the pushed repair. Per 14.53 the anchors remain valid for
 what they covered; the pushed-HEAD walk is the remaining verification, and real writer validation and
 native-register calibration remain the separate open requirements.
+
+### 14.55 The browser walk found the binding defect the fixtures could not: pair items by position
+
+Per 14.54's not-yet-claimed item, the browser traversal check was run against the pushed repair
+(`64da684`). It went red — not on the traversal it was written for: 14.54's parity held (one projected
+order, one admission), but on the real, rank-ordered payload BOTH readers were pairing the wrong item
+with the wrong finding.
+
+**The defect (pre-existing since the ranked queue shipped).** `/fixqueue` sorts items by severity, then
+act, then finding index (`webapp_server.py:2677`), so payload positions stop matching `item.index` —
+measured on the demo desk: `[0, 1, 3, 2, 4]`. `bindQueueItems` returns one binding per item, by
+position (`bound[k]` for `items[k]` — its own tests pin exactly that). But both consumers — the lane
+renderer's entry loop + `byIndex`, and `openFindingsOnScene` — read `bound[item.index]`: a positional
+array fetched with a non-positional key. On the measured payload the two reordered rows exchanged
+partners. What the browser saw, with the marker planted on an ungrounded finding: the marker stayed on
+screen in the default (toggle-off) view — the entry whose finding was `f6nu9ut` was painted with the
+item whose id is `f1xw6ybi` (the planted row), and the loop then expected `['f6nu9ut', 'f1u80v1t']`
+while the rendered rows were `['f1xw6ybi', 'f1u80v1t']`, so a step landed no card. Every suite fixture
+until this suite wrote items in index order, where positions equal `item.index` and the defect is
+invisible; the reordered payload is exactly what the ranked room exists to produce.
+
+**Fix.** Pair by position wherever `bindQueueItems`' output is consumed: `queueProjection` uses
+`bound[k]` (entry loop and `byIndex`) and `openFindingsOnScene` iterates `items` by `k` with `bound[k]`.
+`bindQueueItems` itself is unchanged — it was already positional, and its contract is pinned.
+
+**Evidence.** New node test "a rank-reordered payload binds each row to its OWN finding (14.55)" in
+`tests/js/queue_loop_parity.test.js`: red before the fix (`row 3 must carry its own item` — actual
+`f797tiu` where the row's own item is `fam3qv7`), green after (13/13). New suite
+`tests/e2e_browser_loop_queue_parity.py` — 22 checks, two-phase fixture (discover the rendered task
+rows, plant the ungrounded marker on the first, reload, then walk the loop and flip the toggle):
+**19 pass / 3 fail** on the pushed 14.54 code, each failure recording the swap — **22/22 green** after
+the keying fix. Node **179 pass / 0 fail**; Python **2293 pass / 3 skip**. The suite carries no
+`if`-guarded check (the IF_GUARD_CEILING ratchet stays at 23 — identity anchoring is
+`anchored_run.py`'s job; `docs/TESTING.md`'s runnable-suite count 34 → 35). The builder stayed out of
+the queue's vocabulary: no lane clause in `findingPassesFilter`, no IMPACT/threshold change.
+
+**Ruling.** Display data and display order both come from the item↔finding pair, and that pair is
+positional on the wire consumer side. A consumer that fetches `bindQueueItems`' output with
+`item.index` re-introduces 14.55 — the discriminating test and the browser suite both fail.
+
+Real writer validation and native-register calibration remain the separate open requirements.

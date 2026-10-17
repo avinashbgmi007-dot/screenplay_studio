@@ -155,7 +155,7 @@ driven by `tests/run_browser_suites.py`, which runs every suite, prints one summ
 and exits nonzero on any failure or crash:
 
 ```bash
-python tests/run_browser_suites.py               # all runnable suites (34)
+python tests/run_browser_suites.py               # all runnable suites (35)
 python tests/run_browser_suites.py phase6 smoke  # by name substring
 python tests/run_browser_suites.py --strict      # also chase the known-broken
 E2E_BASE=http://127.0.0.1:8500 python tests/run_browser_suites.py

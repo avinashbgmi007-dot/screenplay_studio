@@ -169,6 +169,40 @@ test('an empty or failed queue fetch yields an empty walk, never a report-order 
   assert.deepEqual(fixture({ findings, items: [] }).list(), []);
 });
 
+test('a rank-reordered payload binds each row to its OWN finding (14.55)', () => {
+  // /fixqueue sorts its items by severity then act (webapp_server.py:2677),
+  // so the payload's ARRAY POSITIONS disagree with item.index whenever the
+  // sort moves a row — measured on the demo desk: [0,1,3,2,4]. bindQueueItems
+  // returns one binding PER ITEM (bound[k] for items[k], queue_lanes.test.js
+  // pins exactly that), so a consumer reading bound[item.index] pairs the
+  // two reordered rows with EACH OTHER's findings. Caught in the browser on
+  // the real payload: the row headed "Setup left dangling" carried the
+  // character row's item (its verbs, flags and toggles) and vice versa.
+  const findings = [
+    finding('dialogue', { issue: 'dialogue row' }),
+    finding('continuity', { issue: 'continuity row', rule_id: 'CONT-1' }),
+    finding('character', { issue: 'character row' }),
+    finding('plot_thread', { issue: 'setup row' }),
+  ];
+  const ids = findings.map(core.computeFindingId);
+  const items = [                                  // severity/act sort moved 3 ahead of 2
+    { index: 0, finding_id: ids[0], dismissed: false },
+    { index: 1, finding_id: ids[1], dismissed: false },
+    { index: 3, finding_id: ids[3], dismissed: false },
+    { index: 2, finding_id: ids[2], dismissed: false },
+  ];
+  const proj = core.queueProjection(items, findings, ids, null);
+  assert.deepEqual(proj.entries.map((e) => e.index).sort(), [0, 1, 2, 3],
+    'every reordered row still reaches its own finding');
+  for (const e of proj.entries) {
+    // The render pairs the row's finding with the row's item through byIndex
+    // (app.js: byIndex.get(entry.index)); the item it fetches must be the one
+    // that binds to THIS finding, or the row wires another row's verbs.
+    assert.equal(proj.byIndex.get(e.index).finding_id, ids[e.index],
+      `row ${e.index} must carry its own item`);
+  }
+});
+
 test('queueProjection: lane order, flatten order, and the byIndex lookup agree', () => {
   const findings = [finding('dialogue'), finding('structure')];
   const ids = findings.map(core.computeFindingId);
