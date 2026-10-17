@@ -18,17 +18,23 @@ and 9 recorded nothing at all: every check in them sat behind `if
 cards.count()`, so the "manuscript never drops below half" law and the fix-loop
 contract stopped being asserted while the suite still printed PASS. (R6-E2E-2.)
 
-Usage:  E2E_BASE=http://127.0.0.1:8500 python tests/e2e_browser_layout_audit.py
-Without E2E_BASE it boots a private demo-model studio (standard suite mode).
+Usage:  python tests/e2e_browser_layout_audit.py
+It boots a private demo-model studio (standard suite mode). It cannot run
+against an E2E_BASE studio: its fix-loop contract needs grounded rows planted
+in the report on disk (see plant_grounded_rows), which a foreign studio
+cannot offer — with E2E_BASE set it refuses loudly instead.
 """
+import contextlib
+import json
 import os
 import sys
+import tempfile
 
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from e2e_browser_common import (  # noqa: E402
-    Checks, note, open_studio, studio_headers)
+    Checks, note, start_studio, studio_headers)
 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
@@ -61,6 +67,56 @@ def seed_desk(base):
 
 
 
+TASK_CATEGORIES = ("plot_thread", "character", "dialogue", "continuity")
+
+
+@contextlib.contextmanager
+def desk():
+    """Boot the desk with a projects dir this suite can write to.
+
+    The fix-loop contract (section 9c) needs >=2 queue rows to step. The demo
+    analysis of the fixture grounds only its deterministic continuity finding —
+    the demo-sample rows carry no quotes, so accuracy kit A marks them
+    ungrounded, and the default queue hides ungrounded rows (spec 14.54: the
+    loop walks the QUEUE, not the report). One row cannot prove stepping, so
+    this suite plants grounded flags on disk before the browser looks — the
+    same mechanism e2e_browser_ungrounded_filter.py uses. A studio run from
+    E2E_BASE cannot be written to, so refuse loudly rather than fail
+    confusingly."""
+    if os.environ.get("E2E_BASE"):
+        print("E2E_BASE is set: this suite must boot its own studio to plant "
+              "the grounded rows its fix-loop contract needs. Unset E2E_BASE "
+              "and re-run.")
+        sys.exit(2)
+    with tempfile.TemporaryDirectory(prefix="layout_audit_e2e_") as tmp:
+        projects = os.path.join(tmp, "projects")
+        os.makedirs(projects, exist_ok=True)
+        with start_studio(projects_dir=projects) as studio:
+            yield studio.base_url, studio.projects_dir
+
+
+def plant_grounded_rows(projects_dir, name, want=2):
+    """Ground `want` task-lane rows in the analyzed report on disk.
+
+    Grounding is display-only: the flags ride report.findings.json to the desk
+    exactly as accuracy kit A wrote them, so flipping them here exercises the
+    same report -> /fixqueue -> queue -> loop path the writer's desk uses."""
+    path = os.path.join(projects_dir, name, "report.findings.json")
+    with open(path, encoding="utf-8") as f:
+        rep = json.load(f)
+    planted = 0
+    for finding in rep.get("findings") or []:
+        if planted >= want:
+            break
+        if finding.get("category") in TASK_CATEGORIES \
+                and finding.get("ungrounded"):
+            finding["ungrounded"] = False
+            planted += 1
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(rep, f)
+    return planted
+
+
 def measure(page, sel):
     return page.evaluate(
         "sel => { const el = document.querySelector(sel);"
@@ -75,8 +131,13 @@ def approx(a, b, tol):
 
 
 def main():
-    with open_studio() as base:
-        seed_desk(base)
+    with desk() as (base, projects_dir):
+        subject = seed_desk(base)
+        planted = plant_grounded_rows(projects_dir, subject)
+        assert planted >= 2, (
+            f"the fixture's analysis offered {planted} ungrounded task rows to "
+            "ground - the fix-loop contract below needs >=2. Has the fixture "
+            "or the demo analysis changed?")
         with sync_playwright() as pw:
             from e2e_browser_common import launch
             browser, page, errors = launch(pw)

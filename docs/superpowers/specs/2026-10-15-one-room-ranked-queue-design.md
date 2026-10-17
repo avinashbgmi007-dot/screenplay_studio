@@ -2010,4 +2010,25 @@ the queue's vocabulary: no lane clause in `findingPassesFilter`, no IMPACT/thres
 positional on the wire consumer side. A consumer that fetches `bindQueueItems`' output with
 `item.index` re-introduces 14.55 — the discriminating test and the browser suite both fail.
 
+**The regression sweep the check set off.** Running the queue-path suites at `40637d8` (and, to
+separate causes, at `64da684` and `5d336d3`) split three failures into two piles. `layout_audit` at
+`40637d8` was 34/3 but 36/1 at `5d336d3`: two of its three failures were a REGRESSION FROM 14.54 —
+its fix-loop contract seeded a desk whose post-14.54 queue legitimately shows one row (the demo
+analysis of the fixture grounds only its deterministic continuity finding; kit A marks the
+demo-sample rows ungrounded and the queue hides them). The pre-14.54 check passed because the loop
+walked `state.findings` — including the hidden ungrounded rows, the very defect 14.54 fixed, so the
+suite had encoded the defect as its oracle. Repaired the seed, not the law: the suite now boots
+privately with its own projects dir and grounds two task-lane rows in the report on disk before the
+browser looks (the same mechanism `e2e_browser_ungrounded_filter.py` uses), refuses `E2E_BASE`
+loudly, and is 37/0. The third `layout_audit` failure — `--ink`, `--ink-2`, `--ink-3` unresolved —
+was pre-existing at `5d336d3`: dead tokens left by the ONE HOME lanes work (`--ink` is the
+preview-design kits' palette, never the desk's; the desk defines `--ink-950..700` and its text
+tiers). Swapped to the desk's own second-tier text tokens (`--text-muted` / `--text`); the suite's
+token census is exactly the guard that catches this class and now passes. And
+`e2e_browser_ungrounded_filter.py`'s 18/3 was identical at `64da684`: pre-existing staleness against
+the lane queue (it plants its contested marker on an observation row lanes never render and probes
+`.row-flag-*` badges inside the retired flat `.fix-row`; the lane row marks ungrounded as text).
+Flagged and documented here, not chased — its repair is its own task, and this arc's browser
+authority is the parity suite above plus the anchored `dock_sections` run.
+
 Real writer validation and native-register calibration remain the separate open requirements.

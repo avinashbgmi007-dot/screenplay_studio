@@ -24,8 +24,21 @@ Failing-then-passing: new node test "a rank-reordered payload binds each row to 
 Node **179 pass / 0 fail**; Python **2293 pass / 3 skip**. Suite lands without an if-guarded check, so
 the IF_GUARD_CEILING ratchet stays at 23; `docs/TESTING.md` runnable-suite count 34 → 35. Spec §14.55
 records the ruling (pair items positionally; a consumer using `item.index` re-introduces the defect).
-Next: identity-anchored regression spot-checks (layout_audit, ungrounded_filter, dock_sections) on the
-pushed 14.55 HEAD; writer validation and register calibration remain the standing open inputs.
+
+Regression sweep on the pushed HEAD, cause-separated by anchored runs at `64da684`/`5d336d3`:
+- `e2e_browser_layout_audit.py` 34/3 at the new sha, but 36/1 at `5d336d3` — TWO failures were a
+  14.54 regression: its fix-loop seed left the post-14.54 queue one row (demo rows ungrounded; the
+  old check had blessed the loop walking hidden rows). Repaired the seed (private boot + grounds two
+  task rows on disk; E2E_BASE refused loudly) → **37/0**.
+- The third layout_audit failure — `--ink`, `--ink-2`, `--ink-3` unresolved — pre-existing: dead
+  tokens from the ONE HOME lanes CSS. Swapped to the desk's own `--text-muted`/`--text` → census
+  passes. layout_audit now fully green.
+- `e2e_browser_ungrounded_filter.py` 18/3, identical at `64da684` — pre-existing staleness against
+  the lane queue (retired `.fix-row` badge probes; contested planted on an observation). Flagged in
+  spec §14.55, not chased.
+`e2e_browser_loop_queue_parity.py` 22/22 identity-anchored at `40637d8`. Still pending: anchored
+`dock_sections` on the final HEAD. Writer validation and register calibration remain the standing
+open inputs.
 
 ### 2026-10-17: Loop/queue traversal repaired — one ordered projection (spec §14.54)
 

@@ -6532,7 +6532,11 @@ body:not(.idea-mode) .desk {
   padding: 2px 0;
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--ink-2);
+  /* 14.55 sweep: --ink-2 was never a desk token (the palette defines
+   * --ink-950..700; the preview-design kits define their own --ink). Dead
+   * var() = silently inherited color. layout_audit's token census is what
+   * catches this class; the desk's second-tier text token is the intent. */
+  color: var(--text-muted);
   opacity: 0.82;
 }
 /* G5: separate successive lanes, not the first lane from its own panel head.
@@ -6645,11 +6649,11 @@ body:not(.idea-mode) .desk {
   border: 1px solid var(--line);
   border-radius: 9px;
   cursor: pointer;
-  color: var(--ink-2);
+  color: var(--text-muted);
   list-style: none;
 }
 .finding-intent-disclosure > summary::-webkit-details-marker { display: none; }
-.finding-intent-disclosure[open] > summary { color: var(--ink); border-color: var(--ink-3); }
+.finding-intent-disclosure[open] > summary { color: var(--text); border-color: var(--text-muted); }
 /* The cluster lays out as its own inline row once opened, so opening it must
  * not re-wrap the four controls the budget is about. */
 .finding-intent-cluster {
