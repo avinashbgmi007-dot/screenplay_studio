@@ -178,7 +178,9 @@ screenplay-studio_1/
   (`state.findingFilter`) driving ink/board/loop/counts together, ink marks
   (`inkAnchorsFor`/`decorateLineWithInk`), the contextual keyboard fix loop
   (`startLoop`/`stepLoop`/`exitLoop`/`renderLoopBar`; n/p/esc when active, scene-stepping
-  on exit), intent buttons (`setFindingIntent`), and the arrival strip (`buildArrivalStrip`:
+  on exit; spec §14.54: `loopList` steps the ranked queue's own ordered projection —
+  `core.queueProjection()` — not the report order), intent buttons (`setFindingIntent`), and
+  the arrival strip (`buildArrivalStrip`:
   scoped pass line + a working-copy draft clause + trust + inline retry + ghosted marks).
   Full spec: `docs/PHASE_B_FV_FOLD_SPEC.md` + `docs/UI_UX_SPECIFICATION.md` §4.9.
 - **Rooms** — `setRoom("cowrite"|"feedback")` swaps panel + `body[data-room]` identity;

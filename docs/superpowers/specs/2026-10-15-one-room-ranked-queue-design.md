@@ -1933,3 +1933,40 @@ protocol's stale highs-only-arrival question: the shipped default includes all t
 disposition behavior, then verify browser traversal on the pushed repair. Do not add lane membership
 to the general predicate, silently retune IMPACT or treat the simulated checklist as a completed
 human study. Writer validation and native-register calibration remain separate open requirements.
+
+### 14.54 The loop walks the queue: one ordered projection, the kit-A clause to one helper
+
+The 14.53 follow-up is repaired. `loopList` no longer walks `state.findings` in report order: it
+consumes the SAME ordered projection the lane renderer consumes, so membership and order are parity
+by construction, not by two expressions that agree today.
+
+**Implementation.** `core.js queueProjection(items, findings, findingIds, admit)` is the queue's own
+chain in the queue's own order — `bindQueueItems` over the FULL item list (the consuming counter must
+see every item), then per-item admission, then `groupByLane` — returning `{groups, order, entries,
+byIndex}`. `renderFixQueuePanel`'s lanes path walks it verbatim (its inline chain was extracted into
+it, including the `byIndex` map's semantics), and `loopList` walks its `entries` flat. Lane membership
+is NOT a predicate clause: `groupByLane` drops observations because they are not tasks, and both
+readers inherit that ruling by consuming the projection (the 14.53 "do not add lane membership to the
+general predicate" instruction holds — `findingPassesFilter` is untouched).
+
+**The loop's admission is explicit and pinned:** a dismissed row is never walked (not even addressed,
+not even with its chips on — the loop has no undismiss verb; the queue keeps that affordance behind
+its own toggle); `findingPassesFilter` keeps the chips AND the preserved disposition rules (open
+always; deferred only with its chip; addressed only with its chip — D2-a intact); and the kit-A
+groundedness clause now rides the ONE helper `ungroundedRowVisible(f, index)`, read by `inFindingFilter`,
+`queueCounts`, `openFindingsOnScene` and `loopList`. The three former inline copies (whose comments
+already named a `queueRowVisible` nothing defined) are gone; the loop previously had no copy at all,
+which is how it stepped rows the queue hides.
+
+**Evidence.** `tests/js/queue_loop_parity.test.js` — 12 tests executing the SHIPPED `loopList` and its
+shipped dependencies (extracted from app.js) plus the shipped projection. Failing-then-passing proven:
+stashed to the old code they are 12/12 red, with the order test reproducing the 14.53 diff exactly
+(old loop `[0, 1]` where the queue renders `[1, 0]`). Suites on this change: Node **178 pass / 0 fail**
+(was 166; +12), Python **2293 pass / 3 skip**. Two source guards
+(`tests/test_queue_lane_rendering.py`: lane centralisation, scene-chip count) were updated to follow
+the rule to its new home and assert the helper itself carries the toggle clause — the guard intent
+(the scene count cannot ignore the Kit-A toggle) is unchanged.
+
+**Not yet claimed:** browser traversal on the pushed repair. Per 14.53 the anchors remain valid for
+what they covered; the pushed-HEAD walk is the remaining verification, and real writer validation and
+native-register calibration remain the separate open requirements.

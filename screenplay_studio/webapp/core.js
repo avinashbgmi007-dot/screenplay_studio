@@ -444,6 +444,56 @@ function groupByLane(entries) {
   return { groups, order: laneOrder(groups) };
 }
 
+/**
+ * SPEC 14.54 — THE ORDERED QUEUE PROJECTION: the ONE traversal the ranked
+ * queue renders and the keyboard loop walks.
+ *
+ * This is the repair of the last code-confirmed loop/queue divergence (14.53):
+ * loopList() walked state.findings in REPORT order through findingPassesFilter,
+ * so it admitted observations and hidden ungrounded rows the queue never
+ * renders, and stepped them in a different order (measured: queue [1,0,5] vs
+ * loop [0,1,2,3,4,5]).
+ *
+ * The projection is the queue's own chain in the queue's own order:
+ *   bindQueueItems -> per-item admission (the caller's predicate; this is
+ *   where findingPassesFilter / inFindingFilter / the kit-A clause enter) ->
+ *   groupByLane. Lane membership is NOT a predicate clause: groupByLane drops
+ *   observations because they are not tasks, and every reader inherits that
+ *   ruling by consuming THIS function, not by copying the rule.
+ *
+ * Returns { groups, order, entries, byIndex }:
+ *   groups/order — exactly what groupByLane returned (the renderer walks it);
+ *   entries — the same members flattened in render order (the loop walks it);
+ *   byIndex — the renderer's finding-position -> queue-item map, kept
+ *   identical to the inline version this replaced, including its last-wins
+ *   behaviour if two items ever bind to the same position.
+ *
+ * Binding runs over the FULL item list before admission: the multimap's
+ * consuming counter must see every item, exactly as the queue's first render
+ * did, or duplicate-id rows would bind to different findings depending on
+ * which sibling happened to be filtered out.
+ */
+function queueProjection(items, findings, findingIds, admit) {
+  const all = items || [];
+  const bound = bindQueueItems(all, findings, findingIds);
+  const byIndex = new Map();
+  for (const item of all) byIndex.set(bound[item.index], item);
+  const entries = [];
+  for (const item of all) {
+    const at = bound[item.index];
+    const f = at >= 0 ? (findings || [])[at] : null;
+    if (!f) continue;
+    if (typeof admit === "function" && !admit(item, f, at)) continue;
+    entries.push({ f, index: at });
+  }
+  const laneCut = groupByLane(entries);
+  const ordered = [];
+  for (const lane of laneCut.order) {
+    for (const e of laneCut.groups[lane] || []) ordered.push(e);
+  }
+  return { groups: laneCut.groups, order: laneCut.order, entries: ordered, byIndex };
+}
+
 /** The string that makes a rank auditable (spec 1.5). A row that cannot print
  *  its own reason is not ranked, it is sorted by something nobody can audit. */
 function rankReasonText(f) {
@@ -486,5 +536,6 @@ if (typeof module !== "undefined" && module.exports) {
     bindQueueItems,
     laneOrder,
     groupByLane,
+    queueProjection,
   };
 }

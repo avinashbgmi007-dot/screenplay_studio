@@ -4392,7 +4392,11 @@ function renderFixQueuePanel(container, opts) {
   // queue and strip share ONE predicate (inFindingFilter), so the two scopes
   // cannot drift apart — N3. Disposition bypass lives inside it.
   const inFilter = inFindingFilter;
-  const shown = items.filter((i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed);
+  // ONE row predicate for both queue render paths AND the shared projection
+  // below (SPEC 14.54): what the lanes render and what the keyboard loop walks
+  // can no longer be two expressions that drift apart.
+  const queueAdmit = (i) => state.fixQueueShowDismissed && i.dismissed ? true : inFilter(i) && !i.dismissed;
+  const shown = items.filter(queueAdmit);
   // ONE counter (N3): the header's open/total come from queueCounts() — the
   // writer's intent (findingMarks) moves this header exactly like the chips
   // and the dawn meter; the raw server-observed item.status never counts.
@@ -4617,20 +4621,17 @@ function renderFixQueuePanel(container, opts) {
     // to positional binding. The suite was green throughout because the code
     // under test never ran. Binding from the tested function means the queue
     // and the node tests cannot disagree about how a row finds its finding.
-    const bound = bindQueueItems(items, state.findings, state.findingIds);
+    //
+    // SPEC 14.54: the whole chain — binding over ALL items, the same admission
+    // predicate the flat path uses, lane grouping and render order — is now the
+    // shared queueProjection() in core.js. loopList() consumes the same
+    // projection, so the loop and the queue cannot disagree about which rows
+    // exist or in what order they are stepped.
+    const laneCut = queueProjection(items, state.findings, state.findingIds, queueAdmit);
     // itemAt is keyed by the finding's TRUE array position, not by item.index:
     // when the two disagree, the card must stamp the position the finding
     // actually occupies or data-finding-index points at the wrong row.
-    const itemAt = new Map();
-    for (const item of items) itemAt.set(bound[item.index], item);
-    const entries = [];
-    for (const item of shown) {
-      const at = bound[item.index];
-      const f = at >= 0 ? (state.findings || [])[at] : null;
-      if (f) entries.push({ f, index: at });
-    }
-    const byIndex = itemAt;
-    const laneCut = groupByLane(entries);
+    const byIndex = laneCut.byIndex;
     for (const lane of laneCut.order) {
       const list = laneCut.groups[lane] || [];
       const group = el("div", "dock-cat-group dock-lane-group");
@@ -7182,7 +7183,7 @@ function openFindingsOnScene(n) {
   // that were both true and did not agree.
   //
   // Count what the queue actually renders, using the SAME exclusion rule as
-  // queueCounts and queueRowVisible. One rule, three surfaces, no drift.
+  // queueCounts and ungroundedRowVisible. One rule, three surfaces, no drift.
   const items = (state.fixQueue && state.fixQueue.items) || [];
   const bound = bindQueueItems(items, state.findings, state.findingIds);
   let count = 0;
@@ -7194,9 +7195,9 @@ function openFindingsOnScene(n) {
                 : (item.status === "addressed" ? "addressed" : "open");
     if (d === "dismissed" || d !== "open") continue;
     // identical to queueCounts: kit A hides ungrounded rows unless the writer
-    // asked for them, and a writer-dispositioned row bypasses the claim.
-    if (item.ungrounded && !state.fixQueueShowUngrounded
-        && d !== "addressed" && d !== "deferred") continue;
+    // asked for them, and a writer-dispositioned row bypasses the claim —
+    // through the ONE helper (ungroundedRowVisible), SPEC 14.54.
+    if (!ungroundedRowVisible(item, at >= 0 ? at : null)) continue;
     const refs = (f && f.scene_refs) || item.scene_refs || [];
     if (refs.includes(n) || refs.includes(String(n))) count += 1;
   }
@@ -7727,12 +7728,33 @@ function buildFailureBanner(failedCategories, errors) {
 // muscle memory is untouched the moment the loop exits (Esc).
 const loopState = { active: false, pos: -1 };
 function loopList() {
-  const out = [];
-  (state.findings || []).forEach((f, index) => {
-    if (!findingPassesFilter(f, index)) return;
-    out.push({ f, index, id: (state.findingIds && state.findingIds[index]) || String(index) });
-  });
-  return out;
+  // SPEC 14.54 — the loop walks the RANKED QUEUE, not the report. Before this
+  // it walked state.findings in report order through findingPassesFilter, so
+  // it admitted observations and hidden ungrounded rows the queue never
+  // renders, at their own order (measured: queue [1,0,5] vs loop [0,1,2,3,4,5]
+  // on the 14.53 probe fixture). It now consumes the same ordered projection
+  // the lane renderer consumes (core.queueProjection), so ORDER AND MEMBERSHIP
+  // are parity by construction; the only clauses left here are admission, and
+  // each is explicit:
+  //   - a dismissed row is never walked, even shown behind the queue's toggle
+  //     (the loop has no undismiss verb; stepping into one would be a trap),
+  //   - findingPassesFilter keeps the chips AND the preserved disposition
+  //     rules (open always; deferred only with its chip; addressed only with
+  //     its chip — the same admission the ink and the board read),
+  //   - the kit-A clause (ungroundedRowVisible) keeps hidden ungrounded rows
+  //     out unless the writer asked for them — the ONE helper the queue's
+  //     admission and counters already read.
+  // Lane membership is NOT re-decided here: queueProjection -> groupByLane
+  // drops observations, so the loop inherits that ruling instead of copying it.
+  const items = (state.fixQueue && state.fixQueue.items) || [];
+  const proj = queueProjection(items, state.findings, state.findingIds,
+    (item, f, at) => !item.dismissed
+      && findingPassesFilter(f, at)
+      && ungroundedRowVisible(f, at));
+  return proj.entries.map((e) => ({
+    f: e.f, index: e.index,
+    id: (state.findingIds && state.findingIds[e.index]) || String(e.index),
+  }));
 }
 function startLoop() {
   if (!state.findings || !state.findings.length) return;
@@ -7881,14 +7903,32 @@ function findingAdmitted(f, index) {
     || (d === "deferred" && !!state.findingFilter.showDeferred)
     || (d === "addressed" && !!state.findingFilter.showAddressed);
 }
+/** Accuracy kit A, ONE rule for its four readers (queue admission via
+ *  inFindingFilter, queueCounts, openFindingsOnScene, and the keyboard loop's
+ *  admission — SPEC 14.54). Before this the clause was inlined three times
+ *  with drifting comments that named a `queueRowVisible` nothing defined; the
+ *  loop had no copy at all, which is how it walked rows the queue hides.
+ *
+ *  Flag-don't-drop: an ungrounded row never leaves the report; it hides from
+ *  the queue and the loop behind one toggle. Writer-dispositioned rows
+ *  (addressed/deferred) bypass ONLY this clause — hiding the writer's own
+ *  triage state would strand their workflow with no path back. Chips still
+ *  apply to them; this never overrides an explicit filter. */
+function ungroundedRowVisible(f, index) {
+  if (!f || !f.ungrounded || state.fixQueueShowUngrounded) return true;
+  const fi = index != null ? index
+    : ((typeof queueItemFindingIndex === "function") ? queueItemFindingIndex(f) : null);
+  const d = fi != null ? findingDisposition((state.findings || [])[fi], fi)
+    : (f.status === "addressed" ? "addressed" : "open");
+  return d === "addressed" || d === "deferred";
+}
 /** The ONE filter predicate (severity + category + scene). The mass strip and
  *  the fix queue both read it, so the two scopes can never drift apart.
  *  Fix-queue items carry the same three fields (/fixqueue's allowlist includes
  *  scene_refs), so they pass through it unchanged.
- *  Accuracy kit A appends the groundedness clause below. Writer-dispositioned
- *  rows (parked/deferred/finished) bypass ONLY that clause: hiding the
- *  writer's own triage state would strand their workflow with no path back.
- *  Chips still apply to them — this never overrides an explicit filter. */
+ *  Accuracy kit A's groundedness clause rides at the end through its ONE
+ *  helper (ungroundedRowVisible), so every reader of the clause resolves the
+ *  writer's disposition by the same rule. */
 function inFindingFilter(f) {
   const sev = ((f && f.severity) || "low").toLowerCase();
   if (!state.findingFilter.severities.includes(sev)) return false;
@@ -7901,12 +7941,7 @@ function inFindingFilter(f) {
   if (sc != null && !findingOnScene(f, sc)) return false;
   // accuracy kit A: ungrounded rows hide by default (flag-don't-drop keeps
   // them one toggle away) — the toggle mirrors the dismissed one
-  if (f && f.ungrounded && !state.fixQueueShowUngrounded) {
-    const fi = (typeof queueItemFindingIndex === "function") ? queueItemFindingIndex(f) : null;
-    const d = fi != null ? findingDisposition((state.findings || [])[fi], fi)
-      : (f.status === "addressed" ? "addressed" : "open");
-    if (d !== "addressed" && d !== "deferred") return false;
-  }
+  if (!ungroundedRowVisible(f)) return false;
   return true;
 }
 /** Scope + disposition counts — the second half of the N3 counting contract.
@@ -7981,10 +8016,10 @@ function queueCounts(items) {
     if (d === "dismissed") continue;
     // accuracy kit A: rows hidden behind the ungrounded toggle sit out of
     // the ledger's totals exactly like dismissed rows do — same counter.
-    // Writer-dispositioned rows bypass (mirrors queueRowVisible): parking or
-    // finishing a note is the writer's own workflow, not a groundedness claim.
-    if (item.ungrounded && !state.fixQueueShowUngrounded
-        && d !== "addressed" && d !== "deferred") continue;
+    // Writer-dispositioned rows bypass (the ONE helper ungroundedRowVisible,
+    // SPEC 14.54): parking or finishing a note is the writer's own workflow,
+    // not a groundedness claim.
+    if (!ungroundedRowVisible(item, index)) continue;
     c.total += 1;
     if (d === "open") c.open += 1;
   }

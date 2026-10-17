@@ -4,6 +4,22 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-17: Loop/queue traversal repaired — one ordered projection (spec §14.54)
+
+The 14.53 gap is closed in code. `loopList` now walks `core.js queueProjection()` — the same
+binding → admission → lane/rank ordering the queue's lanes render — so order and membership are
+parity by construction. Loop admission is explicit: dismissed rows never walked; `findingPassesFilter`
+chips + preserved disposition rules (open always, deferred/addressed behind their chips); the kit-A
+clause via the ONE `ungroundedRowVisible()` helper now read by `inFindingFilter`, `queueCounts`,
+`openFindingsOnScene` and the loop (three former inline copies, one of whose comments named a
+`queueRowVisible` that never existed, are gone). `findingPassesFilter` was NOT given lane membership.
+
+`tests/js/queue_loop_parity.test.js`: 12 tests running the shipped `loopList`; **12/12 red on the old
+code** (order test reproduced the 14.53 `[0,1]` vs `[1,0]` diff), green on the repair. Suites:
+Python **2293 pass / 3 skip**; Node **178 pass / 0 fail** (was 166). Two source guards updated to
+follow the clause to its helper. Next: browser traversal of the loop on the pushed HEAD; writer
+validation and register calibration remain the standing open inputs.
+
 ### 2026-10-17: Simulated senior-writer review complete; loop/queue follow-up open
 
 User requested an AI simulation of a senior screenwriter/novelist. Full 13-question assessment:

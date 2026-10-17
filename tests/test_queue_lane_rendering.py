@@ -140,7 +140,12 @@ def test_every_queue_row_prints_its_rank_reason(app_js: str) -> None:
 
 def test_lane_grouping_is_pure_and_centralised(app_js: str) -> None:
     """The grouping lives in core.js so it is testable without a browser. If it
-    gets re-inlined into app.js, that testability is lost silently."""
+    gets re-inlined into app.js, that testability is lost silently.
+
+    SPEC 14.54 moved where app.js ENTERS the lane code: the render and loopList
+    both call core's queueProjection (bind -> admit -> groupByLane), so the call
+    sites are asserted by their exact code lines, not by a bare name a comment
+    could satisfy."""
     core_path = os.path.join(ROOT, "screenplay_studio", "webapp", "core.js")
     with open(core_path, encoding="utf-8") as fh:
         core = fh.read()
@@ -148,13 +153,27 @@ def test_lane_grouping_is_pure_and_centralised(app_js: str) -> None:
         "groupByLane is missing from core.js. The grouping must stay there: it "
         "is the only reason the lane logic is verifiable without Playwright."
     )
-    assert "groupByLane(" in app_js, (
-        "app.js no longer calls groupByLane — the ledger is not lane-grouped."
+    assert "function queueProjection(" in core, (
+        "SPEC 14.54: the ordered projection (binding -> admission -> lanes) "
+        "must live in core.js — app.js's render AND loopList both consume it, "
+        "and core is the only home verifiable without a browser."
     )
-    # ...and app.js must not have grown its own copy.
+    assert "const laneCut = queueProjection(items" in app_js, (
+        "renderFixQueuePanel no longer calls queueProjection — the ledger is "
+        "not lane-grouped through the shared projection."
+    )
+    assert "const proj = queueProjection(items" in app_js, (
+        "loopList no longer calls queueProjection — the keyboard loop walks the "
+        "report again instead of the ranked queue (the 14.53 divergence)."
+    )
+    # ...and app.js must not have grown its own copies.
     assert "function groupByLane" not in app_js, (
         "app.js defines its own groupByLane. Two implementations of the lane "
         "rule will drift, and only one of them is under test."
+    )
+    assert "function queueProjection" not in app_js, (
+        "app.js defines its own queueProjection. Two implementations of the "
+        "queue walk will drift, and only one of them is under test."
     )
 
 
@@ -432,16 +451,28 @@ def test_the_scene_chip_counts_the_scope_the_list_shows(app_js: str) -> None:
     HIDES behind the Kit A ungrounded toggle. The chip therefore printed a
     grounded count next to an unfiltered list: two numbers, both true, not
     agreeing. The fix counts `state.fixQueue.items` through the SAME exclusion
-    rule as `queueCounts`, so there is one rule and three surfaces."""
+    rule as `queueCounts`, so there is one rule and three surfaces.
+
+    SPEC 14.54: the clause itself now lives in its ONE helper
+    (ungroundedRowVisible), read by this count, queueCounts, inFindingFilter and
+    the keyboard loop. The guard follows it: the function must read the helper,
+    and the helper must be where the toggle clause actually lives."""
     fn = app_js[app_js.index("function openFindingsOnScene"):]
     fn = fn[: fn.index("\n}\n")]
     assert "state.fixQueue.items" in fn, (
         "the scene chip's count no longer walks the queue's items, so it can "
         "disagree with the list beside it. That is the N3 violation."
     )
-    assert "fixQueueShowUngrounded" in fn, (
+    assert "ungroundedRowVisible" in fn, (
         "the scene chip's count ignores the Kit A toggle, so a hidden ungrounded "
         "row is counted by the label and not shown in the list."
+    )
+    helper = app_js[app_js.index("function ungroundedRowVisible"):]
+    helper = helper[: helper.index("\n}\n")]
+    assert "fixQueueShowUngrounded" in helper, (
+        "SPEC 14.54: the Kit A clause must live in its one helper; the surface "
+        "above reads the helper, so a missing toggle check here silently reverts "
+        "the count to the pre-fix spread."
     )
     # and it must not have gone back to reading state.findings directly
     assert "state.findings || []).forEach" not in fn, (
