@@ -4,6 +4,27 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-17: Simulated senior-writer review complete; loop/queue follow-up open
+
+User requested an AI simulation of a senior screenwriter/novelist. Full 13-question assessment:
+`docs/audit/2026-10-17_simulated_senior_writer_ux_review.md`. It is explicitly a heuristic review,
+not a human sitting; `docs/REAL_WRITER_VALIDATION.md` remains untouched and unfilled. No Indic text
+was invented and no weights or thresholds changed.
+
+New source-confirmed gap: keyboard `loopList` walks report order and can include observations and
+hidden ungrounded findings, unlike the ranked queue. Model/server/browser-free Node diagnostic:
+queue `[1,0,5]`, loop `[0,1,2,3,4,5]`; one-category positive control both `[1]`; within-Line order
+queue `[1,0]`, loop `[0,1]`. Controls are constructed English findings, not real analysis output.
+The checklist's highs-only default question is also stale; shipped default admits all severities.
+Spec §14.53 records the distinction between useful simulated review and empirical writer validation.
+Runtime remains identical to `bd86a8e`; prior browser anchors are unchanged, not rerun.
+
+Checkout reset recovery before reviewing: local tree at base `5c1b953` was saved under safety tag
+`safety/writer-review-20261017T042045Z` (`0385453`), verified byte-identical to origin `52e1269`, then
+re-anchored cleanly. Tag retained. No prior work was lost.
+Next: focused loop/queue consistency repair and discriminating tests, then pushed browser traversal.
+Real writer observations and authentic register pages are still required for empirical calibration.
+
 ### 2026-10-16 — G5 closed on `bd86a8e`; full browser re-anchor green
 
 Runner confirmed served-tree identity on all three runs at `bd86a8e`: G5 **PASS**, first actionable

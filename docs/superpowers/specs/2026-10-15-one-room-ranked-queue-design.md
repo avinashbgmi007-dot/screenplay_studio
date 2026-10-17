@@ -1901,3 +1901,35 @@ same `<900px` gate, not excused by this passing anchor.
 Remaining inputs for this arc: a real writer for lane-order/impact validation and real register
 material for threshold A/B/C. `IMPACT` v0 stays visibly uncalibrated; the fuzzy-match threshold stays
 at `0.72`. No additional product or test changes are justified by this closure report.
+
+
+### 14.53 Simulated expert review is useful evidence, not a real writer session
+
+At the user's request, an AI expert-style review now applies a senior screenwriter/novelist lens
+to all 13 questions in `docs/REAL_WRITER_VALIDATION.md`, the current source, the recorded browser
+anchors and the existing short Tenglish excerpt. Full report:
+`docs/audit/2026-10-17_simulated_senior_writer_ux_review.md`.
+
+The requested 25+ years of experience is a simulated perspective, not an actual credential. No
+human participated, no long sitting or fresh browser run occurred, and the human checklist remains
+unfilled. The review does not replace authentic register material or recalibrate weights/thresholds.
+
+**A prior status statement was too strong:** external inputs block empirical calibration, not every
+useful review or mechanically testable improvement. The simulation exposed an additional workflow
+gap outside the previously covered acceptance cases.
+
+**New code-confirmed follow-up:** `loopList` walks report order through `findingPassesFilter`, while
+`renderFixQueuePanel` uses queue admission, binding and lane/rank ordering. A deterministic Node
+probe using shipped functions and extracted queue expressions produced queue indices `[1, 0, 5]`
+versus loop indices `[0, 1, 2, 3, 4, 5]` on constructed English controls. The extra loop entries were
+a theme observation, an ungrounded note and a scene-less opinion. A single-category positive control
+agreed on `[1]`; a two-item Line case produced queue `[1, 0]` versus loop `[0, 1]`.
+
+These are logic results, not pixel or human-preference measurements. The old browser anchors remain
+valid for what they covered. No runtime or test assertion changed. The review also identifies the
+protocol's stale highs-only-arrival question: the shipped default includes all three severities.
+
+**Next:** repair shared loop/queue traversal semantics with discriminating tests, explicitly preserve
+disposition behavior, then verify browser traversal on the pushed repair. Do not add lane membership
+to the general predicate, silently retune IMPACT or treat the simulated checklist as a completed
+human study. Writer validation and native-register calibration remain separate open requirements.
