@@ -4573,26 +4573,7 @@ function renderFixQueuePanel(container, opts) {
     const row = el("div", "fix-row" + (disp === "addressed" ? " done" : "") + (item.dismissed ? " dismissed" : ""));
     row.dataset.findex = String(item.index);
     const sev = el("span", "sev-badge sev-" + (item.severity || "low"), (item.severity || "low").toUpperCase());
-    // accuracy kit A follow-up: demoted rows wear the reason. Collected
-    // here, mounted with sev below — el() nodes have no parent yet, so
-    // sev.after() would be a silent no-op. Static literals only, never
-    // finding text, so no new sink.
-    const rowFlags = [];
-    if (item.contested) {
-      const flag = el("span", "row-flag row-flag-contested", "contested");
-      flag.title = "Its own observation argues against this note — read the observation before acting on it";
-      rowFlags.push(flag);
-    }
-    if (item.identity_uncertain) {
-      const flag = el("span", "row-flag row-flag-identity", "identity?");
-      flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
-      rowFlags.push(flag);
-    }
-    if (item.ungrounded) {
-      const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
-      flag.title = "No quote or checkable observation backs this note yet";
-      rowFlags.push(flag);
-    }
+    const rowFlags = findingRowFlags(item);
     const act = el("span", "act-chip", item.act_name || "Script-level");
     const sceneLabel = item.scene_heading ? `Scene ${(item.scene_refs || [])[0]} — ${item.scene_heading}` : "General";
     const body = el("div", "fix-row-body");
@@ -5346,16 +5327,42 @@ function isAddressed(f, index) {
   return findingStatusOf(f, index) === "addressed";
 }
 
+/** Kit-A/identity reasons have one builder for the flat report and deep cards.
+ *  Flags explain uncertainty, not correctness; they must survive ONE HOME. */
+function findingRowFlags(f) {
+  const flags = [];
+  if (f.contested) {
+    const flag = el("span", "row-flag row-flag-contested", "contested");
+    flag.title = "Its own observation argues against this note — read the observation before acting on it";
+    flags.push(flag);
+  }
+  if (f.identity_uncertain) {
+    const flag = el("span", "row-flag row-flag-identity", "identity?");
+    flag.title = "The script does not settle this identity verdict — read the observation before acting on it";
+    flags.push(flag);
+  }
+  if (f.ungrounded) {
+    const flag = el("span", "row-flag row-flag-ungrounded", "ungrounded");
+    flag.title = "No quote or checkable observation backs this note yet";
+    flags.push(flag);
+  }
+  return flags;
+}
+
 function findingNoteEl(f, index, opts = {}) {
   const disp = opts.disposition || "open";
+  // The primary queue keeps settled rows visible. Writer intent and observed
+  // resolution must paint the same state; isAddressed alone reads only the
+  // latter, which left writer-addressed deep cards looking open after ONE HOME.
+  const addressed = opts.addressed || disp === "addressed";
   // forward-compatible states (Phase D defer / Phase E ghosting): muted
   // rendering only — never red, never reflowing script text (CSS-only)
   const stateClass = disp === "deferred" ? " deferred" : disp === "ghosted" ? " ghosted" : "";
-  const note = el("div", "finding-note" + (SEVERITY_CLASS[f.severity] || "") + (opts.addressed ? " addressed" : "") + stateClass);
+  const note = el("div", "finding-note" + (SEVERITY_CLASS[f.severity] || "") + (addressed ? " addressed" : "") + stateClass);
   note.dataset.findingIndex = String(index);
   const top = el("div", "finding-note-top");
   const cat = el("span", "finding-note-cat", CATEGORY_LABELS[f.category] || f.category);
-  const stateEl = el("span", "finding-note-state", opts.addressed ? "addressed" : (disp === "deferred" ? "next pass" : disp === "ghosted" ? "stale" : ""));
+  const stateEl = el("span", "finding-note-state", addressed ? "addressed" : (disp === "deferred" ? "next pass" : disp === "ghosted" ? "stale" : ""));
   top.appendChild(cat);
   // R6 item 3: the ledger already knows whether a judgment is about one line,
   // named scenes, or the whole script — it just never said so, so every card
@@ -5400,7 +5407,15 @@ function findingNoteEl(f, index, opts = {}) {
     if (f.observation) deep.appendChild(el("span", "finding-deep-observation", f.observation));
     if (f.evidence_quote) deep.appendChild(el("span", "finding-deep-quote", "\u201C" + f.evidence_quote + "\u201D"));
     const badge = verificationBadge(f.verification);
-    if (badge) deep.appendChild(badge);
+    const flags = findingRowFlags(f);
+    if (flags.length) {
+      // Reuse the verification line, not the verb row or another pre-card
+      // header. With no flags, keep the existing verification-badge DOM.
+      const flagRow = el("div", "finding-row-flags");
+      if (badge) flagRow.appendChild(badge);
+      for (const flag of flags) flagRow.appendChild(flag);
+      deep.appendChild(flagRow);
+    } else if (badge) deep.appendChild(badge);
     // The markdown report has printed the verifier's note all along; the desk
     // dropped it, so "the quote came back from a different scene" was invisible
     // unless you exported the report (spec section 7).

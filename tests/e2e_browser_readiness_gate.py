@@ -493,16 +493,20 @@ def run(base, name):
             # through the cards' own buttons: "next pass" parks a finding (it
             # stays on screen, muted, once the Next-pass chip shows it) and
             # "addressed" leaves the ledger but not the Fix-queue row.
-            def click(page, selector):
-                return page.evaluate("""(sel) => {
-                  const b = document.querySelector(sel);
-                  if (!b) return false;
-                  b.click(); return true;
-                }""", selector)
+            def take_intent(title):
+                # Two DIFFERENT tasks: after Park the first card remains in
+                # the queue, so another unscoped first() would overwrite that
+                # same mark instead of exercising both settled appearances.
+                card = page.locator(
+                    '.dock-section-fixqueue .finding-note.queue-row'
+                    ':not(.deferred):not(.addressed)').first
+                card.locator('.finding-intent-disclosure > summary').click()
+                card.locator(f'.intent-btn[title^="{title}"]').click()
+                return True
 
-            parked = click(page, '.finding-note .intent-btn[title^="Park"]')
+            parked = take_intent("Park")
             page.wait_for_timeout(700)
-            called = click(page, '.finding-note .intent-btn[title^="My call"]')
+            called = take_intent("My call")
             page.wait_for_timeout(900)
             chip = page.locator('.dock-filter-row .fchip', has_text="Next pass")
             checks.ok(f"{theme}: the desk offers both writer intents and the chip",
@@ -513,7 +517,7 @@ def run(base, name):
               const visible = (sel) => [...document.querySelectorAll(sel)]
                   .filter((n) => n.offsetParent).length;
               return {deferred: visible('.finding-note.deferred'),
-                      done: visible('.fix-row.done'),
+                      done: visible('.dock-section-fixqueue .finding-note.queue-row.addressed'),
                       marks: JSON.stringify(state.findingMarks || {})};
             }""")
             checks.ok(f"{theme}: a parked finding and a done queue row are on screen",

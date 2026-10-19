@@ -37,6 +37,7 @@ CONTEST_MARKER = "CONTESTED-PROBE-Z9"
 
 DOCK_QUEUE = '.dock-lens[data-lens="evidence"] .dock-section-fixqueue'
 QUEUE_TITLE = DOCK_QUEUE + " .craft-panel-title"
+QUEUE_ROW = DOCK_QUEUE + " .finding-note.queue-row"
 
 TITLE_RE = re.compile(r"(\d+) open / (\d+) shown / (\d+) total")
 
@@ -93,22 +94,37 @@ def run(base, projects_dir):
     if not findings:
         checks.finish()
         return
-    target = findings[0]
+    # Discover the actual task rows before planting. Theme/genre observations
+    # remain in the report and on the wire; they must NOT be turned into tasks
+    # just to satisfy this test. The old findings[1] was a theme observation.
+    for finding in findings:
+        finding["ungrounded"] = False
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(report, f)
+    with sync_playwright() as pw:
+        browser, page, discovery_errors = launch(pw)
+        page.goto(base)
+        page.evaluate("async (n) => { await openProject(n); }", name)
+        page.evaluate("() => { openDock('evidence'); setEvidenceTier(1); }")
+        page.wait_for_selector(QUEUE_ROW, state="attached", timeout=15000)
+        task_indices = page.locator(QUEUE_ROW).evaluate_all(
+            "rows => rows.map(row => Number(row.dataset.findingIndex))")
+        checks.ok("the fixture has two rendered tasks to carry the flags",
+                  len(task_indices) >= 2, f"task indices={task_indices}")
+        browser.close()
+    if len(task_indices) < 2:
+        checks.finish()
+        return
+    target = findings[task_indices[0]]
     target["ungrounded"] = True
-    target["issue"] = (target.get("issue") or "first row") + f" {MARKER}"
-    # A second planted row: contested but grounded (carries a quote), so it
-    # stays visible by default AND must wear its contested mark. D1.
-    if len(findings) > 1:
-        second = findings[1]
-        second["contested"] = True
-        second["evidence_quote"] = second.get("evidence_quote") or "a quoted line"
-        second["issue"] = (second.get("issue") or "second row") + f" {CONTEST_MARKER}"
-    # Deterministic fixture: the demo pipeline's own evidence floor may flag
-    # every row (demo rows carry no quote/observation), which would leave the
-    # queue ALL-hidden and prove nothing about the default view. One planted
-    # ungrounded row among grounded rows is the case under test.
-    for other in findings[1:]:
-        other["ungrounded"] = False
+    target["issue"] = (target.get("issue") or "first task") + f" {MARKER}"
+    # A second, genuinely queued task is contested AND identity-uncertain but
+    # grounded. Both reasons must survive report -> wire -> primary deep card.
+    second = findings[task_indices[1]]
+    second["contested"] = True
+    second["identity_uncertain"] = True
+    second["evidence_quote"] = second.get("evidence_quote") or "a quoted line"
+    second["issue"] = (second.get("issue") or "second task") + f" {CONTEST_MARKER}"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(report, f)
 
@@ -131,6 +147,9 @@ def run(base, projects_dir):
     checks.ok("GET /fixqueue carries contested on the row",
               len(ncont) == 1 and ncont[0].get("contested") is True,
               str(ncont and {k: ncont[0].get(k) for k in ("issue", "contested")}))
+    checks.ok("GET /fixqueue carries identity uncertainty on the same row",
+              len(ncont) == 1 and ncont[0].get("identity_uncertain") is True,
+              str(ncont and ncont[0].get("identity_uncertain")))
     checks.ok("enough rows for a hide-one/show-rest assertion", n_items >= 2,
               f"{n_items} items")
     if n_items < 2:
@@ -143,7 +162,7 @@ def run(base, projects_dir):
         page.evaluate("async (n) => { await openProject(n); }", name)
         page.evaluate("() => { openDock('evidence'); setEvidenceTier(1); }")
         page.wait_for_selector(QUEUE_TITLE, state="attached", timeout=15000)
-        page.wait_for_selector(DOCK_QUEUE + " .fix-row, "
+        page.wait_for_selector(QUEUE_ROW + ", "
                                + DOCK_QUEUE + " .craft-panel-title",
                                state="attached", timeout=15000)
         page.wait_for_timeout(500)  # settle the tier gesture
@@ -154,14 +173,15 @@ def run(base, projects_dir):
                   MARKER not in text, text[:220])
         checks.ok("default: the contested row stays visible (grounded)",
                   CONTEST_MARKER in text, text[:220])
-        contest_row = page.evaluate(
-            f"() => {{ const rows = Array.from(document.querySelectorAll("
-            f"'{DOCK_QUEUE} .fix-row')); const hit = rows.find("
-            f"n => (n.textContent || '').includes('{CONTEST_MARKER}')); "
-            f"return hit ? !!hit.querySelector('.row-flag-contested') : null; }}")
+        contest_row = page.locator(QUEUE_ROW).filter(has_text=CONTEST_MARKER)
+        contested_flag = contest_row.locator(".row-flag-contested")
         checks.ok("default: the contested row wears its mark",
-                  contest_row is True,
-                  "no .row-flag-contested badge on the contested row")
+                  contested_flag.count() == 1 and contested_flag.is_visible(),
+                  "no visible .row-flag-contested badge on the contested task")
+        identity_flag = contest_row.locator(".row-flag-identity")
+        checks.ok("default: identity uncertainty is visible on the deep card",
+                  identity_flag.count() == 1 and identity_flag.is_visible(),
+                  "no visible .row-flag-identity badge on the identity-uncertain task")
         title = queue_title(page)
         m = TITLE_RE.search(title)
         checks.ok("default: the queue header renders counts", m is not None,
@@ -190,21 +210,18 @@ def run(base, projects_dir):
                 timeout=15000)
             checks.ok("toggle: the ungrounded row returns", back,
                       queue_text(page)[:220])
-            ungr_row = page.evaluate(
-                f"() => {{ const rows = Array.from(document.querySelectorAll("
-                f"'{DOCK_QUEUE} .fix-row')); const hit = rows.find("
-                f"n => (n.textContent || '').includes('{MARKER}')); "
-                f"return hit ? !!hit.querySelector('.row-flag-ungrounded') : null; }}")
+            ungr_row = page.locator(QUEUE_ROW).filter(has_text=MARKER)
+            ungrounded_flag = ungr_row.locator(".row-flag-ungrounded")
             checks.ok("toggle: the returned row wears its ungrounded mark",
-                      ungr_row is True,
-                      "no .row-flag-ungrounded badge on the returned row")
+                      ungrounded_flag.count() == 1 and ungrounded_flag.is_visible(),
+                      "no visible .row-flag-ungrounded badge on the returned task")
             title2 = queue_title(page)
             m2 = TITLE_RE.search(title2)
             checks.ok("toggle: header shown includes it again",
                       m2 is not None and int(m2.group(2)) == n_items,
                       f"title={title2!r} items={n_items}")
 
-        assert_no_js_errors(checks, errors)
+        assert_no_js_errors(checks, discovery_errors + errors)
         browser.close()
 
     checks.finish()

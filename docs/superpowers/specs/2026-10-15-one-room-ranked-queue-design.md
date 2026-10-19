@@ -2032,3 +2032,86 @@ Flagged and documented here, not chased — its repair is its own task, and this
 authority is the parity suite above plus the anchored `dock_sections` run.
 
 Real writer validation and native-register calibration remain the separate open requirements.
+
+
+### 14.56 Restore the reasons and settled state on deep cards; migrate stale suite call sites
+
+The new handoff reports an uncommitted kit-A fix and 22/0 browser run in `C:\tmp\run22`.
+That worktree is not accessible here; its result is not an identity-anchored result for this repair.
+The implementation below was reconstructed from pushed `07e5d9b`, not imported or claimed as tested
+from the Windows working tree. The larger T1–T11 restructure and R1–R6 redesign remain deferred.
+
+**Correction to §14.55's staleness classification.** The old suite's `.fix-row` probes and
+observation-row seed were stale, but the product also dropped the visible reasons from its primary
+deep cards. The identity-uncertainty design (2026-10-13, display agreement) explicitly requires its
+chip beside contested/ungrounded in both queue rows and deep-card flag space. Restoring a selector
+alone cannot restore content the renderer never creates.
+
+**Product repair.** `findingRowFlags()` is one literal/textContent builder for all three reasons:
+`contested`, `identity_uncertain`, and `ungrounded`, with the original explanatory titles. The flat
+report keeps its badges; deep cards now display them alongside the existing quote-verification
+badge in a wrapping metadata row, outside the action row and outside `marks`. No flag means no new
+wrapper. A missing verification badge does not suppress a reason. No evidence, verdict, attribution,
+rank explanation, or verb was removed to pay for this. Only app/style cache versions advance.
+
+**A second product defect exposed by the selector migration.** Writer intent could move the ledger
+to addressed while the primary card still looked open. Its `opts.addressed` came from the
+server-observed-only `isAddressed`, even though `opts.disposition` was already `addressed`. A shipped
+renderer test reproduces the missing `.addressed` class and empty label. The card now paints the
+settled class and label for either observed resolution or addressed disposition. Counting and
+admission are unchanged. This is a deterministic display finding, not a new browser observation.
+
+**Deliberate test migrations, not relaxed assertions:**
+
+- `tests/e2e_browser_ungrounded_filter.py` discovers actual rendered task indices before planting
+  on disk. Observations keep their categories and remain in the report/wire. It then exercises the
+  original report -> route -> queue -> toggle path, reads `.finding-note.queue-row`, and requires
+  visible contested, identity-uncertain and ungrounded badges. Header arithmetic is unchanged;
+  identity wire/visibility assertions are additive. This is not a client-only synthetic seed.
+- `tests/e2e_browser_counting_contract.py` reads the sole Tier 1 deep-card home instead of the
+  retired `.fix-row` or Tier 2 card copy. It selects a genuinely rendered task for the mark, opens
+  `marks` before clicking addressed, and checks `.queue-row.addressed`. The section helper now
+  asserts open state (including already-open default), not a positive number of newly opened
+  sections. All ledger/header/chip/dawn/revision/metrics and done-row equalities remain.
+- `tests/e2e_browser_readiness_gate.py` uses `.queue-row.addressed`, opens the intentional disclosure,
+  and takes Park and addressed on two different initially open tasks using real Playwright clicks.
+  Reusing the first card after Park would overwrite that same mark now that it stays in the queue.
+  Both settled appearances, colour-not-alpha, contrast and hit-target assertions remain. No ratio,
+  target size, G5 boundary, assertion or if-guard ceiling was lowered.
+- `tests/js/queue_preamble.test.js` loads the extracted shipped flag helper for the flat renderer.
+  Its assertions are unchanged; substituting an empty stub would not test the moved dependency.
+
+**Local evidence, not browser acceptance.** `tests/js/finding_flags.test.js` executes the shipped
+card, queue, filters and core binding under jsdom, with unrelated reload/refresh/progress services
+stubbed. BROKEN executing `07e5d9b`'s app functions: **1 passed / 9 failed**, absent badges and
+writer-addressed styling, not setup/reference errors. FIXED: **10 passed / 0 failed**. Controls
+include all flags independently and combined, no flags, no verification/evidence, rank-reordered
+payloads, the actual toggle callback, flat report and shallow pins, and preserved card depth/actions.
+Seven distinguishing mutations fail: dead mount, missing identity flag, first-finding flag borrowing,
+missing intent-settled style, empty wrapper, CSS-hidden wrapper, and verification-dependent flags.
+Runtime files were restored byte-identically after mutation testing. jsdom proves no pixels.
+
+Full local suites: `npm test` **189 passed / 0 failed**, exit 0; Python
+`/tmp/ss/bin/python -m pytest tests/ -q -rs` **2292 passed / 4 skipped**, exit 0.
+The extra Linux skip relative to the reported Windows 2293/3 is
+`tests/test_delete_project.py:97` (POSIX unlinks open files); the other three are the existing
+non-load-modify-write exclusions in `tests/test_store_fault_injection.py:545`.
+Python browser-file compile/ruff, JS syntax and whitespace checks pass. No browser binary was
+installed and no local browser result is claimed.
+
+**Acceptance remains open.** This is a Tier 1 addition. Before calling it closed, assert the served
+revision of the pushed repair, then obtain a fresh G5 measurement at the unchanged 1440×900/<900px
+gate, plus runs of `tests/e2e_browser_ungrounded_filter.py`,
+`tests/e2e_browser_counting_contract.py` and `tests/e2e_browser_readiness_gate.py` on that same revision.
+The historical 882px G5 belongs to `bd86a8e`, not this change. The uncommitted Windows 22/0 is not
+carried forward. Report an actual failing assertion; do not erase coverage to make these suites green.
+
+The writer checklist remains blank. IMPACT calibration is about rewrite priority and writer
+judgment; the `0.72` threshold is separately about quote matching across authentic registers.
+Neither was changed. The earlier “only human/model inputs left” is premature while these concrete
+product fixes and their new browser/G5 acceptance are outstanding.
+
+Checkout recovery: another re-clone at `5c1b953` had restored the complete `07e5d9b` tree as
+uncommitted files. Safety tag `safety/kit-a-reclone-20261019T073425Z` preserves `f4ff5cc`; its full
+tree `f66040eb79e0eface6a2071763462a79d3fa27e9` matched the fetched origin tip byte-for-byte before
+resetting this same session branch to that tip. The tag is retained; no previous work was discarded.

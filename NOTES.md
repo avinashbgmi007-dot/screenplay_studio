@@ -4,6 +4,34 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-19: Kit-A reasons and writer-settled deep cards repaired; browser acceptance pending
+
+Bounded follow-up to the new Windows handoff, reconstructed from pushed `07e5d9b`; the uncommitted
+`C:\tmp\run22` fix/result was not accessed or imported. Spec §14.56 corrects the earlier “only suite
+staleness” classification: the primary deep cards really dropped contested/identity/ungrounded
+badges. One `findingRowFlags` builder now serves flat and deep cards; flags share the existing
+verification line where possible, outside verbs/marks, with no empty wrapper on ordinary cards.
+A real-renderer test also found writer-addressed cards still looked open: settled class/label now
+honour addressed disposition as well as server-observed status. No counter/admission changes.
+
+Three browser suites migrate real retired call sites without dropping their laws:
+`tests/e2e_browser_ungrounded_filter.py` discovers task rows before on-disk flag planting (observations
+retained; identity wire/visible checks added); `tests/e2e_browser_counting_contract.py` reads Tier 1,
+opens marks and counts `.queue-row.addressed`; `tests/e2e_browser_readiness_gate.py` acts on two distinct
+tasks, opens marks using real clicks, and retains settled-style/contrast/hit-target checks.
+
+`tests/js/finding_flags.test.js`: BROKEN on old app functions **1 pass/9 fail**, FIXED **10/0**;
+seven mutations distinguished and restored. Full Node **189/0**; Python **2292 pass/4 skip** on Linux
+(the Windows-only delete race plus the three established non-load-modify-write exclusions).
+Syntax, Python browser-file ruff and whitespace pass. No browser binaries, runs or pixel claim.
+Next: pushed-revision identity, fresh G5 (mandatory Tier 1 addition), and the three migrated browser
+suites. Old 882px and uncommitted Windows 22/0 are NOT results for this repair.
+
+T1–T11 and R1–R6 remain deferred; R0 has recorded prior progress. Human checklist stays blank,
+IMPACT unchanged, quote-match threshold stays 0.72. Do not conflate those two calibrations.
+Recovery: `safety/kit-a-reclone-20261019T073425Z` / `f4ff5cc` saved the re-cloned state, verified exactly
+against origin `07e5d9b` before restoring the same branch. No earlier work lost.
+
 ### 2026-10-17: Browser walk found a binding defect the fixtures could not (spec §14.55)
 
 Ran the remaining 14.54 verification — browser traversal of the loop/queue on the pushed repair

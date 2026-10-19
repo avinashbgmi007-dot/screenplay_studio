@@ -74,7 +74,7 @@ function harness(findings, { lanes = true, filter = () => true, dismissed = 0 } 
     },
     refreshAllFindingSurfaces: () => { refreshes += 1; draw(); },
   });
-  for (const name of ['el', 'addPanel', 'verificationBadge', 'renderFixQueuePanel']) {
+  for (const name of ['el', 'addPanel', 'verificationBadge', 'findingRowFlags', 'renderFixQueuePanel']) {
     vm.runInContext(shippedFunction(name), context, { filename: `app.js:${name}` });
   }
   function draw() {

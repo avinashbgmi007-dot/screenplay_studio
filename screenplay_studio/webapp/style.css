@@ -1931,6 +1931,10 @@ body.dawn .premise-field input, body.dawn .premise-field textarea { background: 
   flex-shrink: 0;
   margin-top: var(--sp-1);
 }
+/* Deep cards share the verification line with the reason flags. A combined
+   diagnosis may wrap, never overflow or spend the card's action-row budget. */
+.finding-row-flags { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2); }
+.finding-row-flags .row-flag { margin-top: 0; }
 .row-flag-contested { color: var(--sev-mid-text); border-color: color-mix(in oklab, var(--sev-mid) 50%, transparent); }
 .row-flag-identity { color: var(--text-muted); border-color: color-mix(in oklab, var(--text-muted) 50%, transparent); }
 .row-flag-ungrounded { color: var(--text-muted); border-style: dashed; }

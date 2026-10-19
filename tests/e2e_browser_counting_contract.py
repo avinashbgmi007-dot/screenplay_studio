@@ -33,7 +33,7 @@ sys.path.insert(0, _ROOT)
 
 from e2e_browser_common import (Checks, assert_no_js_errors, became_true,  # noqa: E402
                                  launch,
-                                 open_dock_section_holding, studio_headers)
+                                 open_dock_section, studio_headers)
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 
@@ -57,7 +57,9 @@ def get(base, path):
 # P1.10: the craft shelf no longer embeds a copy of the queue, so the desk has
 # ONE queue header to read - the ledger's. (Before, .first silently picked the
 # shelf clone and the contract was checked against a duplicate.)
-DOCK_QUEUE_TITLE = ".dock-section-fixqueue .fix-queue .craft-panel-title"
+DOCK_QUEUE = '.dock-lens[data-lens="evidence"] .dock-section-fixqueue'
+QUEUE_ROW = DOCK_QUEUE + " .finding-note.queue-row"
+DOCK_QUEUE_TITLE = DOCK_QUEUE + " .fix-queue .craft-panel-title"
 
 CONTRACT_JS = """() => {
   const findings = state.findings || [];
@@ -131,15 +133,9 @@ def test_intent_updates_every_mounted_surface(base, checks):
         page.wait_for_selector("#finding-summary .fs-chip.open",
                                state="attached", timeout=15000)
 
-        # Mount the dock's Evidence lens (the deep cards there carry the intent
-        # buttons). The queue rows live in the SAME lens's Tier 1; the cards in
-        # Tier 2 — summon Tier 2 for the cards, then read the queue by its
-        # section locator after switching back for the title assertions.
-        # openDock FIRST, then summon Tier 2: the Context disclosure only
-        # exists once the lens has rendered, and its inner sections are
-        # unclickable until the disclosure itself is expanded (a closed body
-        # is visibility:hidden — the same contract every ledger section has).
-        page.evaluate("() => { openDock('evidence'); setEvidenceTier(2); }")
+        # ONE HOME: the deep cards AND their intent controls now live in the
+        # default-open Tier 1 queue. Tier 2 contains pointers, not another copy.
+        page.evaluate("() => { openDock('evidence'); setEvidenceTier(1); }")
         # Accuracy kit A parks ungrounded rows behind an explicit toggle, and
         # the demo ledger is ungrounded in full — without opting in there are
         # no cards to click. This suite proves every surface reads ONE ledger,
@@ -148,21 +144,15 @@ def test_intent_updates_every_mounted_surface(base, checks):
         ungr = page.locator(".dock-section-fixqueue .fq-toggle-ungrounded")
         if ungr.count():
             ungr.first.click()
-        checks.ok("intent-e2e: the full ledger is visible (ungrounded opted in)",
+        checks.ok("intent-e2e: task cards are visible (ungrounded opted in)",
                   became_true(page, "() => document.querySelectorAll("
-                              "'.dock-lens[data-lens=\"evidence\"] .finding-note'"
+                              "'.dock-section-fixqueue .finding-note.queue-row'"
                               ").length > 0"),
                   "no finding cards after opting into ungrounded")
-        page.wait_for_selector('.dock-lens[data-lens="evidence"] .finding-note',
+        page.wait_for_selector(QUEUE_ROW,
                                state="attached", timeout=15000)
-        # the context expansion is a 0.18s grid-rows transition; inner section
-        # heads are unclickable until it settles (same settle phase6 uses)
-        page.wait_for_timeout(500)
-        # P1.6: the dock's cards live behind collapsible section headers, and a
-        # closed body is hidden (not clickable). Open the section holding them —
-        # the writer's own first move.
-        checks.ok("intent-e2e: the section holding the dock cards opens",
-                  open_dock_section_holding(page, ".finding-note") > 0)
+        checks.ok("intent-e2e: the section holding the primary cards opens",
+                  open_dock_section(page, "fix-queue"))
 
         # spy on the metrics pull — a mutation must leave the strip fresh
         page.evaluate("""() => {
@@ -172,25 +162,18 @@ def test_intent_updates_every_mounted_surface(base, checks):
         }""")
 
         ledger0 = page.evaluate(CONTRACT_JS)
-        DOCK_QUEUE = '.dock-lens[data-lens="evidence"] .dock-section-fixqueue'
-        page.evaluate("() => setEvidenceTier(1)")
-        page.wait_for_timeout(500)  # settle the tier gesture
-        page.wait_for_selector(f"{DOCK_QUEUE} .fix-row", state="attached", timeout=15000)
-        title0 = page.locator(f"{DOCK_QUEUE} .craft-panel-title").first.text_content() or ""
-        page.evaluate("() => setEvidenceTier(2)")
-        page.wait_for_timeout(500)  # settle before reaching into the context tier
-        # idempotent re-open: the gesture must leave the cards clickable, and
-        # this is the same "open, then act" path the writer takes
-        open_dock_section_holding(page, ".finding-note")
-        page.wait_for_timeout(250)
+        page.wait_for_selector(QUEUE_ROW, state="attached", timeout=15000)
+        title0 = page.locator(DOCK_QUEUE_TITLE).first.text_content() or ""
 
         # the writer marks the first dock card addressed — ONE gesture
         chip0 = page.locator("#finding-summary .fs-chip.open").first.text_content() or ""
-        card = page.locator('.dock-lens[data-lens="evidence"] .finding-note').first
+        card = page.locator(QUEUE_ROW).first
+        # Addressed is inside the intentional marks disclosure. Open it using
+        # the same gesture as the writer; do not dispatch a hidden button.
+        card.locator('.finding-intent-disclosure > summary').click()
         card.locator('.intent-btn[title^="My call"]').click()
-        # the round-trip completed once the summary chips re-render (an
-        # addressed card leaves the dock's open list, so the chips are the
-        # stable post-mark signal)
+        # The summary chips are the stable post-mark signal. An addressed
+        # task stays in the queue with its settled label and undo action.
         page.wait_for_function(
             "(t) => { const c = document.querySelector('#finding-summary .fs-chip.open');"
             " return c && c.textContent !== t; }",
@@ -209,8 +192,7 @@ def test_intent_updates_every_mounted_surface(base, checks):
 
         # THE contract: the lens's own fix-queue section shows the SAME ledger
         # NOW — no reload, no second gesture.
-        page.evaluate("() => setEvidenceTier(1)")
-        page.wait_for_selector(f"{DOCK_QUEUE} .fix-row", state="attached", timeout=15000)
+        page.wait_for_selector(QUEUE_ROW, state="attached", timeout=15000)
         title1 = page.locator(f"{DOCK_QUEUE} .craft-panel-title").first.text_content() or ""
         m = re.search(r"(\d+) open /", title1)
         checks.ok("intent-e2e: the fix-queue section re-rendered on the mark — SAME open count as the chips",
@@ -218,7 +200,7 @@ def test_intent_updates_every_mounted_surface(base, checks):
                   f"queue title before={title0!r} after={title1!r} ledger open={ledger1['open']} "
                   "(pre-fix: setFindingIntent re-rendered dock+manuscript but never the queue tab)")
         addressed = page.evaluate(ADDRESSED_JS)
-        done = page.locator(f"{DOCK_QUEUE} .fix-row.done").count()
+        done = page.locator(QUEUE_ROW + ".addressed").count()
         checks.ok("intent-e2e: queue rows read the SAME disposition ledger (done rows == addressed)",
                   done == addressed,
                   f"done rows={done} ledger addressed={addressed}")
@@ -248,7 +230,6 @@ def run(base, projects_dir, headers):
     if not items:
         checks.finish()
         return
-    target = items[0]
 
     with sync_playwright() as pw:
         browser, page, errors = launch(pw)
@@ -265,11 +246,14 @@ def run(base, projects_dir, headers):
         ungr = page.locator(".dock-section-fixqueue .fq-toggle-ungrounded")
         if ungr.count():
             ungr.first.click()
-        checks.ok("the full ledger is visible (ungrounded opted in)",
+        checks.ok("task cards are visible (ungrounded opted in)",
                   became_true(page, "() => document.querySelectorAll("
-                              "'.dock-section-fixqueue .fix-row').length > 0"),
+                              "'.dock-section-fixqueue .finding-note.queue-row').length > 0"),
                   "no fix-queue rows after opting into ungrounded")
 
+        # Choose an actual queued finding, not a raw /fixqueue observation.
+        target_id = page.locator(QUEUE_ROW).first.evaluate(
+            "row => state.findingIds[Number(row.dataset.findingIndex)]")
 
         # ---- baseline: unmarked, the surfaces agree (control) ---------------
         before = read_surfaces(page)
@@ -284,7 +268,7 @@ def run(base, projects_dir, headers):
 
         # ---- the writer marks one finding addressed --------------------------
         post(base, f"/api/projects/{name}/findings/intent",
-             {"finding_id": target["finding_id"], "intent": "addressed"})
+             {"finding_id": target_id, "intent": "addressed"})
         # re-open so state.findingMarks reloads from the intent store and every
         # surface re-renders (openProject awaits loadScriptData + renderManuscript)
         page.evaluate("async (n) => { await openProject(n); }", name)
