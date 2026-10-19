@@ -2142,3 +2142,31 @@ The final pushed revision, not `cf583f0`, is the target for §14.56's pending id
 three migrated browser suites. No 22/0, contrast, geometry, or browser acceptance result is claimed
 for this follow-up. Both larger plans remain deferred; do not call remaining work exclusively
 human/model input before this acceptance is obtained.
+
+
+### 14.58 Date the circulating review; distinguish repaired code from open acceptance gates
+
+The new handoff still describes `07e5d9b` and an uncommitted Windows flag repair. Read-only remote
+and source checks now confirm `422f4ebbd52cc46074eac30f08c5a45b5992a123` on the session branch:
+§14.54–§14.55 loop/binding work and §14.56–§14.57 card, suite-code and wire repairs are already pushed.
+Do not duplicate them or import an inaccessible Windows working tree as acceptance evidence.
+
+`docs/audit/2026-10-17_simulated_senior_writer_ux_review.md` now opens with a dated current-status
+matrix and names both the original `52e1269` review and the `422f4eb` implementation baseline.
+The original review did name its revision; inspection of `main` is not the demonstrated mechanism.
+Its unqualified implementation objection and next-action wording became stale after the repairs.
+Those labels and affected question rows are corrected; the old diagnostic data stays explicitly
+historical rather than being rewritten as a current failure or silently erased.
+
+The status matrix also records the denominator honesty fix already shipped in `84ce02a`, confirmed
+as an ancestor with `scene_not_found` in `verification_rate`'s denominator. The former chat completion
+percentage is not reused. Implementation, browser regression acceptance, writer validation and
+register calibration are separate gates. R0's prior progress is retained; no larger plan is activated.
+
+This update is documentation only: no runtime or test edits and no reruns. Last local receipts stay
+Node 189/0 and Python 2294 passed/4 expected Linux skips. Historical runner results at `07e5d9b`
+retain that revision scope; they are not current fleet sign-off. Fresh G5 and
+`tests/e2e_browser_ungrounded_filter.py`, `tests/e2e_browser_counting_contract.py`, and
+`tests/e2e_browser_readiness_gate.py` remain required on the identity-checked pushed implementation
+or a verified runtime/test-identical docs-only tip. “Only the writer sitting remains” is premature:
+those browser gates and the separate authentic-register calibration are still open.

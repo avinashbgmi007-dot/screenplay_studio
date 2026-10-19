@@ -1,18 +1,46 @@
 # Simulated senior-writer UX review
 
-**Date:** 2026-10-17
+**Original review date:** 2026-10-17
+
+**Status updated:** 2026-10-19
 
 **Type:** AI expert-style heuristic review, not a human usability session
 
 **Requested lens:** a senior screenwriter and novelist with 25+ years of professional practice
 
-**Reviewed revision:** `52e12695a45dcc55b2e16cdfb0aaac10c5ff105d`; runtime identical to `bd86a8e`
+**Original reviewed revision:** `52e12695a45dcc55b2e16cdfb0aaac10c5ff105d`; runtime identical to `bd86a8e`
+
+**Current implementation baseline:** `422f4ebbd52cc46074eac30f08c5a45b5992a123`
+
+**Branch:** `arena/e6a57b71-screenplay-studio`
+
+## 0. Current status, superseding the original implementation objections
+
+The original loop discrepancy below was real at `52e1269`; it is **not an open defect on this branch now**. It was repaired in `64da684`, followed by the positional binding repair in `40637d8`. Do not use the historical diagnostic or original next action as a current work order. This status refresh changes documentation only.
+
+No overall completion percentage is asserted. Implementation, browser regression acceptance, writer validation and register calibration are separate gates. The earlier chat estimate of 90–95% should not be used as a progress measure.
+
+| Gate | Implemented or recorded state | Still required |
+|---|---|---|
+| Ranked loop and positional binding | Shared `queueProjection()` in `64da684`; positional item binding in `40637d8`. Runner-reported parity 22/0 at `07e5d9b`. | Do not reimplement this repair. These receipts retain their own revision scope. |
+| Quote-verification denominator honesty | Shipped in `84ce02a`: `scene_not_found` joins `verified` and `not_found` in the denominator; only `no_quote` is excluded. | Not an unshipped task and not evidence that a diagnosis is artistically correct. |
+| Visible demotion reasons and settled state | `cf583f0` restores contested/identity/ungrounded badges on deep cards and writer-addressed styling. `422f4eb` also carries identity uncertainty through both row routes. | Fresh browser acceptance for the latest repair. The Windows-only, uncommitted 22/0 is not its acceptance result. |
+| Queue-path suite migrations | `tests/e2e_browser_ungrounded_filter.py`, `tests/e2e_browser_counting_contract.py` and `tests/e2e_browser_readiness_gate.py` have been migrated in `cf583f0`, with their laws retained. | Execute all three against the identity-checked pushed revision. Updated code is not an executed browser pass. Fleet-wide green is not established by the earlier subset. |
+| G5 fold geometry | Historical 882px/18px result at `bd86a8e`. The later flag repair adds Tier 1 content. | Fresh 1440×900 measurement against the unchanged `<900px` boundary. Do not transfer the old geometry result to the latest implementation. |
+| Real-writer UX validation | `docs/REAL_WRITER_VALIDATION.md` remains 13 blank rows; this document is an AI heuristic prior. | An actual sitting, not simulated participant answers. |
+| IMPACT v0 | Explainable and visibly uncalibrated; no weights retuned. | Writer judgments about rewrite priority and lane/rank usefulness. |
+| Quote-match register calibration | `FUZZY_MATCH_THRESHOLD = 0.72` unchanged. | Authentic Hindi/Telugu/Tamil material for the separate quote-matching decision; not invented examples or an IMPACT calibration claim. |
+| Larger programmes | T1–T11 restructure and R1–R6 redesign remain deferred and unchanged; R0 has recorded prior work. | Separate activation and scope decisions. Do not count this queue repair as implementing those programmes. |
+
+Last local receipts for the implementation: **Node 189 passed / 0 failed; Python 2294 passed / 4 expected Linux skips**, plus seven distinguishing mutations. No tests were rerun for this documentation refresh. The runner-reported parity 22/0, layout audit 37/0 and dock sections 187/0 at `07e5d9b` remain historical results, not fresh browser approval of `422f4eb`.
+
+**Current next action:** assert the served identity of the pushed revision, then obtain fresh G5 plus `tests/e2e_browser_ungrounded_filter.py`, `tests/e2e_browser_counting_contract.py` and `tests/e2e_browser_readiness_gate.py` results. A later docs-only tip may be used only with its actual served identity and verified runtime/test equivalence to this baseline. No revision match, no result. Writer validation and authentic-register calibration remain separate after those checks.
 
 ## 1. What this review is, and is not
 
 The requested career history is a simulated perspective, not a credential or personal experience I possess. This review uses professional revision priorities to challenge the product's decisions. It is authored by the same agent working on the implementation, not an independent participant.
 
-Inputs inspected:
+Inputs inspected at the original `52e1269` review:
 
 - `docs/REAL_WRITER_VALIDATION.md`, including all 13 questions.
 - `docs/USER_PERSONAS.md` and the current one-room ranked-queue spec through §14.52.
@@ -20,7 +48,7 @@ Inputs inspected:
 - The existing excerpt in `tests/fixtures/pain_tenglish.fountain`. It is a short Latin-transliterated fixture, not a full screenplay and not native-script Hindi/Telugu/Tamil calibration material.
 - The previously recorded browser anchors: G5 at 882px, `tests/e2e_browser_dock_sections.py` 187/0, and `tests/e2e_browser_print_media.py` 9/0. These were not rerun for this review.
 
-A new deterministic Node diagnostic executed shipped application functions and queue expressions on constructed English control findings. It found the workflow discrepancy in §5. It did not launch a browser, run a model or change application code.
+The original deterministic Node diagnostic executed the `52e1269` application functions and queue expressions on constructed English control findings. It found the historical workflow discrepancy in §5, subsequently repaired. It did not launch a browser, run a model or change application code.
 
 No 30–45 minute session, ten-finding navigation trial, timed comparison, eye-tracking, long-sitting comfort observation or second analysis pass took place. The original human checklist remains unfilled. No new Indic-language material was invented.
 
@@ -34,7 +62,7 @@ For a screenplay, I would usually resolve a consequential motivation or causal p
 
 ## 3. All 13 checklist questions, answered as simulation
 
-These are conditional expert assessments, not participant answers or new acceptance-test passes.
+These are conditional expert assessments, not participant answers or new acceptance-test passes. Evidence cells for repaired implementation objections were updated on 2026-10-19; no writer session or navigation-speed trial was added.
 
 | # | Checklist question | Simulated assessment | Evidence boundary |
 |---|---|---|---|
@@ -42,15 +70,15 @@ These are conditional expert assessments, not participant answers or new accepta
 | 2 | Did the Pass line read as writer progress or analyzer progress? | The explicit “from the last run, not your edits” wording is the right distinction. I would not interpret a changed analysis count as proof that the draft improved. | `buildArrivalStrip` prints the distinction. Actual comprehension was not tested. |
 | 3 | Was “N of M addressed by you” trustworthy and consistent? | Useful if it means my disposition or the working-copy observation, not an objective judgment of artistic improvement. Preserve the separate correct/partial/wrong judgment. | Source and prior counting anchors support the implementation. This review does not add a persistence trial. |
 | 4 | Were ghosted marks honest and non-punitive? | A muted, expandable record is preferable to a red failure. “Moved on” still needs to mean the analysis no longer carries the old note, not that my intent was discarded. | The source names the former issue and intent. No participant interpretation was observed. |
-| 5 | Was N/P faster than clicking a list? | The shortcut is promising, but I cannot endorse the workflow while it walks a different set/order from the ranked queue. Fix that discrepancy before measuring speed. | Deterministic discrepancy reproduced in §5. No speed was measured. |
-| 6 | Did eyes stay on the manuscript, and did auto-open help? | Auto-opening the corresponding evidence card should reduce searching. Stepping to an item with no queue card undermines that locality. | `stepLoop` attempts a card lookup after selecting the loop item; absent-card cases are reachable through §5. Eye movement was not observed. |
+| 5 | Was N/P faster than clicking a list? | Keyboard traversal should follow the ranked worklist before speed is measured. That mechanical repair is now implemented; whether N/P is faster remains an empirical question. | Historical gap at `52e1269`; repaired in `64da684`/`40637d8`, with parity 22/0 reported at `07e5d9b`. No speed measurement. |
+| 6 | Did eyes stay on the manuscript, and did auto-open help? | Auto-opening the corresponding evidence card should reduce searching. The old absent-card mismatch has been repaired; whether the interaction maintains attention is still a hypothesis. | Historical §5 reachability is not a current defect claim. The later card changes still require current browser acceptance. Eye movement was not observed. |
 | 7 | Did mark, next-pass, Discuss and copy land where hands were? | Direct loop actions are useful for repetitive triage. The queue's disclosure preserves its width budget, but “marks” may be less discoverable for a first-time writer. Keep the current pin placement until actual use establishes frequency. | A discoverability hypothesis, not evidence that the green verb budget or pin placement is wrong. |
 | 8 | Did Esc leave cleanly while the dock stayed open? | Leaving the mode without destroying the reading context is the right behavior. | `exitLoop` resets loop state and redraws the bar; it does not close the dock. No felt response is claimed. |
 | 9 | Was highs-only ink on arrival the right amount? | The question's premise is stale. The shipped default admits high, medium and low. I would not recommend hiding low-severity structural findings merely to make a clean-looking screen. Evaluate actual default ink density instead. | `state.findingFilter.severities` contains all three severities. This is not a new ink-density measurement. |
 | 10 | Did peek-chip and unread dot earn attention? | A cue should earn its place by naming new, actionable context. Repeated or ambiguous attention cues would be noise. | Conditional opinion only. No timing, attention or unread-dot lifecycle experiment was run. |
-| 11 | Did page and board ever disagree? | The previous anchors remain the evidence for their covered counting/render behavior. The new queue-versus-loop discrepancy is a different, concrete consistency gap; do not mislabel it as a newly observed page/board browser failure. | Prior browser results plus the scoped Node diagnostic, not a new browser journey. |
+| 11 | Did page and board ever disagree? | Prior browser anchors cover their own inputs and revisions. The loop/queue discrepancy was a separate mechanical gap, now repaired; do not mislabel it as a newly observed page/board browser failure. | Historical browser receipts plus the original scoped diagnostic. Current card/suite changes await fresh acceptance; no new writer journey is claimed. |
 | 12 | Did dawn/night hold up over a long sitting? | Calm, legible presentation is necessary, but source inspection cannot establish fatigue, comfort or preference over a long session. | Unanswered empirically. No invented comfort rating. |
-| 13 | Was anything noisy, slow or wrongly defaulted? | Prioritize loop/queue consistency. Keep report churn from reading as creative progress. Explain quote verification without implying the diagnosis is correct. Update the stale validation question before a real sitting. | First item is code-confirmed; the copy/discoverability concerns are hypotheses. Latency was not measured. |
+| 13 | Was anything noisy, slow or wrongly defaulted? | Verify the latest card and suite repairs rather than reimplementing the fixed loop. Keep report churn from reading as creative progress. Explain quote verification without implying the diagnosis is correct. Update the stale validation question before a real sitting. | Product and suite code repairs are pushed through `422f4eb`; current browser/G5 acceptance remains open. Copy/discoverability concerns are hypotheses. Latency was not measured. |
 
 ## 4. Applying the lens to the existing Pain excerpt
 
@@ -72,22 +100,22 @@ A professional-looking critique must not invent a missing midpoint, Act Two or f
 - The implementation orders populated lanes by their maximum IMPACT, rather than enforcing an unconditional hard-coded Structure-first order. Do not describe the product as doing something the source does not do.
 - Retain v0 and its visible uncalibrated marking. This simulated review supplies no defensible replacement numeric weights.
 
-## 5. Code-confirmed finding: the fix loop does not walk the ranked worklist
+## 5. Historical code-confirmed loop discrepancy at `52e1269` (repaired)
 
-**Priority: high. Evidence: source plus deterministic execution. Status: not repaired by this review.**
+**Original priority: high. Evidence: source plus deterministic execution at `52e1269`. Current status: repaired in `64da684` and `40637d8`; see §0 for remaining acceptance gates.**
 
-`screenplay_studio/webapp/app.js`:
+`screenplay_studio/webapp/app.js` at the original `52e1269` revision, not the current implementation:
 
-- `renderFixQueuePanel` filters queue items through `inFindingFilter`, binds them with `bindQueueItems`, then groups/ranks them with `groupByLane`.
-- `loopList` instead iterates `state.findings` in report-array order and applies `findingPassesFilter`.
-- That latter predicate does not perform queue-lane membership or the ungrounded exclusion implemented by the queue's filter.
-- `stepLoop` then looks for a queue card with the selected report index. When the loop admits an observation or hidden ungrounded row, there need not be a matching queue card.
+- `renderFixQueuePanel` filtered queue items through `inFindingFilter`, bound them with `bindQueueItems`, then grouped/ranked them with `groupByLane`.
+- `loopList` instead iterated `state.findings` in report-array order and applied `findingPassesFilter`.
+- That latter predicate did not perform queue-lane membership or the ungrounded exclusion implemented by the queue's filter.
+- `stepLoop` then looked for a queue card with the selected report index. When the old loop admitted an observation or hidden ungrounded row, there need not have been a matching queue card.
 
-The writer-facing consequence is straightforward: choosing the fix loop from a ranked worklist does not necessarily mean following that worklist. This is a mechanically testable discrepancy, not evidence that a real writer preferred another order.
+The historical writer-facing consequence was that choosing the fix loop from a ranked worklist did not necessarily mean following that worklist. The repaired loop now consumes the shared ordered projection. This diagnostic was not evidence that a real writer preferred another order.
 
-### Reproduction retained as diagnostic data
+### Original reproduction retained as historical diagnostic data
 
-The Node probe loaded the shipped `core.js`, extracted the actual `loopList` and its disposition/filter dependencies from `app.js`, and executed the queue's own admission/binding/grouping expressions extracted from `renderFixQueuePanel`. It used all severities, no scene/category restriction, open dispositions, and the default hidden-ungrounded state.
+The original Node probe loaded `52e1269`'s `core.js`, extracted that revision's `loopList` and its disposition/filter dependencies from `app.js`, and executed the queue's own admission/binding/grouping expressions extracted from `renderFixQueuePanel`. It used all severities, no scene/category restriction, open dispositions, and the default hidden-ungrounded state.
 
 These inputs are constructed English controls, not real screenplay findings:
 
@@ -108,7 +136,7 @@ These inputs are constructed English controls, not real screenplay findings:
 
 The control case agrees, while the mixed and within-lane cases distinguish the paths. This does not require a model, browser, GPU, server or new language material. No pixel, click or navigation-speed verdict follows from this probe. Its successful process exit confirmed these diagnostic outputs; it is **not** a passing acceptance test for loop parity.
 
-**Proposed follow-up:** define the loop's intended disposition scope explicitly, then make it consume a shared ordered queue projection for that scope. Do not add a second lane-membership rule to the general finding predicate. Start with failing-then-passing tests for order, observation exclusion, hidden ungrounded rows, the scene-less mechanical exception, filters and duplicate-id binding; preserve addressed/deferred semantics deliberately. Browser traversal must subsequently verify that selected loop entries have the expected visible cards.
+**Original follow-up, now implemented:** the shared ordered projection, explicit disposition scope and discriminating tests landed in `64da684`; the subsequent browser walk exposed the positional binding defect repaired in `40637d8`. See spec §14.54–§14.55 and `tests/js/queue_loop_parity.test.js` / `tests/e2e_browser_loop_queue_parity.py`. Do not repeat that work. The later card, status and transport repairs in §14.56–§14.57 have their own pending browser/G5 acceptance listed in §0.
 
 ## 6. Other findings and their strength
 
@@ -120,18 +148,18 @@ The control case agrees, while the mixed and within-lane cases distinguish the p
 | Numeric rank explanation may not explain the revision's dramatic consequence | Craft-communication hypothesis | Use the existing observation/why-it-matters surface to make the consequence concrete; retain auditable rank/provenance. |
 | Long-session comfort | Not assessed | Requires an actual sitting. A simulated preference is not fatigue evidence. |
 
-## 7. Decision and next action
+## 7. Current decision and next action
 
-**Keep the architecture. Fix workflow consistency before retuning artistic priorities.** The useful outcome of this simulation is not a fictitious “writer approved” stamp: it is a concrete loop/queue repair target plus clearly labeled craft and comprehension hypotheses.
+**Keep the architecture. Verify the latest repair before retuning artistic priorities.** The original loop/queue target is implemented, not still waiting to be coded. This simulation supplied testable engineering leads and craft/comprehension hypotheses, not a fictitious “writer approved” stamp. The subsequent work also restored demotion reasons, writer-addressed appearance and identity-flag transport. Their code is pushed; current browser acceptance is not yet claimed.
 
 The earlier claim that no further useful evaluation could happen without external input was too absolute. A heuristic review can uncover additional testable defects even when the existing acceptance suites are green. Their recorded results remain valid for the behaviors and inputs they covered.
 
-This review does not:
+Neither the original simulation nor this status refresh establishes:
 
-- complete `docs/REAL_WRITER_VALIDATION.md` or claim independent writer validation;
-- recalibrate IMPACT, change lane rules or move `FUZZY_MATCH_THRESHOLD = 0.72`;
-- supply authentic Hindi/Telugu/Tamil pages or establish a native-register threshold;
-- prove that a universal threshold is mathematically impossible. Existing probes show sample-dependent behavior, not a theorem about unseen registers;
-- alter the implementation, any test assertion, the 18px G5 margin or the historical browser anchors.
+- completion of `docs/REAL_WRITER_VALIDATION.md` or independent writer validation;
+- calibrated IMPACT, new lane rules or a new `FUZZY_MATCH_THRESHOLD` (still `0.72`);
+- authentic Hindi/Telugu/Tamil pages or a native-register threshold decision;
+- that a universal threshold is mathematically impossible. Existing probes show sample-dependent behavior, not a theorem about unseen registers;
+- a new test run or a different revision scope for a historical browser result. The old 18px headroom is not a measurement of the later Tier 1 addition.
 
-**Next action:** repair and regression-test loop/queue consistency as a focused follow-up. Keep actual writer validation and authentic register calibration as separate, still-unfulfilled evidence requirements.
+**Next action:** obtain the identity-anchored G5 and three migrated browser-suite results listed in §0 on the pushed implementation (or a verified runtime-identical docs-only tip). Do not describe suite code migrations as executed passes. Keep actual writer validation and authentic register calibration as separate, still-unfulfilled requirements. No global completion percentage or fleet-wide sign-off is inferred.

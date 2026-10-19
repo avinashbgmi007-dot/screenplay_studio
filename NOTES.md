@@ -4,6 +4,16 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-19: Circulating review status reconciled to the pushed implementation
+
+Review `docs/audit/2026-10-17_simulated_senior_writer_ux_review.md` now leads with a dated gate matrix:
+original diagnosis at `52e1269`, current implementation baseline `422f4eb`, loop and binding repaired,
+card/suite-code/wire repairs pushed, denominator honesty fix `84ce02a` included. Historical probe
+outputs remain labelled historical; question rows and next action no longer call the loop unfixed.
+No overall completion percentage. Spec §14.58 records the distinction and the verified branch state.
+Docs only, no runtime/test changes or reruns. Next: identity-anchored fresh G5 and the three migrated
+browser suites; writer sitting and authentic-register calibration remain separate afterwards.
+
 ### 2026-10-19: Kit-A reasons, settled cards and identity transport repaired; browser acceptance pending
 
 Bounded follow-up to the new Windows handoff, reconstructed from pushed `07e5d9b`; the uncommitted
