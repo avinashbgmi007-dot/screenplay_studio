@@ -2673,6 +2673,7 @@ def _fixqueue_items(m):
             # flag must ride the row like evidence_quote does.
             "ungrounded": bool(f.get("ungrounded")),
             "contested": bool(f.get("contested")),
+            "identity_uncertain": bool(f.get("identity_uncertain")),
         })
     items.sort(key=lambda i: (SEVERITY_WEIGHT.get(i["severity"], 3), i["act"] or 4, i["index"]))
 

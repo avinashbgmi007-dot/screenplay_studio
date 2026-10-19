@@ -2115,3 +2115,30 @@ Checkout recovery: another re-clone at `5c1b953` had restored the complete `07e5
 uncommitted files. Safety tag `safety/kit-a-reclone-20261019T073425Z` preserves `f4ff5cc`; its full
 tree `f66040eb79e0eface6a2071763462a79d3fa27e9` matched the fetched origin tip byte-for-byte before
 resetting this same session branch to that tip. The tag is retained; no previous work was discarded.
+
+
+### 14.57 Final wire check: identity uncertainty was still omitted by both row routes
+
+A check of `_fixqueue_items` after the §14.56 commit (`cf583f0`) found that its explicit field list
+carried `contested` and `ungrounded`, but not `identity_uncertain`. The deep renderer can read that
+reason directly from the report and pass its jsdom tests while the flat/query consumers still lose
+it. The new §14.56 browser identity-wire assertion would correctly fail; it is not removed.
+
+The existing shared assembler now carries `identity_uncertain: bool(f.get("identity_uncertain"))`
+beside the other two reasons. This is one additive field, not a route-envelope unification, a new
+module split, or a change to identity inference, severity, admission, weights or verification.
+
+`tests/test_fixqueue.py::TestFixQueue::test_both_routes_preserve_reason_flags_with_false_and_missing_controls`
+is parameterized over `/fixqueue` and `/findings`. It uses the existing mock-analysis fixture, writes
+true/false/absent controls to the actual report, then exercises real loading, sanitization and both
+public routes. All three reasons must retain their own boolean value, and the two distinct
+envelopes remain asserted. BROKEN: **2 failed**, exactly `/fixqueue drops identity_uncertain` and
+`/findings drops identity_uncertain`. FIXED: both new cases pass; file total **6 passed / 0 failed**.
+Final full Python **2294 passed / 4 expected Linux skips**, exit 0; server/test ruff and whitespace
+pass. Frontend files are byte-identical to `cf583f0`, retaining the **189/0** Node result and seven
+mutation checks, not claiming a new browser run.
+
+The final pushed revision, not `cf583f0`, is the target for §14.56's pending identity-anchored G5 and
+three migrated browser suites. No 22/0, contrast, geometry, or browser acceptance result is claimed
+for this follow-up. Both larger plans remain deferred; do not call remaining work exclusively
+human/model input before this acceptance is obtained.

@@ -4,7 +4,7 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
-### 2026-10-19: Kit-A reasons and writer-settled deep cards repaired; browser acceptance pending
+### 2026-10-19: Kit-A reasons, settled cards and identity transport repaired; browser acceptance pending
 
 Bounded follow-up to the new Windows handoff, reconstructed from pushed `07e5d9b`; the uncommitted
 `C:\tmp\run22` fix/result was not accessed or imported. Spec §14.56 corrects the earlier “only suite
@@ -19,9 +19,12 @@ Three browser suites migrate real retired call sites without dropping their laws
 retained; identity wire/visible checks added); `tests/e2e_browser_counting_contract.py` reads Tier 1,
 opens marks and counts `.queue-row.addressed`; `tests/e2e_browser_readiness_gate.py` acts on two distinct
 tasks, opens marks using real clicks, and retains settled-style/contrast/hit-target checks.
+Final wire audit found `identity_uncertain` absent from the existing shared row assembler: one
+additive boolean now survives both `/fixqueue` and `/findings` (spec §14.57). New true/false/absent
+route controls in `tests/test_fixqueue.py` fail on the old assembler and pass after; file **6/0**.
 
 `tests/js/finding_flags.test.js`: BROKEN on old app functions **1 pass/9 fail**, FIXED **10/0**;
-seven mutations distinguished and restored. Full Node **189/0**; Python **2292 pass/4 skip** on Linux
+seven mutations distinguished and restored. Full Node **189/0**; final Python **2294 pass/4 skip** on Linux
 (the Windows-only delete race plus the three established non-load-modify-write exclusions).
 Syntax, Python browser-file ruff and whitespace pass. No browser binaries, runs or pixel claim.
 Next: pushed-revision identity, fresh G5 (mandatory Tier 1 addition), and the three migrated browser

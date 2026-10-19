@@ -112,3 +112,46 @@ class TestFixQueue:
                     "verified", "not_found", "no_quote", "scene_not_found")
         assert any(i["verification"] for i in items), \
             "verification never crossed the allowlist"
+
+    @pytest.mark.parametrize("endpoint", ["fixqueue", "findings"])
+    def test_both_routes_preserve_reason_flags_with_false_and_missing_controls(self, http_client, endpoint):
+        """The deep card reads the report, but flat/query consumers need the
+        same identity reason too. A selector fix cannot repair a wire omission.
+        Exercise real report loading/sanitization and both public envelopes.
+        """
+        project = _analyzed_project(http_client)
+        path = os.path.join(webapp_server.PROJECTS_DIR, project, "report.findings.json")
+        with open(path, encoding="utf-8") as f:
+            report = json.load(f)
+        original = report["findings"][0]
+        flags = ("contested", "identity_uncertain", "ungrounded")
+        controls = []
+        for label, value in (("set", True), ("clear", False), ("absent", None)):
+            row = dict(original)
+            row["issue"] = f"{original['issue']} [flag transport {label}]"
+            for flag in flags:
+                row.pop(flag, None)
+                if value is not None:
+                    row[flag] = value
+            controls.append(row)
+        report["findings"] = controls
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(report, f)
+
+        response = http_client.get(f"/api/projects/{project}/{endpoint}")
+        assert response.status_code == 200
+        payload = response.get_json()
+        by_issue = {row["issue"]: row for row in payload["items"]}
+        assert set(by_issue) == {row["issue"] for row in controls}
+        for source in controls:
+            served = by_issue[source["issue"]]
+            for flag in flags:
+                assert flag in served, f"/{endpoint} drops {flag} from the finding"
+                assert served[flag] is bool(source.get(flag)), (endpoint, flag, source, served)
+        # The routes deliberately have different envelopes; this is field
+        # carriage through the existing shared assembler, not their unification.
+        if endpoint == "fixqueue":
+            assert payload["acts"]
+            assert payload["total_count"] == len(controls)
+        else:
+            assert payload["count"] == len(controls)
