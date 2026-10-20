@@ -45,8 +45,8 @@ accurate progress measure; this block records what the tree actually contains.
   `preview-r4`, `preview-redesigns`). Migrate surviving assertions before
   deleting; the Node command depends on the ink-layer tests.
 - **T11 — open.** Measure before deciding; no number exists.
-- **Regression count:** the fleet is **66 default-selected browser scripts**
-  (67 including live-only `gun_pen_audit`), not 25.
+- **Regression count:** the fleet is **67 default-selected browser scripts**
+  (68 including live-only `gun_pen_audit`), not 25.
 
 ## 1. Approved decisions
 
@@ -186,7 +186,7 @@ known learning (`docs-drift-vs-code`, 9/10). Update it to Tungsten + self-hosted
 
 ## 6. Regression tests (mandatory — IRON RULE, no approval needed)
 
-- **R1** the ESM extraction must not break any currently-green browser suite (66 default-selected scripts; 67 including live-only `gun_pen_audit`).
+- **R1** the ESM extraction must not break any currently-green browser suite (67 default-selected scripts; 68 including live-only `gun_pen_audit`).
 - **R2** the evidence consolidation must not break `phase6`'s pinned predicate/counts.
 - **R3** the theme fold must keep `phase12`/`phase13` computed values identical.
 

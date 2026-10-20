@@ -10,13 +10,20 @@
 
 **Original reviewed revision:** `52e12695a45dcc55b2e16cdfb0aaac10c5ff105d`; runtime identical to `bd86a8e`
 
-**Last acceptance-run runtime:** `1639fd6` (queue-path readiness/counting/ungrounded/layout anchored; G5 remains red)
+**Last acceptance-run runtime:** `1639fd6` (historical audit anchor; G5 was red there)
 
-**Changes awaiting a new browser anchor:** none from the AA/probe/isolation repair — it is anchored at `1639fd6`. G5 presentation is unchanged and still needs a committed gate.
+**Changes awaiting a new browser anchor:** none from the AA/probe/isolation repair. G5 was closed by Wave 1A: see the closure note below.
 
 **Branch:** `arena/e6a57b71-screenplay-studio`
 
 ## 0. Current status, superseding the original implementation objections
+
+> **Wave 1A closure (2026-10-20, `8907ad5`):** G5 is **PASS 884px** on the same
+> grounded finding, and the committed gate is
+> `tests/e2e_browser_g5_fold.py` (BROKEN **978px** at `b868da8`). The full fleet
+> is **67 passed / 0 failed / 1 skipped / 1663 checks**. Every "G5 remains FAIL"
+> or "committed gate absent" statement below is historical at `1639fd6` and must
+> not be used as the current state. Do not preapprove Option B; it was not used.
 
 The original loop discrepancy below was real at `52e1269`; it is **not an open defect on this branch now**. It was repaired in `64da684`, followed by the positional binding repair in `40637d8`. Do not use the historical diagnostic or original next action as a current work order. This status refresh changes documentation only.
 

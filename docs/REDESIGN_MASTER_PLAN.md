@@ -13,24 +13,25 @@
 
 ---
 
-> **Status re-baseline (2026-10-20, `1639fd6`):** the phasing table below is
+> **Status re-baseline (2026-10-20, `8907ad5`):** the phasing table below is
 > still the plan, but its implied "nothing has shipped" state is stale. Verified:
 > R1 type/spacing (`844eab8`, `a7b02e9`), R2 primitives (`86a8927`, `fd369c5`),
 > R3 composites (`9d1455c`) are in the tree; R0 is partial; R4/R5 are not
 > started; R6 is partial (the structural rail was retired). The five design axes
 > are recorded in `1b86409`: bundle fonts; keep current density/nav/dawn;
 > restrained motion with spotlight moments. The writer review's "R1–R6 remain
-> deferred" line is false. G5 remains the pixel gate red at 978px on the correct
-> grounded card; the committed G5 gate is still absent and is added before any
-> presentation change. The full default fleet at `1639fd6` is **62 passed, 4
-> failed, 1 skipped**: `phase6_evidence` 31/5, `width_budget` 17/3 and
-> `xss_inert` 33/3 are stale selectors/setup against the one-home queue;
-> `trust_line` passed 5/0 standalone and the fleet boot 404 is a flake. The
-> test-only re-points land before the G5 gate. The fleet is 66 default-selected
-> scripts (67 including the live-only `gun_pen_audit`), not 35. `npm test` is
-> the full Node command (it includes the preview-ink-layer `.mjs` tests). R0's token work is pixel-neutral; visible
-> mojibake repairs land separately. See
-> `docs/superpowers/plans/2026-10-20-ux-leftover.md`.
+> deferred" line is false. Wave 1A made G5 reproducible: the committed
+> `tests/e2e_browser_g5_fold.py` gate went from **BROKEN 978px** at `b868da8`
+> to **PASS 884px** at `8907ad5` on the same fixed finding (index 0,
+> continuity, grounded, `timeline_consistency`, verified 1.00). The full default
+> fleet at `8907ad5` is **67 passed, 0 failed, 1 skipped (live-only
+> `gun_pen_audit`), 1663 checks**. The three stale queue suites were re-pointed
+> test-only; `trust_line` passed 5/0 and the earlier fleet boot 404 is a flake.
+> The fleet is 67 default-selected scripts (68 including `gun_pen_audit`), not
+> 35. `npm test` is the full Node command (it includes the preview-ink-layer
+> `.mjs` tests). R0's token work is pixel-neutral; visible mojibake repairs land
+> separately. See `docs/superpowers/plans/2026-10-20-ux-leftover.md` and
+> `docs/superpowers/plans/2026-10-20-ux-wave1a-g5.md`.
 
 ## 0. Relationship to existing documents
 
@@ -171,7 +172,7 @@ Every redesign phase lands green or doesn't land:
 1. `node --check app.js` after any JS touch.
 2. Asset bump both files.
 3. Full browser ladder — the 18-suite canon: `phase5…phase13` (9), `phase14_signoff_journey`, `spark_wall`, `ideas`, `ideas_v3`, `selection_translate`, `ui_fixes`, `smoke`, `ui_batch`, plus `export_flush`/`translate_mic`/`library_delete` when their surfaces are touched.
-   The 18-suite canon is a targeted subset, not the fleet. The full fleet is **66 default-selected browser scripts** (`python tests/run_browser_suites.py`); final acceptance must run it. The Node command is **`npm test`** (it includes the preview-ink-layer `.mjs` tests), not `node --test tests/js/`.
+   The 18-suite canon is a targeted subset, not the fleet. The full fleet is **67 default-selected browser scripts** (`python tests/run_browser_suites.py`; 68 including live-only `gun_pen_audit`); final acceptance must run it. The Node command is **`npm test`** (it includes the preview-ink-layer `.mjs` tests), not `node --test tests/js/`.
 4. pytest full run (re-baseline at `1639fd6`; the Windows-only exclusions tracked, never "fixed" silently).
 5. Viewport matrix spot-check: 1440×900 / 900×1200 / 390×844 (the journey automates the sweep).
 6. Keyboard parity is a feature: Ctrl+Z/Ctrl+Shift+Z, `/` search focus, palette, scene step — the redesign may re-map but never drop. Keyboard + reduced-motion assertions stay in the journey.

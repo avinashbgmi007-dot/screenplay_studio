@@ -4,12 +4,12 @@
 
 **Branch:** `ux-leftover-wave0`
 
-**Last measured runtime:** `1639fd6` (same 357px card / 978px bottom as `422f4eb`)
+**Last measured runtime:** `8907ad5` (PASS 884px, same fixed finding)
 
-**Status:** G5 FAIL. Options only; no G5 presentation change implemented and no
-committed G5 pixel gate exists. Wave 1A adds `tests/e2e_browser_g5_fold.py` with
-a deterministic fixed report fixture and captures BROKEN before any presentation
-change. Option B remains unapproved.
+**Status:** RESOLVED by Wave 1A. `tests/e2e_browser_g5_fold.py` and the fixed
+fixture are committed at `b868da8`, which captured **BROKEN 978px**. Option A
+(non-evidence compaction) landed at `1a207d8` plus headroom at `8907ad5` and
+passes at **884px**. Option B was not used and remains unapproved.
 
 ## Corrected baseline
 
@@ -19,6 +19,8 @@ The runner used one fixed report/project directory across revisions, without res
 |---|---|---|---|---|
 | `bd86a8e` | Index 1, an incorrectly admitted ungrounded demo finding | 262px in the controlled comparison | 882px | The former PASS is withdrawn; wrong subject |
 | `422f4eb` | Index 0, the real grounded continuity finding | 357px | 978px | FAIL against `<900px` |
+| `b868da8` | Index 0, same fixed finding, committed gate | 357px | 978px | Committed gate FAIL |
+| `8907ad5` | Index 0, same fixed finding, after Option A | 328px | 884px | PASS against `<900px` |
 
 The correct card was also 357px at `07e5d9b`. The flags change is not the cause of this height: no flag means no added wrapper. The long observation and quote are actual reading content.
 

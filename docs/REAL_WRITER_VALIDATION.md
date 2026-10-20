@@ -7,10 +7,12 @@ the promises. One sitting, one page, honest notes.
 ## Status (2026-10-20)
 
 No writer sitting has occurred: all 13 answer rows below remain blank. The
-automated baselines are pytest **2295 passed / 3 Windows-only** at `422f4eb`,
-and at `1639fd6` readiness **116/0**, counting **22/0**, ungrounded **24/0**,
-layout audit **37/0**; G5 remains **FAIL 978px**. This checklist is an owner
-task. The programme plan's active-work estimates exclude owner waiting time.
+automated baselines are pytest **2295 passed / 3 Windows-only**, the Node suite
+**198/0**, and the full browser fleet **67 passed / 0 failed / 1 skipped
+(live-only `gun_pen_audit`) at `8907ad5`**. At that revision: readiness
+**116/0**, counting **22/0**, ungrounded **24/0**, layout audit **37/0**, and G5
+**PASS 884px** (was FAIL 978px at `1639fd6`). This checklist is an owner task.
+The programme plan's active-work estimates exclude owner waiting time.
 
 The setup and question text are being corrected where they describe retired
 surfaces (`Problem Board`) or a highs-only default that no longer ships. Do not

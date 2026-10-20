@@ -4,6 +4,23 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-20: Wave 1A complete — committed G5 gate passes at 884px
+
+Branch `ux-leftover-wave0`: `9cc285f` docs/plans, `36093dc` test-only queue
+re-points, `b868da8` fixed fixture + `tests/e2e_browser_g5_fold.py`, `1a207d8`
+Option A repair, `8907ad5` fold headroom. The gate's revision/identity checks
+passed at `b868da8` and it failed only at **bottom 978px**, top 621, card 357.
+After repair the same finding is **PASS 884px**, top 556, card 328. Exact 84px
+saving: filter row 52→26, scene strip 63→34, rank reason 33→19, card hint
+30→15. No evidence removed; no Option B.
+
+Full default fleet: **67 passed, 0 failed, 1 skipped, 0 known-broken — 1663
+checks** (68 scripts including live-only `gun_pen_audit`). `phase6_evidence`
+40/0, `width_budget` 32/0, `xss_inert` 36/0, `trust_line` 5/0. pytest **2295
+passed / 3 skipped**; `npm test` **198/0**. Docs updated to 67 default/68 total;
+G5 is no longer the red gate. Next owner work: Wave 1B writer sitting/IMPACT
+calibration; R0 token work remains partial.
+
 ### 2026-10-20: Wave 0 re-baseline; fleet has four reds, G5 still 978px
 
 Working tree `C:\tmp\run22` is on branch `ux-leftover-wave0` at `1639fd6`; the

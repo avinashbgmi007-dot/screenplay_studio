@@ -70,9 +70,10 @@ Playwright, pytest, Node `npm test`.
 | T9 honest load errors | partial | full 404-vs-real audit open |
 | T10 preview labs | open | 6 dirs + API + suites + Node `.mjs` tests |
 | T11 render perf | open | no measurement |
-| G5 | **FAIL 978px** | correct grounded finding index 0, 357px card; committed gate absent |
-| Queue acceptance | readiness 116/0, counting 22/0, ungrounded 24/0, layout 37/0 | `1639fd6` |
-| Fleet baseline | **62 passed, 4 failed, 1 skipped** | `phase6_evidence` 31/5; `width_budget` 17/3; `xss_inert` 33/3; `trust_line` boot 404 (5/0 standalone — flake) |
+| G5 | **PASS 884px** | same grounded finding index 0, 328px card; committed gate at `b868da8` captured **FAIL 978px**; repair `1a207d8` + `8907ad5` |
+| Queue acceptance | readiness 116/0, counting 22/0, ungrounded 24/0, layout 37/0, phase6 40/0, width 32/0, xss 36/0, trust 5/0 | `8907ad5` |
+| Fleet current | **67 passed, 0 failed, 1 skipped, 1663 checks** | 68 scripts incl. live-only `gun_pen_audit`; baseline at `1639fd6` was 62/4/1 |
+| Python / Node | pytest **2295/3**, `npm test` **198/0** | `8907ad5` |
 | Writer validation | 13 blank rows | `docs/REAL_WRITER_VALIDATION.md` |
 | IMPACT calibration | uncalibrated | live model + writer needed |
 | Quote threshold | `0.72` unchanged | authentic register material needed |
