@@ -1,0 +1,685 @@
+{
+  "title": "Pain",
+  "source_filename": "source.fountain",
+  "model_used": "demo-craft-model",
+  "coverage": {
+    "logline": "A demo logline.",
+    "genre": "Drama",
+    "tone": "Serious",
+    "one_page_synopsis": "A demo synopsis.",
+    "strengths": [
+      "Clear structure"
+    ],
+    "weaknesses": [
+      "Needs more conflict"
+    ],
+    "comparable_films": [
+      "Example Film"
+    ],
+    "recommendation": "consider"
+  },
+  "character_reads": [
+    {
+      "character": "MARA",
+      "how_reads": "Resolute and guarded.",
+      "apparent_intent": "Resolute and guarded.",
+      "gap": "Minimal.",
+      "scene_refs": [
+        1
+      ],
+      "evidence_quote": null,
+      "verification": {
+        "status": "no_quote",
+        "matched_scene": null,
+        "confidence": null
+      }
+    }
+  ],
+  "logline_test": {
+    "logline": "A demo logline.",
+    "signal": "workable",
+    "what_works": "Specific protagonist.",
+    "what_muddles": "Stakes are vague.",
+    "missing": "Clear stakes.",
+    "tightened": "A demo logline, tightened."
+  },
+  "setup_payoff": [
+    {
+      "setup": "The revolver",
+      "kind": "object",
+      "setup_scenes": [
+        1,
+        2
+      ],
+      "payoff_scenes": null,
+      "status": "dangling",
+      "note": "Never used.",
+      "setup_ungrounded": true,
+      "verified": false,
+      "verify_note": "setup terms not found in the cited setup scenes"
+    },
+    {
+      "setup": "The promise",
+      "kind": "theme",
+      "setup_scenes": [
+        2
+      ],
+      "payoff_scenes": [
+        3
+      ],
+      "status": "paid",
+      "note": "Lands.",
+      "verified": false,
+      "verify_note": "payoff scenes carry no matching terms (kept: absence proves nothing)",
+      "payoff_unproven": true
+    }
+  ],
+  "reveal_candidates": [],
+  "twist_verdict": null,
+  "character_dials": [
+    {
+      "character": "MARA",
+      "traits": [
+        {
+          "trait": "proactive",
+          "score": 7,
+          "scene_refs": [
+            1
+          ],
+          "note": "Demo dial."
+        },
+        {
+          "trait": "warm",
+          "score": 4,
+          "scene_refs": [
+            1
+          ],
+          "note": "Demo dial."
+        }
+      ]
+    }
+  ],
+  "pacing": [
+    {
+      "scene_number": 1,
+      "words": 23,
+      "action_words": 23,
+      "dialogue_words": 0,
+      "beats": 4,
+      "density": 5.8,
+      "action_share": 1.0,
+      "pace_score": 0.0,
+      "drag": false
+    },
+    {
+      "scene_number": 2,
+      "words": 238,
+      "action_words": 169,
+      "dialogue_words": 69,
+      "beats": 42,
+      "density": 5.7,
+      "action_share": 0.71,
+      "pace_score": 40.0,
+      "drag": false
+    },
+    {
+      "scene_number": 3,
+      "words": 146,
+      "action_words": 133,
+      "dialogue_words": 13,
+      "beats": 16,
+      "density": 9.1,
+      "action_share": 0.911,
+      "pace_score": 23.0,
+      "drag": false
+    },
+    {
+      "scene_number": 4,
+      "words": 278,
+      "action_words": 276,
+      "dialogue_words": 2,
+      "beats": 11,
+      "density": 25.3,
+      "action_share": 0.993,
+      "pace_score": 61.0,
+      "drag": false
+    },
+    {
+      "scene_number": 5,
+      "words": 75,
+      "action_words": 75,
+      "dialogue_words": 0,
+      "beats": 5,
+      "density": 15.0,
+      "action_share": 1.0,
+      "pace_score": 28.0,
+      "drag": false
+    },
+    {
+      "scene_number": 6,
+      "words": 26,
+      "action_words": 25,
+      "dialogue_words": 1,
+      "beats": 4,
+      "density": 6.5,
+      "action_share": 0.962,
+      "pace_score": 8.0,
+      "drag": false
+    }
+  ],
+  "findings": [
+    {
+      "category": "continuity",
+      "issue": "Unmarked time flip: Scene 5 ends in MORNING and Scene 6 opens in NIGHT with no transition marker (LATER / THE NEXT DAY / etc.).",
+      "why_it_matters": "The reader has to do the writer's work and infer a jump that the page doesn't signal. A one-line transition beats a confused re-read.",
+      "severity": "low",
+      "scene_refs": [
+        6
+      ],
+      "evidence_quote": "INT. KID SIDDHU'S HOUSE - NIGHT",
+      "rule_id": "timeline_consistency",
+      "check_id": "unmarked_time_flip",
+      "evidence_source": "full_text",
+      "verification": {
+        "status": "verified",
+        "matched_scene": 6,
+        "confidence": 1.0
+      },
+      "scene_key": "INT KID SIDDHUS HOUSE NIGHT"
+    },
+    {
+      "category": "dialogue",
+      "issue": "[demo] Sample dialogue finding — the built-in demo model is running, not a real analysis.",
+      "why_it_matters": "Says the feeling instead of dramatizing it.",
+      "severity": "low",
+      "scene_refs": [
+        1
+      ],
+      "evidence_quote": null,
+      "rule_id": null,
+      "observation": null,
+      "evidence_source": "full_text",
+      "verification": {
+        "status": "no_quote",
+        "matched_scene": null,
+        "confidence": null
+      },
+      "ungrounded": true,
+      "scene_key": "EXT INT HOSPITAL NIGHT"
+    },
+    {
+      "category": "dialogue",
+      "issue": "[demo] Sample dialogue finding — the built-in demo model is running, not a real analysis.",
+      "why_it_matters": "Says the feeling instead of dramatizing it.",
+      "severity": "low",
+      "scene_refs": [
+        4
+      ],
+      "evidence_quote": null,
+      "rule_id": null,
+      "observation": null,
+      "evidence_source": "full_text",
+      "verification": {
+        "status": "no_quote",
+        "matched_scene": null,
+        "confidence": null
+      },
+      "ungrounded": true,
+      "scene_key": "INT SIDDHUS HOUSE CONTINUOUS"
+    },
+    {
+      "category": "theme",
+      "issue": "[demo] Sample theme finding — demo model, not a real analysis.",
+      "why_it_matters": "Test reasoning.",
+      "severity": "low",
+      "scene_refs": [
+        2
+      ],
+      "evidence_quote": null,
+      "rule_id": null,
+      "observation": null,
+      "evidence_source": "full_text",
+      "verification": {
+        "status": "no_quote",
+        "matched_scene": null,
+        "confidence": null
+      },
+      "ungrounded": true,
+      "scene_key": "EXT OPEN PARK MAGIC HOUR"
+    },
+    {
+      "category": "character",
+      "issue": "[demo] Sample character finding — demo model, not a real analysis.",
+      "why_it_matters": "Test reasoning.",
+      "severity": "low",
+      "scene_refs": [
+        6
+      ],
+      "evidence_quote": null,
+      "rule_id": null,
+      "observation": null,
+      "evidence_source": "full_text",
+      "verification": {
+        "status": "no_quote",
+        "matched_scene": null,
+        "confidence": null
+      },
+      "ungrounded": true,
+      "scene_key": "INT KID SIDDHUS HOUSE NIGHT"
+    },
+    {
+      "category": "plot_thread",
+      "rule_id": "setup_payoff_general",
+      "issue": "Setup left dangling: \"The revolver\"",
+      "why_it_matters": "Never used.",
+      "severity": "low",
+      "scene_refs": [
+        1,
+        2
+      ],
+      "evidence_quote": null,
+      "evidence_source": "overview",
+      "verification": {
+        "status": "no_quote",
+        "matched_scene": null,
+        "confidence": null
+      },
+      "ungrounded": true,
+      "scene_key": "EXT INT HOSPITAL NIGHT"
+    },
+    {
+      "category": "genre",
+      "issue": "[demo] Sample genre finding — demo model, not a real analysis.",
+      "why_it_matters": "Test reasoning.",
+      "severity": "low",
+      "scene_refs": [],
+      "evidence_quote": null,
+      "rule_id": null,
+      "observation": null,
+      "verification": {
+        "status": "no_quote",
+        "matched_scene": null,
+        "confidence": null
+      },
+      "evidence_source": "overview",
+      "ungrounded": true,
+      "scene_key": ""
+    }
+  ],
+  "formatting_findings": [
+    {
+      "rule": "character_not_capitalized_on_first_appearance",
+      "severity": "low",
+      "scene_refs": [
+        2
+      ],
+      "message": "'DOCTOR' speaks in Scene 2 before appearing in ALL CAPS in any action line — convention is to introduce a character in caps in action text on first appearance."
+    },
+    {
+      "rule": "character_not_capitalized_on_first_appearance",
+      "severity": "low",
+      "scene_refs": [
+        2
+      ],
+      "message": "'RISHI' speaks in Scene 2 before appearing in ALL CAPS in any action line — convention is to introduce a character in caps in action text on first appearance."
+    },
+    {
+      "rule": "character_not_capitalized_on_first_appearance",
+      "severity": "low",
+      "scene_refs": [
+        2
+      ],
+      "message": "'SIDDHARTH' speaks in Scene 2 before appearing in ALL CAPS in any action line — convention is to introduce a character in caps in action text on first appearance."
+    },
+    {
+      "rule": "character_not_capitalized_on_first_appearance",
+      "severity": "low",
+      "scene_refs": [
+        3
+      ],
+      "message": "'GOON ONE' speaks in Scene 3 before appearing in ALL CAPS in any action line — convention is to introduce a character in caps in action text on first appearance."
+    },
+    {
+      "rule": "character_not_capitalized_on_first_appearance",
+      "severity": "low",
+      "scene_refs": [
+        3
+      ],
+      "message": "'GOON TWO' speaks in Scene 3 before appearing in ALL CAPS in any action line — convention is to introduce a character in caps in action text on first appearance."
+    },
+    {
+      "rule": "character_not_capitalized_on_first_appearance",
+      "severity": "low",
+      "scene_refs": [
+        6
+      ],
+      "message": "'FATHER' speaks in Scene 6 before appearing in ALL CAPS in any action line — convention is to introduce a character in caps in action text on first appearance."
+    },
+    {
+      "rule": "long_action_block",
+      "severity": "low",
+      "scene_refs": [
+        4
+      ],
+      "message": "Scene 4 has an action line of 61 words — worth a look for trimming."
+    },
+    {
+      "rule": "long_action_block",
+      "severity": "low",
+      "scene_refs": [
+        4
+      ],
+      "message": "Scene 4 has an action line of 72 words — worth a look for trimming."
+    }
+  ],
+  "stats": {
+    "title": "Pain",
+    "author": "(from Pain_FD_4_scenes.pdf)",
+    "scene_count": 6,
+    "estimated_page_count": null,
+    "character_count": 7,
+    "parse_confidence": "medium",
+    "character_stats": {
+      "characters": [
+        {
+          "character": "DOCTOR",
+          "dialogue_lines": 7,
+          "dialogue_words": 45,
+          "scenes_present": 1,
+          "dialogue_share_pct": 36.8
+        },
+        {
+          "character": "RISHI",
+          "dialogue_lines": 5,
+          "dialogue_words": 21,
+          "scenes_present": 1,
+          "dialogue_share_pct": 26.3
+        },
+        {
+          "character": "GOON TWO",
+          "dialogue_lines": 2,
+          "dialogue_words": 5,
+          "scenes_present": 1,
+          "dialogue_share_pct": 10.5
+        },
+        {
+          "character": "GOON ONE",
+          "dialogue_lines": 2,
+          "dialogue_words": 8,
+          "scenes_present": 1,
+          "dialogue_share_pct": 10.5
+        },
+        {
+          "character": "SIDDHARTH",
+          "dialogue_lines": 1,
+          "dialogue_words": 3,
+          "scenes_present": 1,
+          "dialogue_share_pct": 5.3
+        },
+        {
+          "character": "RAHUL",
+          "dialogue_lines": 1,
+          "dialogue_words": 2,
+          "scenes_present": 1,
+          "dialogue_share_pct": 5.3
+        },
+        {
+          "character": "FATHER",
+          "dialogue_lines": 1,
+          "dialogue_words": 1,
+          "scenes_present": 1,
+          "dialogue_share_pct": 5.3
+        }
+      ],
+      "total_dialogue_lines": 19
+    },
+    "dialogue_action_ratio": {
+      "dialogue_words": 85,
+      "action_words": 611,
+      "dialogue_pct": 12.2,
+      "action_pct": 87.8
+    },
+    "location_usage": {
+      "unique_locations": 6,
+      "usage": [
+        {
+          "location": "HOSPITAL",
+          "scene_count": 1
+        },
+        {
+          "location": "OPEN PARK",
+          "scene_count": 1
+        },
+        {
+          "location": "ROAD-SIDE",
+          "scene_count": 1
+        },
+        {
+          "location": "SIDDHU'S HOUSE",
+          "scene_count": 1
+        },
+        {
+          "location": "METRO",
+          "scene_count": 1
+        },
+        {
+          "location": "KID SIDDHU'S HOUSE",
+          "scene_count": 1
+        }
+      ]
+    },
+    "scene_length_stats": {
+      "scene_count": 6,
+      "avg_elements_per_scene": 13.7,
+      "median_elements_per_scene": 8.0,
+      "shortest_scene": {
+        "scene_number": 1,
+        "elements": 4
+      },
+      "longest_scene": {
+        "scene_number": 2,
+        "elements": 42
+      }
+    },
+    "int_ext_and_time_breakdown": {
+      "int_ext_breakdown": {
+        "INT/EXT": 1,
+        "EXT": 3,
+        "INT": 2
+      },
+      "time_of_day_breakdown": {
+        "NIGHT": 3,
+        "MAGIC HOUR": 1,
+        "CONTINUOUS": 1,
+        "MORNING": 1
+      },
+      "night_scene_count": 3,
+      "night_scene_pct": 50.0
+    },
+    "acts": [
+      {
+        "act": 1,
+        "name": "Act 1",
+        "scene_numbers": [
+          1
+        ],
+        "page_start": 0.1,
+        "page_end": 0.1,
+        "scene_count": 1
+      },
+      {
+        "act": 2,
+        "name": "Act 2",
+        "scene_numbers": [
+          2,
+          3
+        ],
+        "page_start": 1.0,
+        "page_end": 1.4,
+        "scene_count": 2
+      },
+      {
+        "act": 3,
+        "name": "Act 3",
+        "scene_numbers": [
+          4,
+          5,
+          6
+        ],
+        "page_start": 2.1,
+        "page_end": 2.4,
+        "scene_count": 3
+      }
+    ],
+    "pacing": {
+      "segments": [
+        {
+          "page_start": 1,
+          "page_end": 3,
+          "dialogue_words": 85,
+          "action_words": 611,
+          "scene_count": 6
+        }
+      ],
+      "total_pages": 2.4,
+      "segment_pages": 5
+    },
+    "character_arc": [
+      {
+        "character": "DOCTOR",
+        "first_scene": 2,
+        "last_scene": 2,
+        "scene_count": 1,
+        "scene_presence_pct": 16.7,
+        "dialogue_lines": 7,
+        "quiet_gaps": [],
+        "appears_throughout": false
+      },
+      {
+        "character": "RISHI",
+        "first_scene": 2,
+        "last_scene": 2,
+        "scene_count": 1,
+        "scene_presence_pct": 16.7,
+        "dialogue_lines": 5,
+        "quiet_gaps": [],
+        "appears_throughout": false
+      },
+      {
+        "character": "SIDDHARTH",
+        "first_scene": 2,
+        "last_scene": 2,
+        "scene_count": 1,
+        "scene_presence_pct": 16.7,
+        "dialogue_lines": 1,
+        "quiet_gaps": [],
+        "appears_throughout": false
+      },
+      {
+        "character": "GOON ONE",
+        "first_scene": 3,
+        "last_scene": 3,
+        "scene_count": 1,
+        "scene_presence_pct": 16.7,
+        "dialogue_lines": 2,
+        "quiet_gaps": [],
+        "appears_throughout": false
+      },
+      {
+        "character": "GOON TWO",
+        "first_scene": 3,
+        "last_scene": 3,
+        "scene_count": 1,
+        "scene_presence_pct": 16.7,
+        "dialogue_lines": 2,
+        "quiet_gaps": [],
+        "appears_throughout": false
+      },
+      {
+        "character": "RAHUL",
+        "first_scene": 4,
+        "last_scene": 4,
+        "scene_count": 1,
+        "scene_presence_pct": 16.7,
+        "dialogue_lines": 1,
+        "quiet_gaps": [],
+        "appears_throughout": false
+      },
+      {
+        "character": "FATHER",
+        "first_scene": 6,
+        "last_scene": 6,
+        "scene_count": 1,
+        "scene_presence_pct": 16.7,
+        "dialogue_lines": 1,
+        "quiet_gaps": [],
+        "appears_throughout": false
+      }
+    ],
+    "scene_estimates": {
+      "1": {
+        "words": 14,
+        "dialogue_lines": 0,
+        "minutes": 0.1
+      },
+      "2": {
+        "words": 209,
+        "dialogue_lines": 13,
+        "minutes": 1.3
+      },
+      "3": {
+        "words": 135,
+        "dialogue_lines": 4,
+        "minutes": 0.8
+      },
+      "4": {
+        "words": 272,
+        "dialogue_lines": 1,
+        "minutes": 1.7
+      },
+      "5": {
+        "words": 69,
+        "dialogue_lines": 0,
+        "minutes": 0.4
+      },
+      "6": {
+        "words": 18,
+        "dialogue_lines": 1,
+        "minutes": 0.1
+      }
+    },
+    "runtime_minutes": 4.4,
+    "script_level_source": "full_text",
+    "checkpoint_coverage": {
+      "scenes": [
+        2,
+        3,
+        4,
+        6
+      ],
+      "of": 6,
+      "chars": 4210
+    },
+    "evidence_depth": {
+      "full_text": 5,
+      "overview": 2,
+      "overview_and_checkpoints": 0,
+      "unknown": 0,
+      "total": 7
+    }
+  },
+  "withdrawals": [],
+  "verification_summary": {
+    "verified": 1,
+    "not_found": 0,
+    "no_quote": 6,
+    "scene_not_found": 0,
+    "quote_bearing": 1,
+    "verified_pct_of_quoted": 100.0,
+    "observation_bearing": 0,
+    "observation_pct": 0.0
+  },
+  "errors": [],
+  "notices": [],
+  "recoveries": []
+}
