@@ -2,11 +2,14 @@
 
 **Date:** 2026-10-20
 
-**Branch:** `arena/e6a57b71-screenplay-studio`
+**Branch:** `ux-leftover-wave0`
 
-**Last measured runtime:** `422f4ebbd52cc46074eac30f08c5a45b5992a123`
+**Last measured runtime:** `1639fd6` (same 357px card / 978px bottom as `422f4eb`)
 
-**Status:** G5 FAIL. Options only; no G5 presentation change implemented.
+**Status:** G5 FAIL. Options only; no G5 presentation change implemented and no
+committed G5 pixel gate exists. Wave 1A adds `tests/e2e_browser_g5_fold.py` with
+a deterministic fixed report fixture and captures BROKEN before any presentation
+change. Option B remains unapproved.
 
 ## Corrected baseline
 
@@ -48,6 +51,11 @@ Keep the falsifiable observation fully visible. For a long quotation, show an ex
 **Trade-off:** creates room for action while retaining the full citation, but introduces a disclosure and can hide useful context. Collapsing the observation as well is not my recommendation.
 
 ## Recommendation and next measurement
+
+**Gate first.** The committed gate must assert the served revision, the first
+admitted finding (index 0, continuity, grounded, `timeline_consistency`), the
+hidden ungrounded control, font readiness, 1440×900, the default worklist and
+lens scroll 0. A measurement on a different finding is not a G5 result.
 
 Start with A's measurement, not another speculative CSS patch. Consider B only if adequate non-evidence savings cannot be demonstrated and its trade-off is approved.
 

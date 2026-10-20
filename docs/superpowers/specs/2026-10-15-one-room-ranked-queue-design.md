@@ -427,8 +427,13 @@ predicate.
 
 ## §8. Acceptance gates
 
-New checks in `tests/e2e_browser_layout_audit.py`, which already seeds an analyzed desk and gates
-dock geometry. Each is a hard assertion, not a screenshot.
+**Gate status correction (2026-10-20):** G5 was never committed in
+`tests/e2e_browser_layout_audit.py`. That suite's 37 checks are structural/dock
+geometry and do not measure the fold. The approved G5 gate is
+`tests/e2e_browser_g5_fold.py`, backed by the deterministic fixed report fixture
+(the demo analysis of `pain_tenglish.fountain`); its assertion is the G5 row
+below. This corrects the file name, not the gate. The other gates remain where
+they are. Each is a hard assertion, not a screenshot.
 
 | # | Assertion |
 |---|---|
@@ -451,6 +456,12 @@ the verdict line are **not** in that list, by ruling, not by omission.
 first actionable finding (index 0). The former `bd86a8e` **882px PASS is withdrawn in full**, not
 merely historical: it measured an ungrounded finding (index 1) incorrectly rendered by the old
 admission/binding path. There is no valid 18px actionable-row headroom (§14.59).
+
+**G5 gate identity contract:** the gate must assert the served revision, the
+first admitted finding (index 0, continuity, grounded, `timeline_consistency`),
+the hidden ungrounded control, font readiness, 1440×900, the default worklist and
+lens scroll 0. It records the pre-card blocks and card components. A measurement
+on a different finding is not a G5 result.
 
 **Standing regression requirement:** every future Tier 1 addition or geometry-affecting change must
 re-measure G5. Assert served-tree identity first, then measure at 1440×900 with the dock's default-open

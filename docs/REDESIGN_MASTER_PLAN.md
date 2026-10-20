@@ -13,6 +13,25 @@
 
 ---
 
+> **Status re-baseline (2026-10-20, `1639fd6`):** the phasing table below is
+> still the plan, but its implied "nothing has shipped" state is stale. Verified:
+> R1 type/spacing (`844eab8`, `a7b02e9`), R2 primitives (`86a8927`, `fd369c5`),
+> R3 composites (`9d1455c`) are in the tree; R0 is partial; R4/R5 are not
+> started; R6 is partial (the structural rail was retired). The five design axes
+> are recorded in `1b86409`: bundle fonts; keep current density/nav/dawn;
+> restrained motion with spotlight moments. The writer review's "R1–R6 remain
+> deferred" line is false. G5 remains the pixel gate red at 978px on the correct
+> grounded card; the committed G5 gate is still absent and is added before any
+> presentation change. The full default fleet at `1639fd6` is **62 passed, 4
+> failed, 1 skipped**: `phase6_evidence` 31/5, `width_budget` 17/3 and
+> `xss_inert` 33/3 are stale selectors/setup against the one-home queue;
+> `trust_line` passed 5/0 standalone and the fleet boot 404 is a flake. The
+> test-only re-points land before the G5 gate. The fleet is 66 default-selected
+> scripts (67 including the live-only `gun_pen_audit`), not 35. `npm test` is
+> the full Node command (it includes the preview-ink-layer `.mjs` tests). R0's token work is pixel-neutral; visible
+> mojibake repairs land separately. See
+> `docs/superpowers/plans/2026-10-20-ux-leftover.md`.
+
 ## 0. Relationship to existing documents
 
 | Doc | Role here |
@@ -59,6 +78,11 @@ Every live surface, the phase that built it, and the gate that protects it durin
 - `style.css` — **5,765 lines**, 28 media queries, 68 `!important`
 - `app.js` — 7,790 lines (vanilla, no build step — this stays)
 - `index.html` — 744 lines (6 full-screen views, all `main#main` children)
+
+**Current at `1639fd6` (2026-10-20):** `app.js` **10,507 lines** · `style.css`
+**6,360** · `index.html` **682** · **2** `:root` blocks · **20** `body.dawn` ·
+**65** `innerHTML` call sites. The table below is the original `fd181a4` audit,
+kept for provenance; re-derive counts before quoting them as current.
 
 ### CSS debt (the redesign must pay this down FIRST, before any visual change)
 | Finding | Count | Consequence |
@@ -147,10 +171,11 @@ Every redesign phase lands green or doesn't land:
 1. `node --check app.js` after any JS touch.
 2. Asset bump both files.
 3. Full browser ladder — the 18-suite canon: `phase5…phase13` (9), `phase14_signoff_journey`, `spark_wall`, `ideas`, `ideas_v3`, `selection_translate`, `ui_fixes`, `smoke`, `ui_batch`, plus `export_flush`/`translate_mic`/`library_delete` when their surfaces are touched.
-4. pytest full run (686 baseline; the 2 known Windows file-lock flakes tracked, never "fixed" silently).
+   The 18-suite canon is a targeted subset, not the fleet. The full fleet is **66 default-selected browser scripts** (`python tests/run_browser_suites.py`); final acceptance must run it. The Node command is **`npm test`** (it includes the preview-ink-layer `.mjs` tests), not `node --test tests/js/`.
+4. pytest full run (re-baseline at `1639fd6`; the Windows-only exclusions tracked, never "fixed" silently).
 5. Viewport matrix spot-check: 1440×900 / 900×1200 / 390×844 (the journey automates the sweep).
 6. Keyboard parity is a feature: Ctrl+Z/Ctrl+Shift+Z, `/` search focus, palette, scene step — the redesign may re-map but never drop. Keyboard + reduced-motion assertions stay in the journey.
-7. One commit per phase, message = what changed visually + which gates prove no behavioral change.
+7. One revertible commit series per phase/surface; the message says what changed visually + which gates prove no behavioral change.
 8. Baseline discipline: `git diff --check`, inspect diff, no unrelated file changes.
 9. The Phase-14 journey (48 checks) is the redesign's final acceptance gate, updated alongside any deliberate behavior change.
 10. Findings indexing (array position = index) is load-bearing for cards, board rows, and findingStatus — any finding-surface redesign preserves it.
@@ -161,7 +186,7 @@ Deliberately conservative order — the token/primitive layers are where safety 
 
 | Phase | Name | Content | Gate emphasis |
 |---|---|---|---|
-| R0 | **Token layer** | Consolidate night+dawn token blocks to the top; normalize the ~60 off-token hexes + 166 rgba literals into named tokens; adopt the z-ladder; clean file encoding (mojibake). Zero visual change by definition. | Pixel-neutral: ladder green, journey green. |
+| R0 | **Token layer** | Consolidate night+dawn token blocks to the top; normalize the ~60 off-token hexes + 166 rgba literals into named tokens; adopt the z-ladder; clean file encoding (mojibake). Token/encoding work is pixel-neutral; visible mojibake repairs land in a separate commit/suite because corrected text can change rendering. | Pixel-neutral: ladder green, journey green. |
 | R1 | **Type + spacing scale** | One scale, applied; retire ad-hoc px values; font decision from the design discussion lands here. | phase12 (motion/visual), phase11 (responsive). |
 | R2 | **Primitives** | Buttons, inputs, chips, cards, selects, scrollbars — single components styled once. | ui_batch, smoke. |
 | R3 | **Composites** | Desk toolbar, Context Dock, Problem Board, status strip, palette. | phase5–8, phase10, phase13. |
@@ -183,6 +208,14 @@ R0 is the only phase that can start before the design discussion concludes; R1+ 
 | KB rule browser · genre viz · confidence badges | Medium | Dock: a fifth lens ("Craft") is the natural slot. |
 | Pipeline progress viz · realtime feedback | Low | Extends the existing progress chip/popover pattern (phase 8). |
 | FDX export UI · quick analysis | Low | Overflow menu + desk toolbar respectively. |
+
+**Direction recorded (2026-10-20, `1b86409`):** the fork is resolved as a
+hybrid/five-axis baseline: bundle fonts; keep current density, navigation and
+dawn; restrained motion with spotlight moments. Every R4 surface brief must name
+its deviations from that baseline before implementation. The writer-thumbs
+deferred UI keeps its reserved home on the finding card; it is a separate
+feature plan, its overlap with the verdict/intent controls must be audited, and
+it must not silently auto-adjust confidence.
 
 ## 10. Open design questions (the agenda for the UI/UX discussion)
 

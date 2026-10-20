@@ -9,6 +9,45 @@ approved individually; therapy is recorded here rather than re-argued.
 
 ---
 
+## 0. Status re-baseline (2026-10-20, `1639fd6`)
+
+The task list below is the original work order. Its unchecked boxes are not an
+accurate progress measure; this block records what the tree actually contains.
+
+- **T1 — done in substance.** The structural symbol guard is
+  `tests/test_app_symbol_integrity.py` (Python, id/class-family guards), not the
+  proposed `tests/js/structural.test.js`. It refuses the retired rail surface and
+  duplicate symbols.
+- **T5 — done.** `_fixqueue_items` is the shared server-side row assembler; both
+  row routes keep their envelopes.
+- **T7 — done.** The dormant `#feedback-view` is deleted; stored `view:"fv"`
+  redirects to the evidence lens; metrics show 0 renders.
+- **T2/T3 — superseded by the shipped hash router**, inline at
+  `app.js:2251-2339`. There is no `router.js` or `store.js`, no clean-URL
+  `pushState` router, and no Flask catch-all. Do not build the clean-URL
+  mechanism merely to satisfy T3. T2's module extraction and router/state
+  ownership remain separate obligations with a dependency audit.
+- **T4 — partial.** The shared row assembly (T5) landed; one finding model + one
+  render path did not. 65 `innerHTML` call sites remain. Dependency audit before
+  any extraction; preserve the shared finding-model/render contracts.
+- **T6 — folded into R0.** The duplicate base token blocks remain (2 `:root`,
+  20 `body.dawn`); treat it as R0, not a separate task.
+- **T8 — partial.** `core.escapeHtml` + the strict SPA CSP are shipped; not every
+  dynamic sink has been converted. The behavior is protected; the mechanical
+  conversion is not complete.
+- **T9 — partial.** Some load failures surface; a full 404-vs-real audit is
+  still open.
+- **T10 — open, and not a one-hour deletion.** Consumers include
+  `/api/preview/*`, `tests/test_preview_lab.py`, the preview browser suites,
+  token/security tests, the `preview-ink-layer` Node tests in `npm test`, and
+  `tests/probe_ink_layer_trap_frame.py`. Six preview dirs exist
+  (`preview-design`, `preview-ia`, `preview-ink-layer`, `preview-next`,
+  `preview-r4`, `preview-redesigns`). Migrate surviving assertions before
+  deleting; the Node command depends on the ink-layer tests.
+- **T11 — open.** Measure before deciding; no number exists.
+- **Regression count:** the fleet is **66 default-selected browser scripts**
+  (67 including live-only `gun_pen_audit`), not 25.
+
 ## 1. Approved decisions
 
 | ID | Issue | Decision |
@@ -88,7 +127,7 @@ known learning (`docs-drift-vs-code`, 9/10). Update it to Tungsten + self-hosted
 
 ## 5. Implementation Tasks
 
-- [ ] **T1 (P1, human: ~2h / CC: ~20min)** — `tests/js/` — add the structural symbol-uniqueness guard test
+- [x] **T1 (P1, human: ~2h / CC: ~20min)** — `tests/js/` — add the structural symbol-uniqueness guard test
   - Surfaced by: Anatomy 1A; prior learning `classic-script-split-hazards` (9/10)
   - Files: `tests/js/structural.test.js` (new)
   - Verify: `node --test tests/js/` fails when a symbol is defined twice, passes on HEAD
@@ -108,7 +147,7 @@ known learning (`docs-drift-vs-code`, 9/10). Update it to Tungsten + self-hosted
   - Files: `webapp/evidence.js` (new), `webapp/app.js`, re-scribe `tests/e2e_browser_phase6_evidence.py`, `tests/e2e_browser_phase13_legacy_cleanup.py`
   - Verify: `phase6` + `phase13` green with the new one-surface contract
 
-- [ ] **T5 (P2, human: ~4h / CC: ~25min)** — `webapp_server.py` — shared finding item assembly, envelopes kept at the routes
+- [x] **T5 (P2, human: ~4h / CC: ~25min)** — `webapp_server.py` — shared finding item assembly, envelopes kept at the routes
   - Surfaced by: Architecture 2A; prior learning `fixqueue-two-route-contract` (9/10)
   - Files: `webapp_server.py`; `tests/test_fixqueue.py`, `tests/test_preview_lab.py`
   - Verify: both envelopes unchanged; preview `dismissed_keys` intact
@@ -118,7 +157,7 @@ known learning (`docs-drift-vs-code`, 9/10). Update it to Tungsten + self-hosted
   - Files: `style.css`, `tungsten.css`, `index.html`
   - Verify: phase12 luminance/amber-free + phase13 geometry green; computed values unchanged
 
-- [ ] **T7 (P2, human: ~3h / CC: ~20min)** — `app.js` — delete dormant `#feedback-view`; migrate stored `view:"fv"`
+- [x] **T7 (P2, human: ~3h / CC: ~20min)** — `app.js` — delete dormant `#feedback-view`; migrate stored `view:"fv"`
   - Surfaced by: Architecture 4A
   - Files: `webapp/app.js`, `webapp/index.html`, `webapp/style.css`, `docs/UI_UX_SPECIFICATION.md`
   - Verify: old-session migration lands on the workspace; no `"fv"` branch remains
@@ -147,7 +186,7 @@ known learning (`docs-drift-vs-code`, 9/10). Update it to Tungsten + self-hosted
 
 ## 6. Regression tests (mandatory — IRON RULE, no approval needed)
 
-- **R1** the ESM extraction must not break any currently-green browser suite (25 suites).
+- **R1** the ESM extraction must not break any currently-green browser suite (66 default-selected scripts; 67 including live-only `gun_pen_audit`).
 - **R2** the evidence consolidation must not break `phase6`'s pinned predicate/counts.
 - **R3** the theme fold must keep `phase12`/`phase13` computed values identical.
 

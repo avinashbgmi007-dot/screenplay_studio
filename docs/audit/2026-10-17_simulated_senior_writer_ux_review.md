@@ -10,9 +10,9 @@
 
 **Original reviewed revision:** `52e12695a45dcc55b2e16cdfb0aaac10c5ff105d`; runtime identical to `bd86a8e`
 
-**Last acceptance-run runtime:** `422f4ebbd52cc46074eac30f08c5a45b5992a123`
+**Last acceptance-run runtime:** `1639fd6` (queue-path readiness/counting/ungrounded/layout anchored; G5 remains red)
 
-**Changes awaiting a new browser anchor:** pointer alpha repair, current severity-rim probe and counting-case isolation (§14.59). G5 presentation is unchanged.
+**Changes awaiting a new browser anchor:** none from the AA/probe/isolation repair — it is anchored at `1639fd6`. G5 presentation is unchanged and still needs a committed gate.
 
 **Branch:** `arena/e6a57b71-screenplay-studio`
 
@@ -20,7 +20,7 @@
 
 The original loop discrepancy below was real at `52e1269`; it is **not an open defect on this branch now**. It was repaired in `64da684`, followed by the positional binding repair in `40637d8`. Do not use the historical diagnostic or original next action as a current work order. This status refresh changes documentation only.
 
-**Acceptance correction:** G5 is **FAIL at 978px** on the correct grounded finding, and readiness is **106/10** at the runtime above. The old 882px G5 PASS is **withdrawn in full**, not merely historical: it measured an incorrectly admitted ungrounded finding. I am sorry for reporting the wrong subject as actionable-row acceptance. Independent dock/print results are not retracted.
+**Acceptance correction:** G5 is **FAIL at 978px** on the correct grounded finding. Readiness is **116/0** at `1639fd6`; the earlier **106/10** was `422f4eb` and is superseded. The old 882px G5 PASS is **withdrawn in full**, not merely historical: it measured an incorrectly admitted ungrounded finding. I am sorry for reporting the wrong subject as actionable-row acceptance. Independent dock/print results are not retracted.
 
 No overall completion percentage is asserted. Implementation, browser regression acceptance, writer validation and register calibration are separate gates. The earlier chat estimate of 90–95% should not be used as a progress measure.
 
@@ -29,16 +29,18 @@ No overall completion percentage is asserted. Implementation, browser regression
 | Ranked loop and positional binding | Shared `queueProjection()` in `64da684`; positional item binding in `40637d8`. Runner-reported parity 22/0 at `07e5d9b`. | Do not reimplement this repair. These receipts retain their own revision scope. |
 | Quote-verification denominator honesty | Shipped in `84ce02a`: `scene_not_found` joins `verified` and `not_found` in the denominator; only `no_quote` is excluded. | Not an unshipped task and not evidence that a diagnosis is artistically correct. |
 | Visible demotion reasons and settled state | `cf583f0` restores deep-card flags and writer-addressed styling; `422f4eb` carries identity uncertainty through both row routes. Runner: ungrounded 24/0; done == addressed passed. | Retain these verified behaviors; they do not imply G5/readiness approval. |
-| Queue-path browser acceptance | Served `422f4eb`: ungrounded 24/0; counting 22/0* with an uncommitted test-isolation repair; readiness 106/10. | This revision ports counting isolation and repairs the 8 pointer-AA failures plus 2 stale severity probes in code. Fresh readiness/counting execution required; no new native PASS claimed. |
+| Queue-path browser acceptance | Served `1639fd6`: ungrounded 24/0; counting 22/0; readiness 116/0; layout audit 37/0. | Retain these verified behaviors. They do not imply G5 approval. |
 | G5 fold geometry | **FAIL 978px** on grounded finding index 0 (357px card). Former 882px PASS/18px margin at `bd86a8e` is **withdrawn**: it measured ungrounded finding index 1. | Recover >78px through an approved, measured presentation change. No evidence clamp or geometry change was made in the AA/probe patch. See the separate G5 options. |
 | Real-writer UX validation | `docs/REAL_WRITER_VALIDATION.md` remains 13 blank rows; this document is an AI heuristic prior. | An actual sitting, not simulated participant answers. |
 | IMPACT v0 | Explainable and visibly uncalibrated; no weights retuned. | Writer judgments about rewrite priority and lane/rank usefulness. |
 | Quote-match register calibration | `FUZZY_MATCH_THRESHOLD = 0.72` unchanged. | Authentic Hindi/Telugu/Tamil material for the separate quote-matching decision; not invented examples or an IMPACT calibration claim. |
-| Larger programmes | T1–T11 restructure and R1–R6 redesign remain deferred and unchanged; R0 has recorded prior work. | Separate activation and scope decisions. Do not count this queue repair as implementing those programmes. |
+| Larger programmes | R1 type/spacing (`844eab8`, `a7b02e9`), R2 primitives (`86a8927`, `fd369c5`) and R3 composites (`9d1455c`) shipped; R0 partial; R4/R5 not started; R6 partial (struct rail retired). T1/T5/T7 done in substance; T2/T3 superseded by the hash router; T4/T8/T9 partial; T10/T11 open. | Do not count this queue repair as implementing the remaining surfaces; activate R4 only after its brief is signed. |
 
 Latest local checks for the AA/probe/isolation repair: **Node 198 passed / 0 failed; Python 2294 passed / 4 expected Linux skips**, plus nine new distinguishing mutations. No local browser run or contrast ratio is claimed. The runner's Windows Python 2295/3 at `422f4eb` differs by the Windows-only delete-race test. The earlier parity 22/0, layout audit 37/0 and dock sections 187/0 retain their own revision scope, not fleet-wide approval. Counting's 22/0* used a local test-file isolation repair; it is not a pass for the unedited test file.
 
-**Current next action:** identity-anchor the pushed AA/probe/isolation repair, then run `tests/e2e_browser_readiness_gate.py` and `tests/e2e_browser_counting_contract.py`. Do not rerun the already-green ungrounded suite merely to restate its result. G5 remains red: measure correct-card components, choose a presentation change from `docs/audit/2026-10-20_g5_recovery_options.md`, and only then measure that pushed change against `<900px`. No revision match, no result; no correct finding identity, no G5 acceptance. Writer validation and register calibration remain separate.
+**2026-10-20 anchor:** served `1639fd6`; readiness **116/0**, counting **22/0**, ungrounded **24/0**, layout audit **37/0**. G5 remains **FAIL 978px**. The committed G5 gate is still absent; Wave 1A adds it before any presentation change.
+
+**Current next action:** add the committed G5 gate + deterministic fixed report fixture and capture **BROKEN 978** at `1639fd6`; then measure Option A only. Do not preapprove Option B. Readiness/counting are anchored at `1639fd6`; do not rerun the ungrounded suite merely to restate it. Writer validation and register calibration remain separate.
 
 ## 1. What this review is, and is not
 
@@ -154,7 +156,7 @@ The control case agrees, while the mixed and within-lane cases distinguish the p
 
 ## 7. Current decision and next action
 
-**Keep the architecture. Fix and verify the measured acceptance failures before retuning artistic priorities.** The original loop/queue target is implemented, not still waiting to be coded. This simulation supplied testable engineering leads and craft/comprehension hypotheses, not a fictitious “writer approved” stamp. The subsequent work also restored demotion reasons, writer-addressed appearance and identity-flag transport. Their behavior now has scoped browser evidence. G5 and readiness acceptance are red; the AA/probe/isolation repair does not include a G5 presentation change.
+**Keep the architecture. Fix and verify the measured acceptance failures before retuning artistic priorities.** The original loop/queue target is implemented, not still waiting to be coded. This simulation supplied testable engineering leads and craft/comprehension hypotheses, not a fictitious “writer approved” stamp. The subsequent work also restored demotion reasons, writer-addressed appearance and identity-flag transport. Their behavior now has scoped browser evidence. G5 remains red; readiness is green at `1639fd6` (116/0). The AA/probe/isolation repair does not include a G5 presentation change.
 
 The earlier claim that no further useful evaluation could happen without external input was too absolute. A heuristic review can uncover additional testable defects even when the existing acceptance suites are green. Their recorded results remain valid for the behaviors and inputs they covered.
 
@@ -166,4 +168,4 @@ Neither the original simulation nor this status refresh establishes:
 - that a universal threshold is mathematically impossible. Existing probes show sample-dependent behavior, not a theorem about unseen registers;
 - a new browser run or a different revision scope for a browser result. The old G5 PASS/18px headroom is withdrawn because it measured the wrong finding, not merely inapplicable to a later Tier 1 addition.
 
-**Next action:** obtain the identity-anchored readiness/counting reruns listed in §0, and consider the separate, unmeasured G5 options before changing evidence presentation. G5 is not repaired or waived. Keep actual writer validation and authentic-register calibration as separate, still-unfulfilled requirements. No global completion percentage or fleet-wide sign-off is inferred.
+**Next action:** add the committed G5 gate and deterministic fixture, capture the BROKEN 978 receipt at `1639fd6`, then measure Option A only. Readiness/counting are anchored at `1639fd6`; do not rerun the ungrounded suite merely to restate it. G5 is not repaired or waived. Keep actual writer validation and authentic-register calibration as separate, still-unfulfilled requirements. No global completion percentage or fleet-wide sign-off is inferred.

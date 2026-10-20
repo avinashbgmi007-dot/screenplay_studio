@@ -14,7 +14,7 @@ python -m pytest tests/ -k "resume" # by keyword
 - The mock routes on distinctive phrases in the system prompt: `"Summarize each"` → scene summaries; `"on-the-nose dialogue"` → dialogue findings; `"professional script coverage"` → coverage; `"script doctor proposing a targeted revision"` → revision replacements; anything else → a chat echo reply that reports the detected persona, findings count, and injected scene numbers (so grounding can be verified end-to-end).
 - Because Piece 2 and Piece 3 hit the *same* server in real use, one unified mock handles both request shapes — this is what lets the full parse→analyze→chat pipeline be tested genuinely end-to-end.
 - `tests/fixtures/pain_tenglish.fountain` is a small Tenglish sample used by several tests. `tests/fixtures/Pain_FD_4_scenes.pdf` (+ `_recoverable.pdf`) are text-less PDFs that exercise the OCR path (skipped gracefully when no OCR engine is installed).
-- `tests/js/` holds node tests for the DOM-free frontend helpers (`node --test tests/js/`).
+- `tests/js/` holds node tests for the DOM-free frontend helpers. Run them with **`npm test`**, which also includes the preview-ink-layer `.mjs` tests; `node --test tests/js/` is a subset, not the full contract.
 
 ## Test areas
 
@@ -145,7 +145,11 @@ two SSE routes and translate — empty text, unknown project, unknown session). 
 
 ## CI gates (what actually runs automatically)
 
-`ruff check .` → `pytest -q` → `node --test tests/js/*.test.js` → the browser suites.
+`ruff check .` → `pytest -q` → `npm test` → the browser suites.
+
+`npm test` is the full Node command: it runs `tests/js/*.test.js` **and**
+`screenplay_studio/webapp/preview-ink-layer/tests/*.test.mjs`. `node --test tests/js/`
+alone silently omits the ink-layer tests, so it is not the CI contract.
 
 The last one is new (2026-09-20). The `tests/e2e_browser_*.py` suites are standalone
 Playwright scripts, **not** pytest tests — they do not match `test_*.py`, so pytest
@@ -155,7 +159,7 @@ driven by `tests/run_browser_suites.py`, which runs every suite, prints one summ
 and exits nonzero on any failure or crash:
 
 ```bash
-python tests/run_browser_suites.py               # all runnable suites (35)
+python tests/run_browser_suites.py               # 66 default-selected suites (67 scripts total)
 python tests/run_browser_suites.py phase6 smoke  # by name substring
 python tests/run_browser_suites.py --strict      # also chase the known-broken
 E2E_BASE=http://127.0.0.1:8500 python tests/run_browser_suites.py

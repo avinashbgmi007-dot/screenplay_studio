@@ -4,6 +4,31 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-20: Wave 0 re-baseline; fleet has four reds, G5 still 978px
+
+Working tree `C:\tmp\run22` is on branch `ux-leftover-wave0` at `1639fd6`; the
+doc edits and two plan files are uncommitted. The programme plan is
+`docs/superpowers/plans/2026-10-20-ux-leftover.md`; the task-level G5 plan is
+`docs/superpowers/plans/2026-10-20-ux-wave1a-g5.md`.
+
+The first full default fleet run finished **62 passed, 4 failed, 1 skipped, 0
+known-broken (1623 checks)**. Reds: `phase6_evidence` **31/5** (removed
+`by-category` key, old severity badge, old section helper, old `.fix-row`
+dismiss rows, scene-strip scroll subject); `width_budget` **17/3** (queue rows
+hidden behind the ungrounded toggle; doctor button behind the closed `marks`
+disclosure); `xss_inert` **33/3** (old `.fix-row` selector); `trust_line` fleet
+ERROR at port 8099, but **5/0 standalone twice**, so a boot/port flake. No
+product change was made; these are test re-points for Wave 1A.
+
+G5 remains **FAIL 978px** on the correct grounded finding (index 0, continuity,
+`timeline_consistency`/`unmarked_time_flip`, 357px card). The committed gate is
+still absent. Wave 1A must add the fixed fixture + `tests/e2e_browser_g5_fold.py`,
+capture BROKEN, then measure Option A only. No Option B preapproval. Docs now
+record 67 browser scripts / 66 default; `npm test` is the full Node command.
+
+Next: finish Wave 0 doc close-out, then request Wave 1A approval. Do not commit
+or start the product repair without it.
+
 ### 2026-10-20: Acceptance red; AA/probe/isolation repair ready, G5 design still open
 
 Runner anchored `422f4eb`: G5 **FAIL 978px**; `tests/e2e_browser_ungrounded_filter.py` **24/0**;
