@@ -5682,6 +5682,7 @@ body.river-read #right-edge-affordance { display: none; }
   flex-wrap: wrap;
   gap: var(--sp-3) var(--sp-5);
   padding: var(--sp-3) var(--sp-6);
+  margin-bottom: var(--sp-4);
 }
 .dock-lens[data-lens="evidence"] .dock-evidence-scene .dock-scene-head {
   flex: 1 1 180px;
@@ -6615,7 +6616,7 @@ body:not(.idea-mode) .desk {
  * heights or card-anatomy changes: the browser still measures the <900px gate.
  * Side padding is unchanged so the already-green 322px verb budget stays put. */
 .dock-section .fix-queue.fix-queue-ranked {
-  padding-top: 4px;
+  padding-top: 0;
 }
 .dock-section .fix-queue.fix-queue-ranked > .craft-panel-head {
   display: grid;
