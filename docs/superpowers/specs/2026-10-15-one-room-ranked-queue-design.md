@@ -447,13 +447,18 @@ dock geometry. Each is a hard assertion, not a screenshot.
 (severity + This-scene + loop), current-scene box, then the lane-grouped queue. The Top-5 stack and
 the verdict line are **not** in that list, by ruling, not by omission.
 
-G5 passed on the identity-anchored `bd86a8e` re-anchor at **882px**, with **18px** of headroom
-(§14.51). This is a result for the measured input, not a guarantee for every report.
+**G5 is FAIL:** the identity-anchored `422f4eb` acceptance measured **978px** on the correct
+first actionable finding (index 0). The former `bd86a8e` **882px PASS is withdrawn in full**, not
+merely historical: it measured an ungrounded finding (index 1) incorrectly rendered by the old
+admission/binding path. There is no valid 18px actionable-row headroom (§14.59).
 
 **Standing regression requirement:** every future Tier 1 addition or geometry-affecting change must
 re-measure G5. Assert served-tree identity first, then measure at 1440×900 with the dock's default-open
 worklist, lens scroll 0 and no manual scrolling. Report the first actionable row's top, bottom and
-remaining margin. The hard assertion stays `bottom < 900`; source/Node checks cannot waive it.
+remaining margin. Also record finding index, content id, category and groundedness, and verify
+that this is the first admitted actionable finding before treating the geometry as a gate result.
+For design diagnosis, report the pre-card blocks and observation/quote rectangles separately.
+The hard assertion stays `bottom < 900`; source/Node checks cannot waive it.
 
 ---
 
@@ -1776,6 +1781,10 @@ and the `display` declaration that was inert under a flex parent.
 
 ### 14.48 G5 measured on the merged queue: FAIL, 1007px
 
+**Later correction (§14.59):** the 1007/882px row measurements in this compaction history used
+an incorrectly admitted finding. Retain the physical readings as diagnostics, not first-actionable
+acceptance. In particular the former 882px PASS is withdrawn in full.
+
 The runner confirmed served-tree identity at `fa81dba` on both runs. At 1440×900, lens scroll 0,
 no manual scrolling and no page errors, the first actionable card bottom was **1007px**, identical
 on both runs. The `<900px` gate remains unchanged and **failed**.
@@ -1865,42 +1874,47 @@ identity check on the pushed repair, the same G5 measurement, then re-anchors of
 was reported as a result. §14.51 records the completed re-anchor.
 
 
-### 14.51 Original fold complaint closed: all three re-anchors green on `bd86a8e`
+### 14.51 G5 acceptance WITHDRAWN; independent dock and print anchors retained
 
-The runner confirmed served-tree identity for all three runs on
-`bd86a8eb45c8a027c2fe2fc869d725a682b685d4` and reported a cleaned worktree.
+**Retraction following the corrected acceptance audit:** the original G5 PASS claim is withdrawn
+in full. I am sorry for reporting acceptance on the wrong finding. Served-tree identity was correct,
+but finding identity was not: the 882px row was ungrounded finding index 1, not the first actionable
+finding. The corrected admission/binding path exposes grounded continuity finding index 0.
 
-| Instrument | Anchored result | Exit |
+The original instrument receipts are retained for audit, with their corrected verdicts:
+
+| Instrument at `bd86a8e` | Corrected disposition | Recorded exit |
 |---|---|---|
-| Named G5 probe, 1440×900 | **PASS**, first actionable row bottom **882px**, no page errors or scrolling | 0 |
-| `tests/e2e_browser_dock_sections.py` | **187 passed, 0 failed** | 0 |
-| `tests/e2e_browser_print_media.py` | **9 passed, 0 failed** | 0 |
+| Named G5 probe, 1440×900 | **WITHDRAWN PASS**: 882px measured the wrong, ungrounded row | 0, wrong subject |
+| `tests/e2e_browser_dock_sections.py` | **187 passed, 0 failed**, not retracted | 0 |
+| `tests/e2e_browser_print_media.py` | **9 passed, 0 failed**, not retracted | 0 |
 
-| G5 geometry | `fa81dba` | `bd86a8e` |
+| Raw geometry of the incorrectly admitted row, NOT actionable-row acceptance | `fa81dba` | `bd86a8e` |
 |---|---|---|
-| First row top | 746px | 621px |
-| First row bottom | 1007px | 882px |
-| Deep-card height | 261px | 261px |
-| Margin to the unchanged 900px boundary | -107px | 18px |
+| Displayed row top | 746px | 621px |
+| Displayed row bottom | 1007px | 882px |
+| Displayed card height reported by that original instrument | 261px | 261px |
+| Raw distance to 900px, NOT valid headroom | -107px | 18px |
 
-The observed saving is **125px**, entirely before the unchanged-height deep card. The empty-lane
-hypothesis was rejected, not implemented. Preamble compaction and the first-of-type spacing repair
-closed the measured defect without weakening depth or moving the threshold.
+The 125px preamble saving remains a raw observation about that displayed row. It did not close G5.
+The later same-report controlled audit measured index 1 at 262px/882px on `bd86a8e` and the correct
+index 0 at 357px/978px on `422f4eb`; the valid actionable-row result is **FAIL**. The independent
+dock and print suites retain their own covered assertions, not a general G5 sign-off.
 
-The full dock re-anchor retains chip-click coverage, geometry, N3 counting, both membership halves,
-depth, binding and verbs. The print re-anchor closes the outstanding pre-depth-DOM verification.
-All three results belong to `bd86a8e`, not to the later documentation commit recording them.
+### 14.52 No valid 18px margin; G5 remains a product/design gate
 
-### 14.52 The 18px margin is watched, not chased
+The old margin and closure claim were invalid, not merely too specific to reuse. The standing §8
+rule remains mandatory with the unchanged `<900px` boundary and now explicitly records finding
+identity as well as served-tree identity. With the last measured bottom at 978px, recovery must be
+**greater than 78px** to pass; exactly 900px would still fail.
 
-The original complaint is closed on the measured input. An 18px margin is thin; it is not a reason
-for speculative compaction or a wider threshold. The §8 regression requirement makes remeasurement
-mandatory for future Tier 1 additions or geometry changes. A future failure is measured against the
-same `<900px` gate, not excused by this passing anchor.
+The runner reports the correct grounded card is 357px at both `07e5d9b` and `422f4eb`. It carries a
+long observation and quote. Do not blame the flags addition for that height: absent flags add no
+wrapper, as the shipped renderer tests also establish. No evidence clamp, font reduction or layout
+cut is authorized by the AA/probe repair. G5 options are considered separately.
 
-Remaining inputs for this arc: a real writer for lane-order/impact validation and real register
-material for threshold A/B/C. `IMPACT` v0 stays visibly uncalibrated; the fuzzy-match threshold stays
-at `0.72`. No additional product or test changes are justified by this closure report.
+Real writer/lane-order validation and authentic-register threshold calibration remain open too.
+IMPACT stays visibly uncalibrated and the quote-match threshold remains `0.72`.
 
 
 ### 14.53 Simulated expert review is useful evidence, not a real writer session
@@ -2103,8 +2117,8 @@ installed and no local browser result is claimed.
 revision of the pushed repair, then obtain a fresh G5 measurement at the unchanged 1440×900/<900px
 gate, plus runs of `tests/e2e_browser_ungrounded_filter.py`,
 `tests/e2e_browser_counting_contract.py` and `tests/e2e_browser_readiness_gate.py` on that same revision.
-The historical 882px G5 belongs to `bd86a8e`, not this change. The uncommitted Windows 22/0 is not
-carried forward. Report an actual failing assertion; do not erase coverage to make these suites green.
+The former 882px G5 PASS is now withdrawn for measuring the wrong finding (§14.59), not merely
+inapplicable to this change. The uncommitted Windows 22/0 is not carried forward. Report an actual failing assertion; do not erase coverage to make these suites green.
 
 The writer checklist remains blank. IMPACT calibration is about rewrite priority and writer
 judgment; the `0.72` threshold is separately about quote matching across authentic registers.
@@ -2170,3 +2184,64 @@ retain that revision scope; they are not current fleet sign-off. Fresh G5 and
 `tests/e2e_browser_readiness_gate.py` remain required on the identity-checked pushed implementation
 or a verified runtime/test-identical docs-only tip. “Only the writer sitting remains” is premature:
 those browser gates and the separate authentic-register calibration are still open.
+
+
+### 14.59 Acceptance red: retract wrong-row G5; repair pointer AA and current-surface probes
+
+All four runner instruments asserted served `422f4eb` first. Results: G5 **FAIL 978px** at 1440×900;
+`tests/e2e_browser_ungrounded_filter.py` **24/0**; `tests/e2e_browser_counting_contract.py` **22/0***;
+`tests/e2e_browser_readiness_gate.py` **106/10**. The counting asterisk is material: its test file had
+an uncommitted isolation repair while the product served `422f4eb`. The unedited suite was 21/1,
+not product-green; the corrected assertion was unchanged. No current fleet closure is claimed.
+
+**G5 retraction, not a new flags-height theory.** A fixed report/project directory, with no reseed,
+showed the old 882px row was ungrounded finding index 1. The corrected queue exposes grounded
+continuity index 0, with a long observation/quote and 357px height. The runner measured that same
+357px card at `07e5d9b` and `422f4eb`. The claimed `bd86a8e` G5 PASS is withdrawn in full with an
+apology; §8, §14.51–§14.52, NOTES and the circulating review now say so. Dock/print anchors are not
+retracted. The wrong-row physical measurements are retained as diagnostic data, not acceptance.
+
+**AA cause and bounded repair.** Eight dawn text-AA failures came from `.dock-pointer-line`:
+`--text-muted` with `opacity: 0.82` measured 4.28:1. The `07e5d9b` dead-token sweep made the formerly
+undefined `--ink-2` resolve to that real token, exposing the extra alpha. Keep the defined semantic
+token and set pointer opacity to **1**. This is the only product CSS change (plus cache version),
+not an evidence/card/Tier 1 geometry change. Native contrast must still be rerun; no ratio is guessed.
+
+**Severity-probe ruling.** Two readiness failures required `.sev-badge`, emitted by the flat report,
+not the current primary deep-card queue. Deliberately replace that retired PRESENCE check with
+`SEVERITY_CUES_JS`: every visible primary `.finding-note.queue-row` must have severity modifiers
+matching its bound report finding and a non-zero, non-transparent painted left rim. Read the shipped
+`SEVERITY_CLASS`: high uses the base danger rim with an EMPTY modifier, not `.sev-high`. Reject
+unknown severity, wrong classes, missing/transparent rims, off-layout rows and hidden/fully faded
+ancestors. The original text-AA sweep, semantic-token coverage, colour-not-alpha settled checks,
+contrast thresholds and 24px hit-target law are unchanged. This is not claiming a new non-text
+contrast measurement or adding severity badges merely to satisfy a stale selector.
+
+**Counting isolation, not relaxed arithmetic.** `/api/sample` dedupes by title. The first case's
+addressed mark survived into the second case, whose UI button TOGGLES intent; it unmarked the row,
+changing open 4→5 instead of exercising the one-fewer-open contract. Reconstruct the runner's
+`intent: null` baseline repair after the first case and also clear the second case's own mark on
+normal completion for repeatability. All 22 assertions and their equalities remain unchanged.
+The Windows working tree/stash was not accessed or discarded here.
+
+**Local evidence only:** `tests/js/readiness_queue_cues.test.js` pointer guards were BROKEN twice
+on the original shipped opacity (0.82 != 1), then FIXED. All **9/0** new tests pass: computed pointer
+opacity in both theme classes, the actual readiness probe's mapping logic across all severities
+and negative controls. Probe geometry/paint are explicit jsdom test doubles; they prove no native
+pixels or contrast. Nine distinguishing mutations fail (alpha, dead selector, retired badge,
+blessed wrong class, missing rim, ignored ancestor alpha, nonexistent high modifier, off-layout and
+transparent rim); files restored byte-identically. Full Node **198/0**; Python **2294 passed/4
+expected Linux skips**, exit 0. Syntax, Python browser-file ruff and whitespace pass. No browser
+binary was installed and no new browser acceptance is claimed.
+
+**Next:** identity-anchor `tests/e2e_browser_readiness_gate.py` and
+`tests/e2e_browser_counting_contract.py` against the pushed repair. Do not rerun the already-green
+ungrounded suite just to restate it. G5 remains red; measure correct-card component rectangles and
+consider the separate `docs/audit/2026-10-20_g5_recovery_options.md` before changing its presentation.
+No evidence clipping, font-size reduction, admission change, ranking/threshold tuning or hard-gate
+waiver was included in this patch.
+
+Recovery before editing: a fresh clone at `5c1b953` had the full `35ebf5e` state as uncommitted files.
+Safety tag `safety/readiness-reclone-20261020T034721Z` preserves snapshot `a7dbc3c`; its full tree
+`2d332bde99002b90343960706973bb7f87ffbc49` matched origin `35ebf5e` before restoring this same branch.
+No previous work was lost.

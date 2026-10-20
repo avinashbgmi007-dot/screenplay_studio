@@ -4,6 +4,29 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-20: Acceptance red; AA/probe/isolation repair ready, G5 design still open
+
+Runner anchored `422f4eb`: G5 **FAIL 978px**; `tests/e2e_browser_ungrounded_filter.py` **24/0**;
+`tests/e2e_browser_counting_contract.py` **22/0*** after a local isolation edit (unedited 21/1);
+`tests/e2e_browser_readiness_gate.py` **106/10**. Old 882px G5 PASS is **withdrawn**, not just historical:
+wrong ungrounded finding 1 was measured; correct grounded finding 0 is 357px/978px. Apology recorded
+in §14.51; independent dock/print results are not retracted. G5 needs >78px, not a waived boundary.
+
+Bounded patch: pointer `opacity: 1` over the existing muted token addresses the reported 8 dawn AA
+failures; no card/layout change. Readiness replaces retired badge presence with bound-report severity
+mapping + painted primary-card rim (high's modifier is empty), leaving text-AA/hit-target laws intact.
+Counting clears only each case's own addressed mark with `intent: null`, preventing sample-title dedupe
+from turning the next case's UI toggle into an unmark. Assertions unchanged. Windows stash untouched.
+
+`tests/js/readiness_queue_cues.test.js`: BROKEN 2 opacity checks, FIXED 9/0 total; nine mutations caught,
+restored byte-identically. Full local Node **198/0**, Python **2294 pass/4 expected Linux skips**.
+No browser binaries or fresh native result. Next: anchored readiness + counting runs on the pushed
+repair. G5 remains red and separate; options in `docs/audit/2026-10-20_g5_recovery_options.md` are
+unmeasured proposals, not a clamp/layout implementation. Spec §14.59 holds receipts and rulings.
+
+Recovery: tag `safety/readiness-reclone-20261020T034721Z` / `a7dbc3c` preserved a byte-identical copy
+of origin `35ebf5e` before restoring the session branch. No prior work lost.
+
 ### 2026-10-19: Circulating review status reconciled to the pushed implementation
 
 Review `docs/audit/2026-10-17_simulated_senior_writer_ux_review.md` now leads with a dated gate matrix:
@@ -118,23 +141,23 @@ re-anchored cleanly. Tag retained. No prior work was lost.
 Next: focused loop/queue consistency repair and discriminating tests, then pushed browser traversal.
 Real writer observations and authentic register pages are still required for empirical calibration.
 
-### 2026-10-16 — G5 closed on `bd86a8e`; full browser re-anchor green
+### 2026-10-16 — G5 closure WITHDRAWN; dock/print receipts retained
 
-Runner confirmed served-tree identity on all three runs at `bd86a8e`: G5 **PASS**, first actionable
-row bottom **882px** at 1440×900, exit 0, no page errors or scrolling;
-`tests/e2e_browser_dock_sections.py` **187/0**, exit 0;
-`tests/e2e_browser_print_media.py` **9/0**, exit 0. First-row top 746→621 and bottom 1007→882:
-**125px measured saving**, deep-card height unchanged at 261px, margin 18px. Original fold complaint
-closed with the unchanged `<900px` gate. Spec §14.51–§14.52 records closure; §8 now requires a new
-identity-anchored G5 measurement for every Tier 1 addition or geometry change. No margin-chasing.
+**Retraction from the 2026-10-20 acceptance audit:** the original 882px G5 PASS and claimed 18px
+headroom are withdrawn in full. I am sorry: this measured an incorrectly admitted ungrounded
+finding (index 1), not the first actionable task. The controlled fixed-report comparison at
+`422f4eb` measures the correct grounded continuity finding (index 0) at **978px: FAIL**.
+Its card is 357px at both `07e5d9b` and `422f4eb`, not made taller by the flags addition.
 
-Repair and guards: stacked preamble compacted, first category beside lane identity, ineffective
-first-of-type spacing exemption replaced. Empty-lane hypothesis rejected by source and executed DOM.
-`tests/js/queue_preamble.test.js`: six checks, six discriminating mutations. Last local suites on the
-repair: Python **2292 pass/4 skip**, Node **166 pass/0 fail** with test dependencies installed.
-This closure update is documentation only; no new local suite or browser run is claimed.
-Next: writer/register inputs for calibration. Keep impact v0 visibly uncalibrated and threshold 0.72;
-re-measure G5 before accepting any future Tier 1 geometry change.
+The old raw top 746→621 / bottom 1007→882 / card-height 261→261 receipt and 125px preamble saving
+remain diagnostic data for the wrong displayed row, not proof of closure. The later controlled
+same-report audit reports that old row at 262px. The independent identity-anchored
+`tests/e2e_browser_dock_sections.py` **187/0** and `tests/e2e_browser_print_media.py` **9/0** are NOT
+retracted. Spec §8 and §14.51–§14.52 now require both served revision and actionable finding identity.
+
+The six preamble checks and six mutations tested the real renderer but had no layout engine. Local
+repair suites were Python **2292 pass/4 skip**, Node **166/0**; these never established actionable-row
+geometry. Next is the correct-card G5 product/design repair, without weakening `<900px` or card depth.
 
 ### 2026-10-11 — Ledger precision done + trial acceptance (D1-D4 follow-ups, full suite 2191)
 

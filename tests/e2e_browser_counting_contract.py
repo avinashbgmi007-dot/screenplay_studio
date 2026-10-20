@@ -168,6 +168,8 @@ def test_intent_updates_every_mounted_surface(base, checks):
         # the writer marks the first dock card addressed — ONE gesture
         chip0 = page.locator("#finding-summary .fs-chip.open").first.text_content() or ""
         card = page.locator(QUEUE_ROW).first
+        target_id = card.evaluate(
+            "row => state.findingIds[Number(row.dataset.findingIndex)]")
         # Addressed is inside the intentional marks disclosure. Open it using
         # the same gesture as the writer; do not dispatch a hidden button.
         card.locator('.finding-intent-disclosure > summary').click()
@@ -212,6 +214,11 @@ def test_intent_updates_every_mounted_surface(base, checks):
 
         assert_no_js_errors(checks, errors)
         browser.close()
+
+    # /api/sample dedupes by title. Restore this case's mark as well so a
+    # repeated suite does not inherit a toggle-on baseline from this case.
+    post(base, f"/api/projects/{name}/findings/intent",
+         {"finding_id": target_id, "intent": None})
 
 
 def run(base, projects_dir, headers):
@@ -306,6 +313,12 @@ def run(base, projects_dir, headers):
 
         assert_no_js_errors(checks, errors)
         browser.close()
+
+    # The next case requests the same /api/sample title and clicks a TOGGLE.
+    # Leaving this case's addressed mark would make that click unmark the row
+    # (open grows by one), not exercise the intended one-fewer-open contract.
+    post(base, f"/api/projects/{name}/findings/intent",
+         {"finding_id": target_id, "intent": None})
 
     # P0.4: one re-render entry point — a writer mark must move every MOUNTED
     # surface in the same gesture (see the function docstring)

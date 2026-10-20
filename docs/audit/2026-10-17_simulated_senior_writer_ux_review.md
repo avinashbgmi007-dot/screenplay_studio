@@ -2,7 +2,7 @@
 
 **Original review date:** 2026-10-17
 
-**Status updated:** 2026-10-19
+**Status updated:** 2026-10-20
 
 **Type:** AI expert-style heuristic review, not a human usability session
 
@@ -10,7 +10,9 @@
 
 **Original reviewed revision:** `52e12695a45dcc55b2e16cdfb0aaac10c5ff105d`; runtime identical to `bd86a8e`
 
-**Current implementation baseline:** `422f4ebbd52cc46074eac30f08c5a45b5992a123`
+**Last acceptance-run runtime:** `422f4ebbd52cc46074eac30f08c5a45b5992a123`
+
+**Changes awaiting a new browser anchor:** pointer alpha repair, current severity-rim probe and counting-case isolation (§14.59). G5 presentation is unchanged.
 
 **Branch:** `arena/e6a57b71-screenplay-studio`
 
@@ -18,23 +20,25 @@
 
 The original loop discrepancy below was real at `52e1269`; it is **not an open defect on this branch now**. It was repaired in `64da684`, followed by the positional binding repair in `40637d8`. Do not use the historical diagnostic or original next action as a current work order. This status refresh changes documentation only.
 
+**Acceptance correction:** G5 is **FAIL at 978px** on the correct grounded finding, and readiness is **106/10** at the runtime above. The old 882px G5 PASS is **withdrawn in full**, not merely historical: it measured an incorrectly admitted ungrounded finding. I am sorry for reporting the wrong subject as actionable-row acceptance. Independent dock/print results are not retracted.
+
 No overall completion percentage is asserted. Implementation, browser regression acceptance, writer validation and register calibration are separate gates. The earlier chat estimate of 90–95% should not be used as a progress measure.
 
 | Gate | Implemented or recorded state | Still required |
 |---|---|---|
 | Ranked loop and positional binding | Shared `queueProjection()` in `64da684`; positional item binding in `40637d8`. Runner-reported parity 22/0 at `07e5d9b`. | Do not reimplement this repair. These receipts retain their own revision scope. |
 | Quote-verification denominator honesty | Shipped in `84ce02a`: `scene_not_found` joins `verified` and `not_found` in the denominator; only `no_quote` is excluded. | Not an unshipped task and not evidence that a diagnosis is artistically correct. |
-| Visible demotion reasons and settled state | `cf583f0` restores contested/identity/ungrounded badges on deep cards and writer-addressed styling. `422f4eb` also carries identity uncertainty through both row routes. | Fresh browser acceptance for the latest repair. The Windows-only, uncommitted 22/0 is not its acceptance result. |
-| Queue-path suite migrations | `tests/e2e_browser_ungrounded_filter.py`, `tests/e2e_browser_counting_contract.py` and `tests/e2e_browser_readiness_gate.py` have been migrated in `cf583f0`, with their laws retained. | Execute all three against the identity-checked pushed revision. Updated code is not an executed browser pass. Fleet-wide green is not established by the earlier subset. |
-| G5 fold geometry | Historical 882px/18px result at `bd86a8e`. The later flag repair adds Tier 1 content. | Fresh 1440×900 measurement against the unchanged `<900px` boundary. Do not transfer the old geometry result to the latest implementation. |
+| Visible demotion reasons and settled state | `cf583f0` restores deep-card flags and writer-addressed styling; `422f4eb` carries identity uncertainty through both row routes. Runner: ungrounded 24/0; done == addressed passed. | Retain these verified behaviors; they do not imply G5/readiness approval. |
+| Queue-path browser acceptance | Served `422f4eb`: ungrounded 24/0; counting 22/0* with an uncommitted test-isolation repair; readiness 106/10. | This revision ports counting isolation and repairs the 8 pointer-AA failures plus 2 stale severity probes in code. Fresh readiness/counting execution required; no new native PASS claimed. |
+| G5 fold geometry | **FAIL 978px** on grounded finding index 0 (357px card). Former 882px PASS/18px margin at `bd86a8e` is **withdrawn**: it measured ungrounded finding index 1. | Recover >78px through an approved, measured presentation change. No evidence clamp or geometry change was made in the AA/probe patch. See the separate G5 options. |
 | Real-writer UX validation | `docs/REAL_WRITER_VALIDATION.md` remains 13 blank rows; this document is an AI heuristic prior. | An actual sitting, not simulated participant answers. |
 | IMPACT v0 | Explainable and visibly uncalibrated; no weights retuned. | Writer judgments about rewrite priority and lane/rank usefulness. |
 | Quote-match register calibration | `FUZZY_MATCH_THRESHOLD = 0.72` unchanged. | Authentic Hindi/Telugu/Tamil material for the separate quote-matching decision; not invented examples or an IMPACT calibration claim. |
 | Larger programmes | T1–T11 restructure and R1–R6 redesign remain deferred and unchanged; R0 has recorded prior work. | Separate activation and scope decisions. Do not count this queue repair as implementing those programmes. |
 
-Last local receipts for the implementation: **Node 189 passed / 0 failed; Python 2294 passed / 4 expected Linux skips**, plus seven distinguishing mutations. No tests were rerun for this documentation refresh. The runner-reported parity 22/0, layout audit 37/0 and dock sections 187/0 at `07e5d9b` remain historical results, not fresh browser approval of `422f4eb`.
+Latest local checks for the AA/probe/isolation repair: **Node 198 passed / 0 failed; Python 2294 passed / 4 expected Linux skips**, plus nine new distinguishing mutations. No local browser run or contrast ratio is claimed. The runner's Windows Python 2295/3 at `422f4eb` differs by the Windows-only delete-race test. The earlier parity 22/0, layout audit 37/0 and dock sections 187/0 retain their own revision scope, not fleet-wide approval. Counting's 22/0* used a local test-file isolation repair; it is not a pass for the unedited test file.
 
-**Current next action:** assert the served identity of the pushed revision, then obtain fresh G5 plus `tests/e2e_browser_ungrounded_filter.py`, `tests/e2e_browser_counting_contract.py` and `tests/e2e_browser_readiness_gate.py` results. A later docs-only tip may be used only with its actual served identity and verified runtime/test equivalence to this baseline. No revision match, no result. Writer validation and authentic-register calibration remain separate after those checks.
+**Current next action:** identity-anchor the pushed AA/probe/isolation repair, then run `tests/e2e_browser_readiness_gate.py` and `tests/e2e_browser_counting_contract.py`. Do not rerun the already-green ungrounded suite merely to restate its result. G5 remains red: measure correct-card components, choose a presentation change from `docs/audit/2026-10-20_g5_recovery_options.md`, and only then measure that pushed change against `<900px`. No revision match, no result; no correct finding identity, no G5 acceptance. Writer validation and register calibration remain separate.
 
 ## 1. What this review is, and is not
 
@@ -46,7 +50,7 @@ Inputs inspected at the original `52e1269` review:
 - `docs/USER_PERSONAS.md` and the current one-room ranked-queue spec through §14.52.
 - The shipped queue, ranking, filter, card, arrival-strip and keyboard-loop source.
 - The existing excerpt in `tests/fixtures/pain_tenglish.fountain`. It is a short Latin-transliterated fixture, not a full screenplay and not native-script Hindi/Telugu/Tamil calibration material.
-- The previously recorded browser anchors: G5 at 882px, `tests/e2e_browser_dock_sections.py` 187/0, and `tests/e2e_browser_print_media.py` 9/0. These were not rerun for this review.
+- The originally recorded browser receipts: G5 at 882px (**PASS subsequently withdrawn for the wrong finding**), `tests/e2e_browser_dock_sections.py` 187/0 and `tests/e2e_browser_print_media.py` 9/0 (not retracted). The original review did not rerun these browsers.
 
 The original deterministic Node diagnostic executed the `52e1269` application functions and queue expressions on constructed English control findings. It found the historical workflow discrepancy in §5, subsequently repaired. It did not launch a browser, run a model or change application code.
 
@@ -66,7 +70,7 @@ These are conditional expert assessments, not participant answers or new accepta
 
 | # | Checklist question | Simulated assessment | Evidence boundary |
 |---|---|---|---|
-| 1 | Did arrival numbers change how you started, or did you skip them? | On the first reading I would start with the most consequential finding, not the arithmetic. On returning to a revision I would want my settled/open work visible. Keep counts secondary to an actionable card. | Preference hypothesis. The prior G5 anchor establishes placement for its input, not what a writer notices. |
+| 1 | Did arrival numbers change how you started, or did you skip them? | On the first reading I would start with the most consequential finding, not the arithmetic. On returning to a revision I would want my settled/open work visible. Keep counts secondary to an actionable card. | Preference hypothesis. The old G5 PASS is withdrawn; the correct task bottom is 978px, FAIL. No attention trial. |
 | 2 | Did the Pass line read as writer progress or analyzer progress? | The explicit “from the last run, not your edits” wording is the right distinction. I would not interpret a changed analysis count as proof that the draft improved. | `buildArrivalStrip` prints the distinction. Actual comprehension was not tested. |
 | 3 | Was “N of M addressed by you” trustworthy and consistent? | Useful if it means my disposition or the working-copy observation, not an objective judgment of artistic improvement. Preserve the separate correct/partial/wrong judgment. | Source and prior counting anchors support the implementation. This review does not add a persistence trial. |
 | 4 | Were ghosted marks honest and non-punitive? | A muted, expandable record is preferable to a red failure. “Moved on” still needs to mean the analysis no longer carries the old note, not that my intent was discarded. | The source names the former issue and intent. No participant interpretation was observed. |
@@ -78,7 +82,7 @@ These are conditional expert assessments, not participant answers or new accepta
 | 10 | Did peek-chip and unread dot earn attention? | A cue should earn its place by naming new, actionable context. Repeated or ambiguous attention cues would be noise. | Conditional opinion only. No timing, attention or unread-dot lifecycle experiment was run. |
 | 11 | Did page and board ever disagree? | Prior browser anchors cover their own inputs and revisions. The loop/queue discrepancy was a separate mechanical gap, now repaired; do not mislabel it as a newly observed page/board browser failure. | Historical browser receipts plus the original scoped diagnostic. Current card/suite changes await fresh acceptance; no new writer journey is claimed. |
 | 12 | Did dawn/night hold up over a long sitting? | Calm, legible presentation is necessary, but source inspection cannot establish fatigue, comfort or preference over a long session. | Unanswered empirically. No invented comfort rating. |
-| 13 | Was anything noisy, slow or wrongly defaulted? | Verify the latest card and suite repairs rather than reimplementing the fixed loop. Keep report churn from reading as creative progress. Explain quote verification without implying the diagnosis is correct. Update the stale validation question before a real sitting. | Product and suite code repairs are pushed through `422f4eb`; current browser/G5 acceptance remains open. Copy/discoverability concerns are hypotheses. Latency was not measured. |
+| 13 | Was anything noisy, slow or wrongly defaulted? | Address the measured acceptance failures, not the already-fixed loop. Preserve visible, checkable grounds when choosing the G5 presentation change. Keep report churn from reading as creative progress and quote verification separate from diagnosis correctness. | G5 978px FAIL and readiness 106/10 at `422f4eb`. AA/probe/isolation code is repaired in this revision; native recheck and G5 design remain open. No latency or writer trial. |
 
 ## 4. Applying the lens to the existing Pain excerpt
 
@@ -150,7 +154,7 @@ The control case agrees, while the mixed and within-lane cases distinguish the p
 
 ## 7. Current decision and next action
 
-**Keep the architecture. Verify the latest repair before retuning artistic priorities.** The original loop/queue target is implemented, not still waiting to be coded. This simulation supplied testable engineering leads and craft/comprehension hypotheses, not a fictitious “writer approved” stamp. The subsequent work also restored demotion reasons, writer-addressed appearance and identity-flag transport. Their code is pushed; current browser acceptance is not yet claimed.
+**Keep the architecture. Fix and verify the measured acceptance failures before retuning artistic priorities.** The original loop/queue target is implemented, not still waiting to be coded. This simulation supplied testable engineering leads and craft/comprehension hypotheses, not a fictitious “writer approved” stamp. The subsequent work also restored demotion reasons, writer-addressed appearance and identity-flag transport. Their behavior now has scoped browser evidence. G5 and readiness acceptance are red; the AA/probe/isolation repair does not include a G5 presentation change.
 
 The earlier claim that no further useful evaluation could happen without external input was too absolute. A heuristic review can uncover additional testable defects even when the existing acceptance suites are green. Their recorded results remain valid for the behaviors and inputs they covered.
 
@@ -160,6 +164,6 @@ Neither the original simulation nor this status refresh establishes:
 - calibrated IMPACT, new lane rules or a new `FUZZY_MATCH_THRESHOLD` (still `0.72`);
 - authentic Hindi/Telugu/Tamil pages or a native-register threshold decision;
 - that a universal threshold is mathematically impossible. Existing probes show sample-dependent behavior, not a theorem about unseen registers;
-- a new test run or a different revision scope for a historical browser result. The old 18px headroom is not a measurement of the later Tier 1 addition.
+- a new browser run or a different revision scope for a browser result. The old G5 PASS/18px headroom is withdrawn because it measured the wrong finding, not merely inapplicable to a later Tier 1 addition.
 
-**Next action:** obtain the identity-anchored G5 and three migrated browser-suite results listed in §0 on the pushed implementation (or a verified runtime-identical docs-only tip). Do not describe suite code migrations as executed passes. Keep actual writer validation and authentic register calibration as separate, still-unfulfilled requirements. No global completion percentage or fleet-wide sign-off is inferred.
+**Next action:** obtain the identity-anchored readiness/counting reruns listed in §0, and consider the separate, unmeasured G5 options before changing evidence presentation. G5 is not repaired or waived. Keep actual writer validation and authentic-register calibration as separate, still-unfulfilled requirements. No global completion percentage or fleet-wide sign-off is inferred.

@@ -6541,7 +6541,9 @@ body:not(.idea-mode) .desk {
    * var() = silently inherited color. layout_audit's token census is what
    * catches this class; the desk's second-tier text token is the intent. */
   color: var(--text-muted);
-  opacity: 0.82;
+  /* A semantic muted token is already the recede cue.
+     Alpha on top made dawn pointers fail text AA (runner: 4.28:1). */
+  opacity: 1;
 }
 /* G5: separate successive lanes, not the first lane from its own panel head.
  * :first-of-type did not exempt that lane: .craft-panel-head is an earlier div.

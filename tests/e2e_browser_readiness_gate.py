@@ -43,6 +43,53 @@ TOKENS = ("--danger", "--danger-text", "--danger-on-paper", "--sev-mid",
           "--sev-mid-text", "--ok", "--text", "--text-muted", "--text-faint",
           "--accent-ink", "--accent-bright")
 
+# ONE HOME deliberately renders severity on the primary card's left rim,
+# not the flat report's .sev-badge. This is the replacement PRESENCE/SEMANTIC
+# check, not a substitute for the unchanged text-AA sweep below. High uses
+# the base danger rim with no modifier; read the shipped map, do not invent
+# .sev-high. Require every visible primary card to carry its mapped class
+# and an actual painted rim, so another valid card cannot mask a broken one.
+SEVERITY_CUES_JS = r"""() => {
+  const visible = (node) => {
+    if (!node.getClientRects().length) return false;
+    const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    for (let n = node; n; n = n.parentElement) {
+      const style = getComputedStyle(n);
+      if (style.display === 'none' || style.visibility === 'hidden'
+          || style.visibility === 'collapse'
+          || (style.opacity !== '' && Number(style.opacity) === 0)) return false;
+    }
+    return true;
+  };
+  const rows = [...document.querySelectorAll(
+    '.dock-lens[data-lens="evidence"] .dock-section-fixqueue .finding-note.queue-row')]
+    .filter(visible);
+  const invalid = [];
+  const levels = [];
+  for (const row of rows) {
+    const index = Number(row.dataset.findingIndex);
+    const finding = (state.findings || [])[index];
+    const level = finding && String(finding.severity || '').toLowerCase();
+    levels.push(level);
+    const expected = (SEVERITY_CLASS[level] || '').trim().split(/\s+/).filter(Boolean);
+    const actual = [...row.classList].filter((c) => c.startsWith('sev-'));
+    const same = actual.length === expected.length && expected.every((c) => actual.includes(c));
+    const style = getComputedStyle(row);
+    const colour = style.borderLeftColor;
+    const transparent = !colour || colour === 'transparent'
+      || /^rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/.test(colour)
+      || /\/\s*0(?:\.0+)?\s*\)$/.test(colour);
+    const painted = parseFloat(style.borderLeftWidth) > 0
+      && !['none', 'hidden'].includes(style.borderLeftStyle) && !transparent;
+    if (!['high', 'medium', 'low'].includes(level) || !same || !painted) {
+      invalid.push({ index, level, expected, actual,
+        rim: [style.borderLeftWidth, style.borderLeftStyle, colour] });
+    }
+  }
+  return { total: rows.length, levels, invalid };
+}"""
+
 PROBE = """(tokens) => {
   const num = (s) => (s || "").match(/[-\\d.]+/g) || [];
   // Chrome resolves `color-mix(in oklab, ...)` — which is how most of this
@@ -477,13 +524,14 @@ def run(base, name):
             if ungr.count():
                 ungr.first.click()
                 page.wait_for_timeout(800)
-            open_dock_section_holding(page, ".sev-badge")
+            open_dock_section_holding(page, ".finding-note.queue-row")
             page.wait_for_timeout(400)
             checks.ok(f"{theme}: the desk is still on that theme",
                       page.evaluate("() => document.body.classList.contains('dawn')")
                       is (theme == "dawn"))
-            checks.ok(f"{theme}: severity chips are on screen",
-                      page.locator(".sev-badge:visible").count() > 0)
+            cues = page.evaluate(SEVERITY_CUES_JS)
+            checks.ok(f"{theme}: primary cards expose their severity rims",
+                      cues["total"] > 0 and not cues["invalid"], str(cues))
             sweep(checks, page, f"{theme} desk", dots=True)
 
             # ②b The dispositions the desk sweep could not reach. Every settled
