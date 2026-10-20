@@ -128,8 +128,11 @@ test('an unweighed row says it is unweighed', () => {
 test('every row can print its own reason (spec 1.5)', () => {
   for (const cat of Object.keys(core.IMPACT)) {
     const text = core.rankReasonText(f(cat, [1, 2]));
-    assert.match(text, /^ranked here: /, `${cat} printed ${JSON.stringify(text)}`);
-    assert.ok(text.length > 'ranked here: '.length, `${cat} printed an empty reason`);
+    const lane = core.findingLane(f(cat, [1, 2]));
+    const label = core.LANE_LABELS[lane] || cat;
+    assert.ok(text.startsWith(label),
+      `${cat} printed ${JSON.stringify(text)}, expected the ${label} lane`);
+    assert.ok(text.length > label.length, `${cat} printed an empty reason`);
   }
 });
 

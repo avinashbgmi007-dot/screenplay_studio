@@ -149,8 +149,8 @@ test('every populated lane shares its heading with its first category, later cat
   assert.equal(line.querySelector('.dock-lane-head .dock-lane-cat').dataset.category, 'voice');
   assert.deepEqual([...line.querySelector('.dock-finding-list').children].map((n) =>
     n.classList.contains('finding-note') ? n.textContent : n.dataset.category),
-  ['Voice noteDismissranked here: Line, impact 3', 'subtext',
-    'Subtext noteDismissranked here: Line, impact 3']);
+  ['Voice noteDismissLine, impact 3', 'subtext',
+    'Subtext noteDismissLine, impact 3']);
 });
 
 test('relocated category chips still narrow AND widen through the shared refresh entry point', () => {

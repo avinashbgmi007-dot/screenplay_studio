@@ -5611,7 +5611,7 @@ function findingNoteEl(f, index, opts = {}) {
         + sibs.map((t) => "“" + clip(t) + "”").join(" · ")));
     }
     note.appendChild(el("p", "finding-intent-hint",
-      "\u2713 you fixed it \u2014 survives re-analysis \u00B7 \u23ED park it \u2014 returns next analysis"));
+      "\u2713 survives re-analysis \u00B7 \u23ED returns next analysis"));
   }
   return note;
 }

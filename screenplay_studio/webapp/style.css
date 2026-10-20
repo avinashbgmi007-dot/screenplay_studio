@@ -5673,6 +5673,23 @@ body.river-read #right-edge-affordance { display: none; }
   border: 1px solid var(--line-soft);
   border-radius: var(--r-md);
 }
+/* G5: the worklist's orientation strip is one row, not two. The scene heading
+ * keeps its ellipsis and the severity counts keep their order; only the empty
+ * second line the flex column reserved is gone. */
+.dock-lens[data-lens="evidence"] .dock-evidence-scene {
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-5);
+  padding: var(--sp-3) var(--sp-6);
+}
+.dock-lens[data-lens="evidence"] .dock-evidence-scene .dock-scene-head {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.dock-lens[data-lens="evidence"] .dock-evidence-scene .dock-scene-sev {
+  flex: 0 0 auto;
+}
 .dock-scene-head { display: flex; align-items: baseline; gap: var(--sp-4); min-width: 0; }
 .dock-scene-num {
   font-weight: 700;
@@ -6408,6 +6425,18 @@ body:not(.idea-mode) .desk {
    ride the token ladder.
    ============================================================ */
 .dock-filter-row { display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap; }
+/* G5: the ONE filter row is one row in the worklist. The lane column is 319px
+ * and the controls total ~420px, so the row scrolls sideways instead of paying
+ * a second 24px line for the two trailing controls. Every chip keeps its label
+ * and hit target; nothing is removed or shrunk. */
+.dock-lens[data-lens="evidence"] .dock-filter-row {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+.dock-lens[data-lens="evidence"] .dock-filter-row > * { flex: 0 0 auto; }
 .fchip { appearance:none; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:2px var(--sp-3); font-size:var(--fs-2xs); color:var(--text-muted); cursor:pointer; }
 .fchip:hover { color:var(--text); border-color:var(--lamp); }
 .fchip.active { background:var(--lamp); border-color:var(--lamp); color:var(--accent-ink); font-weight:600; }

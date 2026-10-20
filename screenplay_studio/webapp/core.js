@@ -523,7 +523,7 @@ function rankReasonText(f) {
   if (f.verification && f.verification.status === "verified") parts.push("verified");
   const refs = sceneRefCount(f);
   if (refs > 1) parts.push(`spans ${refs} scenes`);
-  return "ranked here: " + parts.join(", ");
+  return parts.join(", ");
 }
 
 // ---- Node test hook (browsers never take this branch) ----
