@@ -21,8 +21,7 @@ sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from e2e_browser_common import (Checks, assert_no_js_errors, launch,  # noqa: E402
-                                open_dock_section_holding, start_studio,
-                                studio_headers)
+                                open_dock_section, start_studio, studio_headers)
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 LENSES = ("evidence", "notes", "sameer", "sushruta")
@@ -98,14 +97,22 @@ def escalate(checks, page, quotes, name):
     """The plan's Step 1 gesture: 🩺 from a finding card, then measure."""
     page.evaluate("() => openDock('evidence')")
     wait_dock_open(page)
-    # Option A+ (Report 2 §4): the finding cards live in the Context disclosure
-    # at the lens foot — summon Tier 2 (expands it, per-project preference),
-    # then open any inner section still holding its cards.
-    page.evaluate("() => setEvidenceTier(2)")
+    # ONE HOME: the finding cards live in the Tier 1 queue. The demo baseline
+    # rows are ungrounded and hidden until the explicit toggle; the doctor
+    # gesture sits inside the card's closed "marks" disclosure.
+    page.evaluate("() => setEvidenceTier(1)")
     page.wait_for_timeout(400)
-    open_dock_section_holding(page, DOCTOR_BTN)
+    ungr = page.locator(".dock-section-fixqueue .fq-toggle-ungrounded")
+    if ungr.count() and "active" not in (ungr.first.get_attribute("class") or ""):
+        ungr.first.click()
+        page.wait_for_timeout(800)
+    open_dock_section(page, "fix-queue")
+    page.evaluate(
+        """() => document.querySelectorAll(
+             '.dock-section-fixqueue .finding-intent-disclosure').forEach(d => { d.open = true; })""")
     page.wait_for_timeout(250)
-    btn = page.locator(f'.dock-lens[data-lens="evidence"] {DOCTOR_BTN}').first
+    btn = page.locator(
+        f'.dock-lens[data-lens="evidence"] .finding-note.queue-row {DOCTOR_BTN}').first
     checks.ok(f"{name}: a finding card offers the escalation", btn.count() == 1,
               f"count={btn.count()}")
     if not btn.count():

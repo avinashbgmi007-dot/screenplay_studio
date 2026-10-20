@@ -26,8 +26,7 @@ import requests
 from playwright.sync_api import sync_playwright
 
 from e2e_browser_common import (Checks, launch, open_dock_section,
-                                open_dock_section_holding, open_studio,
-                                studio_headers)
+                                open_studio, studio_headers)
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "pain_tenglish.fountain")
 
@@ -147,8 +146,10 @@ def run(base):
             if chip.count() and "active" not in (chip.get_attribute("class") or ""):
                 chip.click()
                 page.wait_for_timeout(400)
-        check("fix queue rows carry the severity badge (after widening)",
-              lens.locator(".fix-row .sev-badge").count() > 0)
+        check("fix queue rows carry the severity rim (ONE HOME)",
+              lens.locator(".dock-section-fixqueue .finding-note.queue-row.sev-low, "
+                           ".dock-section-fixqueue .finding-note.queue-row.sev-medium")
+                  .count() > 0)
         page.evaluate("() => setEvidenceTier(2)")
         page.wait_for_timeout(400)
         notes = lens.locator(".finding-note")
@@ -161,11 +162,11 @@ def run(base):
         # P1.6: a section's body is collapsed by default and a closed body is not
         # rendered text — `inner_text()`/`all_inner_texts()` see "" inside it. So
         # open the section the way the writer does before reading its words.
-        check("P1.6: the ledger's category section opens from its header",
-              open_dock_section(page, "by-category"))
-        cat_sections = lens.locator(".dock-section-title")
+        check("P1.6: the fix-queue section opens from its header",
+              open_dock_section(page, "fix-queue"))
+        cat_sections = lens.locator(".dock-section-title, .dock-lane-cat")
         cat_text = " ".join(cat_sections.all_inner_texts())
-        check("category sections group the findings",
+        check("category sub-headers group the findings",
               any(k in cat_text.lower() for k in
                   ["dialogue", "plot", "character", "theme", "pacing", "structure", "format"]))
 
@@ -223,8 +224,9 @@ def run(base):
         # P1.6: the cards live in collapsed sections now — open whatever section
         # holds them (this-scene or by-category, depending on the filter) so the
         # writer's own path (open, then act) is the one under test.
-        check("P1.6: the section holding the finding cards opens",
-              open_dock_section_holding(page, ".finding-note") > 0)
+        check("P1.6: the fix-queue section holding the finding cards is open",
+              open_dock_section(page, "fix-queue")
+              and lens.locator(".finding-note.queue-row").count() > 0)
         # Locate: jumps the manuscript to the finding's scene
         before_scroll = page.locator("#manuscript-container").evaluate(
             "e => e.scrollTop")
@@ -293,14 +295,14 @@ def run(base):
         page.wait_for_timeout(400)
         check("P1.6: the fix-queue section opens for its row actions",
               open_dock_section(page, "fix-queue"))
-        dismiss = lens.locator(".fix-row-actions .fq-dismiss").first
+        dismiss = lens.locator(".fix-row-triage .fq-dismiss").first
         if dismiss.count():
-            rows_before = lens.locator(".fix-row").count()
+            rows_before = lens.locator(".finding-note.queue-row").count()
             dismiss.click()
             page.wait_for_timeout(1200)  # api + re-render
             # the dismissed row must LEAVE the queue. (Was `count() >= 0`, which
             # a count can never violate — so a dismiss that did nothing passed.)
-            rows_after = lens.locator(".fix-row").count()
+            rows_after = lens.locator(".finding-note.queue-row").count()
             check("Dismiss removes the row from the dock queue",
                   rows_after == rows_before - 1,
                   f"before={rows_before} after={rows_after}")
@@ -319,16 +321,16 @@ def run(base):
                 toggle.first.click()
                 page.wait_for_timeout(1200)  # api + re-render
                 open_dock_section(page, "fix-queue")
-                restore = lens.locator(".fix-row-actions .fq-undismiss:visible").first
+                restore = lens.locator(".fix-row-triage .fq-undismiss:visible").first
                 check("Showing dismissed reveals the row to restore",
                       restore.count() > 0,
-                      f"{lens.locator('.fix-row:visible').count()} rows shown")
+                      f"{lens.locator('.finding-note.queue-row:visible').count()} rows shown")
                 if restore.count():
                     restore.click()
                     page.wait_for_timeout(1200)
                     open_dock_section(page, "fix-queue")
                     check("Restore returns the row to the dock queue",
-                          lens.locator(".fix-row-actions .fq-dismiss:visible")
+                          lens.locator(".fix-row-triage .fq-dismiss:visible")
                           .count() > 0)
         else:
             check("Dismiss button present on fix rows", False,
@@ -338,9 +340,13 @@ def run(base):
         page.evaluate("() => setEvidenceTier(1)")  # the scene strip is worklist
         page.wait_for_timeout(400)
         dock_scrolls = page.locator('.dock-lens[data-lens="evidence"] .dock-scene-num')
+        pane = page.locator("#manuscript-container")
+        check("scene-strip check has a scrollable manuscript",
+              pane.evaluate("e => e.scrollHeight > e.clientHeight + 50"))
+        pane.evaluate("e => e.scrollTop = 0")
+        page.wait_for_timeout(700)
         strip_before = dock_scrolls.first.inner_text() if dock_scrolls.count() else ""
-        page.locator("#manuscript-container").evaluate(
-            "e => e.scrollTop = e.scrollHeight")  # scroll to the last scene
+        pane.evaluate("e => e.scrollTop = e.scrollHeight")
         page.wait_for_timeout(700)
         strip_after = dock_scrolls.first.inner_text() if dock_scrolls.count() else ""
         check("scene strip retitles as the writer scrolls",

@@ -518,7 +518,7 @@ def run(base, projects_dir, headers):
         # (a payload in an unused attribute would otherwise pass vacuously).
         page.evaluate(
             "() => document.querySelectorAll("
-            "'.dock-lens[data-lens=\"evidence\"] .fix-row').forEach("
+            "'.dock-lens[data-lens=\"evidence\"] .dock-section-fixqueue .finding-note.queue-row').forEach("
             "n => n.dispatchEvent(new MouseEvent('mouseover', {bubbles:true})))")
         page.wait_for_timeout(300)
         checks.ok("attribute-context payload did NOT execute on interaction",
@@ -533,16 +533,20 @@ def run(base, projects_dir, headers):
         DOCK = '.dock-lens[data-lens="evidence"]'
         rows = page.evaluate(
             "() => document.querySelectorAll("
-            "'.dock-lens[data-lens=\"evidence\"] .fix-row').length")
-        checks.ok("the ledger still renders every finding",
-                  rows == baseline + len(planted),
-                  f"{rows} rows vs expected {baseline + len(planted)}")
+            "'.dock-lens[data-lens=\"evidence\"] .dock-section-fixqueue .finding-note.queue-row').length")
+        queued = page.evaluate(
+            "() => queueProjection(state.fixQueue.items || [], state.findings || [],"
+            " state.findingIds || [], inFindingFilter).entries.length")
+        checks.ok("the queue still renders every queued finding",
+                  rows == queued,
+                  f"{rows} rows vs {queued} queued tasks "
+                  f"({baseline} findings, {len(planted)} planted; observations are not tasks)")
 
         issues = page.evaluate(
             "() => Array.from(document.querySelectorAll("
-            "'.dock-lens[data-lens=\"evidence\"] .fix-row'))"
+            "'.dock-lens[data-lens=\"evidence\"] .dock-section-fixqueue .finding-note.queue-row'))"
             ".map(n => n.textContent)")
-        checks.ok("payload is shown as literal TEXT (not swallowed)",
+        checks.ok("payload is shown as literal TEXT in the queue (not swallowed)",
                   any(PAYLOAD_TEXT in t for t in issues),
                   "the finding text vanished instead of being escaped")
 
@@ -557,13 +561,13 @@ def run(base, projects_dir, headers):
         # --- the row interactions must still WORK ---
         page.evaluate(
             "() => { const it = document.querySelector("
-            "'.dock-lens[data-lens=\"evidence\"] .fix-row');"
+            "'.dock-lens[data-lens=\"evidence\"] .dock-section-fixqueue .finding-note.queue-row');"
             " if (it) it.dispatchEvent(new MouseEvent('click', {bubbles: true})); }")
         page.wait_for_timeout(500)
-        checks.ok("ledger rows remain interactive",
+        checks.ok("queue rows remain interactive",
                   page.evaluate(
                       "() => !!document.querySelector("
-                      "'.dock-lens[data-lens=\"evidence\"] .fix-row')"))
+                      "'.dock-lens[data-lens=\"evidence\"] .dock-section-fixqueue .finding-note.queue-row')"))
 
         # --- the dormant Feedback view is GONE (P0.1), not merely inert ----
         # The clone was deleted — the strongest form of "inert" is "absent".
