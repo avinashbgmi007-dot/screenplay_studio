@@ -1,8 +1,9 @@
 # Real-Writer Validation — the one-page checklist
 
-The one gate left. Automation proved the machinery (713/713 pytest · 30/30 layout audit ·
-live probes d6/d7/d10 with exact arithmetic) — only a writer with their own script can prove
-the promises. One sitting, one page, honest notes.
+The one gate left. Automation proved the machinery (pytest **2295/3**, Node
+**198/0**, fleet **67/0/1**) — only a writer with their own script can prove the
+promises. One sitting, one page, honest notes. The fuller blank protocol and
+recording template are in `docs/validation/wave1b/`.
 
 ## Status (2026-10-20)
 
@@ -14,9 +15,10 @@ automated baselines are pytest **2295 passed / 3 Windows-only**, the Node suite
 **PASS 884px** (was FAIL 978px at `1639fd6`). This checklist is an owner task.
 The programme plan's active-work estimates exclude owner waiting time.
 
-The setup and question text are being corrected where they describe retired
-surfaces (`Problem Board`) or a highs-only default that no longer ships. Do not
-populate an answer to a state the product does not have.
+Questions use the shipped surfaces: **Evidence lens**, **fix queue**, **arrival
+strip**, **ink chips**, and the default filter that admits all three severities.
+The retired Problem Board is not part of this sitting. Do not populate an answer
+to a state the product does not have.
 
 ## Setup (5 min)
 
@@ -40,27 +42,28 @@ populate an answer to a state the product does not have.
 |---|---|---|---|
 | Arrival strip | Did the numbers change how you started — or did you skip them? | | |
 | Arrival strip | Did you read the **Pass** line as *your* progress, or as the analyzer's? (It compares analysis passes only — never your edits. Did the scope chip land, or did you miss it?) | | |
-| Arrival strip | **"N of M addressed by you"** — did you trust it? Did it agree with what the board and cards showed? | | |
+| Arrival strip | **"N of M addressed by you"** — did you trust it? Did it agree with what the page and fix queue showed? | | |
 | Arrival strip | Ghosted marks: honest (never red, in no open count)? | | |
 | Fix loop | Was N/P actually faster than clicking through a list? | | |
 | Fix loop | Did your eyes stay on the manuscript? Dock card auto-open: help or distract? | | |
 | Fix loop | Did mark / next-pass / Discuss / copy land where your hands were? | | |
-| Fix loop | Esc: did leaving feel clean (dock stays open)? | | |
-| Ink & filter | Default ink density (high, medium and low all admitted): right amount on the page? | | |
-| Ink & filter | Peek-chip + unread dot: earned the glance, or felt like chrome? | | |
-| Ink & filter | Did the page and the board ever disagree? (if yes — bug, note it) | | |
+| Fix loop | Esc: did leaving feel clean (the Evidence lens stays open)? | | |
+| Ink & filter | With all three severities admitted by default, is the amount of page ink right? | | |
+| Ink & filter | Ink chip + unread dot on the Evidence tab: earned the glance, or felt like chrome? | | |
+| Ink & filter | Did the page and the fix queue ever disagree? (if yes — bug, note it) | | |
 | Everything | Dawn/night both registers in a long sitting: held up? | | |
 | Everything | Anything noisy, slow, or wrongly defaulted — anything at all? | | |
 
 ## What the answers decide
 
-- **Strip**: prominence, placement (dock Evidence top), whether the scope chip earns its
+- **Strip**: prominence, placement (Evidence lens top), whether the scope chip earns its
   place or is noise, trust formatting, the wording of the draft clause.
-- **Loop**: bar density, peek-chip timing (~4s), unread-dot persistence.
-- **Defaults**: default ink density (all three severities admitted), filter state.
+- **Loop**: bar density, arrival halo timing (~4s), unread-dot persistence.
+- **Defaults**: the default filter admits all three severities; judge the resulting ink.
 - **Anything felt-wrong**: file it — tuning is cheap now that machinery is verified.
 
 ## The rule
 
 **Felt > machinery.** If a number is exact but the moment felt wrong, the moment wins —
-machinery is already proven (713/713 · 30/30 · d6/d7/d10 green); this session judges the promise.
+machinery is already proven (2295/3 pytest · 198/0 Node · 67/0/1 fleet); this session
+judges the promise.

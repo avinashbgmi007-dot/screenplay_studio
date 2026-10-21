@@ -4,6 +4,25 @@ Work-in-progress log for the current session. Update as you go; keep entries sho
 
 ## Completed
 
+### 2026-10-20: Wave 1B prep packets; baseline published, no empirical data
+
+`origin/ux-leftover-wave0` contains **`5dd0baa`** (the accepted Wave 1A tip;
+the prep docs are a commit on top), so the baseline is available outside
+`C:\tmp\run22`. The `arena/e6a57b71-screenplay-studio` branch remains at
+`1639fd6` and was not moved. No branch switch of the Arena checkout, code
+change, gate rerun, weight change or threshold change was made for this prep.
+
+Blank packets are in `docs/validation/wave1b/`: `README.md`,
+`WRITER_SITTING_PROTOCOL.md`, `WRITER_SITTING_RESULTS.md`,
+`IMPACT_CALIBRATION_PROTOCOL.md`, `QUOTE_THRESHOLD_PROTOCOL.md`, and CSV
+templates under `templates/`. They contain no participant answers, no invented
+register pages, and no calibration results. `REAL_WRITER_VALIDATION.md` now
+uses the shipped Evidence-lens/fix-queue vocabulary and current receipts.
+
+Owner inputs still required: writer availability, the permissioned draft and
+report, and authentic Hindi/Telugu/Tamil material with adjudication. Stop before
+execution until those exist.
+
 ### 2026-10-20: Wave 1A complete — committed G5 gate passes at 884px
 
 Branch `ux-leftover-wave0`: `9cc285f` docs/plans, `36093dc` test-only queue

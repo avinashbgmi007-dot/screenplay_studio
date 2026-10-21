@@ -74,9 +74,9 @@ Playwright, pytest, Node `npm test`.
 | Queue acceptance | readiness 116/0, counting 22/0, ungrounded 24/0, layout 37/0, phase6 40/0, width 32/0, xss 36/0, trust 5/0 | `8907ad5` |
 | Fleet current | **67 passed, 0 failed, 1 skipped, 1663 checks** | 68 scripts incl. live-only `gun_pen_audit`; baseline at `1639fd6` was 62/4/1 |
 | Python / Node | pytest **2295/3**, `npm test` **198/0** | `8907ad5` |
-| Writer validation | 13 blank rows | `docs/REAL_WRITER_VALIDATION.md` |
-| IMPACT calibration | uncalibrated | live model + writer needed |
-| Quote threshold | `0.72` unchanged | authentic register material needed |
+| Writer validation | 13 blank rows; blank packet prepared | `docs/validation/wave1b/`; execution needs a real writer + permissioned draft/report |
+| IMPACT calibration | uncalibrated; blinded protocol prepared | live model + writer judgments; no weights changed |
+| Quote threshold | `0.72` unchanged; intake/reporting protocol prepared | authentic Hindi/Telugu/Tamil material + adjudicated goldens |
 
 **Completion estimates:** core UX architecture/redesign + queue ~50% left; full
 scope including deferred UIs and validation ~60–70% left; R4 ~85–90% left. These
@@ -181,6 +181,10 @@ suites green; no product evidence removed.
 
 ## Wave 1B — Empirical validation (parallel with R0)
 
+- [x] **1B.0** Blank prep packets are in `docs/validation/wave1b/`: writer
+  sitting protocol + 13-question template, IMPACT blinded-ranking protocol +
+  manifest templates, quote-threshold intake/reporting protocol + intake
+  template. **No participant, material, or calibration run yet.**
 - [ ] **1B.1** Writer sitting prep: correct the stale highs-only question (done
   in Wave 0); owner runs the 13 rows; do not invent answers.
 - [ ] **1B.2** IMPACT calibration: live `llama-server`, full screenplay, writer
