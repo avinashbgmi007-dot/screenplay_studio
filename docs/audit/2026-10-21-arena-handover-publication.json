@@ -1,0 +1,260 @@
+{
+  "record_type": "preservation, baseline reconciliation and reviewed-draft publication",
+  "publication_utc": "2026-10-21T12:38:05.286477+00:00",
+  "authorization": "Owner selected publish_handover: accepted-baseline fast-forward plus reviewed plans and small preservation record; no product implementation.",
+  "branch": "arena/e6a57b71-screenplay-studio",
+  "preserved_initial_state": {
+    "capture_utc": "20261021T122944Z",
+    "local_head": "5c1b9535d02b54750a0692c71b792236f81669a1",
+    "changed_tracked_paths": 29,
+    "nonignored_untracked_paths": 19,
+    "git_snapshot_tree": "9a71dcabd7f72d678c45a88d80166431afd0e006",
+    "local_safety_tree_tag": "safety/pre-publication-20261021T122944Z",
+    "tree_matches_existing_published_commit": "1639fd6453d44dea70116f37ce2ca0d6091efb55",
+    "exact_tree_match": true,
+    "paths": [
+      {
+        "path": "NOTES.md",
+        "sha256": "d76ff1ec0c36ee27b6e00acc799abfd5d6bce472dc35853028386f4f7494aafb"
+      },
+      {
+        "path": "docs/ARCHITECTURE.md",
+        "sha256": "202def2898a9e074b1ed919546a23c62d6e190345f91bdfd584c8a46b8a7273c"
+      },
+      {
+        "path": "docs/CODEBASE_MAP.md",
+        "sha256": "325c0092f43dd1584fa9175f25659551fb0bedb15d28cf1ef3bf3228ca882b3a"
+      },
+      {
+        "path": "docs/TESTING.md",
+        "sha256": "8f19d3ff4c9a69a4cf573809329488e0a10f3b8141197c56d4e29b25fd4cd74b"
+      },
+      {
+        "path": "docs/audit/2026-10-17_simulated_senior_writer_ux_review.md",
+        "sha256": "c526856685720af417c5bf92fe16d06c88ab0e8cd5e386ceefd45f1aac31cf24"
+      },
+      {
+        "path": "docs/audit/2026-10-20_g5_recovery_options.md",
+        "sha256": "dad3e5990914bae7758ae4214110750fc2ca8d2fa03e4462b1ecc649b982f2e6"
+      },
+      {
+        "path": "docs/debates/2026-10-15_critique-two-agent-panel.md",
+        "sha256": "769230fe693639b1fd74b9184b398d4eef4b033e2f96ce40d0d26df80b7ab076"
+      },
+      {
+        "path": "docs/debates/2026-10-15_feedback-room-architecture-panel.md",
+        "sha256": "55d256fe0a89b0fb1366d365bf2d0af7355d3881f026b03c25a00c11a0a9f110"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-10-15-fuzzy-match-threshold-design.md",
+        "sha256": "c1523e8a00e0547a3e2e4237bbef4cad419267967ace391117e49b0ec428544c"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-10-15-one-room-ranked-queue-design.md",
+        "sha256": "080f6d177b53abc3afbebfbf37c16d17f72904154575a145c7da40a91d37f794"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-10-15-verification-rate-denominator-design.md",
+        "sha256": "36061da8b5e5e07e5cde442fcc22fb35c9390b204f45bcd3eb921c50c16ea97c"
+      },
+      {
+        "path": "screenplay_analyzer/report.py",
+        "sha256": "dbe0511052b8483aee4855157d6cac20f0190132a1c9adc66f64d14528b3686a"
+      },
+      {
+        "path": "screenplay_analyzer/verifier.py",
+        "sha256": "2ded0960a7c42d321b81f453213ac240802acb165014e1a893c5061d8148a580"
+      },
+      {
+        "path": "screenplay_studio/webapp/app.js",
+        "sha256": "11652537493182710556bfdc5e20b370ca403d04f1b71e0c52e132621d096182"
+      },
+      {
+        "path": "screenplay_studio/webapp/core.js",
+        "sha256": "8501f519587f2fa4a0ee9c9fe268c20632adcf2d21fb5e4e060e503296d54be5"
+      },
+      {
+        "path": "screenplay_studio/webapp/index.html",
+        "sha256": "636eb12c58423f10cd9a030145eeea78c63c840d1786a1c330be9de627f95173"
+      },
+      {
+        "path": "screenplay_studio/webapp/style.css",
+        "sha256": "d9ebeda8376d1b704ce32babb22bf45e0c2f273badd3d174fa810eccb84c445a"
+      },
+      {
+        "path": "screenplay_studio/webapp_server.py",
+        "sha256": "6ba47a8f2404c167107bb5edf2cd357aea3d424074511fd3e8dab62dac16d2f8"
+      },
+      {
+        "path": "tests/_ui_capture.py",
+        "sha256": "b0cef2dbcf71f7975891f171f0c2a460fcf2a7fe3d1ba1b0ffc6d24db5663a72"
+      },
+      {
+        "path": "tests/e2e_browser_common.py",
+        "sha256": "d2317417f1ec4e4594437d316af635b4fa8af8f4cd29af201e48d999b19b570c"
+      },
+      {
+        "path": "tests/e2e_browser_counting_contract.py",
+        "sha256": "78993f3843e63bc458955c953c4fa758877b1da3b1934d9ab64f5881418b3db2"
+      },
+      {
+        "path": "tests/e2e_browser_deep_links.py",
+        "sha256": "b712afceeebac3ffd414cff752a82d952eb3e85b117b0a5f48184bbd7b2552ba"
+      },
+      {
+        "path": "tests/e2e_browser_desk_controls.py",
+        "sha256": "44ce090588d39167296d964f7049bd8cb917b2def05cf2036b79b3ca04330685"
+      },
+      {
+        "path": "tests/e2e_browser_dock_sections.py",
+        "sha256": "02ffe6cf0d3f1a9eda222edfd6d1af1450511e2cbf42d97387bcb64ced44d589"
+      },
+      {
+        "path": "tests/e2e_browser_export_flush.py",
+        "sha256": "2e74f52b442b5d91efc666610460e2755f72bb48f7d3ccb99e96c770aba6affc"
+      },
+      {
+        "path": "tests/e2e_browser_layout_audit.py",
+        "sha256": "c550bb2ee73ad01d8565bf540e90527302cba244e533951f08d61452984f6688"
+      },
+      {
+        "path": "tests/e2e_browser_loop_queue_parity.py",
+        "sha256": "6e6fd1fa22e8247b8f2cbfc810d1d8a2c00071f9cc5dd1caf7f3c67c8f4528a0"
+      },
+      {
+        "path": "tests/e2e_browser_phase12_visual_motion.py",
+        "sha256": "43489bf349cdfdb8a49bb1c51eab4fc888fef309b44550755a4e8fb10adb8cfb"
+      },
+      {
+        "path": "tests/e2e_browser_phase9_idea_canvas.py",
+        "sha256": "d4c78ab050507ebd761896388fedd2a265aa78fed1c7ca5f04a54b3c3b982d49"
+      },
+      {
+        "path": "tests/e2e_browser_print_media.py",
+        "sha256": "b0030e4fda7243fa07810e0b759912a8dfe4c35ae5ea25f22ebdd24ff33652c7"
+      },
+      {
+        "path": "tests/e2e_browser_readiness_gate.py",
+        "sha256": "56e815ede7d8539f32957a8e8d37294f103a6ef18f70d20eed09df8f3f42f6cc"
+      },
+      {
+        "path": "tests/e2e_browser_render_scale.py",
+        "sha256": "5b425b0ef8bbd9a0bd9e91cdc6e0818d3e36f4fbd92ddfc29914d775223892e6"
+      },
+      {
+        "path": "tests/e2e_browser_smoke.py",
+        "sha256": "0438037e2b979147b466e48e88ff05d638e2c324e6a7956a38c591d11e8e88cf"
+      },
+      {
+        "path": "tests/e2e_browser_ungrounded_filter.py",
+        "sha256": "a97a7679363b6bb35bade1afa7aa272cf1a680b889b5591470bfe1acd7a09a45"
+      },
+      {
+        "path": "tests/js/finding_flags.test.js",
+        "sha256": "4d38ccd4c43602d1e4c50ec03c4236a13d33a819980bba8bad90c924cb10cd52"
+      },
+      {
+        "path": "tests/js/queue_lanes.test.js",
+        "sha256": "cf6d03266a88359c801f2b275d30bd0eb8b92edda078521b3d90015e849d5d65"
+      },
+      {
+        "path": "tests/js/queue_loop_parity.test.js",
+        "sha256": "6967a6bc50c9f349f9c5e3e07f0de07d607ca38713225066c3daf3ec8835f763"
+      },
+      {
+        "path": "tests/js/queue_preamble.test.js",
+        "sha256": "2649ae357b6733015d4c0c901ffa488192722289a23f856c71bbf1505718bc1f"
+      },
+      {
+        "path": "tests/js/readiness_queue_cues.test.js",
+        "sha256": "982b2f78de48816ec734f173d487a685f7cefcc0527459e0d950b38da00cc436"
+      },
+      {
+        "path": "tests/test_css_selector_list_integrity.py",
+        "sha256": "88b1d28536c712bba49c6240b1ebeb1445f0f875e6d0eee0da5afc1c23de2f0e"
+      },
+      {
+        "path": "tests/test_finding_integrity_gate.py",
+        "sha256": "724adb26802c09d85a1ccf458a327ecb0c317073fd04be663d1f68898d940739"
+      },
+      {
+        "path": "tests/test_fixqueue.py",
+        "sha256": "c2a64007dca6d1d798fd925513d683858d31256201c365ef263cace05f2d3031"
+      },
+      {
+        "path": "tests/test_queue_lane_coverage.py",
+        "sha256": "85d658a8a1f4cfa95ed08625333c46d18c11f85ae0dea9806ea94cb9b5e29ac5"
+      },
+      {
+        "path": "tests/test_queue_lane_rendering.py",
+        "sha256": "527980801d24a0befc69e4c775047f21c06054406070b87034d5ee87cd87cd6f"
+      },
+      {
+        "path": "tests/test_spa_contract.py",
+        "sha256": "1eb651ace86bffd4ca732ff619426cdab1261a5410ea2b79643f521a6d93a7e9"
+      },
+      {
+        "path": "tests/test_uncalibrated_marking_reaches_the_writer.py",
+        "sha256": "441174a501971a7d568317a02fcf270909fb71596802c717c3f88d8e433eb9ea"
+      },
+      {
+        "path": "tests/test_verification_summary_surface.py",
+        "sha256": "47ac5911e1473beb6edde7646958159671f9aecce6250ded634bb94108d305ff"
+      },
+      {
+        "path": "tests/test_verifier_perturbation_bands.py",
+        "sha256": "d11777ecf604792e9d152bbd440b389c101b9cf05930481241c91e350ed5b073"
+      }
+    ]
+  },
+  "reconciliation": {
+    "metadata_reconciled_to": "1639fd6453d44dea70116f37ce2ca0d6091efb55",
+    "working_bytes_unchanged_during_metadata_reconciliation": true,
+    "method": "Update index and the existing branch ref to already-published identical content; no reset/clean, stash replay or duplicate implementation commit."
+  },
+  "accepted_baseline_alignment": {
+    "target_commit": "bd91ed69462c58f2e7a35ad6743ca2a86b07cf7c",
+    "method": "Owner-authorized fast-forward only on the same Arena branch, with overwrite of ignored files forbidden.",
+    "history_preserved": true,
+    "new_merge_commit_created": false
+  },
+  "published_review_copies": [
+    {
+      "path": "docs/superpowers/plans/2026-10-21-ux-completion-master.md",
+      "original_review_r5_sha256": "a377397393150f07721012443c739b63633679f9266ff2a5f7fbe3d2a5361d61",
+      "published_sha256": "34ba58e78e3fd08e70058cdc82a8713a63dc90b4722084df0499bcc4520417ae",
+      "content_change": "Publication-status sentence only; all execution rules and plan content otherwise byte-identical."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-21-ux-foundation.md",
+      "original_review_r5_sha256": "2e01e112469bca9a0e582ec6c82ef3e7f9f6a7ed525388cae0b9c0c1035dcaee",
+      "published_sha256": "a0e16b3de2611568bdac104e7655ab2f2d41c623c0fc7c08e0a7f47f2c3d3262",
+      "content_change": "Publication-status sentence only; all execution rules and plan content otherwise byte-identical."
+    }
+  ],
+  "current_tree_relationship": "The containing publication commit differs from bd91ed6 only by these two plan documents and this record. Runtime, tests, fixtures and dependencies are unchanged from that accepted baseline.",
+  "interpretation_for_other_agents": [
+    "The 29 modified and 19 untracked paths were an already-published 1639fd6 tree restored over an older local HEAD; they are not unique unpublished implementation work.",
+    "All of those source paths are tracked in the published history. Read the containing commit on the Arena branch instead of requiring a cross-machine recovery ZIP.",
+    "The published plans remain reviewed drafts. Publication does not sign surface briefs or authorize foundation/R0 execution.",
+    "Dated branch/dirty-state snapshots inside the review copies describe the pre-reconciliation state. Run a fresh preflight rather than inheriting that old state."
+  ],
+  "not_performed": [
+    "Product implementation",
+    "Foundation execution",
+    "R0 execution",
+    "Empirical data collection",
+    "Model calls",
+    "Test reruns",
+    "Branch creation/switch/rename",
+    "Stash apply/drop",
+    "Reset/clean",
+    "Force push"
+  ],
+  "excluded_from_git": [
+    "Recovery ZIPs, tar archives and raw patches",
+    "Git credentials/configuration",
+    "Ignored project/model/session data"
+  ],
+  "windows_stash_de46036": "Not accessed or applied; equivalence not asserted; preserve separately."
+}
