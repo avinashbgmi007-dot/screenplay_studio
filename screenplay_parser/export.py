@@ -42,16 +42,46 @@ _DIALOGUE_BLOCK_TYPES = frozenset((
     ElementType.CHARACTER, ElementType.PARENTHETICAL, ElementType.DIALOGUE,
 ))
 
+# What may CONTINUE a dialogue block without a blank line in between: a
+# parenthetical or more dialogue. A CHARACTER cue is deliberately NOT here —
+# it always begins a NEW block, and gluing it onto the previous speaker's
+# dialogue line is gap 21: "AJAY / Hello. / VENU / Hi." exported as
+#
+#     AJAY
+#     Hello.
+#     VENU
+#     Hi.
+#
+# re-parses as ONE speech by AJAY, because without the separating blank the
+# parser sees VENU and Hi. as further dialogue lines of the same block. Every
+# line was then attributed to AJAY, which corrupts dialogue attribution on
+# re-import. The blank is what marks the block boundary for a text parser, so
+# it has to be emitted before every character cue.
+_DIALOGUE_CONTINUATION = frozenset((
+    ElementType.PARENTHETICAL, ElementType.DIALOGUE,
+))
+
 
 def _append_blank_after(out: list[str], elements: list, i: int) -> None:
     """A blank line closes the current block. Dialogue blocks (character cue ->
-    parentheticals -> dialogue lines) stay glued together; every other element
-    is followed by a blank. Emitting a blank inside a dialogue block would make
-    the re-parse classify the dialogue line as action."""
-    el = elements[i]
-    if el.type in _DIALOGUE_BLOCK_TYPES:
-        nxt = elements[i + 1].type if i + 1 < len(elements) else None
-        if nxt in _DIALOGUE_BLOCK_TYPES:
+    parentheticals -> dialogue lines) stay glued together; a new character cue
+    and every non-dialogue element are preceded by a blank. Emitting a blank
+    inside a dialogue block would make the re-parse classify the dialogue line
+    as action; omitting it before a new cue would make the re-parse attribute
+    the next speaker's lines to the previous one (gap 21).
+
+    The next element is found by SKIPPING text-less elements, because callers
+    `continue` past those without emitting anything — judging by `elements[i+1]`
+    regardless let an empty element in between suppress the blank and glue two
+    speeches together again.
+    """
+    if elements[i].type in _DIALOGUE_BLOCK_TYPES:
+        nxt = None
+        for j in range(i + 1, len(elements)):
+            if elements[j].text:
+                nxt = elements[j].type
+                break
+        if nxt in _DIALOGUE_CONTINUATION:
             return  # continuation of the same dialogue block
     out.append("")
 

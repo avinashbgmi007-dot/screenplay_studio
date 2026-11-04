@@ -911,3 +911,43 @@ owner prefers availability there, the change is the two `return True` branches i
 `is_deleted`.
 
 Full suite **2320 passed, 7 skipped**; `ruff` clean.
+
+## §36 — Gap 21: export glues a new speaker onto the previous speech (2026-11-04)
+
+**FIXED.** `_append_blank_after` treated `CHARACTER` as a member of the "continue this dialogue block"
+set, so a cue following someone else's dialogue got no separating blank line:
+
+```
+AJAY          AJAY
+Hello.   ->   Hello.
+VENU          VENU        # no blank -> parser reads this as more of AJAY's speech
+Hi.           Hi.
+```
+
+Re-parsing gave `AJAY/dialogue "VENU"`, `dialogue "Hi."` — the next speaker's NAME became a dialogue line
+attributed to the previous speaker. Reproduced through the real exporter and the real parser in both Fountain
+and TXT, then through the actual `/api/projects/<name>/export` download route (not just the function).
+
+**The fix** is one idea: a `CHARACTER` cue always begins a new block. `_DIALOGUE_BLOCK_TYPES` keeps its meaning
+("this element belongs to a dialogue block") but a new `_DIALOGUE_CONTINUATION` set decides what may follow with no
+blank, and it holds only `PARENTHETICAL` and `DIALOGUE`. So a cue → dialogue → cue sequence emits one blank where
+it used to emit none, and cue → parenthetical → dialogue still stays glued.
+
+**Evidence.** 8 new tests; 6 fail against the pre-fix exporter (the two parametrised pairs for Fountain and TXT).
+The other two are the empty-element guard, which I am labelling a REGRESSION GUARD rather than evidence — I
+measured the parser's own output over every `.fountain` in the repo and found **0 text-less elements out of 164**,
+so nothing in the real parse path triggers it. It is defensive: the writers `continue` past text-less elements, so
+deciding from `elements[i + 1]` rather than the next element that actually gets emitted is a latent trap.
+
+**Measured effect on the repo's one real fixture** (`tests/fixtures/pain_tenglish.fountain`): pre-fix, 3 of its 36
+speech elements changed through a round trip, in both formats; post-fix, 0. That is now a test.
+
+**Scope limit, stated because the register's numbers are much bigger.** The register quotes 46 element-type changes
+and 75 speaker changes for Darshi: Pain 3 (TXT 48/75, 43/47). Those came from parsed representations of the user's
+PDFs, which are **not in this repo**, so I cannot reproduce or re-derive them and I am not claiming they are all
+gone. What I can say is narrower and verified: the specific mechanism named in the register (no blank between
+dialogue and the next cue) is removed, it was demonstrably changing attribution on the one real fixture available,
+and both text formats now round-trip that fixture with zero speech churn. Whether the user's larger scripts still
+show churn needs a round trip over those files, which I cannot run here.
+
+Full suite **2328 passed, 7 skipped**; `ruff` clean.

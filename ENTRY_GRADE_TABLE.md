@@ -64,7 +64,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 18 | **B** | Concurrent session saves in isolation | Both concurrency and forced-failure variants used. **FIXED 2026-11-04** — (a) message identity + (b) durable deletion tombstone with stale-snapshot refusal + (e) fail-closed on a failed `.bak`; (c)/(d) covered only indirectly by the existing branch tombstone and `OSError` branch (critique §35). | **G** |
 | 19 | **A** | Real `add_to_stash` with 4,004 characters | Saved 4,000, dropped the tail silently. | **G** |
 | 20 | **B** | Mocked current scene numbers | Staleness is real; the mock is what makes it visible. | **G** |
-| 21 | **A** | Real exporter, then re-parse | `AJAY/VENU` becomes three AJAY lines. Round-trip use reassigns dialogue. | **G** |
+| 21 | **A** | Real exporter, then re-parse | `AJAY/VENU` becomes three AJAY lines. Round-trip use reassigns dialogue. **FIXED 2026-11-04** — a CHARACTER cue now always starts a new block, so the next speaker is no longer read as the previous one's dialogue; 6 of 8 new tests fail without it, and the repo fixture goes 3-of-36 churn to 0. The register's larger per-script counts are not re-derivable here (no PDF-derived scripts in the repo) — critique §36. | **G** |
 | 22 | **A** | Synthetic FDX through the real parser/exporter | Fidelity limits are also documented in the export docstring — known trade-off, still tested. | **K** |
 | 23 | **A** | Real `quotematch.normalize_text` | `కల`/`కాల` collide; a different word verifies as an exact quote. | **G** |
 | 24 | **A** | Synthetic Fountain with a Telugu cue | Native-script speaker cue missed. | **G** |
