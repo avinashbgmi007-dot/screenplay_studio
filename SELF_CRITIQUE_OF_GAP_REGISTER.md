@@ -137,7 +137,7 @@ These are not in doubt and should not have been interleaved with inference-grade
 
 ## 8. New entries from the two areas left ungraded — and their grades
 
-**W — 109 (withdrawn before it was ever filed as a defect).** I suspected my "ruff clean" claim only covered four package directories while CI runs `ruff check .` at the root. I checked: **`ruff check .` at the root passes.** There is no gap. I am leaving the note in only because the discipline it demonstrates — verify the claim you already published — is the point of this document, and because a reader deserves to see a suspicion resolved rather than silently dropped.
+*(109 was withdrawn during this pass and its argument now lives in `ARCHIVE_NOT_GAPS.md` §4. The entries below it survive.)*
 
 **B — 110. A missing source file produces a raw traceback instead of a sentence.** `python -m screenplay_studio run missing.fountain --project …` exits 1 and prints `FileNotFoundError: [Errno 2] No such file or directory` as a traceback. The CLI's own contract (clean messages, machine-usable exit codes) is met on exit status but not on readability, and it is inconsistent with the web app, which turns the same condition into a JSON message. Reachable only by a scripted or mistyped invocation. **Recommendation:** catch the file error at the CLI boundary and print one actionable line naming the argument.
 
@@ -391,3 +391,45 @@ real screen reader, the hover-revealed toolbar timing that `NOTES.md` describes 
 manuscript-first desk actually feels like a manuscript are all outside what a static read can establish. The two
 findings from this pass are about *structure and invariants*; the journey itself remains unaudited, and the visual
 concepts remain unapproved, which is where this review started.
+
+
+## 24. Eleventh pass — file-by-file authenticity review, and the register pruned
+
+The user's instruction changed the job: not "find more" but "go through what is noted, check it against the repo
+entry by entry, and leave only genuine gaps". Done, and the result is a smaller register that I trust more.
+
+**Method.** Every numbered entry was re-read against the code it names, and where a claim could be cheaply
+re-run it was: `quotematch.normalize_text` (23), the Telugu cue ranges in `heuristics.py` (24), the `int(page//5)`
+segment index (27), the "No significant findings" branch in `report.py` (47), `add_to_stash`'s `text[:4000]` (19),
+`beatboard.has_board`/`get_order` (20), `activate_draft` and `draft_dir` (62), and the tracked scratch files (86).
+All of those hold on re-test today. Findings 106/107/108 were re-traced to the analyzer entry signature; they
+also hold — which is exactly why the classification question below matters.
+
+**The distinction the register had stopped making.** Two axes were collapsed into one. *Grade* answers "how sure
+am I that I saw this?" The new axis answers "**is this a gap at all?**" Four entries were excellently evidenced and
+still not gaps: **22** (FDX lossiness is the format's limit and the exporter documents it), **76** (lock sidecars
+are how the lock works), **127** (the wheel is correct; CI merely does not prove it), **128** (escaping is correct;
+nothing enforces the convention). Four more were capability wishes, not defects: **97** (recovery room) and
+**106–108** (intent never reaching the analyzer). Deleting evidence would have been wrong; leaving them numbered
+as defects was also wrong. They are archived, in full, with the check that justified each removal.
+
+**What I was most wrong about, stated plainly.** I have called 106 "the single most consequential product gap in
+the review" and put it in the severe list beside a containment hole that lets one project read another. That
+comparison was not a judgement about severity; it was an accident of the word *gap* covering two different things.
+A writer cannot hit 106 the way they hit 62: 62 corrupts their work, 106 means the tool never asked them what they
+meant. The register now says so — 106 is product direction, and the severe list is 1, 3, 4, 18, 21, 23, 61–65, 87,
+113, 119. That is a genuine correction, not a rewording.
+
+**Numbers after pruning** (computed from `ENTRY_GRADE_TABLE.md`, not typed): **126 entries — 108 genuine gaps,
+4 known trade-offs, 4 product-direction, 6 withdrawn, 4 tested non-defects.** Of the 108 genuine: **48 grade A, 43
+B, 10 C, 7 D.** Eight entries left the register, one (75) merged into 74, and three titles were corrected where the
+headline claimed more than the body supported: 86 no longer says the scratch files ship in the package (they do
+not — I built the wheel), 92 no longer implies the demo's canned replies say anything about the collaborators, and
+95 no longer claims the Design Lab has "no separation" from the writer's desk (it shares the Host guard and token,
+and its session is isolated).
+
+**What this changes about the plan.** The fix order is untouched — 62, then revision safety, then publication
+truthfulness, then 119. The intent work is still the thing worth evaluating first, but it is now filed as a
+decision the writer and the collaborator designs should take, not as defect 106. And the two guard-strength items
+(127, 128) are the only entries that would prevent a regression rather than repair anything, which is why they sit
+at the bottom of the fix order rather than the top.

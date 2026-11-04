@@ -876,3 +876,27 @@ are decoded then compared against the project list, never rendered.
 
 What a static read cannot establish: layout, focus order under a real screen reader, hover-reveal timing, and
 whether the desk feels like a manuscript. The journey remains unaudited and the visual concepts unapproved.
+
+
+## Eleventh pass — file-by-file authenticity review and pruning
+
+At the user's direction the job changed from "find more" to "keep only genuine gaps". Every numbered entry was
+re-read against the code it names, and the cheap ones were re-run: `quotematch.normalize_text` (23 — `కల`/`కాల`
+still collide, `'కాల'` normalises to `'కల'`), the Telugu cue ranges in `heuristics.py` (24 — Devanagari and Tamil
+only), the `int(page // 5)` segment index (27), the `"*No significant findings.*"` branch in `report.py` (47, reached
+whenever `grouped.get(cat)` is empty, including a failed category), `text[:4000]` in `add_to_stash` (19),
+`beatboard.has_board`/`get_order` (20 — `has_board` is `os.path.exists`, so a stale board reports "saved" while
+`get_order` silently returns natural order), and `draft_dir`/`activate_draft` (62 — reproduced again at the correct
+relative depth: a traversal name activated a sibling project's snapshot, 200, `active_draft` set to the traversal
+string). One probe of mine failed first at the wrong `..` depth and was corrected rather than reported; that is
+recorded in the critique §24.
+
+**Result:** 8 entries left the register (22, 76, 97, 102–104, 106–108 were already moving; 127/128 reclassified),
+1 merged (75→74), 3 titles corrected (86, 92, 95). The register now holds **108 genuine gaps, of which 48 are
+grade A**. All removals and their justifications are in `ARCHIVE_NOT_GAPS.md`; the per-entry authenticity column is
+in `ENTRY_GRADE_TABLE.md`.
+
+**The one judgement worth flagging:** 106 (the premise card is never read by the analysis) is traced and true, and I
+had called it "the most consequential product gap". It is now filed as product direction because the software never
+promised intent-awareness — the same word, *gap*, was covering both "the code lies" and "the product could do
+more". The severe list is twelve items and no longer includes it.
