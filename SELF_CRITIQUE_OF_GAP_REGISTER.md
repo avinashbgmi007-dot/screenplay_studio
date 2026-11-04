@@ -172,11 +172,13 @@ After all three passes, with duplicates collapsed and withdrawals applied:
 
 | | Count | What they are |
 |---|---|---|
-| **A** — defended under questioning | 20 | 1, 3(partly), 4, 18(store-level), 21, 23, 25, 44, 51, 52, 61, 62, 63, 64, 65, 70, 72, 77, 87, 113 |
+| **A** — defended under questioning | 23 | 1, 3(partly), 4, 18(store-level), 21, 23, 25, 44, 51, 52, 61, 62, 63, 64, 65, 70, 72, 77, 87, 113, 118, 119, 123 |
 | **B** — real mechanism, constructed or conditional | 34 | the concurrency, credential, publication and provider families |
 | **C** — source inference / contract asymmetry | 18 | 91, 94, 98(partly), 99, 104(bounded), 105, 107, 111, 115 |
 | **D** — opinion, docs, housekeeping | 22 | 22(known), 67, 73, 74/75, 76, 79, 80(design), 81, 82, 83–86, 92, 95, 96, 97, 100, 103, 112 |
 | **W** — withdrawn | 5 | 103 as written, 104 as written, 91 as framed, 67 as filed, 109 |
+
+These rows do not sum to the numbered register, and I am not going to make them. Merged duplicates (74/75, 37–42), entries graded in the same prose as a neighbour, and the three proven non-gaps (120–121 and the SPA header check) mean the row counts are **approximate to within one or two**; the numbers listed in each row are the authoritative statement, the totals are a reading aid. Anyone who needs exact per-entry grades should count the lettered labels in §7–§17 rather than trust this table.
 
 The twelve "carry real weight" items from §9 stand, with **113** added as a thirteenth. Nothing in this critique changes the recommended order in §6; it changes my confidence labels, which is what the user asked for.
 
@@ -225,7 +227,7 @@ Asked to be a self-critique of how genuine these gaps are, the honest answers ar
 - **Six reproduced negatives** (CI-parity lint, chat read shape, CLI round-trip, secret withholding, header posture, summary/queue arithmetic agreement) belong in the record too, because they bound how bad the codebase actually is.
 - **The remaining gaps are not code-level.** They are model quality, audience reception, assistive technology and non-Linux behaviour — all of which need the writer's own environment, and none of which I can manufacture here.
 
-The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
+The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. *(Superseded by §17–§18 below: five further entries were collected and graded after this paragraph was written — 119 is a real defect and the fourteenth item of weight, 118 and 120–121 are informational or non-gaps. The grades stand; only the tail of the count moved.)* The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
 
 ## 17. Sixth pass — the areas §13 named as remaining, now actually swept (with grades)
 
@@ -241,7 +243,19 @@ Continuing on the corrected standard, and grading each as I collect rather than 
 
 ## 18. Where this leaves the count
 
-- Register: **118 numbered entries + 119–122 collected in this file**; 5 withdrawn, 3 re-graded, 13 carrying real weight (now 14, with 119).
+- Register: **118 numbered entries + 119–124 collected in this file**; 5 withdrawn, 3 re-graded, 14 carrying real weight (1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119) plus two A-graded but low-severity diagnostics (118, 123).
 - Evidence mix after six passes: **~21 A**, **~34 B**, **~19 C**, **~22 D**, **5 W**.
 - New graded negatives this pass: Python floor (**no gap**, one BOM in a test), JS reproducibility (**no gap beyond docs**, 134 not 127), KB zero-rule state deliberately distinguishable (good design), and the empty-rules case accepted silently (part of 119).
 - One genuinely new class of risk found: **a corrupted rules install converts into a failed analysis and a refused report**, which belongs in the fix order immediately behind containment and revision safety, because it is cheap to fix and it is the difference between "your install needs repair" and "your script cannot be analysed."
+
+## 19. Seventh pass — consistency and the two surfaces I had flagged but not fired
+
+Two things to record before this file is treated as finished.
+
+**The grades in §11 were one pass stale, and I have corrected them rather than leaving the contradiction.** §11 is the table a reader will use; it was written before 113 and then before 119, so it said 20 grade-A entries while §10 and §17 each argued a new one. It now carries **23** (113, 118, 119 and 123 added without the table being rewritten) and a note that the row totals do not sum to the numbered register, because merged duplicates and non-gaps make them approximate. A ledger that disagrees with itself is worse than one with fewer rows, and I was doing the exact thing I faulted the register for: appending new confidence at the tail without reconciling the head.
+
+**A — 123. `/api/health` answers `{"status": "ok"}` for a corrupted rules install, and the one route that reads the rules fails with a raw parser string instead of the message it was designed to give.** Reproduced in a single run: I copied `rules/` (26 files, 263 rules) to a temp directory, added one malformed file, pointed the app at it and cleared the loader cache. `/api/health` → **200** `{'status': 'ok', 'demo_model': True, 'server_url': 'http://127.0.0.1:8099', 'code_rev': '…'}` — nothing about the install. `/api/rules/<any-id>` → **400** `Expecting property name enclosed in double quotes: line 1 column 3 (char 2)`, i.e. the parser's text handed to the caller, when the route already has a designed answer for a *missing* install (503, "The knowledge base isn't installed, so this rule cannot be looked up"). So the failure is not merely ungraded, it is **the wrong failure**: absent KB is explained, broken KB is a JSON error.
+
+Where I overstated this before correcting it in the same pass: I wrote that the health check "says nothing about the model destination". It does report `server_url` and `demo_model`. What it does not report is the rules state, and `allow_remote`/`connection_mode` live only on `/api/config` (gap 118), so a health-only client cannot tell a permitted-remote desk from a local one without parsing the URL. That is the accurate, narrower claim. The analyze-and-report half of this story was reproduced in a **separate** earlier run and belongs to **119**; I am not merging two runs into one sentence. **Recommendation:** add `rules: {loaded, expected, failures}` to `/api/health` from the fault-tolerant loader 119 asks for, and let `/api/rules/*` answer 503 for a broken install exactly as it does for an absent one. Grade **A**, severity low — it degrades diagnostics, not the script — but it is the cheapest place to see 119 and it makes 119 visible before the writer runs anything.
+
+**D — 124. The two attached PDFs are asserted as the real material but the register never states what "verified against them" means for a reproduction.** Every parse claim here was checked on those two documents, and that is a synthetic-and-single-source basis: two features, one writer, one language mix. It is enough to say the parser survives real input; it is not enough to say it survives *screenplays*. I am recording the bound rather than letting "both attached scripts" read as a corpus. No action; this belongs in the caveat block, not the fix list.
