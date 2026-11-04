@@ -777,3 +777,7 @@ Read `manifest.py` merge/save/load, the idea store, the notes/stash/beat-board/m
 ## Continuity, analytics and export-footprint batch — reviewed scope
 
 Read the deterministic continuity pass end to end (time flips, name variants, normalization helpers), formatting checks, scene statistics, and export dispatch. Ran synthetic day/night and near-name scripts, and parsed both attached PDFs to compare continuity output with the actual cast and headings. Deterministic checks are now mapped; what remains unread or unexercised is the model-facing half of the analyzer prompts, the preview labs, packaging and real-model output. See gaps 77–79.
+
+## Documentation and surface-drift batch — reviewed scope
+
+Compared `docs/API_ROUTE_MAP.md` mechanically against the live Flask URL map, ran both CLIs' `--help`, and read the standalone co-writer server's entrypoint plus the docs that describe it. The four undocumented live routes and the "no standalone server" claim are recorded as gaps 83–86; I did not start the standalone server or exercise its routes. Remaining unread: `docs/*` beyond route/architecture/CLI references, the preview design labs' HTML, and packaging/CI execution.
