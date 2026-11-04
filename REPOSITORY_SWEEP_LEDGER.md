@@ -805,7 +805,7 @@ Genuinely unreviewed, stated plainly so nobody mistakes this for total coverage:
 - **real-model behaviour of any kind** — accuracy, latency, disagreement quality, multilingual output — which no local probe here can substitute for;
 - audience reception of either attached screenplay, which is the user's untested question and not something a code sweep can answer.
 
-The register stands at 108 uniquely numbered gaps. That number is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order is unchanged and starts with identity, containment, atomic publication and whole-bundle restore.
+The register stood at 108 uniquely numbered gaps when this line was written; it is now **124 numbered entries, 6 withdrawn, 4 proven non-gaps, 114 live**, graded individually in `ENTRY_GRADE_TABLE.md`. The count is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order starts with containment and revision safety, and is unchanged.
 
 ## Self-critique pass — reviewed scope and corrected standard
 
