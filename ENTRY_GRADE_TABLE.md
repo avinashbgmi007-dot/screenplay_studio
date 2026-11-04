@@ -112,7 +112,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 61 | **B** | Two synchronized concurrent uploads | Shared temp file and swap target. | **G** |
 | 62 | **A** | Real route with two synthetic projects | **FIXED 2026-11-04** — `draft_dir` validates at the chokepoint; 5 tests, 3 of which fail without the fix. **Most serious item in the register.** Read and overwrite a sibling project; reached outside `PROJECTS_DIR` on a later write. | **G** |
 | 63 | **A** | Draft activation on a real project | **FIXED 2026-11-04** — whole bundle restored; before the fix the original draft lost its cast entirely. | **G** |
-| 64 | **A** | Real upload of an invalid FDX, then reactivation | Writer stranded on a broken active draft. | **G** |
+| 64 | **A** | Real upload of an invalid FDX, then reactivation | **FIXED 2026-11-04** — refused before the swap; parse stage restored with the snapshot. | **G** |
 | 65 | **A** | Stubbed long run plus a real draft switch | **NARROWED 2026-11-04** — switch refused (409) while a run holds the lock; not closed for a cross-process publish. | **G** |
 | 66 | **A** | Real `/analyze/cancel` during a real `retry-failed` | 409; the analysis lock is not taken by upload/activation. | **G** |
 | 67 | **W** | Measured | ~7 ms of subprocess work on a seconds-long operation. Withdrawn. | **W** |

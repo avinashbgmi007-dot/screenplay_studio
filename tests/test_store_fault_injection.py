@@ -39,7 +39,7 @@ from typing import Any, Callable, Optional
 
 import pytest
 
-from screenplay_studio import (beatboard, feedback_ledger, metrics, notes,
+from screenplay_studio import (beatboard, diff, feedback_ledger, metrics, notes,
                                pass_history, revision, stash_store)
 from screenplay_studio.manifest import ProjectManifest
 
@@ -94,6 +94,18 @@ class StoreCase:
     evidence_path: Optional[Callable[[Any], str]] = None
 
 
+def _mark_parsed(m) -> None:
+    """Put a project into the state a snapshot-able draft is in.
+
+    `snapshot_active` copies the source of an unparsed draft but records nothing
+    derived (there is nothing parsed to record), so a stage-record case needs a
+    parsed manifest.
+    """
+    from screenplay_studio.manifest import StageStatus
+    m.stages["parse"] = StageStatus(status="complete")
+    m.save()
+
+
 def _sample_text() -> str:
     return ("INT. ROOM - NIGHT\n\nA lamp.\n\nRAVI\n\nHello.\n")
 
@@ -131,6 +143,24 @@ CASES = [
         missing_default={},
         setup=lambda m: _working_copy(m),
         status="guarded",
+    ),
+    StoreCase(
+        name="draft snapshot stage record",
+        module="screenplay_studio/diff.py",
+        path=lambda m: diff.snapshot_stage_path(diff.draft_dir(m, "original")),
+        read=lambda m: diff.load_snapshot_stage(diff.draft_dir(m, "original")),
+        # a snapshot only records a stage once the draft has been parsed, which
+        # is exactly when activation can use it
+        setup=lambda m: _mark_parsed(m),
+        seed=lambda m: diff.snapshot_active(m, "original"),
+        mutate=lambda m: diff.snapshot_active(m, "original"),
+        missing_default=None,
+        status="guarded",
+        why=("first written with `except ValueError: None` (gap 64), which folded "
+             "a truncated sidecar into 'no record'"),
+        load_modify_write=False,
+        # a damaged record must be REPORTED, never answered with `complete` or
+        # with None; the reader raises, so `error` is the honest outcome
     ),
     StoreCase(
         name="metrics",

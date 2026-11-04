@@ -637,3 +637,42 @@ probe cannot tell the bindings apart, so the test **skips** with the measurement
 product for the host's forwarding). Result: 12/12 runs of the file now report `46 passed, 1 skipped`, and three
 consecutive full-suite runs report **2260 passed, 5 skipped**. The skip is honest, the reason travels with it, and
 the same test still catches a wildcard bind on any host that does not forward.
+
+
+## 29. Gap 64 — and three tests of mine that were quietly worthless
+
+**What was fixed.** Two defects, not one, because the entry described a symptom with a second cause underneath.
+
+1. **A parse gate before the swap.** `_validate_draft_upload` parses the upload from its temp file while the project is
+   still untouched. A file that cannot become a screenplay is a **400** and the project is byte-identical. Measured
+   before: the same upload returned **500** after it had already replaced the active source.
+2. **A rollback if the post-swap parse fails anyway.** The gate makes that rare, not impossible (a file that changes
+   between reads, a full disk), so the handler restores the previous draft with `activate_draft` and says which draft
+   the writer is back on — or says BOTH failures if the rollback fails, because a writer told only "could not
+   process" does not know where they are.
+3. **The parse stage travels with the snapshot.** `snapshot_active` now writes `_stages.json`, and activation restores
+   from it. Before, activation restored `parsed.json` and left the stage saying `failed`, so `/script` refused a draft
+   whose parse was right there — the "only a manual reparse restored it" half of the entry.
+
+**Three test mistakes, in order of embarrassment:**
+
+1. **I asserted on a field that does not exist.** `/drafts` returns `{active_draft, drafts}` — no stage map. My stage
+   test read `.get("stages", {})` and got `{}`, so `!= "failed"` passed vacuously. The real endpoint is
+   `/api/projects/<name>` (`stages.parse`). A test whose key is missing cannot fail, so it cannot test.
+2. **I asserted that every format rejects an empty file.** Measured: `.fdx` and `.pdf` reject garbage; empty
+   `.fountain`/`.txt`/`.md` parse as **zero-scene scripts** and are accepted. That is a product decision older than
+   this gap (a blank file is a valid blank screenplay). The parametrised test now covers the two formats that really
+   reject, and the comment records the other three rather than asserting them away.
+3. **The fault-injection registry caught a defect I had just written.** My first loader was
+   `except ValueError: return None` — folding "unreadable" into "no record", the exact A3 shape that registry exists
+   for. It refused to let `diff.py` count as a store writer without an entry. The loader now raises, the switch is
+   refused **before** the writer is moved, and the case is registered (`load_modify_write=False`, since the snapshot
+   rewrites its own record wholesale).
+
+**Verification.** Six new tests: **five fail without the fixes**, one (the temp-file cleanup) passes both ways and is
+labelled a regression guard, not evidence. The damaged-record test was confirmed by hand too: 400, script unchanged,
+still on `draft-1`. Full suite **2272 passed, 6 skipped**, twice; `ruff` clean. The sixth skip is the honest
+loopback skip from §28b.
+
+**Not claimed.** `.pdf` and `.fdx` rejection is proven; a `.fountain` that parses into zero scenes is accepted and
+still becomes the active draft — that is a different entry's argument, not this one's.

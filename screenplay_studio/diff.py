@@ -29,7 +29,7 @@ from difflib import SequenceMatcher
 
 from screenplay_parser.models import ScriptDocument
 
-from .jsonio import check_safe_id
+from .jsonio import atomic_write_json, check_safe_id
 from .manifest import StageStatus
 from .revision import (edits_log_path, edits_redo_path, quote_present,
                        reset_working, working_path)
@@ -106,6 +106,15 @@ def snapshot_active(m, name: str) -> None:
     for src, rel in _bundle_files(m):
         if os.path.exists(src):
             shutil.copy2(src, os.path.join(dst, rel))
+    # The stage status belongs to the snapshot too (gap 64): activation used to
+    # leave `parse` saying `failed` while restoring a perfectly good parse, so
+    # `/script` kept refusing "Project hasn't been parsed yet" and only a manual
+    # reparse cleared it. Recorded as a small sidecar rather than reconstructed
+    # from the files, because "complete" is a claim the pipeline made, not
+    # something the presence of parsed.json can assert on its own.
+    atomic_write_json(snapshot_stage_path(dst), {
+        "parse": getattr(m.stage("parse").status, "value", m.stage("parse").status),
+    })
     # The writer's own edit cycle travels with the draft (gap 1). Before this,
     # `_reset_derived_state` deleted working.json + edits.json on every switch,
     # so "switch away and switch back" — an action the UI calls
@@ -127,6 +136,38 @@ def snapshot_active(m, name: str) -> None:
 _WORKING = "_working.json"
 _EDITS = "_edits.json"
 _REDO = "_edits.redo.json"
+_STAGE = "_stages.json"
+
+def snapshot_stage_path(snapshot_dir: str) -> str:
+    return os.path.join(snapshot_dir, _STAGE)
+
+
+def load_snapshot_stage(snapshot_dir: str):
+    """The stage status recorded with a snapshot, or None.
+
+    Damage is NOT absence. This store was first written with a bare
+    `except OSError/ValueError: None` (gap 64), which folds "the file is
+    unreadable" into "there is no record" — the exact A3 shape the fault-injection
+    registry exists to catch, and it caught this one. A truncated sidecar means
+    the switch happens without a known stage status, so the writer must be told
+    that the draft's parse state could not be read, not quietly handed a draft
+    whose stage looks like it was never written.
+    """
+    path = snapshot_stage_path(snapshot_dir)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        raise ValueError(
+            f"the snapshot's stage record is unreadable ({e}); the draft was "
+            "restored but its parse status could not be determined") from e
+    if not isinstance(data, dict):
+        raise ValueError(
+            "the snapshot's stage record is not an object; the draft was "
+            "restored but its parse status could not be determined")
+    return data.get("parse")
 
 
 def _bundle_files(m):
@@ -255,6 +296,12 @@ def activate_draft(m, name: str):
     parsed_src = os.path.join(d, "parsed.json")
     if not os.path.exists(parsed_src):
         raise ValueError(f"No snapshot for draft '{name}'.")
+    # Read the stage record BEFORE anything is touched (gap 64). A damaged
+    # sidecar must refuse the switch, not switch first and apologise after: by
+    # the time the bundle has been restored the writer is already on the other
+    # draft, and "restored, but I don't know if it is parsed" is a worse place
+    # to leave them than "not switched".
+    stage_record = load_snapshot_stage(d)
 
     # preserve the current state first (so switching is never destructive)
     snapshot_active(m, m.active_draft or "original")
@@ -304,6 +351,23 @@ def activate_draft(m, name: str):
     # ...and put THIS draft's edits back, if it had any. After
     # `_reset_derived_state` so the reset can never race the restore.
     restore_edit_cycle(m, name)
+    # The parse stage comes back with the parse (gap 64). Without this the
+    # restored draft carried the FAILED status of whatever upload was rejected
+    # since, so `/script` refused a draft whose parsed.json was sitting right
+    # there. A snapshot with no stage record predates this file: fall back to
+    # what the restored files support rather than guessing `complete`.
+    restored_stage = stage_record
+    if restored_stage is None:
+        # No record: either the snapshot predates the sidecar or the draft was
+        # never parsed. parsed.json is restored by the loop above, and the
+        # parse stage's own contract is that it is `complete` exactly when that
+        # file exists — so fall back to the file rather than leaving a stale
+        # status from whatever ran last.
+        restored_stage = "complete" if os.path.exists(m.parsed_path) else None
+    if restored_stage:
+        m.stages["parse"] = StageStatus(status=restored_stage, output_paths={
+            "parsed": m.parsed_path, "kg": m.kg_path,
+        })
     if os.path.exists(m.report_findings_path):
         m.stages["analyze"] = StageStatus(status="complete", output_paths={
             "report_md": m.report_md_path, "report_findings": m.report_findings_path,

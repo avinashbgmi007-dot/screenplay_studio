@@ -606,3 +606,171 @@ class TestNoSwitchDuringAnalysis:
         )
         assert resp.status_code in (200, 400)  # 400 = nothing to switch back to yet
         assert resp.status_code != 409
+
+
+# ---------- gap 64: a bad upload must not become the active draft ----------
+# Measured before the fix: a non-screenplay .fdx returned 500 but had already
+# replaced the active draft — parse `failed`, edits discarded, analysis reset,
+# the previous good report still on disk while /report answered 400, and /script
+# refusing "Project hasn't been parsed yet" even after switching back, because
+# activation left the FAILED status in place.
+
+
+NOT_A_SCREENPLAY = b"\x00\x01\x02 this is not an fdx \xff\xfe"
+
+
+class TestABadUploadCannotBecomeTheActiveDraft:
+    def test_a_broken_upload_is_refused_and_changes_nothing(self, http_client):
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        before = http_client.get(f"/api/projects/{project}/script").get_json()
+
+        resp = http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(NOT_A_SCREENPLAY), "broken.fdx")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 400, "a file that cannot be parsed is a client error"
+        assert "broken.fdx" in resp.get_json()["error"]
+
+        # The draft the writer was on is still the draft they are on, and the
+        # script still reads.
+        after = http_client.get(f"/api/projects/{project}/script").get_json()
+        assert after == before
+        assert http_client.get(f"/api/projects/{project}/report").status_code == 200
+        drafts = http_client.get(f"/api/projects/{project}/drafts").get_json()
+        assert all(d["name"] != "draft-1" for d in drafts.get("drafts", []))
+        assert drafts.get("active_draft") is None  # still the writer's original
+
+    def test_a_rejected_upload_does_not_survive_on_disk(self, http_client, tmp_path):
+        """The quarantine temp file is removed — a rejected upload must not leave
+        a half-valid source lying beside the good one."""
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(NOT_A_SCREENPLAY), "broken.fdx")},
+            content_type="multipart/form-data",
+        )
+        project_dir = os.path.join(webapp_server.PROJECTS_DIR, project)
+        leftovers = [n for n in os.listdir(project_dir) if n.startswith("_draft_upload")]
+        assert leftovers == []
+
+    @pytest.mark.parametrize("filename,body", [
+        ("bad.fdx", NOT_A_SCREENPLAY),
+        ("bad.pdf", b"%PDF this is not a real pdf"),
+    ])
+    def test_every_format_has_a_rejection_path(self, http_client, filename, body):
+        """The gate is format-generic, not fdx-specific.
+
+        `.fdx` and `.pdf` are the two formats that really do reject garbage.
+        `.fountain`, `.txt` and `.md` are flat text: an empty one parses as a
+        zero-scene script and is ACCEPTED — measured, not assumed. That is a
+        product decision older than this gap (a blank file is a valid blank
+        screenplay), so it is recorded here instead of being asserted away; the
+        property this gap needs is only that a REJECTED upload never lands.
+        """
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        resp = http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(body), filename)},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 400
+        assert filename in resp.get_json()["error"]
+        assert http_client.get(f"/api/projects/{project}/script").status_code == 200
+
+
+class TestAParseFailureAfterTheSwapIsUndone:
+    def test_the_writer_is_put_back_on_the_draft_they_had(self, http_client, monkeypatch):
+        """The gate makes this rare, not impossible: a parse can fail on the
+        second read. When it does, `upload_new_draft` has already swapped the
+        source, so the writer is stranded unless we put them back."""
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        before = http_client.get(f"/api/projects/{project}/script").get_json()
+
+        real_run = Orchestrator.run_parse
+        calls = {"n": 0}
+
+        def _fail_the_new_draft(self, *a, **kw):
+            calls["n"] += 1
+            raise RuntimeError("simulated parse failure after the swap")
+
+        monkeypatch.setattr(Orchestrator, "run_parse", _fail_the_new_draft)
+        resp = http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(BETA_SCRIPT), "beta.fountain")},
+            content_type="multipart/form-data",
+        )
+        monkeypatch.setattr(Orchestrator, "run_parse", real_run)
+        assert calls["n"] == 1, "the failure must come from the swapped-in draft"
+
+        assert resp.status_code == 500
+        assert "back on" in resp.get_json()["error"]
+        after = http_client.get(f"/api/projects/{project}/script").get_json()
+        assert after == before, "the writer must be on the draft they started on"
+        assert http_client.get(f"/api/projects/{project}/report").status_code == 200
+
+
+class TestActivationRestoresTheParseStage:
+    def test_switching_back_brings_the_parse_stage_with_it(self, http_client):
+        """A restored parse must not inherit the FAILED status of a later
+        attempt. Measured before the fix: `/script` refused a draft whose
+        parsed.json was sitting right there."""
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(BETA_SCRIPT), "beta.fountain")},
+            content_type="multipart/form-data",
+        )
+        # Make the live parse stage genuinely `failed` — the state a bad upload
+        # used to leave behind. Without the fix, activation restored parsed.json
+        # but kept this status, so `/script` refused a draft whose parse was
+        # sitting right there on disk.
+        from screenplay_studio.manifest import StageStatus
+        m = ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project))
+        m.stages["parse"] = StageStatus(status="failed", error="a parse that failed")
+        m.save()
+
+        assert http_client.post(
+            f"/api/projects/{project}/drafts/activate", json={"name": "original"}
+        ).status_code == 200
+        # `/drafts` carries no stage map — read the project endpoint, which does.
+        stage = http_client.get(f"/api/projects/{project}").get_json()["stages"]["parse"]
+        assert stage == "complete", (
+            "the snapshot's parse was complete, so the restored draft is parsed")
+        assert http_client.get(f"/api/projects/{project}/script").status_code == 200
+
+
+def test_a_damaged_stage_record_refuses_the_switch_without_moving(tmp_path, monkeypatch, mock_server):
+    """Damage is not absence (the fault-injection contract, applied to this
+    store): a truncated stage record must refuse the activation BEFORE the
+    writer is moved, not apologise afterwards."""
+    webapp_server.PROJECTS_DIR = str(tmp_path / "proj_api")
+    os.makedirs(webapp_server.PROJECTS_DIR, exist_ok=True)
+    webapp_server.CONFIG["server_url"] = mock_server
+    webapp_server.CONFIG["model"] = None
+    webapp_server.app.config["TESTING"] = True
+    client = webapp_server.app.test_client()
+
+    project = _upload(client, SAMPLE_SCRIPT).get_json()["project"]
+    client.post(f"/api/projects/{project}/analyze")
+    client.post(
+        f"/api/projects/{project}/drafts",
+        data={"file": (io.BytesIO(BETA_SCRIPT), "beta.fountain")},
+        content_type="multipart/form-data",
+    )
+    sidecar = diff.snapshot_stage_path(
+        diff.draft_dir(ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project)),
+                       "original"))
+    with open(sidecar, "w", encoding="utf-8") as f:
+        f.write('{"parse": "comp')  # crash-truncated
+
+    before = client.get(f"/api/projects/{project}/script").get_json()
+    resp = client.post(f"/api/projects/{project}/drafts/activate", json={"name": "original"})
+    assert resp.status_code == 400
+    assert "unreadable" in resp.get_json()["error"]
+    assert client.get(f"/api/projects/{project}/script").get_json() == before
+    active = client.get(f"/api/projects/{project}/drafts").get_json()["active_draft"]
+    assert active == "draft-1", "a refused switch must not move the writer"

@@ -3522,6 +3522,33 @@ def list_drafts(name):
     return jsonify({"active_draft": m.active_draft, "drafts": m.drafts})
 
 
+def _validate_draft_upload(path: str, filename: str) -> None:
+    """Parse an upload in a QUARANTINE before it is allowed to replace anything.
+
+    Gap 64, measured: a non-screenplay `.fdx` was copied over the active source,
+    the parse failed, and the writer was left on a broken active draft — the
+    previous good report still on disk but `/report` answering 400, `/script`
+    refusing because the parse stage said `failed`, and the edits already
+    reset. Nothing about that state was recoverable in one step.
+
+    The upload is parsed here, from the temp file, while the project is still
+    untouched. A file that cannot be parsed never becomes the active draft, so
+    the failure mode is a 400 and an unchanged project instead of a wrecked one.
+
+    Deliberately NOT done here: the knowledge graph is not built (the real parse
+    does that at the end, and building it twice doubles the cost of the good
+    path). This is a gate, not a rehearsal — it answers "can this file become a
+    screenplay at all", which is exactly the question that stranded the writer.
+    """
+    from screenplay_parser import parse_screenplay  # lazy: see AGENTS.md
+    try:
+        parse_screenplay(path)
+    except Exception as e:  # noqa: BLE001 — any parser failure means "not a draft"
+        raise ValueError(
+            f"{filename} could not be read as a screenplay ({e}). "
+            "The current draft was left untouched.") from e
+
+
 @app.route("/api/projects/<name>/drafts", methods=["POST"])
 def upload_draft(name):
     """Upload a new draft: snapshots the current active draft, then re-parses
@@ -3551,13 +3578,41 @@ def upload_draft(name):
 
     tmp_path = os.path.join(m.project_dir, f"_draft_upload{ext}")
     upload.save(tmp_path)
+    previous_draft = m.active_draft or "original"
     try:
+        # GATE FIRST (gap 64): nothing in the project is touched until the file
+        # has been shown to be a screenplay. A rejected upload is a 400 with the
+        # project byte-identical to what it was.
+        try:
+            _validate_draft_upload(tmp_path, upload.filename)
+        except ValueError as e:
+            return _error(str(e), 400)
+
         from .diff import upload_new_draft
         upload_new_draft(m, tmp_path, upload.filename)
         orch = Orchestrator(m)
         orch.run_parse()
     except Exception as e:
-        return _error(f"Could not process new draft: {e}", 500)
+        # The gate above makes this unlikely, not impossible (a parse can fail
+        # for reasons that only appear on the second read: a file that changed
+        # under us, a full disk). The draft has already been swapped by now, so
+        # the writer is stranded unless we put them back — the snapshot taken by
+        # `upload_new_draft` makes that one call, and it is the recovery the gap
+        # asked for. If the rollback itself fails, say BOTH things: a writer who
+        # is told only "could not process" will not know where they landed.
+        try:
+            from .diff import activate_draft
+            activate_draft(m, previous_draft)
+            rolled_back = True
+            rest = ""
+        except Exception as inner:  # noqa: BLE001
+            rolled_back = False
+            rest = (f" Restoring '{previous_draft}' also failed ({inner}) — "
+                    "re-upload it from your copy.")
+        return _error(
+            f"Could not process new draft: {e}"
+            + (" You are back on '" + previous_draft + "'." if rolled_back else rest),
+            500)
     finally:
         # Cleanup is NOT the operation, and a `finally` is the worst place to
         # raise from: an exception here REPLACES any in-flight one, so a failed
