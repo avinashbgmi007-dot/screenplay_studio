@@ -137,7 +137,7 @@ These are not in doubt and should not have been interleaved with inference-grade
 
 ## 8. New entries from the two areas left ungraded — and their grades
 
-**A — 109. `ruff check .` would fail in CI, but the local packages pass.** The repository's own lint gate runs `ruff check .` at the root while my earlier clean run scoped four package directories. Building the conclusion honestly: the *packages* are clean; the gate's scope is wider, so the pass I reported did not prove what CI proves. This is a process/verification note about my own claim, kept as a gap only because a reader would otherwise take "ruff clean" as CI-parity. Low consequence; **check the root scope before claiming green.**
+**W — 109 (withdrawn before it was ever filed as a defect).** I suspected my "ruff clean" claim only covered four package directories while CI runs `ruff check .` at the root. I checked: **`ruff check .` at the root passes.** There is no gap. I am leaving the note in only because the discipline it demonstrates — verify the claim you already published — is the point of this document, and because a reader deserves to see a suspicion resolved rather than silently dropped.
 
 **B — 110. A missing source file produces a raw traceback instead of a sentence.** `python -m screenplay_studio run missing.fountain --project …` exits 1 and prints `FileNotFoundError: [Errno 2] No such file or directory` as a traceback. The CLI's own contract (clean messages, machine-usable exit codes) is met on exit status but not on readability, and it is inconsistent with the web app, which turns the same condition into a JSON message. Reachable only by a scripted or mistyped invocation. **Recommendation:** catch the file error at the CLI boundary and print one actionable line naming the argument.
 
@@ -150,6 +150,6 @@ These are not in doubt and should not have been interleaved with inference-grade
 - **Twelve entries carry real weight**: 1, 3, 4, 18, 21, 23, 62, 63, 64, 65, 87, 106. Eleven of them are data-safety or truthfulness; one (106) is the product gap.
 - **About fifty are legitimate but conditional**: they need concurrency, a stubbed collaborator, a damaged store, an unusual API client, or a real model to matter.
 - **About forty are inference, documentation, or opinion.** They belong in an appendix, clearly marked, so that nobody — including me — reads them as a bug count.
-- **Four are withdrawn entirely** (103 as written, 104 as written, 91 as framed, 67 as filed).
+- **Five are withdrawn entirely** (103 as written, 104 as written, 91 as framed, 67 as filed, and 109 which never became a gap).
 
 I would defend the twelve. I would caveat the fifty. I would not have written several of the forty. That is the standard I should have applied from the first batch, and it is the standard I will apply to the remaining sweep.
