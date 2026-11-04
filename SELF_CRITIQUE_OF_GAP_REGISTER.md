@@ -557,3 +557,51 @@ draft never had.
 character analytics — still stay bound to the outgoing draft), 64 (a failed upload can become the active draft),
 65 (a running analysis can publish into a draft the writer has since left). Those are the rest of the step-2
 bundle contract; gap 1 was the part that destroyed work in the ordinary case, and it is closed.
+
+
+## 28. Third fix — 63 and 65, and the limits I am not going to paper over
+
+**63: the bundle, not three files.** `snapshot_active` and activation now move every per-snapshot file, not just
+`parsed.json` + the report pair: the knowledge graph, the dismissed-findings store, finding marks, the ambiguous
+marks and the last-pass dedup snapshot. A member the snapshot lacks is **removed** from the live project on switch
+rather than left behind, because a file that survives a switch is a claim about the draft the writer is now
+looking at.
+
+The reproduction was worse than the entry said. The entry described a stale cast appearing; in fact after
+uploading a new draft and switching back, `/characters` returned **`[]`** — the graph on disk belonged to the new
+draft, and the restored parse no longer matched it, so the writer's original draft lost its cast entirely. Post-fix,
+`['ALPHA']` both before and after the round trip.
+
+What is deliberately **not** in the bundle, and why: `sessions/` (a switch does not end a conversation, and chat
+threads have their own scope), stash/notes (the writer's material *about* the work, not a product of one
+snapshot), and the lock files. The list is "per-snapshot state", not "everything in the directory" — and it is one
+function, `_bundle_files`, so the next person can audit the boundary in one place instead of guessing.
+
+**65: the honest fix is a closed door, not a generation tag.** An analysis keeps publishing into whatever the
+active draft becomes. Tagging every write with a generation id and refusing a publish whose generation has moved
+is the thorough answer — and it changes what "publish" means for every caller, in a module I cannot exercise
+against a real model. So I closed the window instead: `/drafts` and `/drafts/activate` answer **409** while the
+per-project analysis lock is held, and work again the moment the run ends. That is the same lock `/analyze` and
+`/retry-failed` already take, so the check and the run cannot interleave.
+
+**Three limits, stated rather than hidden:**
+
+1. **A lease, not a proof.** If a publish happens just after a switch that raced the lock — a second process, or a
+   future worker that does not take this lock — the wrong-draft publication is still possible. Gap 65's mechanism
+   is narrowed, not eliminated. The register entry says so rather than claiming it fixed.
+2. **The UI has to cope.** A 409 on a draft picker is new behaviour; before, the switch appeared to succeed. Until
+   the SPA shows "analysis running — wait", the writer will see a picker that silently refuses. I did not change
+   the front end, so this is a real, deliberate follow-up rather than something the backend fix completed.
+3. **A switch still races a *completed* run's tail.** `record_analysis` and `_record_pass` run after the lock is
+   released in `finally`, so a switch landing in that window can attribute history to the draft the writer moved
+   to. Small, and I have not measured it — so I am naming it, not fixing it.
+
+**Verification:**
+
+- Through the real routes: original cast `['ALPHA']` → upload + analyze a second draft → switch back → `['ALPHA']`,
+  with `BETA STRANGER` absent. Before the fix the same sequence ended at `[]`.
+- With the analysis lock held: activate **409**, upload **409**; after release, activate **200**.
+- Five new tests; **three fail without the fixes** and two are positive controls that pass in both states (the
+  same discipline as §27 — I am not counting guards as proofs).
+- Full suite **2261 passed, 4 skipped**; `ruff` clean. The environment was rebuilt again first — third reset this
+  session — because a suite run in a broken environment proves nothing.

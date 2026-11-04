@@ -499,3 +499,110 @@ class TestSwitchPreservesEdits:
         diff.activate_draft(m, "original")
         # Undo state came back with the draft, so redo can still run.
         assert os.path.exists(revision.edits_redo_path(m)), "the redo stack was lost with the switch"
+
+
+# ---------- gap 63: the whole per-snapshot bundle moves with the draft ----------
+# Restoring only parsed.json + the report pair left parsed.kg.json bound to the
+# outgoing draft, so /characters described a script the writer was no longer
+# looking at. Measured before the fix: switch back to the original draft and its
+# own cast was gone.
+
+
+BETA_SCRIPT = b"""Title: Beta
+
+INT: VAULT - NIGHT
+
+BETA STRANGER waits in the dark.
+
+BETA STRANGER
+Nobody follows me here.
+"""
+
+
+class TestSwitchRestoresTheWholeBundle:
+    def test_characters_follow_the_draft(self, http_client):
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        before = http_client.get(f"/api/projects/{project}/characters").get_json()["characters"]
+        assert before, "the original draft must have a cast to lose"
+
+        http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(BETA_SCRIPT), "beta.fountain")},
+            content_type="multipart/form-data",
+        )
+        http_client.post(f"/api/projects/{project}/analyze")
+
+        assert http_client.post(
+            f"/api/projects/{project}/drafts/activate", json={"name": "original"}
+        ).status_code == 200
+        after = http_client.get(f"/api/projects/{project}/characters").get_json()["characters"]
+        names = {c.get("name") for c in after}
+        assert names == {c.get("name") for c in before}, (
+            f"switching back showed {names}, not the original draft's cast")
+        assert "BETA STRANGER" not in names
+
+    def test_a_draft_without_a_report_does_not_inherit_one(self, http_client):
+        """The other direction: a member the snapshot lacks is removed live, not
+        left over from the draft the writer came from."""
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(BETA_SCRIPT), "beta.fountain")},
+            content_type="multipart/form-data",
+        )
+        # draft-1 was never analyzed, so switching to it must not serve a report.
+        body = http_client.post(
+            f"/api/projects/{project}/drafts/activate", json={"name": "draft-1"}
+        ).get_json()
+        assert body["stages"]["analyze"] != "complete"
+        summary = http_client.get(f"/api/projects/{project}/findings/summary").get_json()
+        assert summary.get("total_count", 0) == 0
+
+
+# ---------- gap 65: no draft switch while an analysis is running ----------
+# An analysis keeps publishing into whatever the active draft becomes, so a
+# switch mid-run writes one draft's findings into another's report. The switch
+# is now refused with 409 while the per-project analysis lock is held.
+
+
+class TestNoSwitchDuringAnalysis:
+    def test_activate_is_refused_while_an_analysis_runs(self, http_client):
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        lock = webapp_server._analyze_lock(project)
+        assert lock.acquire(blocking=False)
+        try:
+            resp = http_client.post(
+                f"/api/projects/{project}/drafts/activate", json={"name": "original"}
+            )
+            assert resp.status_code == 409
+            assert "analysis is running" in resp.get_json()["error"].lower()
+        finally:
+            lock.release()
+
+    def test_upload_is_refused_while_an_analysis_runs(self, http_client):
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        lock = webapp_server._analyze_lock(project)
+        assert lock.acquire(blocking=False)
+        try:
+            resp = http_client.post(
+                f"/api/projects/{project}/drafts",
+                data={"file": (io.BytesIO(BETA_SCRIPT), "beta.fountain")},
+                content_type="multipart/form-data",
+            )
+            assert resp.status_code == 409
+        finally:
+            lock.release()
+
+    def test_switching_works_again_once_the_run_ends(self, http_client):
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        lock = webapp_server._analyze_lock(project)
+        lock.acquire(blocking=False)
+        lock.release()
+        resp = http_client.post(
+            f"/api/projects/{project}/drafts/activate", json={"name": "original"}
+        )
+        assert resp.status_code in (200, 400)  # 400 = nothing to switch back to yet
+        assert resp.status_code != 409

@@ -1505,6 +1505,30 @@ def _analyze_lock(name: str) -> threading.Lock:
         return _ANALYZE_LOCKS.setdefault(name, threading.Lock())
 
 
+def _draft_switch_in_progress(name: str):
+    """409 response if an analysis is running for this project, else None.
+
+    A draft switch DURING a run is the gap-65 hazard: the run keeps publishing
+    into whatever the active draft becomes, so an analysis started on draft A
+    can finish by writing A's findings into draft B's report — or, worse, into
+    the live project after the writer has moved on. Closing the door for the
+    seconds a run takes is the cheap, honest fix; generation-tagging the whole
+    pipeline is the expensive one, and it changes what "publish" means.
+
+    Same lock the analyze/retry routes take, so the check and the run cannot
+    interleave. It is deliberately advisory-but-authoritative: the writer is
+    told to wait, which is true, rather than told a switch happened when the
+    run may already have finished.
+    """
+    lock = _analyze_lock(name)
+    if lock.locked() or not lock.acquire(blocking=False):
+        return _error("An analysis is running for this project — switching "
+                      "drafts now would publish its findings into the wrong "
+                      "draft. Wait for it to finish, or cancel it first.", 409)
+    lock.release()
+    return None
+
+
 @app.route("/api/projects/<name>/analyze", methods=["POST"])
 def analyze_project(name):
     try:
@@ -3507,6 +3531,10 @@ def upload_draft(name):
     except FileNotFoundError:
         return _error("Project not found.", 404)
 
+    busy = _draft_switch_in_progress(name)
+    if busy is not None:
+        return busy
+
     if "file" not in request.files:
         return _error("No file uploaded (expected multipart field 'file').")
     upload = request.files["file"]
@@ -3556,6 +3584,9 @@ def activate_draft_endpoint(name):
     draft = (body.get("name") or "").strip()
     if not draft:
         return _error("A draft name is required.", 400)
+    busy = _draft_switch_in_progress(name)
+    if busy is not None:
+        return busy
     if draft == m.active_draft:
         # Activating the already-active draft is a no-op, not an error (F-01,
         # audit 2026-09-30): activate_draft() requires a snapshot, which only

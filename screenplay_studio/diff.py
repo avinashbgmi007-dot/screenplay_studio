@@ -103,11 +103,7 @@ def snapshot_active(m, name: str) -> None:
                      os.path.join(dst, os.path.basename(m.source_path)))
     if m.stage("parse").status != "complete":
         return  # nothing parsed to snapshot
-    for src, rel in (
-        (m.parsed_path, "parsed.json"),
-        (m.report_findings_path, "report.findings.json"),
-        (m.report_md_path, "report.md"),
-    ):
+    for src, rel in _bundle_files(m):
         if os.path.exists(src):
             shutil.copy2(src, os.path.join(dst, rel))
     # The writer's own edit cycle travels with the draft (gap 1). Before this,
@@ -131,6 +127,39 @@ def snapshot_active(m, name: str) -> None:
 _WORKING = "_working.json"
 _EDITS = "_edits.json"
 _REDO = "_edits.redo.json"
+
+
+def _bundle_files(m):
+    """Every live file that BELONGS TO ONE SNAPSHOT of the script.
+
+    Restoring only `parsed.json` and the report pair left the knowledge graph
+    bound to the outgoing draft, so `/characters`, and anything else built from
+    `parsed.kg.json`, described the draft the writer had left (gap 63: after
+    switching back, the original draft showed the OTHER draft's cast — or, when
+    the graph was newer than the restored parse, no cast at all).
+
+    The finding-level stores are here for the same reason: a dismissal, a
+    finding mark and the last-pass dedup snapshot all key off finding ids that
+    belong to this draft's report. Carrying them across a switch would attach
+    one draft's judgments to another's findings.
+
+    Deliberately NOT included: sessions/ (chat threads have their own scope and
+    a switch does not end a conversation), stash/notes (the writer's material
+    about the work, not a product of one snapshot), and the locks. This list is
+    the per-snapshot set, not "everything in the directory".
+    """
+    from .revision import (ambiguous_marks_path, dismissed_path,
+                           finding_marks_path, last_pass_path)
+    return (
+        (m.parsed_path, "parsed.json"),
+        (m.kg_path, "parsed.kg.json"),
+        (m.report_findings_path, "report.findings.json"),
+        (m.report_md_path, "report.md"),
+        (dismissed_path(m), "dismissed_findings.json"),
+        (finding_marks_path(m), "finding_marks.json"),
+        (ambiguous_marks_path(m), "finding_marks.ambiguous.json"),
+        (last_pass_path(m), "last_pass.json"),
+    )
 
 
 def restore_edit_cycle(m, name: str) -> None:
@@ -258,20 +287,18 @@ def activate_draft(m, name: str):
     # draft being left, which is wrong, but the writer's copy is unrecoverable
     # and a stale source can be re-uploaded.
 
-    # Restore the snapshot's derived files. A draft that was never analyzed
-    # clears the active report rather than leaving the previous draft's findings
-    # attributed to a script that never produced them — `_reset_derived_state`
-    # below re-queues analysis either way, and the outgoing report survives in
-    # that draft's own snapshot.
-    for target, src in (
-        (m.parsed_path, parsed_src),
-        (m.report_findings_path, os.path.join(d, "report.findings.json")),
-        (m.report_md_path, os.path.join(d, "report.md")),
-    ):
+    # Restore the WHOLE bundle, not just the parse and the report pair (gap 63):
+    # a member the snapshot lacks is REMOVED from the live project rather than
+    # left behind, because a file that survives a switch is a claim about the
+    # draft the writer is now looking at, and a draft that was never analyzed
+    # has no report, no graph and no finding marks to inherit. The outgoing
+    # draft keeps its own copy in this snapshot, taken above.
+    for live, rel in _bundle_files(m):
+        src = os.path.join(d, rel)
         if os.path.exists(src):
-            shutil.copy2(src, target)
-        elif os.path.exists(target):
-            os.remove(target)
+            shutil.copy2(src, live)
+        elif os.path.exists(live):
+            os.remove(live)
 
     _reset_derived_state(m)
     # ...and put THIS draft's edits back, if it had any. After
