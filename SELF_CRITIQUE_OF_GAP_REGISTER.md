@@ -433,3 +433,23 @@ truthfulness, then 119. The intent work is still the thing worth evaluating firs
 decision the writer and the collaborator designs should take, not as defect 106. And the two guard-strength items
 (127, 128) are the only entries that would prevent a regression rather than repair anything, which is why they sit
 at the bottom of the fix order rather than the top.
+
+
+## 25. What the prune does not fix — honest closing note
+
+Pruning made the register shorter and more honest. It did not make the remaining entries better evidenced, and
+three limits survive intact:
+
+1. **Ten entries are still grade C** — read in code, never driven. They are the ones most likely to be wrong, and
+   nothing about this pass changed that. They are now marked as such per entry instead of being averaged away.
+2. **Every UI claim still rests on source, DOM or test-client reading.** The browser gate cannot open in this
+   environment (`cdn.playwright.dev` unreachable, no system browser), so 17 and the browser half of 5 remain
+   unverified by me. A networked machine settles that in one command.
+3. **Four areas cannot be graded here at all** (122): real-model behaviour, audience reception of Darshi and Pain 3,
+   screen-reader output, non-Linux filesystem semantics. No amount of further pruning reaches them.
+
+What I would now defend, in one sentence: **the software is careful in the small and inconsistent at the seams** —
+fourteen places where two honest components disagree about which draft, run or generation a claim belongs to, plus
+one containment hole (62) and one privilege-free but real evidence falsehood (23, where a different Telugu word
+verifies as an exact quote). Everything else in the 108 is either conditional, cosmetic, or a documentation
+mismatch, and it says so per entry now.
