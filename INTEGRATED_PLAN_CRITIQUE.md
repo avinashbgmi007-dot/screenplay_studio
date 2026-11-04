@@ -180,3 +180,19 @@ Three consequences for the plan:
 - **The collaborator work still cannot be validated here.** Sameer and Sushruta quality, grounded disagreement, and performance across models need a real endpoint the user runs; everything in this sweep about them is prompt shape, context assembly, transport and failure behaviour. The evaluation gate in §5 stays a prerequisite for claiming the redesign succeeded.
 
 Recommended next step before any code: approve the contracts in §4 plus the recovery surface, then let me prototype the journey screens against them for critique.
+
+## 9. The one architectural cause behind most of the register
+
+Reading the sweep back in order, the ~108 entries reduce to a single missing idea: **the system has no unit of identity for "what the writer was looking at when a claim was made".** Drafts are folder names, reports are files, findings are content hashes, runs are stage statuses, chat turns are messages, and intent is prose in a separate card. Each store is individually careful — there are real locks, atomic writes, damage detection, backups — and yet nearly every serious finding is a disagreement *between* those stores: a report published against a draft it did not read, characters from one draft shown against another, a restored parse whose stage status belongs to a failed attempt, a demo banner decided by today's settings over yesterday's run, a knowledge graph from the wrong bundle, a finding whose rule may not have been in the prompt.
+
+So the coordinated plan should be stated as five contracts, not 108 fixes:
+
+1. **Identity.** One immutable snapshot id per script state; one run id per analysis; one finding id stable across re-analysis and scoped to the snapshot that produced it; one intent record per scene and per finding.
+2. **Containment.** Every path derived from user input or from a stored name resolves inside its own project and nowhere else, checked at one chokepoint, tested with traversal and cross-project names.
+3. **Atomic publication.** A run writes into its own generation; publication is a single pointer swap that is refused if the snapshot moved. Failed or cancelled runs never overwrite a previous good report, and the desk always serves the last successfully published generation plus its true status.
+4. **Whole-bundle restore.** A draft is a bundle (source, parse, graph, report pair, derived analytics, working edits and their history). Switching restores all of it or visibly marks what is missing — never a mixed state presented as success.
+5. **Honest provenance.** Every served and exported artefact carries: snapshot id, run id, provider/model identity, whether the output was a stand-in, which rules were actually supplied, and the evidence tier of each claim. Anything unknowable says "unknown" rather than being inferred from current settings.
+
+Everything else in the register is either a consequence of these five being absent, a quality problem that needs a real model to evaluate (Sameer/Sushruta voice, grounding accuracy), or a content problem (the KB's missing pacing/continuity coverage).
+
+**What I recommend approving first:** contracts 1–5 plus the recovery surface in gap 97, with the intent brief (gaps 106–108) as the product change that makes the redesign worth doing. The visual journey stays unapproved until those exist, because a beautiful desk over a mixed-state store would reproduce every failure this sweep found — just more quietly.
