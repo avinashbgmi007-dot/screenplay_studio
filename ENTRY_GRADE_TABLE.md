@@ -190,7 +190,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 110 | **B** | Real CLI, missing source file | Traceback and exit 1 instead of one actionable line. **FIXED 2026-11-04** — one actionable line + exit 2; no directory left behind. | **G** |
 | 111 | **A** | Real CLI create + `status` | Round-trip works; positional asymmetry (`--project` versus positional) is the only defect. **FIXED 2026-11-04** — `run` accepts the project positionally and via `--project`. | **G** |
 | 112 | **D** | `du` over the repo | `docs/` 12 MB, `impl-shots/` 7.2 MB. Housekeeping. | **G** |
-| 113 | **A** | `/fixqueue` and `/findings/summary` on a two-finding project | `total_count 2`, `open_count 2` while the desk hides the ungrounded row. | **G** |
+| 113 | **A** | `/fixqueue` and `/findings/summary` on a two-finding project | `total_count 2`, `open_count 2` while the desk hides the ungrounded row. **FIXED 2026-11-04** — both routes now ship the grounded/ungrounded split (`ungrounded_count`, `ungrounded_hidden_count`, `open_visible_count`), using the desk's own precedence. **Partly a self-correction:** the claim that the mass strip and dawn meter print this number is wrong — they use `findingCounts()`, which labels whole-script scope — so the impact was an API limitation, not a writer-facing lie. 5 of 7 tests fail without the fix; 2 are static guards. Critique §38. | **G** |
 | 114 | **–** | Same probe | **Negative:** summary, queue and `/report` agree on the ordinary serve path. | **–** |
 | 115 | **B** | One-scene script | `scene_count: 0` in act buckets. Cosmetic display. | **G** |
 | 116 | **–** | Headers read | `X-Frame-Options` absent but CSP `frame-ancestors 'self'` covers it. Not a defect; do not "fix" it. | **–** |

@@ -995,3 +995,56 @@ that were all `ModuleNotFoundError` for the two optional packages, not real fail
 baseline was the expected 2328 passed. I verified that before touching any code.
 
 Full suite **2343 passed, 7 skipped**; `ruff` clean.
+
+## §38 — Gap 113: served counts vs what the desk shows (2026-11-04)
+
+**The reproduction stands; the impact I filed with it does not.** This is a partial retraction, not a fix report.
+
+**What I reproduced at the time:** a two-finding project (one grounded, one `ungrounded`) answers
+`/fixqueue` `total_count: 2` and `/findings/summary` `open_count: 2` while the desk hides the ungrounded row.
+Re-ran it today: identical.
+
+**What I got wrong.** §20 said "the number the writer sees is the *internal* set" and named "the ledger's mass
+strip and dawn meter" as printing it. Reading and then **executing** the shipped client:
+
+* **mass strip**: `buildScriptMassStrip()` prints `findingCounts()` — `"N open of M findings"` over the whole
+  script, followed by `"· K shown by filter"` whenever the filter narrows it. It is a whole-script total that
+  says so on its face.
+* **queue header**: `queueCounts(shown)` **does** drop ungrounded rows (`item.ungrounded && !state.fixQueueShow
+  Ungrounded` with the writer-disposition exemption), printed as `"1 open / 1 shown / 2 total"`. Executed the
+  extracted helpers under Node: with one grounded + one ungrounded and the toggle off, `findingCounts()` gives
+  `total 2, open 2, shown 1`.
+* **the summary itself is read by nothing.** `state.findingsSummary` is assigned at `app.js:407` and `:4346` and
+  read at no site. The only reader of `open_count` outside tests is `preview-ink-layer/core.js`, a prototype no
+  route serves.
+
+So I filed a genuine API limitation as a writer-facing lie about the numbers, and dressed it in the register's
+severity-A voice. That is the same failure §16 admits to — uniform tone over non-uniform evidence — and I did it
+again on a fresh entry.
+
+**What is actually wrong, and what I changed.** A machine consumer of these routes cannot tell "2 open" from "2
+open, one of which the desk will not show". The counts were honest as whole-script totals; the *split* was
+missing. Both routes now ship it:
+
+| key | meaning |
+|---|---|
+| `ungrounded_count` | rows flagged ungrounded, on either route |
+| `ungrounded_hidden_count` | ungrounded rows with **no** writer mark — what the toggle hides |
+| `open_visible_count` | `open_count` minus the above |
+| `grounded_count` | (`/fixqueue`) the other half of `total_count` |
+
+The precedence is **copied from the desk, not invented**: `findingCounts`/`queueCounts` exempt a row the writer
+has marked addressed or deferred, so an ungrounded row they have already judged does not hide. My first cut
+counted every ungrounded row as hidden, which would have re-created the exact drift this register keeps finding;
+the two precedence tests fail when that exemption is removed.
+
+**Evidence.** 7 tests; **5 fail** against the pre-fix routes. The other **2 are static guards**, not evidence —
+they pin the mass strip's scope disclosure and the toggle's exemption so the precedence cannot silently drift.
+Against pre-fix code they pass, and I am labelling them as guards rather than counting them.
+
+**What I did not do.** I left `open_count` as the whole set rather than redefining it to mean "visible". Redefining
+a field a consumer may already read is how a counting contract drifts, and the whole-script number is the one the
+desk's own headline uses. If the owner prefers `open_count` to be the visible number, that is a one-line change
+plus a rename, and it should be decided deliberately rather than smuggled in here.
+
+Full suite **2350 passed, 7 skipped**; `ruff` clean.

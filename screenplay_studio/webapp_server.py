@@ -2821,10 +2821,19 @@ def _build_fixqueue(m) -> dict:
     visible = [i for i in items if include_dismissed or not i["dismissed"]]
     # The writer's ledger flags for the client counting contract (N3): the
     # dock's evidence lens reads these so totals agree with the fix queue.
+    # Gap 113: `total_count` is every row the server holds, which is MORE than
+    # the desk's default view — ungrounded rows are hidden behind a toggle. The
+    # number was never wrong, but it was the only number on the payload, so a
+    # consumer that simply printed it printed a count of the internal set. The
+    # split ships WITH the total so the distinction travels with the data
+    # instead of living in the client's toggle state.
+    ungrounded = sum(1 for it in items if it.get("ungrounded"))
     return {"items": visible, "acts": acts,
             "dismissed_flags": [{"index": it["index"], "finding_id": it["finding_id"]}
                                 for it in items if it["dismissed"]],
             "dismissed_count": len(items) - len(visible),
+            "ungrounded_count": ungrounded,
+            "grounded_count": len(items) - ungrounded,
             "total_count": len(items)}
 
 
@@ -2897,11 +2906,34 @@ def get_findings_summary(name):
         else:
             open_count += 1
     total = len(items) - dismissed
+    # Gap 113: say which rows the writer can see by default. `open_count` above
+    # is still the WHOLE set — that is the honest total, and the desk's own
+    # arrival headline ("N highs") and mass strip ("N open of M findings") print
+    # whole-script scope and say so. What was missing is the breakdown, so a
+    # consumer cannot tell "2 open" from "2 open, one of which you cannot see".
+    #
+    # The precedence is copied from the desk rather than invented here: a row
+    # the writer has ALREADY marked addressed or deferred is theirs, so it does
+    # not hide behind the groundedness toggle (`findingCounts` console line ~7777
+    # and `queueCounts`). An ungrounded row with no writer mark is hidden until
+    # the toggle is flipped.
+    hidden_ungrounded = 0
+    for it in items:
+        if it["dismissed"] or not it.get("ungrounded"):
+            continue
+        marked = intents.get(it["finding_id"])
+        if marked in ("addressed", "deferred"):
+            continue
+        hidden_ungrounded += 1
+    ungrounded_total = sum(1 for it in items if it.get("ungrounded"))
     return jsonify({
         "total_count": len(items),
         "dismissed_count": dismissed,
         "open_count": open_count,
         "done_count": done_count,
+        "ungrounded_count": ungrounded_total,
+        "ungrounded_hidden_count": hidden_ungrounded,
+        "open_visible_count": open_count - hidden_ungrounded,
         "dawn_pct": (round(100 * done_count / total) if total else 0),
         "by_severity": by_severity,
         "by_category": by_category,

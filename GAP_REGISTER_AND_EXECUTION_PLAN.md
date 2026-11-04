@@ -441,7 +441,7 @@ These were collected after the numbered sections above and are recorded in full 
 | 110 | B | A missing source file produces a raw traceback and exit 1 instead of one actionable line | genuine gap — **FIXED 2026-11-04**: one actionable line, exit 2, and `create` checks the source before claiming the directory. See critique §32. |
 | 111 | A | CLI round-trip works; `status` takes the project positionally while `run` requires `--project` | genuine gap (documentation) — **FIXED 2026-11-04**: `run` accepts both spellings. See critique §32. |
 | 112 | D | Repository weight: `docs/` 12 MB, `impl-shots/` 7.2 MB | genuine gap (housekeeping) |
-| 113 | A | `/fixqueue` and `/findings/summary` count rows the desk hides by default (`total_count 2`, `open_count 2`) | **severe list** |
+| 113 | A | `/fixqueue` and `/findings/summary` count rows the desk hides by default (`total_count 2`, `open_count 2`) | genuine gap — **FIXED 2026-11-04**: the split now ships on both routes with the desk's own precedence. **Impact corrected:** the desk does NOT print these numbers — its mass strip uses `findingCounts()` and labels whole-script scope, and nothing reads `findingsSummary` — so this was an API limitation, not a writer-facing miscount. See critique §38. |
 | 114 | – | Summary, queue and `/report` agree on the ordinary serve path | tested, not a defect |
 | 115 | B | Act buckets show `scene_count: 0` for a one-scene script | genuine gap (cosmetic) |
 | 116 | – | No `X-Frame-Options`; the CSP's `frame-ancestors 'self'` covers it | tested, not a defect |
