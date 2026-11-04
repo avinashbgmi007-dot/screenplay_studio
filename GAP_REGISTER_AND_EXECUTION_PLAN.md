@@ -288,6 +288,14 @@ An adversarial self-review of this register is in **`SELF_CRITIQUE_OF_GAP_REGIST
 
 The numbered entries below are unchanged as the evidence record. Where this note conflicts with an entry, **this note is the corrected reading**. Fourteen entries carry real weight: 1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119. Everything else is conditional, inferential or cosmetic, and should be read that way. **Ordering:** 62 first, then revision safety, then publication truthfulness — and 119 immediately behind those, because a broken rules install should say "your install needs repair", not "your script cannot be analysed".
 
+## Per-entry grades
+
+Grades are no longer only in prose. **`ENTRY_GRADE_TABLE.md`** grades all 124 numbered entries
+individually, explains the rule used for each grade, and carries the counts computed from those rows:
+50 A / 43 B / 11 C / 10 D, with 6 withdrawn and 4 proven non-gaps. If a grade in this file's prose ever
+conflicts with that table, the table is the corrected reading. The severe list is unchanged and separate:
+1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119.
+
 ## Segregated triage — one coordinated backlog, not separate fixes
 
 The numbered entries remain the evidence source; a gap can belong to more than one journey. Nothing is marked fixed.

@@ -172,6 +172,12 @@ After all three passes, with duplicates collapsed and withdrawals applied:
 
 | | Count | What they are |
 |---|---|---|
+> **Superseded.** These aggregate rows were a reading aid and two of them were wrong. Every entry now
+> has its own grade in **`ENTRY_GRADE_TABLE.md`**, counted by parsing rather than by memory: **124 entries,
+> 50 A / 43 B / 11 C / 10 D, 6 withdrawn, 4 proven negatives**. Where these rows disagree with that table,
+> the table wins. Kept for the record because silently deleting my own wrong numbers is the habit this
+> document exists to criticise.
+
 | **A** — defended under questioning | 23 | 1, 3(partly), 4, 18(store-level), 21, 23, 25, 44, 51, 52, 61, 62, 63, 64, 65, 70, 72, 77, 87, 113, 118, 119, 123 |
 | **B** — real mechanism, constructed or conditional | 34 | the concurrency, credential, publication and provider families |
 | **C** — source inference / contract asymmetry | 18 | 91, 94, 98(partly), 99, 104(bounded), 105, 107, 111, 115 |
