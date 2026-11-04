@@ -806,3 +806,11 @@ Genuinely unreviewed, stated plainly so nobody mistakes this for total coverage:
 - audience reception of either attached screenplay, which is the user's untested question and not something a code sweep can answer.
 
 The register stands at 108 uniquely numbered gaps. That number is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order is unchanged and starts with identity, containment, atomic publication and whole-bundle restore.
+
+## Self-critique pass — reviewed scope and corrected standard
+
+Re-ran the four highest-severity early findings through real interfaces (draft switch destroying edits, export speaker merge, Indic quote normalization, draft-name containment), then graded the whole register: A = real-interface reproduction, B = constructed/conditional, C = source inference, D = opinion/docs, W = withdrawn. Results, corrections and the five withdrawals are in `SELF_CRITIQUE_OF_GAP_REGISTER.md`, and a headnote in `GAP_REGISTER_AND_EXECUTION_PLAN.md` carries the corrected reading.
+
+Also graded the previously ungraded surfaces this pass: the SPA document and its security headers (strict CSP with frame-ancestors, nosniff, no-referrer, no inline handlers, no external origins — no gap), `/api/config` secret withholding (no leak — reproduced negative), `ruff check .` at the repository root (passes — withdrawn suspicion), CLI create/status round-trip (works; positional asymmetry noted), repository weight (`docs/` 12 MB, `impl-shots/` 7.2 MB — housekeeping only), and summary/queue/count arithmetic agreement (one real inconsistency, finding 113).
+
+**Stop rule:** findings had stopped being independent — the last several batches produced new instances of the same composition seam rather than new mechanisms. Remaining unverifiable-here areas are named explicitly in `SELF_CRITIQUE_OF_GAP_REGISTER.md` §13 (real-model behaviour, audience reception, assistive technology, non-Linux platforms, preview-lab internals). No application code changed in this pass; the suite remained green and root lint clean.
