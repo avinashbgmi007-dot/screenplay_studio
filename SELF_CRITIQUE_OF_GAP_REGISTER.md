@@ -778,3 +778,36 @@ claimed as part of this change.
 grounding, which is the conservative choice but not a graceful one). Nothing re-reads a KB that was damaged and
 then repaired except the paths that call `_reset_kb_caches`. The health check loads the KB, so it pays a small cost
 on each call — acceptable at 263 rules, named rather than hidden.
+
+
+## 32. Step 5 — the CLI and the JS count (110, 111, 121)
+
+**110 — tracebacks instead of a sentence (fixed).** Measured: `status` on a project whose `project.json` lacks a
+field exited with `KeyError: 'project_dir'`; `status` on a directory with no manifest did the same with
+`FileNotFoundError`; and `run --project NEW missing.fountain` raised through `shutil.copy2` **after**
+`ProjectManifest.create` had already made the directory — so a mistyped path left an empty project on the shelf.
+Now: one actionable line, exit 2 (usage error, not 1, which the rest of the CLI reserves for a failed pipeline),
+and `create` checks the source before claiming anything. Also caught in passing: `run` treated *any* load failure
+as "new project", so a corrupt manifest would have been silently replaced by a fresh one — that now exits 2 and
+keeps the record.
+
+**111 — `run` was the odd command out (fixed).** `resume` and `status` take the project positionally; `run`
+required `--project`, so the obvious `run myproject/` was read as a source file and died on a traceback. `run` now
+accepts both: `--project` wins, a first positional that is a directory is the project, one that is a file is the
+source (with the project named after it, as `run script.fountain` always meant), and neither is a usage error that
+says what to type.
+
+**121 — the JS total was typed, not derived (fixed).** Verified from a clean `npm ci`: `npm test` is **134 tests,
+134 pass**, not the 127 the docstring claimed (ink-layer 110 + `tests/js` 24). The docstring now says how to read
+the number instead of remembering it, and `npm run test:js-only` exists so `tests/js` can be run alone (`node --test
+tests/js/` fails on Node 22 — a bare directory is treated as a module path).
+
+**Self-review notes.** One of my early tests "passed" pre-fix for the wrong reason: argparse rejected the `run P`
+spelling before my assertion could distinguish anything. It now asserts that the positional path was *not* rejected
+and that the command got as far as producing output, and it fails pre-fix with the rest. Five of seven fail without
+the fix; the two that pass are the `status` round trip (unaffected) and are guards, not evidence.
+
+**Not done, deliberately.** 112 (repository weight, ~19 MB of `docs/` and `impl-shots/`) and 124 (the evidence bound
+in "verified against both PDFs") are documentation/judgement entries, not code defects. Moving or deleting the
+repository's own audit history is the owner's call, not mine to make silently, and 124's fix is a wording change to
+claims about evidence I cannot re-measure here. I am leaving both un-fixed and saying so rather than marking them.

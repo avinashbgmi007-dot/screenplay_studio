@@ -357,6 +357,14 @@ class ProjectManifest:
 
     @staticmethod
     def create(project_dir: str, source_file: str, title: str = None) -> "ProjectManifest":
+        # Gap 110: the directory used to be created BEFORE the source was
+        # copied, so a mistyped source path left an empty project directory
+        # behind (and, in the CLI, an uncaught traceback). Check first, then
+        # claim: a rejected source leaves nothing on the shelf to clean up.
+        if not os.path.isfile(source_file):
+            raise FileNotFoundError(
+                f"Source screenplay not found: '{source_file}'. "
+                "Check the path — nothing was created.")
         os.makedirs(project_dir, exist_ok=True)
         ext = os.path.splitext(source_file)[1].lower()
         manifest = ProjectManifest(

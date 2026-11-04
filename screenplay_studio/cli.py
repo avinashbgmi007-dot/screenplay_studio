@@ -19,10 +19,37 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 
 from .manifest import ProjectManifest
 from .orchestrator import Orchestrator, OrchestratorError
+
+
+def _load_project(project_dir: str, command: str) -> ProjectManifest:
+    """Load a project, or explain the one thing the writer can act on.
+
+    Gap 110, measured: a project whose `project.json` is missing a field exited
+    `status` with a raw `KeyError: 'project_dir'` traceback, and a directory with
+    no manifest at all did the same with `FileNotFoundError`. Both are the
+    writer's one-line problem — "this is not a project" / "this project file is
+    broken" — so both get one line and exit 2, the conventional CLI usage error.
+    """
+    try:
+        return ProjectManifest.load(project_dir)
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        print(f"  '{project_dir}' is not a project. Point {command} at the "
+              "directory that holds project.json.", file=sys.stderr)
+        sys.exit(2)
+    except (KeyError, ValueError, TypeError) as e:
+        print(f"ERROR: the project file at '{project_dir}' is unreadable ({e}).",
+              file=sys.stderr)
+        print("  The file is present but incomplete or corrupt. Restoring "
+              "project.json from a backup is the only safe repair; re-running "
+              "the pipeline would overwrite the record of what was done.",
+              file=sys.stderr)
+        sys.exit(2)
 
 
 def _resolve_memory(args):
@@ -62,11 +89,27 @@ def cmd_run(args):
     try:
         manifest = ProjectManifest.load(args.project)
         print(f"Resuming existing project at '{args.project}'.")
+    except (KeyError, ValueError, TypeError) as e:
+        # present but broken: `run` used to fall through to "looks like a new
+        # project" for ANY load failure, so a corrupt manifest was silently
+        # replaced by a fresh one — losing the record instead of reporting it.
+        print(f"ERROR: the project file at '{args.project}' is unreadable ({e}).",
+              file=sys.stderr)
+        sys.exit(2)
     except FileNotFoundError:
         if not args.source:
             print("ERROR: new project needs a source file argument.", file=sys.stderr)
             sys.exit(1)
-        manifest = ProjectManifest.create(args.project, args.source, title=args.title)
+        try:
+            manifest = ProjectManifest.create(args.project, args.source, title=args.title)
+        except FileNotFoundError as e:
+            # Gap 110: one actionable line, not a traceback through shutil.
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(2)
+        except (OSError, ValueError) as e:
+            print(f"ERROR: could not create a project at '{args.project}': {e}",
+                  file=sys.stderr)
+            sys.exit(2)
         print(f"Created new project at '{args.project}'.")
 
     if args.server:
@@ -116,7 +159,7 @@ def cmd_run(args):
 
 
 def cmd_resume(args):
-    manifest = ProjectManifest.load(args.project)
+    manifest = _load_project(args.project, "resume")
     if args.server:
         manifest.server_url = args.server
     if args.model:
@@ -142,7 +185,7 @@ def cmd_resume(args):
 
 
 def cmd_status(args):
-    manifest = ProjectManifest.load(args.project)
+    manifest = _load_project(args.project, "status")
     _print_status(manifest)
 
 
@@ -178,8 +221,15 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_run = sub.add_parser("run", help="Run (or resume) a project's pipeline")
+    # Gap 111: `run` was the only command whose project came from `--project`,
+    # while `resume` and `status` took it positionally — so the obvious
+    # `run myproject/` was read as a SOURCE file and died on a traceback. Accept
+    # both; `--project` wins when both are given, and `source` stays optional
+    # because a project that already exists does not need one.
+    p_run.add_argument("project_pos", nargs="?", metavar="PROJECT",
+                       help="Project directory (same as --project)")
     p_run.add_argument("source", nargs="?", help="Source screenplay file (only needed for a new project)")
-    p_run.add_argument("--project", required=True, help="Project directory")
+    p_run.add_argument("--project", dest="project_opt", help="Project directory")
     p_run.add_argument("--title", help="Project title (defaults to source filename)")
     p_run.add_argument("--server", help="llama-server base URL")
     p_run.add_argument("--model", help="Explicit model id override")
@@ -222,7 +272,40 @@ def main():
     p_watch.set_defaults(func=cmd_watch)
 
     args = parser.parse_args()
+    if args.command == "run":
+        _resolve_run_paths(parser, args)
     args.func(args)
+
+
+def _resolve_run_paths(parser, args) -> None:
+    """Turn the two accepted spellings of `run`'s arguments into one meaning.
+
+    Rules, in order: `--project` wins; otherwise a first positional is the
+    project. If only one path is given and it is a FILE, it is the source and the
+    project defaults to the directory named after it (what `run script.fountain`
+    has always meant). If it is a DIRECTORY, it is the project.
+    """
+    project = getattr(args, "project_opt", None)
+    first = getattr(args, "project_pos", None)
+    source = args.source
+
+    if project and first:
+        # `run --project P src.fountain` — one positional, so it is the source.
+        args.source = first if source is None else source
+    elif not project and first:
+        if os.path.isdir(first):
+            project = first
+        elif os.path.isfile(first):
+            # a source file: the project is its stem, as `run SRC` always meant
+            source = source or first
+            project = os.path.splitext(first)[0]
+        else:
+            parser.error(f"'{first}' is neither a project directory nor a source file")
+
+    if not project:
+        parser.error("run needs a project directory: `run PROJECT` or "
+                     "`run --project PROJECT [SOURCE]`")
+    args.project = project
 
 
 def cmd_watch(args):

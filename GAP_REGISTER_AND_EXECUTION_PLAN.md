@@ -438,8 +438,8 @@ These were collected after the numbered sections above and are recorded in full 
 
 | # | Grade | Finding | Status |
 |---|---|---|---|
-| 110 | B | A missing source file produces a raw traceback and exit 1 instead of one actionable line | genuine gap |
-| 111 | A | CLI round-trip works; `status` takes the project positionally while `run` requires `--project` | genuine gap (documentation) |
+| 110 | B | A missing source file produces a raw traceback and exit 1 instead of one actionable line | genuine gap — **FIXED 2026-11-04**: one actionable line, exit 2, and `create` checks the source before claiming the directory. See critique §32. |
+| 111 | A | CLI round-trip works; `status` takes the project positionally while `run` requires `--project` | genuine gap (documentation) — **FIXED 2026-11-04**: `run` accepts both spellings. See critique §32. |
 | 112 | D | Repository weight: `docs/` 12 MB, `impl-shots/` 7.2 MB | genuine gap (housekeeping) |
 | 113 | A | `/fixqueue` and `/findings/summary` count rows the desk hides by default (`total_count 2`, `open_count 2`) | **severe list** |
 | 114 | – | Summary, queue and `/report` agree on the ordinary serve path | tested, not a defect |
@@ -449,7 +449,7 @@ These were collected after the numbered sections above and are recorded in full 
 | 118 | A | `/api/config` exposes `allow_remote`/`connection_mode` with no machine-readable consent scope | genuine gap (informational) |
 | 119 | A | A partially corrupted KB install fails the analysis, answers 502 with parser text, then refuses `/report` while the previous report sits intact | **severe list** | **FIXED 2026-11-04** — typed KB damage: analysis still runs and reports it; rules route 503; health degraded. The '/report hidden while a good report sat on disk' half was step 3. See critique §31. |
 | 120 | – | Python floor is honest; one UTF-8 BOM in a test file | tested, not a defect |
-| 121 | D | JS docstring says 127 tests; the real total is 134, and `node --test tests/js/` fails on Node 22 | genuine gap (documentation) |
+| 121 | D | JS docstring says 127 tests; the real total is 134, and `node --test tests/js/` fails on Node 22 | genuine gap (documentation) — **FIXED 2026-11-04**: the docstring derives the count (verified 134), `npm run test:js-only` added. See critique §32. |
 | 122 | C | Four areas this sweep cannot test: real model, audience reception, screen reader, non-Linux | limit, recorded |
 | 123 | A | With the same corrupt install, `/api/health` says `ok` and `/api/rules/*` returns raw parser text where a missing install gets a designed 503 | genuine gap | **FIXED 2026-11-04** — a broken install answers 503 with a framed reason, not 400 with the parser's text; health reports `degraded`. See critique §31. |
 | 124 | D | "Verified against both PDFs" means two features by one writer in one language mix | genuine gap (a bound on the evidence) |

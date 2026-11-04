@@ -6,7 +6,13 @@
  * affect: the DOM tree, the state machine, the string replacement, the keymap
  * end-to-end, the annunciator, and the geometry the Horizon is handed.
  *
- * Run, from the REPO ROOT:  npm ci && npm test      (both JS suites, 127 tests)
+ * Run, from the REPO ROOT:  npm ci && npm test      (both JS suites)
+ *
+ * The TOTAL is not written here on purpose (gap 121). It was "127 tests" while
+ * the real number was 134 — the count had drifted and nothing could catch it,
+ * because a number in a comment is never executed. Read it from the run:
+ * `npm test` prints `# tests N` / `# pass N`, and the CI check that matters is
+ * `# fail 0`, not a remembered total.
  * Run, this suite alone:    node --test screenplay_studio/webapp/preview-ink-layer/tests/*.test.mjs
  *
  * NOT `node --test tests/` — on Node 22 a bare directory is treated as a module
