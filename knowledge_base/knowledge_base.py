@@ -75,6 +75,31 @@ class Rule:
         )
 
 
+class KnowledgeBaseDamaged(Exception):
+    """The rules directory exists but cannot be loaded.
+
+    Gap 119/123, measured: a corrupt `rules/*.json` raised `JSONDecodeError` out
+    of `KnowledgeBase()`, so the webapp answered 400 with the parser's own
+    sentence ("Expecting property name enclosed in double quotes"), health said
+    `status: ok`, and `/api/rules/<id>` could not tell a damaged KB from a
+    missing rule. The distinction this project keeps everywhere else — a store
+    that cannot be READ is not the same fact as a store that was never there —
+    was absent here.
+
+    `rules_dir` is carried so callers can say where to look without guessing,
+    and `reason` carries the underlying message for the log.
+    """
+
+    def __init__(self, rules_dir: str, reason: str):
+        self.rules_dir = rules_dir
+        self.reason = reason
+        super().__init__(
+            f"The craft knowledge base at {rules_dir} is present but could not "
+            f"be read ({reason}). Reinstalling the package restores it; until "
+            "then analysis runs without craft-principle grounding."
+        )
+
+
 class KnowledgeBase:
     def __init__(self, rules_dir: str = None):
         self.rules_dir = rules_dir or os.path.join(_KB_DIR, "rules")
@@ -83,17 +108,31 @@ class KnowledgeBase:
         self._load()
 
     def _load(self):
+        """Load every rule file, or raise `KnowledgeBaseDamaged`.
+
+        A file that exists and cannot be parsed is damage, not absence: the
+        caller must be able to tell "the KB is not installed" (a designed 503)
+        from "the KB is installed and broken" (an operator problem with a fix in
+        it). Before this, both arrived as a bare `JSONDecodeError`, which the
+        webapp rendered as 400 "your request was bad".
+        """
         for path in sorted(glob.glob(os.path.join(self.rules_dir, "*.json"))):
             fname = os.path.basename(path)
             rule_ids = []
-            with open(path, "r", encoding="utf-8") as f:
-                entries = json.load(f)
-            for e in entries:
-                rule = Rule(**e)
-                if rule.id in self._rules:
-                    raise ValueError(f"Duplicate rule id '{rule.id}' found in {path}")
-                self._rules[rule.id] = rule
-                rule_ids.append(rule.id)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    entries = json.load(f)
+                for e in entries:
+                    rule = Rule(**e)
+                    if rule.id in self._rules:
+                        raise ValueError(f"Duplicate rule id '{rule.id}' found in {path}")
+                    self._rules[rule.id] = rule
+                    rule_ids.append(rule.id)
+            except (OSError, ValueError, TypeError, KeyError) as e:
+                # ValueError covers JSONDecodeError and the duplicate-id case;
+                # TypeError/KeyError cover a file whose entries are not rules.
+                # Anything else is a bug, not a damaged KB, and still escapes.
+                raise KnowledgeBaseDamaged(self.rules_dir, f"{fname}: {e}") from e
             self._files[fname] = rule_ids
 
     def get(self, rule_id: str) -> Rule:

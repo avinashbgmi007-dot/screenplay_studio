@@ -447,11 +447,11 @@ These were collected after the numbered sections above and are recorded in full 
 | 116 | – | No `X-Frame-Options`; the CSP's `frame-ancestors 'self'` covers it | tested, not a defect |
 | 117 | – | A page that fails to parse shows a bare numeric badge — already 47/87 in spirit | not filed twice |
 | 118 | A | `/api/config` exposes `allow_remote`/`connection_mode` with no machine-readable consent scope | genuine gap (informational) |
-| 119 | A | A partially corrupted KB install fails the analysis, answers 502 with parser text, then refuses `/report` while the previous report sits intact | **severe list** |
+| 119 | A | A partially corrupted KB install fails the analysis, answers 502 with parser text, then refuses `/report` while the previous report sits intact | **severe list** | **FIXED 2026-11-04** — typed KB damage: analysis still runs and reports it; rules route 503; health degraded. The '/report hidden while a good report sat on disk' half was step 3. See critique §31. |
 | 120 | – | Python floor is honest; one UTF-8 BOM in a test file | tested, not a defect |
 | 121 | D | JS docstring says 127 tests; the real total is 134, and `node --test tests/js/` fails on Node 22 | genuine gap (documentation) |
 | 122 | C | Four areas this sweep cannot test: real model, audience reception, screen reader, non-Linux | limit, recorded |
-| 123 | A | With the same corrupt install, `/api/health` says `ok` and `/api/rules/*` returns raw parser text where a missing install gets a designed 503 | genuine gap |
+| 123 | A | With the same corrupt install, `/api/health` says `ok` and `/api/rules/*` returns raw parser text where a missing install gets a designed 503 | genuine gap | **FIXED 2026-11-04** — a broken install answers 503 with a framed reason, not 400 with the parser's text; health reports `degraded`. See critique §31. |
 | 124 | D | "Verified against both PDFs" means two features by one writer in one language mix | genuine gap (a bound on the evidence) |
 | 125 | A | `/api/stt/languages` advertises a whisper server the guard then refuses | genuine gap (low) |
 | 126 | C | No magic-byte or duration check on dictated audio | genuine gap (informational) |

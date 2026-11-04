@@ -196,11 +196,11 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 116 | **–** | Headers read | `X-Frame-Options` absent but CSP `frame-ancestors 'self'` covers it. Not a defect; do not "fix" it. | **–** |
 | 117 | **–** | Demo run | A page that fails to parse shows a bare numeric badge — already 47/87 in spirit. Not filed twice. | **–** |
 | 118 | **A** | `/api/config` with synthetic key and token | No key, no token — **negative on secrets**. `allow_remote`/`connection_mode` are plain booleans with no machine-readable consent scope. Informational. | **G** |
-| 119 | **A** | Corrupted rules dir through the real pipeline and webapp | Analyze fails `OrchestratorError`, webapp 502 with parser text, then `/report` 400 "Analysis hasn't completed" while the prior report sits intact. Empty rules dir accepted silently. | **G** |
+| 119 | **A** | Corrupted rules dir through the real pipeline and webapp | Analyze fails `OrchestratorError`, webapp 502 with parser text, then `/report` 400 "Analysis hasn't completed" while the prior report sits intact. Empty rules dir accepted silently. **FIXED 2026-11-04** — typed KB damage; analyze still produces a reading and says so, rules route 503, health degraded. (119's '/report hidden' half was step 3.) | **G** |
 | 120 | **–** | `ast.parse(feature_version=(3,10))` over every module | Python floor honest. One UTF-8 BOM in `tests/test_h7_chat_fix.py`; 5 tests pass. Hygiene note. | **–** |
 | 121 | **D** | `npm ci && npm test` | 134/134. Docstring says 127; `node --test tests/js/` fails on Node 22. Documentation and invocation trap only. | **G** |
 | 122 | **C** | — | The four areas I cannot test here, named rather than faked: real model, audience reception, screen reader, non-Linux. | **G** |
-| 123 | **A** | Corrupted rules dir, hit `/api/health` and `/api/rules/*` | Health 200 `status: ok`; rules lookup 400 with raw `JSONDecodeError` text, where a *missing* install gets a designed 503. | **G** |
+| 123 | **A** | Corrupted rules dir, hit `/api/health` and `/api/rules/*` | Health 200 `status: ok`; rules lookup 400 with raw `JSONDecodeError` text, where a *missing* install gets a designed 503. **FIXED 2026-11-04** — a broken install answers 503 with a framed reason, not 400 with the JSON parser's sentence. | **G** |
 | 124 | **D** | — | "Verified against both PDFs" means two features, one writer, one language mix. A bound on the evidence, not a gap. | **G** |
 
 ---

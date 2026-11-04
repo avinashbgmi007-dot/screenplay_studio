@@ -1273,6 +1273,11 @@ def analyze(
     _cp()
 
     try:
+        from knowledge_base import KnowledgeBaseDamaged as _KB_DAMAGED
+    except ImportError:  # pragma: no cover - the not-installed path below owns it
+        class _KB_DAMAGED(Exception):
+            pass
+    try:
         rules_ctx = RulesContext()
     except ImportError as e:
         import sys
@@ -1288,6 +1293,18 @@ def analyze(
             "without craft-principle grounding. Copy the knowledge_base/ folder next "
             "to screenplay_analyzer/ to restore it."
         )
+    except _KB_DAMAGED as e:
+        # Gap 119: a corrupt rules directory used to abort the WHOLE analysis —
+        # the writer got a 502 carrying a JSON parser's sentence and no reading
+        # at all, when every deterministic pass and every model call would have
+        # worked. A damaged knowledge base is a grounding failure, not an
+        # analysis failure: run without it and say so, exactly as the
+        # zero-rules BE-2 guard below already does for the silent case.
+        import sys
+        print(f"[screenplay_analyzer] WARNING: {e}", file=sys.stderr)
+        rules_ctx = _NullRulesContext()
+        result.errors.append(str(e))
+        result.notices.append(str(e))
     else:
         # BE-2 (audit 2026-09-24): the package can be PRESENT and still load zero
         # rules. `KnowledgeBase._load()` globs `rules/*.json` and silently yields
@@ -1303,6 +1320,11 @@ def analyze(
             import sys
             print(f"[screenplay_analyzer] WARNING: {empty_kb}", file=sys.stderr)
             result.errors.append(empty_kb)
+            # Gap 119, second half: this message went to stderr and into a field
+            # the desk does not show, so the writer saw a normal report whose
+            # findings simply stopped citing anything. Notices are what the UI
+            # renders, so the degradation is announced there.
+            result.notices.append(empty_kb)
 
     # 1. deterministic passes — always run, never fail the whole pipeline
     emit("formatting", "running", "Formatting checks & analytics")

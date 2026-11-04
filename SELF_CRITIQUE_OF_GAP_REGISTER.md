@@ -727,3 +727,54 @@ clean.
 **Not claimed.** The generation directories are never pruned, so a long-lived project accumulates them (small, but
 real). The CLI writes reports to a caller-chosen path and does not publish generations — it has no project. Gap 5
 (cancellation) is untouched; a cancelled run leaves a staged directory behind, which is by design but worth naming.
+
+
+## 31. Step 4 — a damaged knowledge base (119, 123)
+
+Both entries are one missing distinction. Every other store in this package separates "cannot be READ" from "is not
+THERE"; the knowledge base did not. A corrupt `rules/*.json` raised `JSONDecodeError` straight out of
+`KnowledgeBase()`, and every caller rendered that as whatever its own error path happened to say.
+
+**Measured, cold (the caches are `lru_cache`d and never cleared, so a warm process hides this — see below):**
+
+| path | before | after |
+|---|---|---|
+| `POST /analyze` with a corrupt KB | **502**, JSON parser's sentence, **no reading at all** | **200**, a full reading, and the damage named |
+| `GET /api/rules/<id>` | **400** with the parser's text (missing KB gets a designed 503) | **503**, framed, naming the file and the directory |
+| `GET /api/health` | **200 `status: ok`** | **200 `status: degraded`** + reason |
+| empty rules dir (the silent case) | stderr warning; message buried in `errors`, which the desk does not render | same warning **plus a notice the UI shows** |
+
+**What I changed.** `KnowledgeBaseDamaged` (carrying `rules_dir` and the failing file) is raised from `_load` for
+an unreadable file, a non-rule entry, or a duplicate id. `pipeline.analyze` catches it the way it already caught the
+zero-rules case: run without grounding, say so. Health and the rules route each got their own honest answer.
+`_empty_kb_message`'s "cannot count ≠ counted zero" contract is untouched.
+
+**Three things I got wrong in this pass, all found by my own probes rather than the suite:**
+
+1. **My first probe measured nothing.** `_knowledge_base` and `_kb_rule_ids` are `lru_cache(maxsize=1)` and
+   **nothing in the app or tests ever cleared them**, so after one healthy load my "corrupt" KB was never read —
+   the route confidently returned the real rule from cache. That is a genuine latent hazard (a repaired install
+   would keep serving an empty rule set until restart), so I added `_reset_kb_caches()` and clear it on every
+   damage path, with a test that repairs the KB and expects recovery.
+2. **I broke `/report` and did not notice for one step.** With the KB damaged, `_normalize_rule_ids` calls
+   `_kb_rule_ids()`, which now raises — so serving a report 500'd. A damaged KB must never cost the writer their
+   report; that call site now degrades to "leave rule ids as recorded". Caught by probing notices, not by the suite.
+3. **My own test fixture could not run against the pre-fix code.** It used `_reset_kb_caches()`, a function that
+   only exists with the fix — so every case errored instead of failing. Rewritten to clear the caches through the
+   stdlib hooks. This is the third time this session that a test's *dependency* on the fix has hidden whether it
+   would have caught the bug; the rule now written into the test file is: **a test that cannot run pre-fix is not
+   evidence.**
+
+**Verification.** Twelve tests; **6 fail** against the pre-fix behaviour (keeping the typed error, since a test
+cannot import what does not exist) and 6 are positive controls or regression guards — a healthy KB still loads, a
+missing rule is still 404, health is still `ok`, the rule counter still answers. Full suite **2298 passed, 7
+skipped**; `ruff` clean.
+
+**Attribute honestly:** 119 also reported "`/report` 400 while the prior report sits intact". That half was fixed
+by step 3's publication work, verified here (failed run → `/report` 200, same digest, `is_stale: true`), and is not
+claimed as part of this change.
+
+**Not claimed.** A KB that is *partly* corrupt still loses the whole KB (no per-file skip: one bad file means no
+grounding, which is the conservative choice but not a graceful one). Nothing re-reads a KB that was damaged and
+then repaired except the paths that call `_reset_kb_caches`. The health check loads the KB, so it pays a small cost
+on each call — acceptable at 263 rules, named rather than hidden.

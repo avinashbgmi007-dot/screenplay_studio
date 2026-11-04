@@ -918,6 +918,13 @@ def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) 
             continue  # unreadable project dir — never let one bad manifest break the settings save
 
 
+try:  # the typed damage error is optional: the package may not be installed
+    from knowledge_base import KnowledgeBaseDamaged as _KB_DAMAGED
+except ImportError:  # pragma: no cover - exercised by the not-installed 503 path
+    class _KB_DAMAGED(Exception):
+        """Placeholder when the KB package is absent (see `_knowledge_base`)."""
+
+
 @lru_cache(maxsize=1)
 def _knowledge_base():
     """The KB, loaded once. None when the package isn't installed — callers then
@@ -960,7 +967,18 @@ def _normalize_rule_ids(findings: list) -> list:
     dedup's own resolver, so the desk and the merge can never disagree about
     what counts as a rule. A name that matches nothing stays demoted: a
     plausible sentence must not be promoted into a cited authority."""
-    if not _kb_rule_ids():
+    try:
+        rule_ids = _kb_rule_ids()
+    except _KB_DAMAGED:
+        # ...and drop the poisoned entry: a failed KB read must not be cached,
+        # or a repaired install keeps serving an empty rule set until restart.
+        _reset_kb_caches()
+        # A damaged KB must not cost the writer their report (gap 119/123): the
+        # findings are already written and every one of them can be served
+        # exactly as stored. With no rule set to check ids against, promotion is
+        # skipped and each id stays as the analysis recorded it.
+        return findings
+    if not rule_ids:
         return findings
     from screenplay_analyzer.dedupe import canonical_rule_id
     kb = _knowledge_base()  # cached; the resolver takes it rather than re-reading 26 files per card
@@ -1144,11 +1162,32 @@ def real_server_check():
         return jsonify({"demo": True, "available": False, "url": url})
 
 
+def _reset_kb_caches() -> None:
+    """Forget the cached KB. Called only on damage, so a healthy install keeps
+    its single load but a broken-then-repaired one is re-read."""
+    _knowledge_base.cache_clear()
+    _kb_rule_ids.cache_clear()
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "server_url": CONFIG.get("server_url"),
-                    "demo_model": _DEMO_MODEL_ACTIVE,
-                    "code_rev": _CODE_REV_AT_STARTUP})
+    """Liveness plus the one install fault a writer cannot otherwise see.
+
+    Gap 119/123: with a corrupt rules directory this answered `status: ok` and
+    the desk had no way to tell that every finding was about to lose its
+    grounding. A damaged KB is now `degraded`, with the reason — the process is
+    up (so not `error`), and analysis still runs, but it is not healthy.
+    """
+    body = {"status": "ok", "server_url": CONFIG.get("server_url"),
+            "demo_model": _DEMO_MODEL_ACTIVE,
+            "code_rev": _CODE_REV_AT_STARTUP}
+    try:
+        _knowledge_base()
+    except _KB_DAMAGED as e:
+        _reset_kb_caches()
+        body["status"] = "degraded"
+        body["knowledge_base"] = {"state": "damaged", "reason": str(e)}
+    return jsonify(body)
 
 
 @app.route("/api/rules/<rule_id>", methods=["GET"])
@@ -1157,7 +1196,15 @@ def get_rule(rule_id):
     desk has to be able to answer *says who?*. This is a read of the shipped
     knowledge base — no model call, and an id that isn't a rule is a 404 rather
     than a popover that invents an authority."""
-    kb = _knowledge_base()
+    try:
+        kb = _knowledge_base()
+    except _KB_DAMAGED as e:
+        # Gap 123: a KB that is installed and BROKEN used to answer 400 with the
+        # JSON parser's own sentence — reading as "your request was bad" about a
+        # file the app failed to read. The missing-KB path has a designed 503;
+        # damage gets the same honesty with its own reason.
+        _reset_kb_caches()
+        return _error(str(e), 503)
     if kb is None:
         return _error("The knowledge base isn't installed, so this rule "
                       "cannot be looked up.", 503)
