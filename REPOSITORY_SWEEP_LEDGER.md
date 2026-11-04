@@ -773,3 +773,7 @@ Read the full draft-switch/upload routes, `diff.py` snapshot and activation code
 ## Persistence, archive and idea-store batch — reviewed scope
 
 Read `manifest.py` merge/save/load, the idea store, the notes/stash/beat-board/metrics/pass-history readers, both archive routes, the premise route, the export route and the router table. Calls were made against synthetic stores: corrupting each JSON store to see damage handling, two independently loaded manifests writing the same stage, a library archive with an idea and a profile file present, leftovers of another source format, and the absence of any restore route. Every JSON store except `idea.json` raised a distinguishable damage error and preserved the file. Not reviewed here: `webapp_demo.py`, the STT/whisper server modules, the preview/design-lab HTML labs, packaging/launch scripts, and any real-model path. See gaps 70–76.
+
+## Continuity, analytics and export-footprint batch — reviewed scope
+
+Read the deterministic continuity pass end to end (time flips, name variants, normalization helpers), formatting checks, scene statistics, and export dispatch. Ran synthetic day/night and near-name scripts, and parsed both attached PDFs to compare continuity output with the actual cast and headings. Deterministic checks are now mapped; what remains unread or unexercised is the model-facing half of the analyzer prompts, the preview labs, packaging and real-model output. See gaps 77–79.
