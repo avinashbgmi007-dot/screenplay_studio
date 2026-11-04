@@ -162,3 +162,9 @@ Disclosures must describe the report's own generation, not the connection active
 ### Deadline correction
 
 Performance and cancellation must share a real end-to-end deadline across nested busy retries, waiting and provider calls. A fake-clock reproduction showed calls being scheduled after the logical deadline; synchronous requests also cannot guarantee cancellation of work already running on a provider. Measure honest elapsed time and cancellation outcomes under contention instead of treating a per-request timeout as a hard total bound. See gap 60.
+
+## 7. Draft switching must be trustworthy before it can be the writer's undo
+
+The latest sweep adds one product-level constraint that outranks its individual defects: "switch back to my earlier draft" is the writer's safety net, and it currently restores only part of a draft (source, parse and report), keeps the knowledge graph and characters from the outgoing draft (gap 63), can accept a broken upload as the active draft and leave the writer unable to reopen the good one without a manual reparse (gap 64), can publish a running analysis into a different draft than it read (gap 65), and can be pointed at another project's snapshot by a crafted name (gap 62). Concurrency between two uploads is not a normal writer action, but it is a normal consequence of two open tabs or a retry, and it loses a draft (gap 61).
+
+So the snapshot/immutable-bundle contract in §4 is not only plumbing for provenance: it is the feature. Until it exists, any journey screen that offers draft history must be honest about it — show which artifacts belong to the active draft, mark the ones that are stale or belong to another generation, and never present a restored-but-not-switchable state as success. The recommended order therefore stands: identity and containment, then one lock for mutation and analysis, then whole-bundle restore with explicit stale states, then the writer-facing screens.
