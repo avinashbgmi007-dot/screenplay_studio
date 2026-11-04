@@ -29,8 +29,14 @@ from difflib import SequenceMatcher
 
 from screenplay_parser.models import ScriptDocument
 
+from .jsonio import check_safe_id
 from .manifest import StageStatus
 from .revision import reset_working, quote_present
+
+
+# Names that mean "the writer's current state", not a stored snapshot. They
+# never become a directory and must not be validated as one.
+_DRAFT_SENTINELS = (None, "", "active")
 
 
 def drafts_dir(m) -> str:
@@ -38,6 +44,29 @@ def drafts_dir(m) -> str:
 
 
 def draft_dir(m, name: str) -> str:
+    """`drafts/<name>`, refusing any name that is not a plain single segment.
+
+    This is the ONE chokepoint for turning a draft name into a path, so the
+    containment check lives here rather than in each caller. Before it, a
+    request-supplied name was joined onto `drafts/` verbatim: activating
+    `../../OtherProject/drafts/v2` from project A read project B's snapshot,
+    copied it over A's active source and report, and recorded the traversal
+    string as `active_draft` (gap 62). `check_safe_id` is the existing
+    ASCII-id rule the project and idea stores already use, so this adds no new
+    notion of a valid name — it applies the one that was already there.
+
+    Sentinels (`None`, `""`, `"active"`) mean the live root files, not a
+    snapshot, and are never joined into a path; callers resolve them first.
+    """
+    if name in _DRAFT_SENTINELS:
+        raise ValueError(f"draft name {name!r} is not a stored snapshot")
+    try:
+        check_safe_id(name, "draft name")
+    except ValueError:
+        raise ValueError(
+            f"Draft name {name!r} is not valid — a draft name is letters, "
+            "digits, '-' and '_' only."
+        ) from None
     return os.path.join(drafts_dir(m), name)
 
 

@@ -453,3 +453,56 @@ fourteen places where two honest components disagree about which draft, run or g
 one containment hole (62) and one privilege-free but real evidence falsehood (23, where a different Telugu word
 verifies as an exact quote). Everything else in the 108 is either conditional, cosmetic, or a documentation
 mismatch, and it says so per entry now.
+
+
+## 26. First fix landed — 62, verified, with what self-critique caught on the way
+
+Containment is closed. `screenplay_studio/diff.py:40` — `draft_dir()` — now validates the draft name at the single
+chokepoint every path construction goes through, using `jsonio.check_safe_id`, the ASCII-id rule the project and
+idea stores already used. Sentinels (`None`, `""`, `"active"`) are rejected explicitly because they mean "the live
+root files", not a stored snapshot. Five tests were added to `tests/test_diff.py`.
+
+**The fix is one function; the verification is where the work was.** Four things I had to catch in myself:
+
+1. **My first four tests were vacuous and I only found out by reverting the fix.** With `diff.py` restored to its
+   pre-fix state, `1 failed, 4 passed` — which means four of my five new tests would have passed against the bug
+   they were written to catch. Cause: project titles become directory names (`Other Project` → `Other_Project`), and
+   I had hardcoded `../../Other/drafts/v2`, so those tests asserted 400 for a path that never existed. A test that
+   cannot fail is worse than no test, because it advertises coverage.
+2. **The second attempt was still vacuous, for a subtler reason.** Even with the right name, an activation probe
+   returned 404 — because `<project>/drafts` **did not exist**, and `drafts/..` cannot resolve through a
+   non-existent directory. A project that has never been revised is not traversable; every writer past their first
+   revision is. The helper now uploads a second draft first, which is the ordinary state, and asserts the attack
+   target exists before asserting anything about it.
+3. **The `/diff` and `/compare` vector was worse than my register entry said.** The entry described a traversal
+   *write* via activate. In fact both diff routes took the name in a query parameter and returned **200 with the
+   other project's script** — a read, no activation needed, and a live pre-fix reproduction showed
+   `leaked=True` for both. That is now covered by its own test, and the entry says so.
+4. **An already-poisoned manifest is survivable but not repaired.** A project whose `project.json` already holds a
+   traversal string in `active_draft` still lists and opens (200), and `draft_dir` only raises when that name is
+   actually resolved. Reads that do not resolve it are unaffected; the bad name is inert rather than repaired. I did
+   **not** add a migration, because writing one would touch writer-owned manifests on upgrade and I cannot test that
+   against real archives. This is a deliberate limit, not an oversight, and it belongs in the fix notes.
+
+**Verification, stated exactly:**
+
+- The attack, at the correct relative depth, through the real route: `400` for `../../Other/drafts/v2`,
+  `../Other/drafts/v2`, `..`, `/etc/passwd`, `draft 1`, `a/b`, `drafts/v2`; the whole workspace tree was
+  **byte-identical** afterwards (md5 of every file before and after).
+- `/diff` and `/compare` with the same names: `400`, no other-project text in the body; pre-fix both were `200`
+  with it.
+- The flows the fix protects still work, compared **before and after** the change with the same script:
+  upload → `draft-1`, activate `original` → 200, activate `draft-1` → 200, unknown name → old 400, `/diff` and
+  `/compare` → 200, and the restored source text is the right draft's.
+- Against pre-fix code the five new tests give **3 failed, 2 passed**; with the fix, 20/20 in that file.
+- Full suite: **2253 passed, 4 skipped**, three consecutive runs; `ruff check .` clean.
+
+**One failure I am not going to wave away.** The first full-suite run reported `1 failed, 2252 passed`, and the
+traceback line I captured pointed at a log-reading assertion in the packaging/readiness area. Four subsequent
+full runs are green, both affected files pass 3/3 in isolation, and I could not reproduce it with the output I
+had. I think it is a timing-sensitive test unrelated to this change — but I have not proven that, and a fix note
+that says "flaky, moving on" is exactly the kind of claim this review exists to distrust. Recorded as observed,
+not explained.
+
+**What this changes in the plan:** step 1 of the fix order (§6) is done and the register's most serious item is
+closed. Step 2 — revisions surviving a draft switch (1, 63, 64, 65) — is untouched and is now the top of the list.

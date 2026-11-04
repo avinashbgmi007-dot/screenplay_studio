@@ -316,3 +316,121 @@ class TestDraftApi:
         project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
         resp = http_client.get(f"/api/projects/{project}/diff?from=ghost&to=active")
         assert resp.status_code == 400
+
+
+# ---------- gap 62: a draft name is a name, not a path ----------
+# `draft_dir` used to join a request-supplied name onto `drafts/` verbatim, so
+# activating `../../Other/drafts/v2` from one project read a DIFFERENT project's
+# snapshot, copied it over this project's active source and report, and stored
+# the traversal string as `active_draft`. `/diff` and `/compare` took the same
+# names in query params and served the other project's text with a 200.
+#
+# These tests are the attack, run against the real routes, plus the flows that
+# must keep working: the app's own names are `original` and `draft-N`.
+
+TRAVERSAL_NAMES = [
+    "../../Other/drafts/v2",
+    "../Other/drafts/v2",
+    "..",
+    "/etc/passwd",
+    "draft 1",
+    "a/b",
+    "drafts/v2",
+]
+
+
+class TestDraftNameContainment:
+    def test_draft_dir_refuses_a_path(self, analyzed_manifest):
+        for bad in TRAVERSAL_NAMES:
+            with pytest.raises(ValueError):
+                diff.draft_dir(analyzed_manifest, bad)
+
+    def test_draft_dir_accepts_the_names_the_app_makes(self, analyzed_manifest):
+        for good in ("original", "draft-1", "draft-2", "Draft_3"):
+            assert diff.draft_dir(analyzed_manifest, good).endswith(os.sep + good)
+
+    def _project_with_a_revision(self, http_client, title="Diff Test"):
+        """Upload a second draft so the project has a `drafts/` directory.
+
+        This matters: `drafts/..` only resolves if `drafts` exists, so a project
+        that has never been revised cannot be traversed through. Every writer
+        past their first revision is in the vulnerable state; this fixture is
+        therefore the ordinary one, not a contrived one.
+        """
+        project = _upload(http_client, SAMPLE_SCRIPT, title=title).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(DRAFT2.encode()), "draft2.fountain")},
+            content_type="multipart/form-data",
+        )
+        assert os.path.isdir(os.path.join(webapp_server.PROJECTS_DIR, project, "drafts"))
+        return project
+
+    def _poisoned_neighbour(self, http_client):
+        """A DIFFERENT project carrying a real, loadable snapshot at drafts/v2.
+
+        `snapshot_active` only writes `parsed.json` once the parse stage is
+        complete, so the neighbour is parsed first — otherwise the traversal
+        target does not exist and an assertion of 400 would pass for the wrong
+        reason (the first version of this test did exactly that).
+        """
+        other = _upload(http_client, DRAFT2.encode(), title="Other Project").get_json()["project"]
+        other_dir = os.path.join(webapp_server.PROJECTS_DIR, other)
+        Orchestrator(ProjectManifest.load(other_dir)).run_parse()
+        diff.snapshot_active(ProjectManifest.load(other_dir), "v2")
+        assert os.path.exists(os.path.join(other_dir, "drafts", "v2", "parsed.json")), \
+            "the traversal target must exist, or this test proves nothing"
+        return other, other_dir
+
+    def test_activation_of_a_cross_project_name_is_refused(self, http_client):
+        project = self._project_with_a_revision(http_client)
+        other, other_dir = self._poisoned_neighbour(http_client)
+
+        this_dir = os.path.join(webapp_server.PROJECTS_DIR, project)
+        before_source = open(os.path.join(this_dir, "source.fountain"), "rb").read()
+
+        cross = f"../../{other}/drafts/v2"
+        for bad in TRAVERSAL_NAMES + [cross]:
+            resp = http_client.post(
+                f"/api/projects/{project}/drafts/activate", json={"name": bad}
+            )
+            assert resp.status_code == 400, (bad, resp.status_code, resp.get_json())
+
+        # Nothing was copied over this project, and the name was not recorded.
+        assert open(os.path.join(this_dir, "source.fountain"), "rb").read() == before_source
+        assert ProjectManifest.load(this_dir).active_draft != cross
+
+    def test_diff_and_compare_do_not_serve_another_project(self, http_client):
+        project = TestDraftNameContainment._project_with_a_revision(self, http_client)
+        other, other_dir = TestDraftNameContainment._poisoned_neighbour(self, http_client)
+        cross = f"../../{other}/drafts/v2"
+
+        for route in ("diff", "compare"):
+            for query in (f"?from={cross}&to=active", f"?from=original&to={cross}"):
+                resp = http_client.get(f"/api/projects/{project}/{route}{query}")
+                assert resp.status_code == 400, (route, query, resp.status_code)
+                # DRAFT2's opening line — present only if another project's
+                # script was served.
+                assert "unlocks a drawer" not in resp.get_data(as_text=True).lower()
+
+    def test_the_normal_switch_still_works(self, http_client):
+        """The fix must not cost the writer the switch it protects."""
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        http_client.post(f"/api/projects/{project}/analyze")
+        http_client.post(
+            f"/api/projects/{project}/drafts",
+            data={"file": (io.BytesIO(DRAFT2.encode()), "draft2.fountain")},
+            content_type="multipart/form-data",
+        )
+        first = http_client.post(
+            f"/api/projects/{project}/drafts/activate", json={"name": "original"}
+        )
+        assert first.status_code == 200
+        assert first.get_json()["active_draft"] == "original"
+
+        second = http_client.post(
+            f"/api/projects/{project}/drafts/activate", json={"name": "draft-1"}
+        )
+        assert second.status_code == 200
+        assert second.get_json()["active_draft"] == "draft-1"
