@@ -805,7 +805,7 @@ Genuinely unreviewed, stated plainly so nobody mistakes this for total coverage:
 - **real-model behaviour of any kind** — accuracy, latency, disagreement quality, multilingual output — which no local probe here can substitute for;
 - audience reception of either attached screenplay, which is the user's untested question and not something a code sweep can answer.
 
-The register stood at 108 uniquely numbered gaps when this line was written; it is now **127 numbered entries, 6 withdrawn, 4 proven non-gaps, 117 live**, graded individually in `ENTRY_GRADE_TABLE.md`. The count is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order starts with containment and revision safety, and is unchanged.
+The register stood at 108 uniquely numbered gaps when this line was written; it is now **128 numbered entries, 6 withdrawn, 4 proven non-gaps, 118 live**, graded individually in `ENTRY_GRADE_TABLE.md`. The count is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order starts with containment and revision safety, and is unchanged.
 
 ## Self-critique pass — reviewed scope and corrected standard
 
@@ -839,8 +839,8 @@ plus one environment gap stated precisely: **playwright is not installed in this
 test-client-based, never a rendered page. Installing playwright and running that gate is the only remaining
 mechanical work a sweep can do on this repository.
 
-Per-entry grades for all 127 entries, with the counts computed from the table rather than typed, are in
-`ENTRY_GRADE_TABLE.md`: **51 A, 43 B, 12 C, 11 D, 6 withdrawn, 4 proven non-gaps — 117 live findings.**
+Per-entry grades for all 128 entries, with the counts computed from the table rather than typed, are in
+`ENTRY_GRADE_TABLE.md`: **51 A, 43 B, 12 C, 12 D, 6 withdrawn, 4 proven non-gaps — 118 live findings.**
 
 ## Ninth pass — packaging, and the gate that cannot open here
 
@@ -857,3 +857,22 @@ source tree.
 chromium` fails because `cdn.playwright.dev` is unreachable from this sandbox, and no system Chromium or Firefox
 exists to substitute. All 30 `e2e_browser_*.py` suites therefore remain unexecuted by me. Every UI claim in this
 register is source-, DOM- or test-client-based. This is now stated as a limit rather than left as a pending item.
+
+## Tenth pass — the frontend, statically
+
+`app.js` (10,865 lines) and `core.js` (206) read rather than rendered, because the browser gate cannot open here
+(§21). Method: enumerate all 63 `innerHTML` assignments, extract every `${…}` interpolation reaching one, and
+check each unescaped case individually instead of trusting a pattern.
+
+**Finding 128 (D, low)** — the escaping discipline is correct everywhere it matters and is enforced only by
+convention; no test, lint rule or escaping wrapper would fail if a future commit interpolated model or writer text
+raw. Filed in `SELF_CRITIQUE_OF_GAP_REGISTER.md` §23.
+
+Negatives from the same read: `formatMessageContent` escapes `& < >` *before* applying bold/bullets; `escapeHtml`
+escapes both quote characters and is documented against a real historical `<img onerror>` bug; the only unescaped
+interpolations are a developer-authored chip array, numeric counts and SVG geometry; streaming writes tokens with
+`textContent`; no `eval`, `new Function`, `document.write`, `outerHTML` or `insertAdjacentHTML`; deep-link segments
+are decoded then compared against the project list, never rendered.
+
+What a static read cannot establish: layout, focus order under a real screen reader, hover-reveal timing, and
+whether the desk feels like a manuscript. The journey remains unaudited and the visual concepts unapproved.

@@ -173,8 +173,8 @@ After all three passes, with duplicates collapsed and withdrawals applied:
 | | Count | What they are |
 |---|---|---|
 > **Superseded.** These aggregate rows were a reading aid and two of them were wrong. Every entry now
-> has its own grade in **`ENTRY_GRADE_TABLE.md`**, counted by parsing rather than by memory: **127 entries,
-> 51 A / 43 B / 12 C / 11 D, 6 withdrawn, 4 proven negatives**. Where these rows disagree with that table,
+> has its own grade in **`ENTRY_GRADE_TABLE.md`**, counted by parsing rather than by memory: **128 entries,
+> 51 A / 43 B / 12 C / 12 D, 6 withdrawn, 4 proven negatives**. Where these rows disagree with that table,
 > the table wins. Kept for the record because silently deleting my own wrong numbers is the habit this
 > document exists to criticise.
 
@@ -233,7 +233,7 @@ Asked to be a self-critique of how genuine these gaps are, the honest answers ar
 - **Six reproduced negatives** (CI-parity lint, chat read shape, CLI round-trip, secret withholding, header posture, summary/queue arithmetic agreement) belong in the record too, because they bound how bad the codebase actually is.
 - **The remaining gaps are not code-level.** They are model quality, audience reception, assistive technology and non-Linux behaviour — all of which need the writer's own environment, and none of which I can manufacture here.
 
-The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. *(Superseded twice. §17–§18 added 119–122; §19 added 123–124. And the per-entry counts in this paragraph — 34 conditional, 18 inferential, 22 cosmetic — were wrong: recounted from `ENTRY_GRADE_TABLE.md`, the live register is 51 A / 43 B / 12 C / 11 D. I had been counting constructed-but-real entries as inferential, which made my own critique look stricter than it was.)* The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
+The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. *(Superseded twice. §17–§18 added 119–122; §19 added 123–124. And the per-entry counts in this paragraph — 34 conditional, 18 inferential, 22 cosmetic — were wrong: recounted from `ENTRY_GRADE_TABLE.md`, the live register is 51 A / 43 B / 12 C / 12 D. I had been counting constructed-but-real entries as inferential, which made my own critique look stricter than it was.)* The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
 
 ## 17. Sixth pass — the areas §13 named as remaining, now actually swept (with grades)
 
@@ -249,7 +249,7 @@ Continuing on the corrected standard, and grading each as I collect rather than 
 
 ## 18. Where this leaves the count
 
-- Register: **127 numbered entries**; 6 withdrawn, 4 re-graded, 14 carrying real weight (1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119), graded one by one in `ENTRY_GRADE_TABLE.md`: 51 A / 43 B / 12 C / 11 D.
+- Register: **128 numbered entries**; 6 withdrawn, 4 re-graded, 14 carrying real weight (1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119), graded one by one in `ENTRY_GRADE_TABLE.md`: 51 A / 43 B / 12 C / 11 D.
 - Evidence mix after six passes: **~21 A**, **~34 B**, **~19 C**, **~22 D**, **5 W**.
 - New graded negatives this pass: Python floor (**no gap**, one BOM in a test), JS reproducibility (**no gap beyond docs**, 134 not 127), KB zero-rule state deliberately distinguishable (good design), and the empty-rules case accepted silently (part of 119).
 - One genuinely new class of risk found: **a corrupted rules install converts into a failed analysis and a refused report**, which belongs in the fix order immediately behind containment and revision safety, because it is cheap to fix and it is the difference between "your install needs repair" and "your script cannot be analysed."
@@ -341,8 +341,53 @@ today.** A packaging guard that inspects the source tree instead of the artefact
 the product is uninstallable. I verified the artefact by hand this pass; CI does not. That is worth eight lines of
 workflow, and it is the only finding from the last three passes I would put on a schedule.
 
-**And the uncomfortable summary of this whole review, now that it is finished:** 127 numbered entries, 117 live,
+**And the uncomfortable summary of this whole review, now that it is finished:** 128 numbered entries, 118 live,
 51 of them reproduced through a real interface — and **not one of them is new since 119.** Passes eight and nine
 produced two low-severity findings and one CI improvement. That is the stop rule working as designed, and it is
 also the point at which continuing to search would be manufacturing activity rather than doing work. What remains
 is a **fix campaign** (§6/§9 order, starting with 62, then revision safety), not more sweeping.
+
+
+## 23. Tenth pass — the frontend, read rather than rendered (because I cannot render it)
+
+`app.js` is 10,865 lines and `core.js` 206; together with the CSS they are the largest surface this sweep had
+still only touched through headers and route reachability. With the browser gate closed (§21), the honest way to
+review them is a static read plus the project's own test suites, and to say which of the two produced each
+statement.
+
+**No gap — the XSS posture is real, and it is documented in the code rather than in a write-up.** I enumerated
+every `innerHTML` sink (63 assignments) and every `${…}` interpolation that reaches one. What I found:
+
+- Assistant replies go through `formatMessageContent` in `core.js`, which **escapes `&`, `<`, `>` first** and only
+  then applies `**bold**` and `- ` bullets. The ordering matters and the code comments say why.
+- Anything carrying writer or model text goes through `escapeHtml`, which escapes `&` first and covers **both**
+  quote characters, so it is safe in an attribute as well as an element body. The docstring names the exact
+  historical bug (`<img src=x onerror=…>` in a dialogue line) it was written to close.
+- The handful of **unescaped** interpolations are safe and I checked each one rather than trusting the pattern:
+  a static `EXPLORE_CHIPS` icon/label array (developer-authored SVG), numeric `count`/`length` values in the
+  stage stepper, and geometry numbers (`W`, `H`, `pad`) inside a generated bar-chart `<svg>`. No model output,
+  no project name and no screenplay text reaches `innerHTML` unescaped anywhere I could find.
+- `eval` and `new Function` do not appear at all. There is no `document.write`, no `outerHTML`,
+  no `insertAdjacentHTML`.
+- The streaming path appends tokens with `textContent`, not `innerHTML` — the one place a half-written,
+  unguarded model token could land actually uses the safe sink.
+- Deep-link routing (`#/project/view/scene`) decodes each segment with `decodeURIComponent` and then only
+  **compares** the project against the known project list; it never renders the hash. A hostile link cannot
+  inject markup, and `correctRoute()` rewrites the address bar when the project is not one the desk has.
+
+**D — 128. The one real weakness is that the XSS posture is enforced by convention, not by a test or a type.** The
+code comments say `escapeHtml` is "the ONE helper every `innerHTML` sink must route untrusted text through", and
+today that holds — but nothing fails when a future commit interpolates `finding.issue` or an idea title directly
+into a template string. There is no lint rule, no wrapper element that escapes by construction, and no test that
+greps for `${` inside a template assigned to `innerHTML`. This is the same shape as gap 127: the discipline is
+real and the guard is missing, so a correct codebase has an unenforced invariant. **Recommendation:** add one test
+that asserts no `innerHTML` assignment in `app.js`/`core.js` contains an unescaped `${…}` outside an allowlist
+(the chip mark-up and the SVG geometry), or move the two remaining raw sinks behind a tiny `safeHtml` tag
+function. Grade **D**, severity low — nothing is exploitable today; it is a regression guard for the commit
+that has not been written yet.
+
+**What I still cannot say.** Reading 11,000 lines is not rendering them. Layout at 1440×900, focus order under a
+real screen reader, the hover-revealed toolbar timing that `NOTES.md` describes at length, and whether the
+manuscript-first desk actually feels like a manuscript are all outside what a static read can establish. The two
+findings from this pass are about *structure and invariants*; the journey itself remains unaudited, and the visual
+concepts remain unapproved, which is where this review started.

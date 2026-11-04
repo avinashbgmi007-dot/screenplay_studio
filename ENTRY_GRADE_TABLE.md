@@ -157,6 +157,12 @@ Here every entry gets one grade, on the scheme already published in
 | 107 | **D** | — | Design proposal: scene-level intent has nowhere to live. |
 | 108 | **C** | Both collaborator prompt builders | Intent absent from both personas' inputs. |
 
+## Entries 125–128 (eighth to tenth passes — last modules, packaging, frontend)
+
+| # | Grade | Driven through | Note |
+|---|---|---|---|
+| 128 | **D** | Static read of every `innerHTML` sink in `app.js`/`core.js` | Escaping is correct everywhere today; the invariant is enforced by convention only — no test, lint rule or escaping-by-construction wrapper. Regression guard for a future commit, not a live defect. |
+
 ## Entries 125–127 (eighth and ninth passes — last modules, and packaging)
 
 | # | Grade | Driven through | Note |
@@ -195,15 +201,15 @@ Here every entry gets one grade, on the scheme already published in
 
 ## Counts, computed from the rows above rather than typed
 
-Counted by parsing this file, not from memory. **127 numbered entries**, 6 withdrawn, 4 proven negatives,
-**117 live findings**.
+Counted by parsing this file, not from memory. **128 numbered entries**, 6 withdrawn, 4 proven negatives,
+**118 live findings**.
 
-| Grade | Count | Share of the 117 live |
+| Grade | Count | Share of the 118 live |
 |---|---|---|
-| **A** — reproduced through a real interface | 51 | 44% |
-| **B** — real mechanism, constructed condition | 43 | 37% |
+| **A** — reproduced through a real interface | 51 | 43% |
+| **B** — real mechanism, constructed condition | 43 | 36% |
 | **C** — source inference only | 12 | 10% |
-| **D** — docs, housekeeping, opinion | 11 | 9% |
+| **D** — docs, housekeeping, opinion | 12 | 10% |
 | **W** — withdrawn | 6 | — |
 | **–** — tested, not a gap | 4 | — |
 
