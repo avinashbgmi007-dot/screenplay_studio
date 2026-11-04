@@ -951,3 +951,47 @@ and both text formats now round-trip that fixture with zero speech churn. Whethe
 show churn needs a round trip over those files, which I cannot run here.
 
 Full suite **2328 passed, 7 skipped**; `ruff` clean.
+
+## §37 — Gap 23: quote verification erases Indic vowel marks (2026-11-04)
+
+**FIXED, with one residual left deliberately open and pinned.**
+
+**The defect, reproduced.** `normalize_text` filtered with `[^\w\s]`, and Python's `\w` keeps only
+`str.isalnum()` characters — which excludes **combining marks** (categories `Mn` and `Mc`). Telugu, Devanagari
+and Tamil all write vowel length as a combining sign, so `కాల` ("time") and `కల` ("a pen") normalised to the same
+string. Through the real `verify_finding`:
+
+| quote | script contains | verdict before | verdict after |
+|---|---|---|---|
+| the exact line | yes | `verified` **1.0** | `verified` 1.0 |
+| **different word, absent from the script** | no | `verified` **1.0** | `not_found` 0.98 |
+
+All three scripts collided before; none do now.
+
+**Two fixes, each independently required.** (1) The normaliser keeps letters, marks, numbers and the ZWNJ/ZWJ
+joiners, and folds to **NFC** first — so the same word typed composed or decomposed still matches, while two
+genuinely different words never collapse. NFKC is deliberately not used (it would fold ligatures and full-width
+forms). (2) Even with the marks preserved, one vowel sign in a 28-character line leaves the character ratio at
+**0.98**, still above the 0.72 verification threshold — so the verifier would still have certified the quote. A
+`NEAR_IDENTICAL_THRESHOLD = 0.95` band now reports `not_found` with a note instead. Proven separable: reverting
+the normaliser alone fails **8** tests; reverting the threshold alone fails **1**.
+
+**The tolerance survived.** A genuinely reworded real line still verifies (0.81 in my probe). That is the whole
+reason the verifier is lenient, and a fix that lost it would trade one dishonesty for a worse one — calling real
+quotes fabricated. There is a test for it.
+
+**RESIDUAL, not fixed: the studio's change detector still calls a one-mark edit "still present".**
+`revision.quote_present` has `QUOTE_CHANGE_THRESHOLD = 0.95` and its own comment documents the trade-off ("a
+dropped character scores 0.979 (still present)"). So an editor changing `కాలం` → `కలం` sees that finding stay
+open in the desk. I did **not** change it: it is a separate, deliberate decision about the writer-fix signal that
+would flip behaviour across the whole queue, and gap 23 is about the verifier certifying an **absent** quote. I
+pinned the current behaviour in a test named `..._RESIDUAL` so it cannot be mistaken for fixed, and the assertion
+message says to update this section if it ever changes. **This should be a new register entry**, and I have not
+added one — that is a gap in my own housekeeping, not something I am going to leave implied.
+
+**Environment note, so the numbers are reproducible.** This sandbox came up with no `/home/user/.venv`; I rebuilt
+it from `requirements.txt` plus `pytest`, `ruff`, `pyyaml` and `playwright`. The first full run reported 5 failures
+that were all `ModuleNotFoundError` for the two optional packages, not real failures — after installing them the
+baseline was the expected 2328 passed. I verified that before touching any code.
+
+Full suite **2343 passed, 7 skipped**; `ruff` clean.

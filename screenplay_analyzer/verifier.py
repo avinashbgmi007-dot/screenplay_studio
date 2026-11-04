@@ -26,6 +26,16 @@ from screenplay_parser.quotematch import (
 # calling a real quote fabricated is the expensive error here.
 FUZZY_MATCH_THRESHOLD = 0.72
 
+# A fuzzy match this close is NOT reported as `verified`. A quote can paraphrase
+# a real line and still deserve acceptance, but when it is all-but-identical to
+# the script and yet still differs, the honest reading is "these are different
+# words", not "the model reworded it". Gap 23 measured why this matters: one
+# Telugu vowel sign (కాలం "time" vs కలం "a pen") leaves 27 of 28 characters
+# identical, so a character-ratio score of 0.98 called a word absent from the
+# script a `verified` quote. The normaliser fix removed the 1.0 collision; this
+# boundary removes the near-miss that survived it.
+NEAR_IDENTICAL_THRESHOLD = 0.95
+
 # _normalize, _scene_full_text and _best_fuzzy_match are ALIASES, not wrappers.
 # The primitives live in screenplay_parser.quotematch so that the studio's
 # status engine (revision.quote_present) shares them: the two engines used to
@@ -94,6 +104,16 @@ def verify_finding(finding: dict, doc: ScriptDocument) -> dict:
 
     if scene_refs and all(_scene_full_text(doc, s) is None for s in scene_refs):
         finding["verification"] = {"status": "scene_not_found", "matched_scene": None, "confidence": None}
+        return finding
+
+    if best_conf >= NEAR_IDENTICAL_THRESHOLD:
+        # Almost identical, but not equal: a character-level difference this
+        # early in the string is a DIFFERENT WORD, not a paraphrase. Say so
+        # rather than certifying the quote as present.
+        finding["verification"] = {"status": "not_found", "matched_scene": best_scene, "confidence": round(best_conf, 2)}
+        finding["verification"]["note"] = (
+            "Near-identical to the script but not equal — treated as a different "
+            "word, not a reworded quote.")
         return finding
 
     if best_conf >= FUZZY_MATCH_THRESHOLD:

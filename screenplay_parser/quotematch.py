@@ -42,20 +42,57 @@ reported eight findings "addressed by you".
 from __future__ import annotations
 
 import re
+import unicodedata
 from difflib import SequenceMatcher
 
-_NON_WORD = re.compile(r"[^\w\s]")
 _WHITESPACE = re.compile(r"\s+")
+
+# Joiners that carry meaning inside a grapheme cluster in several Indic and
+# Arabic scripts. They are category Cf, so the letter/mark/number rule below
+# would otherwise drop them and could glue two distinct clusters together.
+_MEANINGFUL_JOINERS = frozenset(("\u200c", "\u200d"))  # ZWNJ, ZWJ
+
+_KEEP_CACHE: dict[str, bool] = {}
+
+
+def _is_kept(ch: str) -> bool:
+    """Is this character part of the text we compare, or is it punctuation?
+
+    KEEP letters, combining marks and numbers. The marks are the whole point:
+    Telugu, Devanagari and Tamil write long/ short vowels and other distinctions
+    as combining characters (categories Mn and Mc), so a `\w`-based filter —
+    which keeps only `str.isalnum()` characters — silently deletes them. That
+    made కాల ("time") and కల ("a pen") normalise to the same string, and the
+    verifier then reported a quote that is NOT in the script as `verified` with
+    confidence 1.0 (gap 23). Dropping punctuation is right; dropping a vowel
+    sign changes the word.
+    """
+    try:
+        return _KEEP_CACHE[ch]
+    except KeyError:
+        keep = ch == "_" or ch in _MEANINGFUL_JOINERS or unicodedata.category(ch)[0] in "LMN"
+        _KEEP_CACHE[ch] = keep
+        return keep
 
 
 def normalize_text(text: str) -> str:
     """Lowercase, strip punctuation, collapse whitespace.
 
-    Moved verbatim from `screenplay_analyzer.verifier._normalize`, which is now
-    a thin alias, so the two engines cannot normalise differently.
+    Comparison is done on NFC text: a quote typed with a decomposed vowel sign
+    must match the composed form in the script, because those two are the same
+    word. NFC only folds canonically EQUIVALENT sequences — it cannot merge two
+    genuinely different words — which is why it is safe here where a `\w`-based
+    strip was not. NFKC is deliberately NOT used: it also folds compatibility
+    variants (ligatures, full-width forms), which would blur text a matcher
+    should keep distinct.
+
+    Moved from `screenplay_analyzer.verifier._normalize`, which is now a thin
+    alias, so the two engines cannot normalise differently. Fixing it HERE keeps
+    that guarantee: the analyzer's verifier and the studio's change detector
+    both get the correction, and neither can drift back.
     """
-    text = text.lower()
-    text = _NON_WORD.sub("", text)
+    text = unicodedata.normalize("NFC", text.lower())
+    text = "".join(ch for ch in text if ch.isspace() or _is_kept(ch))
     text = _WHITESPACE.sub(" ", text)
     return text.strip()
 
