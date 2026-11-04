@@ -39,7 +39,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 
 | # | Grade | Driven through | Note | Genuine? |
 |---|---|---|---|---|
-| 1 | **A** | Real Flask routes: edit, upload, reactivate | Worst item in the register. Edits, edit log and working copy destroyed by an action the UI calls non-destructive. | **G** |
+| 1 | **A** | Real Flask routes: edit, upload, reactivate | **FIXED 2026-11-04** — the edit cycle is snapshotted per draft and restored on switch; 2 of 3 tests fail without it. Edits, edit log and working copy destroyed by an action the UI calls non-destructive. | **G** |
 | 2 | **B** | Real orchestrator with a stubbed analyzer | Mechanism is source-visible; publication half is proven at A under 65. | **G** |
 | 3 | **B** | Injected total failure | Contradicts the orchestrator's own comment that a failed run preserves the prior report — that is why it keeps high severity despite B. | **G** |
 | 4 | **A** | Two-client HTTP test | A finding from draft A landed in the completed report for draft B. | **G** |

@@ -506,3 +506,54 @@ not explained.
 
 **What this changes in the plan:** step 1 of the fix order (§6) is done and the register's most serious item is
 closed. Step 2 — revisions surviving a draft switch (1, 63, 64, 65) — is untouched and is now the top of the list.
+
+
+## 27. Second fix — gap 1, the writer's revisions now survive a switch
+
+**What was wrong.** `_reset_derived_state` deleted `working.json`, `edits.json` and `edits.redo.json` on every
+draft switch. The UI calls switching non-destructive — the tooltip says it preserves the current draft — and for
+applied edits it did not. Edit, switch away, switch back: original text, no undo, no redo.
+
+**The change** (`diff.py`, ~85 lines): `snapshot_active` now copies the three cycle files into the draft's own
+snapshot directory under `_working.json` / `_edits.json` / `_edits.redo.json`, and a new `restore_edit_cycle` puts
+them back when the writer returns. Deliberately in `snapshot_active` rather than in `upload_new_draft`, so the
+guarantee holds for **both** exits from a draft — a new upload and a switch to an older draft. A draft that was
+never edited restores nothing and has any inherited cycle member removed, so an undo can never apply to text the
+draft never had.
+
+**Self-critique of the fix, before claiming it:**
+
+1. **My first three tests failed for the wrong reason and I fixed them, not the code.** `apply_edit` returns
+   `applied` as a *list of replacement dicts*, not a count; `undo_last_edit` returns `undone` as the whole record,
+   not a number. Two assertions in my own tests were wrong about the API they were testing. A test that encodes a
+   guess about an interface is worth nothing, so I read both functions and asserted on `len(applied)` and on
+   `restored`/`failed` instead.
+2. **One of the three new tests is not doing what its name suggests, and I left it in knowingly.**
+   `test_a_never_edited_draft_does_not_inherit_an_undo_stack` passes **both** before and after the fix, because the
+   old code deleted the log and the new code removes it — both give "no edits". It is a guard against a future
+   fix regressing the invariant, not evidence for this one. I would rather label it than let a count of "3 tests"
+   imply three proofs. The two that matter fail without the fix: `2 failed, 1 passed`, verified by reverting.
+3. **I nearly reported a false negative from my own harness.** The end-to-end script posted to
+   `/api/projects/<p>/edits` (405 — the real route is `/edits/apply`) and then printed "edit survived: False",
+   which looks exactly like the bug. The status code was sitting in the output I had already captured. Reading the
+   route table before writing the probe would have saved a round trip; assuming a route name cost more than
+   checking it.
+4. **Switching is now "restore", not "merge".** If the same draft is edited in two places the whole cycle is
+   replaced, not reconciled — the same last-writer-wins shape as gap 74, and I have not changed that. Stated so a
+   later reader does not read more into this fix than it does.
+
+**Verification, exactly:**
+
+- Through the real routes: apply an edit (200) → upload a second draft → activate `original` (200) → the edited
+  line **is** in the served script → `/edits/undo` (200) → the original line is back.
+- The identical script against pre-fix code: edit **gone**, undo answers `400 Nothing to undo`. Same script, same
+  server, only `diff.py` changed.
+- Full suite **2256 passed, 4 skipped** (three more than before this fix, i.e. exactly the new tests); `ruff` clean.
+- The environment reset mid-pass — `/home/user/.venv` vanished — and was rebuilt with `pip install -e ".[ci]"`
+  before any of the above was measured. Worth recording because it is the second time, and because a suite run in
+  a half-built environment would have been meaningless.
+
+**What is still open in this area, unchanged:** 63 (derived artefacts other than the cycle — the knowledge graph and
+character analytics — still stay bound to the outgoing draft), 64 (a failed upload can become the active draft),
+65 (a running analysis can publish into a draft the writer has since left). Those are the rest of the step-2
+bundle contract; gap 1 was the part that destroyed work in the ordinary case, and it is closed.

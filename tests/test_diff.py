@@ -434,3 +434,68 @@ class TestDraftNameContainment:
         )
         assert second.status_code == 200
         assert second.get_json()["active_draft"] == "draft-1"
+
+
+# ---------- gap 1: a draft switch must not destroy the writer's revisions ----------
+# The UI calls switching non-destructive — the tooltip literally says switching
+# preserves the current draft. It did not: `_reset_derived_state` deleted
+# working.json + edits.json + edits.redo.json on every switch, so applying an
+# edit, switching away and switching back restored the ORIGINAL text with no
+# undo log and no redo stack. These tests drive the real revision module.
+
+
+class TestSwitchPreservesEdits:
+    def _apply_one_edit(self, m):
+        from screenplay_studio import revision
+        doc = revision.load_working(m)
+        scene = doc.scenes[0]
+        old = next(e.text for e in scene.elements if e.text.strip())
+        result = revision.apply_edit(m, scene.scene_number, [{"old": old, "new": old + " EDITED"}])
+        assert len(result["applied"]) == 1
+        return old
+
+    def test_edits_survive_switching_away_and_back(self, analyzed_manifest, tmp_path):
+        from screenplay_studio import revision
+        m = analyzed_manifest
+        marker = self._apply_one_edit(m)
+        assert revision.has_edits(m)
+        drafts_before = len(revision.load_working(m).scenes)
+
+        diff.upload_new_draft(m, _write_draft2(tmp_path), "draft2.fountain")
+        Orchestrator(m).run_parse()
+        diff.activate_draft(m, "original")
+
+        # The edit is back in the text...
+        texts = [e.text for s in revision.load_working(m).scenes for e in s.elements]
+        assert any(t.endswith("EDITED") for t in texts), "the applied edit was destroyed by the switch"
+        # ...and so is the undo history, so the writer can still take it back.
+        assert revision.has_edits(m)
+        undo = revision.undo_last_edit(m)
+        assert len(undo["restored"]) == 1 and not undo["failed"]
+        texts = [e.text for s in revision.load_working(m).scenes for e in s.elements]
+        assert marker in texts, "undo after a switch did not restore the original line"
+
+    def test_a_never_edited_draft_does_not_inherit_an_undo_stack(self, analyzed_manifest, tmp_path):
+        """The other half: restoring must not hand draft-2 an undo entry for text
+        it never had."""
+        from screenplay_studio import revision
+        m = analyzed_manifest
+        self._apply_one_edit(m)
+        diff.upload_new_draft(m, _write_draft2(tmp_path), "draft2.fountain")
+        Orchestrator(m).run_parse()
+
+        # draft-1 (the upload) has never been edited.
+        assert not revision.has_edits(m), "a fresh upload must not inherit the previous draft's log"
+        with pytest.raises(Exception):
+            revision.undo_last_edit(m)
+
+    def test_redo_is_preserved_when_it_belongs_to_the_draft(self, analyzed_manifest, tmp_path):
+        from screenplay_studio import revision
+        m = analyzed_manifest
+        self._apply_one_edit(m)
+        revision.undo_last_edit(m)          # puts the edit on the redo stack
+        diff.upload_new_draft(m, _write_draft2(tmp_path), "draft2.fountain")
+        Orchestrator(m).run_parse()
+        diff.activate_draft(m, "original")
+        # Undo state came back with the draft, so redo can still run.
+        assert os.path.exists(revision.edits_redo_path(m)), "the redo stack was lost with the switch"

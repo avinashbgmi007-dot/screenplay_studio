@@ -31,7 +31,13 @@ from screenplay_parser.models import ScriptDocument
 
 from .jsonio import check_safe_id
 from .manifest import StageStatus
-from .revision import reset_working, quote_present
+from .revision import (edits_log_path, edits_redo_path, quote_present,
+                       reset_working, working_path)
+
+
+# Names that mean "the writer's current state", not a stored snapshot. They
+# never become a directory and must not be validated as one.
+_DRAFT_SENTINELS = (None, "", "active")
 
 
 # Names that mean "the writer's current state", not a stored snapshot. They
@@ -104,10 +110,58 @@ def snapshot_active(m, name: str) -> None:
     ):
         if os.path.exists(src):
             shutil.copy2(src, os.path.join(dst, rel))
+    # The writer's own edit cycle travels with the draft (gap 1). Before this,
+    # `_reset_derived_state` deleted working.json + edits.json on every switch,
+    # so "switch away and switch back" — an action the UI calls
+    # non-destructive, "switching preserves the current one" — silently
+    # destroyed the applied edits, the undo log and the redo stack. The text is
+    # restored from this copy instead, which is what makes switching a safety
+    # net rather than a hazard.
+    for path, rel in (
+        (working_path(m), _WORKING),
+        (edits_log_path(m), _EDITS),
+        (edits_redo_path(m), _REDO),
+    ):
+        if os.path.exists(path):
+            shutil.copy2(path, os.path.join(dst, rel))
+
+
+# Snapshot names for the edit cycle. Prefixed so they can never collide with the
+# draft's own `source.*` / `parsed.json` / `report*` files.
+_WORKING = "_working.json"
+_EDITS = "_edits.json"
+_REDO = "_edits.redo.json"
+
+
+def restore_edit_cycle(m, name: str) -> None:
+    """Put a snapshot's edit cycle back as the active draft's.
+
+    Copies the draft's stored working copy and edit log over the live ones, and
+    removes any live cycle member the snapshot does not have — a draft that was
+    never edited must not inherit the outgoing draft's undo stack, or the writer
+    would undo an edit that belongs to different text. Caller holds the switch;
+    `activate_draft` invokes this after the derived files are restored.
+    """
+    d = draft_dir(m, name)
+    for path, rel in (
+        (working_path(m), _WORKING),
+        (edits_log_path(m), _EDITS),
+        (edits_redo_path(m), _REDO),
+    ):
+        src = os.path.join(d, rel)
+        if os.path.exists(src):
+            shutil.copy2(src, path)
+        elif os.path.exists(path):
+            os.remove(path)
 
 
 def _reset_derived_state(m) -> None:
-    """After swapping the active draft: discard edits, re-queue analysis."""
+    """After swapping the active draft: discard edits, re-queue analysis.
+
+    "Discard" is safe only because the outgoing draft's cycle was snapshotted
+    first (see `snapshot_active`); the files removed here are restored by
+    `restore_edit_cycle` when the writer switches back.
+    """
     reset_working(m)
     m.stages["analyze"] = StageStatus()
     m.stages["chat"] = StageStatus()
@@ -220,6 +274,9 @@ def activate_draft(m, name: str):
             os.remove(target)
 
     _reset_derived_state(m)
+    # ...and put THIS draft's edits back, if it had any. After
+    # `_reset_derived_state` so the reset can never race the restore.
+    restore_edit_cycle(m, name)
     if os.path.exists(m.report_findings_path):
         m.stages["analyze"] = StageStatus(status="complete", output_paths={
             "report_md": m.report_md_path, "report_findings": m.report_findings_path,
