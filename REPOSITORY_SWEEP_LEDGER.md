@@ -793,3 +793,16 @@ Read the remaining co-writer modules not yet covered end to end (`peer.py`, `cra
 ## Knowledge-base grounding batch — reviewed scope
 
 Inventoried all 26 rule files (263 rules, no duplicate ids), called `RulesContext` for every pass name and category the pipeline uses, and traced the grounding call sites in `pipeline.py`, `dials.py` and `genre.py`. This closes the KB-coverage question: which passes are grounded, which are silent, and how large the fragments get. Not reviewed: rule content quality per se, and how a real model uses any of it. See gaps 102–105.
+
+## Completion audit — what is now covered, and what a sweep cannot reach
+
+Mechanical coverage check: **all 83 Python modules** in the four packages are named in this ledger, **all 222 test files** are in the inventory, and every batch above records its own limits. The full default suite was re-run at the end of this phase: **2,236 passed, 4 skipped, 12 deselected** (browser suites excluded), and `ruff` is clean. **These passes are not evidence about the gaps**: none of the 60+ findings recorded here has a failing existing test, which is exactly why they had to be reproduced by hand.
+
+Genuinely unreviewed, stated plainly so nobody mistakes this for total coverage:
+- the preview design-lab HTML beyond route reachability, the fourteen font files, the nine root concept PNGs;
+- narrative docs beyond `API_ROUTE_MAP`, `ARCHITECTURE`, `CLI_REFERENCE`, `CODEBASE_MAP`, `CONTEXT`, and `AGENTS`;
+- packaging/CI execution beyond the existing guard tests, and any non-Linux platform behaviour;
+- **real-model behaviour of any kind** — accuracy, latency, disagreement quality, multilingual output — which no local probe here can substitute for;
+- audience reception of either attached screenplay, which is the user's untested question and not something a code sweep can answer.
+
+The register stands at 108 uniquely numbered gaps. That number is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order is unchanged and starts with identity, containment, atomic publication and whole-bundle restore.
