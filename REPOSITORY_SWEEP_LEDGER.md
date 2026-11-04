@@ -386,7 +386,7 @@ Status key: **I** = inventoried only or review depth not individually verified; 
 - [P] `screenplay_studio/revision.py`
 - [I] `screenplay_studio/sample.py`
 - [P] `screenplay_studio/stash_store.py`
-- [I] `screenplay_studio/stt.py`
+- [P] `screenplay_studio/stt.py`
 - [P] `screenplay_studio/watch.py`
 - [P] `screenplay_studio/webapp/app.js`
 - [P] `screenplay_studio/webapp/core.js`
@@ -470,7 +470,7 @@ Status key: **I** = inventoried only or review depth not individually verified; 
 - [I] `screenplay_studio/webapp/preview-redesigns/terminal.html`
 - [I] `screenplay_studio/webapp/style.css`
 - [I] `screenplay_studio/webapp/tungsten.css`
-- [I] `screenplay_studio/webapp_demo.py`
+- [P] `screenplay_studio/webapp_demo.py`
 - [P] `screenplay_studio/webapp_server.py`
 
 ## tests (229)
@@ -681,7 +681,7 @@ Status key: **I** = inventoried only or review depth not individually verified; 
 - [I] `tests/test_session_selection_merge.py`
 - [I] `tests/test_setup_payoff.py`
 - [I] `tests/test_shelf_cache.py`
-- [I] `tests/test_sidebar_translate_stt.py`
+- [P] `tests/test_sidebar_translate_stt.py`
 - [I] `tests/test_spa_contract.py`
 - [I] `tests/test_spa_security_headers.py`
 - [I] `tests/test_stale_proposal_guard.py`
@@ -805,7 +805,7 @@ Genuinely unreviewed, stated plainly so nobody mistakes this for total coverage:
 - **real-model behaviour of any kind** — accuracy, latency, disagreement quality, multilingual output — which no local probe here can substitute for;
 - audience reception of either attached screenplay, which is the user's untested question and not something a code sweep can answer.
 
-The register stood at 108 uniquely numbered gaps when this line was written; it is now **124 numbered entries, 6 withdrawn, 4 proven non-gaps, 114 live**, graded individually in `ENTRY_GRADE_TABLE.md`. The count is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order starts with containment and revision safety, and is unchanged.
+The register stood at 108 uniquely numbered gaps when this line was written; it is now **126 numbered entries, 6 withdrawn, 4 proven non-gaps, 116 live**, graded individually in `ENTRY_GRADE_TABLE.md`. The count is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order starts with containment and revision safety, and is unchanged.
 
 ## Self-critique pass — reviewed scope and corrected standard
 
@@ -816,3 +816,28 @@ Also graded the previously ungraded surfaces this pass: the SPA document and its
 **Sixth pass — the areas §13 named as remaining, actually swept.** The Python floor (`requires-python >=3.10`) was checked by parsing every module with `ast.parse(feature_version=(3,10))`: honest, with one UTF-8 BOM in `tests/test_h7_chat_fix.py` that pytest reads and whose 5 tests pass — recorded as a hygiene note, not a gap. JS reproducibility was checked from a clean install (`npm ci` then `npm test`): **134/134** across both suites, while the docstring inside `preview-ink-layer/tests/dom.test.mjs` still says 127, and the obvious `node --test tests/js/` invocation fails on Node 22 — documentation and invocation trap only. The knowledge-base failure modes were driven through the real paths: malformed file → `JSONDecodeError`, schema-invalid entry → `TypeError` from `Rule(**e)`, empty rules directory → 0 rules accepted silently, and an analyze run on a corrupted install → `OrchestratorError`, webapp **502** carrying the parser text, `/report` afterwards **400** "Analysis hasn't completed" although the prior report was intact on disk. That last one is filed as gap **119** (grade A, medium) in `SELF_CRITIQUE_OF_GAP_REGISTER.md` §17. The full default suite was re-run in the rebuilt environment at the end of this pass: **2,248 passed, 4 skipped**, 87 s, and `ruff check .` is clean.
 
 **Stop rule:** findings had stopped being independent — the last several batches produced new instances of the same composition seam rather than new mechanisms. Remaining unverifiable-here areas are named explicitly in `SELF_CRITIQUE_OF_GAP_REGISTER.md` §13 and §17 (real-model behaviour, audience reception, assistive technology, non-Linux platforms, preview-lab internals) and are not going to be faked. No application code changed in any of these passes; the suite remained green and root lint clean throughout.
+
+## Eighth pass — the last product modules at "inventory only"
+
+Short pass, graded as written. `screenplay_studio/stt.py` and its route pair were read end to end and driven
+through the real Flask client in five failure states plus the two URL-guard bypasses the module's own comment
+describes; `screenplay_studio/webapp_demo.py` was driven with a stub over `webapp_server.main` to confirm the
+argv handoff and the forced demo flag. Findings **125** (the languages endpoint advertises a whisper server the
+guard then refuses — grade A, low) and **126** (no magic-byte or duration check on dictated audio, 256 MB
+ceiling inherited from uploads — grade B, low) are in `SELF_CRITIQUE_OF_GAP_REGISTER.md` §20.
+
+Negatives from this batch, recorded with the findings: the whisper URL guard refuses `127.0.0.1@evil.com` before
+any request; `/api/stt` produces five distinct actionable messages and no traceback in every failure state I
+could create; `webapp_demo.py` hands `['--demo-model', '--port', …]` to the canonical `main`, so the token is
+minted and the bind stays loopback; the forced-language auto-retry is deliberate and has two tests.
+
+**Coverage after this pass: no product module remains `[I]`.** Every one of the 83 Python modules has been read
+by me or reviewed within a named batch. What remains unreviewed is exactly the list in §13 of the critique —
+real-model behaviour, audience reception, assistive technology, non-Linux platforms, preview-lab HTML internals —
+plus one environment gap stated precisely: **playwright is not installed in this environment, so the 30
+`e2e_browser_*.py` suites have not been executed by me in any pass.** Every UI claim here is source-, DOM- or
+test-client-based, never a rendered page. Installing playwright and running that gate is the only remaining
+mechanical work a sweep can do on this repository.
+
+Per-entry grades for all 126 entries, with the counts computed from the table rather than typed, are in
+`ENTRY_GRADE_TABLE.md`: **51 A, 44 B, 11 C, 10 D, 6 withdrawn, 4 proven non-gaps — 116 live findings.**

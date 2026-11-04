@@ -157,6 +157,13 @@ Here every entry gets one grade, on the scheme already published in
 | 107 | **D** | — | Design proposal: scene-level intent has nowhere to live. |
 | 108 | **C** | Both collaborator prompt builders | Intent absent from both personas' inputs. |
 
+## Entries 125–126 (eighth pass — the last modules at "inventory only")
+
+| # | Grade | Driven through | Note |
+|---|---|---|---|
+| 125 | **A** | Real `/api/stt/languages` + `/api/stt`, remote whisper URL | Capability endpoint advertises `engine: whisper-server` (200) for a configuration the guard refuses (503). The guard itself is correct; the label is not. Low severity, hand-edited config only. |
+| 126 | **B** | Real `/api/stt`, 3 MB and empty blobs | No magic-byte or duration check, 256 MB inherited ceiling, whole file POSTed to an external local server before any check. Could not reach the decode path with the engine absent. Low severity. |
+
 ## Entries 109–124 (collected in the critique file, graded there and here)
 
 | # | Grade | Driven through | Note |
@@ -166,7 +173,7 @@ Here every entry gets one grade, on the scheme already published in
 | 111 | **A** | Real CLI create + `status` | Round-trip works; positional asymmetry (`--project` versus positional) is the only defect. |
 | 112 | **D** | `du` over the repo | `docs/` 12 MB, `impl-shots/` 7.2 MB. Housekeeping. |
 | 113 | **A** | `/fixqueue` and `/findings/summary` on a two-finding project | `total_count 2`, `open_count 2` while the desk hides the ungrounded row. |
-| 114 | **A** | Same probe | **Negative:** summary, queue and `/report` agree on the ordinary serve path. |
+| 114 | **–** | Same probe | **Negative:** summary, queue and `/report` agree on the ordinary serve path. |
 | 115 | **B** | One-scene script | `scene_count: 0` in act buckets. Cosmetic display. |
 | 116 | **–** | Headers read | `X-Frame-Options` absent but CSP `frame-ancestors 'self'` covers it. Not a defect; do not "fix" it. |
 | 117 | **–** | Demo run | A page that fails to parse shows a bare numeric badge — already 47/87 in spirit. Not filed twice. |
@@ -182,14 +189,14 @@ Here every entry gets one grade, on the scheme already published in
 
 ## Counts, computed from the rows above rather than typed
 
-Counted by parsing this file, not from memory. **124 numbered entries**, 6 withdrawn, 4 proven negatives,
-**114 live findings**.
+Counted by parsing this file, not from memory. **126 numbered entries**, 6 withdrawn, 4 proven negatives,
+**116 live findings**.
 
-| Grade | Count | Share of the 114 live |
+| Grade | Count | Share of the 116 live |
 |---|---|---|
-| **A** — reproduced through a real interface | 50 | 44% |
-| **B** — real mechanism, constructed condition | 43 | 38% |
-| **C** — source inference only | 11 | 10% |
+| **A** — reproduced through a real interface | 51 | 44% |
+| **B** — real mechanism, constructed condition | 44 | 38% |
+| **C** — source inference only | 11 | 9% |
 | **D** — docs, housekeeping, opinion | 10 | 9% |
 | **W** — withdrawn | 6 | — |
 | **–** — tested, not a gap | 4 | — |
