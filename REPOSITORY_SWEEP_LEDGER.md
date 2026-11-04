@@ -781,3 +781,7 @@ Read the deterministic continuity pass end to end (time flips, name variants, no
 ## Documentation and surface-drift batch — reviewed scope
 
 Compared `docs/API_ROUTE_MAP.md` mechanically against the live Flask URL map, ran both CLIs' `--help`, and read the standalone co-writer server's entrypoint plus the docs that describe it. The four undocumented live routes and the "no standalone server" claim are recorded as gaps 83–86; I did not start the standalone server or exercise its routes. Remaining unread: `docs/*` beyond route/architecture/CLI references, the preview design labs' HTML, and packaging/CI execution.
+
+## End-to-end demo-run batch — reviewed scope
+
+Started the built-in demo craft model on loopback and drove the real pipeline, the real Flask routes and the real session store end to end: parse + analyze + report + fix queue + chat start + persona switch + two turns, on a synthetic two-scene script and on both attached screenplays. This exercised routing, persistence, report rendering and the demo client together for the first time in this sweep. It is not a real-model evaluation and says nothing about Sameer/Sushruta quality beyond the demo's canned replies. See gaps 87–94. Remaining unread or unexercised: preview design-lab HTML, most narrative docs beyond routes/architecture/CLI, packaging and CI execution, and all real-model behaviour.
