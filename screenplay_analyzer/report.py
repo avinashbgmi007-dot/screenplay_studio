@@ -467,6 +467,35 @@ def _observation_coverage(findings: list) -> dict:
             "observation_pct": round(100.0 * bearing / total, 1) if total else None}
 
 
+def document_digest(doc) -> str:
+    """A stable fingerprint of the EXACT document a run read (gap 2).
+
+    The digest is taken over the parsed text, not over the file bytes: the same
+    screenplay saved by a newer `save()` (an added field, a re-ordered key) must
+    still be recognisably the same reading, while any change the writer or the
+    parser makes to the words must change it. Findings hang off this digest, so
+    "which script was this note about" is answerable from the report alone.
+
+    Deliberately excludes `source_filename` and `warnings`: renaming a file does
+    not change the screenplay, and parser warnings are advice about the parse,
+    not content.
+    """
+    import hashlib
+    import json as _json
+    payload = {
+        "title": getattr(doc, "title", None),
+        "scenes": [
+            {"heading": getattr(s, "heading_raw", None),
+             "elements": [[getattr(e.type, "value", str(e.type)), e.text]
+                          for e in s.elements]}
+            for s in doc.scenes
+        ],
+    }
+    blob = _json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                       separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(blob).hexdigest()[:32]
+
+
 def to_findings_json(result: AnalysisResult) -> dict:
     """Machine-readable version for Piece 3 to load and reference by scene/finding."""
     # HIGH-1: every finding carries the slugline key of its scene, because the
@@ -477,6 +506,15 @@ def to_findings_json(result: AnalysisResult) -> dict:
     # each re-deriving a scene key (screenplay_parser/scenekey.py).
     from screenplay_parser.scenekey import scene_key_map, stamp_scene_keys
     return {
+        # Gap 2: WHICH script this report is about, in the artifact itself. A
+        # report that does not say which draft it read cannot be checked against
+        # the draft on screen, and the desk would have to trust a manifest entry
+        # that the next upload overwrites.
+        "snapshot": {
+            "digest": document_digest(result.doc),
+            "title": result.doc.title,
+            "scene_count": result.doc.scene_count,
+        },
         "title": result.doc.title,
         "source_filename": result.doc.source_filename,
         "model_used": result.model_used,

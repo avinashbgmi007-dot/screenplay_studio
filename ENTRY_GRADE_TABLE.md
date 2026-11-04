@@ -40,9 +40,9 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | # | Grade | Driven through | Note | Genuine? |
 |---|---|---|---|---|
 | 1 | **A** | Real Flask routes: edit, upload, reactivate | **FIXED 2026-11-04** — the edit cycle is snapshotted per draft and restored on switch; 2 of 3 tests fail without it. Edits, edit log and working copy destroyed by an action the UI calls non-destructive. | **G** |
-| 2 | **B** | Real orchestrator with a stubbed analyzer | Mechanism is source-visible; publication half is proven at A under 65. | **G** |
-| 3 | **B** | Injected total failure | Contradicts the orchestrator's own comment that a failed run preserves the prior report — that is why it keeps high severity despite B. | **G** |
-| 4 | **A** | Two-client HTTP test | A finding from draft A landed in the completed report for draft B. | **G** |
+| 2 | **B** | Real orchestrator with a stubbed analyzer | Mechanism is source-visible; publication half is proven at A under 65. **FIXED 2026-11-04** — analysis now reads the working draft, and the report carries the digest of the script it read. Grade stays B: the reading half was proven with a stubbed analyzer. | **G** |
+| 3 | **B** | Injected total failure | Contradicts the orchestrator's own comment that a failed run preserves the prior report — that is why it keeps high severity despite B. **FIXED 2026-11-04** — staged generations, one pointer; the last good reading survives a failed run. Grade stays B (injected total failure). | **G** |
+| 4 | **A** | Two-client HTTP test | A finding from draft A landed in the completed report for draft B. **FIXED 2026-11-04** — publication re-reads the live draft and refuses if the digest moved. | **G** |
 | 5 | **A** | Real `/analyze/cancel` + real `retry-failed` | The *UI* half (reporting complete on a cancelled response) is C, tracked separately inside the entry. | **G** |
 | 6 | **B** | Injected edit-log write failure | Divergence between working text and history. | **G** |
 | 7 | **B** | Two OS processes on one project | Constructed interleaving; no frequency claimed. | **G** |

@@ -1932,16 +1932,58 @@ def get_report(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    # Gap 3: the question this route answers is "is there a READING that still
+    # describes the script in front of the writer", not "did the last attempt
+    # succeed". A failed re-run used to take a valid, published report off the
+    # desk — 400 while the files sat right there — so the writer lost the
+    # previous reading AND the new one.
+    #
+    # But "serve whatever was published" is not the answer either: after a
+    # re-parse or a new upload the previous reading describes text that no
+    # longer exists, and showing it would be the same lie as a stale analysis
+    # (the pre-existing `test_reparse_then_analyze_regenerates_report` pins
+    # that). So the test is the DIGEST: serve the published generation only
+    # while it still hashes to the script on screen.
+    from .report_generation import current_generation
+    from screenplay_analyzer.report import document_digest
+    try:
+        published = current_generation(m)
+    except ValueError as e:
+        return _error(str(e), 500)
     if m.stage("analyze").status != "complete":
-        return _error("Analysis hasn't completed for this project yet.", 400)
+        if published is None:
+            return _error("Analysis hasn't completed for this project yet.", 400)
+        try:
+            from .revision import load_working
+            live_digest = document_digest(load_working(m))
+        except Exception:                                    # noqa: BLE001
+            live_digest = None
+        if live_digest is not None and published.get("digest") != live_digest:
+            return _error(
+                "This project has changed since its last completed analysis, so "
+                "that report no longer describes the script on screen. Run "
+                "Analysis again to get a reading of the current draft.", 400)
     try:
         report = _load_report_sanitized(m)
     except FileNotFoundError:
         # The manifest claims a finished analyze and the report is not on disk.
         # That is a missing fact, not a bad request and not a server fault worth
         # a stack trace: 404, worded, with no path in it.
+        if m.stage("analyze").status != "complete":
+            # ...but when the stage is not complete either, "the report is
+            # missing" is not the true answer: nothing claims one exists. A
+            # re-parse drops the files and leaves the stage `pending`; the honest
+            # answer is "there is no reading of this project", which is a 400 and
+            # the same thing this route said before the publication change.
+            return _error("Analysis hasn't completed for this project yet.", 400)
         return _error("The analysis report is missing from this project. Re-run "
                       "Analysis to produce one.", 404)
+    if published is not None:
+        report["published"] = published
+        # The honest label: this reading is still here, and it is not from the
+        # last attempt. A reader must not mistake "I can see findings" for "the
+        # run you just started succeeded".
+        report["published"]["is_stale"] = m.stage("analyze").status != "complete"
     return jsonify(report)
 
 

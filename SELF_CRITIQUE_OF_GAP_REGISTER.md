@@ -676,3 +676,54 @@ loopback skip from §28b.
 
 **Not claimed.** `.pdf` and `.fdx` rejection is proven; a `.fountain` that parses into zero scenes is accepted and
 still becomes the active draft — that is a different entry's argument, not this one's.
+
+
+## 30. Step 3 — publication truthfulness (2, 3, 4), and the two places my first version was wrong
+
+The three entries are one shape: the report was written straight onto the live paths as it was produced, so
+there was never a moment at which "this reading is complete and it is about this script" was decided. There was
+nothing to refuse and nothing to roll back to.
+
+**2 — analysis read the wrong document (fixed).** `run_analyze` loaded `m.parsed_path` while `/script` renders the
+working copy. Measured at the `analyze()` boundary: after the writer replaced a line, the run received
+`The drawer was empty.` and never saw `REVOLVER`. It now calls `load_working`, the same document `/script` serves.
+The report also carries a `sha256` digest of the document it read — in the artifact itself, not only in the API
+response — so "which script is this note about" is answerable from the files alone.
+
+**3 — a failed run destroyed the last good reading (fixed).** Measured: a total-failure run replaced both
+`report.md` and `report.findings.json` and `/report` answered 400, while a valid reading had been on disk moments
+before. A run now **stages** its whole set into `report.generations/<time>-<digest>-<pid>/` and publication is one
+pointer write. The manifest is written LAST, so a manifest on disk means the set is whole. A failed or cancelled run
+leaves the previous generation live.
+
+**4 — a run could publish over a draft it never read (fixed).** `publish_generation` re-reads the live draft at the
+moment of publication and refuses if the digest moved. Measured through the real route: edit during the run → the
+run ends 502 "the draft changed … were not published", the stage is `failed`, and `/report` is 400 because nothing
+was published — not a half-report.
+
+**Where my first version was wrong, twice:**
+
+1. **I had two compare-and-publish checks.** The orchestrator checked the digest and `publish_generation` checked it
+   again. Both would have passed the tests. Two copies of a safety check drift apart, so I deleted the orchestrator's
+   and kept the module's — found on re-reading my own diff, not by a test.
+2. **"Serve the published reading" was too blunt, and an existing test caught me.** I first made `/report` serve the
+   published generation whenever one existed. `test_reparse_then_analyze_regenerates_report` failed — correctly:
+   after a re-parse the old reading may describe text that no longer exists, and showing it is the same lie as a
+   stale analysis. The gate is now the digest, not mere existence. A second, narrower mistake fell out of that: a
+   re-parse deletes the report files, so the fall-through reported a 404 ("the report is missing") for a project
+   that never claimed to have one. That path now answers 400 again.
+
+**Two contract decisions made deliberately, both recorded in the tests:** analysis reads the *working* draft (so a
+writer who fixes a line and re-runs gets findings about the fixed text), and the provenance pointer and snapshot are
+part of the per-draft bundle — without them, switching back restored the report files but left the pointer from the
+other draft, and `/report` refused a reading whose text was on disk.
+
+**Verification.** Nine tests. Against the reverted code (only the behavioural files reverted, since the module does
+not exist pre-fix) **6 fail**, and one passes both ways — the "incomplete generation" test — which I am labelling a
+**regression guard, not evidence**, because it exercises a function that only exists with the fix. The two remaining
+tests cover switching drafts and the preserved re-parse rule. Full suite **2286 passed, 7 skipped**, twice; `ruff`
+clean.
+
+**Not claimed.** The generation directories are never pruned, so a long-lived project accumulates them (small, but
+real). The CLI writes reports to a caller-chosen path and does not publish generations — it has no project. Gap 5
+(cancellation) is untouched; a cancelled run leaves a staged directory behind, which is by design but worth naming.

@@ -40,7 +40,7 @@ from typing import Any, Callable, Optional
 import pytest
 
 from screenplay_studio import (beatboard, diff, feedback_ledger, metrics, notes,
-                               pass_history, revision, stash_store)
+                               pass_history, report_generation, revision, stash_store)
 from screenplay_studio.manifest import ProjectManifest
 
 
@@ -92,6 +92,27 @@ class StoreCase:
     # A store may legally rewrite its own path as long as the damaged bytes are
     # still recoverable somewhere (WriterMemory renames the torn file to .bak).
     evidence_path: Optional[Callable[[Any], str]] = None
+
+
+def _publish_a_reading(m) -> None:
+    """Publish a minimal, real generation so the pointer exists.
+
+    Goes through the module's own API rather than writing the file: the point of
+    the case is the reader's contract, and a hand-written pointer would test a
+    shape the store never produces.
+    """
+    from screenplay_parser import ScriptDocument, parse_fountain
+    from screenplay_analyzer.pipeline import AnalysisResult
+    from screenplay_analyzer.report import document_digest
+    from screenplay_studio import report_generation
+
+    doc = ScriptDocument.load(m.parsed_path) if os.path.exists(m.parsed_path) else None
+    if doc is None:
+        doc = parse_fountain(m.source_path)
+    gen = report_generation.new_generation_dir(m, document_digest(doc))
+    report_generation.stage_generation(AnalysisResult(doc), gen, m,
+                                       document_digest(doc), doc)
+    report_generation.publish_generation(m, gen)
 
 
 def _mark_parsed(m) -> None:
@@ -161,6 +182,23 @@ CASES = [
         load_modify_write=False,
         # a damaged record must be REPORTED, never answered with `complete` or
         # with None; the reader raises, so `error` is the honest outcome
+    ),
+    StoreCase(
+        name="published reading pointer",
+        module="screenplay_studio/report_generation.py",
+        path=lambda m: m.report_pointer_path,
+        read=lambda m: report_generation.current_generation(m),
+        seed=lambda m: _publish_a_reading(m),
+        mutate=lambda m: _publish_a_reading(m),
+        missing_default=None,
+        status="guarded",
+        why=("a damaged pointer must not read as 'nothing was ever published': "
+             "the reader raises so the route can say the report's provenance is "
+             "unreadable instead of claiming there is no reading"),
+        # publication writes the pointer wholesale (one atomic rename) and never
+        # reads it back first, so a damaged pointer cannot be clobbered by the
+        # next publish any more than an intact one could
+        load_modify_write=False,
     ),
     StoreCase(
         name="metrics",

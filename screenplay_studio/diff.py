@@ -200,6 +200,14 @@ def _bundle_files(m):
         (finding_marks_path(m), "finding_marks.json"),
         (ambiguous_marks_path(m), "finding_marks.ambiguous.json"),
         (last_pass_path(m), "last_pass.json"),
+        # The published reading's provenance travels with the draft too: without
+        # these two, switching back restored the report FILES but left a pointer
+        # (or none) from the other draft, so `/report` refused a reading whose
+        # text was on disk. The generation directories themselves are not
+        # copied — they are content-addressed by digest and kept on disk, so the
+        # pointer still resolves to the reading it names.
+        (m.report_snapshot_path, "report.snapshot.json"),
+        (m.report_pointer_path, "report.current.json"),
     )
 
 

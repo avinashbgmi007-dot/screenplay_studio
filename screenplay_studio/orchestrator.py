@@ -103,11 +103,9 @@ class Orchestrator:
                           "output_paths": dict(stage.output_paths) if stage.output_paths else None}
         m.mark_running("analyze")
         try:
-            from screenplay_parser.models import ScriptDocument
             from screenplay_analyzer.pipeline import analyze
             from screenplay_analyzer.llm_client import LlamaServerClient
             from screenplay_analyzer.llm_client_base import auth_headers
-            from screenplay_analyzer.report import save_report
 
             def progress_cb(event):
                 import time as _t
@@ -119,7 +117,16 @@ class Orchestrator:
                 # another thread and must never catch this file half-written.
                 atomic_write_json(m.progress_path, dict(event, ts=_t.time()))
 
-            doc = ScriptDocument.load(m.parsed_path)
+            # Gap 2: analyse what the WRITER SEES, not the base parse.
+            # `/script` renders the working copy (edits applied); the pipeline
+            # used to load `m.parsed_path` directly, so a writer who fixed an
+            # issue and re-ran analysis was handed findings about text that no
+            # longer existed on their screen (measured: the report's reading of
+            # a line the writer had already replaced). `load_working` creates
+            # the copy on first use and only rebuilds it from the parse when the
+            # writer has no edits, so this is the same document `/script` serves.
+            from .revision import load_working
+            doc = load_working(m)
             client = LlamaServerClient(base_url=m.server_url, model=m.model_id, timeout=m.timeout,
                                        fallback_to_loaded=True, fast_model=m.fast_model,
                                        extra_headers=auth_headers(m.api_key))
@@ -150,7 +157,29 @@ class Orchestrator:
                 # recompute the verification summary over the combined set.
                 result.merge(m.report_findings_path)
 
-            save_report(result, m.report_md_path, m.report_findings_path)
+            # The document this report is ABOUT, saved next to it (gap 3/4).
+            # The report used to be two files with no record of the script they
+            # described, so a later upload/re-parse could sit beside a report of
+            # the old text and nothing on disk could tell. Saving the document
+            # here is what makes the pair a generation: the report and the script
+            # it read change together or not at all.
+            from screenplay_analyzer.report import document_digest
+            read_digest = document_digest(doc)
+
+            # ---- stage this reading as its own generation (gaps 3 and 4) ---
+            # The compare-and-publish check lives in `publish_generation`, not
+            # here: it re-reads the live draft at the moment of publication and
+            # refuses if it moved. Deliberately ONE authority — an earlier
+            # version of this fix checked the digest here as well, and two
+            # copies of a safety check drift apart.
+            # Written to its own directory, never over the live report. A run
+            # that fails, is cancelled, or finds the draft moved leaves the
+            # previous reading untouched — the desk keeps the last good report
+            # instead of losing it to an attempt that produced nothing usable.
+            from .report_generation import (new_generation_dir, publish_generation,
+                                            stage_generation)
+            gen_dir = new_generation_dir(m, read_digest)
+            stage_generation(result, gen_dir, m, read_digest, doc)
             # Gate 9: record what this run DELIVERED in the feedback ledger —
             # the system of record. Recording here (the one chokepoint both the
             # webapp route and the CLI pass through) means every run is logged
@@ -182,6 +211,7 @@ class Orchestrator:
                 # partial success: some categories failed but the stage produced
                 # a usable report — record as complete with the errors visible,
                 # not as a hard failure, since a partial report is still useful.
+                publish_generation(m, gen_dir)
                 m.mark_complete("analyze", {
                     "report_md": m.report_md_path,
                     "report_findings": m.report_findings_path,
@@ -191,6 +221,7 @@ class Orchestrator:
                     **({"ledger_error": ledger_note} if ledger_note else {}),
                 })
             else:
+                publish_generation(m, gen_dir)
                 m.mark_complete("analyze", {
                     "report_md": m.report_md_path,
                     "report_findings": m.report_findings_path,

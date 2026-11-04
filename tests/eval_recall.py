@@ -26,6 +26,10 @@ SEARCHED_SECTIONS = frozenset({
     "coverage", "character_reads", "formatting_findings", "pacing",
 })
 EXCLUDED_SECTIONS = frozenset({
+    # provenance, not analysis: which script the report describes (gap 2). It
+    # carries a digest, a title and a scene count — searching it for findings
+    # would match the script's own title and inflate recall.
+    "snapshot",
     "withdrawals", "stats", "errors", "notices", "recoveries",
     "character_dials", "verification_summary", "logline_test",
     "model_used", "source_filename", "title",

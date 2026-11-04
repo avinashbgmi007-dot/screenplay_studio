@@ -182,6 +182,33 @@ class ProjectManifest:
         return os.path.join(self.project_dir, "report.findings.json")
 
     @property
+    def report_generations_dir(self) -> str:
+        """Staged, complete readings — one directory per analysis (gap 3).
+
+        A run writes its whole artifact set HERE and only a publication step
+        makes it the live report. A run that fails, is cancelled, or finds the
+        draft moved leaves the previous generation live instead of overwriting
+        it, and a failure can never leave half a generation on the desk.
+        """
+        return os.path.join(self.project_dir, "report.generations")
+
+    @property
+    def report_pointer_path(self) -> str:
+        """Which generation is the published one. The single pointer a reader
+        follows, so publication is one atomic rename rather than three."""
+        return os.path.join(self.project_dir, "report.current.json")
+
+    @property
+    def report_snapshot_path(self) -> str:
+        """The exact document a completed analysis read (gaps 3 and 4).
+
+        Written in the same publish as the report pair, so "which script was
+        this reading about" is answerable from the artifacts themselves rather
+        than from a manifest entry the next upload overwrites.
+        """
+        return os.path.join(self.project_dir, "report.snapshot.json")
+
+    @property
     def sessions_dir(self) -> str:
         return os.path.join(self.project_dir, "sessions")
 
