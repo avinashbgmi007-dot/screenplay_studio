@@ -157,6 +157,12 @@ Here every entry gets one grade, on the scheme already published in
 | 107 | **D** | — | Design proposal: scene-level intent has nowhere to live. |
 | 108 | **C** | Both collaborator prompt builders | Intent absent from both personas' inputs. |
 
+## Entries 125–127 (eighth and ninth passes — last modules, and packaging)
+
+| # | Grade | Driven through | Note |
+|---|---|---|---|
+| 127 | **D** | `python -m build --wheel`, then install into a clean `--target` and boot it | Wheel is correct: 180 files, 4.04 MB, 263 rules, SPA and fonts present, no tests or scratch files, `/` → 200. The only weakness is that CI's packaging tests inspect the source tree, not the wheel, so they could pass while an installed copy broke. |
+
 ## Entries 125–126 (eighth pass — the last modules at "inventory only")
 
 | # | Grade | Driven through | Note |
@@ -189,15 +195,15 @@ Here every entry gets one grade, on the scheme already published in
 
 ## Counts, computed from the rows above rather than typed
 
-Counted by parsing this file, not from memory. **126 numbered entries**, 6 withdrawn, 4 proven negatives,
-**116 live findings**.
+Counted by parsing this file, not from memory. **127 numbered entries**, 6 withdrawn, 4 proven negatives,
+**117 live findings**.
 
-| Grade | Count | Share of the 116 live |
+| Grade | Count | Share of the 117 live |
 |---|---|---|
 | **A** — reproduced through a real interface | 51 | 44% |
 | **B** — real mechanism, constructed condition | 44 | 38% |
 | **C** — source inference only | 11 | 9% |
-| **D** — docs, housekeeping, opinion | 10 | 9% |
+| **D** — docs, housekeeping, opinion | 11 | 9% |
 | **W** — withdrawn | 6 | — |
 | **–** — tested, not a gap | 4 | — |
 
@@ -206,7 +212,7 @@ Five things worth stating plainly, including the two where I had it wrong:
 1. **My own earlier summary was wrong, and in the direction that flattered the critique.** I said "roughly
    half the register is conditional or inferential" (that part holds: 47%) but I also said "about forty are
    inference, documentation, or opinion" and "22 cosmetic or opinion". The honest figure is **21 entries**
-   (11 C + 10 D). I had been double-counting constructed-but-real entries as inferential. The register is
+   (11 C + 11 D). I had been double-counting constructed-but-real entries as inferential. The register is
    *more* evidenced than my self-critique claimed — which means my self-criticism was itself unsupported
    in one of its central numbers.
 2. **The severe list does not move.** 1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119. Grades answer "how

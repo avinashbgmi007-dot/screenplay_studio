@@ -173,8 +173,8 @@ After all three passes, with duplicates collapsed and withdrawals applied:
 | | Count | What they are |
 |---|---|---|
 > **Superseded.** These aggregate rows were a reading aid and two of them were wrong. Every entry now
-> has its own grade in **`ENTRY_GRADE_TABLE.md`**, counted by parsing rather than by memory: **126 entries,
-> 51 A / 44 B / 11 C / 10 D, 6 withdrawn, 4 proven negatives**. Where these rows disagree with that table,
+> has its own grade in **`ENTRY_GRADE_TABLE.md`**, counted by parsing rather than by memory: **127 entries,
+> 51 A / 44 B / 11 C / 11 D, 6 withdrawn, 4 proven negatives**. Where these rows disagree with that table,
 > the table wins. Kept for the record because silently deleting my own wrong numbers is the habit this
 > document exists to criticise.
 
@@ -233,7 +233,7 @@ Asked to be a self-critique of how genuine these gaps are, the honest answers ar
 - **Six reproduced negatives** (CI-parity lint, chat read shape, CLI round-trip, secret withholding, header posture, summary/queue arithmetic agreement) belong in the record too, because they bound how bad the codebase actually is.
 - **The remaining gaps are not code-level.** They are model quality, audience reception, assistive technology and non-Linux behaviour — all of which need the writer's own environment, and none of which I can manufacture here.
 
-The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. *(Superseded twice. §17–§18 added 119–122; §19 added 123–124. And the per-entry counts in this paragraph — 34 conditional, 18 inferential, 22 cosmetic — were wrong: recounted from `ENTRY_GRADE_TABLE.md`, the live register is 51 A / 44 B / 11 C / 10 D. I had been counting constructed-but-real entries as inferential, which made my own critique look stricter than it was.)* The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
+The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. *(Superseded twice. §17–§18 added 119–122; §19 added 123–124. And the per-entry counts in this paragraph — 34 conditional, 18 inferential, 22 cosmetic — were wrong: recounted from `ENTRY_GRADE_TABLE.md`, the live register is 51 A / 44 B / 11 C / 11 D. I had been counting constructed-but-real entries as inferential, which made my own critique look stricter than it was.)* The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
 
 ## 17. Sixth pass — the areas §13 named as remaining, now actually swept (with grades)
 
@@ -249,7 +249,7 @@ Continuing on the corrected standard, and grading each as I collect rather than 
 
 ## 18. Where this leaves the count
 
-- Register: **126 numbered entries**; 6 withdrawn, 3 re-graded, 14 carrying real weight (1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119), graded one by one in `ENTRY_GRADE_TABLE.md`: 51 A / 44 B / 11 C / 10 D.
+- Register: **126 numbered entries**; 6 withdrawn, 3 re-graded, 14 carrying real weight (1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119), graded one by one in `ENTRY_GRADE_TABLE.md`: 51 A / 44 B / 11 C / 11 D.
 - Evidence mix after six passes: **~21 A**, **~34 B**, **~19 C**, **~22 D**, **5 W**.
 - New graded negatives this pass: Python floor (**no gap**, one BOM in a test), JS reproducibility (**no gap beyond docs**, 134 not 127), KB zero-rule state deliberately distinguishable (good design), and the empty-rules case accepted silently (part of 119).
 - One genuinely new class of risk found: **a corrupted rules install converts into a failed analysis and a refused report**, which belongs in the fix order immediately behind containment and revision safety, because it is cheap to fix and it is the difference between "your install needs repair" and "your script cannot be analysed."
@@ -284,3 +284,36 @@ and driving the real routes, in the same pass as grading.
 - **The forced-language retry is deliberate and tested** — an empty transcript under a forced language retries once with auto-detect, and genuinely silent audio still returns empty. Two tests cover both halves.
 
 The consequence for the ledger: after this pass, **no product module remains at `[I]`**. What remains unreviewed is what §13 already listed — real-model behaviour, audience reception, assistive technology, non-Linux platforms, preview-lab internals — and one environment gap I can now state precisely: **playwright is not installed here, so all 30 `e2e_browser_*.py` suites have never been executed by me. Every UI-behaviour claim in this register is source-, DOM- or test-client-based, never a rendered page.** That is gap 17's grade resting on recorded results rather than a run of mine, and it is the last thing standing between this sweep and a clean claim.
+
+
+## 21. Ninth pass — packaging and CI, and the one gate this sandbox cannot open
+
+The last mechanical item I had listed as pending was packaging execution. Done, by building and installing
+rather than reading.
+
+**D — 127. The wheel is correct; the only weakness is how CI reaches that conclusion.** `python -m build --wheel`
+now takes the step every guard test assumes, and the result holds up: **180 files, 4.04 MB**, 26 rule files
+(263 rules) and `knowledge_base/index.json`/`schema.json` present, the whole SPA present under
+`screenplay_studio/webapp/`, `app.js`, `core.js`, both CSS files and the fonts with it, **no** tests, no PNGs and
+no analysis scratch files (`graph.json` is genuinely gone, which closes half of gap 86 — that finding's
+"shipped inside importable packages" claim is false for the built artefact and true only for the source tree).
+Installing that wheel into a clean `--target` and importing it from outside the repo: `/` → **200, 48 KB**,
+`/api/health` → 200, `/api/config` → 200, `/api/stt/languages` → 200, and `KnowledgeBase()` loads **263 rules
+from the wheel**. So the packaged app boots. The gap is that the ten `test_packaging_data_files.py` tests inspect
+the source tree, not a wheel, so a `MANIFEST.in` or `package-data` mistake could pass them and still break an
+installed copy — the suite's confidence is one step stronger than its evidence. **Recommendation:** make one CI
+job install the wheel into a temp prefix and hit `/` plus `/api/health`, which is ~8 lines and converts gap 86
+from "checked in source" to "checked as shipped." Grade **D**, severity low.
+
+**Negative worth stating:** `_API_TOKEN` is `None` in this probe *by my own choice* to allow scripted reads; the
+canonical launch mints a token, and I did not re-verify that in the installed-wheel case. So this pass proves
+the artefact is complete and bootable, not that the installed copy's security posture matches the source one.
+
+**The browser gate cannot run here, and now I can say why precisely.** `playwright` installs, but
+`python -m playwright install chromium` fails: `cdn.playwright.dev` is unreachable from this sandbox ("Client
+network socket disconnected before secure TLS connection was established"), and there is no system Chromium or
+Firefox to point at instead. That is a hard environment limit, not a decision I made, and it is the honest end
+of what a sweep can do here: **all 30 `e2e_browser_*.py` suites remain unexecuted by me**, so every UI claim in
+this register is source-, DOM- or test-client-based, and gap 17's grade rests on the suite's recorded results
+rather than a run of mine. Anyone with network access can close this in one command; I cannot manufacture the
+output.

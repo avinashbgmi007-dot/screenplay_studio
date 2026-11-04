@@ -805,7 +805,7 @@ Genuinely unreviewed, stated plainly so nobody mistakes this for total coverage:
 - **real-model behaviour of any kind** — accuracy, latency, disagreement quality, multilingual output — which no local probe here can substitute for;
 - audience reception of either attached screenplay, which is the user's untested question and not something a code sweep can answer.
 
-The register stood at 108 uniquely numbered gaps when this line was written; it is now **126 numbered entries, 6 withdrawn, 4 proven non-gaps, 116 live**, graded individually in `ENTRY_GRADE_TABLE.md`. The count is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order starts with containment and revision safety, and is unchanged.
+The register stood at 108 uniquely numbered gaps when this line was written; it is now **127 numbered entries, 6 withdrawn, 4 proven non-gaps, 117 live**, graded individually in `ENTRY_GRADE_TABLE.md`. The count is a measure of how much the system asserts versus how much it verifies, not a release checklist; the coordinated fix order starts with containment and revision safety, and is unchanged.
 
 ## Self-critique pass — reviewed scope and corrected standard
 
@@ -839,5 +839,21 @@ plus one environment gap stated precisely: **playwright is not installed in this
 test-client-based, never a rendered page. Installing playwright and running that gate is the only remaining
 mechanical work a sweep can do on this repository.
 
-Per-entry grades for all 126 entries, with the counts computed from the table rather than typed, are in
-`ENTRY_GRADE_TABLE.md`: **51 A, 44 B, 11 C, 10 D, 6 withdrawn, 4 proven non-gaps — 116 live findings.**
+Per-entry grades for all 127 entries, with the counts computed from the table rather than typed, are in
+`ENTRY_GRADE_TABLE.md`: **51 A, 44 B, 11 C, 11 D, 6 withdrawn, 4 proven non-gaps — 117 live findings.**
+
+## Ninth pass — packaging, and the gate that cannot open here
+
+Built the wheel for the first time in this sweep (`python -m build --wheel`) and installed it into a clean
+`--target` outside the repository, then booted it: **180 files, 4.04 MB, 26 rule files (263 rules),
+`index.json`/`schema.json`, the whole SPA and its fonts, no tests, no PNGs, no analysis scratch files**, `/` →
+200 (48 KB), `/api/health`, `/api/config` and `/api/stt/languages` → 200, `KnowledgeBase()` loads 263 rules from
+the installed copy. Gap **127** is filed in `SELF_CRITIQUE_OF_GAP_REGISTER.md` §21 and is narrow: the ten
+packaging tests read the source tree rather than a wheel, so they could pass while an installed copy broke.
+Half of gap 86 is contradicted by the artefact — `graph.json` does not ship; the finding holds only for the
+source tree.
+
+**Browser gate: closed as un-runnable, with the reason measured.** `playwright` installs; `playwright install
+chromium` fails because `cdn.playwright.dev` is unreachable from this sandbox, and no system Chromium or Firefox
+exists to substitute. All 30 `e2e_browser_*.py` suites therefore remain unexecuted by me. Every UI claim in this
+register is source-, DOM- or test-client-based. This is now stated as a limit rather than left as a pending item.
