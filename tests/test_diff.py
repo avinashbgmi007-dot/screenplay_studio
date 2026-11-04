@@ -774,3 +774,60 @@ def test_a_damaged_stage_record_refuses_the_switch_without_moving(tmp_path, monk
     assert client.get(f"/api/projects/{project}/script").get_json() == before
     active = client.get(f"/api/projects/{project}/drafts").get_json()["active_draft"]
     assert active == "draft-1", "a refused switch must not move the writer"
+
+
+# ---------- gap 61: concurrent uploads must not share a staging file ----------
+# Measured before the fix: the staging path was `_draft_upload.<ext>` — ONE name
+# per project — so two uploads wrote each other's bytes and the loser's cleanup
+# removed the winner's file mid-swap. With only the parse gate in place, the
+# second upload died 400 and neither draft was recorded.
+
+
+class TestConcurrentUploadsKeepTheirOwnFiles:
+    def test_two_uploads_do_not_share_a_staging_file(self, http_client, monkeypatch):
+        """Forced interleave at the seam the entry names: one upload pauses after
+        saving its staging file while the other runs to completion."""
+        import threading
+        import time as _time
+
+        project = _upload(http_client, SAMPLE_SCRIPT).get_json()["project"]
+        resp = {"": None}
+        real = webapp_server._validate_draft_upload
+
+        def pause_for_A(path, filename):
+            if filename.startswith("A"):
+                _time.sleep(0.4)  # let B finish while A's staging file exists
+            return real(path, filename)
+
+        monkeypatch.setattr(webapp_server, "_validate_draft_upload", pause_for_A)
+        out = {}
+
+        def upload(tag, body):
+            client = webapp_server.app.test_client()
+            r = client.post(f"/api/projects/{project}/drafts",
+                            data={"file": (io.BytesIO(body), f"{tag}.fountain")},
+                            content_type="multipart/form-data")
+            out[tag] = r.status_code
+
+        a = threading.Thread(target=upload, args=("A", b"Title: A\n\nINT. ROOM - NIGHT\n\nALPHA only.\n"))
+        a.start()
+        _time.sleep(0.1)
+        b = threading.Thread(target=upload, args=("B", b"Title: B\n\nINT. ROOM - NIGHT\n\nBETA only.\n"))
+        b.start()
+        a.join()
+        b.join()
+
+        assert out == {"A": 200, "B": 200}, f"an upload was lost: {out}"
+        m = ProjectManifest.load(os.path.join(webapp_server.PROJECTS_DIR, project))
+        assert len(m.drafts) == 2, f"both uploads must be recorded, got {m.drafts}"
+        src = open(m.source_path, encoding="utf-8").read()
+        # The active source holds the LAST writer's text, and the manifest names
+        # that same file — the two must never disagree.
+        if m.source_filename.startswith("A"):
+            assert "ALPHA only." in src and "BETA only." not in src
+        else:
+            assert "BETA only." in src and "ALPHA only." not in src
+        project_dir = os.path.join(webapp_server.PROJECTS_DIR, project)
+        leftovers = [n for n in os.listdir(project_dir)
+                     if n.startswith("_draft_upload") or n.endswith(".incoming")]
+        assert leftovers == [], f"staging litter left behind: {leftovers}"

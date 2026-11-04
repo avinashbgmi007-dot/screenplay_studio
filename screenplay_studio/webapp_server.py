@@ -24,6 +24,7 @@ import re
 import sys
 import threading
 import time
+import uuid
 import traceback
 import zipfile
 
@@ -3665,9 +3666,23 @@ def upload_draft(name):
     if ext is None:
         return _unsupported_ext_error(upload.filename)
 
-    tmp_path = os.path.join(m.project_dir, f"_draft_upload{ext}")
+    # Gap 61: the staging file was `_draft_upload.<ext>` — ONE name per project,
+    # so two concurrent uploads wrote each other's bytes and the loser's cleanup
+    # deleted the winner's file mid-swap (measured: A read B's text and failed
+    # with the parser's complaint; with only the parse gate in place, A's upload
+    # died with 400 and its draft was never recorded). A per-request name fixes
+    # the collision; it does NOT fix the swap, which is serialized below.
+    tmp_path = os.path.join(
+        m.project_dir, f"_draft_upload-{uuid.uuid4().hex}{ext}")
     upload.save(tmp_path)
     previous_draft = m.active_draft or "original"
+    # ...and ONE writer at a time per project, because the swap below
+    # (`source.<ext>.incoming` + `os.replace`) plus the manifest write is a
+    # read-modify-write over shared project state even with private staging
+    # files. Different uploads also mean different extensions, so two threads
+    # would copy to the SAME incoming path. The same lock `/edits/apply` takes
+    # for the working copy, held across snapshot + swap + manifest.
+    from .jsonio import lock_for
     try:
         # GATE FIRST (gap 64): nothing in the project is touched until the file
         # has been shown to be a screenplay. A rejected upload is a 400 with the
@@ -3678,7 +3693,8 @@ def upload_draft(name):
             return _error(str(e), 400)
 
         from .diff import upload_new_draft
-        upload_new_draft(m, tmp_path, upload.filename)
+        with lock_for(m.source_path):
+            upload_new_draft(m, tmp_path, upload.filename)
         orch = Orchestrator(m)
         orch.run_parse()
     except Exception as e:

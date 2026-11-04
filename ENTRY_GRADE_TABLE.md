@@ -109,7 +109,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 58 | **B** | Isolated Flask test with injected disk error | Partial application; local-only switch leaves a remote destination. | **G** |
 | 59 | **A** | Temporary project with an analysis-complete manifest | Banner follows current demo mode, not report origin. | **G** |
 | 60 | **B** | Fake clock | Nested busy retries past the logical deadline. | **G** |
-| 61 | **B** | Two synchronized concurrent uploads | Shared temp file and swap target. | **G** |
+| 61 | **B** | Two synchronized concurrent uploads | Shared temp file and swap target. **NARROWED 2026-11-04** — private staging file + per-project lock remove the race; the crash window between snapshot/swap/manifest remains. | **G** |
 | 62 | **A** | Real route with two synthetic projects | **FIXED 2026-11-04** — `draft_dir` validates at the chokepoint; 5 tests, 3 of which fail without the fix. **Most serious item in the register.** Read and overwrite a sibling project; reached outside `PROJECTS_DIR` on a later write. | **G** |
 | 63 | **A** | Draft activation on a real project | **FIXED 2026-11-04** — whole bundle restored; before the fix the original draft lost its cast entirely. | **G** |
 | 64 | **A** | Real upload of an invalid FDX, then reactivation | **FIXED 2026-11-04** — refused before the swap; parse stage restored with the snapshot. | **G** |

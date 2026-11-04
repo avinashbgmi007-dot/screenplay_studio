@@ -811,3 +811,28 @@ the fix; the two that pass are the `status` round trip (unaffected) and are guar
 in "verified against both PDFs") are documentation/judgement entries, not code defects. Moving or deleting the
 repository's own audit history is the owner's call, not mine to make silently, and 124's fix is a wording change to
 claims about evidence I cannot re-measure here. I am leaving both un-fixed and saying so rather than marking them.
+
+## 33. Gap 61 — the staging file, and what is still not transactional
+
+**Measured before the fix** (forced interleave at the seam the entry names): the staging path was
+`_draft_upload.<ext>`, one name per project, so the second upload overwrote the first's bytes and the first's
+cleanup removed the second's file mid-swap. Result: `A → 400` with the parser's complaint, `B → 200`, and **one**
+draft record for two uploads.
+
+**Fixed, in the entry's own order of importance:**
+
+1. **A private staging file per request** — `_draft_upload-<uuid4>.<ext>`.
+2. **One draft mutation at a time per project** — the section that snapshots, swaps `source.<ext>` and appends the
+   draft record now runs under `lock_for(m.source_path)`, the same lock `/edits/apply` already takes for the working
+   copy. Unique staging names alone do not fix the swap: two uploads with different extensions copy to the *same*
+   `source.<ext>.incoming` path.
+3. **Cleanup is unchanged** and only ever removes this request's own file.
+
+After: **A 200, B 200, two draft records**, the active source holds the last writer's text, the manifest's
+`source_filename` names that same file, and no staging litter is left.
+
+**What this does NOT make transactional** (the entry asks for snapshot + swap + manifest as one recoverable unit):
+they are still three separate durable writes. A crash between them can leave a draft record whose snapshot was
+never taken, or a swapped source whose manifest still names the old draft. The lock removes the *racing* window,
+not the *crash* window. I have not measured a crash there, so I am naming it rather than claiming it fixed — and I
+am leaving gap 61's "one recoverable transaction" half open on purpose.
