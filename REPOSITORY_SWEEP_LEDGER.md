@@ -789,3 +789,7 @@ Started the built-in demo craft model on loopback and drove the real pipeline, t
 ## Collaborator-intent batch — reviewed scope
 
 Read the remaining co-writer modules not yet covered end to end (`peer.py`, `craft_history.py`, the probe path in `engine.py`, persona/mode validation) and probed the pure intent classifiers with the writer's own documented phrasings from the two attached scripts and the Darshi statements. These are deterministic function calls; no model was invoked. The collaborator's *voice quality* remains unvalidated by design (real-model gate). See gaps 98–101.
+
+## Knowledge-base grounding batch — reviewed scope
+
+Inventoried all 26 rule files (263 rules, no duplicate ids), called `RulesContext` for every pass name and category the pipeline uses, and traced the grounding call sites in `pipeline.py`, `dials.py` and `genre.py`. This closes the KB-coverage question: which passes are grounded, which are silent, and how large the fragments get. Not reviewed: rule content quality per se, and how a real model uses any of it. See gaps 102–105.
