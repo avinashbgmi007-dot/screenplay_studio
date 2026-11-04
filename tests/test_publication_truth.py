@@ -228,3 +228,55 @@ BETA STRANGER waits in the dark.
         resp = client.get(f"/api/projects/{project}/report")
         assert resp.status_code == 400
         assert "hasn't completed" in resp.get_json()["error"].lower()
+
+
+class TestACancellableRetry:
+    def test_cancel_reaches_a_running_retry(self, client, monkeypatch):
+        """Gap 66 measured: `/analyze/cancel` answered 409 "No analysis is running"
+        while a `retry-failed` run was in flight — the retry registered no cancel
+        event and passed no `should_cancel`, so even a registered event would have
+        been ignored. And when it did finally cancel, the orchestrator re-raised it
+        as "Analyze stage failed", marking the stage `failed`."""
+        import threading
+
+        project = _project(client)
+        real = pipeline.analyze
+
+        def partial(doc, llm, **kw):
+            result = real(doc, llm, **kw)
+            result.category_outcomes = {"dialogue": "failed"}
+            result.errors.append("dialogue failed")
+            return result
+
+        monkeypatch.setattr(pipeline, "analyze", partial)
+        client.post(f"/api/projects/{project}/analyze", json={})
+        monkeypatch.setattr(pipeline, "analyze", real)
+
+        started, release = threading.Event(), threading.Event()
+
+        def slow(doc, llm, **kw):
+            started.set()
+            release.wait(timeout=10)
+            return real(doc, llm, **kw)
+
+        monkeypatch.setattr(pipeline, "analyze", slow)
+        out = {}
+
+        def retry():
+            worker = webapp_server.app.test_client()
+            out["resp"] = worker.post(f"/api/projects/{project}/analyze/retry-failed", json={})
+
+        thread = threading.Thread(target=retry)
+        thread.start()
+        assert started.wait(timeout=5), "the retry never reached the pipeline"
+        cancel = client.post(f"/api/projects/{project}/analyze/cancel")
+        release.set()
+        thread.join(timeout=15)
+
+        assert cancel.status_code == 200, (
+            f"cancel was refused while a retry was running: {cancel.get_json()}")
+        assert cancel.get_json()["cancel_requested"] is True
+        assert out["resp"].status_code == 200
+        assert out["resp"].get_json().get("cancelled") is True, (
+            "a deliberate stop must not be reported as a failure")
+        assert client.get(f"/api/projects/{project}").get_json()["stages"]["analyze"] == "complete"

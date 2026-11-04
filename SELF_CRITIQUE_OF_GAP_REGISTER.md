@@ -836,3 +836,29 @@ they are still three separate durable writes. A crash between them can leave a d
 never taken, or a swapped source whose manifest still names the old draft. The lock removes the *racing* window,
 not the *crash* window. I have not measured a crash there, so I am naming it rather than claiming it fixed — and I
 am leaving gap 61's "one recoverable transaction" half open on purpose.
+
+## 34. Gap 66 — a retry the writer could not stop, and a cancel reported as a fault
+
+**Measured:** with a real `retry-failed` run in flight, `POST /analyze/cancel` answered **409 "No analysis is
+running"**. Three separate faults, only the first of which the entry named:
+
+1. **The retry registered no cancel event** and passed no `should_cancel` to `run_analyze`, so there was nothing for
+   cancel to find — and nothing the pipeline would have checked even if it had.
+2. **A cancelled retry was reported as a failure.** The orchestrator's cancel branch was guarded by
+   `and not retry_failed`, so a deliberate stop fell through to the generic handler and was re-raised as
+   `"Analyze stage failed: Analysis cancelled at the writer's request"` — a **502** describing a stop as a fault,
+   with the stage marked `failed`. This was invisible until (1) was fixed, because nothing could cancel a retry
+   before. I found it only because I checked the response *body*, not just the status of the cancel call.
+3. **No stale-event cleanup on the retry path**, so an event could outlive its run and cancel the next one.
+
+After: cancel answers **200 `{"cancel_requested": true}`**; the retry answers **200 `{"cancelled": true}`**; the
+stage returns to the status it had before the retry (`complete`), not `failed`.
+
+**Verification.** One test, which fails pre-fix at the first assertion (`409 != 200`). I am not counting (2) and
+(3) as separately proven: the same test would pass with (1) fixed alone, because the cancel response is checked
+before the retry's own response. They are covered by their own assertions inside the test, but a reader should know
+that the *headline* failure was (1). Full suite **2307 passed, 7 skipped**; `ruff` clean.
+
+**Not claimed.** Cancellation remains co-operative: the pipeline checks between calls, so a model call already in
+flight runs to completion (the front-end limitation gap 5 names). A retry that is cancelled leaves its staged
+generation directory behind, which is the same by-design behaviour as a cancelled full run.

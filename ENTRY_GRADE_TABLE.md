@@ -114,7 +114,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 63 | **A** | Draft activation on a real project | **FIXED 2026-11-04** — whole bundle restored; before the fix the original draft lost its cast entirely. | **G** |
 | 64 | **A** | Real upload of an invalid FDX, then reactivation | **FIXED 2026-11-04** — refused before the swap; parse stage restored with the snapshot. | **G** |
 | 65 | **A** | Stubbed long run plus a real draft switch | **NARROWED 2026-11-04** — switch refused (409) while a run holds the lock; not closed for a cross-process publish. | **G** |
-| 66 | **A** | Real `/analyze/cancel` during a real `retry-failed` | 409; the analysis lock is not taken by upload/activation. | **G** |
+| 66 | **A** | Real `/analyze/cancel` during a real `retry-failed` | 409; the analysis lock is not taken by upload/activation. **FIXED 2026-11-04 (both halves)** — upload/activation take the analysis lock (§28); retry is cancellable (200), a cancelled retry answers `cancelled: true` and the stage is restored, not `failed`. | **G** |
 | 67 | **W** | Measured | ~7 ms of subprocess work on a seconds-long operation. Withdrawn. | **W** |
 | 68 | **B** | Held `lock_for`, 0.05 s deadline, same-process waiter | In-process contention only. | **G** |
 | 69 | **B** | Completed report plus a busy store | Transient warning replaces a good result. | **G** |

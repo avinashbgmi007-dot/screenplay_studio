@@ -231,6 +231,26 @@ class Orchestrator:
                 })
         except Exception as e:
             from screenplay_analyzer.pipeline import AnalysisCancelled
+            if isinstance(e, AnalysisCancelled) and retry_failed:
+                # Gap 66: this branch did not exist, so a cancelled RETRY fell
+                # through to the generic handler below and was re-raised as
+                # "Analyze stage failed: Analysis cancelled at the writer's
+                # request" — a 502 describing a deliberate stop as a fault, with
+                # the stage marked `failed`. A retry is cancellable now, so a
+                # cancel has to reach the writer as a cancel.
+                import time as _tc2
+                from .manifest import StageStatus
+                try:
+                    atomic_write_json(m.progress_path, {"stage": "analyze", "status": "cancelled", "detail": "Cancelled at the writer's request — the previous report is unchanged.", "ts": _tc2.time()})
+                except Exception:
+                    pass
+                st = StageStatus()
+                st.status = (prev_stage or {}).get("status", "complete")
+                if (prev_stage or {}).get("output_paths"):
+                    st.output_paths = prev_stage["output_paths"]
+                m.stages["analyze"] = st
+                m.save()
+                raise
             if isinstance(e, AnalysisCancelled) and not retry_failed:
                 # A cancelled run is NOT a failed run (RE-B4 audit R2): the
                 # writer chose to stop. The stage returns to what it was

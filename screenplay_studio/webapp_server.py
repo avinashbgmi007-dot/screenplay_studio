@@ -1803,6 +1803,10 @@ def retry_failed_categories(name):
         return _retry_failed_locked(m)
     finally:
         lock.release()
+        # Same cleanup as /analyze: a stale cancel event must never outlive the
+        # run, or the NEXT one — a full analysis or another retry — would cancel
+        # the moment it starts.
+        _ANALYZE_CANCEL.pop(name, None)
 
 
 def _retry_failed_locked(m):
@@ -1815,11 +1819,21 @@ def _retry_failed_locked(m):
     orch = Orchestrator(m)
     import time as _t
     _t0 = _t.time()
+    # Gap 66: a retry is an analysis and the writer must be able to stop it.
+    # This path registered no cancel event and passed no `should_cancel`, so
+    # `/analyze/cancel` answered "No analysis is running" (409) while a retry
+    # was genuinely in flight — and even a registered event would have been
+    # ignored, because the pipeline was never asked to look at it.
+    name = os.path.basename(m.project_dir)
+    cancel_event = _ANALYZE_CANCEL.setdefault(name, threading.Event())
     try:
-        orch.run_analyze(retry_failed=True)
+        orch.run_analyze(retry_failed=True, should_cancel=cancel_event.is_set)
     except OrchestratorError as e:
         return _error(str(e), 502)
     except Exception as e:
+        from screenplay_analyzer.pipeline import AnalysisCancelled
+        if isinstance(e, AnalysisCancelled):
+            return jsonify({"cancelled": True, **_manifest_summary(m)})
         traceback.print_exc()
         return _error(f"Unexpected error during retry: {e}", 500)
 
