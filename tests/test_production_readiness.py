@@ -115,6 +115,7 @@ class TestTheShippedServerIsLoopbackOnly:
         import socket
         import subprocess
         import sys
+        import time
         import urllib.request
 
         lan = _non_loopback_ipv4()
@@ -149,10 +150,10 @@ class TestTheShippedServerIsLoopbackOnly:
             # report "never came up" for a server that was fine.
             log_path = tmp_path / "server.log"
             proc = None
-            for _attempt in (1, 2):
+            for _attempt in (1, 2, 3):
                 # `_free_port` binds-then-closes, so another process can take the
-                # port in between. One retry keeps a lost race from being read as
-                # a product failure.
+                # port in between. Retries keep a lost race from being read as a
+                # product failure.
                 port = _free_port()
                 with open(log_path, "wb") as log:
                     proc = subprocess.Popen(
@@ -173,10 +174,43 @@ class TestTheShippedServerIsLoopbackOnly:
                 with urllib.request.urlopen(
                         f"http://127.0.0.1:{port}/api/health", timeout=10) as r:
                     assert r.status == 200
+                # NEGATIVE CONTROL, and it is the reason this test was flaky and
+                # WRONG, not merely slow. MEASURED 2026-11-04 on this host: a socket
+                # bound to `127.0.0.1` and nothing else — the exact shape the product
+                # is supposed to have — refuses a connection to `{lan}` at +0s,
+                # +0.05s and +0.2s, then ACCEPTS it at +0.5s. `ss` shows the cause:
+                # this sandbox runs a proxy that mirrors a local listener onto the
+                # host's LAN address. So on this host "answered on the LAN address"
+                # does not distinguish a wildcard bind from a loopback one, and the
+                # test failed 4 times in 15 runs while the product was, every time,
+                # bound to loopback and nothing else (the shipped `main()` has no
+                # `--host` flag and calls `app.run(host="127.0.0.1")`).
+                #
+                # The control is re-measured HERE, at the same moment as the
+                # assertion, because the proxy's behaviour is time-dependent and a
+                # measurement taken seconds earlier would not describe this moment.
+                # When a loopback-only listener is itself reachable, the probe cannot
+                # tell the two bindings apart: SKIP, with the measurement attached.
+                # Never pass (that would hide a real wildcard bind elsewhere) and
+                # never blame the product for the host's own forwarding.
+                with socket.socket() as loop_only:
+                    loop_only.bind(("127.0.0.1", 0))
+                    loop_only.listen(1)
+                    probe_port = loop_only.getsockname()[1]
+                    for _ in range(40):
+                        if _port_is_open(lan, probe_port):
+                            pytest.skip(
+                                f"this host forwards {lan} connections to local "
+                                f"listeners: a socket bound to 127.0.0.1 alone "
+                                f"answers on {lan}:{probe_port}, so 'answered on the "
+                                "LAN address' cannot distinguish a loopback bind "
+                                "from a wildcard one")
+                        time.sleep(0.05)
+
                 assert not _port_is_open(lan, port), (
-                    f"the shipped server answered on {lan}:{port} — it is bound to "
-                    "more than loopback, so every project on this machine is "
-                    "reachable from the network")
+                        f"the shipped server answered on {lan}:{port} — it is bound to "
+                        "more than loopback, so every project on this machine is "
+                        "reachable from the network")
             finally:
                 proc.terminate()
                 try:

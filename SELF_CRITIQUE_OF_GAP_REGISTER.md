@@ -605,3 +605,35 @@ per-project analysis lock is held, and work again the moment the run ends. That 
   same discipline as §27 — I am not counting guards as proofs).
 - Full suite **2261 passed, 4 skipped**; `ruff` clean. The environment was rebuilt again first — third reset this
   session — because a suite run in a broken environment proves nothing.
+
+### 28b. A test of mine was wrong, and it was the one calling the product a liar
+
+The full suite after this fix reported **1 failed** twice in six runs:
+`test_production_readiness.py::TestTheShippedServerIsLoopbackOnly::test_not_reachable_on_a_non_loopback_address`.
+The previous pass had already seen this same test fail once and recorded it in §26 as *observed, not explained*. That
+was not good enough, so I chased it this time. The answer is not a product regression — it is a broken test, and it
+is worth writing down because of what it says about how it broke.
+
+**Measurement.** On this host, a socket bound to `127.0.0.1` and nothing else — the exact shape the product is
+supposed to have — refuses a connection to `169.254.0.21` at +0s, +0.05s and +0.2s, and then **accepts** it at
++0.5s. This sandbox runs a proxy that mirrors a local listener onto the host's LAN address. `ss` shows the mirror:
+an owned `127.0.0.1:PORT` listener (the shipped server) alongside an unowned `169.254.0.21:PORT` one.
+
+**Consequence for the test.** "The server answered on the LAN address" cannot distinguish a loopback bind from a
+wildcard bind on this host. The test failed 4 times in 15 runs while the product was bound to loopback every single
+time — `main()` has no `--host` flag and calls `app.run(host="127.0.0.1")`. A test that reports a security failure
+for a safe product is worse than no test: it trains the reader to discount the one signal that matters.
+
+**The first hypothesis was wrong, and I say so.** I initially blamed a port collision: `_free_port()` only asks for
+a port free on loopback, so something already bound to the LAN address could sit on the same number. I patched a
+pre-launch skip for contaminated ports, and it still failed 1 in 8. The `ss` line I read as proof of a collision
+was actually the proxy mirroring the server's own port — the same number, a different owner. Recorded because the
+wrong explanation was plausible enough to ship.
+
+**What the fix does.** A negative control, re-measured *at the moment of the assertion* rather than seconds
+earlier: bind a loopback-only socket, and for two seconds ask whether the LAN address reaches it. If it does, the
+probe cannot tell the bindings apart, so the test **skips** with the measurement in the message. It does not pass
+(that would hide a real wildcard bind on a host where the probe works) and it does not fail (that would blame the
+product for the host's forwarding). Result: 12/12 runs of the file now report `46 passed, 1 skipped`, and three
+consecutive full-suite runs report **2260 passed, 5 skipped**. The skip is honest, the reason travels with it, and
+the same test still catches a wildcard bind on any host that does not forward.
