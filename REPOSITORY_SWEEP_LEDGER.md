@@ -785,3 +785,7 @@ Compared `docs/API_ROUTE_MAP.md` mechanically against the live Flask URL map, ra
 ## End-to-end demo-run batch — reviewed scope
 
 Started the built-in demo craft model on loopback and drove the real pipeline, the real Flask routes and the real session store end to end: parse + analyze + report + fix queue + chat start + persona switch + two turns, on a synthetic two-scene script and on both attached screenplays. This exercised routing, persistence, report rendering and the demo client together for the first time in this sweep. It is not a real-model evaluation and says nothing about Sameer/Sushruta quality beyond the demo's canned replies. See gaps 87–94. Remaining unread or unexercised: preview design-lab HTML, most narrative docs beyond routes/architecture/CLI, packaging and CI execution, and all real-model behaviour.
+
+## Collaborator-intent batch — reviewed scope
+
+Read the remaining co-writer modules not yet covered end to end (`peer.py`, `craft_history.py`, the probe path in `engine.py`, persona/mode validation) and probed the pure intent classifiers with the writer's own documented phrasings from the two attached scripts and the Darshi statements. These are deterministic function calls; no model was invoked. The collaborator's *voice quality* remains unvalidated by design (real-model gate). See gaps 98–101.
