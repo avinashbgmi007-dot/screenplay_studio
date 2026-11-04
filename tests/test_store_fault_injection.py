@@ -373,6 +373,26 @@ CASES = [
         why="B4: SessionStore.save parks an unreadable base as .bak before the "
             "save lands, so a chat turn cannot destroy the only recoverable copy",
     ),
+    StoreCase(
+        name="cowriter deletion tombstone",
+        # The tombstone is what stops a stale chat turn resurrecting a deleted
+        # conversation (gap 18b). It is a durable write of its own, so it needs
+        # its own fault coverage rather than an exemption.
+        module="screenplay_cowriter/store.py",
+        path=lambda m: _tombstone_path(m),
+        read=lambda m: _tombstone_read(m),
+        seed=lambda m: _tombstone_seed(m),
+        mutate=lambda m: _tombstone_mutate(m),
+        # No tombstone = no deletion, so a stale save is allowed (that is what a
+        # brand-new session at a fresh id looks like).
+        missing_default="resurrected",
+        status="guarded",
+        # Damage must read as PROTECTED, not as "nothing was ever deleted" —
+        # same shape as every other store here: unreadable is not absent.
+        damage_ok=lambda outcome: outcome == "data",
+        why="gap 18b: a damaged tombstone still refuses the stale save, because "
+            "an unreadable record cannot prove the conversation is gone",
+    ),
 ]
 
 
@@ -456,6 +476,51 @@ def _session_mutate(m) -> None:
     from screenplay_cowriter.models import Session
     session = Session.new(title="saved after the damage")
     session.session_id = _SESSION_ID
+    _session_store(m).save(session)
+
+
+# ---------- the co-writer's deletion tombstone (gap 18b) --------------------
+
+_DELETED_ID = "fault_deleted"
+
+
+def _tombstone_path(m) -> str:
+    return os.path.join(_sessions_dir(m), f"{_DELETED_ID}.deleted.json")
+
+
+def _tombstone_seed(m) -> None:
+    from screenplay_cowriter.models import Session
+    store = _session_store(m)
+    session = Session.new(title="deleted before the fault")
+    session.session_id = _DELETED_ID
+    store.save(session)
+    store.delete(_DELETED_ID)
+
+
+def _tombstone_read(m) -> str:
+    """Ask the question the tombstone exists to answer, not a boolean.
+
+    `is_deleted` is bookkeeping; the DEFECT was that a stale chat turn
+    resurrected a deleted conversation. So probe that: try to save a session
+    older than the deletion and report whether it was refused.
+    """
+    from screenplay_cowriter.models import Session
+    from screenplay_cowriter.store import SessionDeletedError
+    stale = Session.new(title="stale snapshot")
+    stale.session_id = _DELETED_ID
+    stale.created_at = 0.0  # older than any deletion
+    try:
+        _session_store(m).save(stale)
+    except SessionDeletedError:
+        return "protected"
+    return "resurrected"
+
+
+def _tombstone_mutate(m) -> None:
+    """A mundane save at the same id, as a live chat turn would do."""
+    from screenplay_cowriter.models import Session
+    session = Session.new(title="saved after the damage")
+    session.session_id = _DELETED_ID
     _session_store(m).save(session)
 
 

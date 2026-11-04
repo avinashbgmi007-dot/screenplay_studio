@@ -61,7 +61,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 |---|---|---|---|---|
 | 16 | **A** | Isolated temp directory, real `ProjectManifest` and watch path | Release-blocker framing was mine; the reproduction is real. | **G** |
 | 17 | **A** | Existing live-region suite, run | Browser suite behaviour; not re-run this session (playwright absent), so the grade rests on the suite's own recorded failure. Flagged. | **G** |
-| 18 | **B** | Concurrent session saves in isolation | Both concurrency and forced-failure variants used. | **G** |
+| 18 | **B** | Concurrent session saves in isolation | Both concurrency and forced-failure variants used. | **F** — (a) message identity + (b) durable deletion tombstone with stale-snapshot refusal + (e) fail-closed on a failed `.bak`; (c)/(d) covered only indirectly by the existing branch tombstone and `OSError` branch (critique §35). |
 | 19 | **A** | Real `add_to_stash` with 4,004 characters | Saved 4,000, dropped the tail silently. | **G** |
 | 20 | **B** | Mocked current scene numbers | Staleness is real; the mock is what makes it visible. | **G** |
 | 21 | **A** | Real exporter, then re-parse | `AJAY/VENU` becomes three AJAY lines. Round-trip use reassigns dialogue. | **G** |

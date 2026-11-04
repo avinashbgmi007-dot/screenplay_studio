@@ -862,3 +862,52 @@ that the *headline* failure was (1). Full suite **2307 passed, 7 skipped**; `ruf
 **Not claimed.** Cancellation remains co-operative: the pipeline checks between calls, so a model call already in
 flight runs to completion (the front-end limitation gap 5 names). A retry that is cancelled leaves its staged
 generation directory behind, which is the same by-design behaviour as a cancelled full run.
+
+## §35 — Gap 18: chat-session store integrity (2026-11-04)
+
+Five defects, and I am recording exactly which ones this pass actually proves.
+
+**(a) A repeated message is dropped — FIXED.** Messages now carry a stable `message_id` (`models.py`), and
+`_merge_missing_messages` unions on identity, with a deterministic `legacy-<sha1>` id and a text fallback for files
+written before the field existed, so old sessions still load and still merge.
+
+**(b) A stale save resurrects a deleted session — FIXED, but my first two rules were wrong.** `delete()` now leaves a
+durable `<sid>.deleted.json` tombstone under `lock_for`. My first rule ("any save where the file is missing but a
+tombstone exists is refused") **broke a real feature** and the full suite caught it: the Design Lab thread lives at a
+**fixed** id (`preview-lab`), "clear this chat" deletes it, and the next request legitimately re-creates it — every
+request after a clear 500'd. My second rule (`create()` clears the tombstone) fixed the lab but made the documented
+defect fail its own test, because the lab lazily rebuilds with `Session(...)` + `save()`, not `create()`. The rule that
+holds is causal: refuse only when the snapshot came into being (`Session.created_at`) **before** the deletion
+(`deleted_at`). A stale turn is always older than the delete; a session built after a clear is a new conversation at a
+reused id. Strict `<`, so an ambiguous ordering lets the save through rather than break clear-and-start-over.
+
+**(e) A failed `.bak` park overwrote the damaged original — FIXED.** `_park_damaged` now returns success, and `save`
+fails closed (`SessionUnreadableError`) when the damaged bytes cannot be preserved.
+
+**(c) and (d) are covered only INDIRECTLY — not separately proven this pass.** (c) a stale save restoring a deleted
+branch is handled by the pre-existing `deleted_branches` tombstone (DEL-1), which I did not re-derive. (d) a transient
+`OSError` on the merge read is handled by the existing `except OSError: pass` "land the save anyway" branch, which I
+also did not re-derive. I am not claiming fresh evidence for either.
+
+**The admission that matters: my first version of the (a) test was vacuous.** It saved a session that already held
+every message, so in-memory was a superset, the merge never ran, and the test passed against buggy code — it "proved"
+a fix without ever entering the defective path. Rewritten twice more: the second attempt still failed to reproduce
+because the stale snapshot already contained both copies. Only the version where the **disk** holds a repeated message
+the stale snapshot lacks reproduces it, and there pre-fix the store held `['Yes', 'ok']` — one turn silently gone.
+Every new test was re-run against reverted code and shown to fail.
+
+**A new durable write needed new fault coverage.** The repo's discovery gate (`test_every_store_writer_is_in_the_
+registry`) failed the moment `store.py` started calling `atomic_write_json` for the tombstone, and it was right to: I
+registered a `StoreCase` instead of an exemption, probing the question the tombstone exists to answer (does a stale
+save get refused?) rather than the bookkeeping boolean. It is non-vacuous in one direction only — against a **lenient**
+damaged-tombstone policy (`return False`) all three faults fail, which is what proves the fail-conservative branch;
+against mere tombstone existence it passes, so I count it as a damage-policy guard, not as proof that (b) is fixed.
+(b)'s proof remains the direct stale-save test.
+
+**Judgement call, flagged:** a damaged tombstone makes `save` refuse (fail closed). If that record is ever corrupted
+on a real install, a chat turn to that id errors instead of silently continuing. I chose this because a resurrected
+deleted conversation is unrecoverable and a refused save is retriable and says why — the same asymmetry as (e). If the
+owner prefers availability there, the change is the two `return True` branches in `_superseded_by_delete` /
+`is_deleted`.
+
+Full suite **2320 passed, 7 skipped**; `ruff` clean.

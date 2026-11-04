@@ -18,11 +18,26 @@ import uuid
 from dataclasses import dataclass, field, asdict
 
 
+def _legacy_message_id(d: dict) -> str:
+    """A deterministic id for a message saved before ids existed."""
+    import hashlib
+    blob = "\x1f".join(str(d.get(k) or "") for k in
+                        ("role", "content", "timestamp", "mode", "partner"))
+    return "legacy-" + hashlib.sha1(blob.encode("utf-8")).hexdigest()[:16]
+
+
 @dataclass
 class Message:
     role: str  # "user" | "assistant" | "system"
     content: str
     timestamp: float = field(default_factory=time.time)
+    # Gap 18(a): a message's IDENTITY, independent of its text. The store's
+    # merge keyed messages on (role, content), so a writer who said "Yes" twice
+    # had the second one dropped as a duplicate of the first — the merge could
+    # not tell one turn from another. A stable per-message id makes the union a
+    # set operation on identity, and turning content into a fallback for legacy
+    # files without ids.
+    message_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     mode: str | None = None  # e.g. "evidence_discussion", "brainstorm", "persona:producer"
     scene_refs: list[int] = field(default_factory=list)  # scenes pulled into context for this turn
     quote: dict | None = None  # select-to-reply: {"scene_number": int, "text": str}
@@ -35,6 +50,11 @@ class Message:
     def from_dict(d: dict) -> "Message":
         return Message(
             role=d["role"], content=d["content"], timestamp=d.get("timestamp", time.time()),
+            # Legacy sessions predate ids: derive a STABLE one from the fields
+            # that identify that message, so the same old file loaded twice
+            # yields the same id (random ids here would make every legacy
+            # message look new on every load and duplicate the whole history).
+            message_id=d.get("message_id") or _legacy_message_id(d),
             mode=d.get("mode"), scene_refs=d.get("scene_refs", []),
             quote=d.get("quote"), partner=d.get("partner"),
         )

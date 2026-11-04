@@ -6,7 +6,9 @@ keeps the whole thing inspectable/hand-editable if something goes wrong.
 """
 
 import glob
+import json
 import os
+import time
 
 from .models import Session
 
@@ -29,8 +31,28 @@ def _park_damaged(path: str) -> None:
     from screenplay_studio.jsonio import retry_permission
     try:
         retry_permission(lambda: os.replace(path, path + ".bak"))
+        return True
     except OSError:
-        pass  # if it cannot be parked, the save still proceeds
+        # Gap 18(e): this used to return None and the caller saved anyway, so a
+        # failed park meant the save overwrote the damaged original with no
+        # backup. The caller now fails closed on False.
+        return False
+
+
+class SessionDeletedError(Exception):
+    """A save arrived for a session that was deleted while the turn was in flight.
+
+    Gap 18(b): the store used to recreate the session, resurrecting a
+    conversation the writer had deliberately removed.
+    """
+
+
+class SessionUnreadableError(Exception):
+    """A session file is damaged AND could not be preserved as `.bak`.
+
+    Gap 18(e): the save used to proceed regardless, destroying the only
+    recoverable copy of the conversation.
+    """
 
 
 class SessionStore:
@@ -63,6 +85,7 @@ class SessionStore:
         return retry_permission(lambda: Session.load(path))
 
     def save(self, session: Session, *, owns_selection: bool = False) -> None:
+        # (see the tombstone check inside the lock below)
         # Serialize writes per session file AND merge across concurrent turns.
         # The lock alone only serializes the writes; the load that produced
         # `session` happened OUTSIDE it, so a stale in-memory snapshot would
@@ -93,6 +116,13 @@ class SessionStore:
         path = self._path(session.session_id)
         from screenplay_studio.jsonio import lock_for
         with lock_for(path):
+            # Gap 18(b): a stale snapshot must never bring a deleted
+            # conversation back. Refuse loudly — silently dropping the turn
+            # would be the same class of lie in the other direction.
+            if self._superseded_by_delete(path, session):
+                raise SessionDeletedError(
+                    f"Session '{session.session_id}' was deleted while this turn "
+                    "was in flight; the turn was not saved.")
             if os.path.exists(path):
                 try:
                     disk = Session.load(path)
@@ -101,13 +131,53 @@ class SessionStore:
                     # Transient read contention (a sharing violation), NOT
                     # damage — park nothing, and still land this save.
                     pass
-                except Exception:
-                    # Genuinely unreadable (torn or wrong-shape JSON). The save
-                    # must still happen — a chat turn may never break — but the
-                    # unreadable bytes are parked first, so this save is not the
-                    # thing that destroys the only recoverable copy.
-                    _park_damaged(path)
+                except Exception as e:
+                    # Genuinely unreadable (torn or wrong-shape JSON). Gap 18(e):
+                    # this used to park best-effort and save regardless, so when
+                    # the rename failed the save destroyed the only recoverable
+                    # copy. FAIL CLOSED instead: if the damaged bytes cannot be
+                    # preserved, refuse the write and say why. A refused save is
+                    # recoverable; an overwritten conversation is not.
+                    if not _park_damaged(path):
+                        raise SessionUnreadableError(
+                            f"Session '{session.session_id}' is unreadable and "
+                            f"could not be preserved as '{os.path.basename(path)}.bak' "
+                            f"({e}); refusing to overwrite it.") from e
             session.save(path)
+
+    def _superseded_by_delete(self, path, session: Session) -> bool:
+        """Was this in-memory session deleted out from under us?
+
+        A tombstone's mere EXISTENCE is the wrong test, and getting that wrong
+        broke a real feature: the Design Lab thread lives at a FIXED id
+        (`preview-lab`), "clear this chat" deletes it, and the next request
+        legitimately re-creates it at that same id. Blocking on the tombstone
+        made every request after a clear fail with `SessionDeletedError` — the
+        whole lab 500'd (caught by `tests/test_preview_lab.py`).
+
+        The defect is a STALE save, so test for staleness: the session came into
+        being (`Session.created_at`) BEFORE the deletion was recorded. A
+        conversation deleted underneath a stale snapshot is always older than
+        the deletion; a session built after the clear is a new conversation at a
+        reused id and is allowed.
+
+        Strict `<` on purpose: equal timestamps mean the ordering is unknown, so
+        let the save through rather than break clear-and-start-over.
+        """
+        if os.path.exists(path):
+            return False  # live file — the normal merge applies
+        tomb = self._tombstone_path(session.session_id)
+        if not os.path.exists(tomb):
+            return False  # never deleted
+        try:
+            with open(tomb, encoding="utf-8") as f:
+                deleted_at = float(json.load(f)["deleted_at"])
+        except (OSError, ValueError, KeyError, TypeError):
+            # Damaged tombstone: cannot prove this save is fresh. Fail
+            # conservative and refuse — a resurrected conversation is
+            # unrecoverable; a refused save is retriable and says why.
+            return True
+        return session.created_at < deleted_at
 
     @staticmethod
     def _merge_missing_messages(disk: Session, session: Session,
@@ -137,11 +207,22 @@ class SessionStore:
                     continue
                 session.branches[bname] = dbranch  # whole branch is new to us
                 continue
-            have = {(m.role, m.content) for m in sbranch.messages}
+            # Gap 18(a): identity, not text. Keying on (role, content) meant a
+            # writer who said "Yes" twice had the second message dropped as a
+            # duplicate of the first — the merge could not tell two turns
+            # apart. `message_id` is the primary key now; (role, content) is
+            # kept ONLY as the fallback for legacy messages whose id was derived
+            # deterministically, so old sessions still merge the way they did.
+            have_ids = {m.message_id for m in sbranch.messages}
             for m in dbranch.messages:
-                if (m.role, m.content) not in have:
-                    sbranch.messages.append(m)
-                    have.add((m.role, m.content))
+                if m.message_id in have_ids:
+                    continue
+                if m.message_id.startswith("legacy-") and \
+                        any(x.role == m.role and x.content == m.content
+                            for x in sbranch.messages):
+                    continue  # legacy fallback: same text, same turn
+                sbranch.messages.append(m)
+                have_ids.add(m.message_id)
         if not owns_selection:
             # A snapshot that predates the writer's last switch must not write
             # the old branch back. `disk` is the newer truth for a field this
@@ -188,5 +269,41 @@ class SessionStore:
 
     def delete(self, session_id: str) -> None:
         path = self._path(session_id)
-        if os.path.exists(path):
-            os.remove(path)
+        # Gap 18(b): deleting the file was not enough. An in-flight chat holds a
+        # stale snapshot and its next `save` recreates the session — the writer
+        # deleted a conversation and it came back. A durable tombstone (kept
+        # after the file is gone) is what lets `save` tell "deleted" from "new",
+        # and it outlives the process, because the writer's other window may be
+        # a different one.
+        from screenplay_studio.jsonio import atomic_write_json, lock_for
+        with lock_for(path):
+            if os.path.exists(path):
+                os.remove(path)
+            atomic_write_json(self._tombstone_path(session_id), {
+                "session_id": session_id,
+                "deleted_at": time.time(),
+            })
+
+    def _tombstone_path(self, session_id: str) -> str:
+        return os.path.join(self.sessions_dir, f"{session_id}.deleted.json")
+
+    def is_deleted(self, session_id: str) -> bool:
+        """Did the writer delete this conversation?
+
+        A present-but-unparseable tombstone answers YES — the conservative side.
+        The session file is already gone, so a damaged record cannot prove no
+        deletion happened, and guessing "no" would report a deleted
+        conversation as live. `delete()` writes the tombstone atomically, so an
+        unreadable one means outside damage. Bookkeeping only: `save` decides
+        from timestamps (`_superseded_by_delete`), never from this, so failing
+        conservative here does not lock an id against an explicit re-create.
+        """
+        tomb = self._tombstone_path(session_id)
+        if not os.path.exists(tomb):
+            return False
+        try:
+            with open(tomb, encoding="utf-8") as f:
+                json.load(f)
+        except (OSError, ValueError):
+            return True  # damaged: cannot prove it was not a deletion
+        return True
