@@ -275,6 +275,17 @@ Test baseline for this batch: 60 tests in `test_diff`, `test_destructive_paths`,
 
 Test baseline for this batch: relevant storage, backup and idea suites were exercised earlier in this sweep; the probes above are direct module/route calls against synthetic files, and none of them is covered by an existing test.
 
+## Evidence grading and withdrawals — read this before the numbered entries
+
+An adversarial self-review of this register is in **`SELF_CRITIQUE_OF_GAP_REGISTER.md`**. Summary of what it changed:
+
+- **Withdrawn or materially downgraded:** 103 as written (genre/pacing grounding is mostly a mis-keyed probe; pacing is deterministic by design), 104 as written (the oversized fragment came from a pass name the pipeline does not use directly), 91 as framed (the shipped SPA reads `branches`; this is an API asymmetry), 67 as filed (7 ms of subprocess work on a seconds-long operation), and 109, which never became a gap after root lint passed.
+- **Re-graded:** 74/75 merge into one conditional finding; 87 is mechanism-real but its content came from the demo stand-in; 88–89 are renderer omissions (source-confirmed); 97 is a **design proposal**, not a reproduced defect; 83–86 and 96 are housekeeping; 115 downgrades my act-bucketing wording.
+- **Promoted:** 1, 21, 23 and **62** were re-reproduced through real interfaces. **62 (draft-name containment) is the most serious item in the register and was mis-numbered behind dozens of weaker entries**; 1 (edits destroyed on draft switch) is the most serious for the writer's daily work.
+- **Grades:** A = reproduced through a real interface (20 entries); B = real mechanism, constructed or conditional (34); C = source inference only (18); D = opinion/docs/housekeeping (22); W = withdrawn (5).
+
+The numbered entries below are unchanged as the evidence record. Where this note conflicts with an entry, **this note is the corrected reading**. Thirteen entries carry real weight: 1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113. Everything else is conditional, inferential or cosmetic, and should be read that way.
+
 ## Segregated triage — one coordinated backlog, not separate fixes
 
 The numbered entries remain the evidence source; a gap can belong to more than one journey. Nothing is marked fixed.
