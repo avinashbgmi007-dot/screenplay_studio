@@ -840,7 +840,7 @@ test-client-based, never a rendered page. Installing playwright and running that
 mechanical work a sweep can do on this repository.
 
 Per-entry grades for all 127 entries, with the counts computed from the table rather than typed, are in
-`ENTRY_GRADE_TABLE.md`: **51 A, 44 B, 11 C, 11 D, 6 withdrawn, 4 proven non-gaps — 117 live findings.**
+`ENTRY_GRADE_TABLE.md`: **51 A, 43 B, 12 C, 11 D, 6 withdrawn, 4 proven non-gaps — 117 live findings.**
 
 ## Ninth pass — packaging, and the gate that cannot open here
 

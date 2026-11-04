@@ -174,7 +174,7 @@ After all three passes, with duplicates collapsed and withdrawals applied:
 |---|---|---|
 > **Superseded.** These aggregate rows were a reading aid and two of them were wrong. Every entry now
 > has its own grade in **`ENTRY_GRADE_TABLE.md`**, counted by parsing rather than by memory: **127 entries,
-> 51 A / 44 B / 11 C / 11 D, 6 withdrawn, 4 proven negatives**. Where these rows disagree with that table,
+> 51 A / 43 B / 12 C / 11 D, 6 withdrawn, 4 proven negatives**. Where these rows disagree with that table,
 > the table wins. Kept for the record because silently deleting my own wrong numbers is the habit this
 > document exists to criticise.
 
@@ -233,7 +233,7 @@ Asked to be a self-critique of how genuine these gaps are, the honest answers ar
 - **Six reproduced negatives** (CI-parity lint, chat read shape, CLI round-trip, secret withholding, header posture, summary/queue arithmetic agreement) belong in the record too, because they bound how bad the codebase actually is.
 - **The remaining gaps are not code-level.** They are model quality, audience reception, assistive technology and non-Linux behaviour — all of which need the writer's own environment, and none of which I can manufacture here.
 
-The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. *(Superseded twice. §17–§18 added 119–122; §19 added 123–124. And the per-entry counts in this paragraph — 34 conditional, 18 inferential, 22 cosmetic — were wrong: recounted from `ENTRY_GRADE_TABLE.md`, the live register is 51 A / 44 B / 11 C / 11 D. I had been counting constructed-but-real entries as inferential, which made my own critique look stricter than it was.)* The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
+The repo sweep is complete on the corrected standard: 118 numbered entries, of which thirteen carry real weight, 34 are conditional, 18 inferential, 22 cosmetic or opinion, and 5 withdrawn. *(Superseded twice. §17–§18 added 119–122; §19 added 123–124. And the per-entry counts in this paragraph — 34 conditional, 18 inferential, 22 cosmetic — were wrong: recounted from `ENTRY_GRADE_TABLE.md`, the live register is 51 A / 43 B / 12 C / 11 D. I had been counting constructed-but-real entries as inferential, which made my own critique look stricter than it was.)* The coordinated fix order in §6 of this file and §9 of `INTEGRATED_PLAN_CRITIQUE.md` is what I would defend.
 
 ## 17. Sixth pass — the areas §13 named as remaining, now actually swept (with grades)
 
@@ -249,7 +249,7 @@ Continuing on the corrected standard, and grading each as I collect rather than 
 
 ## 18. Where this leaves the count
 
-- Register: **126 numbered entries**; 6 withdrawn, 3 re-graded, 14 carrying real weight (1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119), graded one by one in `ENTRY_GRADE_TABLE.md`: 51 A / 44 B / 11 C / 11 D.
+- Register: **127 numbered entries**; 6 withdrawn, 4 re-graded, 14 carrying real weight (1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119), graded one by one in `ENTRY_GRADE_TABLE.md`: 51 A / 43 B / 12 C / 11 D.
 - Evidence mix after six passes: **~21 A**, **~34 B**, **~19 C**, **~22 D**, **5 W**.
 - New graded negatives this pass: Python floor (**no gap**, one BOM in a test), JS reproducibility (**no gap beyond docs**, 134 not 127), KB zero-rule state deliberately distinguishable (good design), and the empty-rules case accepted silently (part of 119).
 - One genuinely new class of risk found: **a corrupted rules install converts into a failed analysis and a refused report**, which belongs in the fix order immediately behind containment and revision safety, because it is cheap to fix and it is the difference between "your install needs repair" and "your script cannot be analysed."
@@ -317,3 +317,32 @@ of what a sweep can do here: **all 30 `e2e_browser_*.py` suites remain unexecute
 this register is source-, DOM- or test-client-based, and gap 17's grade rests on the suite's recorded results
 rather than a run of mine. Anyone with network access can close this in one command; I cannot manufacture the
 output.
+
+
+## 22. Self-critique of §20–§21, applied before this file was pushed
+
+Grading as I collect only helps if I also argue with the grades I just gave. Three things:
+
+**126 is weaker than I wrote it, and I am downgrading it on the spot.** "No ceiling on the audio that reaches the
+transcriber" is true, and it is also how most local dictation endpoints behave; the 256 MB ceiling is inherited
+from uploads, not chosen badly for audio. The part with real substance is narrower: nothing checks magic bytes, so
+whatever the writer selects is written to a tempfile and handed to a decoder, and the failure they eventually see
+is the decoder's rather than "that isn't an audio file". The "whole file POSTed to an external server" half is not
+a privacy hole — the user started that server themselves and the guard proves it is on this machine. **Revised
+grade: C/D, severity informational, and I would not schedule it.** It stays in the table because it was
+reproduced, and the table is not a fix list.
+
+**125 stays A but is small.** Two endpoints disagreeing about whether dictation is configured is a real
+inconsistency I drove back to back, and the fix is three lines. Calling it "low severity" is right; calling it
+anything more would be the uniform-tone failure this document exists to criticise.
+
+**127 is the one that would actually change behaviour in CI, and it is graded D only because nothing is broken
+today.** A packaging guard that inspects the source tree instead of the artefact is a guard that can pass while
+the product is uninstallable. I verified the artefact by hand this pass; CI does not. That is worth eight lines of
+workflow, and it is the only finding from the last three passes I would put on a schedule.
+
+**And the uncomfortable summary of this whole review, now that it is finished:** 127 numbered entries, 117 live,
+51 of them reproduced through a real interface — and **not one of them is new since 119.** Passes eight and nine
+produced two low-severity findings and one CI improvement. That is the stop rule working as designed, and it is
+also the point at which continuing to search would be manufacturing activity rather than doing work. What remains
+is a **fix campaign** (§6/§9 order, starting with 62, then revision safety), not more sweeping.

@@ -168,7 +168,7 @@ Here every entry gets one grade, on the scheme already published in
 | # | Grade | Driven through | Note |
 |---|---|---|---|
 | 125 | **A** | Real `/api/stt/languages` + `/api/stt`, remote whisper URL | Capability endpoint advertises `engine: whisper-server` (200) for a configuration the guard refuses (503). The guard itself is correct; the label is not. Low severity, hand-edited config only. |
-| 126 | **B** | Real `/api/stt`, 3 MB and empty blobs | No magic-byte or duration check, 256 MB inherited ceiling, whole file POSTed to an external local server before any check. Could not reach the decode path with the engine absent. Low severity. |
+| 126 | **C** | Real `/api/stt`, 3 MB and empty blobs | No magic-byte or duration check, 256 MB ceiling inherited from uploads. **Downgraded B→C in §22**: the external-server half is the user's own machine, and the inherited ceiling is defensible. Informational; I would not schedule it. |
 
 ## Entries 109–124 (collected in the critique file, graded there and here)
 
@@ -201,8 +201,8 @@ Counted by parsing this file, not from memory. **127 numbered entries**, 6 withd
 | Grade | Count | Share of the 117 live |
 |---|---|---|
 | **A** — reproduced through a real interface | 51 | 44% |
-| **B** — real mechanism, constructed condition | 44 | 38% |
-| **C** — source inference only | 11 | 9% |
+| **B** — real mechanism, constructed condition | 43 | 37% |
+| **C** — source inference only | 12 | 10% |
 | **D** — docs, housekeeping, opinion | 11 | 9% |
 | **W** — withdrawn | 6 | — |
 | **–** — tested, not a gap | 4 | — |
@@ -212,7 +212,7 @@ Five things worth stating plainly, including the two where I had it wrong:
 1. **My own earlier summary was wrong, and in the direction that flattered the critique.** I said "roughly
    half the register is conditional or inferential" (that part holds: 47%) but I also said "about forty are
    inference, documentation, or opinion" and "22 cosmetic or opinion". The honest figure is **21 entries**
-   (11 C + 11 D). I had been double-counting constructed-but-real entries as inferential. The register is
+   (12 C + 11 D). I had been double-counting constructed-but-real entries as inferential. The register is
    *more* evidenced than my self-critique claimed — which means my self-criticism was itself unsupported
    in one of its central numbers.
 2. **The severe list does not move.** 1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119. Grades answer "how

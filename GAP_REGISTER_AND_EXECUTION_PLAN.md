@@ -292,7 +292,7 @@ The numbered entries below are unchanged as the evidence record. Where this note
 
 Grades are no longer only in prose. **`ENTRY_GRADE_TABLE.md`** grades all 127 numbered entries
 individually, explains the rule used for each grade, and carries the counts computed from those rows:
-51 A / 44 B / 11 C / 11 D, with 6 withdrawn and 4 proven non-gaps. If a grade in this file's prose ever
+51 A / 43 B / 12 C / 11 D, with 6 withdrawn and 4 proven non-gaps. If a grade in this file's prose ever
 conflicts with that table, the table is the corrected reading. The severe list is unchanged and separate:
 1, 3, 4, 18, 21, 23, 61–65, 87, 106, 113, 119.
 
