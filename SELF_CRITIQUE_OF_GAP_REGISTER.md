@@ -1673,3 +1673,102 @@ be *clear*, not removed. After the fix, the writer pays for at most one call the
 - Pre-existing, unrelated: 5 failures in `test_production_readiness.py` (CI timeout declarations)
   and `test_repo_hygiene.py` (audit scratch paths). Confirmed pre-existing by stashing my changes
   and re-running them against `cddb4a3` — identical 5 failures, so they are not a regression here.
+
+## §51 — Gap 16: watch mode could destroy the file it was watching (2026-11-05)
+
+The register called this "watch-folder processing can overwrite source files — release blocker
+for watch mode". Like gap 5, the severity was right and the shape was wrong: it was not one
+overwrite path but three ways a drop could disappear, and the worst of them had nothing to do with
+overwriting.
+
+### What was measured, before any change
+
+Real directories, real `process_pending()`, real files:
+
+- **A — the overwrite the register described.** Two different scripts dropped under the same
+  filename (`draft.fountain`) one after the other left **one** file: `done/` held the second
+  script's text and the first was gone. `shutil.move(path, os.path.join(done_dir, name))` reuses
+  the name; on this OS the second move replaced the first.
+- **B — the failure path, which the register did not describe.** With `ProjectManifest.create`
+  raising ENOSPC, the move still ran: the source was cleared from the inbox and filed under
+  `done/`, while no project existed anywhere. The gate was `if move_done and (result["ok"] or
+  result["error"])` — an explicit "move on success *or* failure". The writer's script was marked
+  complete and was not.
+- **C — the same gate, reached later.** Failing `manifest.save()` (after the copy succeeded)
+  produced the same outcome.
+
+B and C are the interesting ones. A says "don't clobber"; B says "don't archive a failure as a
+completion", which is the same class of lie as gap 5's "don't announce a stopped run as complete".
+It is worth noticing that both blockers were the same defect wearing different clothes: **the
+system knew an operation had failed and told the writer it had succeeded.**
+
+### The fix, and what each part defends
+
+- **Collision-safe filing.** `_reserve()` creates the destination with `O_CREAT|O_EXCL` and walks
+  to `stem_2.ext` on `FileExistsError`. This is also the cross-worker guarantee: two watchers
+  filing the same name cannot both win a reservation. `_file_into()` removes the empty placeholder
+  if the move itself fails, so a failed filing never leaves a zero-byte `done/` entry that looks
+  processed.
+- **`failed/` with a note.** A failed drop is moved to `failed/<name>` beside
+  `<name>.error.txt`, which states the error, that the source is untouched, and how to retry (move
+  it back). Nothing auto-retries: a permanent error — a disk that is full — would spin forever, so
+  the retry is the writer's decision and the note says so.
+- **Atomic claiming.** Each file is renamed into `<watch>/.processing/<uuid>/` before any work.
+  `os.replace` is atomic on one filesystem, so exactly one worker owns the drop; a crash mid-run
+  leaves the script in `.processing/`, which is visible and recoverable, rather than deleted. This
+  did not come from the register's recommendation list by accident — "cross-process claiming" was
+  in it, and without it two watchers would have hit defect A *and* processed a script twice.
+- **`filed` in the result record.** The old record could not express "where did the source go", so
+  a caller had to assume `done/`. It now reports the actual path, which is also what makes the
+  tests location-agnostic.
+
+### My own errors
+
+**Error 1 — the pre-existing suite caught my regression, which is the system working.** I wrote the
+filing gate as `if result["ok"]: … elif not move_done: …`. That reads naturally and is wrong:
+`move_done=False` means "process in place", and it applies to a *successful* drop too. My version
+filed a successful `move_done=False` drop into `done/` and cleared the inbox.
+`tests/test_watch.py::test_move_done_false_keeps_file` failed immediately. The gate belongs first,
+before the success branch. I did not touch that test — it was right and I was wrong.
+
+**Error 2 — a revert that measured the wrong thing.** My first no-clobber revert replaced the
+whole reservation function with a bare `os.path.join`, which also dropped the `os.makedirs` the
+callers relied on. Filings then failed, sources were stranded in `.processing/`, and the failures
+were reported against unrelated tests (the failure-note and success-path ones) rather than the two
+collision tests. A revert is a measurement; a revert that breaks something else is not the
+measurement I wanted. Redone as "keep the directory creation, drop only the exclusivity", it fails
+exactly the two collision tests.
+
+**Error 3 — a markdown pipe inside a table cell.** Writing `O_CREAT|O_EXCL` into a table row added
+a sixth cell and broke the table's shape. Caught by counting cells with `awk` after the edit
+(`6` where the row needed `5`); fixed by writing `O_CREAT + O_EXCL`. Worth stating because the
+register is read as a table and a silently malformed row is a real defect in the artifact.
+
+**Error 4 — the location-agnostic repro.** My first reproduction script hard-coded `done/`, so
+running it against the fix crashed on a missing directory instead of reporting a result. The script
+then measured nothing. Rewritten to use the result's own `filed` path; it now reports a verdict on
+both the old and the new code, which is the only way it can be evidence.
+
+### Verification
+
+- `tests/test_watch_source_safety.py` — 11 tests: both same-named drops retrievable and at
+  distinct paths; a failed copy and a never-durable manifest each not filed under `done/`; the
+  failure note names the error and says the source is intact; no phantom project directory; the
+  happy path unchanged; `move_done=False` honoured on failure; a two-thread claim race processed
+  exactly once and reported exactly once; `.processing/` clean after a run; and the documented
+  retry path (move the file back) actually re-processes it.
+- Reverts, measured separately and cleanly: **2 fail** (no-clobber removed), **3 fail** (the
+  `ok or error` gate restored), **2 fail** (the claim removed); restored, 11 pass.
+- Full suite: **2493 passed, 7 skipped**; `ruff` clean. The same 5 pre-existing
+  production-readiness/repo-hygiene failures remain, unchanged and unrelated (verified earlier by
+  stashing my changes and reproducing them on `cddb4a3`).
+
+### Still open, deliberately
+
+A drop interrupted by a crash sits in `.processing/` and is **not** automatically recovered on the
+next run. That is a deliberate choice, not an oversight: automatically re-processing a claim left by
+a crashed worker can duplicate a project, and the register's own rule for this entry is "never
+treat failed work as completed" — not "guess what the crash meant". The file is preserved and
+visible; a future entry can add an explicit recovery command with an ownership timeout, but that
+needs a decision about who owns a stale claim across processes, which is a larger change than this
+blocker.
