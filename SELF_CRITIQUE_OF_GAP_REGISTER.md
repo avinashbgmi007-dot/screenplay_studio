@@ -986,8 +986,9 @@ dropped character scores 0.979 (still present)"). So an editor changing `కా�
 open in the desk. I did **not** change it: it is a separate, deliberate decision about the writer-fix signal that
 would flip behaviour across the whole queue, and gap 23 is about the verifier certifying an **absent** quote. I
 pinned the current behaviour in a test named `..._RESIDUAL` so it cannot be mistaken for fixed, and the assertion
-message says to update this section if it ever changes. **This should be a new register entry**, and I have not
-added one — that is a gap in my own housekeeping, not something I am going to leave implied.
+message says to update this section if it ever changes. It is now filed as register entry **129** and argued in §41
+below (written later in the same session); the note you are reading was accurate when written and the hole it admits
+has since been closed.
 
 **Environment note, so the numbers are reproducible.** This sandbox came up with no `/home/user/.venv`; I rebuilt
 it from `requirements.txt` plus `pytest`, `ruff`, `pyyaml` and `playwright`. The first full run reported 5 failures
@@ -1130,3 +1131,45 @@ no-argument form is absent, so the guard got stricter rather than being loosened
 representative is gap 87's territory and is not established.
 
 Full suite **2369 passed, 7 skipped**; `ruff` clean.
+
+## §41 — Gap 23's residual, now filed as its own entry (129), with the decision it needs
+
+When I fixed gap 23 I left one thing open and said in §37 that it deserved its own register entry, which I had **not**
+written. That was a housekeeping hole of mine; it is now entry **129** in both registers, and this section is the
+argument behind it.
+
+**The behaviour.** `revision.quote_present` decides whether a finding's evidence quote is still in the working copy,
+which is how the desk knows the writer fixed something. Its own docstring sets the trade-off: a near-identical
+difference inside one element is read as the parse or the quote being slightly off, not as the writer editing. Measured:
+
+| change | ratio | verdict |
+|---|---|---|
+| dropped character (a typo'd quote) | 0.979 | **still present** |
+| one vowel mark changed (a different word) | 0.982 | **still present** |
+| swapped word | 0.875 | reads as edited |
+| removed word | 0.830 | reads as edited |
+
+So an editor who changes `కాలం` to `కలం` sees that finding stay open in the desk. In a mixed Telugu/Tenglish script —
+exactly the register's stated case — this reaches ordinary copy-editing, not just exotic input.
+
+**Why I did not fix it, stated as a measurement rather than a preference.** The two cases the tolerance has to separate
+are **numerically indistinguishable**: the typo it exists to forgive scores 0.979 and the edit it fails to catch scores
+0.982 — both one character different, both ~2.8% above the 0.95 threshold. No threshold value separates them, so this is
+not a tuning bug and "lower the threshold" has no answer that is right. I checked that before declining, because the
+opposite outcome (a threshold tweak) would have been a genuine fix.
+
+**The option that would work, and why it is not mine to take.** A three-valued answer — *changed*, *unclear*, *still
+present* — is the honest shape: the two middle cases are genuinely ambiguous and should say so rather than being forced
+into one bucket. But the counting contract is binary end to end: `diff.py` buckets into `resolved`/`still_present` and
+would need a third list, and `finding_statuses` maps `unknown` to **open**, so a new "unclear" bucket would either be
+counted as unfinished work (noisy) or excluded (rows vanish from the ledger).
+
+That is a product decision about what the writer is told a number means — the same class as the `open_count` question I
+declined to decide unilaterally on gap 113. So it is filed, evidenced, and left open, with the trade-offs stated where the
+owner can act on it. I am explicitly **not** claiming this as fixed, and the existing `_RESIDUAL`-named test still pins
+the current behaviour so nobody mistakes it for solved.
+
+**Gap 23 itself remains FIXED** — that was the verifier certifying an *absent* quote, which is a different question from
+this one, and its own two-part fix is unaffected.
+
+Full suite unchanged at **2369 passed, 7 skipped**; `ruff` clean.

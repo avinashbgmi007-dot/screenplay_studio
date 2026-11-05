@@ -260,3 +260,4 @@ Five things worth stating plainly, including the two where I had it wrong:
 - The 17 entries graded **A** on behaviour observed in a browser suite that is not installed here (17,
   and the browser half of 5) rest on recorded suite results, not on a run I performed this session. They
   are marked as such rather than upgraded silently.
+| 129 | **B** | Real `revision.quote_present` on a one-mark word edit | A one-mark edit reads "still present", so the writer's fix stays open in the desk. **Not tunable:** the quote-typo case measures 0.979 vs the edit's 0.982 — indistinguishable. Needs a three-valued status the counting contract lacks. A decision, not a bug fix. Critique §41. | **G** |
