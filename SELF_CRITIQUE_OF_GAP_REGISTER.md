@@ -1508,3 +1508,61 @@ not the working copy against the parse-of-record, so it is a different question 
 as a follow-up rather than half-fixing it here.
 
 `tests/test_quote_changed_status.py` (25 tests) + 6 node tests. Full suite **2454 passed, 7 skipped**; `ruff` clean.
+
+## §49 — Gap 131: the custom provider now survives a restart (2026-11-05)
+
+**Filed and fixed in the same pass, at the owner's request.** The ask was a custom provider — base URL, model, API
+key, connect check, connected status, saved config. Four of those six already existed. The last two did not, and the
+measurement is the entry:
+
+```
+process 1: POST /api/config {"connection_mode":"remote",
+                             "server_url":"https://api.example.com/v1",
+                             "model":"gpt-4o-mini","api_key":"sk-…"}  -> 200
+process 2 (fresh interpreter, same projects dir):
+           server_url = http://127.0.0.1:8099   model = None   token = MISSING
+```
+
+**Save never reached disk.** `POST /api/config` was a write to process memory, so every restart silently reverted the
+provider. The button said Save and the app behaved as if it had. And the connect check's result lived in the browser
+tab, so "connected" described the moment the page loaded — nothing could answer "was this answering ten minutes ago",
+and a second tab started blank.
+
+**What was added.** `<projects>/.studio_provider.json` (atomic write, **0600**, because it now contains a secret) is
+written on every successful save and applied at startup; `api_key_origin` travels with the token so gap 57's approval
+survives too, or a restart would treat a saved secret as an unapproved one. The probe records
+`checked_at/ok/model/destination` to `.studio_connection.json`, and a `provider` block on `/api/config` (GET and POST)
+and `/api/health` reports what is configured, whether it is durable (`saved_to_disk`), and the last check — with
+`stale` when the configured endpoint is no longer the one that was checked.
+
+**Three properties I treated as equal in importance to the feature**, because a settings file that carries a secret
+and an endpoint is a security surface:
+
+1. **The file is owner-only.** Created `0600` at `open()` time rather than chmod-ed afterwards, so there is no window
+   where the token is world-readable. A test asserts the mode.
+2. **No route returns the token** — `/api/config` and `/api/health` are checked for the literal string.
+3. **A settings file cannot grant remote permission.** `load_provider()` applies values through the normal setter, so
+   a remembered remote URL is refused unless the operator opted in at launch. Verified as a negative: with
+   `_ALLOW_REMOTE_SERVER = False` and `https://evil.example.com/v1` in the file, the desk stays on loopback. Without
+   this, the fix would have handed the guard an on-disk write path — the one thing the launch flag exists to prevent.
+
+**Honest green, not a fresh-looking one.** `connection_report()`. The status says "Connected 4 min ago — model-x", and
+"Last checked just now, against a different endpoint" after the endpoint moves. I deliberately did **not** carry the old
+verdict forward: `ok` becomes `None` when `destination` no longer matches, because a remembered green describing a
+provider it never tested is the same class of defect as the ones this register keeps finding.
+
+**Two of my own tests were wrong, in the same instructive way.** `test_the_record_survives_a_restart` and
+`test_a_failed_probe_is_remembered_too` recorded a check for `provider.example.com` / `127.0.0.1:1` while the fixture
+still pointed at loopback, then asserted the record was current. It was not, and it should not have been — the staleness
+rule doing its job is what made them fail. The code was right both times; I fixed the tests and pinned the rule as its
+own test so the distinction is explicit.
+
+**Evidence.** 20 Python tests; reverts measured per half — **7 fail** with persistence removed, **3** with the probe's
+recording removed. 7 node tests for the badge wording. Served-asset wiring verified (panel ids present in the HTML the
+app actually returns, renderer called from 4 sites, CSS rule present). Full suite **2474 passed, 7 skipped**; `ruff`
+clean; 42 JS tests.
+
+**Not claimed.** The file is not encrypted — it is a plaintext secret at 0600, which is the same posture as the project
+manifests' `api_key` field and is stated rather than implied. There is no keyring/OS-credential-store integration; that
+would be the next step if this ships to non-technical writers. And a *read-only* install directory means
+`saved_to_disk: false` — the writer is told the setting will not survive a restart instead of being given a false green.

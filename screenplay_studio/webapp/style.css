@@ -2851,6 +2851,17 @@ body.focus-mode #script-pane { background: var(--ink-950); }
    a question rather than as a verdict. Not the danger colour (nothing is wrong)
    and not the addressed green (nothing is closed). */
 .finding-note-state.needs-writer { color: var(--text-muted); font-style: italic; }
+/* Gap 131: the custom provider's state, always with a timestamp beside it. */
+.provider-status { display: flex; align-items: baseline; gap: var(--sp-2);
+  margin: var(--sp-2) 0 var(--sp-6); font-size: var(--fs-xs); }
+.provider-badge { font-weight: 600; padding: 1px 6px; border-radius: 3px;
+  border: 1px solid currentColor; white-space: nowrap; }
+.provider-badge.connected { color: var(--ok); }
+.provider-badge.failed { color: var(--danger-text); }
+.provider-badge.stale, .provider-badge.unsaved { color: var(--text-muted); }
+.provider-badge.saved { color: var(--text-muted); }
+.provider-line { color: var(--text-faint); }
+
 
 
 /* Where-the-model-lives switch: one form, two modes. Both options are real

@@ -696,6 +696,7 @@ function fillSettingsForm() {
   // a perfectly ordinary setup).
   setConnectionMode(cfg.connection_mode || "local", { keepUrl: true });
   renderDestinationWarning(cfg);
+  renderProviderStatus(cfg);
 }
 
 async function loadConfig() {
@@ -791,6 +792,28 @@ function setConnectionMode(mode, opts = {}) {
  * `destinations` block. Called on config load and after every save, because the
  * state this reports can only be produced by a save.
  */
+/**
+ * Gap 131: render the custom provider's state — configured, saved, and when it
+ * last answered. The wording is a tested pure function (core.js), so the badge
+ * cannot say "connected" without a check behind it.
+ */
+function renderProviderStatus(cfg) {
+  const wrap = $("#provider-status");
+  if (!wrap) return;
+  const provider = cfg && cfg.provider;
+  if (!provider) { wrap.style.display = "none"; return; }
+  const state = providerBadgeState(provider);
+  const words = { connected: "Connected", failed: "Not answering",
+                  stale: "Endpoint changed", saved: "Saved",
+                  unsaved: "Not saved", unknown: "" };
+  const badge = $("#provider-badge");
+  badge.textContent = words[state] || "";
+  badge.className = "provider-badge " + state;
+  const line = providerStatusLine(provider, Date.now() / 1000);
+  $("#provider-line").textContent = line || "";
+  wrap.style.display = (badge.textContent || line) ? "" : "none";
+}
+
 function renderDestinationWarning(cfg) {
   const el = $("#destination-warning");
   if (!el) return;
@@ -823,6 +846,7 @@ async function saveConfig() {
   try {
     state.config = await api("/config", { method: "POST", body: JSON.stringify(body) });
     renderDestinationWarning(state.config);
+    renderProviderStatus(state.config);
     clearTokenOnSave = false;
     closeModal("#settings-modal");
     applyDemoDisclosure();
@@ -846,6 +870,12 @@ async function testConnection() {
     const res = await api("/test-connection", { method: "POST", body: JSON.stringify(body) });
     resultEl.textContent = res.message;
     resultEl.classList.add(res.ok ? "ok" : "fail");
+    // the server just recorded this check; re-read so the badge and its
+    // timestamp describe the probe that just ran rather than the last load
+    try {
+      state.config = await api("/config");
+      renderProviderStatus(state.config);
+    } catch (_) { /* the message above is still the answer that matters */ }
   } catch (e) {
     resultEl.textContent = "Couldn't check: " + e.message;
     resultEl.classList.add("fail");

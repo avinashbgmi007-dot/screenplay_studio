@@ -269,3 +269,53 @@ test("findingStateTitle: explains the ambiguity instead of asserting a fix", () 
   assert.ok(/typo/i.test(t) && /rewrite/i.test(t), t);
   assert.ok(/isn't calling this fixed/.test(t), `must not claim a resolution: ${t}`);
 });
+
+// ---- Gap 131: "connected" without a timestamp is a claim, not a status ----
+const { providerStatusLine, providerBadgeState } = require("../../screenplay_studio/webapp/core.js");
+
+test("providerBadgeState: never says connected without a check behind it", () => {
+  assert.strictEqual(providerBadgeState({ saved_to_disk: true, last_check: {} }), "saved");
+  assert.strictEqual(providerBadgeState({ saved_to_disk: false, last_check: {} }), "unsaved");
+  assert.strictEqual(providerBadgeState({ last_check: { checked_at: 1, ok: true } }), "connected");
+  assert.strictEqual(providerBadgeState({ last_check: { checked_at: 1, ok: false } }), "failed");
+  assert.strictEqual(providerBadgeState(null), "unknown");
+});
+
+test("providerBadgeState: a check against a different endpoint is stale, not connected", () => {
+  assert.strictEqual(
+    providerBadgeState({ last_check: { checked_at: 1, ok: true, stale: true } }), "stale");
+});
+
+test("providerStatusLine: always carries WHEN", () => {
+  const p = { saved_to_disk: true, last_check: { checked_at: 1000, ok: true, model: "m-1" } };
+  assert.ok(/just now/.test(providerStatusLine(p, 1030)), "recent check reads as just now");
+  assert.ok(/min ago/.test(providerStatusLine(p, 1000 + 300)), "older check is timed");
+  assert.ok(/h ago/.test(providerStatusLine(p, 1000 + 7200)));
+});
+
+test("providerStatusLine: says the model it actually found", () => {
+  const line = providerStatusLine(
+    { saved_to_disk: true, last_check: { checked_at: 1000, ok: true, model: "gpt-4o-mini" } }, 1000);
+  assert.ok(line.includes("gpt-4o-mini"), line);
+});
+
+test("providerStatusLine: a failed check reports the reason, not just a colour", () => {
+  const line = providerStatusLine(
+    { saved_to_disk: true, last_check: { checked_at: 1000, ok: false, detail: "timed out" } }, 1010);
+  assert.ok(/Not answering/.test(line), line);
+  assert.ok(/timed out/.test(line), line);
+});
+
+test("providerStatusLine: nothing checked yet, and whether it will survive a restart", () => {
+  assert.ok(/No connection check/.test(
+    providerStatusLine({ saved_to_disk: true, last_check: {} }, 0)));
+  assert.ok(/will not survive a restart/.test(
+    providerStatusLine({ saved_to_disk: false, last_check: {} }, 0)));
+});
+
+test("providerStatusLine: a stale check says so instead of showing its old verdict", () => {
+  const line = providerStatusLine(
+    { saved_to_disk: true, last_check: { checked_at: 1000, ok: true, stale: true } }, 1000);
+  assert.ok(/different endpoint/.test(line), line);
+  assert.ok(!/^Connected/.test(line), `must not reuse the old verdict: ${line}`);
+});

@@ -642,6 +642,14 @@
     <p class="modal-hint">If a reply is still generating when this hits, you get a
       “still working — keep waiting?” prompt instead of a silent hang.</p>
 
+    <!-- Gap 131: the provider as the writer configured it, and when it last
+         answered. Always timestamped: a green badge with no time is a claim
+         about the moment the tab opened, which is what this replaces. -->
+    <div id="provider-status" class="provider-status" style="display:none;">
+      <span id="provider-badge" class="provider-badge"></span>
+      <span id="provider-line" class="provider-line"></span>
+    </div>
+
     <button id="test-connection-btn" class="btn-secondary" style="width:100%; margin-bottom:10px;">Test Connection</button>
     <div id="test-connection-result" class="test-connection-result"></div>
 

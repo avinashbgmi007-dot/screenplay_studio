@@ -253,6 +253,48 @@ function findingStateTitle(status, disposition) {
   return null;
 }
 
+/**
+ * Gap 131: the provider badge, and WHEN it was true.
+ *
+ * The status strip re-probes on load, so its green dot describes the moment the
+ * tab opened. A remembered check is the other half of "connected status", and
+ * the only honest way to show it is with its timestamp: "connected 4 minutes
+ * ago" is information, "connected" alone is a claim about now that the app has
+ * not checked. A check made against a DIFFERENT endpoint is not shown at all —
+ * the server reports it stale for exactly that reason.
+ */
+function providerStatusLine(provider, nowSeconds) {
+  if (!provider || typeof provider !== "object") return null;
+  const lc = provider.last_check || {};
+  const at = lc.checked_at;
+  if (at == null) {
+    return provider.saved_to_disk
+      ? "Saved. No connection check has run yet."
+      : "Not saved yet — this will not survive a restart.";
+  }
+  const secs = Math.max(0, (nowSeconds || 0) - at);
+  const when = secs < 90 ? "just now"
+    : secs < 5400 ? Math.round(secs / 60) + " min ago"
+      : Math.round(secs / 3600) + " h ago";
+  if (lc.stale) {
+    return "Last checked " + when + ", against a different endpoint. Re-check to be sure.";
+  }
+  if (lc.ok) {
+    return "Connected " + when + (lc.model ? " — " + lc.model : "")
+      + (provider.saved_to_disk ? "" : " (not saved)");
+  }
+  return "Not answering (" + when + ")" + (lc.detail ? " — " + lc.detail : "");
+}
+
+/** The badge word. Never "connected" without a check behind it. */
+function providerBadgeState(provider) {
+  if (!provider || typeof provider !== "object") return "unknown";
+  const lc = provider.last_check || {};
+  if (lc.checked_at == null) return provider.saved_to_disk ? "saved" : "unsaved";
+  if (lc.stale) return "stale";
+  return lc.ok ? "connected" : "failed";
+}
+
 // ---- Node test hook (browsers never take this branch) ----
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -271,5 +313,7 @@ if (typeof module !== "undefined" && module.exports) {
     destinationMismatchText,
     findingStateLabel,
     findingStateTitle,
+    providerStatusLine,
+    providerBadgeState,
   };
 }

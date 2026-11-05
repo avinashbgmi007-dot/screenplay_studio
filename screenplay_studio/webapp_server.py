@@ -742,6 +742,169 @@ _KEEP = object()
 _LOCAL_SERVER_URL = "http://localhost:8080"
 
 
+# ---------------------------------------------------------------------------
+# The provider is a SETTING, so it has to survive a restart.
+#
+# Measured before this existed: a writer entered a custom provider (base URL,
+# model, token), pressed Save, saw "connected", quit the studio — and the next
+# launch was back on http://127.0.0.1:8099 with no model and no token. The Save
+# button only ever wrote process memory. A "custom provider" that evaporates is
+# not a custom provider.
+#
+# The file holds a SECRET, so it is written 0600 (owner-only) and is never
+# served: `/api/config` reports `api_key_set`, never the value.
+# ---------------------------------------------------------------------------
+
+_PROVIDER_KEYS = ("server_url", "model", "fast_model", "api_key", "timeout", "turn_timeout")
+
+
+def _provider_store_path() -> str | None:
+    """Where the provider is remembered. None when there is nowhere to write."""
+    if not PROJECTS_DIR:
+        return None
+    return os.path.join(PROJECTS_DIR, ".studio_provider.json")
+
+
+def _last_check_path() -> str | None:
+    if not PROJECTS_DIR:
+        return None
+    return os.path.join(PROJECTS_DIR, ".studio_connection.json")
+
+
+def _write_private_json(path: str, payload: dict) -> None:
+    """Atomic write with owner-only permissions.
+
+    The token is in here, so the file is created 0600 *before* any content is
+    written (rather than chmod-ed afterwards, which leaves a window where the
+    secret is world-readable). Best-effort by design: a read-only install
+    directory must not break Save — it just means the setting will not survive a
+    restart, which `saved_to_disk` reports honestly instead of pretending.
+    """
+    tmp = path + ".tmp"
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    except OSError:
+        return
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)     # atomic: a torn file can never be read back
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def save_provider() -> bool:
+    """Persist the connection settings. False when there was nowhere to write."""
+    path = _provider_store_path()
+    if path is None:
+        return False
+    payload = {k: CONFIG.get(k) for k in _PROVIDER_KEYS}
+    # The origin the token was approved for travels WITH the token (gap 57), or a
+    # restart would forget the approval and treat a saved token as unapproved.
+    payload["api_key_origin"] = CONFIG.get("api_key_origin")
+    _write_private_json(path, payload)
+    return os.path.isfile(path)
+
+
+def load_provider() -> bool:
+    """Apply a remembered provider at startup. True when something was applied."""
+    path = _provider_store_path()
+    if not path or not os.path.isfile(path):
+        return False
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    applied = False
+    for key in _PROVIDER_KEYS:
+        if key not in data:
+            continue
+        try:
+            CONFIG[key] = data[key]
+            applied = True
+        except (ValueError, TypeError):
+            # A remembered remote URL is still refused without the launch opt-in,
+            # so a settings file cannot grant the permission the flag exists to
+            # hold. Skipping it is the guard doing its job, not an error.
+            continue
+    if CONFIG.get("api_key") and data.get("api_key_origin"):
+        CONFIG._data["api_key_origin"] = data["api_key_origin"]
+    return applied
+
+
+# ---- the last check, so "connected" is a remembered fact ------------------
+#
+# The status strip re-probes on every page load, which is right for freshness
+# but means the result lives only in the browser. That made "connected" a claim
+# about the moment the tab loaded: after a restart, or on a second tab, there was
+# nothing to say. A recorded result is the other half — always reported with WHEN
+# it was true, because a stale green is worse than no green.
+_LAST_CHECK: dict = {"checked_at": None, "ok": None, "detail": None,
+                     "destination": None, "model": None}
+
+
+def record_last_check(ok: bool, detail: str, url: str | None, model: str | None = None) -> None:
+    _LAST_CHECK.update({
+        "checked_at": time.time(),
+        "ok": bool(ok),
+        "detail": detail,
+        "destination": _origin_of(url if url is not None else CONFIG.get("server_url")),
+        "model": model,
+    })
+    path = _last_check_path()
+    if path:
+        _write_private_json(path, _LAST_CHECK)   # no secret in here
+
+
+def _load_last_check() -> None:
+    path = _last_check_path()
+    if not path or not os.path.isfile(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return
+    if isinstance(data, dict):
+        _LAST_CHECK.update({k: data.get(k) for k in _LAST_CHECK})
+
+
+def connection_report() -> dict:
+    """What is configured, whether it is saved, and when it last answered.
+
+    One block, because the status strip, the settings panel and any scripted
+    client are all asking the same question and three hand-built answers is how
+    they drift apart.
+    """
+    last = _LAST_CHECK
+    fresh = (last.get("checked_at") is not None
+             and last.get("destination") == _origin_of(CONFIG.get("server_url")))
+    return {
+        "server_url": CONFIG.get("server_url"),
+        "model": CONFIG.get("model"),
+        "mode": connection_mode(),
+        "api_key_set": bool(CONFIG.get("api_key")),
+        # honest about durability: a read-only install dir means "saved" is false
+        "saved_to_disk": bool(_provider_store_path() and os.path.isfile(_provider_store_path())),
+        # the remembered check, and whether it still describes THIS endpoint
+        "last_check": {
+            "checked_at": last.get("checked_at"),
+            "ok": last.get("ok") if fresh else None,
+            "detail": last.get("detail") if fresh else None,
+            "model": last.get("model") if fresh else None,
+            "stale": not fresh and last.get("checked_at") is not None,
+        },
+    }
+
+
 def _settings_candidate(body: dict) -> dict:
     """Validate a whole `/api/config` request WITHOUT touching any state.
 
@@ -1472,12 +1635,17 @@ def test_connection():
     try:
         models = client.list_models()
     except LlamaServerError as e:
+        # Remembered as a fact with a timestamp: "it did not answer at 14:02" is
+        # information the writer can act on, and the strip says WHEN.
+        record_last_check(False, str(e), url)
         return jsonify({"ok": False, "message": str(e)})
 
     ids = [m.get("id") or m.get("name") for m in models if isinstance(m, dict)]
     ids = [i for i in ids if i]
     if not ids:
+        record_last_check(False, f"Connected to {url}, but it reports no loaded model.", url)
         return jsonify({"ok": False, "message": f"Connected to {url}, but it reports no loaded model."})
+    record_last_check(True, f"Connected to {url}", url, ids[0])
     mode = connection_mode(url)
     return jsonify({"ok": True, "message": f"Connected ({mode}) — model loaded: {ids[0]}",
                     "models": ids, "mode": mode})
@@ -1529,7 +1697,8 @@ def health():
             "privacy": _privacy_statement(),
             # Gap 58: the health surface is what an operator scripts, and "the
             # mode says local" is not the same answer as "nothing is remote".
-            "destinations": _destination_report()}
+            "destinations": _destination_report(),
+            "provider": connection_report()}
     try:
         _knowledge_base()
     except _KB_DAMAGED as e:
@@ -1582,6 +1751,9 @@ def get_config():
     # Gap 58: what the mode ACTUALLY does for existing projects, next to what
     # the mode says. The panel must not claim "local" while a project is remote.
     cfg["destinations"] = _destination_report()
+    # The custom-provider block: what is configured, whether it survives a
+    # restart, and when it last answered. Never the token itself.
+    cfg["provider"] = connection_report()
     if _DEMO_MODEL_ACTIVE:
         cfg["real_server_url"] = CONFIG.get("real_server_url")
     else:
@@ -1655,12 +1827,17 @@ def set_config():
             api_key=(None if plan["clear_token"] else
                      (CONFIG.get("api_key") if plan["api_key"] is not _UNSET else _UNSET)),
         )
+    # The provider is a setting, so a successful save must reach disk or the next
+    # launch forgets it. `saved_to_disk` in the response is the writer's answer to
+    # "will this still be here tomorrow", including when it will not.
+    save_provider()
     cfg = CONFIG.to_dict()
     cfg["api_key_set"] = bool(cfg.pop("api_key", None))
     cfg["connection_mode"] = connection_mode()
     cfg["allow_remote"] = bool(_ALLOW_REMOTE_SERVER)
     cfg["privacy"] = _privacy_statement()
     cfg["destinations"] = _destination_report()
+    cfg["provider"] = connection_report()
     return jsonify(cfg)
 
 
@@ -5537,10 +5714,36 @@ def main():
     if args.api_key or _api_key_env:
         CONFIG["api_key"] = args.api_key or _api_key_env
 
+    # ---- the remembered provider (custom provider, gap 131) ----------------
+    # Read AFTER the launch-time opt-in and AFTER --server, and by the ordinary
+    # setter, so a settings file cannot do what the flag exists to prevent: a
+    # remembered remote URL is refused unless the operator opted in at launch,
+    # and the refusal is reported rather than silently swallowed. An explicit
+    # --server on the command line wins over the remembered one, because a flag
+    # typed for this run outranks a file saved last week.
+    _load_last_check()          # the remembered connectivity result, no secrets
+    _remembered_provider = False
+    if not _DEMO_MODEL_ACTIVE:
+        if args.server == "http://localhost:8080":
+            # nothing typed: the saved provider is what the writer expects to find
+            _remembered_provider = load_provider()
+        else:
+            _remembered_provider = load_provider() and CONFIG["server_url"] == args.server
+
     print(f"Projects directory: {os.path.abspath(PROJECTS_DIR)}")
     print("Log file: " + (_log_file or
                           "unavailable (could not write beside the projects directory)"))
     print(f"Default model server: {CONFIG['server_url']} ({connection_mode()})")
+    if _remembered_provider:
+        print("Saved provider restored: " + (CONFIG.get("model") or "(no model named)")
+              + (" with a token" if CONFIG.get("api_key") else ""))
+    elif _provider_store_path() and os.path.isfile(_provider_store_path()):
+        # A file exists but did not take effect: say why rather than starting on
+        # a different endpoint than the one the writer configured last time.
+        print("A saved provider was found but not applied"
+              + (" — it points off this machine and this launch did not opt in "
+                 "(--allow-remote-server)." if not _ALLOW_REMOTE_SERVER else
+                 " — this run's --server takes precedence."))
     if CONFIG.get("api_key"):
         print("Model server auth: bearer token set (from "
               + ("--api-key" if args.api_key else "SCREENPLAY_STUDIO_API_KEY") + ")")
