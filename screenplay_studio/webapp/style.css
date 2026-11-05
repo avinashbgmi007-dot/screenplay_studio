@@ -4085,6 +4085,10 @@ body.reader-mode #manuscript-container { padding: 26px 0 60px; }
 .stash-item-text { color: var(--text); max-height: 54px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .stash-item-foot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--sp-2); }
 .stash-item-meta { font-family: var(--font-mono); font-size: var(--fs-3xs); color: var(--text-faint); }
+/* gap 19: an entry the old store cut without saying so. Uses the existing
+   danger text token (verified in :root — there is no --warn). */
+.stash-item-truncated { margin-top: var(--sp-1); font-size: var(--fs-3xs);
+  color: var(--danger-text); line-height: 1.4; }
 .rail-note-text { color: var(--text); }
 .rail-note-foot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--sp-2); }
 .rail-note-form { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }

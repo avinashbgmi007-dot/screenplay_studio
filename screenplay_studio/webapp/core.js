@@ -328,6 +328,49 @@ function isStopRace(err) {
   return /no analysis is running|already finished/i.test(String(err.message || ""));
 }
 
+
+// ---- gap 17: what an unload flush must still send ----
+//
+// The pagehide flush exists so closing the tab inside the 300 ms autosave
+// debounce does not lose the last lines. It decides WHAT to send, so it is pure
+// and testable here rather than buried in the event handler.
+//
+// The guard it replaces was `if (!ideaSaveTimer) return;`. `saveIdeaContent`
+// clears that timer on entry — before its POST has even been sent — so during
+// any in-flight save the timer is null while the server does not yet have the
+// text. Closing the tab in that window sent nothing at all, and the write that
+// was already in flight is exactly the one a pagehide can cut short (a normal
+// fetch is aborted when the document goes away; only a keepalive request
+// survives). The fix is to decide from the TEXT — is what the writer typed
+// different from what the server last confirmed? — not from a timer whose state
+// says nothing about delivery.
+//
+// Returns the content to flush, or null when there is nothing to send.
+//   editorText   -- what is in the textarea right now
+//   savedText    -- the last content the server confirmed
+//   pendingTimer -- truthy while a debounce is scheduled (documented, not used
+//                   as the guard: a null timer does NOT mean "already saved")
+function unloadFlushPayload(editorText, savedText, pendingTimer) {
+  if (typeof editorText !== "string") return null;
+  const now = editorText;
+  const saved = typeof savedText === "string" ? savedText : "";
+  // Identical to the last confirmed save, and no debounce outstanding: the
+  // server already has these exact words.
+  if (now === saved && !pendingTimer) return null;
+  // Identical AND a debounce is pending: the pending save will send this same
+  // text, but pagehide cancels it, so the flush must still carry it — unless
+  // the text is empty and there is nothing to protect.
+  if (now === saved && pendingTimer) return now.length ? now : null;
+  return now;
+}
+
+/** Should the flush use `keepalive`? Only the last-chance request needs it;
+ *  encoded as its own rule because a future edit to the flush must not silently
+ *  drop it (without keepalive the request is aborted as the document unloads). */
+function unloadFlushUsesKeepalive(payload) {
+  return typeof payload === "string" && payload.length > 0;
+}
+
 // ---- Node test hook (browsers never take this branch) ----
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -348,6 +391,8 @@ if (typeof module !== "undefined" && module.exports) {
     findingStateTitle,
     providerStatusLine,
     providerBadgeState,
+    unloadFlushPayload,
+    unloadFlushUsesKeepalive,
     cancellationNote,
     isCancelledAck,
     isStopRace,

@@ -1275,6 +1275,9 @@ async function loadStash() {
   try {
     const data = await api(`/projects/${encodeURIComponent(state.currentProject)}/stash`);
     state.stash = (data && data.stash) || [];
+    // Gap 19: the store's own bound, served so the UI refuses a too-long
+    // selection the same way the store would — before anything is sent.
+    state.stashMaxChars = (data && data.max_text_chars) || 4000;
     renderStashList();
   } catch (_) { /* stash is optional — never break the desk */ }
 }
@@ -1291,6 +1294,16 @@ function renderStashList() {
     const item = el("div", "stash-item");
     const meta = e.scene_number ? `Scene ${e.scene_number}` : "From the desk";
     item.appendChild(el("div", "stash-item-text", e.text));
+    if (e.truncated) {
+      // Gap 19: an entry the OLD store cut at the bound. It is shown as it is —
+      // rewriting it would destroy what survived — with the fact that its tail
+      // may be missing. The count is deliberately absent: the original length
+      // was never recorded, and inventing one would be a second lie.
+      const warn = el("div", "stash-item-truncated",
+        "⚠ Saved by an older version that cut text without saying so — this may be incomplete.");
+      warn.title = e.truncated.note || "";
+      item.appendChild(warn);
+    }
     const row = el("div", "stash-item-foot");
     row.appendChild(el("span", "stash-item-meta", meta));
     const del = el("button", "project-delete", "✕");
@@ -10209,15 +10222,27 @@ function init() {
   // the last few keystrokes vanished silently. A keepalive fetch survives too,
   // and going through api() is what carries the capability token.
   window.addEventListener("pagehide", () => {
-    if (!state.currentIdea || !state.inIdea || !ideaSaveTimer) return;
+    if (!state.currentIdea || !state.inIdea) return;
+    // Gap 17: the guard used to be `!ideaSaveTimer` -> return. saveIdeaContent
+    // clears that timer BEFORE its POST is sent, so during any in-flight save
+    // the timer was null while the server did not yet have the text — closing
+    // the tab in that window flushed nothing, and the in-flight fetch is the
+    // one a pagehide aborts (only keepalive survives). Decide from the text,
+    // not from a timer that says nothing about delivery.
+    const content = unloadFlushPayload(
+      $("#idea-content").value,
+      state.currentIdea.content,
+      ideaSaveTimer,
+    );
     clearTimeout(ideaSaveTimer);
     ideaSaveTimer = null;
-    const content = $("#idea-content").value;
-    if (content === state.currentIdea.content) return;
+    if (content === null) return;
     api(`/ideas/${encodeURIComponent(state.currentIdea.id)}/content`, {
       method: "POST",
       body: JSON.stringify({ content }),
-      keepalive: true,
+      // Without keepalive the request dies with the document; this is the one
+      // send where that matters.
+      keepalive: unloadFlushUsesKeepalive(content),
     }).catch(() => { /* unloading; nothing left to tell */ });
   });
 
@@ -10504,6 +10529,15 @@ function init() {
     window.getSelection().removeAllRanges();
     hideQuoteFloat();
     if (!entry.text) return;
+    // Gap 19: a long passage is refused BEFORE the round trip, with the same
+    // bound the store enforces. Measured before this: a 4,004-character
+    // selection came back "Stashed ✓" with its tail already deleted.
+    const limit = state.stashMaxChars || 4000;
+    if (entry.text.length > limit) {
+      showError(`That selection is ${entry.text.length.toLocaleString()} characters; the Stash keeps up to ${limit.toLocaleString()}. Nothing was saved and nothing was cut — stash a shorter selection.`, true);
+      hideQuoteFloat();
+      return;
+    }
     const original = btn.textContent;
     try {
       await api(`/projects/${encodeURIComponent(state.currentProject)}/stash`, {

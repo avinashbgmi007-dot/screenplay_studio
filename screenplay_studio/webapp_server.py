@@ -2623,8 +2623,18 @@ def get_stash(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
-    from .stash_store import load_stash
-    return jsonify({"stash": load_stash(m.project_dir)})
+    from .stash_store import entry_truncated, load_stash, MAX_TEXT_CHARS
+    stash = load_stash(m.project_dir)
+    # Gap 19: the bound is served, so the UI can refuse a too-long selection
+    # with the same sentence the store would use instead of discovering it after
+    # a round trip. `truncated` marks entries the OLD store cut in silence —
+    # they are shown, with the fact that their tail may be missing, rather than
+    # rewritten (their original text is not on disk to restore).
+    for entry in stash:
+        note = entry_truncated(entry)
+        if note:
+            entry["truncated"] = note
+    return jsonify({"stash": stash, "max_text_chars": MAX_TEXT_CHARS})
 
 
 @app.route("/api/projects/<name>/stash", methods=["POST"])
@@ -2637,6 +2647,8 @@ def add_stash(name):
     try:
         entry = add_stash_entry(m.project_dir, body)
     except ValueError as e:
+        # Includes the too-long refusal: 400 with a sentence naming both the
+        # passage length and the bound, so the UI shows why nothing was saved.
         return _error(str(e), 400)
     return jsonify(entry), 201
 

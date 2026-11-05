@@ -194,6 +194,50 @@ window.__inertScan = (sel) => {
 """
 
 
+def markup_outside_attributes(html: str) -> list:
+    """The markup in `html` that is OUTSIDE quoted attribute values.
+
+    Gap 17: the inert legs used `"<img" not in sc["html"]`, meaning to assert
+    "no <img> tag was created". A payload inside a quoted attribute serializes
+    literally, so `card.title = \'Open "<img ...>" on the desk\'` produced
+    `title="Open &quot;<img ...>&quot; on the desk"` -- and the raw-html check
+    reported `<img` while `handlers == 0 and exec == 0` reported an inert DOM.
+    The suite failed on its own over-broad check, not on a vulnerability.
+
+    This is the narrow version: drop every quoted attribute value, then look for
+    a real tag in what is left. It is still a text check (no DOM needed), so it
+    keeps working in the serialized string the leg already collects, and it is a
+    strict improvement: it can no longer be fooled by an escaped payload sitting
+    in a title, and it still catches a genuine tag anywhere outside one.
+
+    A backslash escape never appears in serialized HTML, so the scan is exact.
+    """
+    out = []
+    in_quote = False
+    quote = ""
+    i = 0
+    while i < len(html):
+        ch = html[i]
+        if in_quote:
+            if ch == quote:
+                in_quote = False
+            i += 1
+            continue
+        if ch in "\"'":
+            in_quote = True
+            quote = ch
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def has_raw_tag(html, tag: str) -> bool:
+    """Is `<tag` present OUTSIDE any quoted attribute value? See above."""
+    return ("<" + tag) in markup_outside_attributes(html or "")
+
+
 def scan(page, selector):
     return page.evaluate("(sel) => window.__inertScan(sel)", selector)
 
@@ -268,7 +312,7 @@ def sink_sweep(page, checks):
     checks.ok("dashboard stepper renders manifest stage strings inert",
               sc["handlers"] == 0 and sc["exec"] == 0
               and 'onclick="window' not in sc["html"]
-              and "<img" not in sc["html"],
+              and not has_raw_tag(sc["html"], "img"),
               f"handlers={sc['handlers']} exec={sc['exec']} detail={sc['detail'][:4]}")
     # remove the probe card and repaint the real shelf
     page.evaluate("""() => {
@@ -552,7 +596,7 @@ def run(base, projects_dir, headers):
             " return n ? n.innerHTML : null; }")
         checks.ok("markup in the DOM is escaped, not raw",
                   bool(dock_html) and "&lt;img" in dock_html
-                  and "<img" not in dock_html)
+                  and not has_raw_tag(dock_html, "img"))
 
         # --- the row interactions must still WORK ---
         page.evaluate(

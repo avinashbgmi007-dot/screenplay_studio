@@ -1772,3 +1772,148 @@ treat failed work as completed" — not "guess what the crash meant". The file i
 visible; a future entry can add an explicit recovery command with an ownership timeout, but that
 needs a decision about who owns a stale claim across processes, which is a larger change than this
 blocker.
+
+## §52 — Gap 17: an over-broad assertion, and a flush that waited on the wrong thing (2026-11-05)
+
+Gap 17 was filed as "browser accessibility/security tests and unload saving need follow-up", with
+three legs and no confirmed product defect. Two of the three legs turned out to contain real work.
+The third is unchanged, and the browser legs still were not run — so this section is explicit about
+what was *not* verified.
+
+### (a) The XSS leg: the register's guess, now proven
+
+The register said the dashboard failure "appears to be an overly broad serialization check, **not a
+demonstrated XSS vulnerability**; retain the structural probe and improve test precision". That was
+right, and the mechanism is visible in two lines: `renderDashboard` sets
+
+    card.title = `Open "${p.title}" on the desk`;
+
+so the payload lands in a **quoted attribute value**. `outerHTML` serializes that literally —
+`title="Open &quot;<img src=x onerror=...>&quot; on the desk"` — which contains the substring
+`<img` while the structural probe in the same scan reports `handlers == 0, exec == 0`. The suite
+failed twice on its own check.
+
+The fix is `markup_outside_attributes()` + `has_raw_tag()`: strip quoted attribute values, then look
+for `<tag` in what remains. It is a text check, so it still runs against the serialized string the
+leg already collects, and it is strictly better than what it replaces: it cannot be fooled by an
+escaped payload in a title, and it still catches a genuine tag anywhere outside one. Both legs that
+used the substring now use it.
+
+I kept the structural probe exactly as it was. The register asked for precision, not for a weaker
+check, and `handlers`/`exec` are what actually prove inertness.
+
+### (b) The unload leg: a real defect, found by reading the guard
+
+The register framed this as "an intermittent test or product risk, not yet a confirmed
+deterministic data-loss bug" and asked for stress tests rather than a fix. Reading the code instead
+found a deterministic one:
+
+    window.addEventListener("pagehide", () => {
+      if (!state.currentIdea || !state.inIdea || !ideaSaveTimer) return;
+
+`saveIdeaContent()` is the function that clears `ideaSaveTimer`, and it does so **on entry**, before
+its POST is sent. So for the entire duration of an in-flight save the timer is null while the server
+does not yet have the writer's last lines — and that in-flight request is precisely the one a
+pagehide aborts (a normal fetch dies with the document; only `keepalive` survives). Closing the tab
+mid-save therefore sent nothing at all, with no error, and the words were the only copy.
+
+The fix moves the decision from a timer to the text: `unloadFlushPayload(editorText, savedText,
+pendingTimer)` returns what to send, and returns null only when the editor already matches the last
+confirmed save with no debounce outstanding. `unloadFlushUsesKeepalive()` exists so a future edit
+cannot quietly drop `keepalive`, which is the one send where it matters.
+
+### How the unload fix was verified without a browser
+
+This is the part I am least able to prove, so I made the evidence as strong as the environment
+allows. The node test **extracts the real `pagehide` listener body from `app.js`** (balanced-brace
+slice) and runs it with a stub `api`, stubbing `$` and `state` — so the shipped handler's own control
+flow is under test, not a reimplementation of it. With the old guard restored, the mid-save test
+fails (`nothing was sent`); with the fix, it sends the unconfirmed text with `keepalive: true`.
+
+That is not a browser run. A real pagehide, a real aborted fetch and a real `sendBeacon`/keepalive
+delivery path are still unverified, and the file says so in a test whose only job is to record it.
+
+### What I could not do, and did not fake
+
+The Chromium legs were **not run**: no system browser exists here and the Playwright download is
+blocked (the CDN is outside this environment's network allowlist). I did not weaken the browser
+suites to make them "pass", and I did not mark the entry FIXED — it is PARTLY FIXED, with the two
+parts named and the unrun part named. The live-region repeat leg is untouched because its open
+question ("does AT re-announce an identical string?") is genuinely not observable from the DOM, which
+is what the suite's own comments already say.
+
+### My own errors
+
+**Error 1 — a test with a false premise.** I asserted `markup_outside_attributes('<a href="/p?q=1">…')
+== input`, on the theory that markup with no quotes is returned unchanged. The input plainly has a
+quoted value; the helper was right and my expectation was wrong. Rewritten to assert the real
+contract (quoted spans removed, structure kept) plus a separate no-quotes case.
+
+**Error 2 — a harness that could not observe the thing it tested.** My first extraction passed
+`ideaSaveTimer` by value, so the handler's `ideaSaveTimer = null` was invisible to the test and the
+"debounce is cleared" assertion failed against correct code. Fixed with a holder the wrapper writes
+back in a `finally` (the body has early returns, so a plain write-back would have been skipped).
+
+**Error 3 — the ESM/CommonJS split.** `import` at the top made Node treat the file as ESM, and
+`__dirname` does not exist there — the file failed to parse before any test ran. Matched the
+repository's convention (`require`, as `core.test.js` and `verification_readout.test.js` do).
+
+**Error 4 — a revert aimed at the wrong line.** My first "restore the substring check" revert edited
+the browser suite's call site, which the new test does not read, so it reported 13 passed and proved
+nothing. Aimed at `has_raw_tag`'s body instead, it fails 4 tests — which is the measurement.
+
+## §53 — Gap 19: the Stash cut writing and called it a save (2026-11-05)
+
+A one-line defect with a five-line consequence, and the clearest example yet of the pattern these
+two blockers share: **the system performed a destructive action and reported success.**
+
+### Reproduced, and worse than filed
+
+`add_to_stash` saved `text[:4000]`. Measured: 4,004 characters in, exactly 4,000 stored, the tail
+gone, no error, `201` from the route, "Stashed ✓" in the UI. The register recorded the store-level
+fact; the route-level fact is what makes it a writer-facing data-loss bug — the only copy of those
+characters was the writer's clipboard, and the UI had already been told it was safe (the selection
+float clears the selection after a successful stash).
+
+The record was also unable to describe the loss: the returned entry has no field for "this was cut",
+so no surface could have reported it even if someone had thought to.
+
+### What the fix is, and what it deliberately is not
+
+The bound itself is not the defect — 4,000 characters is ~2-3 pages of screenplay and the Stash is a
+scrapbook, not a second copy of the script. Three small changes:
+
+1. **Refuse, don't slice.** Over-bound text raises `ValueError` naming the actual length and the
+   bound, and stating that nothing was saved and nothing was cut. The route turns that into a `400`,
+   so the writer sees a sentence instead of a false success. The refusal is atomic: a refused entry
+   creates no file at all (tested).
+2. **Serve the bound.** `GET .../stash` now returns `max_text_chars`, and the selection float
+   refuses locally before the round trip. This is the difference between "the server said no" and
+   "the button never lied to you".
+3. **Report legacy cuts, never rewrite them.** Entries saved by the old code carry `len(text) ==
+   4000` as their only evidence. `entry_truncated()` reports that, and reports `dropped: None` —
+   *unknown*, not zero — because the original length was never recorded. Inventing a count would be
+   the same class of lie in the opposite direction. The entry is served byte-for-byte as stored and
+   marked in the list, because rewriting it would destroy what survived.
+
+I considered raising the bound instead. That would have moved the cliff without removing it, and the
+same silent loss would happen at 8,000. The invariant worth keeping is "nothing is lost without
+being told", and refusal is the only version of that a store can enforce on its own.
+
+### Verification
+
+- 11 tests: refused-not-cut (the exact 4,004 measurement), nothing written on refusal, the boundary
+  saved whole including its last character, Unicode measured in characters with its final glyphs
+  intact, the bound as a named constant, a legacy entry flagged with `dropped: None`, a normal entry
+  not flagged, the served bound, `400` with both lengths in the sentence, at-the-bound accepted, and
+  the proposal path (model-generated text of unknown length) refused the same way.
+- Reverts: **5 fail** with the silent slice restored; **1** with the served bound removed.
+- Full suite **2519 passed, 7 skipped**; 56 node tests; `ruff` clean.
+
+### One incidental discovery, recorded honestly
+
+The suite had been reporting `5` pre-existing failures. After I repaired the stale git HEAD in this
+session (origin was 61 commits ahead; a `--mixed` reset fixed the index without touching files), the
+two `test_repo_hygiene.py` failures disappeared — they were a symptom of the broken index, not of the
+code, and they pass in isolation. The `3` production-readiness failures remain, are unrelated to
+anything here, and are unchanged.
