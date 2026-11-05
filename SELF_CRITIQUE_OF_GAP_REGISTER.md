@@ -1413,3 +1413,43 @@ change completes finishes on its old client, with no per-turn record of where it
 neither is fixed here. Per-project propagation remains best-effort per directory (so one unreadable manifest cannot
 break the save); the `destinations` block turns that silence into a visible report rather than preventing it — which
 is the honest boundary with gap 42.
+
+## §47 — Gap 112: the evidence got smaller, and the check was the point (2026-11-05)
+
+**DONE, with 11 of 71 files deliberately untouched.** 30.6 MB of evidence PNGs → 12.9 MB (−58%); worktree 52 MB →
+35 MB (−33%). `docs/audit/EVIDENCE_IMAGES.md` records the method and the exceptions.
+
+**The decision was "only if it stays readable", so readability had to be measured, not assumed.** Two candidate
+methods, and the first one I tried failed the test I set for it:
+
+* **Half-size downscale** — 84–91% smaller. I compared crops at native size and it is **visibly mushy**: the small
+  print goes soft and grey. Text is "there" and the evidence is worse. **Rejected on sight**, not on a number.
+* **Palette quantisation (128–256 colours)** — 56–76% smaller. Every pixel stays where it is; only the colour table
+  coarsens, which is invisible on a flat-palette UI screenshot. **This is where the size was**, so no resize was needed
+  at all.
+
+**The check I used, and its limit.** No OCR binary exists in this environment, so I could not read the text out
+mechanically. The structural proxy: threshold, label dark blobs, count those sized like glyphs (3–26 px tall). Merged
+letters or a dissolved line collapse that count. A file had to keep **≥80% of its glyph blobs** and its median glyph
+height, and it was **re-read after writing** so the pass verified the bytes on disk rather than my intention. 11 files
+failed at 128 colours and again at 256 and were left alone. On top of the metric I looked at crops myself on the
+worst-scoring file and on a flat-UI board shot; indistinguishable at 1:1.
+
+**The honest limit: this is a proxy, not a reading.** It catches "text was destroyed", which is what quantisation
+would do if it went wrong. It would not catch "this sentence now reads slightly worse but is still there". I looked at
+three crops and not at sixty; a reviewer who thinks a specific image got worse should say so and I will restore it from
+git history — the originals are still there.
+
+**A real finding fell out of it.** Three groups of PNGs are **byte-identical under different filenames**: the three
+`j4_*` evidence shots, `A-scene_function`/`B-character-dials`, and `A02-evidence-lens-full`/`B-coverage`. At most one
+caption per group can be true. That is an **evidence-integrity defect** and I filed it as **gap 130** rather than
+deduping — deleting the duplicates would have deleted the signal that two captions are wrong, and I cannot tell from
+the pixels which frame was intended.
+
+**What I did not do, and why.** I did not rewrite git history. `git filter-repo` would drop the old blobs from `.git`
+(~19 MB → a few MB for a fresh clone), but it rewrites every commit SHA on a shared branch, and the branch policy here
+is explicit that I do not do that unasked. So a fresh clone is still ~19 MB of history while every checkout is 33%
+smaller. Recorded in the table row so the number is not mistaken for "the repo is now small".
+
+Full suite **2429 passed, 7 skipped**; `ruff` clean. No test referenced any of these images, which I checked before
+touching a byte.
