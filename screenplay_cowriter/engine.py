@@ -316,8 +316,25 @@ class CoWriterEngine:
             return reply
         return retry
 
+    def _base_prompt_budget(self, budget, suffix_chars):
+        """The budget to hand `build_system_prompt` once `suffix_chars` of text
+        will be appended to its result.
+
+        Gap 30: the base prompt was trimmed to the full budget and THEN the
+        probe/language/answer-first suffixes were appended, so the system
+        message overshot by exactly their length. Measured: an 11,589 budget
+        produced a 14,253-char turn. Handing the renderer the budget net of
+        those suffixes makes it trim for the text that actually follows."""
+        if not budget:
+            return budget
+        # Never 0: `build_system_prompt` reads 0 as "unlimited", so a turn whose
+        # suffixes alone exceed the budget would silently go un-trimmed instead
+        # of failing. 1 is a real budget and the shed ladder will report it.
+        return max(1, budget - suffix_chars)
+
     def _assemble_messages(self, system_prompt, history, prompt_user, persona,
-                           scene_block=None, quote_context=None, reprime=False):
+                           scene_block=None, quote_context=None, reprime=False,
+                           budget=None, scene_block_for=None):
         """Shared turn assembly for both probe and full paths. Order matters:
         system -> scene/quote context -> few-shot examples (budget-permitting)
         -> [history with trait reminder at fixed depth] -> user turn ->
@@ -337,6 +354,28 @@ class CoWriterEngine:
         (same position, same weight, no extra system role)."""
         from .personas import (post_history_reminder, trait_reminder,
                                persona_examples, FIRST_LINE_ANCHOR)
+        from .context import (BUDGET_IS_WHOLE_TURN, reply_reserve,
+                              room_for_scenes)
+        # Gap 30: the budget now bounds the WHOLE turn. Before this, the scene
+        # block, the quote, the examples and the history were appended after
+        # `build_system_prompt` had already spent the budget — measured, a
+        # declared 2,048 produced a 29,971-char system message. A positive
+        # budget is treated as whole-turn; 0 and None keep the old "unlimited"
+        # contract, which the CLI and the tests rely on.
+        limit = budget if (BUDGET_IS_WHOLE_TURN and budget) else None
+        if limit:
+            limit = max(0, limit - reply_reserve())
+        if scene_block_for is not None and limit is not None:
+            # Size the scene block HERE, not in the caller. The caller knows the
+            # base prompt but not the examples or these notes, so a block sized
+            # there overshot by ~2k (measured: 10,494 chars against a 10,200
+            # limit). Everything that competes for room is visible at this
+            # point.
+            tail_cost = (len(trait_reminder(persona)) if history else 0)
+            tail_cost += len(post_history_reminder(persona, reprime=reprime))
+            tail_cost += len(prompt_user or "") + 128
+            scene_block = scene_block_for(room_for_scenes(
+                budget, len(system_prompt), len(quote_context or ""), margin=tail_cost))
         # Fold every context block into the single system prompt's text.
         system_text = system_prompt
         if scene_block:
@@ -345,11 +384,28 @@ class CoWriterEngine:
             system_text += "\n\n" + quote_context
         total = len(system_text)
         examples = persona_examples(persona)
-        if examples and total + len(examples) <= self.FEWSHOT_CHAR_BUDGET:
+        # The few-shot examples are conditional on the budget as well as on
+        # FEWSHOT_CHAR_BUDGET: they used to be added whenever the pair of them
+        # fit 24k, regardless of what budget the turn declared.
+        if examples and total + len(examples) <= self.FEWSHOT_CHAR_BUDGET and (
+                limit is None or total + len(examples) <= limit):
             system_text += "\n\n" + examples
             total += len(examples)
+        # History is the last elastic block, so it gives way first: an old turn
+        # is worth less than the scene the writer is asking about right now.
+        window = list(history)[-self.history_window:]
+        if limit is not None:
+            room = limit - total
+            kept = []
+            for m in reversed(window):
+                cost = len(m.content or "") + 16
+                if cost > room:
+                    break
+                room -= cost
+                kept.append(m)
+            window = list(reversed(kept))
         messages = [{"role": "system", "content": system_text}]
-        hist = list(history)[-self.history_window:]
+        hist = window
         msgs = [{"role": m.role, "content": m.content} for m in hist]
         if len(msgs) >= self.TRAIT_DEPTH:
             # user-role so we never add a second system message
@@ -364,6 +420,23 @@ class CoWriterEngine:
         # note (was a second system message — the H7a 500 trigger).
         messages.append({"role": "user",
                          "content": post_history_reminder(persona, reprime=reprime) + anchor})
+        if limit is not None:
+            # Gap 30: the bound is enforced HERE, on the finished payload, which
+            # is the only place that can see every block. Refusing is deliberate:
+            # the alternative is sending a prompt the model will truncate, and
+            # the writer getting a worse answer with no explanation. The web
+            # server's send path turns this into a visible error in the chat.
+            used = sum(len(m.get("content") or "") for m in messages)
+            if used > limit:
+                from .context import PromptBudgetUnreachable
+                raise PromptBudgetUnreachable(
+                    f"This turn needs {used} chars of context but the model's budget "
+                    f"is {limit} chars (after reserving {reply_reserve()} for the "
+                    f"reply). The persona, the guards and the standing report are "
+                    f"~{len(system_prompt) // 1000}k chars of that and cannot be "
+                    f"shrunk. Raise the prompt budget, shorten the report, or use a "
+                    f"model with a larger window."
+                )
         return messages
 
     def send_message(self, session: Session, user_text: str, quote: dict | None = None,
@@ -482,7 +555,9 @@ class CoWriterEngine:
                 premise=self.premise, writer_library_text=writer_library_text,
                 mood_text=self.mood_text, doctor_case_text=doctor_case_text,
                 craft_history_text=craft_history_text,
-                budget=prompt_budget,
+                budget=self._base_prompt_budget(
+                    prompt_budget,
+                    len(PROBE_SYSTEM_PROMPT) + len(lang_note) + len(answer_first) + 6),
             ) + "\n\n" + PROBE_SYSTEM_PROMPT
             if lang_note:
                 system_prompt += "\n\n" + lang_note
@@ -490,9 +565,14 @@ class CoWriterEngine:
             # reached the probe branch still deserves an answer-first note
             system_prompt += answer_first
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
+            scene_block_for = (
+                (lambda cap: build_scene_context_block(
+                    self.script_ctx, scene_refs, budget=cap))
+                if prompt_budget else None)
             messages = self._assemble_messages(
                 system_prompt, branch.messages, prompt_user, branch.active_persona,
-                scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
+                scene_block=scene_block, quote_context=quote_context, reprime=reprime_now,
+                budget=prompt_budget, scene_block_for=scene_block_for)
             try:
                 reply = self._generate_mirrored(messages, user_text, on_token)
             except Exception:
@@ -507,15 +587,21 @@ class CoWriterEngine:
                 premise=self.premise, writer_library_text=writer_library_text,
                 mood_text=self.mood_text, doctor_case_text=doctor_case_text,
                 craft_history_text=craft_history_text,
-                budget=prompt_budget,
+                budget=self._base_prompt_budget(
+                    prompt_budget, len(lang_note) + len(answer_first) + 4),
             )
             if lang_note:
                 system_prompt += "\n\n" + lang_note
             system_prompt += answer_first
             scene_block = build_scene_context_block(self.script_ctx, scene_refs)
+            scene_block_for = (
+                (lambda cap: build_scene_context_block(
+                    self.script_ctx, scene_refs, budget=cap))
+                if prompt_budget else None)
             messages = self._assemble_messages(
                 system_prompt, branch.messages, prompt_user, branch.active_persona,
-                scene_block=scene_block, quote_context=quote_context, reprime=reprime_now)
+                scene_block=scene_block, quote_context=quote_context, reprime=reprime_now,
+                budget=prompt_budget, scene_block_for=scene_block_for)
             reply = self._generate_mirrored(messages, user_text, on_token)
             reply = self._guard_reply(reply, scene_refs)
             reply = cap_suggestions(reply)

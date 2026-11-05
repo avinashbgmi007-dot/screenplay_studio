@@ -2083,3 +2083,88 @@ that has nothing to do with hygiene. Installing the package makes them pass. I r
 last session I had reported them as fixed-by-the-index-repair; that was one cause, and this is
 another. A test whose setup dependency is a browser automation package is fragile, but changing it
 is a separate concern from this gap.
+
+## §56 — Gap 30: the budget protected one sixth of the turn (2026-11-05)
+
+The register said "the turn's actual model payload can exceed its declared prompt budget".
+Reproduced through the real engine: `prompt_budget=2048` with three long scenes sent a
+**29,971-char system message and a 30,369-char payload** against a 2,048 budget. The filed
+figure was 39,117 / 39,508 — same defect, my fixture was slightly smaller.
+
+### The register's framing was too generous
+
+It described the budget as "not a hard bound on the complete payload", as though the check had
+simply missed a block or two. It had not missed a block. It bounded exactly one function, and the
+turn was assembled by a different one that took no budget argument at all:
+
+    build_system_prompt(..., budget=2048)   -> 7,277 chars, trimmed as asked
+    _assemble_messages(...)                 -> appends, unbudgeted:
+        scene block                         62,484 chars   <- `build_scene_context_block` had no budget parameter
+        quote context, few-shot examples, trait reminder, post-history reminder, history window
+
+So the number that claimed to protect the turn protected about a sixth of it, and the part it did
+not protect was the part that grows without limit — the script itself. Severity: the same grade A,
+but the diagnosis in the register was wrong about *what* was unbounded, which matters for the fix.
+
+### What the fix does
+
+1. **The limit governs the whole turn.** `_assemble_messages` takes the budget, holds back a reply
+   reserve (`PROMPT_REPLY_RESERVE_CHARS`), and enforces the total on the finished message list.
+2. **The scene block is sized from the room that is actually left** (`room_for_scenes`), and each
+   requested scene gets an equal share so one long scene cannot starve the others. Text is cut at a
+   line boundary with **both ends kept** — a writer asking what happens at the end of scene 4 needs
+   the end of scene 4 — and the cut is marked in the text.
+3. **Omissions are disclosed.** A scene that does not fit is named to the model as not shown, with
+   an instruction not to summarise it.
+4. **History is the last elastic block** and gives way first: an old turn is worth less than the
+   scene the writer is asking about now.
+5. **Below the irreducible floor the turn raises.** `PromptBudgetUnreachable`, with the numbers.
+   The register asked for exactly this ("fail clearly if a required minimum cannot fit").
+
+### The mistakes I made, in order
+
+- **I put the refusal in the wrong place.** I made `build_system_prompt` raise and broke four
+  existing tests. Those tests were right and I was wrong: the function is a *renderer*, and asking
+  it what it can build under an impossible budget is legitimate (that is how the shed ladder is
+  tested). The refusal belongs where the payload is assembled and sent. Caught by the suite, not
+  by me.
+- **A 0-means-unlimited footgun in my own helper.** `_base_prompt_budget` returned `max(0, budget -
+  suffix)`. A budget smaller than the appended suffixes would therefore return **0**, and
+  `build_system_prompt` reads 0 as "unlimited" — the exact silent-truncation failure the gap is
+  about, reintroduced by the fix for it. Now clamped to 1.
+- **Sizing the block in the caller.** I gave the scene block `budget // 2`, then `room_for_scenes`
+  computed in the caller. Both were wrong because the caller cannot see the few-shot examples or
+  the tail notes; measured overshoot of 1,882 then 286 chars. The sizing had to move into
+  `_assemble_messages`, where everything that competes for room is visible.
+- **Forgetting my own overhead.** The block still overran by exactly the length of the omission note
+  I append when trimming — a note paid for from a budget that had not reserved it. Textbook, and I
+  found it only by instrumenting the parts.
+- **A false disclosure.** With no budget, a scene that is *not in the script* was reported to the
+  model as "no room in the context". That invites the model to tell the writer to narrow their
+  question, for a scene narrowing will never produce. Then my first correction over-shot and
+  blamed a *budget* cut on the script. Both are the same error — one variable for two facts — and
+  the fix was to track `absent` and `omitted` separately all the way through.
+- **Two throws at the pinning test.** My first version asserted an end-to-end bound at a budget
+  where nothing was trimmed, so **the revert passed**. That is the third time this session a test
+  failed to pin what it claimed to pin, and it is the failure mode the whole revert discipline
+  exists to catch. The final version asserts the contract directly: the renderer must be handed a
+  budget that leaves room for what the engine appends after it.
+
+### The revert matrix, and a measurement error inside it
+
+My first matrix counted `FAILED` lines with `grep -c`. A **collection error** produces no `FAILED`
+line, so three reverts printed `0` and I nearly recorded them as unpinned. They were *invalid
+patches* — the replacement string did not match. Re-run with the patch verified (`grep -c` on the
+reverted marker) and the real pytest summary line, the numbers were 6 / 9 / 8 / 4 / 1 / 2.
+
+Six reverts, final: whole-turn off **9**; scene block sized by the caller **6**; windowing removed
+**8**; refusal removed **4**; absent/omitted conflated **2**; base prompt trimmed to the full budget
+**1**.
+
+### What I deliberately did not do
+
+No tokenizer. The register suggested comparing tokenizers, and that is a much larger change with a
+model-specific dependency. The budget remains a character bound derived from the reported window at
+2 chars/token, which the code already documents as a deliberate conservative approximation for
+Indic scripts. I have not claimed that characters guarantee tokens, and I have not claimed the
+shorter prompt is better — only that it now fits inside the number it declares.

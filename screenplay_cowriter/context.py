@@ -485,6 +485,90 @@ def _shed_ladder():
 
 PROMPT_SHED_LADDER = tuple(_shed_ladder())
 
+# Gap 30. The budget before this change bounded ONLY `build_system_prompt`.
+# Everything appended afterwards was unbounded: the scene block (62,484 chars
+# for three scenes with no budget argument at all), the quote, the few-shot
+# examples, the trait/post-history reminders and the history window. Measured:
+# a declared budget of 2,048 chars produced a 29,971-char system message.
+#
+# The fix is to budget the WHOLE turn, not one segment of it. `budget_is_whole_turn`
+# records that the number the server derives (and SCREENPLAY_PROMPT_BUDGET) now
+# means every block, with the reply reserved out of it first. It exists so a
+# stored legacy preference cannot silently turn the bound back into a bound on
+# one segment only.
+BUDGET_IS_WHOLE_TURN = True
+
+# Reserved for the model's own reply. The server asks for 900 tokens; at the
+# 2-chars/token assumption this project already uses for Indic scripts that is
+# 1,800 chars, which is what an English 900-token reply will roughly need.
+PROMPT_REPLY_RESERVE_CHARS = 1800
+
+# Disclosed to the writer when a requested scene does not fit. Silence here
+# would leave the model and the writer believing the scene was shown.
+SCENE_MISSING_NOTE = (
+    "SCENE(S) NOT IN THE SCRIPT — the writer referred to {missing}, but no scene "
+    "with that number is in the script data they sent. Do not invent it; say you "
+    "can't see it and ask which one they mean."
+)
+
+SCENE_OMITTED_NOTE = (
+    "SCENES NOT SHOWN THIS TURN — the writer asked about {missing}, but there was "
+    "no room in the model's context for them. Do not quote or summarise them; say "
+    "plainly that you have not been shown them and ask the writer to narrow the "
+    "question or point at a shorter passage."
+)
+
+
+class PromptBudgetUnreachable(RuntimeError):
+    """The irreducible part of a turn exceeds the budget it was given.
+
+    Raised rather than warned because the alternative is a silently truncated
+    prompt — the failure this whole budget exists to prevent. The message names
+    the numbers so an operator can act: raise the budget, shrink the report, or
+    use a model with a larger window. The web server already maps a send-time
+    exception to a visible error in the chat, so this reaches the writer.
+    """
+
+
+def reply_reserve() -> int:
+    """Chars held back for the reply, so a turn cannot fill the window itself."""
+    if not PROMPT_CHAR_BUDGET:
+        return 0
+    return min(PROMPT_REPLY_RESERVE_CHARS, PROMPT_CHAR_BUDGET // 4)
+
+
+def room_for_scenes(limit: int, base_chars: int, quote_chars: int = 0,
+                    margin: int = 400) -> int:
+    """Chars the scene block may use once the rest of the turn is accounted for.
+
+    Derived from what is ACTUALLY in the turn rather than a fixed fraction. My
+    first version gave the scene block `budget // 2`, which is wrong whenever
+    the base prompt is small: with a 12,000 budget and a ~1,200-char base the
+    scene block was handed 6,000 chars it did not need while the remainder sat
+    unused — and with a large base the same formula hands out room that is
+    already spoken for. Measured both ways.
+    """
+    if not limit:
+        return 0
+    return max(0, limit - reply_reserve() - base_chars - quote_chars - margin)
+
+
+def split_over_budget(parts: list, available: int) -> tuple:
+    """Give each part an equal share of `available`.
+
+    Deliberately simple and deterministic: equal shares mean one long scene
+    cannot starve the scenes behind it. Returns (shares, shortfall) —
+    `shortfall` > 0 when not even one character per part would fit, which the
+    caller turns into "these scenes were not shown" rather than empty text.
+    """
+    if not parts:
+        return [], 0
+    per = available // len(parts)
+    if per < 1:
+        return [0] * len(parts), len(parts) - available
+    return [per] * len(parts), 0
+
+
 PROMPT_TRIM_NOTE = (
     "CONTEXT TRIMMED — this turn's context was cut to fit the model's window, so "
     "some reference material above is missing. Do not assume it does not exist: "
@@ -594,14 +678,28 @@ def build_system_prompt(script_ctx: ScriptContext, report_ctx: ReportContext, pe
                 # The ladder has a floor: the persona, the mode, the example
                 # dialogue, the guards and the findings are not shed, so a
                 # budget below their sum is unreachable. Measured: a 22-scene
-                # script with 17 findings floors at ~12k chars. Say so loudly —
-                # otherwise the operator believes the cap is protecting them
-                # while the server still truncates.
+                # script with 17 findings floors at ~12k chars.
+                #
+                # Gap 30: this used to only WARN, and the turn went out anyway
+                # at whatever size the appended blocks made it. A warning in a
+                # server log is not protection — the writer sees a truncated
+                # answer and nothing says why. It now raises, and the web
+                # server's send path already turns a send-time exception into a
+                # visible error in the chat. The warning is kept as well so a
+                # caller that catches the error still leaves a trace.
+                # NOTE (gap 30): this stays a WARNING. It used to be the only
+                # enforcement, and the turn then went out at whatever size the
+                # appended blocks made it. The refusal moved to where the
+                # payload is actually assembled (_assemble_messages), because
+                # this function is a renderer: callers legitimately ask it for
+                # the best prompt it can build under an impossible budget (the
+                # shed-ladder tests do exactly that), and a renderer that raises
+                # cannot be asked what it would have produced.
                 warnings.warn(
                     f"Prompt budget {limit} chars is unreachable for this turn: the "
                     f"irreducible context (persona, guards, examples and findings) is "
                     f"~{len(prompt) // 1000}k chars. Raise SCREENPLAY_PROMPT_BUDGET or "
-                    f"the model will truncate silently.",
+                    f"use a model with a larger window.",
                     RuntimeWarning,
                 )
     return prompt
@@ -678,20 +776,116 @@ def resolve_referenced_scenes(text: str, script_ctx: ScriptContext,
     return sorted(refs)[:max_n]
 
 
-def build_scene_context_block(script_ctx: ScriptContext, scene_numbers: list):
+def window_scene_text(text: str, cap: int) -> tuple:
+    """Cut one scene's text to at most `cap` chars, at a line boundary.
+
+    Returns (text, trimmed). Cuts on a newline so a line of dialogue is never
+    split mid-word, and says so in the returned text — a scene that reads as if
+    it simply ends would let the model reason about an ending that isn't there.
+
+    The BOTTOM is kept as well as the top: a writer asking "what happens at the
+    end of scene 4" needs the end of scene 4, and a head-only cut would answer
+    the wrong question confidently.
+    """
+    if cap <= 0:
+        return "", True
+    if len(text) <= cap:
+        return text, False
+    note = "\n[...scene shortened to fit the model's context; the middle is not shown...]\n"
+    if len(note) >= cap:
+        return text[:cap], True
+    room = cap - len(note)
+    head = text[:int(room * 0.6)]
+    cut = head.rfind("\n")
+    if cut > 0:
+        head = head[:cut]
+    tail = text[len(text) - (room - len(head)):]
+    nl = tail.find("\n")
+    if nl > 0:
+        tail = tail[nl + 1:]
+    return head + note + tail, True
+
+
+def build_scene_context_block(script_ctx: ScriptContext, scene_numbers: list, budget: int | None = None):
+    """The requested scenes, as text for this turn only.
+
+    Gap 30: this function ignored the prompt budget entirely, so three scenes
+    whose text ran long produced a 62,484-char block against a declared budget
+    of 2,048. It now takes a budget and windows each scene into an equal share
+    of it (see `split_over_budget`). Scenes that cannot be shown at all are
+    LISTED IN THE BLOCK, so the writer is told the omission and the model does
+    not answer about a scene it was never given.
+
+    `budget=None` keeps the old unbounded behaviour for the CLI and for every
+    caller that has not opted in.
+    """
     if not scene_numbers:
         return None
-    blocks = []
-    missing = []
+    texts = []
+    # Two DIFFERENT reasons a scene can be absent, tracked apart so the model is
+    # told the true one: `absent` = not in the script, `omitted` = in the script
+    # but no room. Conflating them was my first version's bug, in both
+    # directions (a missing scene blamed on the budget, then a budget cut blamed
+    # on the script).
+    absent = []
+    omitted = []
     for n in scene_numbers:
         text = script_ctx.scene_text(n)
         if text:
-            blocks.append(text)
+            texts.append((n, text))
         else:
-            missing.append(n)
-    if not blocks:
-        return None
+            absent.append(n)
+
+    budget_trimmed = False
+    if texts and budget is not None:
+        # Room the wrapper and the notes will need, taken off the top so the
+        # returned block honours the number it was given. The omission note is
+        # part of the block whenever anything is trimmed — which is exactly the
+        # case where the budget binds — and my first version left it out,
+        # overshooting by 274 chars (measured).
+        overhead = (
+            len("SCENE TEXT (for this turn only):\n\n")
+            + 8 * max(0, len(texts) - 1)          # the "---" separators
+            + len(SCENE_OMITTED_NOTE)             # paid whenever a scene is cut
+            + 80                                  # the not-found note, if any
+        )
+        available = max(0, budget - overhead)
+        shares, shortfall = split_over_budget(texts, available)
+        if shortfall:
+            omitted.extend(n for n, _ in texts)
+            texts = []
+        kept = []
+        for (n, text), cap in zip(texts, shares):
+            piece, trimmed = window_scene_text(text, cap)
+            budget_trimmed = budget_trimmed or trimmed
+            if piece:
+                kept.append(piece)
+            else:
+                omitted.append(n)
+        texts = kept
+
+    if not texts:
+        if not absent and not omitted:
+            return None
+        if absent and not omitted:
+            return SCENE_MISSING_NOTE.format(missing=_names(absent))
+        if omitted and not absent:
+            return SCENE_OMITTED_NOTE.format(missing=_names(omitted))
+        # Nothing can be shown. Still return a block: the omission is the most
+        # important thing this turn can tell the model — and it says WHICH kind
+        # of omission, because "narrow your question" is useless advice for a
+        # scene that is not in the script at all.
+        return (SCENE_OMITTED_NOTE.format(missing=_names(omitted)) + "\n\n"
+                + SCENE_MISSING_NOTE.format(missing=_names(absent)))
+
+    blocks = [t if isinstance(t, str) else t[1] for t in texts]
     out = "SCENE TEXT (for this turn only):\n\n" + "\n\n---\n\n".join(blocks)
-    if missing:
-        out += f"\n\n(Note: scene(s) {missing} were referenced but not found in the script data.)"
+    if absent:
+        out += "\n\n" + SCENE_MISSING_NOTE.format(missing=_names(absent))
+    if budget_trimmed:
+        out += "\n\n" + SCENE_OMITTED_NOTE.format(missing="the long passages above")
     return out
+
+
+def _names(items) -> str:
+    return ", ".join(str(i) for i in items)

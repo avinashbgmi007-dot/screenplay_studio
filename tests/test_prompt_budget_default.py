@@ -362,22 +362,39 @@ class TestTheEngineDefersTheBudget:
         engine = CoWriterEngine(_Client(), _scenes(), _big_report(),
                                 mood_text=MOOD, prompt_budget=lambda: 40000)
         engine.send_message(Session.new(title="t"), "hello")
-        assert seen.get("budget") == 40000
+        # Gap 30: the renderer is now handed the budget NET of the suffixes the
+        # engine appends to its result (probe text, language note, answer-first
+        # note), because a prompt trimmed to the full budget and then appended
+        # to overshoots it. The resolved 40,000 still governs the turn.
+        assert seen.get("budget") is not None
+        assert 38000 <= seen["budget"] <= 40000, seen["budget"]
 
     def test_the_resolved_budget_actually_trims_the_prompt(self):
-        """End to end: a budget from the provider reaches the ladder and sheds a
-        block. Sized off the measured prompt so it lands inside the reachable
-        band (above the irreducible floor, below the untrimmed prompt) rather
-        than under the floor, where the warning — not the trim — is the story."""
+        """End to end: a budget from the provider reaches the ladder, sheds a
+        block, and the turn that is actually sent fits inside it."""
         sc, rep = _scenes(), _big_report()
-        full = build_system_prompt(sc, rep, "writing_partner", "peer", mood_text=MOOD, budget=0)
-        budget = len(full) - len(MOOD) + len(PROMPT_TRIM_NOTE) + 2
+        # Gap 30: the number now bounds the WHOLE turn — the system prompt plus
+        # the few-shot examples, the tail notes and the history — so the budget
+        # must sit above the irreducible floor AND below the untrimmed turn.
+        #
+        # The block this test sheds has to be BIGGER THAN THE REPLY RESERVE
+        # (1,800 chars). Shedding a 600-char mood block cannot rescue a turn
+        # that is 1,800 over: measured by bisection, there was no budget at
+        # which the mood block was shed and the turn was still sendable. That is
+        # arithmetic, not a bug — but it means the mood block is the wrong
+        # subject for a test about shedding. The writer's library is 20k of
+        # optional material, so the band is wide.
+        library = "PAST WORK — " + ("a scene from another script. " * 700)
         engine = CoWriterEngine(_Client(), sc, rep, mood_text=MOOD,
-                                prompt_budget=lambda: budget)
+                                writer_library_text=library,
+                                prompt_budget=lambda: 26000)
         engine.send_message(Session.new(title="t"), "hello")
         system = [m for m in engine.client.messages if m["role"] == "system"][0]["content"]
         assert PROMPT_TRIM_NOTE in system, "the provider's budget never reached the ladder"
-        assert MOOD not in system, "the first ladder step should have shed the room state"
+        assert library not in system, "the ladder should have shed the optional library block"
+        # ...and the turn it actually sends honours the number it was given.
+        used = sum(len(m.get("content") or "") for m in engine.client.messages)
+        assert used <= 26000, f"sent {used} chars against a 26000 budget"
 
     def test_no_provider_leaves_the_prompt_alone(self):
         """The CLI passes nothing, so its turns must be byte-identical to before
