@@ -3506,15 +3506,27 @@ DEMO_REPORT_BANNER = (
 )
 
 
-def _report_banner() -> str:
+def _report_banner(model_used: str | None = None) -> str:
     """The disclosure an exported report carries when the analysis came from the
     demo model. Empty otherwise — a report from a real model says nothing extra,
     and a permanent banner would train the writer to ignore it.
 
-    Factored out of the route so the DECISION is testable without standing up a
-    project whose analyze stage is complete.
+    Gap 88 / gap 59: this used to key off `_DEMO_MODEL_ACTIVE`, i.e. whether the
+    demo mode is on RIGHT NOW. An archived demo report exported after the writer
+    connected their real server therefore lost its banner and read as a real
+    review, and a real report produced while demo mode happened to be on would
+    have been labelled canned. The decision now comes from the RUN's record
+    (`model_used`, persisted with the report), which is what the artifact is
+    actually a record of.
+
+    `model_used=None` means the caller could not establish the run's model; the
+    banner then falls back to the old global check rather than claiming a real
+    reading it cannot vouch for.
     """
-    return DEMO_REPORT_BANNER if _DEMO_MODEL_ACTIVE else ""
+    from screenplay_analyzer.report import model_is_stand_in
+    if model_used is None:
+        return DEMO_REPORT_BANNER if _DEMO_MODEL_ACTIVE else ""
+    return DEMO_REPORT_BANNER if model_is_stand_in(model_used) else ""
 
 
 def _md_to_html(md: str, banner: str = "") -> str:
@@ -3587,6 +3599,13 @@ def _md_to_html(md: str, banner: str = "") -> str:
         elif line == "---":
             flush_para()
             out.append("<hr/>")
+        elif line.startswith("> "):
+            # Gap 88: the report's demo-model disclosure is a blockquote so it
+            # stays readable as plain Markdown. Without this branch the tiny
+            # renderer flattened it into a paragraph with a literal ">", which
+            # is exactly the kind of quiet degradation that loses a warning.
+            flush_para()
+            out.append(f'<blockquote class="report-disclosure">{inline(line[2:])}</blockquote>')
         elif line.startswith("- "):
             flush_para()
             if not in_list:
@@ -3637,7 +3656,13 @@ def export_report(name):
         return _error("Analysis hasn't completed for this project yet.", 400)
     with open(m.report_md_path, "r", encoding="utf-8") as f:
         md = f.read()
-    html = _md_to_html(md, _report_banner())
+    # The run's own record, not the current settings (gap 88).
+    try:
+        with open(m.report_findings_path, "r", encoding="utf-8") as f:
+            model_used = json.load(f).get("model_used")
+    except (OSError, ValueError, AttributeError):
+        model_used = None
+    html = _md_to_html(md, _report_banner(model_used))
     safe_title = "".join(c if c.isalnum() or c in "-_ " else "_" for c in (m.title or "script"))
     return send_file(
         io.BytesIO(html.encode("utf-8")),

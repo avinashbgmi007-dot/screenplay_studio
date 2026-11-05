@@ -77,9 +77,18 @@ class TestExportedReportBanner:
         assert "<body><h1>" in ws._md_to_html(MD)
 
     def test_the_export_route_uses_the_helper(self):
-        """Guards against the route drifting back to its own inline decision."""
+        """Guards against the route drifting back to its own inline decision.
+
+        Gap 88 widened the contract: the route now hands the helper the RUN's
+        model (read from the stored findings payload) instead of letting the
+        decision fall back to the current demo setting. The pin follows that —
+        it is stricter than before, not looser: a bare `_report_banner()` call
+        would again make an archived report's banner depend on global state.
+        """
         src = open(ws.__file__, encoding="utf-8").read()
-        assert "_md_to_html(md, _report_banner())" in src
+        assert "_md_to_html(md, _report_banner(model_used))" in src
+        assert "_report_banner()" not in src, (
+            "the route is deciding the banner from current global state again")
 
 
 # --------------------------------------------------------------------------

@@ -1089,3 +1089,44 @@ them I proved non-vacuous by injection as described above. I am labelling that e
 (provenance by name rather than by nature) is the adjacent disclosure gap.
 
 Full suite **2358 passed, 7 skipped**; `ruff` clean.
+
+## §40 — Gap 88: the report discloses the stand-in by nature, from the run's record (2026-11-04)
+
+**FIXED.** The demo model was disclosed only *by name*: `**Analyzed with:** demo-craft-model`, plus the stub's own
+findings happening to begin `[demo] …`. Two problems with that, and the second is the real one:
+
+1. A model id is not an explanation — `demo-craft-model` means nothing unless you already know what it is.
+2. **The disclosure depended on the stand-in cooperating.** `[demo]` is emitted by `demo_model.py` as finding *text*
+   (lines 609–676), not by the renderer. So the honesty of the artefact rested on the stub's wording. I proved this by
+   rendering a demo report whose findings did not prefix themselves: nothing in the report said demo at all.
+
+**Fixed at the renderer, from the run's own record.** `model_used` is persisted with the report, so
+`model_is_stand_in(result.model_used)` drives a blockquote directly under the header: *"This report was produced by
+the built-in demo model, not a real analysis… Do not use them to judge your screenplay."* It sits above
+`## Detailed Analysis` because a caveat read after the findings is read too late.
+
+**The HTML export had gap 59's defect and I fixed that too.** `_report_banner()` keyed off `_DEMO_MODEL_ACTIVE` — the
+*current* process's setting. So an archived demo report exported after the writer connected their real server lost
+its banner and read as a real review, and a genuine report produced while demo mode happened to be on would have been
+labelled canned. It now takes the run's `model_used` (read from the stored findings payload by the export route), with
+`None` falling back to the old global check so unknown provenance stays conservative rather than claiming a real
+reading. Verified by flipping `_DEMO_MODEL_ACTIVE` to False and confirming the archived demo report still discloses.
+
+**A renderer gap I had to close for that to work.** `_md_to_html` is a deliberately tiny subset renderer with no
+blockquote branch, so the Markdown disclosure would have been flattened into a paragraph starting with a literal
+`>` — a warning degrading quietly, which is the failure mode this gap is about. Added the branch;
+`class="report-disclosure"` now appears in the export.
+
+**Evidence.** 11 tests, and both halves are independently proven: reverting only the Markdown disclosure fails **5**,
+reverting only the banner decision fails **5**. Note the method correction — my first revert attempt failed as an
+`ImportError` because the test imports `model_is_stand_in`, so I redid it keeping the helper and reverting only the
+behaviour. That is the same trap I hit on gap 18 and it is now my default for any revert-check.
+
+**One existing test updated, deliberately.** `test_demo_banner.py` pinned the literal string
+`_md_to_html(md, _report_banner())`. I changed the pin to require `_report_banner(model_used)` *and* to assert the
+no-argument form is absent, so the guard got stricter rather than being loosened to accommodate my change.
+
+**Not claimed:** nothing here says anything about real-model quality. Whether the stand-in's *findings* are
+representative is gap 87's territory and is not established.
+
+Full suite **2369 passed, 7 skipped**; `ruff` clean.

@@ -51,6 +51,23 @@ VERIFICATION_BADGE = {
 UNGROUNDED_BADGE = (" ⚠️ *unsupported — this note cites no quote or observation "
                     "from your script*")
 
+# Gap 88: the built-in stand-in used to be disclosed only BY NAME — its model id
+# appeared in "Analyzed with" and its own findings happened to say "[demo] ...".
+# Both are the stub cooperating with us. A report should say what produced it
+# from the RUN'S OWN RECORD, so that an archive still tells the truth after the
+# demo setting is switched off (gap 59) and so a change of wording inside the
+# stub cannot quietly remove the disclosure.
+DEMO_MODEL_IDS = frozenset({"demo-craft-model"})
+
+
+def model_is_stand_in(model_used: str | None) -> bool:
+    """Was this report produced by the built-in stand-in?
+
+    Derived from the persisted `model_used`, never from the current process's
+    demo setting: what matters is what ran, not what is configured now.
+    """
+    return (model_used or "").strip().lower() in DEMO_MODEL_IDS
+
 CATEGORY_TITLES = {
     "theme": "Theme & Subtext",
     "character": "Character Arcs & Consistency",
@@ -110,6 +127,20 @@ def render_markdown(result: AnalysisResult) -> str:
     lines.append(f"**Parsed from:** `{doc.source_filename}` ({doc.source_format}, parse confidence: {doc.parse_confidence})")
     if result.model_used:
         lines.append(f"**Analyzed with:** `{result.model_used}`")
+    if model_is_stand_in(result.model_used):
+        # Its own line, above everything the writer is about to read, because
+        # the whole report's standing changes: this is a demo of the machinery,
+        # not a reading of their script. Rendered from the run's record, so an
+        # exported copy stays honest after the demo setting is turned off.
+        lines.append("")
+        lines.append(
+            "> ⚠️ **This report was produced by the built-in demo model, not a "
+            "real analysis.** The studio's analysis engine ran end to end, but "
+            "the findings, coverage and craft notes below came from a stand-in "
+            "model that reads the script only superficially. Do not use them to "
+            "judge your screenplay. Run the analysis against your configured "
+            "model to get a real reading.")
+        lines.append("")
     lines.append(f"**Scenes:** {doc.scene_count} | **Characters:** {len(doc.all_characters)}")
     if doc.estimated_page_count:
         lines.append(f"**Estimated pages:** {doc.estimated_page_count}")
