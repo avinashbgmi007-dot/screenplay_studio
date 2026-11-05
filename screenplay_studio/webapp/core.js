@@ -295,6 +295,39 @@ function providerBadgeState(provider) {
   return lc.ok ? "connected" : "failed";
 }
 
+// ---- gap 5: one terminal state for a stop, whichever watcher sees it first ----
+//
+// A stopped run can be announced by two independent watchers: the response
+// handler of the request that started it (POST /analyze, POST .../retry-failed)
+// and the 2s progress poller. Both must say the same thing, and neither may
+// ever say "complete" — that sentence is reserved for a run that published a
+// report. This helper is the single source of that wording; app.js only mounts
+// it, so the copy cannot drift between the two paths.
+//
+// `published` is whether a report arrived in this session. It changes the
+// promise we are allowed to make: with a previous report on disk we can say it
+// is unchanged; on a first run there is nothing yet, and saying otherwise would
+// be the same lie in the other direction.
+function cancellationNote(published) {
+  return published
+    ? "Analysis stopped at your request — the script and your previous report are unchanged."
+    : "Analysis stopped at your request — the script is unchanged and no report was written.";
+}
+
+/** Is this response the server telling us the run was stopped?
+ *  `/analyze` and the retry route both answer `{cancelled: true, ...}`. */
+function isCancelledAck(ack) {
+  return !!(ack && typeof ack === "object" && ack.cancelled === true);
+}
+
+/** A 409 from the stop endpoint means the run got there first. That is not a
+ *  failure to report as one — the next poll lands the real state. */
+function isStopRace(err) {
+  if (!err) return false;
+  if (err.status === 409) return true;
+  return /no analysis is running|already finished/i.test(String(err.message || ""));
+}
+
 // ---- Node test hook (browsers never take this branch) ----
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -315,5 +348,8 @@ if (typeof module !== "undefined" && module.exports) {
     findingStateTitle,
     providerStatusLine,
     providerBadgeState,
+    cancellationNote,
+    isCancelledAck,
+    isStopRace,
   };
 }

@@ -1566,3 +1566,110 @@ clean; 42 JS tests.
 manifests' `api_key` field and is stated rather than implied. There is no keyring/OS-credential-store integration; that
 would be the next step if this ships to non-technical writers. And a *read-only* install directory means
 `saved_to_disk: false` — the writer is told the setting will not survive a restart instead of being given a false green.
+
+## §50 — Gap 5: the stop button was honest about asking and dishonest about the answer (2026-11-05)
+
+Gap 5 was filed as three claims and graded A with one C inside it. All three were real, but the
+recorded shape of claim 1 was wrong, and my first test suite was wrong in a way that nearly shipped
+a fix I had not earned. Both corrections are below, because the register is only useful if it
+records what measurement changed.
+
+### What the entry said, and what measurement showed
+
+The register said the pipeline "checked only at stage boundaries". The census was sharper: 11
+`_cp()` calls, the last at line 1686 — before step 6b, the genre check. Everything after it ran
+unchecked: step 7's gating, step 8's five demote-never-drop passes, step 8e's **observation pass**
+(the run's only remaining model-backed pass), the verification summary, the evidence depth, and the
+`return` at line 1855. That is 169 lines of unguarded work, not a boundary-precision problem.
+
+It mattered more than "the run reports the wrong flag", which is how I had it filed. On the real
+route, with the real pipeline and a real model server, the sequence was:
+
+1. Stop clicked while the run was inside the closing passes → `200 {"cancel_requested": true}`;
+2. the pipeline returned a **full result**;
+3. `stage_generation` → `publish_generation` → `mark_complete("analyze")` ran in that order, so the
+   run **published a new generation over the writer's previous report** and set the stage `complete`;
+4. the writer was told "Analysis complete".
+
+So the defect was not a mislabelled outcome. The button said *stop*, the server said *stopping*, and
+the system replaced the one artifact the button exists to protect. That is data loss reachable with
+one click, which is why the fix is not "improve the label".
+
+### The fix, and why exactly two checks
+
+Two checks, each earning its place by a property a test can falsify:
+
+- **Before the observation pass** — a stop that had already been requested was still followed by a
+  model-backed pass: one call per ungrounded finding, capped at 24 by default. A cancelled run must
+  not spend the writer's time and tokens. (Reverting this check fails exactly one test.)
+- **Immediately before `emit("done", "complete")`** — everything above only shapes `result` in
+  memory; the `return` is what lets the caller publish. This single check is what makes publication
+  impossible past a stop, regardless of which closing pass the writer interrupted. (Reverting it
+  fails three tests, including the real-route one that reads `report.md` off disk.)
+
+I did **not** sprinkle checks between the closing passes. Those passes are pure functions over an
+in-memory list; a check between them would buy nothing a check at the end does not already buy, and
+a guard that cannot be falsified is worse than no guard — it reads as coverage. The one place a
+mid-window check earns its keep is in front of the model call, which is why there are two.
+
+### My own errors
+
+**Error 1 — the tests were passing for the wrong reason.** My first two route tests set *their own*
+`threading.Event`, while the route hands *its* event (`_ANALYZE_CANCEL[name].is_set`) to the
+pipeline. The stop therefore never reached the run, the test "proved" the guard was missing when it
+was fine, and I almost recorded a false negative against working code. The tell was that the
+standalone pipeline version passed while the route version did not — the same property, two
+different harnesses. Fixed by setting the event the run is actually watching, and the test now
+asserts the event exists so this cannot silently regress to the same empty gesture.
+
+**Error 2 — a vacuous assertion.** My first version of the pre-observation test compared
+`len(calls)` to itself (`after == len(with_observation)`). It could not fail. Worse, once rewritten
+to a real assertion, it *still* passed with the check removed, for two compounding reasons: the
+suite switches the observation pass off globally (`tests/conftest.py:53`, for runtime), and my
+anchor was `logline_test/complete` — but `genre` is the last category pass, so an *older* check
+caught the stop before the window was ever entered. Both are now fixed: the test turns the product
+switch back on for its own run, and it anchors on the measured last pass. It fails without the
+check and passes with it.
+
+**Error 3 — process, not code.** I burned a turn on ~20 sequential single-purpose tool calls and
+hit the limit. The cause was reading one grep, one `sed` range and one test file per call instead of
+batching them; and then, mid-revert, restoring a backup from `/tmp` that the sandbox had cleared —
+the `cp` failed and I did not check it, so a half-reverted `pipeline.py` sat in the tree. It was
+caught by grepping for the checks before running anything, and the working tree was re-established
+from `origin` (`cddb4a3`) with a `--mixed` reset that never touches files. The lesson is the same
+one as error 2 in a different costume: **verify the state you think you are in.**
+
+### Claim 2, and why it was graded C
+
+`runAnalysis()` awaited the POST and then unconditionally appended "Analysis complete. The report is
+now grounding this conversation." There was no branch on `ack.cancelled` anywhere in `app.js`. The
+retry path was worse: it never read the body either, so a stopped retry announced "the report has
+been merged and updated" over a report that had not been merged — and it ran with **no Stop control
+at all**, because the desk ladder belonged only to Run Analysis.
+
+The fix is one terminal handler (`settleCancelledRun`) and one wording helper (`cancellationNote`),
+so the two watchers — the response handler and the 2s poller — cannot word the same outcome
+differently. The wording is honest about what it can promise: with a previous report it says it is
+unchanged; on a first run it says no report was written. Saying "your previous report is unchanged"
+to a writer who never had one would be the same lie in the other direction.
+
+### What is still true, and deliberately not fixed
+
+A stop cannot interrupt a model call already in flight. The check lands **between** calls. This is
+the existing co-operative contract and is why the UI says "the current stage finishes"; a hard
+abort would mean killing a socket mid-write and the register's own text asks for the limitation to
+be *clear*, not removed. After the fix, the writer pays for at most one call they cancelled, not 24.
+
+### Verification
+
+- `tests/test_cancellation_lifecycle.py` — 13 tests: publication blocked at three positions in the
+  closing window, between model passes, no-stop-invisibility, the routes' `cancelled` contract, the
+  retry, the run-scoped event (no leak on success or failure), and the stop endpoint's 409/200 scope.
+- 4 node tests pin `cancellationNote` / `isCancelledAck` / `isStopRace`; `isCancelledAck` rejects
+  truthy non-booleans so a stray value cannot be read as a stop.
+- Reverts, measured separately: **3 fail** (publication check), **1 fail** (pre-observation check),
+  **5 fail** (both) — restored, 13 pass.
+- Full suite after the fix: **2482 passed, 7 skipped**; `ruff` clean; 46 node tests.
+- Pre-existing, unrelated: 5 failures in `test_production_readiness.py` (CI timeout declarations)
+  and `test_repo_hygiene.py` (audit scratch paths). Confirmed pre-existing by stashing my changes
+  and re-running them against `cddb4a3` — identical 5 failures, so they are not a regression here.

@@ -319,3 +319,51 @@ test("providerStatusLine: a stale check says so instead of showing its old verdi
   assert.ok(/different endpoint/.test(line), line);
   assert.ok(!/^Connected/.test(line), `must not reuse the old verdict: ${line}`);
 });
+
+// ---- gap 5: one terminal state for a stopped run ----
+// The writer's Stop button makes one promise: a stopped run publishes nothing
+// and is never announced as a finished one. These pin the shared wording so
+// the two watchers (the request's response handler and the 2s poller) cannot
+// drift apart, and so neither can ever say "complete" for a stop.
+
+const {
+  cancellationNote,
+  isCancelledAck,
+  isStopRace,
+} = require("../../screenplay_studio/webapp/core.js");
+
+test("gap 5: a stop where a previous report exists promises it is unchanged", () => {
+  const note = cancellationNote(true);
+  assert.match(note, /stopped at your request/);
+  assert.match(note, /previous report are unchanged/);
+  assert.doesNotMatch(note, /complete/i, "a stop must never read as a completion");
+});
+
+test("gap 5: a stop on a FIRST run must not promise a report that never existed", () => {
+  const note = cancellationNote(false);
+  assert.match(note, /stopped at your request/);
+  assert.match(note, /no report was written/);
+  assert.doesNotMatch(note, /unchanged\.$|previous report/,
+    "there is no previous report to call unchanged on a first run");
+  assert.notStrictEqual(note, cancellationNote(true),
+    "the two terminal states must be distinguishable");
+});
+
+test("gap 5: the cancelled answer is recognised on the response, not inferred", () => {
+  assert.strictEqual(isCancelledAck({ cancelled: true, stages: {} }), true);
+  assert.strictEqual(isCancelledAck({ cancelled: true }), true);
+  // A normal completion carries no flag, and must not be mistaken for a stop.
+  assert.strictEqual(isCancelledAck({ stages: { analyze: "complete" } }), false);
+  assert.strictEqual(isCancelledAck({ cancelled: false }), false);
+  // Truthiness must not be enough: a stray string/1 is not the server's flag.
+  assert.strictEqual(isCancelledAck({ cancelled: "yes" }), false);
+  assert.strictEqual(isCancelledAck(null), false);
+  assert.strictEqual(isCancelledAck(undefined), false);
+});
+
+test("gap 5: a stop that races a finished run is not an error to show", () => {
+  assert.strictEqual(isStopRace({ status: 409, message: "bad" }), true);
+  assert.strictEqual(isStopRace(new Error("No analysis is running for this project.")), true);
+  assert.strictEqual(isStopRace({ status: 500, message: "boom" }), false);
+  assert.strictEqual(isStopRace(null), false);
+});

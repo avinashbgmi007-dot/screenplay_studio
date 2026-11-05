@@ -1799,6 +1799,12 @@ def analyze(
     # a finding is adopted ONLY when its citation survives `verify_finding` —
     # the model is never trusted to certify its own evidence
     # (screenplay_analyzer/observation_pass.py).
+    # Gap 5: this is the ONLY model-backed pass left in the run, and until now
+    # it was the only one with no check in front of it — the last check stood
+    # before step 6b (genre), so a writer who pressed Stop during steps 7-8d
+    # still paid for every observation call this pass makes (one per ungrounded
+    # finding, capped). A stop must land BEFORE the call, never after it.
+    _cp()
     if observation_pass:
         from .observation_pass import (ObservationPass, observation_limit,
                                        observation_pass_enabled)
@@ -1850,6 +1856,17 @@ def analyze(
     result.stats["evidence_depth"] = evidence_depth(result.findings)
     if merged_away:
         result.stats["findings_merged"] = merged_away
+
+    # Gap 5: nothing may be PUBLISHED past a stop. Everything above this line
+    # only shapes `result` in memory; the return below is what lets the caller
+    # stage and publish a new generation over the writer's last good report.
+    # Without this check a stop that landed during any of the closing passes
+    # (evidence floor, the four demote-never-drop guards, the summary, the
+    # depth) was silently discarded: the run reported "done/complete" and
+    # overwrote the previous report — measured on the real route, the Stop
+    # button answered 200 and the stage still went to complete. The check is
+    # cheap and it is the one that makes the stop mean what the button says.
+    _cp()
 
     emit("done", "complete", "Analysis complete")
     return result

@@ -441,16 +441,35 @@ async function retryFailedCategories(anchor) {
   const label = anchor.textContent;
   anchor.disabled = true;
   anchor.textContent = "Rerunning…";
+  // Gap 5: a retry is an analysis — it can take minutes and it is cancellable
+  // server-side (gap 66). It used to run with NO stop control at all: the desk
+  // ladder belongs to Run Analysis, and this button only said "Rerunning…",
+  // so the writer's only way out of a retry was to wait. Same lifecycle as a
+  // full run, one stop button, one terminal state.
+  const ui = startAnalysisProgressUI(Date.now());
+  const hadReport = !!(state.report && (state.report.findings || []).length);
   try {
-    await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/retry-failed`, {
+    const ack = await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/retry-failed`, {
       method: "POST", body: JSON.stringify({}),
     });
+    // Gap 5: the retry route answers `{cancelled: true}` when the writer
+    // stopped it, and this handler ignored the body entirely — a stopped retry
+    // announced "the report has been merged and updated" over a report that
+    // was never merged.
+    if (isCancelledAck(ack)) {
+      await settleCancelledRun(ui, hadReport);
+      return;
+    }
+    ui.stop();
+    hideAnalysisProgressUI();
     appendSystemNote("Failed categories re-run — the report has been merged and updated.");
     await loadProjects();
     await loadScriptData();
     renderManuscript(document.getElementById('manuscript-container'));
     refreshMetrics();
   } catch (e) {
+    ui.stop();
+    hideAnalysisProgressUI();
     showError("Retry failed: " + e.message, true);
     anchor.disabled = false;
     anchor.textContent = label;
@@ -2825,6 +2844,51 @@ function renderStageLadder(container, currentKey, startedTs, timeoutSeconds) {
   return rail;
 }
 
+/** Gap 5: ONE stop request, used by every surface that shows a running run.
+ *  Stop asks the server; the run itself decides when it is safe to stop, so
+ *  this never mutates local state beyond the button — the answer arrives as a
+ *  `cancelled: true` response or as the poller reading `status: cancelled`.
+ *  Returns true when the server accepted the request. */
+async function requestAnalysisStop(cancelBtn) {
+  if (cancelBtn) {
+    cancelBtn.disabled = true;
+    cancelBtn.textContent = "Stopping…";
+  }
+  try {
+    await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/cancel`, { method: "POST" });
+    return true;
+  } catch (e) {
+    // 409 = the run finished on its own between the click and the request.
+    // That is the stop racing a run that was already over, not a failure —
+    // the next poll (or the response handler) lands the real state.
+    if (cancelBtn) {
+      cancelBtn.textContent = "■ Stop";
+      cancelBtn.disabled = false;
+    }
+    if (!isStopRace(e)) showError("Could not stop the analysis: " + e.message, true);
+    return false;
+  }
+}
+
+/** Gap 5: the terminal state of a STOPPED run, in one place.
+ *
+ *  Both watchers call this — the response handler and the poller — so a stop
+ *  reads the same whichever one sees it first, and neither can announce a
+ *  report the run never published. `hadReport` is whether a report exists for
+ *  this project, which decides whether "your previous report is unchanged" is
+ *  a promise we can keep. */
+async function settleCancelledRun(analysisUiRef, hadReport) {
+  if (analysisUiRef) analysisUiRef.stop();
+  hideAnalysisProgressUI();
+  // A stop that arrives from the response handler must also kill the poller:
+  // it is a fresh one per run, so leaving it alive would keep asking about a
+  // run that is over.
+  if (analysisUi) { analysisUi.stop(); analysisUi = null; }
+  appendSystemNote(cancellationNote(!!hadReport), true);
+  await loadProjects();
+  refreshDeskToolbar();
+}
+
 function startAnalysisProgressUI(startedAt) {
   if (analysisUi) analysisUi.stop();
   const btn = $("#desk-analyze-btn");   // Phase 8: the desk toolbar runs the lifecycle
@@ -2833,21 +2897,7 @@ function startAnalysisProgressUI(startedAt) {
   if (cancelBtn) {
     cancelBtn.disabled = false;
     cancelBtn.style.display = "";
-    cancelBtn.onclick = async () => {
-      // Stop asks the server; the run itself decides when it is safe (the
-      // current stage finishes). The button goes inert the moment the ask
-      // lands — one click is one request, and the poller reports the result.
-      cancelBtn.disabled = true;
-      cancelBtn.textContent = "Stopping…";
-      try {
-        await api(`/projects/${encodeURIComponent(state.currentProject)}/analyze/cancel`, { method: "POST" });
-      } catch (e) {
-        // 409 = the run already finished on its own between the click and
-        // the request; the next poll lands the real state either way.
-        cancelBtn.textContent = "■ Stop";
-        cancelBtn.disabled = false;
-      }
-    };
+    cancelBtn.onclick = () => requestAnalysisStop(cancelBtn);
   }
   if (btn) { btn.disabled = true; btn.classList.add("analyzing"); }
   if (deskChip) deskChip.style.display = "flex";
@@ -2913,14 +2963,14 @@ function startAnalysisProgressUI(startedAt) {
       }
       if (p.status === "cancelled") {
         // R2: the writer stopped the run. The server restored the stage to
-        // its pre-run state; nothing was written. Say so plainly, no error.
+        // its pre-run state; nothing was written. Say so plainly, no error —
+        // through the one terminal handler, so this and the response path
+        // cannot word the same outcome differently.
         clearInterval(poll);
         clearInterval(timer);
         finished = true;
-        analysisUi = null;
-        hideAnalysisProgressUI();
-        appendSystemNote("Analysis stopped at your request — the script and any previous report are unchanged.", true);
-        await loadProjects();
+        const hadReport = !!(state.report && (state.report.findings || []).length);
+        await settleCancelledRun(null, hadReport);
         return;
       }
       if (p.stage === "stalled" || p.stage === "failed") {
@@ -3059,11 +3109,26 @@ async function runAnalysis() {
   // orchestrator would otherwise short-circuit on an already-complete stage).
   const reportLanguage = "eng"; // the legacy language select retired with the panel; the API default stands
   const analyzePromise = api(`${base}/analyze`, { method: "POST", body: JSON.stringify({ force: true, report_language: reportLanguage }) });
-  startAnalysisProgressUI(startedAt);
+  const ui = startAnalysisProgressUI(startedAt);
+  // Gap 5: a report the writer already had, BEFORE this run touched anything.
+  // Captured here because by the time the answer arrives `state.report` may
+  // already describe the new one (the poller reloads projects as it goes), and
+  // the sentence a stop is allowed to say depends on whether a report survives.
+  const hadReport = !!(state.report && (state.report.findings || []).length);
 
   try {
     const ack = await analyzePromise;
-    if (analysisUi) analysisUi.stop();
+    // Gap 5: the server answers `{cancelled: true, ...}` when the writer
+    // stopped the run. This branch did not exist, so a run stopped in its
+    // closing passes (the pipeline used to ignore those) and — independently —
+    // a run stopped cleanly were BOTH announced as "Analysis complete. The
+    // report is now grounding this conversation." The stop is a terminal state,
+    // not a success: say what actually happened and do not touch the pane.
+    if (isCancelledAck(ack)) {
+      await settleCancelledRun(ui, hadReport);
+      return;
+    }
+    ui.stop();
     hideAnalysisProgressUI();
     if (ack && ack.stale_code) showError(ack.stale_code, true);
     appendSystemNote("Analysis complete. The report is now grounding this conversation.");
@@ -3074,7 +3139,7 @@ async function runAnalysis() {
     refreshMetrics();
     refreshDeskToolbar(); // Phase 8: complete state on the desk
   } catch (e) {
-    if (analysisUi) analysisUi.stop();
+    ui.stop();
     hideAnalysisProgressUI();
     showError("Analysis failed: " + e.message, true);
     appendSystemNote("Analysis failed: " + e.message, true);
