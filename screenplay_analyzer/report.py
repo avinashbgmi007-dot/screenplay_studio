@@ -379,7 +379,21 @@ def render_markdown(result: AnalysisResult) -> str:
             lines.append("| Pages | Dialogue | Action | Scenes |")
             lines.append("|---|---|---|---|")
             for seg in segments:
-                lines.append(f"| {seg['page_start']}–{seg['page_end']} | {seg['dialogue_words']} | {seg['action_words']} | {seg['scene_count']} |")
+                # Gap 27: a segment holding part of a scene that crosses its
+                # boundary gets an ESTIMATED share of that scene's words, and
+                # the row says so. Printing a split number as if it were
+                # counted would be the same claim-to-precision this row had
+                # wrong when it charged the whole scene to one side.
+                mark = " ~" if seg.get("spans_boundary") else ""
+                lines.append(
+                    f"| {seg['page_start']}–{seg['page_end']} | "
+                    f"{seg['dialogue_words']}{mark} | {seg['action_words']}{mark} | "
+                    f"{seg['scene_count']} |")
+            if pacing.get("weighted"):
+                lines.append("")
+                lines.append("~ includes part of a scene that crosses this segment's "
+                             "boundary — those words are split by page span, so the "
+                             "figure is an estimate, not a count.")
             lines.append("")
         arcs = st.get("character_arc") or []
         if arcs:

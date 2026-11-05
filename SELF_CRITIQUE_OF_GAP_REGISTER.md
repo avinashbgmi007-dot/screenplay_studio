@@ -2013,3 +2013,73 @@ tested here and works. The register asked for "consented native-script fixtures 
 reviewed ground truth", and this change has neither: the fixtures are synthetic and my own. What it
 does have is a property (`script in a table ⇒ recognised as a heading`) that does not depend on
 anyone's judgement about a particular sentence.
+
+## §55 — Gap 27: an off-by-one, a dishonest label, and a scene charged to the wrong page (2026-11-05)
+
+The register called this "pacing segment boundaries can misplace scenes" and named `int(page // 5)`.
+The reproduction matched it exactly, on a controlled document with scenes ending on pages 5 and 10:
+**zero** scenes in 1–5, **both** in 6–10. Three defects fell out once I started measuring the
+boundaries instead of the one case.
+
+### The three, and why each is more than a tweak
+
+1. **Boundary.** `5 // 5 == 1` files page 5 — the last page of the segment labelled 1–5 — into
+   segment 2. In the filed case that emptied segment 1 entirely. Fixed by `segment_of_page`, which
+   is 1-based and inclusive, and by a table test over pages 0, 0.5, 1, 4.999, 5, 5.0001, 6, 10, 11.
+2. **Labels.** `total_pages` was the last scene's *end* page, and every segment's `page_end` was
+   `min((i+1)*n, ceil(total))`. So the number of segments depended on where the last scene stopped
+   finishing: a 10-page script whose last scene ended on page 5 reported **one** segment and filed
+   everything into it, and the label `1–5` was both the count and the clamp at once. `total_pages`
+   is now the span the labels describe, and a test asserts the labels are contiguous and that the
+   last one equals `total_pages`.
+3. **Distribution.** A scene was charged wholly to the segment containing its end page. The register
+   said this "is an estimate, not an observation", which was right but understated the failure: the
+   bucket a long scene was dropped *from* still contained pages of that scene, so it could read
+   **zero words** while being half full. That is not a rounding error, it is a chart that lies about
+   where the writing is.
+
+### The convention, which I got wrong first
+
+I split words by the fraction of `[start, end]` inside each segment. It passes the filed case and
+is wrong: `share_over_segments(10, 12)` returned `{3: 1.0}` — the whole scene in 11–15, with
+`spans_boundary` flagged True on the same row, admitting it had crossed while charging it as if it
+had not. The bug is the interval: a scene "from page 10 to page 12" **occupies pages 10, 11 and 12**
+— a writer counting pages counts three — so the occupied span is `(start-1, end]`, and segments are
+`((k-1)*n, k*n]`. With that, 10→12 is `{2: 1/3, 3: 2/3}` and `1→5` is still exactly one bucket.
+
+I caught this because I printed `share_over_segments` directly rather than only asserting the
+end-to-end case. The direct probe disagreed with the flag already on the row, and the flag was right.
+
+### Two more of my own bugs, both caught by the tests
+
+- **A crash.** `segment_of_page(None)` raised `TypeError`. A text parse supplies `page_start=None`,
+  so the pacing curve would have died mid-report on exactly the scripts that have no real
+  pagination. Now `None` clamps to segment 1.
+- **A nonsense span.** With `page_start=None` I still ran the page-span split, using `end - 1` as an
+  invented start — so a 40-word scene was charged **1 word** to its segment. A position that is only
+  known as an end has no span to split; such scenes are attributed wholly to their end segment, and
+  a test pins the 40 words.
+
+Both of these were introduced by *my* fix, not the original code. They are the strongest argument
+for the revert-measurement discipline: the guard tests are what noticed.
+
+### Verification
+
+- 27 tests: the filed case; the boundary table and other segment lengths; contiguous inclusive
+  labels; `total_pages`; a short last scene not collapsing the count; split by page span with
+  conserved word totals; shares summing to 1 across five spans; one-page and contained multi-page
+  scenes *not* split; the `None`-page path; dialogue split like action; empty document; and the
+  rendered Markdown carrying `~` plus the legend — and *not* carrying either when no split occurred.
+- Reverts, measured separately with `-B`: **10 fail** (boundary), **7** (labels), **2** (split),
+  **1** (report mark). Restored: 27 pass.
+- Full suite: **2562 passed, 8 skipped**.
+
+### An environment note that matters for reading the suite
+
+The two `test_repo_hygiene.py` failures reappeared this session and were **not** a regression: those
+tests import `e2e_browser_gun_pen_audit` to read its `SHOTS` constant, and that module imports
+`playwright` at module level. With `playwright` uninstalled they fail with `ModuleNotFoundError`
+that has nothing to do with hygiene. Installing the package makes them pass. I record this because
+last session I had reported them as fixed-by-the-index-repair; that was one cause, and this is
+another. A test whose setup dependency is a browser automation package is fragile, but changing it
+is a separate concern from this gap.
