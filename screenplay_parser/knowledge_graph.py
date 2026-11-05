@@ -81,10 +81,35 @@ class TraitMention:
         return asdict(self)
 
 
+# Gap 26: "in this scene" has three different kinds of evidence, and collapsing
+# them into `scenes_present` made a silent character look absent. AJAY standing
+# beside VENU without a line appears in no cue, so the index said he was only in
+# the scene where he speaks — and the co-occurrence map therefore recorded no
+# AJAY|VENU pair at all, for two characters standing in the same room.
+#
+#   CUE        a speaker cue (or an FDX character paragraph): he SPEAKS here.
+#   MENTIONED  a name recognised inside action or dialogue text in the scene.
+#   UNCERTAIN  a name-like token recognised but not confirmed as a character.
+#
+# The three are kept apart rather than merged because they are not equally
+# strong, and because `MENTIONED` is exactly what a silent-but-present character
+# looks like — also what an off-screen reference looks like ("Venu's brother
+# called"). It is evidence of a name in the scene, NOT proof of a body in it, and
+# the summary prompt says so in those words.
+PRESENCE_CUE = "cue"
+PRESENCE_MENTIONED = "mentioned"
+PRESENCE_UNCERTAIN = "uncertain"
+
+
 @dataclass
 class CharacterEntry:
     name: str
     scenes_present: list = field(default_factory=list)
+    # scene_number -> [evidence kinds], so a reader can tell "spoke" from
+    # "named in the action" without another pass over the script.
+    scene_presence: dict = field(default_factory=dict)
+    # Scenes where the character is named in the text but has no cue.
+    scenes_mentioned: list = field(default_factory=list)
     scene_dialogue_counts: dict = field(default_factory=dict)  # scene_number -> line count
     first_scene: int = None
     last_scene: int = None
@@ -94,6 +119,8 @@ class CharacterEntry:
         return {
             "name": self.name,
             "scenes_present": self.scenes_present,
+            "scene_presence": self.scene_presence,
+            "scenes_mentioned": self.scenes_mentioned,
             "scene_dialogue_counts": self.scene_dialogue_counts,
             "first_scene": self.first_scene,
             "last_scene": self.last_scene,
@@ -259,11 +286,128 @@ def _extract_promise_candidates(doc: ScriptDocument) -> list:
     return promises
 
 
+def _mentioned_names(scene, known_names) -> set:
+    """Names that appear in this scene's TEXT without a cue.
+
+    Deliberately conservative: a whole-name match on a word boundary, and the
+    name must already be a known character (from a cue somewhere in the script).
+    Simple name matching is NOT proof of physical presence — a character can be
+    named from off-screen, on the phone, or in a past-tense line — which is why
+    the result is stored as `mentioned`, never as `present`.
+    """
+    import re as _re
+    text_parts = [getattr(scene, "heading_raw", "") or ""]
+    for el in scene.elements:
+        if el.type == ElementType.DIALOGUE:
+            # A speaker's own cue is not a mention; the words they say are.
+            text_parts.append(el.text or "")
+        elif el.type != ElementType.CHARACTER:
+            text_parts.append(el.text or "")
+    text = "\n".join(text_parts)
+    found = set()
+    for name in known_names:
+        if len(name) < 2:
+            continue
+        if _re.search(rf"\b{_re.escape(name)}\b", text, _re.I):
+            found.add(name)
+    return found
+
+
+# Words that are written in caps in a screenplay without being a person. Kept
+# deliberately short and boring: the tier is already labelled unconfirmed, so a
+# miss matters less than inventing a character out of "DO NOT ANSWER".
+_NOT_A_NAME = frozenset("""
+INT EXT I/E DAY NIGHT MORNING EVENING DUSK DAWN CONTINUOUS LATER MOMENTS
+THE A AN AND OR BUT IF THEN WHEN HE SHE THEY WE YOU I HIS HER THEIR OUR YOUR
+TV PHONE RADIO CUT TO BACK CONTINUED CONTD CONT'D VO V.O. OS O.S. POV
+SFX FX AM PM OK OKAY YES NO
+""".split())
+
+
+def _uncertain_names(scene, known_names) -> list:
+    """Caps words in this scene that look like a person but are not a known
+    character.
+
+    This is the tier for a character who NEVER speaks — he cannot be found by
+    matching `all_characters`, because that list is built from cues. In the
+    reproduction, RAVI is on the phone and never gets a line, so he is in no
+    list at all and the scene reads as if he does not exist.
+
+    Reported as "unconfirmed" and nothing stronger: a caps word in action could
+    as easily be a prop, a sign, or a location. The point is that the model is
+    TOLD something is there under that name, and told not to assume a body.
+    """
+    import re as _re
+    known = {n.upper() for n in known_names}
+    heading = (getattr(scene, "heading_raw", "") or "").upper()
+    heading_words = set(_re.findall(r"[A-Z][A-Z'.]+", heading))
+    cue_names = {n.upper() for n in (scene.characters_present or [])}
+    found = set()
+    for el in scene.elements:
+        if el.type in (ElementType.CHARACTER, ElementType.SCENE_HEADING,
+                       ElementType.TRANSITION):
+            continue
+        text = el.text or ""
+        # Only words that appear in caps in the ORIGINAL text — lowering the
+        # threshold to "capitalised" would flag the first word of every line.
+        for tok in _re.findall(r"\b[A-Z][A-Z']{1,11}\b", text):
+            up = tok.upper().strip("'.")
+            if up in _NOT_A_NAME or up in known or up in cue_names:
+                continue
+            if up in heading_words:
+                continue          # part of the slug line, e.g. WAREHOUSE
+            found.add(up)
+    return sorted(found)
+
+
+def mentioned_characters(scene, known_names) -> list:
+    """Public: names in this scene's text that have no cue here.
+
+    `known_names` should be the script's character list, so a passing word that
+    happens to look like a name is not promoted to a person. Speakers are
+    excluded — they are already reported by their cue, and listing them twice
+    reads as two different facts.
+    """
+    speakers = set(scene.characters_present or [])
+    return sorted(_mentioned_names(scene, known_names) - speakers)
+
+
+def unconfirmed_characters(scene, known_names) -> list:
+    """Public: caps words that might be people but cannot be confirmed."""
+    speakers = set(scene.characters_present or [])
+    mentioned = _mentioned_names(scene, known_names)
+    return [n for n in _uncertain_names(scene, known_names)
+            if n not in speakers and n not in mentioned]
+
+
 def _build_character_index(doc: ScriptDocument) -> dict:
     characters: dict = {name: CharacterEntry(name=name) for name in doc.all_characters}
 
     for scene in doc.scenes:
+        # Evidence tier 1: a cue. This is the only tier that justifies the word
+        # "speaks"; a cue-only reading is what the index used to record.
+        for name in _mentioned_names(scene, characters.keys()):
+            if name in scene.characters_present:
+                continue
+            entry = characters.get(name)
+            if entry is None:
+                continue
+            if scene.scene_number not in entry.scenes_present:
+                # Present in the sense the graph means by "present": named in
+                # this scene. The evidence tier says how.
+                entry.scenes_present.append(scene.scene_number)
+                entry.scenes_present.sort()
+            if scene.scene_number not in entry.scenes_mentioned:
+                entry.scenes_mentioned.append(scene.scene_number)
+                entry.scenes_mentioned.sort()
+            entry.scene_presence.setdefault(scene.scene_number, []).append(PRESENCE_MENTIONED)
+            if entry.first_scene is None or scene.scene_number < entry.first_scene:
+                entry.first_scene = scene.scene_number
+            if entry.last_scene is None or scene.scene_number > entry.last_scene:
+                entry.last_scene = scene.scene_number
+
         for name in scene.characters_present:
+            characters[name].scene_presence.setdefault(scene.scene_number, []).append(PRESENCE_CUE)
             entry = characters[name]
             if scene.scene_number not in entry.scenes_present:
                 entry.scenes_present.append(scene.scene_number)

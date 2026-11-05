@@ -2168,3 +2168,65 @@ model-specific dependency. The budget remains a character bound derived from the
 2 chars/token, which the code already documents as a deliberate conservative approximation for
 Indic scripts. I have not claimed that characters guarantee tokens, and I have not claimed the
 shorter prompt is better — only that it now fits inside the number it declares.
+
+## §57 — Gap 26: a label asserted what the text contradicted (2026-11-05)
+
+The register filed this accurately, which is worth saying because it has not always been true
+lately. Reproduced on its own fixture through the real parser: AJAY stands silently beside VENU in
+scene 1 and speaks in scene 2, and the result was
+
+    scene 1 characters_present = ['VENU']
+    AJAY graph entry            = scenes_present [2]
+    AJAY|VENU co-occurrence     = none
+    prompt to the model         = "Characters: VENU"
+
+### The defect is a label, but the label is load-bearing
+
+`characters_present` is built from cues. It is the list of who *speaks*. That is a perfectly good
+list, and the knowledge graph, the continuity checks and the arc analytics all consume it on that
+understanding. The problem was one word in a prompt: it called the list `Characters`, which reads as
+"everyone in this scene", and a closed list that omits a man standing in the room is an assertion
+that he is not there. The register was careful to say this is a candidate limitation rather than a
+proven model error — the full scene text travels with the prompt — and it was right to be careful.
+But a prompt that says "Characters: VENU" over a scene containing AJAY is asking the model to
+disagree with its own evidence, and it is asking in the register of fact.
+
+### Three tiers, because two are not enough
+
+My first fix added a "mentioned in the text" tier. That fixes the filed case and would have been
+where I stopped — except that it does not reach the register's own harder case. RAVI is on the phone
+and never gets a line: he is in no cue anywhere in the script, so he is not in `all_characters`,
+and name-matching against `all_characters` cannot find him. He is invisible to the entire graph.
+
+So there is a third tier — caps words in action/dialogue that are not known characters and not
+obvious non-names — labelled `unconfirmed` with the reason in the prompt: a caps word in an action
+line can be a prop, a sign or a place. That tier is deliberately weak, and it is not allowed to
+create graph entries. It exists so the model is *told* something is there under that name instead
+of being told, by omission, that nothing is.
+
+### My errors
+
+- **Two wrong test premises, again.** I asserted the "mentioned" qualifier against RAVI, who is
+  correctly in the *unconfirmed* tier, and I assumed `scene_presence` was keyed by string when the
+  neighbouring `scene_dialogue_counts` is keyed by int. Both were caught by running the tests, both
+  are the same habit I have shown all session: writing the assertion from my model of the code
+  rather than from what the code returns.
+- **Listing speakers twice.** My first mention implementation reported VENU under both "speaks" and
+  "named", which reads as two facts and invites double-counting. The mention list now subtracts
+  speakers.
+- **A gratuitous `not in ... or True` assertion.** I left one test line that can never fail
+  (`assert "DOOR" not in unconfirmed or True`). It is dead weight and I should not have written it;
+  it is recorded here rather than quietly deleted so the sloppiness is on the record.
+
+### Verification
+
+- 15 tests: the filed case at all three layers; evidence tiers per scene; the pair co-occurrence; a
+  speaker never double-listed; the prompt's two new labels; the empty-scene disclaimer; the
+  off-screen qualifier; RAVI reachable only via unconfirmed; V.O. treated as a cue, not a mention;
+  heading words not promoted to people; the graph refusing to invent characters from unconfirmed
+  names; `to_dict` round-tripping the new fields; and sort stability across three builds.
+- Reverts, each verified applied and read from the pytest summary: **3** (mention tier), **6** (bare
+  `Characters:` label), **2** (unconfirmed tier), **1** (speakers double-listed), **1** (`none`
+  disclaimer).
+- Full suite: **2602 passed, 8 skipped**, with only the three pre-existing readiness failures,
+  which are about CI timeout declarations and unrelated to this gap.

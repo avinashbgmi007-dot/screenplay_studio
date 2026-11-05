@@ -131,6 +131,44 @@ LANGUAGE_META_INSTRUCTION = (
 )
 
 
+def _character_cue_line(scene: dict) -> str:
+    """The presence line for one scene, with its evidence stated.
+
+    Gap 26: this label used to be `Characters: <cue-derived list>`, which reads
+    as "everyone in this scene". It is only the people who SPEAK or are cued —
+    a character standing silently in the action line is in none of them, so the
+    line read as an assertion of absence. Measured on a two-scene fixture: AJAY
+    stands beside VENU in scene 1 and says nothing, and scene 1 read
+    `Characters: VENU`.
+
+    Now the line says what it knows and how it knows it, and never claims a
+    silent character is absent:
+      * `Speakers`   — cue-derived, he speaks here;
+      * `Also named` — recognised in the action/dialogue text, no cue. This is
+        what silent presence looks like, and also what an off-screen or
+        past-tense mention looks like, so it is offered as a name in the scene
+        and explicitly NOT as a body in it.
+    """
+    speakers = scene.get("characters_present") or []
+    mentioned = scene.get("characters_mentioned") or []
+    unconfirmed = scene.get("characters_unconfirmed") or []
+    mentioned = [n for n in mentioned if n not in speakers]
+    unconfirmed = [n for n in unconfirmed if n not in speakers and n not in mentioned]
+    if not speakers and not mentioned:
+        return ("Characters: none speak or are named in the text shown — this does "
+                "not mean the scene is empty.")
+    out = f"Characters who speak: {', '.join(speakers) if speakers else 'none'}"
+    if mentioned:
+        out += (f"\nAlso named in the text (may be present silently, off-screen, "
+                f"in a phone call, or only referred to — do not assume they are in "
+                f"the scene): {', '.join(mentioned)}")
+    if unconfirmed:
+        out += (f"\nNames that may belong to a person but are unconfirmed (a caps "
+                f"word in the action line can be a prop, a sign or a place): "
+                f"{', '.join(unconfirmed)}")
+    return out
+
+
 def scene_summary_prompt(scenes_chunk: list[dict], language: str = "eng") -> tuple[str, str]:
     system = (
         "You are a script analyst assistant. Summarize each screenplay scene in 1-2 "
@@ -143,7 +181,7 @@ def scene_summary_prompt(scenes_chunk: list[dict], language: str = "eng") -> tup
     for s in scenes_chunk:
         parts.append(
             f"Scene {s['scene_number']} — {s['heading_raw']}\n"
-            f"Characters: {', '.join(s['characters_present']) or 'none'}\n"
+            f"{_character_cue_line(s)}\n"
             f"{s['full_text']}\n"
         )
     user = "Summarize each of these scenes:\n\n" + "\n---\n".join(parts)

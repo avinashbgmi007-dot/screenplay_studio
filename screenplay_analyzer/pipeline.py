@@ -498,11 +498,21 @@ def build_scene_summaries(doc: ScriptDocument, client: LlamaServerClient, chunk_
     if should_cancel is not None and should_cancel():
         raise AnalysisCancelled("Analysis cancelled at the writer's request.")
     grammar = scene_summary_grammar()
+    # Gap 26: `characters_present` is cue-derived — it is who SPEAKS. A
+    # character standing silently in the action line is in neither list, and
+    # labelling the cue list "Characters" read as an assertion that they were
+    # absent. The summary prompt now gets both tiers, so it can say "VENU
+    # speaks; AJAY is named in the text" instead of pretending the second fact
+    # does not exist.
+    from screenplay_parser.knowledge_graph import (
+        mentioned_characters, unconfirmed_characters)
     scene_dicts = [
         {
             "scene_number": s.scene_number,
             "heading_raw": s.heading_raw,
             "characters_present": s.characters_present,
+            "characters_mentioned": mentioned_characters(s, doc.all_characters),
+            "characters_unconfirmed": unconfirmed_characters(s, doc.all_characters),
             "full_text": _scene_full_text(s),
         }
         for s in doc.scenes
