@@ -6,9 +6,11 @@ prose. A scripted client could enable remote use and learn nothing about what
 leaves the machine.
 
 The other half of this file matters as much: the statement must not promise more
-than the code does. Credentials are NOT origin-bound here — the token is one
-global value that survives a change of `server_url` (gap 57, still open) — so the
-block says `"global"` and a test pins that it does not say `"origin"`.
+than the code does. Since gap 57 a token is bound to the origin it was entered
+for, so `credentials_scope` says `"origin"` — but ONLY when an origin is actually
+recorded. A token inherited from `--api-key` / `SCREENPLAY_STUDIO_API_KEY` or
+from a config written before that bookkeeping existed is refused off-machine
+rather than origin-bound, and the statement reports `"unrecorded"` for it.
 """
 
 import pytest
@@ -65,13 +67,21 @@ class TestTheStatementIsMachineReadable:
 
 
 class TestItDoesNotOverstate:
-    def test_credentials_are_not_claimed_to_be_origin_bound(self, client, config):
-        """Gap 57 is open: the token follows a changed endpoint. A statement
-        saying `origin` would be a promise the code does not keep."""
-        config("https://api.example.com/v1", "sk-synthetic", allow_remote=True)
+    def test_it_claims_origin_scope_only_when_an_origin_is_recorded(self, client, config):
+        """Gap 57 is FIXED: a saved token is only used at the origin it was
+        entered for, so `origin` is now a promise the code keeps. A token with
+        no recorded origin (CLI flag, env var, an older config) is NOT
+        origin-bound — it is refused off-machine — and the statement must not
+        round that up to `origin` either.
+        """
+        config("https://api.example.com/v1", None, allow_remote=True)
+        webapp_server.CONFIG["api_key"] = "sk-synthetic"   # no recorded origin
         p = client.get("/api/config").get_json()["privacy"]
-        assert p["credentials_scope"] == "global"
-        assert p["credentials_scope"] != "origin"
+        assert p["credentials_scope"] == "unrecorded"
+
+        webapp_server._approve_credential_for("https://api.example.com/v1")
+        p = client.get("/api/config").get_json()["privacy"]
+        assert p["credentials_scope"] == "origin"
 
     def test_no_key_means_no_scope_claim(self, client, config):
         config("https://api.example.com/v1", None, allow_remote=True)

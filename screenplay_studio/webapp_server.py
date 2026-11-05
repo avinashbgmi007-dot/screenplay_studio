@@ -486,6 +486,12 @@ class ServerConfig:
 
     def __init__(self):
         self._data = dict(self._DEFAULTS)
+        # Gap 57: `api_key_origin` is the origin the saved token was entered
+        # for — bookkeeping the writer never edits, kept BESIDE the token (see
+        # `__setitem__`) so it can never outlive the secret it describes. None
+        # means "not recorded", which `_credential_is_sendable_to` treats
+        # conservatively.
+        self._data["api_key_origin"] = None
 
     def __getitem__(self, key):
         return self._data[key]
@@ -515,6 +521,12 @@ class ServerConfig:
             # rather than an empty bearer header (which some gateways reject
             # outright, turning "forgot to clear it" into "everything 401s").
             value = (str(value).strip() or None) if value else None
+            # Gap 57: a new token is approved for nothing until it is entered
+            # for an endpoint, and a cleared token forgets its provider. Living
+            # here (not in a side attribute) is what makes that automatic for
+            # every writer of `api_key` — the CLI flag, the mode switch to
+            # local, and any test resetting the field.
+            self._data["api_key_origin"] = None
         if key == "turn_timeout":
             try:
                 value = int(value)
@@ -528,8 +540,13 @@ class ServerConfig:
         return self._data.get(key, default)
 
     def to_dict(self) -> dict:
-        return dict(self._data)
+        # Gap 57's bookkeeping is internal state, not a setting: it is not part
+        # of a config snapshot and must never travel in a response body.
+        return {k: v for k, v in self._data.items() if k not in _INTERNAL_CONFIG_KEYS}
 
+
+# Keys the holder carries for its own bookkeeping; see `to_dict`.
+_INTERNAL_CONFIG_KEYS = frozenset({"api_key_origin"})
 
 CONFIG = ServerConfig()
 
@@ -599,7 +616,11 @@ def _privacy_statement() -> dict:
         # A local loopback server never needs the token (see `_auth_headers`),
         # so "no key" is the honest answer there even if one is configured.
         "credentials_in_use": key_set and remote,
-        "credentials_scope": "global" if key_set else None,
+        # Gap 57 made this true: a token is only used at the origin it was
+        # entered for, so the honest scope is `origin`. Before that fix the
+        # same field had to say `global` — one value that followed any URL.
+        "credentials_scope": ("origin" if _credential_origin_recorded()
+                              else "unrecorded") if key_set else None,
         "remote_permitted": bool(_ALLOW_REMOTE_SERVER),
     }
 
@@ -618,6 +639,83 @@ def _auth_headers(api_key: str | None) -> dict:
         return {}
     from screenplay_analyzer.llm_client_base import auth_headers
     return auth_headers(api_key)
+
+
+def _credential_origin_recorded() -> bool:
+    return CONFIG.get("api_key_origin") is not None
+
+
+def _approve_credential_for(url: str | None) -> None:
+    """Record that the saved token was deliberately entered for this endpoint."""
+    if not (CONFIG.get("api_key") or "").strip():
+        return  # nothing saved, so there is no credential to attach to an origin
+    CONFIG._data["api_key_origin"] = _origin_of(
+        url if url is not None else CONFIG.get("server_url"))
+
+
+def _credential_is_sendable_to(url: str | None) -> bool:
+    """May the saved token be used against `url`?
+
+    Gap 57: the token used to be one global value with no memory of where it
+    came from, so entering provider B and pressing Test — or saving B with the
+    token field left blank, which the UI treats as "leave the saved one alone" —
+    sent provider A's secret to provider B with no trust decision by the writer.
+
+    Note the FIRST case carefully, because conflating it with the third is how a
+    "security fix" starts refusing to connect at all:
+
+      * no token at all            -> nothing to protect and nothing to send;
+                                      this is not a refusal, it is a no-op.
+                                      (`_refuse_credential` must never be
+                                      reached for it — see `_credential_refusal`)
+      * token entered or saved
+        for THIS origin            -> approved
+      * token recorded for ANOTHER
+        origin                     -> refused; typing the token for the new
+                                      endpoint is the only way through
+      * origin never recorded
+        (a token from a CLI flag, an env var, or a token saved before this
+        check existed)             -> approved only for a LOCAL endpoint. A
+                                      loopback server never sees the token
+                                      anyway (`_auth_headers` short-circuits),
+                                      so this costs nothing where it matters and
+                                      refuses the one case that actually leaks:
+                                      an inherited secret sent off the machine.
+
+    A deliberate migration is still one explicit action — type the token for the
+    new provider and save — which is exactly the "new trust decision" the
+    register asks for.
+    """
+    if not (CONFIG.get("api_key") or "").strip():
+        return True   # no saved credential, so nothing can be leaked by using it
+    target = _origin_of(url if url is not None else CONFIG.get("server_url"))
+    if target is None:
+        return False  # an unparseable endpoint is not loopback; never attach a secret
+    if not _credential_origin_recorded():
+        return is_loopback_url(url if url is not None else CONFIG.get("server_url"))
+    return CONFIG.get("api_key_origin") == target
+
+
+def _credential_refusal(url: str | None) -> str | None:
+    """The refusal to show, or None when the token may travel to `url`.
+
+    One predicate, so the probe and the save path cannot disagree — and a route
+    can ask "is there anything to refuse?" without the no-token case coming back
+    as a refusal.
+    """
+    if _credential_is_sendable_to(url):
+        return None
+    where = _origin_of(url) or "that endpoint"
+    if _credential_origin_recorded():
+        known = f"it was entered for {CONFIG.get('api_key_origin')}"
+    else:
+        known = ("it has no recorded provider (it came from --api-key, "
+                 "SCREENPLAY_STUDIO_API_KEY, or a config saved before the "
+                 "studio tracked this)")
+    return (f"Not sending your saved API token to {where}: {known}. Enter the "
+            f"token for this provider in Settings before testing or saving, so "
+            f"a credential is only ever used at the endpoint you approved it "
+            f"for.")
 
 
 def _api_key_for(manifest=None) -> str | None:
@@ -1176,7 +1274,17 @@ def test_connection():
     # The token typed into the form (not yet saved) wins, so "Test Connection"
     # answers the question the writer is actually asking — does THIS URL, with
     # THIS token, work — instead of testing the last saved one.
-    key = body["api_key"] if "api_key" in body else CONFIG.get("api_key")
+    if "api_key" in body:
+        key = body["api_key"]            # typed for this probe; the writer's choice
+    else:
+        # Gap 57: the field was blank, which the UI means as "use the saved one".
+        # The saved one is only usable where it was approved — otherwise this
+        # probe is how a token for provider A reaches provider B. Refused BEFORE
+        # the client is built, so no outbound call happens at all.
+        refusal = _credential_refusal(url)
+        if refusal:
+            return jsonify({"ok": False, "message": refusal})
+        key = CONFIG.get("api_key")
     client = LlamaServerClient(base_url=url, timeout=15, extra_headers=_auth_headers(key))
     try:
         models = client.list_models()
@@ -1326,14 +1434,43 @@ def set_config():
             # never leaves a remote URL pointed at a local-only desk.
             CONFIG["server_url"] = ServerConfig._DEFAULTS["server_url"]
             CONFIG["api_key"] = None
+    # Gap 57: did the writer type a token for THIS request? Tracked before the
+    # assignment below so a blank field ("leave the saved one alone") is not
+    # mistaken for a fresh approval.
+    typed_key = ("api_key" in body
+                 and bool((body.get("api_key") or "").strip()))
+    new_url = body.get("server_url", CONFIG["server_url"])
     if "server_url" in body:
+        # Validate the endpoint BEFORE the credential question, so a remote URL
+        # still answers with the opt-in it needs ("--allow-remote-server")
+        # rather than with an unrelated token complaint. Same check the setter
+        # makes; done here only to get the message order right.
+        _validate_server_url(str(new_url).rstrip("/"))
+        # Gap 57: saving a new endpoint while the token box is blank is the
+        # other half of the defect — the secret would simply follow the URL and
+        # the writer's answer to "where did this token come from" would become
+        # a lie. Refuse, and name the remedy. Three saves are always fine: one
+        # that types the token for the new provider (a real trust decision), one
+        # that clears it (`api_key: ""`), and one to a different port or path
+        # on the SAME origin. With no saved token at all there is nothing to
+        # refuse, so pointing the desk at a new server keeps working.
+        if body.get("api_key", None) is None:
+            refusal = _credential_refusal(new_url)
+            if refusal:
+                raise ValueError(refusal)
         CONFIG["server_url"] = body["server_url"]
         # pointing at anything other than the demo IS the switch back:
         # the demo thread keeps running but stops answering the desk
         if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
             _DEMO_MODEL_ACTIVE = False
     if "api_key" in body:
+        # Assigning the token forgets any previous approval (see `__setitem__`),
+        # so the next line is the only place a token becomes usable somewhere.
         CONFIG["api_key"] = body["api_key"]
+        # A token the writer actually entered is approved for the endpoint it
+        # was entered for. A cleared token approves nothing.
+        if typed_key:
+            _approve_credential_for(CONFIG.get("server_url"))
     if "model" in body:
         CONFIG["model"] = body["model"] or None
     if "fast_model" in body:

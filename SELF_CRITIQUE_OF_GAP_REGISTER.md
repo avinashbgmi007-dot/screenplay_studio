@@ -1255,3 +1255,63 @@ That refusal is correct and is its own contract (`test_connection_modes.py` pins
 recording because the tempting fix would have been to weaken a security guard to make my assertion pass.
 
 Full suite **2386 passed, 7 skipped**; `ruff` clean.
+
+## §44 — Gap 57: the token now remembers which provider it was entered for (2026-11-05)
+
+**FIXED.** Reproduced on the real routes with a fake client, then measured at a loopback server that records every
+request it receives. The precondition is the state a writer reaches by saving a provider: `CONFIG["api_key"] =
+"sk-token-for-provider-A"`, `server_url = https://provider-a.example.com/v1`.
+
+* `POST /api/test-connection {"server_url": "https://provider-b.example.com/v1"}` — the token box blank, which the
+  settings page (and `app.js`) sends as an **omitted** `api_key` field — answered **200**, probed provider B, and put
+  `Authorization: Bearer sk-token-for-provider-A` on the wire.
+* `POST /api/config {"server_url": "https://provider-b.example.com/v1"}` with no `api_key` answered **200** and left
+  `api_key_set: true`. From then on every analysis and chat turn went to B carrying A's credential.
+
+**The cause is a representation, not a missing check.** `api_key` was one value whose meaning was "the token", with no
+record of the question it answered. Any code path that moves the endpoint silently re-points the secret. So the fix is
+bookkeeping: `CONFIG` carries `api_key_origin` — the origin the token was entered for — **beside** the token, inside the
+same holder. That placement is the important part. `__setitem__("api_key", …)` clears the approval, so the CLI flag,
+the "go local" switch, a token clear, and any reset of the field cannot leave an approval describing a secret that is
+no longer there. My first draft used a side attribute and it survived a token clear; the suite caught that as a
+state leak between tests, which is the same bug a writer would have hit as "the old provider keeps getting trusted".
+
+**Two flows, both closed at the last point before an outbound call:**
+
+1. `test_connection()` asks `_credential_refusal(url)` **before** the client is constructed, so nothing is sent. The
+   refusal names the origin the token belongs to and never the secret. Measured: **zero** requests reach the second
+   server.
+2. `set_config()` refuses a save that moves the endpoint while the token box is blank (`body.get("api_key") is None`,
+   which is exactly how the blank box arrives). 400, and `server_url` / `api_key` are left untouched.
+
+**The scope of the refusal is as deliberate as the refusal.** The guard fails closed on the *secret*, not on the
+*endpoint*: a desk with no token at all is not refused (nothing can leak, and refusing would break testing a fresh
+install); a token typed for the new provider is approved for it; `api_key: ""` moves and clears in one request; and a
+changed path or port on the **same** origin keeps the token, because that is the same program. Migration stayed one
+explicit action, which is what the register asked for. A token with **no recorded origin** — `--api-key`,
+`SCREENPLAY_STUDIO_API_KEY`, or a config written before this bookkeeping — keeps working on loopback (where
+`_auth_headers` never sends it anyway) and is refused off-machine; refusing those outright would have broken every
+existing install, and accepting them everywhere would have left the actual leak open.
+
+**Fifteen tests failed when I first ran the suite, and the triage is the point.** I had written the guard to refuse
+when there was no token as well, and the failing tests were the ones that point a desk with no token at a new server —
+all of them correct. So: **zero of the 15 were tests asserting the old leak.** I had introduced an outage, not exposed
+a hidden contract. The guard now returns `True` (nothing to protect) when no token is saved, and the whole suite is
+back to its baseline. Changing fifteen tests to match my bug would have been the wrong repair, and it would have
+looked like a successful fix.
+
+**Evidence.** `tests/test_credential_follows_endpoint.py`, 20 tests over both flows. Revert measured twice: removing
+the two guards fails **6**, and additionally neutering the predicate fails **8**; the remaining 12 are the
+not-regression half (same origin, no token, clearing, typed token).
+Two of my own tests passed on the first, route-only revert **for the wrong reason** — they asserted `ok is False`
+against a non-routable host, which is false whether or not the guard exists. I found that by reverting, not by reading,
+and rewrote them to assert the predicate and the refusal wording. A test that cannot fail is not evidence, and the
+only way I know which is which is to take the fix away and look.
+
+Full suite **2406 passed, 7 skipped**; `ruff` clean.
+
+**What this does not claim.** A **per-project** `manifest.api_key` is still trusted to that manifest's own
+`server_url` — the two are written together by the app and there is no per-manifest origin record, so a hand-edited
+manifest could still pair an old token with a new endpoint. And a **redirect** during a probe is followed by
+`requests` without re-checking the origin of each hop (gaps 58/70). Both are outside this entry and are stated here so
+the fix is not read as covering them.
