@@ -40,6 +40,17 @@ VERIFICATION_BADGE = {
     "scene_not_found": " ⚠️ *unverified — cited scene number doesn't exist*",
 }
 
+# Gap 87: the analyse pipeline demotes a finding with no quote and no
+# observation to low severity and marks it `ungrounded` (pipeline
+# .apply_evidence_floor). The desk honours that — such rows are hidden behind a
+# toggle in the fix queue. The exported Markdown did NOT: it carried neither the
+# flag nor the verification status, so the same unsupported sentence read as a
+# plain "[LOW] Scene 1, Scene 2 — Setup left dangling: 'The revolver'" in the
+# report a writer exports or sends to a producer, and as a hidden guess in the
+# dock. The report is the artefact that travels; it has to say so itself.
+UNGROUNDED_BADGE = (" ⚠️ *unsupported — this note cites no quote or observation "
+                    "from your script*")
+
 CATEGORY_TITLES = {
     "theme": "Theme & Subtext",
     "character": "Character Arcs & Consistency",
@@ -75,6 +86,8 @@ def _format_finding(f: dict) -> str:
     issue = f.get("issue", "").strip()
     why = f.get("why_it_matters", "").strip()
 
+    if f.get("ungrounded"):
+        badge += UNGROUNDED_BADGE
     lines = [f"**[{severity}] {scene_str}** — {issue}{badge}"]
     if why:
         lines.append(f"  - *Why it matters:* {why}")
@@ -196,6 +209,19 @@ def render_markdown(result: AnalysisResult) -> str:
     # --- Analysis categories ---
     grouped = _findings_by_category(result.findings)
     lines.append("## Detailed Analysis")
+    # Gap 87: state the unsupported count where the list is printed, so a writer
+    # scanning the report knows how much of what follows rests on nothing they
+    # can check. Every finding is still rendered — this quotes the proportion
+    # rather than quietly dropping rows from the export.
+    unsupported = [f for f in result.findings if isinstance(f, dict) and f.get("ungrounded")]
+    if unsupported:
+        lines.append(
+            f"*{len(unsupported)} of {len(result.findings)} notes below are "
+            f"**unsupported**: they cite no quote or observation from your script. "
+            f"They are marked ⚠️ in place, are held to low severity, and are "
+            f"hidden by default in the Fix Queue. Treat them as questions, not "
+            f"findings.*")
+        lines.append("")
     for cat, cat_title in CATEGORY_TITLES.items():
         cat_findings = grouped.get(cat, [])
         lines.append(f"### {cat_title}")

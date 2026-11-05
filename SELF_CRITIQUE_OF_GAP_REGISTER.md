@@ -1048,3 +1048,44 @@ desk's own headline uses. If the owner prefers `open_count` to be the visible nu
 plus a rename, and it should be decided deliberately rather than smuggled in here.
 
 Full suite **2350 passed, 7 skipped**; `ruff` clean.
+
+## §39 — Gap 87: the exported report now says when a note is unsupported (2026-11-04)
+
+**FIXED, as a disclosure defect — and that is exactly what it is.** Nothing here was a real-model result: the invented
+detail ("the revolver") came from the built-in demo stand-in, so this gap is about a surface that failed to carry a
+warning it already held, not about a model fabricating.
+
+**Reproduced** through the real `apply_evidence_floor` and the real `render_markdown`, with one grounded and one
+ungrounded finding:
+
+```
+**[LOW] Scene 1, Scene 2** — Setup left dangling: 'The revolver'
+```
+
+No `ungrounded`, no verification status, nothing — while the JSON carries `ungrounded: true` and the dock hides the row
+behind a toggle. `_format_finding` simply never read the flag.
+
+**Fixed in the renderer, which covers both surfaces:** `/api/projects/<name>/report/export` renders the stored
+`report.md` through `_md_to_html`, so fixing `render_markdown` fixes the printed HTML as well as the Markdown file. The
+row now carries `⚠️ unsupported — this note cites no quote or observation from your script`, and the Detailed Analysis
+heading states `"N of M notes below are unsupported"` so the proportion is visible where the list is printed.
+
+**Disclosure, not dropping.** I deliberately did NOT suppress ungrounded rows from the export. The docstring said "his
+guesses presented as script-diagnosis" — but hiding the row in the artefact that travels is the same class of lie in
+the other direction, and it would make the count un-auditable. There is a test asserting every finding still renders.
+
+**The register's third recommendation already existed and I wired a test to it rather than building anything.**
+`_setup_quote` searches the setup scenes' actual lines and returns `None` when nothing matches, and
+`apply_evidence_floor` turns that into `ungrounded`. So "names something absent from the script" was already a
+verifiable classification; it just was not stated in any rendered surface. I checked that test is not vacuous by
+neutering `_setup_quote` to always return `None`: the *grounded* direction then fails, which is what proves it tests
+the distinction rather than the constant.
+
+**Evidence.** 8 tests; **3 fail** against the pre-fix renderer (the two disclosure assertions and the rendered-report
+one). The other 5 cover the classification and the negative cases; of those, 2 passed pre-fix by construction. One of
+them I proved non-vacuous by injection as described above. I am labelling that explicitly rather than counting 8.
+
+**Still open, and not mine to close:** whether a real model produces absent-detail claims is untested here, and gap 88
+(provenance by name rather than by nature) is the adjacent disclosure gap.
+
+Full suite **2358 passed, 7 skipped**; `ruff` clean.
