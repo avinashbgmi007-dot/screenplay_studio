@@ -16,16 +16,44 @@ SCENE_HEADING_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Indian-language scene headings: Hindi (Devanagari) and Tamil equivalents of
-# INT./EXT. Indian scripts in the Roman script (Tenglish/Tanglish) already use
-# standard INT./EXT., so these cover the native-script case.
-# Hindi: इंट (int) / एक्सट (ext); Tamil: உள் (ull/int) / வெளி (veli/ext).
-DEVA_SCENE_HEADING_RE = re.compile(
-    r"^\s*(?:एक्सट\.?/इंट\.?|इंट\.?/एक्सट\.?|इंट\.?|एक्सट\.?)[\s.-].*",
+# Indian-language scene headings. The native-script equivalents of INT./EXT.
+#
+# Gap 24: this used to be one hand-written regex per language, built from a
+# token list that had to list every spelling in advance. Telugu's list was
+# missing two of its own tokens, so `లోపల. హాల్ - ఉదయం` (a perfectly ordinary
+# Telugu INT. heading) matched nothing and opened no scene — the same class of
+# omission that had already left Telugu out of the cue test. A per-language
+# regex with an enumerated token list is a list nobody can keep complete; the
+# pattern below derives from the token TABLES instead, so a token that
+# `parse_scene_heading` accepts is a token the heading test accepts, by
+# construction.
+_NATIVE_HEADING_TOKENS = (
+    "एक्सट", "इंट",                                      # Hindi
+    "வெளி", "உள்",                                       # Tamil
+    "ఎక్స్ట", "ఎక్సట", "బయట", "లోపల", "ఇంట",               # Telugu
+    "ಹೊರಗೆ", "ಒಳಗೆ",                                     # Kannada
+    "എക്സ്റ്റ", "ഇന്റ",                                    # Malayalam
 )
-TAMIL_SCENE_HEADING_RE = re.compile(
-    r"^\s*(?:வெளி\.?/உள்\.?|உள்\.?/வெளி\.?|உள்\.?|வெளி\.?)[\s.-].*",
+
+
+def _alternation(tokens) -> str:
+    """Longest-first alternation, so 'ఎక్సట' is not shadowed by 'ఎక్స'."""
+    return "|".join(sorted((re.escape(t) for t in tokens), key=len, reverse=True))
+
+
+_IN = _alternation(_NATIVE_HEADING_TOKENS)
+# "TOKEN." then a separator, or "A/B" then a separator. The period is optional
+# (some writers omit it) but the separator is not: "ఇంటగది" is a word, not a
+# heading.
+NATIVE_SCENE_HEADING_RE = re.compile(
+    rf"^\s*(?:{_IN})\.?(?:/(?:{_IN})\.?)?[\s.\-].*",
 )
+
+# Backwards-compatible aliases: nothing outside this module imported the
+# per-language names, but keeping them costs nothing and they document which
+# languages the shared pattern covers.
+DEVA_SCENE_HEADING_RE = TAMIL_SCENE_HEADING_RE = NATIVE_SCENE_HEADING_RE
+TELUGU_SCENE_HEADING_RE = KANNADA_SCENE_HEADING_RE = MALAYALAM_SCENE_HEADING_RE = NATIVE_SCENE_HEADING_RE
 
 TIME_OF_DAY_WORDS = [
     "DAY", "NIGHT", "MORNING", "EVENING", "AFTERNOON", "DUSK", "DAWN",
@@ -50,18 +78,55 @@ TIME_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Caseless-script ranges: Devanagari (Hindi/Marathi/Sanskrit) and Tamil have no
-# letter case, so the all-caps character-cue heuristic can't apply to them.
-DEVA_SCRIPT = range(0x0900, 0x0980)
+# Caseless-script ranges. These scripts have no letter case, so the all-caps
+# character-cue heuristic cannot apply to them and a different test is needed.
+#
+# Gap 24: this was `DEVA_SCRIPT` + `TAMIL_SCRIPT` and nothing else, so a Telugu
+# cue scored 0 script chars, fell through to the uppercase test, and was read as
+# ACTION — a Telugu-speaking writer's speaker cues vanished, and (because the
+# heading tokens were unsupported too) the whole script parsed to zero scenes.
+# The set is now the Brahmic scripts that are written without case, which covers
+# every Indian language a screenplay is plausibly written in rather than the two
+# that happened to be reported. Adding a script here is the whole change needed
+# for both the cue test and the native INT./EXT. tokens below.
+DEVA_SCRIPT = range(0x0900, 0x0980)      # Hindi / Marathi / Sanskrit
+BENGALI_SCRIPT = range(0x0980, 0x0A00)   # Bengali / Assamese
+GURMUKHI_SCRIPT = range(0x0A00, 0x0A80)  # Punjabi
+GUJARATI_SCRIPT = range(0x0A80, 0x0B00)
+ORIYA_SCRIPT = range(0x0B00, 0x0B80)     # Odia
 TAMIL_SCRIPT = range(0x0B80, 0x0C00)
+TELUGU_SCRIPT = range(0x0C00, 0x0C80)
+KANNADA_SCRIPT = range(0x0C80, 0x0D00)
+MALAYALAM_SCRIPT = range(0x0D00, 0x0D80)
+SINHALA_SCRIPT = range(0x0D80, 0x0E00)
+
+CASELESS_SCRIPTS = (
+    DEVA_SCRIPT, BENGALI_SCRIPT, GURMUKHI_SCRIPT, GUJARATI_SCRIPT, ORIYA_SCRIPT,
+    TAMIL_SCRIPT, TELUGU_SCRIPT, KANNADA_SCRIPT, MALAYALAM_SCRIPT, SINHALA_SCRIPT,
+)
+
+
+# Sentence-final punctuation across the caseless scripts: ASCII, the Devanagari
+# danda/double-danda, and the Arabic-style full stop used by some Urdu/Telugu
+# publishers. A line of dialogue ends with one; a character name does not.
+SENTENCE_END_PUNCT = (".", "?", "!", "\u0964", "\u0965", "\u06d4")
+
+
+def _count_script(line: str, rng) -> int:
+    return sum(1 for c in line if ord(c) in rng)
 
 
 def _script_share(line: str) -> tuple[int, int]:
-    """(n_script_chars, n_total_letters) for the dominant caseless script."""
-    deva = sum(1 for c in line if ord(c) in DEVA_SCRIPT)
-    tamil = sum(1 for c in line if ord(c) in TAMIL_SCRIPT)
+    """(n_chars_in_the_dominant_caseless_script, n_total_letters).
+
+    Every caseless script is counted, and the LARGEST count wins, so a line that
+    mixes scripts (a Telugu cue with a Latin "(V.O.)", or a name transliterated
+    in the middle) still measures against the script it is mostly written in.
+    """
+    counts = [_count_script(line, rng) for rng in CASELESS_SCRIPTS]
+    dominant = max(counts) if counts else 0
     letters = sum(1 for c in line if c.isalpha())
-    return (deva if deva >= tamil else tamil), letters
+    return dominant, letters
 
 
 SHOT_RE = re.compile(
@@ -97,15 +162,15 @@ CHARACTER_CUE_RE = re.compile(
 CHARACTER_EXTENSION_RE = re.compile(r"\([A-Z0-9 ._'’\-/]{1,15}\)", re.IGNORECASE)
 
 
+# Every native-script heading pattern, in one list. A new language is added
+# here once; the old shape was an if-chain, which is how Telugu ended up
+# supported by nothing (gap 24: its heading tokens existed nowhere, so a Telugu
+# script parsed to ZERO scenes rather than to mislabelled ones).
 def looks_like_scene_heading(line: str) -> bool:
     stripped = line.strip()
     if SCENE_HEADING_RE.match(stripped):
         return True
-    if DEVA_SCENE_HEADING_RE.match(stripped):
-        return True
-    if TAMIL_SCENE_HEADING_RE.match(stripped):
-        return True
-    return False
+    return bool(NATIVE_SCENE_HEADING_RE.match(stripped))
 
 
 def looks_like_time_marker(line: str) -> bool:
@@ -162,6 +227,16 @@ def looks_like_character_cue(line: str, next_nonblank_line: str = "", second_nex
         words = len([w for w in stripped.split() if any(c.isalpha() for c in w)])
         if not nxt or len(stripped) > 30 or words > 3:
             return False
+        # A cue is a NAME, so it does not end a sentence. This is the one
+        # reliable signal in a caseless script, where the all-caps test cannot
+        # help: "రాము" is a cue, "నేను వెళ్తున్నాను." is a line of dialogue that
+        # happens to be short. Without this, a short dialogue line looked like a
+        # cue, which made the line ABOVE it look like it was not one — so a cue
+        # followed by terse dialogue was parsed as action (measured: the first
+        # Telugu cue in a two-line exchange became ACTION while the second
+        # worked, purely because its dialogue was longer).
+        if stripped.endswith(SENTENCE_END_PUNCT):
+            return False
         nxt_is_paren = looks_like_parenthetical(nxt)
         nxt_is_dialogue = (
             not nxt_is_paren
@@ -198,6 +273,27 @@ TAMIL_INT_EXT = {
     "உள்": "INT", "வெளி": "EXT",
     "உள்/வெளி": "INT/EXT", "வெளி/உள்": "INT/EXT",
 }
+# Telugu (gap 24). "ఇంట" is the everyday transliteration of INT.; "బయట" (outside)
+# is the native word a Telugu writer is more likely to reach for, the way Tamil
+# uses வெளி rather than a transliterated EXT.
+TELUGU_INT_EXT = {
+    "ఇంట": "INT", "ఎక్సట": "EXT", "ఎక్స్ట": "EXT", "బయట": "EXT", "లోపల": "INT",
+    "ఇంట/ఎక్సట": "INT/EXT", "ఎక్సట/ఇంట": "INT/EXT",
+}
+KANNADA_INT_EXT = {
+    "ಒಳಗೆ": "INT", "ಹೊರಗೆ": "EXT",
+    "ಒಳಗೆ/ಹೊರಗೆ": "INT/EXT", "ಹೊರಗೆ/ಒಳಗೆ": "INT/EXT",
+}
+MALAYALAM_INT_EXT = {
+    "ഇന്റ": "INT", "എക്സ്റ്റ": "EXT",
+    "ഇന്റ/എക്സ്റ്റ": "INT/EXT", "എക്സ്റ്റ/ഇന്റ": "INT/EXT",
+}
+
+# Every native-script INT./EXT. table, consulted in order. Adding a language is
+# one entry here plus its map above.
+NATIVE_INT_EXT_MAPS = (
+    DEVA_INT_EXT, TAMIL_INT_EXT, TELUGU_INT_EXT, KANNADA_INT_EXT, MALAYALAM_INT_EXT,
+)
 
 
 def parse_scene_heading(raw: str) -> dict:
@@ -215,12 +311,14 @@ def parse_scene_heading(raw: str) -> dict:
     if int_ext is None:
         first_tok = text.split(None, 1)[0] if text else ""
         tok_clean = first_tok.rstrip("./")
-        if tok_clean in DEVA_INT_EXT:
-            int_ext = DEVA_INT_EXT[tok_clean]
-            text = text[len(first_tok):].strip()
-        elif tok_clean in TAMIL_INT_EXT:
-            int_ext = TAMIL_INT_EXT[tok_clean]
-            text = text[len(first_tok):].strip()
+        # One lookup across every native map (gap 24): the if/elif chain meant a
+        # language could be "supported" by having a map and still never be
+        # consulted, which is exactly what happened to Telugu.
+        for token_map in NATIVE_INT_EXT_MAPS:
+            if tok_clean in token_map:
+                int_ext = token_map[tok_clean]
+                text = text[len(first_tok):].strip()
+                break
     text = text.lstrip(".- ").strip()
 
     time_of_day = None

@@ -1917,3 +1917,99 @@ session (origin was 61 commits ahead; a `--mixed` reset fixed the index without 
 two `test_repo_hygiene.py` failures disappeared — they were a symptom of the broken index, not of the
 code, and they pass in isolation. The `3` production-readiness failures remain, are unrelated to
 anything here, and are unchanged.
+
+## §54 — Gap 24: three omissions stacked, and one of them was in the test's shape (2026-11-05)
+
+Gap 24 was filed as "native Telugu speaker cues are missed in a plain-text example", with an
+explicit caution not to infer that all Telugu text parses incorrectly. The caution was well placed,
+and the reproduction was still worse than filed: the script parsed to **zero scenes**.
+
+### Reproduced, in three layers
+
+The filed symptom (no speaker detected) is the *visible* part of three distinct defects, which is
+why fixing any one of them alone would have produced a plausible-looking non-fix:
+
+1. **The script table.** `_script_share` counted Devanagari and Tamil only. A Telugu cue scored 0
+   script characters, so the caseless branch never fired and the line went to the all-caps test,
+   which no caseless line can pass. The heading tokens were in no table either, so
+   `లోపల. హాల్ - ఉదయం` — an ordinary Telugu INT. heading — matched nothing and opened no scene. Every
+   line then landed in front matter: zero scenes, zero speakers.
+2. **The lookahead.** Fixing (1) made `సీత` parse and left `రాము` as ACTION, which looks
+   arbitrary and is not. `రాము`'s dialogue line is `నేను వెళ్తున్నాను.` — four characters, short
+   enough to pass the caseless *cue* test itself, so the lookahead concluded "the next line is
+   another cue" and refused `రాము`. `సీత` only worked because `సరే, జాగ్రత్త.` is longer. The
+   discriminator that was missing: **a character name does not end a sentence.** Adding it fixes
+   the same asymmetry in Hindi and Tamil, which the register had no reason to suspect.
+3. **The heading token list.** Telugu's own list was missing `లోపల` and `ఎక్స్ట` — tokens that
+   `parse_scene_heading` accepted, so the two halves of the same feature disagreed about what a
+   heading was.
+
+### Why the fix is structural, not three patches
+
+(1) and (3) are both "a list that has to be kept complete by hand". So:
+
+- the caseless set is now the ten Brahmic scripts written without case, not the two that were
+  reported (a writer in Kannada, Malayalam, Bengali, Punjabi, Gujarati, Odia or Sinhala had the
+  identical bug and no way to know);
+- `NATIVE_SCENE_HEADING_RE` is **derived from the INT./EXT. token tables**, so "a token
+  `parse_scene_heading` accepts is a token `looks_like_scene_heading` accepts" is true by
+  construction rather than by review. A property test walks every token in every table and
+  asserts exactly that, so the next language added cannot reintroduce the split.
+
+(2) is one line with a real justification, not a heuristic widening: `SENTENCE_END_PUNCT` covers
+`.`/`?`/`!` and the danda/double-danda, and only applies inside the caseless branch — where the
+all-caps signal that normally separates a name from a line of dialogue does not exist.
+
+### My own errors
+
+**Error 1 — three of my test expectations were wrong, in two different ways.** I asserted
+`_script_share("రాము") == (4, 4)`; the real answer is `(4, 2)` because Telugu vowel signs are
+combining marks and `str.isalpha()` is False for them. That is not a curiosity — it is *why* the
+existing cue test compares `script_chars >= letters * 0.8` instead of to `len()`, and my expectation
+would have hidden it. Separately, I asserted a forced cue `@రాము.` keeps its period; the parser
+strips it by design (`normalize_character_name` does `rstrip(".")`). Both replaced with assertions
+of the real, documented contract.
+
+**Error 2 — a stale bytecode cache made a revert measurement lie.** After restoring
+`heuristics.py` from a backup, the "restored" run still failed 2 tests. The file was byte-identical
+to the backup — but restoring happened within the same second and the file size was unchanged, so
+Python reused the `__pycache__` entry compiled from the *reverted* source. I nearly recorded a
+false failure against correct code. From now on the revert runs use `-B` (no bytecode writes), and
+I cleared every `__pycache__` in the tree first. This is the same lesson as the `/tmp` restore in
+§50, in a subtler form: **verify the code you think you are running.**
+
+**Error 3 — I corrupted the register with my own edit and nearly shipped it.** My first attempt at
+appending to entry 24 was written with a stray `if False else None` guard; the guard made the
+*intended* single-line edit a no-op and let a second, unguarded write run instead — which **appended
+336 lines, duplicating entries 25-32** in the plan. The commit went through with it (337 insertions
+where one line was intended). I caught it by looking at the diffstat rather than trusting the edit:
+one row cannot add 338 lines. The file was restored from `HEAD~1`, the edit redone, and the commit
+amended — the committed tree has entry 25 exactly once and the file is back to 507 lines.
+
+The lesson is the one this whole session keeps re-teaching: **read the shape of the change, not
+just its exit code.** A `git diff --stat` that is absurd for the work is a failed test.
+
+**Error 4 — a probe that crashed instead of measuring.** My reproduction script assumed
+`doc.elements` and `scene.heading`, neither of which exists (`ScriptDocument.scenes`,
+`Scene.heading_raw`). Two runs were wasted on `AttributeError` before it printed a single fact.
+
+### Verification
+
+- 19 tests: the reported case end to end (a scene exists at all, cues as CHARACTER elements, both
+  speakers detected, dialogue attributed to the right speaker, action stays action), four Telugu
+  heading variants, the short-dialogue rule in Telugu *and* in Hindi/Tamil, the forced-cue escape
+  hatch, Hindi and Tamil full-script controls, English untouched, the script-table coverage, and the
+  token-table property test.
+- Reverts, measured separately with `-B`: **7 fail** (script set narrowed), **7 fail** (sentence-end
+  rule removed), **2 fail** (two heading tokens dropped). Restored: 19 pass.
+- Full suite: **2538 passed, 7 skipped**; `ruff` clean. The same 3 unrelated production-readiness
+  failures remain.
+
+### What this does not claim
+
+Native-script parsing is still heuristic. A one-word name, a name ending in a period, or dialogue
+that is genuinely ambiguous with a cue will still need Fountain's `@` escape hatch — which is
+tested here and works. The register asked for "consented native-script fixtures and independently
+reviewed ground truth", and this change has neither: the fixtures are synthetic and my own. What it
+does have is a property (`script in a table ⇒ recognised as a heading`) that does not depend on
+anyone's judgement about a particular sentence.
