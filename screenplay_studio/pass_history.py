@@ -65,7 +65,11 @@ def append_pass(m, statuses, failed_categories=None, verification_counts=None) -
     """
     summary = (statuses or {}).get("summary") or {}
     addressed = int(summary.get("addressed") or 0)
-    open_count = int(summary.get("still_present") or 0) + int(summary.get("unknown") or 0)
+    # Gap 129: `changed` is open too (an edited line is not a fixed finding).
+    # One helper rather than this arithmetic repeated, so a future status
+    # cannot be silently excluded from the count.
+    from .revision import open_status_count
+    open_count = open_status_count(summary)
     entry = {
         "ts": time.time(),
         "total": addressed + open_count,

@@ -253,7 +253,10 @@ class TestFindingsSummary:
         assert data["dawn_pct"] == expected_dawn
         assert sum(data["by_severity"].values()) == data["total_count"]
         assert sum(data["by_category"].values()) == data["total_count"]
-        assert set(data["by_status"]) == {"addressed", "still_present", "unknown"}
+        # Gap 129 added a fourth status: a line the writer edited is not the
+        # same claim as one they never touched. This set is the API contract, so
+        # it moves WITH the contract rather than being relaxed to fit.
+        assert set(data["by_status"]) == {"addressed", "still_present", "changed", "unknown"}
         assert data["acts"] and {"act", "name", "scene_count"} <= set(data["acts"][0])
 
     def test_writer_intent_moves_done_and_dawn(self, http_client):

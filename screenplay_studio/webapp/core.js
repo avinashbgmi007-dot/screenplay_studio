@@ -219,6 +219,40 @@ function destinationMismatchText(destinations) {
     + ". Save again, or open the project, before assuming this desk is local.";
 }
 
+/**
+ * Gap 129: what the desk may claim about a finding after the writer edits.
+ *
+ * The engine answers three things: the quoted line is `unchanged`, the line was
+ * `changed` (still recognisably there, text moved), or it is `gone`. Two answers
+ * could not be honest — a typo fix and a two-word edit measure 0.992 and 0.950
+ * against a 0.95 line a one-word edit (0.928) falls below, so calling either one
+ * "addressed" credits a fix the writer may not have made, and calling either one
+ * "still in the script, untouched" hides work they did do.
+ *
+ * `changed` therefore gets its own words and stays OPEN. The engine cannot know
+ * whether the edit was meant to answer the finding; the writer can, and their
+ * existing "addressed" mark is how they close it. This function only decides the
+ * label, never the count.
+ */
+function findingStateLabel(status, disposition) {
+  if (disposition === "addressed" || status === "addressed") return "addressed";
+  if (disposition === "deferred") return "next pass";
+  if (disposition === "ghosted") return "stale";
+  if (status === "changed") return "edited" + " \u2014 you decide";
+  return "";
+}
+
+/** The hover. Long enough to be unambiguous, short enough to read once. */
+function findingStateTitle(status, disposition) {
+  if (status === "changed" && disposition !== "addressed") {
+    return "You edited the quoted line, but not enough to read as a rewrite."
+      + " The desk can't tell a correction of a typo from a repair of the issue, so it"
+      + " isn't calling this fixed either way. Mark it addressed if your edit was meant"
+      + " to answer it, or leave it open if you were only tidying the prose.";
+  }
+  return null;
+}
+
 // ---- Node test hook (browsers never take this branch) ----
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -235,5 +269,7 @@ if (typeof module !== "undefined" && module.exports) {
     _stageStep,
     verificationReadoutText,
     destinationMismatchText,
+    findingStateLabel,
+    findingStateTitle,
   };
 }

@@ -1412,6 +1412,80 @@ def _load_baseline_doc(m):
         return None
 
 
+# Gap 129: the shape every caller of `finding_statuses` gets, one place, so a
+# new status cannot land in one summary and be forgotten in another. `open` is
+# derived from it below rather than counted again.
+_EMPTY_STATUS_SUMMARY = {"addressed": 0, "still_present": 0, "changed": 0, "unknown": 0}
+
+
+def open_status_count(summary: dict) -> int:
+    """How many findings are still live. `changed` counts as open.
+
+    Gap 129's counting contract, in one function: an edited line is not a fixed
+    finding. Before this, callers each wrote
+    `still_present + unknown` by hand at a dozen sites, which is exactly the
+    kind of arithmetic a new status silently breaks.
+    """
+    return (int(summary.get("still_present") or 0)
+            + int(summary.get("changed") or 0)
+            + int(summary.get("unknown") or 0))
+
+
+def quote_change(doc: ScriptDocument, quote: str | None) -> str:
+    """What the working copy did to a finding's quoted line.
+
+    Gap 129. Three answers instead of two, because two answers cannot be honest
+    about a typo fix and a two-word edit — both land within 0.006 of each other
+    (0.992 and 0.950) above a 0.95 line that a one-word edit (0.928) falls
+    below. There is no threshold that separates "the writer tidied a character"
+    from "the writer reworked a phrase", so the engine stops pretending it can
+    and says what it measured:
+
+      "unchanged"  the quote is still in the script, LITERALLY (containment)
+      "changed"    the quote is not literally there, but an element still matches
+                   it at or above QUOTE_CHANGE_THRESHOLD — the text moved and is
+                   still recognisably the same line
+      "gone"       no match worth crediting
+
+    Why `changed` is defined as "the fuzzy branch", not as a middle band: I first
+    wrote a band from 0.90 to 0.95 and measured it, and the bands were the wrong
+    way round. A typo scores 0.992, a two-word deletion 0.950, a one-word swap
+    0.928, a polite reword 0.816 — so the ratio does not order "cosmetic" against
+    "substantive" at all. What the fuzzy branch does tell us reliably is that the
+    line is *not literally present yet still reads as the same line*, and that is
+    exactly the case where the desk used to say "still in the script, untouched"
+    about text the writer had in fact changed. Labelling those `changed` asserts
+    only what was measured.
+
+    Only "gone" may be reported as ADDRESSED. "changed" leaves the finding open
+    and says the writer edited the line — their own "addressed" mark is how they
+    close it, and that is a judgement this function cannot make.
+
+    A short quote (below the word floor) never gets "changed": a fuzzy ratio on
+    three words is noise, so it keeps the old containment-only rule.
+    """
+    if not quote or not quote.strip():
+        return "gone"
+    target_norm = quotematch.normalize_text(quote)
+    if not target_norm:
+        return "gone"
+    scenes = [quotematch.normalize_text(t) for t in quotematch.iter_scene_texts(doc)]
+    if any(target_norm in s for s in scenes):
+        return "unchanged"
+    if len(target_norm.split()) < SHORT_QUOTE_WORDS:
+        return "gone"
+    # Not literally present, so any element match at or above the threshold is
+    # an EDIT: the words moved. Below it there is nothing worth crediting.
+    for s in doc.scenes:
+        for el in s.elements:
+            if not el.text:
+                continue
+            if SequenceMatcher(None, quotematch.normalize_text(el.text),
+                               target_norm).ratio() >= QUOTE_CHANGE_THRESHOLD:
+                return "changed"
+    return "gone"
+
+
 def finding_statuses(m) -> dict:
     """Which findings are still live in the working copy vs. addressed by edits.
 
@@ -1425,7 +1499,7 @@ def finding_statuses(m) -> dict:
         with open(m.report_findings_path, "r", encoding="utf-8") as f:
             report = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+        return {"findings": [], "summary": _EMPTY_STATUS_SUMMARY.copy()}
 
     # the ids below are the client's keys for these rows: same annotation as
     # every other reader, so a legacy report's statuses cannot land under ids
@@ -1453,7 +1527,12 @@ def finding_statuses(m) -> dict:
         if not quote:
             entry["status"] = "unknown"
         elif quote_present(doc, quote):
-            entry["status"] = "still_present"
+            # Gap 129: the three-valued answer, so a line the writer edited is
+            # not reported as one they never touched. "changed" stays OPEN
+            # (every counter below treats it exactly as "still_present"), and
+            # the writer's own mark is what closes it.
+            change = quote_change(doc, quote)
+            entry["status"] = "changed" if change == "changed" else "still_present"
         else:
             if not baseline_loaded:
                 baseline = _load_baseline_doc(m)
@@ -1463,7 +1542,7 @@ def finding_statuses(m) -> dict:
                                and quote_present(baseline, quote) else "unknown")
         statuses.append(entry)
 
-    summary = {"addressed": 0, "still_present": 0, "unknown": 0}
+    summary = _EMPTY_STATUS_SUMMARY.copy()
     for s in statuses:
-        summary[s["status"]] += 1
+        summary[s["status"]] = summary.get(s["status"], 0) + 1
     return {"findings": statuses, "summary": summary, "checked_at": time.time()}

@@ -229,3 +229,43 @@ test("destinationMismatchText: lists a few names, then counts the rest", () => {
   assert.ok(!text.includes("proj-d") && !text.includes("proj-e"),
     `the tail is counted, not enumerated: ${text}`);
 });
+
+// ---- Gap 129: an edited line is the writer's call, not a verdict ----
+const { findingStateLabel, findingStateTitle } = require("../../screenplay_studio/webapp/core.js");
+
+test("findingStateLabel: a changed line says so, and says who decides", () => {
+  const label = findingStateLabel("changed", "open");
+  assert.ok(/edited/.test(label), label);
+  assert.ok(/you decide/.test(label), `the label must hand the call to the writer: ${label}`);
+});
+
+test("findingStateLabel: a changed line never reads as addressed or as untouched", () => {
+  const label = findingStateLabel("changed", "open");
+  assert.ok(!/addressed/i.test(label), label);
+  assert.ok(label.trim() !== "", "silence would be the old 'untouched' claim");
+});
+
+test("findingStateLabel: the writer's own mark still wins", () => {
+  assert.strictEqual(findingStateLabel("changed", "addressed"), "addressed");
+  assert.strictEqual(findingStateLabel("still_present", "addressed"), "addressed");
+  assert.strictEqual(findingStateLabel("changed", "deferred"), "next pass");
+  assert.strictEqual(findingStateLabel("changed", "ghosted"), "stale");
+});
+
+test("findingStateLabel: an untouched line keeps its old (empty) label", () => {
+  assert.strictEqual(findingStateLabel("still_present", "open"), "");
+  assert.strictEqual(findingStateLabel(undefined, "open"), "");
+});
+
+test("findingStateTitle: only a changed, unmarked line explains itself", () => {
+  assert.ok(findingStateTitle("changed", "open"));
+  assert.strictEqual(findingStateTitle("changed", "addressed"), null,
+    "once the writer has decided, the explanation is noise");
+  assert.strictEqual(findingStateTitle("still_present", "open"), null);
+});
+
+test("findingStateTitle: explains the ambiguity instead of asserting a fix", () => {
+  const t = findingStateTitle("changed", "open");
+  assert.ok(/typo/i.test(t) && /rewrite/i.test(t), t);
+  assert.ok(/isn't calling this fixed/.test(t), `must not claim a resolution: ${t}`);
+});

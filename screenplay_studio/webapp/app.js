@@ -5192,7 +5192,17 @@ function findingNoteEl(f, index, opts = {}) {
   note.dataset.findingIndex = String(index);
   const top = el("div", "finding-note-top");
   const cat = el("span", "finding-note-cat", CATEGORY_LABELS[f.category] || f.category);
-  const stateEl = el("span", "finding-note-state", opts.addressed ? "addressed" : (disp === "deferred" ? "next pass" : disp === "ghosted" ? "stale" : ""));
+  // Gap 129: the label comes from one tested function, so "edited — you
+  // decide" cannot drift from the engine's three-valued status. Counting is
+  // untouched: `changed` is open everywhere, exactly as `still_present` was.
+  const rawStatus = (typeof findingStatusOf === "function") ? findingStatusOf(f, index) : null;
+  const stateEl = el("span", "finding-note-state",
+    findingStateLabel(rawStatus, opts.addressed ? "addressed" : disp));
+  const stateTitle = findingStateTitle(rawStatus, opts.addressed ? "addressed" : disp);
+  if (stateTitle) {
+    stateEl.title = stateTitle;
+    stateEl.classList.add("needs-writer");
+  }
   top.appendChild(cat);
   // R6 item 3: the ledger already knows whether a judgment is about one line,
   // named scenes, or the whole script — it just never said so, so every card

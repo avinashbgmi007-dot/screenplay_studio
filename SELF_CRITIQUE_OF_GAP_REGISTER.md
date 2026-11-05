@@ -1453,3 +1453,58 @@ smaller. Recorded in the table row so the number is not mistaken for "the repo i
 
 Full suite **2429 passed, 7 skipped**; `ruff` clean. No test referenced any of these images, which I checked before
 touching a byte.
+
+## §48 — Gap 129: the third state, after measuring that a retune cannot work (2026-11-05)
+
+**FIXED, and the shape is different from what the entry recommended.** The register asked to separate "a typo fix"
+from "a real edit" by tuning. I measured it on one real sentence through the real function and the retune is
+impossible — not hard, impossible:
+
+| case | ratio | old verdict | new verdict |
+|---|---|---|---|
+| unchanged | 1.000 | still present | `unchanged` |
+| comma only | 1.000 | still present | `unchanged` (normalised away) |
+| **typo fixed** | **0.992** | still present | `changed` |
+| **two-word deletion** | **0.950** | still present | `changed` |
+| one-word swap | 0.928 | addressed | `gone` |
+| polite reword | 0.816 | addressed | `gone` |
+
+The typo fix scores **higher** than the two-word repair, and the one-word swap the code already calls resolved sits
+**below** both. There is no ordering the ratio can express, so every cutoff either credits a two-word edit as a fix or
+denies a typo fix. That is the finding; the threshold was never the bug.
+
+**My first design was a middle band (0.90–0.95) and it was wrong in a way only measuring caught.** I assumed a band
+would capture "edited a little". It captures the one-word swap — which the code already, correctly, calls resolved —
+and leaves the typo fix (0.992) outside it, in `unchanged`. The bands were the wrong way round because the ratio does
+not rank cosmetic against substantive at all. So I redefined `changed` as **exactly the fuzzy branch**: the quote is
+not literally present, yet an element still matches it at 0.95. That is precisely the set where the old label lied —
+the desk said "still in the script, untouched" about text the writer had changed — and it asserts only what was
+measured. Both facts are pinned by tests, including the inversion, so if the ratio ever starts ordering the cases the
+suite says so and the design can be revisited.
+
+**What the desk may claim.** `unchanged` (literally still there) / `changed` (edited, still the same line) / `gone`.
+Only `gone` is reported as addressed. `changed` stays **open** and the card says "edited — you decide", because
+whether an edit was meant to answer the note is a judgement the writer makes, not a computation the engine can run.
+Their existing `addressed` mark closes it — no new UI to learn.
+
+**The counting contract was preserved, not changed.** `changed` counts as open exactly as `still_present` did, through
+one `open_status_count()` helper that replaced every hand-written `still_present + unknown` expression. So every
+total, chip, metric and pass-history point stays where it was. That is what made this landable in one commit: it buys
+an honest label, not a different number. A test asserts the old expression yields **0** for a row set of 5 edited
+findings, so the omission cannot come back silently.
+
+**The revert caught a weakness in my own tests.** Reverting only the engine wiring left **22 of 23** tests passing,
+because most of the file calls `quote_change` directly — it proved the function and not the connection. I added two
+tests that drive `/api/projects/<name>/edits`, the route the SPA actually reads, and then the revert fails 2. With the
+counting also reverted, 4 fail. Worth recording: a suite that tests a pure function thoroughly can still be blind to
+whether anything calls it.
+
+**A test fixture of mine was wrong twice** — I guessed `Scene(heading=...)` and a three-argument `ScriptDocument`, and
+every test errored on the constructor. I copied the shape from `test_quote_agreement.py`, the file that already
+exercises this function, rather than inventing a third variation.
+
+**Not covered:** `diff.py`'s draft-to-draft delta still buckets `resolved`/`still_present`. That compares two drafts,
+not the working copy against the parse-of-record, so it is a different question with a different contract; filing it
+as a follow-up rather than half-fixing it here.
+
+`tests/test_quote_changed_status.py` (25 tests) + 6 node tests. Full suite **2454 passed, 7 skipped**; `ruff` clean.

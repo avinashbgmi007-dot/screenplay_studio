@@ -42,6 +42,10 @@ from .ideas import IdeaStore
 from .logsetup import configure as _configure_logging
 from .manifest import ProjectManifest
 from .net_guard import is_loopback_host, is_loopback_url
+# Gap 129: the status vocabulary's shape and its open/closed arithmetic live
+# in one place; importing them here is what stops a new status from being
+# counted at some sites and forgotten at others.
+from .revision import _EMPTY_STATUS_SUMMARY, open_status_count
 from .orchestrator import Orchestrator, OrchestratorError
 
 # Output-encoding contract (round 6): this module prints to the console at IMPORT
@@ -2601,7 +2605,7 @@ def get_edits(name):
         return _error("Project not found.", 404)
     from .revision import (edits_log, finding_statuses, redo_stack, finding_intents,
                            last_pass_snapshot, ambiguous_marks, finding_verdicts)
-    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": _EMPTY_STATUS_SUMMARY.copy()}
     # writer intent (R2-b/R3) + last-pass scorekeeping (R4) ride the same
     # fetch the client already makes on every script load — no second path
     intents = finding_intents(m)
@@ -2780,7 +2784,7 @@ def apply_edits(name):
         # is to regenerate the proposal against the current text. The shape is
         # exactly what `contracts_UI` §3.4 specifies.
         return jsonify({"error": STALE_PROPOSAL_MESSAGE, "stale": True}), 400
-    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": _EMPTY_STATUS_SUMMARY.copy()}
     _record_findings_metrics(m, statuses)
     return jsonify({**result, "findings_status": statuses})
 
@@ -2796,7 +2800,7 @@ def undo_edits(name):
         result = undo_last_edit(m)
     except ValueError as e:
         return _error(str(e), 400)
-    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": _EMPTY_STATUS_SUMMARY.copy()}
     _record_findings_metrics(m, statuses)
     return jsonify({**result, "findings_status": statuses})
 
@@ -2806,8 +2810,8 @@ def _record_findings_metrics(m, statuses) -> None:
     try:
         from .metrics import record_findings
         summary = statuses.get("summary") or {}
-        open_count = (summary.get("still_present") or 0) + (summary.get("unknown") or 0)
-        total = (summary.get("addressed") or 0) + (summary.get("still_present") or 0) + (summary.get("unknown") or 0)
+        open_count = open_status_count(summary)   # gap 129: `changed` counts as open
+        total = (summary.get("addressed") or 0) + open_count
         if total:
             record_findings(m, open_count, total)
     except Exception:
@@ -2835,7 +2839,7 @@ def redo_edits(name):
         result = redo_last_edit(m)
     except ValueError as e:
         return _error(str(e), 400)
-    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": {"addressed": 0, "still_present": 0, "unknown": 0}}
+    statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": _EMPTY_STATUS_SUMMARY.copy()}
     _record_findings_metrics(m, statuses)
     return jsonify({**result, "findings_status": statuses})
 
@@ -3238,7 +3242,7 @@ def get_findings_summary(name):
     intents = finding_intents(m)
     by_severity: dict = {}
     by_category: dict = {}
-    by_status = {"addressed": 0, "still_present": 0, "unknown": 0}
+    by_status = {"addressed": 0, "still_present": 0, "changed": 0, "unknown": 0}
     dismissed = 0
     open_count = 0
     done_count = 0
