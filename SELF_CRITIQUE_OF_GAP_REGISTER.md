@@ -1213,3 +1213,45 @@ skips the guard — both halves independently proven.
 before this endpoint stops reporting `misconfigured`. That is pre-existing and is not addressed here.
 
 Full suite **2376 passed, 7 skipped**; `ruff` clean.
+
+## §43 — Gap 118: consent scope is now machine-readable, and does not overstate itself (2026-11-04)
+
+**FIXED.** Reproduced first: `/api/config` answered `allow_remote: false, connection_mode: "local",
+server_url: "http://127.0.0.1:8099"` and — with a remote host configured — `allow_remote: true,
+connection_mode: "remote", server_url: "https://api.example.com/v1"`. Nowhere in the payload did it say whether the
+script is sent off the machine, where to, or what a credential would be attached to. The settings UI explains this in
+prose; a scripted client gets nothing.
+
+**Added a `privacy` block to `/api/config` (GET and POST) and `/api/health`:**
+
+```json
+{"sends_script_off_machine": true, "destination": "https://api.example.com",
+ "credentials_in_use": true, "credentials_scope": "global", "remote_permitted": true}
+```
+
+Computed by one `_privacy_statement()`, because the same statement now appears on three responses and two
+hand-written copies is exactly how `/api/config` and `/api/health` drifted before (gap 56/the same seam this register
+keeps finding). `/api/health` carrying it also answers the narrower half of §10's own correction: a health-only client
+could previously tell a permitted-remote desk from a local one only by parsing the URL and inferring.
+
+**The decision I want on record: `credentials_scope` is `"global"`, not `"origin"`.** The register's recommendation
+asked for `credentials_scope: origin`. That would have been **false**. The token is a single configuration value in
+`CONFIG["api_key"]`, and `/api/config`'s POST path writes `CONFIG["server_url"]` and `CONFIG["api_key"]` independently —
+so a saved token follows a changed endpoint with no new trust decision. That is **gap 57, still open**. A privacy
+statement that names a scope the code does not enforce is worse than no statement, so the block reports the limitation
+and a test pins it: `credentials_scope == "global"` and explicitly not `"origin"`. When 57 is fixed, that field
+becomes `"origin"` and this test flips with it — which is the right coupling.
+
+**Two smaller honesty choices.** `credentials_in_use` is false for a loopback server even when a key is configured,
+because `_auth_headers` short-circuits locally and nothing is sent — "configured" is not "used". And an unparseable
+`server_url` reports `sends_script_off_machine: true` with `destination: null`: it is not loopback, so treating it as
+off-machine is the conservative reading, and inventing a destination would be the dishonest option.
+
+**Evidence.** 10 tests; **9 fail** with the block removed. The tenth is the secret-withholding negative (no token on
+either surface), which correctly passes either way and is there to keep the block from ever becoming a leak.
+
+**One test bug of mine:** my POST test forgot to enable the launch-time remote opt-in, so the guard refused the switch.
+That refusal is correct and is its own contract (`test_connection_modes.py` pins it); the test was wrong. Worth
+recording because the tempting fix would have been to weaken a security guard to make my assertion pass.
+
+Full suite **2386 passed, 7 skipped**; `ruff` clean.

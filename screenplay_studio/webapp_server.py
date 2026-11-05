@@ -555,6 +555,55 @@ def connection_mode(url: str | None = None) -> str:
     return "local" if is_loopback_url(url if url is not None else CONFIG["server_url"]) else "remote"
 
 
+def _origin_of(url: str | None) -> str | None:
+    """scheme://host[:port] for a URL, or None when it cannot be parsed.
+
+    Origin, not full URL: the path is where a provider's API root happens to be,
+    while the origin is what a credential and a consent decision actually attach
+    to.
+    """
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit((url or "").strip())
+    except ValueError:
+        return None
+    if not parts.scheme or not parts.hostname:
+        return None
+    port = f":{parts.port}" if parts.port else ""
+    return f"{parts.scheme}://{parts.hostname}{port}"
+
+
+def _privacy_statement() -> dict:
+    """What this configuration sends where, in machine-readable form.
+
+    Gap 118: `/api/config` answered `allow_remote` and `connection_mode` as bare
+    booleans with the consequences explained only in the settings UI's prose, so
+    a scripted client could turn remote use on and learn nothing about what
+    leaves the machine. This block is that statement, and it is computed once
+    here because it appears on BOTH `/api/config` and `/api/health` — two
+    hand-written copies is how the two surfaces drifted before.
+
+    `credentials_scope` deliberately says `"global"`, not `"origin"`. The token
+    is a single configuration value that survives a change of `server_url`
+    (that is gap 57, still open), so claiming it is bound to an origin would be
+    a promise the code does not keep. Reporting the limitation is worth more
+    than reporting the intention.
+    """
+    url = CONFIG.get("server_url")
+    mode = connection_mode()
+    remote = mode == "remote"
+    key_set = bool((CONFIG.get("api_key") or "").strip())
+    return {
+        "sends_script_off_machine": remote,
+        "destination": _origin_of(url) if remote else None,
+        # A local loopback server never needs the token (see `_auth_headers`),
+        # so "no key" is the honest answer there even if one is configured.
+        "credentials_in_use": key_set and remote,
+        "credentials_scope": "global" if key_set else None,
+        "remote_permitted": bool(_ALLOW_REMOTE_SERVER),
+    }
+
+
 def _auth_headers(api_key: str | None) -> dict:
     """Bearer header for a token-protected endpoint; {} for a local server.
 
@@ -1181,7 +1230,12 @@ def health():
     """
     body = {"status": "ok", "server_url": CONFIG.get("server_url"),
             "demo_model": _DEMO_MODEL_ACTIVE,
-            "code_rev": _CODE_REV_AT_STARTUP}
+            "code_rev": _CODE_REV_AT_STARTUP,
+            # Gap 118: the same consent statement `/api/config` carries, so a
+            # health-only client (the thing an operator scripts) can tell a
+            # local-only desk from one permitted to send the script off the
+            # machine without parsing a URL and inferring it.
+            "privacy": _privacy_statement()}
     try:
         _knowledge_base()
     except _KB_DAMAGED as e:
@@ -1230,6 +1284,7 @@ def get_config():
     # drifts from the server's canonical list (falls back to empty when the
     # co-writer isn't installed; the UI then shows its built-in defaults).
     cfg["demo_model"] = _DEMO_MODEL_ACTIVE
+    cfg["privacy"] = _privacy_statement()
     if _DEMO_MODEL_ACTIVE:
         cfg["real_server_url"] = CONFIG.get("real_server_url")
     else:
@@ -1305,6 +1360,7 @@ def set_config():
     cfg["api_key_set"] = bool(cfg.pop("api_key", None))
     cfg["connection_mode"] = connection_mode()
     cfg["allow_remote"] = bool(_ALLOW_REMOTE_SERVER)
+    cfg["privacy"] = _privacy_statement()
     return jsonify(cfg)
 
 
