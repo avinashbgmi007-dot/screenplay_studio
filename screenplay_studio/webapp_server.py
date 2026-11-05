@@ -600,11 +600,18 @@ def _privacy_statement() -> dict:
     here because it appears on BOTH `/api/config` and `/api/health` — two
     hand-written copies is how the two surfaces drifted before.
 
-    `credentials_scope` deliberately says `"global"`, not `"origin"`. The token
-    is a single configuration value that survives a change of `server_url`
-    (that is gap 57, still open), so claiming it is bound to an origin would be
-    a promise the code does not keep. Reporting the limitation is worth more
-    than reporting the intention.
+    `credentials_scope` says `"origin"` only when an origin was actually
+    recorded for the token (gap 57 made that enforceable); a token inherited
+    from `--api-key`/the environment, or from a config older than that
+    bookkeeping, reports `"unrecorded"` rather than rounding up.
+
+    `credentials_in_use` is TRUE for a loopback endpoint too, and that is a
+    correction: an earlier version of this block claimed a local server never
+    sees the token. Measured against a loopback recorder, `_auth_headers` sends
+    `Authorization: Bearer …` to `127.0.0.1` exactly like anywhere else — the
+    short-circuit is for *no token*, not for *local*. A loopback endpoint is
+    still another program, and window.__studioPrivacy could not see it. What is
+    true, and what the block now says, is that nothing leaves the machine.
     """
     url = CONFIG.get("server_url")
     mode = connection_mode()
@@ -613,9 +620,10 @@ def _privacy_statement() -> dict:
     return {
         "sends_script_off_machine": remote,
         "destination": _origin_of(url) if remote else None,
-        # A local loopback server never needs the token (see `_auth_headers`),
-        # so "no key" is the honest answer there even if one is configured.
-        "credentials_in_use": key_set and remote,
+        # A credential is attached whenever one is set and something will be
+        # called — local included. See the docstring: the old `and remote` was
+        # measurably false against a loopback recorder.
+        "credentials_in_use": key_set,
         # Gap 57 made this true: a token is only used at the origin it was
         # entered for, so the honest scope is `origin`. Before that fix the
         # same field had to say `global` — one value that followed any URL.

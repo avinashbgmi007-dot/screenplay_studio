@@ -57,13 +57,59 @@ class TestTheStatementIsMachineReadable:
         p = client.get("/api/config").get_json()["privacy"]
         assert p["destination"] == "https://api.example.com:8443"
 
-    def test_a_loopback_server_needs_no_credential_even_if_one_is_set(self, client, config):
-        """`_auth_headers` short-circuits for local, so 'in use' must be false —
-        otherwise the statement overstates what is sent."""
+    def test_a_loopback_endpoint_still_receives_the_credential(self, client, config):
+        """Corrected 2026-11-05 (S44/S45).
+
+        This test used to assert `credentials_in_use is False` for a loopback
+        server, on the theory that `_auth_headers` short-circuits locally. It
+        does not — it short-circuits when there is NO TOKEN. Measured against a
+        loopback recorder, `Authorization: Bearer …` arrives at 127.0.0.1.
+
+        A local endpoint is still another program (a llama-server started with
+        `--api-key`, a wrapper on the writer's machine), so "configured but not
+        used" understated what is sent while the script itself stays on the
+        machine. Both halves are asserted so neither gets dropped again.
+        """
         config("http://127.0.0.1:8080", "sk-synthetic")
         p = client.get("/api/config").get_json()["privacy"]
-        assert p["credentials_in_use"] is False
-        assert p["sends_script_off_machine"] is False
+        assert p["credentials_in_use"] is True
+        assert p["sends_script_off_machine"] is False, (
+            "correcting the credential claim must not start claiming the script leaves")
+
+    def test_the_claim_matches_the_wire(self, client, config):
+        """The statement above is pinned against what a server actually sees."""
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        seen = []
+
+        class _H(BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                seen.append(dict(self.headers))
+                body = b'{"data": [{"id": "m"}]}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        srv = HTTPServer(("127.0.0.1", 0), _H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            base = f"http://127.0.0.1:{srv.server_port}"
+            config(base, "sk-synthetic")
+            p = client.get("/api/config").get_json()["privacy"]
+            assert p["credentials_in_use"] is True, "precondition: a token is set"
+            client.post("/api/test-connection",
+                        json={"server_url": base, "api_key": "sk-synthetic"})
+            assert seen and "Authorization" in seen[-1], (
+                "the statement claims a credential is in use; none arrived")
+            assert seen[-1]["Authorization"] == "Bearer sk-synthetic"
+        finally:
+            srv.shutdown()
+            srv.server_close()
 
 
 class TestItDoesNotOverstate:

@@ -1289,9 +1289,13 @@ state leak between tests, which is the same bug a writer would have hit as "the 
 install); a token typed for the new provider is approved for it; `api_key: ""` moves and clears in one request; and a
 changed path or port on the **same** origin keeps the token, because that is the same program. Migration stayed one
 explicit action, which is what the register asked for. A token with **no recorded origin** — `--api-key`,
-`SCREENPLAY_STUDIO_API_KEY`, or a config written before this bookkeeping — keeps working on loopback (where
-`_auth_headers` never sends it anyway) and is refused off-machine; refusing those outright would have broken every
-existing install, and accepting them everywhere would have left the actual leak open.
+`SCREENPLAY_STUDIO_API_KEY`, or a config written before this bookkeeping — keeps working on loopback and is refused
+off-machine; refusing those outright would have broken every existing install, and accepting them everywhere would
+have left the actual leak open. (This paragraph originally justified the loopback carve-out with "`_auth_headers`
+never sends it anyway". **That was wrong** — see §45. `_auth_headers` short-circuits on *no token*, not on *local*, so
+a loopback llama-server does receive the header. The carve-out still holds, for the narrower reason that loopback is
+this machine: nothing crosses a trust boundary, and the token the writer configured is the one their own local server
+asked for.)
 
 **Fifteen tests failed when I first ran the suite, and the triage is the point.** I had written the guard to refuse
 when there was no token as well, and the failing tests were the ones that point a desk with no token at a new server —
@@ -1315,3 +1319,37 @@ Full suite **2406 passed, 7 skipped**; `ruff` clean.
 manifest could still pair an old token with a new endpoint. And a **redirect** during a probe is followed by
 `requests` without re-checking the origin of each hop (gaps 58/70). Both are outside this entry and are stated here so
 the fix is not read as covering them.
+
+## §45 — Correction: a loopback endpoint does receive the credential (2026-11-05)
+
+**A claim I shipped last commit was false, and my own test was enforcing it.** Gap 118's `privacy` block reported
+`credentials_in_use: false` whenever the endpoint was loopback, on the stated grounds that "a local loopback server
+never needs the token (see `_auth_headers`), so 'no key' is the honest answer there even if one is configured". I
+carried that reasoning into §44's justification for gap 57's loopback carve-out, and last turn I wrote a test —
+`test_a_loopback_server_needs_no_credential_even_if_one_is_set` — asserting it.
+
+Measured against a loopback server that records its headers, with a token set for a *remote* provider:
+
+```
+headers a LOOPBACK server received: {'Host': '127.0.0.1:41887', ..., 'Authorization': 'Bearer sk-secret-for-a-remote-provider'}
+privacy.credentials_in_use for that same state: False
+```
+
+`_auth_headers` short-circuits when there is **no token**, not when the endpoint is **local**. So the header is sent,
+and the statement said it was not. A privacy statement that under-reports what is transmitted is the same class of
+defect as gap 118 itself, one level down — and it was in the field a scripted client reads to decide whether to warn a
+writer. The `window.__studioPrivacy` surface had no way to see it.
+
+**Fixed:** `credentials_in_use` is now true whenever a token is set. `sends_script_off_machine` stays false for
+loopback, which is the distinction that actually matters — a credential reaching another *program on this machine* is
+not the same risk as one leaving the machine, and the block now says both things instead of conflating them. The test
+that asserted the falsehood is rewritten, and the replacement pins the claim **against the wire**: it stands up a
+loopback recorder, drives the probe, and asserts the header that arrives. The old test could not have caught this,
+because it asked the code the same question the code was answering.
+
+**Why this is worth a §: the failure mode was trusting a comment.** `_auth_headers`'s docstring says "`{}` for a local
+server". It is wrong in the same way, and I read it as documentation rather than as an assertion. I have corrected the
+two places that repeated it. The lesson is the standing one for this register: a claim about what goes over the wire is
+only worth what a recorder says it is, and "I read the code" is not evidence — I had read the code.
+
+Full suite **2408 passed, 7 skipped**; `ruff` clean.
