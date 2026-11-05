@@ -179,7 +179,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 
 | # | Grade | Driven through | Note | Genuine? |
 |---|---|---|---|---|
-| 125 | **A** | Real `/api/stt/languages` + `/api/stt`, remote whisper URL | Capability endpoint advertises `engine: whisper-server` (200) for a configuration the guard refuses (503). The guard itself is correct; the label is not. Low severity, hand-edited config only. | **G** |
+| 125 | **A** | Real `/api/stt/languages` + `/api/stt`, remote whisper URL | Capability endpoint advertises `engine: whisper-server` (200) for a configuration the guard refuses (503). The guard itself is correct; the label is not. Low severity, hand-edited config only. **FIXED 2026-11-04** - the label now runs the real guard (`stt.engine_status`) and answers `faster-whisper` + `misconfigured` + the guard own reason, so the two endpoints cannot disagree, including for a `127.0.0.1@evil.com` lookalike. 4 tests fail on each half reverted. The restart-to-reload-env limit is pre-existing and untouched. Critique S42. | **G** |
 | 126 | **C** | Real `/api/stt`, 3 MB and empty blobs | No magic-byte or duration check, 256 MB ceiling inherited from uploads. **Downgraded B→C in §22**: the external-server half is the user's own machine, and the inherited ceiling is defensible. Informational; I would not schedule it. | **G** |
 
 ## Entries 109–124 (collected in the critique file, graded there and here)

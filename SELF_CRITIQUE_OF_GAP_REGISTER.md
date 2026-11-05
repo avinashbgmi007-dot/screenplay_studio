@@ -1173,3 +1173,43 @@ the current behaviour so nobody mistakes it for solved.
 this one, and its own two-part fix is unaffected.
 
 Full suite unchanged at **2369 passed, 7 skipped**; `ruff` clean.
+
+## §42 — Gap 125: the dictation capability endpoint now runs the guard it promises (2026-11-04)
+
+**FIXED.** Reproduced on one client with `SCREENPLAY_STUDIO_WHISPER_URL=http://speech.example.com:9000`:
+
+```
+GET  /api/stt/languages -> 200 {'engine': 'whisper-server', 'languages': [...]}
+POST /api/stt           -> 503 '...must point at a LOCAL whisper server...'
+```
+
+The label was `"whisper-server" if _stt.EXTERNAL_WHISPER_URL else "faster-whisper"` — it tested whether a URL was
+*set*, never whether it was *usable*. The writer is told dictation is configured, records a paragraph, and only then
+learns it is not. The guard itself was, and is, correct.
+
+**Fixed by making the label run the guard.** A new `stt.engine_status()` calls the real `_assert_local_whisper` and
+returns `{"engine": "faster-whisper", "misconfigured": "whisper-server", "reason": "<the guard's own message>"}`
+when the configuration is refused. `/api/stt/languages` merges that. Two deliberate choices:
+
+* it calls the **real guard** rather than re-implementing a loopback test — a second copy is how these drift back
+  apart, and a test asserts the call is there;
+* it keeps the guard's own wording as the reason, so the two endpoints cannot explain the same refusal differently.
+
+Now: not configured -> `faster-whisper`; local server -> `whisper-server`; remote or a `http://127.0.0.1@evil.com`
+lookalike -> `faster-whisper` + `misconfigured` + reason. The lookalike matters: the label would otherwise have become
+a way to ask the guard a question and get the wrong answer.
+
+**A test bug of mine worth recording.** My first consistency assertion failed on `http://127.0.0.1:8090` because a
+*local* server that simply is not running also answers 503 ("could not be reached"). Advertising `whisper-server`
+for that is honest — the configuration is permitted, the machine is not up. I had written "503 means the guard
+refused", which conflated reachability with refusal; the test now keys on the guard's own message. The code was
+right both times and the test was wrong, which is worth saying because the tempting "fix" would have been to change
+the code to make my assertion pass.
+
+**Evidence.** 7 tests; **4 fail** against the pre-fix route label, and **4 fail** against an `engine_status` that
+skips the guard — both halves independently proven.
+
+**Known limit, unchanged:** `EXTERNAL_WHISPER_URL` is read once at import, so correcting the env var needs a restart
+before this endpoint stops reporting `misconfigured`. That is pre-existing and is not addressed here.
+
+Full suite **2376 passed, 7 skipped**; `ruff` clean.

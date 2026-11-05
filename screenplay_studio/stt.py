@@ -108,6 +108,35 @@ def _assert_local_whisper(url: str) -> None:
         )
 
 
+def engine_status() -> dict:
+    """What dictation WILL actually do, and why — one answer for every caller.
+
+    Gap 125: `/api/stt/languages` used to label itself `whisper-server` purely
+    because `EXTERNAL_WHISPER_URL` was set, without running the guard that
+    `/api/stt` applies. So for a remote URL the capability endpoint advertised
+    an engine the transcribe endpoint then refused with a 503 — the writer was
+    told dictation was configured, recorded a paragraph, and only then learned
+    it was not. The label now comes from the SAME check the route enforces, so
+    the two endpoints cannot disagree.
+
+    Runs the real guard on purpose (`_assert_local_whisper`), not a re-implemented
+    loopback test: a second copy is exactly how these two drift apart again.
+    `is_loopback_url` is what actually decides, so a hand-edited URL that only
+    LOOKS local (e.g. `http://127.0.0.1@evil.com`) is reported misconfigured.
+    """
+    if not EXTERNAL_WHISPER_URL:
+        return {"engine": "faster-whisper"}
+    try:
+        _assert_local_whisper(EXTERNAL_WHISPER_URL)
+    except STTUnavailableError as e:
+        # Name the engine that WOULD have been used, and say plainly that this
+        # configuration is refused — rather than claiming a working whisper
+        # server. The reason travels so the UI can explain before the mic opens.
+        return {"engine": "faster-whisper", "misconfigured": "whisper-server",
+                "reason": str(e)}
+    return {"engine": "whisper-server"}
+
+
 def _transcribe_external(audio_bytes: bytes, filename: str, lang: str) -> dict:
     """POST multipart audio to a user-run whisper.cpp server (still localhost)."""
     url = EXTERNAL_WHISPER_URL.rstrip("/")

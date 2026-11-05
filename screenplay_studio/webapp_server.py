@@ -4898,8 +4898,12 @@ def stt_transcribe():
 
 @app.route("/api/stt/languages", methods=["GET"])
 def stt_languages():
-    return jsonify({"languages": _stt.supported_languages(),
-                    "engine": "whisper-server" if _stt.EXTERNAL_WHISPER_URL else "faster-whisper"})
+    """What dictation will do, decided by `stt.engine_status()` — the same guard
+    `/api/stt` enforces, so the capability answer cannot promise an engine the
+    transcribe route refuses (gap 125)."""
+    body = {"languages": _stt.supported_languages()}
+    body.update(_stt.engine_status())
+    return jsonify(body)
 
 
 # ---------- ephemeral reply translation ----------
