@@ -2844,6 +2844,9 @@ body.focus-mode #script-pane { background: var(--ink-950); }
 }
 .modal-hint { font-size: var(--fs-xs); color: var(--text-faint); margin: var(--sp-2) 0 var(--sp-8); line-height: 1.5; }
 .modal-hint code { font-family: var(--mono, monospace); font-size: 0.95em; color: var(--text-muted); }
+/* Gap 58: a destination mismatch is a warning, not a hint — it must not read as
+   fine print next to "everything stays on this machine". */
+.modal-hint.warn { color: var(--danger-text, #fb7185); }
 
 /* Where-the-model-lives switch: one form, two modes. Both options are real
    buttons (not a styled radio) so the whole card is the hit target and the

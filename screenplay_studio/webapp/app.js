@@ -695,6 +695,7 @@ function fillSettingsForm() {
   // info" reset must not overwrite it (a local server on a non-default port is
   // a perfectly ordinary setup).
   setConnectionMode(cfg.connection_mode || "local", { keepUrl: true });
+  renderDestinationWarning(cfg);
 }
 
 async function loadConfig() {
@@ -785,6 +786,19 @@ function setConnectionMode(mode, opts = {}) {
   hint.textContent = text;
 }
 
+/**
+ * Gap 58: render the "your projects are elsewhere" warning from the server's
+ * `destinations` block. Called on config load and after every save, because the
+ * state this reports can only be produced by a save.
+ */
+function renderDestinationWarning(cfg) {
+  const el = $("#destination-warning");
+  if (!el) return;
+  const text = destinationMismatchText(cfg && cfg.destinations);
+  el.textContent = text || "";
+  el.style.display = text ? "" : "none";
+}
+
 document.querySelectorAll(".mode-opt").forEach((btn) => {
   btn.onclick = () => {
     if (btn.disabled) return;
@@ -808,6 +822,7 @@ async function saveConfig() {
   else if (clearTokenOnSave) body.api_key = "";
   try {
     state.config = await api("/config", { method: "POST", body: JSON.stringify(body) });
+    renderDestinationWarning(state.config);
     clearTokenOnSave = false;
     closeModal("#settings-modal");
     applyDemoDisclosure();

@@ -187,6 +187,38 @@ function verificationReadoutText(vs) {
     : null;
 }
 
+/**
+ * Gap 58: what the settings panel must say about existing projects.
+ *
+ * `connectionMode` describes the GLOBAL setting. It is not the same question as
+ * "will my turns go off this machine", because every project carries its own
+ * server_url and credential in its manifest, and those are what the client
+ * factory reads. A "go local" that reset the desk while a project stayed remote
+ * produced the worst possible state: a green "Local" label over turns that were
+ * still being sent to a provider.
+ *
+ * Server-side, `_sync_server_url_to_projects` now keeps them in step, so this
+ * should normally return null. When it does not — a hand-edited manifest, a
+ * project directory that could not be written — the writer must be told, named,
+ * rather than shown a reassurance that is false. Pure, so the wording is tested
+ * in node without a browser.
+ */
+function destinationMismatchText(destinations) {
+  if (!destinations || typeof destinations !== "object") return null;
+  const remote = Array.isArray(destinations.remote_projects)
+    ? destinations.remote_projects : [];
+  if (!remote.length) return null;
+  const names = remote.map((r) => (r && r.project) || "a project");
+  const listed = names.length <= 3
+    ? names.join(", ")
+    : names.slice(0, 3).join(", ") + " and " + (names.length - 3) + " more";
+  return "Still sending to a provider: " + listed + " "
+    + (names.length === 1 ? "has its own" : "have their own")
+    + " server URL and " + (remote.some((r) => r && r.has_credential)
+      ? "an API token saved" : "no token")
+    + ". Save again, or open the project, before assuming this desk is local.";
+}
+
 // ---- Node test hook (browsers never take this branch) ----
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -202,5 +234,6 @@ if (typeof module !== "undefined" && module.exports) {
     _base36,
     _stageStep,
     verificationReadoutText,
+    destinationMismatchText,
   };
 }

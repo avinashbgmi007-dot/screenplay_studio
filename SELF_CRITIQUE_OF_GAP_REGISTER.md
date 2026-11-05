@@ -1353,3 +1353,63 @@ two places that repeated it. The lesson is the standing one for this register: a
 only worth what a recorder says it is, and "I read the code" is not evidence — I had read the code.
 
 Full suite **2408 passed, 7 skipped**; `ruff` clean.
+
+## §46 — Gap 58: settings are all-or-nothing, and "Local" now means local everywhere (2026-11-05)
+
+**FIXED.** Reproduced both halves on the real routes before touching anything:
+
+```
+HALF 1  POST /api/config {"server_url": "http://127.0.0.1:9999", "turn_timeout": -5}
+        -> 400 "turn_timeout must be positive"
+        server_url before: http://127.0.0.1:8080   after: http://127.0.0.1:9999
+
+HALF 2  POST /api/config {"connection_mode": "local"}   -> 200
+        global  : http://localhost:8080   key: None    mode: "local"
+        project : https://provider-b.example.com/v1    key: sk-synthetic-b
+        _make_client(project).base_url -> https://provider-b.example.com/v1
+```
+
+Half 2 was **worse than the register recorded**. The register said the project's URL and key were untouched; what it
+did not say is that the desk then reported `connection_mode: "local"` while an existing project's client — the thing
+that actually sends the script — still resolved to the provider. The status panel reads the mode, so the writer is
+shown a green "everything stays on this machine" over turns that are leaving it. That is the worst shape a privacy
+defect can take: not a silent leak, but a *reassurance* that contradicts the behaviour.
+
+**Half one: validate the whole request, then apply it once.** `_settings_candidate(body)` returns a plan or raises;
+`set_config` writes nothing until it holds a plan. The register's reproduction now leaves all six config fields
+byte-identical, touches no manifest, and the project still opens afterwards. I did this as a separate pure function
+rather than by reordering assignments inside the handler, because "nothing is written before validation" is a
+property you want to be able to *see*, not infer from reading 80 lines in order.
+
+**Half two: propagate the clear, then report any remainder.** "Go local" and `api_key: ""` now reach every manifest,
+so the project's effective destination is loopback with no `extra_headers` — asserted through `_make_client`, not
+through the config. When a project still disagrees (unwritable directory, hand edit), the API says so: a
+`destinations` block on `/api/config` (GET and POST) and `/api/health` names the remote projects, and the settings
+panel renders a warning that names them instead of a "Local" label. The wording is a pure function in `core.js` with
+node tests, so it is checked rather than eyeballed.
+
+**Two regressions of mine, caught by the suite, and both were me relaxing a pinned contract to suit a refactor.**
+My first candidate made `connection_mode: "remote"` with no URL conditional on the saved URL looking local — silently
+weakening `test_remote_needs_a_base_url`. And it made a non-numeric `timeout` fatal after years of it being *ignored*
+(`test_invalid_timeout_ignored_not_crashed`, `test_webapp_config_timeout_validation`). Both fixed in the code, not in
+the tests. A refactor that changes behaviour is not a refactor, and the tempting move in each case was to edit the
+assertion.
+
+**Evidence.** 21 Python tests. Revert measured **per half**: restoring the original mutate-as-you-parse handler fails
+**9**; reverting only the credential propagation (to the old "propagate what was explicitly sent" rule) fails **2**.
+The other 10 are the not-regression half — a valid save still applies everything, remote-without-URL is still
+refused, the forgiving timeout still forgives.
+My first attempt at the half-1 revert **passed 21/21**, which looked like the fix being unnecessary. It was not: I had
+injected the late failure *after* the candidate, so it was unreachable and the revert tested nothing. I redid it from
+`git show` of the previous handler. An unfaithful revert is more dangerous than none, because it reports green.
+
+Plus 5 node tests for the panel wording. One of those failed on my own bad assertion (`!text.includes("e")` against
+"Save again") — the test was wrong, the wording was not.
+
+Full suite **2429 passed, 7 skipped**; `ruff` clean; `npm run test:js-only` 29 passed.
+
+**Not claimed.** Concurrent settings saves are still last-writer-wins, and a turn already in flight when the settings
+change completes finishes on its old client, with no per-turn record of where it went. Neither was reproduced and
+neither is fixed here. Per-project propagation remains best-effort per directory (so one unreadable manifest cannot
+break the save); the `destinations` block turns that silence into a visible report rather than preventing it — which
+is the honest boundary with gap 42.

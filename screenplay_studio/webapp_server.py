@@ -610,8 +610,9 @@ def _privacy_statement() -> dict:
     sees the token. Measured against a loopback recorder, `_auth_headers` sends
     `Authorization: Bearer …` to `127.0.0.1` exactly like anywhere else — the
     short-circuit is for *no token*, not for *local*. A loopback endpoint is
-    still another program, and window.__studioPrivacy could not see it. What is
-    true, and what the block now says, is that nothing leaves the machine.
+    still another program, and nothing in the settings panel said so — which is
+    the same blind spot, one level in. What is true, and what the block now
+    says, is that the credential is used, and that nothing leaves the machine.
     """
     url = CONFIG.get("server_url")
     mode = connection_mode()
@@ -724,6 +725,173 @@ def _credential_refusal(url: str | None) -> str | None:
             f"token for this provider in Settings before testing or saving, so "
             f"a credential is only ever used at the endpoint you approved it "
             f"for.")
+
+
+# Gap 58 sentinels. `_UNSET` means "this request did not mention the field";
+# None is a real value (clear the model). `_KEEP` means "an earlier branch of
+# this same request already decided the value" — the "go local" default must not
+# be overwritten by a `server_url` that was not sent.
+_UNSET = object()
+_KEEP = object()
+
+# What "go local" means, in one place, so the form, the API and the panel agree.
+_LOCAL_SERVER_URL = "http://localhost:8080"
+
+
+def _settings_candidate(body: dict) -> dict:
+    """Validate a whole `/api/config` request WITHOUT touching any state.
+
+    Gap 58: the handler used to mutate as it went — `server_url` was assigned
+    before `turn_timeout` was parsed — so a request that ended in a 400 had
+    already moved the desk to the new endpoint. The writer was told the save
+    failed while half of it had been applied, and the half that landed was
+    usually the one that matters (where the script is sent).
+
+    So: everything is validated here first, and the caller applies the result
+    only if this returns. Raising is the only way out, and a raise means
+    nothing was written. Ordering follows the writer's reading of the form —
+    endpoint, then credential, then numbers — and every message names the field.
+    """
+    out = {"server_url": _UNSET, "api_key": _UNSET, "model": _UNSET,
+           "fast_model": _UNSET, "turn_timeout": _UNSET, "timeout": _UNSET,
+           "clear_token": False, "local_reset": False}
+
+    # ---- the mode switch ---------------------------------------------------
+    mode = _UNSET
+    if "connection_mode" in body:
+        mode = str(body.get("connection_mode") or "").strip().lower()
+        if mode not in ("local", "remote"):
+            raise ValueError("connection_mode must be 'local' or 'remote'")
+        if mode == "remote":
+            _require_remote_optin()
+            if not body.get("server_url"):
+                # Unconditional, as it has always been: "remote" with no URL
+                # names no destination, and reporting success would leave the
+                # form claiming a remote desk it cannot reach. My first draft
+                # made this conditional on the saved URL looking local, which
+                # silently relaxed a pinned contract (`test_remote_needs_a_base_url`)
+                # to suit a refactor that is supposed to change nothing else.
+                raise ValueError(
+                    "A remote connection needs its API base URL — e.g. "
+                    "https://api.example.com/v1 for an OpenAI-compatible endpoint.")
+        elif "server_url" not in body:
+            # "Go local" fills the local info in for you: back to the default
+            # llama-server, token cleared. One click, and the result is a desk
+            # that cannot send the script anywhere.
+            out["server_url"] = _LOCAL_SERVER_URL
+            out["api_key"] = None
+            out["local_reset"] = True
+
+    # ---- endpoint ----------------------------------------------------------
+    if "server_url" in body:
+        url = str(body["server_url"]).rstrip("/")
+        # The opt-in refusal is raised from here, so a remote URL answers with
+        # "--allow-remote-server" before any credential complaint (gap 57).
+        _validate_server_url(url)
+        out["server_url"] = url
+
+    # ---- credential --------------------------------------------------------
+    typed_key = "api_key" in body and bool((body.get("api_key") or "").strip())
+    if "api_key" in body:
+        out["api_key"] = body["api_key"]
+        out["clear_token"] = not typed_key
+
+    # Gap 57: a save that moves the endpoint while the token box is blank would
+    # carry the secret to a provider it was never approved for. Decided against
+    # the CANDIDATE endpoint, so an atomic refusal is the one that happens.
+    candidate_url = out["server_url"] if out["server_url"] is not _UNSET else CONFIG.get("server_url")
+    if body.get("api_key", None) is None and not out["local_reset"]:
+        refusal = _credential_refusal(candidate_url)
+        if refusal:
+            raise ValueError(refusal)
+
+    # ---- numbers -----------------------------------------------------------
+    # `turn_timeout` is a real setting and validates strictly, in the setter and
+    # here: the register's own reproduction used a negative value, and answering
+    # 400 after having moved the URL is the defect under repair.
+    if "turn_timeout" in body:
+        try:
+            turn_timeout = int(body["turn_timeout"])
+        except (TypeError, ValueError):
+            raise ValueError("turn_timeout must be an integer number of seconds")
+        if turn_timeout <= 0:
+            raise ValueError("turn_timeout must be positive")
+        out["turn_timeout"] = turn_timeout
+
+    # `timeout` keeps its long-standing forgiving contract: a value that is not
+    # a number is ignored rather than failing the save. Pinned by
+    # `test_invalid_timeout_ignored_not_crashed`, and unchanged by this fix —
+    # the difference is that ignoring it now cannot coexist with a half-applied
+    # save, because nothing is applied until the end.
+    if "timeout" in body:
+        try:
+            candidate = int(body["timeout"])
+        except (TypeError, ValueError):
+            candidate = None
+        # Ignored when unusable, never fatal — pinned for years by
+        # `test_invalid_timeout_ignored_not_crashed` and
+        # `test_webapp_config_timeout_validation`, and a refactor is not a
+        # licence to turn a forgiving field into a 400.
+        if candidate is not None and candidate > 0:
+            out["timeout"] = candidate
+
+    # ---- plain passthroughs ------------------------------------------------
+    if "model" in body:
+        out["model"] = body["model"] or None
+    if "fast_model" in body:
+        out["fast_model"] = body["fast_model"] or None
+    return out
+
+
+def _project_destinations() -> list[dict]:
+    """Where each existing project would actually send a turn, right now.
+
+    Gap 58's second half: `connection_mode()` describes the GLOBAL setting, so
+    after a "go local" the desk said `local` while an existing project's
+    manifest still resolved to the remote provider — and that project's chat,
+    rewrite and analyze turns used it. The status panel read the mode and was
+    therefore wrong about the thing it exists to report.
+
+    This is the honest list: one row per project, computed from the manifest
+    the client factory actually reads (`_make_client`), not from the config.
+    """
+    rows = []
+    if not os.path.isdir(PROJECTS_DIR):
+        return rows
+    for name in sorted(os.listdir(PROJECTS_DIR)):
+        if not os.path.isfile(os.path.join(PROJECTS_DIR, name, "project.json")):
+            continue
+        try:
+            m = ProjectManifest.load(os.path.join(PROJECTS_DIR, name))
+        except Exception:
+            continue  # unreadable project — the writer library reports those
+        rows.append({
+            "project": name,
+            "server_url": m.server_url,
+            "mode": connection_mode(m.server_url),
+            "has_credential": bool((m.api_key or "").strip()),
+        })
+    return rows
+
+
+def _destination_report() -> dict:
+    """The global destination, plus every project that disagrees with it.
+
+    `remote_projects` is the field the settings panel needs: a non-empty list
+    means "you are in local mode but these projects still send turns to a
+    provider", which is exactly the state gap 58 said must never be silent.
+    """
+    global_mode = connection_mode()
+    projects = _project_destinations()
+    disagreeing = [r for r in projects
+                   if r["mode"] != global_mode or r["server_url"] != CONFIG.get("server_url")]
+    return {
+        "server_url": CONFIG.get("server_url"),
+        "mode": global_mode,
+        "remote_projects": [r for r in disagreeing if r["mode"] == "remote"],
+        "project_count": len(projects),
+        "projects_elsewhere": len(disagreeing),
+    }
 
 
 def _api_key_for(manifest=None) -> str | None:
@@ -1031,8 +1199,7 @@ def _adopt_connection(m: ProjectManifest) -> ProjectManifest:
     return m
 
 
-# sentinel: "model not provided in this request" (None is a real value = clear it)
-_UNSET = object()
+# `_UNSET` is defined once, near the settings candidate that documents it.
 
 
 def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) -> None:
@@ -1064,6 +1231,10 @@ def _sync_server_url_to_projects(server_url: str, model=_UNSET, api_key=_UNSET) 
                     m.model_id = new_model
                     changed = True
             if api_key is not _UNSET:
+                # None here means "the token was cleared", and that must reach
+                # the projects too: gap 58's second half was a "go local" that
+                # reset the global key while every existing project kept the
+                # remote token, so the project's own client still used it.
                 new_key = api_key or None
                 if m.api_key != new_key:
                     m.api_key = new_key
@@ -1351,7 +1522,10 @@ def health():
             # health-only client (the thing an operator scripts) can tell a
             # local-only desk from one permitted to send the script off the
             # machine without parsing a URL and inferring it.
-            "privacy": _privacy_statement()}
+            "privacy": _privacy_statement(),
+            # Gap 58: the health surface is what an operator scripts, and "the
+            # mode says local" is not the same answer as "nothing is remote".
+            "destinations": _destination_report()}
     try:
         _knowledge_base()
     except _KB_DAMAGED as e:
@@ -1401,6 +1575,9 @@ def get_config():
     # co-writer isn't installed; the UI then shows its built-in defaults).
     cfg["demo_model"] = _DEMO_MODEL_ACTIVE
     cfg["privacy"] = _privacy_statement()
+    # Gap 58: what the mode ACTUALLY does for existing projects, next to what
+    # the mode says. The panel must not claim "local" while a project is remote.
+    cfg["destinations"] = _destination_report()
     if _DEMO_MODEL_ACTIVE:
         cfg["real_server_url"] = CONFIG.get("real_server_url")
     else:
@@ -1419,93 +1596,67 @@ def get_config():
 
 @app.route("/api/config", methods=["POST"])
 def set_config():
+    """Save settings — all of them, or none of them.
+
+    Gap 58: this route used to assign as it parsed, so a request rejected at the
+    eleventh field had already changed the first ten. A 400 that has moved the
+    desk to a new endpoint is worse than no save at all, because the writer's
+    next analysis goes somewhere they were told was refused.
+
+    Now `_settings_candidate` validates the entire request and returns a plan,
+    and nothing below is reached unless it succeeded. The propagation to
+    existing projects uses the same plan, so the global config and every
+    manifest cannot disagree about where the model lives — which is the other
+    half of this gap ("go local" resetting the desk while projects stayed
+    remote).
+    """
     global _DEMO_MODEL_ACTIVE
     body = request.get_json() or {}
-    # ---- the mode switch (see `connection_mode` above) ---------------------
-    # "remote" is refused while the process opt-in is off. That is the whole
-    # point of keeping the opt-in at launch: if this request could grant it,
-    # the request that names the remote host would authorise sending the script
-    # there, and the guard would be decorative.
-    if "connection_mode" in body:
-        mode = str(body.get("connection_mode") or "").strip().lower()
-        if mode not in ("local", "remote"):
-            raise ValueError("connection_mode must be 'local' or 'remote'")
-        if mode == "remote":
-            _require_remote_optin()
-            if not body.get("server_url"):
-                raise ValueError(
-                    "A remote connection needs its API base URL — e.g. "
-                    "https://api.example.com/v1 for an OpenAI-compatible endpoint.")
-        elif "server_url" not in body:
-            # "Go local" fills the local info in for you: back to the default
-            # llama-server, token cleared, so switching modes is one click and
-            # never leaves a remote URL pointed at a local-only desk.
-            CONFIG["server_url"] = ServerConfig._DEFAULTS["server_url"]
-            CONFIG["api_key"] = None
-    # Gap 57: did the writer type a token for THIS request? Tracked before the
-    # assignment below so a blank field ("leave the saved one alone") is not
-    # mistaken for a fresh approval.
-    typed_key = ("api_key" in body
-                 and bool((body.get("api_key") or "").strip()))
-    new_url = body.get("server_url", CONFIG["server_url"])
-    if "server_url" in body:
-        # Validate the endpoint BEFORE the credential question, so a remote URL
-        # still answers with the opt-in it needs ("--allow-remote-server")
-        # rather than with an unrelated token complaint. Same check the setter
-        # makes; done here only to get the message order right.
-        _validate_server_url(str(new_url).rstrip("/"))
-        # Gap 57: saving a new endpoint while the token box is blank is the
-        # other half of the defect — the secret would simply follow the URL and
-        # the writer's answer to "where did this token come from" would become
-        # a lie. Refuse, and name the remedy. Three saves are always fine: one
-        # that types the token for the new provider (a real trust decision), one
-        # that clears it (`api_key: ""`), and one to a different port or path
-        # on the SAME origin. With no saved token at all there is nothing to
-        # refuse, so pointing the desk at a new server keeps working.
-        if body.get("api_key", None) is None:
-            refusal = _credential_refusal(new_url)
-            if refusal:
-                raise ValueError(refusal)
-        CONFIG["server_url"] = body["server_url"]
-        # pointing at anything other than the demo IS the switch back:
-        # the demo thread keeps running but stops answering the desk
-        if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
-            _DEMO_MODEL_ACTIVE = False
-    if "api_key" in body:
+    plan = _settings_candidate(body)      # may raise; nothing is written yet
+
+    moved_url = plan["server_url"] is not _UNSET
+    if moved_url:
+        CONFIG["server_url"] = plan["server_url"]
+    if plan["api_key"] is not _UNSET:
         # Assigning the token forgets any previous approval (see `__setitem__`),
-        # so the next line is the only place a token becomes usable somewhere.
-        CONFIG["api_key"] = body["api_key"]
-        # A token the writer actually entered is approved for the endpoint it
-        # was entered for. A cleared token approves nothing.
-        if typed_key:
+        # so `_approve_credential_for` below is the only place a token becomes
+        # usable at an endpoint.
+        CONFIG["api_key"] = plan["api_key"]
+        if (plan["api_key"] or "").strip():
             _approve_credential_for(CONFIG.get("server_url"))
-    if "model" in body:
-        CONFIG["model"] = body["model"] or None
-    if "fast_model" in body:
-        CONFIG["fast_model"] = body["fast_model"] or None
-    if "turn_timeout" in body:
-        CONFIG["turn_timeout"] = body["turn_timeout"]
-    if "timeout" in body:
-        try:
-            CONFIG["timeout"] = int(body["timeout"])
-        except (TypeError, ValueError):
-            pass  # invalid timeout ignored — keep the current value
-    if "server_url" in body or "api_key" in body or "model" in body:
+    if plan["model"] is not _UNSET:
+        CONFIG["model"] = plan["model"]
+    if plan["fast_model"] is not _UNSET:
+        CONFIG["fast_model"] = plan["fast_model"]
+    if plan["turn_timeout"] is not _UNSET:
+        CONFIG["turn_timeout"] = plan["turn_timeout"]
+    if plan["timeout"] is not _UNSET:
+        CONFIG["timeout"] = plan["timeout"]
+    # pointing at anything other than the demo IS the switch back: the demo
+    # thread keeps running but stops answering the desk
+    if _DEMO_MODEL_ACTIVE and CONFIG["server_url"] != _DEMO_URL:
+        _DEMO_MODEL_ACTIVE = False
+
+    if moved_url or plan["api_key"] is not _UNSET or plan["model"] is not _UNSET:
         # the writer changed WHERE the model lives or HOW to reach it — carry
         # that to every existing project too. Without this, projects keep a
         # stale per-project server_url (e.g. an old port) and every LLM call
         # (chat, rewrite, analyze) silently hits a dead server while the status
         # strip shows green (it tests the global URL, not the manifest's).
+        # Passing the token through — including `None` for a clear — is what
+        # makes a local switch actually local for those projects.
         _sync_server_url_to_projects(
             CONFIG["server_url"],
-            body["model"] if "model" in body else _UNSET,
-            api_key=body["api_key"] if "api_key" in body else _UNSET,
+            plan["model"] if plan["model"] is not _UNSET else _UNSET,
+            api_key=(None if plan["clear_token"] else
+                     (CONFIG.get("api_key") if plan["api_key"] is not _UNSET else _UNSET)),
         )
     cfg = CONFIG.to_dict()
     cfg["api_key_set"] = bool(cfg.pop("api_key", None))
     cfg["connection_mode"] = connection_mode()
     cfg["allow_remote"] = bool(_ALLOW_REMOTE_SERVER)
     cfg["privacy"] = _privacy_statement()
+    cfg["destinations"] = _destination_report()
     return jsonify(cfg)
 
 

@@ -186,3 +186,46 @@ test("computeFindingId: the quote tier wins over the issue tier", () => {
   assert.notStrictEqual(withQuote,
     computeFindingId({ category: "dialogue", issue: "the quote wins" }));
 });
+
+// ---- Gap 58: the settings panel must not say "local" over a remote project ----
+const { destinationMismatchText } = require("../../screenplay_studio/webapp/core.js");
+
+test("destinationMismatchText: silent when every project agrees with the mode", () => {
+  assert.strictEqual(destinationMismatchText(null), null);
+  assert.strictEqual(destinationMismatchText({}), null);
+  assert.strictEqual(destinationMismatchText({ remote_projects: [] }), null);
+});
+
+test("destinationMismatchText: names the project still sending to a provider", () => {
+  const text = destinationMismatchText({
+    remote_projects: [{ project: "act-two", has_credential: true }],
+  });
+  assert.ok(text.includes("act-two"), text);
+  assert.ok(/still sending to a provider/i.test(text), text);
+  assert.ok(/API token/.test(text), "a saved credential must be disclosed");
+});
+
+test("destinationMismatchText: says when there is no token, not just when there is", () => {
+  const text = destinationMismatchText({
+    remote_projects: [{ project: "p", has_credential: false }],
+  });
+  assert.ok(/no token/.test(text), text);
+});
+
+test("destinationMismatchText: always tells the writer what to do", () => {
+  const text = destinationMismatchText({ remote_projects: [{ project: "p" }] });
+  assert.ok(/Save again/.test(text), `a warning with no remedy is a puzzle: ${text}`);
+});
+
+test("destinationMismatchText: lists a few names, then counts the rest", () => {
+  // Distinct names, not single letters: the first version of this test asserted
+  // !text.includes("e") and failed on "Save again" — the assertion was wrong,
+  // not the wording.
+  const projects = ["proj-a", "proj-b", "proj-c", "proj-d", "proj-e"]
+    .map((n) => ({ project: n }));
+  const text = destinationMismatchText({ remote_projects: projects });
+  assert.ok(text.includes("proj-a, proj-b, proj-c"), text);
+  assert.ok(text.includes("2 more"), text);
+  assert.ok(!text.includes("proj-d") && !text.includes("proj-e"),
+    `the tail is counted, not enumerated: ${text}`);
+});

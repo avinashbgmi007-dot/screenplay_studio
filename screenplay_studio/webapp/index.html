@@ -604,6 +604,9 @@
       </div>
     </fieldset>
     <p class="modal-hint" id="mode-hint"></p>
+    <!-- Gap 58: shown only when a project's own destination disagrees with the
+         mode label above it. Silent in the normal case. -->
+    <p class="modal-hint warn" id="destination-warning" style="display:none;"></p>
 
     <label class="modal-label" for="server-url-input" id="server-url-label">llama-server URL</label>
     <input type="text" id="server-url-input" placeholder="http://localhost:8080">

@@ -300,6 +300,32 @@ separate redirect bound (gaps 58/70), and claiming this fix closes it would over
 
 **58. Settings can be partially applied even when saving fails, and a local-only API switch can leave a project remote.** In isolated Flask tests, a POST with a new loopback URL and invalid negative `turn_timeout` returned 400, yet process-wide URL had already changed and the project URL had not. Separately, with remote opt-in enabled, a project and synthetic credential set to provider B, posting only `{"connection_mode":"local"}` returned 200 and reset global URL/key, but left the project's remote URL/key intact; actual existing-session destination resolution still chose B. The standard settings form sends an explicit URL and clears the token on a deliberate Local click, so this second reproduction is an API path, not proof that that normal UI switch has the same effect. No outbound request was made. Gap 42 separately covers partial per-project propagation failure. **Recommendation:** validate a complete candidate before any mutation, define and report atomic or explicit partial-application semantics, reconcile per-project state including cleared credentials, and display/authorize each operation's effective destination. Do not claim a local mode switch succeeded while an existing chat can still select a remote endpoint; test failure, concurrent settings changes, existing sessions and in-flight calls.
 
+**FIXED 2026-11-05 (S46), against that recommendation point by point.**
+
+1. *Validate a complete candidate before any mutation.* `_settings_candidate(body)` returns a plan or raises;
+   `set_config` writes nothing until it has the plan. The register's own reproduction (valid new URL + negative
+   `turn_timeout` -> 400) now leaves `server_url`, `model`, `timeout` and `turn_timeout` exactly as they were, and
+   does not touch any manifest.
+2. *Atomic or explicit partial semantics.* Atomic, and now literally so for the config: one apply step at the
+   end. The pre-existing forgiving contracts were **kept** rather than swept into the new strictness — a
+   non-numeric `timeout` is still ignored (`test_invalid_timeout_ignored_not_crashed`), and my first draft made
+   it fatal; that was a regression I caught in the suite, not a design choice.
+3. *Reconcile per-project state including cleared credentials.* "Go local" and `api_key: ""` now propagate
+   the clear to every manifest. Measured through `_make_client`, the client a project actually runs on: after a
+   local switch it is a loopback URL with no `extra_headers`, not the remote provider with the old token.
+4. *Display each operation's effective destination.* New `destinations` block on `/api/config` (GET and POST)
+   and `/api/health`: the global mode, the count of projects, and the projects still resolving to a **remote**
+   origin. The settings panel renders it as a warning naming the projects; `destinationMismatchText` is a pure
+   function with node tests, so the wording is not a string nobody checks.
+
+**Not claimed, and the register said to test it: concurrent settings changes and in-flight calls.** Two saves
+racing each other are still last-writer-wins, and a turn already in flight when the settings change
+completes on its old client — which is correct for that turn, but there is no per-turn record of where it went.
+Neither was reproduced, and neither is fixed here. Per-project propagation can also still fail *silently* for
+one directory (it is deliberately best-effort so a bad manifest cannot break the save); the `destinations`
+block is what turns that silence into a visible report, which is the honest half of gap 42's overlap.
+
+
 **59. Historical report disclosure follows current demo mode, not the report's origin.** In a temporary project with an analysis-complete manifest and a synthetic Markdown report identifying `demo-craft-model`, the actual HTML report export omitted its prominent stand-in banner when current `_DEMO_MODEL_ACTIVE` was false and included it when true. Source also shows the in-app report disclosure follows current configuration. The report text still contained the model identifier in this test, so it was not completely unattributed; the specific missing disclosure is the explanation that the findings are canned. Conversely, the same global decision can place the banner on a historical real-model report while demo mode is active; that inverse is a source-based inference, not separately reproduced. **Recommendation:** persist immutable requested/actual provider, model and demo provenance with each report/run and use that generation's metadata for every report and export; current connection status should label future operations separately. Preserve an honest “origin unknown” state for legacy reports rather than guessing. Test switching providers, restarts, mixed-pass retries, old archives, and historical reports.
 
 Additional connection and demo test suites: **106 passed**. An initial command included nonexistent `tests/test_remote_api.py` and ran no tests; the corrected command ran successfully. The mock-provider tests above do not establish real-provider quality, real-world exploit frequency or complete connection security.
