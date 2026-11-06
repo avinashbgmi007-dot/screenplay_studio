@@ -3268,3 +3268,51 @@ co-writer's 8300 is accepted by the checker as a known port rather than derived
 from `screenplay_cowriter`'s argparse — deriving it is a two-line change but it
 adds a cross-package import to a test for one number, and I chose the smaller
 honest thing over the tidier one.
+
+## §79 — Gap 86: the guard was green because it was checking the wrong thing (2026-11-06)
+
+The filing says these files "ship inside importable packages". They do not. The
+wheel never contained them, and the packaging guard that asserts their absence
+passed the whole time. My own earlier note in the ledger had already caught this —
+*"half of gap 86 is contradicted by the artefact"* — and yet the entry survived as
+written, which is worth noticing on its own: a correction recorded in a side
+document does not fix the register entry it contradicts.
+
+What was actually wrong is smaller and more interesting. The files sat in the
+**source tree**, inside importable packages, where a `.json` reads as data. That is
+the risk the filing names in its last sentence — *"the kind of file that later gets
+loaded because it's there"* — and it is not a packaging risk at all. It was a
+plausibility risk: the directory says "this is part of the parser", and the file
+says "I am JSON", and nobody reads either closely enough to notice that no code
+opens them.
+
+So the interesting repair was not deleting them. It was that **the guard was
+green because it was checking the wrong thing**. `test_wheel_excludes_orphaned_graph_scratch`
+verified the wheel; the problem lived in the tree; the test could not have failed
+no matter how long the files stayed. I kept the test and gave it the other half,
+because retiring a green test while fixing the thing it failed to watch is how a
+repo ends up with one fewer guard and the same blind spot. A guard is only as good
+as the address it watches.
+
+Three details I chose deliberately. **Deleted, not relocated**: git history keeps
+the bytes, nothing reads them, and an `artifacts/` folder for two unwanted files is
+a directory to maintain forever in exchange for a tidier diff. **The pattern, not
+just the deletion**: `.gitignore` now names both, because the generator that made
+them can run again, and a file that reappears silently is the exact failure mode
+being fixed. **A class, not a table**: `SCRATCH_BASENAMES` means a third graphify
+artifact of the same shape trips the guard without anyone remembering to add a row
+— the lesson of this whole gap, since the original defect was a row-shaped
+exemption list that could not grow.
+
+And the honest limit: I did not rebuild the wheel after deleting the files to watch
+them stay absent. The guard plus the absence of any `package-data` glob covering
+them already establish it, and a build costs two minutes — but "established by
+argument" is not "observed", so it is written down as not done rather than implied.
+
+Process note, since it bit me twice in this gap: two of my revert patches applied
+partially and still reported a plausible number (one removed a single line where I
+meant two, leaving the suite green and the revert looking like a false negative;
+another removed the tree check while no scratch file existed to find). Both were
+caught by re-running the revert after verifying the patch actually changed the
+file — `git check-ignore` on a planted file is now part of how I test an ignore
+rule, because a green suite is not the same as a demonstrated behaviour.
