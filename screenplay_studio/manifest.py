@@ -180,6 +180,13 @@ def _refuse_occupied_destination(project_dir: str, source_file: str) -> None:
         "adopted in place instead of replaced.")
 
 
+# The formats a project's source file can be (gap 73). Ordered longest-first so
+# a `.fountain` is never shadowed by a shorter suffix, and kept here rather than
+# inferred from `source_format` because the whole point is to spot a file whose
+# format is NOT the active one.
+_SOURCE_EXTS = (".fountain", ".fdx", ".pdf", ".txt", ".md")
+
+
 @dataclass
 class ProjectManifest:
     project_dir: str
@@ -222,6 +229,67 @@ class ProjectManifest:
     @property
     def source_format_ext(self) -> str:
         return self.source_format if self.source_format.startswith(".") else f".{self.source_format}"
+
+    @property
+    def listed_path(self) -> str:
+        """Where this project's source file is *declared* to live (gap 73).
+
+        `source_path` is derived from `source_format` alone, so it cannot tell
+        a manifest whose source file is missing from one whose source file is
+        a different format — and nothing persisted was guaranteed to exist.
+        `source_filename` is the name the writer actually gave the desk, so
+        when it carries a known screenplay extension it also names the file on
+        disk. Answers None when the filename is absent or not a source format:
+        callers then report "not recorded" rather than guessing.
+        """
+        sf = (self.source_filename or "").strip()
+        low = sf.lower()
+        for ext in _SOURCE_EXTS:
+            if low.endswith(ext):
+                return os.path.join(self.project_dir, "source" + ext)
+        return None
+
+    def unattached_sources(self) -> list:
+        """Source-format files in the project directory that are NOT the active
+        source (gap 73). Reported, never moved or deleted.
+
+        A leftover `source.pdf` beside the active `source.fountain` is real
+        material the writer may still want, and it is also a trap: it is not
+        part of the draft the pages and the export describe, so a writer who
+        opens the folder later has no way to tell the two apart. This answers
+        [{name, size, modified}] so the desk can say so. Any I/O trouble here
+        is not allowed to break the shelf — an unreadable directory simply
+        discloses nothing, which is the pre-gap-73 behaviour, not a crash.
+
+        Scoped to the desk's OWN naming convention — `source.<ext>` — and not
+        to "any file with a script extension". The directory also holds files
+        this desk writes that look like scripts by extension: `report.md` is
+        the analysis report and `draft_notes.md` is the writer's own note. A
+        rule keyed on extension alone would flag those on every project, and a
+        warning that fires on every project is one the writer learns to ignore,
+        which is how a real `source.pdf` gets missed later. Anything outside
+        the convention would have to be guessed at; guess nothing, disclose
+        what the convention makes definite.
+        """
+        active = os.path.realpath(self.source_path)
+        out = []
+        try:
+            names = sorted(os.listdir(self.project_dir))
+        except OSError:
+            return out
+        for name in names:
+            stem, ext = os.path.splitext(name.lower())
+            if stem != "source" or ext not in _SOURCE_EXTS:
+                continue
+            full = os.path.join(self.project_dir, name)
+            if os.path.realpath(full) == active or not os.path.isfile(full):
+                continue
+            try:
+                st = os.stat(full)
+                out.append({"name": name, "size": st.st_size, "modified": st.st_mtime})
+            except OSError:
+                out.append({"name": name, "size": None, "modified": None})
+        return out
 
     @property
     def parsed_path(self) -> str:

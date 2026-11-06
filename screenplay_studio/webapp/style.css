@@ -6520,3 +6520,17 @@ body:not(.idea-mode) .desk {
 @media (prefers-reduced-motion: reduce) {
   .finding-ink.ink-halo, .finding-ink.flash { animation:none; }
 }
+
+/* Gap 73: which file the desk is reading. Quiet by default — it is a fact, not
+   an alert — and it turns amber only when a stray source-format file exists,
+   because that is the case where a writer can pick the wrong file. */
+.project-source {
+  font-size: 11.5px;
+  color: #8a8a8a;
+  margin-left: 10px;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-source-warn { color: #b8860b; }

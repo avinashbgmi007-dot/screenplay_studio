@@ -2538,6 +2538,38 @@ function goHome() {
   loadProjects();
 }
 
+// Gap 73: the pages, the findings and the export all describe ONE file. A
+// leftover source.pdf in the folder looks just as much like the draft, and
+// nothing here used to say which was which — so a writer who later opened the
+// folder had no way to tell, and could hand a collaborator the wrong one.
+// This names the file the desk is actually showing, and reports (never moves)
+// stray source-format files as unattached material.
+function renderSourceProvenance(project) {
+  const line = $("#project-source");
+  if (!line) return;
+  const stray = (project && project.unattached_sources) || [];
+  const name = project && project.source_file;
+  const parts = [];
+  if (name) {
+    parts.push(`Reading ${name}`);
+  } else {
+    // Legacy or hand-assembled project: say so. Do not invent a filename.
+    parts.push("Source file not recorded");
+  }
+  if (stray.length) {
+    const names = stray.map((x) => x.name).join(", ");
+    parts.push(`\u26A0 Not part of this draft: ${names}`);
+    line.title = "These file(s) sit in the project folder and are not the active " +
+      "source, so they are not in the pages or the export. Nothing was moved or deleted.";
+    line.classList.add("project-source-warn");
+  } else {
+    line.title = "The source file these pages, findings and exports describe";
+    line.classList.remove("project-source-warn");
+  }
+  line.textContent = parts.join(" \u00B7 ");
+  line.hidden = false;
+}
+
 async function openProject(name) {
   try {
     // leaving the idea room — the pages are back on the desk
@@ -2591,6 +2623,7 @@ async function openProject(name) {
     $("#project-bar").style.display = "flex";
     $("#project-title").textContent = project.title;
     $("#project-title").title = project.title;
+    renderSourceProvenance(project);
 
     refreshDeskToolbar(); // Phase 8: the desk toolbar owns the analysis lifecycle
 

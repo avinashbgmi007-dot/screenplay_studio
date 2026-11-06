@@ -1325,6 +1325,14 @@ def _manifest_summary(m: ProjectManifest) -> dict:
         "drafts": m.drafts,
         "active_draft": m.active_draft,
         "report_language": m.report_language,
+        # Gap 73: which file the pages actually came from, and what else in the
+        # folder looks like a script but is not part of this draft. The export
+        # went out with neither, so a writer holding a stray source.pdf had no
+        # way to learn it was not the draft.
+        "source_file": m.source_filename,
+        "source_format": m.source_format,
+        "source_recorded": bool((m.source_filename or "").strip()),
+        "unattached_sources": m.unattached_sources(),
         # categories that failed in the last analyze run (partial success) —
         # the frontend offers a one-click "retry failed" when this is non-empty
         "failed_categories": (m.stage("analyze").output_paths or {}).get("failed_categories") or [],
@@ -3239,12 +3247,23 @@ def export_script(name):
     safe_title = "".join(c if c.isalnum() or c in "-_ " else "_" for c in (doc.title or m.title or "script"))
     ext = {"fountain": ".fountain", "fdx": ".fdx", "txt": ".txt"}[fmt]
     mimetype = {"fountain": "text/plain", "fdx": "application/xml", "txt": "text/plain"}[fmt]
-    return send_file(
+    resp = send_file(
         io.BytesIO(text.encode("utf-8")),
         mimetype=mimetype,
         as_attachment=True,
         download_name=f"{safe_title}{ext}",
     )
+    # Gap 73: an exported artifact that does not say what it was made FROM can
+    # be mistaken for the whole story. The filename is the honest answer when
+    # the manifest recorded one; "not-recorded" is the honest answer when it
+    # did not, and is deliberately not smoothed over into a guessed name.
+    resp.headers["X-Source-File"] = (m.source_filename or "").strip() or "not-recorded"
+    resp.headers["X-Source-Format"] = m.source_format or "not-recorded"
+    strays = m.unattached_sources()
+    resp.headers["X-Unattached-Sources"] = str(len(strays))
+    if strays:
+        resp.headers["X-Unattached-Names"] = ", ".join(x["name"] for x in strays)
+    return resp
 
 
 # ---------- beat board ----------
