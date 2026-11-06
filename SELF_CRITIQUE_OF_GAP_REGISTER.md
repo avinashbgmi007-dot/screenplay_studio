@@ -3165,3 +3165,58 @@ that lied about itself; gap 83 is the first one about *documentation* lying abou
 the code, and it was filed as low severity precisely because prose doesn't crash.
 Nothing was connecting the two, which is why it survived long enough to be noticed
 by a reader rather than by a test. Now something connects them.
+
+## §77 — Gap 84: a total is a checksum over a number, not over the content (2026-11-06)
+
+The filing contains one sentence that is worth more than the four missing rows,
+and I built the fix around it: *the document's own totals paragraph claims a count
+pinned by a test; the count test can pass while individual rows drift.*
+
+That is exactly right, and it generalises. `**Totals:** 103 endpoints … = 105` is
+an assertion about a scalar. Add two routes and delete two and the scalar is
+unchanged while the document describes the wrong software. Every count-shaped
+guard in this repo has that property — the entry-table "FIXED" flag, the route
+census, the schema-version numbers — and the fix is always the same: compare the
+**set**, not its size.
+
+So the guard now runs in both directions, and the second direction is the one that
+was never possible before. `undocumented` catches the code outrunning the doc.
+`dead` catches the doc describing a route that no longer exists — which a total can
+never see, because removing a route and forgetting its row leaves the count wrong
+in a way that a *later* addition silently re-balances.
+
+Three decisions I want on the record.
+
+**The prose is not generated.** I could have had `route_map.py` emit the whole
+table and been done. But the useful part of those rows is not the path — it is
+"grounded in knowledge-base rule <id>, so the desk can answer *says who?*" and
+"no model call, report untouched". A generator would replace every one of those
+with a path list to satisfy a checker, which is documentation being optimised for
+its test instead of its reader. So: human prose, mechanical census, both checked,
+in one file and separate.
+
+**The checker is tested, including its ability to fail.** Strip a row and it must
+report `undocumented`; add a ghost row and it must report `dead`; hand-edit the
+generated block and regeneration must stop being a no-op. I learned this the hard
+way in gap 73, where a revert came back 15/15 because the assertion matched its own
+function definition. A checker nobody has watched fail is a checker that might be
+returning an empty list for the wrong reason.
+
+**CI, not just the suite.** `python tools/route_map.py` runs as its own lint-job
+step. A stale doc can fail the suite too — but a failure named
+`test_no_live_route_is_undocumented` buried among 2900 tests reads as a code
+regression, and the diagnosis is "the doc is stale", which is a different job with
+a different fix. Put the check where its failure is legible.
+
+Two of my own bugs in the tool, both the same shape as the gap itself: it counted
+the co-writer server's `/sessions` rows (which gap 83 had just put in the same
+file) as dead **webapp** routes, and it compared `(method, path)` pairs, which
+flagged routes that were documented perfectly well under their primary verb. Both
+were assumptions about a document I had not read closely enough — a checker that
+does not know which server it is checking is a checker that will be switched off.
+
+Recorded as not done: the comparison is **path**-level. A route registered as POST
+but documented under GET passes. Making the pair the unit means regenerating every
+prose row, which is a bigger change than this gap asked for, and it is written down
+rather than half-done. Endpoint *names* are likewise unverified, so a stale
+`get_rule` → `load_rule` in prose would not be caught.
