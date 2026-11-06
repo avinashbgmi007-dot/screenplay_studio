@@ -3016,3 +3016,54 @@ Nothing was lost — the tree matched — but `git log` and `git status` disagre
 and a `git add -A` in that state would have staged 166 files of noise. The check
 that caught it was cheap: `git ls-remote` against `git rev-parse HEAD`. Worth
 doing at the start of any turn that follows a reset.
+
+## §74 — Gap 80: the escape hatch was locked by the thing it exists to escape (2026-11-06)
+
+The filing reads like a UI complaint — card says "unreadable", refuses to open —
+and it was filed as *minor*. The measurement made it worse than filed: **six**
+routes answered 503, and one of them was `/backup`.
+
+That is the whole finding, and it is worth stating plainly because it is a class,
+not an instance. Every route loads the manifest first, for good reasons. `/backup`
+also loads it first, for no reason at all — backup does not need a manifest, it
+needs a directory. So the single action whose entire purpose is "get this folder
+somewhere else before anything else goes wrong" was the one action unavailable
+exactly when it was needed. Guards that sit in front of the recovery path are
+guards that convert a small damage into a large one.
+
+I had the same bug inside my own patch and caught it before it shipped: I had
+registered the recovery function at `/backup` as well, which would have shadowed
+the real backup route and silently replaced the gap-72/73 archive — with its
+manifest, its completeness header and its export provenance — with a plain folder
+copy, for every healthy project. The gate would not have caught that; the
+gap-72 tests would have. I kept a test that a healthy `/backup` still returns a
+real `backup-manifest.json`, and it exists because of that near-miss rather than
+because of the gap.
+
+Two refusals I want on the record, both of which are the tempting shortcut:
+
+- **Repair will not overwrite a readable manifest.** The route exists for damage;
+  if the file loads, there is nothing to fix and the "fix" would destroy the only
+  accurate record. Same logic as gap 70's repair on the idea side.
+- **Repair will not invent a source.** No screenplay in the folder means no
+  honest manifest, so it answers 400 and changes nothing rather than rebuilding
+  an empty project that looks like data loss to everyone who opens it later.
+
+And the rebuild does **not** claim the project was parsed. `parsed.json` is often
+still sitting there, which makes "parse: complete" the obvious and wrong choice —
+the desk would then show pages it never actually read under a manifest it just
+invented. It starts `pending` and says "re-run the parse".
+
+Recorded as not done, because it is the part a reader would assume: `/script`,
+`/drafts`, `/export` and `/report` **still 503** on a damaged manifest. I left
+them. They all need real manifest fields — stage outputs, the draft list, the
+model — that a corrupt file cannot supply, and fabricating those would be a worse
+lie than the refusal. The writer's way out is the recovery routes and a rebuild,
+not a half-working desk. Also stated, not fixed: `/recover` serves the raw
+manifest to anyone who can reach the port, which is the same trust boundary as
+every other route here but is worth knowing given it returns raw bytes.
+
+One process note. This gap, like the last three, began with a sandbox whose local
+git history had reverted to the pre-72 base while the worktree still matched
+origin. I now check `git rev-parse HEAD` against `git ls-remote` before touching
+code; it cost one call and saved a `git add -A` over 166 files of noise.
