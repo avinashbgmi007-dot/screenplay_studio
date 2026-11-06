@@ -1558,7 +1558,22 @@ def _load_report_sanitized(m: ProjectManifest) -> dict:
     # marks cannot land in two different id spaces after an upgrade.
     from .revision import annotate_report_scene_keys
     report = annotate_report_scene_keys(m, report)
-    return _sanitize_report(report)
+    report = _sanitize_report(report)
+    # Gap 59: the in-app view labels the reading from the RUN's own record, not
+    # from whether demo mode is on right now. `model_used` is persisted with the
+    # report, so this survives a provider switch, a restart and an archive; the
+    # strip's `demo_model` flag describes the CURRENT connection and is used for
+    # future operations only. `stand_in` is tri-state on purpose: "unknown" is a
+    # real answer for a report written before the field existed, and it must not
+    # be rendered as either "real" or "canned".
+    from screenplay_analyzer.report import model_is_stand_in
+    used = report.get("model_used")
+    report["provenance"] = {
+        "model_used": used,
+        "stand_in": (None if not (used or "").strip()
+                     else bool(model_is_stand_in(used))),
+    }
+    return report
 
 
 def _error(message: str, status: int = 400):
@@ -4113,6 +4128,17 @@ DEMO_REPORT_BANNER = (
     'run the analysis again for a real review.</div>'
 )
 
+# Gap 59: a third disclosure, for the case the old code guessed about. When a
+# report's own record does not say what produced it, the honest statement is
+# that the origin is unknown — never a guess from whatever is configured NOW.
+UNKNOWN_ORIGIN_BANNER = (
+    '<div class="demo-banner"><b>Report origin not recorded.</b> This report '
+    'does not say which model produced it, so it cannot be checked whether the '
+    'findings came from your own model or from the built-in stand-in. The '
+    'contents are unchanged; treat the provenance as unknown rather than '
+    'assuming either. Running the analysis again will record it.</div>'
+)
+
 
 def _report_banner(model_used: str | None = None) -> str:
     """The disclosure an exported report carries when the analysis came from the
@@ -4123,17 +4149,21 @@ def _report_banner(model_used: str | None = None) -> str:
     demo mode is on RIGHT NOW. An archived demo report exported after the writer
     connected their real server therefore lost its banner and read as a real
     review, and a real report produced while demo mode happened to be on would
-    have been labelled canned. The decision now comes from the RUN's record
+    have been labelled canned. The decision comes from the RUN's record
     (`model_used`, persisted with the report), which is what the artifact is
     actually a record of.
 
-    `model_used=None` means the caller could not establish the run's model; the
-    banner then falls back to the old global check rather than claiming a real
-    reading it cannot vouch for.
+    Gap 59: the last piece of the old behaviour was the `None` branch, which fell
+    back to the same global. Measured: with `model_used=None` the banner
+    appeared when demo mode happened to be on and disappeared when it was off —
+    the report's provenance following the current configuration, which is the
+    defect. A legacy report with no recorded model is now labelled as exactly
+    that: origin unknown. Guessing here is worse than admitting the gap, because
+    both guesses are wrong half the time and the reader cannot tell which.
     """
     from screenplay_analyzer.report import model_is_stand_in
-    if model_used is None:
-        return DEMO_REPORT_BANNER if _DEMO_MODEL_ACTIVE else ""
+    if model_used is None or not str(model_used).strip():
+        return UNKNOWN_ORIGIN_BANNER
     return DEMO_REPORT_BANNER if model_is_stand_in(model_used) else ""
 
 

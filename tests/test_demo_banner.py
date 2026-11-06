@@ -38,19 +38,32 @@ class TestExportedReportBanner:
     # "demo-banner" made two of these tests pass/fail for the wrong reason.)
     MARK = "Built-in stand-in model."
 
+    # Gap 59 corrected this class. These tests used to call `_report_banner()`
+    # with NO ARGUMENT, which is precisely the defect: the disclosure was decided
+    # by the live demo flag rather than by what produced the report. The banner
+    # is now a function of the run's recorded model, so every assertion below
+    # passes one — and the live flag is asserted NOT to matter.
     def test_a_real_model_report_carries_no_banner(self, demo):
         """A permanent banner would train the writer to ignore it."""
         demo(False)
-        assert ws._report_banner() == ""
-        assert self.MARK not in ws._md_to_html(MD, ws._report_banner())
+        assert ws._report_banner("my-llama-7b") == ""
+        assert self.MARK not in ws._md_to_html(MD, ws._report_banner("my-llama-7b"))
 
     def test_a_demo_report_carries_the_banner(self, demo):
         demo(True)
-        assert ws._report_banner() == ws.DEMO_REPORT_BANNER
+        assert ws._report_banner("demo-craft-model") == ws.DEMO_REPORT_BANNER
+
+    def test_the_live_flag_does_not_decide_the_banner(self, demo):
+        """The gap, stated as an assertion: same report, either setting, one answer."""
+        for setting in (True, False):
+            demo(setting)
+            assert ws._report_banner("demo-craft-model") == ws.DEMO_REPORT_BANNER
+            assert ws._report_banner("my-llama-7b") == ""
+            assert ws._report_banner(None) == ws.UNKNOWN_ORIGIN_BANNER
 
     def test_the_banner_lands_at_the_top_of_the_exported_document(self, demo):
         demo(True)
-        html = ws._md_to_html(MD, ws._report_banner())
+        html = ws._md_to_html(MD, ws._report_banner("demo-craft-model"))
         body_at = html.index("<body>")
         banner_at = html.index(self.MARK)
         content_at = html.index("<h1>")
@@ -68,7 +81,7 @@ class TestExportedReportBanner:
 
     def test_the_export_styles_the_banner(self, demo):
         demo(True)
-        html = ws._md_to_html(MD, ws._report_banner())
+        html = ws._md_to_html(MD, ws._report_banner("demo-craft-model"))
         assert ".demo-banner" in html, "an unstyled banner would render as a bare div"
 
     def test_an_empty_banner_leaves_the_document_unchanged(self):

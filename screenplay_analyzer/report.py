@@ -174,6 +174,13 @@ def render_markdown(result: AnalysisResult) -> str:
     lines.append(f"**Parsed from:** `{doc.source_filename}` ({doc.source_format}, parse confidence: {doc.parse_confidence})")
     if result.model_used:
         lines.append(f"**Analyzed with:** `{result.model_used}`")
+    else:
+        # Gap 59: a legacy result carries no model record. Saying nothing lets
+        # the reader assume the default (or whatever is configured now); saying
+        # "unknown" is the only true statement, and it is what the HTML export's
+        # banner says too, so the two artifacts agree.
+        lines.append("**Analyzed with:** *not recorded* — this result does not say "
+                     "which model produced it, so its provenance is unknown.")
     if model_is_stand_in(result.model_used):
         # Its own line, above everything the writer is about to read, because
         # the whole report's standing changes: this is a demo of the machinery,

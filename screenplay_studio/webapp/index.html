@@ -269,10 +269,25 @@
                  is display:none for a project, where the report renders in this
                  dock. Static (outside .dock-body) so renderDockEvidence(), which
                  replaces the lens contents, cannot wipe it. -->
+            <!-- Gap 59: two disclosures, two subjects. The origin banners say what
+                 THIS REPORT is (from the run's record); the connection banner says
+                 what the co-writer and the next analysis will use (the live
+                 setting). One element claiming both is what made an archived demo
+                 report read as real once a real server was connected. -->
+            <div class="demo-banner dock-demo-banner" data-report-origin="stand-in" hidden>
+              <b>Built-in stand-in model.</b> These findings came from the demo craft
+              model, not a real language model — the findings are canned, not a
+              reading of your pages. Run the analysis again with your own model.
+            </div>
+            <div class="demo-banner dock-demo-banner" data-report-origin="unknown" hidden>
+              <b>Report origin not recorded.</b> This report does not say which model
+              produced it, so it cannot be checked whether the findings came from
+              your model or the built-in stand-in.
+            </div>
             <div class="demo-banner dock-demo-banner" data-demo-banner hidden>
-              <b>Built-in stand-in model.</b> These findings and the co-writer both
-              come from the demo craft model, not a real language model. Connect your
-              own llama-server for a real review.
+              <b>Built-in stand-in model connected.</b> The co-writer and any analysis
+              you run now will use the demo craft model, not a real language model.
+              Connect your own llama-server for a real review.
             </div>
             <div class="dock-lenses" role="tablist" aria-label="Dock lenses">
               <button class="dock-lens-tab" id="dock-tab-evidence" role="tab" aria-selected="true" aria-controls="dock-lens-evidence" type="button">Evidence</button>
@@ -409,10 +424,19 @@
              — the drawer serves the writer's desk AND the consultant's/idea
              room, so one banner discloses the demo partner in whichever room
              is lit (the legacy panel banner retired with the panel). -->
-        <div class="demo-banner" data-demo-banner hidden>
+        <div class="demo-banner" data-report-origin="stand-in" hidden>
           <b>Built-in stand-in model.</b> This report comes from the demo craft
           model, not a real language model — the findings are canned, not a reading
           of your pages. Connect your own llama-server and run the analysis again.
+        </div>
+        <div class="demo-banner" data-report-origin="unknown" hidden>
+          <b>Report origin not recorded.</b> This report does not say which model
+          produced it, so its provenance is unknown — it may be a real reading or
+          the built-in stand-in.
+        </div>
+        <div class="demo-banner" data-demo-banner hidden>
+          <b>Built-in stand-in model connected.</b> The co-writer and any new analysis
+          will use the demo craft model, not a real language model.
         </div>
 
       <!-- Co-write room: the writer's desk -->

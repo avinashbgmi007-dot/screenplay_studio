@@ -1002,15 +1002,46 @@ function partnerLabel(base) {
     : base;
 }
 
-// The report's own disclosure. One attribute, several surfaces: the report lives
-// in the dock for a project and in the Feedback panel for the idea room, and a
-// demo studio is a stand-in for the findings AND the co-writer either way. Toggling
-// them all from one place is what stops one surface drifting out of date.
+// The report's own disclosure.
+//
+// Gap 59: this used to key entirely off `state.config.demo_model` — the CURRENT
+// connection. An archived demo report opened after the writer connected their
+// real server lost its disclosure and read as a real review, and a real report
+// viewed while demo mode happened to be on was labelled canned. Which report
+// this is has nothing to do with what the desk is connected to right now.
+//
+// Now there are two kinds of statement, and they are kept apart:
+//   * [data-report-origin] — describes THIS REPORT. Driven by the run's own
+//     record (`state.report.provenance`, tri-state: canned / real / unknown).
+//     Hidden when the report is from a real model, because a permanent banner
+//     trains the writer to ignore it.
+//   * [data-demo-banner] — describes THIS CONNECTION (the co-writer partner and
+//     any future analysis). Still driven by the live flag, because that is what
+//     it is about.
+function reportProvenance() {
+  const p = state.report && state.report.provenance;
+  if (!p) return null;                       // no report on screen
+  return p.stand_in;                         // true | false | null (unknown)
+}
+
+function applyReportOrigin(scope) {
+  const origin = reportProvenance();
+  const root = scope || document;
+  root.querySelectorAll("[data-report-origin]").forEach((el) => {
+    const want = el.getAttribute("data-report-origin");   // "stand-in" | "unknown"
+    const show = want === "stand-in" ? origin === true
+      : want === "unknown" ? origin === null
+        : false;
+    el.hidden = !show;
+  });
+}
+
 function applyDemoDisclosure() {
   const demo = isDemoModel();
   document.querySelectorAll("[data-demo-banner]").forEach((el) => {
     el.hidden = !demo;
   });
+  applyReportOrigin();
 }
 
 function updateStatusStrip() {
@@ -4393,6 +4424,8 @@ async function loadScriptData() {
   }
   state.findings = findings;
   state.report = report;
+  // Gap 59: the disclosure follows the report that just landed, not the setting.
+  applyReportOrigin();
   // A full pass has the same two rule passes in it, judged against the same
   // text — so the provisional rows are retired rather than left on screen
   // disagreeing with the report that just landed.

@@ -2786,3 +2786,41 @@ run. The operator is told on stdout and `/api/config` already carries
 `demo_model`, but the desk has no distinct no-model banner, and I did not invent
 one inside a startup fix. That is recorded in the register tail rather than
 claimed as done.
+
+## §69 — Gap 59: the fix for this gap had itself a hole (2026-11-06)
+
+Gap 88 had already been here. It moved the disclosure from "is demo mode on right
+now" to "what did the run record", which is the right idea — and then wrote:
+
+    `model_used=None` means the caller could not establish the run's model; the
+    banner then falls back to the old global check
+
+That sentence is this gap, wearing a comment. When the record is missing, the
+old global check is exactly the dishonest behaviour, and it is dishonest in
+both directions: unknown-while-demo-on labels a real report canned, and
+unknown-while-demo-off silently drops the disclosure from a canned one. A
+partial fix with a documented exception at the boundary is worth less than it
+looks, because the exception is where the interesting cases live — legacy
+archives, reports written before the field existed, anything where the record
+did not survive.
+
+So the third state is now a first-class answer, not a fallback. `stand_in` is
+`True`, `False`, or `None`, and `None` renders its own banner that says what is
+actually true: the origin is not recorded and cannot be checked. I resisted
+writing "this may be a demo report" because that is a hedge that still tells the
+reader nothing; naming the missing record is more useful than either guess.
+
+The client half needed a structural change rather than a predicate change. There
+was ONE attribute (`data-demo-banner`) doing two jobs: describing the report and
+describing the connection. Any single predicate would have been wrong for one of
+them, which is why the old code looked reasonable and behaved badly. Splitting
+them — `[data-report-origin]` from `state.report.provenance`, `[data-demo-banner]`
+from the live config — is the actual fix, and the test asserts the report-origin
+function does not read `state.config` at all, because the day it does the bug is
+back.
+
+Recorded as not done: the entry asks for immutable provenance per run, including
+mixed-pass retries. `model_used` is still one string per report, so a retry that
+ran on a different model overwrites the earlier record instead of recording
+both. That needs a schema change to the report artifact (a runs list) and I did
+not fold it into a disclosure fix.
