@@ -25,6 +25,14 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      # Gap 84: the route map is checked in BOTH directions here, not inside the
+      # test suite only. The test file needs the app to import (Flask, the demo
+      # model fallback); this job's job is exactly that, and failing the lint job
+      # on a stale doc is cheaper and more legible than a red test named
+      # "test_no_live_route_is_undocumented" buried among 2900 others.
+      - name: Route map is current (docs/API_ROUTE_MAP.md vs the live URL map)
+        run: python tools/route_map.py
+
   test-python:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

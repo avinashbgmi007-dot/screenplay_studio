@@ -79,6 +79,7 @@ analyze/cancel (R2) plus library/backup (R7).)
 |--------|------|---------|---------|
 | GET | `/api/health` | `health` | Liveness/health probe. |
 | GET | `/api/config` | `get_config` | Read server config (server_url, model, fast_model, timeout, personas, modes). |
+| GET | `/api/rules/<rule_id>` | `get_rule` | The shipped knowledge-base rule behind a "grounded in rule <id>" claim, so the desk can answer "says who?" (spec §7). |
 | POST | `/api/config` | `set_config` | Update server config (validated `ServerConfig`). |
 | POST | `/api/test-connection` | `test_connection` | Probe the configured llama-server. |
 | GET | `/api/real-server-check` | `real_server_check` | Report whether a real model is reachable (vs built-in demo). |
@@ -111,6 +112,7 @@ analyze/cancel (R2) plus library/backup (R7).)
 | GET | `/api/projects/<name>/progress` | `get_progress` | Analysis progress / stage statuses. |
 | GET | `/api/projects/<name>/fixqueue` | `get_fixqueue` | Severity-sorted worklist (findings + dismissal + addressed state). |
 | GET | `/api/projects/<name>/findings/summary` | `get_findings_summary` | Counts by severity × category × status + dawn %, one call. |
+| POST | `/api/projects/<name>/findings/intent` | `set_finding_intent_route` | The writer's own judgment on a finding (mark addressed / defer), keyed by content-hash id so it survives report regeneration; `intent: null` clears it. |
 | GET | `/api/projects/<name>/findings` | `get_findings` | Queryable findings (`scene`/`status`/`severity`/`category`/`include_dismissed`; `group_by=issue-text` for display groups). |
 | POST | `/api/projects/<name>/findings/intent/batch` | `set_finding_intents_batch` | Batch writer intent marks (`{intents: {finding_id: intent}}`, 500 max). |
 | POST | `/api/projects/<name>/findings/verdict/batch` | `set_finding_verdicts_batch` | Batch writer TRUTH verdicts (`{verdicts: {finding_id: correct\|partial\|incorrect}}`, 500 max). |
@@ -146,6 +148,8 @@ analyze/cancel (R2) plus library/backup (R7).)
 | Method | Path | Handler | Purpose |
 |--------|------|---------|---------|
 | GET | `/api/projects/<name>/edits` | `get_edits` | Current edit log + redo availability. |
+| GET | `/api/projects/<name>/passes` | `get_pass_history` | The revision arc: one entry per analysis this project has had (spec §15.4). |
+| POST | `/api/projects/<name>/quickcheck` | `quickcheck_project` | Re-run the deterministic passes against the working copy on edit — no model call, report untouched (spec §15.3). |
 | POST | `/api/projects/<name>/rewrite` | `rewrite_scene_endpoint` | Request doctor's replacement candidates for a scene. |
 | POST | `/api/projects/<name>/edits/apply` | `apply_edits` | Apply accepted replacements to the working copy. |
 | POST | `/api/projects/<name>/edits/undo` | `undo_edits` | Undo last applied edit. |
@@ -246,3 +250,121 @@ analyze/cancel (R2) plus library/backup (R7).)
 |--------|------|---------|---------|
 | GET | `/v1/models` | `models` | Advertise `demo-craft-model`. |
 | POST | `/v1/chat/completions` | `chat_completions` | Non-streaming + SSE persona-distinct replies. |
+
+<!-- BEGIN GENERATED: route census (tools/route_map.py) -->
+
+## Route census (generated — do not hand-edit this block)
+
+Written by `tools/route_map.py` from the live Flask URL map. The prose
+above is the human half (what each route *means*); this table is the
+mechanical half (what actually exists). `tests/test_route_map_is_current.py`
+checks both directions, so a route added without a row and a row left
+behind by a deleted route both fail the suite.
+
+**101 live `/api` routes.**
+
+| Method | Path | Endpoint |
+|---|---|---|
+| DELETE | `/api/ideas/<idea_id>` | `delete_idea` |
+| DELETE | `/api/ideas/<idea_id>/chat/sessions/<sid>` | `idea_delete_session` |
+| DELETE | `/api/preview/chat/<name>` | `preview_chat_clear` |
+| DELETE | `/api/projects/<name>` | `delete_project` |
+| DELETE | `/api/projects/<name>/chat/sessions/<sid>` | `delete_session` |
+| DELETE | `/api/projects/<name>/notes/<note_id>` | `delete_note_endpoint` |
+| DELETE | `/api/projects/<name>/stash/<entry_id>` | `delete_stash_entry` |
+| GET | `/api/config` | `get_config` |
+| GET | `/api/health` | `health` |
+| GET | `/api/ideas` | `list_ideas` |
+| GET | `/api/ideas/<idea_id>` | `get_idea` |
+| GET | `/api/ideas/<idea_id>/chat/sessions/<sid>` | `idea_get_session` |
+| GET | `/api/ideas/<idea_id>/recover` | `recover_idea` |
+| GET | `/api/library/backup` | `backup_library` |
+| GET | `/api/preview/chat/<name>` | `preview_chat_get` |
+| GET | `/api/preview/data/<name>` | `preview_data` |
+| GET | `/api/preview/projects` | `preview_projects` |
+| GET | `/api/projects` | `list_projects` |
+| GET | `/api/projects/<name>` | `get_project` |
+| GET | `/api/projects/<name>/backup` | `backup_project` |
+| GET | `/api/projects/<name>/beatboard` | `get_beatboard` |
+| GET | `/api/projects/<name>/beatboard/export` | `export_beatboard` |
+| GET | `/api/projects/<name>/characters` | `get_character_tracks` |
+| GET | `/api/projects/<name>/chat/sessions/<sid>` | `get_session` |
+| GET | `/api/projects/<name>/compare` | `get_compare` |
+| GET | `/api/projects/<name>/diff` | `get_diff` |
+| GET | `/api/projects/<name>/drafts` | `list_drafts` |
+| GET | `/api/projects/<name>/edits` | `get_edits` |
+| GET | `/api/projects/<name>/export` | `export_script` |
+| GET | `/api/projects/<name>/feedback/ledger` | `get_feedback_ledger` |
+| GET | `/api/projects/<name>/findings` | `get_findings` |
+| GET | `/api/projects/<name>/findings/accuracy` | `get_finding_accuracy` |
+| GET | `/api/projects/<name>/findings/summary` | `get_findings_summary` |
+| GET | `/api/projects/<name>/findings/verdicts` | `get_finding_verdicts` |
+| GET | `/api/projects/<name>/fixqueue` | `get_fixqueue` |
+| GET | `/api/projects/<name>/metrics` | `get_metrics` |
+| GET | `/api/projects/<name>/notes` | `get_notes` |
+| GET | `/api/projects/<name>/passes` | `get_pass_history` |
+| GET | `/api/projects/<name>/progress` | `get_progress` |
+| GET | `/api/projects/<name>/recover` | `recover_project` |
+| GET | `/api/projects/<name>/recover/backup` | `recover_backup` |
+| GET | `/api/projects/<name>/report` | `get_report` |
+| GET | `/api/projects/<name>/report/export` | `export_report` |
+| GET | `/api/projects/<name>/script` | `get_script` |
+| GET | `/api/projects/<name>/stash` | `get_stash` |
+| GET | `/api/real-server-check` | `real_server_check` |
+| GET | `/api/rules/<rule_id>` | `get_rule` |
+| GET | `/api/stt/languages` | `stt_languages` |
+| GET | `/api/writer-library` | `get_writer_library` |
+| GET | `/api/writer-memory` | `get_writer_memory` |
+| PATCH | `/api/projects/<name>/notes/<note_id>` | `update_note_endpoint` |
+| POST | `/api/config` | `set_config` |
+| POST | `/api/ideas` | `create_idea` |
+| POST | `/api/ideas/<idea_id>/card` | `save_idea_card` |
+| POST | `/api/ideas/<idea_id>/chat/sessions/<sid>/messages` | `idea_send_message` |
+| POST | `/api/ideas/<idea_id>/chat/sessions/<sid>/messages/stream` | `send_idea_message_stream` |
+| POST | `/api/ideas/<idea_id>/chat/sessions/<sid>/settings` | `idea_update_settings` |
+| POST | `/api/ideas/<idea_id>/chat/sessions/<sid>/translate` | `idea_translate_message` |
+| POST | `/api/ideas/<idea_id>/chat/start` | `start_idea_chat` |
+| POST | `/api/ideas/<idea_id>/content` | `save_idea_content` |
+| POST | `/api/ideas/<idea_id>/graduate` | `graduate_idea` |
+| POST | `/api/ideas/<idea_id>/rename` | `rename_idea` |
+| POST | `/api/ideas/<idea_id>/repair` | `repair_idea` |
+| POST | `/api/preview/chat/<name>` | `preview_chat_send` |
+| POST | `/api/projects` | `create_project` |
+| POST | `/api/projects/<name>/analyze` | `analyze_project` |
+| POST | `/api/projects/<name>/analyze/cancel` | `cancel_analyze` |
+| POST | `/api/projects/<name>/analyze/retry-failed` | `retry_failed_categories` |
+| POST | `/api/projects/<name>/beatboard/reset` | `reset_beatboard` |
+| POST | `/api/projects/<name>/chat/sessions/<sid>/fork` | `fork_session` |
+| POST | `/api/projects/<name>/chat/sessions/<sid>/messages` | `send_message` |
+| POST | `/api/projects/<name>/chat/sessions/<sid>/messages/stream` | `send_message_stream` |
+| POST | `/api/projects/<name>/chat/sessions/<sid>/settings` | `update_settings` |
+| POST | `/api/projects/<name>/chat/sessions/<sid>/switch` | `switch_branch` |
+| POST | `/api/projects/<name>/chat/sessions/<sid>/translate` | `project_translate_message` |
+| POST | `/api/projects/<name>/chat/start` | `start_chat` |
+| POST | `/api/projects/<name>/drafts` | `upload_draft` |
+| POST | `/api/projects/<name>/drafts/activate` | `activate_draft_endpoint` |
+| POST | `/api/projects/<name>/edits/apply` | `apply_edits` |
+| POST | `/api/projects/<name>/edits/redo` | `redo_edits` |
+| POST | `/api/projects/<name>/edits/reset` | `reset_edits` |
+| POST | `/api/projects/<name>/edits/undo` | `undo_edits` |
+| POST | `/api/projects/<name>/findings/<int(signed=True):index>/dismiss` | `dismiss_finding_route` |
+| POST | `/api/projects/<name>/findings/<int(signed=True):index>/undismiss` | `undismiss_finding_route` |
+| POST | `/api/projects/<name>/findings/intent` | `set_finding_intent_route` |
+| POST | `/api/projects/<name>/findings/intent/batch` | `set_finding_intents_batch` |
+| POST | `/api/projects/<name>/findings/verdict` | `set_finding_verdict_route` |
+| POST | `/api/projects/<name>/findings/verdict/batch` | `set_finding_verdicts_batch` |
+| POST | `/api/projects/<name>/notes` | `add_note_endpoint` |
+| POST | `/api/projects/<name>/premise` | `save_project_premise` |
+| POST | `/api/projects/<name>/quickcheck` | `quickcheck_project` |
+| POST | `/api/projects/<name>/repair` | `repair_project` |
+| POST | `/api/projects/<name>/reparse` | `reparse_project` |
+| POST | `/api/projects/<name>/rewrite` | `rewrite_scene_endpoint` |
+| POST | `/api/projects/<name>/stash` | `add_stash` |
+| POST | `/api/sample` | `create_sample_project` |
+| POST | `/api/stt` | `stt_transcribe` |
+| POST | `/api/test-connection` | `test_connection` |
+| POST | `/api/writer-memory/observations/<obs_id>/suppress` | `suppress_writer_observation` |
+| POST | `/api/writer-memory/refresh` | `refresh_writer_memory` |
+| PUT | `/api/projects/<name>/beatboard` | `put_beatboard` |
+
+<!-- END GENERATED: route census -->
