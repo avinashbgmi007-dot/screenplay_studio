@@ -60,7 +60,7 @@ Symbol-level index so you can answer "where is X?" without scanning the whole re
 | `peer.py` | `classify_turn`, `should_probe`, `ensure_forward_momentum`, `cap_suggestions`, `has_embedded_reasoning` | Peer-mode guardrails: probe instead of parrot, forward momentum, suggestion cap |
 | `memory.py` | `WriterMemory`, `build_relationship_card`, `merge_refresh`, `extract_signals`, `apply_signals`, `dimension_gate`, `_migrate_v2` | Writer relationship memory (scoped global/project/idea), notes-on-you card, refresh sync |
 | `writer_library.py` | `build_library`, `library_digest_text` | Past-work digest from every parsed project; rides every turn as PAST WORK (firewalled from current script) |
-| `server.py` | `main` + Flask routes | Standalone Flask API (port 8300) |
+| `server.py` | `main` + Flask routes + `_host_header_is_local` | Standalone Flask API (port 8300, 8 routes) for scripted clients — a SUPPORTED surface, guarded against a foreign `Host` (gap 83); see `docs/API_ROUTE_MAP.md` for how it differs from the webapp |
 | `cli.py` | `main`, `run_repl`, `cmd_chat`, `cmd_list` | `chat`/`list` subcommands + slash commands |
 
 ## screenplay_studio — orchestrator + web UI

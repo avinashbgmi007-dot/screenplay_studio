@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+from urllib.parse import urlparse
 
 from flask import Flask, request, jsonify
 
@@ -22,6 +23,54 @@ from .personas import PERSONAS, MODES
 app = Flask(__name__)
 store: SessionStore = None  # set in main()
 memory_path: str = None  # optional writer relationship memory file (set in main())
+
+
+# Gap 83: this server was a documented front door that the architecture documents
+# said did not exist, and it had NONE of the webapp's guards. It binds 127.0.0.1,
+# which is why the filing is honest that no exposure was demonstrated — but a
+# browser on the same machine can still reach a loopback port, and "it only listens
+# locally" is a statement about the socket, not about who can drive it. The webapp
+# learned this (BE-H1/BE-4): a foreign `Host` header is refused, because DNS
+# rebinding makes a name that resolves to 127.0.0.1 arrive with a Host header that
+# is not local. Same predicate, same answer, stated here rather than assumed to
+# have been inherited.
+#
+# Deliberately NOT copied: the webapp's capability token. That token guards
+# state-changing routes in a browser UI; this server is a scripted API whose only
+# tested use is a direct client, and bolting a cookie/token dance onto it would
+# break every caller to defend a surface nobody browses. Recorded as a limit in
+# docs/API_ROUTE_MAP.md instead of half-implemented here.
+def _host_header_is_local() -> bool:
+    raw = request.host or ""
+    # Reject userinfo/path/whitespace BEFORE parsing: urlparse reads
+    # `evil.com@127.0.0.1` as loopback and would accept it.
+    if not raw or any(ch in raw for ch in "@\\/ \t"):
+        return False
+    try:
+        host = urlparse(f"//{raw}").hostname
+    except ValueError:
+        return False
+    if not host:
+        return False
+    host = host.rstrip(".").lower()
+    if host == "localhost":
+        return True
+    if host == "::1":
+        return True
+    parts = host.split(".")
+    if len(parts) == 4 and all(p.isdigit() for p in parts):
+        return parts[0] == "127"
+    return False
+
+
+@app.before_request
+def _reject_foreign_host():
+    """Every method, reads included — the same rule the desk applies."""
+    if not _host_header_is_local():
+        return jsonify({"error": "request rejected: this server answers only to "
+                                 "its own loopback address",
+                        "host_rejected": True}), 403
+    return None
 
 
 def _load_contexts(session):

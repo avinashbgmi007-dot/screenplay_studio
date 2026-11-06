@@ -93,9 +93,17 @@ python -m screenplay_cowriter chat --resume <session_id>
 # List sessions
 python -m screenplay_cowriter list
 
-# Standalone Flask API (port 8300)
+# Standalone Flask API (port 8300) — a real, supported surface (gap 83)
 python -m screenplay_cowriter.server --port 8300 --sessions-dir ./sessions --memory-path ./writer_profile.json
 ```
+
+**This is not `screenplay_studio`'s CLI.** The studio's own top-level commands are
+exactly `run`, `resume`, `status`, `watch` (`python -m screenplay_studio --help`),
+and each package has its own entry point; this server is one of them. It serves 8
+routes over the same `sessions/` shape the desk uses, binds loopback only, and
+refuses a foreign `Host` header (gap 83 — it previously had no guard at all). It
+has no capability token by design: it is a scripted API, not a browser surface. See
+`docs/API_ROUTE_MAP.md` for the three servers and what guards each.
 
 | Option | Notes |
 |---|---|
@@ -127,4 +135,13 @@ once the question is answered, because it reads a live flag rather than a stored
 
 ## Direct module entry points
 
-The canonical form for each package is `python -m <package>` (e.g. `python -m screenplay_studio run ...`), which invokes that package's `cli.main()` via `__main__.py`. The webapp server is the exception: it runs as `python -m screenplay_studio.webapp_server` (it has its own `main()`, not part of the studio CLI subcommands).
+The canonical form for each package is `python -m <package>` (e.g. `python -m screenplay_studio run ...`), which invokes that package's `cli.main()` via `__main__.py`.
+
+The studio CLI exposes exactly four subcommands — `run`, `resume`, `status`, `watch` — and nothing else. Two surfaces are **modules with their own `main()`**, deliberately not subcommands, because they are long-running processes rather than pipeline steps:
+
+| surface | form | what it is |
+|---|---|---|
+| webapp | `python -m screenplay_studio.webapp_server` | the desk (port 8500) |
+| co-writer API | `python -m screenplay_cowriter.server` | scripted session API (port 8300) |
+
+Gap 83: this document and `docs/API_ROUTE_MAP.md` used to disagree about whether the second one existed. It does; `--help` is the arbiter, and it is listed here so the ambiguity cannot come back.

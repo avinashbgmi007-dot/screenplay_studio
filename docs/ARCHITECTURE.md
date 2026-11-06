@@ -51,7 +51,7 @@ screenplay-studio_1/
 ├── screenplay_cowriter/        # Piece 3 — Conversational co-writing
 │   ├── __init__.py / __main__.py
 │   ├── cli.py                  # CLI with REPL and slash commands
-│   ├── server.py               # Standalone Flask API (port 8300)
+│   ├── server.py               # Standalone Flask API (port 8300, loopback + Host-guarded)
 │   ├── engine.py               # CoWriterEngine.send_message()
 │   ├── context.py              # ScriptContext, ReportContext, scene injection
 │   ├── language_meta.py        # Strips wrapper-language markers from replies

@@ -17,8 +17,46 @@
   idea routes use `<idea_id>`; finding routes use `<int:index>`.
 - The demo craft model runs as a **separate** Flask app (`demo_app`) exposing the
   OpenAI-compatible `/v1/models` and `/v1/chat/completions` (non-streaming + SSE).
-- There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
-  stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
+- There **is** a standalone `screenplay_cowriter/server.py` — this line used to
+  deny it, which was wrong, and gap 83 fixed the documentation rather than the
+  server. Measured: `python -m screenplay_cowriter.server --help` still parses
+  arguments, `main()` still binds `127.0.0.1:8300`, and it serves **8 routes**
+  (see the table below). It is exercised by `tests/test_cowriter_server.py`,
+  `tests/test_session_selection_merge.py` and the route-coverage census in
+  `tests/test_route_coverage.py` — i.e. it is a **maintained, tested surface**,
+  not a leftover, so deleting it to make the docs true would have deleted working
+  code to protect a sentence.
+- So there are **three** HTTP servers, with different jobs and different guards:
+
+  | server | port | who talks to it | guard |
+  |---|---|---|---|
+  | `screenplay_studio/webapp_server.py` | 8500 | the browser SPA | foreign-`Host` refused **and** capability token on state-changing routes |
+  | `screenplay_cowriter/server.py` | 8300 | scripted/direct API clients | foreign-`Host` refused (gap 83 added this — it had none) |
+  | `screenplay_studio/demo_model.py` (`demo_app`) | in-process | the desk, as an OpenAI-compatible endpoint | none needed: never listens on a socket |
+
+- **`screenplay_cowriter/server.py` — every route it serves** (gap 83; listed so the
+  doc and the URL map can be compared mechanically, which is what the test does):
+  plus Flask's auto-registered `/static/<path:filename>`, which can only ever 404
+  here and is declared with its reason in `tests/test_route_coverage.py`.
+
+  | Method | Path |
+  |---|---|
+  | GET | `/health` |
+  | GET | `/sessions` |
+  | POST | `/sessions` |
+  | GET | `/sessions/<session_id>` |
+  | POST | `/sessions/<session_id>/messages` |
+  | POST | `/sessions/<session_id>/fork` |
+  | POST | `/sessions/<session_id>/switch` |
+  | POST | `/sessions/<session_id>/settings` |
+
+- **`server.py` deliberately has no capability token.** That token exists to stop a
+  foreign *page* from driving the browser UI; this server's only supported callers
+  are direct clients, and adding a cookie/token handshake would break every one of
+  them to defend a surface nobody browses. It shares the `sessions/` shape with the
+  webapp, so the honest statement is: it is a second front door onto the same data,
+  loopback-only, Host-guarded, and not a browser surface. Recorded as a limit, not
+  claimed as closed.
 
 **Totals:** 103 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **105**.
 (Pinned by `tests/test_audit_remediation.py::TestF05RouteMapTotals`; regenerate
