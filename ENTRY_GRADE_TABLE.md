@@ -82,7 +82,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 36 | **B** | Mock server advertising new limits | Global context cached stale. | **G** |
 | 37 | **B** | Held-open file during watch | Timing-dependent. | **G** |
 | 38 | **B** | Telugu filename plus a fake orchestrator | Project the desk cannot open. | **G** |
-| 39 | **A** | Real CLI, `watch --once` | Prints FAILED, exits 0. | **G** |
+| 39 | **A** | Real CLI subprocess, `watch --once`, on a broken FDX and a mixed batch | Prints FAILED, exits 0 — reproduced. **FIXED 2026-11-06.** A batch where every file failed printed `FAILED` and exited **0**; a mixed batch also exited 0. Automation reads exit status, so a failed import was indistinguishable from a clean one. `cmd_watch` now documents and returns three codes — **0** all succeeded (including an empty inbox, which is cron's normal case), **1** the batch ran and something failed, **2** usage/configuration error, matching the CLI's existing convention so a retry loop does not also retry a typo. A failure count is printed to stderr, an unreadable watch folder is a 2 rather than an uncaught traceback, and `--json` emits per-file outcomes (filename, ok, project, error) agreeing with the exit code. Reverts: **3 / 5 / 2 / 2 / 1**. 13 tests. Critique S59. | **G** |
 | 40 | **B** | Mock server advertising one model | Silent fallback to a different model. | **G** |
 | 41 | **B** | Mock server implementing `/v1/models` | `/v1` duplication in URL construction. | **G** |
 | 42 | **B** | Injected manifest write error | Partial settings application. | **G** |

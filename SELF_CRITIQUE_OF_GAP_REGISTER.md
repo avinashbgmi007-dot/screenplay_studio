@@ -2289,3 +2289,60 @@ tested with a monkeypatched `OSError` and asserted to take the safe path.
   on the destructive path.
 - One test of mine failed on a casing assumption ("NOT been overwritten" vs the actual "has NOT been
   overwritten"). Same habit as §57: writing the assertion from my model of the string.
+
+## §59 — Gap 39: a success code over a failed batch (2026-11-06)
+
+Filed accurately and fixed in one pass. The interesting part is methodological: **my first probe reported
+`EXIT=2` for everything**, including a batch that should have succeeded, and I nearly wrote that up as
+"the CLI does return nonzero". What I had actually captured was the exit status of the `grep` at the
+end of my pipeline, not of Python. A `| tail` or a `| grep` swallows the status of the process you
+care about and you read the status of the filter.
+
+That is the same family of error as the `grep -c FAILED` miscount in §56 and the invented filename in
+§58: **the measurement was of my own instrumentation, not of the product.** The rule I should have
+been following is simple and I now have it in the runbook — measure the exit code of the process,
+not of the pipeline:
+
+    python -m screenplay_studio.cli ... > out 2> err; echo $?
+
+### The defect
+
+`cmd_watch` printed its per-file lines and `return`ed. Argparse then fell off the end of `main()`,
+and the process exited 0. So:
+
+    FAILED: broken.fdx → Parse stage failed: unclosed token: line 2, column 21
+    $ echo $?
+    0
+
+A CI job, a Makefile, a cron watcher: all of them read the exit status, and all of them were told a
+broken FDX had been imported successfully. A mixed batch where *nothing* succeeded was equally happy.
+
+### The semantics, and why partial failure is 1 rather than 2
+
+2 already means "you asked wrongly" throughout this CLI (`_load_project` uses it for a directory
+that is not a project, argparse uses it for a bad flag). Reusing 2 for "one of your files was
+malformed" would make a retry loop retry forever on a typo. So:
+
+    0  every requested file succeeded — an empty inbox included,
+       because `watch --once` on an empty folder is cron's normal state
+    1  the batch ran and at least one file failed
+    2  usage / configuration error; nothing was requested of any file
+
+The empty-inbox case is the one worth arguing for: a tool that exits nonzero when there is nothing
+to do is a tool that pages someone at 3am for doing its job.
+
+### What the register asked for that was not a number
+
+"Retain machine-readable per-file outcomes and recovery paths." There was no JSON at all. `--json`
+now emits filename, ok, project and error per file, plus the totals, and a test asserts the JSON's
+`ok` agrees with the exit code — two sources of truth for one fact is how dashboards start
+disagreeing with pipelines.
+
+### Verification
+
+- 13 tests, all driving the **real CLI as a subprocess**. This matters: a test that asserted on a
+  returned value would have kept passing while the process still exited 0, which is the filed defect
+  in its entirety. The test had to read the thing the defect was about.
+- Reverts: **3** (swallow the code) / **5** (always exit 0) / **2** (no JSON) / **2** (uncaught
+  folder error) / **1** (no stderr line).
+- Existing `test_watch.py` and `test_watch_source_safety.py`: 14 passed, unchanged.

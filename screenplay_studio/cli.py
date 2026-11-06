@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -266,6 +267,8 @@ def main():
     p_watch.add_argument("--model", help="Explicit model id override")
     p_watch.add_argument("--poll", type=int, default=5, help="Seconds between scans (default 5)")
     p_watch.add_argument("--once", action="store_true", help="Process whatever's there once and exit (no loop)")
+    p_watch.add_argument("--json", action="store_true",
+                         help="With --once, also print a machine-readable per-file summary to stdout")
     p_watch.add_argument("--categories", help="Comma-separated analyzer categories to run")
     p_watch.add_argument("--lang", choices=["eng", "tenglish", "hindi", "tamil"], default="eng",
                       help="Language of the analysis report (eng, tenglish, hindi, tamil)")
@@ -308,16 +311,75 @@ def _resolve_run_paths(parser, args) -> None:
     args.project = project
 
 
+# Exit codes for `watch --once`, documented because automation reads them.
+#
+# Gap 39, measured: a batch in which EVERY file failed printed `FAILED` and
+# exited 0, so a CI job or a Makefile saw a failed import as success. The
+# register asked for defined semantics rather than a bare nonzero, so:
+#
+#   0  every requested file was processed successfully
+#   1  the batch ran but at least one file failed (partial failure)
+#   2  usage / configuration error (argparse, bad directory) — the CLI's
+#      existing convention, see `_load_project`
+#
+# Partial failure is 1, not 2: 2 already means "you asked wrongly" everywhere
+# else in this CLI, and a script that retries on 1 should not also retry on a
+# typo. A failure to list the directory at all is 2: nothing was requested of
+# any file, so no file's outcome can be reported.
+WATCH_EXIT_OK = 0
+WATCH_EXIT_PARTIAL = 1
+WATCH_EXIT_ERROR = 2
+
+
+def watch_exit_code(results: list) -> int:
+    """The exit code for a completed `watch --once` batch.
+
+    Empty batch is success: `watch --once` on an empty inbox is cron's normal
+    case, not an error.
+    """
+    if not results:
+        return WATCH_EXIT_OK
+    if any(not r.get("ok") for r in results):
+        return WATCH_EXIT_PARTIAL
+    return WATCH_EXIT_OK
+
+
 def cmd_watch(args):
     from .watch import process_pending, watch_loop
     categories = tuple(args.categories.split(",")) if args.categories else None
     if args.once:
-        results = process_pending(args.watch_dir, args.projects_dir, args.server, model=args.model,
-                                  categories=categories, report_language=args.lang)
+        try:
+            results = process_pending(args.watch_dir, args.projects_dir, args.server, model=args.model,
+                                      categories=categories, report_language=args.lang)
+        except OSError as e:
+            # Nothing was requested of any file, so this is a configuration
+            # error, not a per-file outcome.
+            print(f"ERROR: cannot read the watch folder '{args.watch_dir}': {e}", file=sys.stderr)
+            sys.exit(WATCH_EXIT_ERROR)
         for r in results:
-            status = "OK" if r["ok"] else "FAILED"
-            print(f"{status}: {r['filename']} → {r['project'] or r['error']}")
-        return
+            status = "OK" if r.get("ok") else "FAILED"
+            print(f"{status}: {r['filename']} → {r.get('project') or r.get('error')}")
+        if getattr(args, "json", False):
+            # Machine-readable per-file outcomes, asked for by the register so
+            # an automation consumer never has to parse the prose above.
+            print(json.dumps({
+                "ok": watch_exit_code(results) == WATCH_EXIT_OK,
+                "total": len(results),
+                "succeeded": sum(1 for r in results if r.get("ok")),
+                "failed": sum(1 for r in results if not r.get("ok")),
+                "results": [
+                    {"filename": r.get("filename"), "ok": bool(r.get("ok")),
+                     "project": r.get("project"), "error": r.get("error")}
+                    for r in results
+                ],
+            }))
+        code = watch_exit_code(results)
+        if code == WATCH_EXIT_PARTIAL:
+            failed = sum(1 for r in results if not r.get("ok"))
+            # A non-zero exit with no explanation in the stream is its own trap.
+            print(f"FAILED {failed} of {len(results)} file(s); see above.",
+                  file=sys.stderr)
+        sys.exit(code)
     watch_loop(args.watch_dir, args.projects_dir, args.server,
                poll_interval=args.poll, model=args.model, categories=categories, report_language=args.lang)
 
