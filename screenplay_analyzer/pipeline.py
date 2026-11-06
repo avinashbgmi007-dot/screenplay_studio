@@ -1394,10 +1394,18 @@ def analyze(
     # index itself feeds the pacing chart in the report.
     try:
         emit("pacing", "running", "Measuring scene pace")
-        from .pacing import per_scene_pace, drag_findings
-        result.pacing = per_scene_pace(doc)
-        all_findings.extend(_tag_evidence(drag_findings(result.pacing), EVIDENCE_FULL_TEXT))
-        emit("pacing", "complete")
+        from .pacing import per_scene_pace, drag_findings, is_measurable
+        if not is_measurable(doc):
+            # Gap 45: the share arithmetic assumes Latin-script words. A Telugu
+            # or Devanagari script is parsed correctly and then this pass would
+            # report an action share computed from a split that does not reflect
+            # how those lines are written. No numbers beats invented numbers.
+            emit("pacing", "complete", "skipped: script is mostly non-Latin text")
+            result.pacing = []
+        else:
+            result.pacing = per_scene_pace(doc)
+            all_findings.extend(_tag_evidence(drag_findings(result.pacing), EVIDENCE_FULL_TEXT))
+            emit("pacing", "complete")
     except Exception as e:
         result.errors.append(f"Pacing pass failed: {e}")
         emit("pacing", "complete", f"failed: {e}")

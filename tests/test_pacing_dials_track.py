@@ -96,7 +96,10 @@ def test_drag_findings_are_structured():
         # resolve in the knowledge base, and the pace index has no KB rule.
         assert f["check_id"] == "pacing_drag"
         assert "rule_id" not in f
-        assert f["severity"] == "medium"
+        # Gap 45: was "medium". Nothing in a word count has established that a
+        # slow-ranked scene is a medium-severity problem in the writing.
+        assert f["severity"] == "low"
+        assert f["is_observation"] is True
         assert isinstance(f["scene_refs"], list) and f["scene_refs"]
 
 

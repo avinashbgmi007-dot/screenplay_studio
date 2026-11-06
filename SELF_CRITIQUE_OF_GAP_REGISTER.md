@@ -2502,3 +2502,59 @@ true relation rather than accommodating my edit.
 The lesson is the one this register keeps teaching: a test that passes is not evidence that it tests
 the right thing. Two of my six hypotheses were about code I had genuinely broken (the composite quote),
 and I only kept them from becoming the official explanation by measuring each one.
+
+## §62 — Gap 45: the prose was wrong because the number was wrong (2026-11-06)
+
+Gap 45 was filed as a language problem. The finding said a scene "meanders where the story needs
+to move" and prescribed "a real event", and the entry's recommendation was about presenting
+metrics as descriptive signals rather than diagnoses. I read that, agreed with it, and started
+editing wording.
+
+That would have been the wrong fix, and it would have looked like the right one. The sentence was
+false because the arithmetic underneath it was false, and rewriting the sentence around false
+arithmetic is not a repair — it is a false statement with better manners.
+
+Three things were wrong with the numbers, discovered in this order:
+
+**The claimed defect.** `else: action += words` put every character cue, slug line, transition and
+parenthetical into "action words". A scene with four dialogue beats and no action line reported
+`action_words=8`, and the finding quoted "only 11% action words" about a scene in which the only
+non-dialogue text was the name MIRA four times and the words INT. ROOM - NIGHT. This one I did
+reproduce before touching code, which is why I caught it at all.
+
+**The rank that could not express an amount.** The filed entry mentions "relative rank". What it
+does not say, and what the reproduction showed, is that min-max normalisation makes the score
+incomparable to anything: three identical all-dialogue scenes each scored exactly 100.0, and a
+script where every scene is equally slow scored 0.0 on all of them. A number whose maximum means
+"slowest of these" and whose zero means "fastest of these" cannot be read as drag, and the report
+rendered it as `({pace_score:.0f}/100)` — an amount out of a hundred.
+
+**The contradiction inside the score.** This is the one that shames me. I only found it because a
+test I wrote for a different reason failed. I asserted that three identical scenes should share a
+rank, and the run said their ranks were 3, 4 and 5 — *below* two action scenes. Density is words
+per **element**, and a 40-word action paragraph is one element. So the more action a scene
+contains, the higher its density, the higher its drag contribution on the 0.6 term — while the
+`action_share` term at 0.4 pushed the other way. Measured: a 44-word all-action scene scored 60.0
+and a 106-word all-dialogue scene scored 40.0. The composite ranked the action scene as draggier
+than the talking heads, i.e. backwards, and the 0.6/0.4 weights were what decided it.
+
+I had already written the comment "invert action_share: low movement => high drag contribution"
+and believed the metric was coherent. I had read that function a dozen times across this register.
+Reading is not measuring. The failing test was accidental — I wrote it expecting a tie — and it is
+the only reason this entry is not a cosmetic wording change on top of an inverted index.
+
+What I changed my mind about: my first plan was to *keep* the rank and label it more loudly. That
+was a compromise with a broken instrument. Absolute terms (length against a fixed reference, plus
+dialogue share) both point the same way and need no normalisation, so the tie, the cross-script
+comparison and the inversion all fall out as consequences rather than as special cases.
+
+What I deliberately did not do: the register asks for "independent assessment" of the critical
+judgement. There is now no critical judgement being made — the pass reports counts and says it
+does not know what they mean for the writing — so there is nothing for a reader panel to assess.
+Inventing a proxy for audience reception would rebuild the exact defect under a new name.
+
+The transferable lesson, added to the one from §61: **a plausible defect description is not a
+diagnosis of the code.** Both of my grossest errors this session (§61's regression, this
+inversion) were found by tests I wrote for a different reason, not by reading harder. When an
+entry's recommendation is about wording, measure the numbers it is talking about before editing
+the wording — the wording may be the only part that is honest.

@@ -328,16 +328,26 @@ def render_markdown(result: AnalysisResult) -> str:
 
     # --- Pacing (deterministic per-scene pace index) ---
     if result.pacing:
-        lines.append("## Pacing — where the script drags")
-        lines.append("*Per-scene pace index (density × movement share). Scenes at or "
-                     "above the drag threshold run long with little on-page movement.*")
+        # Gap 45: this block used to promise "where the script drags" and to
+        # score scenes out of 100 as if the number measured drag. It measures a
+        # RANK among this script's own scenes, from two counts, and it cannot
+        # see dramatic movement at all. Said here so a writer reading the table
+        # does not take the ordering for a judgement.
+        lines.append("## Pacing — relative text density")
+        lines.append("*Per-scene rank by counted words and the action/dialogue "
+                     "split. This is a shape, not a verdict: a dialogue-driven "
+                     "climax and a deliberately quiet scene both rank here.*")
         lines.append("")
         drags = [r for r in result.pacing if r.get("drag")]
         if drags:
-            lines.append("**Pace drags:** " + ", ".join(
-                f"Scene {r['scene_number']} ({r['pace_score']:.0f}/100)" for r in drags) + "")
+            lines.append("**Slowest scenes (rank among this script's scenes):** " + ", ".join(
+                f"Scene {r['scene_number']} "
+                f"({r.get('pace_rank')}/{len([x for x in result.pacing if x.get('pace_score') is not None])})"
+                for r in drags) + "")
         else:
-            lines.append("*No pace drags detected — the script keeps its momentum.*")
+            # "the script keeps its momentum" was a claim about the writing that
+            # a word count cannot make.
+            lines.append("*No scene stands out from its neighbours by this measure.*")
         lines.append("")
 
     # --- Character dials (model-scored trait poles) ---
