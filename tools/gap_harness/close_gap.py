@@ -283,7 +283,11 @@ def run_check(number: int, run_suite: bool = True, run_tests: bool = True) -> Ch
 
     # Revert evidence: stated and non-zero. This is the honesty gate — a zero
     # means the "pin" does not actually pin anything.
-    reverts = re.findall(r"[Rr]everts?:?\s*([0-9][0-9 /\u2013-]*)", section or plan_entry)
+    # Match "Reverts: 5 / 4 / 1", "reverts 5, 4 and 1", "Reverts: **5 / 4**".
+    # My first pattern stopped at the first asterisk, so a bolded count was
+    # invisible and the gate failed a gap that had stated its reverts.
+    blob = (section or "") + " " + (plan_entry or "")
+    reverts = re.findall(r"[Rr]everts?\s*:?[\s*]*([0-9][0-9\s/*\u2013,-]*)", blob)
     numbers: list[int] = []
     for blob in reverts:
         numbers.extend(int(n) for n in re.findall(r"\d+", blob))
@@ -323,20 +327,28 @@ def run_check(number: int, run_suite: bool = True, run_tests: bool = True) -> Ch
 
     if run_suite:
         cmd = [sys.executable, "-B", "-m", "pytest", "tests/", "-q",
-               "-p", "no:logging", "--tb=no"]
+               "-p", "no:logging", "--tb=no", "-rf"]
         res = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=1800)
         tail = (res.stdout or "").strip().splitlines()[-1] if res.stdout.strip() else ""
         # The three readiness failures are pre-existing and unrelated.
-        failed = re.search(r"(\d+) failed", tail)
-        n_failed = int(failed.group(1)) if failed else 0
         known = {"test_every_ci_job_declares_a_timeout",
                  "test_unbounded_network_steps_declare_a_timeout",
                  "test_the_timeout_guards_reject_an_inert_declaration"}
         got = set(re.findall(r"FAILED [^:]+::(\w+)", res.stdout or ""))
         unexpected = got - known
-        c.require(n_failed - len(got & known) == len(unexpected) and not unexpected,
-                  "full suite has no unexpected failures",
-                  f"{tail or 'no summary'}" + (f" ; unexpected: {sorted(unexpected)}" if unexpected else ""))
+        # Guard against the detector itself going inert: if the summary says
+        # failures happened but no names were parsed, the sets are both empty
+        # and "no unexpected failures" would be vacuously true. That is exactly
+        # the class of bug this harness exists to catch, so it is checked here.
+        n_failed = int((re.search(r"(\d+) failed", tail) or [0, 0])[1]) \
+            if re.search(r"(\d+) failed", tail) else 0
+        names_parsed = len(got)
+        c.require(names_parsed >= n_failed,
+                  "the failure names were actually parsed",
+                  f"summary says {n_failed} failed, parsed {names_parsed}")
+        c.require(not unexpected, "full suite has no unexpected failures",
+                  (tail or "no summary")
+                  + (f" ; unexpected: {sorted(unexpected)}" if unexpected else ""))
 
     # --- diffstat sanity --------------------------------------------------
     stat = _git("diff", "--cached", "--stat")

@@ -37,9 +37,22 @@ def test_a_re_derived_grade_wins_over_the_filing():
 
 
 def test_fixed_rows_are_recognised():
+    """Uses gaps fixed earlier, not the one being worked right now.
+
+    My first version asserted gap 35 was NOT fixed and went stale the moment I
+    fixed it — a self-referential test that fails as a reward for working.
+    """
     rows = {r["number"]: r for r in G.entry_rows()}
-    assert rows[30]["fixed"] is True, "gap 30 was fixed this session"
-    assert rows[35]["fixed"] is False
+    assert rows[30]["fixed"] is True, "gap 30 was fixed in this session"
+    assert rows[26]["fixed"] is True, "gap 26 was fixed in this session"
+
+
+def test_an_open_gap_is_reported_open():
+    """The complement, without naming a gap that is about to be closed."""
+    rows = [r for r in G.entry_rows() if G.is_open(r)]
+    assert rows, "the register claims everything is closed"
+    for r in rows[:5]:
+        assert r["fixed"] is False
 
 
 def test_a_documented_trade_off_is_not_open_work():

@@ -1881,6 +1881,34 @@ def list_projects():
     return jsonify(out)
 
 
+def _damaged_project_error(project_dir: str, load_error: Exception):
+    """409 for a project directory that exists but cannot be read.
+
+    Distinct from a 500: nothing failed on our side and nothing is lost. The
+    writer needs to know their files are intact and that opening the sample
+    cannot help, because the sample shares this name.
+
+    The paths are named so the writer can recover by hand, and the message says
+    plainly that nothing was modified — a person who has just been told their
+    project is damaged will otherwise assume the worst.
+    """
+    try:
+        present = sorted(n for n in os.listdir(project_dir)
+                         if os.path.isfile(os.path.join(project_dir, n)))
+    except OSError:
+        present = []
+    return _error(
+        f"The project \"{os.path.basename(project_dir)}\" already has a folder that "
+        f"cannot be read ({type(load_error).__name__}: {load_error}). Nothing in it "
+        f"has been changed, and it has NOT been overwritten with the sample. "
+        f"Files present: {', '.join(present) or 'none'}. "
+        f"To keep that work, rename or repair "
+        f"`{os.path.join(project_dir, 'project.json')}` and reload; to get a fresh "
+        f"sample instead, move that folder aside first.",
+        409,
+    )
+
+
 @app.route("/api/sample", methods=["POST"])
 def create_sample_project():
     """One-click sample page: create a project from the built-in screenplay.
@@ -1901,8 +1929,20 @@ def create_sample_project():
         try:
             m = ProjectManifest.load(project_dir)
             return jsonify(_manifest_summary(m))
-        except Exception:
-            pass  # corrupt dir — fall through and re-create
+        except Exception as load_error:
+            # Gap 35: this used to be `except Exception: pass  # corrupt dir —
+            # fall through and re-create`, and re-creating OVER the directory
+            # replaced the writer's script. Measured: a damaged project holding
+            # a real draft at `source.fountain` came back as the sample, with a
+            # 201 to say it went well. A malformed manifest is a recoverable
+            # injury; the draft beside it is not ours to overwrite.
+            #
+            # So: never write into a directory we could not read, and never
+            # claim a clean success. The existing files are left exactly as they
+            # are and the caller is told what is wrong and what to do, which is
+            # the difference between "your project is damaged" and "your project
+            # is gone".
+            return _damaged_project_error(project_dir, load_error)
 
     tmp_path = os.path.join(project_dir, "_sample.fountain")
     with open(tmp_path, "w", encoding="utf-8") as f:

@@ -2230,3 +2230,62 @@ of being told, by omission, that nothing is.
   disclaimer).
 - Full suite: **2602 passed, 8 skipped**, with only the three pre-existing readiness failures,
   which are about CI timeout declarations and unrelated to this gap.
+
+## §58 — Gap 35: a 201 over six months of work (2026-11-06)
+
+The register filed this accurately, and the fix was small. The interesting part is that **my first
+two reproductions missed it entirely**, for a reason worth writing down.
+
+### Two probes that proved nothing
+
+Probe 1 wrote the fixture into `$SCREENPLAY_HOME/projects/The_Late_Hour`, which the app does not
+use — the projects root is `./studio_projects` relative to CWD. Probe 2 used the right directory but
+named the script `the_late_hour.fountain`. Real projects store it at `source.<ext>`
+(`ProjectManifest.source_path`), so the sample wrote `source.fountain` *beside* the fixture and my
+probe reported "writer's source preserved: True".
+
+Both probes passed. The defect was there the whole time, and I had two green results saying it was
+not. The lesson is not "check your fixture" in the abstract: it is that a reproduction which relies
+on a filename I invented is testing my imagination, not the product. I only found the real gap by
+listing what the route had actually written.
+
+### The measurement
+
+    before: 201
+    source.fountain : "Title: The Late Hour / Author: Real Writer / INT. KITCHEN ..."
+                   -> "Title: The Late Hour / Author: Sample Page / INT. WRITER'S ROOM ..."
+
+A writer's draft, replaced by a demo, and a success code to say it went well. The register's own
+wording — "this is a recovery hazard for that name and damaged/unreadable state, not evidence that
+all projects are overwritten" — was exactly right, and I would have overstated it if I had stopped
+at "the sample route overwrites projects".
+
+### Why 409 and not 500
+
+Nothing failed on the server. The request conflicts with state that already exists, which is what
+409 means, and it lets the UI show a decision rather than an error. The message does three things
+the old code did the opposite of: it names the files that are present, it says **nothing was
+modified**, and it gives both recoveries — repair the manifest, or move the folder aside to get a
+fresh sample. A writer told "your project is damaged" will assume the worst unless told otherwise,
+so the reassurance is part of the fix, not a courtesy.
+
+### The case the register flagged and nobody had tested
+
+`except Exception` also catches `OSError` from a transient read problem. That is the case where
+overwriting is least forgivable — the files were fine, the disk was busy — so it is now explicitly
+tested with a monkeypatched `OSError` and asserted to take the safe path.
+
+### Verification
+
+- 12 tests: the filed reproduction; the caller told what happened; nothing in the directory touched
+  byte-for-byte; no sample artifacts written; the fresh-sample path still returns 201; reopen is
+  deduplicated (200); a restart does not re-create; a transient error does not reach the re-create
+  path; a healthy project still opens; an unlistable directory refuses without crashing; an empty
+  directory is allowed to take the sample; another project's file is untouched.
+- Reverts: **5** (restore the overwrite) / **4** (500 instead of 409) / **1** (drop the
+  reassurance). The 5 on the first revert is the number that matters: restoring one line breaks
+  five independent assertions.
+- Existing tests: `-k "sample or manifest or project"` gives 154 passed, 2 skipped. Nothing depended
+  on the destructive path.
+- One test of mine failed on a casing assumption ("NOT been overwritten" vs the actual "has NOT been
+  overwritten"). Same habit as §57: writing the assertion from my model of the string.
