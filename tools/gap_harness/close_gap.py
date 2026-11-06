@@ -253,10 +253,19 @@ def _changed_files(number: int | None = None) -> list[str]:
         if path:
             files.append(path)
     if number is not None:
-        subject = _git("log", "-1", "--pretty=%s")
-        if re.search(rf"\b[Gg]aps?\b.*\b{number}\b", subject or ""):
-            committed = _git("show", "--pretty=format:", "--name-only", "HEAD")
-            files += [ln.strip() for ln in committed.splitlines() if ln.strip()]
+        # Look back a few commits, not just HEAD: a gap's work legitimately
+        # spans more than one (the fix, then its measured revert counts), and
+        # keying only on HEAD failed gap 59 after exactly that second commit.
+        # Still scoped — a commit only counts if its subject names THIS gap
+        # number, so the previous gap's tests cannot satisfy this gap's checks.
+        recent = _git("log", "-8", "--pretty=%s%x00%H")
+        for row in (recent or "").splitlines():
+            if "\x00" not in row:
+                continue
+            subject, sha = row.split("\x00", 1)
+            if re.search(rf"\b[Gg]aps?\b.*\b{number}\b", subject):
+                committed = _git("show", "--pretty=format:", "--name-only", sha.strip())
+                files += [ln.strip() for ln in committed.splitlines() if ln.strip()]
     return list(dict.fromkeys(files))
 
 
