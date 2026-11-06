@@ -274,10 +274,16 @@ class AnalysisResult:
     both "this pass failed" (`errors`) and "the writer must act" (withdrawals).
     """
     category_outcomes: dict = field(default_factory=dict)
-    """Per-category result: category name -> "ok" | "failed". Lets the
-    orchestrator record exactly which categories succeeded so a partial
+    """Per-category result: category name -> "ok" | "failed" | "skipped". Lets
+    the orchestrator record exactly which categories succeeded so a partial
     analyze (some categories OK, some not) can be resumed category-by-
-    category instead of re-running everything."""
+    category instead of re-running everything.
+
+    Gap 47: "skipped" exists because "ok with no findings", "failed", and
+    "never ran" are three different things and the report used to render all
+    three as "No significant findings". The renderer reads this dict to tell
+    them apart; a category that is absent from it is reported as unrecorded
+    rather than assumed clean."""
     withdrawals: list[dict] = field(default_factory=list)
     """Findings the integrity gate removed from the delivered set, each as
     {index, action, reason, finding} carrying the finding's FULL content — so
@@ -1373,7 +1379,14 @@ def analyze(
         idiolect_findings, _ = run_idiolect_analysis(doc)
         all_findings.extend(_tag_evidence(idiolect_findings, EVIDENCE_FULL_TEXT))
         emit("idiolect", "complete")
+        result.category_outcomes["voice"] = "ok"
+        result.category_outcomes["subtext"] = "ok"
     except Exception as e:
+        # Gap 47: a failed pass must be recorded as a failure, not left blank.
+        # The report renders an empty category as "No significant findings",
+        # which for a pass that never ran is a false clean bill of health.
+        result.category_outcomes["voice"] = "failed"
+        result.category_outcomes["subtext"] = "failed"
         result.errors.append(f"Craft passes (voice/subtext) failed: {e}")
         emit("voice", "complete", f"failed: {e}")
 
@@ -1385,7 +1398,9 @@ def analyze(
         continuity_findings, _ = run_continuity_analysis(doc)
         all_findings.extend(_tag_evidence(continuity_findings, EVIDENCE_FULL_TEXT))
         emit("continuity", "complete")
+        result.category_outcomes["continuity"] = "ok"
     except Exception as e:
+        result.category_outcomes["continuity"] = "failed"
         result.errors.append(f"Continuity pass failed: {e}")
         emit("continuity", "complete", f"failed: {e}")
 
@@ -1402,11 +1417,16 @@ def analyze(
             # how those lines are written. No numbers beats invented numbers.
             emit("pacing", "complete", "skipped: script is mostly non-Latin text")
             result.pacing = []
+            # Gap 47: "skipped" is its own outcome. It must not render as
+            # "no findings" — nothing was measured.
+            result.category_outcomes["pacing"] = "skipped"
         else:
             result.pacing = per_scene_pace(doc)
             all_findings.extend(_tag_evidence(drag_findings(result.pacing), EVIDENCE_FULL_TEXT))
             emit("pacing", "complete")
+            result.category_outcomes["pacing"] = "ok"
     except Exception as e:
+        result.category_outcomes["pacing"] = "failed"
         result.errors.append(f"Pacing pass failed: {e}")
         emit("pacing", "complete", f"failed: {e}")
 

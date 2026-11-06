@@ -2558,3 +2558,39 @@ diagnosis of the code.** Both of my grossest errors this session (§61's regress
 inversion) were found by tests I wrote for a different reason, not by reading harder. When an
 entry's recommendation is about wording, measure the numbers it is talking about before editing
 the wording — the wording may be the only part that is honest.
+
+## §63 — Gap 47: "no findings" was four different sentences wearing one coat (2026-11-06)
+
+The filed entry is accurate and it is smaller than the defect. It says the renderer prints
+"No significant findings" without checking the category outcome. I reproduced exactly that in one
+probe: dialogue marked failed, a provider error on the result, and the Dialogue & Action section
+reading *"No significant findings."* with the string "fail" absent from the section.
+
+What the reproduction did not show, and what I checked before writing the fix, is that
+`category_outcomes` was not merely unread — it was **incompletely written**. Voice, subtext,
+continuity and pacing recorded no outcome at all. So the four passes most likely to fail silently
+(deterministic, no model, wrapped in bare `except Exception`) were exactly the ones with no way to
+report that they had failed. Fixing only the renderer would have made the four grid sections honest
+and left the deterministic ones claiming cleanliness by omission. That is the shape of a
+half-fix that passes its own test.
+
+The four states. Counting them was the useful step: ran-and-clean, failed, not-applicable, and
+never-requested. The old code had one sentence for all four. The fourth is the one I nearly
+missed — a category with no entry in the dict is not "ok", and treating a missing key as clean is
+how a report from before this change would print ten confident clean bills of health. So the
+`None` case gets its own text and says "not a clean result" explicitly.
+
+A guard I did not write caught the JSON key. `test_every_report_section_is_classified` failed as
+soon as I added `category_outcomes` to `to_findings_json`, demanding I classify it rather than let
+the eval ignore it silently. I classified it as excluded, with a reason: three fixed words, no
+findings content. Ten minutes earlier I had written in the 45 entry that my grossest errors were
+caught by tests written for a different reason. This is the same lesson from the other direction —
+the repository already had a test whose entire purpose was to stop me forgetting a step, and it
+worked.
+
+What I did not do, and am recording rather than claiming: the entry asks that markdown, JSON and
+the UI agree. Markdown and JSON now agree. The web desk's category view renders from `findings`
+and has no notion of a failed pass, so a writer using the desk still sees an empty category with
+no caveat. That is a real remaining gap, it is a UI change with its own review needs, and calling
+it done because two of three surfaces agree would be the same overclaim this register keeps
+finding in the product.

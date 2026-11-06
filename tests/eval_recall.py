@@ -33,6 +33,10 @@ EXCLUDED_SECTIONS = frozenset({
     "withdrawals", "stats", "errors", "notices", "recoveries",
     "character_dials", "verification_summary", "logline_test",
     "model_used", "source_filename", "title",
+    # Gap 47: per-pass outcome metadata ("ok" / "failed" / "skipped"). It says
+    # whether a section was assessed, not what was found in it — searching it
+    # for findings would match nothing, since the values are three fixed words.
+    "category_outcomes",
 })
 
 

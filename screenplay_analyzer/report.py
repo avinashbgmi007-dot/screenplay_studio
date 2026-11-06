@@ -91,6 +91,45 @@ CATEGORY_TITLES = {
 }
 
 
+# Gap 47: an empty category used to say "No significant findings" whatever had
+# happened. Three very different situations shared one sentence:
+#
+#   ok       the pass ran, found nothing            -> a clean result
+#   failed   the pass errored                       -> NOT a clean result
+#   skipped  the pass could not apply to this text  -> NOT a clean result
+#
+# and a fourth, worse one: the category was never attempted (not requested, or
+# a prerequisite was missing) and so appears in no `category_outcomes` entry at
+# all. A writer reading "No significant findings" under Dialogue cannot tell
+# whether the dialogue is clean or the dialogue pass crashed, and the honest
+# answer changes what they do next.
+_OUTCOME_TEXT = {
+    "failed": ("**This pass failed — the section below is not a clean result.** "
+               "Check the run errors, then re-run analysis before treating "
+               "\"{title}\" as cleared."),
+    "skipped": ("*Not applicable to this script, so nothing was measured here. "
+                "This says nothing either way about \"{title}\"*"),
+    "pending": ("*This pass did not finish, so nothing here was assessed.*"),
+}
+
+
+def _empty_category_line(cat: str, outcomes: dict) -> str:
+    """What an empty category means, given what the pass actually did."""
+    title = CATEGORY_TITLES.get(cat, cat)
+    outcome = outcomes.get(cat)
+    if outcome in _OUTCOME_TEXT:
+        return _OUTCOME_TEXT[outcome].format(title=title)
+    if outcome == "ok":
+        return ("*Analyzed, no findings.* The pass ran on this script and raised "
+                "nothing in this category.")
+    if outcome is None:
+        # No record at all: either an older report, or a category that was not
+        # requested. Neither is evidence of quality, so it may not read as one.
+        return ("*Not analyzed in this run, so there is no assessment here — "
+                "this is not a clean result.*")
+    return f"*No findings recorded (pass outcome: {outcome}).*"
+
+
 def _findings_by_category(findings: list[dict]) -> dict[str, list[dict]]:
     grouped: dict[str, list[dict]] = {}
     for f in findings:
@@ -261,14 +300,15 @@ def render_markdown(result: AnalysisResult) -> str:
             f"hidden by default in the Fix Queue. Treat them as questions, not "
             f"findings.*")
         lines.append("")
+    outcomes = dict(getattr(result, "category_outcomes", None) or {})
     for cat, cat_title in CATEGORY_TITLES.items():
         cat_findings = grouped.get(cat, [])
         lines.append(f"### {cat_title}")
-        if not cat_findings:
-            lines.append("*No significant findings.*")
-        else:
+        if cat_findings:
             for f in cat_findings:
                 lines.append(_format_finding(f))
+        else:
+            lines.append(_empty_category_line(cat, outcomes))
         lines.append("")
 
     # --- Setup / Payoff ledger (end-of-pipeline whole-script audit) ---
@@ -652,6 +692,9 @@ def to_findings_json(result: AnalysisResult) -> dict:
         # key so the writer can be told the finding set is path-dependent without
         # being told the run is broken.
         "recoveries": result.recoveries,
+        # Gap 47: per-category outcome, so a JSON consumer can tell "read
+        # clean" from "never ran". The markdown report reads the same dict.
+        "category_outcomes": dict(getattr(result, "category_outcomes", None) or {}),
     }
 
 
