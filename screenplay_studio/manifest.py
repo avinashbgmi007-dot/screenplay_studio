@@ -122,6 +122,64 @@ class StageStatus:
         )
 
 
+def _claim_directory(project_dir: str) -> None:
+    """Create `project_dir`, failing rather than reusing a raced directory.
+
+    Gap 50: `makedirs(exist_ok=True)` treats "someone else got here first" as
+    success. `mkdir` reports it. Parents still need creating, so they are made
+    first and only the final component is claimed.
+    """
+    parent = os.path.dirname(os.path.abspath(project_dir))
+    os.makedirs(parent, exist_ok=True)
+    try:
+        os.mkdir(project_dir)
+    except FileExistsError:
+        if os.path.isdir(project_dir):
+            return          # existed before us and passed the occupancy check
+        raise
+
+
+def _refuse_occupied_destination(project_dir: str, source_file: str) -> None:
+    """Refuse to create a project in a directory that holds anything of value.
+
+    Gap 50. Allowed: the directory is missing, empty, or contains only the
+    source file being installed (the web routes stage an `_upload.<ext>` inside
+    the claimed directory, so that case must stay legal). Everything else is
+    someone's data and creation must not touch it.
+    """
+    if not os.path.isdir(project_dir):
+        return
+    try:
+        entries = os.listdir(project_dir)
+    except OSError as e:
+        raise ValueError(
+            f"The directory '{project_dir}' exists but cannot be read ({e}). "
+            "Nothing was created — check its permissions.")
+    if not entries:
+        return
+
+    src = os.path.realpath(source_file)
+    others = []
+    for name in entries:
+        if os.path.realpath(os.path.join(project_dir, name)) == src:
+            continue        # the file being installed is not "other data"
+        others.append(name)
+    if not others:
+        return
+
+    shown = ", ".join(sorted(others)[:5])
+    if len(others) > 5:
+        shown += f", and {len(others) - 5} more"
+    raise ValueError(
+        f"The directory '{project_dir}' already contains data ({shown}) but has no "
+        "project.json. It would be treated as a new project, which would replace "
+        "the files it holds. Nothing was overwritten. Either start the project in "
+        "a different directory, move the existing one aside first "
+        f"(for example: mv '{project_dir}' '{project_dir}.old'), or — if the file "
+        "there is the script you meant to work on — name it as the source so it is "
+        "adopted in place instead of replaced.")
+
+
 @dataclass
 class ProjectManifest:
     project_dir: str
@@ -365,7 +423,27 @@ class ProjectManifest:
             raise FileNotFoundError(
                 f"Source screenplay not found: '{source_file}'. "
                 "Check the path — nothing was created.")
-        os.makedirs(project_dir, exist_ok=True)
+        # Gap 50: creation claims a directory; it does not move into one.
+        #
+        # Before this, `create` did `makedirs(exist_ok=True)` and then copied
+        # over `source.<ext>` unconditionally. The web routes happened to be
+        # safe — they claim a fresh directory first (`_claim_project_dir`) or
+        # refuse a damaged one (gap 35) — but that safety lived in four call
+        # sites, and the CLI had none of it: `run --project <dir> <script>` on a
+        # directory holding a draft but no `project.json` printed "Created new
+        # project", replaced the draft with the new file, exited 0, and left no
+        # backup. Measured through the real CLI: six lines of the writer's script
+        # became a different script under a success message.
+        #
+        # An orphaned `source.fountain` with no manifest is exactly what a
+        # half-finished copy, an interrupted create, or a hand-assembled project
+        # looks like — the one case where the data beside it is most likely to be
+        # the only copy. So the rule is now enforced here, once: a destination
+        # may be a directory that does not exist, or an empty one, or one whose
+        # only entry is the very file being installed. Anything else is refused
+        # with the existing data untouched.
+        _refuse_occupied_destination(project_dir, source_file)
+        _claim_directory(project_dir)
         ext = os.path.splitext(source_file)[1].lower()
         manifest = ProjectManifest(
             project_dir=project_dir,
@@ -373,6 +451,24 @@ class ProjectManifest:
             source_filename=os.path.basename(source_file),
             source_format=ext,
         )
-        shutil.copy2(source_file, manifest.source_path)
+        # Exclusive create ('xb'), not copy2: copy2 replaces silently, so two
+        # runs racing on the same destination would still clobber. This can only
+        # lose a race it already refused above, and it fails loudly instead of
+        # writing over whatever won.
+        try:
+            if os.path.realpath(source_file) == os.path.realpath(manifest.source_path):
+                # Adoption, not a copy: the caller named the file already sitting
+                # at the destination (e.g. `run --project dir dir/source.fountain`
+                # to take ownership of an orphan). There is nothing to install and
+                # copying a file onto itself would raise SameFileError.
+                pass
+            else:
+                with open(source_file, "rb") as src, open(manifest.source_path, "xb") as dst:
+                    shutil.copyfileobj(src, dst)
+                shutil.copystat(source_file, manifest.source_path)
+        except FileExistsError:
+            raise ValueError(
+                f"'{manifest.source_path}' appeared while the project was being "
+                "created. Nothing was overwritten — try a new directory.")
         manifest.save()
         return manifest

@@ -2594,3 +2594,43 @@ and has no notion of a failed pass, so a writer using the desk still sees an emp
 no caveat. That is a real remaining gap, it is a UI change with its own review needs, and calling
 it done because two of three surfaces agree would be the same overclaim this register keeps
 finding in the product.
+
+## §64 — Gap 50: the safety was in the callers, so the primitive had none (2026-11-06)
+
+Reproduced as filed, first try through the CLI: a directory with a draft at `source.fountain` and
+no manifest, given `run --project <dir> <other.fountain> --only parse`, printed "Created new
+project at …", replaced the draft with a different script, and exited **0**.
+
+What I got wrong before getting it right: my first probe passed `--source`, which does not exist —
+source is a positional argument. The run died on argparse with exit 2 and I nearly wrote down
+"not reproduced". That is the third time this session a broken probe has looked like a clean
+result, and the guard I keep needing is the same one: a probe that fails must be distinguishable
+from a product that refuses. Here the tell was exit 2 with a usage string rather than a
+domain error.
+
+Where the fix belongs was the interesting question. `ProjectManifest.create` is called from five
+places: the CLI, `watch`, and three web routes. Reading them, all four non-CLI callers were
+already safe — three call `_claim_project_dir` for an atomically-created fresh directory, and the
+sample route refuses a damaged directory (gap 35). So the API was not "missing" a check that
+callers supplied; the API had a **silent-replace contract** and every caller was individually
+responsible for avoiding the case it permitted. Four callers remembered. One did not. That is not
+a bug in the CLI, it is a bug in the shape of the primitive, and fixing it only in the CLI would
+have left the next caller to rediscover it.
+
+Two invariants moved into `create`: a destination must be *claimed* (parents made, final
+component `mkdir`'d, so "someone got here first" is reported rather than adopted), and the
+install must not be able to replace (`'xb'`, not `copy2` — `copy2` clobbers, so two runs racing
+still lost data even with the occupancy check in place). I only added the exclusive open after
+asking what happens when two CLI runs start together, which the entry's "claim new directories
+atomically" line asks for and which the occupancy check alone does not answer.
+
+The one place I changed course mid-fix: my first version refused *every* non-empty directory,
+which broke the case where the caller names the file already sitting at the destination. That is
+not a defect in my test, it is the adoption recovery — and it is the only way to take ownership of
+an orphan without moving files around. Pre-fix that path raised `SameFileError`, so it never
+worked; I made it work, because my own error message tells writers to do it and an error that
+recommends an action that fails is worse than one that recommends nothing.
+
+Recorded as not done: `watch` builds its own suffixed directory before creating, so it is
+unaffected, and I did not add a new regression test for that loop — it has its own passing suite
+and I did not want to claim coverage I had not measured.
