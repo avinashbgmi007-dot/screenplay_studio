@@ -3121,3 +3121,47 @@ back red for a reason that had nothing to do with the code. I caught it from the
 `cp: cannot stat` line and restored with `git checkout --`, not from a stale `/tmp`
 copy. Backups that are assumed rather than verified are how a green matrix becomes
 a fiction.
+
+## §76 — Gap 83: a doc is a claim, and nothing was checking it (2026-11-06)
+
+The filing reads like housekeeping — the docs and the CLI disagree — and the
+recommendation offers a fork: delete the server, or guard and document it. The
+fork is the interesting part, because both branches are reasonable and one of them
+would have been wrong.
+
+I kept the server, and the reason is mechanical rather than sentimental:
+`test_cowriter_server.py`, `test_session_selection_merge.py` and the route-coverage
+census all drive it. Deleting it would have deleted working, tested code in order
+to make a sentence true. When a document and the code disagree, the document is the
+cheap thing to fix — the only case for deleting code is that the code is wrong,
+and "a doc denied it" is evidence about the doc.
+
+The half that was not housekeeping: this server had **none** of the desk's guards.
+It binds loopback, and the filing is honest that no exposure was demonstrated — but
+"it only listens on loopback" is a claim about the socket, not about who can drive
+it. DNS rebinding is exactly the technique that turns a loopback-bound service into
+a reachable one, and it arrives as a `Host` header that is not local. So it now
+refuses a foreign `Host` on every method, tested against `evil.com@127.0.0.1` and
+`127.0.0.1.evil.com` as carefully as against `localhost.` and `127.0.0.5`. A guard
+that only rejects what I thought of is not a guard.
+
+I did **not** copy the capability token, and I want that on the record as a stated
+limit rather than an omission. That token exists to stop a foreign page from driving
+the browser UI; this server's only supported callers are direct, scripted clients,
+and bolting a cookie handshake onto it would break every one of them to defend a
+surface nobody browses. Half-implementing a security control is worse than
+documenting its absence.
+
+Two of my own errors are worth naming because they are the same error twice. I wrote
+the route list from memory and got the set wrong — the test caught it. Then I fixed
+the test's parser to understand one table format, and it still failed, because the
+doc uses two. Both times the failure was *my description* of the code, not the code.
+The final shape is the point of the whole gap: the test reads `--help` output and
+the live URL maps and compares them to the prose, so the document cannot drift away
+from the artifact again without something going red.
+
+That is the class-level lesson. This register has spent many entries fixing code
+that lied about itself; gap 83 is the first one about *documentation* lying about
+the code, and it was filed as low severity precisely because prose doesn't crash.
+Nothing was connecting the two, which is why it survived long enough to be noticed
+by a reader rather than by a test. Now something connects them.
