@@ -181,17 +181,30 @@ def _doc_two_scenes():
         "The CIGAR sits on the table, untouched.\n")
 
 
-def test_false_dangling_flips_to_paid_with_proof():
+def test_false_dangling_is_flagged_for_review_not_flipped():
+    """Gap 54 corrected this test, which pinned the defect.
+
+    Its fixture is scene 2 = "The CIGAR sits on the table, untouched" — the
+    cigar is explicitly NOT lit, and the old assertion was that this flips
+    `dangling` -> `paid` with `verified: True` because the word "cigar" recurs.
+    That is the gap: recurrence of a setup's vocabulary is a place to look, not
+    a dramatic resolution. The scene says the thing was never used.
+
+    The mechanical pass now records the scene as a CANDIDATE and leaves the
+    model's verdict alone. What it can still establish is where to look.
+    """
     from screenplay_analyzer.setup_payoff import adjudicate_ledger
     entries = adjudicate_ledger([{
         "setup": "The cigar", "kind": "object",
         "setup_scenes": [1], "payoff_scenes": None,
         "status": "dangling", "note": "Never lit."}], _doc_two_scenes())
-    assert entries[0]["status"] == "paid"
-    assert entries[0]["verified"] is True
-    assert "2" in entries[0]["verify_note"]
-    assert "dangling" in entries[0]["verify_note"], \
-        "the note must name what the verdict was, not what it became"
+    e = entries[0]
+    assert e["status"] == "dangling", "an untouched cigar is not a payoff"
+    assert e["verified"] is False
+    assert e["payoff_candidates"] == [2]
+    assert "2" in e["verify_note"]
+    assert "dangling" in e["verify_note"], \
+        "the note must name the verdict the entry still carries"
 
 
 def test_true_dangling_keeps_verdict():

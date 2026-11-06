@@ -2713,3 +2713,40 @@ Deliberately not done: durable element IDs surviving a re-parse. Speaker-qualifi
 for the edit cycle that produced the record, and a reversal after a fresh upload is refused with a
 reason instead of attempted. The entry asks for stable IDs; that is a schema change to the working
 document and I did not fold it into a bug fix at the end of a long session.
+
+## §67 — Gap 54: the docstring was the bug report (2026-11-06)
+
+This one was unusually clean to diagnose, because the module documented its own defect as a design
+decision: *"Asymmetric: recurrence proves payoff (flip + note), absence proves nothing (keep +
+mark)."* The asymmetry sounds like prudence. It is only half prudent. Absence genuinely proves
+nothing — a scene can pay a setup off in words the setup never used, so a missing match must not
+downgrade anything. But recurrence proves nothing either. It proves the setup's vocabulary
+reappears, which is a location, not a resolution, and the gap between those two is the whole
+finding.
+
+Measured on the register's own fixture: a key promised to open a vault, then a scene where the key
+hangs on a hook and the vault stays locked. The status flipped, the scene became `payoff_scenes`,
+`verified` went true, and the dangling finding vanished. The vault is still locked.
+
+What I want recorded beyond the fix: **a test in this repository was pinning the defect, and it was
+written by someone who read the docstring and believed it.** `test_false_dangling_flips_to_paid_with_proof`
+uses a scene reading *"The CIGAR sits on the table, untouched"* and asserts that this is a payoff,
+verified. The word "untouched" is in the fixture. Whoever wrote it was encoding the documented rule
+rather than asking whether the rule was true — which is exactly the failure mode this whole register
+is about, arriving from the inside. I rewrote the test to assert the candidate, and I am naming it
+here rather than quietly changing an assertion, because a green suite that encodes a false rule is
+worse than a red one.
+
+I also did less than the entry asks. It wants an independent assessment across complete scripts,
+distinguishing a deliberately unresolved thread from an abandoned one *by content*. The pass cannot
+make that judgement. So it now reports both readings — the model's verdict, the candidate scene, and
+the possibility that the strand is open on purpose — and stops there. Inventing a heuristic that
+scores "did the story mean to leave this open" would rebuild the same defect with more moving parts.
+
+Two process notes, because the user called both out. First: I was spending twenty tool calls per gap
+on exploratory probes and incremental edits, so turns kept ending mid-gap with a red suite. The last
+few gaps were done in six calls each — read once, patch code and tests and registers together, run
+the suite, run the gate, commit. Same verification standard, a third of the budget; the measured
+reverts are what make that compression safe. Second, and worse: a sandbox reset threw away this
+gap's tracked edits because I had not committed yet, and I redid the whole patch. Work that is not
+committed does not exist. Commit as soon as the suite is green, not after the registers are polished.

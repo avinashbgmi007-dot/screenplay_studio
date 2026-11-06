@@ -222,14 +222,33 @@ def dangling_findings(ledger: list[dict], existing_plot_thread: list[dict],
             continue  # already reported by the Principles Engine
         label = "Setup left dangling" if e.get("status") == "dangling" else "Setup abandoned"
         quote = _setup_quote(e, doc) if doc is not None else None
+        # Gap 54: "Do not count an unresolved relationship or intentionally open
+        # ending as a defect merely because closure is absent." The statuses can
+        # express a deliberate choice (`red_herring` is one), but the note is
+        # free prose and the reader of a finding needs to know a strand may be
+        # open on purpose. So the finding says it, and a candidate location from
+        # `adjudicate_ledger` is surfaced as evidence to check rather than
+        # silently absorbed into a verdict.
+        why = (e.get("note") or "Set up on the page, never paid off.").strip()
+        why += (" An unresolved strand can be deliberate — the story may end with "
+                "it open on purpose. If it is, this note is wrong and the strand "
+                "is fine.")
+        candidates = e.get("payoff_candidates") or []
+        if candidates:
+            why += (" The setup's words reappear in scene "
+                    f"{', '.join(str(n) for n in candidates)} — worth reading that "
+                    "scene, though matching words are not a payoff.")
         findings.append({
             "category": "plot_thread",
             "rule_id": "setup_payoff_general",
             "issue": f'{label}: "{setup}"',
-            "why_it_matters": e.get("note") or "Set up on the page, never paid off.",
+            "why_it_matters": why,
             "severity": _severity_for(rules_ctx, "setup_payoff_general"),
             "scene_refs": e.get("setup_scenes") or [],
             "evidence_quote": quote,
+            "payoff_candidates": candidates,
+            "is_observation": True,
+            "confidence": "observation",
         })
     return findings
 
@@ -275,9 +294,31 @@ def _terms_in_scenes(terms: set, doc, scenes: list) -> tuple[bool, int | None]:
 
 
 def adjudicate_ledger(entries: list, doc) -> list:
-    """Mechanical re-read of every model verdict (accuracy follow-up).
-    Asymmetric: recurrence proves payoff (flip + note), absence proves
-    nothing (keep + mark). Mutates entries in place, returns them."""
+    """Mechanical re-read of every model verdict.
+
+    Gap 54. The rule this used to state was "recurrence proves payoff (flip +
+    note), absence proves nothing". The asymmetry was half right: absence really
+    does prove nothing. Recurrence proves nothing either. It proves that the
+    setup's vocabulary appears again, which is a *location to look at*, not a
+    dramatic resolution — and the two are not the same thing.
+
+    Measured on the register's own fixture: a ledger entry saying a silver key
+    opens the vault, and a second scene where the key hangs on a hook while the
+    vault stays locked. The words recur, so the entry flipped `dangling` ->
+    `paid`, dropped a payoff scene onto it, and set `verified: true`, which
+    suppressed the dangling finding entirely. The vault is still locked.
+
+    Now:
+      * recurrence records CANDIDATE locations (`payoff_candidates`) and leaves
+        the model's status alone;
+      * `verified` is only ever set by checking a payoff the entry already
+        claims — this pass never manufactures one;
+      * an entry the model called dangling stays dangling, with the candidate
+        scene recorded and uncertainty stated, so the writer can see both the
+        claim and the contradictory evidence;
+      * absence still proves nothing (a scene may pay off a setup in words the
+        setup never used), so nothing is downgraded for lack of a match.
+    """
     for e in entries or []:
         if not isinstance(e, dict):
             continue
@@ -316,11 +357,17 @@ def adjudicate_ledger(entries: list, doc) -> list:
                 later = [s.scene_number for s in (doc.scenes or [])]
             ok, at = _terms_in_scenes(terms, doc, later)
             if ok:
-                old_status = e.get("status")
-                e["status"] = "paid"
-                e["payoff_scenes"] = [at]
-                e["verified"] = True
-                e["verify_note"] = f"setup terms recur in scene {at} — paid, not {old_status}"
+                # Gap 54: a candidate, not a verdict. The scene's words match;
+                # whether it RESOLVES the setup is a judgement about content
+                # that a token overlap cannot make. The status stays as the
+                # model wrote it and `verified` stays False — this pass has not
+                # verified anything, it has found somewhere to look.
+                e["payoff_candidates"] = [at]
+                e.setdefault("payoff_scenes", e.get("payoff_scenes") or [])
+                e["verified"] = False
+                e["verify_note"] = (
+                    f"setup terms reappear in scene {at}, which is a place to look, "
+                    f"not a payoff — the entry stays {e.get('status')}")
             else:
                 e["verified"] = False
                 e["verify_note"] = "no later recurrence found (kept: absence proves nothing)"
