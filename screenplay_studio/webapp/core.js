@@ -177,13 +177,24 @@ function verificationReadoutText(vs) {
   if (!vs || typeof vs !== "object") return null;
   const checkable = (vs.verified || 0) + (vs.not_found || 0) + (vs.scene_not_found || 0);
   const unquoted = vs.no_quote || 0;
+  // Gap 93: the desk already carried its denominator, which the report did not.
+  // What it never said is how many findings can be FALSIFIED — the observation
+  // count. A readout that reports "3 of 3 quotes verified" beside thirteen
+  // unchecked rows reads as "the analysis is 100% sound", and the observation
+  // number is the one that corrects it. Appended only when the field is present
+  // (reports analysed before it existed must not invent a zero).
+  const hasObs = typeof vs.observation_bearing === "number";
+  const obs = hasObs
+    ? " \u00B7 " + vs.observation_bearing + " carried a checkable observation"
+    : "";
   if (checkable) {
     return (vs.verified || 0) + " of " + checkable + " quotes verified ("
       + Math.round(100 * (vs.verified || 0) / checkable) + "%)"
-      + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "");
+      + (unquoted ? " \u00B7 " + unquoted + " carried no quote" : "")
+      + obs;
   }
-  return unquoted
-    ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify"
+  return unquoted || hasObs
+    ? unquoted + " finding" + (unquoted === 1 ? "" : "s") + " carried no quote to verify" + obs
     : null;
 }
 

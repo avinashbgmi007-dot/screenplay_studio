@@ -66,3 +66,45 @@ test("missing fields default to 0 instead of NaN", () => {
     "2 of 2 quotes verified (100%)"
   );
 });
+
+// ---- Gap 93: the falsifiability count rides in the same breath ----
+//
+// The filed case: 16 findings, 3 quoted and verified, 0 with an observation.
+// The old line said "3 of 3 quotes verified (100%) · 13 carried no quote" —
+// every number true, and the sentence a writer quotes back is "100%", which is
+// not what the run showed. Observation coverage is the number that corrects it.
+
+test("observation coverage is stated beside the quote rate", () => {
+  assert.strictEqual(
+    verificationReadoutText({
+      verified: 3, not_found: 0, scene_not_found: 0, no_quote: 13,
+      observation_bearing: 0, observation_pct: 0.0,
+    }),
+    "3 of 3 quotes verified (100%) \u00B7 13 carried no quote"
+      + " \u00B7 0 carried a checkable observation"
+  );
+});
+
+test("a report analysed before the field existed invents no zero", () => {
+  // Older reports have no observation_bearing. Printing "0 carried" for them
+  // would accuse the run of a defect it was never measured for.
+  const text = verificationReadoutText({ verified: 2, not_found: 0, no_quote: 4 });
+  assert.strictEqual(text, "2 of 2 quotes verified (100%) \u00B7 4 carried no quote");
+  assert.ok(text.indexOf("observation") === -1);
+});
+
+test("the nothing-checkable case still counts findings and can carry observations", () => {
+  assert.strictEqual(
+    verificationReadoutText({ no_quote: 16, observation_bearing: 5 }),
+    "16 findings carried no quote to verify \u00B7 5 carried a checkable observation"
+  );
+});
+
+test("an observation count of zero is printed, not suppressed", () => {
+  // Zero is the whole point of the gap: it is a fact about falsifiability, and
+  // falsy-zero handling would hide exactly the case that matters most.
+  const text = verificationReadoutText({
+    verified: 1, not_found: 0, no_quote: 0, observation_bearing: 0,
+  });
+  assert.ok(text.indexOf("0 carried a checkable observation") !== -1);
+});

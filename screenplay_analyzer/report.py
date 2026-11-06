@@ -513,16 +513,57 @@ def render_markdown(result: AnalysisResult) -> str:
                 "numbers are checked too, and a citation that cannot exist reads as unverified, "
                 "not as quietly fine."
             )
+        # Gap 93: the percentage used to stand alone here, and on real material it
+        # read "100.0% (3 of 3)" beside THIRTEEN findings carrying no quotable text
+        # at all. The denominator was present but the excluded mass was not, so the
+        # sentence a writer quotes back ("100% of quotes verified") meant nothing
+        # like what it looked like. Coverage now comes first, with every count in
+        # one sentence, and the rate is stated as a fraction OF THE QUOTED.
+        quoted = v.get("verified", 0) + v.get("not_found", 0)
+        unquoted = total - quoted
+        obs = _observation_coverage(getattr(result, "findings", None) or [])
+        lines.append("")
+        if total:
+            pct = round(100.0 * quoted / total, 1)
+            lines.append(
+                f"**Evidence coverage: {quoted} of {total} findings "
+                f"({pct}%) carry a quotable line; {obs['observation_bearing']} of {total} "
+                f"({obs['observation_pct']}%) carry a checkable observation.**"
+            )
+        # Falsifiability is its own statement, not a footnote: a quote makes a
+        # finding citable, an observation makes it checkable, and a report where
+        # NO finding carries one is a report whose claims cannot be falsified —
+        # which the writer needs to see, in the report, not only in the JSON.
+        if total and not obs["observation_bearing"]:
+            lines.append(
+                "\n⚠️ **No finding in this report carries a checkable observation.** "
+                "Every note is an assertion without a falsifying condition — treat the "
+                "readings as prompts to look, not as findings you can confirm or refute."
+            )
+
         # The one number a writer can act on: of the findings whose citation a
         # machine CAN judge (they carry a quotable line), how many held up.
         # Deliberately absent when nothing was quote-checkable — a percentage
         # over nothing is a lie (verifier.verification_rate owns the rule).
         rate = verification_rate(v)
         if rate["quote_bearing"]:
+            # Gap 93: the excluded count rides IN the same sentence. A rate whose
+            # denominator is 3, sitting beside 13 unchecked rows, is a number the
+            # writer will quote back with the wrong meaning unless it says so here.
+            excl = (f"; the other {unquoted} finding{'s' if unquoted != 1 else ''} "
+                    f"cite{'s' if unquoted == 1 else ''} no quotable text and "
+                    f"{'is' if unquoted == 1 else 'are'} excluded from it"
+                    if unquoted else "")
             lines.append(
-                f"\n**Quote-verified rate: {rate['verified_pct_of_quoted']}%** "
-                f"({v.get('verified', 0)} of {rate['quote_bearing']} findings that cite quotable "
-                "text; summary-reasoned findings cite scene numbers and are excluded)."
+                f"\n**Quote-verified rate: {rate['verified_pct_of_quoted']}%** — "
+                f"{v.get('verified', 0)} of {rate['quote_bearing']} findings that cite "
+                f"quotable text, verified against the actual script{excl}."
+            )
+        elif total:
+            lines.append(
+                "\n**No quote-verified rate is reported:** no finding in this run cited a "
+                "quotable line, so there is nothing for a mechanical check to judge. That is "
+                "not a clean bill of health — it means every citation here is by scene number."
             )
         # Evidence depth (§5 item 4): the paragraph above describes the ceiling in
         # prose; this states its SIZE. A count is what makes an invisible
