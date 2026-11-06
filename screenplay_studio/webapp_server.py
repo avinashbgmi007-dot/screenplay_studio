@@ -3031,7 +3031,20 @@ def undo_edits(name):
         return _error(str(e), 400)
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": _EMPTY_STATUS_SUMMARY.copy()}
     _record_findings_metrics(m, statuses)
-    return jsonify({**result, "findings_status": statuses})
+    # Gap 51: an undo that reversed nothing is not a 200 with an empty list for
+    # the client to ignore. 409 — the request was well-formed, the document's
+    # current state is what blocked it. The record is still on the undo stack
+    # (revision.undo_last_edit guarantees that), so the writer can fix the line
+    # and retry instead of having lost the edit.
+    if not result.get("undone"):
+        return jsonify({"ok": False, "error": result.get("reason") or
+                        "This edit could not be undone.",
+                        "restored": result.get("restored", []),
+                        "failed": result.get("failed", []),
+                        "can_undo": result.get("can_undo", True),
+                        "can_redo": result.get("can_redo", False),
+                        "findings_status": statuses}), 409
+    return jsonify({**result, "ok": True, "findings_status": statuses})
 
 
 def _record_findings_metrics(m, statuses) -> None:
@@ -3068,9 +3081,19 @@ def redo_edits(name):
         result = redo_last_edit(m)
     except ValueError as e:
         return _error(str(e), 400)
+    # Gap 51, the mirror: same rule for redo, whose failure path the entry
+    # flagged but did not reproduce.
     statuses = finding_statuses(m) if m.stage("analyze").status == "complete" else {"findings": [], "summary": _EMPTY_STATUS_SUMMARY.copy()}
     _record_findings_metrics(m, statuses)
-    return jsonify({**result, "findings_status": statuses})
+    if not result.get("redone"):
+        return jsonify({"ok": False, "error": result.get("reason") or
+                        "This edit could not be re-applied.",
+                        "applied": result.get("applied", []),
+                        "failed": result.get("failed", []),
+                        "can_undo": result.get("can_undo", False),
+                        "can_redo": result.get("can_redo", True),
+                        "findings_status": statuses}), 409
+    return jsonify({**result, "ok": True, "findings_status": statuses})
 
 
 @app.route("/api/projects/<name>/quickcheck", methods=["POST"])

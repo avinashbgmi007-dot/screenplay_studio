@@ -2677,3 +2677,39 @@ Recorded as not done: editing still addresses elements by text, so two identical
 scene are refused as ambiguous rather than disambiguated, and undo of a rename is tested at the
 text level only. The entry asks for stable element IDs; that is gap 51's territory (undo that
 fails while claiming success) and I did not widen this fix into it.
+
+## §66 — Gap 51: undo was honest about failing and dishonest about everything else (2026-11-06)
+
+The filed reproduction held exactly. Undo returned `restored: []` with one `failed` entry, the
+prose was unchanged, and the record moved from the undo log to the redo stack anyway. The route
+answered 200, and the client printed "Undid the last applied edit." without looking at the body.
+
+The part I nearly missed by treating the entry as complete: **the failure was manufactured by the
+apply.** The entry describes undo refusing a line it cannot identify. It does not say why the line
+became unidentifiable. Replacing MARA's `First line.` with `Second line.` — which TOM already says
+— leaves two dialogue lines with identical text under two different speakers, and the reversal,
+matching on text alone, cannot tell which one the edit produced. So the honest fix is not only "do
+not consume the record on failure". A line that has a speaker has an identity, and both directions
+should carry it. That turned the filed case from *refused* into *undoable*, which is the difference
+between a correct refusal and a working feature.
+
+I also introduced a regression and the suite caught it within one run. My first `_speaker_of_line`
+returned the **first** match, so a line two characters share was read as confidently belonging to
+the first of them — and an ambiguous edit sailed through without a hint. A test I had written
+expecting the *refusal* failed instead of passing, which is the only reason I looked. The function
+now returns None unless exactly one speaker says the text, and identity only ever narrows a
+candidate set; it never decides on its own that a repeated line is unambiguous.
+
+Two other things worth recording. The existing `test_undo_redo.py` fixture seeded the edit **only
+into the log** and never into the working copy, so the recorded text was nowhere in the document
+and the undo had nothing to reverse. It passed for years because the old code returned the record
+as "undone" no matter what — the fixture was testing the defect. Once a failed reversal stopped
+consuming the record, the fixture failed, and I fixed the fixture rather than loosening the fix.
+And on group semantics the entry says "make them explicit and transactional": I chose
+all-or-nothing refusal over partial application, because the group is the unit the writer asked
+for, and a half-reversed document matches neither the before state nor the after one.
+
+Deliberately not done: durable element IDs surviving a re-parse. Speaker-qualified text is enough
+for the edit cycle that produced the record, and a reversal after a fresh upload is refused with a
+reason instead of attempted. The entry asks for stable IDs; that is a schema change to the working
+document and I did not fold it into a bug fix at the end of a long session.

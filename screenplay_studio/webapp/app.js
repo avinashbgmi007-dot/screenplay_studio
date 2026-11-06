@@ -9383,11 +9383,29 @@ async function applyRewrite() {
   applyBtn.disabled = false;
 }
 
+// Gap 51: these used to fire the request and then unconditionally announce
+// success. The route could answer 200 with `restored: []` and one `failed`
+// entry — the document unchanged — and the writer was told "Undid the last
+// applied edit." Three things were wrong: the payload was ignored, the notice
+// claimed a specific outcome, and a partial reversal read as a complete one.
+// Now the response is read: `ok === false` (a 409 from the route) says what
+// could not be reversed, keeps the edit on the stack, and never says "Undid".
 async function undoEdit() {
   try {
-    await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/undo`, { method: "POST" });
+    const res = await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/undo`, { method: "POST" });
     await afterScriptEdit();
-    appendSystemNote("Undid the last applied edit.");
+    if (res && res.ok === false) {
+      appendSystemNote(res.error || "That edit could not be undone — it is still on the undo stack.");
+      showError(res.error || "Couldn't undo that edit.");
+      return;
+    }
+    const n = res && typeof res.applied_count === "number" ? res.applied_count : null;
+    const partial = res && res.failed && res.failed.length;
+    appendSystemNote(
+      partial
+        ? `Undid ${res.applied_count} of ${res.applied_count + res.failed.length} change(s); the rest could not be reversed.`
+        : (n === null ? "Undid the last applied edit." : `Undid the last applied edit (${n} change(s)).`)
+    );
   } catch (e) {
     showError("Couldn't undo: " + e.message);
   }
@@ -9395,9 +9413,15 @@ async function undoEdit() {
 
 async function redoEdit() {
   try {
-    await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/redo`, { method: "POST" });
+    const res = await api(`/projects/${encodeURIComponent(state.currentProject)}/edits/redo`, { method: "POST" });
     await afterScriptEdit();
-    appendSystemNote("Re-applied the undone edit.");
+    if (res && res.ok === false) {
+      appendSystemNote(res.error || "That edit could not be re-applied — it is still on the redo stack.");
+      showError(res.error || "Couldn't redo that edit.");
+      return;
+    }
+    const n = res && typeof res.applied_count === "number" ? res.applied_count : null;
+    appendSystemNote(n === null ? "Re-applied the undone edit." : `Re-applied the undone edit (${n} change(s)).`);
   } catch (e) {
     showError("Couldn't redo: " + e.message);
   }

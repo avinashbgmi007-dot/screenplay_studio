@@ -1054,6 +1054,52 @@ def _replace_in_scene(doc: ScriptDocument, scene_number: int, from_text: str, to
     return False
 
 
+def _resolve_reversal(doc: ScriptDocument, record: dict, forward: bool = False) -> list[dict]:
+    """Work out, for every replacement in a group, which element it applies to.
+
+    Gap 51. Undo reverses new -> old; redo re-applies old -> new. Resolution is
+    exact-match only — the module's standing rule is that undo and redo never
+    fuzzy-guess which line the writer meant, because guessing wrong silently
+    edits a different line.
+
+    Returns one entry per replacement: {element, from, to, reason}. `element` is
+    None when the line could not be identified, and `reason` says why in terms a
+    writer can act on.
+    """
+    elements = scene_elements(doc, record["scene_number"])
+    out = []
+    for rep in record.get("applied", []):
+        old_text, new_text = rep["old"], rep["new"]
+        frm, to = (old_text, new_text) if forward else (new_text, old_text)
+        exact = [el for el in elements if el.text == frm]
+        # Gap 51's "stable identity": the speaker is part of a line's identity.
+        # Two lines that read the same under DIFFERENT speakers are two
+        # different lines, and the edit that produced the text knew which one it
+        # touched — so it can say which one it was without guessing.
+        if len(exact) > 1 and rep.get("character"):
+            exact = [el for el in exact if (el.character or "") == rep["character"]]
+        reason = ""
+        if len(exact) > 1:
+            reason = (f"{len(exact)} lines now read \"{frm}\" with no way to tell "
+                      "which one this edit changed, so nothing was changed")
+        elif not exact:
+            reason = (f"no line in the scene reads \"{frm}\" any more — it was edited "
+                      "again or re-parsed since")
+        out.append({"element": exact[0] if len(exact) == 1 else None,
+                    "from": frm, "to": to, "reason": reason})
+    return out
+
+
+def _unrestorable_reason(record: dict, unrestorable: list[dict]) -> str:
+    """One sentence for the writer: what failed and why, without jargon."""
+    n = len(unrestorable)
+    of = len(record.get("applied", []))
+    detail = unrestorable[0]["reason"] if unrestorable else ""
+    tail = "" if n == 1 else f" (and {n - 1} more of the {of})"
+    return (f"This edit could not be reversed, so it is still in place and still "
+            f"on the undo stack: {detail}{tail}.")
+
+
 def undo_last_edit(m) -> dict:
     """Reverse the most recent applied edit group (new -> old). The record
     moves from the undo log to the redo stack. Returns a summary dict.
@@ -1084,13 +1130,43 @@ def undo_last_edit(m) -> dict:
         # consuming it and leaving a half-applied reversal behind.
         redo_stack(m)
         doc = load_working(m)
-        restored, failed = [], []
-        for rep in record.get("applied", []):
-            old_text, new_text = rep["old"], rep["new"]
-            if _replace_in_scene(doc, record["scene_number"], new_text, old_text):
-                restored.append({"old": new_text, "new": old_text})
-            else:
-                failed.append({"old": new_text, "new": old_text})
+        # Gap 51: look up EVERY replacement before changing ANY of them.
+        #
+        # The unfixed shape applied what it could, saved, then moved the record
+        # from the undo log to the redo stack whether or not anything had been
+        # reversed. Measured through the real functions: MARA's `First line.`
+        # was replaced with `Second line.` (TOM already had that line); undo
+        # returned `restored: [], failed: [one]` — prose unchanged in the
+        # document — and yet the record left the undo log, landed on the redo
+        # stack, and `can_undo` went False. The writer's last edit was now
+        # unrecoverable and the interface said "Undid the last applied edit."
+        #
+        # Applying part of a group and refusing the rest is worse than refusing
+        # the group: the group is the unit the writer asked for, and a half-
+        # reversal leaves a document that matches neither before nor after.
+        targets = _resolve_reversal(doc, record)
+        unrestorable = [t for t in targets if t["element"] is None]
+        if unrestorable:
+            return {
+                "undone": None,
+                "restored": [],
+                "failed": [{"old": t["from"], "new": t["to"], "reason": t["reason"]}
+                           for t in unrestorable],
+                "can_undo": True,        # the record is still there to retry
+                "can_redo": bool(redo_stack(m)),
+                "applied_count": 0,
+                "reason": _unrestorable_reason(record, unrestorable),
+            }
+        restored = []
+        for t in targets:
+            t["element"].text = t["to"]
+            restored.append({"old": t["from"], "new": t["to"]})
+        # Gap 52's rule, both directions: the element is the source of truth, so
+        # a reversal has to re-derive the heading/character fields it restored.
+        scene_obj = next((sc for sc in doc.scenes
+                          if sc.scene_number == record["scene_number"]), None)
+        if scene_obj is not None:
+            _rebuild_scene_derived(scene_obj)
         doc.save(wp)
         # move the record: undo log -> redo stack, inside the same section —
         # the redo write re-reads under the cycle lock, so it appends to the
@@ -1103,9 +1179,11 @@ def undo_last_edit(m) -> dict:
     return {
         "undone": record,
         "restored": restored,
-        "failed": failed,
+        "failed": [],
         "can_undo": bool(log),
         "can_redo": True,
+        "applied_count": len(restored),
+        "reason": "",
     }
 
 
@@ -1134,13 +1212,32 @@ def redo_last_edit(m) -> dict:
         # before the working copy is rewritten, instead of after.
         edits_log(m)
         doc = load_working(m)
-        applied, failed = [], []
-        for rep in record.get("applied", []):
-            old_text, new_text = rep["old"], rep["new"]
-            if _replace_in_scene(doc, record["scene_number"], old_text, new_text):
-                applied.append({"old": old_text, "new": new_text})
-            else:
-                failed.append({"old": old_text, "new": new_text})
+        # Gap 51, the mirror of undo: the entry says "a similar failure path
+        # exists in redo; it was not independently reproduced". It is the same
+        # code shape, so it is fixed the same way — no partial application, and
+        # a record that cannot be re-applied stays on the stack instead of being
+        # dropped. (Reproduced: same fixture, redo after a refused undo.)
+        targets = _resolve_reversal(doc, record, forward=True)
+        unappliable = [t for t in targets if t["element"] is None]
+        if unappliable:
+            return {
+                "redone": None,
+                "applied": [],
+                "failed": [{"old": t["from"], "new": t["to"], "reason": t["reason"]}
+                           for t in unappliable],
+                "can_undo": bool(edits_log(m)),
+                "can_redo": True,        # still on the stack, still retryable
+                "applied_count": 0,
+                "reason": _unrestorable_reason(record, unappliable),
+            }
+        applied = []
+        for t in targets:
+            t["element"].text = t["to"]
+            applied.append({"old": t["from"], "new": t["to"]})
+        scene_obj = next((sc for sc in doc.scenes
+                          if sc.scene_number == record["scene_number"]), None)
+        if scene_obj is not None:
+            _rebuild_scene_derived(scene_obj)
         doc.save(wp)
         redo.pop()
         _save_json_list(redo_path, redo)
@@ -1152,9 +1249,11 @@ def redo_last_edit(m) -> dict:
     return {
         "redone": record,
         "applied": applied,
-        "failed": failed,
+        "failed": [],
         "can_undo": True,
         "can_redo": bool(redo),
+        "applied_count": len(applied),
+        "reason": "",
     }
 
 
@@ -1189,17 +1288,101 @@ def scene_text(doc: ScriptDocument, scene_number: int) -> str:
     raise ValueError(f"Scene {scene_number} not found in script.")
 
 
-def _match_element(elements: list, old_text: str):
+def _replacement_speaker(elements: list, replacements: list[dict] | None) -> str | None:
+    """The speaker a batch of replacements is for, when it can be established.
+
+    Gap 51 / gap 52's "stable identity". A writer working a note about MARA
+    sends replacements for MARA's lines; if the line they quote happens to read
+    the same as a line TOM says, the speaker disambiguates it without guessing.
+
+    Established ONLY when the batch names exactly one speaker: every `old` line
+    that matches must sit in a single character's block. A batch that touches
+    two speakers' lines establishes nothing, and the old ambiguity rule stands.
+    """
+    if not replacements:
+        return None
+    # An explicit hint from the caller wins: the writer (or the UI that built the
+    # batch) knows whose line this is, and stating it is not a guess.
+    stated = {(rep.get("character") or "").strip() for rep in replacements
+              if (rep.get("character") or "").strip()}
+    if len(stated) == 1:
+        return next(iter(stated))
+    if len(stated) > 1:
+        return None                 # contradictory hints establish nothing
+    speakers = set()
+    for rep in replacements:
+        old_text = (rep.get("old") or "").strip()
+        if not old_text:
+            continue
+        hit = _speaker_of_line(elements, old_text)
+        if hit is None:
+            return None             # a line we cannot place — say nothing
+        speakers.add(hit)
+        if len(speakers) > 1:
+            return None             # more than one speaker — no basis to pick
+    return next(iter(speakers)) if len(speakers) == 1 else None
+
+
+def _block_speaker(elements: list, target) -> str | None:
+    """The character whose dialogue block contains `target`."""
+    current = None
+    for el in elements:
+        if el.type == ElementType.CHARACTER:
+            current = el.character or el.text
+        elif el.type == ElementType.SCENE_HEADING:
+            current = None
+        if el is target:
+            return current
+    return None
+
+
+def _speaker_of_line(elements: list, text: str) -> str | None:
+    """Which character speaks the line whose text is `text`, if it is dialogue.
+
+    Returns None when the text is not dialogue, or when MORE THAN ONE character
+    says it — the batch then establishes no speaker, and the ambiguity rule
+    stands. My first version returned the first match, which turned a line two
+    characters share into a confident "this is MARA's" and let an ambiguous edit
+    through without a hint. The test that expected the refusal caught it.
+    """
+    current = None
+    speakers = []
+    for el in elements:
+        if el.type == ElementType.CHARACTER:
+            current = el.character or el.text
+        elif el.type == ElementType.SCENE_HEADING:
+            current = None
+        elif el.text == text:
+            if el.type in (ElementType.DIALOGUE, ElementType.PARENTHETICAL):
+                speakers.append(el.character or current)
+            else:
+                return None         # prose/heading belongs to no speaker
+    unique = {s for s in speakers if s}
+    return next(iter(unique)) if len(unique) == 1 else None
+
+
+def _match_element(elements: list, old_text: str, speaker: str | None = None):
     """Find the element whose text should be replaced by `old_text`.
 
     Exact match first; then a unique fuzzy match above 0.8 similarity.
     Returns (element, similarity) or (None, 0) if ambiguous / not found.
+
+    `speaker` narrows a repeated line to that speaker's block before uniqueness
+    is judged (gap 51). Without it, a line said by two characters is refused as
+    ambiguous even when the batch is clearly about one of them.
     """
     stripped = old_text.strip()
     if not stripped:
         return None, 0
 
     exact = [el for el in elements if el.text == stripped]
+    if len(exact) > 1 and speaker:
+        # The speaker narrows the candidates — it never decides on its own which
+        # text matches. Below, a remaining non-unique set is still refused.
+        mine = [el for el in exact
+                if (el.character or _block_speaker(elements, el)) == speaker]
+        if mine:
+            exact = mine
     if len(exact) == 1:
         return exact[0], 1.0
     if len(exact) > 1:
@@ -1230,6 +1413,14 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
     elements = scene_elements(doc, scene_number)
     scene_obj = next((s for s in doc.scenes if s.scene_number == scene_number), None)
     applied, skipped = [], []
+    # Gap 51: which speaker the replacements are for, if any. `_match_element`
+    # refuses a line that appears more than once, which is right — but it was
+    # counting a duplicate ACROSS speakers, where the writer's intent is not
+    # ambiguous at all. Measured: `First line.` (MARA) replaced with
+    # `Second line.`, which TOM already says, left two identical dialogue lines
+    # under two different speakers; the edit record's `(new -> old)` could then
+    # no longer identify which line to reverse, so undo failed.
+    speaker = _replacement_speaker(elements, replacements)
     for rep in replacements or []:
         old_text = (rep.get("old") or "").strip()
         new_text = (rep.get("new") or "").strip()
@@ -1239,7 +1430,7 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
         if "\n" in old_text:
             skipped.append({"old": old_text, "new": new_text, "reason": "old spans multiple lines"})
             continue
-        el, ratio = _match_element(elements, old_text)
+        el, ratio = _match_element(elements, old_text, speaker=speaker)
         if el is not None:
             refusal = _reject_edits_that_break_the_document(elements, old_text, new_text)
             if refusal:
@@ -1253,6 +1444,11 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
             ) else "line not found in scene"
             skipped.append({"old": old_text, "new": new_text, "reason": reason})
             continue
+        # Gap 51: record the line's identity with the edit, so a later reversal
+        # is not looking at text alone. `character` is captured BEFORE the
+        # retag, because a cue rename changes it and the reversal has to be
+        # resolvable against the value the document will actually hold.
+        identity = _block_speaker(elements, el) or el.character
         el.text = new_text
         renamed = _retag_element(el, new_text)
         if renamed:
@@ -1264,7 +1460,10 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
             # renamed speaker appeared to have no dialogue at all.
             _carry_speaker_rename(elements, elements.index(el), renamed,
                                   el.character)
-        applied.append({"old": old_text, "new": new_text, "similarity": round(ratio, 3)})
+        entry_row = {"old": old_text, "new": new_text, "similarity": round(ratio, 3)}
+        if identity:
+            entry_row["character"] = identity
+        applied.append(entry_row)
     # Gap 52: `heading_raw` and `character` are the fields everything else
     # reads — the Fountain/TXT/FDX exporters write `heading_raw`, the knowledge
     # graph keys characters by `dialogue.character`, and the manuscript UI

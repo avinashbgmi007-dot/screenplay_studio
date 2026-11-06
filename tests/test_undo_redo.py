@@ -258,14 +258,28 @@ def _seed_redo(m) -> None:
 
 
 def _seed_one_edit(m, scene_number=1, applied=None) -> None:
-    """Put the project in the state an undo expects: a working copy plus one
-    applied edit in the log.
+    """Put the project in the state an undo expects: a working copy that REALLY
+    CONTAINS the edit, plus that edit in the log.
 
-    Written directly rather than through `save_working`, because that calls
-    `clear_redo()` — which would delete the very stack these tests damage.
-    `_make_project` has already produced the working copy via `ensure_working`.
+    Gap 51 corrected this fixture. It used to write only the log entry, leaving
+    the working copy untouched — so the recorded edit's `new` text was nowhere
+    in the document and the undo could not find it. That went unnoticed because
+    the old `undo_last_edit` returned the record as "undone" whether or not it
+    had reversed anything; once a failed reversal stopped consuming the record,
+    this fixture failed. The doc-state write goes through `save_working` with no
+    record (it does not touch the redo stack); the log is seeded by hand,
+    because `save_working(..., record=...)` calls `clear_redo()` and would
+    delete the very stack these tests damage.
     """
     import json as _json
+    if applied:
+        doc = revision.load_working(m)
+        elements = revision.scene_elements(doc, scene_number)
+        for rep in applied:
+            hits = [el for el in elements if el.text == rep["old"]]
+            if len(hits) == 1:
+                hits[0].text = rep["new"]
+        revision.save_working(m, doc)          # document only, no log entry
     with open(revision.edits_log_path(m), "w", encoding="utf-8") as f:
         _json.dump([{"id": "aa11", "scene_number": scene_number,
                      "applied": applied if applied is not None else [],
