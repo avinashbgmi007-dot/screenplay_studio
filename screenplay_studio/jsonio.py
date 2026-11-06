@@ -301,6 +301,58 @@ def retry_permission(fn, attempts: int = 6):
             time.sleep(min(0.6, 0.05 * (attempt + 1)) * (0.5 + random.random() * 0.5))
 
 
+# Gap 82: the two shelves described the same damage in two different vocabularies —
+# a damaged project said `{project, title, unreadable, stages, sessions}` and a
+# damaged idea said `{id, title, unreadable, created_at, updated_at}`. The only
+# shared words were `title` and `unreadable`, so the recovery UI built for one
+# shelf (gap 80) could not read the other, and neither row said whether anything
+# could be rescued, why the file failed, or what the file last looked like.
+#
+# Damage is the same event regardless of which store it happens to, so it gets
+# one vocabulary here — the module that already owns `StoreUnreadable` — and every
+# shelf is a superset of it. Shelf-specific keys stay (the project card still
+# carries `stages`), they just no longer *are* the damage description.
+DAMAGE_ENVELOPE_KEYS = ("kind", "id", "title", "unreadable",
+                        "recoverable", "detail", "last_known")
+
+
+def damage_envelope(kind: str, ident: str, *, title: str = None,
+                    detail: str = None, recoverable: bool = True,
+                    last_known: dict = None, **shelf_fields) -> dict:
+    """"This thing is damaged", in the one shape every reader understands.
+
+    `recoverable` is a claim about what the RECOVERY ROUTE would return, not a
+    mood: True means there are bytes to hand back or a file to rebuild from.
+    `detail` is the parser's own reason, kept verbatim so support tooling and the
+    writer see the same sentence. `last_known` is what can be said about the file
+    without reading it — size and mtime — because a destroyed file still has a
+    past and guessing at its contents would invent one.
+    """
+    env = {
+        "kind": kind,
+        "id": ident,
+        # A damaged thing keeps its identifier as its title until something
+        # better survives; never blank, so no reader renders an empty card.
+        "title": title or ident,
+        "unreadable": True,
+        "recoverable": bool(recoverable),
+        "detail": detail,
+        "last_known": last_known,
+    }
+    env.update(shelf_fields)
+    return env
+
+
+def last_known_facts(path: str) -> dict:
+    """What is knowable about a damaged file without trusting its contents."""
+    try:
+        st = os.stat(path)
+        return {"file": os.path.basename(path), "size": st.st_size,
+                "modified": st.st_mtime}
+    except OSError:
+        return {"file": os.path.basename(path), "size": None, "modified": None}
+
+
 class StoreUnreadable(RuntimeError):
     """A store file is there but cannot be read as its documented shape.
 

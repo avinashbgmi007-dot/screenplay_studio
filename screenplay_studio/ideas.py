@@ -22,7 +22,7 @@ import shutil
 import time
 import uuid
 
-from .jsonio import atomic_write_json, check_safe_id, lock_for, retry_permission
+from .jsonio import atomic_write_json, check_safe_id, damage_envelope, last_known_facts, lock_for, retry_permission
 
 EMPTY_CARD = {"title": "", "logline": "", "premise": "", "questions": []}
 
@@ -226,16 +226,24 @@ class IdeaStore:
         for name in sorted(os.listdir(self.ideas_dir)):
             try:
                 out.append(self.load(name))
-            except Exception:
+            except Exception as e:
                 # Flag, don't drop: a corrupt/unreadable idea must still show
                 # on the shelf so the writer knows it exists.
-                out.append({
-                    "id": name,
-                    "title": name,
-                    "unreadable": True,
-                    "created_at": 0,
-                    "updated_at": 0,
-                })
+                #
+                # Gap 82: through the SHARED damage envelope, so the shelf row says
+                # whether the idea can be rescued, why it failed, and what the file
+                # last looked like — the same three things the project shelf says.
+                # `recoverable` is honest here: `recover_idea` hands back the raw
+                # bytes of whatever is on disk, and `repair_idea` can rebuild from
+                # a source-only folder, so a directory that exists is recoverable.
+                meta_path = os.path.join(self._dir(name), "idea.json")
+                out.append(damage_envelope(
+                    "idea", name,
+                    detail=f"{type(e).__name__}: {e}",
+                    recoverable=os.path.isdir(self._dir(name)),
+                    last_known=last_known_facts(meta_path),
+                    created_at=0, updated_at=0,
+                ))
         out.sort(key=lambda m: m.get("updated_at", 0), reverse=True)
         return out
 

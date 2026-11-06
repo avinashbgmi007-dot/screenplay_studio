@@ -1557,12 +1557,12 @@ function renderIdeaList() {
     item.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        if (idea.unreadable) { showError("This idea's file is damaged on disk and can't be opened."); return; }
+        if (idea.unreadable) { showRecovery(idea, "idea"); return; }
         openIdea(idea.id);
       }
     });
     item.addEventListener("click", () => {
-      if (idea.unreadable) { showError("This idea's file is damaged on disk and can't be opened."); return; }
+      if (idea.unreadable) { showRecovery(idea, "idea"); return; }
       openIdea(idea.id);
     });
     list.appendChild(item);
@@ -2575,44 +2575,67 @@ function renderSourceProvenance(project) {
 // would have saved the folder. The warning was right; the dead end was not.
 // This offers the two things that actually help: copy the folder out with no
 // trust in the desk, or rebuild the manifest from the files on disk.
-async function showRecovery(p) {
+async function showRecovery(p, kind) {
+  // Gap 82: one damage vocabulary, so one recovery surface. The shelves differ in
+  // two things only — which route answers, and which label names the thing — and
+  // those are parameters, not a second panel. A writer should not have to learn a
+  // different recovery story depending on whether the damage hit a project or an
+  // idea; the damage was the same event.
+  kind = kind || "project";
+  const ident = kind === "idea" ? p.id : p.project;
+  const route = kind === "idea" ? "ideas" : "projects";
   let info = null;
   try {
-    info = await api(`/projects/${encodeURIComponent(p.project)}/recover`);
+    info = await api(`/${route}/${encodeURIComponent(ident)}/recover`);
   } catch (e) {
-    showError("This project's files are damaged and the recovery view could not be read: " + e.message);
+    showError(`This ${kind}'s files are damaged and the recovery view could not be read: ` + e.message);
     return;
   }
   const panel = $("#recovery-panel");
   if (!panel) { showError("This project's files are damaged on disk and can't be opened."); return; }
   panel.innerHTML = "";
-  const title = el("h3", null, `${p.title || p.project} — damaged manifest`);
+  const title = el("h3", null, `${p.title || ident} \u2014 damaged file`);
   title.id = "recovery-title";
   panel.appendChild(title);
+  const what = kind === "idea" ? "idea page" : "screenplay";
+  const only = info.damage && /\.json/.test(info.damage) ? "" : "";
   panel.appendChild(el("p", "recovery-note",
     info.recoverable
-      ? `Your screenplay is still here: ${info.source_file} (${info.source_bytes} bytes)` +
-        (info.parsed_present ? ", and its parse too. " : ". ") +
-        "Only project.json is unreadable — the list of settings and stages. Nothing has been deleted or changed."
-      : "No screenplay file could be found in this project folder. Only project.json is unreadable, and " +
-        "nothing has been deleted or changed. Copy the folder out before doing anything else."));
+      ? (kind === "idea"
+          ? "Your idea's folder is still here" +
+            (info.had_file ? ", and its idea.json can be read back verbatim. " : ". ") +
+            "Only the idea's metadata file is unreadable. Nothing has been deleted or changed."
+          : `Your ${what} is still here: ${info.source_file} (${info.source_bytes} bytes)` +
+            (info.parsed_present ? ", and its parse too. " : ". ") +
+            "Only project.json is unreadable — the list of settings and stages. Nothing has been deleted or changed.")
+      : `No recoverable ${what} could be found for this ${kind}. Nothing has been deleted or changed. ` +
+        "Copy the folder out before doing anything else." + only));
   if (info.damage) panel.appendChild(el("p", "recovery-damage", "Damage: " + info.damage));
   const acts = el("div", "recovery-actions");
   const copy = el("a", "dash-backup", "\u2B07 Copy the folder (no manifest needed)");
-  copy.href = `/api/projects/${encodeURIComponent(p.project)}/recover/backup`;
-  copy.download = `${p.project}-recovery.zip`;
+  if (kind === "project") {
+    copy.href = `/api/projects/${encodeURIComponent(ident)}/recover/backup`;
+    copy.download = `${ident}-recovery.zip`;
+  } else {
+    // An idea has no folder-copy route: its files are metadata plus a page, and
+    // /recover already returns the raw bytes. Do not offer an action that 404s.
+    copy.href = `/api/ideas/${encodeURIComponent(ident)}/recover`;
+    copy.download = "";
+  }
   copy.title = "Zip the folder exactly as it is. Nothing is parsed, repaired or interpreted.";
   acts.appendChild(copy);
   if (info.recoverable) {
-    const fix = el("button", "dash-open", "Rebuild the manifest \u2192");
+    const fix = el("button", "dash-open", kind === "idea" ? "Rebuild the idea \u2192" : "Rebuild the manifest \u2192");
     fix.type = "button";
-    fix.title = "Write a new project.json from the file on disk, keeping the damaged one";
+    fix.title = "Rebuild the metadata from what is on disk, keeping the damaged file";
     fix.addEventListener("click", async () => {
       try {
-        const res = await api(`/projects/${encodeURIComponent(p.project)}/repair`, { method: "POST" });
+        const res = await api(`/${route}/${encodeURIComponent(ident)}/repair`, { method: "POST" });
         panel.hidden = true;
-        await loadProjects();
-        showError(`Manifest rebuilt from ${res.source_file}. Re-run the parse before trusting the pages.`);
+        if (kind === "idea") { await loadIdeas(); } else { await loadProjects(); }
+        showError(kind === "idea"
+          ? "The idea's metadata was rebuilt. The damaged file was kept beside it."
+          : `Manifest rebuilt from ${res.source_file}. Re-run the parse before trusting the pages.`);
       } catch (e) {
         showError("Couldn't rebuild the manifest: " + e.message);
       }

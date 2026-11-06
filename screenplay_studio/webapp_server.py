@@ -37,7 +37,9 @@ from werkzeug.exceptions import HTTPException
 
 from .jsonio import (StoreLockTimeout, StoreUnreadable, atomic_write_json,
                      check_safe_id, lock_for, retry_permission, safe_dir_name,
-                     suffixed_id)
+                     suffixed_id,
+    damage_envelope, last_known_facts,
+)
 
 from .ideas import IdeaStore
 from .logsetup import configure as _configure_logging
@@ -1398,7 +1400,9 @@ def recover_project(name):
         # can read it, rather than leaving the writer to guess from a red card.
         "recoverable": bool(source),
     })
-    resp.headers["X-Project-Readable"] = "true" if readable else "false"
+    # Gap 82: one header name for "can this record be read", whichever shelf.
+    resp.headers["X-Record-Readable"] = "true" if readable else "false"
+    resp.headers["X-Project-Readable"] = resp.headers["X-Record-Readable"]
     return resp
 
 
@@ -2137,17 +2141,30 @@ def list_projects():
             out.append(_manifest_summary(m))
         except FileNotFoundError:
             continue  # not a project (stray file / the ideas store)
-        except Exception:
+        except Exception as e:
             # Flag, don't drop: a damaged manifest stays visible on the shelf
             # so the writer knows it exists and can remove it. Empty stage
             # dicts keep every frontend reader (stageLabel/dot/steps) safe.
-            out.append({
-                "project": name,
-                "title": name,
-                "unreadable": True,
-                "stages": {"parse": {}, "analyze": {}, "chat": {}},
-                "sessions": [],
-            })
+            #
+            # Gap 82: through the SHARED damage envelope — the same seven keys a
+            # damaged idea carries — with the project's own card fields alongside.
+            # `recoverable` is what /recover would actually find: a source file or
+            # the raw manifest, both of which gap 80 made reachable.
+            pdir = _project_dir(name)
+            try:
+                _src = _recovered_source_file(pdir)
+            except Exception:
+                _src = None
+            out.append(damage_envelope(
+                "project", name,
+                detail=f"{type(e).__name__}: {e}",
+                recoverable=bool(_src) or os.path.exists(
+                    os.path.join(pdir, "project.json")),
+                last_known=last_known_facts(os.path.join(pdir, "project.json")),
+                project=name,
+                stages={"parse": {}, "analyze": {}, "chat": {}},
+                sessions=[],
+            ))
     out.sort(key=lambda p: p.get("title", ""))
     return jsonify(out)
 
@@ -5740,9 +5757,33 @@ def recover_idea(idea_id):
     at it from inside the app. This returns the bytes exactly as they sit —
     not a repair, not a parsed view — so the writer can copy out what they
     recognise.
+
+    Gap 82: answered in the same shape as `/projects/<name>/recover`, because the
+    recovery panel is one surface now. `damage` and `had_file` are additions the
+    client reads; `raw`/`readable` are unchanged so gap 70's tests and any other
+    reader keep working.
     """
     from .jsonio import StoreUnreadable
     store = IdeaStore(_ideas_dir())
+    meta_path = os.path.join(store._dir(idea_id), "idea.json")
+
+    def _answer(raw, readable, title=None, detail=None):
+        resp = jsonify({
+            "kind": "idea",
+            "id": idea_id,
+            "raw": raw,
+            "readable": readable,
+            "had_file": raw is not None,
+            "damage": detail,
+            "last_known": last_known_facts(meta_path),
+            # An idea is recoverable as long as its directory exists: the raw bytes
+            # can always be handed back, and repair can rebuild the metadata.
+            "recoverable": os.path.isdir(store._dir(idea_id)),
+            **({"title": title} if title else {}),
+        })
+        resp.headers["X-Record-Readable"] = "true" if readable else "false"
+        return resp
+
     try:
         meta = store.load(idea_id)
     except FileNotFoundError:
@@ -5751,12 +5792,11 @@ def recover_idea(idea_id):
             raw = store.raw_meta_text(idea_id)
         except OSError:
             return _error("Idea not found.", 404)
-        return jsonify({"id": idea_id, "raw": raw, "readable": False})
-    except StoreUnreadable:
-        return jsonify({"id": idea_id, "raw": store.raw_meta_text(idea_id),
-                        "readable": False})
-    return jsonify({"id": idea_id, "raw": store.raw_meta_text(idea_id),
-                    "readable": True, "title": meta.get("title")})
+        return _answer(raw, False, detail="idea.json is missing or unreadable")
+    except StoreUnreadable as e:
+        return _answer(store.raw_meta_text(idea_id), False,
+                       detail=getattr(e, "detail", "") or str(e))
+    return _answer(store.raw_meta_text(idea_id), True, title=meta.get("title"))
 
 
 @app.route("/api/ideas/<idea_id>/repair", methods=["POST"])
