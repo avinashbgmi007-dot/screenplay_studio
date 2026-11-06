@@ -3220,3 +3220,51 @@ but documented under GET passes. Making the pair the unit means regenerating eve
 prose row, which is a bigger change than this gap asked for, and it is written down
 rather than half-done. Endpoint *names* are likewise unverified, so a stale
 `get_rule` → `load_rule` in prose would not be caught.
+
+## §78 — Gap 85: the number was in the prose instead of in the code (2026-11-06)
+
+Filed as "small", and it is. The reason to fix it is also in the filing, and it is
+not small: *a support document is where a stuck writer looks first.* A wrong port
+in a support doc is not a typo — it is a writer who concludes the app is broken and
+files a bug about software that works.
+
+The fix that actually holds is not the table. It is that **the number stopped
+living in the prose**. The argparse parser existed only inside `main()`, so nothing
+outside a launch could state the port; every document that wanted to had to retype
+it, and they drifted. It is now `build_argument_parser()` with `DEFAULT_PORT` and
+`DEFAULT_BIND` at module level, `app.run()` takes the constant, and the CLI's
+`--help` epilog is *built from* those constants rather than written beside them.
+The tests then read the values out of the code and require the prose to contain
+them, so the doc cannot restate a stale figure and still pass.
+
+Three things in this gap are worth remembering beyond it.
+
+**A weak pin passes for a strong one until you try to break it.** My first version
+asserted `str(DEFAULT_PORT) in text`. The revert that replaced *one of three*
+mentions of 8500 in `AGENTS.md` still passed, because the other two carried the
+number. So "the doc mentions the right port" is not "the doc agrees with the code"
+— the tightened version rejects any four-digit port-like token the code does not
+have. That only surfaced because I ran the revert twice: the first run looked like
+a clean failure of a *different* revert attempt of mine, and I nearly recorded it.
+
+**Two of my six revert patches silently did not apply.** My `str.replace` targets
+did not match the file (the epilog is `epilog=(f"…`, and I had written `epilog=(`),
+so two reverts "passed" by doing nothing at all. This is the second time in three
+gaps that a revert reported a false negative because the *patch* failed rather than
+the *test*. The discipline is now: a revert that does not change the file count is
+not a result, and `grep -c` after each patch is cheaper than a re-run.
+
+**The wrap is not the sentence.** One test failed because argparse wraps at 80
+columns and split "capability token" across a line. Weakening the assertion would
+have been wrong — the sentence is the contract and the wrap is cosmetic — so the
+test normalises whitespace instead. That distinction (what a test asserts vs what a
+renderer happens to do to it) is the same one that kept me from over-fitting the
+room detection earlier.
+
+Recorded as not done: `docs/ARCHITECTURE.md` still spells out 8500 in a file tree,
+a section heading and an ASCII diagram. Those are structural annotations rather
+than the launch promise, and an ASCII diagram cannot derive its own labels. The
+co-writer's 8300 is accepted by the checker as a known port rather than derived
+from `screenplay_cowriter`'s argparse — deriving it is a two-line change but it
+adds a cross-package import to a test for one number, and I chose the smaller
+honest thing over the tidier one.

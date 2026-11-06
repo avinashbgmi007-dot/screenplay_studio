@@ -138,10 +138,24 @@ def test_the_cli_help_derives_its_numbers_from_the_server():
 @pytest.mark.parametrize("path", [("docs", "CLI_REFERENCE.md"), ("AGENTS.md",)])
 def test_every_doc_that_mentions_the_port_agrees_with_the_code(path):
     text = _doc(*path)
-    assert str(webapp_server.DEFAULT_PORT) in text
+    real = str(webapp_server.DEFAULT_PORT)
+    assert real in text
     # a doc that mentions the port must also mention that it is loopback-only,
     # because "run this on 8500" without the bind is the sentence that misleads
     assert "127.0.0.1" in text or "loopback" in text.lower()
+
+    # `real in text` is too coarse to catch drift on its own: a doc may carry the
+    # right number in one sentence and a stale one in another (measured — I could
+    # replace one of three mentions and this test still passed). Every four-digit
+    # port-like token in the doc must therefore BE a port the code actually has.
+    known = {str(webapp_server.DEFAULT_PORT), "8300",          # webapp, cowriter API
+             str(demo_model.DEMO_PREFERRED_PORT), "8080"}      # demo model, llama-server
+    found = set(re.findall(r"\b\d{4}\b", text))
+    stray = {p for p in found if p not in known and p.startswith(("80", "81", "82",
+                                                                 "83", "84", "85", "86"))}
+    assert not stray, (
+        f"{path[0] if len(path) == 1 else path[-1]} mentions port-like numbers the code "
+        f"does not have: {sorted(stray)} (known: {sorted(known)})")
 
 
 def test_no_doc_promises_a_lan_visible_desk():
