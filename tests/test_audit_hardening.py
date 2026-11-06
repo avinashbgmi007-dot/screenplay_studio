@@ -124,11 +124,16 @@ def test_corrupt_idea_is_flagged_on_shelf(client):
     assert entry is not None, "corrupt idea must stay on the shelf"
     assert entry.get("unreadable") is True
 
-    # opening it answers a clean client error, not a raw traceback
+    # Gap 70 corrected this assertion. It used to accept `(400, 500)` as "a
+    # clean client error", which is exactly the two wrong answers: 400 said the
+    # writer's REQUEST was malformed (it was not) and 500 said the server broke
+    # (it did not). Damage is 503 with `unreadable`, the same contract every
+    # other writer-owned store keeps.
     r = client.get(f"/api/ideas/{iid}")
-    assert r.status_code in (400, 500)
+    assert r.status_code == 503, r.get_json()
     body = r.get_json()
-    assert body and "error" in body
+    assert body and body.get("unreadable") is True
+    assert "damaged" in body["error"].lower()
 
 
 def test_healthy_ideas_are_not_flagged(client):

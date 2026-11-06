@@ -20,7 +20,7 @@
 - There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
   stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
 
-**Totals:** 98 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **100**.
+**Totals:** 100 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **102**.
 (Pinned by `tests/test_audit_remediation.py::TestF05RouteMapTotals`; regenerate
 after adding or changing any `@app.route` — this map had drifted by +4 before
 the 2026-09-30 audit, the verdict channel added 5 more, and this branch added
@@ -175,6 +175,8 @@ analyze/cancel (R2) plus library/backup (R7).)
 | POST | `/api/ideas` | `create_idea` | Create a new Idea (scriptless embryo). |
 | GET | `/api/ideas/<idea_id>` | `get_idea` | Get an Idea (page + card). |
 | POST | `/api/ideas/<idea_id>/content` | `save_idea_content` | Autosave the Idea page. |
+| GET | `/api/ideas/<idea_id>/recover` | `recover_idea` | The raw idea file verbatim, for a damaged page (gap 70). |
+| POST | `/api/ideas/<idea_id>/repair` | `repair_idea` | Replace a damaged idea file with writer-supplied text; keeps the original. |
 | POST | `/api/ideas/<idea_id>/rename` | `rename_idea` | Rename an Idea. |
 | POST | `/api/ideas/<idea_id>/card` | `save_idea_card` | Save the premise card. |
 | DELETE | `/api/ideas/<idea_id>` | `delete_idea` | Delete an Idea. |

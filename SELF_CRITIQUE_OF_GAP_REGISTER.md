@@ -2824,3 +2824,42 @@ mixed-pass retries. `model_used` is still one string per report, so a retry that
 ran on a different model overwrites the earlier record instead of recording
 both. That needs a schema change to the report artifact (a runs list) and I did
 not fold it into a disclosure fix.
+
+## §70 — Gap 70: the one store that never joined the contract (2026-11-06)
+
+Reproduced on the first attempt, all three claims. The shelf flagged the damaged
+idea (correct and unchanged), while opening or saving it answered 400 with
+*"Expecting ',' delimiter: line 1 column 46 (char 45)"*. That is a JSON parser's
+vocabulary shown to a writer as though they had typed something wrong, for a
+file they never touched — and the file sat there, intact and unreachable.
+
+The cause is a one-line gap in an otherwise consistent design. Every
+writer-owned store in this package calls `load_json_store`, which distinguishes
+MISSING from PRESENT-BUT-UNREADABLE and raises `StoreUnreadable`; the app has a
+dedicated 503 handler for exactly that, with a comment explaining why damage must
+never read as absence. `IdeaStore._read_meta_raw` was a bare `json.load`.
+`JSONDecodeError` subclasses `ValueError`, so it fell into the generic
+"malformed request" path. Nobody wrote anything wrong; one store simply never
+got migrated, and no test noticed because no test corrupted an idea file.
+
+Two deliberate choices in the fix. First, `recover` returns the file **verbatim**
+rather than a best-effort partial parse. I considered a "salvage what we can"
+parse and rejected it: the value of a recovery path is that it returns the
+writer's actual bytes, and a partial parse of a torn file is a second guess
+layered on a first failure. Second, `repair` refuses a readable file. It would
+have been easy to make it a general "write this text as the idea" endpoint, and
+that would have been a silent bypass of every merge rule in the module — the
+same class of bug as the ones this register keeps finding, wrapped in a new
+route.
+
+One thing I did less well: my first patch used
+`__import__("screenplay_studio.jsonio", fromlist=["x"]).retry_permission` when
+`retry_permission` was already imported at the top of the file. Nothing broke,
+but a fix that hides an already-imported name behind `__import__` is the kind of
+line that makes the next reader distrust the whole function. Cleaned up before
+committing.
+
+Recorded as not done: neither new route has a UI affordance. The entry's
+reproduction is about the server answering honestly, and it now does, but a
+writer with a damaged idea still has to know that `/recover` exists. That is a
+desk change, and I did not fold a UI feature into a store-contract fix.

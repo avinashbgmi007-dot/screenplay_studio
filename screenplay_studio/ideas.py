@@ -77,8 +77,79 @@ class IdeaStore:
         return retry_permission(lambda: self._read_meta_raw(idea_id))
 
     def _read_meta_raw(self, idea_id: str) -> dict:
-        with open(self._meta_path(idea_id), "r", encoding="utf-8") as f:
-            return json.load(f)
+        """Read idea.json through the shared store reader (gap 70).
+
+        This used to be a bare `json.load`, so a truncated file surfaced as
+        `JSONDecodeError` — a ValueError — which the app's error handling turned
+        into **400 "Expecting ',' delimiter"**: the writer's own page reported as
+        if their request were malformed. Every other writer-owned store answers
+        damage as damage (503 `unreadable`), and the project side handles the
+        same corruption that way, so this was the one store that told the writer
+        their data was a bad request.
+
+        `load_json_store` gives the contract the rest of the package already
+        keeps: MISSING -> default (the caller turns that into 404), PRESENT-BUT-
+        UNREADABLE -> `StoreUnreadable`, which the app's handler answers as 503
+        with the byte-level reason. Shape is checked here, because a dict store
+        handed a list is just as damaged as a torn file.
+        """
+        from .jsonio import StoreUnreadable, load_json_store
+
+        meta = retry_permission(
+            lambda: load_json_store(self._meta_path(idea_id), default=None))
+        if meta is None:
+            # Missing is missing: the routes already answer 404 for it, and
+            # `list()` relies on the exception to flag a dir with no meta file.
+            with open(self._meta_path(idea_id), "r", encoding="utf-8") as f:
+                return json.load(f)
+        if not isinstance(meta, dict):
+            raise StoreUnreadable(
+                self._meta_path(idea_id),
+                f"expected a JSON object, found {type(meta).__name__}")
+        return meta
+
+    def raw_meta_text(self, idea_id: str) -> str:
+        """The idea file exactly as it sits on disk, damage and all (gap 70).
+
+        Recovery needs the BYTES, not a parsed view: the whole point is that the
+        file cannot be parsed. Returned verbatim and never repaired here — the
+        writer (or a support person) decides what to salvage, and this function
+        must not become the thing that overwrites the only copy.
+        """
+        with open(self._meta_path(idea_id), "r", encoding="utf-8",
+                  errors="replace") as f:
+            return f.read()
+
+    def repair_meta(self, idea_id: str, text: str) -> dict:
+        """Replace a damaged file with text the writer chose, keeping the old one.
+
+        The damaged original is moved aside first — `<idea>.json.damaged-<ts>` —
+        so a repair is never the act that destroys the evidence. It is only
+        allowed when the file really is unreadable: a readable idea is edited
+        through the normal paths, and using this to overwrite one would be a
+        silent bypass of every merge rule in this module.
+        """
+        from .jsonio import StoreUnreadable
+        path = self._meta_path(idea_id)
+        try:
+            self._read_meta_raw(idea_id)
+        except StoreUnreadable:
+            pass
+        else:
+            raise ValueError(
+                "This idea file is readable, so it does not need repairing. "
+                "Edit it normally instead.")
+        try:
+            parsed = json.loads(text or "")
+        except ValueError as e:
+            raise ValueError(f"That text is not valid JSON yet: {e}")
+        if not isinstance(parsed, dict):
+            raise ValueError("An idea file has to be a JSON object.")
+        kept = f"{path}.damaged-{int(time.time())}"
+        retry_permission(lambda: shutil.move(path, kept))
+        atomic_write_json(path, parsed)
+        parsed["repaired_from"] = os.path.basename(kept)
+        return parsed
 
     def _write(self, idea_id: str, meta: dict) -> None:
         meta["updated_at"] = time.time()

@@ -5375,6 +5375,54 @@ def save_idea_content(idea_id):
     return jsonify({"title": meta["title"], "auto_title": meta.get("auto_title", True)})
 
 
+@app.route("/api/ideas/<idea_id>/recover", methods=["GET"])
+def recover_idea(idea_id):
+    """The raw idea file, for a writer whose page will not open (gap 70).
+
+    A damaged idea used to be a dead end: it appeared on the shelf flagged
+    unreadable, and every attempt to open or save it answered 400 with a
+    JSON parser message. The data was still on disk and there was no way to get
+    at it from inside the app. This returns the bytes exactly as they sit —
+    not a repair, not a parsed view — so the writer can copy out what they
+    recognise.
+    """
+    from .jsonio import StoreUnreadable
+    store = IdeaStore(_ideas_dir())
+    try:
+        meta = store.load(idea_id)
+    except FileNotFoundError:
+        # No readable meta: it may still be a damaged file we can hand back.
+        try:
+            raw = store.raw_meta_text(idea_id)
+        except OSError:
+            return _error("Idea not found.", 404)
+        return jsonify({"id": idea_id, "raw": raw, "readable": False})
+    except StoreUnreadable:
+        return jsonify({"id": idea_id, "raw": store.raw_meta_text(idea_id),
+                        "readable": False})
+    return jsonify({"id": idea_id, "raw": store.raw_meta_text(idea_id),
+                    "readable": True, "title": meta.get("title")})
+
+
+@app.route("/api/ideas/<idea_id>/repair", methods=["POST"])
+def repair_idea(idea_id):
+    """Put writer-supplied text in place of a damaged idea file (gap 70).
+
+    Refuses a readable file: repairing is only for damage, and a repair that
+    could overwrite a healthy page would be a bypass of every merge rule in the
+    store. The damaged original is kept beside it.
+    """
+    body = request.get_json() or {}
+    try:
+        meta = IdeaStore(_ideas_dir()).repair_meta(idea_id, body.get("text") or "")
+    except FileNotFoundError:
+        return _error("Idea not found.", 404)
+    except ValueError as e:
+        return _error(str(e), 400)
+    return jsonify({"ok": True, "title": meta.get("title"),
+                    "kept_original": meta.get("repaired_from")})
+
+
 @app.route("/api/ideas/<idea_id>/rename", methods=["POST"])
 def rename_idea(idea_id):
     """A deliberate rename — stops the auto-title from the page's first line."""
