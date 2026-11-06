@@ -2863,3 +2863,42 @@ Recorded as not done: neither new route has a UI affordance. The entry's
 reproduction is about the server answering honestly, and it now does, but a
 writer with a damaged idea still has to know that `/recover` exists. That is a
 desk change, and I did not fold a UI feature into a store-contract fix.
+
+## §71 — Gap 72: a backup that does not say what it left out (2026-11-06)
+
+Reproduced with one faulted file: 200, the file missing from the zip, no manifest
+inside, no header. The filed line was literally `except OSError: continue`, and
+the per-project route did not even keep a count of what it wrote, so it had no
+way to be honest even in principle.
+
+Worth saying why this class matters more than its severity suggests. The file is
+still on disk — nothing was lost. But a backup is not a file, it is a *promise
+about completeness*, and the whole reason someone downloads one is to stop
+worrying. A 200 with a hole in it converts a recoverable situation into a
+believed-safe one, and the failure surfaces months later when it is the only copy
+left.
+
+Two decisions I want on the record. First, the omission is recorded **inside the
+archive**, not only in a response header. A header is discarded with the browser
+session; the zip is what survives, gets copied to a drive and opened a year
+later. A manifest that travels with the artifact is the durable form of the
+statement, and the header is a convenience on top. Second, `files: n` in the
+library manifest now counts files that actually landed rather than attempts. The
+old count was not wrong when nothing failed, which is exactly how it stayed
+wrong unnoticed.
+
+I also had a fixture bug before I had a finding: my first probe hand-wrote a
+`project.json` and got `500 KeyError: 'project_dir'`. The product was fine; my
+fixture was not a real manifest. Building the project through
+`ProjectManifest.create` — the way the app does — turned it into a real
+reproduction. This is the fourth time this session a broken probe has mimicked a
+product failure, and the tell is the same every time: an error from a layer the
+defect is not about.
+
+Recorded as not done: the entry ends with "verify a restore before calling an
+archive good", and I did not implement a restore. There is no restore route for
+either archive — that is gap 71's territory, along with labelling ideas and
+writer memory as their own sections and deciding whether relationship memory
+belongs in a backup at all, which is a privacy decision rather than a default.
+Adding a restore here would have meant designing that whole surface inside a
+completeness fix.

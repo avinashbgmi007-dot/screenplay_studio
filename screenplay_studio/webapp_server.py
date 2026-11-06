@@ -2431,6 +2431,45 @@ def _retry_failed_locked(m):
     return jsonify(_manifest_summary_with_code(m))
 
 
+def _mark_completeness(resp, skipped: list, failed: list | None = None) -> None:
+    """Say on the response whether the archive is whole (gap 72).
+
+    A header is not the whole story — the manifest inside the archive is the
+    durable record — but it is what a script or a browser can see without
+    unpacking, and `X-Backup-Complete: false` is the difference between "your
+    backup is here" and "your backup is here, minus what it names".
+    """
+    parts = list(skipped or [])
+    if failed:
+        parts = parts + [{"path": f.get("project"), "reason": f.get("error")}
+                         for f in failed]
+    resp.headers["X-Backup-Complete"] = "false" if parts else "true"
+    if parts:
+        resp.headers["X-Backup-Omitted"] = str(len(parts))
+
+
+def _add_file(zf, full: str, arcname: str, skipped: list, kept: list) -> None:
+    """Add one file to the archive, recording whether it made it (gap 72).
+
+    Both backup routes used to wrap `zf.write` in `except OSError: continue`.
+    A file that vanished mid-zip — or one the OS refused to read — was dropped
+    from the archive and the writer was told nothing: a 200, a download that
+    looks complete, and a hole in it. Measured: with one file faulted, the
+    project archive came back **200** with that file absent, **no manifest inside
+    it** and no header to say so.
+
+    A backup is a promise about completeness, so an omission has to be on the
+    record. This records both sides; the caller puts them in the archive and in
+    the response.
+    """
+    try:
+        zf.write(full, arcname)
+    except OSError as e:
+        skipped.append({"path": arcname, "reason": f"{type(e).__name__}: {e}"})
+        return
+    kept.append(arcname)
+
+
 @app.route("/api/projects/<name>/backup", methods=["GET"])
 def backup_project(name):
     """Whole-project backup as a single .zip — source, parse, knowledge graph,
@@ -2443,6 +2482,8 @@ def backup_project(name):
 
     project_dir = os.path.realpath(m.project_dir)
     buf = io.BytesIO()
+    skipped: list[dict] = []
+    kept: list[str] = []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, _dirs, files in os.walk(project_dir):
             for fname in files:
@@ -2452,13 +2493,23 @@ def backup_project(name):
                     continue
                 full = os.path.join(root, fname)
                 arcname = os.path.join(name, os.path.relpath(full, project_dir))
-                try:
-                    zf.write(full, arcname)
-                except OSError:
-                    continue  # a file vanishing mid-zip shouldn't kill the backup
+                _add_file(zf, full, arcname, skipped, kept)
+        # Gap 72: the archive carries its own account of itself, so the record
+        # travels with the file rather than only in a response header the
+        # browser throws away.
+        zf.writestr("backup-manifest.json", json.dumps({
+            "kind": "script-doctor-project-backup",
+            "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "project": name,
+            "files": len(kept),
+            "skipped": skipped,
+            "complete": not skipped,
+        }, indent=2), zipfile.ZIP_DEFLATED)
     buf.seek(0)
-    return send_file(buf, mimetype="application/zip", as_attachment=True,
+    resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"{name}-backup.zip")
+    _mark_completeness(resp, skipped)
+    return resp
 
 
 @app.route("/api/library/backup", methods=["GET"])
@@ -2476,6 +2527,8 @@ def backup_library():
     in the per-project backup."""
     buf = io.BytesIO()
     included, failed = [], []
+    skipped: list[dict] = []
+    kept: list[str] = []
     stamp = time.strftime("%Y%m%d-%H%M")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         if os.path.isdir(PROJECTS_DIR):
@@ -2492,11 +2545,11 @@ def backup_library():
                             if fname.endswith(".lock") or fname.endswith(".tmp"):
                                 continue
                             full = os.path.join(root, fname)
-                            try:
-                                zf.write(full, os.path.join(name, os.path.relpath(full, project_dir)))
+                            arc = os.path.join(name, os.path.relpath(full, project_dir))
+                            before = len(skipped)
+                            _add_file(zf, full, arc, skipped, kept)
+                            if len(skipped) == before:
                                 n_files += 1
-                            except OSError:
-                                continue  # a file vanishing mid-zip: skip it, keep the archive
                     included.append({"project": name, "files": n_files})
                 except OSError as e:
                     # One unreadable project must not destroy the backup of
@@ -2507,10 +2560,18 @@ def backup_library():
             "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "projects": included,
             "failed": failed,
+            # Gap 72: files that were skipped, named. The manifest counted what
+            # it INCLUDED and reported projects it could not read, but a file
+            # that vanished mid-zip was dropped without a word — the archive
+            # still said it was a backup of everything.
+            "skipped": skipped,
+            "complete": not (skipped or failed),
         }, indent=2), zipfile.ZIP_DEFLATED)
     buf.seek(0)
-    return send_file(buf, mimetype="application/zip", as_attachment=True,
+    resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=f"script-doctor-library-backup-{stamp}.zip")
+    _mark_completeness(resp, skipped, failed)
+    return resp
 
 
 @app.route("/api/projects/<name>/reparse", methods=["POST"])
