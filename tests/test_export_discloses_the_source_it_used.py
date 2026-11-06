@@ -193,8 +193,15 @@ def test_the_client_names_the_file_and_the_strays():
     assert "source_file" in body
     # the unrecorded case must be spoken, not skipped
     assert re.search(r"not recorded", body, re.I), "an unrecorded source must say so"
-    # and it must be wired into the project open, or it never runs
-    assert "renderSourceProvenance(project)" in js
+    # And it must be WIRED INTO the project open, or it never runs. Asserting on
+    # the bare call text is not enough: the definition ("function
+    # renderSourceProvenance(project)") contains it, so an unwired helper would
+    # still pass. Count call sites outside the definition instead.
+    assert js.count("renderSourceProvenance(") >= 2, (
+        "renderSourceProvenance is defined but never called — the banner never runs")
+    open_at = js.index("async function openProject(name)")
+    assert "renderSourceProvenance(project)" in js[open_at:], (
+        "the project open must call it, or opening a project says nothing")
 
     with open(os.path.join(ROOT, "screenplay_studio", "webapp", "index.html"),
               encoding="utf-8") as f:

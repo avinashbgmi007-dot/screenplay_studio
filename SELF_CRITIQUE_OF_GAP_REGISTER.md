@@ -2902,3 +2902,61 @@ writer memory as their own sections and deciding whether relationship memory
 belongs in a backup at all, which is a privacy decision rather than a default.
 Adding a restore here would have meant designing that whole surface inside a
 completeness fix.
+
+## §72 — Gap 73: the desk knew which file it was reading and never said (2026-11-06)
+
+The smallest gap I have closed this session, and the one with the least
+excitement in it. A project folder held `source.pdf` beside a live
+`source.fountain`; the export went out correct and silent. Nothing was corrupt.
+That quiet is the finding: the only way for a writer to learn that two scripts
+shared a folder was to open the folder.
+
+What the measurement changed. The filing describes an *export* problem, and the
+export was indeed silent — but `/api/projects/<name>` carried **no source
+filename at all**, so the desk did not know the answer either. A gap named after
+one symptom is often larger upstream, and here the honest fix began one layer
+below the export.
+
+Where I had to choose, and chose the harder answer twice.
+
+First, the unrecorded case. A manifest without `source_filename` is common
+enough — hand-assembled, pre-dating the field, or damaged — and the tempting fix
+is to infer: there is exactly one `source.*` file in the folder, so call it that.
+I refused. The whole subject of this gap is provenance, and a confident guess
+about provenance reproduces the defect it is fixing, only with better manners.
+It says `not-recorded`. A stated hole is usable; a wrong name is not.
+
+Second, the stray itself. It is material the writer may still want, possibly the
+only copy of something, so it is disclosed and never moved. That restraint makes
+the warning weaker on purpose: the desk cannot clean up for the writer without
+deciding, on their behalf, which of two scripts was the one that mattered.
+
+**The scope was narrowed by measurement, and I want that on the record** because
+it looks like a shortcut. My first rule was "any file with a screenplay
+extension". I ran it and it flagged `report.md` and `draft_notes.md` — this
+desk's own output, sitting in every project directory. A warning that fires on
+every project, every time, is not a warning; it is wallpaper, and it is how a
+genuine `source.pdf` gets skipped six months later. So the rule is the desk's own
+convention, `source.<ext>`, which is definite rather than a guess. The
+recommendation asked for stray source-format files to be named; it did not ask
+for them to be guessed at by extension, and the two are not the same thing.
+Trade-off accepted and named: a stray named `old_draft.fountain` is not reported
+by this rule, because the desk cannot tell it from `draft_notes.md` without
+guessing.
+
+I also caught myself writing a test that could not fail. My first revert matrix
+came back **15 / 15, zero failures** with the client banner unwired — because the
+assertion had searched the whole file for `renderSourceProvenance(project)`, and
+the function's own *definition* contains that string. An unwired helper passed.
+The fix was to count call sites and assert the call specifically inside
+`openProject`; the revert then failed properly. A revert that does not fail is
+not evidence of coverage, it is evidence that the test is decorative — and the
+sixth revert is there precisely to catch that class of mistake.
+
+Recorded as not done: the register's ask that the active file be explicit **in
+the project's own metadata** is only half met. `create` records it; a manifest
+from before the field existed does not, and this reports the hole rather than
+backfilling it. And the filed *export* half is met on the wire, not in the
+artifact: the `.fountain`/`.fdx` this route hands over still contains no
+provenance block. That is gap 79's territory, and gap 79 stays open rather than
+being quietly counted closed by this.
