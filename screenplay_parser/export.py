@@ -19,6 +19,7 @@ character cue) are the documented lossy boundary.
 
 from __future__ import annotations
 
+import json
 import xml.etree.ElementTree as ET
 
 from .models import ElementType, ScriptDocument
@@ -36,6 +37,58 @@ FDX_TYPE_NAMES = {
 }
 
 SUPPORTED_FORMATS = ("fountain", "fdx", "txt")
+
+# Gap 79: an export used to be indistinguishable from an original. A script
+# reconstructed from a PDF parse went out looking exactly like the writer's own
+# Fountain file, so a collaborator receiving it had no way to know the layout had
+# been approximated, or which file it came from at all. The mark below travels
+# WITH the artifact, because an artifact outlives the session that made it.
+PROVENANCE_MARKER = "screenplay-studio-provenance"
+
+
+def build_provenance(doc: ScriptDocument, extra: dict = None) -> dict:
+    """What this artifact must say about its own origin.
+
+    Everything here is read off the document — nothing is remembered or passed
+    around by the caller — so the provenance cannot drift from the text it sits
+    beside. `extra` may add facts only the caller knows (which project, when the
+    parse ran); a None value means "not recorded" and is dropped rather than
+    rendered as a blank.
+    """
+    src = (doc.source_format or "").strip().lower().lstrip(".")
+    prov = {
+        "generator": "screenplay-studio",
+        "source_file": doc.source_filename or None,
+        "source_format": src or None,
+        # A PDF is never the writer's file — it is a reading of one. Saying
+        # "reconstructed" is a factual claim about the parse, not a hedge.
+        "reconstructed": src == "pdf",
+        "parse_confidence": doc.parse_confidence,
+        "parse_warnings": len(doc.warnings or []),
+        "scenes": len(doc.scenes),
+    }
+    if extra:
+        prov.update({k: v for k, v in extra.items() if v is not None})
+    return prov
+
+
+def provenance_sentence(prov: dict) -> str:
+    """The human half. A machine-readable block nobody can read is not
+    disclosure — it is a receipt filed in a drawer."""
+    name = prov.get("source_file") or "an unrecorded file"
+    ext = (prov.get("source_format") or "unknown").upper()
+    if prov.get("reconstructed"):
+        return (f"Reconstructed by screenplay-studio from a parse of {name} ({ext}). "
+                f"This is not the writer's original file: layout, emphasis and page "
+                f"breaks are approximations of what the parse could read.")
+    conf = prov.get("parse_confidence") or "unrecorded"
+    return (f"Exported by screenplay-studio from {name} ({ext}), parse confidence {conf}.")
+
+
+def _resolve_provenance(doc: ScriptDocument, provenance):
+    if provenance is False:
+        return None
+    return build_provenance(doc, provenance if isinstance(provenance, dict) else None)
 
 
 _DIALOGUE_BLOCK_TYPES = frozenset((
@@ -98,13 +151,23 @@ def _title_page_lines(doc: ScriptDocument) -> list[str]:
     return lines
 
 
-def to_fountain(doc: ScriptDocument) -> str:
+def to_fountain(doc: ScriptDocument, provenance=None) -> str:
     """
     Fountain export. Layout conventions (blank-line-delimited blocks, forced
     '>' for transitions) match what the parser's state machine expects, so
     re-parsing the export reproduces the same structure on the happy path.
     """
     out: list[str] = []
+    prov = _resolve_provenance(doc, provenance)
+    if prov is not None:
+        # Fountain's boneyard. `_strip_boneyard` removes it on re-import, so the
+        # note is visible in the file a writer opens and invisible to the parser
+        # that reads it back — disclosure without contamination.
+        out.append("/* " + PROVENANCE_MARKER)
+        out.append(provenance_sentence(prov))
+        out.append(json.dumps(prov, ensure_ascii=False, sort_keys=True))
+        out.append("*/")
+        out.append("")
     out.extend(_title_page_lines(doc))
 
     for el in doc.front_matter:
@@ -136,8 +199,17 @@ def to_fountain(doc: ScriptDocument) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
-def to_txt(doc: ScriptDocument) -> str:
-    """Plain-text export — same layout as Fountain without forced syntax."""
+def to_txt(doc: ScriptDocument, provenance=None) -> str:
+    """Plain-text export — same layout as Fountain without forced syntax.
+
+    Gap 79 deliberate limit: no provenance block here, and the reason is
+    narrower than it first looks. Measured: a boneyard-prepended .txt re-imports
+    with the scene count unchanged (6 -> 6) and the marker nowhere in scene
+    text — but all four note lines land in `front_matter` as ACTION elements.
+    So it corrupts no structure; it prints four bogus action paragraphs at the
+    top of the writer's screenplay. Refused on that basis, and `/export` reports
+    `X-Provenance-Embedded: none` so the absence is stated, not assumed.
+    """
     out: list[str] = []
     out.extend(_title_page_lines(doc))
     for el in doc.front_matter:
@@ -163,12 +235,22 @@ def to_txt(doc: ScriptDocument) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
-def to_fdx(doc: ScriptDocument) -> str:
+def to_fdx(doc: ScriptDocument, provenance=None) -> str:
     """
     Final Draft XML export. Paragraph types map 1:1 onto the parser's
     ElementType, so an fdx -> parse -> export -> parse round trip is exact.
     """
     root = ET.Element("FinalDraft", DocumentType="Script", Template="No", Version="1")
+    prov = _resolve_provenance(doc, provenance)
+    if prov is not None:
+        # An XML comment directly under <FinalDraft>. `parse_fdx` reads only
+        # TitlePage and Content, and ElementTree discards comments by default,
+        # so Final Draft and our own re-import both ignore it. A real <Element>
+        # would risk the first, and a title-page paragraph would print the note
+        # on the writer's page — both were rejected for that reason.
+        root.insert(0, ET.Comment(
+            f" {PROVENANCE_MARKER} {provenance_sentence(prov)} "
+            f"{json.dumps(prov, ensure_ascii=False, sort_keys=True)} "))
 
     # TitlePage mirrors what the .fdx parser reads back (first paragraph = title,
     # a 'by <name>' line = author), so title/author survive the round trip.
@@ -208,20 +290,25 @@ def to_fdx(doc: ScriptDocument) -> str:
     return body.decode("utf-8")
 
 
-def export(doc: ScriptDocument, fmt: str) -> str:
-    """Dispatch: 'fountain' | 'fdx' | 'txt' -> text content of the export."""
+def export(doc: ScriptDocument, fmt: str, provenance=None) -> str:
+    """Dispatch: 'fountain' | 'fdx' | 'txt' -> text content of the export.
+
+    `provenance` is an optional dict of caller-known facts, or False to suppress
+    the block entirely (format-conformance fixtures only — every writer-facing
+    route embeds it).
+    """
     if fmt not in SUPPORTED_FORMATS:
         raise ValueError(f"Unsupported export format '{fmt}'. Supported: {list(SUPPORTED_FORMATS)}")
     if fmt == "fountain":
-        return to_fountain(doc)
+        return to_fountain(doc, provenance=provenance)
     if fmt == "fdx":
-        return to_fdx(doc)
-    return to_txt(doc)
+        return to_fdx(doc, provenance=provenance)
+    return to_txt(doc, provenance=provenance)
 
 
-def export_to_path(doc: ScriptDocument, fmt: str, path: str) -> str:
+def export_to_path(doc: ScriptDocument, fmt: str, path: str, provenance=None) -> str:
     """Export and write to disk. Returns the export text."""
-    text = export(doc, fmt)
+    text = export(doc, fmt, provenance=provenance)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     return text

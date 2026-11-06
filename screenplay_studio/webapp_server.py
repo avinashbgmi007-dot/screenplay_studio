@@ -2506,6 +2506,17 @@ def backup_project(name):
         # travels with the file rather than only in a response header the
         # browser throws away.
         zf.writestr("backup-manifest.json", json.dumps({
+        # Gap 79: what an export from this project would say about itself, so
+        # the archive answers "reconstructed or original" years later, when the
+        # manifest that knew has been replaced or lost.
+        "export_provenance": {
+            "source_file": m.source_filename or None,
+            "source_format": m.source_format,
+            "reconstructed": (m.source_format or "").lstrip(".").lower() == "pdf",
+            "parse_status": m.stage("parse").status,
+            "parsed_at": (m.stage("parse").updated_at
+                          if m.stage("parse").status == "complete" else None),
+        },
             "kind": "script-doctor-project-backup",
             "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "project": name,
@@ -3242,7 +3253,15 @@ def export_script(name):
     from screenplay_parser.export import export
     from .revision import load_working
     doc = load_working(m)
-    text = export(doc, fmt)
+    # Gap 79: the document knows what it was parsed from; only the manifest knows
+    # which project this is and when the parse ran. Both belong on the artifact,
+    # because the artifact is what leaves the machine.
+    parse_stage = m.stage("parse")
+    text = export(doc, fmt, provenance={
+        "project": os.path.basename(m.project_dir),
+        "project_source_file": m.source_filename or None,
+        "parsed_at": parse_stage.updated_at if parse_stage.status == "complete" else None,
+    })
 
     safe_title = "".join(c if c.isalnum() or c in "-_ " else "_" for c in (doc.title or m.title or "script"))
     ext = {"fountain": ".fountain", "fdx": ".fdx", "txt": ".txt"}[fmt]
@@ -3260,6 +3279,10 @@ def export_script(name):
     resp.headers["X-Source-File"] = (m.source_filename or "").strip() or "not-recorded"
     resp.headers["X-Source-Format"] = m.source_format or "not-recorded"
     strays = m.unattached_sources()
+    # Gap 79, stated per format rather than assumed: a .txt cannot carry the
+    # block without contaminating the script, so the absence is announced.
+    resp.headers["X-Provenance-Embedded"] = {"fountain": "boneyard",
+                                             "fdx": "xml-comment"}.get(fmt, "none")
     resp.headers["X-Unattached-Sources"] = str(len(strays))
     if strays:
         resp.headers["X-Unattached-Names"] = ", ".join(x["name"] for x in strays)
