@@ -229,8 +229,21 @@ def _git(*args: str) -> str:
         return ""
 
 
-def _changed_files() -> list[str]:
-    """Files touched since the last commit, plus untracked ones."""
+def _changed_files(number: int | None = None) -> list[str]:
+    """Files touched since the last commit, plus untracked ones.
+
+    The working tree is the normal case, but a gap can also already be
+    COMMITTED when the gate runs — and then this returned nothing, so the gate
+    reported "nothing under tests/ has changed" for a fully finished gap. That
+    happened for gap 54, which was committed first on purpose: an earlier
+    sandbox reset had thrown away an uncommitted gap, so committing early was
+    the safer order. A checker that punishes the safe order is a broken checker.
+
+    So HEAD is included too — but ONLY when HEAD's own commit is this gap
+    (its subject names the gap number). Otherwise the previous gap's files
+    would satisfy this gap's checks, which is the false pass this gate exists
+    to prevent.
+    """
     out = _git("status", "--porcelain")
     files = []
     for line in out.splitlines():
@@ -239,7 +252,12 @@ def _changed_files() -> list[str]:
             path = path.split(" -> ")[-1]
         if path:
             files.append(path)
-    return files
+    if number is not None:
+        subject = _git("log", "-1", "--pretty=%s")
+        if re.search(rf"\b[Gg]aps?\b.*\b{number}\b", subject or ""):
+            committed = _git("show", "--pretty=format:", "--name-only", "HEAD")
+            files += [ln.strip() for ln in committed.splitlines() if ln.strip()]
+    return list(dict.fromkeys(files))
 
 
 def _critique_section(number: int) -> str:
@@ -306,7 +324,7 @@ def run_check(number: int, run_suite: bool = True, run_tests: bool = True) -> Ch
         c.require(count == 1, f"plan has exactly one entry {number}", f"found {count}")
 
     # --- 3. tests that exist ---------------------------------------------
-    changed = _changed_files()
+    changed = _changed_files(number)
     test_files = [f for f in changed
                   if f.startswith("tests/") and f.endswith(".py")
                   and os.path.basename(f).startswith("test_")]
