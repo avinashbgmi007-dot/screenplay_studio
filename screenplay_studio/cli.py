@@ -218,7 +218,20 @@ def _add_memory_args(parser):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="screenplay_studio")
+    # Gap 85: the help said nothing about the desk at all — not its port, not
+    # that it binds loopback, not that it wants a token. A writer who runs
+    # `--help` looking for "how do I open the app" got four pipeline commands and
+    # silence. The default is READ from `webapp_server`, never restated here, so
+    # this sentence cannot drift from the code it describes.
+    from .webapp_server import DEFAULT_BIND, DEFAULT_PORT
+    parser = argparse.ArgumentParser(
+        prog="screenplay_studio",
+        epilog=(f"The desk (browser UI) is not a subcommand — run "
+                f"`python -m screenplay_studio.webapp_server [--port {DEFAULT_PORT}]`. "
+                f"It serves the API and the SPA from ONE process, binds "
+                f"{DEFAULT_BIND} only, and requires a per-process capability token "
+                f"(mint-on-launch; pass --no-token only for scripted clients)."),
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_run = sub.add_parser("run", help="Run (or resume) a project's pipeline")

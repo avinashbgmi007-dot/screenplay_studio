@@ -29,7 +29,9 @@ python -m screenplay_parser parse script.fdx -o parsed.json --kg
 python -m screenplay_analyzer parsed.json --server http://localhost:8080 -o report.md
 python -m screenplay_cowriter chat --new "Name" --report report.findings.json --script parsed.json
 
-# Web app (Flask, port 8500) — module, not a studio subcommand
+# Web app (Flask, default port 8500) — module, not a studio subcommand.
+# One process serves both the JSON API and the SPA; binds 127.0.0.1 only and
+# requires a capability token on mutating requests unless --no-token.
 python -m screenplay_studio.webapp_server --port 8500 --projects-dir ./studio_projects
 
 # Tests (700+ tests collected; mock llama-server, no model needed)
@@ -56,7 +58,7 @@ Key flows:
 - **Three-zone shell (Phase 0):** scene index + docked **Stash & Notes** lens (the left structural rail was retired 2026-09-23 — see `docs/REDESIGN_MASTER_PLAN.md` §6), script pane never <50%, docked right room panel, thin status strip (model · connection · dawn).
 - **Resume semantics:** `project.json` manifest tracks each stage as `pending`/`complete`/`failed`. A *total* analyze failure is `failed` (raises); a *partial* failure (some categories OK) is `complete` with visible errors.
 - **Model discovery:** explicit flag → model inherited from report → first available on llama-server.
-- **Webapp:** Flask JSON API (port 8500), SPA frontend, projects stored under `studio_projects/`.
+- **Webapp:** one Flask process serving the JSON API and the SPA, default port 8500, 127.0.0.1 only, capability token on by default; projects stored under `studio_projects/`.
 
 ## Conventions
 

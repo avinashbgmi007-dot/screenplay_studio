@@ -30,7 +30,9 @@ python -m screenplay_studio status ./proj
 python -m screenplay_studio watch ./inbox --projects-dir ./watched_projects --poll 5
 python -m screenplay_studio watch ./inbox --once    # process what's there and exit
 
-# Web app (Flask, port 8500) — separate module, not a studio subcommand
+# Web app (Flask, default port 8500) — separate module, not a studio subcommand.
+# Binds 127.0.0.1 only and mints a capability token on launch (gap 85: the
+# numbers here are asserted against webapp_server's own argparse by tests).
 python -m screenplay_studio.webapp_server --port 8500 --projects-dir ./studio_projects
 
 # Web app with the built-in demo craft model forced on (no llama-server needed)
@@ -141,7 +143,7 @@ The studio CLI exposes exactly four subcommands — `run`, `resume`, `status`, `
 
 | surface | form | what it is |
 |---|---|---|
-| webapp | `python -m screenplay_studio.webapp_server` | the desk (port 8500) |
+| webapp | `python -m screenplay_studio.webapp_server` | the desk — one process serving API + SPA, default port 8500, loopback only, token on |
 | co-writer API | `python -m screenplay_cowriter.server` | scripted session API (port 8300) |
 
 Gap 83: this document and `docs/API_ROUTE_MAP.md` used to disagree about whether the second one existed. It does; `--help` is the arbiter, and it is listed here so the ambiguity cannot come back.

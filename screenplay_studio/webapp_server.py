@@ -6173,18 +6173,30 @@ def _startup_token(no_token: bool):
     return secrets.token_urlsafe(24)
 
 
-def main():
-    global PROJECTS_DIR, CONFIG, _API_TOKEN, _ALLOW_REMOTE_SERVER
-    parser = argparse.ArgumentParser()
+# Gap 85: the launch defaults used to exist only inside `main()`, so every
+# document that wanted to state the port had to restate it by hand — and they
+# drifted, in the support document a stuck writer reads first. One builder, one
+# statement of the defaults; `docs/API_ROUTE_MAP.md` and the CLI reference derive
+# their sentences from THIS at test time instead of from memory.
+DEFAULT_PORT = 8500
+DEFAULT_BIND = "127.0.0.1"
+DEFAULT_PROJECTS_DIR = "./studio_projects"
+DEFAULT_SERVER_URL = "http://localhost:8080"
+
+
+def build_argument_parser(argv=None) -> argparse.ArgumentParser:
+    """The desk's launch surface. `main()` uses it; tests assert the docs against it."""
+    parser = argparse.ArgumentParser(prog="screenplay_studio.webapp_server")
     parser.add_argument("--require-token", action="store_true",
                         help="(Deprecated -- now the default.) Require a per-process "
                              "capability token (X-Studio-Token) on all mutating requests.")
     parser.add_argument("--no-token", action="store_true",
                         help="Opt OUT of the capability token. Trusted scripted clients "
                              "(the E2E harness, curl) on a loopback-only machine only.")
-    parser.add_argument("--port", type=int, default=8500)
-    parser.add_argument("--projects-dir", default="./studio_projects")
-    parser.add_argument("--server", default="http://localhost:8080", help="Default llama-server URL")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--projects-dir", default=DEFAULT_PROJECTS_DIR)
+    parser.add_argument("--server", default=DEFAULT_SERVER_URL,
+                        help="Default llama-server URL")
     parser.add_argument("--api-key", default=None,
                         help="Bearer token for a remote OpenAI-compatible endpoint. Not needed "
                              "for a local llama-server. Only takes effect together with "
@@ -6201,6 +6213,12 @@ def main():
                              "llama-server — the whole desk (analysis, chat, streaming) "
                              "works live without a GGUF. Testing only; the default flow "
                              "(your llama-server on :8080) is untouched.")
+    return parser
+
+
+def main():
+    global PROJECTS_DIR, CONFIG, _API_TOKEN, _ALLOW_REMOTE_SERVER
+    parser = build_argument_parser()
     args = parser.parse_args()
 
     if args.require_token:
@@ -6305,7 +6323,7 @@ def main():
              args.port, os.path.abspath(PROJECTS_DIR), CONFIG["server_url"],
              _ALLOW_REMOTE_SERVER, "on" if _API_TOKEN else "OFF")
     # threaded: one long LLM turn must never freeze autosave/sidebar/etc.
-    app.run(host="127.0.0.1", port=args.port, debug=False, threaded=True)
+    app.run(host=DEFAULT_BIND, port=args.port, debug=False, threaded=True)
 
 
 _DEMO_MODEL_ACTIVE = False
