@@ -146,7 +146,7 @@ everything else is preserved with its argument in `ARCHIVE_NOT_GAPS.md`.
 | 90 | **B** | Refresh after a complete analysis, timed | Second full pass; demo server outlives the run. | **G** |
 | 91 | **W** | Real POST/GET | GET returns `branches`, POST returns `messages` — API asymmetry, not a discarded reply. | **W** |
 | 92 | **D** | Demo transcripts | Canned first-meeting lines. A statement about the stand-in, not the product. | **G** |
-| 93 | **A** | Demo over both attached screenplays, timed | Fast, zero checkable evidence. | **G** |
+| 93 | **A** | A synthetic `AnalysisResult` in the filing's exact shape through the real `render_markdown` + `to_findings_json`, plus `core.js`'s readout | Markdown printed "100.0% (3 of 3)" beside 13 unchecked rows and never mentioned observations at all — reproduced. **FIXED 2026-11-06.** Coverage first (quotable **and** observation, with denominators), an explicit warning when no finding carries a falsifiable observation, the excluded count inside the rate sentence, and an explained absence when nothing was checkable. The desk readout gains the observation count and does not invent a zero for pre-existing reports. Reverts: **1 / 5 / 1 / 2 / 1 / 2**. 12 Python + 4 node tests. Critique S80. Not done: the demo timing/quality claim is untouched (not a defect); old reports get honest silence, not a backfilled zero; gap 87 left open. | **F** |
 | 94 | **B** | Route reads plus the 113 probe | "What the writer sees" is assembled per request from several stores. | **G** |
 | 95 | **D** | Route reachability | Design lab is a deliberate shipping decision. | **G** |
 | 96 | **D** | Filename serving | Dead labs; housekeeping. | **G** |

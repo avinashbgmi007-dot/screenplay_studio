@@ -3316,3 +3316,57 @@ another removed the tree check while no scratch file existed to find). Both were
 caught by re-running the revert after verifying the patch actually changed the
 file — `git check-ignore` on a planted file is now part of how I test an ignore
 rule, because a green suite is not the same as a demonstrated behaviour.
+
+## §80 — Gap 93: every number was true and the sentence was a lie (2026-11-06)
+
+This is the most interesting gap I have closed this session, and the reason is that
+**nothing in it was a bug**. Three verified of three quoted is correct. Thirteen
+findings citing scene numbers only is correct — expected, even, for the
+summary-reasoning categories. `verification_rate` already refused to divide by zero
+and said so in its docstring. The desk helper already carried its denominator.
+
+And a writer reading that report walks away believing the analysis was 100% sound.
+
+The defect was in the *arrangement*: a rate in bold, followed by a parenthetical,
+with the excluded mass mentioned only in a clause that was easy to skim past. On a
+report where 3 of 16 findings carry evidence, the sentence that survives the skim
+is "100%". So the fix is editorial, and the editorial rules are the finding:
+
+**Coverage before the rate.** A reader who stops after one line must have the
+covering number. This is why the coverage sentence comes first even though the rate
+is the more impressive figure — impressive-first is exactly the ordering that
+produced the misreading.
+
+**The excluded mass lives in the same sentence as the rate.** Not the next
+paragraph, not a footnote. `"...3 of 3 findings that cite quotable text; the other
+13 findings cite no quotable text and are excluded from it."` A denominator is not
+context; it is a number, and a number next to a percentage gets read as the whole.
+
+**Zero is the loudest value, not the quietest.** The renderer now says, in the
+report, that *no finding carries a checkable observation* and why that matters —
+every note is an assertion with no falsifying condition. My first instinct was that
+this warning would fire constantly and become wallpaper (the gap-73 lesson), and
+that instinct was worth overriding here: on the demo material it is true, and it
+being true constantly is the finding, not a reason to be quiet.
+
+**Silence must be explained.** The old code correctly refused to print a rate when
+nothing was checkable, and then said nothing — which reads as "nothing to report",
+i.e. clean. It now says there is nothing for a mechanical check to judge and that
+this is not a clean bill of health.
+
+One asymmetry I did not expect: the two surfaces had drifted in **opposite
+directions**. The report had no denominator (it printed "3 of 3"); the desk had the
+denominator and no falsifiability count. So "make the report match the desk" would
+have fixed the wrong half. Both now carry both.
+
+And a rule carried over from gap 59: the desk checks `typeof observation_bearing` and
+prints nothing when it is absent, so a report analysed before today gets honest
+silence instead of a backfilled `0`. An invented zero would accuse an old run of a
+defect nobody ever measured — the same class of error as assuming an unrecorded
+model origin was the demo.
+
+Recorded as not done: the filing's timing and quality observations (0.3 s analyze,
+`[demo]` markers on 11 of 12) are **not** touched, and should not be — they describe
+what the stand-in model is, and no claim about a real model follows from them. Gap
+87, the adjacent desk-text-vs-markdown half, was left open; this gap made the
+markdown agree with the desk rather than closing its neighbour by implication.
