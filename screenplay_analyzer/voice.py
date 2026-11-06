@@ -238,29 +238,97 @@ def run_idiolect_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
     return findings, []
 
 
+# Gap 43. The old finding asserted three things from a regex match:
+#   "the subtext is missing"  — an absence claim
+#   "the scene tells instead of shows" — a craft verdict on the scene
+#   "the moment lands flat"   — a claim about the reader's experience
+# A regex knows none of these. It knows the line NAMES AN EMOTION. Measured on
+# a scene built as a twelve-years-delayed confession — silence held in the
+# action line, the line as the release — the old code produced exactly the same
+# finding as on the bare line with no framing at all. Directness can be
+# deliberate: a confession, a comic beat, or a character who withholds nothing
+# are all places where stating the feeling IS the writing.
+#
+# What replaces it is an OBSERVATION, flagged as one, that says the writer is
+# the judge. The register asked for "an optional observation or context-sensitive
+# question, not proof of absent subtext" and for useful directness not to be
+# banned — so the finding survives, the verdict does not.
+SUBTEXT_OBSERVATION_ISSUE = (
+    'Direct statement of feeling for {character}: "{line}" names the emotion '
+    'outright rather than showing it.'
+)
+SUBTEXT_OBSERVATION_WHY = (
+    "Naming a feeling can be a choice — a confession, a comic beat, a character "
+    "who withholds nothing — or it can be a line doing work that behaviour and "
+    "silence would do better. That is the writer's call, and it depends on the "
+    "scene this line sits in, which this check cannot read. Read it in place. "
+    "The question worth asking is whether the scene has earned the plainness, "
+    "not whether plainness is allowed."
+)
+
+# Words in the surrounding action that suggest the plainness is being STAGED:
+# something has been held, delayed, or is being released. When one of these sits
+# next to the line, the observation says so rather than pretending to judge.
+_IN_PLACE_RELEASE_RE = re.compile(
+    r"\b(finally|at last|twelve years|for years|held (?:it|this|back)|"
+    r"never said|all this time|admits?|confess\w*|the first time)\b",
+    re.IGNORECASE,
+)
+
+
+def _stagings(scene, index: int) -> str:
+    """A short description of deliberate framing around element `index`, or "".
+
+    Looks at the action line BEFORE the cue and the one after the dialogue,
+    because that is where a writer stages a release or a pause. Deliberately
+    crude: it only decides whether the finding should say "this looks staged",
+    never whether the writing is good.
+    """
+    window = scene.elements[max(0, index - 3):index + 4]
+    hits = []
+    for el in window:
+        if el.type in (ElementType.ACTION, ElementType.PARENTHETICAL) and el.text:
+            m = _IN_PLACE_RELEASE_RE.search(el.text)
+            if m:
+                hits.append(m.group(0).lower())
+    return ", ".join(dict.fromkeys(hits))
+
+
 def run_subtext_analysis(doc: ScriptDocument) -> tuple[list[dict], list[str]]:
     findings = []
     for scene in doc.scenes:
         current = None
-        for e in scene.elements:
+        for index, e in enumerate(scene.elements):
             if e.type == ElementType.CHARACTER:
                 current = e.text.strip()
             elif e.type == ElementType.DIALOGUE and current:
                 line = e.text.strip()
                 m = _ON_THE_NOSE_RE.search(line)
                 if m:
+                    staged = _stagings(scene, index)
+                    why = SUBTEXT_OBSERVATION_WHY
+                    if staged:
+                        why = (
+                            f"This looks deliberate — the action around it stages the moment "
+                            f"({staged}). If the plainness is the point, this is an "
+                            f"observation, not a note. If it still reads flat in place, the "
+                            f"work is elsewhere in the scene."
+                        )
                     findings.append({
                         "category": "subtext",
-                        "issue": f'On-the-nose line for {current}: "{line}" names the emotion outright — '
-                                 f'the subtext is missing, so the scene tells instead of shows.',
-                        "why_it_matters": "Real people rarely announce their feelings. When a line states the "
-                                          "emotion directly, the moment lands flat; letting behavior and "
-                                          "silence carry it makes the scene play.",
+                        "issue": SUBTEXT_OBSERVATION_ISSUE.format(
+                            character=current, line=line),
+                        "why_it_matters": why,
                         "severity": "low",
                         "scene_refs": [scene.scene_number],
                         "evidence_quote": line,
                         "rule_id": "on_the_nose_vs_subtext",
                         "check_id": "on_the_nose",
+                        # Marked as an observation so nothing downstream reads it
+                        # as a verdict. The report and the integrity pass both
+                        # honour this flag.
+                        "is_observation": True,
+                        "confidence": "observation",
                     })
                 current = None
     return findings, []

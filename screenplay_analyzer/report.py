@@ -51,6 +51,12 @@ VERIFICATION_BADGE = {
 UNGROUNDED_BADGE = (" ⚠️ *unsupported — this note cites no quote or observation "
                     "from your script*")
 
+# Gap 43: a deterministic check can notice a line and cannot judge a scene. Such
+# findings are marked with a badge that says so in the one place the writer
+# reads, so an observation is never mistaken for a note on the writing.
+OBSERVATION_BADGE = (" ◆ *observation — a pattern, not a verdict; whether it works "
+                     "depends on the scene, which is your call*")
+
 # Gap 88: the built-in stand-in used to be disclosed only BY NAME — its model id
 # appeared in "Analyzed with" and its own findings happened to say "[demo] ...".
 # Both are the stub cooperating with us. A report should say what produced it
@@ -105,6 +111,8 @@ def _format_finding(f: dict) -> str:
 
     if f.get("ungrounded"):
         badge += UNGROUNDED_BADGE
+    if f.get("is_observation"):
+        badge += OBSERVATION_BADGE
     lines = [f"**[{severity}] {scene_str}** — {issue}{badge}"]
     if why:
         lines.append(f"  - *Why it matters:* {why}")

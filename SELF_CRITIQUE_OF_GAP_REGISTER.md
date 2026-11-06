@@ -2346,3 +2346,63 @@ disagreeing with pipelines.
 - Reverts: **3** (swallow the code) / **5** (always exit 0) / **2** (no JSON) / **2** (uncaught
   folder error) / **1** (no stderr line).
 - Existing `test_watch.py` and `test_watch_source_safety.py`: 14 passed, unchanged.
+
+## §60 — Gap 43: a regex was grading scenes (2026-11-06)
+
+Filed accurately. Reproduced on the register's own framing — a scene built as a twelve-years-delayed
+confession — and the measurement is stark: the finding was **byte-identical** to the one produced by
+the same line with no framing whatsoever, and to a comic beat built on the bluntness. The context
+never entered the code at all.
+
+### What the old finding actually claimed
+
+    "names the emotion outright — the subtext is missing, so the scene tells instead of shows"
+    "the moment lands flat"
+
+Three claims from one regex match: an absence, a craft verdict on the scene, and a prediction about
+a reader's experience. The check had seen a lexicon word. That is the whole of its evidence. The
+register's phrase for this — "an unconditional inference from wording, not an independent judgment"
+— is precise, and it is the same species as gaps 44/45 (a numeric proxy stated as a diagnosis) and
+54 (a recurrence read as a payoff). This cluster is one architectural mistake wearing five hats: a
+deterministic pass reporting an observation in the grammar of a finding.
+
+### What I changed, and what I deliberately did not
+
+I kept the finding. The register was explicit — "do not categorically ban useful directness" — and
+the check is genuinely useful: a writer scanning for on-the-nose dialogue wants the list. What I
+removed is the verdict, and what I added is the machinery to keep observations from being read as
+notes:
+
+* the issue states what was detected ("names the emotion outright rather than showing it");
+* `is_observation` and `confidence: observation` travel with the data;
+* the report badges it: *"a pattern, not a verdict; whether it works depends on the scene, which is
+  your call"*.
+
+That badge is the part I nearly skipped. Without it the new prose is still a finding sitting in a
+findings list, and a list is a verdict by layout. An observation has to *look* different where the
+writer reads it, or moving the judgement into the prose is cosmetic.
+
+### The context sensitivity
+
+The register asked for a "context-sensitive question". I did not build a question generator — that
+needs a model, and this pass is deliberately model-free. What I built is a staging detector: action
+near the line containing *held this*, *twelve years*, *finally*, *confess*, *admits*, *the first
+time* switches the explanation to "this looks deliberate — if the plainness is the point, this is an
+observation, not a note". It is crude and it only ever changes the *explanation*, never the
+decision. I want to be clear that this is the weakest part of the change: the honest version is a
+context-sensitive question, and that needs a live model plus a writer to answer it.
+
+### My errors
+
+One, small, and the same one as §57 and §58: I wrote a test asserting `"I feel lost."` would be
+flagged, without checking the emotion lexicon — `lost` is not in it. Third time this session that I
+asserted from my model of the code rather than from the code. It is now a standing runbook trap.
+
+### Verification
+
+- 15 tests: the filed case; no "subtext is missing"; no "lands flat"; the observation still reports
+  what was detected; directness still reported; the flag and confidence; the report badge; the badge
+  absent from ordinary findings; the flag on every wording; staged vs unstaged explanations; the
+  comic control; a scene with no direct emotion; an orphan line; and per-scene attribution.
+- Reverts: **1 / 3 / 1 / 1 / 1**, each verified applied by marker count.
+- Full suite run through the gate before commit.
