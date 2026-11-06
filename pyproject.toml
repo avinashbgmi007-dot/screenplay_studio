@@ -54,6 +54,13 @@ packages = ["screenplay_parser", "screenplay_analyzer", "screenplay_cowriter", "
 # agreement.
 include-package-data = true
 
+# Gap 86: no `exclude-package-data` entry is needed for graphify scratch
+# (`graph.json` / `graph_output.json`), because the files are no longer in the
+# tree at all and `.gitignore` keeps them from coming back. They were never in
+# the package-data globs below, so the wheel was already correct — the defect was
+# their presence in the SOURCE, where a reader assumes a .json inside a package is
+# data. Guard: tests/test_packaging_data_files.py (tree AND wheel).
+
 [tool.setuptools.package-data]
 # 263 attributed craft rules across 26 files, plus the index/schema the loader
 # globs for at import time.

@@ -110,3 +110,16 @@ Cursors/
 # Guard: tests/test_repo_hygiene.py
 /impl-shots/runs/
 .agent_state.json
+
+# Gap 86: these SHIPPED inside importable packages. `screenplay_analyzer/graph.json`
+# and `screenplay_parser/graph_output.json` are graphify scratch — nothing in the
+# code reads them (`grep -rn 'graph_output|graph\.json' --include=*.py` finds only
+# the packaging guard). They sat in the source tree where a reader reasonably
+# assumes a .json inside a package IS data, which is exactly how a file like this
+# gets loaded "because it's there" a year later.
+#
+# Deleted rather than relocated: git history has them, the guard that asserted they
+# must not ship is kept (it now documents a class of file), and the pattern below
+# keeps a future graphify run from recreating the problem invisibly.
+graph.json
+graph_output.json

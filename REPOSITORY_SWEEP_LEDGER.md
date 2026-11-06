@@ -308,7 +308,7 @@ Status key: **I** = inventoried only or review depth not individually verified; 
 - [I] `screenplay_analyzer/formatting_check.py`
 - [I] `screenplay_analyzer/genre.py`
 - [I] `screenplay_analyzer/grammar.py`
-- [I] `screenplay_analyzer/graph.json`
+- [I] ~~`screenplay_analyzer/graph.json`~~ — **deleted in gap 86** (graphify scratch inside an importable package; no code read it)
 - [I] `screenplay_analyzer/llm_client.py`
 - [I] `screenplay_analyzer/llm_client_base.py`
 - [P] `screenplay_analyzer/observation_pass.py`
@@ -353,7 +353,7 @@ Status key: **I** = inventoried only or review depth not individually verified; 
 - [P] `screenplay_parser/cli.py`
 - [P] `screenplay_parser/export.py`
 - [P] `screenplay_parser/fdx_parser.py`
-- [I] `screenplay_parser/graph_output.json`
+- [I] ~~`screenplay_parser/graph_output.json`~~ — **deleted in gap 86** (same)
 - [P] `screenplay_parser/heuristics.py`
 - [P] `screenplay_parser/knowledge_graph.py`
 - [P] `screenplay_parser/models.py`
@@ -850,8 +850,12 @@ Built the wheel for the first time in this sweep (`python -m build --wheel`) and
 200 (48 KB), `/api/health`, `/api/config` and `/api/stt/languages` → 200, `KnowledgeBase()` loads 263 rules from
 the installed copy. Gap **127** is filed in `SELF_CRITIQUE_OF_GAP_REGISTER.md` §21 and is narrow: the ten
 packaging tests read the source tree rather than a wheel, so they could pass while an installed copy broke.
-Half of gap 86 is contradicted by the artefact — `graph.json` does not ship; the finding holds only for the
-source tree.
+**Gap 86 closed 2026-11-06.** That note was accurate and is now historical: the wheel never shipped
+`graph.json`, so the finding was true only for the SOURCE tree — which is where it still mattered, because a
+`.json` sitting inside an importable package reads as data. Both files were deleted rather than relocated
+(git history keeps them; nothing read them), `.gitignore` now pattern-guards the two names so a graphify run
+cannot recreate the problem invisibly, and the packaging guard was strengthened to assert the absence in
+**both** the tree and the wheel.
 
 **Browser gate: closed as un-runnable, with the reason measured.** `playwright` installs; `playwright install
 chromium` fails because `cdn.playwright.dev` is unreachable from this sandbox, and no system Chromium or Firefox

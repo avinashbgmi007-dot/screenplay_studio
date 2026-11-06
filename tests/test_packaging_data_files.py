@@ -70,10 +70,16 @@ REQUIRED_ASSETS = (
 # the shipping patterns on purpose — and asserted absent from the wheel.
 # Keyed by repo-relative path -> why it is not shipped. A stale entry fails the
 # guard below, so this table cannot rot.
-EXCLUDED_FROM_SHIPPING = {
-    "screenplay_parser/graph_output.json": "orphaned graphify scratch; no code reads it",
-    "screenplay_analyzer/graph.json": "orphaned graphify scratch; no code reads it",
-}
+# Gap 86: these two entries are GONE from that table because the files are gone
+# from the repo (deleted, with `.gitignore` pattern-guarding the names). The guard
+# below is kept and strengthened: it now asserts this CLASS of file — a bare
+# `graph.json` / `graph_output.json` anywhere inside a package — is absent from
+# both the tree and the wheel, so a future graphify run cannot ship its scratch
+# just because nobody re-added a table row.
+EXCLUDED_FROM_SHIPPING = {}
+
+# Scratch shapes that must never live inside an importable package, by basename.
+SCRATCH_BASENAMES = ("graph.json", "graph_output.json")
 
 
 # --------------------------------------------------------------------------
@@ -292,11 +298,30 @@ def test_wheel_excludes_evidence_screenshots(wheel_path):
 
 
 def test_wheel_excludes_orphaned_graph_scratch(wheel_path):
-    """`graph_output.json` / `graph.json` sit inside packages but no code reads them."""
-    basenames = tuple(os.path.basename(p) for p in EXCLUDED_FROM_SHIPPING)
+    """Gap 86: graphify scratch must not ship, and must not sit in the tree either.
+
+    The original version of this test only checked the wheel, which is why the
+    files could be deleted from the tree without the guard noticing — and why the
+    files could sit in the tree for months while the guard stayed green. Both
+    halves are now asserted: absent from the distribution, and absent from the
+    source, because "correctly excluded from the wheel" is not the same claim as
+    "not pretending to be package data".
+    """
     names = _wheel_names(wheel_path)
-    strays = [n for n in names if n.endswith(basenames)]
-    assert not strays, f"orphaned scratch artifacts shipped: {strays}"
+    shipped = [n for n in names if n.endswith(SCRATCH_BASENAMES)]
+    assert not shipped, f"orphaned scratch artifacts shipped: {shipped}"
+
+    packages = ("screenplay_parser", "screenplay_analyzer",
+                "screenplay_cowriter", "screenplay_studio")
+    in_tree = []
+    for package in packages:
+        for dirpath, _dirs, files in os.walk(os.path.join(ROOT, package)):
+            for name in files:
+                if name in SCRATCH_BASENAMES:
+                    in_tree.append(os.path.relpath(os.path.join(dirpath, name), ROOT))
+    assert not in_tree, (
+        "analysis scratch is sitting inside an importable package, where a reader "
+        f"reasonably assumes a .json is data: {in_tree}")
 
 
 def test_sdist_ships_the_data_files(sdist_path):
