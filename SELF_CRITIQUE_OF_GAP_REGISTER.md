@@ -2634,3 +2634,46 @@ recommends an action that fails is worse than one that recommends nothing.
 Recorded as not done: `watch` builds its own suffixed directory before creating, so it is
 unaffected, and I did not add a new regression test for that loop — it has its own passing suite
 and I did not want to claim coverage I had not measured.
+
+## §65 — Gap 52: the edit wrote to one of six copies of the same fact (2026-11-06)
+
+Both filed reproductions held on the first probe, no guesswork needed: a heading edit left
+`heading_raw` stale (export and UI showing the old slug) and a cue rename left the dialogue
+carrying the old `character`. The interesting part was not reproducing it but deciding where the
+fact lives.
+
+An element's text is not stored once. `scene.heading_raw`, `int_ext`, `location` and
+`time_of_day` all restate the heading; a dialogue element's `character` restates the cue above
+it; `characters_present` and `doc.all_characters` restate both. The edit path wrote `el.text` and
+stopped. Every one of those six is a derived copy, and I had a choice between patching the copies
+the failing tests named or rebuilding all of them from the elements after any applied edit. I
+rebuilt: a heading edit can change int/ext, location *and* time at once, and a rename can move a
+speaker between scenes' lists, so patching is how you get a document that is coherent in the cases
+you thought of. The elements are now the only source of truth for the fields that can be re-derived
+from them.
+
+Two narrower decisions I want on the record. The rename is carried only across the dialogue run
+immediately after the cue, stopping at the next cue or heading — a character's name in action text
+is prose, and rewriting it would be the editor deciding what the writer meant, which is the exact
+failure mode this gap is about. And I used the parser's own `normalize_character_name` rather than
+my own string handling, because my first attempt stripped `(V.O.)` into `character` and thereby
+invented a second, worse inconsistency: the cue read `PRIYA (V.O.)` but the speaker was recorded as
+the whole line.
+
+Then the part the entry only gestures at — "either support structural changes end-to-end or refuse
+them clearly before acknowledging". I probed what an edit can do to a document that must survive
+serialization, and it was worse than filed: a heading edited to prose came back as a script with
+**zero scenes**, and a lowercase cue came back with its dialogue block demoted to two action lines.
+Both returned applied. The working copy is re-parsed on resume, export and reanalysis, so an edit
+the parser will not read the same way is not a partial success — it is silent restructuring that
+the writer only discovers later, in a different room. Refusing was the entry's own second option
+and the honest one: there is no way to "support" a scene heading that is not a scene heading.
+
+The guard keys on the element's *type*, not the text, which I only thought to check because a
+naive version would have refused to edit any action line containing the word `INT.`. A guard that
+stops legitimate work is a different bug wearing the same uniform.
+
+Recorded as not done: editing still addresses elements by text, so two identical lines in one
+scene are refused as ambiguous rather than disambiguated, and undo of a rename is tested at the
+text level only. The entry asks for stable element IDs; that is gap 51's territory (undo that
+fails while claiming success) and I did not widen this fix into it.

@@ -29,7 +29,7 @@ import uuid
 from difflib import SequenceMatcher
 
 from screenplay_parser import quotematch
-from screenplay_parser.models import ScriptDocument
+from screenplay_parser.models import ElementType, ScriptDocument
 from screenplay_parser.scenekey import scene_key_map, stamp_scene_keys
 
 
@@ -1228,6 +1228,7 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
     records stay in the log, and undo reports `failed` with no explanation.
     """
     elements = scene_elements(doc, scene_number)
+    scene_obj = next((s for s in doc.scenes if s.scene_number == scene_number), None)
     applied, skipped = [], []
     for rep in replacements or []:
         old_text = (rep.get("old") or "").strip()
@@ -1239,6 +1240,13 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
             skipped.append({"old": old_text, "new": new_text, "reason": "old spans multiple lines"})
             continue
         el, ratio = _match_element(elements, old_text)
+        if el is not None:
+            refusal = _reject_edits_that_break_the_document(elements, old_text, new_text)
+            if refusal:
+                # Refused, not silently restructured, and not partially applied.
+                skipped.append({"old": old_text, "new": new_text,
+                                "reason": f"refused — {refusal}"})
+                continue
         if el is None:
             reason = "no exact match, and multiple identical lines" if ratio == 0 and any(
                 e.text == old_text for e in elements
@@ -1246,8 +1254,162 @@ def apply_replacements(doc: ScriptDocument, scene_number: int, replacements: lis
             skipped.append({"old": old_text, "new": new_text, "reason": reason})
             continue
         el.text = new_text
+        renamed = _retag_element(el, new_text)
+        if renamed:
+            # Gap 52: the cue is one line but the speaker is a property of the
+            # dialogue block beneath it. Renaming only the cue left the dialogue
+            # carrying `character: MARA`, so the export said TOM while every
+            # downstream character read — knowledge graph, dials, arcs, per-
+            # character tracks — still attributed those lines to MARA, and the
+            # renamed speaker appeared to have no dialogue at all.
+            _carry_speaker_rename(elements, elements.index(el), renamed,
+                                  el.character)
         applied.append({"old": old_text, "new": new_text, "similarity": round(ratio, 3)})
+    # Gap 52: `heading_raw` and `character` are the fields everything else
+    # reads — the Fountain/TXT/FDX exporters write `heading_raw`, the knowledge
+    # graph keys characters by `dialogue.character`, and the manuscript UI
+    # renders `heading_raw`. Editing only `element.text` left those carrying the
+    # pre-edit text: measured, `INT. ROOM - DAY` → `EXT. PARK - NIGHT` returned
+    # applied, and the export still contained `INT. ROOM - DAY`.
+    if applied and scene_obj is not None:
+        _rebuild_scene_derived(scene_obj)
     return {"applied": applied, "skipped": skipped}
+
+
+# Gap 52. An element's text is duplicated into fields other code reads, so an
+# edit has to keep them in step. Every case here was measured going stale:
+#   SCENE_HEADING  -> scene.heading_raw (exporters + manuscript UI) and the
+#                     derived int_ext / location / time_of_day (continuity,
+#                     scene keys, location analytics)
+#   CHARACTER      -> the cues below it keep character=<old name>, so the
+#                     renamed speaker's dialogue still counts for the old one
+#                     and the new name has no dialogue at all
+#   DIALOGUE / PARENTHETICAL -> its own `character` if the speaker was renamed
+def _reject_edits_that_break_the_document(elements: list, old_text: str, new_text: str) -> str | None:
+    """Refuse an edit whose result the parser would read back as something else.
+
+    Gap 52's second half: "either support structural changes end-to-end or
+    refuse them clearly before acknowledging". The working document is serialized
+    to Fountain and re-parsed on every resume, export and reanalysis, so an edit
+    that the parser will not read the same way is not a partial success — it is
+    silent restructuring. Measured before this guard:
+
+      * heading `INT. ROOM - DAY` -> `Hello there.` returned applied, and the
+        re-imported script had **0 scenes where it had 1**: the line was no
+        longer a slug line, so the scene and everything in it vanished.
+      * cue `MARA` -> `priya` returned applied, and the re-imported scene was
+        `[heading, action('priya'), action('Hello there.')]` — the dialogue block
+        was gone, demoted to two action lines.
+
+    Returns a refusal reason, or None to allow the edit. Checked against the
+    exact element being replaced, so prose that merely looks like a heading is
+    unaffected (only a SCENE_HEADING element can stop being a heading).
+    """
+    from screenplay_parser.heuristics import (
+        looks_like_scene_heading, looks_like_character_cue,
+        looks_like_transition, looks_like_shot,
+    )
+
+    target = next((el for el in elements if el.text == old_text.strip()), None)
+    if target is None:
+        return None             # the normal path matches elsewhere; not ours
+    kind = target.type
+
+    if kind == ElementType.SCENE_HEADING and not looks_like_scene_heading(new_text):
+        return ("a scene heading has to keep reading as a scene heading "
+                "(INT./EXT. … — LOCATION - TIME), or the scene stops existing "
+                "when the script is re-parsed")
+
+    if kind == ElementType.CHARACTER:
+        # What the parser requires: short, uppercase, not a heading/transition/
+        # shot, and followed by dialogue or a parenthetical. The following line
+        # is the element after this one, which the caller has not touched.
+        idx = elements.index(target)
+        following = ""
+        for nxt in elements[idx + 1:]:
+            following = nxt.text or ""
+            if following.strip():
+                break
+        if not looks_like_character_cue(new_text, following):
+            return ("a character cue has to stay uppercase and short, or the "
+                    "dialogue beneath it is re-read as action and the block is lost")
+
+    if kind == ElementType.TRANSITION and not looks_like_transition(new_text):
+        return "a transition has to keep reading as a transition (e.g. CUT TO:)"
+
+    if kind == ElementType.SHOT and not looks_like_shot(new_text):
+        return "a shot has to keep reading as a shot (e.g. CLOSE ON)"
+
+    return None
+
+
+def _retag_element(el, new_text: str) -> str | None:
+    """Keep an edited element's duplicated fields in step.
+
+    Returns the OLD bare speaker name when a cue was renamed, so the caller can
+    carry the rename to the dialogue under it; None otherwise.
+    """
+    from screenplay_parser.heuristics import normalize_character_name
+
+    if el.type == ElementType.CHARACTER:
+        old_name = el.character or normalize_character_name(el.text)
+        new_name = normalize_character_name(new_text)
+        el.character = new_name or None
+        # (V.O.), (CONT'D) and friends live in the cue TEXT, and the parser keeps
+        # only the bare name in `character` — so the extension survives without
+        # special handling here.
+        return old_name if old_name and new_name and old_name != new_name else None
+    if el.type == ElementType.SCENE_HEADING:
+        el.text = new_text.strip()
+    return None
+
+
+def _carry_speaker_rename(elements: list, cue_index: int, old_name: str,
+                          new_name: str | None) -> None:
+    """Rename the speaker on the dialogue block that follows a renamed cue.
+
+    Scope, deliberately narrow: the run of DIALOGUE and PARENTHETICAL elements
+    after the cue, stopping at the next cue or heading. A character's name in
+    ACTION text is prose, not metadata, and is left alone — rewriting it would
+    be the editor guessing at intent, which is the failure this gap is about.
+    """
+    if not new_name:
+        return
+    for el in elements[cue_index + 1:]:
+        if el.type in (ElementType.CHARACTER, ElementType.SCENE_HEADING):
+            break
+        if el.type in (ElementType.DIALOGUE, ElementType.PARENTHETICAL):
+            if (el.character or "") == old_name:
+                el.character = new_name
+
+
+def _rebuild_scene_derived(scene) -> None:
+    """Re-derive everything the edit could have invalidated, from the elements.
+
+    Rewritten rather than patched: a heading edit can change the int/ext, the
+    location AND the time of day at once, and a cue rename can move a speaker
+    between scenes' character lists. Two sources of truth is what caused the
+    defect, so the elements are made the only one.
+    """
+    from screenplay_parser.heuristics import parse_scene_heading
+
+    headings = [e for e in scene.elements if e.type == ElementType.SCENE_HEADING]
+    if headings:
+        heading = headings[0].text.strip()
+        scene.heading_raw = heading
+        parsed = parse_scene_heading(heading)
+        scene.int_ext = parsed["int_ext"]
+        scene.location = parsed["location"]
+        scene.time_of_day = parsed["time_of_day"]
+
+    # Who speaks in this scene, read from the elements as they now stand. The
+    # parser appends in first-appearance order and dedupes; so does this.
+    present: list[str] = []
+    for e in scene.elements:
+        if e.type in (ElementType.DIALOGUE, ElementType.PARENTHETICAL) and e.character:
+            if e.character not in present:
+                present.append(e.character)
+    scene.characters_present = present
 
 
 def rewrite_scene(client, doc: ScriptDocument, scene_number: int, finding_text: str = "", instruction: str = "") -> dict:
