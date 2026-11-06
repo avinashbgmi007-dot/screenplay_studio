@@ -23,6 +23,7 @@ import queue
 import re
 import sys
 import threading
+import shutil
 import time
 import uuid
 import traceback
@@ -1271,6 +1272,253 @@ def _load_manifest(name: str) -> ProjectManifest:
     return ProjectManifest.load(_project_dir(name))
 
 
+# ---------------- gap 80: an unreadable manifest is a RECOVERY state ----------------
+#
+# The shelf has always flagged a damaged project (`unreadable: true`) and then
+# refused every single thing the writer could do about it: open, export, and even
+# /backup — because every route loads the manifest first, including the one whose
+# whole job is to copy the folder to safety. Measured on a project with a
+# truncated project.json: six routes, six 503s, while the source file (4711 bytes)
+# and parsed.json were both perfectly intact. The damage is one small file; the
+# lockout was the whole project.
+#
+# Same dead-end shape as gap 70 on the idea side, so it gets the same shape of
+# answer: keep the warning, remove the dead end. Read the raw bytes, copy the
+# folder out, and rebuild a manifest from what is actually on disk — while
+# keeping the damaged file, because it is the only record of what was there.
+
+def _manifest_damage(project_dir: str) -> str | None:
+    """Why this project's manifest cannot be loaded, or None when it can.
+
+    Only DAMAGE counts. A project with no project.json at all is a different
+    thing (an orphaned source, gap 50's territory) and must not be silently
+    "repaired" into existence by a recovery route.
+    """
+    path = os.path.join(project_dir, "project.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        ProjectManifest.load(project_dir)
+        return None
+    except FileNotFoundError:
+        return None
+    except StoreUnreadable as e:
+        return getattr(e, "detail", "") or str(e)
+    except (ValueError, OSError) as e:
+        return f"{type(e).__name__}: {e}"
+
+
+def _recovery_project_dir(name: str) -> str:
+    """The project directory for a recovery route, refusing path traversal.
+
+    These routes do NOT load the manifest (they cannot — that is the point), so
+    this is the only gate between an untrusted name and the filesystem.
+    """
+    project_dir = _project_dir(name)
+    if not os.path.isdir(project_dir):
+        raise FileNotFoundError(f"No project directory at '{name}'.")
+    return project_dir
+
+
+def _recovered_source_file(project_dir: str) -> str | None:
+    """The source file to rebuild from, chosen by what is on disk.
+
+    Preference order is deliberate: the desk's own `source.<ext>` first (that is
+    what `create` installs), then any other parseable file at the top level. A
+    recovery that picks the wrong file would build a manifest describing a script
+    the writer never worked on, so this returns None rather than guessing when
+    the choice is not obvious.
+    """
+    try:
+        names = sorted(os.listdir(project_dir))
+    except OSError:
+        return None
+    preferred = [n for n in names
+                 if os.path.splitext(n)[0].lower() == "source"
+                 and os.path.splitext(n)[1].lower() in SUPPORTED_UPLOAD_EXTS]
+    if len(preferred) == 1:
+        return os.path.join(project_dir, preferred[0])
+    others = [n for n in names
+              if os.path.splitext(n)[1].lower() in SUPPORTED_UPLOAD_EXTS
+              and os.path.isfile(os.path.join(project_dir, n))]
+    if len(others) == 1:
+        return os.path.join(project_dir, others[0])
+    return None
+
+
+@app.route("/api/projects/<name>/recover", methods=["GET"])
+def recover_project(name):
+    """What is actually on disk for a project whose manifest will not load.
+
+    Read-only. Answers the raw bytes of the damaged manifest, the source file it
+    can still see, and what else survived — so the writer can copy their script
+    out by hand with no trust in the desk at all.
+    """
+    try:
+        project_dir = _recovery_project_dir(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+
+    path = os.path.join(project_dir, "project.json")
+    raw, readable = None, False
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        return _error(f"project.json could not be read: {e}", 500)
+
+    try:
+        ProjectManifest.load(project_dir)
+        readable = True
+    except (StoreUnreadable, ValueError, OSError):
+        readable = False
+    except FileNotFoundError:
+        readable = False
+
+    source = _recovered_source_file(project_dir)
+    try:
+        files = sorted(n for n in os.listdir(project_dir)
+                       if os.path.isfile(os.path.join(project_dir, n)))
+    except OSError:
+        files = []
+
+    resp = jsonify({
+        "project": name,
+        "manifest": "project.json",
+        "raw": raw,
+        "readable": readable,
+        "damage": _manifest_damage(project_dir),
+        "source_file": os.path.basename(source) if source else None,
+        "source_bytes": os.path.getsize(source) if source else None,
+        "files": files,
+        "parsed_present": os.path.exists(os.path.join(project_dir, "parsed.json")),
+        # Gap 80's whole point: the writing is still here. Say so where the SPA
+        # can read it, rather than leaving the writer to guess from a red card.
+        "recoverable": bool(source),
+    })
+    resp.headers["X-Project-Readable"] = "true" if readable else "false"
+    return resp
+
+
+@app.route("/api/projects/<name>/recover/backup", methods=["GET"])
+def recover_backup(name):
+    """Copy the folder out WITH NO MANIFEST — the route that used to be unavailable.
+
+    `/backup` loads the manifest first, so the one action that could have saved a
+    damaged project was the one the damage locked. This zips the directory as-is:
+    no parsing, no manifest requirement, nothing interpreted. It is a file copy,
+    which is exactly why it is the right tool for "I do not trust this folder".
+    """
+    try:
+        project_dir = _recovery_project_dir(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+
+    buf = io.BytesIO()
+    skipped, kept = [], []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Report what is in the folder and what actually left it; a recovery
+        # archive that quietly omits a file would be the same lie as gap 72.
+        for dirpath, _dirnames, filenames in os.walk(project_dir):
+            for fn in sorted(filenames):
+                full = os.path.join(dirpath, fn)
+                arc = os.path.relpath(full, project_dir).replace(os.sep, "/")
+                if fn.endswith((".lock", ".tmp")):
+                    continue
+                _add_file(zf, full, arc, skipped, kept)
+        zf.writestr("recovery-manifest.json", json.dumps({
+            "kind": "recovery",
+            "generated": time.time(),
+            "project": name,
+            "note": ("Copied without reading project.json. Nothing here was "
+                     "parsed, repaired or interpreted."),
+            "damage": _manifest_damage(project_dir),
+            "files": len(kept),
+            "skipped": skipped,
+            "complete": not skipped,
+        }, indent=2), zipfile.ZIP_DEFLATED)
+
+    buf.seek(0)
+    resp = send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name=f"{safe_dir_name(name)}-recovery.zip")
+    _mark_completeness(resp, skipped, None)
+    resp.headers["X-Recovery-Archive"] = "true"
+    return resp
+
+
+@app.route("/api/projects/<name>/repair", methods=["POST"])
+def repair_project(name):
+    """Rebuild a usable manifest from what is on disk, keeping the damaged one.
+
+    Refuses a healthy project: if `project.json` loads, there is nothing to
+    repair and overwriting it would destroy the real record. Refuses a project
+    with no source to rebuild from, rather than inventing an empty one.
+    """
+    try:
+        project_dir = _recovery_project_dir(name)
+    except FileNotFoundError:
+        return _error("Project not found.", 404)
+
+    path = os.path.join(project_dir, "project.json")
+    if os.path.exists(path) and _manifest_damage(project_dir) is None:
+        return _error("This project's manifest is readable and does not need "
+                      "repairing. Nothing was changed.", 400)
+
+    source = _recovered_source_file(project_dir)
+    if source is None:
+        return _error("No screenplay file was found in this project, so a "
+                      "manifest cannot be rebuilt from what is on disk. "
+                      "Nothing was changed.", 400)
+
+    # Keep the damaged file BEFORE writing a new one. It is the only record of
+    # the stages, settings and model the project had; a repair that discards it
+    # turns a recoverable damage into a permanent loss of history.
+    damaged_copy = None
+    if os.path.exists(path):
+        damaged_copy = f"{path}.damaged-{int(time.time())}"
+        try:
+            retry_permission(lambda: shutil.move(path, damaged_copy))
+        except OSError as e:
+            return _error(f"Could not preserve the damaged project.json: {e}. "
+                          "Nothing was changed.", 500)
+
+    ext = os.path.splitext(source)[1].lower()
+    rebuilt = ProjectManifest(
+        project_dir=project_dir,
+        title=os.path.basename(project_dir),
+        source_filename=os.path.basename(source),
+        source_format=ext,
+    )
+    # A rebuild that lied about having parsed would make the desk show a script
+    # it never read, so the parse stage starts pending and the writer re-runs it.
+    if os.path.exists(os.path.join(project_dir, "parsed.json")):
+        rebuilt.stages["parse"].status = "pending"
+    try:
+        rebuilt.save()
+    except OSError as e:
+        # Put the damaged file back: a failed repair must leave the folder as it
+        # found it, not half-repaired.
+        if damaged_copy and not os.path.exists(path):
+            try:
+                retry_permission(lambda: shutil.move(damaged_copy, path))
+            except OSError:
+                pass
+        return _error(f"Could not write a new project.json: {e}", 500)
+
+    return jsonify({
+        "project": name,
+        "repaired": True,
+        "source_file": os.path.basename(source),
+        "damaged_copy": os.path.basename(damaged_copy) if damaged_copy else None,
+        "parse_stage": rebuilt.stages["parse"].status,
+        "needs_reparse": True,
+        "note": ("A new manifest was written from the files on disk. The damaged "
+                 "one was kept beside it. Re-run parse before trusting the pages."),
+    })
+
+
 # Mirror of the parser's dispatch table (`screenplay_parser._EXT_DISPATCH`):
 # the extensions `parse_screenplay` accepts. Kept as a local constant because
 # this module must not import the parser at load (AGENTS.md: no cross-package
@@ -2487,6 +2735,10 @@ def backup_project(name):
         m = _load_manifest(name)
     except FileNotFoundError:
         return _error("Project not found.", 404)
+    except StoreUnreadable:
+        # Gap 80: the route that exists to copy the folder out must not be the
+        # one a damaged manifest locks. Fall through to the no-manifest archive.
+        return recover_backup(name)
 
     project_dir = os.path.realpath(m.project_dir)
     buf = io.BytesIO()

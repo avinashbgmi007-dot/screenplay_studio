@@ -20,7 +20,7 @@
 - There is **no** standalone `server.py` (the `docs/CODEBASE_MAP.md` entry is
   stale). The only HTTP servers are `webapp_server.py` and the demo `demo_app`.
 
-**Totals:** 100 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **102**.
+**Totals:** 103 endpoints in `webapp_server.py` + 2 in `demo_model.py` = **105**.
 (Pinned by `tests/test_audit_remediation.py::TestF05RouteMapTotals`; regenerate
 after adding or changing any `@app.route` — this map had drifted by +4 before
 the 2026-09-30 audit, the verdict channel added 5 more, and this branch added
@@ -64,6 +64,9 @@ analyze/cancel (R2) plus library/backup (R7).)
 | POST | `/api/projects/<name>/analyze/retry-failed` | `retry_failed_categories` | Re-run only failed analysis categories. |
 | POST | `/api/projects/<name>/reparse` | `reparse_project` | Re-parse source, regenerate KG, invalidate analysis. |
 | GET | `/api/projects/<name>/backup` | `backup_project` | Download the whole project dir as a zip. |
+| `/api/projects/<name>/recover` | GET | gap 80 — what is on disk when `project.json` will not load: raw manifest bytes, the source file, the surviving files. Read-only. |
+| `/api/projects/<name>/recover/backup` | GET | gap 80 — zip the folder with NO manifest. `/backup` falls back to this when the manifest is damaged. |
+| `/api/projects/<name>/repair` | POST | gap 80 — rebuild `project.json` from the source on disk, keeping the damaged file as `project.json.damaged-<ts>`. |
 | GET | `/api/projects/<name>/report` | `get_report` | Get the report (findings sanitized at serve time). |
 | GET | `/api/projects/<name>/report/export` | `export_report` | Export the report as `.md`. |
 | GET | `/api/projects/<name>/characters` | `get_character_tracks` | Assemble per-character track (KG + report, no model). |

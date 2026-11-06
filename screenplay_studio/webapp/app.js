@@ -1172,7 +1172,7 @@ function renderDashboard() {
     openBtn.type = "button";
     openBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+      if (p.unreadable) { showRecovery(p); return; }
       openProject(p.project);
     });
     const backup = el("a", "dash-backup", "⬇ Backup");
@@ -1193,12 +1193,12 @@ function renderDashboard() {
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+        if (p.unreadable) { showRecovery(p); return; }
         openProject(p.project);
       }
     });
     card.addEventListener("click", () => {
-      if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+      if (p.unreadable) { showRecovery(p); return; }
       openProject(p.project);
     });
     grid.appendChild(card);
@@ -1287,12 +1287,12 @@ function renderProjectList() {
     item.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+        if (p.unreadable) { showRecovery(p); return; }
         openProject(p.project);
       }
     });
     item.addEventListener("click", () => {
-      if (p.unreadable) { showError("This project's files are damaged on disk and can't be opened."); return; }
+      if (p.unreadable) { showRecovery(p); return; }
       openProject(p.project);
     });
     list.appendChild(item);
@@ -2568,6 +2568,63 @@ function renderSourceProvenance(project) {
   }
   line.textContent = parts.join(" \u00B7 ");
   line.hidden = false;
+}
+
+// Gap 80: a damaged project used to be a dead card — the shelf flagged it and
+// then every action refused, including "Backup", which is the one thing that
+// would have saved the folder. The warning was right; the dead end was not.
+// This offers the two things that actually help: copy the folder out with no
+// trust in the desk, or rebuild the manifest from the files on disk.
+async function showRecovery(p) {
+  let info = null;
+  try {
+    info = await api(`/projects/${encodeURIComponent(p.project)}/recover`);
+  } catch (e) {
+    showError("This project's files are damaged and the recovery view could not be read: " + e.message);
+    return;
+  }
+  const panel = $("#recovery-panel");
+  if (!panel) { showError("This project's files are damaged on disk and can't be opened."); return; }
+  panel.innerHTML = "";
+  const title = el("h3", null, `${p.title || p.project} — damaged manifest`);
+  title.id = "recovery-title";
+  panel.appendChild(title);
+  panel.appendChild(el("p", "recovery-note",
+    info.recoverable
+      ? `Your screenplay is still here: ${info.source_file} (${info.source_bytes} bytes)` +
+        (info.parsed_present ? ", and its parse too. " : ". ") +
+        "Only project.json is unreadable — the list of settings and stages. Nothing has been deleted or changed."
+      : "No screenplay file could be found in this project folder. Only project.json is unreadable, and " +
+        "nothing has been deleted or changed. Copy the folder out before doing anything else."));
+  if (info.damage) panel.appendChild(el("p", "recovery-damage", "Damage: " + info.damage));
+  const acts = el("div", "recovery-actions");
+  const copy = el("a", "dash-backup", "\u2B07 Copy the folder (no manifest needed)");
+  copy.href = `/api/projects/${encodeURIComponent(p.project)}/recover/backup`;
+  copy.download = `${p.project}-recovery.zip`;
+  copy.title = "Zip the folder exactly as it is. Nothing is parsed, repaired or interpreted.";
+  acts.appendChild(copy);
+  if (info.recoverable) {
+    const fix = el("button", "dash-open", "Rebuild the manifest \u2192");
+    fix.type = "button";
+    fix.title = "Write a new project.json from the file on disk, keeping the damaged one";
+    fix.addEventListener("click", async () => {
+      try {
+        const res = await api(`/projects/${encodeURIComponent(p.project)}/repair`, { method: "POST" });
+        panel.hidden = true;
+        await loadProjects();
+        showError(`Manifest rebuilt from ${res.source_file}. Re-run the parse before trusting the pages.`);
+      } catch (e) {
+        showError("Couldn't rebuild the manifest: " + e.message);
+      }
+    });
+    acts.appendChild(fix);
+  }
+  const close = el("button", "recovery-close", "Close");
+  close.type = "button";
+  close.addEventListener("click", () => { panel.hidden = true; });
+  acts.appendChild(close);
+  panel.appendChild(acts);
+  panel.hidden = false;
 }
 
 async function openProject(name) {

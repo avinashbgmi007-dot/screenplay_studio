@@ -61,6 +61,11 @@
       <div id="project-list" class="project-list sidebar-flyout">
         <p class="empty-hint">The shelf is empty — bring in a screenplay.</p>
       </div>
+
+    <!-- Gap 80: a damaged project is a recovery state, not a dead card. Shown in
+         place of the refusal that used to be the only answer. -->
+    <section id="recovery-panel" class="recovery-panel" role="dialog" aria-modal="false"
+             aria-labelledby="recovery-title" hidden></section>
     </div>
 
     <div class="sidebar-section" id="library-section">
