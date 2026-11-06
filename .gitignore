@@ -109,3 +109,4 @@ Cursors/
 # it in place; refreshing it is the explicit act AUDIT_PROMOTE=1.
 # Guard: tests/test_repo_hygiene.py
 /impl-shots/runs/
+.agent_state.json
