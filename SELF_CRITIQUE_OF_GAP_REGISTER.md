@@ -3067,3 +3067,57 @@ One process note. This gap, like the last three, began with a sandbox whose loca
 git history had reverted to the pre-72 base while the worktree still matched
 origin. I now check `git rev-parse HEAD` against `git ls-remote` before touching
 code; it cost one call and saved a `git add -A` over 166 files of noise.
+
+## §75 — Gap 82: "low severity" was the wrong reading, and the reason matters (2026-11-06)
+
+I filed this one myself as *low severity — a prerequisite for gap 80's fix rather
+than a separate product risk*. That was wrong, and the way it was wrong is the
+useful part.
+
+By the time I picked it up, gap 80 had **already shipped** a recovery panel for
+damaged projects. The panel could not answer for an idea, and not because nobody
+had thought about ideas: because the two shelves had no shared fields to read.
+The consequence was concrete — gap 70 had built `/ideas/<id>/recover` and
+`/ideas/<id>/repair` for exactly this situation, and **nothing in the client ever
+called them**. A writer whose idea file was damaged still got a card that refused
+every click, with a working repair path sitting one HTTP call away.
+
+So the finding was not "two payloads would need a shared surface someday". It was
+"the shared surface exists, it covers half the product, and the missing fields are
+why." Severity estimates about *consistency* decay badly: the same inconsistency
+that looks cosmetic today is a shipped dead end tomorrow.
+
+Two decisions worth naming.
+
+**Union, not replacement.** The envelope does not strip `stages` and `sessions`
+from the project card — the desk renders those. It says: these seven keys mean the
+same thing everywhere, and anything else is a field of the shelf, not of the
+damage. That distinction is the whole contract, and it is why the tests assert the
+seven keys plus the survival of the shelf fields rather than an exact dict.
+
+**`recoverable` is a claim, not a mood.** The tempting implementation is `True`
+whenever a row is marked damaged. Instead both shelves are tested to answer 200 on
+their `recover` route when they say `True`. A boolean nobody is forced to honour
+becomes decoration within two refactors. Same discipline for `last_known`: a
+missing file reports `size: null`, not `0` — `0` is a fact and missing is not, and
+a damage row is precisely the place where that difference gets abused.
+
+I also found the same defect one layer down, which the filing did not mention: the
+two `recover` routes described one situation with different keys. I fixed that in
+the same pass rather than opening a third gap for symmetry, and kept
+`X-Project-Readable` alongside the new `X-Record-Readable` so gap 80's test keeps
+passing — a rename that breaks your own previous test is a rename that changed two
+things at once.
+
+Recorded as not done: nothing **structurally** forces a future shelf through the
+envelope. There is no type, no base class, no builder the routes are required to
+call — the contract is pinned by tests over the two rows that exist. That is
+honest for today and will not survive a third store; the fix then is to make the
+envelope the only way a shelf can express damage, not to add more tests.
+
+A process note, because it cost a call: my sixth revert script referenced a backup
+file I had never written, so the restore silently did nothing and the suite came
+back red for a reason that had nothing to do with the code. I caught it from the
+`cp: cannot stat` line and restored with `git checkout --`, not from a stale `/tmp`
+copy. Backups that are assumed rather than verified are how a green matrix becomes
+a fiction.
