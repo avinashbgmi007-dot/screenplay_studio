@@ -48,6 +48,23 @@ INT. KITCHEN - DAY
 AARAV pours coffee.
 """
 
+# Same PLACE, opposite time, nothing between: the only case the headings cannot
+# settle. Different from FLIP, which moves place and states both times.
+SAME_PLACE_FLIP = """Title: SamePlaceFlip
+Author: T
+
+INT. ROOM - NIGHT
+
+AARAV
+Goodnight.
+
+CUT TO:
+
+INT. ROOM - DAY
+
+AARAV pours coffee.
+"""
+
 MARKED_FLIP = """Title: MarkedFlip
 Author: T
 
@@ -80,11 +97,33 @@ AARAV pours coffee.
 
 
 def test_unmarked_time_flip_flagged():
-    doc = _parse(FLIP)
+    """Gap 44/77: this test asserted the defect.
+
+    FLIP is `INT. ROOM - NIGHT` -> `INT. KITCHEN - DAY`: a different place, with
+    both times stated in the headings. The old check called that a dropped
+    transition, and this test pinned it. The register's point was that the
+    heading IS the transition; the fixture below is the case a heading cannot
+    express — SAME place, opposite time, nothing in between — and that is what
+    `unmarked_time_flip` now reports, still at low severity and still under
+    continuity.
+
+    The check_id is deliberately unchanged: it is a stable name used by
+    AnalysisResult.merge and by the dock's evidence chips, and renaming it would
+    break those for no gain.
+    """
+    doc = _parse(SAME_PLACE_FLIP)
     findings = _rules(doc, "unmarked_time_flip")
     assert len(findings) == 1
     assert findings[0]["category"] == "continuity"
     assert findings[0]["severity"] == "low"
+    assert findings[0].get("is_observation") is True, (
+        "a pattern the writer judges, not a verdict")
+
+
+def test_an_ordinary_day_night_cut_under_different_places_is_not_flagged():
+    """The flip this test used to require. Same fixture as FLIP, now asserting
+    silence — this is the gap 44 measurement in the file that was pinning it."""
+    assert _rules(_parse(FLIP), "unmarked_time_flip") == []
 
 
 def test_time_flip_cleared_by_marker():

@@ -249,7 +249,8 @@ def _critique_section(number: int) -> str:
     text = CRITIQUE.read_text(encoding="utf-8")
     sections = re.split(r"\n## §", text)
     for sec in sections:
-        if re.search(rf"Gap\s+{number}\b", sec):
+        # "Gap 44" or "Gaps 44 + 77": a combined section covers both numbers.
+        if re.search(rf"Gaps?\s+.*\b{number}\b", sec):
             return sec
     return ""
 

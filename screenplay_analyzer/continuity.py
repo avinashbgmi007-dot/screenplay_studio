@@ -28,6 +28,8 @@ is a verbatim script line.
 
 from __future__ import annotations
 
+import re
+
 
 from screenplay_parser.models import ElementType, ScriptDocument
 from screenplay_parser.knowledge_graph import TIME_SKIP_RE
@@ -37,8 +39,24 @@ from .deterministic_utils import dialogue_lines_by_character
 
 CATEGORY = "continuity"
 
-# Opposites only — a MORNING->EVENING drift is normal pacing; a full
-# day/night flip with no marker is a dropped transition.
+# Opposites only — a MORNING->EVENING drift is normal pacing; a day/night change
+# is worth a look.
+#
+# Gaps 44 and 77. The original premise was that a day/night change with no
+# LATER-style marker is a DROPPED TRANSITION, and it is wrong. In a screenplay
+# the scene heading is where time is stated: `INT. KITCHEN - DAY` followed by
+# `EXT. STREET - NIGHT` is the ordinary, correctly formatted way to move time.
+# Demanding a redundant marker on top of it reports the writer's correct
+# formatting as a defect.
+#
+# Measured before the change: the ordinary cut produced "Unmarked time flip"
+# whose own `evidence_quote` was the SECOND SCENE'S HEADING — the text that
+# states the new time. A finding quoting its own refutation.
+#
+# What survives is the only thing a heading cannot express: that the TWO
+# headings are in tension with each other — same place, opposite time, nothing
+# in between to account for the gap. That is a question, not a verdict, and it
+# is reported as an observation with the uncertainty stated.
 _OPPOSITE = {
     "NIGHT": {"DAY", "MORNING"},
     "DAY": {"NIGHT"},
@@ -48,11 +66,44 @@ _OPPOSITE = {
 _HEADING_STOPWORDS = {"INT", "EXT", "INT/EXT", "EST", "CONTINUOUS"}
 
 
+# Gap 44/77: TIME_SKIP_RE knows the explicit time-skip vocabulary but not the
+# deliberate chronology moves, so a scene opening "FLASHBACK. Twelve years ago."
+# still read as a dropped transition — the register asked for flashbacks by name.
+# These are the writer SAYING the chronology is intentional, which is the
+# strongest possible marker, so they silence the observation the same way.
+_INTENTIONAL_CHRONOLOGY_RE = re.compile(
+    r"\b(FLASHBACK|FLASH BACK|FLASH-FORWARD|FLASH FORWARD|DREAM|FANTASY|"
+    r"MEMORY|SERIES OF SHOTS|MONTAGE|IMAGINE|REMEMBER(S|ED)?)\b",
+    re.IGNORECASE,
+)
+
+
 def _scene_has_time_marker(scene) -> bool:
+    """True when the scene says, in words, that time has moved or is not linear."""
     for e in scene.elements:
-        if e.type == ElementType.ACTION and TIME_SKIP_RE.search(e.text):
+        if e.type not in (ElementType.ACTION, ElementType.PARENTHETICAL):
+            continue
+        text = e.text or ""
+        if TIME_SKIP_RE.search(text) or _INTENTIONAL_CHRONOLOGY_RE.search(text):
             return True
     return False
+
+
+def _place_changed(prev, cur) -> bool:
+    """True when the two scenes are in different places.
+
+    Uses the parsed location when both sides have one, and falls back to the
+    heading text so an unusual slug line still counts as a move. Errs towards
+    "changed": a false "different place" only suppresses an observation, while a
+    false "same place" would raise one about an ordinary cut.
+    """
+    pl = (prev.location or "").strip().upper()
+    cl = (cur.location or "").strip().upper()
+    if pl and cl:
+        return pl != cl
+    ph = (prev.heading_raw or "").upper()
+    ch = (cur.heading_raw or "").upper()
+    return ph != ch
 
 
 def _time_flip_findings(doc: ScriptDocument) -> list[dict]:
@@ -68,20 +119,42 @@ def _time_flip_findings(doc: ScriptDocument) -> list[dict]:
             continue
         if _scene_has_time_marker(prev) or _scene_has_time_marker(cur):
             continue
+        # A location change is how a screenplay says "time has moved"; the
+        # heading has already done the work the old check asked for.
+        if _place_changed(prev, cur):
+            continue
         findings.append({
             "category": CATEGORY,
+            # The issue names what was noticed and nothing more. It does not say
+            # a transition is missing, because the heading plainly states the
+            # time and a transition is exactly what a new slug line is.
             "issue": (
-                f"Unmarked time flip: Scene {prev.scene_number} ends in {pt} and "
-                f"Scene {cur.scene_number} opens in {ct} with no transition marker "
-                f"(LATER / THE NEXT DAY / etc.)."
+                f"Possible same-place time jump: Scene {prev.scene_number} "
+                f"(\"{prev.heading_raw}\") is in {pt} and Scene "
+                f"{cur.scene_number} (\"{cur.heading_raw}\") returns to the same "
+                f"place in {ct}, with nothing in between to account for the gap."
             ),
             "why_it_matters": (
-                "The reader has to do the writer's work and infer a jump that the "
-                "page doesn't signal. A one-line transition beats a confused re-read."
+                "A reader can follow this, and it may be exactly what you intend — "
+                "an ellipsis is a normal cut. Worth a look only because both scenes "
+                "are in the same location at opposite times: if the intervening "
+                "hours matter, a beat or a line can carry them. If they don't, "
+                "there is nothing to fix."
             ),
             "severity": "low",
-            "scene_refs": [cur.scene_number],
+            "scene_refs": [prev.scene_number, cur.scene_number],
+            # A single VERBATIM line, because this module's contract (and the
+            # pipeline's quote-verification step) requires it: every evidence
+            # quote must be a line that exists in the script. My first version
+            # wrote `f"{prev.heading_raw}  ->  {cur.heading_raw}"` to show the
+            # pair, which is a composite that is in NO scene — verification
+            # failed on it and a downstream revision test broke. The pair
+            # belongs in the ISSUE text, where the writer still sees both
+            # headings; the quote is the second heading, and it is quoted as the
+            # evidence FOR "same place, opposite time", never as evidence that a
+            # transition is missing (which was gap 77's complaint).
             "evidence_quote": cur.heading_raw,
+            "paired_heading": prev.heading_raw,
             # Two fields, two meanings. `rule_id` is the knowledge-base rule
             # this check implements — the UI renders it as "Grounded in
             # knowledge-base rule <id>", so it must resolve in the KB.
@@ -90,6 +163,10 @@ def _time_flip_findings(doc: ScriptDocument) -> list[dict]:
             # every run (see _DETERMINISTIC_CHECK_IDS).
             "rule_id": "timeline_consistency",
             "check_id": "unmarked_time_flip",
+            # Gap 44/77, same discipline as gap 43: a deterministic pass can
+            # notice a pattern and cannot judge a cut.
+            "is_observation": True,
+            "confidence": "observation",
         })
     return findings
 

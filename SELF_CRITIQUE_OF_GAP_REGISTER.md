@@ -2406,3 +2406,99 @@ asserted from my model of the code rather than from the code. It is now a standi
   comic control; a scene with no direct emotion; an orphan line; and per-scene attribution.
 - Reverts: **1 / 3 / 1 / 1 / 1**, each verified applied by marker count.
 - Full suite run through the gate before commit.
+
+## §61 — Gaps 44 + 77: a finding that quoted its own refutation (2026-11-06)
+
+Two entries, one piece of code, so one fix and one section. I read both before touching anything,
+which is the only reason I did not fix 44 and leave 77 filed.
+
+### The defect, restated plainly
+
+    INT. KITCHEN - DAY  ->  EXT. STREET - NIGHT
+
+    "Unmarked time flip: Scene 1 ends in DAY and Scene 2 opens in NIGHT with no
+     transition marker (LATER / THE NEXT DAY / etc.)."
+    evidence_quote: "EXT. STREET - NIGHT"
+
+Entry 77 had already spotted the thing I would otherwise have missed: the evidence quote is the
+second scene's **heading**, and that heading states the new time. The finding quotes the text that
+refutes it. That is not a wording bug; it is the check misunderstanding what a slug line is for. In
+a screenplay the heading is *where time is stated*, and a new heading is itself the transition. The
+old check demanded a marker on top of the marker, and then quoted the marker as proof it was absent.
+
+### What I did not do: delete the check
+
+The tempting fix is to remove `unmarked_time_flip` entirely, and it would be wrong. There is a real
+question a heading cannot settle — both scenes in the SAME place at opposite times, with nothing
+between them. Same kitchen, breakfast, then same kitchen, dark. That may be a deliberate ellipsis
+or it may be a dropped beat, and the page does not say. So the check survives as exactly that case,
+as a question, marked as an observation, quoting both headings, and telling the writer that an
+ellipsis is a normal cut and there may be nothing to fix.
+
+The `check_id` stays `unmarked_time_flip` even though the phrase is gone. It is a stable name used
+by `AnalysisResult.merge` and by the dock's evidence chips; renaming it would break those for
+cosmetics.
+
+### Two of my own failures
+
+**I wrote a dead branch and nearly called it a fix.** My first patch added `continue` and then left
+the old finding code below it under `if False`-style unreachable shape, with a comment calling it
+"the shape of the replacement". A branch that cannot run is a tombstone, not a fix — it invites the
+next person to "re-enable" it. I reverted the whole file and wrote the check properly: the old
+finding is gone, and a real one tests for same-place tension.
+
+**I stopped one register sentence short.** The entry says "Test parallel events, intentional
+ellipses, flashbacks and unclear chronology". I implemented three of the four, wrote a flashback
+test, and it failed: `FLASHBACK. Twelve years ago, this same room.` still read as a dropped
+transition, because `TIME_SKIP_RE` knows `LATER` and `1998` but not the writer *saying* the
+chronology is deliberate. The fix was a small vocabulary addition — but only because I wrote the
+test the register asked for rather than the three I had thought of.
+
+### An existing test was pinning the defect
+
+`tests/test_continuity_idiolect.py::test_unmarked_time_flip_flagged` required the old behaviour on a
+fixture that moves place and states both times. It was not a regression; it was the filed defect,
+pinned. I re-based it on a same-place fixture, kept its assertions (category, severity, low), added
+the observation flag check, and added a second test asserting the old fixture is now silent — so the
+gap-44 measurement lives in the file that used to contradict it, with a comment saying which is
+which. I did not delete it.
+
+### Verification
+
+- 13 new tests: both filed cases silent; the phrase gone; no single heading quoted; same-place
+  raised as a question; observation flags; marker silences even the same-place case; morning→evening;
+  continuous; flashback; a concrete year; a seven-scene run of act cuts (the 5→6 / 13→14 / 17→18
+  class); an unparsed time left alone.
+- Reverts: **4** (flag every day/night change) / **1** (quote one heading) / **1** (state as fact) /
+  **1** (drop flags) / **1** (no flashback vocabulary). The 1s are thin and I would rather they were
+  higher; each is a single independent assertion on a distinct behaviour.
+- Existing: `test_continuity_idiolect`, `test_bugfix_batch`, `test_cross_rule_dedup` — 73 passed.
+
+### The regression the gate caught, and what it really was
+
+`close_gap.py check` refused gaps 44 and 77 with an UNEXPECTED suite failure:
+`test_revision.py::TestLastPass::test_same_input_headline_agrees_with_the_board`. I would not have seen
+it otherwise — I had run the continuity tests and the watch tests, not the revision ones.
+
+I then spent five wrong hypotheses on it: a composite `evidence_quote` breaking verification (plausible,
+and I had in fact written exactly that bug — more below), id collisions, fixture ordering, a stale
+snapshot, `kept` being sampled from the wrong list. Each was checked by measurement and each was wrong,
+which is the only reason the sixth was right.
+
+**What it actually was:** the test computed the id churn as `prev_distinct - survivors`. That formula
+is only correct when every kept finding is quote-identified, because a re-worded no-quote finding gets
+a brand-new id rather than a moved one. The fixture used to put two continuity findings at the front of
+the list — headings, therefore quote-identified — so the wrong formula happened to give the right
+number. My fix **deleted those two findings**, the front of the list became a no-quote finding, and the
+coincidence collapsed: 4 vs the correct 5.
+
+So the production code was right the whole time and the test was encoding a coincidence. I could have
+"fixed" this by changing the fixture to keep two quoted findings at the front, which would have
+restored the green light and left a false assertion in place. I did not: the test now computes
+`len(old_ids - new_ids)`, capturing `old_ids` before the report is overwritten, and — the check that
+matters — **it passes with my continuity change both applied and reverted**, so it is asserting the
+true relation rather than accommodating my edit.
+
+The lesson is the one this register keeps teaching: a test that passes is not evidence that it tests
+the right thing. Two of my six hypotheses were about code I had genuinely broken (the composite quote),
+and I only kept them from becoming the official explanation by measuring each one.

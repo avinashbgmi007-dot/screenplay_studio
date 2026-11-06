@@ -431,7 +431,8 @@ class TestLastPass:
         """
         m = _analyzed_manifest(tmp_path, sample_fountain, mock_server)
         report = json.load(open(m.report_findings_path, encoding="utf-8"))
-        prev_distinct = len({revision.compute_finding_id(f) for f in report["findings"]})
+        prev_ids = {revision.compute_finding_id(f) for f in report["findings"]}
+        prev_distinct = len(prev_ids)
         assert prev_distinct > 2, "the fixture must file enough findings to shrink"
         assert revision.last_pass_snapshot(m) is None  # first pass seeds
         # the SAME script analyzed again: the model files FEWER findings and
@@ -442,16 +443,29 @@ class TestLastPass:
         report["findings"] = kept
         json.dump(report, open(m.report_findings_path, "w", encoding="utf-8"))
         # A re-worded finding only changes its id on the NO-QUOTE tier; on the
-        # quoted tier the quote IS the identity, so the survivor count is what
-        # the churn is measured against.
-        survivors = len({revision.compute_finding_id(f) for f in kept})
+        # quoted tier the quote IS the identity. So `rewritten` is the number of
+        # OLD ids that no longer appear — which is NOT `prev_distinct - survivors`
+        # in general: that formula silently assumed every re-worded id was still
+        # an old id, which only holds when the kept findings are all on the
+        # quoted tier.
+        #
+        # Measured: `prev_distinct - survivors` read 4 while the correct churn
+        # was 5, because one kept finding has no quote and its re-worded id is a
+        # NEW id rather than a moved one. The fixture's ordering used to put two
+        # continuity findings (headings, so quote-identified) at the front, which
+        # made the wrong formula look right. Fixing gaps 44/77 removed those
+        # findings, the front of the list changed, and the coincidence broke.
+        old_ids, new_ids = prev_ids, {revision.compute_finding_id(f) for f in kept}
+        survivors = len(old_ids & new_ids)
         lp = revision.last_pass_snapshot(m)
         assert lp["same_input"] is True
         assert lp["last_total"] == len(kept)          # the board's row count
         assert lp["still_live"] == len(kept)          # nothing was fixed
         assert lp["fixed"] == 0 and lp["new"] == 0
         assert lp["prev_total"] == prev_distinct      # disclosed, never headlined
-        assert lp["rewritten"] == prev_distinct - survivors  # the ids that moved
+        assert lp["rewritten"] == len(old_ids - new_ids), (
+            "the churn is the old ids that no longer appear — not "
+            "prev_distinct minus the re-worded survivors")
 
     def test_changed_script_reports_the_real_delta(self, tmp_path, sample_fountain, mock_server):
         """The gate opens when the analyzer input genuinely moved."""
