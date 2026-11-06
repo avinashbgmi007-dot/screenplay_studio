@@ -2750,3 +2750,39 @@ the suite, run the gate, commit. Same verification standard, a third of the budg
 reverts are what make that compression safe. Second, and worse: a sandbox reset threw away this
 gap's tracked edits because I had not committed yet, and I redid the whole patch. Work that is not
 committed does not exist. Commit as soon as the suite is green, not after the registers are polished.
+
+## §68 — Gap 56: "off" and "unset" were the same value (2026-11-06)
+
+The reproduction is the kind that reads as a joke in a bug report: with
+`SCREENPLAY_STUDIO_DEMO_MODEL=0` set, the server printed *"set
+SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback"* and then, on the very
+next line, *"DEMO MODEL active (in-process)"*. A program contradicting itself in
+two adjacent lines is usually a good sign that two different pieces of code
+decided the same question.
+
+That is exactly what it was. `_env_flag` returns a bool, so `"0"` and `""` both
+come back `False` — the function is correct for "is this switch on", and simply
+cannot answer "did the writer say anything at all". The fallback needed the
+second question and asked the first. `_demo_setting()` now returns on / off /
+unset, and the test that pins the point asserts the two functions disagree about
+the same input: `_env_flag(...) is False` for both `"0"` and unset, while
+`_demo_setting()` returns `"off"` and `"unset"`. That assertion is the whole gap
+in three lines, and it will fail if anyone "simplifies" the helper back.
+
+The second half of the report took longer to see than it should have. `main()`
+called `_undo_demo_fallback()`, which sets `_DEMO_FALLBACK_AUTO = False`, and
+`_recheck_fallback_after_args()` returns immediately unless that flag is set —
+so main() disabled the mechanism it was about to rely on and then "confirmed"
+the demo was fine. Reading it as two independent bugs would have produced two
+patches; it is one decision being made in two places with different rules. Both
+now call `_recheck_fallback_after_args`, which consults `_demo_setting()`
+directly, and I removed the copy-pasted `under_pytest` two-liner from both sites
+because duplicated policy checks are how the two paths drifted in the first
+place. A count-based source assertion keeps the env var to a single reader.
+
+What I did not do, stated plainly because the entry asks for it: it wants a
+clear "unavailable" state in the UI and the actual provider/model labelled per
+run. The operator is told on stdout and `/api/config` already carries
+`demo_model`, but the desk has no distinct no-model banner, and I did not invent
+one inside a startup fix. That is recorded in the register tail rather than
+claimed as done.

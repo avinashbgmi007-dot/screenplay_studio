@@ -5777,9 +5777,7 @@ def main():
         # so the E2E fleet's deterministic boots are never second-guessed)
         # and unless the import-time AUTO fallback is what put the demo in
         # charge — an env/flag demo choice is never overridden here.
-        under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
-            any("pytest" in str(a).lower() for a in __import__("sys").argv)
-        if not under_pytest:
+        if not _running_under_pytest():
             _recheck_fallback_after_args()
 
     # The token can also come from the environment, so a launcher script does not
@@ -5839,6 +5837,31 @@ def main():
 
 _DEMO_MODEL_ACTIVE = False
 _DEMO_URL = None  # the in-process demo server's URL while active
+
+
+def _demo_setting() -> str:
+    """What the writer asked for, in three states rather than two.
+
+    Gap 56. `SCREENPLAY_STUDIO_DEMO_MODEL` was read through `_env_flag`, which
+    collapses it to a bool: "on" and "unset" are distinguishable, but "off" and
+    "unset" are not. So the fallback below could not tell a writer who had
+    explicitly refused the demo from one who never mentioned it — and it printed
+    "set SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback" while that
+    variable was already 0 as it started the demo. Measured in a fresh process:
+    the message and "DEMO MODEL active" appeared on consecutive lines.
+
+    Returns "on" (explicit demo), "off" (explicit opt-out) or "unset".
+    """
+    raw = os.environ.get("SCREENPLAY_STUDIO_DEMO_MODEL", "").strip().lower()
+    if raw in ("", "0", "false", "no", "off"):
+        return "off" if raw else "unset"
+    return "on"
+
+
+def _running_under_pytest() -> bool:
+    """E2E boots must be deterministic, so the startup probe stands down."""
+    return bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
+        any("pytest" in str(a).lower() for a in __import__("sys").argv)
 # True only while the desk runs on the IMPORT-TIME auto-fallback (the writer
 # never asked for demo; the default url just looked dead). Explicit demo —
 # env trigger or --demo-model — keeps this False, so main()'s re-check never
@@ -5919,8 +5942,23 @@ def _recheck_fallback_after_args() -> None:
     E2E fleet's deterministic BOOT path, not the helper itself, which stays
     unit-testable.
     """
-    if not _DEMO_FALLBACK_AUTO:
-        return  # explicit demo, or import found a reachable server: stand down
+    if not _DEMO_FALLBACK_AUTO and _demo_setting() != "off":
+        # Explicit demo, or import found a reachable server: stand down and do
+        # not spend a second probe. Gap 56: an explicit OPT-OUT re-decides too —
+        # it must be able to discover a real --server and never start a demo.
+        return
+    if _demo_setting() == "off":
+        # The writer refused the demo. Report the state plainly and make sure no
+        # demo is running, whatever import did.
+        if _DEMO_MODEL_ACTIVE:
+            _undo_demo_fallback()
+        reachable = _server_reachable(CONFIG["server_url"])
+        print(f"Model server: {CONFIG['server_url']} — "
+              + ("reachable." if reachable else "NOT reachable."))
+        print("Demo fallback is disabled (SCREENPLAY_STUDIO_DEMO_MODEL=0), so no "
+              "demo model was started. Analyses will fail until a real server is "
+              "reachable; unset the variable to allow the fallback.")
+        return
     if _server_reachable(CONFIG["server_url"]):
         print("Your model server is reachable — continuing with it. (The startup "
               "probe had only tested the default address before --server was "
@@ -5941,16 +5979,27 @@ def _recheck_fallback_after_args() -> None:
 # launch (llama.cpp binds IPv4, `localhost` resolves `::1` first on Windows)
 # was exactly that desk. main() now re-runs the decision against the real URL
 # and undoes a demo fallback the real server proves wrong.
-if _env_flag("SCREENPLAY_STUDIO_DEMO_MODEL"):
+_demo_choice = _demo_setting()
+if _demo_choice == "on":
     _use_demo_model()
-else:
-    under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST")) or \
-        any("pytest" in str(a).lower() for a in __import__("sys").argv)
-    if not under_pytest and not _server_reachable(CONFIG["server_url"]):
+elif not _running_under_pytest() and not _server_reachable(CONFIG["server_url"]):
+    if _demo_choice == "off":
+        # Gap 56: the advertised opt-out is honoured HERE, where the fallback
+        # happens — not only in main(). It used to be ignored at import, so
+        # `flask run` and `import screenplay_studio.webapp_server` started the
+        # demo against a variable set explicitly to 0.
+        print(f"Configured model server ({CONFIG['server_url']}) is unreachable at "
+              "startup, and the demo fallback is DISABLED by "
+              "SCREENPLAY_STUDIO_DEMO_MODEL=0.")
+        print("The desk will start with no model: analyses and chat will fail "
+              "until a real server is reachable. Unset that variable to allow the "
+              "built-in demo model instead.")
+    else:
         print("Configured model server is unreachable at startup — falling back "
               "to the built-in DEMO craft model so the desk still works.")
         print("It is used again automatically whenever your llama-server is up; "
-              "set SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback.")
+              "set SCREENPLAY_STUDIO_DEMO_MODEL=0 to disable this fallback "
+              "(that opt-out is honoured here, at import, as well as in main()).")
         _use_demo_model(auto=True)
 
 
