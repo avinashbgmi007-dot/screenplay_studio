@@ -2960,3 +2960,59 @@ backfilling it. And the filed *export* half is met on the wire, not in the
 artifact: the `.fountain`/`.fdx` this route hands over still contains no
 provenance block. That is gap 79's territory, and gap 79 stays open rather than
 being quietly counted closed by this.
+
+## §73 — Gap 79: the artifact had no memory (2026-11-06)
+
+The export was correct and mute. Every writer-facing surface had been taught to
+explain itself — the report says which model made it, the backup says what it
+left out, the project bar says which file it is reading (gap 73, an hour ago) —
+and the one thing that actually leaves the machine said nothing at all. A PDF
+parse with `parse_confidence: low` produced a Fountain file indistinguishable
+from the writer's own.
+
+The design choice that mattered was *where the note goes*. Three formats, three
+different answers, and only two of them get to have one:
+
+- **Fountain** — the boneyard. It is the format's own mechanism for "this is not
+  screenplay", and `_strip_boneyard` already runs on re-import, so the note is
+  visible to the writer opening the file and invisible to the parser reading it
+  back. Nothing new had to be invented; I only had to look for it.
+- **FDX** — an XML comment. A real `<Provenance>` element would be at the mercy
+  of Final Draft's schema, and a title-page paragraph would *print the note on
+  the writer's page*. Both are the obvious implementations and both are wrong for
+  the same reason: they make the label part of the work.
+- **`.txt`** — nothing, and I had to be corrected on why.
+
+That last one is the part worth writing down. I refused the `.txt` block with a
+confident mechanism: an embedded note would re-import as dialogue and corrupt the
+script. Then I wrote a test to demonstrate it and **the test failed** — scene
+count 6 → 6, marker never in scene text. The real behaviour is duller: the note
+lines land in `front_matter` as ACTION, so they print as four bogus action
+paragraphs at the top of the screenplay. Same decision, different and smaller
+reason. Had I skipped the demonstration — which is the tempting move when a
+conclusion feels obvious — I would have shipped a comment, a docstring and a test
+name all asserting something false about my own code. The lesson is not "measure
+more"; it is that a *justification* is a factual claim and decays exactly like
+code does.
+
+Two of my three initial test failures were fixtures lying about the product, and
+the pattern is now familiar enough to name: I named a PDF copy `kept.fountain`,
+so the project was a Fountain project and `reconstructed` came back `False`; and
+I wrote `parsed.json` without marking the parse stage, so `/backup` reported
+`pending` for a project that had parsed fine. `/backup` reads the manifest's
+stage, not the file. Both errors pointed at the product and both were mine.
+
+Recorded as not done: the filed line covers **export and revision**, and I only
+fixed export. The edits flow still hands over a working copy with no note, and
+the provenance block describes the parse rather than each edit generation — an
+export after ten accepted edits says nothing about them. That is a real gap
+inside the closed one, and it stays written down rather than counted closed.
+
+I also owe a note on the session itself: this gap was closed on a sandbox whose
+local git history had silently reverted to the pre-72 base while the working tree
+still matched origin's content. Commits I believed were local were only on
+origin; a fresh local commit sat on a branch missing two gaps' worth of history.
+Nothing was lost — the tree matched — but `git log` and `git status` disagreed,
+and a `git add -A` in that state would have staged 166 files of noise. The check
+that caught it was cheap: `git ls-remote` against `git rev-parse HEAD`. Worth
+doing at the start of any turn that follows a reset.
