@@ -300,8 +300,13 @@ def _plan_entry(number: int) -> str:
     m = re.search(rf"^\*\*{number}\. .*$", text, re.M)
     if m:
         return m.group(0)
-    m = re.search(rf"^\| \*\*{number}\*\* \|.*$", text, re.M)
-    return m.group(0) if m else ""
+    # Table rows come in two weights: the bolded `| **6** |` summary table and
+    # the plain `| 22 |` trade-off table further up the file.
+    for pattern in (rf"^\| \*\*{number}\*\* \|.*$", rf"^\| {number} \|.*$"):
+        m = re.search(pattern, text, re.M)
+        if m:
+            return m.group(0)
+    return ""
 
 
 def run_check(number: int, run_suite: bool = True, run_tests: bool = True) -> Check:
@@ -349,7 +354,8 @@ def run_check(number: int, run_suite: bool = True, run_tests: bool = True) -> Ch
         # plan holding one of either is a single entry.
         count = max(
             len(re.findall(rf"^\*\*{number}\. ", plan_text, re.M)),
-            len(re.findall(rf"^\| \*\*{number}\*\* \|", plan_text, re.M)))
+            len(re.findall(rf"^\| \*\*{number}\*\* \|", plan_text, re.M)),
+            len(re.findall(rf"^\| {number} \|", plan_text, re.M)))
         c.require(count == 1, f"plan has exactly one entry {number}", f"found {count}")
 
     # --- 3. tests that exist ---------------------------------------------

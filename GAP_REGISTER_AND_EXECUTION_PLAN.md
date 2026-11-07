@@ -40,7 +40,7 @@ inference; D = docs/housekeeping/opinion; W = withdrawn. Of the 108 entries in t
 
 | # | What it was | Why it is not a gap | Where it lives |
 |---|---|---|---|
-| 22 | FDX export loses original formatting | The format's limit, and the exporter documents it | archive §1 |
+| 22 | FDX export loses original formatting | **NOT a format limit — corrected and FIXED 2026-11-08.** FDX carries emphasis natively as styled `<Text>` runs; the loss was ours at parse, in the model, and at export. See critique §83. | fixed before the entry was even worked |
 | 76 | Lock sidecars visible as project files | That is how the lock works; documented in `jsonio` | archive §1 |
 | 127 | Packaging tests inspect source, not wheel | Wheel verified correct by hand; CI strength, not a defect | archive §1 |
 | 128 | XSS escaping has no test behind it | Escaping correct at every sink; a future-regression guard | archive §1 |
@@ -445,8 +445,7 @@ Test baseline: pure-function probes of `classify_turn`, `should_probe` and `has_
 This register was pruned on 2026-11-04 entry by entry, against the code, so that what remains are findings with a
 defect behind them. Removals are archived in **`ARCHIVE_NOT_GAPS.md`** with the check that justified each one.
 
-**Moved to known trade-offs (documented behaviour, not defects):** 22 (FDX lossiness is the format's limit and the
-export code states it), 76 (lock sidecars are how the lock works), 127 (the wheel is correct; CI just does not
+**Moved to known trade-offs (documented behaviour, not defects):** 76 (lock sidecars are how the lock works), 127 (the wheel is correct; CI just does not
 prove it), 128 (the escaping is correct; nothing enforces the convention yet).
 
 **Moved to product direction (things the product should do, not things it fails to do):** 97 (recovery room), 106,

@@ -3475,3 +3475,63 @@ makes the interruption *detectable and repairable*, not atomic. A write that
 lands between the journal and the document leaves no copy of the old text, so
 the repair reconstructs from the parsed script plus the log; a writer who typed
 by hand outside the cycle loses that typing. Stated, not fixed.
+
+## §83 — Gap 22: I repeated a claim instead of testing it (2026-11-08)
+
+The register said *"FDX lossiness is the format's limit and the export code
+states it"*, and it was archived as a known trade-off. I read that, restated it
+to the user as fact, and offered three options built on it — including
+"warn the writer about a limitation we cannot fix". The user pushed back with
+one sentence: *can't you fix it at the code level instead of talking as if you
+can't?* They were right, and the measurement took four minutes.
+
+**Reverts: 4 / 1 / 7 / 7 / 1 / 1 / 7 / 1.** 13 tests.
+
+What the code actually said. FDX carries emphasis natively: a `<Paragraph>`
+holds `<Text>` runs and each run accepts `Style="Bold"`, `Style="Italic"`,
+`Style="Bold+Italic"`. Nothing in the format had to give. The loss was ours
+three times over:
+
+- `parse_fdx._paragraph_text` concatenated the runs and discarded every `Style`
+  — the function's own docstring says *"FDX splits styled text into runs"* and
+  then joins them, which is the loss written down as a description;
+- `Element` had no field to hold a style, so even a perfect parse had nowhere to
+  put the answer;
+- `to_fdx` wrote one plain `<Text>` per paragraph.
+
+So the archived justification was not merely incomplete, it was **backwards**:
+the format supported it, we never did. A "documented trade-off" whose
+documentation is wrong is worse than an undocumented gap, because it stops the
+next person looking.
+
+Three things this fix would have got wrong if I had written it in a hurry, and
+which are worth keeping:
+
+- **`from_dict` builds `Element(...)` with explicit keyword arguments.** A new
+  field is silently dropped there, so the fix would have worked until the next
+  `working.json` reload — and that file is reloaded constantly. Found by reading
+  the loader before writing the field, not by a test.
+- **Stale spans on an edit.** Emphasis is character ranges into the old text. A
+  whole-line replacement that kept them would attach the writer's emphasis to
+  whatever characters happen to sit at those offsets in text they just wrote.
+  The rule is now explicit: a replaced line carries no emphasis, because we
+  cannot know where it belonged.
+- **Stripped text shifts every offset.** The parser returns the joined runs
+  `.strip()`ed, so spans computed against the unstripped join point one word
+  early. Pinned by its own test (R2) — a one-character error that reads as a
+  parsing quirk rather than a bug.
+
+One revert was initially a lie in my favour: R4 "exporter ignores spans" passed
+all 13 tests, because I patched the FRONT-MATTER call site while every test
+exercised a scene element. The revert was ineffective, not the tests blind —
+a distinction I could only make by going back and re-aiming it at the scene
+path, where it failed 7 tests. Recorded because "my revert passed, therefore my
+test is weak" and "my revert missed the line I meant" look identical from the
+summary line.
+
+Not fixed, and stated rather than counted: `.txt` has no mechanism for emphasis,
+so that half of the original filing stands, and the PDF parser extracts no
+styling at all — a bold in a PDF still does not arrive. Non-numeric scene numbers
+("12A") are a separate loss: `scene_number` is typed `int` and is load-bearing
+for undo, redo and the knowledge graph, so re-typing it was deliberately not
+bundled into this change.
